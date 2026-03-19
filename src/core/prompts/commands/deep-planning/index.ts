@@ -5,7 +5,7 @@ import { generateGemini3Template } from "./variants/gemini3"
 import { generateGPT51Template } from "./variants/gpt51"
 
 const focusChainIntro: string = `**Task Progress Parameter:**
-When creating the new task, you must include a task_progress parameter that breaks down the implementation into trackable steps. This parameter should be included inside the tool call, but not located inside of other content/argument blocks. This should follow the standard Markdown checklist format with "- [ ]" for incomplete items.`
+When creating the new task, include the current task_progress checklist as concise Markdown list items inside the tool call.`
 
 /**
  * Generates the deep-planning slash command response with model-family-aware variant selection

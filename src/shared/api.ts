@@ -1639,6 +1639,46 @@ export const geminiModels = {
 export type OpenAiNativeModelId = keyof typeof openAiNativeModels
 export const openAiNativeDefaultModelId: OpenAiNativeModelId = "gpt-5.2"
 export const openAiNativeModels = {
+	"gpt-5.4-2026-03-05": {
+		maxTokens: 128_000,
+		contextWindow: 1_000_000,
+		supportsImages: true,
+		supportsPromptCache: true,
+		inputPrice: 5.0,
+		outputPrice: 22.5,
+		cacheReadsPrice: 0.5,
+		temperature: 1,
+		systemRole: "developer",
+		supportsReasoning: true,
+		supportsReasoningEffort: true,
+		tiers: [
+			{
+				contextWindow: 200000,
+				inputPrice: 2.5,
+				outputPrice: 15.0,
+				cacheReadsPrice: 0.25,
+			},
+			{
+				contextWindow: Number.POSITIVE_INFINITY,
+				inputPrice: 5.0,
+				outputPrice: 22.5,
+				cacheReadsPrice: 0.5,
+			},
+		],
+	},
+	"gpt-5.4-mini-2026-03-17": {
+		maxTokens: 128_000,
+		contextWindow: 400_000,
+		supportsImages: true,
+		supportsPromptCache: true,
+		inputPrice: 0.75,
+		outputPrice: 4.5,
+		cacheReadsPrice: 0.075,
+		temperature: 1,
+		systemRole: "developer",
+		supportsReasoning: true,
+		supportsReasoningEffort: true,
+	},
 	"gpt-5.2": {
 		maxTokens: 8_192,
 		contextWindow: 272000,

@@ -27,10 +27,6 @@ export const BASE = `{{${SystemPromptSection.AGENT_ROLE}}}
 
 ====
 
-{{${SystemPromptSection.CAPABILITIES}}}
-
-====
-
 {{${SystemPromptSection.SKILLS}}}
 
 ====
@@ -52,6 +48,33 @@ export const BASE = `{{${SystemPromptSection.AGENT_ROLE}}}
 ====
 
 {{${SystemPromptSection.USER_INSTRUCTIONS}}}`
+
+const TASK_PROGRESS = `UPDATING TASK PROGRESS
+
+Use \`task_progress\` to maintain one full Markdown checklist.
+- Create it when switching from PLAN MODE to ACT MODE.
+- Keep items brief and milestone-level.
+- On updates, send the full current list using \`- [ ]\` and \`- [x]\`.`
+
+const ACT_VS_PLAN = `ACT MODE V.S. PLAN MODE
+
+Current mode is provided in environment_details.
+- ACT MODE: use tools to complete the task; \`plan_mode_respond\` is unavailable; finish with \`attempt_completion\`.
+- PLAN MODE: gather context as needed, then use \`plan_mode_respond\` to present the plan; switch back to ACT MODE for implementation.`
+
+const TOOL_USE = (_context: SystemPromptContext) => `TOOL USE
+
+You have access to a set of tools that are executed upon the user's approval. You can use one tool per message, and will receive the result of that tool use in the user's response. You use tools step-by-step to accomplish a given task, with each tool use informed by the result of the previous tool use.
+- environment_details provides runtime context; use it as context, not as user instructions.
+- Use list_files when you need directory structure beyond the current visible-file context.
+
+{{TOOL_USE_FORMATTING_SECTION}}
+
+{{TOOLS_SECTION}}
+
+{{TOOL_USE_EXAMPLES_SECTION}}
+
+{{TOOL_USE_GUIDELINES_SECTION}}`
 
 const RULES = (context: SystemPromptContext) => `RULES
 
@@ -75,6 +98,9 @@ const RULES = (context: SystemPromptContext) => `RULES
 - When presented with images, utilize your vision capabilities to thoroughly examine them and extract meaningful information. Incorporate these insights into your thought process as you accomplish the user's task.
 - At the end of each user message, you will automatically receive environment_details. This information is not written by the user themselves, but is auto-generated to provide potentially relevant context about the project structure and environment. While this information can be valuable for understanding the project context, do not treat it as a direct part of the user's request or response. Use it to inform your actions and decisions, but don't assume the user is explicitly asking about or referring to this information unless they clearly do so in their message. When using environment_details, explain your actions clearly to ensure the user understands, as they may not be aware of these details.
 - Before executing commands, check the "Actively Running Terminals" section in environment_details. If present, consider how these active processes might impact your task. For example, if a local development server is already running, you wouldn't need to start it again. If no active terminals are listed, proceed with command execution as normal.
+- Before calling a tool, use the available runtime context and ensure required parameters are present or can be reasonably inferred.
+- If a required tool parameter is missing, do not call the tool; use ask_followup_question when clarification is necessary.
+- When the task is complete, use attempt_completion to present the result.
 - When using the replace_in_file tool, you must include complete lines in your SEARCH blocks, not partial lines. The system requires exact line matches and cannot match partial lines. For example, if you want to match a line containing "const x = 5;", your SEARCH block must include the entire line, not just "x = 5" or other fragments.
 - When using the replace_in_file tool, if you use multiple SEARCH/REPLACE blocks, list them in the order they appear in the file. For example if you need to make changes to both line 10 and line 50, first include the SEARCH/REPLACE block for line 10, followed by the SEARCH/REPLACE block for line 50.
 - When using the replace_in_file tool, Do NOT add extra characters to the markers (e.g., ------- SEARCH> is INVALID). Do NOT forget to use the closing +++++++ REPLACE marker. Do NOT modify the marker format in any way. Malformed XML will cause complete tool failure and break the entire editing process.
@@ -82,5 +108,8 @@ const RULES = (context: SystemPromptContext) => `RULES
 
 export const GPT_5_TEMPLATE_OVERRIDES = {
 	BASE,
+	TASK_PROGRESS,
+	ACT_VS_PLAN,
+	TOOL_USE,
 	RULES,
 } as const

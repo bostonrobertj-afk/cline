@@ -1,0 +1,112 @@
+{
+  "exitCommand": "bmad-exit",
+  "agents": [
+    {
+      "id": "bmad-analyst",
+      "slashCommand": "bmad-analyst",
+      "personaFile": "_bmad/bmm/agents/analyst.md",
+      "personaReminder": "Stay in the Business Analyst persona: precise, evidence-driven, and focused on requirements, research, and root-cause clarity.",
+      "allowedSkills": [
+        "bmad-brainstorming",
+        "bmad-market-research",
+        "bmad-domain-research",
+        "bmad-technical-research",
+        "bmad-create-product-brief",
+        "bmad-document-project",
+        "bmad-party-mode"
+      ]
+    },
+    {
+      "id": "bmad-pm",
+      "slashCommand": "bmad-pm",
+      "personaFile": "_bmad/bmm/agents/pm.md",
+      "personaReminder": "Stay in the Product Manager persona: scope tightly, ask why, and keep decisions centered on user value and product clarity.",
+      "allowedSkills": [
+        "bmad-create-prd",
+        "bmad-validate-prd",
+        "bmad-edit-prd",
+        "bmad-create-epics-and-stories",
+        "bmad-check-implementation-readiness",
+        "bmad-correct-course",
+        "bmad-party-mode"
+      ]
+    },
+    {
+      "id": "bmad-architect",
+      "slashCommand": "bmad-architect",
+      "personaFile": "_bmad/bmm/agents/architect.md",
+      "personaReminder": "Stay in the Architect persona: calm, pragmatic, tradeoff-aware, and focused on scalable technical decisions.",
+      "allowedSkills": [
+        "bmad-create-architecture",
+        "bmad-check-implementation-readiness",
+        "bmad-party-mode"
+      ]
+    },
+    {
+      "id": "bmad-ux-designer",
+      "slashCommand": "bmad-ux-designer",
+      "personaFile": "_bmad/bmm/agents/ux-designer.md",
+      "personaReminder": "Stay in the UX Designer persona: user-centered, flow-focused, and attentive to states, edge cases, and experience quality.",
+      "allowedSkills": [
+        "bmad-create-ux-design",
+        "bmad-party-mode"
+      ]
+    },
+    {
+      "id": "bmad-sm",
+      "slashCommand": "bmad-sm",
+      "personaFile": "_bmad/bmm/agents/sm.md",
+      "personaReminder": "Stay in the Scrum Master persona: crisp, checklist-driven, and focused on implementation-ready stories and clear sequencing.",
+      "allowedSkills": [
+        "bmad-sprint-planning",
+        "bmad-create-story",
+        "bmad-retrospective",
+        "bmad-correct-course",
+        "bmad-party-mode"
+      ]
+    },
+    {
+      "id": "bmad-dev",
+      "slashCommand": "bmad-dev",
+      "personaFile": "_bmad/bmm/agents/dev.md",
+      "personaReminder": "Stay in the Developer persona: concise, implementation-first, and anchored in files, tasks, tests, and code quality.",
+      "allowedSkills": [
+        "bmad-dev-story",
+        "bmad-code-review",
+        "bmad-party-mode"
+      ]
+    },
+    {
+      "id": "bmad-qa",
+      "slashCommand": "bmad-qa",
+      "personaFile": "_bmad/bmm/agents/qa.md",
+      "personaReminder": "Stay in the QA persona: practical, coverage-focused, and biased toward the smallest test set that gives confidence.",
+      "allowedSkills": [
+        "bmad-qa-generate-e2e-tests",
+        "bmad-party-mode"
+      ]
+    },
+    {
+      "id": "bmad-tech-writer",
+      "slashCommand": "bmad-tech-writer",
+      "personaFile": "_bmad/bmm/agents/tech-writer/tech-writer.md",
+      "personaReminder": "Stay in the Technical Writer persona: clear, structured, and focused on usable documentation and handoff quality.",
+      "allowedSkills": [
+        "bmad-document-project",
+        "bmad-party-mode"
+      ]
+    },
+    {
+      "id": "bmad-quick-flow-solo-dev",
+      "slashCommand": "bmad-quick-flow-solo-dev",
+      "personaFile": "_bmad/bmm/agents/quick-flow-solo-dev.md",
+      "personaReminder": "Stay in the Quick Flow Solo Dev persona: fast, lean, and relentlessly focused on shipping scoped work with minimum ceremony.",
+      "allowedSkills": [
+        "bmad-quick-spec",
+        "bmad-quick-dev",
+        "bmad-code-review",
+        "bmad-party-mode"
+      ]
+    }
+  ]
+}

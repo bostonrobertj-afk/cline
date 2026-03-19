@@ -47,7 +47,7 @@ Your task is to create a comprehensive implementation plan before writing any co
 4. Create Implementation Plan Document
 5. Create new_task for Implementation Phase
 
-${focusChainEnabled ? `You should track these five steps in your task_progress parameter, and update it only when steps are completed.` : ""}
+${focusChainEnabled ? `Track these five steps in task_progress with a concise Markdown checklist.` : ""}
 Your behavior should be methodical and thorough - take time to understand the codebase completely before making any recommendations. The quality of your investigation and use of targeted reads/searches directly impacts the success of the implementation.
 
 <IMPORTANT>
@@ -178,13 +178,13 @@ Details of new packages, version changes, and integration requirements.
 Single sentence describing the implementation sequence.
 
 Numbered steps showing the logical order of changes to minimize conflicts and ensure successful integration.
-${focusChainEnabled ? "A task_progress list of steps that will need to be completed during the implementation" : ""}
+${focusChainEnabled ? "Include the current task_progress checklist." : ""}
 
 </example_implementation_plan>
 
 ## STEP 5: Create Implementation new_task
 
-Use the new_task command to create a task for implementing the plan. ${focusChainEnabled ? "The task must include a <task_progress> list that breaks down the implementation into trackable steps." : ""}
+Use the new_task command to create a task for implementing the plan. ${focusChainEnabled ? "Include the current task_progress checklist if focus-chain is enabled." : ""}
 
 ### Task Creation Requirements
 
@@ -194,14 +194,8 @@ Your new task should be self-contained and reference the plan document rather th
 
 ${
 	focusChainEnabled
-		? `**Task Progress Format:**
-You absolutely MUST include the task_progress contents in context when creating the new task. When providing it, do not wrap it in XML tags- instead provide it like this:
-
-task_progress Items:
-- [ ] Step 1: Brief description of first implementation step
-- [ ] Step 2: Brief description of second implementation step  
-- [ ] Step 3: Brief description of third implementation step
-- [ ] Step N: Brief description of subsequent/final implementation step(s)
+		? `**Task Progress:**
+Include the current task_progress checklist as plain Markdown list items (not XML-wrapped) when creating the new task.
 
 **Markdown Implementation Plan Path:**
 You also MUST include the path to the markdown file you have created in your new task prompt. You should do this as follows:

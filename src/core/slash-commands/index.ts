@@ -14,6 +14,11 @@ import {
 	reportBugToolResponse,
 } from "../prompts/commands"
 import { StateManager } from "../storage/StateManager"
+import { getBmadAgentBySlashCommand, isBmadExitCommand } from "../task/bmad-agent-mode"
+
+export type PersistentSlashCommandAction =
+	| { type: "activate_bmad_agent"; agentId: string }
+	| { type: "exit_bmad_agent" }
 
 /**
  * Callback type for fetching MCP prompts
@@ -48,7 +53,8 @@ export async function parseSlashCommands(
 	enableNativeToolCalls?: boolean,
 	providerInfo?: ApiProviderInfo,
 	mcpPromptFetcher?: McpPromptFetcher,
-): Promise<{ processedText: string; needsClinerulesFileCheck: boolean }> {
+	cwd?: string,
+): Promise<{ processedText: string; needsClinerulesFileCheck: boolean; persistentSlashCommandAction?: PersistentSlashCommandAction }> {
 	const SUPPORTED_DEFAULT_COMMANDS = ["newtask", "smol", "compact", "newrule", "reportbug", "deep-planning", "explain-changes"]
 
 	// Determine if the current provider/model/setting actually uses native tool calling
@@ -129,6 +135,29 @@ export async function parseSlashCommands(
 			// slashMatch[2] is the command name
 			const commandName = slashMatch[2] // casing matters
 
+			if (cwd) {
+				const matchingAgent = await getBmadAgentBySlashCommand(cwd, commandName)
+				if (matchingAgent) {
+					const textWithoutSlashCommand = removeSlashCommand(text, tagContent, contentStartIndex, slashMatch)
+					telemetryService.captureSlashCommandUsed(ulid, commandName, "builtin")
+					return {
+						processedText: textWithoutSlashCommand,
+						needsClinerulesFileCheck: false,
+						persistentSlashCommandAction: { type: "activate_bmad_agent", agentId: matchingAgent.id },
+					}
+				}
+
+				if (await isBmadExitCommand(cwd, commandName)) {
+					const textWithoutSlashCommand = removeSlashCommand(text, tagContent, contentStartIndex, slashMatch)
+					telemetryService.captureSlashCommandUsed(ulid, commandName, "builtin")
+					return {
+						processedText: textWithoutSlashCommand,
+						needsClinerulesFileCheck: false,
+						persistentSlashCommandAction: { type: "exit_bmad_agent" },
+					}
+				}
+			}
+
 			// we give preference to the default commands if the user has a file with the same name
 			if (SUPPORTED_DEFAULT_COMMANDS.includes(commandName)) {
 				// remove the slash command and add custom instructions at the top of this message
@@ -138,7 +167,10 @@ export async function parseSlashCommands(
 				// Track telemetry for builtin slash command usage
 				telemetryService.captureSlashCommandUsed(ulid, commandName, "builtin")
 
-				return { processedText: processedText, needsClinerulesFileCheck: commandName === "newrule" }
+				return {
+					processedText: processedText,
+					needsClinerulesFileCheck: commandName === "newrule",
+				}
 			}
 
 			// Check for MCP prompt commands (format: mcp:<server>:<prompt>)

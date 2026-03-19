@@ -54,11 +54,9 @@ export const config = createVariant(ModelFamily.NATIVE_GPT_5)
 		SystemPromptSection.TOOL_USE,
 		SystemPromptSection.TASK_PROGRESS,
 		SystemPromptSection.ACT_VS_PLAN,
-		SystemPromptSection.CAPABILITIES,
 		SystemPromptSection.FEEDBACK,
 		SystemPromptSection.RULES,
 		SystemPromptSection.SYSTEM_INFO,
-		SystemPromptSection.OBJECTIVE,
 		SystemPromptSection.USER_INSTRUCTIONS,
 		SystemPromptSection.SKILLS,
 	)
@@ -89,6 +87,9 @@ export const config = createVariant(ModelFamily.NATIVE_GPT_5)
 		MODEL_FAMILY: ModelFamily.NATIVE_GPT_5,
 	})
 	.config({})
+	.overrideComponent(SystemPromptSection.TASK_PROGRESS, {
+		template: GPT_5_TEMPLATE_OVERRIDES.TASK_PROGRESS,
+	})
 	// Override the RULES component with custom template
 	.overrideComponent(SystemPromptSection.RULES, {
 		template: GPT_5_TEMPLATE_OVERRIDES.RULES,
@@ -98,9 +99,6 @@ export const config = createVariant(ModelFamily.NATIVE_GPT_5)
 	})
 	.overrideComponent(SystemPromptSection.ACT_VS_PLAN, {
 		template: GPT_5_TEMPLATE_OVERRIDES.ACT_VS_PLAN,
-	})
-	.overrideComponent(SystemPromptSection.OBJECTIVE, {
-		template: GPT_5_TEMPLATE_OVERRIDES.OBJECTIVE,
 	})
 	.overrideComponent(SystemPromptSection.FEEDBACK, {
 		template: GPT_5_TEMPLATE_OVERRIDES.FEEDBACK,

@@ -7,6 +7,8 @@ import type { ToolResponse } from "../../index"
 import type { IPartialBlockHandler, IToolHandler } from "../ToolExecutorCoordinator"
 import type { TaskConfig } from "../types/TaskConfig"
 import type { StronglyTypedUIHelpers } from "../types/UIHelpers"
+import { getBmadAgentById } from "../../bmad-agent-mode"
+import { getTaskMetadata, saveTaskMetadata } from "@core/storage/disk"
 
 export class UseSkillToolHandler implements IToolHandler, IPartialBlockHandler {
 	readonly name = ClineDefaultTool.USE_SKILL
@@ -33,6 +35,15 @@ export class UseSkillToolHandler implements IToolHandler, IPartialBlockHandler {
 		if (!skillName) {
 			config.taskState.consecutiveMistakeCount++
 			return `Error: Missing required parameter 'skill_name'. Please provide the name of the skill to activate.`
+		}
+
+		if (config.taskState.activeAgentId) {
+			const activeAgent = await getBmadAgentById(config.cwd, config.taskState.activeAgentId)
+			if (activeAgent && !activeAgent.allowedSkills.includes(skillName)) {
+				return `Error: Active agent "${activeAgent.id}" is not allowed to use skill "${skillName}". Allowed skills: ${activeAgent.allowedSkills.join(
+					", ",
+				)}. Use /bmad-exit to leave agent mode or switch to another /bmad-* agent.`
+			}
 		}
 
 		// Discover skills on-demand (lazy loading)
@@ -88,6 +99,16 @@ export class UseSkillToolHandler implements IToolHandler, IPartialBlockHandler {
 					}),
 				"UseSkillToolHandler.execute",
 			)
+
+			config.taskState.activeWorkflowId = skillName
+			config.taskState.activeWorkflowJustStarted = true
+			try {
+				const taskMetadata = await getTaskMetadata(config.taskId)
+				taskMetadata.activeWorkflowId = skillName
+				await saveTaskMetadata(config.taskId, taskMetadata)
+			} catch {
+				// non-fatal: workflow persistence should not block the skill activation
+			}
 
 			return `# Skill "${skillContent.name}" is now active
 

@@ -163,7 +163,7 @@ Numbered steps showing the logical order of changes to minimize conflicts and en
 
 ## STEP 4: Create Implementation Task
 
-Use the new_task command to create a task for implementing the plan. The task must include a <task_progress> list that breaks down the implementation into trackable steps.
+Use the new_task command to create a task for implementing the plan. If focus-chain is enabled, include the current task_progress checklist.
 
 ### Task Creation Requirements
 
@@ -227,16 +227,9 @@ sed -n '/\\[Implementation Order\\]/,$p' implementation_plan.md | cat
 }
 
 
-**Task Progress Format:**
+**Task Progress:**
 <IMPORTANT>
-You absolutely must include the task_progress contents in context when creating the new task. When providing it, do not wrap it in XML tags- instead provide it like this:
-
-
-task_progress Items:
-- [ ] Step 1: Brief description of first implementation step
-- [ ] Step 2: Brief description of second implementation step  
-- [ ] Step 3: Brief description of third implementation step
-- [ ] Step N: Brief description of final implementation step
+If focus-chain is enabled, include the current task_progress checklist as plain Markdown list items (not XML-wrapped) when creating the new task.
 
 
 You also MUST include the path to the markdown file you have created in your new task prompt. You should do this as follows:

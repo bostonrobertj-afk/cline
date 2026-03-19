@@ -9,6 +9,17 @@ export async function getSkillsSection(_variant: PromptVariant, context: SystemP
 
 	const skillsList = skills.map((skill) => `  - "${skill.name}": ${skill.description}`).join("\n")
 
+	if (context.activeAgentId) {
+		return `SKILLS
+
+The following skills are the only workflow-backed skills allowed while the active BMAD agent persona is set.
+
+Allowed skills for active agent \`${context.activeAgentId}\`:
+${skillsList}
+
+Use only these skills while this agent mode remains active. Do not select skills outside this list.`
+	}
+
 	return `SKILLS
 
 The following skills provide specialized instructions for specific tasks. When a user's request matches a skill description, use the use_skill tool to load and activate the skill.

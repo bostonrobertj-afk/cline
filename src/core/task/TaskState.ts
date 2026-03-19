@@ -60,6 +60,10 @@ export class TaskState {
 
 	// Task Initialization
 	isInitialized = false
+	activeAgentId?: string
+	activeAgentJustActivated = false
+	activeWorkflowId?: string
+	activeWorkflowJustStarted = false
 
 	// Focus Chain / Todo List Management
 	apiRequestCount = 0

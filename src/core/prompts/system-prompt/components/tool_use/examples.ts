@@ -1,30 +1,6 @@
 import { TemplateEngine } from "../../templates/TemplateEngine"
 import type { PromptVariant, SystemPromptContext } from "../../types"
 
-const FOCUS_CHAIN_EXAMPLE_BASH = `<task_progress>
-- [x] Set up project structure
-- [x] Install dependencies
-- [ ] Run command to start server
-- [ ] Test application
-</task_progress>
-`
-
-const FOCUS_CHAIN_EXAMPLE_NEW_FILE = `<task_progress>
-- [x] Set up project structure
-- [x] Install dependencies
-- [ ] Create components
-- [ ] Test application
-</task_progress>
-`
-
-const FOCUS_CHAIN_EXAMPLE_EDIT = `<task_progress>
-- [x] Set up project structure
-- [x] Install dependencies
-- [ ] Create components
-- [ ] Test application
-</task_progress>
-`
-
 const TOOL_USE_EXAMPLES_TEMPLATE_TEXT = `# Tool Use Examples
 
 ## Example 1: Requesting to execute a command
@@ -32,7 +8,7 @@ const TOOL_USE_EXAMPLES_TEMPLATE_TEXT = `# Tool Use Examples
 <execute_command>
 <command>npm run dev</command>
 <requires_approval>false</requires_approval>
-{{FOCUS_CHAIN_EXAMPLE_BASH}}</execute_command>
+</execute_command>
 
 ## Example 2: Requesting to create a new file
 
@@ -54,7 +30,7 @@ const TOOL_USE_EXAMPLES_TEMPLATE_TEXT = `# Tool Use Examples
   "version": "1.0.0"
 }
 </content>
-{{FOCUS_CHAIN_EXAMPLE_NEW_FILE}}</write_to_file>
+</write_to_file>
 
 ## Example 3: Creating a new task
 
@@ -120,7 +96,7 @@ return (
   <div>
 +++++++ REPLACE
 </diff>
-{{FOCUS_CHAIN_EXAMPLE_EDIT}}</replace_in_file>
+</replace_in_file>
 
 
 ## Example 5: Requesting to use an MCP tool
@@ -154,12 +130,5 @@ return (
 </use_mcp_tool>`
 
 export async function getToolUseExamplesSection(_variant: PromptVariant, context: SystemPromptContext): Promise<string> {
-	// Return the placeholder that will be replaced with actual tools
-	const focusChainEnabled = context.focusChainSettings?.enabled
-
-	return new TemplateEngine().resolve(TOOL_USE_EXAMPLES_TEMPLATE_TEXT, context, {
-		FOCUS_CHAIN_EXAMPLE_BASH: focusChainEnabled ? FOCUS_CHAIN_EXAMPLE_BASH : "",
-		FOCUS_CHAIN_EXAMPLE_NEW_FILE: focusChainEnabled ? FOCUS_CHAIN_EXAMPLE_NEW_FILE : "",
-		FOCUS_CHAIN_EXAMPLE_EDIT: focusChainEnabled ? FOCUS_CHAIN_EXAMPLE_EDIT : "",
-	})
+	return new TemplateEngine().resolve(TOOL_USE_EXAMPLES_TEMPLATE_TEXT, context, {})
 }

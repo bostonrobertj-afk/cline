@@ -59,7 +59,6 @@ import { combineCommandSequences } from "@shared/combineCommandSequences"
 import { ClineApiReqCancelReason, ClineApiReqInfo, ClineAsk, ClineMessage, ClineSay } from "@shared/ExtensionMessage"
 import { HistoryItem } from "@shared/HistoryItem"
 import { DEFAULT_LANGUAGE_SETTINGS, getLanguageKey, LanguageDisplay } from "@shared/Languages"
-import { USER_CONTENT_TAGS } from "@shared/messages/constants"
 import { convertClineMessageToProto } from "@shared/proto-conversions/cline-message"
 import { ClineDefaultTool, READ_ONLY_TOOLS } from "@shared/tools"
 import { ClineAskResponse } from "@shared/WebviewMessage"
@@ -121,6 +120,7 @@ import { TaskState } from "./TaskState"
 import { ToolExecutor } from "./ToolExecutor"
 import { detectAvailableCliTools, extractProviderDomainFromUrl, updateApiReqMsg } from "./utils"
 import { buildUserFeedbackContent } from "./utils/buildUserFeedbackContent"
+import { hasExplicitMentionSyntax, hasUserContentTag } from "./utils/userContentProcessing"
 
 export type ToolResponse = ClineToolResponseContent
 
@@ -3230,18 +3230,10 @@ export class Task {
 		const cwd = this.cwd
 		const { localWorkflowToggles, globalWorkflowToggles } = await refreshWorkflowToggles(this.controller, cwd)
 
-		const hasUserContentTag = (text: string): boolean => {
-			return USER_CONTENT_TAGS.some((tag) => text.includes(tag))
-		}
-
-		const parseTextBlock = async (text: string): Promise<string> => {
-			const parsedText = await parseMentions(
-				text,
-				cwd,
-				this.urlContentFetcher,
-				this.fileContextTracker,
-				this.workspaceManager,
-			)
+		const parseTextBlock = async (text: string, shouldParseMentions: boolean): Promise<string> => {
+			const parsedText = shouldParseMentions
+				? await parseMentions(text, cwd, this.urlContentFetcher, this.fileContextTracker, this.workspaceManager)
+				: text
 
 			// Create MCP prompt fetcher callback that wraps mcpHub.getPrompt
 			const mcpPromptFetcher = async (serverName: string, promptName: string) => {
@@ -3271,11 +3263,18 @@ export class Task {
 		}
 
 		const processTextContent = async (block: ClineTextContentBlock): Promise<ClineTextContentBlock> => {
-			if (block.type !== "text" || !hasUserContentTag(block.text)) {
+			if (block.type !== "text") {
 				return block
 			}
 
-			const processedText = await parseTextBlock(block.text)
+			const shouldParseSlashCommands = hasUserContentTag(block.text)
+			const shouldParseMentions = hasExplicitMentionSyntax(block.text)
+
+			if (!shouldParseSlashCommands && !shouldParseMentions) {
+				return block
+			}
+
+			const processedText = await parseTextBlock(block.text, shouldParseMentions)
 			return { ...block, text: processedText }
 		}
 
@@ -3310,8 +3309,9 @@ export class Task {
 
 			return block
 		}
-
-		// Process all content and environment details in parallel
+		// Process all content and environment details in parallel.
+		// Mentions are now expanded only when the text contains explicit mention syntax.
+		// User-content tags remain as compatibility markers for slash-command processing and prompt extraction.
 		// NOTE: (Ara) This is a temporary solution to dynamically load context mentions from tool results. It checks for the presence of tags that indicate that the tool was rejected and feedback was provided (see formatToolDeniedFeedback, attemptCompletion, executeCommand, and consecutiveMistakeCount >= 3) or "<answer>" (see askFollowupQuestion), we place all user generated content in these tags so they can effectively be used as markers for when we should parse mentions). However if we allow multiple tools responses in the future, we will need to parse mentions specifically within the user content tags.
 		// (Note: this caused the @/ import alias bug where file contents were being parsed as well, since v2 converted tool results to text blocks)
 		const [processedUserContent, environmentDetails] = await Promise.all([
@@ -3450,8 +3450,8 @@ export class Task {
 		const host = await HostProvider.env.getHostVersion({})
 		let details = ""
 
-		// Workspace roots (multi-root)
-		details += this.formatWorkspaceRootsSection()
+		details += "\n\n# Current Working Directory"
+		details += `\n${this.cwd.toPosix()}`
 
 		// It could be useful for cline to know if the user went from one or no file to another between messages, so we always include this context
 		details += `\n\n# ${host.platform} Visible Files`
@@ -3469,23 +3469,6 @@ export class Task {
 			details += `\n${allowedVisibleFiles}`
 		} else {
 			details += "\n(No visible files)"
-		}
-
-		details += `\n\n# ${host.platform} Open Tabs`
-		const rawOpenTabPaths = (await HostProvider.window.getOpenTabs({})).paths
-		const filteredOpenTabPaths = await filterExistingFiles(rawOpenTabPaths)
-		const openTabPaths = filteredOpenTabPaths.map((absolutePath) => path.relative(this.cwd, absolutePath))
-
-		// Filter paths through clineIgnoreController
-		const allowedOpenTabs = this.clineIgnoreController
-			.filterPaths(openTabPaths)
-			.map((p) => p.toPosix())
-			.join("\n")
-
-		if (allowedOpenTabs) {
-			details += `\n${allowedOpenTabs}`
-		} else {
-			details += "\n(No open tabs)"
 		}
 
 		const busyTerminals = this.terminalManager.getTerminals(true)
@@ -3548,103 +3531,9 @@ export class Task {
 			details += terminalDetails
 		}
 
-		// Add recently modified files section
-		const recentlyModifiedFiles = this.fileContextTracker.getAndClearRecentlyModifiedFiles()
-		if (recentlyModifiedFiles.length > 0) {
-			details +=
-				"\n\n# Recently Modified Files\nThese files have been modified since you last accessed them (file was just edited so you may need to re-read it before editing):"
-			for (const filePath of recentlyModifiedFiles) {
-				details += `\n${filePath}`
-			}
-		}
-
-		// Add current time information with timezone
-		const now = new Date()
-		const formatter = new Intl.DateTimeFormat(undefined, {
-			year: "numeric",
-			month: "numeric",
-			day: "numeric",
-			hour: "numeric",
-			minute: "numeric",
-			second: "numeric",
-			hour12: true,
-		})
-		const timeZone = formatter.resolvedOptions().timeZone
-		const timeZoneOffset = -now.getTimezoneOffset() / 60 // Convert to hours and invert sign to match conventional notation
-		const timeZoneOffsetStr = `${timeZoneOffset >= 0 ? "+" : ""}${timeZoneOffset}:00`
-		details += `\n\n# Current Time\n${formatter.format(now)} (${timeZone}, UTC${timeZoneOffsetStr})`
 
 		if (includeFileDetails) {
-			details += this.formatFileDetailsHeader()
-			const isDesktop = arePathsEqual(this.cwd, getDesktopDir())
-			if (isDesktop) {
-				// don't want to immediately access desktop since it would show permission popup
-				details += "(Desktop files not shown automatically. Use list_files to explore if needed.)"
-			} else {
-				const [files, didHitLimit] = await listFiles(this.cwd, true, 200)
-				const result = formatResponse.formatFilesList(this.cwd, files, didHitLimit, this.clineIgnoreController)
-				details += result
-			}
-
-			// Add workspace information in JSON format
-			if (this.workspaceManager) {
-				const workspacesJson = await this.workspaceManager.buildWorkspacesJson()
-				if (workspacesJson) {
-					details += `\n\n# Workspace Configuration\n${workspacesJson}`
-				}
-			}
-
-			// Add detected CLI tools
-			const availableCliTools = await detectAvailableCliTools()
-			if (availableCliTools.length > 0) {
-				details += `\n\n# Detected CLI Tools\nThese are some of the tools on the user's machine, and may be useful if needed to accomplish the task: ${availableCliTools.join(", ")}. This list is not exhaustive, and other tools may be available.`
-			}
-		}
-
-		// Add context window usage information (conditionally for some models)
-		const { contextWindow } = getContextWindowInfo(this.api)
-
-		// Get the token count from the most recent API request to accurately reflect context management
-		const getTotalTokensFromApiReqMessage = (msg: ClineMessage) => {
-			if (!msg.text) {
-				return 0
-			}
-			try {
-				const { tokensIn, tokensOut, cacheWrites, cacheReads } = JSON.parse(msg.text)
-				return (tokensIn || 0) + (tokensOut || 0) + (cacheWrites || 0) + (cacheReads || 0)
-			} catch (_e) {
-				return 0
-			}
-		}
-
-		const clineMessages = this.messageStateHandler.getClineMessages()
-		const modifiedMessages = combineApiRequests(combineCommandSequences(clineMessages.slice(1)))
-		const lastApiReqMessage = findLast(modifiedMessages, (msg) => {
-			if (msg.say !== "api_req_started") {
-				return false
-			}
-			return getTotalTokensFromApiReqMessage(msg) > 0
-		})
-
-		const lastApiReqTotalTokens = lastApiReqMessage ? getTotalTokensFromApiReqMessage(lastApiReqMessage) : 0
-		const usagePercentage = Math.round((lastApiReqTotalTokens / contextWindow) * 100)
-
-		// Determine if context window info should be displayed
-		const currentModelId = this.api.getModel().id
-		const isNextGenModel = isClaude4PlusModelFamily(currentModelId) || isGPT5ModelFamily(currentModelId)
-
-		let shouldShowContextWindow = true
-		// For next-gen models, only show context window usage if it exceeds a certain threshold
-		if (isNextGenModel) {
-			const autoCondenseThreshold = 0.75
-			const displayThreshold = autoCondenseThreshold - 0.15
-			const currentUsageRatio = lastApiReqTotalTokens / contextWindow
-			shouldShowContextWindow = currentUsageRatio >= displayThreshold
-		}
-
-		if (shouldShowContextWindow) {
-			details += "\n\n# Context Window Usage"
-			details += `\n${lastApiReqTotalTokens.toLocaleString()} / ${(contextWindow / 1000).toLocaleString()}K tokens used (${usagePercentage}%)`
+			details += "\n\n# Workspace Context\nUse list_files to inspect directory structure when needed."
 		}
 
 		details += "\n\n# Current Mode"

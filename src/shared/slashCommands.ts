@@ -7,6 +7,66 @@ export interface SlashCommand {
 
 export const BASE_SLASH_COMMANDS: SlashCommand[] = [
 	{
+		name: "bmad-analyst",
+		description: "Activate the BMAD analyst persona for this task",
+		section: "default",
+		cliCompatible: true,
+	},
+	{
+		name: "bmad-pm",
+		description: "Activate the BMAD PM persona for this task",
+		section: "default",
+		cliCompatible: true,
+	},
+	{
+		name: "bmad-architect",
+		description: "Activate the BMAD architect persona for this task",
+		section: "default",
+		cliCompatible: true,
+	},
+	{
+		name: "bmad-ux-designer",
+		description: "Activate the BMAD UX designer persona for this task",
+		section: "default",
+		cliCompatible: true,
+	},
+	{
+		name: "bmad-sm",
+		description: "Activate the BMAD scrum master persona for this task",
+		section: "default",
+		cliCompatible: true,
+	},
+	{
+		name: "bmad-dev",
+		description: "Activate the BMAD developer persona for this task",
+		section: "default",
+		cliCompatible: true,
+	},
+	{
+		name: "bmad-qa",
+		description: "Activate the BMAD QA persona for this task",
+		section: "default",
+		cliCompatible: true,
+	},
+	{
+		name: "bmad-tech-writer",
+		description: "Activate the BMAD tech writer persona for this task",
+		section: "default",
+		cliCompatible: true,
+	},
+	{
+		name: "bmad-quick-flow-solo-dev",
+		description: "Activate the BMAD quick-flow solo dev persona for this task",
+		section: "default",
+		cliCompatible: true,
+	},
+	{
+		name: "bmad-exit",
+		description: "Exit the active BMAD agent persona for this task",
+		section: "default",
+		cliCompatible: true,
+	},
+	{
 		name: "newtask",
 		description: "Create a new task with context from the current task",
 		section: "default",

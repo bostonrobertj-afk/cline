@@ -101,6 +101,7 @@ export interface SystemPromptContext {
 	}
 	readonly supportsBrowserUse?: boolean
 	readonly mcpHub?: McpHub
+	readonly activeAgentId?: string
 	readonly skills?: SkillMetadata[]
 	readonly focusChainSettings?: FocusChainSettings
 	readonly globalClineRulesFileInstructions?: string
