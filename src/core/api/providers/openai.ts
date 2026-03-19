@@ -113,62 +113,63 @@ export class OpenAiHandler implements ApiHandler {
 		const isReasoningModelFamily =
 			["o1", "o3", "o4", "gpt-5"].some((prefix) => modelId.includes(prefix)) && !modelId.includes("chat")
 
-const toInputContent = (content: any): any[] => {
-	if (typeof content === "string") {
-		return [{ type: "input_text", text: content }]
-	}
+		const toInputContent = (content: any): any[] => {
+			if (typeof content === "string") {
+				return [{ type: "input_text", text: content }]
+			}
 
-	if (!Array.isArray(content)) {
-		return [{ type: "input_text", text: String(content ?? "") }]
-	}
+			if (!Array.isArray(content)) {
+				return [{ type: "input_text", text: String(content ?? "") }]
+			}
 
-	return content.flatMap((item: any) => {
-		if (!item || typeof item !== "object") {
-			return [{ type: "input_text", text: String(item ?? "") }]
+			return content.reduce<any[]>((acc, item: any) => {
+				if (!item || typeof item !== "object") {
+					acc.push({ type: "input_text", text: String(item ?? "") })
+					return acc
+				}
+
+				if (item.type === "text") {
+					acc.push({ type: "input_text", text: item.text ?? "" })
+					return acc
+				}
+
+				if (item.type === "image_url") {
+					acc.push({
+						type: "input_image",
+						image_url: typeof item.image_url === "string" ? item.image_url : item.image_url?.url,
+					})
+					return acc
+				}
+
+				return acc
+			}, [])
 		}
 
-		if (item.type === "text") {
-			return [{ type: "input_text", text: item.text ?? "" }]
+		const toAssistantOutputContent = (content: any): any[] => {
+			if (typeof content === "string") {
+				return [{ type: "output_text", text: content }]
+			}
+
+			if (!Array.isArray(content)) {
+				return [{ type: "output_text", text: String(content ?? "") }]
+			}
+
+			return content.flatMap((item: any) => {
+				if (!item || typeof item !== "object") {
+					return [{ type: "output_text", text: String(item ?? "") }]
+				}
+
+				if (item.type === "text") {
+					return [{ type: "output_text", text: item.text ?? "" }]
+				}
+
+				if (item.type === "refusal") {
+					return [item]
+				}
+
+				return []
+			})
 		}
-
-		if (item.type === "image_url") {
-			return [
-				{
-					type: "input_image",
-					image_url: typeof item.image_url === "string" ? item.image_url : item.image_url?.url,
-				},
-			]
-		}
-
-		return []
-	})
-}
-
-const toAssistantOutputContent = (content: any): any[] => {
-	if (typeof content === "string") {
-		return [{ type: "output_text", text: content }]
-	}
-
-	if (!Array.isArray(content)) {
-		return [{ type: "output_text", text: String(content ?? "") }]
-	}
-
-	return content.flatMap((item: any) => {
-		if (!item || typeof item !== "object") {
-			return [{ type: "output_text", text: String(item ?? "") }]
-		}
-
-		if (item.type === "text") {
-			return [{ type: "output_text", text: item.text ?? "" }]
-		}
-
-		if (item.type === "refusal") {
-			return [item]
-		}
-
-		return []
-	})
-}
 
 		const buildResponsesInput = (sourceMessages: ClineStorageMessage[]): any[] => {
 			const openAiMessages = convertToOpenAiMessages(sourceMessages) as any[]
@@ -199,10 +200,10 @@ const toAssistantOutputContent = (content: any): any[] => {
 					return acc
 				}
 
-acc.push({
-	role: message.role,
-	content: toInputContent(message.content),
-})
+				acc.push({
+					role: message.role,
+					content: toInputContent(message.content),
+				})
 
 				return acc
 			}, [])
@@ -249,7 +250,10 @@ acc.push({
 			responseInput = convertToR1Format([{ role: "user", content: systemPrompt }, ...inputMessages]).map((message: any) => {
 				return {
 					role: message.role,
-					content: message.role === "assistant" ? toAssistantOutputContent(message.content) : toInputContent(message.content),
+					content:
+						message.role === "assistant"
+							? toAssistantOutputContent(message.content)
+							: toInputContent(message.content),
 				}
 			})
 		}
