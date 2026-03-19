@@ -7,6 +7,7 @@ import { ClineStorageMessage } from "@/shared/messages/content"
 import { createOpenAIClient, fetch } from "@/shared/net"
 import { ApiHandler, CommonApiHandlerOptions } from "../index"
 import { withRetry } from "../retry"
+import { convertToOpenAiMessages } from "../transform/openai-format"
 import { convertToR1Format } from "../transform/r1-format"
 import { ApiStream } from "../transform/stream"
 import { ToolCallProcessor } from "../transform/tool-call-processor"
@@ -141,35 +142,33 @@ export class OpenAiHandler implements ApiHandler {
 		}
 
 		const buildResponsesInput = (sourceMessages: ClineStorageMessage[]): any[] => {
-			const openAiMessages = convertToOpenAiMessages(sourceMessages)
+			const openAiMessages = convertToOpenAiMessages(sourceMessages) as any[]
 
-			return openAiMessages.flatMap((message: any) => {
+			return openAiMessages.reduce<any[]>((acc, message) => {
 				if (message.role === "tool") {
 					const toolCallId =
 						typeof message.tool_call_id === "string" && message.tool_call_id.length > 0
 							? message.tool_call_id
 							: undefined
 
-					if (!toolCallId) {
-						return []
-					}
-
-					return [
-						{
+					if (toolCallId) {
+						acc.push({
 							type: "function_call_output",
 							call_id: toolCallId,
 							output: typeof message.content === "string" ? message.content : JSON.stringify(message.content ?? ""),
-						},
-					]
+						})
+					}
+
+					return acc
 				}
 
-				return [
-					{
-						role: message.role,
-						content: toResponsesContent(message.content),
-					},
-				]
-			})
+				acc.push({
+					role: message.role,
+					content: toResponsesContent(message.content),
+				})
+
+				return acc
+			}, [])
 		}
 
 		let previousResponseId: string | undefined
