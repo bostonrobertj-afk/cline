@@ -27,6 +27,7 @@ import { parseMentions } from "@core/mentions"
 import { CommandPermissionController } from "@core/permissions"
 import { summarizeTask } from "@core/prompts/contextManagement"
 import { formatResponse } from "@core/prompts/responses"
+import type { PersistentSlashCommandAction } from "@core/slash-commands"
 import { parseSlashCommands } from "@core/slash-commands"
 import {
 	ensureRulesDirectoryExists,
@@ -34,6 +35,8 @@ import {
 	GlobalFileNames,
 	getSavedApiConversationHistory,
 	getSavedClineMessages,
+	getTaskMetadata,
+	saveTaskMetadata,
 } from "@core/storage/disk"
 import { releaseTaskLock } from "@core/task/TaskLockUtils"
 import { isMultiRootEnabled } from "@core/workspace/multi-root-utils"
@@ -56,6 +59,7 @@ import { ClineApiReqCancelReason, ClineApiReqInfo, ClineAsk, ClineSay } from "@s
 import { HistoryItem } from "@shared/HistoryItem"
 import { DEFAULT_LANGUAGE_SETTINGS, getLanguageKey, LanguageDisplay } from "@shared/Languages"
 import { convertClineMessageToProto } from "@shared/proto-conversions/cline-message"
+import type { SkillMetadata } from "@shared/skills"
 import { ClineDefaultTool, READ_ONLY_TOOLS } from "@shared/tools"
 import { ClineAskResponse } from "@shared/WebviewMessage"
 import { isLocalModel, isNextGenModelFamily, isParallelToolCallingEnabled } from "@utils/model-utils"
@@ -101,6 +105,12 @@ import { refreshWorkflowToggles } from "../context/instructions/user-instruction
 import { Controller } from "../controller"
 import { executeHook } from "../hooks/hook-executor"
 import { StateManager } from "../storage/StateManager"
+import {
+	buildBmadAgentActivationInstructions,
+	buildBmadAgentReminder,
+	getBmadAgentById,
+	getBmadWorkflowReminder,
+} from "./bmad-agent-mode"
 import { FocusChainManager } from "./focus-chain"
 import { MessageStateHandler } from "./message-state"
 import { StreamChunkCoordinator } from "./StreamChunkCoordinator"
@@ -883,6 +893,84 @@ export class Task {
 		return await this.controller.toggleActModeForYoloMode()
 	}
 
+	private async applyPersistentSlashCommandAction(action?: PersistentSlashCommandAction): Promise<void> {
+		if (!action) {
+			return
+		}
+
+		if (action.type === "activate_bmad_agent") {
+			this.taskState.activeAgentId = action.agentId
+			this.taskState.activeAgentJustActivated = true
+			this.taskState.activeWorkflowId = undefined
+			this.taskState.activeWorkflowJustStarted = false
+		} else {
+			this.taskState.activeAgentId = undefined
+			this.taskState.activeAgentJustActivated = false
+			this.taskState.activeWorkflowId = undefined
+			this.taskState.activeWorkflowJustStarted = false
+		}
+
+		try {
+			const taskMetadata = await getTaskMetadata(this.taskId)
+			taskMetadata.activeAgentId = this.taskState.activeAgentId
+			taskMetadata.activeWorkflowId = this.taskState.activeWorkflowId
+			await saveTaskMetadata(this.taskId, taskMetadata)
+		} catch {
+			// Non-fatal: prompt/runtime state should continue even if metadata persistence fails.
+		}
+	}
+
+	private async buildPromptSkillScope(enabledSkills: SkillMetadata[]): Promise<SkillMetadata[]> {
+		const alwaysAllowedSkillNames = new Set(["bmad-help"])
+
+		if (!this.taskState.activeAgentId) {
+			return enabledSkills.filter((skill) => alwaysAllowedSkillNames.has(skill.name))
+		}
+
+		const activeAgent = await getBmadAgentById(this.cwd, this.taskState.activeAgentId)
+		const allowedSkillNames = new Set(activeAgent?.allowedSkills ?? [])
+		alwaysAllowedSkillNames.forEach((skillName) => allowedSkillNames.add(skillName))
+
+		return enabledSkills.filter((skill) => allowedSkillNames.has(skill.name))
+	}
+
+	private async buildBmadPromptInstructions(): Promise<{
+		activeAgentInstructions?: string
+		activeWorkflowReminder?: string
+	}> {
+		let activeAgentInstructions: string | undefined
+		let activeWorkflowReminder: string | undefined
+
+		if (this.taskState.activeAgentId) {
+			if (this.taskState.activeAgentJustActivated) {
+				activeAgentInstructions = await buildBmadAgentActivationInstructions(this.cwd, this.taskState.activeAgentId)
+			} else {
+				const activeAgent = await getBmadAgentById(this.cwd, this.taskState.activeAgentId)
+				if (activeAgent) {
+					activeAgentInstructions = buildBmadAgentReminder(activeAgent)
+				}
+			}
+		}
+
+		if (this.taskState.activeWorkflowId) {
+			activeWorkflowReminder = await getBmadWorkflowReminder(this.cwd, this.taskState.activeWorkflowId)
+		}
+
+		return { activeAgentInstructions, activeWorkflowReminder }
+	}
+
+	private async restoreBmadStateFromMetadata(): Promise<void> {
+		try {
+			const metadata = await getTaskMetadata(this.taskId)
+			this.taskState.activeAgentId = metadata.activeAgentId
+			this.taskState.activeAgentJustActivated = false
+			this.taskState.activeWorkflowId = metadata.activeWorkflowId
+			this.taskState.activeWorkflowJustStarted = false
+		} catch {
+			// Non-fatal: tasks without metadata should still resume normally.
+		}
+	}
+
 	/**
 	 * Unified cancellation handler for hook-requested cancellations.
 	 * Ensures state is always saved before aborting, regardless of whether
@@ -1154,6 +1242,7 @@ export class Task {
 
 		this.taskState.isInitialized = true
 		this.taskState.abort = false // Reset abort flag when resuming task
+		await this.restoreBmadStateFromMetadata()
 
 		const { response, text, images, files } = await this.ask(askType) // calls poststatetowebview
 
@@ -1859,6 +1948,8 @@ export class Task {
 			// If toggle exists, use it; otherwise default to enabled (true)
 			return toggles[skill.path] !== false
 		})
+		const promptSkills = await this.buildPromptSkillScope(availableSkills)
+		const { activeAgentInstructions, activeWorkflowReminder } = await this.buildBmadPromptInstructions()
 
 		// Snapshot editor tabs so prompt tools can decide whether to include
 		// filetype-specific instructions (e.g. notebooks) without adding bespoke flags.
@@ -1877,7 +1968,10 @@ export class Task {
 			editorTabs,
 			supportsBrowserUse,
 			mcpHub: this.mcpHub,
-			skills: availableSkills,
+			activeAgentId: this.taskState.activeAgentId,
+			activeAgentInstructions,
+			activeWorkflowReminder,
+			skills: promptSkills,
 			focusChainSettings: this.stateManager.getGlobalSettingsKey("focusChainSettings"),
 			globalClineRulesFileInstructions,
 			localClineRulesFileInstructions,
@@ -1910,6 +2004,8 @@ export class Task {
 		}
 
 		const { systemPrompt, tools } = await getSystemPrompt(promptContext)
+		this.taskState.activeAgentJustActivated = false
+		this.taskState.activeWorkflowJustStarted = false
 		this.useNativeToolCalls = !!tools?.length
 		await this.writePromptMetadataArtifacts({ systemPrompt, providerInfo })
 
@@ -3210,6 +3306,7 @@ export class Task {
 		useCompactPrompt = false,
 	): Promise<[ClineContent[], string, boolean]> {
 		let needsClinerulesFileCheck = false
+		let persistentSlashCommandAction: PersistentSlashCommandAction | undefined
 
 		// Pre-fetch necessary data to avoid redundant calls within loops
 		const ulid = this.ulid
@@ -3233,7 +3330,11 @@ export class Task {
 				}
 			}
 
-			const { processedText, needsClinerulesFileCheck: needsCheck } = await parseSlashCommands(
+			const {
+				processedText,
+				needsClinerulesFileCheck: needsCheck,
+				persistentSlashCommandAction: slashAction,
+			} = await parseSlashCommands(
 				parsedText,
 				localWorkflowToggles,
 				globalWorkflowToggles,
@@ -3242,10 +3343,14 @@ export class Task {
 				useNativeToolCalls,
 				providerInfo,
 				mcpPromptFetcher,
+				cwd,
 			)
 
 			if (needsCheck) {
 				needsClinerulesFileCheck = true
+			}
+			if (slashAction) {
+				persistentSlashCommandAction = slashAction
 			}
 
 			return processedText
@@ -3312,6 +3417,8 @@ export class Task {
 		const clinerulesError = needsClinerulesFileCheck
 			? await ensureLocalClineDirExists(this.cwd, GlobalFileNames.clineRules)
 			: false
+
+		await this.applyPersistentSlashCommandAction(persistentSlashCommandAction)
 
 		// Add focus chain instructions if needed
 		if (!useCompactPrompt && this.FocusChainManager?.shouldIncludeFocusChainInstructions()) {
