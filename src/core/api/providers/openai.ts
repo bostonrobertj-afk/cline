@@ -5,6 +5,7 @@ import OpenAI, { AzureOpenAI } from "openai"
 import { buildExternalBasicHeaders } from "@/services/EnvUtils"
 import { ClineStorageMessage } from "@/shared/messages/content"
 import { createOpenAIClient, fetch } from "@/shared/net"
+import { Logger } from "@/shared/services/Logger"
 import { ApiHandler, CommonApiHandlerOptions } from "../index"
 import { withRetry } from "../retry"
 import { convertToOpenAiMessages } from "../transform/openai-format"
@@ -282,6 +283,12 @@ export class OpenAiHandler implements ApiHandler {
 
 		let stream: any
 		try {
+			Logger.debug("OPENAI REQUEST DEBUG", {
+				model: modelId,
+				previousResponseId,
+				input: request.input,
+			})
+
 			stream = await client.responses.create(request)
 		} catch (error) {
 			if (this.shouldRetryWithFullContext(error, !!previousResponseId)) {
