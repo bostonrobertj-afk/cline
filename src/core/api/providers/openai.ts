@@ -7,7 +7,6 @@ import { ClineStorageMessage } from "@/shared/messages/content"
 import { createOpenAIClient, fetch } from "@/shared/net"
 import { ApiHandler, CommonApiHandlerOptions } from "../index"
 import { withRetry } from "../retry"
-import { convertToOpenAiMessages } from "../transform/openai-format"
 import { convertToR1Format } from "../transform/r1-format"
 import { ApiStream } from "../transform/stream"
 import { ToolCallProcessor } from "../transform/tool-call-processor"
@@ -112,7 +111,7 @@ export class OpenAiHandler implements ApiHandler {
 		const isReasoningModelFamily =
 			["o1", "o3", "o4", "gpt-5"].some((prefix) => modelId.includes(prefix)) && !modelId.includes("chat")
 
-			const toResponsesContent = (content: any): any[] => {
+		const toResponsesContent = (content: any): any[] => {
 			if (typeof content === "string") {
 				return [{ type: "input_text", text: content }]
 			}
@@ -141,6 +140,38 @@ export class OpenAiHandler implements ApiHandler {
 			})
 		}
 
+		const buildResponsesInput = (sourceMessages: ClineStorageMessage[]): any[] => {
+			const openAiMessages = convertToOpenAiMessages(sourceMessages)
+
+			return openAiMessages.flatMap((message: any) => {
+				if (message.role === "tool") {
+					const toolCallId =
+						typeof message.tool_call_id === "string" && message.tool_call_id.length > 0
+							? message.tool_call_id
+							: undefined
+
+					if (!toolCallId) {
+						return []
+					}
+
+					return [
+						{
+							type: "function_call_output",
+							call_id: toolCallId,
+							output: typeof message.content === "string" ? message.content : JSON.stringify(message.content ?? ""),
+						},
+					]
+				}
+
+				return [
+					{
+						role: message.role,
+						content: toResponsesContent(message.content),
+					},
+				]
+			})
+		}
+
 		let previousResponseId: string | undefined
 		let inputMessages = messages
 
@@ -160,12 +191,7 @@ export class OpenAiHandler implements ApiHandler {
 			}
 		}
 
-		let responseInput: any[] = convertToOpenAiMessages(inputMessages).map((message: any) => {
-			return {
-				role: message.role,
-				content: toResponsesContent(message.content),
-			}
-		})
+		let responseInput: any[] = buildResponsesInput(inputMessages)
 
 		let temperature: number | undefined
 		if (this.options.openAiModelInfo?.temperature !== undefined) {
@@ -193,12 +219,7 @@ export class OpenAiHandler implements ApiHandler {
 		}
 
 		if (isReasoningModelFamily) {
-			responseInput = convertToOpenAiMessages(inputMessages).map((message: any) => {
-				return {
-					role: message.role,
-					content: toResponsesContent(message.content),
-				}
-			})
+			responseInput = buildResponsesInput(inputMessages)
 			const requestedEffort = normalizeOpenaiReasoningEffort(this.options.reasoningEffort)
 			reasoningEffort = requestedEffort === "none" ? undefined : requestedEffort
 
@@ -217,19 +238,13 @@ export class OpenAiHandler implements ApiHandler {
 		const fallbackRequest: any = {
 			model: modelId,
 			instructions: systemPrompt,
-			input: convertToOpenAiMessages(messages).map((message: any) => {
-				return {
-					role: message.role,
-					content: toResponsesContent(message.content),
-				}
-			}),
+			input: buildResponsesInput(messages),
 			stream: true,
 		}
 
 		if (previousResponseId) {
 			request.previous_response_id = previousResponseId
 		}
-
 
 		if (tools?.length) {
 			const responseTools = tools.map((tool: any) => {
