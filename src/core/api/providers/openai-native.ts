@@ -192,10 +192,12 @@ export class OpenAiNativeHandler implements ApiHandler {
 			tools: responseTools,
 		})
 
+		const fallbackInput = this.stripFunctionCallOutputs(input)
+
 		const fallbackParams = this.buildResponseCreateParams({
 			modelId: model.id,
 			systemPrompt,
-			input,
+			input: fallbackInput,
 			tools: responseTools,
 		})
 
@@ -223,7 +225,7 @@ export class OpenAiNativeHandler implements ApiHandler {
 			}
 		}
 
-		yield* this.createResponseStreamHttp(model.info, params)
+		yield* this.createResponseStreamHttp(model.info, fallbackParams)
 	}
 
 	private preconnectResponsesWebsocket(): void {
@@ -250,6 +252,10 @@ export class OpenAiNativeHandler implements ApiHandler {
 				parameters: tool.function.parameters ?? null,
 				strict: tool.function.strict ?? true,
 			}))
+	}
+
+	private stripFunctionCallOutputs(input: OpenAI.Responses.ResponseInput): OpenAI.Responses.ResponseInput {
+		return input.filter((item: any) => item?.type !== "function_call_output") as OpenAI.Responses.ResponseInput
 	}
 
 	private buildResponseCreateParams(args: {

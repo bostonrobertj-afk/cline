@@ -171,11 +171,19 @@ export class OpenAiHandler implements ApiHandler {
 			})
 		}
 
-		const buildResponsesInput = (sourceMessages: ClineStorageMessage[]): any[] => {
+		const buildResponsesInput = (
+			sourceMessages: ClineStorageMessage[],
+			options?: { includeToolOutputs?: boolean },
+		): any[] => {
+			const includeToolOutputs = options?.includeToolOutputs ?? false
 			const openAiMessages = convertToOpenAiMessages(sourceMessages) as any[]
 
 			return openAiMessages.reduce<any[]>((acc, message) => {
 				if (message.role === "tool") {
+					if (!includeToolOutputs) {
+						return acc
+					}
+
 					const toolCallId =
 						typeof message.tool_call_id === "string" && message.tool_call_id.length > 0
 							? message.tool_call_id
@@ -228,7 +236,9 @@ export class OpenAiHandler implements ApiHandler {
 			}
 		}
 
-		let responseInput: any[] = buildResponsesInput(inputMessages)
+		let responseInput: any[] = buildResponsesInput(inputMessages, {
+			includeToolOutputs: !!previousResponseId,
+		})
 
 		let temperature: number | undefined
 		if (this.options.openAiModelInfo?.temperature !== undefined) {
@@ -259,7 +269,9 @@ export class OpenAiHandler implements ApiHandler {
 		}
 
 		if (isReasoningModelFamily) {
-			responseInput = buildResponsesInput(inputMessages)
+			responseInput = buildResponsesInput(inputMessages, {
+				includeToolOutputs: !!previousResponseId,
+			})
 			const requestedEffort = normalizeOpenaiReasoningEffort(this.options.reasoningEffort)
 			reasoningEffort = requestedEffort === "none" ? undefined : requestedEffort
 
@@ -278,7 +290,9 @@ export class OpenAiHandler implements ApiHandler {
 		const fallbackRequest: any = {
 			model: modelId,
 			instructions: systemPrompt,
-			input: buildResponsesInput(messages),
+			input: buildResponsesInput(messages, {
+				includeToolOutputs: false,
+			}),
 			stream: true,
 		}
 
