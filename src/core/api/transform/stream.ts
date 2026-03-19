@@ -1,5 +1,10 @@
 export type ApiStream = AsyncGenerator<ApiStreamChunk> & { id?: string }
-export type ApiStreamChunk = ApiStreamTextChunk | ApiStreamThinkingChunk | ApiStreamUsageChunk | ApiStreamToolCallsChunk
+export type ApiStreamChunk =
+	| ApiStreamTextChunk
+	| ApiStreamThinkingChunk
+	| ApiStreamUsageChunk
+	| ApiStreamToolCallsChunk
+	| ApiStreamResponseIdChunk
 
 export interface ApiStreamTextChunk {
 	type: "text"
@@ -29,6 +34,11 @@ export interface ApiStreamUsageChunk {
 	 * The response ID associated with this response
 	 */
 	id?: string
+}
+
+export interface ApiStreamResponseIdChunk {
+	type: "response_id"
+	id: string
 }
 
 export interface ApiStreamToolCallsChunk {

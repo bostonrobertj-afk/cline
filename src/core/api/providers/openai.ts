@@ -2,7 +2,6 @@ import { DefaultAzureCredential, getBearerTokenProvider } from "@azure/identity"
 import { azureOpenAiDefaultApiVersion, ModelInfo, OpenAiCompatibleModelInfo, openAiModelInfoSaneDefaults } from "@shared/api"
 import { normalizeOpenaiReasoningEffort } from "@shared/storage/types"
 import OpenAI, { AzureOpenAI } from "openai"
-import type { ChatCompletionReasoningEffort, ChatCompletionTool } from "openai/resources/chat/completions"
 import { buildExternalBasicHeaders } from "@/services/EnvUtils"
 import { ClineStorageMessage } from "@/shared/messages/content"
 import { createOpenAIClient, fetch } from "@/shared/net"
@@ -11,7 +10,9 @@ import { withRetry } from "../retry"
 import { convertToOpenAiMessages } from "../transform/openai-format"
 import { convertToR1Format } from "../transform/r1-format"
 import { ApiStream } from "../transform/stream"
-import { getOpenAIToolParams, ToolCallProcessor } from "../transform/tool-call-processor"
+import { ToolCallProcessor } from "../transform/tool-call-processor"
+
+type ResponseTool = any
 
 interface OpenAiHandlerOptions extends CommonApiHandlerOptions {
 	openAiApiKey?: string
@@ -93,8 +94,17 @@ export class OpenAiHandler implements ApiHandler {
 		return this.client
 	}
 
+	private shouldRetryWithFullContext(error: unknown, hadPreviousResponseId: boolean): boolean {
+		const errorCode =
+			typeof error === "object" && error && "code" in error && typeof (error as { code: unknown }).code === "string"
+				? (error as { code: string }).code
+				: undefined
+
+		return !!hadPreviousResponseId && errorCode === "previous_response_not_found"
+	}
+
 	@withRetry()
-	async *createMessage(systemPrompt: string, messages: ClineStorageMessage[], tools?: ChatCompletionTool[]): ApiStream {
+	async *createMessage(systemPrompt: string, messages: ClineStorageMessage[], tools?: ResponseTool[]): ApiStream {
 		const client = this.ensureClient()
 		const modelId = this.options.openAiModelId ?? ""
 		const isDeepseekReasoner = modelId.includes("deepseek-reasoner")
@@ -102,10 +112,61 @@ export class OpenAiHandler implements ApiHandler {
 		const isReasoningModelFamily =
 			["o1", "o3", "o4", "gpt-5"].some((prefix) => modelId.includes(prefix)) && !modelId.includes("chat")
 
-		let openAiMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [
-			{ role: "system", content: systemPrompt },
-			...convertToOpenAiMessages(messages),
-		]
+			const toResponsesContent = (content: any): any[] => {
+			if (typeof content === "string") {
+				return [{ type: "input_text", text: content }]
+			}
+
+			if (!Array.isArray(content)) {
+				return [{ type: "input_text", text: String(content ?? "") }]
+			}
+
+			return content.map((item: any) => {
+				if (!item || typeof item !== "object") {
+					return { type: "input_text", text: String(item ?? "") }
+				}
+
+				if (item.type === "text") {
+					return { type: "input_text", text: item.text ?? "" }
+				}
+
+				if (item.type === "image_url") {
+					return {
+						type: "input_image",
+						image_url: typeof item.image_url === "string" ? item.image_url : item.image_url?.url,
+					}
+				}
+
+				return item
+			})
+		}
+
+		let previousResponseId: string | undefined
+		let inputMessages = messages
+
+		for (let i = messages.length - 1; i >= 0; i--) {
+			const message = messages[i] as any
+			const isRecentEnough = message?.ts ? Date.now() - message.ts < 23 * 60 * 60 * 1000 : false
+			const isOpenAiCompatibleAssistant =
+				message?.role === "assistant" &&
+				message?.modelInfo?.providerId === "openai" &&
+				typeof message?.id === "string" &&
+				message.id.length > 0
+
+			if (isOpenAiCompatibleAssistant && isRecentEnough) {
+				previousResponseId = message.id
+				inputMessages = messages.slice(i + 1)
+				break
+			}
+		}
+
+		let responseInput: any[] = convertToOpenAiMessages(inputMessages).map((message: any) => {
+			return {
+				role: message.role,
+				content: toResponsesContent(message.content),
+			}
+		})
+
 		let temperature: number | undefined
 		if (this.options.openAiModelInfo?.temperature !== undefined) {
 			const tempValue = Number(this.options.openAiModelInfo.temperature)
@@ -113,7 +174,7 @@ export class OpenAiHandler implements ApiHandler {
 		} else {
 			temperature = openAiModelInfoSaneDefaults.temperature
 		}
-		let reasoningEffort: ChatCompletionReasoningEffort | undefined
+		let reasoningEffort: string | undefined
 		let maxTokens: number | undefined
 
 		if (this.options.openAiModelInfo?.maxTokens && this.options.openAiModelInfo.maxTokens > 0) {
@@ -123,57 +184,137 @@ export class OpenAiHandler implements ApiHandler {
 		}
 
 		if (isDeepseekReasoner || isR1FormatRequired) {
-			openAiMessages = convertToR1Format([{ role: "user", content: systemPrompt }, ...messages])
+			responseInput = convertToR1Format([{ role: "user", content: systemPrompt }, ...inputMessages]).map((message: any) => {
+				return {
+					role: message.role,
+					content: toResponsesContent(message.content),
+				}
+			})
 		}
 
 		if (isReasoningModelFamily) {
-			openAiMessages = [{ role: "developer", content: systemPrompt }, ...convertToOpenAiMessages(messages)]
-			temperature = undefined // does not support temperature
+			responseInput = convertToOpenAiMessages(inputMessages).map((message: any) => {
+				return {
+					role: message.role,
+					content: toResponsesContent(message.content),
+				}
+			})
 			const requestedEffort = normalizeOpenaiReasoningEffort(this.options.reasoningEffort)
-			reasoningEffort = requestedEffort === "none" ? undefined : (requestedEffort as ChatCompletionReasoningEffort)
+			reasoningEffort = requestedEffort === "none" ? undefined : requestedEffort
+
+			if (reasoningEffort) {
+				temperature = undefined // GPT-5.4 rejects temperature when reasoning effort is not none
+			}
 		}
 
-		const stream = await client.chat.completions.create({
+		const request: any = {
 			model: modelId,
-			messages: openAiMessages,
-			temperature,
-			max_tokens: maxTokens,
-			reasoning_effort: reasoningEffort,
+			instructions: systemPrompt,
+			input: responseInput,
 			stream: true,
-			stream_options: { include_usage: true },
-			...getOpenAIToolParams(tools),
-		})
+		}
+
+		const fallbackRequest: any = {
+			model: modelId,
+			instructions: systemPrompt,
+			input: convertToOpenAiMessages(messages).map((message: any) => {
+				return {
+					role: message.role,
+					content: toResponsesContent(message.content),
+				}
+			}),
+			stream: true,
+		}
+
+		if (previousResponseId) {
+			request.previous_response_id = previousResponseId
+		}
+
+
+		if (tools?.length) {
+			const responseTools = tools.map((tool: any) => {
+				if (tool?.type === "function" && tool.function) {
+					return {
+						type: "function",
+						name: tool.function.name,
+						description: tool.function.description,
+						parameters: tool.function.parameters,
+						strict: tool.function.strict,
+					}
+				}
+
+				return tool
+			})
+
+			request.tools = responseTools
+			fallbackRequest.tools = responseTools
+		}
+
+		if (temperature !== undefined) {
+			request.temperature = temperature
+			fallbackRequest.temperature = temperature
+		}
+
+		if (maxTokens) {
+			request.max_output_tokens = maxTokens
+			fallbackRequest.max_output_tokens = maxTokens
+		}
+
+		if (reasoningEffort) {
+			const reasoning = { effort: reasoningEffort }
+			request.reasoning = reasoning
+			fallbackRequest.reasoning = reasoning
+		}
+
+		let stream: any
+		try {
+			stream = await client.responses.create(request)
+		} catch (error) {
+			if (this.shouldRetryWithFullContext(error, !!previousResponseId)) {
+				stream = await client.responses.create(fallbackRequest)
+			} else {
+				throw error
+			}
+		}
 
 		const toolCallProcessor = new ToolCallProcessor()
 
-		for await (const chunk of stream) {
-			const delta = chunk.choices?.[0]?.delta
-			if (delta?.content) {
+		for await (const event of stream as AsyncIterable<any>) {
+			if (event.type === "response.output_text.delta" && event.delta) {
 				yield {
 					type: "text",
-					text: delta.content,
+					text: event.delta,
 				}
 			}
 
-			if (delta && "reasoning_content" in delta && delta.reasoning_content) {
+			if (event.type === "response.output_item.done" && event.item?.type === "function_call") {
+				yield* toolCallProcessor.processToolCallDeltas([
+					{
+						index: event.output_index ?? 0,
+						id: event.item.call_id ?? event.item.id,
+						type: "function",
+						function: {
+							name: event.item.name,
+							arguments: event.item.arguments ?? "",
+						},
+					},
+				] as any)
+			}
+
+			if (event.type === "response.completed" && event.response) {
 				yield {
-					type: "reasoning",
-					reasoning: (delta.reasoning_content as string | undefined) || "",
+					type: "response_id",
+					id: event.response.id,
 				}
-			}
 
-			if (delta?.tool_calls) {
-				yield* toolCallProcessor.processToolCallDeltas(delta.tool_calls)
-			}
-
-			if (chunk.usage) {
-				yield {
-					type: "usage",
-					inputTokens: chunk.usage.prompt_tokens || 0,
-					outputTokens: chunk.usage.completion_tokens || 0,
-					cacheReadTokens: chunk.usage.prompt_tokens_details?.cached_tokens || 0,
-					// @ts-expect-error-next-line
-					cacheWriteTokens: chunk.usage.prompt_cache_miss_tokens || 0,
+				if (event.response.usage) {
+					yield {
+						type: "usage",
+						inputTokens: event.response.usage.input_tokens || 0,
+						outputTokens: event.response.usage.output_tokens || 0,
+						cacheReadTokens: 0,
+						cacheWriteTokens: 0,
+					}
 				}
 			}
 		}

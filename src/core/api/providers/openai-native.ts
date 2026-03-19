@@ -170,10 +170,13 @@ export class OpenAiNativeHandler implements ApiHandler {
 		tools: ChatCompletionTool[],
 	): ApiStream {
 		const model = this.getModel()
-		const usePreviousResponseId = this.useWebsocketMode(model.info.apiFormat)
+		const useWebsocketMode = this.useWebsocketMode(model.info.apiFormat)
+		const usePreviousResponseId =
+			model.info.apiFormat === ApiFormat.OPENAI_RESPONSES ||
+			model.info.apiFormat === ApiFormat.OPENAI_RESPONSES_WEBSOCKET_MODE
 
 		// Warm websocket connection early in websocket mode so the first response.create avoids handshake latency.
-		if (usePreviousResponseId) {
+		if (useWebsocketMode) {
 			this.preconnectResponsesWebsocket()
 		}
 
@@ -196,13 +199,27 @@ export class OpenAiNativeHandler implements ApiHandler {
 			tools: responseTools,
 		})
 
-		if (usePreviousResponseId && previousResponseId) {
+		if (useWebsocketMode && previousResponseId) {
 			try {
 				yield* this.createResponseStreamWebsocket(model.info, params, fallbackParams)
 				return
 			} catch (error) {
 				Logger.error("OpenAI websocket mode failed, falling back to HTTP Responses API:", error)
 				this.closeResponsesWebsocket()
+			}
+		}
+
+		if (previousResponseId) {
+			try {
+				yield* this.createResponseStreamHttp(model.info, params)
+				return
+			} catch (error) {
+				if (this.shouldRetryWithFullContext(error, true)) {
+					Logger.log("Retrying HTTP response with full context after previous_response_not_found")
+					yield* this.createResponseStreamHttp(model.info, fallbackParams)
+					return
+				}
+				throw error
 			}
 		}
 
@@ -282,7 +299,7 @@ export class OpenAiNativeHandler implements ApiHandler {
 		try {
 			yield* this.processResponsesEvents(this.createResponseEventsViaWebsocket(primaryParams), modelInfo)
 		} catch (error) {
-			if (this.shouldRetryWebsocketWithFullContext(error, !!primaryParams.previous_response_id)) {
+			if (this.shouldRetryWithFullContext(error, !!primaryParams.previous_response_id)) {
 				Logger.log("Retrying websocket response with full context after previous_response_not_found or socket reset")
 				this.closeResponsesWebsocket()
 				yield* this.processResponsesEvents(this.createResponseEventsViaWebsocket(fallbackParams), modelInfo)
@@ -292,7 +309,7 @@ export class OpenAiNativeHandler implements ApiHandler {
 		}
 	}
 
-	private shouldRetryWebsocketWithFullContext(error: unknown, hadPreviousResponseId: boolean): boolean {
+	private shouldRetryWithFullContext(error: unknown, hadPreviousResponseId: boolean): boolean {
 		const errorCode =
 			typeof error === "object" && error && "code" in error && typeof (error as { code: unknown }).code === "string"
 				? (error as { code: string }).code

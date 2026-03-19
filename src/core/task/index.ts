@@ -2706,6 +2706,7 @@ export class Task {
 			const stream = this.attemptApiRequest(previousApiReqIndex) // yields only if the first chunk is successful, otherwise will allow the user to retry the request (most likely due to rate limit error, which gets thrown on the first chunk)
 
 			let assistantMessageId = ""
+			let responseId: string | undefined
 			let assistantMessage = "" // For UI display (includes XML)
 			let assistantTextOnly = "" // For API history (text only, no tool XML)
 			let assistantTextSignature: string | undefined
@@ -2839,6 +2840,10 @@ export class Task {
 							if (this.taskState.assistantMessageContent.length > prevLength) {
 								this.taskState.userMessageContentReady = false // new content we need to present, reset to false in case previous content set this to true
 							}
+							break
+						}
+						case "response_id": {
+							responseId = chunk.id
 							break
 						}
 					}
@@ -3050,7 +3055,7 @@ export class Task {
 						role: "assistant",
 						content: assistantContent,
 						modelInfo,
-						id: requestId,
+						id: responseId || requestId,
 						metrics: {
 							tokens: {
 								prompt: taskMetrics.inputTokens,
@@ -3133,7 +3138,6 @@ export class Task {
 					"Invalid API Response: The provider returned an empty or unparsable response. This is a provider-side issue where the model failed to generate valid output or returned tool calls that Cline cannot process. Retrying the request may help resolve this issue."
 				const errorText = reqId ? `${baseErrorMessage} (Request ID: ${reqId})` : baseErrorMessage
 
-				await this.say("error", errorText)
 				await this.messageStateHandler.addToApiConversationHistory({
 					role: "assistant",
 					content: [
@@ -3143,7 +3147,6 @@ export class Task {
 						},
 					],
 					modelInfo,
-					id: this.streamHandler.requestId,
 					metrics: {
 						tokens: {
 							prompt: taskMetrics.inputTokens,
