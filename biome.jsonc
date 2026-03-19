@@ -132,7 +132,10 @@
 			"!!**/webview-ui/build",
 			"!!**/generated",
 			"!!**/proto",
-			"!!**/tests/specs"
+			"!!**/tests/specs",
+			// BMAD/WDS HTML template artifacts use placeholder syntax like {{TOKEN}}
+			// and bracketed markers that are not valid HTML/JS for Biome parsing.
+			"!!_bmad/wds/workflows/**/templates/*.html"
 		]
 	},
 	"plugins": [

@@ -4,7 +4,6 @@ import { ApiStream } from "@core/api/transform/stream"
 import { AssistantMessageContent, parseAssistantMessageV2, ToolUse } from "@core/assistant-message"
 import { ContextManager } from "@core/context/context-management/ContextManager"
 import { checkContextWindowExceededError } from "@core/context/context-management/context-error-handling"
-import { getContextWindowInfo } from "@core/context/context-management/context-window-utils"
 import { EnvironmentContextTracker } from "@core/context/context-tracking/EnvironmentContextTracker"
 import { FileContextTracker } from "@core/context/context-tracking/FileContextTracker"
 import { ModelContextTracker } from "@core/context/context-tracking/ModelContextTracker"
@@ -50,26 +49,16 @@ import { ITerminalManager } from "@integrations/terminal/types"
 import { BrowserSession } from "@services/browser/BrowserSession"
 import { UrlContentFetcher } from "@services/browser/UrlContentFetcher"
 import { featureFlagsService } from "@services/feature-flags"
-import { listFiles } from "@services/glob/list-files"
 import { McpHub } from "@services/mcp/McpHub"
 import { ApiConfiguration } from "@shared/api"
-import { findLast, findLastIndex } from "@shared/array"
-import { combineApiRequests } from "@shared/combineApiRequests"
-import { combineCommandSequences } from "@shared/combineCommandSequences"
-import { ClineApiReqCancelReason, ClineApiReqInfo, ClineAsk, ClineMessage, ClineSay } from "@shared/ExtensionMessage"
+import { findLastIndex } from "@shared/array"
+import { ClineApiReqCancelReason, ClineApiReqInfo, ClineSay } from "@shared/ExtensionMessage"
 import { HistoryItem } from "@shared/HistoryItem"
 import { DEFAULT_LANGUAGE_SETTINGS, getLanguageKey, LanguageDisplay } from "@shared/Languages"
 import { convertClineMessageToProto } from "@shared/proto-conversions/cline-message"
 import { ClineDefaultTool, READ_ONLY_TOOLS } from "@shared/tools"
 import { ClineAskResponse } from "@shared/WebviewMessage"
-import {
-	isClaude4PlusModelFamily,
-	isGPT5ModelFamily,
-	isLocalModel,
-	isNextGenModelFamily,
-	isParallelToolCallingEnabled,
-} from "@utils/model-utils"
-import { arePathsEqual, getDesktopDir } from "@utils/path"
+import { isLocalModel, isNextGenModelFamily, isParallelToolCallingEnabled } from "@utils/model-utils"
 import { filterExistingFiles } from "@utils/tabFiltering"
 import cloneDeep from "clone-deep"
 import fs from "fs/promises"
@@ -118,7 +107,7 @@ import { StreamChunkCoordinator } from "./StreamChunkCoordinator"
 import { StreamResponseHandler } from "./StreamResponseHandler"
 import { TaskState } from "./TaskState"
 import { ToolExecutor } from "./ToolExecutor"
-import { detectAvailableCliTools, extractProviderDomainFromUrl, updateApiReqMsg } from "./utils"
+import { extractProviderDomainFromUrl, updateApiReqMsg } from "./utils"
 import { buildUserFeedbackContent } from "./utils/buildUserFeedbackContent"
 import { hasExplicitMentionSyntax, hasUserContentTag } from "./utils/userContentProcessing"
 
@@ -3530,7 +3519,6 @@ export class Task {
 		if (terminalDetails) {
 			details += terminalDetails
 		}
-
 
 		if (includeFileDetails) {
 			details += "\n\n# Workspace Context\nUse list_files to inspect directory structure when needed."
