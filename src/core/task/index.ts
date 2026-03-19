@@ -255,6 +255,7 @@ export class Task {
 
 	// Command executor for running shell commands (extracted from executeCommandTool)
 	private commandExecutor!: CommandExecutor
+	private nextApiRequestIncludesHumanAuthoredInput = false
 
 	constructor(params: TaskParams) {
 		const {
@@ -932,6 +933,35 @@ export class Task {
 		alwaysAllowedSkillNames.forEach((skillName) => allowedSkillNames.add(skillName))
 
 		return enabledSkills.filter((skill) => allowedSkillNames.has(skill.name))
+	}
+
+	private hasHumanAuthoredInput(contentBlocks: ClineContent[]): boolean {
+		const blockContainsHumanInput = (block: ClineContent): boolean => {
+			switch (block.type) {
+				case "text":
+					return hasUserContentTag(block.text)
+				case "image":
+					return true
+				case "tool_result": {
+					if (!block.content) {
+						return false
+					}
+					if (typeof block.content === "string") {
+						return hasUserContentTag(block.content)
+					}
+					if (Array.isArray(block.content)) {
+						return block.content.some(
+							(contentBlock) => contentBlock.type === "text" && hasUserContentTag(contentBlock.text),
+						)
+					}
+					return false
+				}
+				default:
+					return false
+			}
+		}
+
+		return contentBlocks.some(blockContainsHumanInput)
 	}
 
 	private async buildBmadPromptInstructions(): Promise<{
@@ -1877,6 +1907,7 @@ export class Task {
 		})
 
 		const providerInfo = this.getCurrentProviderInfo()
+		const shouldIncludeDynamicPromptContext = this.nextApiRequestIncludesHumanAuthoredInput
 		const host = await HostProvider.env.getHostVersion({})
 		const ide = host?.platform || "Unknown"
 		const isCliEnvironment = host.clineType === ClineClient.Cli
@@ -1948,8 +1979,10 @@ export class Task {
 			// If toggle exists, use it; otherwise default to enabled (true)
 			return toggles[skill.path] !== false
 		})
-		const promptSkills = await this.buildPromptSkillScope(availableSkills)
-		const { activeAgentInstructions, activeWorkflowReminder } = await this.buildBmadPromptInstructions()
+		const promptSkills = shouldIncludeDynamicPromptContext ? await this.buildPromptSkillScope(availableSkills) : []
+		const { activeAgentInstructions, activeWorkflowReminder } = shouldIncludeDynamicPromptContext
+			? await this.buildBmadPromptInstructions()
+			: {}
 
 		// Snapshot editor tabs so prompt tools can decide whether to include
 		// filetype-specific instructions (e.g. notebooks) without adding bespoke flags.
@@ -1968,19 +2001,21 @@ export class Task {
 			editorTabs,
 			supportsBrowserUse,
 			mcpHub: this.mcpHub,
-			activeAgentId: this.taskState.activeAgentId,
+			activeAgentId: shouldIncludeDynamicPromptContext ? this.taskState.activeAgentId : undefined,
 			activeAgentInstructions,
 			activeWorkflowReminder,
 			skills: promptSkills,
 			focusChainSettings: this.stateManager.getGlobalSettingsKey("focusChainSettings"),
-			globalClineRulesFileInstructions,
-			localClineRulesFileInstructions,
-			localCursorRulesFileInstructions,
-			localCursorRulesDirInstructions,
-			localWindsurfRulesFileInstructions,
-			localAgentsRulesFileInstructions,
-			clineIgnoreInstructions,
-			preferredLanguageInstructions,
+			globalClineRulesFileInstructions: shouldIncludeDynamicPromptContext ? globalClineRulesFileInstructions : undefined,
+			localClineRulesFileInstructions: shouldIncludeDynamicPromptContext ? localClineRulesFileInstructions : undefined,
+			localCursorRulesFileInstructions: shouldIncludeDynamicPromptContext ? localCursorRulesFileInstructions : undefined,
+			localCursorRulesDirInstructions: shouldIncludeDynamicPromptContext ? localCursorRulesDirInstructions : undefined,
+			localWindsurfRulesFileInstructions: shouldIncludeDynamicPromptContext
+				? localWindsurfRulesFileInstructions
+				: undefined,
+			localAgentsRulesFileInstructions: shouldIncludeDynamicPromptContext ? localAgentsRulesFileInstructions : undefined,
+			clineIgnoreInstructions: shouldIncludeDynamicPromptContext ? clineIgnoreInstructions : undefined,
+			preferredLanguageInstructions: shouldIncludeDynamicPromptContext ? preferredLanguageInstructions : undefined,
 			browserSettings: this.stateManager.getGlobalSettingsKey("browserSettings"),
 			yoloModeToggled: this.stateManager.getGlobalSettingsKey("yoloModeToggled"),
 			subagentsEnabled: this.stateManager.getGlobalSettingsKey("subagentsEnabled"),
@@ -1999,15 +2034,16 @@ export class Task {
 
 		// Notify user if any conditional rules were applied for this request
 		const activatedConditionalRules = [...globalRules.activatedConditionalRules, ...localRules.activatedConditionalRules]
-		if (activatedConditionalRules.length > 0) {
+		if (shouldIncludeDynamicPromptContext && activatedConditionalRules.length > 0) {
 			await this.say("conditional_rules_applied", JSON.stringify({ rules: activatedConditionalRules }))
 		}
 
 		const { systemPrompt, tools } = await getSystemPrompt(promptContext)
+		const effectiveSystemPrompt = shouldIncludeDynamicPromptContext ? systemPrompt : ""
 		this.taskState.activeAgentJustActivated = false
 		this.taskState.activeWorkflowJustStarted = false
 		this.useNativeToolCalls = !!tools?.length
-		await this.writePromptMetadataArtifacts({ systemPrompt, providerInfo })
+		await this.writePromptMetadataArtifacts({ systemPrompt: effectiveSystemPrompt, providerInfo })
 
 		const contextManagementMetadata = await this.contextManager.getNewContextMessagesAndMetadata(
 			this.messageStateHandler.getApiConversationHistory(),
@@ -2026,7 +2062,11 @@ export class Task {
 		}
 
 		// Response API requires native tool calls to be enabled
-		const stream = this.api.createMessage(systemPrompt, contextManagementMetadata.truncatedConversationHistory, tools)
+		const stream = this.api.createMessage(
+			effectiveSystemPrompt,
+			contextManagementMetadata.truncatedConversationHistory,
+			tools,
+		)
 
 		const iterator = stream[Symbol.asyncIterator]()
 
@@ -2587,6 +2627,7 @@ export class Task {
 
 		// Replace userContent with parsed content that includes file details and command instructions.
 		userContent = parsedUserContent
+		this.nextApiRequestIncludesHumanAuthoredInput = this.hasHumanAuthoredInput(userContent)
 
 		// add environment details as its own text block, separate from tool results
 		// do not add environment details to the message which we are compacting the context window
