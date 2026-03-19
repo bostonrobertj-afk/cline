@@ -217,7 +217,7 @@ export class OpenAiNativeHandler implements ApiHandler {
 				return
 			} catch (error) {
 				if (this.shouldRetryWithFullContext(error, true)) {
-					Logger.log("Retrying HTTP response with full context after previous_response_not_found")
+					Logger.log("Retrying HTTP response with full context after response-chain mismatch")
 					yield* this.createResponseStreamHttp(model.info, fallbackParams)
 					return
 				}
@@ -321,12 +321,26 @@ export class OpenAiNativeHandler implements ApiHandler {
 				? (error as { code: string }).code
 				: undefined
 
+		const errorMessage =
+			typeof error === "object" &&
+			error &&
+			"message" in error &&
+			typeof (error as { message: unknown }).message === "string"
+				? (error as { message: string }).message
+				: ""
+
 		if (hadPreviousResponseId && errorCode === "previous_response_not_found") {
 			return true
 		}
+
+		if (hadPreviousResponseId && errorMessage.includes("No tool call found for function call output with call_id")) {
+			return true
+		}
+
 		if (errorCode === "websocket_closed" || errorCode === "websocket_error") {
 			return true
 		}
+
 		return false
 	}
 
