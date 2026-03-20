@@ -275,4 +275,57 @@ describe("OpenAiHandler", () => {
 		warnStub.firstCall.args[0].should.containEql('"usingFullHistoryFallback":true')
 		createStub.callCount.should.equal(2)
 	})
+
+	it("should include reasoning and cached tokens in Responses API usage chunks", async () => {
+		const handler = new OpenAiHandler({
+			openAiApiKey: "test-api-key",
+			openAiModelId: "gpt-5.4-2026-03-05",
+			openAiModelInfo: {
+				contextWindow: 1_000_000,
+				maxTokens: 128_000,
+				supportsPromptCache: true,
+				inputPrice: 5,
+				outputPrice: 22.5,
+				cacheReadsPrice: 0.5,
+			},
+		})
+
+		const fakeClient = {
+			responses: {
+				create: sinon.stub().resolves(
+					createAsyncIterable([
+						{
+							type: "response.completed",
+							response: {
+								id: "resp_reasoning_usage",
+								usage: {
+									input_tokens: 90,
+									input_tokens_details: {
+										cached_tokens: 15,
+									},
+									output_tokens: 25,
+									output_tokens_details: {
+										reasoning_tokens: 35,
+									},
+								},
+							},
+						},
+					]),
+				),
+			},
+		}
+		sinon.stub(handler as any, "ensureClient").returns(fakeClient as any)
+
+		const chunks: any[] = []
+		for await (const chunk of handler.createMessage("system", [{ role: "user", content: "hi" }] as any, [])) {
+			chunks.push(chunk)
+		}
+
+		const usageChunk = chunks.find((chunk) => chunk.type === "usage")
+		usageChunk.should.not.equal(undefined)
+		usageChunk.inputTokens.should.equal(75)
+		usageChunk.cacheReadTokens.should.equal(15)
+		usageChunk.outputTokens.should.equal(60)
+		usageChunk.totalCost.should.be.a.Number()
+	})
 })

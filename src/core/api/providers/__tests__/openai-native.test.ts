@@ -181,4 +181,61 @@ describe("OpenAiNativeHandler", () => {
 		warnStub.firstCall.args[0].should.containEql('"usingFullHistoryFallback":true')
 		createStub.callCount.should.equal(2)
 	})
+
+	it("should include reasoning tokens in Responses API output usage totals", async () => {
+		const handler = new OpenAiNativeHandler({
+			openAiNativeApiKey: "test-api-key",
+			apiModelId: "gpt-5.4-2026-03-05",
+		})
+
+		const fakeClient = {
+			responses: {
+				create: sinon.stub().resolves(
+					createAsyncIterable([
+						{
+							type: "response.completed",
+							response: {
+								id: "resp_reasoning_usage",
+								usage: {
+									input_tokens: 120,
+									input_tokens_details: {
+										cached_tokens: 20,
+									},
+									output_tokens: 30,
+									output_tokens_details: {
+										reasoning_tokens: 70,
+									},
+									total_tokens: 220,
+								},
+							},
+						},
+					]),
+				),
+			},
+		}
+		sinon.stub(handler as any, "ensureClient").returns(fakeClient as any)
+		sinon.stub(handler as any, "useWebsocketMode").returns(false)
+
+		const tools = [
+			{
+				type: "function",
+				function: {
+					name: "read_file",
+					description: "Read a file",
+					parameters: { type: "object" },
+				},
+			},
+		] as any
+
+		const chunks: any[] = []
+		for await (const chunk of handler.createMessage("system", [{ role: "user", content: "hi" }] as any, tools)) {
+			chunks.push(chunk)
+		}
+
+		const usageChunk = chunks.find((chunk) => chunk.type === "usage")
+		usageChunk.should.not.equal(undefined)
+		usageChunk.inputTokens.should.equal(100)
+		usageChunk.cacheReadTokens.should.equal(20)
+		usageChunk.outputTokens.should.equal(100)
+	})
 })

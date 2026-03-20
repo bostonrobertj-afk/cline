@@ -13,6 +13,7 @@ import { buildExternalBasicHeaders } from "@/services/EnvUtils"
 import { ClineStorageMessage } from "@/shared/messages/content"
 import { createOpenAIClient, fetch } from "@/shared/net"
 import { Logger } from "@/shared/services/Logger"
+import { calculateApiCostOpenAI } from "@/utils/cost"
 import { ApiHandler, CommonApiHandlerOptions } from "../index"
 import { withRetry } from "../retry"
 import { convertToOpenAiMessages } from "../transform/openai-format"
@@ -470,12 +471,17 @@ export class OpenAiHandler implements ApiHandler {
 				}
 
 				if (event.response.usage) {
+					const usage = event.response.usage
+					const inputTokens = usage.input_tokens || 0
+					const cacheReadTokens = usage.input_tokens_details?.cached_tokens || 0
+					const outputTokens = (usage.output_tokens || 0) + (usage.output_tokens_details?.reasoning_tokens || 0)
 					yield {
 						type: "usage",
-						inputTokens: event.response.usage.input_tokens || 0,
-						outputTokens: event.response.usage.output_tokens || 0,
-						cacheReadTokens: 0,
+						inputTokens: Math.max(0, inputTokens - cacheReadTokens),
+						outputTokens,
+						cacheReadTokens,
 						cacheWriteTokens: 0,
+						totalCost: calculateApiCostOpenAI(this.getModel().info, inputTokens, outputTokens, 0, cacheReadTokens),
 					}
 				}
 			}

@@ -155,13 +155,14 @@ export async function* handleResponsesApiStreamResponse(
 			// Handle usage information when response is complete
 			const usage = chunk.response.usage
 			const inputTokens = usage.input_tokens || 0
-			const outputTokens = usage.output_tokens || 0
-			const cacheReadTokens = usage.output_tokens_details?.reasoning_tokens || 0
-			const cacheWriteTokens = usage.input_tokens_details?.cached_tokens || 0
+			const reasoningTokens = usage.output_tokens_details?.reasoning_tokens || 0
+			const outputTokens = (usage.output_tokens || 0) + reasoningTokens
+			const cacheReadTokens = usage.input_tokens_details?.cached_tokens || 0
+			const cacheWriteTokens = 0
 			const totalTokens = usage.total_tokens || 0
 			const totalCost = await calculateCost(modelInfo, inputTokens, outputTokens, cacheWriteTokens, cacheReadTokens)
 			Logger.log(`Total tokens from Responses API usage: ${totalTokens}`)
-			const nonCachedInputTokens = Math.max(0, inputTokens - cacheReadTokens - cacheWriteTokens)
+			const nonCachedInputTokens = Math.max(0, inputTokens - cacheReadTokens)
 			yield {
 				type: "usage",
 				inputTokens: nonCachedInputTokens,
