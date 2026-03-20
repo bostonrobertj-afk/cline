@@ -2589,6 +2589,7 @@ export class Task {
 		// Determine if we should compact context window
 		// Note: We delay context loading until we know if we're compacting (performance optimization)
 		const useCompactPrompt = customPrompt === "compact" && isLocalModel(this.getCurrentProviderInfo())
+		const useReducedEnvironmentDetails = isGPT5ModelFamily(this.getCurrentProviderInfo().model.id)
 		let shouldCompact = false
 		const useAutoCondense = this.stateManager.getGlobalSettingsKey("useAutoCondense")
 
@@ -2662,6 +2663,7 @@ export class Task {
 				userContent,
 				includeFileDetails,
 				useCompactPrompt,
+				!useReducedEnvironmentDetails,
 			)
 		}
 
@@ -3712,7 +3714,7 @@ export class Task {
 						if (includeDetailedEnvironmentDetails) {
 							terminalDetails += `\n### New Output\n${newOutput}`
 						} else {
-							terminalDetails += "\n### New Output\n(available; omitted for compact prompt turn)"
+							terminalDetails += "\n### New Output\n(available; omitted for this reduced-detail prompt turn)"
 						}
 					}
 				}
