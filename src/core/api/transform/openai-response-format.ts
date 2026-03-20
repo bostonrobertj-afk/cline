@@ -99,13 +99,6 @@ export function convertToOpenAIResponsesInput(
 		}
 	}
 
-	messages = messages.filter((m) => {
-		if (m.role !== "user") return true
-		if (!Array.isArray(m.content)) return true
-
-		return m.content.some((part: any) => part.type !== "tool_result")
-	})
-
 	const allItems: any[] = []
 	const toolUseIdToCallId = new Map<string, string>()
 
