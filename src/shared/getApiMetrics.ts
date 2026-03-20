@@ -75,7 +75,9 @@ export function getApiMetrics(messages: ClineMessage[]): ApiMetrics {
  * Gets the total token count from the last API request.
  *
  * This is used for context window progress display - it shows how much of the
- * context window is used in the current/most recent request, not cumulative totals.
+ * context window is used in the current/most recent request, not lifetime or UI-cumulative totals.
+ * Stateful Responses API turns can therefore appear to grow across a conversation because prior
+ * thread state is carried into the latest request.
  *
  * @param messages - An array of ClineMessage objects to process.
  * @returns The total tokens (tokensIn + tokensOut + cacheWrites + cacheReads) from the last api_req_started message, or 0 if none found.

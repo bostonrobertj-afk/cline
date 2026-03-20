@@ -1640,7 +1640,7 @@ export type OpenAiNativeModelId = keyof typeof openAiNativeModels
 export const openAiNativeDefaultModelId: OpenAiNativeModelId = "gpt-5.2"
 export const openAiNativeModels = {
 	"gpt-5.4-2026-03-05": {
-		maxTokens: 128_000,
+		maxTokens: 128_000, // Capability ceiling, not the default per-turn request budget for long-running threads.
 		contextWindow: 1_000_000,
 		supportsImages: true,
 		supportsPromptCache: true,
@@ -1668,7 +1668,7 @@ export const openAiNativeModels = {
 		],
 	},
 	"gpt-5.4-mini-2026-03-17": {
-		maxTokens: 128_000,
+		maxTokens: 128_000, // Capability ceiling, not the default per-turn request budget for long-running threads.
 		contextWindow: 400_000,
 		supportsImages: true,
 		supportsPromptCache: true,

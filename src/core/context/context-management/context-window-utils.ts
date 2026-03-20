@@ -33,3 +33,33 @@ export function getContextWindowInfo(api: ApiHandler) {
 
 	return { contextWindow, maxAllowedSize }
 }
+
+/**
+ * Determines whether an OpenAI Responses request should include an explicit max_output_tokens cap.
+ *
+ * For long-running GPT-5 threads, treating the model's published max output capability as a per-turn
+ * default can unnecessarily shrink the usable input window. We therefore only preserve an explicit cap
+ * when it is lower than the model's capability ceiling.
+ */
+export function getSafeOpenAIResponsesMaxOutputTokens(options: {
+	contextWindow?: number
+	configuredMaxTokens?: number
+	capabilityMaxTokens?: number
+}): number | undefined {
+	const configuredMaxTokens = options.configuredMaxTokens
+	if (!configuredMaxTokens || configuredMaxTokens <= 0) {
+		return undefined
+	}
+
+	const capabilityMaxTokens = options.capabilityMaxTokens
+	if (capabilityMaxTokens && configuredMaxTokens >= capabilityMaxTokens) {
+		return undefined
+	}
+
+	if (!options.contextWindow || options.contextWindow <= 0) {
+		return configuredMaxTokens
+	}
+
+	// Keep obviously invalid caps from exceeding the full request window even when a reduced explicit cap is set.
+	return Math.min(configuredMaxTokens, options.contextWindow)
+}

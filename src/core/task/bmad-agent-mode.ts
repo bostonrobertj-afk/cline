@@ -491,7 +491,7 @@ ${buildInstalledSkillSection(skillName, installedSkill)}
 export function buildBmadAgentReminder(agent: BmadAgentAllowlistEntry, options: BmadAgentReminderOptions = {}): string {
 	const skillName = options.skillName ?? agent.id
 	const activatedSlashCommand = options.activatedSlashCommand ?? agent.slashCommand
-	return `<active_bmad_agent activated="false" agent_id="${agent.id}" skill_name="${skillName}" slash_command="${formatSlashCommand(activatedSlashCommand)}">
+	return `<active_bmad_agent activated="true" reminder="true" agent_id="${agent.id}" skill_name="${skillName}" slash_command="${formatSlashCommand(activatedSlashCommand)}">
 The active BMAD agent persona for this task is ${agent.id}.
 Remain in this persona until /bmad-exit.
 ${agent.personaReminder ? `${agent.personaReminder}` : ""}

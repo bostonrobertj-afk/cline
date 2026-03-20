@@ -3,7 +3,12 @@ import fs from "fs/promises"
 import os from "os"
 import path from "path"
 import type { SkillMetadata } from "@/shared/skills"
-import { buildBmadAgentActivationInstructions, filterSkillsForBmadAgentMode, resolveBmadAgentActivation } from "./bmad-agent-mode"
+import {
+	buildBmadAgentActivationInstructions,
+	buildBmadAgentReminder,
+	filterSkillsForBmadAgentMode,
+	resolveBmadAgentActivation,
+} from "./bmad-agent-mode"
 
 describe("bmad-agent-mode", () => {
 	const tempDirs: string[] = []
@@ -117,6 +122,22 @@ You must fully embody this test BMAD skill wrapper.
 		expect(instructions).to.not.include("<installed_bmad_skill_wrapper")
 		expect(instructions).to.not.include("<installed_bmad_skill_instructions")
 		expect(instructions?.match(/You must fully embody this test BMAD skill wrapper\./g)?.length).to.equal(1)
+	})
+
+	it("marks follow-up reminder turns as still active while distinguishing them from initial activation", async () => {
+		const workspaceDir = await makeWorkspaceWithSkill("bmad-dev")
+		const activation = await resolveBmadAgentActivation(workspaceDir, "bmad-agent-bmm-dev")
+
+		expect(activation).to.not.equal(null)
+
+		const reminder = buildBmadAgentReminder(activation!.agent, {
+			skillName: activation!.skillName,
+			activatedSlashCommand: activation!.preferredActivationCommand,
+		})
+
+		expect(reminder).to.include('<active_bmad_agent activated="true" reminder="true"')
+		expect(reminder).to.not.include('activated="false"')
+		expect(reminder).to.include("Remain in this persona until /bmad-exit.")
 	})
 
 	describe("filterSkillsForBmadAgentMode", () => {

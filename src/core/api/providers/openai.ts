@@ -1,5 +1,12 @@
 import { DefaultAzureCredential, getBearerTokenProvider } from "@azure/identity"
-import { azureOpenAiDefaultApiVersion, ModelInfo, OpenAiCompatibleModelInfo, openAiModelInfoSaneDefaults } from "@shared/api"
+import { getSafeOpenAIResponsesMaxOutputTokens } from "@core/context/context-management/context-window-utils"
+import {
+	azureOpenAiDefaultApiVersion,
+	ModelInfo,
+	OpenAiCompatibleModelInfo,
+	openAiModelInfoSaneDefaults,
+	openAiNativeModels,
+} from "@shared/api"
 import { normalizeOpenaiReasoningEffort } from "@shared/storage/types"
 import OpenAI, { AzureOpenAI } from "openai"
 import { buildExternalBasicHeaders } from "@/services/EnvUtils"
@@ -102,6 +109,42 @@ export class OpenAiHandler implements ApiHandler {
 				: undefined
 
 		return !!hadPreviousResponseId && errorCode === "previous_response_not_found"
+	}
+
+	private getOpenAiErrorDiagnostics(error: unknown): Record<string, unknown> {
+		if (!error || typeof error !== "object") {
+			return { message: String(error) }
+		}
+
+		const candidate = error as {
+			message?: unknown
+			code?: unknown
+			status?: unknown
+			type?: unknown
+			param?: unknown
+			request_id?: unknown
+		}
+
+		return {
+			message: typeof candidate.message === "string" ? candidate.message : String(error),
+			code: typeof candidate.code === "string" ? candidate.code : undefined,
+			status: typeof candidate.status === "number" ? candidate.status : undefined,
+			type: typeof candidate.type === "string" ? candidate.type : undefined,
+			param: typeof candidate.param === "string" ? candidate.param : undefined,
+			requestId: typeof candidate.request_id === "string" ? candidate.request_id : undefined,
+		}
+	}
+
+	private logOpenAiInfo(event: string, details: Record<string, unknown>): void {
+		Logger.info(`[OpenAI] ${event} ${JSON.stringify(details)}`)
+	}
+
+	private logOpenAiWarn(event: string, details: Record<string, unknown>): void {
+		Logger.warn(`[OpenAI] ${event} ${JSON.stringify(details)}`)
+	}
+
+	private logOpenAiError(event: string, details: Record<string, unknown>): void {
+		Logger.error(`[OpenAI] ${event} ${JSON.stringify(details)}`)
 	}
 
 	@withRetry()
@@ -248,13 +291,17 @@ export class OpenAiHandler implements ApiHandler {
 			temperature = openAiModelInfoSaneDefaults.temperature
 		}
 		let reasoningEffort: string | undefined
-		let maxTokens: number | undefined
-
-		if (this.options.openAiModelInfo?.maxTokens && this.options.openAiModelInfo.maxTokens > 0) {
-			maxTokens = Number(this.options.openAiModelInfo.maxTokens)
-		} else {
-			maxTokens = undefined
-		}
+		const configuredMaxTokens =
+			this.options.openAiModelInfo?.maxTokens && this.options.openAiModelInfo.maxTokens > 0
+				? Number(this.options.openAiModelInfo.maxTokens)
+				: undefined
+		const capabilityMaxTokens =
+			modelId in openAiNativeModels ? openAiNativeModels[modelId as keyof typeof openAiNativeModels].maxTokens : undefined
+		const maxTokens = getSafeOpenAIResponsesMaxOutputTokens({
+			contextWindow: this.options.openAiModelInfo?.contextWindow,
+			configuredMaxTokens,
+			capabilityMaxTokens,
+		})
 
 		if (isDeepseekReasoner || isR1FormatRequired) {
 			responseInput = convertToR1Format([{ role: "user", content: systemPrompt }, ...inputMessages]).map((message: any) => {
@@ -336,20 +383,59 @@ export class OpenAiHandler implements ApiHandler {
 		}
 
 		let stream: any
+		let usedFullHistoryFallback = false
 		try {
-			Logger.debug("OPENAI REQUEST DEBUG", {
+			this.logOpenAiInfo("Responses request path", {
 				model: modelId,
 				previousResponseId,
-				input: request.input,
+				usingPreviousResponseId: !!previousResponseId,
+				usingFullHistoryFallback: false,
+				inputItems: Array.isArray(request.input) ? request.input.length : undefined,
 			})
 
 			stream = await client.responses.create(request)
 		} catch (error) {
+			this.logOpenAiError("Responses request failed", this.getOpenAiErrorDiagnostics(error))
 			if (this.shouldRetryWithFullContext(error, !!previousResponseId)) {
-				stream = await client.responses.create(fallbackRequest)
+				usedFullHistoryFallback = true
+				this.logOpenAiWarn("Retrying with full-history fallback", {
+					model: modelId,
+					previousResponseId,
+					usingPreviousResponseId: false,
+					usingFullHistoryFallback: true,
+					inputItems: Array.isArray(fallbackRequest.input) ? fallbackRequest.input.length : undefined,
+				})
+				try {
+					stream = await client.responses.create(fallbackRequest)
+				} catch (fallbackError) {
+					this.logOpenAiError("Full-history fallback request failed", this.getOpenAiErrorDiagnostics(fallbackError))
+					throw fallbackError
+				}
 			} else {
 				throw error
 			}
+		}
+
+		if (usedFullHistoryFallback) {
+			this.logOpenAiInfo("Responses request completed after full-history fallback", {
+				model: modelId,
+				previousResponseId,
+				usingPreviousResponseId: false,
+				usingFullHistoryFallback: true,
+			})
+		} else if (!previousResponseId) {
+			this.logOpenAiInfo("Responses request completed without previous_response_id", {
+				model: modelId,
+				usingPreviousResponseId: false,
+				usingFullHistoryFallback: false,
+			})
+		} else {
+			this.logOpenAiInfo("Responses request completed without full-history fallback", {
+				model: modelId,
+				previousResponseId,
+				usingPreviousResponseId: true,
+				usingFullHistoryFallback: false,
+			})
 		}
 
 		const toolCallProcessor = new ToolCallProcessor()
