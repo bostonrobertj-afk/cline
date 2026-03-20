@@ -2,17 +2,18 @@ import * as disk from "@core/storage/disk"
 import { expect } from "chai"
 import { describe, it } from "mocha"
 import sinon from "sinon"
+import type { ManagedWorkflowRunState } from "../../../managed-workflows/types"
 import { TaskState } from "../../../TaskState"
 import type { TaskConfig } from "../../types/TaskConfig"
 import { AttemptCompletionHandler } from "../AttemptCompletionHandler"
 import { CompleteWorkflowItemToolHandler } from "../CompleteWorkflowItemToolHandler"
 import { UseSkillToolHandler } from "../UseSkillToolHandler"
 
-function createManagedWorkflowRun() {
+function createManagedWorkflowRun(): ManagedWorkflowRunState {
 	return {
 		workflowId: "bmad-code-review",
 		slashCommand: "bmad-code-review",
-		status: "active" as const,
+		status: "active",
 		currentPhaseIndex: 0,
 		createdAt: Date.now(),
 		updatedAt: Date.now(),
@@ -172,10 +173,11 @@ describe("Managed workflow handlers", () => {
 			expect(getMetadataStub.calledOnce).to.equal(true)
 			expect(saveMetadataStub.calledOnce).to.equal(true)
 			const [, savedMetadata] = saveMetadataStub.firstCall.args
-			expect(savedMetadata.managedWorkflowRun.phases[0].items[0].completed).to.equal(true)
+			expect(savedMetadata.managedWorkflowRun).to.exist
+			expect(savedMetadata.managedWorkflowRun!.phases[0].items[0].completed).to.equal(true)
 			expect((config.callbacks.updateFCListFromToolResponse as sinon.SinonStub).calledOnce).to.equal(true)
 
-			const restoredRun = savedMetadata.managedWorkflowRun
+			const restoredRun = savedMetadata.managedWorkflowRun!
 			expect(restoredRun.workflowId).to.equal("bmad-code-review")
 			expect(restoredRun.phases[0].items[0].completed).to.equal(true)
 		} finally {

@@ -7,6 +7,7 @@ import {
 } from "../ManagedWorkflowController"
 import { clearManagedWorkflowRegistryCache } from "../ManagedWorkflowRegistry"
 import { buildManagedWorkflowPrompt, renderManagedWorkflowTaskProgress } from "../ManagedWorkflowRenderer"
+import type { ManagedWorkflowRunState } from "../types"
 
 describe("ManagedWorkflowController", () => {
 	const cwd = process.cwd()
@@ -91,10 +92,10 @@ describe("ManagedWorkflowController", () => {
 	})
 
 	it("prevents later items from bypassing an unresolved blocked checkpoint", () => {
-		const run = {
+		const run: ManagedWorkflowRunState = {
 			workflowId: "synthetic-workflow",
 			slashCommand: "synthetic-workflow",
-			status: "active" as const,
+			status: "active",
 			currentPhaseIndex: 0,
 			createdAt: Date.now(),
 			updatedAt: Date.now(),
@@ -127,10 +128,10 @@ describe("ManagedWorkflowController", () => {
 	})
 
 	it("prevents later required items from completing before the active workflow item", () => {
-		const run = {
+		const run: ManagedWorkflowRunState = {
 			workflowId: "synthetic-workflow",
 			slashCommand: "synthetic-workflow",
-			status: "active" as const,
+			status: "active",
 			currentPhaseIndex: 0,
 			createdAt: Date.now(),
 			updatedAt: Date.now(),
@@ -157,10 +158,10 @@ describe("ManagedWorkflowController", () => {
 	})
 
 	it("moves to a terminal no-active-phase state after the last required item completes", () => {
-		let run = {
+		let run: ManagedWorkflowRunState = {
 			workflowId: "synthetic-workflow",
 			slashCommand: "synthetic-workflow",
-			status: "active" as const,
+			status: "active",
 			currentPhaseIndex: 0,
 			createdAt: Date.now(),
 			updatedAt: Date.now(),
@@ -186,10 +187,10 @@ describe("ManagedWorkflowController", () => {
 	})
 
 	it("does not allow duplicate completion of an already completed item", () => {
-		const run = {
+		const run: ManagedWorkflowRunState = {
 			workflowId: "synthetic-workflow",
 			slashCommand: "synthetic-workflow",
-			status: "active" as const,
+			status: "active",
 			currentPhaseIndex: 0,
 			createdAt: Date.now(),
 			updatedAt: Date.now(),
@@ -210,10 +211,10 @@ describe("ManagedWorkflowController", () => {
 	})
 
 	it("treats advisory items as visible but non-blocking for workflow completion", () => {
-		let run = {
+		let run: ManagedWorkflowRunState = {
 			workflowId: "synthetic-workflow",
 			slashCommand: "synthetic-workflow",
-			status: "active" as const,
+			status: "active",
 			currentPhaseIndex: 0,
 			createdAt: Date.now(),
 			updatedAt: Date.now(),

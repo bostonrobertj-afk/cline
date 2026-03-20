@@ -22,7 +22,8 @@ export async function getAvailableSlashCommands(controller: Controller, _request
 		)
 	}
 
-	const cwd = controller.workspaceManager?.getPrimaryRoot()?.path
+	const workspaceManager = controller.getWorkspaceManager() ?? (await controller.ensureWorkspaceManager())
+	const cwd = workspaceManager?.getPrimaryRoot()?.path
 	if (cwd) {
 		const managedWorkflows = await loadManagedWorkflowRegistry(cwd)
 		for (const workflow of managedWorkflows) {
