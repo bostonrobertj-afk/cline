@@ -148,6 +148,10 @@ type TaskParams = {
 	taskLockAcquired: boolean
 }
 
+export function shouldIncludePersistentPromptContext(taskState: Pick<TaskState, "activeAgentId" | "activeWorkflowId">): boolean {
+	return !!taskState.activeAgentId || !!taskState.activeWorkflowId
+}
+
 export class Task {
 	// Core task variables
 	readonly taskId: string
@@ -1947,6 +1951,8 @@ export class Task {
 		const isPromptRefreshTurn = this.isPromptRefreshTurn()
 		const useMinimalGptPrompt = this.shouldUseMinimalGptPrompt(providerInfo)
 		const shouldIncludeDynamicPromptContext = this.nextApiRequestIncludesHumanAuthoredInput
+		const shouldIncludePersistentPromptContextForTurn = shouldIncludePersistentPromptContext(this.taskState)
+		const shouldIncludeBmadPromptContext = shouldIncludeDynamicPromptContext || shouldIncludePersistentPromptContextForTurn
 		const host = await HostProvider.env.getHostVersion({})
 		const ide = host?.platform || "Unknown"
 		const isCliEnvironment = host.clineType === ClineClient.Cli
@@ -2018,9 +2024,10 @@ export class Task {
 			// If toggle exists, use it; otherwise default to enabled (true)
 			return toggles[skill.path] !== false
 		})
-		const promptSkills = shouldIncludeDynamicPromptContext ? await this.buildPromptSkillScope(availableSkills) : []
-		const { activeAgentInstructions, activeAgentCatalogInstructions, activeWorkflowReminder } =
-			shouldIncludeDynamicPromptContext ? await this.buildBmadPromptInstructions() : {}
+		const promptSkills = shouldIncludeBmadPromptContext ? await this.buildPromptSkillScope(availableSkills) : []
+		const { activeAgentInstructions, activeAgentCatalogInstructions, activeWorkflowReminder } = shouldIncludeBmadPromptContext
+			? await this.buildBmadPromptInstructions()
+			: {}
 
 		// Snapshot editor tabs so prompt tools can decide whether to include
 		// filetype-specific instructions (e.g. notebooks) without adding bespoke flags.
@@ -2039,7 +2046,7 @@ export class Task {
 			editorTabs,
 			supportsBrowserUse,
 			mcpHub: this.mcpHub,
-			activeAgentId: shouldIncludeDynamicPromptContext ? this.taskState.activeAgentId : undefined,
+			activeAgentId: shouldIncludeBmadPromptContext ? this.taskState.activeAgentId : undefined,
 			activeAgentInstructions,
 			activeAgentCatalogInstructions,
 			activeWorkflowReminder,

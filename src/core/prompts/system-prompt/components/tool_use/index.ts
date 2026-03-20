@@ -46,13 +46,20 @@ function shouldIncludeExamples(context: SystemPromptContext): boolean {
 	return false
 }
 
+function shouldIncludeInlineToolsCatalog(context: SystemPromptContext): boolean {
+	// Native tool-calling models already receive structured tool definitions separately.
+	// Repeating the full tool catalog in the human-readable prompt wastes tokens and can
+	// overshadow higher-priority persona/behavior instructions.
+	return !(context.useMinimalGptPrompt === true && context.enableNativeToolCalls === true)
+}
+
 export async function getToolUseSection(variant: PromptVariant, context: SystemPromptContext): Promise<string> {
 	const template = variant.componentOverrides?.[SystemPromptSection.TOOL_USE]?.template || getToolUseTemplate(context)
 
 	const templateEngine = new TemplateEngine()
 	return templateEngine.resolve(template, context, {
 		TOOL_USE_FORMATTING_SECTION: await getToolUseFormattingSection(variant, context),
-		TOOLS_SECTION: await getToolUseToolsSection(variant, context),
+		TOOLS_SECTION: shouldIncludeInlineToolsCatalog(context) ? await getToolUseToolsSection(variant, context) : "",
 		TOOL_USE_EXAMPLES_SECTION: shouldIncludeExamples(context) ? await getToolUseExamplesSection(variant, context) : "",
 		TOOL_USE_GUIDELINES_SECTION: await getToolUseGuidelinesSection(variant, context),
 		CWD: context.cwd,

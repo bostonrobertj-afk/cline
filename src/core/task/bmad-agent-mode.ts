@@ -276,6 +276,45 @@ ${document.content}
 </installed_bmad_skill_loaded_documents>`
 }
 
+function buildAgentActivationHeader(
+	agent: BmadAgentAllowlistEntry,
+	skillName: string | undefined,
+	activatedSlashCommand: string,
+): string {
+	const skillNameAttr = skillName ? ` skill_name="${skillName}"` : ""
+	const activationSource = skillName
+		? `Activation source: installed BMAD skill "${skillName}".`
+		: "Activation source: fallback persona document."
+
+	return `<active_bmad_agent activated="true" agent_id="${agent.id}"${skillNameAttr} slash_command="${formatSlashCommand(activatedSlashCommand)}">
+Activated via ${formatSlashCommand(activatedSlashCommand)}.
+${activationSource}
+${agent.personaReminder ? `${agent.personaReminder}` : ""}
+Allowed workflow skills while this persona is active: ${agent.allowedSkills.join(", ")}.`
+}
+
+function buildInstalledSkillSection(
+	skillName: string,
+	installedSkill: { instructions: string; referencedDocuments: LoadedInstructionDocument[] },
+): string {
+	const referencedDocumentCount = installedSkill.referencedDocuments.length
+	const summary = `<installed_bmad_skill_activation skill_name="${skillName}">
+Use the installed BMAD activation source for persona behavior and workflow routing.
+${referencedDocumentCount > 0 ? `Treat the loaded document${referencedDocumentCount === 1 ? "" : "s"} below as the primary source of truth for persona, activation, and menu instructions.` : "Treat the installed skill instructions below as the primary source of truth for persona and activation instructions."}
+Remain in character until the user exits BMAD agent mode.
+</installed_bmad_skill_activation>`
+
+	if (referencedDocumentCount > 0) {
+		return `${summary}${buildReferencedDocumentsSection(installedSkill.referencedDocuments)}`
+	}
+
+	return `${summary}
+
+<installed_bmad_skill_instructions skill_name="${skillName}">
+${installedSkill.instructions}
+</installed_bmad_skill_instructions>`
+}
+
 function buildFallbackActivationInstructions(
 	agent: BmadAgentAllowlistEntry,
 	activatedSlashCommand: string,
@@ -287,11 +326,8 @@ function buildFallbackActivationInstructions(
 ${personaContent}`
 		: ""
 
-	return `<active_bmad_agent activated="true" agent_id="${agent.id}" slash_command="${formatSlashCommand(activatedSlashCommand)}">
-The user explicitly activated this BMAD agent persona with ${formatSlashCommand(activatedSlashCommand)}.
-You must enter this persona now and follow its activation/menu instructions.
-${agent.personaReminder ? `${agent.personaReminder}` : ""}
-While this agent mode is active, only use these skills: ${agent.allowedSkills.join(", ")}.
+	return `${buildAgentActivationHeader(agent, undefined, activatedSlashCommand)}
+Follow the fallback persona document below as the source of truth for activation and menu behavior.
 ${personaSection}
 </active_bmad_agent>`
 }
@@ -438,16 +474,8 @@ export async function buildBmadAgentActivationInstructions(
 	const installedSkill = await loadInstalledBmadSkillInstructions(cwd, skillName)
 
 	if (installedSkill) {
-		return `<active_bmad_agent activated="true" agent_id="${agent.id}" skill_name="${skillName}" slash_command="${formatSlashCommand(activatedSlashCommand)}">
-The user explicitly activated this BMAD agent persona with ${formatSlashCommand(activatedSlashCommand)}.
-The installed BMAD skill "${skillName}" is the activation source for this persona.
-You must enter this persona now and follow its activation/menu instructions.
-${agent.personaReminder ? `${agent.personaReminder}` : ""}
-While this agent mode is active, only use these skills: ${agent.allowedSkills.join(", ")}.
-
-<installed_bmad_skill_wrapper skill_name="${skillName}">
-${installedSkill.instructions}
-</installed_bmad_skill_wrapper>${buildReferencedDocumentsSection(installedSkill.referencedDocuments)}
+		return `${buildAgentActivationHeader(agent, skillName, activatedSlashCommand)}
+${buildInstalledSkillSection(skillName, installedSkill)}
 </active_bmad_agent>`
 	}
 

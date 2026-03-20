@@ -341,6 +341,27 @@ describe("Prompt System Integration Tests", () => {
 				},
 			)
 		})
+
+		it("does not inline the verbose tool catalog for BMAD-active GPT-5.4 OpenAI turns", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
+					enableNativeToolCalls: true,
+					useMinimalGptPrompt: true,
+					activeAgentId: "bmad-quick-flow-solo-dev",
+					activeAgentInstructions: '<active_bmad_agent activated="true">stub</active_bmad_agent>',
+				},
+				"gpt-5.4-2026-03-05",
+				async ({ systemPrompt }) => {
+					expect(systemPrompt).to.include("You are Cline operating under the active BMAD agent persona")
+					expect(systemPrompt).to.not.include("# Tools")
+					expect(systemPrompt).to.not.include("## execute_command")
+					expect(systemPrompt).to.not.include("Description: Request to execute a CLI command")
+				},
+			)
+		})
 	})
 
 	describe("Error Handling", () => {
