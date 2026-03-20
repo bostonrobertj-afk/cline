@@ -82,6 +82,7 @@ export function convertToOpenAIResponsesInput(
 	// When chaining, only send new items after that assistant turn.
 	let previousResponseId: string | undefined
 	let messages = _messages
+
 	if (options?.usePreviousResponseId) {
 		for (let i = _messages.length - 1; i >= 0; i--) {
 			const msg = _messages[i]
@@ -97,6 +98,13 @@ export function convertToOpenAIResponsesInput(
 			}
 		}
 	}
+
+	messages = messages.filter((m) => {
+		if (m.role !== "user") return true
+		if (!Array.isArray(m.content)) return true
+
+		return m.content.some((part: any) => part.type !== "tool_result")
+	})
 
 	const allItems: any[] = []
 	const toolUseIdToCallId = new Map<string, string>()
@@ -229,7 +237,13 @@ export function convertToOpenAIResponsesInput(
 							allItems.push({ role: m.role, content: [...messageContent] })
 							messageContent.length = 0
 						}
-						const call_id = part.call_id || toolUseIdToCallId.get(part.tool_use_id) || part.tool_use_id
+						const call_id = part.call_id || toolUseIdToCallId.get(part.tool_use_id)
+
+						if (!call_id) {
+							// 🚨 CRITICAL: skip orphaned tool results
+							continue
+						}
+
 						allItems.push({
 							type: "function_call_output",
 							call_id,

@@ -192,7 +192,7 @@ export class OpenAiNativeHandler implements ApiHandler {
 			tools: responseTools,
 		})
 
-		const fallbackInput = this.stripFunctionCallOutputs(input)
+		const fallbackInput = this.stripFunctionCallChainItems(input)
 
 		const fallbackParams = this.buildResponseCreateParams({
 			modelId: model.id,
@@ -254,8 +254,14 @@ export class OpenAiNativeHandler implements ApiHandler {
 			}))
 	}
 
-	private stripFunctionCallOutputs(input: OpenAI.Responses.ResponseInput): OpenAI.Responses.ResponseInput {
-		return input.filter((item: any) => item?.type !== "function_call_output") as OpenAI.Responses.ResponseInput
+	private stripFunctionCallChainItems(input: OpenAI.Responses.ResponseInput): OpenAI.Responses.ResponseInput {
+		return input.filter((item: any) => {
+			if (!item || typeof item !== "object") {
+				return true
+			}
+
+			return item.type !== "function_call_output" && item.type !== "function_call"
+		}) as OpenAI.Responses.ResponseInput
 	}
 
 	private buildResponseCreateParams(args: {
