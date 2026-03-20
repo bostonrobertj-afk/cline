@@ -2039,7 +2039,7 @@ export class Task {
 		}
 
 		const { systemPrompt, tools } = await getSystemPrompt(promptContext)
-		const effectiveSystemPrompt = shouldIncludeDynamicPromptContext ? systemPrompt : ""
+		const effectiveSystemPrompt = systemPrompt
 		this.taskState.activeAgentJustActivated = false
 		this.taskState.activeWorkflowJustStarted = false
 		this.useNativeToolCalls = !!tools?.length
