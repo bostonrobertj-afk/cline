@@ -190,6 +190,7 @@ export class OpenAiNativeHandler implements ApiHandler {
 			input,
 			previousResponseId,
 			tools: responseTools,
+			store: !useWebsocketMode,
 		})
 
 		const fallbackInput = previousResponseId
@@ -201,6 +202,7 @@ export class OpenAiNativeHandler implements ApiHandler {
 			systemPrompt,
 			input: fallbackInput,
 			tools: responseTools,
+			store: !useWebsocketMode,
 		})
 
 		if (useWebsocketMode && previousResponseId) {
@@ -262,6 +264,7 @@ export class OpenAiNativeHandler implements ApiHandler {
 		input: OpenAI.Responses.ResponseInput
 		tools: OpenAI.Responses.Tool[]
 		previousResponseId?: string
+		store: boolean
 	}): OpenAI.Responses.ResponseCreateParamsStreaming {
 		const requestedEffort = normalizeOpenaiReasoningEffort(this.options.reasoningEffort)
 		const reasoning: { effort: ChatCompletionReasoningEffort; summary: "auto" } | undefined =
@@ -278,7 +281,9 @@ export class OpenAiNativeHandler implements ApiHandler {
 			input: args.input,
 			stream: true,
 			tools: args.tools,
-			store: !args.previousResponseId, // Do not use store when websocket mode is enabled.
+			// Keep HTTP response chains stored so future `previous_response_id` requests can
+			// continue across tool turns. Websocket mode manages storage separately.
+			store: args.store,
 			...(args.previousResponseId ? { previous_response_id: args.previousResponseId } : {}),
 			...(reasoning ? { reasoning } : {}),
 		}
@@ -332,6 +337,10 @@ export class OpenAiNativeHandler implements ApiHandler {
 		}
 
 		if (hadPreviousResponseId && errorMessage.includes("No tool call found for function call output with call_id")) {
+			return true
+		}
+
+		if (hadPreviousResponseId && errorMessage.includes("Item with id") && errorMessage.includes("not found")) {
 			return true
 		}
 
