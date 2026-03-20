@@ -44,6 +44,20 @@ describe("OpenAiNativeHandler", () => {
 		shouldRetry.should.equal(true)
 	})
 
+	it("should retry with full context when OpenAI reports a missing tool output for a chained function call", () => {
+		const handler = new OpenAiNativeHandler({
+			openAiNativeApiKey: "test-api-key",
+			apiModelId: "gpt-5.4-mini-2026-03-17",
+		})
+
+		const shouldRetry = (handler as any).shouldRetryWithFullContext(
+			new Error("400 No tool output found for function call call_jFR9GQbj4wRVT6jV03mQelcY."),
+			true,
+		)
+
+		shouldRetry.should.equal(true)
+	})
+
 	it("should log production-readable native request path details without previous_response_id", async () => {
 		const handler = new OpenAiNativeHandler({
 			openAiNativeApiKey: "test-api-key",

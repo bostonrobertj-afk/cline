@@ -11,6 +11,22 @@ import { TaskConfig } from "../types/TaskConfig"
  * Utility functions for handling tool results and feedback
  */
 export class ToolResultUtils {
+	private static resolveToolResultId(block: ToolUse, toolUseIdMap?: Map<string, string>): string | undefined {
+		const mappedToolUseId = toolUseIdMap?.get(block.call_id || "")
+		if (mappedToolUseId) {
+			return mappedToolUseId
+		}
+
+		// OpenAI Responses tool outputs are keyed by call_id. If the per-turn toolUseIdMap
+		// was not populated for some reason, preserve the native call_id so we can still
+		// serialize a function_call_output instead of degrading to plain text.
+		if (block.isNativeToolCall && block.call_id) {
+			return block.call_id
+		}
+
+		return undefined
+	}
+
 	/**
 	 * Push tool result to user message content with proper formatting
 	 */
@@ -33,8 +49,9 @@ export class ToolResultUtils {
 					})()
 				: toolDescription(block)
 
-			// Get tool_use_id from map using call_id, or use "cline" as fallback for backward compatibility
-			const toolUseId = toolUseIdMap?.get(block.call_id || "") || "cline"
+			// Get tool_use_id from the per-turn mapping when available. For native tool calls,
+			// fall back to the call_id so OpenAI Responses chains can still attach the tool output.
+			const toolUseId = ToolResultUtils.resolveToolResultId(block, toolUseIdMap) || "cline"
 
 			// If we have already added a tool result for this tool use, skip adding another one
 			if (
@@ -51,7 +68,7 @@ export class ToolResultUtils {
 		} else {
 			// For complex content (arrays with text/image blocks), pass it through directly
 			// The content array should already be properly formatted with type, text, source, etc.
-			const toolUseId = toolUseIdMap?.get(block.call_id || "") || "cline"
+			const toolUseId = ToolResultUtils.resolveToolResultId(block, toolUseIdMap) || "cline"
 
 			// If using backward-compatible "cline" ID and content is an array, spread it directly
 			// instead of wrapping it (which would cause JSON.stringify in createToolResultBlock)

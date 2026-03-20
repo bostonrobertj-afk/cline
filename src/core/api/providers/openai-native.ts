@@ -477,6 +477,10 @@ export class OpenAiNativeHandler implements ApiHandler {
 			return true
 		}
 
+		if (hadPreviousResponseId && errorMessage.includes("No tool output found for function call")) {
+			return true
+		}
+
 		if (hadPreviousResponseId && errorMessage.includes("Item with id") && errorMessage.includes("not found")) {
 			return true
 		}
