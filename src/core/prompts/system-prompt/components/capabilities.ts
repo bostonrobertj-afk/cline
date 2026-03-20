@@ -11,7 +11,7 @@ const getCapabilitiesTemplateText = (context: SystemPromptContext) => `CAPABILIT
 - You have access to MCP servers that may provide additional tools and resources. Each server may provide different capabilities that you can use to accomplish tasks more effectively.`
 
 export async function getCapabilitiesSection(variant: PromptVariant, context: SystemPromptContext): Promise<string> {
-	if (context.useMinimalGptPrompt === true && context.isPromptRefreshTurn !== true) {
+	if (context.useMinimalGptPrompt === true) {
 		const browserCapabilities = context.supportsBrowserUse
 			? "- Browser automation is available for web verification when needed."
 			: ""

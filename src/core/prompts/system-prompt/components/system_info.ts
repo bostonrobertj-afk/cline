@@ -55,7 +55,7 @@ export async function getSystemEnv(context: SystemPromptContext, isTesting = fal
 }
 
 export async function getSystemInfo(variant: PromptVariant, context: SystemPromptContext): Promise<string> {
-	if (context.useMinimalGptPrompt === true && context.isPromptRefreshTurn !== true) {
+	if (context.useMinimalGptPrompt === true) {
 		return undefined as any
 	}
 

@@ -7,7 +7,7 @@ export async function getSkillsSection(_variant: PromptVariant, context: SystemP
 	const skills = context.skills
 	if (!skills || skills.length === 0) return undefined
 
-	if (context.useMinimalGptPrompt === true && context.isPromptRefreshTurn !== true) {
+	if (context.useMinimalGptPrompt === true) {
 		const skillNames = skills.map((skill) => `\`${skill.name}\``).join(", ")
 
 		if (context.activeAgentId) {

@@ -41,7 +41,7 @@ const getRulesTemplateText = (context: SystemPromptContext) => `RULES
 - MCP operations should be used one at a time, similar to other tool usage. Wait for confirmation of success before proceeding with additional operations.`
 
 export async function getRulesSection(variant: PromptVariant, context: SystemPromptContext): Promise<string> {
-	if (context.useMinimalGptPrompt === true && context.isPromptRefreshTurn !== true) {
+	if (context.useMinimalGptPrompt === true) {
 		return new TemplateEngine().resolve(
 			`RULES
 

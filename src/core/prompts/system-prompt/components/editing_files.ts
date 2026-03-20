@@ -78,7 +78,7 @@ You have access to two tools for working with files: **write_to_file** and **rep
 By thoughtfully selecting between write_to_file and replace_in_file, you can make your file editing process smoother, safer, and more efficient.`
 
 export async function getEditingFilesSection(variant: PromptVariant, context: SystemPromptContext): Promise<string> {
-	if (context.useMinimalGptPrompt === true && context.isPromptRefreshTurn !== true) {
+	if (context.useMinimalGptPrompt === true) {
 		return new TemplateEngine().resolve(
 			`EDITING FILES
 

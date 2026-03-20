@@ -14,7 +14,7 @@ You accomplish a given task iteratively, breaking it down into clear steps and w
 6. The user may provide feedback, which you can use to make improvements and try again. But DO NOT continue in pointless back and forth conversations, i.e. don't end your responses with questions or offers for further assistance.`
 
 export async function getObjectiveSection(variant: PromptVariant, context: SystemPromptContext): Promise<string> {
-	if (context.useMinimalGptPrompt === true && context.isPromptRefreshTurn !== true) {
+	if (context.useMinimalGptPrompt === true) {
 		return new TemplateEngine().resolve(
 			`OBJECTIVE
 

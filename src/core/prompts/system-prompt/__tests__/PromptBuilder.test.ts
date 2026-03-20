@@ -250,6 +250,43 @@ describe("PromptBuilder", () => {
 		})
 	})
 
+	describe("tool prompt compaction", () => {
+		it("uses compact tool specs for minimal GPT prompts even on refresh turns", () => {
+			const toolPrompt = PromptBuilder.tool(
+				{
+					id: "read_file",
+					name: "read_file",
+					description: "Read a file from disk.",
+					parameters: [
+						{
+							name: "path",
+							required: true,
+							instruction: "Path to the file.",
+							description: "Use an absolute or workspace-relative file path.",
+						},
+						{
+							name: "task_progress",
+							required: false,
+							instruction: "Checklist.",
+						},
+					],
+				} as any,
+				[] as any,
+				{
+					...mockContext,
+					useMinimalGptPrompt: true,
+					isPromptRefreshTurn: true,
+				} as SystemPromptContext,
+			)
+
+			expect(toolPrompt).to.include("## read_file")
+			expect(toolPrompt).to.include("Required params: path")
+			expect(toolPrompt).to.not.include("Parameters:")
+			expect(toolPrompt).to.not.include("Usage:")
+			expect(toolPrompt).to.not.include("Use an absolute or workspace-relative file path.")
+		})
+	})
+
 	describe("VariantBuilder auto-generation", () => {
 		it("should auto-generate baseTemplate from componentOrder when not provided", () => {
 			const config = createVariant(ModelFamily.GENERIC)

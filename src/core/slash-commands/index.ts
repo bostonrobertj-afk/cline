@@ -101,21 +101,18 @@ export async function parseSlashCommands(
 	const slashCommandInTextRegex = /(^|\s)\/([a-zA-Z0-9_.:@-]+)(?=\s|$)/
 
 	// Helper function to calculate positions and remove slash command from text
-	const removeSlashCommand = (
+	const removeCommand = (
 		fullText: string,
-		_tagContent: string, // kept for clarity about the context
 		contentStartIndex: number,
-		slashMatch: RegExpExecArray,
+		matchIndexInContent: number,
+		prefixLength: number,
+		commandText: string,
 	): string => {
-		// slashMatch.index is where the match starts (could include whitespace before /)
-		// slashMatch[1] is the whitespace or empty string before the slash
-		// slashMatch[2] is the command name
-		const slashPositionInContent = slashMatch.index + slashMatch[1].length
-		const slashPositionInFullText = contentStartIndex + slashPositionInContent
-		const commandText = "/" + slashMatch[2]
-		const commandEndPosition = slashPositionInFullText + commandText.length
+		const commandPositionInContent = matchIndexInContent + prefixLength
+		const commandPositionInFullText = contentStartIndex + commandPositionInContent
+		const commandEndPosition = commandPositionInFullText + commandText.length
 
-		return fullText.substring(0, slashPositionInFullText) + fullText.substring(commandEndPosition)
+		return fullText.substring(0, commandPositionInFullText) + fullText.substring(commandEndPosition)
 	}
 
 	// if we find a valid match, we will return inside that block
@@ -130,19 +127,39 @@ export async function parseSlashCommands(
 
 			// Find slash command within the tag content
 			const slashMatch = slashCommandInTextRegex.exec(tagContent)
+			const bareCommandAtStartMatch = /^\s*([a-zA-Z0-9_.:@-]+)(?=\s|$)/.exec(tagContent)
 
-			if (!slashMatch) {
+			const slashCommandName = slashMatch?.[2]
+			const bareCommandName = bareCommandAtStartMatch?.[1]
+			const commandName = slashCommandName ?? bareCommandName
+
+			if (!commandName) {
 				continue
 			}
 
-			// slashMatch[1] is the whitespace or empty string before the slash
-			// slashMatch[2] is the command name
-			const commandName = slashMatch[2] // casing matters
+			const removeMatchedCommand = () => {
+				if (slashMatch && slashCommandName === commandName) {
+					return removeCommand(text, contentStartIndex, slashMatch.index, slashMatch[1].length, "/" + slashMatch[2])
+				}
+
+				if (bareCommandAtStartMatch && bareCommandName === commandName) {
+					const leadingWhitespaceLength = bareCommandAtStartMatch[0].length - bareCommandAtStartMatch[1].length
+					return removeCommand(
+						text,
+						contentStartIndex,
+						bareCommandAtStartMatch.index,
+						leadingWhitespaceLength,
+						bareCommandAtStartMatch[1],
+					)
+				}
+
+				return text
+			}
 
 			if (cwd) {
 				const activation = await resolveBmadAgentActivation(cwd, commandName)
 				if (activation) {
-					const textWithoutSlashCommand = removeSlashCommand(text, tagContent, contentStartIndex, slashMatch)
+					const textWithoutSlashCommand = removeMatchedCommand()
 					telemetryService.captureSlashCommandUsed(ulid, commandName, "builtin")
 					return {
 						processedText: textWithoutSlashCommand,
@@ -157,7 +174,7 @@ export async function parseSlashCommands(
 				}
 
 				if (await isBmadExitCommand(cwd, commandName)) {
-					const textWithoutSlashCommand = removeSlashCommand(text, tagContent, contentStartIndex, slashMatch)
+					const textWithoutSlashCommand = removeMatchedCommand()
 					telemetryService.captureSlashCommandUsed(ulid, commandName, "builtin")
 					return {
 						processedText: textWithoutSlashCommand,
@@ -170,7 +187,10 @@ export async function parseSlashCommands(
 			// we give preference to the default commands if the user has a file with the same name
 			if (SUPPORTED_DEFAULT_COMMANDS.includes(commandName)) {
 				// remove the slash command and add custom instructions at the top of this message
-				const textWithoutSlashCommand = removeSlashCommand(text, tagContent, contentStartIndex, slashMatch)
+				if (!slashMatch) {
+					continue
+				}
+				const textWithoutSlashCommand = removeMatchedCommand()
 				const processedText = commandReplacements[commandName] + textWithoutSlashCommand
 
 				// Track telemetry for builtin slash command usage
@@ -196,7 +216,10 @@ export async function parseSlashCommands(
 							const promptContent = formatMcpPromptResponse(promptResponse)
 
 							// Remove the slash command and add the prompt content
-							const textWithoutSlashCommand = removeSlashCommand(text, tagContent, contentStartIndex, slashMatch)
+							if (!slashMatch) {
+								continue
+							}
+							const textWithoutSlashCommand = removeMatchedCommand()
 							const processedText =
 								`<mcp_prompt server="${serverName}" prompt="${promptName}">\n${promptContent}\n</mcp_prompt>\n` +
 								textWithoutSlashCommand
@@ -265,7 +288,10 @@ export async function parseSlashCommands(
 					}
 
 					// remove the slash command and add custom instructions at the top of this message
-					const textWithoutSlashCommand = removeSlashCommand(text, tagContent, contentStartIndex, slashMatch)
+					if (!slashMatch) {
+						continue
+					}
+					const textWithoutSlashCommand = removeMatchedCommand()
 					const processedText =
 						`<explicit_instructions type="${matchingWorkflow.fileName}">\n${workflowContent}\n</explicit_instructions>\n` +
 						textWithoutSlashCommand

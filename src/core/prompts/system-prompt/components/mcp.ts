@@ -39,7 +39,7 @@ export async function getMcp(variant: PromptVariant, context: SystemPromptContex
 		return undefined
 	}
 
-	if (context.useMinimalGptPrompt === true && context.isPromptRefreshTurn !== true) {
+	if (context.useMinimalGptPrompt === true) {
 		const connectedServerNames = servers
 			.filter((server) => server.status === "connected")
 			.map((server) => server.name)

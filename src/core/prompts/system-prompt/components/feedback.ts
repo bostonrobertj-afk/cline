@@ -15,7 +15,7 @@ export async function getFeedbackSection(variant: PromptVariant, context: System
 		return undefined
 	}
 
-	if (context.useMinimalGptPrompt === true && context.isPromptRefreshTurn !== true) {
+	if (context.useMinimalGptPrompt === true) {
 		return undefined
 	}
 

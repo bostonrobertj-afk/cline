@@ -184,5 +184,41 @@ describe("slash-commands", () => {
 				invokedSlashCommand: "bmad-agent-bmm-quick-flow-solo-dev",
 			})
 		})
+
+		it("should resolve BMAD activation when the command token arrives without a leading slash", async () => {
+			sinon.stub(bmadAgentMode, "resolveBmadAgentActivation").resolves({
+				agent: {
+					id: "bmad-quick-flow-solo-dev",
+					slashCommand: "bmad-quick-flow-solo-dev",
+					personaFile: "_bmad/bmm/agents/quick-flow-solo-dev.md",
+					allowedSkills: ["bmad-quick-spec", "bmad-quick-dev"],
+				},
+				skillName: "bmad-quick-flow-solo-dev",
+				invokedSlashCommand: "bmad-agent-bmm-quick-flow-solo-dev",
+				preferredActivationCommand: "bmad-agent-bmm-quick-flow-solo-dev",
+			})
+			sinon.stub(bmadAgentMode, "isBmadExitCommand").resolves(false)
+
+			const result = await parseSlashCommands(
+				"<task>bmad-agent-bmm-quick-flow-solo-dev CR target is entity-creation-engine.ts</task>",
+				{},
+				{},
+				"test-ulid",
+				undefined,
+				false,
+				undefined,
+				undefined,
+				"/test/project",
+			)
+
+			expect(result.processedText).to.equal("<task> CR target is entity-creation-engine.ts</task>")
+			expect(result.needsClinerulesFileCheck).to.equal(false)
+			expect(result.persistentSlashCommandAction).to.deep.equal({
+				type: "activate_bmad_agent",
+				agentId: "bmad-quick-flow-solo-dev",
+				skillName: "bmad-quick-flow-solo-dev",
+				invokedSlashCommand: "bmad-agent-bmm-quick-flow-solo-dev",
+			})
+		})
 	})
 })

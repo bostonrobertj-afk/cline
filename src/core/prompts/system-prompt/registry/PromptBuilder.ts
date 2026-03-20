@@ -148,7 +148,7 @@ export class PromptBuilder {
 		if (!config.parameters?.length && !config.description?.length) {
 			return ""
 		}
-		const useCompactToolSpecs = context.useMinimalGptPrompt === true && context.isPromptRefreshTurn !== true
+		const useCompactToolSpecs = context.useMinimalGptPrompt === true
 		const displayName = config.name || config.id
 		const title = `## ${displayName}`
 		const description = [`Description: ${config.description}`]
