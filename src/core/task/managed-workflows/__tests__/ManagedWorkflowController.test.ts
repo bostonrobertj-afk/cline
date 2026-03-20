@@ -79,6 +79,56 @@ describe("ManagedWorkflowController", () => {
 		expect(resumedRun.currentPhaseIndex).to.equal(0)
 	})
 
+	it("refreshes an active run when the stored phase layout no longer matches the current workflow definition", async () => {
+		clearManagedWorkflowRegistryCache(cwd)
+
+		const legacyWrapperRun: ManagedWorkflowRunState = {
+			workflowId: "bmad-code-review",
+			slashCommand: "bmad-code-review",
+			status: "active",
+			currentPhaseIndex: 0,
+			createdAt: Date.now(),
+			updatedAt: Date.now(),
+			allRequiredComplete: false,
+			phases: [
+				{
+					id: "workflow",
+					title: "workflow",
+					sourcePath: ".cline/skills/bmad-code-review/workflow.md",
+					sourceContent: "# workflow",
+					completed: false,
+					items: [
+						{
+							id: "workflow::item-1",
+							label: "Configuration Loading: project_name, planning_artifacts, implementation_artifacts, user_name",
+							sourceText:
+								"Configuration Loading: project_name, planning_artifacts, implementation_artifacts, user_name",
+							completed: false,
+						},
+						{
+							id: "workflow::item-2",
+							label: "First Step Execution: First Step Execution",
+							sourceText: "First Step Execution: First Step Execution",
+							completed: false,
+						},
+					],
+				},
+			],
+		}
+
+		const { run: refreshedRun, resumed } = await startOrResumeManagedWorkflowRun(
+			cwd,
+			"bmad-code-review",
+			legacyWrapperRun,
+			"bmad-code-review",
+		)
+
+		expect(resumed).to.equal(false)
+		expect(refreshedRun.phases).to.have.length(4)
+		expect(refreshedRun.phases[0].sourcePath).to.equal(".cline/skills/bmad-code-review/steps/step-01-gather-context.md")
+		expect(refreshedRun.phases[0].items.length).to.be.greaterThan(2)
+	})
+
 	it("prevents checkpoint items from completing before earlier required items are done", async () => {
 		clearManagedWorkflowRegistryCache(cwd)
 

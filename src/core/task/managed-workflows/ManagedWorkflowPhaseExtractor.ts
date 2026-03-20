@@ -453,6 +453,14 @@ async function discoverPhasePaths(cwd: string, workflow: ManagedWorkflowDefiniti
 		}
 	}
 
+	if (workflow.phaseRoots.length > 0 && found.length === 0) {
+		throw new Error(
+			`Managed workflow "${workflow.workflowId}" is configured with explicit phase roots (${workflow.phaseRoots.join(
+				", ",
+			)}) but no phase markdown files were found in the current workspace. This workflow cannot fall back to "${workflow.workflowPath}" because that would ignore the authored step files. Sync or restore the .cline/skills workflow assets and try again.`,
+		)
+	}
+
 	return Array.from(new Set(found))
 }
 

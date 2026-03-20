@@ -1,5 +1,8 @@
 import { expect } from "chai"
+import fs from "fs/promises"
 import { describe, it } from "mocha"
+import os from "os"
+import path from "path"
 import { extractManagedWorkflowPhases } from "../ManagedWorkflowPhaseExtractor"
 import { clearManagedWorkflowRegistryCache, getManagedWorkflowDefinition } from "../ManagedWorkflowRegistry"
 
@@ -69,6 +72,40 @@ describe("ManagedWorkflowPhaseExtractor", () => {
 		for (const item of advisoryOptions) {
 			expect(item.required).to.equal(false)
 			expect(item.advisory).to.equal(true)
+		}
+	})
+
+	it("does not silently fall back to workflow.md when an explicit phase-root workflow is missing its step files", async () => {
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "managed-workflow-phase-roots-"))
+		const workflow = await getManagedWorkflowDefinition(cwd, "bmad-code-review")
+
+		try {
+			await fs.mkdir(path.join(tempRoot, "_bmad", "_config"), { recursive: true })
+			await fs.writeFile(
+				path.join(tempRoot, "_bmad", "_config", "managed-workflows.json"),
+				JSON.stringify([workflow], null, 2),
+				"utf8",
+			)
+			await fs.mkdir(path.join(tempRoot, ".cline", "skills", "bmad-code-review"), { recursive: true })
+			await fs.writeFile(
+				path.join(tempRoot, ".cline", "skills", "bmad-code-review", "workflow.md"),
+				'# workflow\n\n## EXECUTION\n\n<step n="1" goal="Wrapper only"><action>Wrapper action</action></step>\n',
+				"utf8",
+			)
+
+			let thrownError: unknown
+			try {
+				await extractManagedWorkflowPhases(tempRoot, workflow!)
+			} catch (error) {
+				thrownError = error
+			}
+
+			expect(thrownError).to.be.instanceOf(Error)
+			expect((thrownError as Error).message).to.match(
+				/configured with explicit phase roots .* but no phase markdown files were found/i,
+			)
+		} finally {
+			await fs.rm(tempRoot, { recursive: true, force: true })
 		}
 	})
 })

@@ -6,6 +6,48 @@ function isRequiredManagedWorkflowItem(item: ManagedWorkflowItemState): boolean 
 	return item.required !== false && item.optional !== true
 }
 
+function canResumeManagedWorkflowRun(existingRun: ManagedWorkflowRunState, freshRun: ManagedWorkflowRunState): boolean {
+	if (existingRun.status !== "active") {
+		return false
+	}
+
+	if (existingRun.workflowId !== freshRun.workflowId) {
+		return false
+	}
+
+	if (existingRun.phases.length !== freshRun.phases.length) {
+		return false
+	}
+
+	return existingRun.phases.every((phase, phaseIndex) => {
+		const freshPhase = freshRun.phases[phaseIndex]
+		if (!freshPhase) {
+			return false
+		}
+
+		if (phase.sourcePath !== freshPhase.sourcePath || phase.id !== freshPhase.id) {
+			return false
+		}
+
+		if (phase.items.length !== freshPhase.items.length) {
+			return false
+		}
+
+		return phase.items.every((item, itemIndex) => {
+			const freshItem = freshPhase.items[itemIndex]
+			return (
+				!!freshItem &&
+				item.id === freshItem.id &&
+				item.label === freshItem.label &&
+				item.required === freshItem.required &&
+				item.optional === freshItem.optional &&
+				item.advisory === freshItem.advisory &&
+				item.blocked === freshItem.blocked
+			)
+		})
+	})
+}
+
 export async function startOrResumeManagedWorkflowRun(
 	cwd: string,
 	workflowId: string,
@@ -17,7 +59,15 @@ export async function startOrResumeManagedWorkflowRun(
 		throw new Error(`Managed workflow "${workflowId}" is not registered.`)
 	}
 
-	if (existingRun && existingRun.workflowId === definition.workflowId && existingRun.status === "active") {
+	if (existingRun && existingRun.workflowId === definition.workflowId) {
+		const freshRun = await createManagedWorkflowRunFromDefinition(cwd, definition, slashCommand)
+		if (!canResumeManagedWorkflowRun(existingRun, freshRun)) {
+			return {
+				run: freshRun,
+				resumed: false,
+			}
+		}
+
 		return {
 			run: slashCommand ? { ...existingRun, slashCommand, updatedAt: Date.now() } : existingRun,
 			resumed: true,
