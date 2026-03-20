@@ -1210,7 +1210,7 @@ export class Task {
 		} catch (error) {
 			Logger.error("Failed to record environment metadata:", error)
 		}
-
+		this.nextApiRequestIncludesHumanAuthoredInput = this.hasHumanAuthoredInput(userContent)
 		await this.initiateTaskLoop(userContent)
 	}
 
@@ -1484,6 +1484,7 @@ export class Task {
 		}
 
 		await this.messageStateHandler.overwriteApiConversationHistory(modifiedApiConversationHistory)
+		this.nextApiRequestIncludesHumanAuthoredInput = this.hasHumanAuthoredInput(newUserContent)
 		await this.initiateTaskLoop(newUserContent)
 	}
 
