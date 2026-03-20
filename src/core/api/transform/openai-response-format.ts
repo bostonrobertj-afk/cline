@@ -230,12 +230,13 @@ export function convertToOpenAIResponsesInput(
 							allItems.push({ role: m.role, content: [...messageContent] })
 							messageContent.length = 0
 						}
-						const call_id = part.call_id || toolUseIdToCallId.get(part.tool_use_id)
+						const call_id = part.call_id || toolUseIdToCallId.get(part.tool_use_id) || part.tool_use_id // 🔥 fallback
 
-						if (!call_id) {
-							// 🚨 CRITICAL: skip orphaned tool results
-							continue
-						}
+						allItems.push({
+							type: "function_call_output",
+							call_id,
+							output: typeof part.content === "string" ? part.content : JSON.stringify(part.content),
+						})
 
 						allItems.push({
 							type: "function_call_output",
