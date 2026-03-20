@@ -109,6 +109,7 @@ import {
 	buildBmadAgentActivationInstructions,
 	buildBmadAgentCatalogInstructions,
 	buildBmadAgentReminder,
+	filterSkillsForBmadAgentMode,
 	getBmadAgentById,
 	getBmadWorkflowReminder,
 } from "./bmad-agent-mode"
@@ -929,17 +930,12 @@ export class Task {
 	}
 
 	private async buildPromptSkillScope(enabledSkills: SkillMetadata[]): Promise<SkillMetadata[]> {
-		const alwaysAllowedSkillNames = new Set(["bmad-help"])
-
 		if (!this.taskState.activeAgentId) {
-			return enabledSkills.filter((skill) => alwaysAllowedSkillNames.has(skill.name))
+			return filterSkillsForBmadAgentMode(enabledSkills, undefined)
 		}
 
 		const activeAgent = await getBmadAgentById(this.cwd, this.taskState.activeAgentId)
-		const allowedSkillNames = new Set(activeAgent?.allowedSkills ?? [])
-		alwaysAllowedSkillNames.forEach((skillName) => allowedSkillNames.add(skillName))
-
-		return enabledSkills.filter((skill) => allowedSkillNames.has(skill.name))
+		return filterSkillsForBmadAgentMode(enabledSkills, activeAgent ?? null)
 	}
 
 	private hasHumanAuthoredInput(contentBlocks: ClineContent[]): boolean {

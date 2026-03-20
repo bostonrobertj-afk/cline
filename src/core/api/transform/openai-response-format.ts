@@ -219,8 +219,8 @@ export function convertToOpenAIResponsesInput(
 					case "tool_use": {
 						// Function calls use call_id, not related to reasoning item ID
 						const call_id = part.call_id || part.id
-						if (part.call_id) {
-							toolUseIdToCallId.set(part.id, part.call_id)
+						if (part.id && call_id) {
+							toolUseIdToCallId.set(part.id, call_id)
 						}
 						assistantItems.push({
 							type: "function_call",
@@ -267,7 +267,7 @@ export function convertToOpenAIResponsesInput(
 							messageContent.length = 0
 						}
 
-						const call_id = part.call_id || toolUseIdToCallId.get(part.tool_use_id)
+						const call_id = part.call_id || toolUseIdToCallId.get(part.tool_use_id) || part.tool_use_id
 
 						if (!call_id) {
 							throw new Error(

@@ -23,6 +23,7 @@ import * as path from "node:path"
 import { expect } from "chai"
 import type { McpHub } from "@/services/mcp/McpHub"
 import { ModelFamily } from "@/shared/prompts"
+import { isGPT5ModelFamily } from "@/utils/model-utils"
 import { getSystemPrompt } from "../index"
 import type { SystemPromptContext } from "../types"
 
@@ -225,6 +226,7 @@ describe("Prompt System Integration Tests", () => {
 						...baseContext,
 						providerInfo: makeProviderInfo(modelId, providerId),
 						enableNativeToolCalls,
+						useMinimalGptPrompt: isGPT5ModelFamily(modelId),
 					}
 
 					await runPromptTest(this, context, modelId, async ({ tools }) => {
@@ -254,6 +256,7 @@ describe("Prompt System Integration Tests", () => {
 							...override,
 							providerInfo: makeProviderInfo(modelId, providerId),
 							enableNativeToolCalls,
+							useMinimalGptPrompt: isGPT5ModelFamily(modelId),
 						}
 
 						await runPromptTest(this, context, modelId, async ({ systemPrompt, tools }) => {
@@ -319,6 +322,25 @@ describe("Prompt System Integration Tests", () => {
 				})
 			})
 		}
+
+		it("keeps native GPT-5 minimal prompts on the concise variant-specific tool section", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: makeProviderInfo("gpt-5-codex", "openai"),
+					enableNativeToolCalls: true,
+					useMinimalGptPrompt: true,
+				},
+				"gpt-5-codex",
+				async ({ systemPrompt }) => {
+					expect(systemPrompt).to.include("TOOL USE")
+					expect(systemPrompt).to.include("You have access to tools that run after user approval.")
+					expect(systemPrompt).to.not.include("# Tools")
+					expect(systemPrompt).to.not.include("## execute_command")
+				},
+			)
+		})
 	})
 
 	describe("Error Handling", () => {

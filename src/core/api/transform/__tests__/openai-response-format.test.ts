@@ -150,4 +150,45 @@ describe("convertToOpenAIResponsesInput", () => {
 		;(fullContext.input[2] as any).call_id.should.equal("call_tool_789")
 		;(fullContext.input[2] as any).output.should.equal("/workspace")
 	})
+
+	it("should fall back to the tool_use_id when rebuilding full context from stored tool calls without explicit call_id metadata", () => {
+		const messages: ClineStorageMessage[] = [
+			{
+				role: "assistant",
+				id: "resp_missing_call_id",
+				ts: Date.now(),
+				modelInfo: {
+					modelId: "gpt-5.4-2026-03-05",
+					providerId: "openai-native",
+					mode: "act",
+				},
+				content: [
+					{
+						type: "tool_use",
+						id: "fc_0ad17b3bd677d97e0069bcce385b648193a2ccc93a433d1581",
+						name: "execute_command",
+						input: { command: "pwd" },
+					} as any,
+				],
+			},
+			{
+				role: "user",
+				content: [
+					{
+						type: "tool_result",
+						tool_use_id: "fc_0ad17b3bd677d97e0069bcce385b648193a2ccc93a433d1581",
+						content: "/workspace",
+					} as any,
+				],
+			},
+		]
+
+		const fullContext = convertToOpenAIResponsesInput(messages, { usePreviousResponseId: false })
+
+		fullContext.input.should.have.length(2)
+		;(fullContext.input[0] as any).type.should.equal("function_call")
+		;(fullContext.input[0] as any).call_id.should.equal("fc_0ad17b3bd677d97e0069bcce385b648193a2ccc93a433d1581")
+		;(fullContext.input[1] as any).type.should.equal("function_call_output")
+		;(fullContext.input[1] as any).call_id.should.equal("fc_0ad17b3bd677d97e0069bcce385b648193a2ccc93a433d1581")
+	})
 })

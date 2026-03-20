@@ -47,10 +47,7 @@ function shouldIncludeExamples(context: SystemPromptContext): boolean {
 }
 
 export async function getToolUseSection(variant: PromptVariant, context: SystemPromptContext): Promise<string> {
-	const template =
-		context.useMinimalGptPrompt === true
-			? getToolUseTemplate(context)
-			: variant.componentOverrides?.[SystemPromptSection.TOOL_USE]?.template || getToolUseTemplate(context)
+	const template = variant.componentOverrides?.[SystemPromptSection.TOOL_USE]?.template || getToolUseTemplate(context)
 
 	const templateEngine = new TemplateEngine()
 	return templateEngine.resolve(template, context, {

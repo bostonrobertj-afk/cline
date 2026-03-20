@@ -78,7 +78,7 @@ export function toolSpecFunctionDefinition(tool: ClineToolSpec, context: SystemP
 			// Build parameter schema
 			const paramSchema: any = {
 				type: paramType,
-				description: replacer(resolveInstruction(param.instruction, context), context),
+				description: getNativeToolParameterDescription(tool, param, context),
 			}
 
 			// Add items for array types
@@ -125,7 +125,7 @@ export function toolSpecFunctionDefinition(tool: ClineToolSpec, context: SystemP
 		type: "function",
 		function: {
 			name: tool.name,
-			description: replacer(tool.description, context),
+			description: getNativeToolDescription(tool, context),
 			strict: false,
 			parameters: {
 				type: "object",
@@ -412,6 +412,88 @@ function replacer(description: string, context: SystemPromptContext): string {
 		.replace(/{{BROWSER_VIEWPORT_HEIGHT}}/g, String(height))
 		.replace(/{{CWD}}/g, cwd)
 		.replace(/{{MULTI_ROOT_HINT}}/g, multiRootHint)
+}
+
+function shouldCompactNativeToolSchema(context: SystemPromptContext): boolean {
+	return context.enableNativeToolCalls === true && context.useMinimalGptPrompt === true
+}
+
+function firstSentence(value: string): string {
+	const normalized = value.replace(/\s+/g, " ").trim()
+	if (!normalized) {
+		return normalized
+	}
+
+	const sentenceEnd = normalized.match(/[.!?](?:\s|$)/)
+	if (sentenceEnd?.index !== undefined) {
+		return normalized.slice(0, sentenceEnd.index + 1).trim()
+	}
+
+	return normalized
+}
+
+function getNativeToolDescription(tool: ClineToolSpec, context: SystemPromptContext): string {
+	const resolved = replacer(tool.description, context)
+	if (!shouldCompactNativeToolSchema(context)) {
+		return resolved
+	}
+
+	switch (tool.name) {
+		case "apply_patch":
+			return "Apply a V4A patch by passing the complete `apply_patch` command in `input` with `*** Begin Patch` and `*** End Patch`."
+		case "browser_action":
+			return "Control the browser with one action per call. Start with `launch`, end with `close`, and while the browser is open use only this tool."
+		case "execute_command":
+			return "Run a shell command in the current workspace."
+		case "attempt_completion":
+			return "Present the final result to the user when the task is complete."
+		case "ask_followup_question":
+			return "Ask the user one concise follow-up question when required input cannot be inferred."
+		case "plan_mode_respond":
+			return "Present a concrete plan when the task is in PLAN MODE."
+		case "use_skill":
+			return "Activate a skill by exact name when the request matches an available skill."
+		default:
+			return firstSentence(resolved)
+	}
+}
+
+function getNativeToolParameterDescription(
+	tool: ClineToolSpec,
+	param: NonNullable<ClineToolSpec["parameters"]>[number],
+	context: SystemPromptContext,
+): string {
+	const resolved = replacer(resolveInstruction(param.instruction, context), context)
+	if (!shouldCompactNativeToolSchema(context)) {
+		return resolved
+	}
+
+	if (param.name === "task_progress") {
+		return "Optional Markdown checklist of current task progress."
+	}
+
+	if (tool.name === "apply_patch" && param.name === "input") {
+		return "Complete `apply_patch` command to execute."
+	}
+
+	if (tool.name === "browser_action") {
+		switch (param.name) {
+			case "action":
+				return "Browser action: `launch`, `click`, `type`, `scroll_down`, `scroll_up`, or `close`."
+			case "url":
+				return "URL for `launch`."
+			case "coordinate":
+				return "Click coordinate as `x,y` within the browser viewport."
+			case "text":
+				return "Text for `type`."
+		}
+	}
+
+	if (tool.name === "execute_command" && param.name === "requires_approval") {
+		return "Set true for impactful or risky commands; false for safe non-destructive commands."
+	}
+
+	return firstSentence(resolved)
 }
 
 /**

@@ -1,3 +1,4 @@
+import type { SkillMetadata } from "@shared/skills"
 import fs from "fs/promises"
 import path from "path"
 import { discoverSkills, getAvailableSkills, getSkillContent } from "../context/instructions/user-instructions/skills"
@@ -24,6 +25,104 @@ type WorkflowReminderConfig = Record<string, WorkflowReminderEntry>
 const CONFIG_PATH = path.join("_bmad", "_config", "agent-workflow-allowlist.json")
 const WORKFLOW_REMINDERS_PATH = path.join("_bmad", "_config", "workflow-reminders.json")
 export const BMAD_AGENT_ALIAS_PREFIX = "bmad-agent-bmm-"
+const ALWAYS_ALLOWED_BMAD_SKILL_NAMES = ["bmad-help"] as const
+
+const BUILTIN_BMAD_AGENT_ALLOWLIST: ReadonlyArray<BmadAgentAllowlistEntry> = [
+	{
+		id: "bmad-analyst",
+		slashCommand: "bmad-analyst",
+		personaFile: "_bmad/bmm/agents/analyst.md",
+		personaReminder:
+			"Stay in the Business Analyst persona: precise, evidence-driven, and focused on requirements, research, and root-cause clarity.",
+		allowedSkills: [
+			"bmad-brainstorming",
+			"bmad-market-research",
+			"bmad-domain-research",
+			"bmad-technical-research",
+			"bmad-create-product-brief",
+			"bmad-document-project",
+			"bmad-party-mode",
+		],
+	},
+	{
+		id: "bmad-pm",
+		slashCommand: "bmad-pm",
+		personaFile: "_bmad/bmm/agents/pm.md",
+		personaReminder:
+			"Stay in the Product Manager persona: scope tightly, ask why, and keep decisions centered on user value and product clarity.",
+		allowedSkills: [
+			"bmad-create-prd",
+			"bmad-validate-prd",
+			"bmad-edit-prd",
+			"bmad-create-epics-and-stories",
+			"bmad-check-implementation-readiness",
+			"bmad-correct-course",
+			"bmad-party-mode",
+		],
+	},
+	{
+		id: "bmad-architect",
+		slashCommand: "bmad-architect",
+		personaFile: "_bmad/bmm/agents/architect.md",
+		personaReminder:
+			"Stay in the Architect persona: calm, pragmatic, tradeoff-aware, and focused on scalable technical decisions.",
+		allowedSkills: ["bmad-create-architecture", "bmad-check-implementation-readiness", "bmad-party-mode"],
+	},
+	{
+		id: "bmad-ux-designer",
+		slashCommand: "bmad-ux-designer",
+		personaFile: "_bmad/bmm/agents/ux-designer.md",
+		personaReminder:
+			"Stay in the UX Designer persona: user-centered, flow-focused, and attentive to states, edge cases, and experience quality.",
+		allowedSkills: ["bmad-create-ux-design", "bmad-party-mode"],
+	},
+	{
+		id: "bmad-sm",
+		slashCommand: "bmad-sm",
+		personaFile: "_bmad/bmm/agents/sm.md",
+		personaReminder:
+			"Stay in the Scrum Master persona: crisp, checklist-driven, and focused on implementation-ready stories and clear sequencing.",
+		allowedSkills: [
+			"bmad-sprint-planning",
+			"bmad-create-story",
+			"bmad-retrospective",
+			"bmad-correct-course",
+			"bmad-party-mode",
+		],
+	},
+	{
+		id: "bmad-dev",
+		slashCommand: "bmad-dev",
+		personaFile: "_bmad/bmm/agents/dev.md",
+		personaReminder:
+			"Stay in the Developer persona: concise, implementation-first, and anchored in files, tasks, tests, and code quality.",
+		allowedSkills: ["bmad-dev-story", "bmad-code-review", "bmad-party-mode"],
+	},
+	{
+		id: "bmad-qa",
+		slashCommand: "bmad-qa",
+		personaFile: "_bmad/bmm/agents/qa.md",
+		personaReminder:
+			"Stay in the QA persona: practical, coverage-focused, and biased toward the smallest test set that gives confidence.",
+		allowedSkills: ["bmad-qa-generate-e2e-tests", "bmad-party-mode"],
+	},
+	{
+		id: "bmad-tech-writer",
+		slashCommand: "bmad-tech-writer",
+		personaFile: "_bmad/bmm/agents/tech-writer/tech-writer.md",
+		personaReminder:
+			"Stay in the Technical Writer persona: clear, structured, and focused on usable documentation and handoff quality.",
+		allowedSkills: ["bmad-document-project", "bmad-party-mode"],
+	},
+	{
+		id: "bmad-quick-flow-solo-dev",
+		slashCommand: "bmad-quick-flow-solo-dev",
+		personaFile: "_bmad/bmm/agents/quick-flow-solo-dev.md",
+		personaReminder:
+			"Stay in the Quick Flow Solo Dev persona: fast, lean, and relentlessly focused on shipping scoped work with minimum ceremony.",
+		allowedSkills: ["bmad-quick-spec", "bmad-quick-dev", "bmad-code-review", "bmad-party-mode"],
+	},
+]
 
 type BmadAgentActivationResolution = {
 	agent: BmadAgentAllowlistEntry
@@ -54,6 +153,46 @@ async function loadAgentAllowlistConfig(cwd: string): Promise<BmadAgentAllowlist
 		return JSON.parse(raw) as BmadAgentAllowlistConfig
 	} catch {
 		return undefined
+	}
+}
+
+async function getConfiguredBmadAgentAllowlist(cwd: string): Promise<BmadAgentAllowlistConfig | undefined> {
+	return loadAgentAllowlistConfig(cwd)
+}
+
+function findMatchingBmadAgent(
+	agents: ReadonlyArray<BmadAgentAllowlistEntry>,
+	commandName: string,
+	aliasNormalizedCommand?: string,
+): BmadAgentAllowlistEntry | undefined {
+	return agents.find(
+		(agent) =>
+			agent.slashCommand === commandName ||
+			agent.id === commandName ||
+			(aliasNormalizedCommand !== undefined && agent.id === aliasNormalizedCommand),
+	)
+}
+
+async function getAvailableBmadSkills(cwd: string): Promise<SkillMetadata[]> {
+	const discoveredSkills = await discoverSkills(cwd)
+	return getAvailableSkills(discoveredSkills)
+}
+
+async function hasAvailableSkill(cwd: string, skillName: string): Promise<boolean> {
+	const availableSkills = await getAvailableBmadSkills(cwd)
+	return availableSkills.some((skill) => skill.name === skillName)
+}
+
+async function hasPersonaFallback(cwd: string, personaFile: string): Promise<boolean> {
+	if (!personaFile) {
+		return false
+	}
+
+	try {
+		await fs.access(path.resolve(cwd, personaFile))
+		return true
+	} catch {
+		return false
 	}
 }
 
@@ -96,8 +235,7 @@ async function loadInstalledBmadSkillInstructions(
 	cwd: string,
 	skillName: string,
 ): Promise<{ instructions: string; referencedDocuments: LoadedInstructionDocument[] } | undefined> {
-	const discoveredSkills = await discoverSkills(cwd)
-	const availableSkills = getAvailableSkills(discoveredSkills)
+	const availableSkills = await getAvailableBmadSkills(cwd)
 	const skillContent = await getSkillContent(skillName, availableSkills)
 
 	if (!skillContent) {
@@ -187,16 +325,19 @@ export async function resolveBmadAgentActivation(
 	cwd: string,
 	commandName: string,
 ): Promise<BmadAgentActivationResolution | undefined> {
-	const config = await loadAgentAllowlistConfig(cwd)
 	const aliasNormalizedCommand = normalizeBmadAliasCommand(commandName)
-	const matchingAgent = config?.agents.find(
-		(agent) =>
-			agent.slashCommand === commandName ||
-			agent.id === commandName ||
-			(aliasNormalizedCommand !== undefined && agent.id === aliasNormalizedCommand),
-	)
+	const configuredAgents = (await getConfiguredBmadAgentAllowlist(cwd))?.agents ?? []
+	const matchingAgent =
+		findMatchingBmadAgent(configuredAgents, commandName, aliasNormalizedCommand) ??
+		findMatchingBmadAgent(BUILTIN_BMAD_AGENT_ALLOWLIST, commandName, aliasNormalizedCommand)
 
 	if (!matchingAgent) {
+		return undefined
+	}
+
+	const activationSourceAvailable =
+		(await hasAvailableSkill(cwd, matchingAgent.id)) || (await hasPersonaFallback(cwd, matchingAgent.personaFile))
+	if (!activationSourceAvailable) {
 		return undefined
 	}
 
@@ -209,18 +350,24 @@ export async function resolveBmadAgentActivation(
 }
 
 export async function getBmadAgentBySlashCommand(cwd: string, commandName: string): Promise<BmadAgentAllowlistEntry | undefined> {
-	const config = await loadAgentAllowlistConfig(cwd)
-	return config?.agents.find((agent) => agent.slashCommand === commandName)
+	const configuredAgents = (await getConfiguredBmadAgentAllowlist(cwd))?.agents ?? []
+	return (
+		configuredAgents.find((agent) => agent.slashCommand === commandName) ??
+		BUILTIN_BMAD_AGENT_ALLOWLIST.find((agent) => agent.slashCommand === commandName)
+	)
 }
 
 export async function getBmadAgentById(cwd: string, agentId: string): Promise<BmadAgentAllowlistEntry | undefined> {
-	const config = await loadAgentAllowlistConfig(cwd)
-	return config?.agents.find((agent) => agent.id === agentId)
+	const configuredAgents = (await getConfiguredBmadAgentAllowlist(cwd))?.agents ?? []
+	return (
+		configuredAgents.find((agent) => agent.id === agentId) ??
+		BUILTIN_BMAD_AGENT_ALLOWLIST.find((agent) => agent.id === agentId)
+	)
 }
 
 export async function isBmadExitCommand(cwd: string, commandName: string): Promise<boolean> {
-	const config = await loadAgentAllowlistConfig(cwd)
-	return config?.exitCommand === commandName
+	const configuredExitCommand = (await getConfiguredBmadAgentAllowlist(cwd))?.exitCommand
+	return (configuredExitCommand ?? "bmad-exit") === commandName
 }
 
 export async function getBmadAgentReference(cwd: string): Promise<string | undefined> {
@@ -329,4 +476,24 @@ export function buildBmadExitInstructions(): string {
 The user explicitly exited BMAD agent mode with /bmad-exit.
 Do not continue any previously active BMAD agent persona unless reactivated with another /bmad-* command.
 </active_bmad_agent_exit>`
+}
+
+export function filterSkillsForBmadAgentMode(
+	enabledSkills: SkillMetadata[],
+	activeAgent: Pick<BmadAgentAllowlistEntry, "allowedSkills"> | undefined | null,
+): SkillMetadata[] {
+	const alwaysAllowedSkillNames = new Set<string>(ALWAYS_ALLOWED_BMAD_SKILL_NAMES)
+
+	if (activeAgent === undefined) {
+		return enabledSkills
+	}
+
+	if (activeAgent === null) {
+		return enabledSkills.filter((skill) => alwaysAllowedSkillNames.has(skill.name))
+	}
+
+	const allowedSkillNames = new Set(activeAgent.allowedSkills)
+	alwaysAllowedSkillNames.forEach((skillName) => allowedSkillNames.add(skillName))
+
+	return enabledSkills.filter((skill) => allowedSkillNames.has(skill.name))
 }

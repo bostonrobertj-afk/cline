@@ -102,6 +102,13 @@ class ToolUseHandler {
 			pending = this.createPendingToolUse(delta.id, delta.name || "", call_id)
 		}
 
+		// OpenAI Responses can emit the function-call item id (`fc_*`) before the stable
+		// `call_id`. Upgrade the pending tool use as soon as the real call id arrives so
+		// downstream tool_result blocks can reference the correct Responses identifier.
+		if (call_id && pending.call_id !== call_id) {
+			pending.call_id = call_id
+		}
+
 		if (delta.name) {
 			pending.name = delta.name
 		}

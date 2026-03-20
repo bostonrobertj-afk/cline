@@ -126,4 +126,45 @@ describe("native tool placeholder replacement", () => {
 			expect(desc).to.not.include("{{MULTI_ROOT_HINT}}")
 		}
 	})
+
+	it("compacts native GPT tool descriptions and task_progress parameter text in minimal GPT mode", () => {
+		const context: SystemPromptContext = {
+			...mockContext,
+			enableNativeToolCalls: true,
+			useMinimalGptPrompt: true,
+			providerInfo: {
+				providerId: "openai",
+				model: { id: "gpt-5.4-2026-03-05", info: { supportsPromptCache: false } },
+				mode: "act",
+			},
+		}
+		const tool = makeTool({
+			name: "apply_patch",
+			description:
+				'This is a custom utility that makes it more convenient to add, remove, move, or edit code in a single file. To use the `apply_patch` command, you should pass a message of the following structure as "input": ...',
+			parameters: [
+				{
+					name: "input",
+					required: true,
+					instruction: "The apply_patch command that you wish to execute.",
+				},
+				{
+					name: "task_progress",
+					required: false,
+					instruction:
+						"A checklist showing task progress after this tool use is completed. The task_progress parameter must be included as a separate parameter inside of the parent tool call.",
+				},
+			],
+		})
+
+		const openAI = toolSpecFunctionDefinition(tool, context) as any
+
+		expect(openAI.function.description).to.equal(
+			"Apply a V4A patch by passing the complete `apply_patch` command in `input` with `*** Begin Patch` and `*** End Patch`.",
+		)
+		expect(openAI.function.parameters.properties.input.description).to.equal("Complete `apply_patch` command to execute.")
+		expect(openAI.function.parameters.properties.task_progress.description).to.equal(
+			"Optional Markdown checklist of current task progress.",
+		)
+	})
 })
