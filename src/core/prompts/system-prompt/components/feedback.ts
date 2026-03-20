@@ -15,6 +15,10 @@ export async function getFeedbackSection(variant: PromptVariant, context: System
 		return undefined
 	}
 
+	if (context.useMinimalGptPrompt === true && context.isPromptRefreshTurn !== true) {
+		return undefined
+	}
+
 	const template = variant.componentOverrides?.[SystemPromptSection.FEEDBACK]?.template || FEEDBACK_TEMPLATE_TEXT
 
 	return new TemplateEngine().resolve(template, context, {})

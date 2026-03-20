@@ -14,10 +14,10 @@ import {
 	reportBugToolResponse,
 } from "../prompts/commands"
 import { StateManager } from "../storage/StateManager"
-import { getBmadAgentBySlashCommand, isBmadExitCommand } from "../task/bmad-agent-mode"
+import { isBmadExitCommand, resolveBmadAgentActivation } from "../task/bmad-agent-mode"
 
 export type PersistentSlashCommandAction =
-	| { type: "activate_bmad_agent"; agentId: string }
+	| { type: "activate_bmad_agent"; agentId: string; skillName: string; invokedSlashCommand: string }
 	| { type: "exit_bmad_agent" }
 
 /**
@@ -54,7 +54,11 @@ export async function parseSlashCommands(
 	providerInfo?: ApiProviderInfo,
 	mcpPromptFetcher?: McpPromptFetcher,
 	cwd?: string,
-): Promise<{ processedText: string; needsClinerulesFileCheck: boolean; persistentSlashCommandAction?: PersistentSlashCommandAction }> {
+): Promise<{
+	processedText: string
+	needsClinerulesFileCheck: boolean
+	persistentSlashCommandAction?: PersistentSlashCommandAction
+}> {
 	const SUPPORTED_DEFAULT_COMMANDS = ["newtask", "smol", "compact", "newrule", "reportbug", "deep-planning", "explain-changes"]
 
 	// Determine if the current provider/model/setting actually uses native tool calling
@@ -136,14 +140,19 @@ export async function parseSlashCommands(
 			const commandName = slashMatch[2] // casing matters
 
 			if (cwd) {
-				const matchingAgent = await getBmadAgentBySlashCommand(cwd, commandName)
-				if (matchingAgent) {
+				const activation = await resolveBmadAgentActivation(cwd, commandName)
+				if (activation) {
 					const textWithoutSlashCommand = removeSlashCommand(text, tagContent, contentStartIndex, slashMatch)
 					telemetryService.captureSlashCommandUsed(ulid, commandName, "builtin")
 					return {
 						processedText: textWithoutSlashCommand,
 						needsClinerulesFileCheck: false,
-						persistentSlashCommandAction: { type: "activate_bmad_agent", agentId: matchingAgent.id },
+						persistentSlashCommandAction: {
+							type: "activate_bmad_agent",
+							agentId: activation.agent.id,
+							skillName: activation.skillName,
+							invokedSlashCommand: activation.invokedSlashCommand,
+						},
 					}
 				}
 

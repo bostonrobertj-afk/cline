@@ -62,7 +62,7 @@ import { convertClineMessageToProto } from "@shared/proto-conversions/cline-mess
 import type { SkillMetadata } from "@shared/skills"
 import { ClineDefaultTool, READ_ONLY_TOOLS } from "@shared/tools"
 import { ClineAskResponse } from "@shared/WebviewMessage"
-import { isLocalModel, isNextGenModelFamily, isParallelToolCallingEnabled } from "@utils/model-utils"
+import { isGPT5ModelFamily, isLocalModel, isNextGenModelFamily, isParallelToolCallingEnabled } from "@utils/model-utils"
 import { filterExistingFiles } from "@utils/tabFiltering"
 import cloneDeep from "clone-deep"
 import fs from "fs/promises"
@@ -107,6 +107,7 @@ import { executeHook } from "../hooks/hook-executor"
 import { StateManager } from "../storage/StateManager"
 import {
 	buildBmadAgentActivationInstructions,
+	buildBmadAgentCatalogInstructions,
 	buildBmadAgentReminder,
 	getBmadAgentById,
 	getBmadWorkflowReminder,
@@ -901,11 +902,15 @@ export class Task {
 
 		if (action.type === "activate_bmad_agent") {
 			this.taskState.activeAgentId = action.agentId
+			this.taskState.activeAgentSkillName = action.skillName
+			this.taskState.activeAgentInvokedSlashCommand = action.invokedSlashCommand
 			this.taskState.activeAgentJustActivated = true
 			this.taskState.activeWorkflowId = undefined
 			this.taskState.activeWorkflowJustStarted = false
 		} else {
 			this.taskState.activeAgentId = undefined
+			this.taskState.activeAgentSkillName = undefined
+			this.taskState.activeAgentInvokedSlashCommand = undefined
 			this.taskState.activeAgentJustActivated = false
 			this.taskState.activeWorkflowId = undefined
 			this.taskState.activeWorkflowJustStarted = false
@@ -914,6 +919,8 @@ export class Task {
 		try {
 			const taskMetadata = await getTaskMetadata(this.taskId)
 			taskMetadata.activeAgentId = this.taskState.activeAgentId
+			taskMetadata.activeAgentSkillName = this.taskState.activeAgentSkillName
+			taskMetadata.activeAgentInvokedSlashCommand = this.taskState.activeAgentInvokedSlashCommand
 			taskMetadata.activeWorkflowId = this.taskState.activeWorkflowId
 			await saveTaskMetadata(this.taskId, taskMetadata)
 		} catch {
@@ -966,19 +973,31 @@ export class Task {
 
 	private async buildBmadPromptInstructions(): Promise<{
 		activeAgentInstructions?: string
+		activeAgentCatalogInstructions?: string
 		activeWorkflowReminder?: string
 	}> {
 		let activeAgentInstructions: string | undefined
+		let activeAgentCatalogInstructions: string | undefined
 		let activeWorkflowReminder: string | undefined
 
 		if (this.taskState.activeAgentId) {
 			if (this.taskState.activeAgentJustActivated) {
-				activeAgentInstructions = await buildBmadAgentActivationInstructions(this.cwd, this.taskState.activeAgentId)
+				activeAgentInstructions = await buildBmadAgentActivationInstructions(this.cwd, this.taskState.activeAgentId, {
+					skillName: this.taskState.activeAgentSkillName,
+					activatedSlashCommand: this.taskState.activeAgentInvokedSlashCommand,
+				})
 			} else {
 				const activeAgent = await getBmadAgentById(this.cwd, this.taskState.activeAgentId)
 				if (activeAgent) {
-					activeAgentInstructions = buildBmadAgentReminder(activeAgent)
+					activeAgentInstructions = buildBmadAgentReminder(activeAgent, {
+						skillName: this.taskState.activeAgentSkillName,
+						activatedSlashCommand: this.taskState.activeAgentInvokedSlashCommand,
+					})
 				}
+			}
+
+			if (this.taskState.activeAgentJustActivated || this.isPromptRefreshTurn()) {
+				activeAgentCatalogInstructions = await buildBmadAgentCatalogInstructions(this.cwd, this.taskState.activeAgentId)
 			}
 		}
 
@@ -986,13 +1005,34 @@ export class Task {
 			activeWorkflowReminder = await getBmadWorkflowReminder(this.cwd, this.taskState.activeWorkflowId)
 		}
 
-		return { activeAgentInstructions, activeWorkflowReminder }
+		return { activeAgentInstructions, activeAgentCatalogInstructions, activeWorkflowReminder }
+	}
+
+	private getPromptRefreshInterval(): number {
+		const focusChainSettings = this.stateManager.getGlobalSettingsKey("focusChainSettings")
+		return Math.max(1, focusChainSettings?.remindClineInterval ?? 6)
+	}
+
+	private isPromptRefreshTurn(): boolean {
+		const refreshInterval = this.getPromptRefreshInterval()
+		return (
+			this.taskState.apiRequestCount === 1 ||
+			this.taskState.activeAgentJustActivated ||
+			this.taskState.didRespondToPlanAskBySwitchingMode ||
+			this.taskState.apiRequestCount % refreshInterval === 0
+		)
+	}
+
+	private shouldUseMinimalGptPrompt(providerInfo: ApiProviderInfo): boolean {
+		return isGPT5ModelFamily(providerInfo.model.id)
 	}
 
 	private async restoreBmadStateFromMetadata(): Promise<void> {
 		try {
 			const metadata = await getTaskMetadata(this.taskId)
 			this.taskState.activeAgentId = metadata.activeAgentId
+			this.taskState.activeAgentSkillName = metadata.activeAgentSkillName
+			this.taskState.activeAgentInvokedSlashCommand = metadata.activeAgentInvokedSlashCommand
 			this.taskState.activeAgentJustActivated = false
 			this.taskState.activeWorkflowId = metadata.activeWorkflowId
 			this.taskState.activeWorkflowJustStarted = false
@@ -1908,6 +1948,8 @@ export class Task {
 		})
 
 		const providerInfo = this.getCurrentProviderInfo()
+		const isPromptRefreshTurn = this.isPromptRefreshTurn()
+		const useMinimalGptPrompt = this.shouldUseMinimalGptPrompt(providerInfo)
 		const shouldIncludeDynamicPromptContext = this.nextApiRequestIncludesHumanAuthoredInput
 		const host = await HostProvider.env.getHostVersion({})
 		const ide = host?.platform || "Unknown"
@@ -1981,9 +2023,8 @@ export class Task {
 			return toggles[skill.path] !== false
 		})
 		const promptSkills = shouldIncludeDynamicPromptContext ? await this.buildPromptSkillScope(availableSkills) : []
-		const { activeAgentInstructions, activeWorkflowReminder } = shouldIncludeDynamicPromptContext
-			? await this.buildBmadPromptInstructions()
-			: {}
+		const { activeAgentInstructions, activeAgentCatalogInstructions, activeWorkflowReminder } =
+			shouldIncludeDynamicPromptContext ? await this.buildBmadPromptInstructions() : {}
 
 		// Snapshot editor tabs so prompt tools can decide whether to include
 		// filetype-specific instructions (e.g. notebooks) without adding bespoke flags.
@@ -2004,7 +2045,10 @@ export class Task {
 			mcpHub: this.mcpHub,
 			activeAgentId: shouldIncludeDynamicPromptContext ? this.taskState.activeAgentId : undefined,
 			activeAgentInstructions,
+			activeAgentCatalogInstructions,
 			activeWorkflowReminder,
+			isPromptRefreshTurn,
+			useMinimalGptPrompt,
 			skills: promptSkills,
 			focusChainSettings: this.stateManager.getGlobalSettingsKey("focusChainSettings"),
 			globalClineRulesFileInstructions: shouldIncludeDynamicPromptContext ? globalClineRulesFileInstructions : undefined,
@@ -3346,6 +3390,7 @@ export class Task {
 		userContent: ClineContent[],
 		includeFileDetails = false,
 		useCompactPrompt = false,
+		includeDetailedEnvironmentDetails = true,
 	): Promise<[ClineContent[], string, boolean]> {
 		let needsClinerulesFileCheck = false
 		let persistentSlashCommandAction: PersistentSlashCommandAction | undefined
@@ -3452,7 +3497,7 @@ export class Task {
 		// (Note: this caused the @/ import alias bug where file contents were being parsed as well, since v2 converted tool results to text blocks)
 		const [processedUserContent, environmentDetails] = await Promise.all([
 			Promise.all(userContent.map(processContentBlock)),
-			this.getEnvironmentDetails(includeFileDetails),
+			this.getEnvironmentDetails(includeFileDetails, includeDetailedEnvironmentDetails),
 		])
 
 		// Check clinerulesData if needed
@@ -3584,12 +3629,14 @@ export class Task {
 		return `\n\n# Current Working Directory (${this.cwd.toPosix()}) Files\n`
 	}
 
-	async getEnvironmentDetails(includeFileDetails = false) {
+	async getEnvironmentDetails(includeFileDetails = false, includeDetailedEnvironmentDetails = true) {
 		const host = await HostProvider.env.getHostVersion({})
 		let details = ""
 
-		details += "\n\n# Current Working Directory"
-		details += `\n${this.cwd.toPosix()}`
+		if (includeDetailedEnvironmentDetails) {
+			details += "\n\n# Current Working Directory"
+			details += `\n${this.cwd.toPosix()}`
+		}
 
 		// It could be useful for cline to know if the user went from one or no file to another between messages, so we always include this context
 		details += `\n\n# ${host.platform} Visible Files`
@@ -3636,11 +3683,11 @@ export class Task {
 			terminalDetails += "\n\n# Actively Running Terminals"
 			for (const busyTerminal of busyTerminals) {
 				terminalDetails += `\n## Original command: \`${busyTerminal.lastCommand}\``
-				const newOutput = this.terminalManager.getUnretrievedOutput(busyTerminal.id)
-				if (newOutput) {
-					terminalDetails += `\n### New Output\n${newOutput}`
-				} else {
-					// details += `\n(Still running, no new output)` // don't want to show this right after running the command
+				if (includeDetailedEnvironmentDetails) {
+					const newOutput = this.terminalManager.getUnretrievedOutput(busyTerminal.id)
+					if (newOutput) {
+						terminalDetails += `\n### New Output\n${newOutput}`
+					}
 				}
 			}
 		}
@@ -3659,7 +3706,11 @@ export class Task {
 					const inactiveTerminal = inactiveTerminals.find((t) => t.id === terminalId)
 					if (inactiveTerminal) {
 						terminalDetails += `\n## ${inactiveTerminal.lastCommand}`
-						terminalDetails += `\n### New Output\n${newOutput}`
+						if (includeDetailedEnvironmentDetails) {
+							terminalDetails += `\n### New Output\n${newOutput}`
+						} else {
+							terminalDetails += "\n### New Output\n(available; omitted for compact prompt turn)"
+						}
 					}
 				}
 			}
@@ -3669,7 +3720,7 @@ export class Task {
 			details += terminalDetails
 		}
 
-		if (includeFileDetails) {
+		if (includeFileDetails && includeDetailedEnvironmentDetails) {
 			details += "\n\n# Workspace Context\nUse list_files to inspect directory structure when needed."
 		}
 

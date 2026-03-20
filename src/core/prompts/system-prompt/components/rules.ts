@@ -41,6 +41,20 @@ const getRulesTemplateText = (context: SystemPromptContext) => `RULES
 - MCP operations should be used one at a time, similar to other tool usage. Wait for confirmation of success before proceeding with additional operations.`
 
 export async function getRulesSection(variant: PromptVariant, context: SystemPromptContext): Promise<string> {
+	if (context.useMinimalGptPrompt === true && context.isPromptRefreshTurn !== true) {
+		return new TemplateEngine().resolve(
+			`RULES
+
+- Operate from \`{{CWD}}\`; pass explicit paths instead of assuming directory changes.
+- Verify important command/edit results before completion.
+- Use ask_followup_question only when required input cannot be inferred.
+- Keep responses direct, technical, and final when completing the task.
+- Use complete-line SEARCH blocks in \`replace_in_file\` and preserve marker syntax exactly.`,
+			context,
+			{ CWD: context.cwd || process.cwd() },
+		)
+	}
+
 	const template = variant.componentOverrides?.[SystemPromptSection.RULES]?.template || getRulesTemplateText
 
 	const browserRules = context.supportsBrowserUse ? BROWSER_RULES : ""

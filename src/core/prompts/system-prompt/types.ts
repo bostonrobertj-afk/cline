@@ -103,7 +103,10 @@ export interface SystemPromptContext {
 	readonly mcpHub?: McpHub
 	readonly activeAgentId?: string
 	readonly activeAgentInstructions?: string
+	readonly activeAgentCatalogInstructions?: string
 	readonly activeWorkflowReminder?: string
+	readonly isPromptRefreshTurn?: boolean
+	readonly useMinimalGptPrompt?: boolean
 	readonly skills?: SkillMetadata[]
 	readonly focusChainSettings?: FocusChainSettings
 	readonly globalClineRulesFileInstructions?: string

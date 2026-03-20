@@ -11,6 +11,28 @@ const getCapabilitiesTemplateText = (context: SystemPromptContext) => `CAPABILIT
 - You have access to MCP servers that may provide additional tools and resources. Each server may provide different capabilities that you can use to accomplish tasks more effectively.`
 
 export async function getCapabilitiesSection(variant: PromptVariant, context: SystemPromptContext): Promise<string> {
+	if (context.useMinimalGptPrompt === true && context.isPromptRefreshTurn !== true) {
+		const browserCapabilities = context.supportsBrowserUse
+			? "- Browser automation is available for web verification when needed."
+			: ""
+		const webToolsCapabilities =
+			context.providerInfo.providerId === "cline" && context.clineWebToolsEnabled === true
+				? "- Web search/fetch tools are available for current external information."
+				: ""
+
+		return new TemplateEngine().resolve(
+			`CAPABILITIES
+
+- Use read/search/list tools to inspect the codebase efficiently.
+- Use execute_command for validation, builds, and targeted shell operations.
+${browserCapabilities}
+${webToolsCapabilities}
+- MCP servers may provide additional tools/resources when connected.`,
+			context,
+			{},
+		)
+	}
+
 	const template = variant.componentOverrides?.[SystemPromptSection.CAPABILITIES]?.template || getCapabilitiesTemplateText
 
 	const browserSupport = context.supportsBrowserUse ? ", use the browser" : ""

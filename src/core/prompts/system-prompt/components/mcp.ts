@@ -38,6 +38,24 @@ export async function getMcp(variant: PromptVariant, context: SystemPromptContex
 	if (servers.length === 0) {
 		return undefined
 	}
+
+	if (context.useMinimalGptPrompt === true && context.isPromptRefreshTurn !== true) {
+		const connectedServerNames = servers
+			.filter((server) => server.status === "connected")
+			.map((server) => server.name)
+			.join(", ")
+
+		if (!connectedServerNames) {
+			return undefined
+		}
+
+		return `MCP SERVERS
+
+Connected MCP servers: ${connectedServerNames}
+
+Use MCP tools/resources only when needed. Full MCP details are omitted on this compact prompt turn.`
+	}
+
 	return await getMcpServers(servers, variant, context)
 }
 
@@ -77,7 +95,10 @@ function formatMcpServersList(servers: McpServer[]): string {
 				?.map((prompt) => {
 					const argsStr = prompt.arguments?.length
 						? `\n    Arguments: ${prompt.arguments
-								.map((arg) => `${arg.name}${arg.required ? " (required)" : ""}${arg.description ? `: ${arg.description}` : ""}`)
+								.map(
+									(arg) =>
+										`${arg.name}${arg.required ? " (required)" : ""}${arg.description ? `: ${arg.description}` : ""}`,
+								)
 								.join(", ")}`
 						: ""
 					const title = prompt.title ? ` (${prompt.title})` : ""

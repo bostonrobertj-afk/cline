@@ -14,6 +14,21 @@ You accomplish a given task iteratively, breaking it down into clear steps and w
 6. The user may provide feedback, which you can use to make improvements and try again. But DO NOT continue in pointless back and forth conversations, i.e. don't end your responses with questions or offers for further assistance.`
 
 export async function getObjectiveSection(variant: PromptVariant, context: SystemPromptContext): Promise<string> {
+	if (context.useMinimalGptPrompt === true && context.isPromptRefreshTurn !== true) {
+		return new TemplateEngine().resolve(
+			`OBJECTIVE
+
+Complete the user's task with the smallest correct sequence of tool actions.
+
+1. Identify the next concrete goal.
+2. Use tools to make measurable progress.
+3. Verify the result before attempt_completion.
+4. Avoid unnecessary conversation or repeated explanation.`,
+			context,
+			{},
+		)
+	}
+
 	const template = variant.componentOverrides?.[SystemPromptSection.OBJECTIVE]?.template || getObjectiveTemplateText
 
 	return new TemplateEngine().resolve(template, context, {})

@@ -148,6 +148,7 @@ export class PromptBuilder {
 		if (!config.parameters?.length && !config.description?.length) {
 			return ""
 		}
+		const useCompactToolSpecs = context.useMinimalGptPrompt === true && context.isPromptRefreshTurn !== true
 		const displayName = config.name || config.id
 		const title = `## ${displayName}`
 		const description = [`Description: ${config.description}`]
@@ -178,8 +179,17 @@ export class PromptBuilder {
 
 		// Collect additional descriptions only from filtered parameters
 		const additionalDesc = filteredParams.map((p) => p.description).filter((desc): desc is string => Boolean(desc))
-		if (additionalDesc.length) {
+		if (!useCompactToolSpecs && additionalDesc.length) {
 			description.push(...additionalDesc)
+		}
+
+		if (useCompactToolSpecs) {
+			const requiredParams = filteredParams.filter((p) => p.required).map((p) => p.name)
+			const compactParameters = requiredParams.length
+				? `Required params: ${requiredParams.join(", ")}`
+				: "Required params: none"
+
+			return [title, description.join("\n"), compactParameters].filter(Boolean).join("\n")
 		}
 
 		// Build prompt sections efficiently

@@ -61,6 +61,8 @@ export class TaskState {
 	// Task Initialization
 	isInitialized = false
 	activeAgentId?: string
+	activeAgentSkillName?: string
+	activeAgentInvokedSlashCommand?: string
 	activeAgentJustActivated = false
 	activeWorkflowId?: string
 	activeWorkflowJustStarted = false

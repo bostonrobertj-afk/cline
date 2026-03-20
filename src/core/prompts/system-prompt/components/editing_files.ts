@@ -78,6 +78,18 @@ You have access to two tools for working with files: **write_to_file** and **rep
 By thoughtfully selecting between write_to_file and replace_in_file, you can make your file editing process smoother, safer, and more efficient.`
 
 export async function getEditingFilesSection(variant: PromptVariant, context: SystemPromptContext): Promise<string> {
+	if (context.useMinimalGptPrompt === true && context.isPromptRefreshTurn !== true) {
+		return new TemplateEngine().resolve(
+			`EDITING FILES
+
+- Prefer \`replace_in_file\` for targeted edits and \`write_to_file\` for new files or full rewrites.
+- SEARCH blocks in \`replace_in_file\` must match complete lines exactly.
+- After an edit, use the final tool-returned file state as the source of truth for later edits.`,
+			context,
+			{},
+		)
+	}
+
 	const template = variant.componentOverrides?.[SystemPromptSection.EDITING_FILES]?.template || EDITING_FILES_TEMPLATE_TEXT
 
 	// Skip auto-formatting section for CLI since there's no IDE to auto-format files

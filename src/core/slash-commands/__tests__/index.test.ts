@@ -1,8 +1,14 @@
 import type { McpPromptResponse } from "@shared/mcp"
 import { expect } from "chai"
+import * as sinon from "sinon"
+import * as bmadAgentMode from "../../task/bmad-agent-mode"
 import { formatMcpPromptResponse, McpPromptFetcher, parseSlashCommands } from "../index"
 
 describe("slash-commands", () => {
+	afterEach(() => {
+		sinon.restore()
+	})
+
 	describe("formatMcpPromptResponse", () => {
 		it("should format text message", () => {
 			const response: McpPromptResponse = {
@@ -140,5 +146,43 @@ describe("slash-commands", () => {
 		// Note: Tests for "unknown MCP server", "no fetcher", and "fetcher errors"
 		// are skipped because they require StateManager initialization when falling
 		// through to workflow checking. The core MCP functionality is covered above.
+	})
+
+	describe("parseSlashCommands BMAD activation", () => {
+		it("should resolve preferred BMAD alias commands into persistent activation state", async () => {
+			sinon.stub(bmadAgentMode, "resolveBmadAgentActivation").resolves({
+				agent: {
+					id: "bmad-quick-flow-solo-dev",
+					slashCommand: "bmad-quick-flow-solo-dev",
+					personaFile: "_bmad/bmm/agents/quick-flow-solo-dev.md",
+					allowedSkills: ["bmad-quick-spec", "bmad-quick-dev"],
+				},
+				skillName: "bmad-quick-flow-solo-dev",
+				invokedSlashCommand: "bmad-agent-bmm-quick-flow-solo-dev",
+				preferredActivationCommand: "bmad-agent-bmm-quick-flow-solo-dev",
+			})
+			sinon.stub(bmadAgentMode, "isBmadExitCommand").resolves(false)
+
+			const result = await parseSlashCommands(
+				"<task>/bmad-agent-bmm-quick-flow-solo-dev ch how are you today</task>",
+				{},
+				{},
+				"test-ulid",
+				undefined,
+				false,
+				undefined,
+				undefined,
+				"/test/project",
+			)
+
+			expect(result.processedText).to.equal("<task> ch how are you today</task>")
+			expect(result.needsClinerulesFileCheck).to.equal(false)
+			expect(result.persistentSlashCommandAction).to.deep.equal({
+				type: "activate_bmad_agent",
+				agentId: "bmad-quick-flow-solo-dev",
+				skillName: "bmad-quick-flow-solo-dev",
+				invokedSlashCommand: "bmad-agent-bmm-quick-flow-solo-dev",
+			})
+		})
 	})
 })

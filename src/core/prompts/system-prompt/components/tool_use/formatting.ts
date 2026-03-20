@@ -3,7 +3,13 @@ import type { PromptVariant, SystemPromptContext } from "../../types"
 
 export async function getToolUseFormattingSection(_variant: PromptVariant, context: SystemPromptContext): Promise<string> {
 	const templateEngine = new TemplateEngine()
-	return templateEngine.resolve(TOOL_USE_FORMATTING_TEMPLATE_TEXT, context, {})
+	const template =
+		context.useMinimalGptPrompt === true
+			? `# Tool Use Formatting
+
+Use the exact tool format required by the current tool mode. Match tool names and parameter names exactly.`
+			: TOOL_USE_FORMATTING_TEMPLATE_TEXT
+	return templateEngine.resolve(template, context, {})
 }
 
 const TOOL_USE_FORMATTING_TEMPLATE_TEXT = `# Tool Use Formatting

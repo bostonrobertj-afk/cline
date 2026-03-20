@@ -23,5 +23,14 @@ It is crucial to proceed step-by-step, waiting for the user's message after each
 By waiting for and carefully considering the user's response after each tool use, you can react accordingly and make informed decisions about how to proceed with the task. This iterative process helps ensure the overall success and accuracy of your work.`
 
 export async function getToolUseGuidelinesSection(_variant: PromptVariant, context: SystemPromptContext): Promise<string> {
-	return new TemplateEngine().resolve(TOOL_USE_GUIDELINES_TEMPLATE_TEXT, context, {})
+	const template =
+		context.useMinimalGptPrompt === true
+			? `# Tool Use Guidelines
+
+1. Pick the smallest tool that moves the task forward.
+2. Verify important results before completing the task.
+3. Ask a follow-up question only when required input cannot be inferred.`
+			: TOOL_USE_GUIDELINES_TEMPLATE_TEXT
+
+	return new TemplateEngine().resolve(template, context, {})
 }

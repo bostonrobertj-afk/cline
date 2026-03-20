@@ -21,6 +21,18 @@ In each user message, the environment_details will specify the current mode. The
 - Finally once it seems like you've reached a good plan, ask the user to switch you back to ACT MODE to implement the solution.`
 
 export async function getActVsPlanModeSection(variant: PromptVariant, context: SystemPromptContext): Promise<string> {
+	if (context.useMinimalGptPrompt === true) {
+		return new TemplateEngine().resolve(
+			`ACT MODE V.S. PLAN MODE
+
+Current mode is provided in environment_details.
+- ACT MODE: complete the task with tools and finish with \`attempt_completion\`.
+- PLAN MODE: investigate as needed, then respond with \`plan_mode_respond\`.`,
+			context,
+			{},
+		)
+	}
+
 	const template = variant.componentOverrides?.[SystemPromptSection.ACT_VS_PLAN]?.template || getActVsPlanModeTemplateText
 
 	return new TemplateEngine().resolve(template, context, {})

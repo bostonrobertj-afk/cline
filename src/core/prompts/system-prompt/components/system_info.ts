@@ -24,9 +24,8 @@ function getEffectiveShell(context: SystemPromptContext): string {
 		// Background exec uses the system default shell, not VS Code config
 		if (process.platform === "win32") {
 			return process.env.COMSPEC || "cmd.exe"
-		} else {
-			return process.env.SHELL || "/bin/bash"
 		}
+		return process.env.SHELL || "/bin/bash"
 	}
 	// VS Code terminal mode (or undefined) uses the VS Code configured shell
 	return getShell()
@@ -56,6 +55,10 @@ export async function getSystemEnv(context: SystemPromptContext, isTesting = fal
 }
 
 export async function getSystemInfo(variant: PromptVariant, context: SystemPromptContext): Promise<string> {
+	if (context.useMinimalGptPrompt === true && context.isPromptRefreshTurn !== true) {
+		return undefined as any
+	}
+
 	const testMode = !!process?.env?.CI || !!process?.env?.IS_TEST || context.isTesting || false
 	const info = await getSystemEnv(context, testMode)
 

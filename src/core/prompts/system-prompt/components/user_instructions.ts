@@ -11,6 +11,7 @@ The following additional instructions are provided by the user, and should be fo
 export async function getUserInstructions(variant: PromptVariant, context: SystemPromptContext): Promise<string | undefined> {
 	const customInstructions = buildUserInstructions(
 		context.activeAgentInstructions,
+		context.activeAgentCatalogInstructions,
 		context.activeWorkflowReminder,
 		context.globalClineRulesFileInstructions,
 		context.localClineRulesFileInstructions,
@@ -36,6 +37,7 @@ export async function getUserInstructions(variant: PromptVariant, context: Syste
 
 function buildUserInstructions(
 	activeAgentInstructions?: string,
+	activeAgentCatalogInstructions?: string,
 	activeWorkflowReminder?: string,
 	globalClineRulesFileInstructions?: string,
 	localClineRulesFileInstructions?: string,
@@ -49,6 +51,9 @@ function buildUserInstructions(
 	const customInstructions = []
 	if (activeAgentInstructions) {
 		customInstructions.push(activeAgentInstructions)
+	}
+	if (activeAgentCatalogInstructions) {
+		customInstructions.push(activeAgentCatalogInstructions)
 	}
 	if (activeWorkflowReminder) {
 		customInstructions.push(activeWorkflowReminder)
