@@ -1,0 +1,720 @@
+[
+	{
+		"workflowId": "bmad-advanced-elicitation",
+		"slashCommand": "bmad-advanced-elicitation",
+		"skillName": "bmad-advanced-elicitation",
+		"module": "core",
+		"skillPath": ".cline/skills/bmad-advanced-elicitation/SKILL.md",
+		"workflowPath": ".cline/skills/bmad-advanced-elicitation/workflow.md",
+		"aliases": [],
+		"phaseRoots": [],
+		"checklistPath": null,
+		"supportsManagedExecution": true,
+		"strategyHints": [
+			"workflow-steps",
+			"ordered-lists",
+			"bullet-groups",
+			"heading-items"
+		],
+		"extractionMode": "linear",
+		"primaryStepRange": null,
+		"packagedAssetPaths": [
+			".cline/skills/bmad-advanced-elicitation/bmad-skill-manifest.yaml",
+			".cline/skills/bmad-advanced-elicitation/methods.csv",
+			".cline/skills/bmad-advanced-elicitation/SKILL.md",
+			".cline/skills/bmad-advanced-elicitation/workflow.md"
+		]
+	},
+	{
+		"workflowId": "bmad-check-implementation-readiness",
+		"slashCommand": "bmad-check-implementation-readiness",
+		"skillName": "bmad-check-implementation-readiness",
+		"module": "bmm",
+		"skillPath": ".cline/skills/bmad-check-implementation-readiness/SKILL.md",
+		"workflowPath": ".cline/skills/bmad-check-implementation-readiness/workflow.md",
+		"aliases": [],
+		"phaseRoots": [
+			".cline/skills/bmad-check-implementation-readiness/steps"
+		],
+		"checklistPath": null,
+		"supportsManagedExecution": true,
+		"strategyHints": [
+			"numbered-headings",
+			"ordered-lists",
+			"bullet-groups"
+		],
+		"extractionMode": "linear",
+		"primaryStepRange": null,
+		"packagedAssetPaths": [
+			".cline/skills/bmad-check-implementation-readiness/bmad-skill-manifest.yaml",
+			".cline/skills/bmad-check-implementation-readiness/SKILL.md",
+			".cline/skills/bmad-check-implementation-readiness/steps/step-01-document-discovery.md",
+			".cline/skills/bmad-check-implementation-readiness/steps/step-02-prd-analysis.md",
+			".cline/skills/bmad-check-implementation-readiness/steps/step-03-epic-coverage-validation.md",
+			".cline/skills/bmad-check-implementation-readiness/steps/step-04-ux-alignment.md",
+			".cline/skills/bmad-check-implementation-readiness/steps/step-05-epic-quality-review.md",
+			".cline/skills/bmad-check-implementation-readiness/steps/step-06-final-assessment.md",
+			".cline/skills/bmad-check-implementation-readiness/templates/readiness-report-template.md",
+			".cline/skills/bmad-check-implementation-readiness/workflow.md"
+		]
+	},
+	{
+		"workflowId": "bmad-cis-design-thinking",
+		"slashCommand": "bmad-cis-design-thinking",
+		"skillName": "bmad-cis-design-thinking",
+		"module": "cis",
+		"skillPath": ".cline/skills/bmad-cis-design-thinking/SKILL.md",
+		"workflowPath": ".cline/skills/bmad-cis-design-thinking/workflow.md",
+		"aliases": [],
+		"phaseRoots": [],
+		"checklistPath": null,
+		"supportsManagedExecution": true,
+		"strategyHints": [
+			"workflow-steps",
+			"template-outputs",
+			"ordered-lists"
+		],
+		"extractionMode": "linear",
+		"primaryStepRange": null,
+		"packagedAssetPaths": [
+			".cline/skills/bmad-cis-design-thinking/bmad-skill-manifest.yaml",
+			".cline/skills/bmad-cis-design-thinking/design-methods.csv",
+			".cline/skills/bmad-cis-design-thinking/SKILL.md",
+			".cline/skills/bmad-cis-design-thinking/template.md",
+			".cline/skills/bmad-cis-design-thinking/workflow.md"
+		]
+	},
+	{
+		"workflowId": "bmad-cis-innovation-strategy",
+		"slashCommand": "bmad-cis-innovation-strategy",
+		"skillName": "bmad-cis-innovation-strategy",
+		"module": "cis",
+		"skillPath": ".cline/skills/bmad-cis-innovation-strategy/SKILL.md",
+		"workflowPath": ".cline/skills/bmad-cis-innovation-strategy/workflow.md",
+		"aliases": [],
+		"phaseRoots": [],
+		"checklistPath": null,
+		"supportsManagedExecution": true,
+		"strategyHints": [
+			"workflow-steps",
+			"template-outputs",
+			"ordered-lists"
+		],
+		"extractionMode": "linear",
+		"primaryStepRange": null,
+		"packagedAssetPaths": [
+			".cline/skills/bmad-cis-innovation-strategy/bmad-skill-manifest.yaml",
+			".cline/skills/bmad-cis-innovation-strategy/innovation-frameworks.csv",
+			".cline/skills/bmad-cis-innovation-strategy/SKILL.md",
+			".cline/skills/bmad-cis-innovation-strategy/template.md",
+			".cline/skills/bmad-cis-innovation-strategy/workflow.md"
+		]
+	},
+	{
+		"workflowId": "bmad-cis-problem-solving",
+		"slashCommand": "bmad-cis-problem-solving",
+		"skillName": "bmad-cis-problem-solving",
+		"module": "cis",
+		"skillPath": ".cline/skills/bmad-cis-problem-solving/SKILL.md",
+		"workflowPath": ".cline/skills/bmad-cis-problem-solving/workflow.md",
+		"aliases": [
+			"bmad-problem-solving"
+		],
+		"phaseRoots": [],
+		"checklistPath": null,
+		"supportsManagedExecution": true,
+		"strategyHints": [
+			"workflow-steps",
+			"template-outputs",
+			"ordered-lists"
+		],
+		"extractionMode": "linear",
+		"primaryStepRange": null,
+		"packagedAssetPaths": [
+			".cline/skills/bmad-cis-problem-solving/bmad-skill-manifest.yaml",
+			".cline/skills/bmad-cis-problem-solving/SKILL.md",
+			".cline/skills/bmad-cis-problem-solving/solving-methods.csv",
+			".cline/skills/bmad-cis-problem-solving/template.md",
+			".cline/skills/bmad-cis-problem-solving/workflow.md"
+		]
+	},
+	{
+		"workflowId": "bmad-cis-storytelling",
+		"slashCommand": "bmad-cis-storytelling",
+		"skillName": "bmad-cis-storytelling",
+		"module": "cis",
+		"skillPath": ".cline/skills/bmad-cis-storytelling/SKILL.md",
+		"workflowPath": ".cline/skills/bmad-cis-storytelling/workflow.md",
+		"aliases": [],
+		"phaseRoots": [],
+		"checklistPath": null,
+		"supportsManagedExecution": true,
+		"strategyHints": [
+			"workflow-steps",
+			"template-outputs",
+			"ordered-lists"
+		],
+		"extractionMode": "linear",
+		"primaryStepRange": null,
+		"packagedAssetPaths": [
+			".cline/skills/bmad-cis-storytelling/bmad-skill-manifest.yaml",
+			".cline/skills/bmad-cis-storytelling/SKILL.md",
+			".cline/skills/bmad-cis-storytelling/story-types.csv",
+			".cline/skills/bmad-cis-storytelling/template.md",
+			".cline/skills/bmad-cis-storytelling/workflow.md"
+		]
+	},
+	{
+		"workflowId": "bmad-code-review",
+		"slashCommand": "bmad-code-review",
+		"skillName": "bmad-code-review",
+		"module": "bmm",
+		"skillPath": ".cline/skills/bmad-code-review/SKILL.md",
+		"workflowPath": ".cline/skills/bmad-code-review/workflow.md",
+		"aliases": [],
+		"phaseRoots": [
+			".cline/skills/bmad-code-review/steps"
+		],
+		"checklistPath": null,
+		"supportsManagedExecution": true,
+		"strategyHints": [
+			"ordered-lists",
+			"numbered-headings",
+			"bullet-groups"
+		],
+		"extractionMode": "linear",
+		"primaryStepRange": null,
+		"packagedAssetPaths": [
+			".cline/skills/bmad-code-review/bmad-skill-manifest.yaml",
+			".cline/skills/bmad-code-review/SKILL.md",
+			".cline/skills/bmad-code-review/steps/step-01-gather-context.md",
+			".cline/skills/bmad-code-review/steps/step-02-review.md",
+			".cline/skills/bmad-code-review/steps/step-03-triage.md",
+			".cline/skills/bmad-code-review/steps/step-04-present.md",
+			".cline/skills/bmad-code-review/workflow.md"
+		]
+	},
+	{
+		"workflowId": "bmad-correct-course",
+		"slashCommand": "bmad-correct-course",
+		"skillName": "bmad-correct-course",
+		"module": "bmm",
+		"skillPath": ".cline/skills/bmad-correct-course/SKILL.md",
+		"workflowPath": ".cline/skills/bmad-correct-course/workflow.md",
+		"aliases": [],
+		"phaseRoots": [],
+		"checklistPath": ".cline/skills/bmad-correct-course/checklist.md",
+		"supportsManagedExecution": true,
+		"strategyHints": [
+			"ordered-lists",
+			"bullet-groups",
+			"heading-items"
+		],
+		"extractionMode": "linear",
+		"primaryStepRange": null,
+		"packagedAssetPaths": [
+			".cline/skills/bmad-correct-course/bmad-skill-manifest.yaml",
+			".cline/skills/bmad-correct-course/checklist.md",
+			".cline/skills/bmad-correct-course/SKILL.md",
+			".cline/skills/bmad-correct-course/workflow.md"
+		]
+	},
+	{
+		"workflowId": "bmad-create-architecture",
+		"slashCommand": "bmad-create-architecture",
+		"skillName": "bmad-create-architecture",
+		"module": "bmm",
+		"skillPath": ".cline/skills/bmad-create-architecture/SKILL.md",
+		"workflowPath": ".cline/skills/bmad-create-architecture/workflow.md",
+		"aliases": [],
+		"phaseRoots": [
+			".cline/skills/bmad-create-architecture/steps"
+		],
+		"checklistPath": null,
+		"supportsManagedExecution": true,
+		"strategyHints": [
+			"numbered-headings",
+			"ordered-lists",
+			"bullet-groups"
+		],
+		"extractionMode": "linear",
+		"primaryStepRange": null,
+		"packagedAssetPaths": [
+			".cline/skills/bmad-create-architecture/architecture-decision-template.md",
+			".cline/skills/bmad-create-architecture/bmad-skill-manifest.yaml",
+			".cline/skills/bmad-create-architecture/data/domain-complexity.csv",
+			".cline/skills/bmad-create-architecture/data/project-types.csv",
+			".cline/skills/bmad-create-architecture/SKILL.md",
+			".cline/skills/bmad-create-architecture/steps/step-01-init.md",
+			".cline/skills/bmad-create-architecture/steps/step-01b-continue.md",
+			".cline/skills/bmad-create-architecture/steps/step-02-context.md",
+			".cline/skills/bmad-create-architecture/steps/step-03-starter.md",
+			".cline/skills/bmad-create-architecture/steps/step-04-decisions.md",
+			".cline/skills/bmad-create-architecture/steps/step-05-patterns.md",
+			".cline/skills/bmad-create-architecture/steps/step-06-structure.md",
+			".cline/skills/bmad-create-architecture/steps/step-07-validation.md",
+			".cline/skills/bmad-create-architecture/steps/step-08-complete.md",
+			".cline/skills/bmad-create-architecture/workflow.md"
+		]
+	},
+	{
+		"workflowId": "bmad-create-epics-and-stories",
+		"slashCommand": "bmad-create-epics-and-stories",
+		"skillName": "bmad-create-epics-and-stories",
+		"module": "bmm",
+		"skillPath": ".cline/skills/bmad-create-epics-and-stories/SKILL.md",
+		"workflowPath": ".cline/skills/bmad-create-epics-and-stories/workflow.md",
+		"aliases": [],
+		"phaseRoots": [
+			".cline/skills/bmad-create-epics-and-stories/steps"
+		],
+		"checklistPath": null,
+		"supportsManagedExecution": true,
+		"strategyHints": [
+			"numbered-headings",
+			"ordered-lists",
+			"bullet-groups"
+		],
+		"extractionMode": "linear",
+		"primaryStepRange": null,
+		"packagedAssetPaths": [
+			".cline/skills/bmad-create-epics-and-stories/bmad-skill-manifest.yaml",
+			".cline/skills/bmad-create-epics-and-stories/SKILL.md",
+			".cline/skills/bmad-create-epics-and-stories/steps/step-01-validate-prerequisites.md",
+			".cline/skills/bmad-create-epics-and-stories/steps/step-02-design-epics.md",
+			".cline/skills/bmad-create-epics-and-stories/steps/step-03-create-stories.md",
+			".cline/skills/bmad-create-epics-and-stories/steps/step-04-final-validation.md",
+			".cline/skills/bmad-create-epics-and-stories/templates/epics-template.md",
+			".cline/skills/bmad-create-epics-and-stories/workflow.md"
+		]
+	},
+	{
+		"workflowId": "bmad-create-prd",
+		"slashCommand": "bmad-create-prd",
+		"skillName": "bmad-create-prd",
+		"module": "bmm",
+		"skillPath": ".cline/skills/bmad-create-prd/SKILL.md",
+		"workflowPath": ".cline/skills/bmad-create-prd/workflow.md",
+		"aliases": [],
+		"phaseRoots": [
+			".cline/skills/bmad-create-prd/steps-c"
+		],
+		"checklistPath": null,
+		"supportsManagedExecution": true,
+		"strategyHints": [
+			"workflow-steps",
+			"numbered-headings",
+			"ordered-lists",
+			"bullet-groups"
+		],
+		"extractionMode": "linear",
+		"primaryStepRange": null,
+		"packagedAssetPaths": [
+			".cline/skills/bmad-create-prd/bmad-skill-manifest.yaml",
+			".cline/skills/bmad-create-prd/data/domain-complexity.csv",
+			".cline/skills/bmad-create-prd/data/prd-purpose.md",
+			".cline/skills/bmad-create-prd/data/project-types.csv",
+			".cline/skills/bmad-create-prd/SKILL.md",
+			".cline/skills/bmad-create-prd/steps-c/step-01-init.md",
+			".cline/skills/bmad-create-prd/steps-c/step-01b-continue.md",
+			".cline/skills/bmad-create-prd/steps-c/step-02-discovery.md",
+			".cline/skills/bmad-create-prd/steps-c/step-02b-vision.md",
+			".cline/skills/bmad-create-prd/steps-c/step-02c-executive-summary.md",
+			".cline/skills/bmad-create-prd/steps-c/step-03-success.md",
+			".cline/skills/bmad-create-prd/steps-c/step-04-journeys.md",
+			".cline/skills/bmad-create-prd/steps-c/step-05-domain.md",
+			".cline/skills/bmad-create-prd/steps-c/step-06-innovation.md",
+			".cline/skills/bmad-create-prd/steps-c/step-07-project-type.md",
+			".cline/skills/bmad-create-prd/steps-c/step-08-scoping.md",
+			".cline/skills/bmad-create-prd/steps-c/step-09-functional.md",
+			".cline/skills/bmad-create-prd/steps-c/step-10-nonfunctional.md",
+			".cline/skills/bmad-create-prd/steps-c/step-11-polish.md",
+			".cline/skills/bmad-create-prd/steps-c/step-12-complete.md",
+			".cline/skills/bmad-create-prd/templates/prd-template.md",
+			".cline/skills/bmad-create-prd/workflow.md"
+		]
+	},
+	{
+		"workflowId": "bmad-create-product-brief",
+		"slashCommand": "bmad-create-product-brief",
+		"skillName": "bmad-create-product-brief",
+		"module": "bmm",
+		"skillPath": ".cline/skills/bmad-create-product-brief/SKILL.md",
+		"workflowPath": ".cline/skills/bmad-create-product-brief/workflow.md",
+		"aliases": [],
+		"phaseRoots": [
+			".cline/skills/bmad-create-product-brief/steps"
+		],
+		"checklistPath": null,
+		"supportsManagedExecution": true,
+		"strategyHints": [
+			"numbered-headings",
+			"ordered-lists",
+			"bullet-groups"
+		],
+		"extractionMode": "linear",
+		"primaryStepRange": null,
+		"packagedAssetPaths": [
+			".cline/skills/bmad-create-product-brief/bmad-skill-manifest.yaml",
+			".cline/skills/bmad-create-product-brief/product-brief.template.md",
+			".cline/skills/bmad-create-product-brief/SKILL.md",
+			".cline/skills/bmad-create-product-brief/steps/step-01-init.md",
+			".cline/skills/bmad-create-product-brief/steps/step-01b-continue.md",
+			".cline/skills/bmad-create-product-brief/steps/step-02-vision.md",
+			".cline/skills/bmad-create-product-brief/steps/step-03-users.md",
+			".cline/skills/bmad-create-product-brief/steps/step-04-metrics.md",
+			".cline/skills/bmad-create-product-brief/steps/step-05-scope.md",
+			".cline/skills/bmad-create-product-brief/steps/step-06-complete.md",
+			".cline/skills/bmad-create-product-brief/workflow.md"
+		]
+	},
+	{
+		"workflowId": "bmad-create-story",
+		"slashCommand": "bmad-create-story",
+		"skillName": "bmad-create-story",
+		"module": "bmm",
+		"skillPath": ".cline/skills/bmad-create-story/SKILL.md",
+		"workflowPath": ".cline/skills/bmad-create-story/workflow.md",
+		"aliases": [],
+		"phaseRoots": [],
+		"checklistPath": ".cline/skills/bmad-create-story/checklist.md",
+		"supportsManagedExecution": true,
+		"strategyHints": [
+			"workflow-steps",
+			"template-outputs",
+			"ordered-lists"
+		],
+		"extractionMode": "linear",
+		"primaryStepRange": null,
+		"packagedAssetPaths": [
+			".cline/skills/bmad-create-story/bmad-skill-manifest.yaml",
+			".cline/skills/bmad-create-story/checklist.md",
+			".cline/skills/bmad-create-story/discover-inputs.md",
+			".cline/skills/bmad-create-story/SKILL.md",
+			".cline/skills/bmad-create-story/template.md",
+			".cline/skills/bmad-create-story/workflow.md"
+		]
+	},
+	{
+		"workflowId": "bmad-create-ux-design",
+		"slashCommand": "bmad-create-ux-design",
+		"skillName": "bmad-create-ux-design",
+		"module": "bmm",
+		"skillPath": ".cline/skills/bmad-create-ux-design/SKILL.md",
+		"workflowPath": ".cline/skills/bmad-create-ux-design/workflow.md",
+		"aliases": [],
+		"phaseRoots": [
+			".cline/skills/bmad-create-ux-design/steps"
+		],
+		"checklistPath": null,
+		"supportsManagedExecution": true,
+		"strategyHints": [
+			"workflow-steps",
+			"numbered-headings",
+			"ordered-lists",
+			"bullet-groups"
+		],
+		"extractionMode": "guided",
+		"primaryStepRange": null,
+		"packagedAssetPaths": [
+			".cline/skills/bmad-create-ux-design/bmad-skill-manifest.yaml",
+			".cline/skills/bmad-create-ux-design/SKILL.md",
+			".cline/skills/bmad-create-ux-design/steps/step-01-init.md",
+			".cline/skills/bmad-create-ux-design/steps/step-01b-continue.md",
+			".cline/skills/bmad-create-ux-design/steps/step-02-discovery.md",
+			".cline/skills/bmad-create-ux-design/steps/step-03-core-experience.md",
+			".cline/skills/bmad-create-ux-design/steps/step-04-emotional-response.md",
+			".cline/skills/bmad-create-ux-design/steps/step-05-inspiration.md",
+			".cline/skills/bmad-create-ux-design/steps/step-06-design-system.md",
+			".cline/skills/bmad-create-ux-design/steps/step-07-defining-experience.md",
+			".cline/skills/bmad-create-ux-design/steps/step-08-visual-foundation.md",
+			".cline/skills/bmad-create-ux-design/steps/step-09-design-directions.md",
+			".cline/skills/bmad-create-ux-design/steps/step-10-user-journeys.md",
+			".cline/skills/bmad-create-ux-design/steps/step-11-component-strategy.md",
+			".cline/skills/bmad-create-ux-design/steps/step-12-ux-patterns.md",
+			".cline/skills/bmad-create-ux-design/steps/step-13-responsive-accessibility.md",
+			".cline/skills/bmad-create-ux-design/steps/step-14-complete.md",
+			".cline/skills/bmad-create-ux-design/ux-design-template.md",
+			".cline/skills/bmad-create-ux-design/workflow.md"
+		]
+	},
+	{
+		"workflowId": "bmad-dev-story",
+		"slashCommand": "bmad-dev-story",
+		"skillName": "bmad-dev-story",
+		"module": "bmm",
+		"skillPath": ".cline/skills/bmad-dev-story/SKILL.md",
+		"workflowPath": ".cline/skills/bmad-dev-story/workflow.md",
+		"aliases": [],
+		"phaseRoots": [],
+		"checklistPath": ".cline/skills/bmad-dev-story/checklist.md",
+		"supportsManagedExecution": true,
+		"strategyHints": [
+			"workflow-steps",
+			"template-outputs",
+			"ordered-lists"
+		],
+		"extractionMode": "linear",
+		"primaryStepRange": null,
+		"packagedAssetPaths": [
+			".cline/skills/bmad-dev-story/bmad-skill-manifest.yaml",
+			".cline/skills/bmad-dev-story/checklist.md",
+			".cline/skills/bmad-dev-story/SKILL.md",
+			".cline/skills/bmad-dev-story/workflow.md"
+		]
+	},
+	{
+		"workflowId": "bmad-distillator",
+		"slashCommand": "bmad-distillator",
+		"skillName": "bmad-distillator",
+		"module": "core",
+		"skillPath": ".cline/skills/bmad-distillator/SKILL.md",
+		"workflowPath": ".cline/skills/bmad-distillator/SKILL.md",
+		"aliases": [],
+		"phaseRoots": [],
+		"checklistPath": null,
+		"supportsManagedExecution": true,
+		"strategyHints": [
+			"ordered-lists",
+			"bullet-groups",
+			"heading-items"
+		],
+		"extractionMode": "linear",
+		"primaryStepRange": null,
+		"packagedAssetPaths": [
+			".cline/skills/bmad-distillator/agents/distillate-compressor.md",
+			".cline/skills/bmad-distillator/agents/round-trip-reconstructor.md",
+			".cline/skills/bmad-distillator/bmad-skill-manifest.yaml",
+			".cline/skills/bmad-distillator/resources/compression-rules.md",
+			".cline/skills/bmad-distillator/resources/distillate-format-reference.md",
+			".cline/skills/bmad-distillator/resources/splitting-strategy.md",
+			".cline/skills/bmad-distillator/scripts/analyze_sources.py",
+			".cline/skills/bmad-distillator/scripts/tests/test_analyze_sources.py",
+			".cline/skills/bmad-distillator/SKILL.md"
+		]
+	},
+	{
+		"workflowId": "bmad-document-project",
+		"slashCommand": "bmad-document-project",
+		"skillName": "bmad-document-project",
+		"module": "bmm",
+		"skillPath": ".cline/skills/bmad-document-project/SKILL.md",
+		"workflowPath": ".cline/skills/bmad-document-project/instructions.md",
+		"aliases": [],
+		"phaseRoots": [],
+		"checklistPath": ".cline/skills/bmad-document-project/checklist.md",
+		"supportsManagedExecution": true,
+		"strategyHints": [
+			"workflow-steps",
+			"ordered-lists",
+			"bullet-groups"
+		],
+		"extractionMode": "linear",
+		"primaryStepRange": null,
+		"packagedAssetPaths": [
+			".cline/skills/bmad-document-project/bmad-skill-manifest.yaml",
+			".cline/skills/bmad-document-project/checklist.md",
+			".cline/skills/bmad-document-project/documentation-requirements.csv",
+			".cline/skills/bmad-document-project/instructions.md",
+			".cline/skills/bmad-document-project/SKILL.md",
+			".cline/skills/bmad-document-project/templates/deep-dive-template.md",
+			".cline/skills/bmad-document-project/templates/index-template.md",
+			".cline/skills/bmad-document-project/templates/project-overview-template.md",
+			".cline/skills/bmad-document-project/templates/project-scan-report-schema.json",
+			".cline/skills/bmad-document-project/templates/source-tree-template.md",
+			".cline/skills/bmad-document-project/workflow.md",
+			".cline/skills/bmad-document-project/workflows/deep-dive-instructions.md",
+			".cline/skills/bmad-document-project/workflows/deep-dive-workflow.md",
+			".cline/skills/bmad-document-project/workflows/full-scan-instructions.md",
+			".cline/skills/bmad-document-project/workflows/full-scan-workflow.md"
+		]
+	},
+	{
+		"workflowId": "bmad-edit-prd",
+		"slashCommand": "bmad-edit-prd",
+		"skillName": "bmad-edit-prd",
+		"module": "bmm",
+		"skillPath": ".cline/skills/bmad-edit-prd/SKILL.md",
+		"workflowPath": ".cline/skills/bmad-edit-prd/workflow.md",
+		"aliases": [],
+		"phaseRoots": [
+			".cline/skills/bmad-edit-prd/steps-e"
+		],
+		"checklistPath": null,
+		"supportsManagedExecution": true,
+		"strategyHints": [
+			"numbered-headings",
+			"ordered-lists",
+			"bullet-groups"
+		],
+		"extractionMode": "linear",
+		"primaryStepRange": null,
+		"packagedAssetPaths": [
+			".cline/skills/bmad-edit-prd/bmad-skill-manifest.yaml",
+			".cline/skills/bmad-edit-prd/SKILL.md",
+			".cline/skills/bmad-edit-prd/steps-e/step-e-01-discovery.md",
+			".cline/skills/bmad-edit-prd/steps-e/step-e-01b-legacy-conversion.md",
+			".cline/skills/bmad-edit-prd/steps-e/step-e-02-review.md",
+			".cline/skills/bmad-edit-prd/steps-e/step-e-03-edit.md",
+			".cline/skills/bmad-edit-prd/steps-e/step-e-04-complete.md",
+			".cline/skills/bmad-edit-prd/workflow.md"
+		]
+	},
+	{
+		"workflowId": "bmad-help",
+		"slashCommand": "bmad-help",
+		"skillName": "bmad-help",
+		"module": "core",
+		"skillPath": ".cline/skills/bmad-help/SKILL.md",
+		"workflowPath": ".cline/skills/bmad-help/workflow.md",
+		"aliases": [],
+		"phaseRoots": [],
+		"checklistPath": null,
+		"supportsManagedExecution": true,
+		"strategyHints": [
+			"ordered-lists",
+			"bullet-groups",
+			"heading-items"
+		],
+		"extractionMode": "linear",
+		"primaryStepRange": null,
+		"packagedAssetPaths": [
+			".cline/skills/bmad-help/bmad-skill-manifest.yaml",
+			".cline/skills/bmad-help/SKILL.md",
+			".cline/skills/bmad-help/workflow.md"
+		]
+	},
+	{
+		"workflowId": "bmad-quick-dev",
+		"slashCommand": "bmad-quick-dev",
+		"skillName": "bmad-quick-dev",
+		"module": "bmm",
+		"skillPath": ".cline/skills/bmad-quick-dev/SKILL.md",
+		"workflowPath": ".cline/skills/bmad-quick-dev/workflow.md",
+		"aliases": [],
+		"phaseRoots": [
+			".cline/skills/bmad-quick-dev/steps"
+		],
+		"checklistPath": null,
+		"supportsManagedExecution": true,
+		"strategyHints": [
+			"numbered-headings",
+			"workflow-steps",
+			"ordered-lists"
+		],
+		"extractionMode": "linear",
+		"primaryStepRange": null,
+		"packagedAssetPaths": [
+			".cline/skills/bmad-quick-dev/bmad-skill-manifest.yaml",
+			".cline/skills/bmad-quick-dev/SKILL.md",
+			".cline/skills/bmad-quick-dev/steps/step-01-mode-detection.md",
+			".cline/skills/bmad-quick-dev/steps/step-02-context-gathering.md",
+			".cline/skills/bmad-quick-dev/steps/step-03-execute.md",
+			".cline/skills/bmad-quick-dev/steps/step-04-self-check.md",
+			".cline/skills/bmad-quick-dev/steps/step-05-adversarial-review.md",
+			".cline/skills/bmad-quick-dev/steps/step-06-resolve-findings.md",
+			".cline/skills/bmad-quick-dev/workflow.md"
+		]
+	},
+	{
+		"workflowId": "bmad-review-adversarial-general",
+		"slashCommand": "bmad-review-adversarial-general",
+		"skillName": "bmad-review-adversarial-general",
+		"module": "core",
+		"skillPath": ".cline/skills/bmad-review-adversarial-general/SKILL.md",
+		"workflowPath": ".cline/skills/bmad-review-adversarial-general/workflow.md",
+		"aliases": [],
+		"phaseRoots": [],
+		"checklistPath": null,
+		"supportsManagedExecution": true,
+		"strategyHints": [
+			"numbered-headings",
+			"ordered-lists",
+			"bullet-groups"
+		],
+		"extractionMode": "linear",
+		"primaryStepRange": null,
+		"packagedAssetPaths": [
+			".cline/skills/bmad-review-adversarial-general/bmad-skill-manifest.yaml",
+			".cline/skills/bmad-review-adversarial-general/SKILL.md",
+			".cline/skills/bmad-review-adversarial-general/workflow.md"
+		]
+	},
+	{
+		"workflowId": "bmad-review-edge-case-hunter",
+		"slashCommand": "bmad-review-edge-case-hunter",
+		"skillName": "bmad-review-edge-case-hunter",
+		"module": "core",
+		"skillPath": ".cline/skills/bmad-review-edge-case-hunter/SKILL.md",
+		"workflowPath": ".cline/skills/bmad-review-edge-case-hunter/workflow.md",
+		"aliases": [],
+		"phaseRoots": [],
+		"checklistPath": null,
+		"supportsManagedExecution": true,
+		"strategyHints": [
+			"numbered-headings",
+			"ordered-lists",
+			"bullet-groups"
+		],
+		"extractionMode": "linear",
+		"primaryStepRange": null,
+		"packagedAssetPaths": [
+			".cline/skills/bmad-review-edge-case-hunter/bmad-skill-manifest.yaml",
+			".cline/skills/bmad-review-edge-case-hunter/SKILL.md",
+			".cline/skills/bmad-review-edge-case-hunter/workflow.md"
+		]
+	},
+	{
+		"workflowId": "bmad-sprint-planning",
+		"slashCommand": "bmad-sprint-planning",
+		"skillName": "bmad-sprint-planning",
+		"module": "bmm",
+		"skillPath": ".cline/skills/bmad-sprint-planning/SKILL.md",
+		"workflowPath": ".cline/skills/bmad-sprint-planning/workflow.md",
+		"aliases": [],
+		"phaseRoots": [],
+		"checklistPath": ".cline/skills/bmad-sprint-planning/checklist.md",
+		"supportsManagedExecution": true,
+		"strategyHints": [
+			"ordered-lists",
+			"numbered-headings",
+			"bullet-groups"
+		],
+		"extractionMode": "linear",
+		"primaryStepRange": null,
+		"packagedAssetPaths": [
+			".cline/skills/bmad-sprint-planning/bmad-skill-manifest.yaml",
+			".cline/skills/bmad-sprint-planning/checklist.md",
+			".cline/skills/bmad-sprint-planning/SKILL.md",
+			".cline/skills/bmad-sprint-planning/sprint-status-template.yaml",
+			".cline/skills/bmad-sprint-planning/workflow.md"
+		]
+	},
+	{
+		"workflowId": "bmad-sprint-status",
+		"slashCommand": "bmad-sprint-status",
+		"skillName": "bmad-sprint-status",
+		"module": "bmm",
+		"skillPath": ".cline/skills/bmad-sprint-status/SKILL.md",
+		"workflowPath": ".cline/skills/bmad-sprint-status/workflow.md",
+		"aliases": [],
+		"phaseRoots": [],
+		"checklistPath": null,
+		"supportsManagedExecution": true,
+		"strategyHints": [
+			"workflow-steps",
+			"template-outputs",
+			"ordered-lists"
+		],
+		"extractionMode": "branch-aware",
+		"primaryStepRange": {
+			"min": 0,
+			"max": 5
+		},
+		"packagedAssetPaths": [
+			".cline/skills/bmad-sprint-status/bmad-skill-manifest.yaml",
+			".cline/skills/bmad-sprint-status/SKILL.md",
+			".cline/skills/bmad-sprint-status/workflow.md"
+		]
+	}
+]

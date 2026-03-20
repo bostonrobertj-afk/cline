@@ -105,6 +105,7 @@ export interface SystemPromptContext {
 	readonly activeAgentInstructions?: string
 	readonly activeAgentCatalogInstructions?: string
 	readonly activeWorkflowReminder?: string
+	readonly managedWorkflowActive?: boolean
 	readonly isPromptRefreshTurn?: boolean
 	readonly useMinimalGptPrompt?: boolean
 	readonly skills?: SkillMetadata[]

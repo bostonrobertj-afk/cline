@@ -1,3 +1,5 @@
+import type { ManagedWorkflowRunState } from "@/core/task/managed-workflows/types"
+
 // Type definitions for FileContextTracker
 export interface FileMetadataEntry {
 	path: string
@@ -33,4 +35,5 @@ export interface TaskMetadata {
 	activeAgentSkillName?: string
 	activeAgentInvokedSlashCommand?: string
 	activeWorkflowId?: string
+	managedWorkflowRun?: ManagedWorkflowRunState
 }

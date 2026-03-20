@@ -15,8 +15,10 @@ import {
 } from "../prompts/commands"
 import { StateManager } from "../storage/StateManager"
 import { isBmadExitCommand, resolveBmadAgentActivation } from "../task/bmad-agent-mode"
+import { getManagedWorkflowDefinitionBySlashCommand } from "../task/managed-workflows/ManagedWorkflowRegistry"
 
 export type PersistentSlashCommandAction =
+	| { type: "activate_managed_workflow"; workflowId: string; slashCommand: string }
 	| { type: "activate_bmad_agent"; agentId: string; skillName: string; invokedSlashCommand: string }
 	| { type: "exit_bmad_agent" }
 
@@ -157,6 +159,21 @@ export async function parseSlashCommands(
 			}
 
 			if (cwd) {
+				const managedWorkflow = await getManagedWorkflowDefinitionBySlashCommand(cwd, commandName)
+				if (managedWorkflow) {
+					const textWithoutSlashCommand = removeMatchedCommand()
+					telemetryService.captureSlashCommandUsed(ulid, commandName, "workflow")
+					return {
+						processedText: textWithoutSlashCommand,
+						needsClinerulesFileCheck: false,
+						persistentSlashCommandAction: {
+							type: "activate_managed_workflow",
+							workflowId: managedWorkflow.workflowId,
+							slashCommand: managedWorkflow.slashCommand,
+						},
+					}
+				}
+
 				const activation = await resolveBmadAgentActivation(cwd, commandName)
 				if (activation) {
 					const textWithoutSlashCommand = removeMatchedCommand()

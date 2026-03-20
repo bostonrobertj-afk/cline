@@ -40,6 +40,7 @@ const BUILTIN_BMAD_AGENT_ALLOWLIST: ReadonlyArray<BmadAgentAllowlistEntry> = [
 			"bmad-domain-research",
 			"bmad-technical-research",
 			"bmad-create-product-brief",
+			"bmad-generate-project-context",
 			"bmad-document-project",
 			"bmad-party-mode",
 		],
@@ -55,8 +56,6 @@ const BUILTIN_BMAD_AGENT_ALLOWLIST: ReadonlyArray<BmadAgentAllowlistEntry> = [
 			"bmad-validate-prd",
 			"bmad-edit-prd",
 			"bmad-create-epics-and-stories",
-			"bmad-check-implementation-readiness",
-			"bmad-correct-course",
 			"bmad-party-mode",
 		],
 	},
@@ -84,6 +83,7 @@ const BUILTIN_BMAD_AGENT_ALLOWLIST: ReadonlyArray<BmadAgentAllowlistEntry> = [
 			"Stay in the Scrum Master persona: crisp, checklist-driven, and focused on implementation-ready stories and clear sequencing.",
 		allowedSkills: [
 			"bmad-sprint-planning",
+			"bmad-sprint-status",
 			"bmad-create-story",
 			"bmad-retrospective",
 			"bmad-correct-course",
@@ -112,7 +112,7 @@ const BUILTIN_BMAD_AGENT_ALLOWLIST: ReadonlyArray<BmadAgentAllowlistEntry> = [
 		personaFile: "_bmad/bmm/agents/tech-writer/tech-writer.md",
 		personaReminder:
 			"Stay in the Technical Writer persona: clear, structured, and focused on usable documentation and handoff quality.",
-		allowedSkills: ["bmad-document-project", "bmad-party-mode"],
+		allowedSkills: ["bmad-party-mode"],
 	},
 	{
 		id: "bmad-quick-flow-solo-dev",
@@ -120,7 +120,7 @@ const BUILTIN_BMAD_AGENT_ALLOWLIST: ReadonlyArray<BmadAgentAllowlistEntry> = [
 		personaFile: "_bmad/bmm/agents/quick-flow-solo-dev.md",
 		personaReminder:
 			"Stay in the Quick Flow Solo Dev persona: fast, lean, and relentlessly focused on shipping scoped work with minimum ceremony.",
-		allowedSkills: ["bmad-quick-spec", "bmad-quick-dev", "bmad-code-review", "bmad-party-mode"],
+		allowedSkills: ["bmad-quick-spec", "bmad-quick-dev", "bmad-quick-dev-new-preview", "bmad-party-mode"],
 	},
 ]
 
@@ -399,6 +399,35 @@ export async function getBmadAgentById(cwd: string, agentId: string): Promise<Bm
 		configuredAgents.find((agent) => agent.id === agentId) ??
 		BUILTIN_BMAD_AGENT_ALLOWLIST.find((agent) => agent.id === agentId)
 	)
+}
+
+export function isSkillAllowedForBmadAgent(
+	agent: Pick<BmadAgentAllowlistEntry, "allowedSkills"> | undefined | null,
+	skillName: string,
+): boolean {
+	if (!agent) {
+		return false
+	}
+
+	return (
+		agent.allowedSkills.includes(skillName) ||
+		ALWAYS_ALLOWED_BMAD_SKILL_NAMES.includes(skillName as (typeof ALWAYS_ALLOWED_BMAD_SKILL_NAMES)[number])
+	)
+}
+
+export async function getBmadAgentsAllowedForSkill(cwd: string, skillName: string): Promise<BmadAgentAllowlistEntry[]> {
+	const configuredAgents = (await getConfiguredBmadAgentAllowlist(cwd))?.agents ?? []
+	const agents = configuredAgents.length > 0 ? configuredAgents : BUILTIN_BMAD_AGENT_ALLOWLIST
+	return agents.filter((agent) => isSkillAllowedForBmadAgent(agent, skillName))
+}
+
+export async function getOwningBmadAgentForSkill(cwd: string, skillName: string): Promise<BmadAgentAllowlistEntry | undefined> {
+	if (ALWAYS_ALLOWED_BMAD_SKILL_NAMES.includes(skillName as (typeof ALWAYS_ALLOWED_BMAD_SKILL_NAMES)[number])) {
+		return undefined
+	}
+
+	const allowedAgents = await getBmadAgentsAllowedForSkill(cwd, skillName)
+	return allowedAgents.length === 1 ? allowedAgents[0] : undefined
 }
 
 export async function isBmadExitCommand(cwd: string, commandName: string): Promise<boolean> {

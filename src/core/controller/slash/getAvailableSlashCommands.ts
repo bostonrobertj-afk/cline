@@ -1,5 +1,6 @@
 import { EmptyRequest } from "@shared/proto/cline/common"
 import { SlashCommandInfo, SlashCommandsResponse } from "@shared/proto/cline/slash"
+import { loadManagedWorkflowRegistry } from "@/core/task/managed-workflows/ManagedWorkflowRegistry"
 import { BASE_SLASH_COMMANDS } from "@/shared/slashCommands"
 import { Controller } from ".."
 
@@ -19,6 +20,21 @@ export async function getAvailableSlashCommands(controller: Controller, _request
 				cliCompatible: cmd.cliCompatible,
 			}),
 		)
+	}
+
+	const cwd = controller.workspaceManager?.getPrimaryRoot()?.path
+	if (cwd) {
+		const managedWorkflows = await loadManagedWorkflowRegistry(cwd)
+		for (const workflow of managedWorkflows) {
+			commands.push(
+				SlashCommandInfo.create({
+					name: workflow.slashCommand,
+					description: `Managed workflow: ${workflow.workflowId}`,
+					section: "custom",
+					cliCompatible: true,
+				}),
+			)
+		}
 	}
 
 	// Get workflow toggles from state

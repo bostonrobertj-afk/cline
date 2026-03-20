@@ -3,6 +3,7 @@ type,name,module,path,hash
 "csv","task-manifest","_config","_config/task-manifest.csv","4d40aa929231dc109a3e2183cf0238e77340e7f2d884045bde4e334d04571bd6"
 "csv","workflow-manifest","_config","_config/workflow-manifest.csv","9e8b5210ea250c48455912fda318c7dff6bd00b8fa905eb2516bbc41eb17b6f8"
 "yaml","manifest","_config","_config/manifest.yaml","e5abf38035709382405293c765c540ca7719ee3c9308407a81b98c8dd2acc3e4"
+"json","managed-workflows","_config","_config/managed-workflows.json","532c9999ab6c6633a0585fc2c6434b22fd52118761834d04656d84f5190cc2a1"
 "md","documentation-standards","_memory","_memory/tech-writer-sidecar/documentation-standards.md","b046192ee42fcd1a3e9b2ae6911a0db38510323d072c8d75bad0594f943039e4"
 "yaml","config","_memory","_memory/config.yaml","f9670ddde74243ced1f56c8232b691a337b02ed1a907c647d71156620f611605"
 "csv","module-help","bmb","bmb/module-help.csv","588e613d0242f9ba38a046110d37fd0addd5ada0b0ee1356d6918f275d39636b"

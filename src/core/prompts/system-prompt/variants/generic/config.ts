@@ -73,6 +73,7 @@ export const config = createVariant(ModelFamily.GENERIC)
 		ClineDefaultTool.TODO,
 		ClineDefaultTool.GENERATE_EXPLANATION,
 		ClineDefaultTool.USE_SKILL,
+		ClineDefaultTool.COMPLETE_WORKFLOW_ITEM,
 		ClineDefaultTool.USE_SUBAGENTS,
 	)
 	.placeholders({

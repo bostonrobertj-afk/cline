@@ -1,6 +1,7 @@
 import { Anthropic } from "@anthropic-ai/sdk"
 import { AssistantMessageContent } from "@core/assistant-message"
 import { ClineAskResponse } from "@shared/WebviewMessage"
+import type { ManagedWorkflowRunState } from "./managed-workflows/types"
 import type { HookExecution } from "./types/HookExecution"
 
 export class TaskState {
@@ -66,6 +67,7 @@ export class TaskState {
 	activeAgentJustActivated = false
 	activeWorkflowId?: string
 	activeWorkflowJustStarted = false
+	managedWorkflowRun?: ManagedWorkflowRunState
 
 	// Focus Chain / Todo List Management
 	apiRequestCount = 0

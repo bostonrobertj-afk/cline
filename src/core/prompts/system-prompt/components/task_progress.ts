@@ -36,6 +36,17 @@ export async function getUpdatingTaskProgress(variant: PromptVariant, context: S
 		return undefined
 	}
 
+	if (context.managedWorkflowActive) {
+		return `UPDATING TASK PROGRESS
+
+The current checklist is backend-managed for an active workflow.
+
+- Do not create a new checklist.
+- Do not rewrite checklist items manually.
+- Use the complete_workflow_item tool to mark the current workflow item complete.
+- task_progress is rendered from backend workflow state.`
+	}
+
 	// Check for component override first
 	if (variant.componentOverrides?.[SystemPromptSection.TASK_PROGRESS]?.template) {
 		const template = variant.componentOverrides[SystemPromptSection.TASK_PROGRESS].template

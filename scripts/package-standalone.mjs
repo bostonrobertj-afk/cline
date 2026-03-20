@@ -29,6 +29,7 @@ const UNIVERSAL_BUILD = !process.argv.includes("-s")
 const IS_VERBOSE = process.argv.includes("-v") || process.argv.includes("--verbose")
 
 async function main() {
+	verifyManagedWorkflowAssets()
 	await installNodeDependencies()
 	if (UNIVERSAL_BUILD) {
 		console.log("Building universal package for all platforms...")
@@ -36,7 +37,14 @@ async function main() {
 	} else {
 		console.log(`Building package for ${os.platform()}-${os.arch()}...`)
 	}
-	await zipDistribution()
+	const zipPath = await zipDistribution()
+	verifyManagedWorkflowAssets(zipPath)
+}
+
+function verifyManagedWorkflowAssets(archivePath) {
+	console.log("Verifying managed workflow assets...")
+	const archiveArg = archivePath ? ` --archive=${archivePath} --archive-prefix=extension` : ""
+	execSync(`node scripts/verify-managed-workflow-assets.mjs${archiveArg}`, { stdio: "inherit" })
 }
 
 async function installNodeDependencies() {
@@ -146,6 +154,7 @@ async function zipDistribution() {
 
 	console.log("Zipping package...")
 	await archive.finalize()
+	return zipPath
 }
 
 /**

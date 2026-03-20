@@ -11,6 +11,7 @@ import { COMPLETION_RESULT_CHANGES_FLAG } from "@shared/ExtensionMessage"
 import { Logger } from "@shared/services/Logger"
 import { ClineDefaultTool } from "@shared/tools"
 import type { ToolResponse } from "../../index"
+import { listIncompleteManagedWorkflowItems } from "../../managed-workflows/ManagedWorkflowRenderer"
 import { showNotificationForApproval } from "../../utils"
 import { buildUserFeedbackContent } from "../../utils/buildUserFeedbackContent"
 import type { IPartialBlockHandler, IToolHandler } from "../ToolExecutorCoordinator"
@@ -61,6 +62,14 @@ export class AttemptCompletionHandler implements IToolHandler, IPartialBlockHand
 		if (!result) {
 			config.taskState.consecutiveMistakeCount++
 			return await config.callbacks.sayAndCreateMissingParamError(this.name, "result")
+		}
+
+		if (config.taskState.managedWorkflowRun && !config.taskState.managedWorkflowRun.allRequiredComplete) {
+			config.taskState.consecutiveMistakeCount++
+			const remainingItems = listIncompleteManagedWorkflowItems(config.taskState.managedWorkflowRun)
+			return formatResponse.toolError(
+				`Managed workflow "${config.taskState.managedWorkflowRun.workflowId}" is still in progress. Remaining items:\n- ${remainingItems.join("\n- ")}`,
+			)
 		}
 
 		config.taskState.consecutiveMistakeCount = 0

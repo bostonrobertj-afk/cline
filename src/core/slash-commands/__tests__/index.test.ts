@@ -149,6 +149,31 @@ describe("slash-commands", () => {
 	})
 
 	describe("parseSlashCommands BMAD activation", () => {
+		it("should resolve managed workflow aliases before BMAD agent activation", async () => {
+			sinon.stub(bmadAgentMode, "resolveBmadAgentActivation").resolves(undefined)
+			sinon.stub(bmadAgentMode, "isBmadExitCommand").resolves(false)
+
+			const result = await parseSlashCommands(
+				"<task>/bmad-problem-solving help me untangle this issue</task>",
+				{},
+				{},
+				"test-ulid",
+				undefined,
+				false,
+				undefined,
+				undefined,
+				process.cwd(),
+			)
+
+			expect(result.processedText).to.equal("<task> help me untangle this issue</task>")
+			expect(result.needsClinerulesFileCheck).to.equal(false)
+			expect(result.persistentSlashCommandAction).to.deep.equal({
+				type: "activate_managed_workflow",
+				workflowId: "bmad-cis-problem-solving",
+				slashCommand: "bmad-cis-problem-solving",
+			})
+		})
+
 		it("should resolve preferred BMAD alias commands into persistent activation state", async () => {
 			sinon.stub(bmadAgentMode, "resolveBmadAgentActivation").resolves({
 				agent: {

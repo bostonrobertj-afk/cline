@@ -7,6 +7,8 @@ import {
 	buildBmadAgentActivationInstructions,
 	buildBmadAgentReminder,
 	filterSkillsForBmadAgentMode,
+	getOwningBmadAgentForSkill,
+	isSkillAllowedForBmadAgent,
 	resolveBmadAgentActivation,
 } from "./bmad-agent-mode"
 
@@ -88,7 +90,7 @@ You must fully embody this test BMAD skill wrapper.
 		expect(activation?.agent.allowedSkills).to.deep.equal([
 			"bmad-quick-spec",
 			"bmad-quick-dev",
-			"bmad-code-review",
+			"bmad-quick-dev-new-preview",
 			"bmad-party-mode",
 		])
 	})
@@ -172,6 +174,35 @@ You must fully embody this test BMAD skill wrapper.
 
 		it("falls back to only always-allowed BMAD skills when the active agent cannot be resolved", () => {
 			expect(filterSkillsForBmadAgentMode(enabledSkills, null).map((skill) => skill.name)).to.deep.equal(["bmad-help"])
+		})
+	})
+
+	describe("workflow ownership and permission helpers", () => {
+		it("infers the owning BMAD agent for uniquely-allowed managed workflows", async () => {
+			const workspaceDir = await makeWorkspaceWithSkill("bmad-dev")
+
+			const owner = await getOwningBmadAgentForSkill(workspaceDir, "bmad-code-review")
+
+			expect(owner?.id).to.equal("bmad-dev")
+		})
+
+		it("treats bmad-help as agent-agnostic for ownership resolution", async () => {
+			const workspaceDir = await makeWorkspaceWithSkill("bmad-dev")
+
+			const owner = await getOwningBmadAgentForSkill(workspaceDir, "bmad-help")
+
+			expect(owner).to.equal(undefined)
+		})
+
+		it("allows bmad-help for any active BMAD agent", () => {
+			expect(
+				isSkillAllowedForBmadAgent(
+					{
+						allowedSkills: ["bmad-dev-story", "bmad-code-review"],
+					},
+					"bmad-help",
+				),
+			).to.equal(true)
 		})
 	})
 })

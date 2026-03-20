@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, it } from "mocha"
 import "should"
 import * as sinon from "sinon"
+import { clearManagedWorkflowRegistryCache } from "@/core/task/managed-workflows/ManagedWorkflowRegistry"
 import { Controller } from "../core/controller"
 import { getAvailableSlashCommands } from "../core/controller/slash/getAvailableSlashCommands"
 import { EmptyRequest } from "../shared/proto/cline/common"
@@ -74,6 +75,20 @@ describe("getAvailableSlashCommands", () => {
 					cmd.section.should.equal("default")
 				}
 			}
+		})
+
+		it("should include managed BMAD workflows from the generated registry when a workspace is active", async () => {
+			clearManagedWorkflowRegistryCache(process.cwd())
+			;(mockController as any).workspaceManager = {
+				getPrimaryRoot: () => ({ path: process.cwd() }),
+			}
+
+			const response = await getAvailableSlashCommands(mockController as Controller, EmptyRequest.create())
+			const workflow = response.commands.find((cmd) => cmd.name === "bmad-code-review")
+
+			workflow!.should.not.be.undefined()
+			workflow!.section.should.equal("custom")
+			workflow!.cliCompatible.should.equal(true)
 		})
 	})
 

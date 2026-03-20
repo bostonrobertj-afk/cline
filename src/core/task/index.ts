@@ -112,8 +112,12 @@ import {
 	filterSkillsForBmadAgentMode,
 	getBmadAgentById,
 	getBmadWorkflowReminder,
+	getOwningBmadAgentForSkill,
+	isSkillAllowedForBmadAgent,
 } from "./bmad-agent-mode"
 import { FocusChainManager } from "./focus-chain"
+import { startOrResumeManagedWorkflowRun } from "./managed-workflows/ManagedWorkflowController"
+import { buildManagedWorkflowPrompt, renderManagedWorkflowTaskProgress } from "./managed-workflows/ManagedWorkflowRenderer"
 import { MessageStateHandler } from "./message-state"
 import { StreamChunkCoordinator } from "./StreamChunkCoordinator"
 import { StreamResponseHandler } from "./StreamResponseHandler"
@@ -905,20 +909,75 @@ export class Task {
 			return
 		}
 
-		if (action.type === "activate_bmad_agent") {
+		const hadManagedWorkflowRun = !!this.taskState.managedWorkflowRun
+
+		if (action.type === "activate_managed_workflow") {
+			const owningAgent = await getOwningBmadAgentForSkill(this.cwd, action.workflowId)
+			if (this.taskState.activeAgentId) {
+				const activeAgent = await getBmadAgentById(this.cwd, this.taskState.activeAgentId)
+				if (activeAgent && !isSkillAllowedForBmadAgent(activeAgent, action.workflowId)) {
+					await this.say(
+						"error",
+						`Cannot activate workflow "${action.workflowId}" while BMAD agent "${activeAgent.id}" is active. Allowed skills for that agent: ${activeAgent.allowedSkills.join(
+							", ",
+						)}. Use /bmad-exit first or activate the matching agent for this workflow.`,
+					)
+					return
+				}
+			} else if (owningAgent) {
+				this.taskState.activeAgentId = owningAgent.id
+				this.taskState.activeAgentSkillName = owningAgent.id
+				this.taskState.activeAgentInvokedSlashCommand = action.slashCommand
+				this.taskState.activeAgentJustActivated = true
+			}
+
+			const { run, resumed } = await startOrResumeManagedWorkflowRun(
+				this.cwd,
+				action.workflowId,
+				this.taskState.managedWorkflowRun,
+				action.slashCommand,
+			)
+			this.taskState.managedWorkflowRun = run
+			this.taskState.activeWorkflowId = run.workflowId
+			this.taskState.activeWorkflowJustStarted = !resumed
+			await this.refreshManagedWorkflowChecklistProjection()
+		} else if (action.type === "activate_bmad_agent") {
+			const targetAgent = await getBmadAgentById(this.cwd, action.agentId)
+			if (this.taskState.managedWorkflowRun && targetAgent) {
+				const activeWorkflowId = this.taskState.managedWorkflowRun.workflowId
+				if (!isSkillAllowedForBmadAgent(targetAgent, activeWorkflowId)) {
+					await this.say(
+						"error",
+						`Cannot activate BMAD agent "${targetAgent.id}" while managed workflow "${activeWorkflowId}" is active. Exit the workflow context first or use an agent permitted to run that workflow.`,
+					)
+					return
+				}
+			}
+
 			this.taskState.activeAgentId = action.agentId
 			this.taskState.activeAgentSkillName = action.skillName
 			this.taskState.activeAgentInvokedSlashCommand = action.invokedSlashCommand
 			this.taskState.activeAgentJustActivated = true
-			this.taskState.activeWorkflowId = undefined
-			this.taskState.activeWorkflowJustStarted = false
+			if (!this.taskState.managedWorkflowRun) {
+				this.taskState.activeWorkflowId = undefined
+				this.taskState.activeWorkflowJustStarted = false
+			} else if (hadManagedWorkflowRun) {
+				await this.refreshManagedWorkflowChecklistProjection()
+			} else if (this.taskState.currentFocusChainChecklist == null) {
+				await this.refreshManagedWorkflowChecklistProjection()
+			}
 		} else {
 			this.taskState.activeAgentId = undefined
 			this.taskState.activeAgentSkillName = undefined
 			this.taskState.activeAgentInvokedSlashCommand = undefined
 			this.taskState.activeAgentJustActivated = false
-			this.taskState.activeWorkflowId = undefined
-			this.taskState.activeWorkflowJustStarted = false
+			if (!this.taskState.managedWorkflowRun) {
+				this.taskState.activeWorkflowId = undefined
+				this.taskState.activeWorkflowJustStarted = false
+			}
+			if (hadManagedWorkflowRun && !this.taskState.managedWorkflowRun) {
+				await this.clearManagedWorkflowChecklistProjection()
+			}
 		}
 
 		try {
@@ -927,6 +986,7 @@ export class Task {
 			taskMetadata.activeAgentSkillName = this.taskState.activeAgentSkillName
 			taskMetadata.activeAgentInvokedSlashCommand = this.taskState.activeAgentInvokedSlashCommand
 			taskMetadata.activeWorkflowId = this.taskState.activeWorkflowId
+			taskMetadata.managedWorkflowRun = this.taskState.managedWorkflowRun
 			await saveTaskMetadata(this.taskId, taskMetadata)
 		} catch {
 			// Non-fatal: prompt/runtime state should continue even if metadata persistence fails.
@@ -1001,7 +1061,9 @@ export class Task {
 			}
 		}
 
-		if (this.taskState.activeWorkflowId) {
+		if (this.taskState.managedWorkflowRun) {
+			activeWorkflowReminder = buildManagedWorkflowPrompt(this.taskState.managedWorkflowRun)
+		} else if (this.taskState.activeWorkflowId) {
 			activeWorkflowReminder = await getBmadWorkflowReminder(this.cwd, this.taskState.activeWorkflowId)
 		}
 
@@ -1036,9 +1098,38 @@ export class Task {
 			this.taskState.activeAgentJustActivated = false
 			this.taskState.activeWorkflowId = metadata.activeWorkflowId
 			this.taskState.activeWorkflowJustStarted = false
+			this.taskState.managedWorkflowRun = metadata.managedWorkflowRun
 		} catch {
 			// Non-fatal: tasks without metadata should still resume normally.
 		}
+	}
+
+	private async refreshManagedWorkflowChecklistProjection(): Promise<void> {
+		if (!this.taskState.managedWorkflowRun) {
+			return
+		}
+
+		if (this.FocusChainManager) {
+			await this.FocusChainManager.refreshManagedWorkflowChecklistProjection()
+			return
+		}
+
+		this.taskState.currentFocusChainChecklist = renderManagedWorkflowTaskProgress(this.taskState.managedWorkflowRun)
+		this.taskState.todoListWasUpdatedByUser = false
+		this.taskState.apiRequestsSinceLastTodoUpdate = 0
+		await this.postStateToWebview()
+	}
+
+	private async clearManagedWorkflowChecklistProjection(): Promise<void> {
+		if (this.FocusChainManager) {
+			await this.FocusChainManager.clearManagedWorkflowChecklistProjection()
+			return
+		}
+
+		this.taskState.currentFocusChainChecklist = null
+		this.taskState.todoListWasUpdatedByUser = false
+		this.taskState.apiRequestsSinceLastTodoUpdate = 0
+		await this.postStateToWebview()
 	}
 
 	/**
@@ -1313,6 +1404,9 @@ export class Task {
 		this.taskState.isInitialized = true
 		this.taskState.abort = false // Reset abort flag when resuming task
 		await this.restoreBmadStateFromMetadata()
+		if (this.taskState.managedWorkflowRun) {
+			await this.refreshManagedWorkflowChecklistProjection()
+		}
 
 		const { response, text, images, files } = await this.ask(askType) // calls poststatetowebview
 
@@ -2050,6 +2144,7 @@ export class Task {
 			activeAgentInstructions,
 			activeAgentCatalogInstructions,
 			activeWorkflowReminder,
+			managedWorkflowActive: !!this.taskState.managedWorkflowRun,
 			isPromptRefreshTurn,
 			useMinimalGptPrompt,
 			skills: promptSkills,

@@ -1,14 +1,16 @@
 import type { ToolUse } from "@core/assistant-message"
 import { discoverSkills, getAvailableSkills, getSkillContent } from "@core/context/instructions/user-instructions/skills"
+import { getTaskMetadata, saveTaskMetadata } from "@core/storage/disk"
+import { startOrResumeManagedWorkflowRun } from "@core/task/managed-workflows/ManagedWorkflowController"
+import { getManagedWorkflowDefinition } from "@core/task/managed-workflows/ManagedWorkflowRegistry"
 import type { SkillMetadata } from "@shared/skills"
 import { telemetryService } from "@/services/telemetry"
 import { ClineDefaultTool } from "@/shared/tools"
+import { getBmadAgentById, getOwningBmadAgentForSkill, isSkillAllowedForBmadAgent } from "../../bmad-agent-mode"
 import type { ToolResponse } from "../../index"
 import type { IPartialBlockHandler, IToolHandler } from "../ToolExecutorCoordinator"
 import type { TaskConfig } from "../types/TaskConfig"
 import type { StronglyTypedUIHelpers } from "../types/UIHelpers"
-import { getBmadAgentById } from "../../bmad-agent-mode"
-import { getTaskMetadata, saveTaskMetadata } from "@core/storage/disk"
 
 export class UseSkillToolHandler implements IToolHandler, IPartialBlockHandler {
 	readonly name = ClineDefaultTool.USE_SKILL
@@ -37,9 +39,15 @@ export class UseSkillToolHandler implements IToolHandler, IPartialBlockHandler {
 			return `Error: Missing required parameter 'skill_name'. Please provide the name of the skill to activate.`
 		}
 
+		const managedWorkflowDefinition = await getManagedWorkflowDefinition(config.cwd, skillName)
+		const resolvedSkillName = managedWorkflowDefinition?.skillName ?? skillName
+		const owningAgent = managedWorkflowDefinition
+			? await getOwningBmadAgentForSkill(config.cwd, resolvedSkillName)
+			: undefined
+
 		if (config.taskState.activeAgentId) {
 			const activeAgent = await getBmadAgentById(config.cwd, config.taskState.activeAgentId)
-			if (activeAgent && !activeAgent.allowedSkills.includes(skillName)) {
+			if (activeAgent && !isSkillAllowedForBmadAgent(activeAgent, resolvedSkillName)) {
 				return `Error: Active agent "${activeAgent.id}" is not allowed to use skill "${skillName}". Allowed skills: ${activeAgent.allowedSkills.join(
 					", ",
 				)}. Use /bmad-exit to leave agent mode or switch to another /bmad-* agent.`
@@ -79,7 +87,7 @@ export class UseSkillToolHandler implements IToolHandler, IPartialBlockHandler {
 		config.taskState.consecutiveMistakeCount = 0
 
 		try {
-			const skillContent = await getSkillContent(skillName, availableSkills)
+			const skillContent = await getSkillContent(resolvedSkillName, availableSkills)
 
 			if (!skillContent) {
 				const availableNames = availableSkills.map((s: SkillMetadata) => s.name).join(", ")
@@ -90,7 +98,7 @@ export class UseSkillToolHandler implements IToolHandler, IPartialBlockHandler {
 				() =>
 					telemetryService.captureSkillUsed({
 						ulid: config.ulid,
-						skillName,
+						skillName: resolvedSkillName,
 						skillSource: skillContent.source === "global" ? "global" : "project",
 						skillsAvailableGlobal: globalCount,
 						skillsAvailableProject: projectCount,
@@ -99,6 +107,55 @@ export class UseSkillToolHandler implements IToolHandler, IPartialBlockHandler {
 					}),
 				"UseSkillToolHandler.execute",
 			)
+
+			if (managedWorkflowDefinition) {
+				if (!config.taskState.activeAgentId && owningAgent) {
+					config.taskState.activeAgentId = owningAgent.id
+					config.taskState.activeAgentSkillName = owningAgent.id
+					config.taskState.activeAgentInvokedSlashCommand = skillName
+					config.taskState.activeAgentJustActivated = true
+				}
+
+				const { run: managedWorkflowRun, resumed } = await startOrResumeManagedWorkflowRun(
+					config.cwd,
+					skillName,
+					config.taskState.managedWorkflowRun,
+				)
+				config.taskState.managedWorkflowRun = managedWorkflowRun
+				config.taskState.activeWorkflowId = managedWorkflowRun.workflowId
+				config.taskState.activeWorkflowJustStarted = !resumed
+				await config.callbacks.updateFCListFromToolResponse(undefined)
+				try {
+					const taskMetadata = await getTaskMetadata(config.taskId)
+					taskMetadata.activeAgentId = config.taskState.activeAgentId
+					taskMetadata.activeAgentSkillName = config.taskState.activeAgentSkillName
+					taskMetadata.activeAgentInvokedSlashCommand = config.taskState.activeAgentInvokedSlashCommand
+					taskMetadata.activeWorkflowId = managedWorkflowRun.workflowId
+					taskMetadata.managedWorkflowRun = managedWorkflowRun
+					await saveTaskMetadata(config.taskId, taskMetadata)
+				} catch {
+					// non-fatal: workflow persistence should not block the skill activation
+				}
+
+				const aliasNote =
+					skillName !== managedWorkflowRun.workflowId
+						? `\nInvoked via alias "${skillName}". Canonical managed workflow: "${managedWorkflowRun.workflowId}".`
+						: ""
+
+				if (resumed) {
+					return `# Managed workflow "${skillContent.name}" resumed
+
+The backend restored the existing workflow checklist and preserved current progress.${aliasNote}
+
+IMPORTANT: Do not create or rewrite the checklist manually. Follow the current phase instructions in the prompt and use the complete_workflow_item tool to mark workflow items complete.`
+				}
+
+				return `# Managed workflow "${skillContent.name}" is now active
+
+The backend created the workflow checklist and owns workflow progression for this task.${aliasNote}
+
+IMPORTANT: Do not create or rewrite the checklist manually. Follow the current phase instructions in the prompt and use the complete_workflow_item tool to mark workflow items complete.`
+			}
 
 			config.taskState.activeWorkflowId = skillName
 			config.taskState.activeWorkflowJustStarted = true
