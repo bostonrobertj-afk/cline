@@ -2,8 +2,70 @@
 outputFile: '{planning_artifacts}/implementation-readiness-report-{{date}}.md'
 ---
 
-# Step 3: Epic Coverage Validation
+# step 03 epic coverage validation
 
+## META
+
+- Goal: To validate that all Functional Requirements from the PRD are captured in the epics and stories document, identifying any gaps in coverage.
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
+
+## EXECUTION
+
+<step n="1" goal="Initialize Coverage Validation">
+  <action>Load the epics and stories document</action>
+  <action>Extract FR coverage information</action>
+  <action>Compare against PRD FRs from previous step</action>
+  <action>Identify any FRs not covered in epics&quot;</action>
+</step>
+
+<step n="2" goal="Load Epics Document">
+  <action>Load the epics and stories document (whole or sharded)</action>
+  <action>Read it completely to find FR coverage information</action>
+  <action>Look for sections like &quot;FR Coverage Map&quot; or similar</action>
+</step>
+
+<step n="3" goal="Extract Epic FR Coverage">
+  <action>Find FR coverage mapping or list</action>
+  <ask>Extract which FR numbers are claimed to be covered</ask>
+  <ask>Document which epics cover which FRs</ask>
+</step>
+
+<step n="4" goal="Compare Coverage Against PRD">
+  <action>Check each PRD FR against epic coverage</action>
+  <action>Identify FRs NOT covered in epics</action>
+  <action>Note any FRs in epics but NOT in PRD</action>
+</step>
+
+<step n="5" goal="Document Missing Coverage">
+  <action>Impact: [Why this is critical]</action>
+  <ask>Recommendation: [Which epic should include this]</ask>
+</step>
+
+<step n="6" goal="Add to Assessment Report">
+  <action>Total PRD FRs: [count]</action>
+  <action>FRs covered in epics: [count]</action>
+  <action>Coverage percentage: [percentage]</action>
+</step>
+
+<step n="7" goal="Auto-Proceed to Next Step">
+  <action>After coverage validation complete, immediately load next step.</action>
+  <action>## PROCEEDING TO UX ALIGNMENT Epic coverage validation complete.</action>
+  <output>Read fully and follow: ./step-04-ux-alignment.md ---</output>
+</step>
+
+## CHECKPOINT
+
+Complete the current required actions in order before moving to the next workflow phase.
+
+## ADVISORY
+
+- Next handoff: ./step-04-ux-alignment.md
+
+## REFERENCE
+
+<prose>
 ## STEP GOAL:
 
 To validate that all Functional Requirements from the PRD are captured in the epics and stories document, identifying any gaps in coverage.
@@ -167,3 +229,4 @@ Epic coverage validation complete. Read fully and follow: `./step-04-ux-alignmen
 - Incomplete coverage analysis
 
 **Master Rule:** Every FR must have a traceable implementation path.
+</prose>

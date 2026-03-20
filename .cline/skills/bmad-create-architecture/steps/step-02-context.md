@@ -1,5 +1,75 @@
-# Step 2: Project Context Analysis
+# step 02 context
 
+## META
+
+- Goal: context
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
+
+## EXECUTION
+
+<step n="1" goal="Review Project Requirements">
+  <action>Extract and analyze Functional Requirements (FRs)</action>
+  <action>Identify Non-Functional Requirements (NFRs) like performance, security, compliance</action>
+  <action>Note any technical constraints or dependencies mentioned</action>
+  <action>Count and categorize requirements to understand project scale</action>
+  <action>Map epic structure and user stories to architectural components</action>
+</step>
+
+<step n="2" goal="Project Scale Assessment">
+  <action>Real-time features requirements</action>
+  <action>Multi-tenancy needs</action>
+  <action>Regulatory compliance requirements</action>
+  <action>Integration complexity</action>
+  <action>User interaction complexity</action>
+</step>
+
+<step n="3" goal="Reflect Understanding">
+  <action>[Summarize core functionality from FRs]</action>
+  <action>[Note critical NFRs that will shape architecture]</action>
+  <action>{if_ux_loaded}[Note UX complexity and technical requirements]{/if_ux_loaded}</action>
+  <action>[Identify unique technical challenges or constraints]</action>
+  <action>[Highlight any regulatory or compliance requirements]</action>
+</step>
+
+<step n="4" goal="Generate Project Context Content">
+  <action>Primary domain:</action>
+  <action>Complexity level:</action>
+  <action>Estimated architectural components:</action>
+</step>
+
+<step n="5" goal="Present Content and Menu">
+  <action>This sets the foundation for our architectural decisions.</action>
+  <ask>Here's what I'll add to the document: [Show the complete markdown content from step 4] What would you like to do?</ask>
+  <output>Show the generated content and present choices: &quot;I've drafted the Project Context Analysis based on your requirements.</output>
+  <output>[A] Advanced Elicitation - Let's dive deeper into architectural implications [P] Party Mode - Bring different perspectives to analyze requirements [C] Continue - Save this analysis and begin architectural decisions&quot;</output>
+</step>
+
+<step n="6" goal="Handle Menu Selection">
+  <action>Invoke the bmad-advanced-elicitation skill with the current context analysis</action>
+  <action>Process the enhanced architectural insights that come back</action>
+  <action>Invoke the bmad-party-mode skill with the current project context</action>
+  <action>Process the collaborative improvements to architectural understanding</action>
+  <action>Update frontmatter: stepsCompleted: [1, 2]</action>
+  <ask>Ask user: &quot;Accept these enhancements to the project context analysis? (y/n)&quot;</ask>
+  <ask>Ask user: &quot;Accept these changes to the project context analysis? (y/n)&quot;</ask>
+  <output>If yes: Update content with improvements, then return to A/P/C menu</output>
+  <output>If no: Keep original content, then return to A/P/C menu</output>
+  <output>Append the final content to {planning_artifacts}/architecture.md</output>
+</step>
+
+## CHECKPOINT
+
+Halt for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.
+
+## ADVISORY
+
+- Persist workflow state updates whenever this phase writes or updates a managed artifact.
+
+## REFERENCE
+
+<prose>
 ## MANDATORY EXECUTION RULES (READ FIRST):
 
 - 🛑 NEVER generate content without user input
@@ -222,3 +292,4 @@ When user selects 'C', append the content directly to the document using the str
 After user selects 'C' and content is saved to document, load `./step-03-starter.md` to evaluate starter template options.
 
 Remember: Do NOT proceed to step-03 until user explicitly selects 'C' from the A/P/C menu and content is saved!
+</prose>

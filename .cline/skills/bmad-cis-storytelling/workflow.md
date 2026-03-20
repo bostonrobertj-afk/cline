@@ -5,8 +5,154 @@ standalone: true
 main_config: '{project-root}/_bmad/cis/config.yaml'
 ---
 
-# Storytelling Workflow
+# workflow
 
+## META
+
+- Goal: Craft compelling narratives through structured story development, emotional arc design, and channel-specific adaptations.
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
+
+## EXECUTION
+
+<step n="1" goal="Story context setup">
+  <action>Check whether context data was provided with the workflow invocation.</action>
+  <action>If context data was passed:</action>
+  <action>Load the context document from the provided data file path.</action>
+  <action>Study the background information, brand details, or subject matter.</action>
+  <action>Use the provided context to inform story development.</action>
+  <action>Acknowledge the focused storytelling goal.</action>
+  <ask>Ask: &quot;I see we're crafting a story based on the context provided. What specific angle or emphasis would you like?&quot;</ask>
+  <ask>Ask:</ask>
+  <ask>What's the purpose of this story? (e.g., marketing, pitch, brand narrative, case study)</ask>
+  <ask>Who is your target audience?</ask>
+  <ask>What key messages or takeaways do you want the audience to have?</ask>
+  <ask>Any constraints? (length, tone, medium, existing brand guidelines)</ask>
+  <template-output>story_purpose, target_audience, key_messages</template-output>
+</step>
+
+<step n="2" goal="Select story framework">
+  <action>Load story frameworks from {story_frameworks_file}.</action>
+  <action>Parse the framework data with the same storytelling assumptions used by the legacy workflow, including story_type, name, description, key_elements, and best_for.</action>
+  <action>Based on the context from Step 1, present framework options:</action>
+  <action>I can help craft your story using these proven narrative frameworks:</action>
+  <action>Transformation Narratives:</action>
+  <action>Hero's Journey - Classic transformation arc with adventure and return</action>
+  <ask>Ask which framework best fits the purpose. Accept 1-10 or a request for recommendation.</ask>
+  <ask>If the user asks for a recommendation:</ask>
+  <template-output>story_type, framework_name</template-output>
+</step>
+
+<step n="3" goal="Gather story elements">
+  <action>Guide narrative development using the Socratic method. Draw out their story through questions rather than writing it for them unless they explicitly request you to write it.</action>
+  <action>Keep these storytelling principles active:</action>
+  <action>Every great story has conflict or tension. Find the struggle.</action>
+  <action>Show, don't tell. Use vivid, concrete details.</action>
+  <action>Emotion drives memory. Find the feeling.</action>
+  <action>Authenticity resonates. Stay true to the core truth.</action>
+  <ask>Change is essential. Ask what transforms.</ask>
+  <ask>Who or what is the hero of this story?</ask>
+  <ask>What's their ordinary world before the adventure?</ask>
+  <ask>What call to adventure disrupts their world?</ask>
+  <ask>What trials or challenges do they face?</ask>
+  <ask>How are they transformed by the journey?</ask>
+  <template-output>story_beats, character_voice, conflict_tension, transformation</template-output>
+</step>
+
+<step n="4" goal="Craft emotional arc">
+  <action>Develop the emotional journey of the story.</action>
+  <action>Help the user identify:</action>
+  <action>Relatable struggles that create empathy</action>
+  <action>Surprising moments that capture attention</action>
+  <action>Personal stakes that make it matter</action>
+  <action>Satisfying payoffs that create resolution</action>
+  <ask>Ask:</ask>
+  <ask>What emotion should the audience feel at the beginning?</ask>
+  <ask>What emotional shift happens at the turning point?</ask>
+  <ask>What emotion should they carry away at the end?</ask>
+  <ask>Where are the emotional peaks (high tension or joy)?</ask>
+  <ask>Where are the valleys (low points or struggle)?</ask>
+  <template-output>emotional_arc, emotional_touchpoints</template-output>
+</step>
+
+<step n="5" goal="Develop opening hook">
+  <action>The first moment determines whether the audience keeps reading or listening.</action>
+  <action>Guide toward a strong hook that:</action>
+  <action>Surprises or challenges assumptions</action>
+  <action>Raises an urgent question</action>
+  <action>Creates immediate relatability</action>
+  <action>Promises valuable payoff</action>
+  <ask>Ask:</ask>
+  <ask>What surprising fact, question, or statement could open this story?</ask>
+  <ask>What's the most intriguing part of this story to lead with?</ask>
+  <template-output>opening_hook</template-output>
+</step>
+
+<step n="6" goal="Write core narrative">
+  <action>Draft the story themselves with your guidance</action>
+  <action>Have you write the first draft based on the discussion</action>
+  <action>Co-create it iteratively together</action>
+  <action>If they choose to draft it themselves:</action>
+  <action>Provide writing prompts and encouragement.</action>
+  <action>Offer feedback on drafts they share.</action>
+  <ask>Ask whether the user wants to:</ask>
+  <template-output>complete_story, core_narrative</template-output>
+</step>
+
+<step n="7" goal="Create story variations">
+  <action>Adapt the story for different contexts and lengths.</action>
+  <action>Based on the response, create:</action>
+  <action>Short Version (1-3 sentences) for social media, email subject lines, and quick pitches</action>
+  <action>Medium Version (1-2 paragraphs) for email body, blog intro, and executive summary</action>
+  <action>Extended Version (full narrative) for articles, presentations, case studies, and websites</action>
+  <ask>Ask what channels or formats will use this story.</ask>
+  <template-output>short_version, medium_version, extended_version</template-output>
+</step>
+
+<step n="8" goal="Usage guidelines">
+  <action>Provide strategic guidance for story deployment.</action>
+  <action>Consider:</action>
+  <action>Best channels for this story type</action>
+  <action>Audience-specific adaptations needed</action>
+  <action>Tone and voice consistency with brand</action>
+  <action>Visual or multimedia enhancements</action>
+  <ask>Ask where and how the story will be used.</ask>
+  <template-output>best_channels, audience_considerations, tone_notes, adaptation_suggestions</template-output>
+</step>
+
+<step n="9" goal="Refinement and next steps">
+  <action>Polish the story and plan forward.</action>
+  <ask>Ask:</ask>
+  <ask>What parts of the story feel strongest?</ask>
+  <ask>What areas could use more refinement?</ask>
+  <ask>What's the key resolution or call to action for your story?</ask>
+  <ask>Do you need additional story versions for other audiences or purposes?</ask>
+  <ask>How will you test this story with your audience?</ask>
+  <template-output>resolution, refinement_opportunities, additional_versions, feedback_plan</template-output>
+</step>
+
+<step n="10" goal="Generate final output">
+  <action>Compile all story components into the structured template.</action>
+  <action>Before finishing:</action>
+  <action>Ensure all story versions are complete and polished.</action>
+  <action>Format according to the template structure.</action>
+  <action>Include all strategic guidance and usage notes.</action>
+  <action>Verify tone and voice consistency.</action>
+  <template-output>agent_role, agent_name, user_name, date</template-output>
+</step>
+
+## CHECKPOINT
+
+Halt for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.
+
+## ADVISORY
+
+- Use the prose block below for the full agent-facing guidance that complements the structured execution steps.
+
+## REFERENCE
+
+<prose>
 **Goal:** Craft compelling narratives through structured story development, emotional arc design, and channel-specific adaptations.
 
 **Your Role:** You are a master storyteller and narrative guide. Draw out the user's story through questions, preserve authentic voice, build emotional resonance, and never give time estimates.
@@ -60,262 +206,130 @@ Load config from `{main_config}` and resolve:
 <workflow>
 
 <step n="1" goal="Story context setup">
-Check whether context data was provided with the workflow invocation.
-
-If context data was passed:
-
-- Load the context document from the provided data file path.
-- Study the background information, brand details, or subject matter.
-- Use the provided context to inform story development.
-- Acknowledge the focused storytelling goal.
-- Ask: "I see we're crafting a story based on the context provided. What specific angle or emphasis would you like?"
-
-If no context data was provided:
-
-- Proceed with context gathering.
-- Ask:
-  - What's the purpose of this story? (e.g., marketing, pitch, brand narrative, case study)
-  - Who is your target audience?
-  - What key messages or takeaways do you want the audience to have?
-  - Any constraints? (length, tone, medium, existing brand guidelines)
-- Wait for the user's response before proceeding. This context shapes the narrative approach.
-
-<template-output>story_purpose, target_audience, key_messages</template-output>
+  <action>Check whether context data was provided with the workflow invocation.</action>
+  <action>If context data was passed:</action>
+  <action>Load the context document from the provided data file path.</action>
+  <action>Study the background information, brand details, or subject matter.</action>
+  <action>Use the provided context to inform story development.</action>
+  <action>Acknowledge the focused storytelling goal.</action>
+  <ask>Ask: &quot;I see we're crafting a story based on the context provided. What specific angle or emphasis would you like?&quot;</ask>
+  <ask>Ask:</ask>
+  <ask>What's the purpose of this story? (e.g., marketing, pitch, brand narrative, case study)</ask>
+  <ask>Who is your target audience?</ask>
+  <ask>What key messages or takeaways do you want the audience to have?</ask>
+  <ask>Any constraints? (length, tone, medium, existing brand guidelines)</ask>
+  <template-output>story_purpose, target_audience, key_messages</template-output>
 </step>
 
 <step n="2" goal="Select story framework">
-Load story frameworks from `{story_frameworks_file}`.
-
-Parse the framework data with the same storytelling assumptions used by the legacy workflow, including `story_type`, `name`, `description`, `key_elements`, and `best_for`.
-
-Based on the context from Step 1, present framework options:
-
-I can help craft your story using these proven narrative frameworks:
-
-**Transformation Narratives:**
-
-1. **Hero's Journey** - Classic transformation arc with adventure and return
-2. **Pixar Story Spine** - Emotional structure building tension to resolution
-3. **Customer Journey Story** - Before/after transformation narrative
-4. **Challenge-Overcome Arc** - Dramatic obstacle-to-victory structure
-
-**Strategic Narratives:**
-
-5. **Brand Story** - Values, mission, and unique positioning
-6. **Pitch Narrative** - Persuasive problem-to-solution structure
-7. **Vision Narrative** - Future-focused aspirational story
-8. **Origin Story** - Foundational narrative of how it began
-
-**Specialized Narratives:**
-
-9. **Data Storytelling** - Transform insights into compelling narrative
-10. **Emotional Hooks** - Craft powerful opening and touchpoints
-
-Ask which framework best fits the purpose. Accept `1-10` or a request for recommendation.
-
-If the user asks for a recommendation:
-
-- Analyze `story_purpose`, `target_audience`, and `key_messages`.
-- Recommend the best-fit framework with clear rationale.
-- Use the format:
-  - "Based on your {story_purpose} for {target_audience}, I recommend {framework_name} because {rationale}"
-
-<template-output>story_type, framework_name</template-output>
+  <action>Load story frameworks from {story_frameworks_file}.</action>
+  <action>Parse the framework data with the same storytelling assumptions used by the legacy workflow, including story_type, name, description, key_elements, and best_for.</action>
+  <action>Based on the context from Step 1, present framework options:</action>
+  <action>I can help craft your story using these proven narrative frameworks:</action>
+  <action>Transformation Narratives:</action>
+  <action>Hero's Journey - Classic transformation arc with adventure and return</action>
+  <ask>Ask which framework best fits the purpose. Accept 1-10 or a request for recommendation.</ask>
+  <ask>If the user asks for a recommendation:</ask>
+  <template-output>story_type, framework_name</template-output>
 </step>
 
 <step n="3" goal="Gather story elements">
-Guide narrative development using the Socratic method. Draw out their story through questions rather than writing it for them unless they explicitly request you to write it.
-
-Keep these storytelling principles active:
-
-- Every great story has conflict or tension. Find the struggle.
-- Show, don't tell. Use vivid, concrete details.
-- Change is essential. Ask what transforms.
-- Emotion drives memory. Find the feeling.
-- Authenticity resonates. Stay true to the core truth.
-
-Based on the selected framework:
-
-- Reference `key_elements` from the selected `story_type` in the framework data.
-- Parse pipe-separated `key_elements` into individual components.
-- Guide the user through each element with targeted questions.
-
-Framework-specific guidance:
-
-For Hero's Journey:
-
-- Who or what is the hero of this story?
-- What's their ordinary world before the adventure?
-- What call to adventure disrupts their world?
-- What trials or challenges do they face?
-- How are they transformed by the journey?
-- What wisdom do they bring back?
-
-For Pixar Story Spine:
-
-- Once upon a time, what was the situation?
-- Every day, what was the routine?
-- Until one day, what changed?
-- Because of that, what happened next?
-- And because of that? (continue chain)
-- Until finally, how was it resolved?
-
-For Brand Story:
-
-- What was the origin spark for this brand?
-- What core values drive every decision?
-- How does this impact customers or users?
-- What makes this different from alternatives?
-- Where is this heading in the future?
-
-For Pitch Narrative:
-
-- What's the problem landscape you're addressing?
-- What's your vision for the solution?
-- What proof or traction validates this approach?
-- What action do you want the audience to take?
-
-For Data Storytelling:
-
-- What context does the audience need?
-- What's the key data revelation or insight?
-- What patterns explain this insight?
-- So what? Why does this matter?
-- What actions should this insight drive?
-
-<template-output>story_beats, character_voice, conflict_tension, transformation</template-output>
+  <action>Guide narrative development using the Socratic method. Draw out their story through questions rather than writing it for them unless they explicitly request you to write it.</action>
+  <action>Keep these storytelling principles active:</action>
+  <action>Every great story has conflict or tension. Find the struggle.</action>
+  <action>Show, don't tell. Use vivid, concrete details.</action>
+  <action>Emotion drives memory. Find the feeling.</action>
+  <action>Authenticity resonates. Stay true to the core truth.</action>
+  <ask>Change is essential. Ask what transforms.</ask>
+  <ask>Who or what is the hero of this story?</ask>
+  <ask>What's their ordinary world before the adventure?</ask>
+  <ask>What call to adventure disrupts their world?</ask>
+  <ask>What trials or challenges do they face?</ask>
+  <ask>How are they transformed by the journey?</ask>
+  <template-output>story_beats, character_voice, conflict_tension, transformation</template-output>
 </step>
 
 <step n="4" goal="Craft emotional arc">
-Develop the emotional journey of the story.
-
-Ask:
-
-- What emotion should the audience feel at the beginning?
-- What emotional shift happens at the turning point?
-- What emotion should they carry away at the end?
-- Where are the emotional peaks (high tension or joy)?
-- Where are the valleys (low points or struggle)?
-
-Help the user identify:
-
-- Relatable struggles that create empathy
-- Surprising moments that capture attention
-- Personal stakes that make it matter
-- Satisfying payoffs that create resolution
-
-<template-output>emotional_arc, emotional_touchpoints</template-output>
+  <action>Develop the emotional journey of the story.</action>
+  <action>Help the user identify:</action>
+  <action>Relatable struggles that create empathy</action>
+  <action>Surprising moments that capture attention</action>
+  <action>Personal stakes that make it matter</action>
+  <action>Satisfying payoffs that create resolution</action>
+  <ask>Ask:</ask>
+  <ask>What emotion should the audience feel at the beginning?</ask>
+  <ask>What emotional shift happens at the turning point?</ask>
+  <ask>What emotion should they carry away at the end?</ask>
+  <ask>Where are the emotional peaks (high tension or joy)?</ask>
+  <ask>Where are the valleys (low points or struggle)?</ask>
+  <template-output>emotional_arc, emotional_touchpoints</template-output>
 </step>
 
 <step n="5" goal="Develop opening hook">
-The first moment determines whether the audience keeps reading or listening.
-
-Ask:
-
-- What surprising fact, question, or statement could open this story?
-- What's the most intriguing part of this story to lead with?
-
-Guide toward a strong hook that:
-
-- Surprises or challenges assumptions
-- Raises an urgent question
-- Creates immediate relatability
-- Promises valuable payoff
-- Uses vivid, concrete details
-
-<template-output>opening_hook</template-output>
+  <action>The first moment determines whether the audience keeps reading or listening.</action>
+  <action>Guide toward a strong hook that:</action>
+  <action>Surprises or challenges assumptions</action>
+  <action>Raises an urgent question</action>
+  <action>Creates immediate relatability</action>
+  <action>Promises valuable payoff</action>
+  <ask>Ask:</ask>
+  <ask>What surprising fact, question, or statement could open this story?</ask>
+  <ask>What's the most intriguing part of this story to lead with?</ask>
+  <template-output>opening_hook</template-output>
 </step>
 
 <step n="6" goal="Write core narrative">
-Ask whether the user wants to:
-
-1. Draft the story themselves with your guidance
-2. Have you write the first draft based on the discussion
-3. Co-create it iteratively together
-
-If they choose to draft it themselves:
-
-- Provide writing prompts and encouragement.
-- Offer feedback on drafts they share.
-- Suggest refinements for clarity, emotion, and flow.
-
-If they want you to write the next draft:
-
-- Synthesize all gathered elements.
-- Write the complete narrative in the appropriate tone and style.
-- Structure it according to the chosen framework.
-- Include vivid details and emotional beats.
-- Present the draft for feedback and refinement.
-
-If they want collaborative co-creation:
-
-- Write the opening paragraph.
-- Get feedback and iterate.
-- Build the story section by section together.
-
-<template-output>complete_story, core_narrative</template-output>
+  <action>Draft the story themselves with your guidance</action>
+  <action>Have you write the first draft based on the discussion</action>
+  <action>Co-create it iteratively together</action>
+  <action>If they choose to draft it themselves:</action>
+  <action>Provide writing prompts and encouragement.</action>
+  <action>Offer feedback on drafts they share.</action>
+  <ask>Ask whether the user wants to:</ask>
+  <template-output>complete_story, core_narrative</template-output>
 </step>
 
 <step n="7" goal="Create story variations">
-Adapt the story for different contexts and lengths.
-
-Ask what channels or formats will use this story.
-
-Based on the response, create:
-
-1. **Short Version** (1-3 sentences) for social media, email subject lines, and quick pitches
-2. **Medium Version** (1-2 paragraphs) for email body, blog intro, and executive summary
-3. **Extended Version** (full narrative) for articles, presentations, case studies, and websites
-
-<template-output>short_version, medium_version, extended_version</template-output>
+  <action>Adapt the story for different contexts and lengths.</action>
+  <action>Based on the response, create:</action>
+  <action>Short Version (1-3 sentences) for social media, email subject lines, and quick pitches</action>
+  <action>Medium Version (1-2 paragraphs) for email body, blog intro, and executive summary</action>
+  <action>Extended Version (full narrative) for articles, presentations, case studies, and websites</action>
+  <ask>Ask what channels or formats will use this story.</ask>
+  <template-output>short_version, medium_version, extended_version</template-output>
 </step>
 
 <step n="8" goal="Usage guidelines">
-Provide strategic guidance for story deployment.
-
-Ask where and how the story will be used.
-
-Consider:
-
-- Best channels for this story type
-- Audience-specific adaptations needed
-- Tone and voice consistency with brand
-- Visual or multimedia enhancements
-- Testing and feedback approach
-
-<template-output>best_channels, audience_considerations, tone_notes, adaptation_suggestions</template-output>
+  <action>Provide strategic guidance for story deployment.</action>
+  <action>Consider:</action>
+  <action>Best channels for this story type</action>
+  <action>Audience-specific adaptations needed</action>
+  <action>Tone and voice consistency with brand</action>
+  <action>Visual or multimedia enhancements</action>
+  <ask>Ask where and how the story will be used.</ask>
+  <template-output>best_channels, audience_considerations, tone_notes, adaptation_suggestions</template-output>
 </step>
 
 <step n="9" goal="Refinement and next steps">
-Polish the story and plan forward.
-
-Ask:
-
-- What parts of the story feel strongest?
-- What areas could use more refinement?
-- What's the key resolution or call to action for your story?
-- Do you need additional story versions for other audiences or purposes?
-- How will you test this story with your audience?
-
-<template-output>resolution, refinement_opportunities, additional_versions, feedback_plan</template-output>
+  <action>Polish the story and plan forward.</action>
+  <ask>Ask:</ask>
+  <ask>What parts of the story feel strongest?</ask>
+  <ask>What areas could use more refinement?</ask>
+  <ask>What's the key resolution or call to action for your story?</ask>
+  <ask>Do you need additional story versions for other audiences or purposes?</ask>
+  <ask>How will you test this story with your audience?</ask>
+  <template-output>resolution, refinement_opportunities, additional_versions, feedback_plan</template-output>
 </step>
 
 <step n="10" goal="Generate final output">
-Compile all story components into the structured template.
-
-Before finishing:
-
-1. Ensure all story versions are complete and polished.
-2. Format according to the template structure.
-3. Include all strategic guidance and usage notes.
-4. Verify tone and voice consistency.
-5. Fill all template placeholders with actual content.
-
-Write the final story document to `{default_output_file}`.
-
-Confirm completion with: "Story complete, {user_name}! Your narrative has been saved to {default_output_file}".
-
-<template-output>agent_role, agent_name, user_name, date</template-output>
+  <action>Compile all story components into the structured template.</action>
+  <action>Before finishing:</action>
+  <action>Ensure all story versions are complete and polished.</action>
+  <action>Format according to the template structure.</action>
+  <action>Include all strategic guidance and usage notes.</action>
+  <action>Verify tone and voice consistency.</action>
+  <template-output>agent_role, agent_name, user_name, date</template-output>
 </step>
 
 </workflow>
+</prose>

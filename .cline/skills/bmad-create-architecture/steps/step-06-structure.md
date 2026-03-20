@@ -1,5 +1,83 @@
-# Step 6: Project Structure & Boundaries
+# step 06 structure
 
+## META
+
+- Goal: structure
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
+
+## EXECUTION
+
+<step n="1" goal="Analyze Requirements Mapping">
+  <action>User stories within the epic</action>
+  <action>Cross-epic dependencies</action>
+  <action>Shared components needed</action>
+  <action>Related functional requirements</action>
+  <action>Shared functionality across categories</action>
+</step>
+
+<step n="2" goal="Define Project Directory Structure">
+  <action>Package management files (package.json, requirements.txt, etc.)</action>
+  <action>Build and development configuration</action>
+  <action>Environment configuration files</action>
+  <action>CI/CD pipeline files</action>
+  <action>Documentation files</action>
+</step>
+
+<step n="3" goal="Define Integration Boundaries">
+  <action>External API endpoints</action>
+  <action>Internal service boundaries</action>
+  <action>Authentication and authorization boundaries</action>
+  <action>Data access layer boundaries</action>
+  <action>Frontend component communication patterns</action>
+</step>
+
+<step n="4" goal="Create Complete Project Tree">
+  <output>Generate a comprehensive directory structure showing all files and directories: Technology-Specific Structure Examples: Next.js Full-Stack: API Backend (NestJS):</output>
+</step>
+
+<step n="5" goal="Map Requirements to Structure">
+  <action>Components: src/components/features/users/</action>
+  <action>Services: src/services/users/</action>
+  <action>API Routes: src/app/api/users/</action>
+  <action>Database: prisma/migrations/_users_</action>
+  <action>Tests: tests/features/users/&quot;</action>
+</step>
+
+<step n="6" goal="Generate Structure Content">
+  <output>Prepare the content to append to the document: #### Content Structure:</output>
+</step>
+
+<step n="7" goal="Present Content and Menu">
+  <ask>Here's what I'll add to the document: [Show the complete markdown content from step 6] What would you like to do?</ask>
+  <output>Show the generated project structure content and present choices: &quot;I've created a complete project structure based on all our architectural decisions.</output>
+  <output>[A] Advanced Elicitation - Explore innovative project organization approaches [P] Party Mode - Review structure from different development perspectives [C] Continue - Save this structure and move to architecture validation&quot;</output>
+</step>
+
+<step n="8" goal="Handle Menu Selection">
+  <action>Invoke the bmad-advanced-elicitation skill with current project structure</action>
+  <action>Process enhanced organizational insights that come back</action>
+  <action>Invoke the bmad-party-mode skill with project structure context</action>
+  <action>Process collaborative insights about organization trade-offs</action>
+  <action>Update frontmatter: stepsCompleted: [1, 2, 3, 4, 5, 6]</action>
+  <ask>Ask user: &quot;Accept these changes to the project structure? (y/n)&quot;</ask>
+  <output>If yes: Update content, then return to A/P/C menu</output>
+  <output>If no: Keep original content, then return to A/P/C menu</output>
+  <output>Append the final content to {planning_artifacts}/architecture.md</output>
+</step>
+
+## CHECKPOINT
+
+Halt for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.
+
+## ADVISORY
+
+- Persist workflow state updates whenever this phase writes or updates a managed artifact.
+
+## REFERENCE
+
+<prose>
 ## MANDATORY EXECUTION RULES (READ FIRST):
 
 - 🛑 NEVER generate content without user input
@@ -377,3 +455,4 @@ When user selects 'C', append the content directly to the document using the str
 After user selects 'C' and content is saved to document, load `./step-07-validation.md` to validate architectural coherence and completeness.
 
 Remember: Do NOT proceed to step-07 until user explicitly selects 'C' from the A/P/C menu and content is saved!
+</prose>

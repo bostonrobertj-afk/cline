@@ -1,5 +1,3 @@
-# Step 9: Functional Requirements
-
 ## META
 
 - Goal: synthesize functional requirements by capability area.

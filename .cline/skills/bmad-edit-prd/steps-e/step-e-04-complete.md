@@ -4,8 +4,51 @@ prdFile: '{prd_file_path}'
 validationWorkflow: '{project-root}/_bmad/bmm/workflows/2-plan-workflows/create-prd/steps-v/step-v-01-discovery.md'
 ---
 
-# Step E-4: Complete & Validate
+# step e 04 complete
 
+## META
+
+- Goal: Present summary of completed edits and offer next steps including seamless integration with validation workflow.
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
+
+## EXECUTION
+
+<step n="1" goal="Compile Edit Summary">
+  <action>Sections added: {list with names}</action>
+  <action>Sections updated: {list with names}</action>
+  <action>Content removed: {list}</action>
+  <action>Structure changes: {description}</action>
+  <action>Total sections affected: {count}</action>
+</step>
+
+<step n="2" goal="Present Completion Summary">
+  <action>Downstream workflows (UX Design, Architecture)</action>
+  <action>Validation to ensure quality</action>
+  <action>Production use</action>
+</step>
+
+<step n="3" goal="Present MENU OPTIONS">
+  <action>ALWAYS halt and wait for user input</action>
+  <action>Only proceed based on user selection</action>
+  <action>IF V (Run Full Validation):</action>
+  <action>IF E (Edit More):</action>
+  <action>IF S (Summary):</action>
+  <output>IF Any other: Help user, then redisplay menu</output>
+</step>
+
+## CHECKPOINT
+
+Halt for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.
+
+## ADVISORY
+
+- Next handoff: ./step-e-03-edit.md
+
+## REFERENCE
+
+<prose>
 ## STEP GOAL:
 
 Present summary of completed edits and offer next steps including seamless integration with validation workflow.
@@ -163,3 +206,4 @@ Display:
 - No clear handoff to validation workflow
 
 **Master Rule:** Edit workflow seamlessly integrates with validation. User can edit → validate → edit again → validate again in iterative improvement cycle.
+</prose>

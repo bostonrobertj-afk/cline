@@ -4,8 +4,73 @@ outputFile: '{planning_artifacts}/product-brief-{{project_name}}-{{date}}.md'
 
 ---
 
-# Step 2: Product Vision Discovery
+# step 02 vision
 
+## META
+
+- Goal: Conduct comprehensive product vision discovery to define the core problem, solution, and unique value proposition through collaborative analysis.
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
+
+## EXECUTION
+
+<step n="1" goal="Begin Vision Discovery">
+  <ask>What core problem are you trying to solve?</ask>
+  <ask>Who experiences this problem most acutely?</ask>
+  <ask>What would success look like for the people you're helping?</ask>
+</step>
+
+<step n="2" goal="Deep Problem Understanding">
+  <ask>How do people currently solve this problem?</ask>
+  <ask>What's frustrating about current solutions?</ask>
+  <ask>What happens if this problem goes unsolved?</ask>
+</step>
+
+<step n="3" goal="Current Solutions Analysis">
+  <ask>What solutions exist today?</ask>
+  <ask>Where do they fall short?</ask>
+  <ask>What gaps are they leaving open?</ask>
+</step>
+
+<step n="4" goal="Solution Vision">
+  <ask>If we could solve this perfectly, what would that look like?</ask>
+  <ask>What's the simplest way we could make a meaningful difference?</ask>
+  <ask>What makes your approach different from what's out there?</ask>
+</step>
+
+<step n="5" goal="Unique Differentiators">
+  <ask>What's your unfair advantage?</ask>
+  <ask>What would be hard for competitors to copy?</ask>
+  <ask>What insight or approach is uniquely yours?</ask>
+</step>
+
+<step n="6" goal="Generate Executive Summary Content">
+  <output>Content to Append: Prepare the following structure for document append:</output>
+</step>
+
+<step n="7" goal="Present MENU OPTIONS">
+  <action>IF A: Invoke the bmad-advanced-elicitation skill with current vision content to dive deeper and refine</action>
+  <action>IF P: Invoke the bmad-party-mode skill to bring different perspectives to positioning and differentiation</action>
+  <action>ONLY proceed to next step when user selects 'C'</action>
+  <ask>User can chat or ask questions - always respond and then end with display again of the menu options</ask>
+  <output>IF C: Save content to {outputFile}, update frontmatter with stepsCompleted: [1, 2], then read fully and follow: ./step-03-users.md</output>
+  <output>IF Any other comments or queries: help user respond then Redisplay Menu Options</output>
+  <output>ALWAYS halt and wait for user input after presenting menu</output>
+</step>
+
+## CHECKPOINT
+
+Halt for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.
+
+## ADVISORY
+
+- Next handoff: ./step-03-users.md
+- Persist workflow state updates whenever this phase writes or updates a managed artifact.
+
+## REFERENCE
+
+<prose>
 ## STEP GOAL:
 
 Conduct comprehensive product vision discovery to define the core problem, solution, and unique value proposition through collaborative analysis.
@@ -191,3 +256,4 @@ ONLY WHEN [C continue option] is selected and [vision content finalized and save
 - Not updating frontmatter properly
 
 **Master Rule:** Skipping steps, optimizing sequences, or not following exact instructions is FORBIDDEN and constitutes SYSTEM FAILURE.
+</prose>

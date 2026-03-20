@@ -1,5 +1,74 @@
-# Step 4: Final Validation
+# step 04 final validation
 
+## META
+
+- Goal: To validate complete coverage of all requirements and ensure stories are ready for development.
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
+
+## EXECUTION
+
+<step n="1" goal="FR Coverage Validation">
+  <action>Go through each FR from the Requirements Inventory</action>
+  <action>Verify it appears in at least one story</action>
+  <action>Check that acceptance criteria fully address the FR</action>
+  <action>No FRs should be left uncovered</action>
+</step>
+
+<step n="2" goal="Architecture Implementation Validation">
+  <action>If YES: Epic 1 Story 1 must be &quot;Set up initial project from starter template&quot;</action>
+  <action>This includes cloning, installing dependencies, initial configuration</action>
+  <ask>Does Architecture document specify a starter template?</ask>
+  <ask>Are database tables/entities created ONLY when needed by stories?</ask>
+  <output>❌ WRONG: Epic 1 creates all tables upfront</output>
+  <output>✅ RIGHT: Tables created as part of the first story that needs them</output>
+  <output>Each story should create/modify ONLY what it needs</output>
+</step>
+
+<step n="3" goal="Story Quality Validation">
+  <action>Be completable by a single dev agent</action>
+  <action>Have clear acceptance criteria</action>
+  <action>Reference specific FRs it implements</action>
+  <action>Include necessary technical details</action>
+  <action>Not have forward dependencies (can only depend on PREVIOUS stories)</action>
+</step>
+
+<step n="4" goal="Epic Structure Validation">
+  <action>Epics deliver user value, not technical milestones</action>
+  <action>Dependencies flow naturally</action>
+  <action>Foundation stories only setup what's needed</action>
+  <action>No big upfront technical work</action>
+</step>
+
+<step n="5" goal="Dependency Validation (CRITICAL)">
+  <action>❌ WRONG: Epic 2 requires Epic 3 features to work</action>
+  <action>✅ RIGHT: Each epic is independently valuable</action>
+  <action>❌ WRONG: &quot;This story depends on a future story&quot;</action>
+  <action>❌ WRONG: Story references features not yet implemented</action>
+  <action>✅ RIGHT: Each story builds only on previous stories</action>
+  <ask>Does each epic deliver COMPLETE functionality for its domain?</ask>
+  <ask>Can Epic 2 function without Epic 3 being implemented?</ask>
+  <ask>Can Epic 3 function standalone using Epic 1 &amp; 2 outputs?</ask>
+</step>
+
+<step n="6" goal="Complete and Save">
+  <action>Update any remaining placeholders in the document</action>
+  <action>Ensure proper formatting</action>
+  <output>Save the final epics.md</output>
+</step>
+
+## CHECKPOINT
+
+Halt for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.
+
+## ADVISORY
+
+- Use the prose block below for the full agent-facing guidance that complements the structured execution steps.
+
+## REFERENCE
+
+<prose>
 ## STEP GOAL:
 
 To validate complete coverage of all requirements and ensure stories are ready for development.
@@ -129,3 +198,4 @@ When C is selected, the workflow is complete and the epics.md is ready for devel
 Epics and Stories complete. Invoke the `bmad-help` skill.
 
 Upon Completion of task output: offer to answer any questions about the Epics and Stories.
+</prose>

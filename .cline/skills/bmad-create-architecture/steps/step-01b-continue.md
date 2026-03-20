@@ -1,5 +1,72 @@
-# Step 1b: Workflow Continuation Handler
+# step 01b continue
 
+## META
+
+- Goal: continue
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
+
+## EXECUTION
+
+<step n="1" goal="Analyze Current Document State">
+  <action>stepsCompleted: What steps have been done</action>
+  <action>inputDocuments: What documents were loaded</action>
+  <action>lastStep: Last step that was executed</action>
+  <action>project_name, user_name, date: Basic context</action>
+  <action>What sections exist in the document</action>
+</step>
+
+<step n="2" goal="Present Continuation Summary">
+  <action>Steps completed:</action>
+  <action>Last step worked on: Step</action>
+  <action>Input documents loaded: files</action>
+  <action>{areas that appear incomplete or have placeholders}</action>
+</step>
+
+<step n="3" goal="Handle User Choice">
+  <action>Identify the next step based on stepsCompleted</action>
+  <action>Load the appropriate step file to continue</action>
+  <action>Example: If stepsCompleted: [1, 2, 3], load ./step-04-decisions.md</action>
+  <action>Analyze the document content to determine logical next step</action>
+  <action>May need to review content quality and completeness</action>
+  <ask>Let user choose which step to work on</ask>
+  <ask>Confirm: &quot;This will delete all existing architectural decisions. Are you sure? (y/n)&quot;</ask>
+  <output>If confirmed: Delete existing document and read fully and follow: ./step-01-init.md</output>
+  <output>If not confirmed: Return to continuation menu</output>
+</step>
+
+<step n="4" goal="Navigate to Selected Step">
+  <action>Update frontmatter lastStep to reflect current navigation</action>
+  <action>Execute the selected step file</action>
+  <action>Let that step handle the detailed continuation logic</action>
+  <action>Maintain all existing content in the document</action>
+  <action>Keep stepsCompleted accurate</action>
+</step>
+
+<step n="5" goal="Special Continuation Cases">
+  <action>This suggests an interrupted workflow</action>
+  <action>./step-02-context.md</action>
+  <action>./step-03-starter.md</action>
+  <action>./step-04-decisions.md</action>
+  <action>./step-05-patterns.md</action>
+  <ask>Ask user: &quot;I see the document has content but no steps are marked as complete. Should I analyze what's here and set the appropriate step status?&quot;</ask>
+  <ask>Ask user: &quot;The document seems incomplete. Would you like me to try to recover what's here, or would you prefer to start fresh?&quot;</ask>
+  <ask>Ask user: &quot;The architecture looks complete! Should I mark this workflow as finished, or is there more you'd like to work on?&quot;</ask>
+</step>
+
+## CHECKPOINT
+
+Halt for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.
+
+## ADVISORY
+
+- Next handoff: ./step-01-init.md
+- Persist workflow state updates whenever this phase writes or updates a managed artifact.
+
+## REFERENCE
+
+<prose>
 ## MANDATORY EXECUTION RULES (READ FIRST):
 
 - 🛑 NEVER generate content without user input
@@ -171,3 +238,4 @@ Valid step files to load:
 - `./step-08-complete.md`
 
 Remember: The goal is smooth, transparent resumption that respects the work already done while giving the user control over how to proceed.
+</prose>

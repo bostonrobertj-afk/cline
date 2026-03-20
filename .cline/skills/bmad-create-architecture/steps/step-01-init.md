@@ -1,5 +1,50 @@
-# Step 1: Architecture Workflow Initialization
+# step 01 init
 
+## META
+
+- Goal: init
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
+
+## EXECUTION
+
+<step n="1" goal="Check for Existing Workflow">
+  <action>Look for existing {planning_artifacts}/architecture.md</action>
+  <action>If exists, read the complete file(s) including frontmatter</action>
+  <action>If not exists, this is a fresh workflow</action>
+</step>
+
+<step n="2" goal="Handle Continuation (If Document Exists)">
+  <action>STOP here and load ./step-01b-continue.md immediately</action>
+  <action>Do not proceed with any initialization tasks</action>
+  <action>Let step-01b handle the continuation logic</action>
+  <ask>If the document exists and has frontmatter with stepsCompleted: - STOP here and load ./step-01b-continue.md immediately - Do not proceed with any initialization tasks - Let step-01b handle the continuation logic</ask>
+</step>
+
+<step n="3" goal="Fresh Workflow Setup (If No Document)">
+  <action>{planning_artifacts}/**</action>
+  <action>{output_folder}/**</action>
+  <action>{project_knowledge}/**</action>
+  <action>{project-root}/docs/**</action>
+  <action>Product Brief (brief.md)</action>
+  <ask>For Example, if searching for foo.md and not found, also search for a folder called foo/index.md (which indicates sharded content) Try to discover the following: - Product Brief (brief.md) - Product Requirements Document (prd.md) - UX Design (ux-design.md) and other - Research Documents (research.md) - Project Documentation (generally multiple documents might be found for this in the {project_knowledge} or {project-root}/docs folder.) - Project Context (/project-context.md) Confirm what you have found with the user, along with asking if the user wants to provide anything else.</ask>
+  <ask>Do you have any other documents you'd like me to include?</ask>
+  <output>Create Initial Document Copy the template from ../architecture-decision-template.md to {planning_artifacts}/architecture.md #### D.</output>
+  <output>Complete Initialization and Report Complete setup and report to user: Document Setup: - Created: {planning_artifacts}/architecture.md from template - Initialized frontmatter with workflow state Input Documents Discovered: Report what was found: &quot;Welcome !</output>
+</step>
+
+## CHECKPOINT
+
+Halt for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.
+
+## ADVISORY
+
+- Persist workflow state updates whenever this phase writes or updates a managed artifact.
+
+## REFERENCE
+
+<prose>
 ## MANDATORY EXECUTION RULES (READ FIRST):
 
 - 🛑 NEVER generate content without user input
@@ -151,3 +196,4 @@ Ready to begin architectural decision making. Do you have any other documents yo
 After user selects [C] to continue, only after ensuring all the template output has been created, then load `./step-02-context.md` to analyze the project context and begin architectural decision making.
 
 Remember: Do NOT proceed to step-02 until user explicitly selects [C] from the menu and setup is confirmed!
+</prose>

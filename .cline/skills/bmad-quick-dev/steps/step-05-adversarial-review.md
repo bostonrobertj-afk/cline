@@ -7,6 +7,54 @@
 
 ---
 
+# step 05 adversarial review
+
+## META
+
+- Goal: adversarial review
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
+
+## EXECUTION
+
+<step n="1" goal="Construct Diff">
+  <action>List all files you modified during steps 2-4</action>
+  <action>For each file, show the changes you made (before/after if you recall, or just current state)</action>
+  <action>Include any new files you created with their full content</action>
+  <action>Note: This is less precise than Git diff but still enables meaningful review</action>
+  <output>### If {baseline_commit} is a Git commit hash: Tracked File Changes: New Untracked Files: Only include untracked files that YOU created during this workflow (steps 2-4).</output>
+  <output>For each new file created, include its full content as a &quot;new file&quot; addition.</output>
+</step>
+
+<step n="2" goal="Invoke Adversarial Review">
+  <output>With {diff_output} constructed, invoke the bmad-review-adversarial-general skill.</output>
+  <output>The skill should return a list of findings.</output>
+</step>
+
+<step n="3" goal="Process Findings">
+  <action>Diff constructed from baseline_commit</action>
+  <action>New files included in diff</action>
+  <action>Skill invoked with diff as input</action>
+  <action>Findings received</action>
+  <action>Findings processed into TODOs or table and presented to user</action>
+  <ask>DO NOT exclude findings based on severity or validity unless explicitly asked to do so.</ask>
+  <output>If TodoWrite or similar tool is available, turn each finding into a TODO, include ID, severity, validity, and description in the TODO; otherwise present findings as a table with columns: ID, Severity, Validity, Description --- ## NEXT STEP With findings in hand, read fully and follow: ./step-06-resolve-findings.md for user to choose resolution approach.</output>
+  <output>--- ## SUCCESS METRICS - Diff constructed from baseline_commit - New files included in diff - Skill invoked with diff as input - Findings received - Findings processed into TODOs or table and presented to user ## FAILURE MODES - Missing baseline_commit (can't construct accurate diff) - Not including new untracked files in diff - Invoking skill without providing diff input - Accepting zero findings without questioning - Presenting fewer findings than the review skill returned without explicit instruction to do so</output>
+</step>
+
+## CHECKPOINT
+
+Halt for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.
+
+## ADVISORY
+
+- Next handoff: ./step-06-resolve-findings.md
+- Treat this phase as read-only unless the instructions explicitly call for a write action.
+
+## REFERENCE
+
+<prose>
 ## AVAILABLE STATE
 
 From previous steps:
@@ -92,3 +140,4 @@ With findings in hand, read fully and follow: `./step-06-resolve-findings.md` fo
 - Invoking skill without providing diff input
 - Accepting zero findings without questioning
 - Presenting fewer findings than the review skill returned without explicit instruction to do so
+</prose>

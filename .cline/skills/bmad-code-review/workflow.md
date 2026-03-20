@@ -2,8 +2,41 @@
 main_config: '{project-root}/_bmad/bmm/config.yaml'
 ---
 
-# Code Review Workflow
+# workflow
 
+## META
+
+- Goal: Review code changes adversarially using parallel review layers and structured triage.
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
+
+## EXECUTION
+
+<step n="1" goal="Configuration Loading">
+  <action>project_name, planning_artifacts, implementation_artifacts, user_name</action>
+  <action>communication_language, document_output_language, user_skill_level</action>
+  <action>date as system-generated current datetime</action>
+  <action>project_context = **/project-context.md (load if exists)</action>
+  <action>CLAUDE.md / memory files (load if exist)</action>
+</step>
+
+<step n="2" goal="First Step Execution">
+  <action>First Step Execution</action>
+</step>
+
+## CHECKPOINT
+
+Halt for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.
+
+## ADVISORY
+
+- Next handoff: ./steps/step-01-gather-context.md
+- Do not load future step files until the current phase is complete and the workflow directs the transition.
+
+## REFERENCE
+
+<prose>
 **Goal:** Review code changes adversarially using parallel review layers and structured triage.
 
 **Your Role:** You are an elite code reviewer. You gather context, launch parallel adversarial reviews, triage findings with precision, and present actionable results. No noise, no filler.
@@ -52,3 +85,4 @@ YOU MUST ALWAYS SPEAK OUTPUT in your Agent communication style with the config `
 ### 2. First Step Execution
 
 Read fully and follow: `./steps/step-01-gather-context.md` to begin the workflow.
+</prose>

@@ -1,5 +1,85 @@
-# Step 7: Architecture Validation & Completion
+# step 07 validation
 
+## META
+
+- Goal: validation
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
+
+## EXECUTION
+
+<step n="1" goal="Coherence Validation">
+  <ask>Do all technology choices work together without conflicts?</ask>
+  <ask>Are all versions compatible with each other?</ask>
+  <ask>Do patterns align with technology choices?</ask>
+</step>
+
+<step n="2" goal="Requirements Coverage Validation">
+  <ask>Does every epic have architectural support?</ask>
+  <ask>Are all user stories implementable with these decisions?</ask>
+  <ask>Are cross-epic dependencies handled architecturally?</ask>
+</step>
+
+<step n="3" goal="Implementation Readiness Validation">
+  <ask>Are all critical decisions documented with versions?</ask>
+  <ask>Are implementation patterns comprehensive enough?</ask>
+  <ask>Are consistency rules clear and enforceable?</ask>
+</step>
+
+<step n="4" goal="Gap Analysis">
+  <action>Missing architectural decisions that block implementation</action>
+  <action>Incomplete patterns that could cause conflicts</action>
+  <action>Missing structural elements needed for development</action>
+  <action>Undefined integration points</action>
+  <action>Areas that need more detailed specification</action>
+</step>
+
+<step n="5" goal="Address Validation Issues">
+  <action>For any issues found, facilitate resolution: Critical Issues: &quot;I found some issues that need to be addressed before implementation: These could cause implementation problems.</action>
+  <ask>How would you like to resolve this?&quot; Important Issues: &quot;I noticed a few areas that could be improved: These aren't blocking, but addressing them would make implementation smoother.</ask>
+  <ask>Should we work on these?&quot; Minor Issues: &quot;Here are some minor suggestions for improvement: These are optional refinements.</ask>
+  <ask>Would you like to address any of these?&quot;</ask>
+</step>
+
+<step n="6" goal="Generate Validation Content">
+  <action>[x] Project context thoroughly analyzed</action>
+  <action>[x] Scale and complexity assessed</action>
+  <action>[x] Technical constraints identified</action>
+  <action>[x] Cross-cutting concerns mapped</action>
+  <action>[x] Critical decisions documented with versions</action>
+</step>
+
+<step n="7" goal="Present Content and Menu">
+  <action>✅ Coherence: All decisions work together</action>
+  <action>✅ Coverage: All requirements are supported</action>
+  <action>✅ Readiness: AI agents can implement consistently</action>
+</step>
+
+<step n="8" goal="Handle Menu Selection">
+  <action>Invoke the bmad-advanced-elicitation skill with validation issues</action>
+  <action>Process enhanced solutions for complex concerns</action>
+  <action>Invoke the bmad-party-mode skill with validation context</action>
+  <action>Process collaborative insights on implementation readiness</action>
+  <action>Update frontmatter: stepsCompleted: [1, 2, 3, 4, 5, 6, 7]</action>
+  <ask>Ask user: &quot;Accept these architectural improvements? (y/n)&quot;</ask>
+  <ask>Ask user: &quot;Accept these changes to the validation results? (y/n)&quot;</ask>
+  <output>If yes: Update content, then return to A/P/C menu</output>
+  <output>If no: Keep original content, then return to A/P/C menu</output>
+  <output>Append the final content to {planning_artifacts}/architecture.md</output>
+</step>
+
+## CHECKPOINT
+
+Halt for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.
+
+## ADVISORY
+
+- Persist workflow state updates whenever this phase writes or updates a managed artifact.
+
+## REFERENCE
+
+<prose>
 ## MANDATORY EXECUTION RULES (READ FIRST):
 
 - 🛑 NEVER generate content without user input
@@ -357,3 +437,4 @@ When user selects 'C', append the content directly to the document using the str
 After user selects 'C' and content is saved to document, load `./step-08-complete.md` to complete the workflow and provide implementation guidance.
 
 Remember: Do NOT proceed to step-08 until user explicitly selects 'C' from the A/P/C menu and content is saved!
+</prose>

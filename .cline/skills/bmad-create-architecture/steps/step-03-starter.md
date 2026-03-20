@@ -1,5 +1,90 @@
-# Step 3: Starter Template Evaluation
+# step 03 starter
 
+## META
+
+- Goal: starter
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
+
+## EXECUTION
+
+<step n="1" goal="Check Technical Preferences &amp; Context">
+  <action>Languages/Frameworks:</action>
+  <action>Tools &amp; Libraries:</action>
+  <action>Development Patterns:</action>
+  <action>Platform Preferences:</action>
+  <ask>Languages: Do you have preferences between TypeScript/JavaScript, Python, Go, Rust, etc.?</ask>
+  <ask>Frameworks: Any existing familiarity or preferences (React, Vue, Angular, Next.js, etc.)?</ask>
+  <ask>Databases: Any preferences or existing infrastructure (PostgreSQL, MongoDB, MySQL, etc.)?</ask>
+</step>
+
+<step n="2" goal="Identify Primary Technology Domain">
+  <action>Web application → Look for Next.js, Vite, Remix, SvelteKit starters</action>
+  <action>Mobile app → Look for React Native, Expo, Flutter starters</action>
+  <action>API/Backend → Look for NestJS, Express, Fastify, Supabase starters</action>
+  <action>CLI tool → Look for CLI framework starters (oclif, commander, etc.)</action>
+  <action>Full-stack → Look for T3, RedwoodJS, Blitz, Next.js starters</action>
+</step>
+
+<step n="3" goal="UX Requirements Consideration">
+  <action>Rich animations → Framer Motion compatible starter</action>
+  <action>Complex forms → React Hook Form included starter</action>
+  <action>Real-time features → Socket.io or WebSocket ready starter</action>
+  <action>Design system → Storybook-enabled starter</action>
+  <action>Offline capability → Service worker or PWA configured starter</action>
+</step>
+
+<step n="4" goal="Research Current Starter Options">
+  <action>Search the web to find current, maintained starter templates:</action>
+</step>
+
+<step n="5" goal="Investigate Top Starter Options">
+  <action>For each promising starter found, investigate details:</action>
+</step>
+
+<step n="6" goal="Analyze What Each Starter Provides">
+  <action>Language/TypeScript configuration</action>
+  <action>Styling solution (CSS, Tailwind, Styled Components, etc.)</action>
+  <action>Testing framework setup</action>
+  <action>Linting/Formatting configuration</action>
+  <action>Build tooling and optimization</action>
+</step>
+
+<step n="7" goal="Present Starter Options">
+  <action>It makes these architectural decisions for us: This gives us a solid foundation following current best practices.</action>
+  <action>Think of it like buying a prefab house frame instead of cutting each board yourself.</action>
+  <ask>Based on user skill level and project needs: For Expert Users: &quot;Found which provides: This would establish our base architecture with these technical decisions already made.</ask>
+  <ask>Use it?&quot; For Intermediate Users: &quot;I found , which is a well-maintained starter for projects.</ask>
+  <ask>Should we use it?&quot; For Beginner Users: &quot;I found , which is like a pre-built foundation for your project.</ask>
+  <output>It makes these decisions for us: This is a great starting point that follows best practices and saves us from making dozens of small technical choices.</output>
+</step>
+
+<step n="8" goal="Get Current CLI Commands">
+  <output>If user shows interest in a starter, get the exact current commands:</output>
+</step>
+
+<step n="9" goal="Generate Starter Template Content">
+  <output>Prepare the content to append to the document: #### Content Structure: bash `</output>
+</step>
+
+<step n="10" goal="Present Content and Menu">
+  <ask>Here's what I'll add to the document: [Show the complete markdown content from step 8] What would you like to do?</ask>
+  <output>Show the generated content and present choices: &quot;I've analyzed starter template options for projects.</output>
+  <output>[A] Advanced Elicitation - Explore custom approaches or unconventional starters [P] Party Mode - Evaluate trade-offs from different perspectives [C] Continue - Save this decision and move to architectural decisions&quot;</output>
+</step>
+
+## CHECKPOINT
+
+Halt for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.
+
+## ADVISORY
+
+- Persist workflow state updates whenever this phase writes or updates a managed artifact.
+
+## REFERENCE
+
+<prose>
 ## MANDATORY EXECUTION RULES (READ FIRST):
 
 - 🛑 NEVER generate content without user input
@@ -327,3 +412,4 @@ When user selects 'C', append the content directly to the document using the str
 After user selects 'C' and content is saved to document, load `./step-04-decisions.md` to begin making specific architectural decisions.
 
 Remember: Do NOT proceed to step-04 until user explicitly selects 'C' from the A/P/C menu and content is saved!
+</prose>

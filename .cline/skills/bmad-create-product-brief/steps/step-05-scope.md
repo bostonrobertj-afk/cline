@@ -4,8 +4,89 @@ outputFile: '{planning_artifacts}/product-brief-{{project_name}}-{{date}}.md'
 
 ---
 
-# Step 5: MVP Scope Definition
+# step 05 scope
 
+## META
+
+- Goal: Define MVP scope with clear boundaries and outline future vision through collaborative scope negotiation that balances ambition with realism.
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
+
+## EXECUTION
+
+<step n="1" goal="Begin Scope Definition">
+  <ask>What's the absolute minimum we need to deliver to solve the core problem?</ask>
+  <ask>What features would make users say 'this solves my problem'?</ask>
+  <ask>How do we balance ambition with getting something valuable to users quickly?</ask>
+</step>
+
+<step n="2" goal="MVP Core Features Definition">
+  <action>Solves Core Problem: Addresses the main pain point effectively</action>
+  <action>Feasible: Achievable with available resources and timeline</action>
+  <action>Testable: Allows learning and iteration based on user feedback</action>
+  <ask>&quot;What's the core functionality that must work?&quot;</ask>
+  <ask>&quot;Which features directly address the main problem we're solving?&quot;</ask>
+  <ask>&quot;What would users consider 'incomplete' if it was missing?&quot;</ask>
+  <output>User Value: Creates meaningful outcome for target users</output>
+</step>
+
+<step n="3" goal="Out of Scope Boundaries">
+  <action>Clear communication about what's not included</action>
+  <action>Rationale for deferring certain features</action>
+  <action>Timeline considerations for future additions</action>
+  <action>Trade-off explanations for stakeholders</action>
+  <ask>&quot;What features would be nice to have but aren't essential?&quot;</ask>
+  <ask>&quot;What functionality could wait for version 2.0?&quot;</ask>
+  <ask>&quot;What are we intentionally saying 'no' to for now?&quot;</ask>
+</step>
+
+<step n="4" goal="MVP Success Criteria">
+  <action>User adoption metrics</action>
+  <action>Problem validation evidence</action>
+  <action>Technical feasibility confirmation</action>
+  <action>Business model validation</action>
+  <ask>&quot;How will we know the MVP is successful?&quot;</ask>
+  <ask>&quot;What metrics will indicate we should proceed beyond MVP?&quot;</ask>
+  <ask>&quot;What user feedback signals validate our approach?&quot;</ask>
+</step>
+
+<step n="5" goal="Future Vision Exploration">
+  <action>Post-MVP enhancements that build on core functionality</action>
+  <action>Scale considerations and growth capabilities</action>
+  <action>Platform or ecosystem expansion opportunities</action>
+  <action>Advanced features that differentiate in the long term</action>
+  <ask>&quot;If this is wildly successful, what does it become in 2-3 years?&quot;</ask>
+  <ask>&quot;What capabilities would we add with more resources?&quot;</ask>
+  <ask>&quot;How does the MVP evolve into the full product vision?&quot;</ask>
+</step>
+
+<step n="6" goal="Generate MVP Scope Content">
+  <output>Content to Append: Prepare the following structure for document append:</output>
+</step>
+
+<step n="7" goal="Present MENU OPTIONS">
+  <action>IF A: Invoke the bmad-advanced-elicitation skill with current scope content to optimize scope definition</action>
+  <action>IF P: Invoke the bmad-party-mode skill to bring different perspectives to validate MVP scope</action>
+  <action>ONLY proceed to next step when user selects 'C'</action>
+  <ask>User can chat or ask questions - always respond and then end with display again of the menu options</ask>
+  <output>IF C: Save content to {outputFile}, update frontmatter with stepsCompleted: [1, 2, 3, 4, 5], then read fully and follow: ./step-06-complete.md</output>
+  <output>IF Any other comments or queries: help user respond then Redisplay Menu Options</output>
+  <output>ALWAYS halt and wait for user input after presenting menu</output>
+</step>
+
+## CHECKPOINT
+
+Halt for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.
+
+## ADVISORY
+
+- Next handoff: ./step-06-complete.md
+- Persist workflow state updates whenever this phase writes or updates a managed artifact.
+
+## REFERENCE
+
+<prose>
 ## STEP GOAL:
 
 Define MVP scope with clear boundaries and outline future vision through collaborative scope negotiation that balances ambition with realism.
@@ -211,3 +292,4 @@ ONLY WHEN [C continue option] is selected and [MVP scope finalized and saved to 
 - Not updating frontmatter properly
 
 **Master Rule:** Skipping steps, optimizing sequences, or not following exact instructions is FORBIDDEN and constitutes SYSTEM FAILURE.
+</prose>

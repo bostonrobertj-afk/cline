@@ -3,8 +3,58 @@
 outputFile: '{planning_artifacts}/product-brief-{{project_name}}-{{date}}.md'
 ---
 
-# Step 1: Product Brief Initialization
+# step 01 init
 
+## META
+
+- Goal: Initialize the product brief workflow by detecting continuation state and setting up the document structure for collaborative product discovery.
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
+
+## EXECUTION
+
+<step n="1" goal="Check for Existing Workflow State">
+  <action>Look for file {outputFile}</action>
+  <action>If exists, read the complete file including frontmatter</action>
+  <action>If not exists, this is a fresh workflow</action>
+</step>
+
+<step n="2" goal="Handle Continuation (If Document Exists)">
+  <action>STOP immediately and load ./step-01b-continue.md</action>
+  <action>Let step-01b handle all continuation logic</action>
+  <action>This is an auto-proceed situation - no user choice needed</action>
+  <ask>Do not proceed with any initialization tasks</ask>
+</step>
+
+<step n="3" goal="Fresh Workflow Setup (If No Document)">
+  <action>{planning_artifacts}/**</action>
+  <action>{output_folder}/**</action>
+  <action>{product_knowledge}/**</action>
+  <action>{project-root}/docs/**</action>
+  <action>Brainstorming Reports (brainstorming.md)</action>
+  <output>Created: {outputFile} from template</output>
+  <output>Initialized frontmatter with workflow state</output>
+</step>
+
+<step n="4" goal="Present MENU OPTIONS">
+  <action>This is an initialization step with auto-proceed after setup completion</action>
+  <action>Proceed directly to next step after document setup and reporting</action>
+  <output>After setup report is presented, without delay, read fully and follow: ./step-02-vision.md</output>
+</step>
+
+## CHECKPOINT
+
+Halt for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.
+
+## ADVISORY
+
+- Next handoff: ./step-02-vision.md
+- Persist workflow state updates whenever this phase writes or updates a managed artifact.
+
+## REFERENCE
+
+<prose>
 ## STEP GOAL:
 
 Initialize the product brief workflow by detecting continuation state and setting up the document structure for collaborative product discovery.
@@ -168,3 +218,4 @@ ONLY WHEN [setup completion is achieved and frontmatter properly updated], will 
 - Proceeding without user selecting 'C' (Continue)
 
 **Master Rule:** Skipping steps, optimizing sequences, or not following exact instructions is FORBIDDEN and constitutes SYSTEM FAILURE.
+</prose>

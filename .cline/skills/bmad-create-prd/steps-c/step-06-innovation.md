@@ -1,5 +1,3 @@
-# Step 6: Innovation Analysis
-
 ## META
 
 - Goal: identify whether the product contains meaningful innovation that the PRD should capture explicitly.

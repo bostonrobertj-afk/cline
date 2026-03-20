@@ -4,8 +4,71 @@ outputFile: '{planning_artifacts}/product-brief-{{project_name}}-{{date}}.md'
 
 ---
 
-# Step 3: Target Users Discovery
+# step 03 users
 
+## META
+
+- Goal: Define target users with rich personas and map their key interactions with the product through collaborative user research and journey mapping.
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
+
+## EXECUTION
+
+<step n="1" goal="Begin User Discovery">
+  <ask>Who experiences the problem we're solving?</ask>
+  <ask>Are there different types of users with different needs?</ask>
+  <ask>Who gets the most value from this solution?</ask>
+</step>
+
+<step n="2" goal="Primary User Segment Development">
+  <action>Give them a realistic name and brief backstory</action>
+  <action>Define their role, environment, and context</action>
+  <action>&quot;Tell me about a typical person who would use &quot;</action>
+  <ask>What motivates them? What are their goals?</ask>
+  <ask>How do they currently experience the problem?</ask>
+  <ask>What workarounds are they using?</ask>
+</step>
+
+<step n="3" goal="Secondary User Segment Exploration">
+  <ask>&quot;Who else benefits from this solution, even if they're not the primary user?&quot;</ask>
+  <ask>&quot;Are there admin, support, or oversight roles we should consider?&quot;</ask>
+  <ask>&quot;Who influences the decision to adopt or purchase this product?&quot;</ask>
+</step>
+
+<step n="4" goal="User Journey Mapping">
+  <action>&quot;Walk me through how [Persona Name] would discover and start using &quot;</action>
+  <ask>Discovery: How do they find out about the solution?</ask>
+  <ask>Onboarding: What's their first experience like?</ask>
+  <ask>Core Usage: How do they use the product day-to-day?</ask>
+</step>
+
+<step n="5" goal="Generate Target Users Content">
+  <output>Content to Append: Prepare the following structure for document append:</output>
+</step>
+
+<step n="6" goal="Present MENU OPTIONS">
+  <action>IF A: Invoke the bmad-advanced-elicitation skill with current user content to dive deeper into personas and journeys</action>
+  <action>IF P: Invoke the bmad-party-mode skill to bring different perspectives to validate user understanding</action>
+  <action>ONLY proceed to next step when user selects 'C'</action>
+  <ask>User can chat or ask questions - always respond and then end with display again of the menu options</ask>
+  <output>IF C: Save content to {outputFile}, update frontmatter with stepsCompleted: [1, 2, 3], then read fully and follow: ./step-04-metrics.md</output>
+  <output>IF Any other comments or queries: help user respond then Redisplay Menu Options</output>
+  <output>ALWAYS halt and wait for user input after presenting menu</output>
+</step>
+
+## CHECKPOINT
+
+Halt for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.
+
+## ADVISORY
+
+- Next handoff: ./step-04-metrics.md
+- Persist workflow state updates whenever this phase writes or updates a managed artifact.
+
+## REFERENCE
+
+<prose>
 ## STEP GOAL:
 
 Define target users with rich personas and map their key interactions with the product through collaborative user research and journey mapping.
@@ -194,3 +257,4 @@ ONLY WHEN [C continue option] is selected and [user personas finalized and saved
 - Not updating frontmatter properly
 
 **Master Rule:** Skipping steps, optimizing sequences, or not following exact instructions is FORBIDDEN and constitutes SYSTEM FAILURE.
+</prose>

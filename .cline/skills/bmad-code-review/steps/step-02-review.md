@@ -2,8 +2,54 @@
 failed_layers: '' # set at runtime: comma-separated list of layers that failed or returned empty
 ---
 
-# Step 2: Review
+# step 02 review
 
+## META
+
+- Goal: review
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
+
+## EXECUTION
+
+<step n="1" goal="Launch parallel subagents">
+  <action>Launch parallel subagents. Each subagent gets NO conversation history from this session:</action>
+  <action>Blind Hunter -- Invoke the bmad-review-adversarial-general skill in a subagent. Pass content = {diff_output} only. No spec, no project access.</action>
+  <action>Edge Case Hunter -- Invoke the bmad-review-edge-case-hunter skill in a subagent. Pass content = {diff_output}. This subagent has read access to the project.</action>
+  <ask>Acceptance Auditor (only if {review_mode} = &quot;full&quot;) -- A subagent that receives {diff_output}, the content of the file at {spec_file}, and any loaded context docs. Its prompt:</ask>
+</step>
+
+<step n="2" goal="Subagent failure handling: If any subagent fails, times out, or returns empty results, append the layer name to {failed_layers} (comma-separated) and proceed with findings from the remaining layers">
+  <action>Subagent failure handling: If any subagent fails, times out, or returns empty results, append the layer name to {failed_layers} (comma-separated) and proceed with findings from the remaining layers.</action>
+</step>
+
+<step n="3" goal="If {review_mode} = &quot;no-spec&quot;, note to the user: &quot;Acceptance Auditor skipped — no spec file provided">
+  <action>If {review_mode} = &quot;no-spec&quot;, note to the user: &quot;Acceptance Auditor skipped — no spec file provided.&quot;</action>
+</step>
+
+<step n="4" goal="Fallback (if subagents are not available): Generate prompt files in {implementation_artifacts} -- one per active reviewer:">
+  <action>review-blind-hunter.md (always)</action>
+  <action>review-edge-case-hunter.md (always)</action>
+  <action>review-acceptance-auditor.md (only if {review_mode} = &quot;full&quot;)</action>
+  <ask>Fallback (if subagents are not available): Generate prompt files in {implementation_artifacts} -- one per active reviewer:</ask>
+</step>
+
+<step n="5" goal="Collect all findings from the completed layers">
+  <action>Collect all findings from the completed layers.</action>
+</step>
+
+## CHECKPOINT
+
+Halt for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.
+
+## ADVISORY
+
+- Next handoff: ./step-03-triage.md
+
+## REFERENCE
+
+<prose>
 ## RULES
 
 - YOU MUST ALWAYS SPEAK OUTPUT in your Agent communication style with the config `{communication_language}`
@@ -39,3 +85,4 @@ failed_layers: '' # set at runtime: comma-separated list of layers that failed o
 ## NEXT
 
 Read fully and follow `./step-03-triage.md`
+</prose>

@@ -1,5 +1,3 @@
-# Step 8: Scoping
-
 ## META
 
 - Goal: define MVP boundaries, post-MVP expansion, and scope risk management.

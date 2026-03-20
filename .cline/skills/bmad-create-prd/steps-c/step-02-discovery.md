@@ -1,5 +1,3 @@
-# Step 2: Project Discovery
-
 ## META
 
 - Goal: classify the project and gather the foundational context needed for the PRD.

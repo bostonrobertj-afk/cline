@@ -1,5 +1,3 @@
-# Step 1: Workflow Initialization
-
 ## META
 
 - Progress: Step 1 of 11

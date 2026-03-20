@@ -3,8 +3,72 @@
 outputFile: '{planning_artifacts}/product-brief-{{project_name}}-{{date}}.md'
 ---
 
-# Step 1B: Product Brief Continuation
+# step 01b continue
 
+## META
+
+- Goal: Resume the product brief workflow from where it was left off, ensuring smooth continuation with full context restoration.
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
+
+## EXECUTION
+
+<step n="1" goal="Analyze Current State">
+  <action>lastStep: The most recently completed step number</action>
+  <action>inputDocuments: What context was already loaded</action>
+  <action>All other frontmatter variables</action>
+  <ask>stepsCompleted: Which steps are already done</ask>
+</step>
+
+<step n="2" goal="Restore Context Documents">
+  <action>For each document in inputDocuments, load the complete file</action>
+  <action>This ensures you have full context for continuation</action>
+  <action>Don't discover new documents - only reload what was previously processed</action>
+  <action>Maintain the same context as when workflow was interrupted</action>
+</step>
+
+<step n="3" goal="Present Current Progress">
+  <action>Steps completed: {stepsCompleted}</action>
+  <action>Last worked on: Step {lastStep}</action>
+  <action>Context documents available: {len(inputDocuments)} files</action>
+  <action>Current product brief is ready with all completed sections</action>
+  <action>Ready to continue from where we left off</action>
+</step>
+
+<step n="4" goal="Determine Continuation Path">
+  <action>If lastStep = 1 → Load ./step-02-vision.md</action>
+  <action>If lastStep = 2 → Load ./step-03-users.md</action>
+  <action>If lastStep = 3 → Load ./step-04-metrics.md</action>
+  <action>Continue this pattern for all steps</action>
+  <action>If lastStep = 6 → Workflow already complete</action>
+</step>
+
+<step n="5" goal="Handle Workflow Completion">
+  <action>Review the completed product brief with you</action>
+  <action>Suggest next workflow steps (like PRD creation)</action>
+  <action>Start a new product brief revision</action>
+</step>
+
+<step n="6" goal="Present MENU OPTIONS">
+  <action>ONLY proceed to next step when user selects 'C'</action>
+  <ask>User can chat or ask questions about current progress</ask>
+  <output>IF C: Read fully and follow the appropriate next step file based on lastStep</output>
+  <output>IF Any other comments or queries: respond and redisplay menu</output>
+  <output>ALWAYS halt and wait for user input after presenting menu</output>
+</step>
+
+## CHECKPOINT
+
+Halt for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.
+
+## ADVISORY
+
+- Persist workflow state updates whenever this phase writes or updates a managed artifact.
+
+## REFERENCE
+
+<prose>
 ## STEP GOAL:
 
 Resume the product brief workflow from where it was left off, ensuring smooth continuation with full context restoration.
@@ -156,3 +220,4 @@ ONLY WHEN [C continue option] is selected and [current state confirmed], will yo
 - Not maintaining context consistency from previous session
 
 **Master Rule:** Skipping steps, optimizing sequences, or not following exact instructions is FORBIDDEN and constitutes SYSTEM FAILURE.
+</prose>

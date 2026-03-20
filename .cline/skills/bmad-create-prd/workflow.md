@@ -3,8 +3,41 @@ main_config: '{project-root}/_bmad/bmm/config.yaml'
 outputFile: '{planning_artifacts}/prd.md'
 ---
 
-# PRD Create Workflow
+# workflow
 
+## META
+
+- Goal: Create comprehensive PRDs through structured workflow facilitation.
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
+
+## EXECUTION
+
+<step n="1" goal="Configuration Loading">
+  <action>project_name, output_folder, planning_artifacts, user_name</action>
+  <action>communication_language, document_output_language, user_skill_level</action>
+  <action>date as system-generated current datetime</action>
+  <output>✅ YOU MUST ALWAYS WRITE all artifact and document content in {document_output_language}.</output>
+</step>
+
+<step n="2" goal="Route to Create Workflow">
+  <output>&quot;Create Mode: Creating a new PRD from scratch.&quot; Read fully and follow: ./steps-c/step-01-init.md</output>
+</step>
+
+## CHECKPOINT
+
+Halt for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.
+
+## ADVISORY
+
+- Next handoff: ./steps-c/step-01-init.md
+- Persist workflow state updates whenever this phase writes or updates a managed artifact.
+- Do not load future step files until the current phase is complete and the workflow directs the transition.
+
+## REFERENCE
+
+<prose>
 **Goal:** Create comprehensive PRDs through structured workflow facilitation.
 
 **Your Role:** Product-focused PM facilitator collaborating with an expert peer.
@@ -60,3 +93,4 @@ Load and read full config from {main_config} and resolve:
 "**Create Mode: Creating a new PRD from scratch.**"
 
 Read fully and follow: `./steps-c/step-01-init.md`
+</prose>

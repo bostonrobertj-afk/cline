@@ -1,5 +1,50 @@
-# Step 1: UX Design Workflow Initialization
+# step 01 init
 
+## META
+
+- Goal: init
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
+
+## EXECUTION
+
+<step n="1" goal="Check for Existing Workflow">
+  <action>Look for file at {planning_artifacts}/ux-design-specification.md</action>
+  <action>If exists, read the complete file including frontmatter</action>
+  <action>If not exists, this is a fresh workflow</action>
+</step>
+
+<step n="2" goal="Handle Continuation (If Document Exists)">
+  <action>STOP here and load ./step-01b-continue.md immediately</action>
+  <action>Do not proceed with any initialization tasks</action>
+  <action>Let step-01b handle the continuation logic</action>
+  <ask>If the document exists and has frontmatter with stepsCompleted: - STOP here and load ./step-01b-continue.md immediately - Do not proceed with any initialization tasks - Let step-01b handle the continuation logic</ask>
+</step>
+
+<step n="3" goal="Fresh Workflow Setup (If No Document)">
+  <action>{planning_artifacts}/**</action>
+  <action>{output_folder}/**</action>
+  <action>{product_knowledge}/**</action>
+  <action>{project-root}/docs/**</action>
+  <action>Product Brief (brief.md)</action>
+  <ask>For Example, if searching for foo.md and not found, also search for a folder called foo/index.md (which indicates sharded content) Try to discover the following: - Product Brief (brief.md) - Research Documents (prd.md) - Project Documentation (generally multiple documents might be found for this in the {product_knowledge} or docs folder.) - Project Context (/project-context.md) Confirm what you have found with the user, along with asking if the user wants to provide anything else.</ask>
+  <ask>Documents Found: - PRD: {number of PRD files loaded or &quot;None found&quot;} - Product brief: {number of brief files loaded or &quot;None found&quot;} - Other context: {number of other files loaded or &quot;None found&quot;} Files loaded:** {list of specific file names or &quot;No additional documents found&quot;} Do you have any other documents you'd like me to include, or shall we continue to the next step?</ask>
+  <output>Create Initial Document Copy the template from ../ux-design-template.md to {planning_artifacts}/ux-design-specification.md Initialize frontmatter in the template.</output>
+  <output>Complete Initialization and Report Complete setup and report to user: Document Setup: - Created: {planning_artifacts}/ux-design-specification.md from template - Initialized frontmatter with workflow state Input Documents Discovered: Report what was found: &quot;Welcome !</output>
+</step>
+
+## CHECKPOINT
+
+Halt for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.
+
+## ADVISORY
+
+- Persist workflow state updates whenever this phase writes or updates a managed artifact.
+
+## REFERENCE
+
+<prose>
 ## MANDATORY EXECUTION RULES (READ FIRST):
 
 - 🛑 NEVER generate content without user input
@@ -133,3 +178,4 @@ Remember: Do NOT proceed to step-02 until output file has been updated and user 
 ❌ **CRITICAL**: Reading only partial step file - leads to incomplete understanding and poor decisions
 ❌ **CRITICAL**: Proceeding with 'C' without fully reading and understanding the next step file
 ❌ **CRITICAL**: Making decisions without complete understanding of step requirements and protocols
+</prose>

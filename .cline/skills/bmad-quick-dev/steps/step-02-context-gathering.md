@@ -9,6 +9,59 @@
 
 ---
 
+# step 02 context gathering
+
+## META
+
+- Goal: context gathering
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
+
+## EXECUTION
+
+<step n="1" goal="Identify Files to Modify">
+  <action>Search for relevant files using glob/grep</action>
+  <action>Identify the specific files that need changes</action>
+  <action>Note file locations and purposes</action>
+</step>
+
+<step n="2" goal="Find Relevant Patterns">
+  <action>Code style and conventions used</action>
+  <action>Existing patterns for similar functionality</action>
+  <action>Import/export patterns</action>
+  <action>Error handling approaches</action>
+  <action>Test patterns (if tests exist nearby)</action>
+</step>
+
+<step n="3" goal="Note Dependencies">
+  <action>External libraries used</action>
+  <action>Internal module dependencies</action>
+  <action>Configuration files that may need updates</action>
+  <action>Related files that might be affected</action>
+</step>
+
+<step n="4" goal="Create Mental Plan">
+  <action>{task 1}</action>
+  <action>{task 2}</action>
+  <action>List of tasks to complete</action>
+  <action>Acceptance criteria (inferred from user request)</action>
+  <action>Order of operations</action>
+  <ask>Synthesize gathered context into: - List of tasks to complete - Acceptance criteria (inferred from user request) - Order of operations - Files to touch --- ## PRESENT PLAN Display to user: - y: Proceed to execution - n: Gather more context or clarify - adjust: Modify the plan based on feedback --- ## NEXT STEP DIRECTIVE CRITICAL: When user confirms ready, explicitly state: - y: &quot;NEXT: Read fully and follow: ./step-03-execute.md&quot; - n/adjust: Continue gathering context, then re-present plan --- ## SUCCESS METRICS - Files to modify identified - Relevant patterns documented - Dependencies noted - Mental plan created with tasks and AC - User confirmed readiness to proceed ## FAILURE MODES - Executing this step when Mode A (tech-spec) - Proceeding without identifying files to modify - Not presenting plan for user confirmation - Missing obvious patterns in existing code</ask>
+  <output>Synthesize gathered context into: - List of tasks to complete - Acceptance criteria (inferred from user request) - Order of operations - Files to touch --- ## PRESENT PLAN Display to user: - y: Proceed to execution - n: Gather more context or clarify - adjust: Modify the plan based on feedback --- ## NEXT STEP DIRECTIVE CRITICAL: When user confirms ready, explicitly state: - y: &quot;NEXT: Read fully and follow: ./step-03-execute.md&quot; - n/adjust: Continue gathering context, then re-present plan --- ## SUCCESS METRICS - Files to modify identified - Relevant patterns documented - Dependencies noted - Mental plan created with tasks and AC - User confirmed readiness to proceed ## FAILURE MODES - Executing this step when Mode A (tech-spec) - Proceeding without identifying files to modify - Not presenting plan for user confirmation - Missing obvious patterns in existing code</output>
+</step>
+
+## CHECKPOINT
+
+Halt for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.
+
+## ADVISORY
+
+- Next handoff: ./step-03-execute.md
+
+## REFERENCE
+
+<prose>
 ## AVAILABLE STATE
 
 From step-01:
@@ -112,3 +165,4 @@ Ready to execute? (y/n/adjust)
 - Proceeding without identifying files to modify
 - Not presenting plan for user confirmation
 - Missing obvious patterns in existing code
+</prose>

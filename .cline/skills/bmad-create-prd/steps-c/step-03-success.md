@@ -1,5 +1,3 @@
-# Step 3: Success Criteria
-
 ## META
 
 - Goal: define user, business, technical, and scope success criteria for the PRD.

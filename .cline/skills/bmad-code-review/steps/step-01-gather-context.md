@@ -4,8 +4,73 @@ spec_file: '' # set at runtime (path or empty)
 review_mode: '' # set at runtime: "full" or "no-spec"
 ---
 
-# Step 1: Gather Context
+# step 01 gather context
 
+## META
+
+- Goal: gather context
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
+
+## EXECUTION
+
+<step n="1" goal="Detect review intent from invocation text">
+  <action>&quot;staged&quot; / &quot;staged changes&quot; → Staged changes only</action>
+  <action>&quot;uncommitted&quot; / &quot;working tree&quot; / &quot;all changes&quot; → Uncommitted changes (staged + unstaged)</action>
+  <action>&quot;branch diff&quot; / &quot;vs main&quot; / &quot;against main&quot; / &quot;compared to {branch}&quot; → Branch diff (extract base branch if mentioned)</action>
+  <action>&quot;commit range&quot; / &quot;last N commits&quot; / &quot;{sha}..{sha}&quot; → Specific commit range</action>
+  <action>&quot;this diff&quot; / &quot;provided diff&quot; / &quot;paste&quot; → User-provided diff (do not match bare &quot;diff&quot; — it appears in other modes)</action>
+  <ask>Detect review intent from invocation text. Check the triggering prompt for phrases that map to a review mode:</ask>
+</step>
+
+<step n="2" goal="Complete ordered workflow item">
+  <action>Uncommitted changes (staged + unstaged)</action>
+  <action>Staged changes only</action>
+  <action>Provided diff or file list (user pastes or provides a path)</action>
+  <ask>HALT. Ask the user: What do you want to review? Present these options:</ask>
+  <ask>Branch diff vs a base branch (ask which base branch)</ask>
+  <ask>Specific commit range (ask for the range)</ask>
+</step>
+
+<step n="3" goal="Construct {diff_output} from the chosen source">
+  <action>Construct {diff_output} from the chosen source.</action>
+  <ask>For branch diff: verify the base branch exists before running git diff. If it does not exist, HALT and ask the user for a valid branch.</ask>
+  <ask>For commit range: verify the range resolves. If it does not, HALT and ask the user for a valid range.</ask>
+  <ask>For provided diff: validate the content is non-empty and parseable as a unified diff. If it is not parseable, HALT and ask the user to provide a valid diff.</ask>
+  <output>After constructing {diff_output}, verify it is non-empty regardless of source type. If empty, HALT and tell the user there is nothing to review.</output>
+</step>
+
+<step n="4" goal="Is there a spec or story file that provides context for these changes">
+  <action>If yes: set {spec_file} to the path provided, verify the file exists and is readable, then set {review_mode} = &quot;full&quot;.</action>
+  <action>If no: set {review_mode} = &quot;no-spec&quot;.</action>
+  <ask>Ask the user: Is there a spec or story file that provides context for these changes?</ask>
+</step>
+
+<step n="5" goal="If {review_mode} = &quot;full&quot; and the file at {spec_file} has a context field in its frontmatter listing additional docs, load each referenced document">
+  <action>If {review_mode} = &quot;full&quot; and the file at {spec_file} has a context field in its frontmatter listing additional docs, load each referenced document. Warn the user about any docs that cannot be found.</action>
+  <action>Warn the user about any docs that cannot be found.</action>
+</step>
+
+<step n="6" goal="Sanity check: if {diff_output} exceeds approximately 3000 lines, warn the user and offer to chunk the review by file group">
+  <action>Sanity check: if {diff_output} exceeds approximately 3000 lines, warn the user and offer to chunk the review by file group.</action>
+  <action>If the user opts to chunk: agree on the first group, narrow {diff_output} accordingly, and list the remaining groups for the user to note for follow-up runs.</action>
+  <action>If the user declines: proceed as-is with the full diff.</action>
+</step>
+
+## CHECKPOINT
+
+Present a summary before proceeding: diff stats (files changed, lines added/removed), {review_mode}, and loaded spec/context docs (if any). HALT and wait for user confirmation to proceed.
+
+## ADVISORY
+
+- Next handoff: ./step-02-review.md
+- Persist workflow state updates whenever this phase writes or updates a managed artifact.
+- Treat this phase as read-only unless the instructions explicitly call for a write action.
+
+## REFERENCE
+
+<prose>
 ## RULES
 
 - YOU MUST ALWAYS SPEAK OUTPUT in your Agent communication style with the config `{communication_language}`
@@ -59,3 +124,4 @@ Present a summary before proceeding: diff stats (files changed, lines added/remo
 ## NEXT
 
 Read fully and follow `./step-02-review.md`
+</prose>

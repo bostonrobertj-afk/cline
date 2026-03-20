@@ -4,8 +4,73 @@ outputFile: '{planning_artifacts}/product-brief-{{project_name}}-{{date}}.md'
 
 ---
 
-# Step 4: Success Metrics Definition
+# step 04 metrics
 
+## META
+
+- Goal: Define comprehensive success metrics that include user success, business objectives, and key performance indicators through collaborative metric definition aligned with product vision and user value.
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
+
+## EXECUTION
+
+<step n="1" goal="Begin Success Metrics Discovery">
+  <ask>How will we know we're succeeding for our users?</ask>
+  <ask>What would make users say 'this was worth it'?</ask>
+  <ask>What metrics show we're creating real value?</ask>
+</step>
+
+<step n="2" goal="User Success Metrics">
+  <action>&quot;Users are happy&quot; → &quot;Users complete [key action] within [timeframe]&quot;</action>
+  <action>Focus on outcomes and behaviors, not just satisfaction scores</action>
+  <ask>&quot;What outcome are users trying to achieve?&quot;</ask>
+  <ask>&quot;How will they know the product is working for them?&quot;</ask>
+  <ask>&quot;What's the moment where they realize this is solving their problem?&quot;</ask>
+  <output>&quot;Product is useful&quot; → &quot;Users return [frequency] and use [core feature]&quot;</output>
+</step>
+
+<step n="3" goal="Business Objectives">
+  <action>Growth Metrics: User acquisition, market penetration</action>
+  <action>Engagement Metrics: Usage patterns, retention, satisfaction</action>
+  <action>Financial Metrics: Revenue, profitability, cost efficiency</action>
+  <action>Strategic Metrics: Market position, competitive advantage</action>
+  <ask>&quot;What does success look like for the business at 3 months? 12 months?&quot;</ask>
+  <ask>&quot;Are we measuring revenue, user growth, engagement, something else?&quot;</ask>
+  <ask>&quot;What business metrics would make you say 'this is working'?&quot;</ask>
+</step>
+
+<step n="4" goal="Key Performance Indicators">
+  <action>Transform objectives into measurable indicators</action>
+  <action>Ensure each KPI has a clear measurement method</action>
+  <action>Define targets and timeframes where appropriate</action>
+  <action>Include leading indicators that predict success</action>
+  <action>User acquisition: &quot;X new users per month&quot;</action>
+</step>
+
+<step n="5" goal="Connect Metrics to Strategy">
+  <action>Connect each metric back to the product vision</action>
+  <action>Ensure user success metrics drive business success</action>
+  <action>Validate that metrics measure what truly matters</action>
+  <action>Avoid vanity metrics that don't drive decisions</action>
+</step>
+
+<step n="6" goal="Generate Success Metrics Content">
+  <output>Content to Append: Prepare the following structure for document append: ```markdown</output>
+</step>
+
+## CHECKPOINT
+
+Halt for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.
+
+## ADVISORY
+
+- Next handoff: ./step-05-scope.md
+- Persist workflow state updates whenever this phase writes or updates a managed artifact.
+
+## REFERENCE
+
+<prose>
 ## STEP GOAL:
 
 Define comprehensive success metrics that include user success, business objectives, and key performance indicators through collaborative metric definition aligned with product vision and user value.
@@ -197,3 +262,4 @@ ONLY WHEN [C continue option] is selected and [success metrics finalized and sav
 - Not updating frontmatter properly
 
 **Master Rule:** Skipping steps, optimizing sequences, or not following exact instructions is FORBIDDEN and constitutes SYSTEM FAILURE.
+</prose>

@@ -1,5 +1,87 @@
-# Step 2: Design Epic List
+# step 02 design epics
 
+## META
+
+- Goal: To design and get approval for the epics_list that will organize all requirements into user-value-focused epics.
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
+
+## EXECUTION
+
+<step n="1" goal="Review Extracted Requirements">
+  <action>Functional Requirements: Count and review FRs from Step 1</action>
+  <action>Non-Functional Requirements: Review NFRs that need to be addressed</action>
+  <action>Additional Requirements: Review technical and UX requirements</action>
+</step>
+
+<step n="2" goal="Explain Epic Design Principles">
+  <action>User-Value First: Each epic must enable users to accomplish something meaningful</action>
+  <action>Requirements Grouping: Group related FRs that deliver cohesive user outcomes</action>
+  <action>Incremental Delivery: Each epic should deliver value independently</action>
+  <action>Logical Flow: Natural progression from user's perspective</action>
+  <action>🔗 Dependency-Free Within Epic: Stories within an epic must NOT depend on future stories</action>
+  <output>Epic 2: Content Creation (users can create, edit, publish content) - Standalone: Uses auth, creates content</output>
+  <output>Epic 1: Database Setup (creates all tables upfront) - No user value</output>
+  <output>Epic 3: Frontend Components (creates reusable components) - No user value</output>
+</step>
+
+<step n="3" goal="Design Epic Structure Collaboratively">
+  <action>Epic Title: User-centric, value-focused</action>
+  <action>User Outcome: What users can accomplish after this epic</action>
+  <action>Implementation Notes: Any technical or UX considerations</action>
+  <action>Look for natural groupings in the FRs</action>
+  <action>Identify user journeys or workflows</action>
+  <ask>FR Coverage: Which FR numbers this epic addresses</ask>
+</step>
+
+<step n="4" goal="Present Epic List for Review">
+  <action>Total number of epics</action>
+  <action>FR coverage per epic</action>
+  <action>User value delivered by each epic</action>
+  <action>Any natural dependencies</action>
+</step>
+
+<step n="5" goal="Create Requirements Coverage Map">
+  <output>Create showing how each FR maps to an epic: This ensures no FRs are missed.</output>
+</step>
+
+<step n="6" goal="Collaborative Refinement">
+  <ask>&quot;Does this epic structure align with your product vision?&quot;</ask>
+  <ask>&quot;Are all user outcomes properly captured?&quot;</ask>
+  <ask>&quot;Should we adjust any epic groupings?&quot;</ask>
+</step>
+
+<step n="7" goal="Get Final Approval">
+  <action>Replace placeholder with the approved epic list</action>
+  <action>Replace with the coverage map</action>
+  <action>Ensure all FRs are mapped to epics</action>
+  <action>Make the requested adjustments</action>
+  <action>Update the epics_list</action>
+  <output>Re-present for approval</output>
+</step>
+
+<step n="8" goal="Present MENU OPTIONS">
+  <action>IF A: Invoke the bmad-advanced-elicitation skill</action>
+  <action>IF P: Invoke the bmad-party-mode skill</action>
+  <action>ONLY proceed to next step when user selects 'C'</action>
+  <ask>User can chat or ask questions - always respond when conversation ends, redisplay the menu options</ask>
+  <output>IF C: Save approved epics_list to {planning_artifacts}/epics.md, update frontmatter, then read fully and follow: ./step-03-create-stories.md</output>
+  <output>IF Any other comments or queries: help user respond then Redisplay Menu Options</output>
+  <output>ALWAYS halt and wait for user input after presenting menu</output>
+</step>
+
+## CHECKPOINT
+
+Halt for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.
+
+## ADVISORY
+
+- Persist workflow state updates whenever this phase writes or updates a managed artifact.
+
+## REFERENCE
+
+<prose>
 ## STEP GOAL:
 
 To design and get approval for the epics_list that will organize all requirements into user-value-focused epics.
@@ -210,3 +292,4 @@ ONLY WHEN C is selected and the approved epics_list is saved to document, will y
 - epics_list not saved to document
 
 **Master Rule:** Skipping steps, optimizing sequences, or not following exact instructions is FORBIDDEN and constitutes SYSTEM FAILURE.
+</prose>

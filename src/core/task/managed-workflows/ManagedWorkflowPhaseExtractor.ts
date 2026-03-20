@@ -56,8 +56,16 @@ function stripMarkdown(text: string): string {
 		.trim()
 }
 
+function stripProseBlocks(content: string): string {
+	return content.replace(/<prose\b[^>]*>[\s\S]*?<\/prose>/g, " ")
+}
+
 function normalizeHeading(heading: string): string {
-	return heading.replace(/#+\s*/, "").trim().toUpperCase()
+	return heading
+		.replace(/#+\s*/, "")
+		.replace(/[:.;]+$/, "")
+		.trim()
+		.toUpperCase()
 }
 
 function dedupeLabels(labels: string[]): string[] {
@@ -81,7 +89,8 @@ function extractHeadingTitle(content: string): string | undefined {
 }
 
 function extractCheckpointSection(content: string): string | undefined {
-	const match = content.match(/### CHECKPOINT([\s\S]*?)(?:\n## |\n### |Z)/i)
+	const extractionContent = stripProseBlocks(content)
+	const match = extractionContent.match(/##?# CHECKPOINT([\s\S]*?)(?:\n## |\n### |Z)/i)
 	return match?.[1]?.trim()
 }
 
@@ -361,17 +370,18 @@ function extractItemsForPhase(
 	phaseId: string,
 	phaseTitle: string,
 ): ManagedWorkflowItemState[] {
-	const candidateSections = extractCandidateSections(sourceContent)
+	const extractionSource = stripProseBlocks(sourceContent)
+	const candidateSections = extractCandidateSections(extractionSource)
 	const scopedContent = candidateSections.join("\n\n").trim()
 	const strategies = workflow.strategyHints?.length ? workflow.strategyHints : DEFAULT_STRATEGY_ORDER
 
 	const strategyOutputs: Record<ManagedWorkflowExtractionStrategy, string[]> = {
-		"workflow-steps": extractWorkflowStepItems(scopedContent || sourceContent, workflow),
-		"template-outputs": extractTemplateOutputItems(scopedContent || sourceContent),
-		"numbered-headings": extractNumberedHeadingItems(scopedContent || sourceContent),
-		"ordered-lists": extractOrderedItems(scopedContent || sourceContent),
-		"bullet-groups": extractBulletGroupItems(scopedContent || sourceContent),
-		"heading-items": extractHeadingItems(scopedContent || sourceContent),
+		"workflow-steps": extractWorkflowStepItems(scopedContent || extractionSource, workflow),
+		"template-outputs": extractTemplateOutputItems(scopedContent || extractionSource),
+		"numbered-headings": extractNumberedHeadingItems(scopedContent || extractionSource),
+		"ordered-lists": extractOrderedItems(scopedContent || extractionSource),
+		"bullet-groups": extractBulletGroupItems(scopedContent || extractionSource),
+		"heading-items": extractHeadingItems(scopedContent || extractionSource),
 	}
 
 	for (const strategy of strategies) {

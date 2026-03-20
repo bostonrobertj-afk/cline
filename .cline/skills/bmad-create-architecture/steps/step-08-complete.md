@@ -1,5 +1,38 @@
-# Step 8: Architecture Completion & Handoff
+# step 08 complete
 
+## META
+
+- Goal: complete
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
+
+## EXECUTION
+
+<step n="1" goal="Congratulate the User on Completion">
+  <action>Both you and the User completed something amazing here - give a summary of what you achieved together and really congratulate the user on a job well done.</action>
+</step>
+
+<step n="2" goal="Next Steps Guidance">
+  <action>Architecture complete.</action>
+  <action>Invoke the bmad-help skill.</action>
+  <action>## WORKFLOW COMPLETE: This is the final step of the Architecture workflow.</action>
+  <action>The user now has a complete, validated architecture document ready for AI agent implementation.</action>
+  <action>The architecture will serve as the single source of truth for all technical decisions, ensuring consistent implementation across the entire project development lifecycle.</action>
+  <ask>Upon Completion of task output: offer to answer any questions about the Architecture Document.</ask>
+</step>
+
+## CHECKPOINT
+
+Complete the current required actions in order before moving to the next workflow phase.
+
+## ADVISORY
+
+- Persist workflow state updates whenever this phase writes or updates a managed artifact.
+
+## REFERENCE
+
+<prose>
 ## MANDATORY EXECUTION RULES (READ FIRST):
 
 - 🛑 NEVER generate content without user input
@@ -74,3 +107,4 @@ Upon Completion of task output: offer to answer any questions about the Architec
 This is the final step of the Architecture workflow. The user now has a complete, validated architecture document ready for AI agent implementation.
 
 The architecture will serve as the single source of truth for all technical decisions, ensuring consistent implementation across the entire project development lifecycle.
+</prose>

@@ -1,5 +1,3 @@
-# Step 2b: Vision Discovery
-
 ## META
 
 - Goal: refine the product vision now that the project classification is known.

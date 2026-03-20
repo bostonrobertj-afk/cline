@@ -1,5 +1,3 @@
-# Step 7: Project-Type Requirements
-
 ## META
 
 - Goal: capture requirements that are specific to the project’s type or delivery model.

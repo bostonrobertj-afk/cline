@@ -1,5 +1,3 @@
-# Step 10: Non-Functional Requirements
-
 ## META
 
 - Goal: define the non-functional requirements that matter for this product.

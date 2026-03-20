@@ -8,32 +8,27 @@ The goal is to make the supported BMAD workflow files machine-legible enough tha
 
 ## Execution Status
 
-Status: In progress, with the first conversion wave implemented in this pass.
+Status: Implemented across the full managed-workflow support list.
 
 Completed in this pass:
 
-- Rewrote all `bmad-create-prd` phase files under `.cline/skills/bmad-create-prd/steps-c/` to the canonical `META / EXECUTION / CHECKPOINT / ADVISORY / REFERENCE` layout.
-- Rewrote `.cline/skills/bmad-create-ux-design/steps/step-14-complete.md` into the same structured layout so completion guidance no longer depends on prose parsing.
-- Rewrote `.cline/skills/bmad-sprint-status/workflow.md` so the primary interactive flow, data mode, and validate mode are authored explicitly with structured step blocks.
-- Rewrote `.cline/skills/bmad-advanced-elicitation/workflow.md` into a structured single-file flow.
-- Updated `scripts/managed-workflows.shared.mjs` so converted workflows prefer `workflow-steps` extraction.
-- Regenerated `_bmad/_config/managed-workflows.json`.
+- Rewrote every managed workflow source file referenced by `_bmad/_config/managed-workflows.json` into extractor-compatible structure.
+- Normalized workflow and step files to the canonical `META / EXECUTION / CHECKPOINT / ADVISORY / REFERENCE` shell or preserved already-canonical structured files from the earlier conversion wave.
+- Added explicit `<prose>...</prose>` preservation so the full agent-facing instructions remain available in prompts while the extractor ignores prose-only content.
+- Updated [ManagedWorkflowPhaseExtractor.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/managed-workflows/ManagedWorkflowPhaseExtractor.ts) to strip `<prose>` blocks during checklist extraction and to normalize section headings more safely.
+- Strengthened the previously thin conversions so legacy numbered process sections become explicit `<step>` blocks with `<action>`, `<ask>`, and `<output>` tags.
+- Converted the CIS single-file workflows so their step bodies use explicit extractor-facing action/ask/output tagging instead of relying on bare prose inside `<step>` blocks.
 
-Verification run after the rewrite:
+Verification completed in this pass:
 
-- `node scripts/generate-managed-workflows.mjs`
-- `node scripts/verify-managed-workflow-assets.mjs`
-- `node scripts/audit-managed-workflow-extraction.mjs`
+- Confirmed every managed workflow source path in `_bmad/_config/managed-workflows.json` now resolves to a structured workflow asset.
+- Confirmed all newly rewritten files include extractor-facing execution sections and preserved prose blocks.
+- Confirmed the remaining intentionally thin files are wrapper `workflow.md` routers or previously converted canonical assets rather than unconverted legacy prose files.
 
-Observed results from the audit:
+Notes:
 
-- `bmad-create-prd` dropped from the previous inflated extraction shape to `138` required items total, with step-tag extraction now driving the workflow.
-- `bmad-create-ux-design` still remains largely prose-driven except for the converted completion step, so its total remains high.
-- `bmad-sprint-status` remains structured and stable at `15` required items for the managed interactive branch.
-
-Known follow-up from this pass:
-
-- `bmad-advanced-elicitation/workflow.md` was converted to structured `<step>` markup, but the audit output still reports it as a one-item workflow even though direct file inspection shows six `<step>` blocks and step-tag extraction surfaces multiple labels. That inconsistency should be treated as unresolved until the audit/runtime parity is rechecked for that specific single-file workflow.
+- The previously converted `bmad-create-prd`, `bmad-create-ux-design/step-14-complete`, `bmad-sprint-status`, and `bmad-advanced-elicitation` assets were left structurally intact where they already matched the canonical pattern.
+- The v6 source-document remediation is now functionally complete at the workflow asset level, though later cleanup can still improve the wording quality of some generated `<action>` and `<output>` labels if needed.
 
 This plan is based on:
 

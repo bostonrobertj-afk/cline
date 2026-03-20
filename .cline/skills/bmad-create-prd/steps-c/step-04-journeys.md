@@ -1,5 +1,3 @@
-# Step 4: User Journeys
-
 ## META
 
 - Goal: define narrative user journeys that connect user needs to product requirements.

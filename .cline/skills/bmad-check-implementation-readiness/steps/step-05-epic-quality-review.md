@@ -2,8 +2,103 @@
 outputFile: '{planning_artifacts}/implementation-readiness-report-{{date}}.md'
 ---
 
-# Step 5: Epic Quality Review
+# step 05 epic quality review
 
+## META
+
+- Goal: To validate epics and stories against the best practices defined in create-epics-and-stories workflow, focusing on user value, independence, dependencies, and implementation readiness.
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
+
+## EXECUTION
+
+<step n="1" goal="Initialize Best Practices Validation">
+  <action>Epics deliver user value (not technical milestones)</action>
+  <action>Epic independence (Epic 2 doesn't need Epic 3)</action>
+  <action>Story dependencies (no forward references)</action>
+  <action>Proper story sizing and completeness</action>
+</step>
+
+<step n="2" goal="Epic Structure Validation">
+  <action>&quot;API Development&quot; - technical milestone</action>
+  <action>&quot;Infrastructure Setup&quot; - not user-facing</action>
+  <action>Epic 1: Must stand alone completely</action>
+  <action>Epic 2: Can function using only Epic 1 output</action>
+  <action>Epic 3: Can function using Epic 1 &amp; 2 outputs</action>
+  <ask>Epic Title: Is it user-centric (what user can do)?</ask>
+  <ask>Epic Goal: Does it describe user outcome?</ask>
+  <ask>Value Proposition: Can users benefit from this epic alone?</ask>
+  <output>&quot;Setup Database&quot; or &quot;Create Models&quot; - no user value</output>
+</step>
+
+<step n="3" goal="Story Quality Assessment">
+  <action>&quot;Setup all models&quot; - not a USER story</action>
+  <action>Vague criteria like &quot;user can login&quot;</action>
+  <action>Missing error conditions</action>
+  <action>Incomplete happy path</action>
+  <action>Non-measurable outcomes</action>
+  <ask>Clear User Value: Does the story deliver something meaningful?</ask>
+  <ask>Independent: Can it be completed without future stories?</ask>
+  <ask>Given/When/Then Format: Proper BDD structure?</ask>
+  <output>&quot;Create login UI (depends on Story 1.3)&quot; - forward dependency</output>
+</step>
+
+<step n="4" goal="Dependency Analysis">
+  <action>Story 1.1 must be completable alone</action>
+  <action>Story 1.2 can use Story 1.1 output</action>
+  <action>Story 1.3 can use Story 1.1 &amp; 1.2 outputs</action>
+  <action>&quot;This story depends on Story 1.4&quot;</action>
+  <action>&quot;Wait for future story to work&quot;</action>
+  <ask>Check: Are tables created only when first needed?</ask>
+  <output>Wrong: Epic 1 Story 1 creates all tables upfront</output>
+  <output>Right: Each story creates tables it needs</output>
+</step>
+
+<step n="5" goal="Special Implementation Checks">
+  <action>If YES: Epic 1 Story 1 must be &quot;Set up initial project from starter template&quot;</action>
+  <action>Verify story includes cloning, dependencies, initial configuration</action>
+  <action>Initial project setup story</action>
+  <action>Development environment configuration</action>
+  <action>CI/CD pipeline setup early</action>
+</step>
+
+<step n="6" goal="Best Practices Compliance Checklist">
+  <action>[ ] Epic delivers user value</action>
+  <action>[ ] Epic can function independently</action>
+  <action>[ ] Stories appropriately sized</action>
+  <action>[ ] No forward dependencies</action>
+  <action>[ ] Clear acceptance criteria</action>
+  <output>[ ] Database tables created when needed</output>
+</step>
+
+<step n="7" goal="Quality Assessment Documentation">
+  <action>Technical epics with no user value</action>
+  <action>Forward dependencies breaking independence</action>
+  <action>Epic-sized stories that cannot be completed</action>
+  <action>Vague acceptance criteria</action>
+  <action>Stories requiring future stories</action>
+</step>
+
+<step n="8" goal="Autonomous Review Execution">
+  <action>Apply best practices without compromise</action>
+  <action>Document every violation with specific examples</action>
+  <action>Provide clear remediation guidance</action>
+  <action>Prepare recommendations for each issue</action>
+  <action>Update {outputFile} with all quality findings</action>
+</step>
+
+## CHECKPOINT
+
+Complete the current required actions in order before moving to the next workflow phase.
+
+## ADVISORY
+
+- Use the prose block below for the full agent-facing guidance that complements the structured execution steps.
+
+## REFERENCE
+
+<prose>
 ## STEP GOAL:
 
 To validate epics and stories against the best practices defined in create-epics-and-stories workflow, focusing on user value, independence, dependencies, and implementation readiness.
@@ -239,3 +334,4 @@ This step executes autonomously. Load ./step-06-final-assessment.md only after c
 - Overlooking obvious violations
 
 **Master Rule:** Enforce best practices rigorously. Find all violations.
+</prose>

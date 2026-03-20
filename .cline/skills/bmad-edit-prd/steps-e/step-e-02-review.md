@@ -5,8 +5,86 @@ validationReport: '{validation_report_path}'  # If provided
 prdPurpose: '{project-root}/_bmad/bmm/workflows/2-plan-workflows/create-prd/data/prd-purpose.md'
 ---
 
-# Step E-2: Deep Review & Analysis
+# step e 02 review
 
+## META
+
+- Goal: Thoroughly review the existing PRD, analyze validation report findings (if provided), and prepare a detailed change plan before editing.
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
+
+## EXECUTION
+
+<step n="1" goal="Attempt Sub-Process Deep Review">
+  <action>Extract all findings from validation report</action>
+  <action>Map findings to specific PRD sections</action>
+  <action>Prioritize by severity: Critical &gt; Warning &gt; Informational</action>
+  <action>For each critical issue: identify specific fix needed</action>
+  <action>For user's manual edit goals: identify where in PRD to apply</action>
+</step>
+
+<step n="2" goal="Build Change Plan">
+  <action>Current State: Brief description of what exists</action>
+  <action>Issues Identified: [List from validation report or manual analysis]</action>
+  <action>Changes Needed: [Specific changes required]</action>
+  <action>Priority: [Critical/High/Medium/Low]</action>
+  <action>Sections to add (if missing)</action>
+  <ask>User Requirements Met: [Which user edit goals address this section]</ask>
+  <output>Sections to update (if present but needs work)</output>
+</step>
+
+<step n="3" goal="Prepare Change Plan Summary">
+  <action>Additions: {count} sections to add</action>
+  <action>Updates: {count} sections to update</action>
+  <action>Removals: {count} items to remove</action>
+  <action>Restructuring: {yes/no} if format conversion needed</action>
+  <action>Critical: {count} changes (must fix)</action>
+</step>
+
+<step n="4" goal="Present Change Plan to User">
+  <action>Critical: {count} items</action>
+  <action>High: {count} items</action>
+  <action>Medium: {count} items</action>
+  <ask>Does this change plan align with what you had in mind?</ask>
+  <ask>Any sections I should add/remove/reprioritize?</ask>
+  <ask>Any concerns before I proceed with edits?</ask>
+</step>
+
+<step n="5" goal="Get User Confirmation">
+  <action>Discuss requested changes</action>
+  <action>Revise change plan accordingly</action>
+  <action>Note: &quot;Change plan approved. Proceeding to edit step.&quot;</action>
+  <action>Continue to step 6</action>
+  <output>Represent for confirmation</output>
+</step>
+
+<step n="6" goal="Document Approved Plan">
+  <action>Approved changes: Section-by-section list</action>
+  <action>Priority order: Sequence to apply changes</action>
+  <action>User confirmed: Yes</action>
+</step>
+
+<step n="7" goal="Present MENU OPTIONS (If User Wants Discussion)">
+  <action>ALWAYS halt and wait for user input</action>
+  <action>Only proceed to edit when user selects 'C'</action>
+  <action>IF C: Document approval, then load step-e-03-edit.md</action>
+  <output>IF A: Invoke the bmad-advanced-elicitation skill, then return to discussion</output>
+  <output>IF P: Invoke the bmad-party-mode skill, then return to discussion</output>
+  <output>IF Any other: discuss, then redisplay menu</output>
+</step>
+
+## CHECKPOINT
+
+Halt for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.
+
+## ADVISORY
+
+- Next handoff: ./step-e-03-edit.md
+
+## REFERENCE
+
+<prose>
 ## STEP GOAL:
 
 Thoroughly review the existing PRD, analyze validation report findings (if provided), and prepare a detailed change plan before editing.
@@ -243,3 +321,4 @@ Read fully and follow: `./step-e-03-edit.md`
 - Proceeding without user approval
 
 **Master Rule:** Plan before editing. Thorough analysis ensures we make the right changes in the right order. User approval prevents misalignment.
+</prose>

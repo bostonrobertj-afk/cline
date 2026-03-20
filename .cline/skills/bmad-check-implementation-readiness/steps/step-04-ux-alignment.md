@@ -2,8 +2,64 @@
 outputFile: '{planning_artifacts}/implementation-readiness-report-{{date}}.md'
 ---
 
-# Step 4: UX Alignment
+# step 04 ux alignment
 
+## META
+
+- Goal: To check if UX documentation exists and validate that it aligns with PRD requirements and Architecture decisions, ensuring architecture accounts for both PRD and UX needs.
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
+
+## EXECUTION
+
+<step n="1" goal="Initialize UX Validation">
+  <action>Check if UX documentation exists</action>
+  <action>If UX exists: validate alignment with PRD and Architecture</action>
+  <action>If no UX: determine if UX is implied and document warning&quot;</action>
+</step>
+
+<step n="2" goal="Search for UX Documentation">
+  <action>{planning_artifacts}/ux.md (whole document)</action>
+  <action>{planning_artifacts}/ux/index.md (sharded)</action>
+  <action>Look for UI-related terms in other documents</action>
+</step>
+
+<step n="3" goal="If UX Document Exists">
+  <action>Check UX requirements reflected in PRD</action>
+  <action>Verify user journeys in UX match PRD use cases</action>
+  <action>Identify UX requirements not in PRD</action>
+  <action>Verify architecture supports UX requirements</action>
+  <action>Check performance needs (responsiveness, load times)</action>
+</step>
+
+<step n="4" goal="If No UX Document">
+  <ask>Does PRD mention user interface?</ask>
+  <ask>Are there web/mobile components implied?</ask>
+  <ask>Is this a user-facing application?</ask>
+</step>
+
+<step n="5" goal="Add Findings to Report">
+  <output>Append to {outputFile}:</output>
+</step>
+
+<step n="6" goal="Auto-Proceed to Next Step">
+  <action>After UX assessment complete, immediately load next step.</action>
+  <action>## PROCEEDING TO EPIC QUALITY REVIEW UX alignment assessment complete.</action>
+  <output>Read fully and follow: ./step-05-epic-quality-review.md ---</output>
+</step>
+
+## CHECKPOINT
+
+Complete the current required actions in order before moving to the next workflow phase.
+
+## ADVISORY
+
+- Next handoff: ./step-05-epic-quality-review.md
+
+## REFERENCE
+
+<prose>
 ## STEP GOAL:
 
 To check if UX documentation exists and validate that it aligns with PRD requirements and Architecture decisions, ensuring architecture accounts for both PRD and UX needs.
@@ -127,3 +183,4 @@ UX alignment assessment complete. Read fully and follow: `./step-05-epic-quality
 - Not checking for UX document
 - Ignoring alignment issues
 - Not documenting warnings
+</prose>

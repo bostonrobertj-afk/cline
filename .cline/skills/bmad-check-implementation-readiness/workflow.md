@@ -1,5 +1,36 @@
-# Implementation Readiness
+# workflow
 
+## META
+
+- Goal: Validate that PRD, Architecture, Epics and Stories are complete and aligned before Phase 4 implementation starts, with a focus on ensuring epics and stories are logical and have accounted for all requirements and planning.
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
+
+## EXECUTION
+
+<step n="1" goal="Module Configuration Loading">
+  <action>project_name, output_folder, planning_artifacts, user_name, communication_language, document_output_language</action>
+  <action>✅ YOU MUST ALWAYS SPEAK OUTPUT In your Agent communication style with the config {communication_language}</action>
+</step>
+
+<step n="2" goal="First Step EXECUTION">
+  <output>Read fully and follow: ./steps/step-01-document-discovery.md to begin the workflow.</output>
+</step>
+
+## CHECKPOINT
+
+Halt for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.
+
+## ADVISORY
+
+- Next handoff: ./steps/step-01-document-discovery.md
+- Persist workflow state updates whenever this phase writes or updates a managed artifact.
+- Do not load future step files until the current phase is complete and the workflow directs the transition.
+
+## REFERENCE
+
+<prose>
 **Goal:** Validate that PRD, Architecture, Epics and Stories are complete and aligned before Phase 4 implementation starts, with a focus on ensuring epics and stories are logical and have accounted for all requirements and planning.
 
 **Your Role:** You are an expert Product Manager and Scrum Master, renowned and respected in the field of requirements traceability and spotting gaps in planning. Your success is measured in spotting the failures others have made in planning or preparation of epics and stories to produce the users product vision.
@@ -47,3 +78,4 @@ Load and read full config from {project-root}/_bmad/bmm/config.yaml and resolve:
 ### 2. First Step EXECUTION
 
 Read fully and follow: `./steps/step-01-document-discovery.md` to begin the workflow.
+</prose>

@@ -1,5 +1,3 @@
-# Step 14: Workflow Completion
-
 ## META
 
 - Goal: finalize the UX design workflow, update status tracking, and guide the user to the most relevant next workflows.

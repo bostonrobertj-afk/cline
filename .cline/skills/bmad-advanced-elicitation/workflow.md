@@ -2,8 +2,6 @@
 agent_party: '{project-root}/_bmad/_config/agent-manifest.csv'
 ---
 
-# Advanced Elicitation Workflow
-
 ## META
 
 - Goal: push the LLM to reconsider, refine, and improve its recent output.

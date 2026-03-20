@@ -1,3 +1,62 @@
+# Step 3: Triage
+
+## META
+
+- Goal: Triage
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
+
+## EXECUTION
+
+<step n="1" goal="Normalize findings into a common format">
+  <action>Normalize findings into a common format. Expected input formats:</action>
+  <action>Adversarial (Blind Hunter): markdown list of descriptions</action>
+  <action>Edge Case Hunter: JSON array with location, trigger_condition, guard_snippet, potential_consequence fields</action>
+  <action>Acceptance Auditor: markdown list with title, AC/constraint reference, and evidence</action>
+  <action>id -- sequential integer</action>
+</step>
+
+<step n="2" goal="Deduplicate">
+  <action>Deduplicate. If two or more findings describe the same issue, merge them into one:</action>
+  <action>Use the most specific finding as the base (prefer edge-case JSON with location over adversarial prose).</action>
+  <action>Append any unique detail, reasoning, or location references from the other finding(s) into the surviving detail field.</action>
+  <action>Set source to the merged sources (e.g., blind+edge).</action>
+</step>
+
+<step n="3" goal="Classify each finding into exactly one bucket:">
+  <action>Classify each finding into exactly one bucket:</action>
+  <action>intent_gap -- The spec/intent is incomplete; cannot resolve from existing information. Only possible if {review_mode} = &quot;full&quot;.</action>
+  <action>bad_spec -- The spec should have prevented this; spec is wrong or ambiguous. Only possible if {review_mode} = &quot;full&quot;.</action>
+  <action>patch -- Code issue that is trivially fixable without human input. Just needs a code change.</action>
+  <action>defer -- Pre-existing issue not caused by the current change. Real but not actionable now.</action>
+</step>
+
+<step n="4" goal="Drop all reject findings">
+  <action>Drop all reject findings. Record the reject count for the summary.</action>
+  <action>Record the reject count for the summary.</action>
+</step>
+
+<step n="5" goal="If {failed_layers} is non-empty, report which layers failed before announcing results">
+  <action>If zero findings remain after dropping rejects AND {failed_layers} is non-empty, warn the user that the review may be incomplete rather than announcing a clean review.</action>
+  <ask>If {failed_layers} is non-empty, report which layers failed before announcing results. If zero findings remain after dropping rejects AND {failed_layers} is non-empty, warn the user that the review may be incomplete rather than announcing a clean review.</ask>
+</step>
+
+<step n="6" goal="If zero findings remain after dropping rejects and no layers failed, note clean review">
+  <action>If zero findings remain after dropping rejects and no layers failed, note clean review.</action>
+</step>
+
+## CHECKPOINT
+
+Complete the current required actions in order before moving to the next workflow phase.
+
+## ADVISORY
+
+- Next handoff: ./step-04-present.md
+
+## REFERENCE
+
+<prose>
 ---
 ---
 
@@ -48,3 +107,4 @@
 ## NEXT
 
 Read fully and follow `./step-04-present.md`
+</prose>

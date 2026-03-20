@@ -1,5 +1,3 @@
-# Step 5: Domain Requirements
-
 ## META
 
 - Goal: capture domain-specific constraints, regulations, integrations, and risk mitigations.

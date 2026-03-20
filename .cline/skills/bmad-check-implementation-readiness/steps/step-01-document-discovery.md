@@ -2,8 +2,48 @@
 outputFile: '{planning_artifacts}/implementation-readiness-report-{{date}}.md'
 ---
 
-# Step 1: Document Discovery
+# step 01 document discovery
 
+## META
+
+- Goal: To discover, inventory, and organize all project documents, identifying duplicates and determining which versions to use for the assessment.
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
+
+## EXECUTION
+
+<step n="1" goal="Initialize Document Discovery">
+  <action>Search for all required documents (PRD, Architecture, Epics, UX)</action>
+  <action>Group sharded documents together</action>
+  <action>Identify any duplicates (whole + sharded versions)</action>
+  <action>Present findings for your confirmation&quot;</action>
+  <output>Present findings for your confirmation&quot;</output>
+</step>
+
+<step n="2" goal="Document Search Patterns">
+  <action>Whole: {planning_artifacts}/prd.md</action>
+  <action>Sharded: {planning_artifacts}/prd/index.md and related files</action>
+  <action>Whole: {planning_artifacts}/architecture.md</action>
+  <action>Sharded: {planning_artifacts}/architecture/index.md and related files</action>
+  <action>Whole: {planning_artifacts}/epic.md</action>
+</step>
+
+<step n="3" goal="Organize Findings">
+  <action>Organize Findings</action>
+</step>
+
+## CHECKPOINT
+
+Halt for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.
+
+## ADVISORY
+
+- Persist workflow state updates whenever this phase writes or updates a managed artifact.
+
+## REFERENCE
+
+<prose>
 ## STEP GOAL:
 
 To discover, inventory, and organize all project documents, identifying duplicates and determining which versions to use for the assessment.
@@ -177,3 +217,4 @@ ONLY WHEN C is selected and document inventory is saved will you load ./step-02-
 - Not saving document inventory
 
 **Master Rule:** Clear file identification is essential for accurate assessment.
+</prose>

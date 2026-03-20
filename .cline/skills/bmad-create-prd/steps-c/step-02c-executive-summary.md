@@ -1,5 +1,3 @@
-# Step 2c: Executive Summary
-
 ## META
 
 - Goal: create an executive summary grounded in the confirmed discovery and vision context.

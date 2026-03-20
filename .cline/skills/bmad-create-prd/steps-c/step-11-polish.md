@@ -1,5 +1,3 @@
-# Step 11: Document Polish
-
 ## META
 
 - Goal: review and polish the PRD for coherence, completeness, and flow.

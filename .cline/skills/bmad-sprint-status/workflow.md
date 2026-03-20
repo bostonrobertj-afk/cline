@@ -1,5 +1,3 @@
-# Sprint Status Workflow
-
 ## META
 
 - Goal: summarize sprint status, surface risks, and recommend the next workflow action.

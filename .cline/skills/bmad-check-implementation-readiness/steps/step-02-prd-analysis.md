@@ -3,8 +3,74 @@ outputFile: '{planning_artifacts}/implementation-readiness-report-{{date}}.md'
 epicsFile: '{planning_artifacts}/*epic*.md' # Will be resolved to actual file
 ---
 
-# Step 2: PRD Analysis
+# step 02 prd analysis
 
+## META
+
+- Goal: To fully read and analyze the PRD document (whole or sharded) to extract all Functional Requirements (FRs) and Non-Functional Requirements (NFRs) for validation against epics coverage.
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
+
+## EXECUTION
+
+<step n="1" goal="Initialize PRD Analysis">
+  <action>Load the PRD document (whole or sharded)</action>
+  <action>Read it completely and thoroughly</action>
+  <action>Extract ALL Functional Requirements (FRs)</action>
+  <action>Extract ALL Non-Functional Requirements (NFRs)</action>
+  <action>Document findings for coverage validation&quot;</action>
+</step>
+
+<step n="2" goal="Load and Read PRD">
+  <action>Ensure complete coverage - no files skipped</action>
+  <output>If whole PRD file exists: Load and read it completely</output>
+  <output>If sharded PRD exists: Load and read ALL files in the PRD folder</output>
+</step>
+
+<step n="3" goal="Extract Functional Requirements (FRs)">
+  <action>Numbered FRs (FR1, FR2, FR3, etc.)</action>
+  <action>Requirements labeled &quot;Functional Requirement&quot;</action>
+  <action>Business rules that must be implemented</action>
+  <output>User stories or use cases that represent functional needs</output>
+</step>
+
+<step n="4" goal="Extract Non-Functional Requirements (NFRs)">
+  <action>Performance requirements (response times, throughput)</action>
+  <action>Security requirements (authentication, encryption, etc.)</action>
+  <action>Usability requirements (accessibility, ease of use)</action>
+  <action>Reliability requirements (uptime, error rates)</action>
+  <action>Scalability requirements (concurrent users, data growth)</action>
+</step>
+
+<step n="5" goal="Document Additional Requirements">
+  <action>Constraints or assumptions</action>
+  <action>Technical requirements not labeled as FR/NFR</action>
+  <action>Business constraints</action>
+  <action>Integration requirements</action>
+</step>
+
+<step n="6" goal="Add to Assessment Report">
+  <output>Append to {outputFile}:</output>
+</step>
+
+<step n="7" goal="Auto-Proceed to Next Step">
+  <action>After PRD analysis complete, immediately load next step for epic coverage validation.</action>
+  <action>## PROCEEDING TO EPIC COVERAGE VALIDATION PRD analysis complete.</action>
+  <output>Read fully and follow: ./step-03-epic-coverage-validation.md ---</output>
+</step>
+
+## CHECKPOINT
+
+Complete the current required actions in order before moving to the next workflow phase.
+
+## ADVISORY
+
+- Next handoff: ./step-03-epic-coverage-validation.md
+
+## REFERENCE
+
+<prose>
 ## STEP GOAL:
 
 To fully read and analyze the PRD document (whole or sharded) to extract all Functional Requirements (FRs) and Non-Functional Requirements (NFRs) for validation against epics coverage.
@@ -166,3 +232,4 @@ PRD analysis complete. Read fully and follow: `./step-03-epic-coverage-validatio
 - Not documenting findings in report
 
 **Master Rule:** Complete requirement extraction is essential for traceability validation.
+</prose>

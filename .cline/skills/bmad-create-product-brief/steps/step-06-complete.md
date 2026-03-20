@@ -3,8 +3,68 @@
 outputFile: '{planning_artifacts}/product-brief-{{project_name}}-{{date}}.md'
 ---
 
-# Step 6: Product Brief Completion
+# step 06 complete
 
+## META
+
+- Goal: Complete the product brief workflow, update status files, and provide guidance on logical next steps for continued product development.
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
+
+## EXECUTION
+
+<step n="1" goal="Announce Workflow Completion">
+  <action>✅ Executive Summary with clear vision and problem statement</action>
+  <action>✅ Core Vision with solution definition and unique differentiators</action>
+  <action>✅ Target Users with rich personas and user journeys</action>
+  <action>✅ Success Metrics with measurable outcomes and business objectives</action>
+  <action>✅ MVP Scope with focused feature set and clear boundaries</action>
+</step>
+
+<step n="2" goal="Document Quality Check">
+  <ask>Does the executive summary clearly communicate the vision and problem?</ask>
+  <ask>Are target users well-defined with compelling personas?</ask>
+  <ask>Do success metrics connect user value to business objectives?</ask>
+</step>
+
+<step n="3" goal="Suggest Next Steps">
+  <action>domain-research - Deep market or domain research (if needed)</action>
+  <action>The PRD workflow builds directly on this brief for detailed planning</action>
+  <action>Consider team capacity and immediate priorities</action>
+  <action>Use brief to validate concept before committing to detailed work</action>
+  <action>Brief can guide early technical feasibility discussions</action>
+  <output>create-prd - Create detailed Product Requirements Document</output>
+  <output>create-ux-design - UX research and design (can run parallel with PRD)</output>
+</step>
+
+<step n="4" goal="Congrats to the user">
+  <action>Clear vision and problem definition</action>
+  <action>Deep understanding of target users</action>
+  <action>Measurable success criteria</action>
+  <action>Focused MVP scope with realistic boundaries</action>
+  <action>Inspiring long-term vision</action>
+</step>
+
+<step n="5" goal="Suggest next steps">
+  <action>Product Brief complete.</action>
+  <action>Invoke the bmad-help skill.</action>
+  <action>--- ## FINAL WORKFLOW COMPLETION This product brief is now complete and serves as the strategic foundation for the entire product lifecycle.</action>
+  <action>All subsequent design, architecture, and development work should trace back to the vision, user needs, and success criteria documented in this brief.</action>
+  <action>Congratulations on completing the Product Brief for !</action>
+</step>
+
+## CHECKPOINT
+
+Halt for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.
+
+## ADVISORY
+
+- Persist workflow state updates whenever this phase writes or updates a managed artifact.
+
+## REFERENCE
+
+<prose>
 ## STEP GOAL:
 
 Complete the product brief workflow, update status files, and provide guidance on logical next steps for continued product development.
@@ -157,3 +217,4 @@ Product Brief complete. Invoke the `bmad-help` skill.
 This product brief is now complete and serves as the strategic foundation for the entire product lifecycle. All subsequent design, architecture, and development work should trace back to the vision, user needs, and success criteria documented in this brief.
 
 **Congratulations on completing the Product Brief for {{project_name}}!** 🎉
+</prose>

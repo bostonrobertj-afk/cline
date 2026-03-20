@@ -1,5 +1,86 @@
-# Step 12: UX Consistency Patterns
+# step 12 ux patterns
 
+## META
+
+- Goal: ux patterns
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
+
+## EXECUTION
+
+<step n="1" goal="Identify Pattern Categories">
+  <action>Button hierarchy and actions</action>
+  <action>Feedback patterns (success, error, warning, info)</action>
+  <action>Form patterns and validation</action>
+  <action>Navigation patterns</action>
+  <action>Modal and overlay patterns</action>
+</step>
+
+<step n="2" goal="Define Critical Patterns First">
+  <action>Visual hierarchy (primary vs. secondary actions)</action>
+  <action>Feedback mechanisms</action>
+  <action>Error recovery</action>
+  <action>Accessibility requirements</action>
+  <action>Mobile vs. desktop considerations</action>
+</step>
+
+<step n="3" goal="Establish Pattern Guidelines">
+  <action>Document specific design decisions: Pattern Guidelines Template:</action>
+</step>
+
+<step n="4" goal="Design System Integration">
+  <action>[Custom rule 1]</action>
+  <action>[Custom rule 2]</action>
+  <action>[Custom rule 3]&quot;</action>
+  <ask>How do these patterns complement our design system components?</ask>
+  <ask>What customizations are needed?</ask>
+  <ask>How do we maintain consistency while meeting unique needs?</ask>
+</step>
+
+<step n="5" goal="Create Pattern Documentation">
+  <action>Clear usage guidelines for each pattern</action>
+  <action>Visual examples and specifications</action>
+  <action>Implementation notes for developers</action>
+  <action>Accessibility checklists</action>
+  <action>Mobile-first considerations</action>
+</step>
+
+<step n="6" goal="Generate UX Patterns Content">
+  <output>Prepare the content to append to the document: #### Content Structure: When saving to document, append these Level 2 and Level 3 sections:</output>
+</step>
+
+<step n="7" goal="Present Content and Menu">
+  <action>These patterns ensure users have a consistent, predictable experience across all interactions.</action>
+  <ask>Here's what I'll add to the document: [Show the complete markdown content from step 6] What would you like to do?</ask>
+  <output>Show the generated UX patterns content and present choices: &quot;I've established UX consistency patterns for .</output>
+  <output>[A] Advanced Elicitation - Let's refine our UX patterns [P] Party Mode - Bring different perspectives on consistency patterns [C] Continue - Save this to the document and move to responsive design</output>
+</step>
+
+<step n="8" goal="Handle Menu Selection">
+  <action>Invoke the bmad-advanced-elicitation skill with the current UX patterns content</action>
+  <action>Process the enhanced pattern insights that come back</action>
+  <action>Invoke the bmad-party-mode skill with the current UX patterns</action>
+  <action>Process the collaborative pattern insights that come back</action>
+  <action>Load ./step-13-responsive-accessibility.md</action>
+  <ask>Ask user: &quot;Accept these improvements to the UX patterns? (y/n)&quot;</ask>
+  <ask>Ask user: &quot;Accept these changes to the UX patterns? (y/n)&quot;</ask>
+  <output>If yes: Update content with improvements, then return to A/P/C menu</output>
+  <output>If no: Keep original content, then return to A/P/C menu</output>
+  <output>Append the final content to {planning_artifacts}/ux-design-specification.md</output>
+</step>
+
+## CHECKPOINT
+
+Halt for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.
+
+## ADVISORY
+
+- Persist workflow state updates whenever this phase writes or updates a managed artifact.
+
+## REFERENCE
+
+<prose>
 ## MANDATORY EXECUTION RULES (READ FIRST):
 
 - 🛑 NEVER generate content without user input
@@ -236,3 +317,4 @@ When user selects 'C', append the content directly to the document using the str
 After user selects 'C' and content is saved to document, load `./step-13-responsive-accessibility.md` to define responsive design and accessibility strategy.
 
 Remember: Do NOT proceed to step-13 until user explicitly selects 'C' from the A/P/C menu and content is saved!
+</prose>

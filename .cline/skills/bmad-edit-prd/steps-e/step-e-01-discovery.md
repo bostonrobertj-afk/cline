@@ -3,8 +3,93 @@
 prdPurpose: '{project-root}/_bmad/bmm/workflows/2-plan-workflows/create-prd/data/prd-purpose.md'
 ---
 
-# Step E-1: Discovery & Understanding
+# Look for most recent validation report in the PRD folder
 
+## META
+
+- Goal: Understand what the user wants to edit in the PRD, detect PRD format/type, check for validation report guidance, and route appropriately.
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
+
+## EXECUTION
+
+<step n="1" goal="Load PRD Purpose Standards">
+  <action>Internalize this understanding - it will guide improvement recommendations.</action>
+  <output>Load and read the complete file at: {prdPurpose} (data/prd-purpose.md) This file defines what makes a great BMAD PRD.</output>
+</step>
+
+<step n="2" goal="Discover PRD to Edit">
+  <ask>&quot;PRD Edit Workflow Which PRD would you like to edit?</ask>
+  <ask>Please provide the path to the PRD file you want to edit.&quot; Wait for user to provide PRD path.</ask>
+</step>
+
+<step n="3" goal="Validate PRD Exists and Load">
+  <action>Check if PRD file exists at specified path</action>
+  <action>If not found: &quot;I cannot find a PRD at that path. Please check the path and try again.&quot;</action>
+  <action>If found: Load the complete PRD file including frontmatter</action>
+</step>
+
+<step n="4" goal="Check for Existing Validation Report">
+  <action>[U] Use validation report - Load it to guide and prioritize edits</action>
+  <action>[S] Skip - Proceed with manual edit discovery&quot;</action>
+  <action>Load the validation report file</action>
+  <action>Extract findings, issues, and improvement suggestions</action>
+  <action>Note: &quot;Validation report loaded - will use it to guide prioritized improvements&quot;</action>
+  <ask>Continue to step 5 without asking user</ask>
+</step>
+
+<step n="5" goal="Ask About Validation Report">
+  <action>Load the validation report</action>
+  <action>Extract findings, severity, improvement suggestions</action>
+  <action>Note: &quot;Validation report loaded - will use it to guide prioritized improvements&quot;</action>
+  <action>Note: &quot;Proceeding with manual edit discovery&quot;</action>
+  <action>Continue to step 6</action>
+</step>
+
+<step n="6" goal="Discover Edit Requirements">
+  <action>Fix specific issues (information density, implementation leakage, etc.)</action>
+  <action>Add missing sections or content</action>
+  <action>Improve structure and flow</action>
+  <action>Convert to BMAD format (if legacy PRD)</action>
+  <action>General improvements</action>
+</step>
+
+<step n="7" goal="Detect PRD Format">
+  <action>Executive Summary</action>
+  <action>Success Criteria</action>
+  <action>Product Scope</action>
+  <action>User Journeys</action>
+  <action>Functional Requirements</action>
+  <output>BMAD Standard: 5-6 core sections present</output>
+  <output>BMAD Variant: 3-4 core sections present, generally follows BMAD patterns</output>
+</step>
+
+<step n="8" goal="Route Based on Format and Context">
+  <ask>Your edit goals: {user's requirements} How would you like to proceed?&quot; Present MENU OPTIONS below for user selection</ask>
+  <output>IF validation report provided OR PRD is BMAD Standard/Variant: Display: &quot;Edit Requirements Understood PRD Format: {classification} {If validation report: &quot;Validation Guide: Yes - will use validation report findings&quot;} Edit Goals: {summary of user's requirements} Proceeding to deep review and analysis...&quot; Read fully and follow: ./step-e-02-review.md IF PRD is Legacy (Non-Standard) AND no validation report: Display: &quot;Format Detected: Legacy PRD This PRD does not follow BMAD standard structure (only {count}/6 core sections present).</output>
+</step>
+
+<step n="9" goal="Present MENU OPTIONS (Legacy PRDs Only)">
+  <action>ALWAYS halt and wait for user input</action>
+  <action>Only proceed based on user selection</action>
+  <output>IF C (Convert): Read fully and follow: ./step-e-01b-legacy-conversion.md</output>
+  <output>IF E (Edit As-Is): Display &quot;Proceeding with edits...&quot; then load next step</output>
+  <output>IF X (Exit): Display summary and exit</output>
+</step>
+
+## CHECKPOINT
+
+Halt for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.
+
+## ADVISORY
+
+- Next handoff: ./step-e-02-review.md
+- Persist workflow state updates whenever this phase writes or updates a managed artifact.
+
+## REFERENCE
+
+<prose>
 ## STEP GOAL:
 
 Understand what the user wants to edit in the PRD, detect PRD format/type, check for validation report guidance, and route appropriately.
@@ -240,3 +325,4 @@ Present MENU OPTIONS below for user selection
 - Auto-proceeding without understanding intent
 
 **Master Rule:** Understand before editing. Detect format early so we can guide users appropriately. Auto-detect and use validation reports for prioritized improvements.
+</prose>

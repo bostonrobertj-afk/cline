@@ -1,5 +1,53 @@
-# Step 5: Implementation Patterns & Consistency Rules
+# step 05 patterns
 
+## META
+
+- Goal: patterns
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
+
+## EXECUTION
+
+<step n="1" goal="Identify Potential Conflict Points">
+  <action>Database table/column naming conventions</action>
+  <action>API endpoint naming patterns</action>
+  <action>File and directory naming</action>
+  <action>Component/function/variable naming</action>
+  <action>Route parameter formats</action>
+</step>
+
+<step n="2" goal="Facilitate Pattern Decisions">
+  <action>-</action>
+</step>
+
+<step n="3" goal="Define Pattern Categories">
+  <action>Config file locations and naming</action>
+  <action>Static asset organization</action>
+  <action>Documentation placement</action>
+  <action>Environment file organization</action>
+  <action>Null handling patterns</action>
+  <ask>Table naming: users, Users, or user?</ask>
+  <ask>Column naming: user_id or userId?</ask>
+  <ask>Foreign key format: user_id or fk_user?</ask>
+</step>
+
+<step n="4" goal="Generate Patterns Content">
+  <output>Prepare the content to append to the document: #### Content Structure: ``markdown ## NEXT STEP: After user selects 'C' and content is saved to document, load ./step-06-structure.md` to define the complete project structure.</output>
+  <output>Remember: Do NOT proceed to step-06 until user explicitly selects 'C' from the A/P/C menu and content is saved!</output>
+</step>
+
+## CHECKPOINT
+
+Halt for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.
+
+## ADVISORY
+
+- Persist workflow state updates whenever this phase writes or updates a managed artifact.
+
+## REFERENCE
+
+<prose>
 ## MANDATORY EXECUTION RULES (READ FIRST):
 
 - 🛑 NEVER generate content without user input
@@ -357,3 +405,4 @@ When user selects 'C', append the content directly to the document using the str
 After user selects 'C' and content is saved to document, load `./step-06-structure.md` to define the complete project structure.
 
 Remember: Do NOT proceed to step-06 until user explicitly selects 'C' from the A/P/C menu and content is saved!
+</prose>

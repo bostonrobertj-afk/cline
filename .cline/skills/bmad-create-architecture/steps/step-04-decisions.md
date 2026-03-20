@@ -1,5 +1,72 @@
-# Step 4: Core Architectural Decisions
+# step 04 decisions
 
+## META
+
+- Goal: decisions
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
+
+## EXECUTION
+
+<step n="1" goal="Load Decision Framework &amp; Check Existing Preferences">
+  <action>Review Technical Preferences from Step 3: &quot;Based on our technical preferences discussion in step 3, let's build on those foundations: Your Technical Preferences: Starter Template Decisions: Project Context Technical Rules: &quot; Identify Remaining Decisions: Based on technical preferences, starter template choice, and project context, identify remaining critical decisions: Already Decided (Don't re-decide these): - - - Critical Decisions: Must be decided before implementation can proceed Important Decisions: Shape the architecture significantly Nice-to-Have: Can be deferred if needed</action>
+</step>
+
+<step n="2" goal="Decision Categories by Priority">
+  <action>Database choice (if not determined by starter)</action>
+  <action>Data modeling approach</action>
+  <action>Data validation strategy</action>
+  <action>Migration approach</action>
+  <action>Caching strategy</action>
+</step>
+
+<step n="3" goal="Facilitate Each Decision Category">
+  <action>If user wants more info: Provide deeper explanation</action>
+  <action>If user has preference: Discuss implications and record decision</action>
+  <action>If user wants alternatives: Explore other options</action>
+  <action>Category:</action>
+  <action>Decision:</action>
+</step>
+
+<step n="4" goal="Check for Cascading Implications">
+  <action>&quot;</action>
+</step>
+
+<step n="5" goal="Generate Decisions Content">
+  <output>After facilitating all decision categories, prepare the content to append: #### Content Structure:</output>
+</step>
+
+<step n="6" goal="Present Content and Menu">
+  <ask>Here's what I'll add to the document: [Show the complete markdown content from step 5] What would you like to do?</ask>
+  <output>Show the generated decisions content and present choices: &quot;I've documented all the core architectural decisions we've made together.</output>
+  <output>[A] Advanced Elicitation - Explore innovative approaches to any specific decisions [P] Party Mode - Review decisions from multiple perspectives [C] Continue - Save these decisions and move to implementation patterns&quot;</output>
+</step>
+
+<step n="7" goal="Handle Menu Selection">
+  <action>Invoke the bmad-advanced-elicitation skill with specific decision categories</action>
+  <action>Process enhanced insights about particular decisions</action>
+  <action>Invoke the bmad-party-mode skill with architectural decisions context</action>
+  <action>Process collaborative insights about decision trade-offs</action>
+  <action>Update frontmatter: stepsCompleted: [1, 2, 3, 4]</action>
+  <ask>Ask user: &quot;Accept these enhancements to the architectural decisions? (y/n)&quot;</ask>
+  <ask>Ask user: &quot;Accept these changes to the architectural decisions? (y/n)&quot;</ask>
+  <output>If yes: Update content, then return to A/P/C menu</output>
+  <output>If no: Keep original content, then return to A/P/C menu</output>
+  <output>Append the final content to {planning_artifacts}/architecture.md</output>
+</step>
+
+## CHECKPOINT
+
+Halt for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.
+
+## ADVISORY
+
+- Persist workflow state updates whenever this phase writes or updates a managed artifact.
+
+## REFERENCE
+
+<prose>
 ## MANDATORY EXECUTION RULES (READ FIRST):
 
 - 🛑 NEVER generate content without user input
@@ -316,3 +383,4 @@ When user selects 'C', append the content directly to the document using the str
 After user selects 'C' and content is saved to document, load `./step-05-patterns.md` to define implementation patterns that ensure consistency across AI agents.
 
 Remember: Do NOT proceed to step-05 until user explicitly selects 'C' from the A/P/C menu and content is saved!
+</prose>

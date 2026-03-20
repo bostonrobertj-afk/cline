@@ -1,5 +1,70 @@
-# Step 2: Project Understanding
+# step 02 discovery
 
+## META
+
+- Goal: discovery
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
+
+## EXECUTION
+
+<step n="1" goal="Review Loaded Context">
+  <action>Start by analyzing what we know from the loaded documents: &quot;Based on the project documentation we have loaded, let me confirm what I'm understanding about .</action>
+  <ask>From the documents: {summary of key insights from loaded PRD, briefs, and other context documents} Target Users: {summary of user information from loaded documents} Key Features/Goals: {summary of main features and goals from loaded documents} Does this match your understanding?</ask>
+  <ask>Are there any corrections or additions you'd like to make?&quot;</ask>
+</step>
+
+<step n="2" goal="Fill Context Gaps (If no documents or gaps exist)">
+  <action>(Core user action or goal)&quot;</action>
+  <ask>If no documents were loaded or key information is missing: &quot;Since we don't have complete documentation, let's start with the essentials: What are you building?</ask>
+  <ask>(Describe your product in 1-2 sentences) Who is this for?</ask>
+  <ask>(Describe your ideal user or target audience) What makes this special or different?</ask>
+</step>
+
+<step n="3" goal="Explore User Context Deeper">
+  <ask>What problem are users trying to solve?</ask>
+  <ask>What frustrates them with current solutions?</ask>
+  <ask>What would make them say 'this is exactly what I needed'?</ask>
+</step>
+
+<step n="4" goal="Identify UX Design Challenges">
+  <action>[Identify 2-3 key UX challenges based on project type and user needs]</action>
+  <action>[Note any platform-specific considerations]</action>
+  <action>[Highlight any complex user flows or interactions]</action>
+  <action>[Note any opportunities for innovative UX patterns]</action>
+  <output>[Identify 2-3 areas where great UX could create competitive advantage]</output>
+</step>
+
+<step n="5" goal="Generate Project Understanding Content">
+  <output>Prepare the content to append to the document: #### Content Structure: When saving to document, append these Level 2 and Level 3 sections:</output>
+</step>
+
+<step n="6" goal="Present Content and Menu">
+  <action>This will guide all our design decisions moving forward.</action>
+  <ask>Here's what I'll add to the document: [Show the complete markdown content from step 5] What would you like to do?</ask>
+  <output>Show the generated project understanding content and present choices: &quot;I've documented our understanding of from a UX perspective.</output>
+  <output>[C] Continue - Save this to the document and move to core experience definition&quot;</output>
+</step>
+
+<step n="7" goal="Handle Menu Selection">
+  <action>Update frontmatter: stepsCompleted: [1, 2]</action>
+  <action>Load ./step-03-core-experience.md</action>
+  <output>Append the final content to {planning_artifacts}/ux-design-specification.md</output>
+</step>
+
+## CHECKPOINT
+
+Halt for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.
+
+## ADVISORY
+
+- Next handoff: ./step-03-core-experience.md
+- Persist workflow state updates whenever this phase writes or updates a managed artifact.
+
+## REFERENCE
+
+<prose>
 ## MANDATORY EXECUTION RULES (READ FIRST):
 
 - 🛑 NEVER generate content without user input
@@ -188,3 +253,4 @@ When user selects 'C', append the content directly to the document. Only after t
 ## NEXT STEP:
 
 Remember: Do NOT proceed to step-03 until user explicitly selects 'C' from the menu and content is saved!
+</prose>

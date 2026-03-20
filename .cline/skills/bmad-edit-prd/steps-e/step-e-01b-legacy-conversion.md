@@ -4,8 +4,70 @@ prdFile: '{prd_file_path}'
 prdPurpose: '{project-root}/_bmad/bmm/workflows/2-plan-workflows/create-prd/data/prd-purpose.md'
 ---
 
-# Step E-1B: Legacy PRD Conversion Assessment
+# step e 01b legacy conversion
 
+## META
+
+- Goal: Analyze legacy PRD against BMAD standards, identify gaps, propose conversion strategy, and let user choose how to proceed.
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
+
+## EXECUTION
+
+<step n="1" goal="Attempt Sub-Process Assessment">
+  <action>Content gaps in each section</action>
+  <action>Overall conversion effort: Quick / Moderate / Substantial</action>
+  <action>Recommended approach: Full restructuring vs targeted improvements</action>
+  <action>Manually check PRD for each BMAD section</action>
+  <action>Estimate conversion effort</action>
+  <ask>Does PRD have this section? (Executive Summary, Success Criteria, Product Scope, User Journeys, Functional Requirements, Non-Functional Requirements)</ask>
+  <ask>If present: Is it complete and well-structured?</ask>
+  <ask>If missing: What content exists that could migrate to this section?</ask>
+  <output>Effort to create/complete: Minimal / Moderate / Significant</output>
+  <output>Core sections present: {count}/6</output>
+  <output>Note what's present and what's missing</output>
+</step>
+
+<step n="2" goal="Build Gap Analysis">
+  <action>Gap: [what's missing or incomplete]</action>
+  <action>Effort to Complete: [Minimal/Moderate/Significant]</action>
+  <action>Total Conversion Effort: [Quick/Moderate/Substantial]</action>
+  <action>Recommended: [Full restructuring / Targeted improvements]</action>
+  <output>Present: [Yes/No/Partial]</output>
+  <output>Sections Present: {count}/6</output>
+</step>
+
+<step n="3" goal="Present Conversion Assessment">
+  <output>Core sections present: {count}/6</output>
+</step>
+
+<step n="4" goal="Present MENU OPTIONS">
+  <action>ALWAYS halt and wait for user input</action>
+  <action>Only proceed based on user selection</action>
+  <action>IF R (Restructure): Note conversion mode, then load next step</action>
+  <action>IF I (Targeted): Note targeted mode, then load next step</action>
+  <action>IF E (Edit &amp; Restructure): Note both mode, then load next step</action>
+  <output>IF X (Exit): Display summary, exit</output>
+</step>
+
+<step n="5" goal="Document Conversion Strategy">
+  <action>Conversion mode: [Full restructuring / Targeted improvements / Both]</action>
+  <action>Edit requirements: [user's requirements from step e-01]</action>
+  <action>Gap analysis: [summary of gaps identified]</action>
+</step>
+
+## CHECKPOINT
+
+Halt for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.
+
+## ADVISORY
+
+- Next handoff: ./step-e-02-review.md
+
+## REFERENCE
+
+<prose>
 ## STEP GOAL:
 
 Analyze legacy PRD against BMAD standards, identify gaps, propose conversion strategy, and let user choose how to proceed.
@@ -202,3 +264,4 @@ Read fully and follow: `./step-e-02-review.md`
 - Not documenting conversion strategy
 
 **Master Rule:** Legacy PRDs need conversion assessment so users understand the work involved and can choose the best approach.
+</prose>

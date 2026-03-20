@@ -4,8 +4,94 @@ description: Lossless LLM-optimized compression of source documents. Use when th
 argument-hint: "[to create provide input paths] [--validate distillate-path to confirm distillate is lossless and optimized]"
 ---
 
-# Distillator: A Document Distillation Engine
+# SKILL
 
+## META
+
+- Goal: SKILL
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
+
+## EXECUTION
+
+<step n="1" goal="Validate inputs">
+  <action>Validate inputs. The caller must provide:</action>
+  <action>source_documents (required) — One or more file paths, folder paths, or glob patterns to distill</action>
+  <action>downstream_consumer (optional) — What workflow/agent consumes this distillate (e.g., &quot;PRD creation&quot;, &quot;architecture design&quot;). When provided, use it to judge signal vs noise. When omitted, preserve everything.</action>
+  <action>token_budget (optional) — Approximate target size. When provided and the distillate would exceed it, trigger semantic splitting.</action>
+  <output>output_path (optional) — Where to save. When omitted, save adjacent to the primary source document with -distillate.md suffix.</output>
+  <output>--validate (flag) — Run round-trip reconstruction test after producing the distillate.</output>
+</step>
+
+<step n="2" goal="Route — proceed to Stage 1">
+  <action>Route — proceed to Stage 1.</action>
+</step>
+
+<step n="3" goal="Spawn one compressor subagent per group from the analysis output">
+  <action>Spawn one compressor subagent per group from the analysis output. Each compressor receives only its group's file paths and produces an intermediate distillate.</action>
+  <action>Each compressor receives only its group's file paths and produces an intermediate distillate.</action>
+</step>
+
+<step n="4" goal="After all compressors return, spawn one final merge compressor subagent using agents/distillate-compressor">
+  <action>After all compressors return, spawn one final merge compressor subagent using agents/distillate-compressor.md. Pass it the intermediate distillate contents as its input (not the original files). Its job is cross-group deduplication, thematic regrouping, and final compression.</action>
+  <action>Pass it the intermediate distillate contents as its input (not the original files).</action>
+  <action>Its job is cross-group deduplication, thematic regrouping, and final compression.</action>
+</step>
+
+<step n="5" goal="Clean up intermediate distillate content (it exists only in memory, not saved to disk)">
+  <action>Clean up intermediate distillate content (it exists only in memory, not saved to disk).</action>
+  <action>Graceful degradation: If subagent spawning is unavailable, read the source documents and perform the compression work directly using the same instructions from agents/distillate-compressor.md.</action>
+  <action>For fan-out, process groups sequentially then merge.</action>
+  <output>The compressor returns a structured JSON result containing the distillate content, source headings, named entities, and token estimate.</output>
+</step>
+
+<step n="6" goal="Completeness check">
+  <action>Completeness check. Using the headings and named entities list returned by the compressor, verify each appears in the distillate content. If gaps are found, send them back to the compressor for a targeted fix pass — not a full recompression. Limit to 2 fix passes maximum.</action>
+  <action>If gaps are found, send them back to the compressor for a targeted fix pass — not a full recompression.</action>
+  <action>Limit to 2 fix passes maximum.</action>
+  <output>Using the headings and named entities list returned by the compressor, verify each appears in the distillate content.</output>
+</step>
+
+<step n="7" goal="Format check">
+  <action>Format check. Verify the output follows distillate format rules:</action>
+  <action>No prose paragraphs (only bullets)</action>
+  <action>No decorative formatting</action>
+  <action>No repeated information</action>
+  <action>Each bullet is self-contained</action>
+</step>
+
+<step n="8" goal="Determine output format">
+  <action>Determine output format. Using the split prediction from Stage 1 and actual distillate size:</action>
+  <action>&quot;{relative path to source file 1}&quot;</action>
+  <action>&quot;{relative path to source file 2}&quot;</action>
+  <action>Frontmatter with sources (relative paths from the distillate folder to the originals)</action>
+  <action>3-5 bullet orientation (what was distilled, from what)</action>
+</step>
+
+<step n="9" goal="Measure distillate">
+  <action>Measure distillate. Run scripts/analyze_sources.py on the final distillate file(s) to get accurate token counts for the output. Use the total_estimated_tokens from this analysis as distillate_total_tokens.</action>
+  <action>Run scripts/analyze_sources.py on the final distillate file(s) to get accurate token counts for the output.</action>
+  <action>Use the total_estimated_tokens from this analysis as distillate_total_tokens.</action>
+</step>
+
+<step n="10" goal="Report results">
+  <action>Report results. Always return structured JSON output:</action>
+  <action>The compression_ratio is source_total_tokens / distillate_total_tokens formatted as &quot;X:1&quot; (e.g., &quot;3.2:1&quot;).</action>
+  <output>Always return structured JSON output: Where source_total_tokens is from the Stage 1 analysis and distillate_total_tokens is from step 4.</output>
+</step>
+
+## CHECKPOINT
+
+Complete the current required actions in order before moving to the next workflow phase.
+
+## ADVISORY
+
+- Persist workflow state updates whenever this phase writes or updates a managed artifact.
+
+## REFERENCE
+
+<prose>
 ## Overview
 
 This skill produces hyper-compressed, token-efficient documents (distillates) from any set of source documents. A distillate preserves every fact, decision, constraint, and relationship from the sources while stripping all overhead that humans need and LLMs don't. Act as an information extraction and compression specialist. The output is a single dense document (or semantically-split set) that a downstream LLM workflow can consume as sole context input without information loss.
@@ -176,3 +262,4 @@ This stage proves the distillate is lossless by reconstructing source documents 
 5. **If gaps are found**, offer to run a targeted fix pass on the distillate — adding the missing information without full recompression. Limit to 2 fix passes maximum.
 
 6. **Clean up** — delete the temporary reconstruction files after the report is generated.
+</prose>

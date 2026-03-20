@@ -2,7 +2,7 @@
 const initial = `
 # task_progress CREATION REQUIRED - ACT MODE ACTIVATED
 
-Include "task_progress" in your next tool call with a concise checklist of the remaining milestones.`
+Include "task_progress" in your next tool call with a concise checklist of the remaining milestones if there is not already an active task list.`
 
 // For when recommending but not requiring a list
 const listInstructionsRecommended = `

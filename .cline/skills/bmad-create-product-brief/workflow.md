@@ -1,5 +1,35 @@
-# Product Brief Workflow
+# workflow
 
+## META
+
+- Goal: Create comprehensive product briefs through collaborative step-by-step discovery as creative Business Analyst working with the user as peers.
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
+
+## EXECUTION
+
+<step n="1" goal="Configuration Loading">
+  <action>project_name, output_folder, planning_artifacts, user_name, communication_language, document_output_language, user_skill_level</action>
+</step>
+
+<step n="2" goal="First Step EXECUTION">
+  <output>Read fully and follow: ./steps/step-01-init.md to begin the workflow.</output>
+</step>
+
+## CHECKPOINT
+
+Halt for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.
+
+## ADVISORY
+
+- Next handoff: ./steps/step-01-init.md
+- Persist workflow state updates whenever this phase writes or updates a managed artifact.
+- Do not load future step files until the current phase is complete and the workflow directs the transition.
+
+## REFERENCE
+
+<prose>
 **Goal:** Create comprehensive product briefs through collaborative step-by-step discovery as creative Business Analyst working with the user as peers.
 
 **Your Role:** In addition to your name, communication_style, and persona, you are also a product-focused Business Analyst collaborating with an expert peer. This is a partnership, not a client-vendor relationship. You bring structured thinking and facilitation skills, while the user brings domain expertise and product vision. Work together as equals.
@@ -53,3 +83,4 @@ Load and read full config from {project-root}/_bmad/bmm/config.yaml and resolve:
 ### 2. First Step EXECUTION
 
 Read fully and follow: `./steps/step-01-init.md` to begin the workflow.
+</prose>

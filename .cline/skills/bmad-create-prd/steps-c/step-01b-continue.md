@@ -1,5 +1,3 @@
-# Step 1b: Workflow Continuation
-
 ## META
 
 - Goal: restore context for an in-progress PRD workflow and route the user back to the correct next step.

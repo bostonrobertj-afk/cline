@@ -1,5 +1,60 @@
-# Step 1B: UX Design Workflow Continuation
+# step 01b continue
 
+## META
+
+- Goal: continue
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
+
+## EXECUTION
+
+<step n="1" goal="Analyze Current State">
+  <action>lastStep: The most recently completed step number</action>
+  <action>inputDocuments: What context was already loaded</action>
+  <action>All other frontmatter variables</action>
+  <ask>stepsCompleted: Which steps are already done</ask>
+</step>
+
+<step n="2" goal="Load All Input Documents">
+  <action>For each document in inputDocuments, load the complete file</action>
+  <action>This ensures you have full context for continuation</action>
+  <action>Don't discover new documents - only reload what was previously processed</action>
+</step>
+
+<step n="3" goal="Summarize Current Progress">
+  <action>Steps completed: {stepsCompleted}</action>
+  <action>Last worked on: Step {lastStep}</action>
+  <action>Context documents available: {len(inputDocuments)} files</action>
+  <action>Current UX design specification is ready with all completed sections</action>
+  <action>Current UX design document is ready with all completed sections</action>
+</step>
+
+<step n="4" goal="Determine Next Step">
+  <action>If lastStep = 1 → Load ./step-02-discovery.md</action>
+  <action>If lastStep = 2 → Load ./step-03-core-experience.md</action>
+  <action>If lastStep = 3 → Load ./step-04-emotional-response.md</action>
+  <action>Continue this pattern for all steps</action>
+  <action>If lastStep indicates final step → Workflow already complete</action>
+</step>
+
+<step n="5" goal="Present Continuation Options">
+  <action>Review the completed UX design specification with you</action>
+  <action>Suggest next workflow steps (like wireframe generation or architecture)</action>
+  <action>Start a new UX design revision</action>
+</step>
+
+## CHECKPOINT
+
+Halt for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.
+
+## ADVISORY
+
+- Persist workflow state updates whenever this phase writes or updates a managed artifact.
+
+## REFERENCE
+
+<prose>
 ## MANDATORY EXECUTION RULES (READ FIRST):
 
 - 🛑 NEVER generate content without user input
@@ -125,3 +180,4 @@ What would be most helpful?"
 After user confirms they're ready to continue, load the appropriate next step file based on the `lastStep` value from frontmatter.
 
 Remember: Do NOT load the next step until user explicitly selects [C] to continue!
+</prose>

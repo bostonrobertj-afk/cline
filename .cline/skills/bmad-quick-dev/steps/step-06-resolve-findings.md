@@ -7,6 +7,71 @@
 
 ---
 
+# step 06 resolve findings
+
+## META
+
+- Goal: resolve findings
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
+
+## EXECUTION
+
+<step n="1" goal="Present the finding with context">
+  <action>Present the finding with context</action>
+</step>
+
+<step n="2" goal="Ask: fix now / skip / discuss">
+  <ask>Ask: fix now / skip / discuss</ask>
+</step>
+
+<step n="3" goal="If fix: Apply the fix immediately">
+  <action>If fix: Apply the fix immediately</action>
+</step>
+
+<step n="4" goal="If skip: Note as acknowledged, continue">
+  <action>If skip: Note as acknowledged, continue</action>
+</step>
+
+<step n="5" goal="If discuss: Provide more context, re-ask">
+  <ask>If discuss: Provide more context, re-ask</ask>
+</step>
+
+<step n="6" goal="Move to next finding">
+  <action>Move to next finding</action>
+  <action>---</action>
+</step>
+
+<step n="7" goal="Filter findings to only those classified as &quot;real&quot;">
+  <action>Filter findings to only those classified as &quot;real&quot;</action>
+</step>
+
+<step n="8" goal="Apply fixes for each real finding">
+  <action>Apply fixes for each real finding</action>
+</step>
+
+<step n="9" goal="Report what was fixed:">
+  <action>Report what was fixed:</action>
+  <action>F1: {description of fix}</action>
+  <action>F3: {description of fix}</action>
+</step>
+
+<step n="10" goal="Acknowledge all findings were reviewed">
+  <action>Acknowledge all findings were reviewed</action>
+</step>
+
+## CHECKPOINT
+
+Halt for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.
+
+## ADVISORY
+
+- Use the prose block below for the full agent-facing guidance that complements the structured execution steps.
+
+## REFERENCE
+
+<prose>
 ## AVAILABLE STATE
 
 From previous steps:
@@ -142,3 +207,4 @@ User can:
 - Not updating tech-spec after resolution (Mode A)
 - No completion summary
 - Leaving user unclear on next steps
+</prose>

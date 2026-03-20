@@ -1,5 +1,3 @@
-# Step 12: Workflow Completion
-
 ## META
 
 - Goal: finalize the PRD workflow, update status tracking, and guide the user to next steps.

@@ -5,8 +5,140 @@ standalone: true
 main_config: '{project-root}/_bmad/cis/config.yaml'
 ---
 
-# Design Thinking Workflow
+# workflow
 
+## META
+
+- Goal: Guide human-centered design through empathy, definition, ideation, prototyping, and testing.
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
+
+## EXECUTION
+
+<step n="1" goal="Gather context and define design challenge">
+  <action>Load any context data provided via the data attribute.</action>
+  <action>Create a clear design challenge statement.</action>
+  <ask>Ask the user about their design challenge:</ask>
+  <ask>What problem or opportunity are you exploring?</ask>
+  <ask>Who are the primary users or stakeholders?</ask>
+  <ask>What constraints exist (time, budget, technology)?</ask>
+  <ask>What does success look like for this project?</ask>
+  <ask>What existing research or context should we consider?</ask>
+  <template-output>design_challenge</template-output>
+  <template-output>challenge_statement</template-output>
+</step>
+
+<step n="2" goal="EMPATHIZE - Build understanding of users">
+  <action>Review empathy methods from {design_methods_file} for the empathize phase and select 3-5 methods that fit the design challenge context. Consider:</action>
+  <action>Available resources and access to users</action>
+  <action>Time constraints</action>
+  <action>Type of product or service being designed</action>
+  <action>Depth of understanding needed</action>
+  <action>Help gather and synthesize user insights:</action>
+  <ask>Offer the selected methods with guidance on when each works best, then ask which methods the user has used or can use, or make a recommendation based on the specific challenge.</ask>
+  <ask>What did users say, think, do, and feel?</ask>
+  <ask>What pain points emerged?</ask>
+  <ask>What surprised you?</ask>
+  <ask>What patterns do you see?</ask>
+  <output>Guide the user through empathy-building activities. Explain in your own voice why deep empathy with users is essential before jumping to solutions.</output>
+  <template-output>user_insights</template-output>
+  <template-output>key_observations</template-output>
+  <template-output>empathy_map</template-output>
+</step>
+
+<step n="3" goal="DEFINE - Frame the problem clearly">
+  <action>Transform observations into actionable problem statements.</action>
+  <action>Create a Point of View statement: &quot;[User type] needs [need] because [insight]&quot;</action>
+  <action>Generate &quot;How Might We&quot; questions that open solution space</action>
+  <action>Identify key insights and opportunity areas</action>
+  <ask>Ask probing questions:</ask>
+  <ask>What's the real problem we're solving?</ask>
+  <ask>Why does this matter to users?</ask>
+  <ask>What would success look like for them?</ask>
+  <ask>What assumptions are we making?</ask>
+  <output>Guide the user through problem framing:</output>
+  <template-output>pov_statement</template-output>
+  <template-output>hmw_questions</template-output>
+  <template-output>problem_insights</template-output>
+</step>
+
+<step n="4" goal="IDEATE - Generate diverse solutions">
+  <action>Review ideation methods from {design_methods_file} for the ideate phase and select 3-5 methods that fit the context. Consider:</action>
+  <action>Group versus individual ideation</action>
+  <action>Time available</action>
+  <action>Problem complexity</action>
+  <action>Team creativity comfort level</action>
+  <action>Walk through the chosen method or methods:</action>
+  <ask>Which ideas excite you most?</ask>
+  <ask>Which ideas address the core user need?</ask>
+  <ask>Which ideas are feasible given the constraints?</ask>
+  <output>Facilitate creative solution generation. Explain in your own voice the importance of divergent thinking and deferring judgment during ideation.</output>
+  <output>Offer the selected methods with brief descriptions of when each works best.</output>
+  <template-output>ideation_methods</template-output>
+  <template-output>generated_ideas</template-output>
+  <template-output>top_concepts</template-output>
+</step>
+
+<step n="5" goal="PROTOTYPE - Make ideas tangible">
+  <action>Review prototyping methods from {design_methods_file} for the prototype phase and select 2-4 methods that fit the solution type. Consider:</action>
+  <action>Physical versus digital product</action>
+  <action>Service versus product</action>
+  <action>Available materials and tools</action>
+  <action>Help define the prototype:</action>
+  <ask>What needs to be tested</ask>
+  <ask>What's the minimum needed to test your assumptions?</ask>
+  <ask>What are you trying to learn?</ask>
+  <ask>What should users be able to do?</ask>
+  <ask>What can you fake versus build?</ask>
+  <output>Guide creation of low-fidelity prototypes for testing. Explain in your own voice why rough and quick prototypes are better than polished ones at this stage.</output>
+  <output>Offer the selected methods with guidance on fit.</output>
+  <template-output>prototype_approach</template-output>
+  <template-output>prototype_description</template-output>
+  <template-output>features_to_test</template-output>
+</step>
+
+<step n="6" goal="TEST - Validate with users">
+  <action>Help plan testing:</action>
+  <action>Guide feedback collection:</action>
+  <action>Synthesize learnings:</action>
+  <ask>Design the validation approach and capture learnings. Explain in your own voice why observing what users do matters more than what they say.</ask>
+  <ask>Who will you test with? Aim for 5-7 users.</ask>
+  <ask>What tasks will they attempt?</ask>
+  <ask>What questions will you ask?</ask>
+  <ask>How will you capture feedback?</ask>
+  <ask>What worked well?</ask>
+  <template-output>testing_plan</template-output>
+  <template-output>user_feedback</template-output>
+  <template-output>key_learnings</template-output>
+</step>
+
+<step n="7" goal="Plan next iteration">
+  <action>Define clear next steps and success criteria.</action>
+  <action>Based on testing insights:</action>
+  <action>Determine the next cycle:</action>
+  <ask>What refinements are needed?</ask>
+  <ask>What's the priority action?</ask>
+  <ask>Who needs to be involved?</ask>
+  <ask>What sequence makes sense?</ask>
+  <ask>How will you measure success?</ask>
+  <ask>Do you need more empathy work?</ask>
+  <template-output>refinements</template-output>
+  <template-output>action_items</template-output>
+  <template-output>success_metrics</template-output>
+</step>
+
+## CHECKPOINT
+
+Halt for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.
+
+## ADVISORY
+
+- Use the prose block below for the full agent-facing guidance that complements the structured execution steps.
+
+## REFERENCE
+
+<prose>
 **Goal:** Guide human-centered design through empathy, definition, ideation, prototyping, and testing.
 
 **Your Role:** You are a human-centered design facilitator. Keep users at the center, defer judgment during ideation, prototype quickly, and never give time estimates.
@@ -58,185 +190,116 @@ Load config from `{main_config}` and resolve:
 <workflow>
 
 <step n="1" goal="Gather context and define design challenge">
-Ask the user about their design challenge:
-
-- What problem or opportunity are you exploring?
-- Who are the primary users or stakeholders?
-- What constraints exist (time, budget, technology)?
-- What does success look like for this project?
-- What existing research or context should we consider?
-
-Load any context data provided via the data attribute.
-
-Create a clear design challenge statement.
-
-<template-output>design_challenge</template-output>
-<template-output>challenge_statement</template-output>
+  <action>Load any context data provided via the data attribute.</action>
+  <action>Create a clear design challenge statement.</action>
+  <ask>Ask the user about their design challenge:</ask>
+  <ask>What problem or opportunity are you exploring?</ask>
+  <ask>Who are the primary users or stakeholders?</ask>
+  <ask>What constraints exist (time, budget, technology)?</ask>
+  <ask>What does success look like for this project?</ask>
+  <ask>What existing research or context should we consider?</ask>
+  <template-output>design_challenge</template-output>
+  <template-output>challenge_statement</template-output>
 </step>
 
 <step n="2" goal="EMPATHIZE - Build understanding of users">
-Guide the user through empathy-building activities. Explain in your own voice why deep empathy with users is essential before jumping to solutions.
-
-Review empathy methods from `{design_methods_file}` for the `empathize` phase and select 3-5 methods that fit the design challenge context. Consider:
-
-- Available resources and access to users
-- Time constraints
-- Type of product or service being designed
-- Depth of understanding needed
-
-Offer the selected methods with guidance on when each works best, then ask which methods the user has used or can use, or make a recommendation based on the specific challenge.
-
-Help gather and synthesize user insights:
-
-- What did users say, think, do, and feel?
-- What pain points emerged?
-- What surprised you?
-- What patterns do you see?
-
-<template-output>user_insights</template-output>
-<template-output>key_observations</template-output>
-<template-output>empathy_map</template-output>
+  <action>Review empathy methods from {design_methods_file} for the empathize phase and select 3-5 methods that fit the design challenge context. Consider:</action>
+  <action>Available resources and access to users</action>
+  <action>Time constraints</action>
+  <action>Type of product or service being designed</action>
+  <action>Depth of understanding needed</action>
+  <action>Help gather and synthesize user insights:</action>
+  <ask>Offer the selected methods with guidance on when each works best, then ask which methods the user has used or can use, or make a recommendation based on the specific challenge.</ask>
+  <ask>What did users say, think, do, and feel?</ask>
+  <ask>What pain points emerged?</ask>
+  <ask>What surprised you?</ask>
+  <ask>What patterns do you see?</ask>
+  <output>Guide the user through empathy-building activities. Explain in your own voice why deep empathy with users is essential before jumping to solutions.</output>
+  <template-output>user_insights</template-output>
+  <template-output>key_observations</template-output>
+  <template-output>empathy_map</template-output>
 </step>
 
 <step n="3" goal="DEFINE - Frame the problem clearly">
-<energy-checkpoint>
-Check in: "We've gathered rich user insights. How are you feeling? Ready to synthesize them into problem statements?"
-</energy-checkpoint>
-
-Transform observations into actionable problem statements.
-
-Guide the user through problem framing:
-
-1. Create a Point of View statement: "[User type] needs [need] because [insight]"
-2. Generate "How Might We" questions that open solution space
-3. Identify key insights and opportunity areas
-
-Ask probing questions:
-
-- What's the real problem we're solving?
-- Why does this matter to users?
-- What would success look like for them?
-- What assumptions are we making?
-
-<template-output>pov_statement</template-output>
-<template-output>hmw_questions</template-output>
-<template-output>problem_insights</template-output>
+  <action>Transform observations into actionable problem statements.</action>
+  <action>Create a Point of View statement: &quot;[User type] needs [need] because [insight]&quot;</action>
+  <action>Generate &quot;How Might We&quot; questions that open solution space</action>
+  <action>Identify key insights and opportunity areas</action>
+  <ask>Ask probing questions:</ask>
+  <ask>What's the real problem we're solving?</ask>
+  <ask>Why does this matter to users?</ask>
+  <ask>What would success look like for them?</ask>
+  <ask>What assumptions are we making?</ask>
+  <output>Guide the user through problem framing:</output>
+  <template-output>pov_statement</template-output>
+  <template-output>hmw_questions</template-output>
+  <template-output>problem_insights</template-output>
 </step>
 
 <step n="4" goal="IDEATE - Generate diverse solutions">
-Facilitate creative solution generation. Explain in your own voice the importance of divergent thinking and deferring judgment during ideation.
-
-Review ideation methods from `{design_methods_file}` for the `ideate` phase and select 3-5 methods that fit the context. Consider:
-
-- Group versus individual ideation
-- Time available
-- Problem complexity
-- Team creativity comfort level
-
-Offer the selected methods with brief descriptions of when each works best.
-
-Walk through the chosen method or methods:
-
-- Generate at least 15-30 ideas
-- Build on others' ideas
-- Go for wild and practical
-- Defer judgment
-
-Help cluster and select top concepts:
-
-- Which ideas excite you most?
-- Which ideas address the core user need?
-- Which ideas are feasible given the constraints?
-- Select 2-3 ideas to prototype
-
-<template-output>ideation_methods</template-output>
-<template-output>generated_ideas</template-output>
-<template-output>top_concepts</template-output>
+  <action>Review ideation methods from {design_methods_file} for the ideate phase and select 3-5 methods that fit the context. Consider:</action>
+  <action>Group versus individual ideation</action>
+  <action>Time available</action>
+  <action>Problem complexity</action>
+  <action>Team creativity comfort level</action>
+  <action>Walk through the chosen method or methods:</action>
+  <ask>Which ideas excite you most?</ask>
+  <ask>Which ideas address the core user need?</ask>
+  <ask>Which ideas are feasible given the constraints?</ask>
+  <output>Facilitate creative solution generation. Explain in your own voice the importance of divergent thinking and deferring judgment during ideation.</output>
+  <output>Offer the selected methods with brief descriptions of when each works best.</output>
+  <template-output>ideation_methods</template-output>
+  <template-output>generated_ideas</template-output>
+  <template-output>top_concepts</template-output>
 </step>
 
 <step n="5" goal="PROTOTYPE - Make ideas tangible">
-<energy-checkpoint>
-Check in: "We've generated lots of ideas. How is your energy for making some of them tangible through prototyping?"
-</energy-checkpoint>
-
-Guide creation of low-fidelity prototypes for testing. Explain in your own voice why rough and quick prototypes are better than polished ones at this stage.
-
-Review prototyping methods from `{design_methods_file}` for the `prototype` phase and select 2-4 methods that fit the solution type. Consider:
-
-- Physical versus digital product
-- Service versus product
-- Available materials and tools
-- What needs to be tested
-
-Offer the selected methods with guidance on fit.
-
-Help define the prototype:
-
-- What's the minimum needed to test your assumptions?
-- What are you trying to learn?
-- What should users be able to do?
-- What can you fake versus build?
-
-<template-output>prototype_approach</template-output>
-<template-output>prototype_description</template-output>
-<template-output>features_to_test</template-output>
+  <action>Review prototyping methods from {design_methods_file} for the prototype phase and select 2-4 methods that fit the solution type. Consider:</action>
+  <action>Physical versus digital product</action>
+  <action>Service versus product</action>
+  <action>Available materials and tools</action>
+  <action>Help define the prototype:</action>
+  <ask>What needs to be tested</ask>
+  <ask>What's the minimum needed to test your assumptions?</ask>
+  <ask>What are you trying to learn?</ask>
+  <ask>What should users be able to do?</ask>
+  <ask>What can you fake versus build?</ask>
+  <output>Guide creation of low-fidelity prototypes for testing. Explain in your own voice why rough and quick prototypes are better than polished ones at this stage.</output>
+  <output>Offer the selected methods with guidance on fit.</output>
+  <template-output>prototype_approach</template-output>
+  <template-output>prototype_description</template-output>
+  <template-output>features_to_test</template-output>
 </step>
 
 <step n="6" goal="TEST - Validate with users">
-Design the validation approach and capture learnings. Explain in your own voice why observing what users do matters more than what they say.
-
-Help plan testing:
-
-- Who will you test with? Aim for 5-7 users.
-- What tasks will they attempt?
-- What questions will you ask?
-- How will you capture feedback?
-
-Guide feedback collection:
-
-- What worked well?
-- Where did they struggle?
-- What surprised them, and you?
-- What questions arose?
-- What would they change?
-
-Synthesize learnings:
-
-- What assumptions were validated or invalidated?
-- What needs to change?
-- What should stay?
-- What new insights emerged?
-
-<template-output>testing_plan</template-output>
-<template-output>user_feedback</template-output>
-<template-output>key_learnings</template-output>
+  <action>Help plan testing:</action>
+  <action>Guide feedback collection:</action>
+  <action>Synthesize learnings:</action>
+  <ask>Design the validation approach and capture learnings. Explain in your own voice why observing what users do matters more than what they say.</ask>
+  <ask>Who will you test with? Aim for 5-7 users.</ask>
+  <ask>What tasks will they attempt?</ask>
+  <ask>What questions will you ask?</ask>
+  <ask>How will you capture feedback?</ask>
+  <ask>What worked well?</ask>
+  <template-output>testing_plan</template-output>
+  <template-output>user_feedback</template-output>
+  <template-output>key_learnings</template-output>
 </step>
 
 <step n="7" goal="Plan next iteration">
-<energy-checkpoint>
-Check in: "Great work. How is your energy for final planning and defining next steps?"
-</energy-checkpoint>
-
-Define clear next steps and success criteria.
-
-Based on testing insights:
-
-- What refinements are needed?
-- What's the priority action?
-- Who needs to be involved?
-- What sequence makes sense?
-- How will you measure success?
-
-Determine the next cycle:
-
-- Do you need more empathy work?
-- Should you reframe the problem?
-- Are you ready to refine the prototype?
-- Is it time to pilot with real users?
-
-<template-output>refinements</template-output>
-<template-output>action_items</template-output>
-<template-output>success_metrics</template-output>
+  <action>Define clear next steps and success criteria.</action>
+  <action>Based on testing insights:</action>
+  <action>Determine the next cycle:</action>
+  <ask>What refinements are needed?</ask>
+  <ask>What's the priority action?</ask>
+  <ask>Who needs to be involved?</ask>
+  <ask>What sequence makes sense?</ask>
+  <ask>How will you measure success?</ask>
+  <ask>Do you need more empathy work?</ask>
+  <template-output>refinements</template-output>
+  <template-output>action_items</template-output>
+  <template-output>success_metrics</template-output>
 </step>
 
 </workflow>
+</prose>

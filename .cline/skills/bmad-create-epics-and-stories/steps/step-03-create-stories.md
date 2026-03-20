@@ -1,5 +1,88 @@
-# Step 3: Generate Epics and Stories
+# step 03 create stories
 
+## META
+
+- Goal: To generate all epics with their stories based on the approved epics_list, following the template structure exactly.
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
+
+## EXECUTION
+
+<step n="1" goal="Load Approved Epic Structure">
+  <action>Approved epics_list from Step 2</action>
+  <action>FR coverage map</action>
+  <action>Template structure at the end of the document</action>
+  <output>All requirements (FRs, NFRs, additional, UX Design requirements if present)</output>
+</step>
+
+<step n="2" goal="Explain Story Creation Approach">
+  <action>Follow the exact template structure</action>
+  <action>Are sized for single dev agent completion</action>
+  <action>Have clear user value</action>
+  <action>Include specific acceptance criteria</action>
+  <action>Reference requirements being fulfilled</action>
+  <output>❌ WRONG: Epic 1 Story 1 creates all 50 database tables</output>
+  <output>✅ RIGHT: Each story creates/alters ONLY the tables it needs</output>
+  <output>Story 2.1: Create New Blog Post</output>
+</step>
+
+<step n="3" goal="Process Epics Sequentially">
+  <action>Story Title: Clear, action-oriented</action>
+  <action>User Story: Complete the As a/I want/So that format</action>
+  <action>Epic number and title</action>
+  <action>Epic goal statement</action>
+  <action>FRs covered by this epic</action>
+  <ask>Ask: &quot;Does this story capture the requirement correctly?&quot;</ask>
+  <ask>&quot;Is the scope appropriate for a single dev session?&quot;</ask>
+  <ask>&quot;Are the acceptance criteria complete and testable?&quot;</ask>
+  <output>Acceptance Criteria: Write specific, testable criteria</output>
+  <output>Present the story to user</output>
+  <output>Append it to {planning_artifacts}/epics.md following template structure</output>
+</step>
+
+<step n="4" goal="Epic Completion">
+  <action>Verify all FRs for the epic are covered</action>
+  <action>Get user confirmation to proceed to next epic</action>
+  <output>Display epic summary</output>
+  <output>Show count of stories created</output>
+</step>
+
+<step n="5" goal="Repeat for All Epics">
+  <action>Continue the process for each epic in the approved list, processing them in order (Epic 1, Epic 2, etc.).</action>
+</step>
+
+<step n="6" goal="Final Document Completion">
+  <action>Overview section with project name</action>
+  <action>Requirements Inventory with all three subsections populated</action>
+  <action>Epic List with approved epic structure</action>
+  <action>Epic sections for each epic (N = 1, 2, 3...)</action>
+  <action>Verify the document follows template structure exactly</action>
+  <output>FR Coverage Map showing requirement to epic mapping</output>
+</step>
+
+<step n="7" goal="Present FINAL MENU OPTIONS">
+  <action>IF A: Invoke the bmad-advanced-elicitation skill</action>
+  <action>IF P: Invoke the bmad-party-mode skill</action>
+  <action>ONLY proceed to next step when user selects 'C'</action>
+  <ask>User can chat or ask questions - always respond and then end with display again of the menu options</ask>
+  <output>IF C: Save content to {planning_artifacts}/epics.md, update frontmatter, then read fully and follow: ./step-04-final-validation.md</output>
+  <output>IF Any other comments or queries: help user respond then Redisplay Menu Options</output>
+  <output>ALWAYS halt and wait for user input after presenting menu</output>
+</step>
+
+## CHECKPOINT
+
+Halt for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.
+
+## ADVISORY
+
+- Next handoff: ./step-04-final-validation.md
+- Persist workflow state updates whenever this phase writes or updates a managed artifact.
+
+## REFERENCE
+
+<prose>
 ## STEP GOAL:
 
 To generate all epics with their stories based on the approved epics_list, following the template structure exactly.
@@ -253,3 +336,4 @@ ONLY WHEN [C continue option] is selected and [all epics and stories saved to do
 - Not following proper formatting
 
 **Master Rule:** Skipping steps, optimizing sequences, or not following exact instructions is FORBIDDEN and constitutes SYSTEM FAILURE.
+</prose>

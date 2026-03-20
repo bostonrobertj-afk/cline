@@ -2,8 +2,63 @@
 outputFile: '{planning_artifacts}/implementation-readiness-report-{{date}}.md'
 ---
 
-# Step 6: Final Assessment
+# step 06 final assessment
 
+## META
+
+- Goal: To provide a comprehensive summary of all findings and give the report a final polish, ensuring clear recommendations and overall readiness status.
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
+
+## EXECUTION
+
+<step n="1" goal="Initialize Final Assessment">
+  <action>Review all findings from previous steps</action>
+  <action>Provide a comprehensive summary</action>
+  <action>Add specific recommendations</action>
+  <action>Determine overall readiness status&quot;</action>
+</step>
+
+<step n="2" goal="Review Previous Findings">
+  <action>File and FR Validation findings</action>
+  <action>UX Alignment issues</action>
+  <action>Epic Quality violations</action>
+</step>
+
+<step n="3" goal="Add Final Assessment Section">
+  <action>[Specific action item 1]</action>
+  <action>[Specific action item 2]</action>
+  <action>[Specific action item 3]</action>
+</step>
+
+<step n="4" goal="Complete the Report">
+  <action>Ensure all findings are clearly documented</action>
+  <action>Verify recommendations are actionable</action>
+  <action>Add date and assessor information</action>
+  <output>Save the final report</output>
+</step>
+
+<step n="5" goal="Present Completion">
+  <action>Review the detailed report for specific findings and recommendations.&quot; ## WORKFLOW COMPLETE The implementation readiness workflow is now complete.</action>
+  <action>The report contains all findings and recommendations for the user to consider.</action>
+  <action>Implementation Readiness complete.</action>
+  <action>Invoke the bmad-help skill.</action>
+  <action>---</action>
+  <output>Display: &quot;Implementation Readiness Assessment Complete Report generated: {outputFile} The assessment found [number] issues requiring attention.</output>
+</step>
+
+## CHECKPOINT
+
+Complete the current required actions in order before moving to the next workflow phase.
+
+## ADVISORY
+
+- Use the prose block below for the full agent-facing guidance that complements the structured execution steps.
+
+## REFERENCE
+
+<prose>
 ## STEP GOAL:
 
 To provide a comprehensive summary of all findings and give the report a final polish, ensuring clear recommendations and overall readiness status.
@@ -124,3 +179,4 @@ Implementation Readiness complete. Invoke the `bmad-help` skill.
 - Not reviewing previous findings
 - Incomplete summary
 - No clear recommendations
+</prose>
