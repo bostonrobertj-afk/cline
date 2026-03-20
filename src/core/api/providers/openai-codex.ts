@@ -110,12 +110,18 @@ export class OpenAiCodexHandler implements ApiHandler {
 			throw new Error("Not authenticated with OpenAI Codex. Please sign in using the OpenAI Codex OAuth flow in settings.")
 		}
 		const useWebsocketMode = this.useWebsocketMode(model.info.apiFormat)
-		const { input, previousResponseId } = convertToOpenAIResponsesInput(messages, { usePreviousResponseId: useWebsocketMode })
+		const { input, previousResponseId } = convertToOpenAIResponsesInput(messages, {
+			usePreviousResponseId: useWebsocketMode,
+			previousResponseProviderIds: ["openai-codex"],
+		})
 		const usePreviousResponseId = useWebsocketMode && !!previousResponseId
 
 		// Build request body
 		const requestBody = this.buildRequestBody(model, input, systemPrompt, tools, previousResponseId)
-		const fallbackRequestBody = this.buildRequestBody(model, input, systemPrompt, tools)
+		const fallbackInput = previousResponseId
+			? convertToOpenAIResponsesInput(messages, { usePreviousResponseId: false }).input
+			: input
+		const fallbackRequestBody = this.buildRequestBody(model, fallbackInput, systemPrompt, tools)
 
 		// Make the request with retry on auth failure
 		for (let attempt = 0; attempt < 2; attempt++) {

@@ -366,7 +366,8 @@ export class OpenAiHandler implements ApiHandler {
 				yield* toolCallProcessor.processToolCallDeltas([
 					{
 						index: event.output_index ?? 0,
-						id: event.item.call_id ?? event.item.id,
+						id: event.item.id ?? event.item.call_id,
+						call_id: event.item.call_id ?? event.item.id,
 						type: "function",
 						function: {
 							name: event.item.name,

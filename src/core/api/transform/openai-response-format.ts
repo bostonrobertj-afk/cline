@@ -73,7 +73,7 @@ import { ClineStorageMessage } from "@/shared/messages/content"
  */
 export function convertToOpenAIResponsesInput(
 	_messages: ClineStorageMessage[],
-	options?: { usePreviousResponseId?: boolean },
+	options?: { usePreviousResponseId?: boolean; previousResponseProviderIds?: string[] },
 ): {
 	input: ResponseInput
 	previousResponseId?: string
@@ -84,14 +84,19 @@ export function convertToOpenAIResponsesInput(
 	let messages = _messages
 
 	if (options?.usePreviousResponseId) {
+		const previousResponseProviderIds = new Set(options.previousResponseProviderIds ?? ["openai-native"])
+
 		for (let i = _messages.length - 1; i >= 0; i--) {
 			const msg = _messages[i]
 			// Must be less than 24 hours old to be considered for chaining as the previous_response_id is only valid for 24 hours.
 			// Set to 23 hours to account for any potential delays in processing.
 			const isLessThan23HoursOld = msg.ts ? Date.now() - msg.ts < 23 * 60 * 60 * 1000 : false
-			const isOpenAiNativeAssistant = msg.role === "assistant" && msg.modelInfo?.providerId === "openai-native"
+			const isMatchingAssistant =
+				msg.role === "assistant" &&
+				typeof msg.modelInfo?.providerId === "string" &&
+				previousResponseProviderIds.has(msg.modelInfo.providerId)
 
-			if (isOpenAiNativeAssistant && msg.id && isLessThan23HoursOld) {
+			if (isMatchingAssistant && msg.id && isLessThan23HoursOld) {
 				previousResponseId = msg.id
 				messages = _messages.slice(i + 1)
 				break
@@ -104,7 +109,19 @@ export function convertToOpenAIResponsesInput(
 
 	for (const m of messages) {
 		if (typeof m.content === "string") {
-			allItems.push({ role: m.role, content: [{ type: "input_text", text: m.content }] })
+			if (m.role === "assistant") {
+				allItems.push({
+					type: "message",
+					role: "assistant",
+					content: [{ type: "output_text", text: m.content }],
+				})
+			} else {
+				allItems.push({
+					type: "message",
+					role: m.role,
+					content: [{ type: "input_text", text: m.content }],
+				})
+			}
 			continue
 		}
 
@@ -227,21 +244,26 @@ export function convertToOpenAIResponsesInput(
 					case "tool_result": {
 						// Flush any pending message content before adding tool result
 						if (messageContent.length > 0) {
-							allItems.push({ role: m.role, content: [...messageContent] })
+							allItems.push({
+								type: "message",
+								role: m.role,
+								content: [...messageContent],
+							})
 							messageContent.length = 0
 						}
-						const call_id = part.call_id || toolUseIdToCallId.get(part.tool_use_id) || part.tool_use_id // 🔥 fallback
+
+						const call_id = part.call_id || toolUseIdToCallId.get(part.tool_use_id)
+
+						if (!call_id) {
+							throw new Error(
+								`Missing OpenAI Responses call_id for tool_result with tool_use_id: ${part.tool_use_id}`,
+							)
+						}
 
 						allItems.push({
 							type: "function_call_output",
 							call_id,
-							output: typeof part.content === "string" ? part.content : JSON.stringify(part.content),
-						})
-
-						allItems.push({
-							type: "function_call_output",
-							call_id,
-							output: typeof part.content === "string" ? part.content : JSON.stringify(part.content),
+							output: convertToolResultContentToResponseOutput(part.content),
 						})
 						break
 					}
@@ -250,10 +272,59 @@ export function convertToOpenAIResponsesInput(
 
 			// Flush any remaining user message content
 			if (messageContent.length > 0) {
-				allItems.push({ role: m.role, content: [...messageContent] })
+				allItems.push({
+					type: "message",
+					role: m.role,
+					content: [...messageContent],
+				})
 			}
 		}
 	}
 
 	return { input: allItems, previousResponseId }
+}
+
+function convertToolResultContentToResponseOutput(content: unknown): string | Array<Record<string, unknown>> {
+	if (typeof content === "string") {
+		return content
+	}
+
+	if (!Array.isArray(content)) {
+		return JSON.stringify(content ?? "")
+	}
+
+	const outputParts: Array<Record<string, unknown>> = []
+
+	for (const part of content) {
+		if (!part || typeof part !== "object" || !("type" in part)) {
+			outputParts.push({ type: "input_text", text: String(part ?? "") })
+			continue
+		}
+
+		if (part.type === "text") {
+			outputParts.push({ type: "input_text", text: typeof part.text === "string" ? part.text : "" })
+			continue
+		}
+
+		if (part.type === "image") {
+			const source = "source" in part && part.source && typeof part.source === "object" ? (part.source as any) : undefined
+			if (typeof source?.media_type === "string" && typeof source?.data === "string") {
+				outputParts.push({
+					type: "input_image",
+					detail: "auto",
+					image_url: `data:${source.media_type};base64,${source.data}`,
+				})
+			}
+		}
+	}
+
+	if (outputParts.length === 0) {
+		return JSON.stringify(content)
+	}
+
+	if (outputParts.every((part) => part.type === "input_text")) {
+		return outputParts.map((part) => String(part.text ?? "")).join("\n")
+	}
+
+	return outputParts
 }
