@@ -1,7 +1,19 @@
 import "should"
+import sinon from "sinon"
+import { Logger } from "@/shared/services/Logger"
 import { OpenAiNativeHandler } from "../openai-native"
 
 describe("OpenAiNativeHandler", () => {
+	afterEach(() => {
+		sinon.restore()
+	})
+
+	const createAsyncIterable = (data: any[] = []) => ({
+		[Symbol.asyncIterator]: async function* () {
+			yield* data
+		},
+	})
+
 	it("should keep HTTP response chains stored across tool turns", () => {
 		const handler = new OpenAiNativeHandler({
 			openAiNativeApiKey: "test-api-key",
@@ -30,5 +42,129 @@ describe("OpenAiNativeHandler", () => {
 		const shouldRetry = (handler as any).shouldRetryWithFullContext(new Error("404 Item with id 'rs_123' not found."), true)
 
 		shouldRetry.should.equal(true)
+	})
+
+	it("should log production-readable native request path details without previous_response_id", async () => {
+		const handler = new OpenAiNativeHandler({
+			openAiNativeApiKey: "test-api-key",
+			apiModelId: "gpt-5.4-mini-2026-03-17",
+		})
+
+		const createStub = sinon.stub().resolves(
+			createAsyncIterable([
+				{
+					type: "response.completed",
+					response: {
+						id: "resp_native_logging_no_prev",
+						usage: {
+							input_tokens: 10,
+							output_tokens: 5,
+						},
+					},
+				},
+			]),
+		)
+		const fakeClient = {
+			responses: {
+				create: createStub,
+			},
+		}
+		sinon.stub(handler as any, "ensureClient").returns(fakeClient as any)
+		sinon.stub(handler as any, "useWebsocketMode").returns(false)
+		const infoStub = sinon.stub(Logger, "info")
+
+		const tools = [
+			{
+				type: "function",
+				function: {
+					name: "read_file",
+					description: "Read a file",
+					parameters: { type: "object" },
+				},
+			},
+		] as any
+
+		for await (const _chunk of handler.createMessage("system", [{ role: "user", content: "hi" }] as any, tools)) {
+			// drain
+		}
+
+		infoStub.called.should.equal(true)
+		infoStub.firstCall.args[0].should.containEql("[OpenAI] Native Responses request path")
+		infoStub.firstCall.args[0].should.containEql('"usingPreviousResponseId":false')
+		infoStub.firstCall.args[0].should.containEql('"usingFullHistoryFallback":false')
+		infoStub.secondCall.args[0].should.containEql("[OpenAI] Native Responses request completed without previous_response_id")
+	})
+
+	it("should log native fallback usage when previous_response_id retry falls back to full history", async () => {
+		const handler = new OpenAiNativeHandler({
+			openAiNativeApiKey: "test-api-key",
+			apiModelId: "gpt-5.4-mini-2026-03-17",
+		})
+
+		const createStub = sinon
+			.stub()
+			.onFirstCall()
+			.rejects({ code: "previous_response_not_found", message: "missing response chain", status: 404 })
+			.onSecondCall()
+			.resolves(
+				createAsyncIterable([
+					{
+						type: "response.completed",
+						response: {
+							id: "resp_native_logging_fallback",
+							usage: {
+								input_tokens: 10,
+								output_tokens: 5,
+							},
+						},
+					},
+				]),
+			)
+
+		const fakeClient = {
+			responses: {
+				create: createStub,
+			},
+		}
+		sinon.stub(handler as any, "ensureClient").returns(fakeClient as any)
+		sinon.stub(handler as any, "useWebsocketMode").returns(false)
+		sinon.stub(Logger, "info")
+		const warnStub = sinon.stub(Logger, "warn")
+		const errorStub = sinon.stub(Logger, "error")
+
+		const messages = [
+			{
+				role: "assistant",
+				content: "prior",
+				id: "resp_prev_chain",
+				ts: Date.now(),
+				modelInfo: { providerId: "openai-native" },
+			},
+			{
+				role: "user",
+				content: "continue",
+			},
+		] as any
+
+		const tools = [
+			{
+				type: "function",
+				function: {
+					name: "read_file",
+					description: "Read a file",
+					parameters: { type: "object" },
+				},
+			},
+		] as any
+
+		for await (const _chunk of handler.createMessage("system", messages, tools)) {
+			// drain
+		}
+
+		errorStub.firstCall.args[0].should.containEql("[OpenAI] Native Responses request failed")
+		errorStub.firstCall.args[0].should.containEql('"code":"previous_response_not_found"')
+		warnStub.firstCall.args[0].should.containEql("[OpenAI] Native retrying with full-history fallback")
+		warnStub.firstCall.args[0].should.containEql('"usingFullHistoryFallback":true')
+		createStub.callCount.should.equal(2)
 	})
 })

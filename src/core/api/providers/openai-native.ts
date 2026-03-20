@@ -65,6 +65,42 @@ export class OpenAiNativeHandler implements ApiHandler {
 		return this.client
 	}
 
+	private getOpenAiErrorDiagnostics(error: unknown): Record<string, unknown> {
+		if (!error || typeof error !== "object") {
+			return { message: String(error) }
+		}
+
+		const candidate = error as {
+			message?: unknown
+			code?: unknown
+			status?: unknown
+			type?: unknown
+			param?: unknown
+			request_id?: unknown
+		}
+
+		return {
+			message: typeof candidate.message === "string" ? candidate.message : String(error),
+			code: typeof candidate.code === "string" ? candidate.code : undefined,
+			status: typeof candidate.status === "number" ? candidate.status : undefined,
+			type: typeof candidate.type === "string" ? candidate.type : undefined,
+			param: typeof candidate.param === "string" ? candidate.param : undefined,
+			requestId: typeof candidate.request_id === "string" ? candidate.request_id : undefined,
+		}
+	}
+
+	private logOpenAiInfo(event: string, details: Record<string, unknown>): void {
+		Logger.info(`[OpenAI] ${event} ${JSON.stringify(details)}`)
+	}
+
+	private logOpenAiWarn(event: string, details: Record<string, unknown>): void {
+		Logger.warn(`[OpenAI] ${event} ${JSON.stringify(details)}`)
+	}
+
+	private logOpenAiError(event: string, details: Record<string, unknown>): void {
+		Logger.error(`[OpenAI] ${event} ${JSON.stringify(details)}`)
+	}
+
 	private async *yieldUsage(info: ModelInfo, usage: OpenAI.Completions.CompletionUsage | undefined): ApiStream {
 		const inputTokens = usage?.prompt_tokens || 0 // sum of cache hits and misses
 		const outputTokens = usage?.completion_tokens || 0
@@ -206,30 +242,101 @@ export class OpenAiNativeHandler implements ApiHandler {
 		})
 
 		if (useWebsocketMode && previousResponseId) {
+			this.logOpenAiInfo("Native Responses request path", {
+				transport: "websocket",
+				model: model.id,
+				previousResponseId,
+				usingPreviousResponseId: true,
+				usingFullHistoryFallback: false,
+				inputItems: Array.isArray(params.input) ? params.input.length : undefined,
+			})
 			try {
 				yield* this.createResponseStreamWebsocket(model.info, params, fallbackParams)
 				return
 			} catch (error) {
-				Logger.error("OpenAI websocket mode failed, falling back to HTTP Responses API:", error)
+				this.logOpenAiWarn("Native websocket mode falling back to HTTP Responses API", {
+					model: model.id,
+					previousResponseId,
+					usingPreviousResponseId: true,
+					usingFullHistoryFallback: false,
+					...this.getOpenAiErrorDiagnostics(error),
+				})
 				this.closeResponsesWebsocket()
 			}
 		}
 
 		if (previousResponseId) {
 			try {
+				this.logOpenAiInfo("Native Responses request path", {
+					transport: "http",
+					model: model.id,
+					previousResponseId,
+					usingPreviousResponseId: true,
+					usingFullHistoryFallback: false,
+					inputItems: Array.isArray(params.input) ? params.input.length : undefined,
+				})
 				yield* this.createResponseStreamHttp(model.info, params)
+				this.logOpenAiInfo("Native Responses request completed without full-history fallback", {
+					transport: "http",
+					model: model.id,
+					previousResponseId,
+					usingPreviousResponseId: true,
+					usingFullHistoryFallback: false,
+				})
 				return
 			} catch (error) {
+				this.logOpenAiError("Native Responses request failed", this.getOpenAiErrorDiagnostics(error))
 				if (this.shouldRetryWithFullContext(error, true)) {
-					Logger.log("Retrying HTTP response with full context after response-chain mismatch")
-					yield* this.createResponseStreamHttp(model.info, fallbackParams)
-					return
+					this.logOpenAiWarn("Native retrying with full-history fallback", {
+						transport: "http",
+						model: model.id,
+						previousResponseId,
+						usingPreviousResponseId: false,
+						usingFullHistoryFallback: true,
+						inputItems: Array.isArray(fallbackParams.input) ? fallbackParams.input.length : undefined,
+					})
+					try {
+						yield* this.createResponseStreamHttp(model.info, fallbackParams)
+						this.logOpenAiInfo("Native Responses request completed after full-history fallback", {
+							transport: "http",
+							model: model.id,
+							previousResponseId,
+							usingPreviousResponseId: false,
+							usingFullHistoryFallback: true,
+						})
+						return
+					} catch (fallbackError) {
+						this.logOpenAiError(
+							"Native full-history fallback request failed",
+							this.getOpenAiErrorDiagnostics(fallbackError),
+						)
+						throw fallbackError
+					}
 				}
 				throw error
 			}
 		}
 
-		yield* this.createResponseStreamHttp(model.info, fallbackParams)
+		this.logOpenAiInfo("Native Responses request path", {
+			transport: "http",
+			model: model.id,
+			previousResponseId,
+			usingPreviousResponseId: false,
+			usingFullHistoryFallback: false,
+			inputItems: Array.isArray(fallbackParams.input) ? fallbackParams.input.length : undefined,
+		})
+		try {
+			yield* this.createResponseStreamHttp(model.info, fallbackParams)
+			this.logOpenAiInfo("Native Responses request completed without previous_response_id", {
+				transport: "http",
+				model: model.id,
+				usingPreviousResponseId: false,
+				usingFullHistoryFallback: false,
+			})
+		} catch (error) {
+			this.logOpenAiError("Native Responses request failed", this.getOpenAiErrorDiagnostics(error))
+			throw error
+		}
 	}
 
 	private preconnectResponsesWebsocket(): void {
@@ -307,12 +414,42 @@ export class OpenAiNativeHandler implements ApiHandler {
 		Logger.debug(`OpenAI Responses Input (WebSocket): ${JSON.stringify(primaryParams.input)}`)
 		try {
 			yield* this.processResponsesEvents(this.createResponseEventsViaWebsocket(primaryParams), modelInfo)
+			this.logOpenAiInfo("Native websocket Responses request completed without full-history fallback", {
+				transport: "websocket",
+				model: primaryParams.model,
+				previousResponseId: primaryParams.previous_response_id,
+				usingPreviousResponseId: !!primaryParams.previous_response_id,
+				usingFullHistoryFallback: false,
+			})
 		} catch (error) {
+			this.logOpenAiError("Native websocket Responses request failed", this.getOpenAiErrorDiagnostics(error))
 			if (this.shouldRetryWithFullContext(error, !!primaryParams.previous_response_id)) {
-				Logger.log("Retrying websocket response with full context after previous_response_not_found or socket reset")
+				this.logOpenAiWarn("Native websocket retrying with full-history fallback", {
+					transport: "websocket",
+					model: primaryParams.model,
+					previousResponseId: primaryParams.previous_response_id,
+					usingPreviousResponseId: false,
+					usingFullHistoryFallback: true,
+					inputItems: Array.isArray(fallbackParams.input) ? fallbackParams.input.length : undefined,
+				})
 				this.closeResponsesWebsocket()
-				yield* this.processResponsesEvents(this.createResponseEventsViaWebsocket(fallbackParams), modelInfo)
-				return
+				try {
+					yield* this.processResponsesEvents(this.createResponseEventsViaWebsocket(fallbackParams), modelInfo)
+					this.logOpenAiInfo("Native websocket Responses request completed after full-history fallback", {
+						transport: "websocket",
+						model: fallbackParams.model,
+						previousResponseId: primaryParams.previous_response_id,
+						usingPreviousResponseId: false,
+						usingFullHistoryFallback: true,
+					})
+					return
+				} catch (fallbackError) {
+					this.logOpenAiError(
+						"Native websocket full-history fallback request failed",
+						this.getOpenAiErrorDiagnostics(fallbackError),
+					)
+					throw fallbackError
+				}
 			}
 			throw error
 		}
