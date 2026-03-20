@@ -7,6 +7,27 @@ export type { SlashCommand }
 export const DEFAULT_SLASH_COMMANDS: SlashCommand[] =
 	PLATFORM_CONFIG.type === PlatformType.VSCODE ? [...BASE_SLASH_COMMANDS, ...VSCODE_ONLY_COMMANDS] : BASE_SLASH_COMMANDS
 
+function getDiscoverableSlashCommands(
+	localWorkflowToggles: Record<string, boolean>,
+	globalWorkflowToggles: Record<string, boolean>,
+	remoteWorkflowToggles?: Record<string, boolean>,
+	remoteWorkflows?: any[],
+	availableCommands?: SlashCommand[],
+): SlashCommand[] {
+	if (availableCommands && availableCommands.length > 0) {
+		return availableCommands
+	}
+
+	const workflowCommands = getWorkflowCommands(
+		localWorkflowToggles,
+		globalWorkflowToggles,
+		remoteWorkflowToggles,
+		remoteWorkflows,
+	)
+
+	return [...DEFAULT_SLASH_COMMANDS, ...workflowCommands]
+}
+
 export function getWorkflowCommands(
 	localWorkflowToggles: Record<string, boolean>,
 	globalWorkflowToggles: Record<string, boolean>,
@@ -181,15 +202,19 @@ export function getMatchingSlashCommands(
 	remoteWorkflowToggles?: Record<string, boolean>,
 	remoteWorkflows?: any[],
 	mcpServers: McpServer[] = [],
+	availableCommands?: SlashCommand[],
 ): SlashCommand[] {
-	const workflowCommands = getWorkflowCommands(
-		localWorkflowToggles,
-		globalWorkflowToggles,
-		remoteWorkflowToggles,
-		remoteWorkflows,
-	)
 	const mcpPromptCommands = getMcpPromptCommands(mcpServers)
-	const allCommands = [...DEFAULT_SLASH_COMMANDS, ...workflowCommands, ...mcpPromptCommands]
+	const allCommands = [
+		...getDiscoverableSlashCommands(
+			localWorkflowToggles,
+			globalWorkflowToggles,
+			remoteWorkflowToggles,
+			remoteWorkflows,
+			availableCommands,
+		),
+		...mcpPromptCommands,
+	]
 
 	if (!query) {
 		return allCommands
@@ -233,19 +258,23 @@ export function validateSlashCommand(
 	remoteWorkflowToggles?: Record<string, boolean>,
 	remoteWorkflows?: any[],
 	mcpServers: McpServer[] = [],
+	availableCommands?: SlashCommand[],
 ): "full" | "partial" | null {
 	if (!command) {
 		return null
 	}
 
-	const workflowCommands = getWorkflowCommands(
-		localWorkflowToggles,
-		globalWorkflowToggles,
-		remoteWorkflowToggles,
-		remoteWorkflows,
-	)
 	const mcpPromptCommands = getMcpPromptCommands(mcpServers)
-	const allCommands = [...DEFAULT_SLASH_COMMANDS, ...workflowCommands, ...mcpPromptCommands]
+	const allCommands = [
+		...getDiscoverableSlashCommands(
+			localWorkflowToggles,
+			globalWorkflowToggles,
+			remoteWorkflowToggles,
+			remoteWorkflows,
+			availableCommands,
+		),
+		...mcpPromptCommands,
+	]
 
 	// case insensitive matching
 	const exactMatch = allCommands.some((cmd) => cmd.name.toLowerCase() === command.toLowerCase())

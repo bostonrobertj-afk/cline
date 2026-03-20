@@ -1,5 +1,5 @@
 import { mentionRegex, mentionRegexGlobal } from "@shared/context-mentions"
-import { StringRequest } from "@shared/proto/cline/common"
+import { EmptyRequest, StringRequest } from "@shared/proto/cline/common"
 import { FileSearchRequest, FileSearchType, RelativePathsRequest } from "@shared/proto/cline/file"
 import { PlanActMode, TogglePlanActModeRequest } from "@shared/proto/cline/state"
 import { type SlashCommand } from "@shared/slashCommands"
@@ -19,7 +19,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useExtensionState } from "@/context/ExtensionStateContext"
 import { usePlatform } from "@/context/PlatformContext"
 import { cn } from "@/lib/utils"
-import { FileServiceClient, StateServiceClient } from "@/services/grpc-client"
+import { FileServiceClient, SlashServiceClient, StateServiceClient } from "@/services/grpc-client"
 import {
 	ContextMenuOptionType,
 	getContextMenuOptionIndex,
@@ -230,6 +230,7 @@ const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 		const [showSlashCommandsMenu, setShowSlashCommandsMenu] = useState(false)
 		const [selectedSlashCommandsIndex, setSelectedSlashCommandsIndex] = useState(0)
 		const [slashCommandsQuery, setSlashCommandsQuery] = useState("")
+		const [availableSlashCommands, setAvailableSlashCommands] = useState<SlashCommand[]>([])
 		const slashCommandsMenuContainerRef = useRef<HTMLDivElement>(null)
 
 		const [thumbnailsHeight, setThumbnailsHeight] = useState(0)
@@ -258,6 +259,30 @@ const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 		const [fileSearchResults, setFileSearchResults] = useState<SearchResult[]>([])
 		const [searchLoading, setSearchLoading] = useState(false)
 		const [, metaKeyChar] = useMetaKeyDetection(platform)
+
+		useEffect(() => {
+			let isCancelled = false
+
+			const refreshAvailableSlashCommands = async () => {
+				try {
+					const response = await SlashServiceClient.getAvailableSlashCommands(EmptyRequest.create())
+					if (!isCancelled) {
+						setAvailableSlashCommands(response.commands as SlashCommand[])
+					}
+				} catch (error) {
+					console.error("Error loading available slash commands:", error)
+					if (!isCancelled) {
+						setAvailableSlashCommands([])
+					}
+				}
+			}
+
+			void refreshAvailableSlashCommands()
+
+			return () => {
+				isCancelled = true
+			}
+		}, [localWorkflowToggles, globalWorkflowToggles, remoteWorkflowToggles, remoteConfigSettings])
 
 		// Fetch git commits when Git is selected or when typing a hash
 		useEffect(() => {
@@ -479,6 +504,7 @@ const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 								remoteWorkflowToggles,
 								remoteConfigSettings?.remoteGlobalWorkflows,
 								mcpServers,
+								availableSlashCommands,
 							)
 
 							if (allCommands.length === 0) {
@@ -504,6 +530,7 @@ const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 							remoteWorkflowToggles,
 							remoteConfigSettings?.remoteGlobalWorkflows,
 							mcpServers,
+							availableSlashCommands,
 						)
 						if (commands.length > 0) {
 							handleSlashCommandsSelect(commands[selectedSlashCommandsIndex])
@@ -962,6 +989,8 @@ const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 					globalWorkflowToggles,
 					remoteWorkflowToggles,
 					remoteConfigSettings?.remoteGlobalWorkflows,
+					mcpServers,
+					availableSlashCommands,
 				)
 
 				if (isValidCommand) {
@@ -975,7 +1004,14 @@ const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 			highlightLayerRef.current.innerHTML = processedText
 			highlightLayerRef.current.scrollTop = textAreaRef.current.scrollTop
 			highlightLayerRef.current.scrollLeft = textAreaRef.current.scrollLeft
-		}, [localWorkflowToggles, globalWorkflowToggles, remoteWorkflowToggles, remoteConfigSettings])
+		}, [
+			availableSlashCommands,
+			localWorkflowToggles,
+			globalWorkflowToggles,
+			remoteWorkflowToggles,
+			remoteConfigSettings,
+			mcpServers,
+		])
 
 		useLayoutEffect(() => {
 			updateHighlights()
@@ -1363,6 +1399,7 @@ const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 					{showSlashCommandsMenu && (
 						<div ref={slashCommandsMenuContainerRef}>
 							<SlashCommandMenu
+								availableCommands={availableSlashCommands}
 								globalWorkflowToggles={globalWorkflowToggles}
 								localWorkflowToggles={localWorkflowToggles}
 								mcpServers={mcpServers}

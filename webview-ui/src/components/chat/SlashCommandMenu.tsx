@@ -1,8 +1,8 @@
 import type { McpServer } from "@shared/mcp"
-import type { SlashCommand } from "@/utils/slash-commands"
 import React, { useCallback, useEffect, useRef } from "react"
 import ScreenReaderAnnounce from "@/components/common/ScreenReaderAnnounce"
 import { useMenuAnnouncement } from "@/hooks/useMenuAnnouncement"
+import type { SlashCommand } from "@/utils/slash-commands"
 import { getMatchingSlashCommands } from "@/utils/slash-commands"
 
 interface SlashCommandMenuProps {
@@ -11,6 +11,7 @@ interface SlashCommandMenuProps {
 	setSelectedIndex: (index: number) => void
 	onMouseDown: () => void
 	query: string
+	availableCommands?: SlashCommand[]
 	localWorkflowToggles?: Record<string, boolean>
 	globalWorkflowToggles?: Record<string, boolean>
 	remoteWorkflowToggles?: Record<string, boolean>
@@ -24,6 +25,7 @@ const SlashCommandMenu: React.FC<SlashCommandMenuProps> = ({
 	setSelectedIndex,
 	onMouseDown,
 	query,
+	availableCommands,
 	localWorkflowToggles = {},
 	globalWorkflowToggles = {},
 	remoteWorkflowToggles,
@@ -40,6 +42,7 @@ const SlashCommandMenu: React.FC<SlashCommandMenuProps> = ({
 		remoteWorkflowToggles,
 		remoteWorkflows,
 		mcpServers,
+		availableCommands,
 	)
 	const defaultCommands = filteredCommands.filter((cmd) => cmd.section === "default" || !cmd.section)
 	const workflowCommands = filteredCommands.filter((cmd) => cmd.section === "custom")
@@ -140,12 +143,7 @@ const SlashCommandMenu: React.FC<SlashCommandMenuProps> = ({
 					<>
 						{renderCommandSection(defaultCommands, "Default Commands", 0, true)}
 						{renderCommandSection(workflowCommands, "Workflow Commands", defaultCommands.length, false)}
-						{renderCommandSection(
-							mcpCommands,
-							"MCP Prompts",
-							defaultCommands.length + workflowCommands.length,
-							true,
-						)}
+						{renderCommandSection(mcpCommands, "MCP Prompts", defaultCommands.length + workflowCommands.length, true)}
 					</>
 				) : (
 					<div aria-selected="false" className="py-2 px-3 cursor-default flex flex-col" role="option">

@@ -172,6 +172,28 @@ describe("slash-commands", () => {
 			const result = getMatchingSlashCommands("mcp:nonexistent", {}, {}, undefined, undefined, mcpServers)
 			expect(result).toHaveLength(0)
 		})
+
+		it("prefers backend-provided slash commands over local workflow synthesis when available", () => {
+			const availableCommands = [
+				{ name: "bmad-code-review", section: "custom" as const },
+				{ name: "explain-changes", description: "Explain code changes", section: "default" as const },
+			]
+
+			const result = getMatchingSlashCommands(
+				"bmad",
+				{
+					"/tmp/local-only.md": true,
+				},
+				{},
+				undefined,
+				undefined,
+				mcpServers,
+				availableCommands,
+			)
+
+			expect(result.map((cmd) => cmd.name)).toContain("bmad-code-review")
+			expect(result.map((cmd) => cmd.name)).not.toContain("local-only.md")
+		})
 	})
 
 	describe("validateSlashCommand with MCP servers", () => {
@@ -200,6 +222,19 @@ describe("slash-commands", () => {
 		it("should return null for non-matching MCP command", () => {
 			const result = validateSlashCommand("mcp:unknown:cmd", {}, {}, undefined, undefined, mcpServers)
 			expect(result).toBe(null)
+		})
+
+		it("validates backend-provided managed workflow commands", () => {
+			const result = validateSlashCommand(
+				"bmad-code-review",
+				{},
+				{},
+				undefined,
+				undefined,
+				[],
+				[{ name: "bmad-code-review", section: "custom" }],
+			)
+			expect(result).toBe("full")
 		})
 	})
 

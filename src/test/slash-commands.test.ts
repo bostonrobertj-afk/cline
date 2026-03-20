@@ -5,7 +5,7 @@ import { clearManagedWorkflowRegistryCache } from "@/core/task/managed-workflows
 import { Controller } from "../core/controller"
 import { getAvailableSlashCommands } from "../core/controller/slash/getAvailableSlashCommands"
 import { EmptyRequest } from "../shared/proto/cline/common"
-import { BASE_SLASH_COMMANDS } from "../shared/slashCommands"
+import { BASE_SLASH_COMMANDS, VSCODE_ONLY_COMMANDS } from "../shared/slashCommands"
 
 /**
  * Unit tests for getAvailableSlashCommands RPC endpoint
@@ -74,6 +74,16 @@ describe("getAvailableSlashCommands", () => {
 				if (baseCommandNames.includes(cmd.name)) {
 					cmd.section.should.equal("default")
 				}
+			}
+		})
+
+		it("should include VS Code-only slash commands in the backend response", async () => {
+			const response = await getAvailableSlashCommands(mockController as Controller, EmptyRequest.create())
+
+			for (const vscodeCmd of VSCODE_ONLY_COMMANDS) {
+				const found = response.commands.find((cmd) => cmd.name === vscodeCmd.name)
+				found!.should.not.be.undefined()
+				found!.section.should.equal("default")
 			}
 		})
 
