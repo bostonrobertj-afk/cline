@@ -97,4 +97,57 @@ describe("convertToOpenAIResponsesInput", () => {
 		;(chained.input[0] as any).call_id.should.equal("call_tool_456")
 		;(chained.input[0] as any).output.should.equal("Found 1 result")
 	})
+
+	it("should omit stored response item ids when rebuilding full context after a tool turn", () => {
+		const messages: ClineStorageMessage[] = [
+			{
+				role: "assistant",
+				id: "resp_789",
+				ts: Date.now(),
+				modelInfo: {
+					modelId: "gpt-5.4-2026-03-05",
+					providerId: "openai-native",
+					mode: "act",
+				},
+				content: [
+					{
+						type: "thinking",
+						thinking: "Need to inspect the workspace before answering.",
+						call_id: "rs_123",
+						summary: [{ type: "summary_text", text: "Inspect workspace first." }],
+					} as any,
+					{
+						type: "tool_use",
+						id: "fc_tool_789",
+						call_id: "call_tool_789",
+						name: "exec_command",
+						input: { cmd: "pwd" },
+					} as any,
+				],
+			},
+			{
+				role: "user",
+				content: [
+					{
+						type: "tool_result",
+						tool_use_id: "fc_tool_789",
+						call_id: "call_tool_789",
+						content: "/workspace",
+					} as any,
+				],
+			},
+		]
+
+		const fullContext = convertToOpenAIResponsesInput(messages, { usePreviousResponseId: false })
+
+		fullContext.input.should.have.length(3)
+		;(fullContext.input[0] as any).type.should.equal("reasoning")
+		;("id" in (fullContext.input[0] as any)).should.equal(false)
+		;(fullContext.input[1] as any).type.should.equal("function_call")
+		;(fullContext.input[1] as any).call_id.should.equal("call_tool_789")
+		;("id" in (fullContext.input[1] as any)).should.equal(false)
+		;(fullContext.input[2] as any).type.should.equal("function_call_output")
+		;(fullContext.input[2] as any).call_id.should.equal("call_tool_789")
+		;(fullContext.input[2] as any).output.should.equal("/workspace")
+	})
 })

@@ -104,6 +104,13 @@ export function convertToOpenAIResponsesInput(
 		}
 	}
 
+	// Stored Responses API item IDs (for example `rs_*`, `msg_*`, `fc_*`) are only
+	// safe to rely on when continuing a live response chain via `previous_response_id`.
+	// When we rebuild full context instead, replaying those IDs can cause the API to
+	// treat them as stale item references and reject the request with:
+	// "Item with id 'rs_*' not found."
+	const reuseStoredOutputItemIds = !!previousResponseId
+
 	const allItems: any[] = []
 	const toolUseIdToCallId = new Map<string, string>()
 
@@ -155,11 +162,14 @@ export function convertToOpenAIResponsesInput(
 								]
 							}
 
-							assistantItems.push({
-								id: part.call_id,
+							const reasoningItem: any = {
 								type: "reasoning",
 								summary,
-							} as ResponseReasoningItem)
+							}
+							if (reuseStoredOutputItemIds) {
+								reasoningItem.id = part.call_id
+							}
+							assistantItems.push(reasoningItem as ResponseReasoningItem)
 						}
 						break
 					case "redacted_thinking":
@@ -167,9 +177,11 @@ export function convertToOpenAIResponsesInput(
 						// Even if data is missing, we need to maintain the reasoning-function_call pairing
 						if (part.call_id && part.call_id.length > 0) {
 							const reasoningItem: any = {
-								id: part.call_id,
 								type: "reasoning",
 								summary: [],
+							}
+							if (reuseStoredOutputItemIds) {
+								reasoningItem.id = part.call_id
 							}
 							// Only include encrypted_content if data exists
 							if (part.data) {
@@ -186,8 +198,8 @@ export function convertToOpenAIResponsesInput(
 							role: "assistant",
 							content: [{ type: "output_text", text: part.text }],
 						}
-						// Set message-level id if available
-						if (part.call_id) {
+						// Only reuse stored message ids when continuing a live response chain.
+						if (reuseStoredOutputItemIds && part.call_id) {
 							messageItem.id = part.call_id
 						}
 						assistantItems.push(messageItem)
@@ -199,8 +211,7 @@ export function convertToOpenAIResponsesInput(
 							role: "assistant",
 							content: [{ type: "output_text", text: `[image:${part.source.media_type}]` }],
 						}
-						// Set message-level id if available (though images typically don't have call_id)
-						if (part.call_id) {
+						if (reuseStoredOutputItemIds && part.call_id) {
 							imageItem.id = part.call_id
 						}
 						assistantItems.push(imageItem)
@@ -214,10 +225,14 @@ export function convertToOpenAIResponsesInput(
 						assistantItems.push({
 							type: "function_call",
 							call_id,
-							// MAX 53 characters for OpenAI Responses API tool IDs
-							id: !part.id.startsWith("fc_") ? `fc_${part.id.slice(0, 50)}` : part.id,
 							name: part.name,
 							arguments: JSON.stringify(part.input ?? {}),
+							// MAX 53 characters for OpenAI Responses API tool IDs.
+							// When rebuilding full context, omit stored output item ids and rely on
+							// the stable call_id instead.
+							...(reuseStoredOutputItemIds
+								? { id: !part.id.startsWith("fc_") ? `fc_${part.id.slice(0, 50)}` : part.id }
+								: {}),
 						})
 						break
 					}
