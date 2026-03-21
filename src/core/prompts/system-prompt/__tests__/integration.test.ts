@@ -351,6 +351,14 @@ describe("Prompt System Integration Tests", () => {
 					enableNativeToolCalls: true,
 					useMinimalGptPrompt: true,
 					activeAgentId: "bmad-quick-flow-solo-dev",
+					skills: [
+						{
+							name: "bmad-code-review",
+							description: "workflow",
+							path: "/skills/bmad-code-review/SKILL.md",
+							source: "project",
+						},
+					],
 					activeAgentRoleInstructions:
 						"Agent Metadata\nName: Barry\nTitle: Quick Flow Solo Dev\n\nActivation\n1. Load config\n\nPersona\nRole: Quick Flow Solo Dev",
 				},
@@ -362,6 +370,8 @@ describe("Prompt System Integration Tests", () => {
 					expect(systemPrompt).to.not.include("<agent")
 					expect(systemPrompt).to.not.include("<activation")
 					expect(systemPrompt).to.not.include("<persona")
+					expect(systemPrompt).to.not.include("Allowed skills for active agent")
+					expect(systemPrompt).to.not.include("SKILLS")
 					expect(systemPrompt.match(/Role: Quick Flow Solo Dev/g)?.length).to.equal(1)
 					expect(systemPrompt).to.not.include("# Tools")
 					expect(systemPrompt).to.not.include("## execute_command")

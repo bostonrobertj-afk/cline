@@ -108,10 +108,10 @@ import { StateManager } from "../storage/StateManager"
 import {
 	buildBmadAgentCatalogInstructions,
 	buildBmadAgentRoleInstructions,
-	filterSkillsForBmadAgentMode,
 	getBmadAgentById,
 	getBmadWorkflowReminder,
 	getOwningBmadAgentForSkill,
+	isHumanInvokedBmadSkillName,
 	isSkillAllowedForBmadAgent,
 } from "./bmad-agent-mode"
 import { FocusChainManager } from "./focus-chain"
@@ -994,11 +994,10 @@ export class Task {
 
 	private async buildPromptSkillScope(enabledSkills: SkillMetadata[]): Promise<SkillMetadata[]> {
 		if (!this.taskState.activeAgentId) {
-			return filterSkillsForBmadAgentMode(enabledSkills, undefined)
+			return enabledSkills.filter((skill) => !isHumanInvokedBmadSkillName(skill.name))
 		}
 
-		const activeAgent = await getBmadAgentById(this.cwd, this.taskState.activeAgentId)
-		return filterSkillsForBmadAgentMode(enabledSkills, activeAgent ?? null)
+		return []
 	}
 
 	private hasHumanAuthoredInput(contentBlocks: ClineContent[]): boolean {

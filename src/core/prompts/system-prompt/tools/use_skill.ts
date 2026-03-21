@@ -10,7 +10,8 @@ const generic: ClineToolSpec = {
 	name: "use_skill",
 	description:
 		"Load and activate a skill by name. Skills provide specialized instructions for specific tasks. Use this tool ONCE when a user's request matches one of the available skill descriptions shown in the SKILLS section of your system prompt. After activation, follow the skill's instructions directly - do not call use_skill again.",
-	contextRequirements: (context) => context.skills !== undefined && context.skills.length > 0,
+	contextRequirements: (context) =>
+		context.activeAgentId === undefined && context.skills !== undefined && context.skills.length > 0,
 	parameters: [
 		{
 			name: "skill_name",

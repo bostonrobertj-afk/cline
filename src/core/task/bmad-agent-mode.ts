@@ -27,6 +27,10 @@ const WORKFLOW_REMINDERS_PATH = path.join("_bmad", "_config", "workflow-reminder
 export const BMAD_AGENT_ALIAS_PREFIX = "bmad-agent-bmm-"
 const ALWAYS_ALLOWED_BMAD_SKILL_NAMES = ["bmad-help"] as const
 
+export function isHumanInvokedBmadSkillName(skillName: string): boolean {
+	return skillName.startsWith("bmad-")
+}
+
 const BUILTIN_BMAD_AGENT_ALLOWLIST: ReadonlyArray<BmadAgentAllowlistEntry> = [
 	{
 		id: "bmad-analyst",
