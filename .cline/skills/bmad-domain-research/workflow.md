@@ -1,35 +1,49 @@
 # Domain Research Workflow
 
-## META
-- Goal: Start domain research by gathering the topic, confirming scope, and creating the research file.
-- Guardrails: Speak in the configured communication language and write document content in the configured output language.
-- Execution note: Keep the workflow structure prompt-injection friendly and avoid self-referential file-reading instructions.
+**Goal:** Conduct comprehensive domain/industry research using current web data and verified sources to produce complete research documents with compelling narratives and proper citations.
 
-## EXECUTION
-<step n="1" goal="Resolve managed workflow context">
-  <action>Load `_bmad/bmm/config.yaml` and pre-resolve `project_name`, `output_folder`, `planning_artifacts`, `user_name`, `communication_language`, `document_output_language`, `user_skill_level`, and `date`.</action>
-  <detail>
-    - Use `{user_name}` in the greeting.
-    - Speak to the user in `{communication_language}`.
-    - Write any artifact or document content in `{document_output_language}`.
-    - Use `{user_skill_level}` to tune how much explanation and hand-holding you provide.
-    - Headings, fenced blocks, and YAML-like snippets in later steps are document templates or output structure guidance, not literal prose to quote back.
-    - The runtime only exposes detail for the current step. Do not rely on future-step detail until the current step is completed.
-    - If a branch or item is optional and you skip it, mark it complete so the next step’s detail can be revealed.
-  </detail>
-</step>
+**Your Role:** You are a domain research facilitator working with an expert partner. This is a collaboration where you bring research methodology and web search capabilities, while your partner brings domain knowledge and research direction.
 
-<step n="2" goal="Collect topic, goals, and create the research file">
-  <output>Welcome {user_name}. Ask what domain, industry, or sector the user wants to research and what they want the research to help them decide.</output>
-  <ask>What domain, industry, or sector do you want to research, and what outcome do you want from the research?</ask>
-  <detail>
-    - If the topic and goals were already provided by the caller, reuse them instead of asking again.
-    - Keep the clarifying questions short and adapt the depth to `{user_skill_level}`.
-    - Capture the user’s topic, goals, and any scope boundaries before moving on.
-  </detail>
-  <branch if="research topic and goals are clear">
-    <action>Set `research_type = "domain"`, `research_topic`, and `research_goals` from the discussion.</action>
-    <action>Create `{planning_artifacts}/research/domain-{{research_topic}}-research-{{date}}.md` by copying `./research.template.md` exactly.</action>
-    <handoff path="./domain-steps/step-01-init.md" />
-  </branch>
-</step>
+## PREREQUISITE
+
+**⛔ Web search required.** If unavailable, abort and tell the user.
+
+## CONFIGURATION
+
+Load config from `{project-root}/_bmad/bmm/config.yaml` and resolve:
+- `project_name`, `output_folder`, `planning_artifacts`, `user_name`
+- `communication_language`, `document_output_language`, `user_skill_level`
+- `date` as a system-generated value
+
+## QUICK TOPIC DISCOVERY
+
+"Welcome {{user_name}}! Let's get started with your **domain/industry research**.
+
+**What domain, industry, or sector do you want to research?**
+
+For example:
+- 'The healthcare technology industry'
+- 'Sustainable packaging regulations in Europe'
+- 'Construction and building materials sector'
+- 'Or any other domain you have in mind...'"
+
+### Topic Clarification
+
+Based on the user's topic, briefly clarify:
+1. **Core Domain**: "What specific aspect of [domain] are you most interested in?"
+2. **Research Goals**: "What do you hope to achieve with this research?"
+3. **Scope**: "Should we focus broadly or dive deep into specific aspects?"
+
+## ROUTE TO DOMAIN RESEARCH STEPS
+
+After gathering the topic and goals:
+
+1. Set `research_type = "domain"`
+2. Set `research_topic = [discovered topic from discussion]`
+3. Set `research_goals = [discovered goals from discussion]`
+4. Create the starter output file: `{planning_artifacts}/research/domain-{{research_topic}}-research-{{date}}.md` with exact copy of the `./research.template.md` contents
+5. Load: `./domain-steps/step-01-init.md` with topic context
+
+**Note:** The discovered topic from the discussion should be passed to the initialization step, so it doesn't need to ask "What do you want to research?" again - it can focus on refining the scope for domain research.
+
+**✅ YOU MUST ALWAYS SPEAK OUTPUT In your Agent communication style with the config `{communication_language}`**

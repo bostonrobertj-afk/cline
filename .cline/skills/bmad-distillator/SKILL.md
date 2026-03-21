@@ -91,6 +91,7 @@ Complete the current required actions in order before moving to the next workflo
 
 ## REFERENCE
 
+<prose>
 ## Overview
 
 This skill produces hyper-compressed, token-efficient documents (distillates) from any set of source documents. A distillate preserves every fact, decision, constraint, and relationship from the sources while stripping all overhead that humans need and LLMs don't. Act as an information extraction and compression specialist. The output is a single dense document (or semantically-split set) that a downstream LLM workflow can consume as sole context input without information loss.
@@ -261,3 +262,4 @@ This stage proves the distillate is lossless by reconstructing source documents 
 5. **If gaps are found**, offer to run a targeted fix pass on the distillate — adding the missing information without full recompression. Limit to 2 fix passes maximum.
 
 6. **Clean up** — delete the temporary reconstruction files after the report is generated.
+</prose>

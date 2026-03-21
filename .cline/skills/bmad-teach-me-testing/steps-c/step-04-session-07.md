@@ -9,34 +9,9 @@ nextStepFile: './step-03-session-menu.md'
 advancedElicitationTask: '{project-root}/_bmad/core/workflows/advanced-elicitation/workflow.xml'
 partyModeWorkflow: '{project-root}/_bmad/core/workflows/party-mode/workflow.md'
 ---
+
 # Step 4: Session 7 - Advanced Patterns
 
-## META
-- managed_workflow_extraction: enabled
-- phase_type: phase
-- source_format: procedural
-
-## EXECUTION
-<step n="1" goal="Review Detailed Guidance">
-  <action>Read the advisory, reference, and prose sections in this file completely before taking action.</action>
-</step>
-
-<step n="2" goal="Follow Phase Procedure">
-  <action>Execute this file in order, preserving every approval gate, routing rule, document update instruction, and constraint described below.</action>
-</step>
-
-## CHECKPOINT
-This phase can be marked complete only after the required outputs, approvals, and routing conditions in this file are satisfied.
-
-## ADVISORY
-- Treat the <prose> section as the authoritative detailed instructions for this file.
-- Preserve all existing user-input pauses, continuation checks, and referenced companion files.
-- Keep any document templates, frontmatter updates, and save instructions exactly as authored.
-
-## REFERENCE
-- Original authored procedure retained below for managed workflow extraction compatibility.
-
-<prose>
 ## STEP GOAL:
 
 To provide menu-driven exploration of 35 TEA knowledge fragments organized by category, allowing deep-dive into specific advanced topics on-demand.
@@ -235,4 +210,3 @@ Return to {nextStepFile}.
 ✅ Fragment categories displayed, user explored chosen fragments, notes generated with exploration summary, progress updated, returned to hub.
 
 **Master Rule:** This session is exploratory and repeatable. User drives exploration, workflow facilitates.
-</prose>

@@ -1,12 +1,8 @@
-
-# step 02b vision
-
 ## META
 
-- Goal: Refine the product vision now that the project classification is known.
-- Execute this file in order.
-- Halt whenever user input, confirmation, or workflow gating is required.
-- Use the structured sections for extraction and handoff.
+- Goal: refine the product vision now that the project classification is known.
+- Speak to the user in `{communication_language}`.
+- Stay focused on what makes the product meaningful and distinct.
 
 ## EXECUTION
 
@@ -35,4 +31,9 @@
 Wait for the user to confirm the vision summary before saving it.
 
 ## ADVISORY
+
 - The vision should stay product-level and strategic, not become a feature list.
+
+## REFERENCE
+
+- Later success, scope, and journey work should trace back to the validated vision.

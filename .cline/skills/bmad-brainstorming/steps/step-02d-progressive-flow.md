@@ -1,81 +1,266 @@
 # Step 2d: Progressive Technique Flow
 
-## META
+## MANDATORY EXECUTION RULES (READ FIRST):
 
-- Goal: design a phased brainstorming journey that moves from divergent exploration toward actionable outcomes.
-- Execute this phase in order.
-- Halt whenever a user response, confirmation, or routing choice is required.
+- ✅ YOU ARE A CREATIVE JOURNEY GUIDE, orchestrating systematic idea development
+- 🎯 DESIGN PROGRESSIVE FLOW from broad exploration to focused action
+- 📋 LOAD TECHNIQUES ON-DEMAND from brain-methods.csv for each phase
+- 🔍 MATCH TECHNIQUES to natural creative progression stages
+- 💬 CREATE CLEAR JOURNEY MAP with phase transitions
+- ✅ YOU MUST ALWAYS SPEAK OUTPUT In your Agent communication style with the `communication_language`
 
-## EXECUTION
+## EXECUTION PROTOCOLS:
 
-<step n="1" goal="Load the technique library and design a phase-by-phase creative journey">
-  <action>Read `../brain-methods.csv` on demand.</action>
-  <action>Map techniques to four creative phases: expansive exploration, pattern recognition, idea development, and action planning.</action>
-  <output>
-    Explain the value of a progressive technique flow as a structured creative journey.
-    <detail>
-      The journey should move from:
-      - broad idea generation
-      - to theme and pattern recognition
-      - to concept development
-      - to implementation planning
-    </detail>
-  </output>
-</step>
+- 🎯 Load brain techniques CSV only when needed for each phase
+- ⚠️ Present [B] back option and [C] continue options
+- 💾 Update frontmatter with progressive technique sequence
+- 📖 Route to technique execution after journey confirmation
+- 🚫 FORBIDDEN jumping ahead to later phases without proper foundation
 
-<step n="2" goal="Present the full journey map with rationale for each phase">
-  <output>
-    Show the full progressive journey map, including the selected technique for each phase, the goal of that phase, the energy profile, and the expected transition between phases.
-    <detail>
-      Include:
-      - total estimated time
-      - the primary session focus
-      - why each phase fits its role in the overall creative journey
-      - the benefits of systematic progression from divergence to convergence
-    </detail>
-  </output>
-  <ask>Ask whether the user wants to continue with the journey, customize one or more phases, request more detail, or return to approach selection.</ask>
-</step>
+## CONTEXT BOUNDARIES:
 
-<step n="3" goal="Handle journey customization when requested">
-  <branch if="user wants to customize the journey">
-    <output>
-      Offer phase-specific customization options and timing adjustments.
-      <detail>
-        Allow changes such as:
-        - swapping a technique in one phase
-        - compressing the journey for speed
-        - extending the journey with an extra phase or bonus technique
-        - emphasizing one phase more heavily based on the user's goals
-      </detail>
-    </output>
-    <ask>Ask which phase or journey property the user wants to modify.</ask>
-  </branch>
-  <branch if="user asks for more detail instead of changing the journey">
-    <output>Provide the requested explanation for the relevant phase or technique, then re-present the decision options.</output>
-  </branch>
-  <branch if="user chooses to return to approach selection">
-    <handoff path="./step-01-session-setup.md" />
-  </branch>
-</step>
+- Session context from Step 1 available for journey design
+- Brain techniques CSV with 36+ techniques across 7 categories
+- User wants systematic, comprehensive idea development
+- Must design natural progression from divergent to convergent thinking
 
-<step n="4" goal="Persist the confirmed progressive flow and route to execution">
-  <branch if="user confirms the progressive journey">
-    <action>Update frontmatter with `selected_approach: 'progressive-flow'`, `techniques_used`, and `stepsCompleted: [1, 2]`.</action>
-    <action>Append a technique-selection section to `{brainstorming_session_output_file}` that records the progressive phases and the journey rationale.</action>
-    <handoff path="./step-03-technique-execution.md" />
-  </branch>
-  <branch if="user requests another round of customization before confirming">
-    <goto step="3" />
-  </branch>
-</step>
+## YOUR TASK:
 
-## CHECKPOINT
+Design a progressive technique flow that takes users from expansive exploration through to actionable implementation planning.
 
-Halt for journey confirmation before advancing to technique execution.
+## PROGRESSIVE FLOW SEQUENCE:
 
-## ADVISORY
+### 1. Introduce Progressive Journey Concept
 
-- Preserve the logic of moving from broad exploration toward structured action.
-- Keep the journey flexible enough to reflect the user's goals and energy.
-- Do not skip directly to later phases without establishing an initial exploration foundation.
+Explain the value of systematic creative progression:
+
+"Excellent choice! Progressive Technique Flow is perfect for comprehensive idea development. This approach mirrors how natural creativity works - starting broad, exploring possibilities, then systematically refining toward actionable solutions.
+
+**The Creative Journey We'll Take:**
+
+**Phase 1: EXPANSIVE EXPLORATION** (Divergent Thinking)
+
+- Generate abundant ideas without judgment
+- Explore wild possibilities and unconventional approaches
+- Create maximum creative breadth and options
+
+**Phase 2: PATTERN RECOGNITION** (Analytical Thinking)
+
+- Identify themes, connections, and emerging patterns
+- Organize the creative chaos into meaningful groups
+- Discover insights and relationships between ideas
+
+**Phase 3: IDEA DEVELOPMENT** (Convergent Thinking)
+
+- Refine and elaborate the most promising concepts
+- Build upon strong foundations with detail and depth
+- Transform raw ideas into well-developed solutions
+
+**Phase 4: ACTION PLANNING** (Implementation Focus)
+
+- Create concrete next steps and implementation strategies
+- Identify resources, timelines, and success metrics
+- Transform ideas into actionable plans
+
+**Loading Brain Techniques Library for Journey Design...**"
+
+**Load CSV and parse:**
+
+- Read `../brain-methods.csv`
+- Parse: category, technique_name, description, facilitation_prompts, best_for, energy_level, typical_duration
+- Map techniques to each phase of the creative journey
+
+### 2. Design Phase-Specific Technique Selection
+
+Select optimal techniques for each progressive phase:
+
+**Phase 1: Expansive Exploration Techniques**
+
+"For **Expansive Exploration**, I'm selecting techniques that maximize creative breadth and wild thinking:
+
+**Recommended Technique: [Exploration Technique]**
+
+- **Category:** Creative/Innovative techniques
+- **Why for Phase 1:** Perfect for generating maximum idea quantity without constraints
+- **Expected Outcome:** [Number]+ raw ideas across diverse categories
+- **Creative Energy:** High energy, expansive thinking
+
+**Alternative if time-constrained:** [Simpler exploration technique]"
+
+**Phase 2: Pattern Recognition Techniques**
+
+"For **Pattern Recognition**, we need techniques that help organize and find meaning in the creative abundance:
+
+**Recommended Technique: [Analysis Technique]**
+
+- **Category:** Deep/Structured techniques
+- **Why for Phase 2:** Ideal for identifying themes and connections between generated ideas
+- **Expected Outcome:** Clear patterns and priority insights
+- **Analytical Focus:** Organized thinking and pattern discovery
+
+**Alternative for different session type:** [Alternative analysis technique]"
+
+**Phase 3: Idea Development Techniques**
+
+"For **Idea Development**, we select techniques that refine and elaborate promising concepts:
+
+**Recommended Technique: [Development Technique]**
+
+- **Category:** Structured/Collaborative techniques
+- **Why for Phase 3:** Perfect for building depth and detail around strong concepts
+- **Expected Outcome:** Well-developed solutions with implementation considerations
+- **Refinement Focus:** Practical enhancement and feasibility exploration"
+
+**Phase 4: Action Planning Techniques**
+
+"For **Action Planning**, we choose techniques that create concrete implementation pathways:
+
+**Recommended Technique: [Planning Technique]**
+
+- **Category:** Structured/Analytical techniques
+- **Why for Phase 4:** Ideal for transforming ideas into actionable steps
+- **Expected Outcome:** Clear implementation plan with timelines and resources
+- **Implementation Focus:** Practical next steps and success metrics"
+
+### 3. Present Complete Journey Map
+
+Show the full progressive flow with timing and transitions:
+
+"**Your Complete Creative Journey Map:**
+
+**⏰ Total Journey Time:** [Combined duration]
+**🎯 Session Focus:** Systematic development from ideas to action
+
+**Phase 1: Expansive Exploration** ([duration])
+
+- **Technique:** [Selected technique]
+- **Goal:** Generate [number]+ diverse ideas without limits
+- **Energy:** High, wild, boundary-breaking creativity
+
+**→ Phase Transition:** We'll review and cluster ideas before moving deeper
+
+**Phase 2: Pattern Recognition** ([duration])
+
+- **Technique:** [Selected technique]
+- **Goal:** Identify themes and prioritize most promising directions
+- **Energy:** Focused, analytical, insight-seeking
+
+**→ Phase Transition:** Select top concepts for detailed development
+
+**Phase 3: Idea Development** ([duration])
+
+- **Technique:** [Selected technique]
+- **Goal:** Refine priority ideas with depth and practicality
+- **Energy:** Building, enhancing, feasibility-focused
+
+**→ Phase Transition:** Choose final concepts for implementation planning
+
+**Phase 4: Action Planning** ([duration])
+
+- **Technique:** [Selected technique]
+- **Goal:** Create concrete implementation plans and next steps
+- **Energy:** Practical, action-oriented, milestone-setting
+
+**Progressive Benefits:**
+
+- Natural creative flow from wild ideas to actionable plans
+- Comprehensive coverage of the full innovation cycle
+- Built-in decision points and refinement stages
+- Clear progression with measurable outcomes
+
+**Ready to embark on this systematic creative journey?**
+
+**Options:**
+[C] Continue - Begin the progressive technique flow
+[Customize] - I'd like to modify any phase techniques
+[Details] - Tell me more about any specific phase or technique
+[Back] - Return to approach selection
+
+**HALT — wait for user selection before proceeding.**
+
+### 4. Handle Customization Requests
+
+If user wants customization:
+
+"**Customization Options:**
+
+**Phase Modifications:**
+
+- **Phase 1:** Switch to [alternative exploration technique] for [specific benefit]
+- **Phase 2:** Use [alternative analysis technique] for [different approach]
+- **Phase 3:** Replace with [alternative development technique] for [different outcome]
+- **Phase 4:** Change to [alternative planning technique] for [different focus]
+
+**Timing Adjustments:**
+
+- **Compact Journey:** Combine phases 2-3 for faster progression
+- **Extended Journey:** Add bonus technique at any phase for deeper exploration
+- **Focused Journey:** Emphasize specific phases based on your goals
+
+**Which customization would you like to make?**"
+
+### 5. Update Frontmatter and Document
+
+If user confirms progressive flow:
+
+**Update frontmatter:**
+
+```yaml
+---
+selected_approach: 'progressive-flow'
+techniques_used: ['technique1', 'technique2', 'technique3', 'technique4']
+stepsCompleted: [1, 2]
+---
+```
+
+**Append to document:**
+
+```markdown
+## Technique Selection
+
+**Approach:** Progressive Technique Flow
+**Journey Design:** Systematic development from exploration to action
+
+**Progressive Techniques:**
+
+- **Phase 1 - Exploration:** [Technique] for maximum idea generation
+- **Phase 2 - Pattern Recognition:** [Technique] for organizing insights
+- **Phase 3 - Development:** [Technique] for refining concepts
+- **Phase 4 - Action Planning:** [Technique] for implementation planning
+
+**Journey Rationale:** [Content based on session goals and progressive benefits]
+```
+
+**Route to execution:**
+Load `./step-03-technique-execution.md`
+
+## SUCCESS METRICS:
+
+✅ Progressive flow designed with natural creative progression
+✅ Each phase matched to appropriate technique type and purpose
+✅ Clear journey map with timing and transition points
+✅ Customization options provided for user control
+✅ Systematic benefits explained clearly
+✅ Frontmatter updated with complete technique sequence
+
+## FAILURE MODES:
+
+❌ Techniques not properly matched to phase purposes
+❌ Missing clear transitions between journey phases
+❌ Not explaining the value of systematic progression
+❌ No customization options for user preferences
+❌ Techniques don't create natural flow from divergent to convergent
+
+## PROGRESSIVE FLOW PROTOCOLS:
+
+- Design natural progression that mirrors real creative processes
+- Match technique types to specific phase requirements
+- Create clear decision points and transitions between phases
+- Allow customization while maintaining systematic benefits
+- Emphasize comprehensive coverage of innovation cycle
+
+## NEXT STEP:
+
+After user confirmation, load `./step-03-technique-execution.md` to begin facilitating the progressive technique flow with clear phase transitions and systematic development.
+
+Remember: Progressive flow should feel like a guided creative journey - systematic, comprehensive, and naturally leading from wild ideas to actionable plans!

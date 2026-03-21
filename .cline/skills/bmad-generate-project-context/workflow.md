@@ -1,32 +1,5 @@
-
 # Generate Project Context Workflow
 
-## META
-- managed_workflow_extraction: enabled
-- phase_type: workflow
-- source_format: procedural
-
-## EXECUTION
-<step n="1" goal="Review Detailed Guidance">
-  <action>Read the advisory, reference, and prose sections in this file completely before taking action.</action>
-</step>
-
-<step n="2" goal="Follow Workflow">
-  <action>Execute this file in order, preserving every approval gate, routing rule, document update instruction, and constraint described below.</action>
-</step>
-
-## CHECKPOINT
-Workflow progress can advance only after the required outputs, approvals, and routing conditions in this file are satisfied.
-
-## ADVISORY
-- Treat the <prose> section as the authoritative detailed instructions for this file.
-- Preserve all existing user-input pauses, continuation checks, and referenced companion files.
-- Keep any document templates, frontmatter updates, and save instructions exactly as authored.
-
-## REFERENCE
-- Original authored procedure retained below for managed workflow extraction compatibility.
-
-<prose>
 **Goal:** Create a concise, optimized `project-context.md` file containing critical rules, patterns, and guidelines that AI agents must follow when implementing code. This file focuses on unobvious details that LLMs need to be reminded of.
 
 **Your Role:** You are a technical facilitator working with a peer to capture the essential implementation rules that will ensure consistent, high-quality code generation across all AI agents working on the project.
@@ -68,4 +41,3 @@ Load config from `{project-root}/_bmad/bmm/config.yaml` and resolve:
 Load and execute `./steps/step-01-discover.md` to begin the workflow.
 
 **Note:** Input document discovery and initialization protocols are handled in step-01-discover.md.
-</prose>

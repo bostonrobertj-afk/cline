@@ -4,34 +4,9 @@ nextStepFile: './step-v-07-implementation-leakage-validation.md'
 prdFile: '{prd_file_path}'
 validationReportPath: '{validation_report_path}'
 ---
+
 # Step 6: Traceability Validation
 
-## META
-- managed_workflow_extraction: enabled
-- phase_type: phase
-- source_format: procedural
-
-## EXECUTION
-<step n="1" goal="Review Detailed Guidance">
-  <action>Read the advisory, reference, and prose sections in this file completely before taking action.</action>
-</step>
-
-<step n="2" goal="Follow Phase Procedure">
-  <action>Execute this file in order, preserving every approval gate, routing rule, document update instruction, and constraint described below.</action>
-</step>
-
-## CHECKPOINT
-This phase can be marked complete only after the required outputs, approvals, and routing conditions in this file are satisfied.
-
-## ADVISORY
-- Treat the <prose> section as the authoritative detailed instructions for this file.
-- Preserve all existing user-input pauses, continuation checks, and referenced companion files.
-- Keep any document templates, frontmatter updates, and save instructions exactly as authored.
-
-## REFERENCE
-- Original authored procedure retained below for managed workflow extraction compatibility.
-
-<prose>
 ## STEP GOAL:
 
 Validate the traceability chain from Executive Summary → Success Criteria → User Journeys → Functional Requirements is intact, ensuring every requirement traces back to a user need or business objective.
@@ -237,4 +212,3 @@ Without delay, read fully and follow: {nextStepFile} (step-v-07-implementation-l
 - Not auto-proceeding
 
 **Master Rule:** Every requirement should trace to a user need or business objective. Orphan FRs indicate broken traceability that must be fixed.
-</prose>

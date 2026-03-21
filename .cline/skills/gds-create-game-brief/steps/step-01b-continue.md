@@ -10,34 +10,9 @@ thisStepFile: './step-01b-continue.md'
 workflowFile: '{workflow_path}/workflow.md'
 outputFile: '{output_folder}/game-brief.md'
 ---
+
 # Step 1B: Workflow Continuation
 
-## META
-- managed_workflow_extraction: enabled
-- phase_type: phase
-- source_format: procedural
-
-## EXECUTION
-<step n="1" goal="Review Detailed Guidance">
-  <action>Read the advisory, reference, and prose sections in this file completely before taking action.</action>
-</step>
-
-<step n="2" goal="Follow Phase Procedure">
-  <action>Execute this file in order, preserving every approval gate, routing rule, document update instruction, and constraint described below.</action>
-</step>
-
-## CHECKPOINT
-This phase can be marked complete only after the required outputs, approvals, and routing conditions in this file are satisfied.
-
-## ADVISORY
-- Treat the <prose> section as the authoritative detailed instructions for this file.
-- Preserve all existing user-input pauses, continuation checks, and referenced companion files.
-- Keep any document templates, frontmatter updates, and save instructions exactly as authored.
-
-## REFERENCE
-- Original authored procedure retained below for managed workflow extraction compatibility.
-
-<prose>
 ## STEP GOAL:
 
 Resume the Game Brief workflow from where it was left off, ensuring smooth continuation with full context restoration.
@@ -175,4 +150,3 @@ ONLY WHEN [C continue option] is selected and [current state confirmed], will yo
 - Proceeding without user confirmation of current state
 
 **Master Rule:** Skipping steps, optimizing sequences, or not following exact instructions is FORBIDDEN and constitutes SYSTEM FAILURE.
-</prose>

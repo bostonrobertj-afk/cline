@@ -1,12 +1,8 @@
-
-# step 09 functional
-
 ## META
 
-- Goal: Synthesize functional requirements by capability area.
-- Execute this file in order.
-- Halt whenever user input, confirmation, or workflow gating is required.
-- Use the structured sections for extraction and handoff.
+- Goal: synthesize functional requirements by capability area.
+- Speak to the user in `{communication_language}`.
+- Requirements should be complete, organized, and implementation-useful.
 
 ## EXECUTION
 
@@ -42,4 +38,9 @@
 Wait for the user to approve the functional requirements before saving them.
 
 ## ADVISORY
+
 - Favor concrete behavior and capability language over implementation detail.
+
+## REFERENCE
+
+- The FR section is the core capability contract for the product.

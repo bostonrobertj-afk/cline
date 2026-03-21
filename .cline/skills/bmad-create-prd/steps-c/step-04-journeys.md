@@ -1,12 +1,8 @@
-
-# step 04 journeys
-
 ## META
 
-- Goal: Define narrative user journeys that connect user needs to product requirements.
-- Execute this file in order.
-- Halt whenever user input, confirmation, or workflow gating is required.
-- Use the structured sections for extraction and handoff.
+- Goal: define narrative user journeys that connect user needs to product requirements.
+- Speak to the user in `{communication_language}`.
+- Keep journeys story-like and outcome-oriented.
 
 ## EXECUTION
 
@@ -39,4 +35,9 @@
 Wait for the user to approve the journey set before saving it.
 
 ## ADVISORY
+
 - The journeys should be comprehensive enough to drive later functional requirements without turning into UI specs.
+
+## REFERENCE
+
+- Good journeys expose missing requirements early and help keep scope user-centered.

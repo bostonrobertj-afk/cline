@@ -1,12 +1,8 @@
-
-# step 07 project type
-
 ## META
 
-- Goal: Capture requirements that are specific to the project’s type or delivery model.
-- Execute this file in order.
-- Halt whenever user input, confirmation, or workflow gating is required.
-- Use the structured sections for extraction and handoff.
+- Goal: capture requirements that are specific to the project’s type or delivery model.
+- Speak to the user in `{communication_language}`.
+- Use the confirmed classification as the driver for this step.
 
 ## EXECUTION
 
@@ -38,4 +34,9 @@
 Wait for the user to approve the project-type section before saving it.
 
 ## ADVISORY
+
 - Keep this section grounded in the actual project type rather than generic software advice.
+
+## REFERENCE
+
+- Project-type content should make later architecture and planning work easier, not noisier.

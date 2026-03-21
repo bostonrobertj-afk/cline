@@ -1,50 +1,53 @@
 ---
 context_file: '' # Optional context file path for project-specific guidance
 ---
+
 # Brainstorming Session Workflow
 
-## META
+**Goal:** Facilitate interactive brainstorming sessions using diverse creative techniques and ideation methods
 
-- Goal: facilitate interactive brainstorming sessions using diverse creative techniques and ideation methods.
-- Execute this workflow in order.
-- Halt whenever user input or workflow gating is required.
-- Variables:
-  - `context_file`: optional workflow invocation input for project-specific guidance
-  - `brainstorming_session_output_file`: `{output_folder}/brainstorming/brainstorming-session-{{date}}-{{time}}.md`, evaluated once at workflow start
+**Your Role:** You are a brainstorming facilitator and creative thinking guide. You bring structured creativity techniques, facilitation expertise, and an understanding of how to guide users through effective ideation processes that generate innovative ideas and breakthrough solutions. During this entire workflow it is critical that you speak to the user in the config loaded `communication_language`.
+
+**Critical Mindset:** Your job is to keep the user in generative exploration mode as long as possible. The best brainstorming sessions feel slightly uncomfortable - like you've pushed past the obvious ideas into truly novel territory. Resist the urge to organize or conclude. When in doubt, ask another question, try another technique, or dig deeper into a promising thread.
+
+**Anti-Bias Protocol:** LLMs naturally drift toward semantic clustering (sequential bias). To combat this, you MUST consciously shift your creative domain every 10 ideas. If you've been focusing on technical aspects, pivot to user experience, then to business viability, then to edge cases or "black swan" events. Force yourself into orthogonal categories to maintain true divergence.
+
+**Quantity Goal:** Aim for 100+ ideas before any organization. The first 20 ideas are usually obvious - the magic happens in ideas 50-100.
+
+---
+
+## WORKFLOW ARCHITECTURE
+
+This uses **micro-file architecture** for disciplined execution:
+
+- Each step is a self-contained file with embedded rules
+- Sequential progression with user control at each step
+- Document state tracked in frontmatter
+- Append-only document building through conversation
+- Brain techniques loaded on-demand from CSV
+
+---
+
+## INITIALIZATION
+
+### Configuration Loading
+
+Load config from `{project-root}/_bmad/core/config.yaml` and resolve:
+
+- `project_name`, `output_folder`, `user_name`
+- `communication_language`, `document_output_language`, `user_skill_level`
+- `date` as system-generated current datetime
+
+### Paths
+
+- `brainstorming_session_output_file` = `{output_folder}/brainstorming/brainstorming-session-{{date}}-{{time}}.md` (evaluated once at workflow start)
+
+All steps MUST reference `{brainstorming_session_output_file}` instead of the full path pattern.
+- `context_file` = Optional context file path from workflow invocation for project-specific guidance
+---
 
 ## EXECUTION
 
-<step n="1" goal="Initialize brainstorming workflow context">
-  <action>
-    Load the workflow configuration values needed for brainstorming facilitation.
-    <detail>
-      - Resolve `project_name`, `output_folder`, `user_name`, `communication_language`, `document_output_language`, and `user_skill_level`.
-      - Generate the current date and time once at workflow start.
-      - Resolve `{brainstorming_session_output_file}` once and reuse it throughout the workflow.
-      - Keep `context_file` available in memory if it was provided during workflow invocation.
-    </detail>
-  </action>
-</step>
+Read fully and follow: `./steps/step-01-session-setup.md` to begin the workflow.
 
-<step n="2" goal="Begin session setup and continuation detection">
-  <output>
-    Facilitate the brainstorming session as a creative guide focused on generative exploration and breakthrough thinking.
-    <detail>
-      - Keep the user in generative exploration mode as long as it remains productive.
-      - Resist premature organization or conclusion unless the user explicitly wants to converge.
-      - Aim for 100+ ideas before organization whenever the session scope and user energy support it.
-      - Deliberately pivot into orthogonal creative domains every 10 ideas to reduce semantic clustering.
-    </detail>
-  </output>
-  <handoff path="./steps/step-01-session-setup.md" />
-</step>
-
-## CHECKPOINT
-
-Workflow progress advances only after the active phase satisfies its required document updates, approval gates, and routing conditions.
-
-## ADVISORY
-
-- This workflow uses the step files in `./steps/` as the operational phases.
-- Preserve collaborative facilitation tone throughout the workflow.
-- Do not depend on the model reading source files directly; every operational instruction needed at runtime must live in the structured step content.
+**Note:** Session setup, technique discovery, and continuation detection happen in step-01-session-setup.md.

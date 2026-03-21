@@ -18,34 +18,9 @@ engineMcps: '{workflow_path}/engine-mcps.yaml'
 advancedElicitationTask: '{project-root}/_bmad/core/workflows/advanced-elicitation/workflow.xml'
 partyModeWorkflow: '{project-root}/_bmad/core/workflows/party-mode/workflow.md'
 ---
+
 # Step 3: Engine & Starter Selection
 
-## META
-- managed_workflow_extraction: enabled
-- phase_type: phase
-- source_format: procedural
-
-## EXECUTION
-<step n="1" goal="Review Detailed Guidance">
-  <action>Read the advisory, reference, and prose sections in this file completely before taking action.</action>
-</step>
-
-<step n="2" goal="Follow Phase Procedure">
-  <action>Execute this file in order, preserving every approval gate, routing rule, document update instruction, and constraint described below.</action>
-</step>
-
-## CHECKPOINT
-This phase can be marked complete only after the required outputs, approvals, and routing conditions in this file are satisfied.
-
-## ADVISORY
-- Treat the <prose> section as the authoritative detailed instructions for this file.
-- Preserve all existing user-input pauses, continuation checks, and referenced companion files.
-- Keep any document templates, frontmatter updates, and save instructions exactly as authored.
-
-## REFERENCE
-- Original authored procedure retained below for managed workflow extraction compatibility.
-
-<prose>
 **Progress: Step 3 of 9** - Next: Architectural Decisions
 
 ## STEP GOAL:
@@ -373,4 +348,3 @@ ONLY WHEN [C continue option] is selected and [engine content saved with frontma
 
 **Master Rule:** Skipping steps, optimizing sequences, or not following exact instructions is FORBIDDEN and constitutes SYSTEM FAILURE.
 ```
-</prose>

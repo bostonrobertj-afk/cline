@@ -5,34 +5,9 @@ nextStepFile: './step-05-gate-decision.md'
 outputFile: '{test_artifacts}/traceability-report.md'
 tempOutputFile: '/tmp/tea-trace-coverage-matrix-{{timestamp}}.json'
 ---
+
 # Step 4: Complete Phase 1 - Coverage Matrix Generation
 
-## META
-- managed_workflow_extraction: enabled
-- phase_type: phase
-- source_format: procedural
-
-## EXECUTION
-<step n="1" goal="Review Detailed Guidance">
-  <action>Read the advisory, reference, and prose sections in this file completely before taking action.</action>
-</step>
-
-<step n="2" goal="Follow Phase Procedure">
-  <action>Execute this file in order, preserving every approval gate, routing rule, document update instruction, and constraint described below.</action>
-</step>
-
-## CHECKPOINT
-This phase can be marked complete only after the required outputs, approvals, and routing conditions in this file are satisfied.
-
-## ADVISORY
-- Treat the <prose> section as the authoritative detailed instructions for this file.
-- Preserve all existing user-input pauses, continuation checks, and referenced companion files.
-- Keep any document templates, frontmatter updates, and save instructions exactly as authored.
-
-## REFERENCE
-- Original authored procedure retained below for managed workflow extraction compatibility.
-
-<prose>
 ## STEP GOAL
 
 **Phase 1 Final Step:** Analyze coverage gaps (including endpoint/auth/error-path blind spots), generate recommendations, and output complete coverage matrix to temp file for Phase 2 (gate decision).
@@ -444,4 +419,3 @@ Load next step: `{nextStepFile}`
 - Invalid JSON output
 
 **Master Rule:** Phase 1 MUST output complete coverage matrix to temp file before Phase 2 can proceed.
-</prose>

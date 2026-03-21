@@ -13,34 +13,9 @@ execution_hints:
   autonomous: true
   iterative: true
 ---
+
 # Game Test Framework Setup
 
-## META
-- managed_workflow_extraction: enabled
-- phase_type: workflow
-- source_format: procedural
-
-## EXECUTION
-<step n="1" goal="Review Detailed Guidance">
-  <action>Read the advisory, reference, and prose sections in this file completely before taking action.</action>
-</step>
-
-<step n="2" goal="Follow Workflow">
-  <action>Execute this file in order, preserving every approval gate, routing rule, document update instruction, and constraint described below.</action>
-</step>
-
-## CHECKPOINT
-Workflow progress can advance only after the required outputs, approvals, and routing conditions in this file are satisfied.
-
-## ADVISORY
-- Treat the <prose> section as the authoritative detailed instructions for this file.
-- Preserve all existing user-input pauses, continuation checks, and referenced companion files.
-- Keep any document templates, frontmatter updates, and save instructions exactly as authored.
-
-## REFERENCE
-- Original authored procedure retained below for managed workflow extraction compatibility.
-
-<prose>
 **Workflow ID**: `gds-test-framework`
 **Version**: 1.0 (BMad v6)
 
@@ -427,4 +402,3 @@ After completing this workflow, provide a summary:
 ## Validation
 
 Refer to `checklist.md` for comprehensive validation criteria.
-</prose>

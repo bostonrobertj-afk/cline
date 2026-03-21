@@ -1,10 +1,8 @@
-
-# Step 14: Workflow Completion
-
 ## META
-Goal: Finalize the UX design workflow, update status tracking, and guide the user to relevant next workflows.
-Execute this file in order.
-Halt whenever user input, confirmation, or workflow gating is required.
+
+- Goal: finalize the UX design workflow, update status tracking, and guide the user to the most relevant next workflows.
+- Speak to the user in `{communication_language}`.
+- Do not load additional UX design phase files after this step.
 
 ## EXECUTION
 
@@ -32,4 +30,14 @@ Halt whenever user input, confirmation, or workflow gating is required.
 </step>
 
 ## CHECKPOINT
+
 Wait for the user to decide which next workflow path they want to take after completion.
+
+## ADVISORY
+
+- Suggested next actions such as wireframes, prototypes, architecture, Figma work, or epic creation are advisory follow-on options, not blocking completion tasks for this workflow.
+
+## REFERENCE
+
+- This completion step should not reopen unfinished design phases.
+- The UX design specification should remain the canonical reference for downstream design and development work.

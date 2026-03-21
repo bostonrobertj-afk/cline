@@ -1,12 +1,8 @@
-
-# step 02c executive summary
-
 ## META
 
-- Goal: Create an executive summary grounded in the confirmed discovery and vision context.
-- Execute this file in order.
-- Halt whenever user input, confirmation, or workflow gating is required.
-- Use the structured sections for extraction and handoff.
+- Goal: create an executive summary grounded in the confirmed discovery and vision context.
+- Speak to the user in `{communication_language}`.
+- Keep the summary concise and decision-useful.
 
 ## EXECUTION
 
@@ -30,4 +26,9 @@
 Wait for the user to approve the executive summary before saving it.
 
 ## ADVISORY
+
 - Keep the summary aligned with the classification and vision already confirmed.
+
+## REFERENCE
+
+- The executive summary is a high-level framing section, not a detailed requirements dump.

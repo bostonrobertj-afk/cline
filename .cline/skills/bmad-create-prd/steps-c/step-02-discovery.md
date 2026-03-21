@@ -1,11 +1,8 @@
-# step 02 discovery
-
 ## META
 
-- Goal: Classify the project and gather the foundational context needed for the PRD.
-- Execute this file in order.
-- Halt whenever user input, confirmation, or workflow gating is required.
-- Use the structured sections for extraction and handoff.
+- Goal: classify the project and gather the foundational context needed for the PRD.
+- Speak to the user in `{communication_language}`.
+- Use existing document context before asking redundant questions.
 
 ## EXECUTION
 
@@ -40,5 +37,10 @@
 Wait for explicit user confirmation of the project classification before saving it and moving forward.
 
 ## ADVISORY
+
 - Reuse existing documents aggressively so discovery focuses on gaps rather than repetition.
 - Keep the classification concise and actionable because later steps depend on it.
+
+## REFERENCE
+
+- Discovery should capture enough structure to guide vision, success criteria, domain requirements, and project-type requirements in later steps.

@@ -1,40 +1,295 @@
-# Step 02 - Project Context
+# step 02 context
 
-Workflow ID: `bmad-create-architecture`
+## META
+
+- Goal: context
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
 
 ## EXECUTION
-<step n="1" goal="Review project requirements">
-  <action>Extract and analyze functional requirements, non-functional requirements, technical constraints, and dependencies.</action>
-  <detail>Count and categorize requirements, then map epics and user stories to architectural components.</detail>
+
+<step n="1" goal="Review Project Requirements">
+  <action>Extract and analyze Functional Requirements (FRs)</action>
+  <action>Identify Non-Functional Requirements (NFRs) like performance, security, compliance</action>
+  <action>Note any technical constraints or dependencies mentioned</action>
+  <action>Count and categorize requirements to understand project scale</action>
+  <action>Map epic structure and user stories to architectural components</action>
 </step>
 
-<step n="2" goal="Assess project scale and complexity">
-  <action>Evaluate real-time needs, multi-tenancy, compliance, integration complexity, and user interaction complexity.</action>
+<step n="2" goal="Project Scale Assessment">
+  <action>Real-time features requirements</action>
+  <action>Multi-tenancy needs</action>
+  <action>Regulatory compliance requirements</action>
+  <action>Integration complexity</action>
+  <action>User interaction complexity</action>
 </step>
 
-<step n="3" goal="Reflect the architectural understanding">
-  <action>Summarize the core functionality, critical NFRs, unique technical challenges, and any regulatory concerns.</action>
-  <detail>If UX documents were loaded, include the relevant UX-driven technical implications in the summary.</detail>
+<step n="3" goal="Reflect Understanding">
+  <action>[Summarize core functionality from FRs]</action>
+  <action>[Note critical NFRs that will shape architecture]</action>
+  <action>{if_ux_loaded}[Note UX complexity and technical requirements]{/if_ux_loaded}</action>
+  <action>[Identify unique technical challenges or constraints]</action>
+  <action>[Highlight any regulatory or compliance requirements]</action>
 </step>
 
-<step n="4" goal="Draft the project context section">
-  <action>Capture the primary domain, complexity level, and estimated architectural component count.</action>
-  <detail>Use the gathered requirements to create a concise foundation for the rest of the architecture workflow.</detail>
+<step n="4" goal="Generate Project Context Content">
+  <action>Primary domain:</action>
+  <action>Complexity level:</action>
+  <action>Estimated architectural components:</action>
 </step>
 
-<step n="5" goal="Present the draft and prompt for action">
-  <output>Show the drafted project context analysis and explain that it will anchor the architecture decisions.</output>
-  <ask>What would you like to do: [A] Advanced Elicitation, [P] Party Mode, or [C] Continue?</ask>
+<step n="5" goal="Present Content and Menu">
+  <action>This sets the foundation for our architectural decisions.</action>
+  <ask>Here's what I'll add to the document: [Show the complete markdown content from step 4] What would you like to do?</ask>
+  <output>Show the generated content and present choices: &quot;I've drafted the Project Context Analysis based on your requirements.</output>
+  <output>[A] Advanced Elicitation - Let's dive deeper into architectural implications [P] Party Mode - Bring different perspectives to analyze requirements [C] Continue - Save this analysis and begin architectural decisions&quot;</output>
 </step>
 
-<step n="6" goal="Handle the selected menu option">
-  <action>Use Advanced Elicitation or Party Mode to improve the context analysis when selected.</action>
-  <action>Update frontmatter to `stepsCompleted: [1, 2]` when the user chooses C.</action>
-  <output>Append the final content to `{planning_artifacts}/architecture.md` and return to the A/P/C menu when changes are accepted or rejected.</output>
+<step n="6" goal="Handle Menu Selection">
+  <action>Invoke the bmad-advanced-elicitation skill with the current context analysis</action>
+  <action>Process the enhanced architectural insights that come back</action>
+  <action>Invoke the bmad-party-mode skill with the current project context</action>
+  <action>Process the collaborative improvements to architectural understanding</action>
+  <action>Update frontmatter: stepsCompleted: [1, 2]</action>
+  <ask>Ask user: &quot;Accept these enhancements to the project context analysis? (y/n)&quot;</ask>
+  <ask>Ask user: &quot;Accept these changes to the project context analysis? (y/n)&quot;</ask>
+  <output>If yes: Update content with improvements, then return to A/P/C menu</output>
+  <output>If no: Keep original content, then return to A/P/C menu</output>
+  <output>Append the final content to {planning_artifacts}/architecture.md</output>
 </step>
 
 ## CHECKPOINT
-Halt for required user confirmation, menu selection, continuation gating, or missing input before proceeding.
+
+Halt for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.
 
 ## ADVISORY
+
 - Persist workflow state updates whenever this phase writes or updates a managed artifact.
+
+## REFERENCE
+
+<prose>
+## MANDATORY EXECUTION RULES (READ FIRST):
+
+- 🛑 NEVER generate content without user input
+
+- 📖 CRITICAL: ALWAYS read the complete step file before taking any action - partial understanding leads to incomplete decisions
+- 🔄 CRITICAL: When loading next step with 'C', ensure the entire file is read and understood before proceeding
+- ✅ ALWAYS treat this as collaborative discovery between architectural peers
+- 📋 YOU ARE A FACILITATOR, not a content generator
+- 💬 FOCUS on understanding project scope and requirements for architecture
+- 🎯 ANALYZE loaded documents, don't assume or generate requirements
+- ⚠️ ABSOLUTELY NO TIME ESTIMATES - AI development speed has fundamentally changed
+- ✅ YOU MUST ALWAYS SPEAK OUTPUT In your Agent communication style with the config `{communication_language}`
+
+## EXECUTION PROTOCOLS:
+
+- 🎯 Show your analysis before taking any action
+- ⚠️ Present A/P/C menu after generating project context analysis
+- 💾 ONLY save when user chooses C (Continue)
+- 📖 Update frontmatter `stepsCompleted: [1, 2]` before loading next step
+- 🚫 FORBIDDEN to load next step until C is selected
+
+## COLLABORATION MENUS (A/P/C):
+
+This step will generate content and present choices:
+
+- **A (Advanced Elicitation)**: Use discovery protocols to develop deeper insights about project context and architectural implications
+- **P (Party Mode)**: Bring multiple perspectives to analyze project requirements from different architectural angles
+- **C (Continue)**: Save the content to the document and proceed to next step
+
+## PROTOCOL INTEGRATION:
+
+- When 'A' selected: Invoke the `bmad-advanced-elicitation` skill
+- When 'P' selected: Invoke the `bmad-party-mode` skill
+- PROTOCOLS always return to display this step's A/P/C menu after the A or P have completed
+- User accepts/rejects protocol changes before proceeding
+
+## CONTEXT BOUNDARIES:
+
+- Current document and frontmatter from step 1 are available
+- Input documents already loaded are in memory (PRD, epics, UX spec, etc.)
+- Focus on architectural implications of requirements
+- No technology decisions yet - pure analysis phase
+
+## YOUR TASK:
+
+Fully read and Analyze the loaded project documents to understand architectural scope, requirements, and constraints before beginning decision making.
+
+## CONTEXT ANALYSIS SEQUENCE:
+
+### 1. Review Project Requirements
+
+**From PRD Analysis:**
+
+- Extract and analyze Functional Requirements (FRs)
+- Identify Non-Functional Requirements (NFRs) like performance, security, compliance
+- Note any technical constraints or dependencies mentioned
+- Count and categorize requirements to understand project scale
+
+**From Epics/Stories (if available):**
+
+- Map epic structure and user stories to architectural components
+- Extract acceptance criteria for technical implications
+- Identify cross-cutting concerns that span multiple epics
+- Estimate story complexity for architectural planning
+
+**From UX Design (if available):**
+
+- Extract architectural implications from UX requirements:
+  - Component complexity (simple forms vs rich interactions)
+  - Animation/transition requirements
+  - Real-time update needs (live data, collaborative features)
+  - Platform-specific UI requirements
+  - Accessibility standards (WCAG compliance level)
+  - Responsive design breakpoints
+  - Offline capability requirements
+  - Performance expectations (load times, interaction responsiveness)
+
+### 2. Project Scale Assessment
+
+Calculate and present project complexity:
+
+**Complexity Indicators:**
+
+- Real-time features requirements
+- Multi-tenancy needs
+- Regulatory compliance requirements
+- Integration complexity
+- User interaction complexity
+- Data complexity and volume
+
+### 3. Reflect Understanding
+
+Present your analysis back to user for validation:
+
+"I'm reviewing your project documentation for {{project_name}}.
+
+{if_epics_loaded}I see {{epic_count}} epics with {{story_count}} total stories.{/if_epics_loaded}
+{if_no_epics}I found {{fr_count}} functional requirements organized into {{fr_category_list}}.{/if_no_epics}
+{if_ux_loaded}I also found your UX specification which defines the user experience requirements.{/if_ux_loaded}
+
+**Key architectural aspects I notice:**
+
+- [Summarize core functionality from FRs]
+- [Note critical NFRs that will shape architecture]
+- {if_ux_loaded}[Note UX complexity and technical requirements]{/if_ux_loaded}
+- [Identify unique technical challenges or constraints]
+- [Highlight any regulatory or compliance requirements]
+
+**Scale indicators:**
+
+- Project complexity appears to be: [low/medium/high/enterprise]
+- Primary technical domain: [web/mobile/api/backend/full-stack/etc]
+- Cross-cutting concerns identified: [list major ones]
+
+This analysis will help me guide you through the architectural decisions needed to ensure AI agents implement this consistently.
+
+Does this match your understanding of the project scope and requirements?"
+
+### 4. Generate Project Context Content
+
+Prepare the content to append to the document:
+
+#### Content Structure:
+
+```markdown
+## Project Context Analysis
+
+### Requirements Overview
+
+**Functional Requirements:**
+{{analysis of FRs and what they mean architecturally}}
+
+**Non-Functional Requirements:**
+{{NFRs that will drive architectural decisions}}
+
+**Scale & Complexity:**
+{{project_scale_assessment}}
+
+- Primary domain: {{technical_domain}}
+- Complexity level: {{complexity_level}}
+- Estimated architectural components: {{component_count}}
+
+### Technical Constraints & Dependencies
+
+{{known_constraints_dependencies}}
+
+### Cross-Cutting Concerns Identified
+
+{{concerns_that_will_affect_multiple_components}}
+```
+
+### 5. Present Content and Menu
+
+Show the generated content and present choices:
+
+"I've drafted the Project Context Analysis based on your requirements. This sets the foundation for our architectural decisions.
+
+**Here's what I'll add to the document:**
+
+[Show the complete markdown content from step 4]
+
+**What would you like to do?**
+[A] Advanced Elicitation - Let's dive deeper into architectural implications
+[P] Party Mode - Bring different perspectives to analyze requirements
+[C] Continue - Save this analysis and begin architectural decisions"
+
+### 6. Handle Menu Selection
+
+#### If 'A' (Advanced Elicitation):
+
+- Invoke the `bmad-advanced-elicitation` skill with the current context analysis
+- Process the enhanced architectural insights that come back
+- Ask user: "Accept these enhancements to the project context analysis? (y/n)"
+- If yes: Update content with improvements, then return to A/P/C menu
+- If no: Keep original content, then return to A/P/C menu
+
+#### If 'P' (Party Mode):
+
+- Invoke the `bmad-party-mode` skill with the current project context
+- Process the collaborative improvements to architectural understanding
+- Ask user: "Accept these changes to the project context analysis? (y/n)"
+- If yes: Update content with improvements, then return to A/P/C menu
+- If no: Keep original content, then return to A/P/C menu
+
+#### If 'C' (Continue):
+
+- Append the final content to `{planning_artifacts}/architecture.md`
+- Update frontmatter: `stepsCompleted: [1, 2]`
+- Load `./step-03-starter.md`
+
+## APPEND TO DOCUMENT:
+
+When user selects 'C', append the content directly to the document using the structure from step 4.
+
+## SUCCESS METRICS:
+
+✅ All input documents thoroughly analyzed for architectural implications
+✅ Project scope and complexity clearly assessed and validated
+✅ Technical constraints and dependencies identified
+✅ Cross-cutting concerns mapped for architectural planning
+✅ User confirmation of project understanding
+✅ A/P/C menu presented and handled correctly
+✅ Content properly appended to document when C selected
+
+## FAILURE MODES:
+
+❌ Skimming documents without deep architectural analysis
+❌ Missing or misinterpreting critical NFRs
+❌ Not validating project understanding with user
+❌ Underestimating complexity indicators
+❌ Generating content without real analysis of loaded documents
+❌ Not presenting A/P/C menu after content generation
+
+❌ **CRITICAL**: Reading only partial step file - leads to incomplete understanding and poor decisions
+❌ **CRITICAL**: Proceeding with 'C' without fully reading and understanding the next step file
+❌ **CRITICAL**: Making decisions without complete understanding of step requirements and protocols
+
+## NEXT STEP:
+
+After user selects 'C' and content is saved to document, load `./step-03-starter.md` to evaluate starter template options.
+
+Remember: Do NOT proceed to step-03 until user explicitly selects 'C' from the A/P/C menu and content is saved!
+</prose>

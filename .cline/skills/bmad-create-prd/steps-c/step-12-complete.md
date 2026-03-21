@@ -1,12 +1,8 @@
-
-# step 12 complete
-
 ## META
 
-- Goal: Finalize the PRD workflow, update status tracking, and guide the user to next steps.
-- Execute this file in order.
+- Goal: finalize the PRD workflow, update status tracking, and guide the user to next steps.
+- Speak to the user in `{communication_language}`.
 - Do not load any additional PRD steps after this file.
-- Use the structured sections for extraction and handoff.
 
 ## EXECUTION
 
@@ -25,7 +21,7 @@
 </step>
 
 <step n="4" goal="Suggest next workflows">
-  <action>Point the user toward `bmad-help` so they can see the relevant next workflow options for architecture, UX, epics, or validation.</action>
+  <action>Invoke the `bmad-help` skill so the user can see the relevant next workflow options for architecture, UX, epics, or validation.</action>
 </step>
 
 <step n="5" goal="Confirm completion clearly">
@@ -37,4 +33,9 @@
 Wait for the user to choose whether to run validation now or proceed to later workflows.
 
 ## ADVISORY
+
 - The completed PRD should remain the source of truth for future design, architecture, and development planning.
+
+## REFERENCE
+
+- Completion should leave the user with a clear understanding of the PRD’s readiness and the most relevant next workflow choices.

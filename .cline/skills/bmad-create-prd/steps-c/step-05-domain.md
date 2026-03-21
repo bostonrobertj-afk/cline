@@ -1,12 +1,8 @@
-
-# step 05 domain
-
 ## META
 
-- Goal: Capture domain-specific constraints, regulations, integrations, and risk mitigations.
-- Execute this file in order.
-- Halt whenever user input, confirmation, or workflow gating is required.
-- Use the structured sections for extraction and handoff.
+- Goal: capture domain-specific constraints, regulations, integrations, and risk mitigations.
+- Speak to the user in `{communication_language}`.
+- Skip generic filler and focus on domain-specific obligations.
 
 ## EXECUTION
 
@@ -38,4 +34,9 @@
 Wait for the user to confirm the domain-specific requirements before saving them.
 
 ## ADVISORY
+
 - If the project domain is simple, keep this section short rather than inventing complexity.
+
+## REFERENCE
+
+- Domain requirements should add only the concerns that materially shape design, delivery, or compliance.

@@ -1,34 +1,37 @@
-# Step 1: UX Design Workflow Initialization
+# step 01 init
 
 ## META
-Goal: Initialize the UX design workflow and determine whether this is a fresh run or a continuation.
-Execute this file in order.
-Halt whenever user input, confirmation, or workflow gating is required.
+
+- Goal: init
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
 
 ## EXECUTION
 
 <step n="1" goal="Check for Existing Workflow">
-  <action>Check whether `{planning_artifacts}/ux-design-specification.md` exists.</action>
-  <action>If it exists, inspect the complete document, including frontmatter.</action>
-  <action>If it does not exist, treat this as a fresh workflow.</action>
+  <action>Look for file at {planning_artifacts}/ux-design-specification.md</action>
+  <action>If exists, read the complete file including frontmatter</action>
+  <action>If not exists, this is a fresh workflow</action>
 </step>
 
 <step n="2" goal="Handle Continuation (If Document Exists)">
-  <branch if="the document exists and frontmatter includes `stepsCompleted`">
-    <action>Stop here and load `./step-01b-continue.md`.</action>
-    <action>Do not perform initialization tasks in this step.</action>
-  </branch>
+  <action>STOP here and load ./step-01b-continue.md immediately</action>
+  <action>Do not proceed with any initialization tasks</action>
+  <action>Let step-01b handle the continuation logic</action>
+  <ask>If the document exists and has frontmatter with stepsCompleted: - STOP here and load ./step-01b-continue.md immediately - Do not proceed with any initialization tasks - Let step-01b handle the continuation logic</ask>
 </step>
 
 <step n="3" goal="Fresh Workflow Setup (If No Document)">
-  <action>Search `{planning_artifacts}`, `{output_folder}`, `{product_knowledge}`, and `{project-root}/docs` for supporting context.</action>
-  <detail>
-    Look for product briefs, research documents, broader project documentation, and project context files. If a document appears as a sharded folder, check for `index.md` first and then load the full shard.
-  </detail>
-  <ask>Confirm the documents you found with the user and ask whether anything else should be included.</ask>
-  <action>Load all documents the user confirms or provides and track them in frontmatter `inputDocuments`.</action>
-  <action>Create `{planning_artifacts}/ux-design-specification.md` from `../ux-design-template.md` and initialize frontmatter.</action>
-  <output>Report the setup summary, list the documents loaded, and ask whether to continue to UX discovery.</output>
+  <action>{planning_artifacts}/**</action>
+  <action>{output_folder}/**</action>
+  <action>{product_knowledge}/**</action>
+  <action>{project-root}/docs/**</action>
+  <action>Product Brief (brief.md)</action>
+  <ask>For Example, if searching for foo.md and not found, also search for a folder called foo/index.md (which indicates sharded content) Try to discover the following: - Product Brief (brief.md) - Research Documents (prd.md) - Project Documentation (generally multiple documents might be found for this in the {product_knowledge} or docs folder.) - Project Context (/project-context.md) Confirm what you have found with the user, along with asking if the user wants to provide anything else.</ask>
+  <ask>Documents Found: - PRD: {number of PRD files loaded or &quot;None found&quot;} - Product brief: {number of brief files loaded or &quot;None found&quot;} - Other context: {number of other files loaded or &quot;None found&quot;} Files loaded:** {list of specific file names or &quot;No additional documents found&quot;} Do you have any other documents you'd like me to include, or shall we continue to the next step?</ask>
+  <output>Create Initial Document Copy the template from ../ux-design-template.md to {planning_artifacts}/ux-design-specification.md Initialize frontmatter in the template.</output>
+  <output>Complete Initialization and Report Complete setup and report to user: Document Setup: - Created: {planning_artifacts}/ux-design-specification.md from template - Initialized frontmatter with workflow state Input Documents Discovered: Report what was found: &quot;Welcome !</output>
 </step>
 
 ## CHECKPOINT
@@ -38,3 +41,141 @@ Halt for any required user confirmation, menu selection, continuation gate, or m
 ## ADVISORY
 
 - Persist workflow state updates whenever this phase writes or updates a managed artifact.
+
+## REFERENCE
+
+<prose>
+## MANDATORY EXECUTION RULES (READ FIRST):
+
+- 🛑 NEVER generate content without user input
+
+- 📖 CRITICAL: ALWAYS read the complete step file before taking any action - partial understanding leads to incomplete decisions
+- 🔄 CRITICAL: When loading next step with 'C', ensure the entire file is read and understood before proceeding
+- ✅ ALWAYS treat this as collaborative discovery between UX facilitator and stakeholder
+- 📋 YOU ARE A UX FACILITATOR, not a content generator
+- 💬 FOCUS on initialization and setup only - don't look ahead to future steps
+- 🚪 DETECT existing workflow state and handle continuation properly
+- ✅ YOU MUST ALWAYS SPEAK OUTPUT In your Agent communication style with the config `{communication_language}`
+
+## EXECUTION PROTOCOLS:
+
+- 🎯 Show your analysis before taking any action
+- 💾 Initialize document and update frontmatter
+- 📖 Set up frontmatter `stepsCompleted: [1]` before loading next step
+- 🚫 FORBIDDEN to load next step until setup is complete
+
+## CONTEXT BOUNDARIES:
+
+- Variables from workflow.md are available in memory
+- Previous context = what's in output document + frontmatter
+- Don't assume knowledge from other steps
+- Input document discovery happens in this step
+
+## YOUR TASK:
+
+Initialize the UX design workflow by detecting continuation state and setting up the design specification document.
+
+## INITIALIZATION SEQUENCE:
+
+### 1. Check for Existing Workflow
+
+First, check if the output document already exists:
+
+- Look for file at `{planning_artifacts}/*ux-design-specification*.md`
+- If exists, read the complete file including frontmatter
+- If not exists, this is a fresh workflow
+
+### 2. Handle Continuation (If Document Exists)
+
+If the document exists and has frontmatter with `stepsCompleted`:
+
+- **STOP here** and load `./step-01b-continue.md` immediately
+- Do not proceed with any initialization tasks
+- Let step-01b handle the continuation logic
+
+### 3. Fresh Workflow Setup (If No Document)
+
+If no document exists or no `stepsCompleted` in frontmatter:
+
+#### A. Input Document Discovery
+
+Discover and load context documents using smart discovery. Documents can be in the following locations:
+- {planning_artifacts}/**
+- {output_folder}/**
+- {product_knowledge}/**
+- {project-root}/docs/**
+
+Also - when searching - documents can be a single markdown file, or a folder with an index and multiple files. For Example, if searching for `*foo*.md` and not found, also search for a folder called *foo*/index.md (which indicates sharded content)
+
+Try to discover the following:
+- Product Brief (`*brief*.md`)
+- Research Documents (`*prd*.md`)
+- Project Documentation (generally multiple documents might be found for this in the `{product_knowledge}` or `docs` folder.)
+- Project Context (`**/project-context.md`)
+
+<critical>Confirm what you have found with the user, along with asking if the user wants to provide anything else. Only after this confirmation will you proceed to follow the loading rules</critical>
+
+**Loading Rules:**
+
+- Load ALL discovered files completely that the user confirmed or provided (no offset/limit)
+- If there is a project context, whatever is relevant should try to be biased in the remainder of this whole workflow process
+- For sharded folders, load ALL files to get complete picture, using the index first to potentially know the potential of each document
+- index.md is a guide to what's relevant whenever available
+- Track all successfully loaded files in frontmatter `inputDocuments` array
+
+#### B. Create Initial Document
+
+Copy the template from `../ux-design-template.md` to `{planning_artifacts}/ux-design-specification.md`
+Initialize frontmatter in the template.
+
+#### C. Complete Initialization and Report
+
+Complete setup and report to user:
+
+**Document Setup:**
+
+- Created: `{planning_artifacts}/ux-design-specification.md` from template
+- Initialized frontmatter with workflow state
+
+**Input Documents Discovered:**
+Report what was found:
+"Welcome {{user_name}}! I've set up your UX design workspace for {{project_name}}.
+
+**Documents Found:**
+
+- PRD: {number of PRD files loaded or "None found"}
+- Product brief: {number of brief files loaded or "None found"}
+- Other context: {number of other files loaded or "None found"}
+
+**Files loaded:** {list of specific file names or "No additional documents found"}
+
+Do you have any other documents you'd like me to include, or shall we continue to the next step?
+
+[C] Continue to UX discovery"
+
+## NEXT STEP:
+
+After user selects [C] to continue, ensure the file `{planning_artifacts}/ux-design-specification.md` has been created and saved, and then load `./step-02-discovery.md` to begin the UX discovery phase.
+
+Remember: Do NOT proceed to step-02 until output file has been updated and user explicitly selects [C] to continue!
+
+## SUCCESS METRICS:
+
+✅ Existing workflow detected and handed off to step-01b correctly
+✅ Fresh workflow initialized with template and frontmatter
+✅ Input documents discovered and loaded using sharded-first logic
+✅ All discovered files tracked in frontmatter `inputDocuments`
+✅ User confirmed document setup and can proceed
+
+## FAILURE MODES:
+
+❌ Proceeding with fresh initialization when existing workflow exists
+❌ Not updating frontmatter with discovered input documents
+❌ Creating document without proper template
+❌ Not checking sharded folders first before whole files
+❌ Not reporting what documents were found to user
+
+❌ **CRITICAL**: Reading only partial step file - leads to incomplete understanding and poor decisions
+❌ **CRITICAL**: Proceeding with 'C' without fully reading and understanding the next step file
+❌ **CRITICAL**: Making decisions without complete understanding of step requirements and protocols
+</prose>

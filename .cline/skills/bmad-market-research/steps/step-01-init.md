@@ -1,41 +1,184 @@
-# Step 01 - Market Research Initialization
+# Market Research Step 1: Market Research Initialization
 
-Workflow ID: `bmad-market-research`
+## MANDATORY EXECUTION RULES (READ FIRST):
 
-## EXECUTION
-<step n="1" goal="Confirm the research context">
-  <action>Read the discovered `research_topic` and `research_goals` from the workflow context.</action>
-  <action>Keep the scope limited to market-research setup and do not begin web research yet.</action>
-  <detail>Use the existing topic and goals from the triggering conversation so the user does not have to repeat them.</detail>
-</step>
+- 🛑 NEVER generate research content in init step
+- ✅ ALWAYS confirm understanding of user's research goals
+- 📋 YOU ARE A MARKET RESEARCH FACILITATOR, not content generator
+- 💬 FOCUS on clarifying scope and approach
+- 🔍 NO WEB RESEARCH in init - that's for later steps
+- 📖 CRITICAL: ALWAYS read the complete step file before taking any action - partial understanding leads to incomplete research
+- 🔄 CRITICAL: When loading next step with 'C', ensure the entire file is read and understood before proceeding
+- ✅ YOU MUST ALWAYS SPEAK OUTPUT In your Agent communication style with the config `{communication_language}`
 
-<step n="2" goal="Align on scope before research begins">
-  <ask>Confirm that the topic, goals, and intended market-research scope are understood.</ask>
-  <detail>Cover the core topic, the research goals, the likely market focus, and any region or segment priorities the user wants to add.</detail>
-</step>
+## EXECUTION PROTOCOLS:
 
-<step n="3" goal="Document the initial scope">
-  <action>Append a brief initialization summary to `{outputFile}` with the confirmed topic, goals, date, scope focus, and research approach.</action>
-  <detail>Keep this section about setup only. Do not add market findings in the initialization phase.</detail>
-</step>
+- 🎯 Confirm research understanding before proceeding
+- ⚠️ Present [C] continue option after scope clarification
+- 💾 Write initial scope document immediately
+- 📖 Update frontmatter `stepsCompleted: [1]` before loading next step
+- 🚫 FORBIDDEN to load next step until C is selected
 
-<step n="4" goal="Present the continuation gate">
-  <output>Summarize the confirmed scope and invite the user to continue.</output>
-  <ask>Offer `[C] Continue` to proceed or `[Modify]` to adjust the scope.</ask>
-  <branch if="user chooses `C`">
-    <action>Update frontmatter `stepsCompleted: [1]`.</action>
-    <output>Load `./step-02-customer-behavior.md`.</output>
-  </branch>
-  <branch if="user chooses `Modify`">
-    <action>Capture the requested scope adjustments and update the initialization section.</action>
-    <output>Re-present the revised scope for confirmation.</output>
-  </branch>
-</step>
+## CONTEXT BOUNDARIES:
 
-## CHECKPOINT
-Halt for user confirmation before moving to customer analysis.
+- Current document and frontmatter from main workflow discovery are available
+- Research type = "market" is already set
+- **Research topic = "{{research_topic}}"** - discovered from initial discussion
+- **Research goals = "{{research_goals}}"** - captured from initial discussion
+- Focus on market research scope clarification
+- Web search capabilities are enabled for later steps
 
-## ADVISORY
-- Keep the first phase focused on understanding and framing the research, not on market findings.
-- Preserve the append-only flow into the research document.
-- Do not advance until the user explicitly chooses to continue.
+## YOUR TASK:
+
+Initialize market research by confirming understanding of {{research_topic}} and establishing clear research scope.
+
+## MARKET RESEARCH INITIALIZATION:
+
+### 1. Confirm Research Understanding
+
+**INITIALIZE - DO NOT RESEARCH YET**
+
+Start with research confirmation:
+"I understand you want to conduct **market research** for **{{research_topic}}** with these goals: {{research_goals}}
+
+**My Understanding of Your Research Needs:**
+
+- **Research Topic**: {{research_topic}}
+- **Research Goals**: {{research_goals}}
+- **Research Type**: Market Research
+- **Approach**: Comprehensive market analysis with source verification
+
+**Market Research Areas We'll Cover:**
+
+- Market size, growth dynamics, and trends
+- Customer insights and behavior analysis
+- Competitive landscape and positioning
+- Strategic recommendations and implementation guidance
+
+**Does this accurately capture what you're looking for?**"
+
+### 2. Refine Research Scope
+
+Gather any clarifications needed:
+
+#### Scope Clarification Questions:
+
+- "Are there specific customer segments or aspects of {{research_topic}} we should prioritize?"
+- "Should we focus on specific geographic regions or global market?"
+- "Is this for market entry, expansion, product development, or other business purpose?"
+- "Any competitors or market segments you specifically want us to analyze?"
+
+### 3. Document Initial Scope
+
+**WRITE IMMEDIATELY TO DOCUMENT**
+
+Write initial research scope to document:
+
+```markdown
+# Market Research: {{research_topic}}
+
+## Research Initialization
+
+### Research Understanding Confirmed
+
+**Topic**: {{research_topic}}
+**Goals**: {{research_goals}}
+**Research Type**: Market Research
+**Date**: {{date}}
+
+### Research Scope
+
+**Market Analysis Focus Areas:**
+
+- Market size, growth projections, and dynamics
+- Customer segments, behavior patterns, and insights
+- Competitive landscape and positioning analysis
+- Strategic recommendations and implementation guidance
+
+**Research Methodology:**
+
+- Current web data with source verification
+- Multiple independent sources for critical claims
+- Confidence level assessment for uncertain data
+- Comprehensive coverage with no critical gaps
+
+### Next Steps
+
+**Research Workflow:**
+
+1. ✅ Initialization and scope setting (current step)
+2. Customer Insights and Behavior Analysis
+3. Competitive Landscape Analysis
+4. Strategic Synthesis and Recommendations
+
+**Research Status**: Scope confirmed, ready to proceed with detailed market analysis
+```
+
+### 4. Present Confirmation and Continue Option
+
+Show initial scope document and present continue option:
+"I've documented our understanding and initial scope for **{{research_topic}}** market research.
+
+**What I've established:**
+
+- Research topic and goals confirmed
+- Market analysis focus areas defined
+- Research methodology verification
+- Clear workflow progression
+
+**Document Status:** Initial scope written to research file for your review
+
+**Ready to begin detailed market research?**
+[C] Continue - Confirm scope and proceed to customer insights analysis
+[Modify] Suggest changes to research scope before proceeding
+
+**HALT — wait for user response before proceeding.**
+
+### 5. Handle User Response
+
+#### If 'C' (Continue):
+
+- Update frontmatter: `stepsCompleted: [1]`
+- Add confirmation note to document: "Scope confirmed by user on {{date}}"
+- Load: `./step-02-customer-behavior.md`
+
+#### If 'Modify':
+
+- Gather user changes to scope
+- Update document with modifications
+- Re-present updated scope for confirmation
+
+## SUCCESS METRICS:
+
+✅ Research topic and goals accurately understood
+✅ Market research scope clearly defined
+✅ Initial scope document written immediately
+✅ User opportunity to review and modify scope
+✅ [C] continue option presented and handled correctly
+✅ Document properly updated with scope confirmation
+
+## FAILURE MODES:
+
+❌ Not confirming understanding of research topic and goals
+❌ Generating research content instead of just scope clarification
+❌ Not writing initial scope document to file
+❌ Not providing opportunity for user to modify scope
+❌ Proceeding to next step without user confirmation
+❌ **CRITICAL**: Reading only partial step file - leads to incomplete understanding and poor research decisions
+❌ **CRITICAL**: Proceeding with 'C' without fully reading and understanding the next step file
+❌ **CRITICAL**: Making decisions without complete understanding of step requirements and protocols
+
+## INITIALIZATION PRINCIPLES:
+
+This step ensures:
+
+- Clear mutual understanding of research objectives
+- Well-defined research scope and approach
+- Immediate documentation for user review
+- User control over research direction before detailed work begins
+
+## NEXT STEP:
+
+After user confirmation and scope finalization, load `./step-02-customer-behavior.md` to begin detailed market research with customer insights analysis.
+
+Remember: Init steps confirm understanding and scope, not generate research content!

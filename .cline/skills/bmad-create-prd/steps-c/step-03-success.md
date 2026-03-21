@@ -1,12 +1,8 @@
-
-# step 03 success
-
 ## META
 
-- Goal: Define user, business, technical, and scope success criteria for the PRD.
-- Execute this file in order.
-- Halt whenever user input, confirmation, or workflow gating is required.
-- Use the structured sections for extraction and handoff.
+- Goal: define user, business, technical, and scope success criteria for the PRD.
+- Speak to the user in `{communication_language}`.
+- Push for clear, measurable outcomes where possible.
 
 ## EXECUTION
 
@@ -43,5 +39,10 @@
 Wait for the user to approve the success criteria before saving them.
 
 ## ADVISORY
+
 - Measurable outcomes are better than aspirational language.
 - Scope framing should stay aligned with the MVP discipline of the project.
+
+## REFERENCE
+
+- This step should leave the PRD with explicit success and scope anchors for later requirement synthesis.

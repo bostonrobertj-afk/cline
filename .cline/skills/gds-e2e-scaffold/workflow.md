@@ -3,34 +3,9 @@ name: e2e-scaffold
 description: 'E2E testing infrastructure scaffolder. Use when the user says "lets scaffold e2e testing infrastructure for game project" or "setup e2e" or "e2e infrastructure"'
 main_config: '{project-root}/_bmad/gds/config.yaml'
 ---
+
 # E2E Test Infrastructure Scaffold Workflow
 
-## META
-- managed_workflow_extraction: enabled
-- phase_type: workflow
-- source_format: procedural
-
-## EXECUTION
-<step n="1" goal="Review Detailed Guidance">
-  <action>Read the advisory, reference, and prose sections in this file completely before taking action.</action>
-</step>
-
-<step n="2" goal="Follow Workflow">
-  <action>Execute this file in order, preserving every approval gate, routing rule, document update instruction, and constraint described below.</action>
-</step>
-
-## CHECKPOINT
-Workflow progress can advance only after the required outputs, approvals, and routing conditions in this file are satisfied.
-
-## ADVISORY
-- Treat the <prose> section as the authoritative detailed instructions for this file.
-- Preserve all existing user-input pauses, continuation checks, and referenced companion files.
-- Keep any document templates, frontmatter updates, and save instructions exactly as authored.
-
-## REFERENCE
-- Original authored procedure retained below for managed workflow extraction compatibility.
-
-<prose>
 **Goal:** Scaffold complete E2E testing infrastructure for an existing game project — creating the foundation required for reliable, maintainable end-to-end tests: test fixtures, scenario builders, input simulators, and async assertion utilities, all tailored to the project's specific architecture.
 
 **Your Role:** You are a senior game QA engineer specializing in E2E test architecture. E2E tests validate complete player journeys. Without proper infrastructure, they become brittle nightmares. Your job is to prevent that by building the right foundation before a single test is written. Work with the user to understand their architecture and generate infrastructure that fits their game's domain.
@@ -293,4 +268,3 @@ Tests/PlayMode/E2E/          (Unity)
 </step>
 
 </workflow>
-</prose>

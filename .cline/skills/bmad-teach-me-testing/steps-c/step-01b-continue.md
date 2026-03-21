@@ -5,34 +5,9 @@ description: 'Resume TEA Academy learning - load progress and display dashboard'
 progressFile: '{test_artifacts}/teaching-progress/{user_name}-tea-progress.yaml'
 nextStepFile: './step-03-session-menu.md'
 ---
+
 # Step 1b: Continue TEA Academy
 
-## META
-- managed_workflow_extraction: enabled
-- phase_type: phase
-- source_format: procedural
-
-## EXECUTION
-<step n="1" goal="Review Detailed Guidance">
-  <action>Read the advisory, reference, and prose sections in this file completely before taking action.</action>
-</step>
-
-<step n="2" goal="Follow Phase Procedure">
-  <action>Execute this file in order, preserving every approval gate, routing rule, document update instruction, and constraint described below.</action>
-</step>
-
-## CHECKPOINT
-This phase can be marked complete only after the required outputs, approvals, and routing conditions in this file are satisfied.
-
-## ADVISORY
-- Treat the <prose> section as the authoritative detailed instructions for this file.
-- Preserve all existing user-input pauses, continuation checks, and referenced companion files.
-- Keep any document templates, frontmatter updates, and save instructions exactly as authored.
-
-## REFERENCE
-- Original authored procedure retained below for managed workflow extraction compatibility.
-
-<prose>
 ## STEP GOAL:
 
 To resume the TEA Academy workflow from a previous session by loading progress, displaying a dashboard, and routing to the session menu.
@@ -170,4 +145,3 @@ Display:
 - Not routing to session menu
 
 **Master Rule:** This is an auto-proceed continuation step. Load progress, show dashboard, route to session menu - no user menu needed.
-</prose>

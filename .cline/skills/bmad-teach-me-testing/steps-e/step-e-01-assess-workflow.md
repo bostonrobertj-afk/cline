@@ -7,34 +7,9 @@ workflowPath: '../'
 advancedElicitationTask: '{project-root}/_bmad/core/workflows/advanced-elicitation/workflow.xml'
 partyModeWorkflow: '{project-root}/_bmad/core/workflows/party-mode/workflow.md'
 ---
+
 # Edit Step 1: Assess What to Edit
 
-## META
-- managed_workflow_extraction: enabled
-- phase_type: phase
-- source_format: procedural
-
-## EXECUTION
-<step n="1" goal="Review Detailed Guidance">
-  <action>Read the advisory, reference, and prose sections in this file completely before taking action.</action>
-</step>
-
-<step n="2" goal="Follow Phase Procedure">
-  <action>Execute this file in order, preserving every approval gate, routing rule, document update instruction, and constraint described below.</action>
-</step>
-
-## CHECKPOINT
-This phase can be marked complete only after the required outputs, approvals, and routing conditions in this file are satisfied.
-
-## ADVISORY
-- Treat the <prose> section as the authoritative detailed instructions for this file.
-- Preserve all existing user-input pauses, continuation checks, and referenced companion files.
-- Keep any document templates, frontmatter updates, and save instructions exactly as authored.
-
-## REFERENCE
-- Original authored procedure retained below for managed workflow extraction compatibility.
-
-<prose>
 ## STEP GOAL:
 
 To identify what the user wants to edit in the teach-me-testing workflow and gather requirements for the modifications.
@@ -164,4 +139,3 @@ Display: **Select an Option:** [A] Advanced Elicitation [P] Party Mode [C] Conti
 ✅ Edit requirements clearly understood, target files identified, edit plan documented, user approves plan.
 
 **Master Rule:** Understand before editing. Get clear requirements first.
-</prose>

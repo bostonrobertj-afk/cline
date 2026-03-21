@@ -1,12 +1,8 @@
-
-# step 10 nonfunctional
-
 ## META
 
-- Goal: Define the non-functional requirements that matter for this product.
-- Execute this file in order.
-- Halt whenever user input, confirmation, or workflow gating is required.
-- Use the structured sections for extraction and handoff.
+- Goal: define the non-functional requirements that matter for this product.
+- Speak to the user in `{communication_language}`.
+- Only include categories that are relevant to this project.
 
 ## EXECUTION
 
@@ -42,4 +38,9 @@
 Wait for the user to approve the non-functional requirements before saving them.
 
 ## ADVISORY
+
 - Exclude generic NFR boilerplate that does not materially apply to the project.
+
+## REFERENCE
+
+- The NFR section should help architecture and delivery teams understand the product’s quality bar.

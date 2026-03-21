@@ -1,87 +1,229 @@
 # Step 2a: User-Selected Techniques
 
-## META
+## MANDATORY EXECUTION RULES (READ FIRST):
 
-- Goal: let the user browse the brainstorming technique library and choose techniques directly.
-- Execute this phase in order.
-- Halt whenever a user response, confirmation, or routing choice is required.
+- ✅ YOU ARE A TECHNIQUE LIBRARIAN, not a recommender
+- 🎯 LOAD TECHNIQUES ON-DEMAND from brain-methods.csv
+- 📋 PREVIEW TECHNIQUE OPTIONS clearly and concisely
+- 🔍 LET USER EXPLORE and select based on their interests
+- 💬 PROVIDE BACK OPTION to return to approach selection
+- ✅ YOU MUST ALWAYS SPEAK OUTPUT In your Agent communication style with the `communication_language`
 
-## EXECUTION
+## EXECUTION PROTOCOLS:
 
-<step n="1" goal="Load the brainstorming technique library for browsing">
-  <action>Read `../brain-methods.csv` on demand.</action>
-  <action>Parse the technique library by category, technique name, description, facilitation prompts, best-for guidance, energy level, and typical duration.</action>
-  <output>Explain that the full brainstorming technique library is now available for browsing.</output>
-</step>
+- 🎯 Load brain techniques CSV only when needed for presentation
+- ⚠️ Present [B] back option and [C] continue options
+- 💾 Update frontmatter with selected techniques
+- 📖 Route to technique execution after confirmation
+- 🚫 FORBIDDEN making recommendations or steering choices
 
-<step n="2" goal="Present technique categories and capture the user's browsing direction">
-  <output>
-    Show the major brainstorming technique categories with concise descriptions and representative examples.
-    <detail>
-      Present categories such as:
-      - Structured Thinking
-      - Creative Innovation
-      - Collaborative Methods
-      - Deep Analysis
-      - Theatrical Exploration
-      - Wild Thinking
-      - Introspective Delight
-    </detail>
-  </output>
-  <ask>Ask which category the user wants to explore, or what style of thinking they feel drawn to.</ask>
-</step>
+## CONTEXT BOUNDARIES:
 
-<step n="3" goal="Present techniques from the chosen category and support exploration">
-  <action>
-    Show 3-5 techniques from the selected category.
-    <detail>
-      For each technique, include:
-      - technique name
-      - duration
-      - energy level
-      - brief description
-      - what it is best for
-      - an example facilitation prompt
-    </detail>
-  </action>
-  <ask>Ask which techniques appeal to the user, whether they want more details, whether they want to browse another category, or whether they want to go back to approach selection.</ask>
-  <branch if="user asks for more details about a technique">
-    <output>Provide deeper detail for the requested technique and then re-present the selection options.</output>
-  </branch>
-  <branch if="user asks to browse another category">
-    <goto step="2" />
-  </branch>
-  <branch if="user asks to return to approach selection">
-    <handoff path="./step-01-session-setup.md" />
-  </branch>
-</step>
+- Session context from Step 1 is available
+- Brain techniques CSV contains 36+ techniques across 7 categories
+- User wants full control over technique selection
+- May need to present techniques by category or search capability
 
-<step n="4" goal="Confirm the selected techniques and persist the choice">
-  <output>Summarize the selected techniques and explain how they fit the user's session goals.</output>
-  <ask>
-    Ask the user to confirm the selected techniques or request changes.
-    <detail>
-      Confirmation options:
-      - `[C]` Continue with the selected techniques
-      - `[Back]` Modify the selection
-    </detail>
-  </ask>
-  <branch if="user confirms the selection">
-    <action>Update frontmatter with `selected_approach: 'user-selected'`, `techniques_used`, and `stepsCompleted: [1, 2]`.</action>
-    <action>Append a technique-selection section to `{brainstorming_session_output_file}` that records the chosen techniques and the selection rationale.</action>
-    <handoff path="./step-03-technique-execution.md" />
-  </branch>
-  <branch if="user wants to modify the selection">
-    <goto step="3" />
-  </branch>
-</step>
+## YOUR TASK:
 
-## CHECKPOINT
+Load and present brainstorming techniques from CSV, allowing user to browse and select based on their preferences.
 
-Halt for category selection and final technique confirmation before advancing.
+## USER SELECTION SEQUENCE:
 
-## ADVISORY
+### 1. Load Brain Techniques Library
 
-- Present techniques neutrally without steering or recommending.
-- Load CSV data only when it is needed for category or technique presentation.
-- Respect the user's autonomy in technique selection.
+Load techniques from CSV on-demand:
+
+"Perfect! Let's explore our complete brainstorming techniques library. I'll load all available techniques so you can browse and select exactly what appeals to you.
+
+**Loading Brain Techniques Library...**"
+
+**Load CSV and parse:**
+
+- Read `../brain-methods.csv`
+- Parse: category, technique_name, description, facilitation_prompts, best_for, energy_level, typical_duration
+- Organize by categories for browsing
+
+### 2. Present Technique Categories
+
+Show available categories with brief descriptions:
+
+"**Our Brainstorming Technique Library - 36+ Techniques Across 7 Categories:**
+
+**[1] Structured Thinking** (6 techniques)
+
+- Systematic frameworks for thorough exploration and organized analysis
+- Includes: SCAMPER, Six Thinking Hats, Mind Mapping, Resource Constraints
+
+**[2] Creative Innovation** (7 techniques)
+
+- Innovative approaches for breakthrough thinking and paradigm shifts
+- Includes: What If Scenarios, Analogical Thinking, Reversal Inversion
+
+**[3] Collaborative Methods** (4 techniques)
+
+- Group dynamics and team ideation approaches for inclusive participation
+- Includes: Yes And Building, Brain Writing Round Robin, Role Playing
+
+**[4] Deep Analysis** (5 techniques)
+
+- Analytical methods for root cause and strategic insight discovery
+- Includes: Five Whys, Morphological Analysis, Provocation Technique
+
+**[5] Theatrical Exploration** (5 techniques)
+
+- Playful exploration for radical perspectives and creative breakthroughs
+- Includes: Time Travel Talk Show, Alien Anthropologist, Dream Fusion
+
+**[6] Wild Thinking** (5 techniques)
+
+- Extreme thinking for pushing boundaries and breakthrough innovation
+- Includes: Chaos Engineering, Guerrilla Gardening Ideas, Pirate Code
+
+**[7] Introspective Delight** (5 techniques)
+
+- Inner wisdom and authentic exploration approaches
+- Includes: Inner Child Conference, Shadow Work Mining, Values Archaeology
+
+**Which category interests you most? Enter 1-7, or tell me what type of thinking you're drawn to.**"
+
+**HALT — wait for user selection before proceeding.**
+
+### 3. Handle Category Selection
+
+After user selects category:
+
+#### Load Category Techniques:
+
+"**[Selected Category] Techniques:**
+
+**Loading specific techniques from this category...**"
+
+**Present 3-5 techniques from selected category:**
+For each technique:
+
+- **Technique Name** (Duration: [time], Energy: [level])
+- Description: [Brief clear description]
+- Best for: [What this technique excels at]
+- Example prompt: [Sample facilitation prompt]
+
+**Example presentation format:**
+"**1. SCAMPER Method** (Duration: 20-30 min, Energy: Moderate)
+
+- Systematic creativity through seven lenses (Substitute/Combine/Adapt/Modify/Put/Eliminate/Reverse)
+- Best for: Product improvement, innovation challenges, systematic idea generation
+- Example prompt: "What could you substitute in your current approach to create something new?"
+
+**2. Six Thinking Hats** (Duration: 15-25 min, Energy: Moderate)
+
+- Explore problems through six distinct perspectives for comprehensive analysis
+- Best for: Complex decisions, team alignment, thorough exploration
+- Example prompt: "White hat thinking: What facts do we know for certain about this challenge?"
+
+### 4. Allow Technique Selection
+
+"**Which techniques from this category appeal to you?**
+
+You can:
+
+- Select by technique name or number
+- Ask for more details about any specific technique
+- Browse another category
+- Select multiple techniques for a comprehensive session
+
+**Options:**
+
+- Enter technique names/numbers you want to use
+- [Details] for more information about any technique
+- [Categories] to return to category list
+- [Back] to return to approach selection
+
+### 5. Handle Technique Confirmation
+
+When user selects techniques:
+
+**Confirmation Process:**
+"**Your Selected Techniques:**
+
+- [Technique 1]: [Why this matches their session goals]
+- [Technique 2]: [Why this complements the first]
+- [Technique 3]: [If selected, how it builds on others]
+
+**Session Plan:**
+This combination will take approximately [total_time] and focus on [expected outcomes].
+
+**Confirm these choices?**
+[C] Continue - Begin technique execution
+[Back] - Modify technique selection"
+
+**HALT — wait for user selection before proceeding.**
+
+### 6. Update Frontmatter and Continue
+
+If user confirms:
+
+**Update frontmatter:**
+
+```yaml
+---
+selected_approach: 'user-selected'
+techniques_used: ['technique1', 'technique2', 'technique3']
+stepsCompleted: [1, 2]
+---
+```
+
+**Append to document:**
+
+```markdown
+## Technique Selection
+
+**Approach:** User-Selected Techniques
+**Selected Techniques:**
+
+- [Technique 1]: [Brief description and session fit]
+- [Technique 2]: [Brief description and session fit]
+- [Technique 3]: [Brief description and session fit]
+
+**Selection Rationale:** [Content based on user's choices and reasoning]
+```
+
+**Route to execution:**
+Load `./step-03-technique-execution.md`
+
+### 7. Handle Back Option
+
+If user selects [Back]:
+
+- Return to approach selection in step-01-session-setup.md
+- Maintain session context and preferences
+
+## SUCCESS METRICS:
+
+✅ Brain techniques CSV loaded successfully on-demand
+✅ Technique categories presented clearly with helpful descriptions
+✅ User able to browse and select techniques based on interests
+✅ Selected techniques confirmed with session fit explanation
+✅ Frontmatter updated with technique selections
+✅ Proper routing to technique execution or back navigation
+
+## FAILURE MODES:
+
+❌ Preloading all techniques instead of loading on-demand
+❌ Making recommendations instead of letting user explore
+❌ Not providing enough detail for informed selection
+❌ Missing back navigation option
+❌ Not updating frontmatter with technique selections
+
+## USER SELECTION PROTOCOLS:
+
+- Present techniques neutrally without steering or preference
+- Load CSV data only when needed for category/technique presentation
+- Provide sufficient detail for informed choices without overwhelming
+- Always maintain option to return to previous steps
+- Respect user's autonomy in technique selection
+
+## NEXT STEP:
+
+After technique confirmation, load `./step-03-technique-execution.md` to begin facilitating the selected brainstorming techniques.
+
+Remember: Your role is to be a knowledgeable librarian, not a recommender. Let the user explore and choose based on their interests and intuition!

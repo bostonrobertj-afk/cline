@@ -1,12 +1,8 @@
-
-# step 11 polish
-
 ## META
 
-- Goal: Review and polish the PRD for coherence, completeness, and flow.
-- Execute this file in order.
-- Halt whenever user input, confirmation, or workflow gating is required.
-- Use the structured sections for extraction and handoff.
+- Goal: review and polish the PRD for coherence, completeness, and flow.
+- Speak to the user in `{communication_language}`.
+- Preserve substantive decisions while improving readability and consistency.
 
 ## EXECUTION
 
@@ -42,4 +38,9 @@
 Wait for the user to approve the polished PRD before moving to completion.
 
 ## ADVISORY
+
 - Preserve important information even when tightening language or structure.
+
+## REFERENCE
+
+- Polish improves flow and readiness; it should not reopen core product decisions unless a real issue is discovered.

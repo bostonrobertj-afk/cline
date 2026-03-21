@@ -4,34 +4,9 @@ nextStepFile: './step-v-04-brief-coverage-validation.md'
 prdFile: '{prd_file_path}'
 validationReportPath: '{validation_report_path}'
 ---
+
 # Step 3: Information Density Validation
 
-## META
-- managed_workflow_extraction: enabled
-- phase_type: phase
-- source_format: procedural
-
-## EXECUTION
-<step n="1" goal="Review Detailed Guidance">
-  <action>Read the advisory, reference, and prose sections in this file completely before taking action.</action>
-</step>
-
-<step n="2" goal="Follow Phase Procedure">
-  <action>Execute this file in order, preserving every approval gate, routing rule, document update instruction, and constraint described below.</action>
-</step>
-
-## CHECKPOINT
-This phase can be marked complete only after the required outputs, approvals, and routing conditions in this file are satisfied.
-
-## ADVISORY
-- Treat the <prose> section as the authoritative detailed instructions for this file.
-- Preserve all existing user-input pauses, continuation checks, and referenced companion files.
-- Keep any document templates, frontmatter updates, and save instructions exactly as authored.
-
-## REFERENCE
-- Original authored procedure retained below for managed workflow extraction compatibility.
-
-<prose>
 ## STEP GOAL:
 
 Validate PRD meets BMAD information density standards by scanning for conversational filler, wordy phrases, and redundant expressions that violate conciseness principles.
@@ -194,4 +169,3 @@ Without delay, read fully and follow: {nextStepFile} (step-v-04-brief-coverage-v
 - Not attempting subprocess architecture
 
 **Master Rule:** Information density validation runs autonomously. Scan, classify, report, auto-proceed. No user interaction needed.
-</prose>

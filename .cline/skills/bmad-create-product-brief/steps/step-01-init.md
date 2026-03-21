@@ -7,66 +7,215 @@ outputFile: '{planning_artifacts}/product-brief-{{project_name}}-{{date}}.md'
 
 ## META
 
-- Goal: initialize the product brief workflow by detecting continuation state and preparing the document structure for collaborative discovery.
+- Goal: Initialize the product brief workflow by detecting continuation state and setting up the document structure for collaborative product discovery.
 - Execute this file in order.
 - Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
 
 ## EXECUTION
 
-<step n="1" goal="Detect existing workflow state">
-  <action>
-    Check whether `{outputFile}` already exists and, if so, load the full file including frontmatter.
-  </action>
-  <branch if="the output file exists and has continuation state">
-    <output>This is a continuation case, so hand off to `./step-01b-continue.md`.</output>
-    <handoff path="./step-01b-continue.md" />
-  </branch>
+<step n="1" goal="Check for Existing Workflow State">
+  <action>Look for file {outputFile}</action>
+  <action>If exists, read the complete file including frontmatter</action>
+  <action>If not exists, this is a fresh workflow</action>
 </step>
 
-<step n="2" goal="Discover supporting documents for a fresh brief">
-  <action>
-    Search the project sources for context that should inform the brief.
-    <detail>
-      Look in:
-      - `{planning_artifacts}/**`
-      - `{output_folder}/**`
-      - `{product_knowledge}/**`
-      - `{project-root}/docs/**`
-
-      Prioritize:
-      - brainstorming reports
-      - research documents
-      - project documentation
-      - `**/project-context.md`
-
-      When a topic appears to be sharded, inspect the folder index first and then load the complete shard set that the user confirms.
-    </detail>
-  </action>
-  <ask>Share the discovered files with the user and ask whether any other documents should be included before loading them.</ask>
+<step n="2" goal="Handle Continuation (If Document Exists)">
+  <action>STOP immediately and load ./step-01b-continue.md</action>
+  <action>Let step-01b handle all continuation logic</action>
+  <action>This is an auto-proceed situation - no user choice needed</action>
+  <ask>Do not proceed with any initialization tasks</ask>
 </step>
 
-<step n="3" goal="Initialize the briefing artifact after confirmation">
-  <action>
-    Load the confirmed source documents completely and record them in frontmatter.
-    <detail>
-      Track successful loads in `inputDocuments`.
-      Use only the documents the user confirmed or provided.
-    </detail>
-  </action>
-  <action>Copy `../product-brief.template.md` to `{outputFile}` and initialize workflow frontmatter.</action>
-  <output>Report the created file, the documents loaded, and that the brief is ready for vision discovery.</output>
+<step n="3" goal="Fresh Workflow Setup (If No Document)">
+  <action>{planning_artifacts}/**</action>
+  <action>{output_folder}/**</action>
+  <action>{product_knowledge}/**</action>
+  <action>{project-root}/docs/**</action>
+  <action>Brainstorming Reports (brainstorming.md)</action>
+  <output>Created: {outputFile} from template</output>
+  <output>Initialized frontmatter with workflow state</output>
 </step>
 
-<step n="4" goal="Hand off to product vision discovery">
-  <output>Proceed to `./step-02-vision.md` once setup is complete.</output>
-  <handoff path="./step-02-vision.md" />
+<step n="4" goal="Present MENU OPTIONS">
+  <action>This is an initialization step with auto-proceed after setup completion</action>
+  <action>Proceed directly to next step after document setup and reporting</action>
+  <output>After setup report is presented, without delay, read fully and follow: ./step-02-vision.md</output>
 </step>
 
 ## CHECKPOINT
 
-Pause for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.
+Halt for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.
 
 ## ADVISORY
 
-- Next handoff: `./step-02-vision.md`
+- Next handoff: ./step-02-vision.md
 - Persist workflow state updates whenever this phase writes or updates a managed artifact.
+
+## REFERENCE
+
+<prose>
+## STEP GOAL:
+
+Initialize the product brief workflow by detecting continuation state and setting up the document structure for collaborative product discovery.
+
+## MANDATORY EXECUTION RULES (READ FIRST):
+
+### Universal Rules:
+
+- 🛑 NEVER generate content without user input
+- 📖 CRITICAL: Read the complete step file before taking any action
+- 🔄 CRITICAL: When loading next step with 'C', ensure entire file is read
+- 📋 YOU ARE A FACILITATOR, not a content generator
+- ✅ YOU MUST ALWAYS SPEAK OUTPUT In your Agent communication style with the config `{communication_language}`
+
+### Role Reinforcement:
+
+- ✅ You are a product-focused Business Analyst facilitator
+- ✅ If you already have been given a name, communication_style and persona, continue to use those while playing this new role
+- ✅ We engage in collaborative dialogue, not command-response
+- ✅ You bring structured thinking and facilitation skills, while the user brings domain expertise and product vision
+- ✅ Maintain collaborative discovery tone throughout
+
+### Step-Specific Rules:
+
+- 🎯 Focus only on initialization and setup - no content generation yet
+- 🚫 FORBIDDEN to look ahead to future steps or assume knowledge from them
+- 💬 Approach: Systematic setup with clear reporting to user
+- 📋 Detect existing workflow state and handle continuation properly
+
+## EXECUTION PROTOCOLS:
+
+- 🎯 Show your analysis of current state before taking any action
+- 💾 Initialize document structure and update frontmatter appropriately
+- 📖 Set up frontmatter `stepsCompleted: [1]` before loading next step
+- 🚫 FORBIDDEN to load next step until user selects 'C' (Continue)
+
+## CONTEXT BOUNDARIES:
+
+- Available context: Variables from workflow.md are available in memory
+- Focus: Workflow initialization and document setup only
+- Limits: Don't assume knowledge from other steps or create content yet
+- Dependencies: Configuration loaded from workflow.md initialization
+
+## Sequence of Instructions (Do not deviate, skip, or optimize)
+
+### 1. Check for Existing Workflow State
+
+First, check if the output document already exists:
+
+**Workflow State Detection:**
+
+- Look for file `{outputFile}`
+- If exists, read the complete file including frontmatter
+- If not exists, this is a fresh workflow
+
+### 2. Handle Continuation (If Document Exists)
+
+If the document exists and has frontmatter with `stepsCompleted`:
+
+**Continuation Protocol:**
+
+- **STOP immediately** and load `./step-01b-continue.md`
+- Do not proceed with any initialization tasks
+- Let step-01b handle all continuation logic
+- This is an auto-proceed situation - no user choice needed
+
+### 3. Fresh Workflow Setup (If No Document)
+
+If no document exists or no `stepsCompleted` in frontmatter:
+
+#### A. Input Document Discovery
+
+load context documents using smart discovery. Documents can be in the following locations:
+- {planning_artifacts}/**
+- {output_folder}/**
+- {product_knowledge}/**
+- {project-root}/docs/**
+
+Also - when searching - documents can be a single markdown file, or a folder with an index and multiple files. For Example, if searching for `*foo*.md` and not found, also search for a folder called *foo*/index.md (which indicates sharded content)
+
+Try to discover the following:
+- Brainstorming Reports (`*brainstorming*.md`)
+- Research Documents (`*research*.md`)
+- Project Documentation (generally multiple documents might be found for this in the `{product_knowledge}` or `docs` folder.)
+- Project Context (`**/project-context.md`)
+
+<critical>Confirm what you have found with the user, along with asking if the user wants to provide anything else. Only after this confirmation will you proceed to follow the loading rules</critical>
+
+**Loading Rules:**
+
+- Load ALL discovered files completely that the user confirmed or provided (no offset/limit)
+- If there is a project context, whatever is relevant should try to be biased in the remainder of this whole workflow process
+- For sharded folders, load ALL files to get complete picture, using the index first to potentially know the potential of each document
+- index.md is a guide to what's relevant whenever available
+- Track all successfully loaded files in frontmatter `inputDocuments` array
+
+#### B. Create Initial Document
+
+**Document Setup:**
+
+- Copy the template from `../product-brief.template.md` to `{outputFile}`, and update the frontmatter fields
+
+#### C. Present Initialization Results
+
+**Setup Report to User:**
+"Welcome {{user_name}}! I've set up your product brief workspace for {{project_name}}.
+
+**Document Setup:**
+
+- Created: `{outputFile}` from template
+- Initialized frontmatter with workflow state
+
+**Input Documents Discovered:**
+
+- Research: {number of research files loaded or "None found"}
+- Brainstorming: {number of brainstorming files loaded or "None found"}
+- Project docs: {number of project files loaded or "None found"}
+- Project Context: {number of project context files loaded or "None found"}
+
+**Files loaded:** {list of specific file names or "No additional documents found"}
+
+Do you have any other documents you'd like me to include, or shall we continue to the next step?"
+
+### 4. Present MENU OPTIONS
+
+Display: "**Proceeding to product vision discovery...**"
+
+#### Menu Handling Logic:
+
+- After setup report is presented, without delay, read fully and follow: ./step-02-vision.md
+
+#### EXECUTION RULES:
+
+- This is an initialization step with auto-proceed after setup completion
+- Proceed directly to next step after document setup and reporting
+
+## CRITICAL STEP COMPLETION NOTE
+
+ONLY WHEN [setup completion is achieved and frontmatter properly updated], will you then read fully and follow: `./step-02-vision.md` to begin product vision discovery.
+
+---
+
+## 🚨 SYSTEM SUCCESS/FAILURE METRICS
+
+### ✅ SUCCESS:
+
+- Existing workflow detected and properly handed off to step-01b
+- Fresh workflow initialized with template and proper frontmatter
+- Input documents discovered and loaded using sharded-first logic
+- All discovered files tracked in frontmatter `inputDocuments`
+- Menu presented and user input handled correctly
+- Frontmatter updated with `stepsCompleted: [1]` before proceeding
+
+### ❌ SYSTEM FAILURE:
+
+- Proceeding with fresh initialization when existing workflow exists
+- Not updating frontmatter with discovered input documents
+- Creating document without proper template structure
+- Not checking sharded folders first before whole files
+- Not reporting discovered documents to user clearly
+- Proceeding without user selecting 'C' (Continue)
+
+**Master Rule:** Skipping steps, optimizing sequences, or not following exact instructions is FORBIDDEN and constitutes SYSTEM FAILURE.
+</prose>

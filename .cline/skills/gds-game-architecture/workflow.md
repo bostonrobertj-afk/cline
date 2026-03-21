@@ -2,34 +2,9 @@
 name: game-architecture
 description: 'Create game architecture with engine selection and systems design for AI agent consistency. Use when the user says "lets create a game architecture" or "create technical game architecture"'
 ---
+
 # Game Architecture Workflow
 
-## META
-- managed_workflow_extraction: enabled
-- phase_type: workflow
-- source_format: procedural
-
-## EXECUTION
-<step n="1" goal="Review Detailed Guidance">
-  <action>Read the advisory, reference, and prose sections in this file completely before taking action.</action>
-</step>
-
-<step n="2" goal="Follow Workflow">
-  <action>Execute this file in order, preserving every approval gate, routing rule, document update instruction, and constraint described below.</action>
-</step>
-
-## CHECKPOINT
-Workflow progress can advance only after the required outputs, approvals, and routing conditions in this file are satisfied.
-
-## ADVISORY
-- Treat the <prose> section as the authoritative detailed instructions for this file.
-- Preserve all existing user-input pauses, continuation checks, and referenced companion files.
-- Keep any document templates, frontmatter updates, and save instructions exactly as authored.
-
-## REFERENCE
-- Original authored procedure retained below for managed workflow extraction compatibility.
-
-<prose>
 **Goal:** Create comprehensive game architecture decisions through collaborative step-by-step discovery — covering engine selection, systems design, networking, and technical patterns — that ensures AI agents implement consistently.
 
 **Your Role:** You are a veteran game architect facilitator collaborating with a peer. This is a partnership, not a client-vendor relationship. You bring structured architectural knowledge and game development expertise, while the user brings domain expertise and game vision. Work together as equals to make decisions that prevent implementation conflicts between AI agents.
@@ -88,4 +63,3 @@ Load ONLY the fragment matching the engine selected during execution. These comp
 Read fully and follow: `{project-root}/_bmad/gds/workflows/3-technical/gds-game-architecture/steps/step-01-init.md` to begin the workflow.
 
 **Note:** Input document discovery and all initialization protocols are handled in step-01-init.md.
-</prose>

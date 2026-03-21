@@ -12,34 +12,9 @@ session06File: './step-04-session-06.md'
 session07File: './step-04-session-07.md'
 completionFile: './step-05-completion.md'
 ---
+
 # Step 3: Session Menu (Hub)
 
-## META
-- managed_workflow_extraction: enabled
-- phase_type: phase
-- source_format: procedural
-
-## EXECUTION
-<step n="1" goal="Review Detailed Guidance">
-  <action>Read the advisory, reference, and prose sections in this file completely before taking action.</action>
-</step>
-
-<step n="2" goal="Follow Phase Procedure">
-  <action>Execute this file in order, preserving every approval gate, routing rule, document update instruction, and constraint described below.</action>
-</step>
-
-## CHECKPOINT
-This phase can be marked complete only after the required outputs, approvals, and routing conditions in this file are satisfied.
-
-## ADVISORY
-- Treat the <prose> section as the authoritative detailed instructions for this file.
-- Preserve all existing user-input pauses, continuation checks, and referenced companion files.
-- Keep any document templates, frontmatter updates, and save instructions exactly as authored.
-
-## REFERENCE
-- Original authored procedure retained below for managed workflow extraction compatibility.
-
-<prose>
 ## STEP GOAL:
 
 To present all 7 learning sessions with completion status, allow non-linear session selection, and route to chosen session or completion. This is the central hub - all sessions return here.
@@ -242,4 +217,3 @@ Load, read entire file, then execute {completionFile}
 - Not allowing non-linear session selection
 
 **Master Rule:** This is the central hub. Display accurate status, let learner choose freely, route correctly. All sessions return here.
-</prose>

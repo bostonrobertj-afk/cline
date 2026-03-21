@@ -1,12 +1,8 @@
-
-# step 01b continue
-
 ## META
 
-- Goal: Restore context for an in-progress PRD workflow and route the user back to the correct next step.
-- Execute this file in order.
-- Halt whenever user input, confirmation, or workflow gating is required.
-- Use the structured sections for extraction and handoff.
+- Goal: restore context for an in-progress PRD workflow and route the user back to the correct next step.
+- Speak to the user in `{communication_language}`.
+- Do not restart the workflow from scratch.
 
 ## EXECUTION
 
@@ -40,5 +36,10 @@
 Wait for the user to confirm whether to continue from the recommended next step or choose another path.
 
 ## ADVISORY
+
 - Preserve the existing workflow state rather than rewriting completed sections unnecessarily.
 - If the workflow is already complete, transition into wrap-up behavior instead of reopening unfinished-step menus.
+
+## REFERENCE
+
+- Continuation exists to restore state safely, not to duplicate initialization logic.

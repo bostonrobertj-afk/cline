@@ -1,106 +1,259 @@
 ---
 # File References
 outputFile: '{planning_artifacts}/product-brief-{{project_name}}-{{date}}.md'
+
 ---
 
 # step 02 vision
 
 ## META
 
-- Goal: define the product vision, the problem it solves, and the differentiators that make the approach compelling.
+- Goal: Conduct comprehensive product vision discovery to define the core problem, solution, and unique value proposition through collaborative analysis.
 - Execute this file in order.
 - Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction; use the prose block for additional agent context.
 
 ## EXECUTION
 
-<step n="1" goal="Explore the core problem">
+<step n="1" goal="Begin Vision Discovery">
   <ask>What core problem are you trying to solve?</ask>
-  <ask>Who feels this problem most acutely?</ask>
-  <ask>What would success look like for the people you are helping?</ask>
+  <ask>Who experiences this problem most acutely?</ask>
+  <ask>What would success look like for the people you're helping?</ask>
 </step>
 
-<step n="2" goal="Understand the problem in more depth">
-  <ask>How do people solve this today?</ask>
-  <ask>What is frustrating or inefficient about the current approach?</ask>
-  <ask>What happens if the problem is left unsolved?</ask>
+<step n="2" goal="Deep Problem Understanding">
+  <ask>How do people currently solve this problem?</ask>
+  <ask>What's frustrating about current solutions?</ask>
+  <ask>What happens if this problem goes unsolved?</ask>
 </step>
 
-<step n="3" goal="Review the current solution landscape">
+<step n="3" goal="Current Solutions Analysis">
   <ask>What solutions exist today?</ask>
   <ask>Where do they fall short?</ask>
-  <ask>What gap are they leaving open?</ask>
+  <ask>What gaps are they leaving open?</ask>
 </step>
 
-<step n="4" goal="Shape the solution vision">
-  <ask>If we solved this perfectly, what would that look like?</ask>
-  <ask>What is the smallest meaningful way to make a difference?</ask>
-  <ask>What makes your approach different from what is already out there?</ask>
+<step n="4" goal="Solution Vision">
+  <ask>If we could solve this perfectly, what would that look like?</ask>
+  <ask>What's the simplest way we could make a meaningful difference?</ask>
+  <ask>What makes your approach different from what's out there?</ask>
 </step>
 
-<step n="5" goal="Surface differentiators">
-  <ask>What is your unfair advantage?</ask>
+<step n="5" goal="Unique Differentiators">
+  <ask>What's your unfair advantage?</ask>
   <ask>What would be hard for competitors to copy?</ask>
   <ask>What insight or approach is uniquely yours?</ask>
 </step>
 
-<step n="6" goal="Prepare the executive summary draft">
-  <output>
-    Draft the following content for append to the product brief.
-    <detail>
-      ```markdown
-      ## Executive Summary
-
-      [Executive summary content based on the conversation]
-
-      ---
-
-      ## Core Vision
-
-      ### Problem Statement
-
-      [Problem statement content based on the conversation]
-
-      ### Problem Impact
-
-      [Problem impact content based on the conversation]
-
-      ### Why Existing Solutions Fall Short
-
-      [Analysis of existing solution gaps based on the conversation]
-
-      ### Proposed Solution
-
-      [Proposed solution description based on the conversation]
-
-      ### Key Differentiators
-
-      [Key differentiators based on the conversation]
-      ```
-    </detail>
-  </output>
+<step n="6" goal="Generate Executive Summary Content">
+  <output>Content to Append: Prepare the following structure for document append:</output>
 </step>
 
-<step n="7" goal="Present the menu and pause">
-  <output>Present the drafted vision content and offer `[A]` Advanced Elicitation, `[P]` Party Mode, or `[C]` Continue.</output>
-  <branch if="the user selects A">
-    <action>Use the `bmad-advanced-elicitation` skill to deepen and refine the current vision draft.</action>
-  </branch>
-  <branch if="the user selects P">
-    <action>Use the `bmad-party-mode` skill to explore alternate perspectives on positioning and differentiation.</action>
-  </branch>
-  <branch if="the user selects C">
-    <action>Save the drafted vision content to `{outputFile}` and update frontmatter `stepsCompleted: [1, 2]`.</action>
-    <handoff path="./step-03-users.md" />
-  </branch>
-  <ask>Invite the user to chat, ask questions, or choose A, P, or C.</ask>
-  <output>Always halt and wait for user input after presenting the menu.</output>
+<step n="7" goal="Present MENU OPTIONS">
+  <action>IF A: Invoke the bmad-advanced-elicitation skill with current vision content to dive deeper and refine</action>
+  <action>IF P: Invoke the bmad-party-mode skill to bring different perspectives to positioning and differentiation</action>
+  <action>ONLY proceed to next step when user selects 'C'</action>
+  <ask>User can chat or ask questions - always respond and then end with display again of the menu options</ask>
+  <output>IF C: Save content to {outputFile}, update frontmatter with stepsCompleted: [1, 2], then read fully and follow: ./step-03-users.md</output>
+  <output>IF Any other comments or queries: help user respond then Redisplay Menu Options</output>
+  <output>ALWAYS halt and wait for user input after presenting menu</output>
 </step>
 
 ## CHECKPOINT
 
-Pause for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.
+Halt for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.
 
 ## ADVISORY
 
-- Next handoff: `./step-03-users.md`
+- Next handoff: ./step-03-users.md
 - Persist workflow state updates whenever this phase writes or updates a managed artifact.
+
+## REFERENCE
+
+<prose>
+## STEP GOAL:
+
+Conduct comprehensive product vision discovery to define the core problem, solution, and unique value proposition through collaborative analysis.
+
+## MANDATORY EXECUTION RULES (READ FIRST):
+
+### Universal Rules:
+
+- 🛑 NEVER generate content without user input
+- 📖 CRITICAL: Read the complete step file before taking any action
+- 🔄 CRITICAL: When loading next step with 'C', ensure entire file is read
+- 📋 YOU ARE A FACILITATOR, not a content generator
+- ✅ YOU MUST ALWAYS SPEAK OUTPUT In your Agent communication style with the config `{communication_language}`
+- ✅ YOU MUST ALWAYS WRITE all artifact and document content in `{document_output_language}`
+
+### Role Reinforcement:
+
+- ✅ You are a product-focused Business Analyst facilitator
+- ✅ If you already have been given a name, communication_style and persona, continue to use those while playing this new role
+- ✅ We engage in collaborative dialogue, not command-response
+- ✅ You bring structured thinking and facilitation skills, while the user brings domain expertise and product vision
+- ✅ Maintain collaborative discovery tone throughout
+
+### Step-Specific Rules:
+
+- 🎯 Focus only on product vision, problem, and solution discovery
+- 🚫 FORBIDDEN to generate vision without real user input and collaboration
+- 💬 Approach: Systematic discovery from problem to solution
+- 📋 COLLABORATIVE discovery, not assumption-based vision crafting
+
+## EXECUTION PROTOCOLS:
+
+- 🎯 Show your analysis before taking any action
+- 💾 Generate vision content collaboratively with user
+- 📖 Update frontmatter `stepsCompleted: [1, 2]` before loading next step
+- 🚫 FORBIDDEN to proceed without user confirmation through menu
+
+## CONTEXT BOUNDARIES:
+
+- Available context: Current document and frontmatter from step 1, input documents already loaded in memory
+- Focus: This will be the first content section appended to the document
+- Limits: Focus on clear, compelling product vision and problem statement
+- Dependencies: Document initialization from step-01 must be complete
+
+## Sequence of Instructions (Do not deviate, skip, or optimize)
+
+### 1. Begin Vision Discovery
+
+**Opening Conversation:**
+"As your PM peer, I'm excited to help you shape the vision for {{project_name}}. Let's start with the foundation.
+
+**Tell me about the product you envision:**
+
+- What core problem are you trying to solve?
+- Who experiences this problem most acutely?
+- What would success look like for the people you're helping?
+- What excites you most about this solution?
+
+Let's start with the problem space before we get into solutions."
+
+### 2. Deep Problem Understanding
+
+**Problem Discovery:**
+Explore the problem from multiple angles using targeted questions:
+
+- How do people currently solve this problem?
+- What's frustrating about current solutions?
+- What happens if this problem goes unsolved?
+- Who feels this pain most intensely?
+
+### 3. Current Solutions Analysis
+
+**Competitive Landscape:**
+
+- What solutions exist today?
+- Where do they fall short?
+- What gaps are they leaving open?
+- Why haven't existing solutions solved this completely?
+
+### 4. Solution Vision
+
+**Collaborative Solution Crafting:**
+
+- If we could solve this perfectly, what would that look like?
+- What's the simplest way we could make a meaningful difference?
+- What makes your approach different from what's out there?
+- What would make users say 'this is exactly what I needed'?
+
+### 5. Unique Differentiators
+
+**Competitive Advantage:**
+
+- What's your unfair advantage?
+- What would be hard for competitors to copy?
+- What insight or approach is uniquely yours?
+- Why is now the right time for this solution?
+
+### 6. Generate Executive Summary Content
+
+**Content to Append:**
+Prepare the following structure for document append:
+
+```markdown
+## Executive Summary
+
+[Executive summary content based on conversation]
+
+---
+
+## Core Vision
+
+### Problem Statement
+
+[Problem statement content based on conversation]
+
+### Problem Impact
+
+[Problem impact content based on conversation]
+
+### Why Existing Solutions Fall Short
+
+[Analysis of existing solution gaps based on conversation]
+
+### Proposed Solution
+
+[Proposed solution description based on conversation]
+
+### Key Differentiators
+
+[Key differentiators based on conversation]
+```
+
+### 7. Present MENU OPTIONS
+
+**Content Presentation:**
+"I've drafted the executive summary and core vision based on our conversation. This captures the essence of {{project_name}} and what makes it special.
+
+**Here's what I'll add to the document:**
+[Show the complete markdown content from step 6]
+
+**Select an Option:** [A] Advanced Elicitation [P] Party Mode [C] Continue"
+
+#### Menu Handling Logic:
+
+- IF A: Invoke the `bmad-advanced-elicitation` skill with current vision content to dive deeper and refine
+- IF P: Invoke the `bmad-party-mode` skill to bring different perspectives to positioning and differentiation
+- IF C: Save content to {outputFile}, update frontmatter with stepsCompleted: [1, 2], then read fully and follow: ./step-03-users.md
+- IF Any other comments or queries: help user respond then [Redisplay Menu Options](#7-present-menu-options)
+
+#### EXECUTION RULES:
+
+- ALWAYS halt and wait for user input after presenting menu
+- ONLY proceed to next step when user selects 'C'
+- After other menu items execution, return to this menu with updated content
+- User can chat or ask questions - always respond and then end with display again of the menu options
+
+## CRITICAL STEP COMPLETION NOTE
+
+ONLY WHEN [C continue option] is selected and [vision content finalized and saved to document with frontmatter updated], will you then read fully and follow: `./step-03-users.md` to begin target user discovery.
+
+---
+
+## 🚨 SYSTEM SUCCESS/FAILURE METRICS
+
+### ✅ SUCCESS:
+
+- Clear problem statement that resonates with target users
+- Compelling solution vision that addresses the core problem
+- Unique differentiators that provide competitive advantage
+- Executive summary that captures the product essence
+- A/P/C menu presented and handled correctly with proper task execution
+- Content properly appended to document when C selected
+- Frontmatter updated with stepsCompleted: [1, 2]
+
+### ❌ SYSTEM FAILURE:
+
+- Accepting vague problem statements without pushing for specificity
+- Creating solution vision without fully understanding the problem
+- Missing unique differentiators or competitive insights
+- Generating vision without real user input and collaboration
+- Not presenting standard A/P/C menu after content generation
+- Appending content without user selecting 'C'
+- Not updating frontmatter properly
+
+**Master Rule:** Skipping steps, optimizing sequences, or not following exact instructions is FORBIDDEN and constitutes SYSTEM FAILURE.
+</prose>

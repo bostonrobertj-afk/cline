@@ -2,34 +2,9 @@
 name: correct-course
 description: 'Manage significant changes during sprint execution. Use when the user says "correct course" or "propose sprint change"'
 ---
+
 # Correct Course - Sprint Change Management Workflow
 
-## META
-- managed_workflow_extraction: enabled
-- phase_type: workflow
-- source_format: procedural
-
-## EXECUTION
-<step n="1" goal="Review Detailed Guidance">
-  <action>Read the advisory, reference, and prose sections in this file completely before taking action.</action>
-</step>
-
-<step n="2" goal="Follow Workflow">
-  <action>Execute this file in order, preserving every approval gate, routing rule, document update instruction, and constraint described below.</action>
-</step>
-
-## CHECKPOINT
-Workflow progress can advance only after the required outputs, approvals, and routing conditions in this file are satisfied.
-
-## ADVISORY
-- Treat the <prose> section as the authoritative detailed instructions for this file.
-- Preserve all existing user-input pauses, continuation checks, and referenced companion files.
-- Keep any document templates, frontmatter updates, and save instructions exactly as authored.
-
-## REFERENCE
-- Original authored procedure retained below for managed workflow extraction compatibility.
-
-<prose>
 **Goal:** Manage significant changes during sprint execution by analyzing impact across all project artifacts and producing a structured Sprint Change Proposal.
 
 **Your Role:** You are a Scrum Master navigating change management. Analyze the triggering issue, assess impact across GDD, epics, architecture, and UX artifacts, and produce an actionable Sprint Change Proposal with clear handoff.
@@ -305,4 +280,3 @@ Load config from `{project-root}/_bmad/gds/config.yaml` and resolve:
 </step>
 
 </workflow>
-</prose>

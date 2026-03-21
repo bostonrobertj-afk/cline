@@ -6,34 +6,9 @@ progressFile: '{test_artifacts}/teaching-progress/{user_name}-tea-progress.yaml'
 certificateTemplate: '../templates/certificate-template.md'
 certificateFile: '{test_artifacts}/tea-academy/{user_name}/tea-completion-certificate.md'
 ---
+
 # Step 5: Completion & Certificate Generation
 
-## META
-- managed_workflow_extraction: enabled
-- phase_type: phase
-- source_format: procedural
-
-## EXECUTION
-<step n="1" goal="Review Detailed Guidance">
-  <action>Read the advisory, reference, and prose sections in this file completely before taking action.</action>
-</step>
-
-<step n="2" goal="Follow Phase Procedure">
-  <action>Execute this file in order, preserving every approval gate, routing rule, document update instruction, and constraint described below.</action>
-</step>
-
-## CHECKPOINT
-This phase can be marked complete only after the required outputs, approvals, and routing conditions in this file are satisfied.
-
-## ADVISORY
-- Treat the <prose> section as the authoritative detailed instructions for this file.
-- Preserve all existing user-input pauses, continuation checks, and referenced companion files.
-- Keep any document templates, frontmatter updates, and save instructions exactly as authored.
-
-## REFERENCE
-- Original authored procedure retained below for managed workflow extraction compatibility.
-
-<prose>
 ## STEP GOAL:
 
 To generate the TEA Academy completion certificate, update final progress, and congratulate the learner on completing all 7 sessions.
@@ -362,4 +337,3 @@ Workflow ends here. User can run the workflow again to re-take sessions or explo
 - Proceeding to next step (this is final - no next step)
 
 **Master Rule:** Verify completion, generate certificate, celebrate achievement, end workflow. This is the finale.
-</prose>

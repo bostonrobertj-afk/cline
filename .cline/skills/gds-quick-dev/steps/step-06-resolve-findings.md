@@ -5,34 +5,9 @@ description: 'Handle review findings interactively, apply fixes, update tech-spe
 workflow_path: '{project-root}/_bmad/gds/workflows/gds-quick-flow/gds-quick-dev'
 thisStepFile: './step-06-resolve-findings.md'
 ---
+
 # Step 6: Resolve Findings
 
-## META
-- managed_workflow_extraction: enabled
-- phase_type: phase
-- source_format: procedural
-
-## EXECUTION
-<step n="1" goal="Review Detailed Guidance">
-  <action>Read the advisory, reference, and prose sections in this file completely before taking action.</action>
-</step>
-
-<step n="2" goal="Follow Phase Procedure">
-  <action>Execute this file in order, preserving every approval gate, routing rule, document update instruction, and constraint described below.</action>
-</step>
-
-## CHECKPOINT
-This phase can be marked complete only after the required outputs, approvals, and routing conditions in this file are satisfied.
-
-## ADVISORY
-- Treat the <prose> section as the authoritative detailed instructions for this file.
-- Preserve all existing user-input pauses, continuation checks, and referenced companion files.
-- Keep any document templates, frontmatter updates, and save instructions exactly as authored.
-
-## REFERENCE
-- Original authored procedure retained below for managed workflow extraction compatibility.
-
-<prose>
 **Goal:** Handle adversarial review findings interactively, apply fixes, finalize tech-spec.
 
 ---
@@ -163,4 +138,3 @@ User can:
 - Not updating tech-spec after resolution (Mode A)
 - No completion summary
 - Leaving user unclear on next steps
-</prose>

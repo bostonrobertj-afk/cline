@@ -5,34 +5,9 @@ description: 'Analyze the requirement delta between current state and what user 
 templateFile: '../tech-spec-template.md'
 wipFile: '{implementation_artifacts}/tech-spec-wip.md'
 ---
+
 # Step 1: Analyze Requirement Delta
 
-## META
-- managed_workflow_extraction: enabled
-- phase_type: phase
-- source_format: procedural
-
-## EXECUTION
-<step n="1" goal="Review Detailed Guidance">
-  <action>Read the advisory, reference, and prose sections in this file completely before taking action.</action>
-</step>
-
-<step n="2" goal="Follow Phase Procedure">
-  <action>Execute this file in order, preserving every approval gate, routing rule, document update instruction, and constraint described below.</action>
-</step>
-
-## CHECKPOINT
-This phase can be marked complete only after the required outputs, approvals, and routing conditions in this file are satisfied.
-
-## ADVISORY
-- Treat the <prose> section as the authoritative detailed instructions for this file.
-- Preserve all existing user-input pauses, continuation checks, and referenced companion files.
-- Keep any document templates, frontmatter updates, and save instructions exactly as authored.
-
-## REFERENCE
-- Original authored procedure retained below for managed workflow extraction compatibility.
-
-<prose>
 **Progress: Step 1 of 4** - Next: Deep Investigation
 
 ## RULES:
@@ -212,4 +187,3 @@ b) **HALT and wait for user selection.**
 - [ ] WIP check performed FIRST before any greeting.
 - [ ] `{wipFile}` created with correct frontmatter, Overview, Context for Development, and `stepsCompleted: [1]`.
 - [ ] User selected [C] to continue.
-</prose>

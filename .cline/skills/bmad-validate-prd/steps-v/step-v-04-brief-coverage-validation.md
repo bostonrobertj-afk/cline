@@ -5,34 +5,9 @@ prdFile: '{prd_file_path}'
 productBrief: '{product_brief_path}'
 validationReportPath: '{validation_report_path}'
 ---
+
 # Step 4: Product Brief Coverage Validation
 
-## META
-- managed_workflow_extraction: enabled
-- phase_type: phase
-- source_format: procedural
-
-## EXECUTION
-<step n="1" goal="Review Detailed Guidance">
-  <action>Read the advisory, reference, and prose sections in this file completely before taking action.</action>
-</step>
-
-<step n="2" goal="Follow Phase Procedure">
-  <action>Execute this file in order, preserving every approval gate, routing rule, document update instruction, and constraint described below.</action>
-</step>
-
-## CHECKPOINT
-This phase can be marked complete only after the required outputs, approvals, and routing conditions in this file are satisfied.
-
-## ADVISORY
-- Treat the <prose> section as the authoritative detailed instructions for this file.
-- Preserve all existing user-input pauses, continuation checks, and referenced companion files.
-- Keep any document templates, frontmatter updates, and save instructions exactly as authored.
-
-## REFERENCE
-- Original authored procedure retained below for managed workflow extraction compatibility.
-
-<prose>
 ## STEP GOAL:
 
 Validate that PRD covers all content from Product Brief (if brief was used as input), mapping brief content to PRD sections and identifying gaps.
@@ -234,4 +209,3 @@ Without delay, read fully and follow: {nextStepFile} (step-v-05-measurability-va
 - Not auto-proceeding
 
 **Master Rule:** Product Brief coverage is conditional - skip if no brief, validate thoroughly if brief exists. Always auto-proceed.
-</prose>

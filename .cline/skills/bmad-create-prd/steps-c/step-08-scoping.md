@@ -1,12 +1,8 @@
-
-# step 08 scoping
-
 ## META
 
-- Goal: Define MVP boundaries, post-MVP expansion, and scope risk management.
-- Execute this file in order.
-- Halt whenever user input, confirmation, or workflow gating is required.
-- Use the structured sections for extraction and handoff.
+- Goal: define MVP boundaries, post-MVP expansion, and scope risk management.
+- Speak to the user in `{communication_language}`.
+- Keep the MVP disciplined and realistic.
 
 ## EXECUTION
 
@@ -46,4 +42,9 @@
 Wait for the user to approve MVP and phased scope boundaries before saving them.
 
 ## ADVISORY
+
 - The scoping step should force real prioritization rather than soft commitments to everything.
+
+## REFERENCE
+
+- Good scoping improves delivery confidence and requirement quality downstream.

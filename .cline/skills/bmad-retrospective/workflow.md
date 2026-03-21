@@ -1,32 +1,5 @@
-
 # Retrospective Workflow
 
-## META
-- managed_workflow_extraction: enabled
-- phase_type: workflow
-- source_format: procedural
-
-## EXECUTION
-<step n="1" goal="Review Detailed Guidance">
-  <action>Read the advisory, reference, and prose sections in this file completely before taking action.</action>
-</step>
-
-<step n="2" goal="Follow Workflow">
-  <action>Execute this file in order, preserving every approval gate, routing rule, document update instruction, and constraint described below.</action>
-</step>
-
-## CHECKPOINT
-Workflow progress can advance only after the required outputs, approvals, and routing conditions in this file are satisfied.
-
-## ADVISORY
-- Treat the <prose> section as the authoritative detailed instructions for this file.
-- Preserve all existing user-input pauses, continuation checks, and referenced companion files.
-- Keep any document templates, frontmatter updates, and save instructions exactly as authored.
-
-## REFERENCE
-- Original authored procedure retained below for managed workflow extraction compatibility.
-
-<prose>
 **Goal:** Post-epic review to extract lessons and assess success.
 
 **Your Role:** Scrum Master facilitating retrospective.
@@ -107,7 +80,7 @@ Bob (Scrum Master): "Welcome to the retrospective, {user_name}. Let me help you 
 <action>Extract epic number from keys like "epic-X-retrospective" or story keys like "X-Y-story-name"</action>
 <action>Set {{detected_epic}} = highest epic number found with completed stories</action>
 
-<check if="{{detected_epic}} found">
+<branch if="{{detected_epic}} found">
   <action>Present finding to user with context</action>
 
   <output>
@@ -116,19 +89,19 @@ Bob (Scrum Master): "Based on {sprint_status_file}, it looks like Epic {{detecte
 
 <action>WAIT for {user_name} to confirm or correct</action>
 
-  <check if="{user_name} confirms">
+  <branch if="{user_name} confirms">
     <action>Set {{epic_number}} = {{detected_epic}}</action>
-  </check>
+  </branch>
 
-  <check if="{user_name} provides different epic number">
+  <branch if="{user_name} provides different epic number">
     <action>Set {{epic_number}} = user-provided number</action>
     <output>
 Bob (Scrum Master): "Got it, we're reviewing Epic {{epic_number}}. Let me gather that information."
     </output>
-  </check>
-</check>
+  </branch>
+</branch>
 
-<check if="{{detected_epic}} NOT found in sprint-status">
+<branch if="{{detected_epic}} NOT found in sprint-status">
   <action>PRIORITY 2: Ask user directly</action>
 
   <output>
@@ -137,9 +110,9 @@ Bob (Scrum Master): "I'm having trouble detecting the completed epic from {sprin
 
 <action>WAIT for {user_name} to provide epic number</action>
 <action>Set {{epic_number}} = user-provided number</action>
-</check>
+</branch>
 
-<check if="{{epic_number}} still not determined">
+<branch if="{{epic_number}} still not determined">
   <action>PRIORITY 3: Fallback to stories folder</action>
 
 <action>Scan {implementation_artifacts} for highest numbered story files</action>
@@ -152,7 +125,7 @@ Bob (Scrum Master): "I found stories for Epic {{detected_epic}} in the stories f
 
 <action>WAIT for {user_name} to confirm or correct</action>
 <action>Set {{epic_number}} = confirmed number</action>
-</check>
+</branch>
 
 <action>Once {{epic_number}} is determined, verify epic completion status</action>
 
@@ -168,7 +141,7 @@ Bob (Scrum Master): "I found stories for Epic {{detected_epic}} in the stories f
 <action>Collect list of pending story keys (status != "done")</action>
 <action>Determine if complete: true if all stories are done, false otherwise</action>
 
-<check if="epic is not complete">
+<branch if="epic is not complete">
   <output>
 Alice (Product Owner): "Wait, Bob - I'm seeing that Epic {{epic_number}} isn't actually complete yet."
 
@@ -192,30 +165,34 @@ Bob (Scrum Master): "{user_name}, we typically run retrospectives after all stor
 3. Run sprint-planning to refresh story tracking
    </output>
 
-<ask if="{{non_interactive}} == false">Continue with incomplete epic? (yes/no)</ask>
+  <branch if="{{non_interactive}} == false">
+    <ask>Continue with incomplete epic? (yes/no)</ask>
+  </branch>
 
-  <check if="user says no">
+  <branch if="user says no">
     <output>
 Bob (Scrum Master): "Smart call, {user_name}. Let's finish those stories first and then have a proper retrospective."
     </output>
     <action>HALT</action>
-  </check>
+  </branch>
 
-<action if="user says yes">Set {{partial_retrospective}} = true</action>
+  <branch if="user says yes">
+    <action>Set {{partial_retrospective}} = true</action>
+  </branch>
 <output>
 Charlie (Senior Dev): "Just so everyone knows, this partial retro might miss some important lessons from those pending stories."
 
 Bob (Scrum Master): "Good point, Charlie. {user_name}, we'll document what we can now, but we may want to revisit after everything's done."
 </output>
-</check>
+</branch>
 
-<check if="epic is complete">
+<branch if="epic is complete">
   <output>
 Alice (Product Owner): "Excellent! All {{done_stories}} stories are marked done."
 
 Bob (Scrum Master): "Perfect. Epic {{epic_number}} is complete and ready for retrospective, {user_name}."
 </output>
-</check>
+</branch>
 
 </step>
 
@@ -322,10 +299,10 @@ Bob (Scrum Master): "We'll get to all of it. But first, let me load the previous
 
 <action>Calculate previous epic number: {{prev_epic_num}} = {{epic_number}} - 1</action>
 
-<check if="{{prev_epic_num}} >= 1">
+<branch if="{{prev_epic_num}} >= 1">
   <action>Search for previous retrospectives using pattern: {implementation_artifacts}/epic-{{prev_epic_num}}-retro-*.md</action>
 
-  <check if="previous retrospectives found">
+  <branch if="previous retrospectives found">
     <output>
 Bob (Scrum Master): "I found our retrospectives from Epic {{prev_epic_num}}. Let me see what we committed to back then..."
     </output>
@@ -391,26 +368,26 @@ Elena (Junior Dev): "That's... actually pretty insightful."
 Bob (Scrum Master): "That's why we track this stuff. Pattern recognition helps us improve."
 </output>
 
-  </check>
+  </branch>
 
-  <check if="no previous retro found">
-    <output>
+  <branch if="no previous retro found">
+<output>
 Bob (Scrum Master): "I don't see a retrospective for Epic {{prev_epic_num}}. Either we skipped it, or this is your first retro."
 
 Alice (Product Owner): "Probably our first one. Good time to start the habit!"
 </output>
 <action>Set {{first_retrospective}} = true</action>
-</check>
-</check>
+</branch>
+</branch>
 
-<check if="{{prev_epic_num}} < 1">
+<branch if="{{prev_epic_num}} < 1">
   <output>
 Bob (Scrum Master): "This is Epic 1, so naturally there's no previous retro to reference. We're starting fresh!"
 
 Charlie (Senior Dev): "First epic, first retro. Let's make it count."
 </output>
 <action>Set {{first_retrospective}} = true</action>
-</check>
+</branch>
 
 </step>
 
@@ -429,23 +406,23 @@ Alice (Product Owner): "Good thinking - helps us connect what we learned to what
 **Try sharded first (more specific):**
 <action>Check if file exists: {planning_artifacts}/epic*/epic-{{next_epic_num}}.md</action>
 
-<check if="sharded epic file found">
+<branch if="sharded epic file found">
   <action>Load {planning_artifacts}/*epic*/epic-{{next_epic_num}}.md</action>
   <action>Set {{next_epic_source}} = "sharded"</action>
-</check>
+</branch>
 
 **Fallback to whole document:**
-<check if="sharded epic not found">
+<branch if="sharded epic not found">
 <action>Check if file exists: {planning_artifacts}/epic*.md</action>
 
-  <check if="whole epic file found">
+  <branch if="whole epic file found">
     <action>Load entire epics document</action>
     <action>Extract Epic {{next_epic_num}} section</action>
     <action>Set {{next_epic_source}} = "whole"</action>
-  </check>
-</check>
+  </branch>
+</branch>
 
-<check if="next epic found">
+<branch if="next epic found">
   <action>Analyze next epic for:</action>
   - Epic title and objectives
   - Planned stories and complexity estimates
@@ -487,9 +464,9 @@ Bob (Scrum Master): "Good question - that's exactly what we need to explore in t
 </output>
 
 <action>Set {{next_epic_exists}} = true</action>
-</check>
+</branch>
 
-<check if="next epic NOT found">
+<branch if="next epic NOT found">
   <output>
 Bob (Scrum Master): "Hmm, I don't see Epic {{next_epic_num}} defined yet."
 
@@ -499,7 +476,7 @@ Bob (Scrum Master): "No problem. We'll still do a thorough retro on Epic {{epic_
 </output>
 
 <action>Set {{next_epic_exists}} = false</action>
-</check>
+</branch>
 
 </step>
 
@@ -694,7 +671,7 @@ Bob (Scrum Master): "No shame, Charlie. Now we know, and we can improve. {user_n
 - Specific stories are referenced with real examples
 - Emotions are authentic (frustration, pride, concern, hope)
 
-<check if="previous retrospective exists">
+<branch if="previous retrospective exists">
   <output>
 Bob (Scrum Master): "Before we move on, I want to circle back to Epic {{prev_epic_num}}'s retrospective."
 
@@ -716,7 +693,7 @@ Bob (Scrum Master): "{user_name}, looking at what we committed to last time and 
 <action>WAIT for {user_name} to respond</action>
 
 <action>Use the previous retro follow-through as a learning moment about commitment and accountability</action>
-</check>
+</branch>
 
 <output>
 Bob (Scrum Master): "Alright, we've covered a lot of ground. Let me summarize what I'm hearing..."
@@ -740,12 +717,12 @@ Bob (Scrum Master): "Does that capture it? Anyone have something important we mi
 
 <step n="7" goal="Next Epic Preparation Discussion - Interactive and Collaborative">
 
-<check if="{{next_epic_exists}} == false">
+<branch if="{{next_epic_exists}} == false">
   <output>
 Bob (Scrum Master): "Normally we'd discuss preparing for the next epic, but since Epic {{next_epic_num}} isn't defined yet, let's skip to action items."
   </output>
   <action>Skip to Step 8</action>
-</check>
+</branch>
 
 <output>
 Bob (Scrum Master): "Now let's shift gears. Epic {{next_epic_num}} is coming up: '{{next_epic_title}}'"
@@ -1011,7 +988,7 @@ Estimated: {{est_4}}
 - Team capacity or skill gaps more severe than planned
 - Technical debt level unsustainable without intervention
 
-<check if="significant discoveries detected">
+<branch if="significant discoveries detected">
   <output>
 
 ═══════════════════════════════════════════════════════════
@@ -1079,15 +1056,15 @@ Charlie (Senior Dev): "This is why retrospectives matter. We caught this before 
 
 Bob (Scrum Master): "Adding to critical path: Epic {{next_epic_num}} planning review session before epic kickoff."
 </output>
-</check>
+</branch>
 
-<check if="no significant discoveries">
+<branch if="no significant discoveries">
   <output>
 Bob (Scrum Master): "Good news - nothing from Epic {{epic_number}} fundamentally changes our plan for Epic {{next_epic_num}}. The plan is still sound."
 
 Alice (Product Owner): "We learned a lot, but the direction is right."
 </output>
-</check>
+</branch>
 
 <output>
 Bob (Scrum Master): "Let me show you the complete action plan..."
@@ -1135,7 +1112,7 @@ Bob (Scrum Master): "{user_name}, are you confident Epic {{epic_number}} is prod
 
 <action>WAIT for {user_name} to assess quality readiness</action>
 
-<check if="{user_name} expresses concerns">
+<branch if="{user_name} expresses concerns">
   <output>
 Bob (Scrum Master): "Okay, let's capture that. What specific testing is still needed?"
 
@@ -1144,7 +1121,7 @@ Dana (QA Engineer): "I can handle {{testing_work_needed}}, estimated {{testing_h
 Bob (Scrum Master): "Adding to critical path: Complete {{testing_work_needed}} before Epic {{next_epic_num}}."
 </output>
 <action>Add testing completion to critical path</action>
-</check>
+</branch>
 
 <action>Explore deployment and release status</action>
 
@@ -1154,7 +1131,7 @@ Bob (Scrum Master): "{user_name}, what's the deployment status for Epic {{epic_n
 
 <action>WAIT for {user_name} to provide deployment status</action>
 
-<check if="not yet deployed">
+<branch if="not yet deployed">
   <output>
 Charlie (Senior Dev): "If it's not deployed yet, we need to factor that into Epic {{next_epic_num}} timing."
 
@@ -1164,7 +1141,7 @@ Bob (Scrum Master): "{user_name}, when is deployment planned? Does that timing w
 <action>WAIT for {user_name} to clarify deployment timeline</action>
 
 <action>Add deployment milestone to critical path with agreed timeline</action>
-</check>
+</branch>
 
 <action>Explore stakeholder acceptance</action>
 
@@ -1178,7 +1155,7 @@ Bob (Scrum Master): "{user_name}, any feedback from stakeholders still pending?"
 
 <action>WAIT for {user_name} to describe stakeholder acceptance status</action>
 
-<check if="acceptance incomplete or feedback pending">
+<branch if="acceptance incomplete or feedback pending">
   <output>
 Alice (Product Owner): "We should get formal acceptance before moving on. Otherwise Epic {{next_epic_num}} might get interrupted by rework."
 
@@ -1188,7 +1165,7 @@ Bob (Scrum Master): "{user_name}, how do you want to handle stakeholder acceptan
 <action>WAIT for {user_name} decision</action>
 
 <action>Add stakeholder acceptance to critical path if user agrees</action>
-</check>
+</branch>
 
 <action>Explore technical health and stability</action>
 
@@ -1202,7 +1179,7 @@ Charlie (Senior Dev): "Be honest, {user_name}. We've all shipped epics that felt
 
 <action>WAIT for {user_name} to assess codebase health</action>
 
-<check if="{user_name} expresses stability concerns">
+<branch if="{user_name} expresses stability concerns">
   <output>
 Charlie (Senior Dev): "Okay, let's dig into that. What's causing those concerns?"
 
@@ -1218,7 +1195,7 @@ Bob (Scrum Master): "{user_name}, is addressing this stability work worth doing 
 <action>WAIT for {user_name} decision</action>
 
 <action>Add stability work to preparation sprint if user agrees</action>
-</check>
+</branch>
 
 <action>Explore unresolved blockers</action>
 
@@ -1232,7 +1209,7 @@ Bob (Scrum Master): "Nothing is off limits here. If there's a problem, we need t
 
 <action>WAIT for {user_name} to surface any blockers</action>
 
-<check if="blockers identified">
+<branch if="blockers identified">
   <output>
 Bob (Scrum Master): "Let's capture those blockers and figure out how they affect Epic {{next_epic_num}}."
 
@@ -1247,7 +1224,7 @@ Bob (Scrum Master): "Who owns that work?"
 
 <action>Assign blocker resolution to appropriate agent</action>
 <action>Add to critical path with priority and deadline</action>
-</check>
+</branch>
 
 <action>Synthesize the readiness assessment</action>
 
@@ -1400,22 +1377,22 @@ Bob (Scrum Master): "See you all when prep work is done. Meeting adjourned!"
 <action>Update last_updated field to current date</action>
 <action>Save file, preserving ALL comments and structure including STATUS DEFINITIONS</action>
 
-<check if="update successful">
+<branch if="update successful">
   <output>
 ✅ Retrospective marked as completed in {sprint_status_file}
 
 Retrospective key: epic-{{epic_number}}-retrospective
 Status: {{previous_status}} → done
 </output>
-</check>
+</branch>
 
-<check if="retrospective key not found">
+<branch if="retrospective key not found">
   <output>
 ⚠️ Could not update retrospective status: epic-{{epic_number}}-retrospective not found in {sprint_status_file}
 
 Retrospective document was saved successfully, but {sprint_status_file} may need manual update.
 </output>
-</check>
+</branch>
 
 </step>
 
@@ -1504,4 +1481,3 @@ Charlie (Senior Dev): "Time to knock out that prep work."
 <guideline>Document everything - retrospective insights are valuable for future reference</guideline>
 <guideline>Two-part structure ensures both reflection AND preparation</guideline>
 </facilitation-guidelines>
-</prose>
