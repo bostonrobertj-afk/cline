@@ -1,34 +1,24 @@
-# Full Project Scan Sub-Workflow
+# Full Project Scan Workflow
 
-**Goal:** Complete project documentation (initial scan or full rescan).
-
-**Your Role:** Full project scan documentation specialist.
-
----
-
-## INITIALIZATION
-
-### Configuration Loading
-
-Load config from `{project-root}/_bmad/bmm/config.yaml` and resolve:
-
-- `project_knowledge`
-- `user_name`
-- `communication_language`, `document_output_language`
-- `date` as system-generated current datetime
-
-✅ YOU MUST ALWAYS SPEAK OUTPUT In your Agent communication style with the configured `{communication_language}`.
-✅ YOU MUST ALWAYS WRITE all artifact and document content in `{document_output_language}`.
-
-### Runtime Inputs
-
-- `workflow_mode` = `""` (set by parent: `initial_scan` or `full_rescan`)
-- `scan_level` = `""` (set by parent: `quick`, `deep`, or `exhaustive`)
-- `resume_mode` = `false`
-- `autonomous` = `false` (requires user input at key decision points)
-
----
+Workflow ID: `bmad-document-project`
 
 ## EXECUTION
+<step n="1" goal="Resolve scan workflow configuration">
+  <action>Load and resolve `project_knowledge`, `user_name`, `communication_language`, `document_output_language`, `user_skill_level`, and `date` from `{project-root}/_bmad/bmm/config.yaml`.</action>
+  <detail>Use the resolved values for the scan prompts and every generated document in this workflow branch.</detail>
+</step>
 
-Read fully and follow: `./full-scan-instructions.md`
+<step n="2" goal="Enter the full-scan instruction set">
+  <output>Load `./full-scan-instructions.md` as the active phase. Only the current step's detail is visible now; the next step's detail appears after the current step is completed. Mark skipped optional steps complete so the backend can reveal the next step.</output>
+  <detail>
+    - This workflow branch covers `initial_scan` and `full_rescan`.
+    - Markup-like tokens such as `<step>`, `<action>`, `<ask>`, `<output>`, and `<detail>` are workflow tags, not user-facing prose.
+  </detail>
+</step>
+
+## CHECKPOINT
+Workflow progress advances only after the required outputs, approvals, and routing conditions in the active phase are satisfied.
+
+## ADVISORY
+- Keep advisory guidance attached to the active step inside `full-scan-instructions.md`.
+- Preserve backend-owned state file updates and archive behavior.

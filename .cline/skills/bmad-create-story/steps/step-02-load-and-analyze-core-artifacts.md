@@ -1,16 +1,20 @@
 ---
 name: 'step-02-load-and-analyze-core-artifacts'
-description: 'Load planning artifacts and extract story foundation context'
-
-# Path Definitions
+description: 'Load planning artifacts and extract the story foundation'
+config_source: '{project-root}/_bmad/gds/config.yaml'
+project_name: '{config_source}:project_name'
+user_name: '{config_source}:user_name'
+communication_language: '{config_source}:communication_language'
+document_output_language: '{config_source}:document_output_language'
+game_dev_experience: '{config_source}:game_dev_experience'
+planning_artifacts: '{config_source}:planning_artifacts'
+implementation_artifacts: '{config_source}:implementation_artifacts'
+project_knowledge: '{config_source}:project_knowledge'
+date: system-generated current datetime
 workflow_path: '{project-root}/.cline/skills/bmad-create-story'
-
-# File References
 thisStepFile: './step-02-load-and-analyze-core-artifacts.md'
 nextStepFile: './step-03-architecture-analysis-for-developer-guardrails.md'
 workflowFile: '{workflow_path}/workflow.md'
-
-# Companion References
 checklistFile: '{workflow_path}/checklist.md'
 discoverInputsFile: '{workflow_path}/discover-inputs.md'
 templateFile: '{workflow_path}/template.md'
@@ -18,104 +22,46 @@ templateFile: '{workflow_path}/template.md'
 # Step 2: Load and Analyze Core Artifacts
 
 ## META
-- managed_workflow_extraction: enabled
-- phase_type: phase
-- source_format: procedural
+- current_phase: workflow::step-2
+- goal: Build the story foundation from planning artifacts and prior work.
+- Speak in `{communication_language}`.
 
 ## EXECUTION
-<step n="1" goal="Review Detailed Guidance">
-  <action>Read the advisory, reference, and prose sections in this file completely before taking action.</action>
+<step n="1" goal="Load the relevant source material">
+  <action>Use the discovery protocol to load the story's source context.</action>
+  <detail>Prefer full or selectively targeted loads for epics, GDD, architecture, UX, and project context artifacts.</detail>
 </step>
 
-<step n="2" goal="Follow Phase Procedure">
-  <action>Execute this file in order, preserving every approval gate, routing rule, document update instruction, and constraint described below.</action>
+<step n="2" goal="Extract the epic and story foundation">
+  <action>From the epic source, capture the epic objectives, business value, all stories in the epic, the target story statement, acceptance criteria, source hints, technical constraints, and dependencies.</action>
+  <detail>Focus on the story's implementation foundation rather than copying the epic verbatim.</detail>
+</step>
+
+<step n="3" goal="Extract previous-story intelligence when applicable">
+  <branch if="story_num > 1">
+    <action>Find the closest previous story file in the same epic and load it completely.</action>
+    <action>Extract actionable learnings that could affect the current story.</action>
+    <detail>Focus on dev notes, review feedback, created or modified files, testing patterns, solved problems, and conventions established by prior work.</detail>
+  </branch>
+</step>
+
+<step n="4" goal="Capture git intelligence when available">
+  <branch if="a git repository is detected and prior story context exists">
+    <action>Inspect recent commits for implementation patterns relevant to the story.</action>
+    <detail>Look for files changed, dependencies added or updated, architecture decisions, and testing approaches.</detail>
+  </branch>
+</step>
+
+<step n="5" goal="Preserve usable context for the next phase">
+  <action>Summarize the extracted story foundation so the architecture phase can start from the current context instead of rediscovering basics.</action>
+  <detail>Only the current phase detail is visible now. If a branch was intentionally skipped, mark it complete before advancing so the next phase can surface.</detail>
 </step>
 
 ## CHECKPOINT
-This phase can be marked complete only after the required outputs, approvals, and routing conditions in this file are satisfied.
+This phase can be marked complete only after the required outputs, approvals, and routing conditions are satisfied.
 
 ## ADVISORY
-- Treat the <prose> section as the authoritative detailed instructions for this file.
-- Preserve all existing user-input pauses, continuation checks, and referenced companion files.
-- Keep any document templates, frontmatter updates, and save instructions exactly as authored.
-
-## REFERENCE
-- Original authored procedure retained below for managed workflow extraction compatibility.
-
-<prose>
-## STEP GOAL
-
-Load the available planning context and extract the story foundation from the source documents.
-
-## MANDATORY RULES
-
-- Analyze all relevant artifacts thoroughly.
-- Do not skip the previous-story context when a prior story exists.
-- Keep responses in `{communication_language}`.
-
-## EXECUTION
-
-### 1. Load all relevant source material
-
-Use the workflow input-discovery protocol to load the story's source context.
-
-<detail>
-Prefer full or selectively targeted loads for:
-- epics
-- GDD
-- architecture
-- UX
-- project context
-</detail>
-
-### 2. Extract the epic and story foundation
-
-From the epic source, capture:
-
-- epic objectives and business value
-- all stories in the epic for cross-story context
-- the selected story's user story statement
-- acceptance criteria and source hints
-- technical requirements and constraints
-- dependencies on other stories or epics
-
-### 3. Extract previous-story intelligence when applicable
-
-<branch if="story_num > 1">
-  <action>Find the closest previous story file in the same epic and load it completely.</action>
-  <action>Extract actionable learnings that could affect the current story.</action>
-  <detail>
-    Focus on dev notes, review feedback, created or modified files, testing patterns, solved problems, and conventions established by prior work.
-  </detail>
-</branch>
-
-### 4. Capture git intelligence when available
-
-<branch if="a git repository is detected and prior story context exists">
-  <action>Inspect the most recent commits for implementation patterns relevant to the story.</action>
-  <detail>
-    Look for files changed, dependencies added or updated, architecture decisions, and testing approaches.
-  </detail>
-</branch>
-
-### 5. Preserve usable context for the next phase
-
-Summarize the extracted story foundation in working context so the next step can perform the architecture deep dive without re-discovering the basic requirements.
-
-## NEXT STEP
-
-Continue to `./step-03-architecture-analysis-for-developer-guardrails.md`.
-
-## SUCCESS METRICS
-
-- All relevant planning artifacts are loaded.
-- Epic and story foundation are captured clearly.
-- Prior-story and git learnings are preserved when available.
-
-## FAILURE MODES
-
-- Skipping context that could prevent implementation mistakes
-- Ignoring previous-story learnings
-- Failing to preserve the story foundation for the next step
-
-</prose>
+- Keep all user-facing text in `{communication_language}`.
+- Use the discovered planning context to ground the next phase in real source material.
+- If prior-story or git context is unavailable, note that explicitly and continue with the artifacts that do exist.
+- The next phase details stay hidden until this phase is completed.

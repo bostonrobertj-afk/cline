@@ -1,17 +1,21 @@
 ---
 name: 'step-01-determine-target-story'
-description: 'Determine the target story from user input or sprint tracking'
-
-# Path Definitions
+description: 'Resolve the story target from user input or sprint tracking'
+config_source: '{project-root}/_bmad/gds/config.yaml'
+project_name: '{config_source}:project_name'
+user_name: '{config_source}:user_name'
+communication_language: '{config_source}:communication_language'
+document_output_language: '{config_source}:document_output_language'
+game_dev_experience: '{config_source}:game_dev_experience'
+planning_artifacts: '{config_source}:planning_artifacts'
+implementation_artifacts: '{config_source}:implementation_artifacts'
+project_knowledge: '{config_source}:project_knowledge'
+date: system-generated current datetime
 workflow_path: '{project-root}/.cline/skills/bmad-create-story'
-
-# File References
 thisStepFile: './step-01-determine-target-story.md'
 nextStepFile: './step-02-load-and-analyze-core-artifacts.md'
 workflowFile: '{workflow_path}/workflow.md'
 sprintStatusFile: '{implementation_artifacts}/sprint-status.yaml'
-
-# Companion References
 checklistFile: '{workflow_path}/checklist.md'
 discoverInputsFile: '{workflow_path}/discover-inputs.md'
 templateFile: '{workflow_path}/template.md'
@@ -19,144 +23,81 @@ templateFile: '{workflow_path}/template.md'
 # Step 1: Determine Target Story
 
 ## META
-- managed_workflow_extraction: enabled
-- phase_type: phase
-- source_format: procedural
+- current_phase: workflow::step-1
+- goal: Resolve the target story before any content is created.
+- Speak in `{communication_language}`.
 
 ## EXECUTION
-<step n="1" goal="Review Detailed Guidance">
-  <action>Read the advisory, reference, and prose sections in this file completely before taking action.</action>
+<step n="1" goal="Resolve the target from explicit input first">
+  <action>Check the user request for an explicit story id or story file path.</action>
+  <detail>Accept `1-2-user-auth`, `1.2`, `epic 1 story 2`, or a direct story file path. If only a path is given, store `story_path` and infer `story_key` only when the filename or path is unambiguous.</detail>
 </step>
 
-<step n="2" goal="Follow Phase Procedure">
-  <action>Execute this file in order, preserving every approval gate, routing rule, document update instruction, and constraint described below.</action>
+<step n="2" goal="Fall back to sprint tracking when needed">
+  <action>Check whether `{sprintStatusFile}` exists when no explicit target is provided.</action>
+  <branch if="the sprint status file does not exist">
+    <output>No sprint status file was found and no story was specified.</output>
+    <output>Provide an epic-story number, provide a story docs path, or run sprint planning first.</output>
+    <ask>Choose [1] to initialize sprint tracking, provide an epic-story number, provide a story docs path, or choose [q] to quit.</ask>
+    <branch if="the user chooses q">
+      <action>Halt without making changes.</action>
+    </branch>
+    <branch if="the user chooses 1">
+      <output>Run sprint planning first to create `sprint-status.yaml`.</output>
+      <action>Halt until sprint tracking exists.</action>
+    </branch>
+    <branch if="the user provides an epic-story number or path">
+      <action>Parse `epic_num`, `story_num`, `story_title`, and `story_key` when available.</action>
+      <action>Store the provided path as `story_path` when the user supplies story documents.</action>
+      <action>Continue once the target is resolved.</action>
+    </branch>
+  </branch>
+  <branch if="the sprint status file exists and no explicit target was provided">
+    <action>Load the full sprint-status file from start to end.</action>
+    <detail>Preserve order while scanning and parse the `development_status` section completely.</detail>
+    <action>Find the first backlog story key that matches the `number-number-name` pattern and is not an epic or retrospective entry.</action>
+    <branch if="no backlog story is found">
+      <output>No backlog stories were found in `sprint-status.yaml`.</output>
+      <output>All stories are already created, in progress, or done.</output>
+      <output>Refresh sprint tracking, add more stories, or run a retrospective.</output>
+      <action>Halt.</action>
+    </branch>
+    <action>Extract `epic_num`, `story_num`, `story_title`, and `story_key` from the found key.</action>
+    <action>Set `story_id` to `{{epic_num}}.{{story_num}}`.</action>
+    <action>Check whether this is the first story in epic `{{epic_num}}`.</action>
+    <branch if="this is the first story in the epic">
+      <action>Load the sprint status file and inspect epic `epic-{{epic_num}}`.</action>
+      <branch if="epic status is backlog or legacy contexted">
+        <action>Update the epic status to `in-progress`.</action>
+        <output>Epic `{{epic_num}}` status updated to in-progress.</output>
+      </branch>
+      <branch if="epic status is in-progress">
+        <action>No change is needed.</action>
+      </branch>
+      <branch if="epic status is done">
+        <output>Cannot create a story in a completed epic.</output>
+        <action>Halt.</action>
+      </branch>
+      <branch if="epic status is anything else">
+        <output>Invalid epic status `{{epic_status}}`.</output>
+        <action>Halt.</action>
+      </branch>
+    </branch>
+    <action>Continue after the target story is confirmed.</action>
+  </branch>
+</step>
+
+<step n="3" goal="Confirm the resolved target and hand off">
+  <output>Target story resolved: `{{story_id}}` / `{{story_key}}`.</output>
+  <detail>Only the current phase detail is visible now. If a branch was intentionally skipped, mark it complete before advancing so the next phase can surface.</detail>
+  <action>Proceed to the core artifact analysis phase.</action>
 </step>
 
 ## CHECKPOINT
-This phase can be marked complete only after the required outputs, approvals, and routing conditions in this file are satisfied.
+Do not advance until the story target is known.
 
 ## ADVISORY
-- Treat the <prose> section as the authoritative detailed instructions for this file.
-- Preserve all existing user-input pauses, continuation checks, and referenced companion files.
-- Keep any document templates, frontmatter updates, and save instructions exactly as authored.
-
-## REFERENCE
-- Original authored procedure retained below for managed workflow extraction compatibility.
-
-<prose>
-## STEP GOAL
-
-Determine which story should be created, either from explicit user input or from sprint tracking.
-
-## MANDATORY RULES
-
-- Never create story content before the target story is known.
-- Read the full sprint-status file when auto-discovering the next backlog story.
-- Ask the user when the workflow cannot confidently determine the target.
-- Keep all responses in `{communication_language}`.
-
-## EXECUTION
-
-### 1. Accept explicit story input first
-
-If the user provides a story identifier or path, accept formats like:
-
-- `1-2-user-auth`
-- `1.2`
-- `epic 1 story 2`
-- an explicit story file path
-
-Parse the epic number, story number, and story title when possible, then continue to Step 2.
-<detail>
-If the user provides only a story-file path, store it as `story_path` and derive `story_key` only when the path or filename makes it clear.
-</detail>
-
-### 2. Fall back to sprint tracking
-
-If no explicit target is provided, check whether `{sprintStatusFile}` exists.
-
-<branch if="the sprint status file does not exist">
-  <output>🚫 No sprint status file found and no story specified</output>
-  <output>
-    **Required Options:**
-    1. Run `sprint-planning` to initialize sprint tracking
-    2. Provide a specific epic-story number to create
-    3. Provide a path to story documents if sprint tracking does not exist yet
-  </output>
-  <ask>Choose option [1], provide an epic-story number, provide a story docs path, or [q] to quit.</ask>
-  <branch if="the user chooses `q`">
-    <action>HALT - No work needed</action>
-  </branch>
-  <branch if="the user chooses `1`">
-    <output>Run `sprint-planning` first to create `sprint-status.yaml`.</output>
-    <action>HALT - User needs to run sprint-planning</action>
-  </branch>
-  <branch if="the user provides an epic-story number or path">
-    <action>Parse the provided target and store `epic_num`, `story_num`, `story_title`, and `story_key` when available.</action>
-    <action>Store the provided path as `story_path` when the user supplies a story docs path.</action>
-    <action>Continue to Step 2.</action>
-  </branch>
-</branch>
-
-<branch if="the sprint status file exists and no explicit target was provided">
-  <action>Load the full sprint-status file from start to end.</action>
-  <detail>
-    Preserve order while scanning. Read every line and parse the `development_status` section completely.
-  </detail>
-  <action>Find the first story key in backlog status that matches the `number-number-name` pattern and is not an epic or retrospective entry.</action>
-  <branch if="no backlog story is found">
-    <output>📋 No backlog stories found in sprint-status.yaml</output>
-    <output>
-      All stories are already created, in progress, or done.
-
-      **Options:**
-      1. Run `sprint-planning` to refresh story tracking
-      2. Load PM agent and run `correct-course` to add more stories
-      3. Check whether the current sprint is complete and run a retrospective
-    </output>
-    <action>HALT</action>
-  </branch>
-  <action>Extract `epic_num`, `story_num`, `story_title`, and `story_key` from the found key.</action>
-  <action>Set `story_id` to `{{epic_num}}.{{story_num}}`.</action>
-  <action>Check whether this is the first story in epic `{{epic_num}}`.</action>
-  <branch if="this is the first story in the epic">
-    <action>Load the sprint status file and inspect epic `epic-{{epic_num}}`.</action>
-    <branch if="epic status is `backlog` or legacy `contexted`">
-      <action>Update the epic status to `in-progress`.</action>
-      <output>📊 Epic {{epic_num}} status updated to in-progress</output>
-    </branch>
-    <branch if="epic status is `in-progress`">
-      <action>No change is needed.</action>
-    </branch>
-    <branch if="epic status is `done`">
-      <output>🚫 ERROR: Cannot create story in completed epic</output>
-      <output>Epic {{epic_num}} is marked as `done`. All stories are complete.</output>
-      <output>If more work is needed, move the epic back to `in-progress` or create a new epic.</output>
-      <action>HALT - Cannot proceed</action>
-    </branch>
-    <branch if="epic status is anything else">
-      <output>🚫 ERROR: Invalid epic status `{{epic_status}}`</output>
-      <output>Expected: backlog, in-progress, contexted, or done</output>
-      <action>HALT - Cannot proceed</action>
-    </branch>
-  </branch>
-  <action>Continue to Step 2.</action>
-</branch>
-
-## NEXT STEP
-
-Continue to `./step-02-load-and-analyze-core-artifacts.md`.
-
-## SUCCESS METRICS
-
-- The target story is known before any story file is created.
-- Sprint tracking is handled safely when auto-discovering the next backlog item.
-- Epic status is updated only when required.
-
-## FAILURE MODES
-
-- Skipping target resolution
-- Failing to preserve sprint order when auto-discovering a backlog story
-- Proceeding without a confirmed story key
-
-</prose>
+- Keep all user-facing text in `{communication_language}`.
+- Use config-resolved variables instead of hard-coded project assumptions.
+- Optional or skipped branches should be marked complete before moving on so the next phase can appear.
+- The next phase details stay hidden until this phase is completed.

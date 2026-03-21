@@ -2,10 +2,15 @@
 
 <workflow>
 
-<critical>This workflow performs complete project documentation (Steps 1-12)</critical>
-<critical>Handles: initial_scan and full_rescan modes</critical>
-<critical>YOU MUST ALWAYS SPEAK OUTPUT In your Agent communication style with the configured `{communication_language}`</critical>
-<critical>YOU MUST ALWAYS WRITE all artifact and document content in `{document_output_language}`</critical>
+<critical>This workflow performs complete project documentation (Steps 1-12).</critical>
+<critical>Handles `initial_scan` and `full_rescan` modes.</critical>
+<critical>YOU MUST ALWAYS SPEAK OUTPUT in your Agent communication style with the configured `{communication_language}`.</critical>
+<critical>YOU MUST ALWAYS WRITE all artifact and document content in `{document_output_language}`.</critical>
+
+<step n="0.4" goal="Load workflow configuration" if="resume_mode == false OR resume_mode == true">
+<action>Load and resolve `project_knowledge`, `user_name`, `user_skill_level`, `communication_language`, `document_output_language`, and `date` from `{project-root}/_bmad/bmm/config.yaml`.</action>
+<detail>Use the resolved values for prompts, gating, and generated artifacts throughout this workflow branch.</detail>
+</step>
 
 <step n="0.5" goal="Load documentation requirements data for fresh starts (not needed for resume)" if="resume_mode == false">
 <critical>DATA LOADING STRATEGY - Understanding the Documentation Requirements System:</critical>
@@ -41,12 +46,17 @@ This workflow uses a single comprehensive CSV file to intelligently document you
 <action>Display: "Loaded documentation requirements for 12 project types (web, mobile, backend, cli, library, desktop, game, data, extension, infra, embedded)"</action>
 
 <action>Display: "✓ Documentation requirements loaded successfully. Ready to begin project analysis."</action>
+<detail>
+  - Only the active step's detail should be visible now; the next step's detail appears after this step is completed.
+  - If a later step is optional and skipped, mark it complete so the backend can reveal the next step.
+  - Markup-like tokens such as `<step>`, `<action>`, `<ask>`, `<output>`, `<detail>`, and `<critical>` are workflow tags, not end-user prose.
+</detail>
 </step>
 
 <step n="0.6" goal="Check for existing documentation and determine workflow mode">
 <action>Check if {project_knowledge}/index.md exists</action>
 
-<check if="index.md exists">
+<branch if="index.md exists">
   <action>Read existing index.md to extract metadata (date, project structure, parts count)</action>
   <action>Store as {{existing_doc_date}}, {{existing_structure}}</action>
 
@@ -61,32 +71,32 @@ What would you like to do?
 Your choice [1/2/3]:
 </ask>
 
-  <check if="user selects 1">
+  <branch if="user selects 1">
     <action>Set workflow_mode = "full_rescan"</action>
     <action>Continue to scan level selection below</action>
   </check>
 
-  <check if="user selects 2">
+  <branch if="user selects 2">
     <action>Set workflow_mode = "deep_dive"</action>
     <action>Set scan_level = "exhaustive"</action>
     <action>Initialize state file with mode=deep_dive, scan_level=exhaustive</action>
     <action>Jump to Step 13</action>
   </check>
 
-  <check if="user selects 3">
+  <branch if="user selects 3">
     <action>Display message: "Keeping existing documentation. Exiting workflow."</action>
     <action>Exit workflow</action>
   </check>
 </check>
 
-<check if="index.md does not exist">
+<branch if="index.md does not exist">
   <action>Set workflow_mode = "initial_scan"</action>
   <action>Continue to scan level selection below</action>
 </check>
 
 <action if="workflow_mode != deep_dive">Select Scan Level</action>
 
-<check if="workflow_mode == initial_scan OR workflow_mode == full_rescan">
+<branch if="workflow_mode == initial_scan OR workflow_mode == full_rescan">
   <ask>Choose your scan depth level:
 
 **1. Quick Scan** (2-5 minutes) [DEFAULT]
@@ -146,6 +156,10 @@ Your choice [1/2/3] (default: 1):
 }
 </action>
 <action>Continue with standard workflow from Step 1</action>
+<detail>
+  - This phase is the only visible phase until the current step is completed.
+  - Optional choices that are skipped should be marked complete in workflow state so later details can be revealed.
+</detail>
 </check>
 </step>
 
@@ -167,7 +181,7 @@ Your choice [1/2/3] (default: 1):
 - **Multi-part**: Separate client/server or similar architecture
   </action>
 
-<check if="multiple distinct parts detected (e.g., client/ and server/ folders)">
+<branch if="multiple distinct parts detected (e.g., client/ and server/ folders)">
   <action>List detected parts with their paths</action>
   <ask>I detected multiple parts in this project:
   {{detected_parts_list}}
@@ -182,7 +196,7 @@ Is this correct? Should I document each part separately? [y/n]
 <action if="user denies or corrects">Ask user to specify correct parts and their paths</action>
 </check>
 
-<check if="single cohesive project detected">
+<branch if="single cohesive project detected">
   <action>Set repository_type = "monolith"</action>
   <action>Create single part in project_parts array with root_path = {{project_root_path}}</action>
   <action>Run project type detection using key_file_patterns from documentation-requirements.csv</action>
@@ -288,7 +302,7 @@ Are there any other important documents or key areas I should focus on while ana
 
 <critical>BATCHING STRATEGY FOR DEEP/EXHAUSTIVE SCANS</critical>
 
-<check if="scan_level == deep OR scan_level == exhaustive">
+<branch if="scan_level == deep OR scan_level == exhaustive">
   <action>This step requires file reading. Apply batching strategy:</action>
 
 <action>Identify subfolders to process based on: - scan_level == "deep": Use critical_directories from documentation_requirements - scan_level == "exhaustive": Get ALL subfolders recursively (excluding node_modules, .git, dist, build, coverage)
@@ -304,7 +318,7 @@ findings.batches_completed: [
 </action>
 </check>
 
-<check if="scan_level == quick">
+<branch if="scan_level == quick">
   <action>Use pattern matching only - do NOT read source files</action>
   <action>Use glob/grep to identify file locations and patterns</action>
   <action>Extract information from filenames, directory structure, and config files only</action>
@@ -312,15 +326,15 @@ findings.batches_completed: [
 
 <action>For each part, check documentation_requirements boolean flags and execute corresponding scans:</action>
 
-<check if="requires_api_scan == true">
+<branch if="requires_api_scan == true">
   <action>Scan for API routes and endpoints using integration_scan_patterns</action>
   <action>Look for: controllers/, routes/, api/, handlers/, endpoints/</action>
 
-  <check if="scan_level == quick">
+  <branch if="scan_level == quick">
     <action>Use glob to find route files, extract patterns from filenames and folder structure</action>
   </check>
 
-  <check if="scan_level == deep OR scan_level == exhaustive">
+  <branch if="scan_level == deep OR scan_level == exhaustive">
     <action>Read files in batches (one subfolder at a time)</action>
     <action>Extract: HTTP methods, paths, request/response types from actual code</action>
   </check>
@@ -333,15 +347,15 @@ findings.batches_completed: [
 <template-output>api_contracts\*{part_id}</template-output>
 </check>
 
-<check if="requires_data_models == true">
+<branch if="requires_data_models == true">
   <action>Scan for data models using schema_migration_patterns</action>
   <action>Look for: models/, schemas/, entities/, migrations/, prisma/, ORM configs</action>
 
-  <check if="scan_level == quick">
+  <branch if="scan_level == quick">
     <action>Identify schema files via glob, parse migration file names for table discovery</action>
   </check>
 
-  <check if="scan_level == deep OR scan_level == exhaustive">
+  <branch if="scan_level == deep OR scan_level == exhaustive">
     <action>Read model files in batches (one subfolder at a time)</action>
     <action>Extract: table names, fields, relationships, constraints from actual code</action>
   </check>
@@ -354,14 +368,14 @@ findings.batches_completed: [
 <template-output>data_models\*{part_id}</template-output>
 </check>
 
-<check if="requires_state_management == true">
+<branch if="requires_state_management == true">
   <action>Analyze state management patterns</action>
   <action>Look for: Redux, Context API, MobX, Vuex, Pinia, Provider patterns</action>
   <action>Identify: stores, reducers, actions, state structure</action>
   <template-output>state_management_patterns_{part_id}</template-output>
 </check>
 
-<check if="requires_ui_components == true">
+<branch if="requires_ui_components == true">
   <action>Inventory UI component library</action>
   <action>Scan: components/, ui/, widgets/, views/ folders</action>
   <action>Categorize: Layout, Form, Display, Navigation, etc.</action>
@@ -369,7 +383,7 @@ findings.batches_completed: [
   <template-output>ui_component_inventory_{part_id}</template-output>
 </check>
 
-<check if="requires_hardware_docs == true">
+<branch if="requires_hardware_docs == true">
   <action>Look for hardware schematics using hardware_interface_patterns</action>
   <ask>This appears to be an embedded/hardware project. Do you have:
   - Pinout diagrams
@@ -383,7 +397,7 @@ If yes, please provide paths or links. [Provide paths or type 'none']
 <template-output>hardware*documentation*{part_id}</template-output>
 </check>
 
-<check if="requires_asset_inventory == true">
+<branch if="requires_asset_inventory == true">
   <action>Scan and catalog assets using asset_patterns</action>
   <action>Categorize by: Images, Audio, 3D Models, Sprites, Textures, etc.</action>
   <action>Calculate: Total size, file counts, formats used</action>
@@ -898,7 +912,7 @@ Would you like to:
 Your choice:
 </ask>
 
-<check if="user selects option 1 (generate incomplete)">
+<branch if="user selects option 1 (generate incomplete)">
   <ask>Which incomplete items would you like to generate?
 
 {{#each incomplete_docs_list}}
@@ -1034,7 +1048,7 @@ Enter number(s) separated by commas (e.g., "1,3,5"), or type 'all':
 <action if="user requests other changes (options 2-3)">Make requested modifications and regenerate affected files</action>
 <action if="user selects finalize (option 4 or 5)">Proceed to Step 12 completion</action>
 
-<check if="not finalizing">
+<branch if="not finalizing">
   <action>Update state file:
 - Add to completed_steps: {"step": "step_11_iteration", "status": "completed", "timestamp": "{{now}}", "summary": "Review iteration complete"}
 - Keep current_step = "step_11" (for loop back)
@@ -1043,7 +1057,7 @@ Enter number(s) separated by commas (e.g., "1,3,5"), or type 'all':
   <action>Loop back to beginning of Step 11 (re-scan for remaining incomplete docs)</action>
 </check>
 
-<check if="finalizing">
+<branch if="finalizing">
   <action>Update state file:
 - Add to completed_steps: {"step": "step_11", "status": "completed", "timestamp": "{{now}}", "summary": "Validation and review complete"}
 - Update current_step = "step_12"
@@ -1103,5 +1117,7 @@ When ready to plan new features, run the PRD workflow and provide this index as 
   </action>
 
 <action>Display: "State file saved: {{project_knowledge}}/project-scan-report.json"</action>
+
+</step>
 
 </workflow>
