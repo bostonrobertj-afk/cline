@@ -1,37 +1,12 @@
 
-# Step
+# step 04 journeys
 
 ## META
-- managed_workflow_extraction: enabled
-- phase_type: phase
-- source_format: procedural
 
-## EXECUTION
-<step n="1" goal="Review Detailed Guidance">
-  <action>Read the advisory, reference, and prose sections in this file completely before taking action.</action>
-</step>
-
-<step n="2" goal="Follow Phase Procedure">
-  <action>Execute this file in order, preserving every approval gate, routing rule, document update instruction, and constraint described below.</action>
-</step>
-
-## CHECKPOINT
-This phase can be marked complete only after the required outputs, approvals, and routing conditions in this file are satisfied.
-
-## ADVISORY
-- Treat the <prose> section as the authoritative detailed instructions for this file.
-- Preserve all existing user-input pauses, continuation checks, and referenced companion files.
-- Keep any document templates, frontmatter updates, and save instructions exactly as authored.
-
-## REFERENCE
-- Original authored procedure retained below for managed workflow extraction compatibility.
-
-<prose>
-## META
-
-- Goal: define narrative user journeys that connect user needs to product requirements.
-- Speak to the user in `{communication_language}`.
-- Keep journeys story-like and outcome-oriented.
+- Goal: Define narrative user journeys that connect user needs to product requirements.
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction and handoff.
 
 ## EXECUTION
 
@@ -64,10 +39,4 @@ This phase can be marked complete only after the required outputs, approvals, an
 Wait for the user to approve the journey set before saving it.
 
 ## ADVISORY
-
 - The journeys should be comprehensive enough to drive later functional requirements without turning into UI specs.
-
-## REFERENCE
-
-- Good journeys expose missing requirements early and help keep scope user-centered.
-</prose>

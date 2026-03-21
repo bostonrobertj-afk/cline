@@ -1,37 +1,12 @@
 
-# Step
+# step 01b continue
 
 ## META
-- managed_workflow_extraction: enabled
-- phase_type: phase
-- source_format: procedural
 
-## EXECUTION
-<step n="1" goal="Review Detailed Guidance">
-  <action>Read the advisory, reference, and prose sections in this file completely before taking action.</action>
-</step>
-
-<step n="2" goal="Follow Phase Procedure">
-  <action>Execute this file in order, preserving every approval gate, routing rule, document update instruction, and constraint described below.</action>
-</step>
-
-## CHECKPOINT
-This phase can be marked complete only after the required outputs, approvals, and routing conditions in this file are satisfied.
-
-## ADVISORY
-- Treat the <prose> section as the authoritative detailed instructions for this file.
-- Preserve all existing user-input pauses, continuation checks, and referenced companion files.
-- Keep any document templates, frontmatter updates, and save instructions exactly as authored.
-
-## REFERENCE
-- Original authored procedure retained below for managed workflow extraction compatibility.
-
-<prose>
-## META
-
-- Goal: restore context for an in-progress PRD workflow and route the user back to the correct next step.
-- Speak to the user in `{communication_language}`.
-- Do not restart the workflow from scratch.
+- Goal: Restore context for an in-progress PRD workflow and route the user back to the correct next step.
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction and handoff.
 
 ## EXECUTION
 
@@ -65,11 +40,5 @@ This phase can be marked complete only after the required outputs, approvals, an
 Wait for the user to confirm whether to continue from the recommended next step or choose another path.
 
 ## ADVISORY
-
 - Preserve the existing workflow state rather than rewriting completed sections unnecessarily.
 - If the workflow is already complete, transition into wrap-up behavior instead of reopening unfinished-step menus.
-
-## REFERENCE
-
-- Continuation exists to restore state safely, not to duplicate initialization logic.
-</prose>

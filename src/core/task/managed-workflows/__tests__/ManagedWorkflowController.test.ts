@@ -40,6 +40,23 @@ describe("ManagedWorkflowController", () => {
 		expect(run.phases[1].sourcePath).to.equal(".cline/skills/bmad-code-review/steps/step-02-review.md")
 	})
 
+	it("renders a step-only checklist and active-step obligations without dumping raw phase source", async () => {
+		clearManagedWorkflowRegistryCache(cwd)
+
+		const run = await startManagedWorkflowRun(cwd, "bmad-code-review", "bmad-code-review")
+		const prompt = buildManagedWorkflowPrompt(run)
+		const taskProgress = renderManagedWorkflowTaskProgress(run)
+
+		expect(prompt).to.contain("Current active step: Detect review intent from invocation text.")
+		expect(prompt).to.contain("Actions:")
+		expect(prompt).to.contain("Branches:")
+		expect(prompt).to.contain("Details:")
+		expect(prompt).to.not.contain("<managed_workflow_phase")
+		expect(prompt).to.not.contain("<step n=")
+		expect(taskProgress).to.contain("step 01 gather context: Detect review intent from invocation text.")
+		expect(taskProgress).to.not.contain("staged changes")
+	})
+
 	it("falls back to the authored skill file when a managed workflow does not ship a separate workflow.md", async () => {
 		clearManagedWorkflowRegistryCache(cwd)
 

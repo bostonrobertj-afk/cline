@@ -6,227 +6,76 @@ outputFile: '{planning_artifacts}/implementation-readiness-report-{{date}}.md'
 
 ## META
 
-- Goal: To validate that all Functional Requirements from the PRD are captured in the epics and stories document, identifying any gaps in coverage.
+- Goal: validate that every functional requirement extracted from the PRD is covered in the selected epics and stories artifacts.
 - Execute this file in order.
 - Halt whenever user input, confirmation, or workflow gating is required.
-- Use the structured sections for extraction; use the prose block for additional agent context.
 
 ## EXECUTION
 
-<step n="1" goal="Initialize Coverage Validation">
-  <action>Load the epics and stories document</action>
-  <action>Extract FR coverage information</action>
-  <action>Compare against PRD FRs from previous step</action>
-  <action>Identify any FRs not covered in epics&quot;</action>
+<step n="1" goal="Load the selected epics and stories artifact completely">
+  <action>
+    Load the epics and stories artifact confirmed during document discovery.
+    <detail>
+      If the confirmed artifact is a whole document, read it completely.
+      If it is sharded, read every file in the shard set completely.
+    </detail>
+  </action>
+  <action>Look for FR coverage maps, traceability lists, epic mappings, story mappings, or equivalent coverage indicators.</action>
 </step>
 
-<step n="2" goal="Load Epics Document">
-  <action>Load the epics and stories document (whole or sharded)</action>
-  <action>Read it completely to find FR coverage information</action>
-  <action>Look for sections like &quot;FR Coverage Map&quot; or similar</action>
+<step n="2" goal="Extract the FR coverage claims from the epics and stories artifact">
+  <action>
+    Extract which PRD functional requirements are claimed to be covered and where they are covered.
+    <detail>
+      Record which epics and stories map to each FR whenever that information is available.
+    </detail>
+  </action>
+  <output>Produce a structured FR coverage list or matrix based on the epics and stories artifact.</output>
 </step>
 
-<step n="3" goal="Extract Epic FR Coverage">
-  <action>Find FR coverage mapping or list</action>
-  <ask>Extract which FR numbers are claimed to be covered</ask>
-  <ask>Document which epics cover which FRs</ask>
+<step n="3" goal="Compare epic coverage against the PRD FR list">
+  <action>
+    Compare each PRD functional requirement from the prior phase against the extracted epic coverage information.
+    <detail>
+      Identify:
+      - PRD FRs that are not covered anywhere in epics or stories
+      - FRs referenced in epics or stories that do not exist in the PRD
+      - weak or ambiguous mappings that do not clearly show coverage
+    </detail>
+  </action>
+  <output>Produce a coverage analysis with a status for each PRD FR.</output>
 </step>
 
-<step n="4" goal="Compare Coverage Against PRD">
-  <action>Check each PRD FR against epic coverage</action>
-  <action>Identify FRs NOT covered in epics</action>
-  <action>Note any FRs in epics but NOT in PRD</action>
+<step n="4" goal="Document missing or questionable coverage with impact and remediation guidance">
+  <action>
+    Document every uncovered or weakly covered FR.
+    <detail>
+      For each coverage issue, include:
+      - the full FR text
+      - why the gap is important
+      - which epic or story should likely absorb the requirement
+      - any ambiguity that blocks traceability confidence
+    </detail>
+  </action>
 </step>
 
-<step n="5" goal="Document Missing Coverage">
-  <action>Impact: [Why this is critical]</action>
-  <ask>Recommendation: [Which epic should include this]</ask>
-</step>
-
-<step n="6" goal="Add to Assessment Report">
-  <action>Total PRD FRs: [count]</action>
-  <action>FRs covered in epics: [count]</action>
-  <action>Coverage percentage: [percentage]</action>
-</step>
-
-<step n="7" goal="Auto-Proceed to Next Step">
-  <action>After coverage validation complete, immediately load next step.</action>
-  <action>## PROCEEDING TO UX ALIGNMENT Epic coverage validation complete.</action>
-  <output>Read fully and follow: ./step-04-ux-alignment.md ---</output>
+<step n="5" goal="Append coverage findings and statistics to the readiness report">
+  <action>
+    Append an epic-coverage validation section to `{outputFile}`.
+    <detail>
+      Include:
+      - the coverage matrix or equivalent structured analysis
+      - missing or weakly covered requirements
+      - coverage statistics such as total PRD FRs, covered FRs, and coverage percentage
+    </detail>
+  </action>
 </step>
 
 ## CHECKPOINT
 
-Complete the current required actions in order before moving to the next workflow phase.
+Complete the coverage comparison and report update before the workflow advances to UX alignment.
 
 ## ADVISORY
 
-- Next handoff: ./step-04-ux-alignment.md
-
-## REFERENCE
-
-<prose>
-## STEP GOAL:
-
-To validate that all Functional Requirements from the PRD are captured in the epics and stories document, identifying any gaps in coverage.
-
-## MANDATORY EXECUTION RULES (READ FIRST):
-
-### Universal Rules:
-
-- 🛑 NEVER generate content without user input
-- 📖 CRITICAL: Read the complete step file before taking any action
-- 🔄 CRITICAL: When loading next step with 'C', ensure entire file is read
-- 📋 YOU ARE A FACILITATOR, not a content generator
-- ✅ YOU MUST ALWAYS SPEAK OUTPUT In your Agent communication style with the config `{communication_language}`
-
-### Role Reinforcement:
-
-- ✅ You are an expert Product Manager and Scrum Master
-- ✅ Your expertise is in requirements traceability
-- ✅ You ensure no requirements fall through the cracks
-- ✅ Success is measured in complete FR coverage
-
-### Step-Specific Rules:
-
-- 🎯 Focus ONLY on FR coverage validation
-- 🚫 Don't analyze story quality (that's later)
-- 💬 Compare PRD FRs against epic coverage list
-- 🚪 Document every missing FR
-
-## EXECUTION PROTOCOLS:
-
-- 🎯 Load epics document completely
-- 💾 Extract FR coverage from epics
-- 📖 Compare against PRD FR list
-- 🚫 FORBIDDEN to proceed without documenting gaps
-
-## EPIC COVERAGE VALIDATION PROCESS:
-
-### 1. Initialize Coverage Validation
-
-"Beginning **Epic Coverage Validation**.
-
-I will:
-
-1. Load the epics and stories document
-2. Extract FR coverage information
-3. Compare against PRD FRs from previous step
-4. Identify any FRs not covered in epics"
-
-### 2. Load Epics Document
-
-From the document inventory in step 1:
-
-- Load the epics and stories document (whole or sharded)
-- Read it completely to find FR coverage information
-- Look for sections like "FR Coverage Map" or similar
-
-### 3. Extract Epic FR Coverage
-
-From the epics document:
-
-- Find FR coverage mapping or list
-- Extract which FR numbers are claimed to be covered
-- Document which epics cover which FRs
-
-Format as:
-
-```
-## Epic FR Coverage Extracted
-
-FR1: Covered in Epic X
-FR2: Covered in Epic Y
-FR3: Covered in Epic Z
-...
-Total FRs in epics: [count]
-```
-
-### 4. Compare Coverage Against PRD
-
-Using the PRD FR list from step 2:
-
-- Check each PRD FR against epic coverage
-- Identify FRs NOT covered in epics
-- Note any FRs in epics but NOT in PRD
-
-Create coverage matrix:
-
-```
-## FR Coverage Analysis
-
-| FR Number | PRD Requirement | Epic Coverage  | Status    |
-| --------- | --------------- | -------------- | --------- |
-| FR1       | [PRD text]      | Epic X Story Y | ✓ Covered |
-| FR2       | [PRD text]      | **NOT FOUND**  | ❌ MISSING |
-| FR3       | [PRD text]      | Epic Z Story A | ✓ Covered |
-```
-
-### 5. Document Missing Coverage
-
-List all FRs not covered:
-
-```
-## Missing FR Coverage
-
-### Critical Missing FRs
-
-FR#: [Full requirement text from PRD]
-- Impact: [Why this is critical]
-- Recommendation: [Which epic should include this]
-
-### High Priority Missing FRs
-
-[List any other uncovered FRs]
-```
-
-### 6. Add to Assessment Report
-
-Append to {outputFile}:
-
-```markdown
-## Epic Coverage Validation
-
-### Coverage Matrix
-
-[Complete coverage matrix from section 4]
-
-### Missing Requirements
-
-[List of uncovered FRs from section 5]
-
-### Coverage Statistics
-
-- Total PRD FRs: [count]
-- FRs covered in epics: [count]
-- Coverage percentage: [percentage]
-```
-
-### 7. Auto-Proceed to Next Step
-
-After coverage validation complete, immediately load next step.
-
-## PROCEEDING TO UX ALIGNMENT
-
-Epic coverage validation complete. Read fully and follow: `./step-04-ux-alignment.md`
-
----
-
-## 🚨 SYSTEM SUCCESS/FAILURE METRICS
-
-### ✅ SUCCESS:
-
-- Epics document loaded completely
-- FR coverage extracted accurately
-- All gaps identified and documented
-- Coverage matrix created
-
-### ❌ SYSTEM FAILURE:
-
-- Not reading complete epics document
-- Missing FRs in comparison
-- Not documenting uncovered requirements
-- Incomplete coverage analysis
-
-**Master Rule:** Every FR must have a traceable implementation path.
-</prose>
+- Every PRD functional requirement must have a traceable implementation path.
+- Do not treat weak or implied coverage as fully validated coverage without explicit evidence.

@@ -1,415 +1,58 @@
-# step 03 starter
+# Step 03 - Starter Evaluation
 
-## META
-
-- Goal: starter
-- Execute this file in order.
-- Halt whenever user input, confirmation, or workflow gating is required.
-- Use the structured sections for extraction; use the prose block for additional agent context.
+Workflow ID: `bmad-create-architecture`
 
 ## EXECUTION
-
-<step n="1" goal="Check Technical Preferences &amp; Context">
-  <action>Languages/Frameworks:</action>
-  <action>Tools &amp; Libraries:</action>
-  <action>Development Patterns:</action>
-  <action>Platform Preferences:</action>
-  <ask>Languages: Do you have preferences between TypeScript/JavaScript, Python, Go, Rust, etc.?</ask>
-  <ask>Frameworks: Any existing familiarity or preferences (React, Vue, Angular, Next.js, etc.)?</ask>
-  <ask>Databases: Any preferences or existing infrastructure (PostgreSQL, MongoDB, MySQL, etc.)?</ask>
+<step n="1" goal="Check technical preferences and project context">
+  <action>Capture language, framework, database, platform, and tooling preferences from the user and any project context notes.</action>
+  <detail>Use the loaded context to avoid re-asking questions that have already been answered.</detail>
 </step>
 
-<step n="2" goal="Identify Primary Technology Domain">
-  <action>Web application → Look for Next.js, Vite, Remix, SvelteKit starters</action>
-  <action>Mobile app → Look for React Native, Expo, Flutter starters</action>
-  <action>API/Backend → Look for NestJS, Express, Fastify, Supabase starters</action>
-  <action>CLI tool → Look for CLI framework starters (oclif, commander, etc.)</action>
-  <action>Full-stack → Look for T3, RedwoodJS, Blitz, Next.js starters</action>
+<step n="2" goal="Identify the primary technology domain and UX needs">
+  <action>Classify the project as web, mobile, backend, CLI, or full-stack and note any UX-driven starter requirements.</action>
+  <detail>Consider animations, forms, real-time behavior, design systems, and offline capability when choosing a starter.</detail>
 </step>
 
-<step n="3" goal="UX Requirements Consideration">
-  <action>Rich animations → Framer Motion compatible starter</action>
-  <action>Complex forms → React Hook Form included starter</action>
-  <action>Real-time features → Socket.io or WebSocket ready starter</action>
-  <action>Design system → Storybook-enabled starter</action>
-  <action>Offline capability → Service worker or PWA configured starter</action>
+<step n="3" goal="Research current starter options">
+  <action>Search the web for current, maintained starter templates and verify their current versions and commands.</action>
+  <detail>Never rely on hardcoded versions; confirm current CLI usage and maintenance status from live sources.</detail>
 </step>
 
-<step n="4" goal="Research Current Starter Options">
-  <action>Search the web to find current, maintained starter templates:</action>
+<step n="4" goal="Investigate the strongest starter candidates">
+  <action>Review the language/runtime setup, styling system, testing setup, linting/formatting, build tooling, and project organization for each promising starter.</action>
 </step>
 
-<step n="5" goal="Investigate Top Starter Options">
-  <action>For each promising starter found, investigate details:</action>
+<step n="5" goal="Present the starter decision">
+  <output>Explain that a starter can establish a solid architectural foundation and reduce low-level setup decisions.</output>
+  <branch if="user_skill_level = expert">
+    <ask>Found {starter_name}, which provides {starter_capabilities}. Should we use it as the base architecture?</ask>
+  </branch>
+  <branch if="user_skill_level = intermediate">
+    <ask>I found {starter_name}, which is a well-maintained starter for this kind of project. Should we use it?</ask>
+  </branch>
+  <branch if="user_skill_level = beginner">
+    <ask>I found {starter_name}, which is like a pre-built foundation for your project. It follows best practices and saves us from making dozens of small technical choices up front. Should we use it?</ask>
+  </branch>
 </step>
 
-<step n="6" goal="Analyze What Each Starter Provides">
-  <action>Language/TypeScript configuration</action>
-  <action>Styling solution (CSS, Tailwind, Styled Components, etc.)</action>
-  <action>Testing framework setup</action>
-  <action>Linting/Formatting configuration</action>
-  <action>Build tooling and optimization</action>
+<step n="6" goal="Capture the current command and draft the starter summary">
+  <action>When the user is interested in a starter, capture the exact current CLI command and the starter’s key decisions.</action>
+  <output>Prepare the markdown content that records the chosen starter and the architectural decisions it provides.</output>
 </step>
 
-<step n="7" goal="Present Starter Options">
-  <action>It makes these architectural decisions for us: This gives us a solid foundation following current best practices.</action>
-  <action>Think of it like buying a prefab house frame instead of cutting each board yourself.</action>
-  <ask>Based on user skill level and project needs: For Expert Users: &quot;Found which provides: This would establish our base architecture with these technical decisions already made.</ask>
-  <ask>Use it?&quot; For Intermediate Users: &quot;I found , which is a well-maintained starter for projects.</ask>
-  <ask>Should we use it?&quot; For Beginner Users: &quot;I found , which is like a pre-built foundation for your project.</ask>
-  <output>It makes these decisions for us: This is a great starting point that follows best practices and saves us from making dozens of small technical choices.</output>
+<step n="7" goal="Present the draft and menu">
+  <ask>Show the drafted starter evaluation and ask what the user wants to do next.</ask>
+  <output>Offer [A] Advanced Elicitation, [P] Party Mode, or [C] Continue.</output>
 </step>
 
-<step n="8" goal="Get Current CLI Commands">
-  <output>If user shows interest in a starter, get the exact current commands:</output>
-</step>
-
-<step n="9" goal="Generate Starter Template Content">
-  <output>Prepare the content to append to the document: #### Content Structure: bash `</output>
-</step>
-
-<step n="10" goal="Present Content and Menu">
-  <ask>Here's what I'll add to the document: [Show the complete markdown content from step 8] What would you like to do?</ask>
-  <output>Show the generated content and present choices: &quot;I've analyzed starter template options for projects.</output>
-  <output>[A] Advanced Elicitation - Explore custom approaches or unconventional starters [P] Party Mode - Evaluate trade-offs from different perspectives [C] Continue - Save this decision and move to architectural decisions&quot;</output>
+<step n="8" goal="Handle the selected menu option">
+  <action>Use Advanced Elicitation or Party Mode to refine the starter analysis when requested.</action>
+  <action>Update frontmatter to `stepsCompleted: [1, 2, 3]` when the user chooses C.</action>
+  <output>Append the final content to `{planning_artifacts}/architecture.md` and continue to `./step-04-decisions.md`.</output>
 </step>
 
 ## CHECKPOINT
-
 Halt for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.
 
 ## ADVISORY
-
 - Persist workflow state updates whenever this phase writes or updates a managed artifact.
-
-## REFERENCE
-
-<prose>
-## MANDATORY EXECUTION RULES (READ FIRST):
-
-- 🛑 NEVER generate content without user input
-- ✅ ALWAYS treat this as collaborative discovery between architectural peers
-- 📋 YOU ARE A FACILITATOR, not a content generator
-- 💬 FOCUS on evaluating starter template options with current versions
-- 🌐 ALWAYS search the web to verify current versions - NEVER trust hardcoded versions
-- ⚠️ ABSOLUTELY NO TIME ESTIMATES - AI development speed has fundamentally changed
-- 📖 CRITICAL: ALWAYS read the complete step file before taking any action - partial understanding leads to incomplete architecture
-- 🔄 CRITICAL: When loading next step with 'C', ensure the entire file is read and understood before proceeding
-- ✅ YOU MUST ALWAYS SPEAK OUTPUT In your Agent communication style with the config `{communication_language}`
-
-## EXECUTION PROTOCOLS:
-
-- 🎯 Show your analysis before taking any action
-- 🌐 Search the web to verify current versions and options
-- ⚠️ Present A/P/C menu after generating starter template analysis
-- 💾 ONLY save when user chooses C (Continue)
-- 📖 Update frontmatter `stepsCompleted: [1, 2, 3]` before loading next step
-- 🚫 FORBIDDEN to load next step until C is selected
-
-## COLLABORATION MENUS (A/P/C):
-
-This step will generate content and present choices:
-
-- **A (Advanced Elicitation)**: Use discovery protocols to explore unconventional starter options or custom approaches
-- **P (Party Mode)**: Bring multiple perspectives to evaluate starter trade-offs for different use cases
-- **C (Continue)**: Save the content to the document and proceed to next step
-
-## PROTOCOL INTEGRATION:
-
-- When 'A' selected: Invoke the `bmad-advanced-elicitation` skill
-- When 'P' selected: Invoke the `bmad-party-mode` skill
-- PROTOCOLS always return to display this step's A/P/C menu after the A or P have completed
-- User accepts/rejects protocol changes before proceeding
-
-## CONTEXT BOUNDARIES:
-
-- Project context from step 2 is available and complete
-- Project context file from step-01 may contain technical preferences
-- No architectural decisions made yet - evaluating foundations
-- Focus on technical preferences discovery and starter evaluation
-- Consider project requirements and existing preferences when evaluating options
-
-## YOUR TASK:
-
-Discover technical preferences and evaluate starter template options, leveraging existing technical preferences and establishing solid architectural foundations.
-
-## STARTER EVALUATION SEQUENCE:
-
-### 0. Check Technical Preferences & Context
-
-**Check Project Context for Existing Technical Preferences:**
-"Before we dive into starter templates, let me check if you have any technical preferences already documented.
-
-{{if_project_context_exists}}
-I found some technical rules in your project context file:
-{{extracted_technical_preferences_from_project_context}}
-
-**Project Context Technical Rules Found:**
-
-- Languages/Frameworks: {{languages_frameworks_from_context}}
-- Tools & Libraries: {{tools_from_context}}
-- Development Patterns: {{patterns_from_context}}
-- Platform Preferences: {{platforms_from_context}}
-
-{{else}}
-No existing technical preferences found in project context file. We'll establish your technical preferences now.
-{{/if_project_context}}"
-
-**Discover User Technical Preferences:**
-"Based on your project context, let's discuss your technical preferences:
-
-{{primary_technology_category}} Preferences:
-
-- **Languages**: Do you have preferences between TypeScript/JavaScript, Python, Go, Rust, etc.?
-- **Frameworks**: Any existing familiarity or preferences (React, Vue, Angular, Next.js, etc.)?
-- **Databases**: Any preferences or existing infrastructure (PostgreSQL, MongoDB, MySQL, etc.)?
-
-**Development Experience:**
-
-- What's your team's experience level with different technologies?
-- Are there any technologies you want to learn vs. what you're comfortable with?
-
-**Platform/Deployment Preferences:**
-
-- Cloud provider preferences (AWS, Vercel, Railway, etc.)?
-- Container preferences (Docker, Serverless, Traditional)?
-
-**Integrations:**
-
-- Any existing systems or APIs you need to integrate with?
-- Third-party services you plan to use (payment, authentication, analytics, etc.)?
-
-These preferences will help me recommend the most suitable starter templates and guide our architectural decisions."
-
-### 1. Identify Primary Technology Domain
-
-Based on project context analysis and technical preferences, identify the primary technology stack:
-
-- **Web application** → Look for Next.js, Vite, Remix, SvelteKit starters
-- **Mobile app** → Look for React Native, Expo, Flutter starters
-- **API/Backend** → Look for NestJS, Express, Fastify, Supabase starters
-- **CLI tool** → Look for CLI framework starters (oclif, commander, etc.)
-- **Full-stack** → Look for T3, RedwoodJS, Blitz, Next.js starters
-- **Desktop** → Look for Electron, Tauri starters
-
-### 2. UX Requirements Consideration
-
-If UX specification was loaded, consider UX requirements when selecting starter:
-
-- **Rich animations** → Framer Motion compatible starter
-- **Complex forms** → React Hook Form included starter
-- **Real-time features** → Socket.io or WebSocket ready starter
-- **Design system** → Storybook-enabled starter
-- **Offline capability** → Service worker or PWA configured starter
-
-### 3. Research Current Starter Options
-
-Search the web to find current, maintained starter templates:
-
-```
-Search the web: "{{primary_technology}} starter template CLI create command latest"
-Search the web: "{{primary_technology}} boilerplate generator latest options"
-Search the web: "{{primary_technology}} production-ready starter best practices"
-```
-
-### 4. Investigate Top Starter Options
-
-For each promising starter found, investigate details:
-
-```
-Search the web: "{{starter_name}} default setup technologies included latest"
-Search the web: "{{starter_name}} project structure file organization"
-Search the web: "{{starter_name}} production deployment capabilities"
-Search the web: "{{starter_name}} recent updates maintenance status"
-```
-
-### 5. Analyze What Each Starter Provides
-
-For each viable starter option, document:
-
-**Technology Decisions Made:**
-
-- Language/TypeScript configuration
-- Styling solution (CSS, Tailwind, Styled Components, etc.)
-- Testing framework setup
-- Linting/Formatting configuration
-- Build tooling and optimization
-- Project structure and organization
-
-**Architectural Patterns Established:**
-
-- Code organization patterns
-- Component structure conventions
-- API layering approach
-- State management setup
-- Routing patterns
-- Environment configuration
-
-**Development Experience Features:**
-
-- Hot reloading and development server
-- TypeScript configuration
-- Debugging setup
-- Testing infrastructure
-- Documentation generation
-
-### 6. Present Starter Options
-
-Based on user skill level and project needs:
-
-**For Expert Users:**
-"Found {{starter_name}} which provides:
-{{quick_decision_list_of_key_decisions}}
-
-This would establish our base architecture with these technical decisions already made. Use it?"
-
-**For Intermediate Users:**
-"I found {{starter_name}}, which is a well-maintained starter for {{project_type}} projects.
-
-It makes these architectural decisions for us:
-{{decision_list_with_explanations}}
-
-This gives us a solid foundation following current best practices. Should we use it?"
-
-**For Beginner Users:**
-"I found {{starter_name}}, which is like a pre-built foundation for your project.
-
-Think of it like buying a prefab house frame instead of cutting each board yourself.
-
-It makes these decisions for us:
-{{friendly_explanation_of_decisions}}
-
-This is a great starting point that follows best practices and saves us from making dozens of small technical choices. Should we use it?"
-
-### 7. Get Current CLI Commands
-
-If user shows interest in a starter, get the exact current commands:
-
-```
-Search the web: "{{starter_name}} CLI command options flags latest"
-Search the web: "{{starter_name}} create new project command examples"
-```
-
-### 8. Generate Starter Template Content
-
-Prepare the content to append to the document:
-
-#### Content Structure:
-
-````markdown
-## Starter Template Evaluation
-
-### Primary Technology Domain
-
-{{identified_domain}} based on project requirements analysis
-
-### Starter Options Considered
-
-{{analysis_of_evaluated_starters}}
-
-### Selected Starter: {{starter_name}}
-
-**Rationale for Selection:**
-{{why_this_starter_was_chosen}}
-
-**Initialization Command:**
-
-```bash
-{{full_starter_command_with_options}}
-```
-
-**Architectural Decisions Provided by Starter:**
-
-**Language & Runtime:**
-{{language_typescript_setup}}
-
-**Styling Solution:**
-{{styling_solution_configuration}}
-
-**Build Tooling:**
-{{build_tools_and_optimization}}
-
-**Testing Framework:**
-{{testing_setup_and_configuration}}
-
-**Code Organization:**
-{{project_structure_and_patterns}}
-
-**Development Experience:**
-{{development_tools_and_workflow}}
-
-**Note:** Project initialization using this command should be the first implementation story.
-
-````
-
-### 9. Present Content and Menu
-
-Show the generated content and present choices:
-
-"I've analyzed starter template options for {{project_type}} projects.
-
-**Here's what I'll add to the document:**
-
-[Show the complete markdown content from step 8]
-
-**What would you like to do?**
-[A] Advanced Elicitation - Explore custom approaches or unconventional starters
-[P] Party Mode - Evaluate trade-offs from different perspectives
-[C] Continue - Save this decision and move to architectural decisions"
-
-### 10. Handle Menu Selection
-
-#### If 'A' (Advanced Elicitation):
-
-- Invoke the `bmad-advanced-elicitation` skill with current starter analysis
-- Process enhanced insights about starter options or custom approaches
-- Ask user: "Accept these changes to the starter template evaluation? (y/n)"
-- If yes: Update content, then return to A/P/C menu
-- If no: Keep original content, then return to A/P/C menu
-
-#### If 'P' (Party Mode):
-
-- Invoke the `bmad-party-mode` skill with starter evaluation context
-- Process collaborative insights about starter trade-offs
-- Ask user: "Accept these changes to the starter template evaluation? (y/n)"
-- If yes: Update content, then return to A/P/C menu
-- If no: Keep original content, then return to A/P/C menu
-
-#### If 'C' (Continue):
-
-- Append the final content to `{planning_artifacts}/architecture.md`
-- Update frontmatter: `stepsCompleted: [1, 2, 3]`
-- Load `./step-04-decisions.md`
-
-## APPEND TO DOCUMENT:
-
-When user selects 'C', append the content directly to the document using the structure from step 8.
-
-## SUCCESS METRICS:
-
-✅ Primary technology domain correctly identified from project context
-✅ Current, maintained starter templates researched and evaluated
-✅ All versions verified using web search, not hardcoded
-✅ Architectural implications of starter choice clearly documented
-✅ User provided with clear rationale for starter selection
-✅ A/P/C menu presented and handled correctly
-✅ Content properly appended to document when C selected
-
-## FAILURE MODES:
-
-❌ Not verifying current versions with web search
-❌ Ignoring UX requirements when evaluating starters
-❌ Not documenting what architectural decisions the starter makes
-❌ Failing to consider maintenance status of starter templates
-❌ Not providing clear rationale for starter selection
-❌ Not presenting A/P/C menu after content generation
-❌ **CRITICAL**: Reading only partial step file - leads to incomplete understanding and poor decisions
-❌ **CRITICAL**: Proceeding with 'C' without fully reading and understanding the next step file
-❌ **CRITICAL**: Making decisions without complete understanding of step requirements and protocols
-
-## NEXT STEP:
-
-After user selects 'C' and content is saved to document, load `./step-04-decisions.md` to begin making specific architectural decisions.
-
-Remember: Do NOT proceed to step-04 until user explicitly selects 'C' from the A/P/C menu and content is saved!
-</prose>

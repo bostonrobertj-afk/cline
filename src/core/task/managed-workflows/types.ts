@@ -7,6 +7,32 @@ export type ManagedWorkflowExtractionStrategy =
 	| "bullet-groups"
 	| "heading-items"
 export type ManagedWorkflowExtractionMode = "linear" | "branch-aware" | "guided"
+export type ManagedWorkflowRouteKind = "goto" | "handoff" | "return" | "exit"
+export type ManagedWorkflowAnnotationKind = "critical" | "note" | "guideline"
+
+export interface ManagedWorkflowInstructionNode {
+	type: "branch" | "action" | "ask" | "output" | "detail" | "template-output" | "annotation" | "route"
+	text?: string
+	condition?: string
+	optional?: boolean
+	annotationKind?: ManagedWorkflowAnnotationKind
+	routeKind?: ManagedWorkflowRouteKind
+	routeTarget?: string
+	children?: ManagedWorkflowInstructionNode[]
+}
+
+export interface ManagedWorkflowStepDefinition {
+	id: string
+	number?: number
+	goal: string
+	condition?: string
+	optional?: boolean
+	instructions: ManagedWorkflowInstructionNode[]
+}
+
+export interface ManagedWorkflowExecutionDefinition {
+	steps: ManagedWorkflowStepDefinition[]
+}
 
 export interface ManagedWorkflowDefinition {
 	workflowId: string
@@ -33,6 +59,7 @@ export interface ManagedWorkflowItemState {
 	label: string
 	sourceText: string
 	completed: boolean
+	stepId?: string
 	optional?: boolean
 	required?: boolean
 	advisory?: boolean
@@ -44,6 +71,8 @@ export interface ManagedWorkflowPhaseState {
 	title: string
 	sourcePath: string
 	sourceContent: string
+	execution?: ManagedWorkflowExecutionDefinition
+	checkpointText?: string
 	items: ManagedWorkflowItemState[]
 	completed: boolean
 }

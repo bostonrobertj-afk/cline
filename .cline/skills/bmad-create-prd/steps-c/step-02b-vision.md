@@ -1,37 +1,12 @@
 
-# Step
+# step 02b vision
 
 ## META
-- managed_workflow_extraction: enabled
-- phase_type: phase
-- source_format: procedural
 
-## EXECUTION
-<step n="1" goal="Review Detailed Guidance">
-  <action>Read the advisory, reference, and prose sections in this file completely before taking action.</action>
-</step>
-
-<step n="2" goal="Follow Phase Procedure">
-  <action>Execute this file in order, preserving every approval gate, routing rule, document update instruction, and constraint described below.</action>
-</step>
-
-## CHECKPOINT
-This phase can be marked complete only after the required outputs, approvals, and routing conditions in this file are satisfied.
-
-## ADVISORY
-- Treat the <prose> section as the authoritative detailed instructions for this file.
-- Preserve all existing user-input pauses, continuation checks, and referenced companion files.
-- Keep any document templates, frontmatter updates, and save instructions exactly as authored.
-
-## REFERENCE
-- Original authored procedure retained below for managed workflow extraction compatibility.
-
-<prose>
-## META
-
-- Goal: refine the product vision now that the project classification is known.
-- Speak to the user in `{communication_language}`.
-- Stay focused on what makes the product meaningful and distinct.
+- Goal: Refine the product vision now that the project classification is known.
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction and handoff.
 
 ## EXECUTION
 
@@ -60,10 +35,4 @@ This phase can be marked complete only after the required outputs, approvals, an
 Wait for the user to confirm the vision summary before saving it.
 
 ## ADVISORY
-
 - The vision should stay product-level and strategic, not become a feature list.
-
-## REFERENCE
-
-- Later success, scope, and journey work should trace back to the validated vision.
-</prose>

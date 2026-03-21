@@ -1,37 +1,10 @@
 
-# Step
+# Step 14: Workflow Completion
 
 ## META
-- managed_workflow_extraction: enabled
-- phase_type: phase
-- source_format: procedural
-
-## EXECUTION
-<step n="1" goal="Review Detailed Guidance">
-  <action>Read the advisory, reference, and prose sections in this file completely before taking action.</action>
-</step>
-
-<step n="2" goal="Follow Phase Procedure">
-  <action>Execute this file in order, preserving every approval gate, routing rule, document update instruction, and constraint described below.</action>
-</step>
-
-## CHECKPOINT
-This phase can be marked complete only after the required outputs, approvals, and routing conditions in this file are satisfied.
-
-## ADVISORY
-- Treat the <prose> section as the authoritative detailed instructions for this file.
-- Preserve all existing user-input pauses, continuation checks, and referenced companion files.
-- Keep any document templates, frontmatter updates, and save instructions exactly as authored.
-
-## REFERENCE
-- Original authored procedure retained below for managed workflow extraction compatibility.
-
-<prose>
-## META
-
-- Goal: finalize the UX design workflow, update status tracking, and guide the user to the most relevant next workflows.
-- Speak to the user in `{communication_language}`.
-- Do not load additional UX design phase files after this step.
+Goal: Finalize the UX design workflow, update status tracking, and guide the user to relevant next workflows.
+Execute this file in order.
+Halt whenever user input, confirmation, or workflow gating is required.
 
 ## EXECUTION
 
@@ -59,15 +32,4 @@ This phase can be marked complete only after the required outputs, approvals, an
 </step>
 
 ## CHECKPOINT
-
 Wait for the user to decide which next workflow path they want to take after completion.
-
-## ADVISORY
-
-- Suggested next actions such as wireframes, prototypes, architecture, Figma work, or epic creation are advisory follow-on options, not blocking completion tasks for this workflow.
-
-## REFERENCE
-
-- This completion step should not reopen unfinished design phases.
-- The UX design specification should remain the canonical reference for downstream design and development work.
-</prose>

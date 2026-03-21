@@ -9,70 +9,61 @@ import { clearManagedWorkflowRegistryCache, getManagedWorkflowDefinition } from 
 describe("ManagedWorkflowPhaseExtractor", () => {
 	const cwd = process.cwd()
 
-	it("extracts detailed numbered-heading items for bmad-create-prd discovery", async () => {
+	it("extracts step-only checklist items for the converted bmad-code-review gather-context phase", async () => {
 		clearManagedWorkflowRegistryCache(cwd)
-		const workflow = await getManagedWorkflowDefinition(cwd, "bmad-create-prd")
+		const workflow = await getManagedWorkflowDefinition(cwd, "bmad-code-review")
 		const phases = await extractManagedWorkflowPhases(cwd, workflow!)
-		const discoveryPhase = phases.find((phase) => phase.id === "step-02-discovery")
+		const gatherContextPhase = phases.find((phase) => phase.id === "step-01-gather-context")
 
-		expect(discoveryPhase).to.exist
-		expect(discoveryPhase!.items.length).to.be.greaterThan(8)
-		expect(discoveryPhase!.items.some((item) => item.label.includes("Check Document State"))).to.equal(true)
-		expect(discoveryPhase!.items.some((item) => item.label.includes("Load Classification Data"))).to.equal(true)
+		expect(gatherContextPhase).to.exist
+		expect(gatherContextPhase!.execution?.steps).to.have.length(6)
+		expect(gatherContextPhase!.items.map((item) => item.label)).to.deep.equal([
+			"Detect review intent from invocation text.",
+			"HALT. Ask the user: What do you want to review?",
+			"Construct {diff_output} from the chosen source.",
+			"Ask the user for files containing context",
+			"Load referenced documents",
+			"Sanity check",
+			"Present a summary before proceeding: diff stats (files changed, lines added/removed), {review_mode}, and loaded spec/context docs (if any). HALT and wait for user confirmation to proceed.",
+		])
+		expect(gatherContextPhase!.items.some((item) => item.label.includes("staged changes"))).to.equal(false)
+		expect(gatherContextPhase!.execution?.steps[0]?.instructions.some((node) => node.type === "branch")).to.equal(true)
+		expect(gatherContextPhase!.checkpointText).to.contain("Present a summary before proceeding")
 	})
 
-	it("extracts multiple step-driven items for bmad-review-edge-case-hunter", async () => {
-		clearManagedWorkflowRegistryCache(cwd)
-		const workflow = await getManagedWorkflowDefinition(cwd, "bmad-review-edge-case-hunter")
-		const phases = await extractManagedWorkflowPhases(cwd, workflow!)
-
-		expect(phases).to.have.length(1)
-		expect(phases[0].items.length).to.be.greaterThan(4)
-		expect(phases[0].items.some((item) => item.label.includes("Receive Content"))).to.equal(true)
-		expect(phases[0].items.some((item) => item.label.includes("Present Findings"))).to.equal(true)
-	})
-
-	it("extracts workflow-step items for bmad-sprint-status instead of collapsing to one item", async () => {
+	it("preserves branch and detail content without turning them into sprint-status checklist rows", async () => {
 		clearManagedWorkflowRegistryCache(cwd)
 		const workflow = await getManagedWorkflowDefinition(cwd, "bmad-sprint-status")
 		const phases = await extractManagedWorkflowPhases(cwd, workflow!)
 
 		expect(phases).to.have.length(1)
-		expect(phases[0].items.length).to.be.greaterThan(8)
-		expect(phases[0].items.some((item) => item.label.includes("Determine execution mode"))).to.equal(true)
-		expect(phases[0].items.some((item) => item.label.includes('Persist "next_workflow_id"'))).to.equal(true)
-		expect(phases[0].items.some((item) => item.label.includes("Display summary: Produce output -"))).to.equal(true)
-		expect(phases[0].items.some((item) => item.label.startsWith("Data mode output:"))).to.equal(false)
-		expect(phases[0].items.some((item) => item.label.startsWith("Validate sprint-status file:"))).to.equal(false)
-		expect(phases[0].items.some((item) => item.label.includes("Jump to Step 20"))).to.equal(false)
-		expect(phases[0].items.some((item) => item.label.includes("Jump to Step 30"))).to.equal(false)
+		expect(phases[0].execution?.steps).to.have.length(6)
+		expect(phases[0].items.map((item) => item.label)).to.deep.equal([
+			"Determine execution mode",
+			"Locate sprint status file",
+			"Read and parse sprint status",
+			"Select next action recommendation",
+			"Display sprint summary",
+			"Offer interactive actions",
+			"Workflow progress can advance only after the required outputs, approvals, and routing conditions in this file are satisfied.",
+		])
+		expect(phases[0].items.some((item) => item.label.includes("Data mode output"))).to.equal(false)
+		expect(phases[0].items.some((item) => item.label.includes("next_workflow_id"))).to.equal(false)
+		expect(phases[0].execution?.steps[1]?.instructions.some((node) => node.type === "branch")).to.equal(true)
 	})
 
-	it("uses the document-project instructions router rather than the thin wrapper workflow file", async () => {
+	it("parses branch-based starter presentation guidance as step detail rather than checklist rows", async () => {
 		clearManagedWorkflowRegistryCache(cwd)
-		const workflow = await getManagedWorkflowDefinition(cwd, "bmad-document-project")
+		const workflow = await getManagedWorkflowDefinition(cwd, "bmad-create-architecture")
 		const phases = await extractManagedWorkflowPhases(cwd, workflow!)
+		const starterPhase = phases.find((phase) => phase.id === "step-03-starter")
 
-		expect(workflow!.workflowPath).to.equal(".cline/skills/bmad-document-project/instructions.md")
-		expect(phases).to.have.length(1)
-		expect(phases[0].sourcePath).to.equal(".cline/skills/bmad-document-project/instructions.md")
-		expect(phases[0].items.length).to.be.greaterThan(4)
-	})
-
-	it("marks ux design next-step guidance as advisory when extracted", async () => {
-		clearManagedWorkflowRegistryCache(cwd)
-		const workflow = await getManagedWorkflowDefinition(cwd, "bmad-create-ux-design")
-		const phases = await extractManagedWorkflowPhases(cwd, workflow!)
-		const completionPhase = phases.find((phase) => phase.id === "step-14-complete")
-
-		expect(completionPhase).to.exist
-		const advisoryOptions = completionPhase!.items.filter((item) =>
-			/Wireframe Generation|Interactive Prototype|Figma Visual Design/i.test(item.label),
-		)
-		for (const item of advisoryOptions) {
-			expect(item.required).to.equal(false)
-			expect(item.advisory).to.equal(true)
-		}
+		expect(starterPhase).to.exist
+		const starterPresentation = starterPhase!.execution?.steps.find((step) => step.number === 7)
+		expect(starterPresentation).to.exist
+		expect(starterPresentation!.goal).to.equal("Present starter options")
+		expect(starterPresentation!.instructions.filter((node) => node.type === "branch")).to.have.length(3)
+		expect(starterPhase!.items.some((item) => item.label.includes("well-maintained starter"))).to.equal(false)
 	})
 
 	it("does not silently fall back to workflow.md when an explicit phase-root workflow is missing its step files", async () => {

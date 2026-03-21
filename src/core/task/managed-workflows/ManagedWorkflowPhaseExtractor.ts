@@ -1,97 +1,49 @@
 import fs from "fs/promises"
 import path from "path"
 import type {
+	ManagedWorkflowAnnotationKind,
 	ManagedWorkflowDefinition,
-	ManagedWorkflowExtractionStrategy,
+	ManagedWorkflowExecutionDefinition,
+	ManagedWorkflowInstructionNode,
 	ManagedWorkflowItemState,
 	ManagedWorkflowPhaseState,
+	ManagedWorkflowStepDefinition,
 } from "./types"
 
 const PHASE_ROOT_CANDIDATES = ["steps", "steps-c", "steps-e", "steps-v", "domain-steps", "market-steps", "technical-steps"]
-const DEFAULT_SECTION_HEADER_CANDIDATES = [
-	"## INSTRUCTIONS",
-	"## EXECUTION",
-	"## EXECUTION PROTOCOLS",
-	"## EXECUTION PROCESS",
-	"## PROCESS",
-	"## STEPS",
-	"## WORKFLOW",
-	"## DISCOVERY SEQUENCE",
-	"## REQUIREMENTS EXTRACTION PROCESS",
-	"## YOUR TASK",
-	"## CONTENT TO SAVE TO DOCUMENT",
-	"## STAGES",
-	"## ON ACTIVATION",
-]
-const DEFAULT_STRATEGY_ORDER: ManagedWorkflowExtractionStrategy[] = [
-	"workflow-steps",
-	"numbered-headings",
-	"ordered-lists",
-	"bullet-groups",
-	"template-outputs",
-	"heading-items",
-]
-
-const UX_DESIGN_COMPLETE_ADVISORY_PATTERNS = [
-	/Wireframe Generation/i,
-	/Interactive Prototype/i,
-	/Solution Architecture/i,
-	/Figma Visual Design/i,
-	/Epic Creation/i,
-	/For design-focused teams/i,
-	/For technical teams/i,
-	/Consider team capacity/i,
-]
+const EXECUTION_SECTION_HEADER_CANDIDATES = ["## INSTRUCTIONS", "## EXECUTION", "## WORKFLOW", "## STEPS"]
+const ANNOTATION_TAGS = new Set(["critical", "note", "guideline"])
+const ROUTE_TAGS = new Set(["goto", "handoff", "return", "exit"])
+const GENERIC_WRAPPER_STEP_GOALS = [/review detailed guidance/i, /follow workflow/i, /wrapper/i]
 
 function stripMarkdown(text: string): string {
 	return text
+		.replace(/^---[\s\S]*?---\s*/m, "")
 		.replace(/```[\s\S]*?```/g, " ")
 		.replace(/`([^`]+)`/g, "$1")
 		.replace(/\*\*([^*]+)\*\*/g, "$1")
 		.replace(/\*([^*]+)\*/g, "$1")
 		.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+		.replace(/&quot;/g, '"')
+		.replace(/&amp;/g, "&")
+		.replace(/&lt;/g, "<")
+		.replace(/&gt;/g, ">")
 		.replace(/<\/?[^>]+>/g, " ")
 		.replace(/\{\{[^}]+\}\}/g, " ")
 		.replace(/\s+/g, " ")
 		.trim()
 }
 
-function stripProseBlocks(content: string): string {
-	return content.replace(/<prose\b[^>]*>[\s\S]*?<\/prose>/g, " ")
-}
-
-function normalizeHeading(heading: string): string {
-	return heading
-		.replace(/#+\s*/, "")
-		.replace(/[:.;]+$/, "")
-		.trim()
-		.toUpperCase()
-}
-
-function dedupeLabels(labels: string[]): string[] {
-	const seen = new Set<string>()
-	const result: string[] = []
-
-	for (const label of labels.map((entry) => stripMarkdown(entry)).filter(Boolean)) {
-		const key = label.toLowerCase()
-		if (!seen.has(key)) {
-			seen.add(key)
-			result.push(label)
-		}
+function parseAttributes(rawAttrs: string): Record<string, string> {
+	const attributes: Record<string, string> = {}
+	for (const match of rawAttrs.matchAll(/([a-zA-Z_][\w-]*)="([^"]*)"/g)) {
+		attributes[match[1]] = match[2]
 	}
-
-	return result
+	return attributes
 }
 
-function extractHeadingTitle(content: string): string | undefined {
-	const match = content.match(/^#\s+(.+)$/m)
-	return match?.[1]?.trim()
-}
-
-function extractCheckpointSection(content: string): string | undefined {
-	const extractionContent = stripProseBlocks(content)
-	const match = extractionContent.match(/##?# CHECKPOINT([\s\S]*?)(?:\n## |\n### |Z)/i)
-	return match?.[1]?.trim()
+function isOptionalAttribute(value?: string): boolean {
+	return value?.trim().toLowerCase() === "true"
 }
 
 function splitIntoLevelTwoSections(content: string): Array<{ heading: string; body: string }> {
@@ -102,303 +54,271 @@ function splitIntoLevelTwoSections(content: string): Array<{ heading: string; bo
 
 	return matches.map((match, index) => {
 		const start = match.index ?? 0
-		const heading = `## ${match[1]?.trim() ?? ""}`
 		const bodyStart = start + match[0].length
 		const end = index + 1 < matches.length ? (matches[index + 1].index ?? content.length) : content.length
 		return {
-			heading,
+			heading: `## ${match[1]?.trim() ?? ""}`,
 			body: content.slice(bodyStart, end).trim(),
 		}
 	})
 }
 
-function extractCandidateSections(content: string): string[] {
+function normalizeHeading(heading: string): string {
+	return heading.replace(/#+\s*/, "").trim().toUpperCase()
+}
+
+function extractSectionBody(content: string, headerCandidates: string[]): string | undefined {
 	const sections = splitIntoLevelTwoSections(content)
 	if (sections.length === 0) {
-		return [content]
-	}
-
-	const candidateHeaders = new Set(DEFAULT_SECTION_HEADER_CANDIDATES.map((heading) => normalizeHeading(heading)))
-	const matched = sections
-		.filter((section) => candidateHeaders.has(normalizeHeading(section.heading)))
-		.map((section) => `${section.heading}\n${section.body}`.trim())
-
-	return matched.length > 0 ? matched : [content]
-}
-
-function extractOrderedItems(content: string): string[] {
-	const lines = content.split("\n")
-	const items: string[] = []
-	let current: string[] = []
-
-	const flush = () => {
-		if (current.length > 0) {
-			items.push(current.join(" ").trim())
-			current = []
-		}
-	}
-
-	for (const rawLine of lines) {
-		const line = rawLine.replace(/\t/g, "    ")
-		if (/^\d+\.\s+/.test(line.trimStart()) && line === line.trimStart()) {
-			flush()
-			current.push(line.trimStart().replace(/^\d+\.\s+/, ""))
-			continue
-		}
-
-		if (current.length > 0) {
-			if (/^##\s+/.test(line) || /^###\s+/.test(line)) {
-				flush()
-				continue
-			}
-			if (line.trim()) {
-				current.push(line.trim())
-			}
-		}
-	}
-
-	flush()
-	return dedupeLabels(items)
-}
-
-function extractHeadingItems(content: string): string[] {
-	return dedupeLabels(
-		Array.from(content.matchAll(/^###\s+(.+)$/gm))
-			.map((match) => match[1] ?? "")
-			.filter(Boolean),
-	)
-}
-
-function extractBulletGroupItems(content: string): string[] {
-	const lines = content.split("\n")
-	const labels: string[] = []
-	let inFence = false
-
-	for (const rawLine of lines) {
-		const line = rawLine.trim()
-		if (line.startsWith("```")) {
-			inFence = !inFence
-			continue
-		}
-
-		if (inFence || !line.startsWith("- ")) {
-			continue
-		}
-
-		labels.push(line.replace(/^-+\s+/, ""))
-	}
-
-	return dedupeLabels(labels)
-}
-
-function extractNumberedHeadingItems(content: string): string[] {
-	const headingRegex = /^###\s+((?:\d+[A-Za-z]?\.?\s+|N\.\s+).+)$/gm
-	const matches = Array.from(content.matchAll(headingRegex))
-	if (matches.length === 0) {
-		return []
-	}
-
-	const items: string[] = []
-
-	for (const [index, match] of matches.entries()) {
-		const start = match.index ?? 0
-		const end = index + 1 < matches.length ? (matches[index + 1].index ?? content.length) : content.length
-		const block = content.slice(start, end)
-		const heading = stripMarkdown((match[1] ?? "").replace(/^(?:\d+[A-Za-z]?\.?\s+|N\.\s+)/, ""))
-		if (heading) {
-			items.push(heading)
-		}
-
-		const bulletItems = extractBulletGroupItems(block)
-		for (const bullet of bulletItems) {
-			items.push(`${heading}: ${bullet}`)
-		}
-
-		const boldLabels = Array.from(block.matchAll(/\*\*([^*]+)\*\*:?/g))
-			.map((entry) => stripMarkdown(entry[1] ?? ""))
-			.filter(Boolean)
-		for (const label of boldLabels) {
-			if (!label.toLowerCase().startsWith("success") && !label.toLowerCase().startsWith("system failure")) {
-				items.push(`${heading}: ${label}`)
-			}
-		}
-	}
-
-	return dedupeLabels(items)
-}
-
-function stripCheckBlocks(content: string): string {
-	return content.replace(/<check\b[^>]*>[\s\S]*?<\/check>/g, " ")
-}
-
-function parseStepNumber(attrs: string): number | undefined {
-	const raw = /n="([^"]+)"/.exec(attrs)?.[1]?.trim()
-	if (!raw) {
 		return undefined
 	}
 
-	const parsed = Number.parseInt(raw, 10)
-	return Number.isNaN(parsed) ? undefined : parsed
+	const candidates = new Set(headerCandidates.map((header) => normalizeHeading(header)))
+	return sections.find((section) => candidates.has(normalizeHeading(section.heading)))?.body?.trim()
 }
 
-function isStepWithinPrimaryRange(stepNumber: number | undefined, workflow: ManagedWorkflowDefinition): boolean {
-	if (workflow.primaryStepRange == null || stepNumber == null) {
-		return true
+function extractHeadingTitle(content: string): string | undefined {
+	return content.match(/^#\s+(.+)$/m)?.[1]?.trim()
+}
+
+function extractProseBlocks(content: string): string[] {
+	return Array.from(content.matchAll(/<prose\b[^>]*>([\s\S]*?)<\/prose>/g)).map((match) => match[1] ?? "")
+}
+
+function extractCheckpointSection(content: string): string | undefined {
+	return extractSectionBody(content, ["## CHECKPOINT"])
+}
+
+function findMatchingClosingTag(
+	content: string,
+	tagName: string,
+	searchStart: number,
+): { start: number; end: number } | undefined {
+	const matcher = new RegExp(`<${tagName}\\b[^>]*>|</${tagName}>`, "g")
+	matcher.lastIndex = searchStart
+	let depth = 1
+
+	for (let match = matcher.exec(content); match; match = matcher.exec(content)) {
+		if (match[0].startsWith(`</${tagName}`)) {
+			depth -= 1
+		} else {
+			depth += 1
+		}
+
+		if (depth === 0) {
+			return {
+				start: match.index,
+				end: matcher.lastIndex,
+			}
+		}
 	}
 
-	const min = workflow.primaryStepRange.min ?? Number.NEGATIVE_INFINITY
-	const max = workflow.primaryStepRange.max ?? Number.POSITIVE_INFINITY
-	return stepNumber >= min && stepNumber <= max
+	return undefined
 }
 
-function extractTemplateOutputItems(content: string): string[] {
-	return dedupeLabels(
-		Array.from(content.matchAll(/<template-output>\s*([^<\n]+?)\s*<\/template-output>/g)).map(
-			(match) => `Persist template output "${stripMarkdown(match[1] ?? "")}"`,
-		),
-	)
-}
+function parseNodeBody(content: string): { nodes: ManagedWorkflowInstructionNode[]; text?: string } {
+	const nodes: ManagedWorkflowInstructionNode[] = []
+	const textParts: string[] = []
+	const matcher =
+		/<(branch|check|action|ask|output|detail|template-output|critical|note|guideline)\b([^>]*)>|<(goto|handoff)\b([^>]*)\/>|<(return|exit)\s*\/>/g
 
-function extractWorkflowStepItems(content: string, workflow: ManagedWorkflowDefinition): string[] {
-	const stepMatches = Array.from(content.matchAll(/<step\b([^>]*)>([\s\S]*?)<\/step>/g))
-	if (stepMatches.length === 0) {
-		return []
-	}
+	let cursor = 0
+	while (cursor < content.length) {
+		matcher.lastIndex = cursor
+		const match = matcher.exec(content)
+		if (!match) {
+			textParts.push(content.slice(cursor))
+			break
+		}
 
-	const labels: string[] = []
+		const start = match.index
+		if (start > cursor) {
+			textParts.push(content.slice(cursor, start))
+		}
 
-	for (const match of stepMatches) {
-		const attrs = match[1] ?? ""
-		const body = match[2] ?? ""
-		const stepNumber = parseStepNumber(attrs)
-		if (!isStepWithinPrimaryRange(stepNumber, workflow)) {
+		if (match[1]) {
+			const tagName = match[1]
+			const attrs = parseAttributes(match[2] ?? "")
+			const openEnd = matcher.lastIndex
+			const closing = findMatchingClosingTag(content, tagName, openEnd)
+			const closeStart = closing?.start ?? content.length
+			const closeEnd = closing?.end ?? content.length
+			const inner = content.slice(openEnd, closeStart)
+			const parsedInner = parseNodeBody(inner)
+			const immediateText = parsedInner.text
+			const children = parsedInner.nodes.length > 0 ? parsedInner.nodes : undefined
+
+			let node: ManagedWorkflowInstructionNode | undefined
+			if (tagName === "branch" || tagName === "check") {
+				node = {
+					type: "branch",
+					condition: attrs.if?.trim() || undefined,
+					optional: isOptionalAttribute(attrs.optional),
+					text: immediateText,
+					children,
+				}
+			} else if (tagName === "action" || tagName === "ask" || tagName === "output" || tagName === "detail") {
+				node = {
+					type: tagName,
+					condition: attrs.if?.trim() || undefined,
+					optional: isOptionalAttribute(attrs.optional),
+					text: immediateText,
+					children,
+				}
+			} else if (tagName === "template-output") {
+				node = {
+					type: "template-output",
+					condition: attrs.if?.trim() || undefined,
+					optional: isOptionalAttribute(attrs.optional),
+					text: immediateText,
+					children,
+				}
+			} else if (ANNOTATION_TAGS.has(tagName)) {
+				node = {
+					type: "annotation",
+					annotationKind: tagName as ManagedWorkflowAnnotationKind,
+					condition: attrs.if?.trim() || undefined,
+					optional: isOptionalAttribute(attrs.optional),
+					text: immediateText,
+					children,
+				}
+			}
+
+			if (node && (node.text || node.children?.length || node.type === "branch")) {
+				nodes.push(node)
+			}
+			cursor = closeEnd
 			continue
 		}
 
-		const extractionBody = workflow.extractionMode === "branch-aware" ? stripCheckBlocks(body) : body
-		const goal = stripMarkdown(/goal="([^"]+)"/.exec(attrs)?.[1] ?? "") || "Complete workflow step"
-
-		const actionMatches = Array.from(extractionBody.matchAll(/<action(?:\s+if="[^"]*")?>([\s\S]*?)<\/action>/g))
-		for (const action of actionMatches) {
-			const actionText = stripMarkdown(action[1] ?? "")
-			if (actionText) {
-				labels.push(`${goal}: ${actionText}`)
-			}
+		const routeTag = (match[3] ?? match[5] ?? "").trim()
+		if (routeTag && ROUTE_TAGS.has(routeTag)) {
+			const attrs = parseAttributes(match[4] ?? "")
+			nodes.push({
+				type: "route",
+				routeKind: routeTag as ManagedWorkflowInstructionNode["routeKind"],
+				routeTarget: attrs.step ?? attrs.path,
+			})
 		}
-
-		const askMatches = Array.from(extractionBody.matchAll(/<ask>([\s\S]*?)<\/ask>/g))
-		for (const ask of askMatches) {
-			const askText = stripMarkdown(ask[1] ?? "")
-			if (askText) {
-				labels.push(`${goal}: Ask user - ${askText}`)
-			}
-		}
-
-		const templateOutputMatches = Array.from(extractionBody.matchAll(/<template-output>\s*([^<\n]+?)\s*<\/template-output>/g))
-		for (const output of templateOutputMatches) {
-			const outputText = stripMarkdown(output[1] ?? "")
-			if (outputText) {
-				labels.push(`${goal}: Persist "${outputText}"`)
-			}
-		}
-
-		const outputMatches = Array.from(extractionBody.matchAll(/<output>([\s\S]*?)<\/output>/g))
-		for (const output of outputMatches) {
-			const outputText = stripMarkdown(output[1] ?? "")
-			if (outputText) {
-				labels.push(`${goal}: Produce output - ${outputText}`)
-			}
-		}
-
-		const bulletItems = extractBulletGroupItems(extractionBody)
-		for (const bullet of bulletItems) {
-			labels.push(`${goal}: ${bullet}`)
-		}
-
-		if (
-			actionMatches.length === 0 &&
-			askMatches.length === 0 &&
-			templateOutputMatches.length === 0 &&
-			outputMatches.length === 0 &&
-			bulletItems.length === 0
-		) {
-			labels.push(goal)
-		}
+		cursor = matcher.lastIndex
 	}
 
-	return dedupeLabels(labels)
+	const text = stripMarkdown(textParts.join(" "))
+	return {
+		nodes,
+		text: text || undefined,
+	}
 }
 
-function toItemStates(phaseId: string, labels: string[]): ManagedWorkflowItemState[] {
-	return labels.map((label, index) => ({
-		id: `${phaseId}::item-${index + 1}`,
-		label,
-		sourceText: label,
+function parseExecutionSteps(
+	content: string,
+	phaseId: string,
+	workflow: ManagedWorkflowDefinition,
+): ManagedWorkflowStepDefinition[] {
+	const steps: ManagedWorkflowStepDefinition[] = []
+	const stepMatcher = /<step\b([^>]*)>/g
+
+	for (let match = stepMatcher.exec(content); match; match = stepMatcher.exec(content)) {
+		const attrs = parseAttributes(match[1] ?? "")
+		const openEnd = stepMatcher.lastIndex
+		const closing = findMatchingClosingTag(content, "step", openEnd)
+		const closeStart = closing?.start ?? content.length
+		const closeEnd = closing?.end ?? content.length
+		const goal = stripMarkdown(attrs.goal ?? "") || "Complete workflow step"
+		const n = attrs.n ? Number.parseInt(attrs.n, 10) : undefined
+		const sequence = Number.isNaN(n ?? Number.NaN) ? undefined : n
+		const stepId = `${phaseId}::step-${attrs.n?.trim() || steps.length + 1}`
+		const parsedBody = parseNodeBody(content.slice(openEnd, closeStart))
+
+		steps.push({
+			id: stepId,
+			number: sequence,
+			goal,
+			condition: attrs.if?.trim() || undefined,
+			optional: isOptionalAttribute(attrs.optional),
+			instructions: parsedBody.nodes,
+		})
+
+		stepMatcher.lastIndex = closeEnd
+	}
+
+	if (workflow.primaryStepRange) {
+		const min = workflow.primaryStepRange.min ?? Number.NEGATIVE_INFINITY
+		const max = workflow.primaryStepRange.max ?? Number.POSITIVE_INFINITY
+		return steps.filter((step) => step.number == null || (step.number >= min && step.number <= max))
+	}
+
+	return steps
+}
+
+function buildFallbackExecution(phaseId: string, phaseTitle: string): ManagedWorkflowExecutionDefinition {
+	return {
+		steps: [
+			{
+				id: `${phaseId}::step-1`,
+				goal: `Review and complete phase "${phaseTitle}"`,
+				instructions: [],
+			},
+		],
+	}
+}
+
+function countStructuredSteps(content: string | undefined): number {
+	if (!content) {
+		return 0
+	}
+	return Array.from(content.matchAll(/<step\b/g)).length
+}
+
+function looksLikeWrapperExecution(content: string): boolean {
+	const goals = Array.from(content.matchAll(/<step\b[^>]*goal="([^"]+)"/g)).map((match) => stripMarkdown(match[1] ?? ""))
+	return goals.length > 0 && goals.every((goal) => GENERIC_WRAPPER_STEP_GOALS.some((pattern) => pattern.test(goal)))
+}
+
+function extractExecutionSource(content: string): string {
+	const primaryBody = extractSectionBody(content, EXECUTION_SECTION_HEADER_CANDIDATES)
+	const proseBodies = extractProseBlocks(content)
+	const proseCandidateBodies = proseBodies
+		.map((body) => extractSectionBody(body, EXECUTION_SECTION_HEADER_CANDIDATES) ?? body)
+		.filter(Boolean)
+
+	const primaryStepCount = countStructuredSteps(primaryBody)
+	if (primaryBody && primaryStepCount > 0 && !looksLikeWrapperExecution(primaryBody)) {
+		return primaryBody
+	}
+
+	const proseCandidate = proseCandidateBodies
+		.map((body) => ({ body, steps: countStructuredSteps(body) }))
+		.sort((a, b) => b.steps - a.steps)[0]
+	if (proseCandidate && proseCandidate.steps > primaryStepCount) {
+		return proseCandidate.body
+	}
+
+	return primaryBody ?? content
+}
+
+function toItemStates(steps: ManagedWorkflowStepDefinition[]): ManagedWorkflowItemState[] {
+	return steps.map((step) => ({
+		id: step.id,
+		label: step.goal,
+		sourceText: step.goal,
 		completed: false,
+		stepId: step.id,
+		optional: step.optional === true ? true : undefined,
+		required: step.optional === true ? false : true,
+		advisory: step.optional === true ? true : undefined,
 	}))
 }
 
-function applyWorkflowSpecificItemPolicies(
-	workflow: ManagedWorkflowDefinition,
-	phaseId: string,
-	items: ManagedWorkflowItemState[],
-): ManagedWorkflowItemState[] {
-	if (workflow.workflowId === "bmad-sprint-status") {
-		return items.filter(
-			(item) =>
-				!item.label.startsWith("Data mode output:") &&
-				!item.label.startsWith("Validate sprint-status file:") &&
-				!item.label.includes("Jump to Step 20") &&
-				!item.label.includes("Jump to Step 30"),
-		)
-	}
-
-	if (workflow.workflowId === "bmad-create-ux-design" && phaseId === "step-14-complete") {
-		return items.map((item) =>
-			UX_DESIGN_COMPLETE_ADVISORY_PATTERNS.some((pattern) => pattern.test(item.label))
-				? { ...item, required: false, advisory: true }
-				: item,
-		)
-	}
-
-	return items
-}
-
-function extractItemsForPhase(
+function buildExecutionDefinition(
 	sourceContent: string,
-	workflow: ManagedWorkflowDefinition,
 	phaseId: string,
 	phaseTitle: string,
-): ManagedWorkflowItemState[] {
-	const extractionSource = stripProseBlocks(sourceContent)
-	const candidateSections = extractCandidateSections(extractionSource)
-	const scopedContent = candidateSections.join("\n\n").trim()
-	const strategies = workflow.strategyHints?.length ? workflow.strategyHints : DEFAULT_STRATEGY_ORDER
-
-	const strategyOutputs: Record<ManagedWorkflowExtractionStrategy, string[]> = {
-		"workflow-steps": extractWorkflowStepItems(scopedContent || extractionSource, workflow),
-		"template-outputs": extractTemplateOutputItems(scopedContent || extractionSource),
-		"numbered-headings": extractNumberedHeadingItems(scopedContent || extractionSource),
-		"ordered-lists": extractOrderedItems(scopedContent || extractionSource),
-		"bullet-groups": extractBulletGroupItems(scopedContent || extractionSource),
-		"heading-items": extractHeadingItems(scopedContent || extractionSource),
-	}
-
-	for (const strategy of strategies) {
-		const labels = dedupeLabels(strategyOutputs[strategy])
-		if (labels.length > 0) {
-			return applyWorkflowSpecificItemPolicies(workflow, phaseId, toItemStates(phaseId, labels))
-		}
-	}
-
-	return applyWorkflowSpecificItemPolicies(workflow, phaseId, [
-		{
-			id: `${phaseId}::item-1`,
-			label: `Review and complete phase "${phaseTitle}"`,
-			sourceText: phaseTitle,
-			completed: false,
-		},
-	])
+	workflow: ManagedWorkflowDefinition,
+): ManagedWorkflowExecutionDefinition {
+	const executionSource = extractExecutionSource(sourceContent)
+	const steps = parseExecutionSteps(executionSource, phaseId, workflow)
+	return steps.length > 0 ? { steps } : buildFallbackExecution(phaseId, phaseTitle)
 }
 
 async function readPhaseFile(
@@ -409,14 +329,15 @@ async function readPhaseFile(
 	const sourceContent = await fs.readFile(absPath, "utf8")
 	const title = extractHeadingTitle(sourceContent) ?? path.basename(relPath, path.extname(relPath))
 	const phaseId = path.basename(relPath, path.extname(relPath))
-	const items = extractItemsForPhase(sourceContent, workflow, phaseId, title)
-	const checkpoint = extractCheckpointSection(sourceContent)
+	const execution = buildExecutionDefinition(sourceContent, phaseId, title, workflow)
+	const items = toItemStates(execution.steps)
+	const checkpointText = extractCheckpointSection(sourceContent)
 
-	if (checkpoint) {
+	if (checkpointText) {
 		items.push({
 			id: `${phaseId}::checkpoint`,
-			label: stripMarkdown(checkpoint.split("\n")[0] || "Complete checkpoint"),
-			sourceText: stripMarkdown(checkpoint),
+			label: stripMarkdown(checkpointText.split("\n")[0] || "Complete checkpoint"),
+			sourceText: stripMarkdown(checkpointText),
 			completed: false,
 			blocked: true,
 		})
@@ -427,6 +348,8 @@ async function readPhaseFile(
 		title,
 		sourcePath: relPath,
 		sourceContent,
+		execution,
+		checkpointText,
 		items,
 		completed: false,
 	}

@@ -1,37 +1,12 @@
 
-# Step
+# step 05 domain
 
 ## META
-- managed_workflow_extraction: enabled
-- phase_type: phase
-- source_format: procedural
 
-## EXECUTION
-<step n="1" goal="Review Detailed Guidance">
-  <action>Read the advisory, reference, and prose sections in this file completely before taking action.</action>
-</step>
-
-<step n="2" goal="Follow Phase Procedure">
-  <action>Execute this file in order, preserving every approval gate, routing rule, document update instruction, and constraint described below.</action>
-</step>
-
-## CHECKPOINT
-This phase can be marked complete only after the required outputs, approvals, and routing conditions in this file are satisfied.
-
-## ADVISORY
-- Treat the <prose> section as the authoritative detailed instructions for this file.
-- Preserve all existing user-input pauses, continuation checks, and referenced companion files.
-- Keep any document templates, frontmatter updates, and save instructions exactly as authored.
-
-## REFERENCE
-- Original authored procedure retained below for managed workflow extraction compatibility.
-
-<prose>
-## META
-
-- Goal: capture domain-specific constraints, regulations, integrations, and risk mitigations.
-- Speak to the user in `{communication_language}`.
-- Skip generic filler and focus on domain-specific obligations.
+- Goal: Capture domain-specific constraints, regulations, integrations, and risk mitigations.
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction and handoff.
 
 ## EXECUTION
 
@@ -63,10 +38,4 @@ This phase can be marked complete only after the required outputs, approvals, an
 Wait for the user to confirm the domain-specific requirements before saving them.
 
 ## ADVISORY
-
 - If the project domain is simple, keep this section short rather than inventing complexity.
-
-## REFERENCE
-
-- Domain requirements should add only the concerns that materially shape design, delivery, or compliance.
-</prose>

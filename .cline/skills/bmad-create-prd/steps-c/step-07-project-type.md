@@ -1,37 +1,12 @@
 
-# Step
+# step 07 project type
 
 ## META
-- managed_workflow_extraction: enabled
-- phase_type: phase
-- source_format: procedural
 
-## EXECUTION
-<step n="1" goal="Review Detailed Guidance">
-  <action>Read the advisory, reference, and prose sections in this file completely before taking action.</action>
-</step>
-
-<step n="2" goal="Follow Phase Procedure">
-  <action>Execute this file in order, preserving every approval gate, routing rule, document update instruction, and constraint described below.</action>
-</step>
-
-## CHECKPOINT
-This phase can be marked complete only after the required outputs, approvals, and routing conditions in this file are satisfied.
-
-## ADVISORY
-- Treat the <prose> section as the authoritative detailed instructions for this file.
-- Preserve all existing user-input pauses, continuation checks, and referenced companion files.
-- Keep any document templates, frontmatter updates, and save instructions exactly as authored.
-
-## REFERENCE
-- Original authored procedure retained below for managed workflow extraction compatibility.
-
-<prose>
-## META
-
-- Goal: capture requirements that are specific to the project’s type or delivery model.
-- Speak to the user in `{communication_language}`.
-- Use the confirmed classification as the driver for this step.
+- Goal: Capture requirements that are specific to the project’s type or delivery model.
+- Execute this file in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use the structured sections for extraction and handoff.
 
 ## EXECUTION
 
@@ -63,10 +38,4 @@ This phase can be marked complete only after the required outputs, approvals, an
 Wait for the user to approve the project-type section before saving it.
 
 ## ADVISORY
-
 - Keep this section grounded in the actual project type rather than generic software advice.
-
-## REFERENCE
-
-- Project-type content should make later architecture and planning work easier, not noisier.
-</prose>

@@ -178,6 +178,7 @@
 		"checklistPath": null,
 		"supportsManagedExecution": true,
 		"strategyHints": [
+			"workflow-steps",
 			"ordered-lists",
 			"numbered-headings",
 			"bullet-groups"
@@ -233,6 +234,7 @@
 		"checklistPath": null,
 		"supportsManagedExecution": true,
 		"strategyHints": [
+			"workflow-steps",
 			"numbered-headings",
 			"ordered-lists",
 			"bullet-groups"
@@ -376,7 +378,9 @@
 		"skillPath": ".cline/skills/bmad-create-story/SKILL.md",
 		"workflowPath": ".cline/skills/bmad-create-story/workflow.md",
 		"aliases": [],
-		"phaseRoots": [],
+		"phaseRoots": [
+			".cline/skills/bmad-create-story/steps"
+		],
 		"checklistPath": ".cline/skills/bmad-create-story/checklist.md",
 		"supportsManagedExecution": true,
 		"strategyHints": [
@@ -392,6 +396,12 @@
 			".cline/skills/bmad-create-story/discover-inputs.md",
 			".cline/skills/bmad-create-story/SKILL.md",
 			".cline/skills/bmad-create-story/template.md",
+			".cline/skills/bmad-create-story/steps/step-01-determine-target-story.md",
+			".cline/skills/bmad-create-story/steps/step-02-load-and-analyze-core-artifacts.md",
+			".cline/skills/bmad-create-story/steps/step-03-architecture-analysis-for-developer-guardrails.md",
+			".cline/skills/bmad-create-story/steps/step-04-web-research-for-latest-technical-specifics.md",
+			".cline/skills/bmad-create-story/steps/step-05-create-comprehensive-story-file.md",
+			".cline/skills/bmad-create-story/steps/step-06-update-sprint-status-and-finalize.md",
 			".cline/skills/bmad-create-story/workflow.md"
 		]
 	},

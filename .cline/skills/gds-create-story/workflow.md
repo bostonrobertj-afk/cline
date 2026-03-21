@@ -1,10 +1,10 @@
 ---
-name: gds-create-story
-description: 'Creates a dedicated story file with all the context the agent will need to implement it later. Use when the user says "create the next story" or "create story [story identifier]"'
+main_config: '{project-root}/_bmad/gds/config.yaml'
 ---
-# Create Story Workflow
+# workflow
 
 ## META
+
 - managed_workflow_extraction: enabled
 - phase_type: workflow
 - source_format: procedural
@@ -173,12 +173,12 @@ Load config from `{project-root}/_bmad/gds/config.yaml` and resolve:
         <action>HALT - Cannot proceed</action>
       </check>
       <check if="epic status is not one of: backlog, contexted, in-progress, done">
-        <output>🚫 ERROR: Invalid epic status '{{epic_status}}'</output>
+        <output>ERROR: Invalid epic status '{{epic_status}}'</output>
         <output>Epic {{epic_num}} has invalid status. Expected: backlog, in-progress, or done</output>
         <output>Please fix sprint-status.yaml manually or run sprint-planning to regenerate</output>
         <action>HALT - Cannot proceed</action>
       </check>
-      <output>📊 Epic {{epic_num}} status updated to in-progress</output>
+      <output>Epic {{epic_num}} status updated to in-progress</output>
     </check>
 
     <action>GOTO step 2a</action>
@@ -258,157 +258,3 @@ Load config from `{project-root}/_bmad/gds/config.yaml` and resolve:
   (As a, I want, so that) - Detailed acceptance criteria (already BDD formatted) - Technical requirements specific to this story -
   Business context and value - Success criteria <!-- Previous story analysis for context continuity -->
   <check if="story_num > 1">
-    <action>Find {{previous_story_num}}: scan {implementation_artifacts} for the story file in epic {{epic_num}} with the highest story number less than {{story_num}}</action>
-    <action>Load previous story file: {implementation_artifacts}/{{epic_num}}-{{previous_story_num}}-*.md</action> **PREVIOUS STORY INTELLIGENCE:** -
-  Dev notes and learnings from previous story - Review feedback and corrections needed - Files that were created/modified and their
-  patterns - Testing approaches that worked/didn't work - Problems encountered and solutions found - Code patterns established <action>Extract
-  all learnings that could impact current story implementation</action>
-  </check>
-
-  <!-- Git intelligence for previous work patterns -->
-  <check
-    if="previous story exists AND git repository detected">
-    <action>Get last 5 commit titles to understand recent work patterns</action>
-    <action>Analyze 1-5 most recent commits for relevance to current story:
-      - Files created/modified
-      - Code patterns and conventions used
-      - Library dependencies added/changed
-      - Architecture decisions implemented
-      - Testing approaches used
-    </action>
-    <action>Extract actionable insights for current story implementation</action>
-  </check>
-</step>
-
-<step n="3" goal="Architecture analysis for developer guardrails">
-  <critical>🏗️ ARCHITECTURE INTELLIGENCE - Extract everything the developer MUST follow!</critical> **ARCHITECTURE DOCUMENT ANALYSIS:** <action>Systematically
-  analyze architecture content for story-relevant requirements:</action>
-
-  <!-- Load architecture - single file or sharded -->
-  <check if="architecture file is single file">
-    <action>Load complete {architecture_content}</action>
-  </check>
-  <check if="architecture is sharded to folder">
-    <action>Load architecture index and scan all architecture files</action>
-  </check> **CRITICAL ARCHITECTURE EXTRACTION:** <action>For
-  each architecture section, determine if relevant to this story:</action> - **Technical Stack:** Languages, frameworks, libraries with
-  versions - **Code Structure:** Folder organization, naming conventions, file patterns - **API Patterns:** Service structure, endpoint
-  patterns, data contracts - **Database Schemas:** Tables, relationships, constraints relevant to story - **Security Requirements:**
-  Authentication patterns, authorization rules - **Performance Requirements:** Caching strategies, optimization patterns - **Testing
-  Standards:** Testing frameworks, coverage expectations, test patterns - **Deployment Patterns:** Environment configurations, build
-  processes - **Integration Patterns:** External service integrations, data flows <action>Extract any story-specific requirements that the
-  developer MUST follow</action>
-  <action>Identify any architectural decisions that override previous patterns</action>
-</step>
-
-<step n="4" goal="Web research for latest technical specifics">
-  <critical>🌐 ENSURE LATEST TECH KNOWLEDGE - Prevent outdated implementations!</critical> **WEB INTELLIGENCE:** <action>Identify specific
-  technical areas that require latest version knowledge:</action>
-
-  <!-- Check for libraries/frameworks mentioned in architecture -->
-  <action>From architecture analysis, identify specific libraries, APIs, or
-  frameworks</action>
-  <action>For each critical technology, research latest stable version and key changes:
-    - Latest API documentation and breaking changes
-    - Security vulnerabilities or updates
-    - Performance improvements or deprecations
-    - Best practices for current version
-  </action>
-  **EXTERNAL CONTEXT INCLUSION:** <action>Include in story any critical latest information the developer needs:
-    - Specific library versions and why chosen
-    - API endpoints with parameters and authentication
-    - Recent security patches or considerations
-    - Performance optimization techniques
-    - Migration considerations if upgrading
-  </action>
-</step>
-
-<step n="5" goal="Create comprehensive story file">
-  <critical>📝 CREATE ULTIMATE STORY FILE - The developer's master implementation guide!</critical>
-
-  <action>Initialize from template.md:
-  {default_output_file}</action>
-  <template-output file="{default_output_file}">story_header</template-output>
-
-  <!-- Story foundation from epics analysis -->
-  <template-output
-    file="{default_output_file}">story_requirements</template-output>
-
-  <!-- Developer context section - MOST IMPORTANT PART -->
-  <template-output file="{default_output_file}">
-  developer_context_section</template-output> **DEV AGENT GUARDRAILS:** <template-output file="{default_output_file}">
-  technical_requirements</template-output>
-  <template-output file="{default_output_file}">architecture_compliance</template-output>
-  <template-output
-    file="{default_output_file}">library_framework_requirements</template-output>
-  <template-output file="{default_output_file}">
-  file_structure_requirements</template-output>
-  <template-output file="{default_output_file}">testing_requirements</template-output>
-
-  <!-- Previous story intelligence -->
-  <check
-    if="previous story learnings available">
-    <template-output file="{default_output_file}">previous_story_intelligence</template-output>
-  </check>
-
-  <!-- Git intelligence -->
-  <check
-    if="git analysis completed">
-    <template-output file="{default_output_file}">git_intelligence_summary</template-output>
-  </check>
-
-  <!-- Latest technical specifics -->
-  <check if="web research completed">
-    <template-output file="{default_output_file}">latest_tech_information</template-output>
-  </check>
-
-  <!-- Project context reference -->
-  <template-output
-    file="{default_output_file}">project_context_reference</template-output>
-
-  <!-- Final status update -->
-  <template-output file="{default_output_file}">
-  story_completion_status</template-output>
-
-  <!-- CRITICAL: Set status to ready-for-dev -->
-  <action>Set story Status to: "ready-for-dev"</action>
-  <action>Add completion note: "Ultimate
-  context engine analysis completed - comprehensive developer guide created"</action>
-</step>
-
-<step n="6" goal="Update sprint status and finalize">
-  <action>Validate the newly created story file {story_file} against {installed_path}/checklist.md and apply any required fixes before finalizing</action>
-  <action>Save story document unconditionally</action>
-
-  <!-- Update sprint status -->
-  <check if="sprint status file exists">
-    <action>Update {{sprint_status}}</action>
-    <action>Load the FULL file and read all development_status entries</action>
-    <action>Find development_status key matching {{story_key}}</action>
-    <action>Verify current status is "backlog" (expected previous state)</action>
-    <action>Update development_status[{{story_key}}] = "ready-for-dev"</action>
-    <action>Update last_updated field to current date</action>
-    <action>Save file, preserving ALL comments and structure including STATUS DEFINITIONS</action>
-  </check>
-
-  <action>Report completion</action>
-  <output>**🎯 ULTIMATE BMad Method STORY CONTEXT CREATED, {user_name}!**
-
-    **Story Details:**
-    - Story ID: {{story_id}}
-    - Story Key: {{story_key}}
-    - File: {{story_file}}
-    - Status: ready-for-dev
-
-    **Next Steps:**
-    1. Review the comprehensive story in {{story_file}}
-    2. Run dev agents `dev-story` for optimized implementation
-    3. Run `code-review` when complete (auto-marks done)
-    4. Optional: If Test Architect module installed, run `/bmad:tea:automate` after `dev-story` to generate guardrail tests
-
-    **The developer now has everything needed for flawless implementation!**
-  </output>
-</step>
-
-</workflow>
-</prose>
