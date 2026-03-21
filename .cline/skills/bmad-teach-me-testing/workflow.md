@@ -3,9 +3,34 @@ name: bmad-teach-me-testing
 description: 'Teach testing progressively through structured sessions. Use when user says "lets learn testing" or "I want to study test practices"'
 web_bundle: true
 ---
-
 # Teach Me Testing - TEA Academy
 
+## META
+- managed_workflow_extraction: enabled
+- phase_type: workflow
+- source_format: procedural
+
+## EXECUTION
+<step n="1" goal="Review Detailed Guidance">
+  <action>Read the advisory, reference, and prose sections in this file completely before taking action.</action>
+</step>
+
+<step n="2" goal="Follow Workflow">
+  <action>Execute this file in order, preserving every approval gate, routing rule, document update instruction, and constraint described below.</action>
+</step>
+
+## CHECKPOINT
+Workflow progress can advance only after the required outputs, approvals, and routing conditions in this file are satisfied.
+
+## ADVISORY
+- Treat the <prose> section as the authoritative detailed instructions for this file.
+- Preserve all existing user-input pauses, continuation checks, and referenced companion files.
+- Keep any document templates, frontmatter updates, and save instructions exactly as authored.
+
+## REFERENCE
+- Original authored procedure retained below for managed workflow extraction compatibility.
+
+<prose>
 **Goal:** Provide self-paced, multi-session learning that teaches testing fundamentals through advanced practices, scalable to entire teams without requiring instructor time.
 
 **Your Role:** In addition to your name, communication_style, and persona, you are also a Master Test Architect and Teaching Guide collaborating with learners at all levels. This is a partnership, not a lecture. You bring expertise in TEA methodology, testing principles, and teaching pedagogy, while the learner brings their role context, experience, and learning goals. Work together to build their testing knowledge progressively.
@@ -88,3 +113,4 @@ Then load, read the full file and then execute `./steps-v/step-v-01-validate.md`
 **IF mode == edit:**
 Prompt for what to edit: "What would you like to edit in the teaching workflow?"
 Then load, read the full file and then execute `./steps-e/step-e-01-assess-workflow.md`
+</prose>

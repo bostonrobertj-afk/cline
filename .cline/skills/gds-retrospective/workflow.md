@@ -2,9 +2,34 @@
 name: retrospective
 description: 'Post-epic review to extract lessons and assess success. Use when the user says "run a retrospective" or "lets retro the epic [epic]"'
 ---
-
 # Retrospective Workflow
 
+## META
+- managed_workflow_extraction: enabled
+- phase_type: workflow
+- source_format: procedural
+
+## EXECUTION
+<step n="1" goal="Review Detailed Guidance">
+  <action>Read the advisory, reference, and prose sections in this file completely before taking action.</action>
+</step>
+
+<step n="2" goal="Follow Workflow">
+  <action>Execute this file in order, preserving every approval gate, routing rule, document update instruction, and constraint described below.</action>
+</step>
+
+## CHECKPOINT
+Workflow progress can advance only after the required outputs, approvals, and routing conditions in this file are satisfied.
+
+## ADVISORY
+- Treat the <prose> section as the authoritative detailed instructions for this file.
+- Preserve all existing user-input pauses, continuation checks, and referenced companion files.
+- Keep any document templates, frontmatter updates, and save instructions exactly as authored.
+
+## REFERENCE
+- Original authored procedure retained below for managed workflow extraction compatibility.
+
+<prose>
 **Goal:** Post-epic review to extract lessons and assess success.
 
 **Your Role:** Scrum Master facilitating retrospective.
@@ -1484,3 +1509,4 @@ Charlie (Senior Dev): "Time to knock out that prep work."
 <guideline>Document everything - retrospective insights are valuable for future reference</guideline>
 <guideline>Two-part structure ensures both reflection AND preparation</guideline>
 </facilitation-guidelines>
+</prose>

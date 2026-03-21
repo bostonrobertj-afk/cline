@@ -5,9 +5,34 @@ altStepFile: './step-v-02b-parity-check.md'
 prdFile: '{prd_file_path}'
 validationReportPath: '{validation_report_path}'
 ---
-
 # Step 2: Format Detection & Structure Analysis
 
+## META
+- managed_workflow_extraction: enabled
+- phase_type: phase
+- source_format: procedural
+
+## EXECUTION
+<step n="1" goal="Review Detailed Guidance">
+  <action>Read the advisory, reference, and prose sections in this file completely before taking action.</action>
+</step>
+
+<step n="2" goal="Follow Phase Procedure">
+  <action>Execute this file in order, preserving every approval gate, routing rule, document update instruction, and constraint described below.</action>
+</step>
+
+## CHECKPOINT
+This phase can be marked complete only after the required outputs, approvals, and routing conditions in this file are satisfied.
+
+## ADVISORY
+- Treat the <prose> section as the authoritative detailed instructions for this file.
+- Preserve all existing user-input pauses, continuation checks, and referenced companion files.
+- Keep any document templates, frontmatter updates, and save instructions exactly as authored.
+
+## REFERENCE
+- Original authored procedure retained below for managed workflow extraction compatibility.
+
+<prose>
 ## STEP GOAL:
 
 Detect if PRD follows BMAD format and route appropriately - classify as BMAD Standard / BMAD Variant / Non-Standard, with optional parity check for non-standard formats.
@@ -186,3 +211,4 @@ Present MENU OPTIONS below for user selection
 - Proceeding without user decision for non-standard formats
 
 **Master Rule:** Format detection determines validation path. Non-standard PRDs require user choice before proceeding.
+</prose>

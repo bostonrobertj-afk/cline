@@ -3,9 +3,34 @@ name: 'step-01b-resume'
 description: 'Resume interrupted workflow from last completed step'
 outputFile: '{test_artifacts}/test-review.md'
 ---
-
 # Step 1b: Resume Workflow
 
+## META
+- managed_workflow_extraction: enabled
+- phase_type: phase
+- source_format: procedural
+
+## EXECUTION
+<step n="1" goal="Review Detailed Guidance">
+  <action>Read the advisory, reference, and prose sections in this file completely before taking action.</action>
+</step>
+
+<step n="2" goal="Follow Phase Procedure">
+  <action>Execute this file in order, preserving every approval gate, routing rule, document update instruction, and constraint described below.</action>
+</step>
+
+## CHECKPOINT
+This phase can be marked complete only after the required outputs, approvals, and routing conditions in this file are satisfied.
+
+## ADVISORY
+- Treat the <prose> section as the authoritative detailed instructions for this file.
+- Preserve all existing user-input pauses, continuation checks, and referenced companion files.
+- Keep any document templates, frontmatter updates, and save instructions exactly as authored.
+
+## REFERENCE
+- Original authored procedure retained below for managed workflow extraction compatibility.
+
+<prose>
 ## STEP GOAL
 
 Resume an interrupted workflow by loading the existing output document, displaying progress, and routing to the next incomplete step.
@@ -102,3 +127,4 @@ The existing content in `{outputFile}` provides context from previously complete
 - Routing to wrong step
 
 **Master Rule:** Resume MUST route to the exact next incomplete step. Never re-execute completed steps.
+</prose>

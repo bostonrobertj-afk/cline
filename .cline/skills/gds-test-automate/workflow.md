@@ -3,9 +3,34 @@ name: gametest-automate
 description: 'Automated test scenario generator. Use when the user says "I want to create automated game tests" or "Generate test scenarios for Unity Unreal or Godot"'
 main_config: '{project-root}/_bmad/gds/config.yaml'
 ---
-
 # Game Test Automation Workflow
 
+## META
+- managed_workflow_extraction: enabled
+- phase_type: workflow
+- source_format: procedural
+
+## EXECUTION
+<step n="1" goal="Review Detailed Guidance">
+  <action>Read the advisory, reference, and prose sections in this file completely before taking action.</action>
+</step>
+
+<step n="2" goal="Follow Workflow">
+  <action>Execute this file in order, preserving every approval gate, routing rule, document update instruction, and constraint described below.</action>
+</step>
+
+## CHECKPOINT
+Workflow progress can advance only after the required outputs, approvals, and routing conditions in this file are satisfied.
+
+## ADVISORY
+- Treat the <prose> section as the authoritative detailed instructions for this file.
+- Preserve all existing user-input pauses, continuation checks, and referenced companion files.
+- Keep any document templates, frontmatter updates, and save instructions exactly as authored.
+
+## REFERENCE
+- Original authored procedure retained below for managed workflow extraction compatibility.
+
+<prose>
 **Goal:** Generate automated test code for game projects based on test design scenarios or by analyzing existing game code. Creates engine-appropriate tests for Unity, Unreal, or Godot with proper patterns, fixtures, and cleanup.
 
 **Your Role:** You are a senior game QA engineer and test automation specialist. Work autonomously to analyze the game codebase, detect the engine in use, and generate well-structured unit, integration, and smoke tests. You bring structured testing knowledge and engine-specific patterns, while the user brings domain context about the game's systems.
@@ -351,3 +376,4 @@ public IEnumerator Smoke_NewGame_StartsSuccessfully()
 </step>
 
 </workflow>
+</prose>

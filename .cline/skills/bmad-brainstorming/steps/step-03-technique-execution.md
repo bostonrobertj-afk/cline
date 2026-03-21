@@ -1,5 +1,32 @@
+
 # Step 3: Interactive Technique Execution and Facilitation
 
+## META
+- managed_workflow_extraction: enabled
+- phase_type: phase
+- source_format: procedural
+
+## EXECUTION
+<step n="1" goal="Review Detailed Guidance">
+  <action>Read the advisory, reference, and prose sections in this file completely before taking action.</action>
+</step>
+
+<step n="2" goal="Follow Phase Procedure">
+  <action>Execute this file in order, preserving every approval gate, routing rule, document update instruction, and constraint described below.</action>
+</step>
+
+## CHECKPOINT
+This phase can be marked complete only after the required outputs, approvals, and routing conditions in this file are satisfied.
+
+## ADVISORY
+- Treat the <prose> section as the authoritative detailed instructions for this file.
+- Preserve all existing user-input pauses, continuation checks, and referenced companion files.
+- Keep any document templates, frontmatter updates, and save instructions exactly as authored.
+
+## REFERENCE
+- Original authored procedure retained below for managed workflow extraction compatibility.
+
+<prose>
 ---
 
 ---
@@ -399,3 +426,4 @@ When user selects 'C', append the content directly to `{brainstorming_session_ou
 After technique completion and user confirmation, load `./step-04-idea-organization.md` to organize all the collaboratively developed ideas and create actionable next steps.
 
 Remember: This is creative coaching, not technique delivery! The user's creative energy is your guide, not the technique structure.
+</prose>

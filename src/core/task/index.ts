@@ -106,9 +106,8 @@ import { Controller } from "../controller"
 import { executeHook } from "../hooks/hook-executor"
 import { StateManager } from "../storage/StateManager"
 import {
-	buildBmadAgentActivationInstructions,
 	buildBmadAgentCatalogInstructions,
-	buildBmadAgentReminder,
+	buildBmadAgentRoleInstructions,
 	filterSkillsForBmadAgentMode,
 	getBmadAgentById,
 	getBmadWorkflowReminder,
@@ -1032,29 +1031,18 @@ export class Task {
 	}
 
 	private async buildBmadPromptInstructions(): Promise<{
-		activeAgentInstructions?: string
+		activeAgentRoleInstructions?: string
 		activeAgentCatalogInstructions?: string
 		activeWorkflowReminder?: string
 	}> {
-		let activeAgentInstructions: string | undefined
+		let activeAgentRoleInstructions: string | undefined
 		let activeAgentCatalogInstructions: string | undefined
 		let activeWorkflowReminder: string | undefined
 
 		if (this.taskState.activeAgentId) {
-			if (this.taskState.activeAgentJustActivated) {
-				activeAgentInstructions = await buildBmadAgentActivationInstructions(this.cwd, this.taskState.activeAgentId, {
-					skillName: this.taskState.activeAgentSkillName,
-					activatedSlashCommand: this.taskState.activeAgentInvokedSlashCommand,
-				})
-			} else {
-				const activeAgent = await getBmadAgentById(this.cwd, this.taskState.activeAgentId)
-				if (activeAgent) {
-					activeAgentInstructions = buildBmadAgentReminder(activeAgent, {
-						skillName: this.taskState.activeAgentSkillName,
-						activatedSlashCommand: this.taskState.activeAgentInvokedSlashCommand,
-					})
-				}
-			}
+			activeAgentRoleInstructions = await buildBmadAgentRoleInstructions(this.cwd, this.taskState.activeAgentId, {
+				includeActivation: this.taskState.activeAgentJustActivated,
+			})
 
 			if (this.taskState.activeAgentJustActivated || this.isPromptRefreshTurn()) {
 				activeAgentCatalogInstructions = await buildBmadAgentCatalogInstructions(this.cwd, this.taskState.activeAgentId)
@@ -1067,7 +1055,7 @@ export class Task {
 			activeWorkflowReminder = await getBmadWorkflowReminder(this.cwd, this.taskState.activeWorkflowId)
 		}
 
-		return { activeAgentInstructions, activeAgentCatalogInstructions, activeWorkflowReminder }
+		return { activeAgentRoleInstructions, activeAgentCatalogInstructions, activeWorkflowReminder }
 	}
 
 	private getPromptRefreshInterval(): number {
@@ -2119,9 +2107,8 @@ export class Task {
 			return toggles[skill.path] !== false
 		})
 		const promptSkills = shouldIncludeBmadPromptContext ? await this.buildPromptSkillScope(availableSkills) : []
-		const { activeAgentInstructions, activeAgentCatalogInstructions, activeWorkflowReminder } = shouldIncludeBmadPromptContext
-			? await this.buildBmadPromptInstructions()
-			: {}
+		const { activeAgentRoleInstructions, activeAgentCatalogInstructions, activeWorkflowReminder } =
+			shouldIncludeBmadPromptContext ? await this.buildBmadPromptInstructions() : {}
 
 		// Snapshot editor tabs so prompt tools can decide whether to include
 		// filetype-specific instructions (e.g. notebooks) without adding bespoke flags.
@@ -2141,7 +2128,7 @@ export class Task {
 			supportsBrowserUse,
 			mcpHub: this.mcpHub,
 			activeAgentId: shouldIncludeBmadPromptContext ? this.taskState.activeAgentId : undefined,
-			activeAgentInstructions,
+			activeAgentRoleInstructions,
 			activeAgentCatalogInstructions,
 			activeWorkflowReminder,
 			managedWorkflowActive: !!this.taskState.managedWorkflowRun,

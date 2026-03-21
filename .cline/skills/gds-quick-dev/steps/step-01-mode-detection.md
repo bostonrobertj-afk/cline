@@ -7,9 +7,34 @@ thisStepFile: './step-01-mode-detection.md'
 nextStepFile_modeA: './step-03-execute.md'
 nextStepFile_modeB: './step-02-context-gathering.md'
 ---
-
 # Step 1: Mode Detection
 
+## META
+- managed_workflow_extraction: enabled
+- phase_type: phase
+- source_format: procedural
+
+## EXECUTION
+<step n="1" goal="Review Detailed Guidance">
+  <action>Read the advisory, reference, and prose sections in this file completely before taking action.</action>
+</step>
+
+<step n="2" goal="Follow Phase Procedure">
+  <action>Execute this file in order, preserving every approval gate, routing rule, document update instruction, and constraint described below.</action>
+</step>
+
+## CHECKPOINT
+This phase can be marked complete only after the required outputs, approvals, and routing conditions in this file are satisfied.
+
+## ADVISORY
+- Treat the <prose> section as the authoritative detailed instructions for this file.
+- Preserve all existing user-input pauses, continuation checks, and referenced companion files.
+- Keep any document templates, frontmatter updates, and save instructions exactly as authored.
+
+## REFERENCE
+- Original authored procedure retained below for managed workflow extraction compatibility.
+
+<prose>
 **Goal:** Determine execution mode, capture baseline, handle escalation if needed.
 
 ---
@@ -154,3 +179,4 @@ This sounds like platform/system work.
 - Loading step-02 when Mode A (tech-spec provided)
 - Attempting to "return" after escalation instead of EXIT
 - No explicit NEXT directive at step completion
+</prose>

@@ -1,7 +1,34 @@
 ---
 agent_party: '{project-root}/_bmad/_config/agent-manifest.csv'
 ---
+# Workflow
 
+## META
+- managed_workflow_extraction: enabled
+- phase_type: workflow
+- source_format: procedural
+
+## EXECUTION
+<step n="1" goal="Review Detailed Guidance">
+  <action>Read the advisory, reference, and prose sections in this file completely before taking action.</action>
+</step>
+
+<step n="2" goal="Follow Workflow">
+  <action>Execute this file in order, preserving every approval gate, routing rule, document update instruction, and constraint described below.</action>
+</step>
+
+## CHECKPOINT
+Workflow progress can advance only after the required outputs, approvals, and routing conditions in this file are satisfied.
+
+## ADVISORY
+- Treat the <prose> section as the authoritative detailed instructions for this file.
+- Preserve all existing user-input pauses, continuation checks, and referenced companion files.
+- Keep any document templates, frontmatter updates, and save instructions exactly as authored.
+
+## REFERENCE
+- Original authored procedure retained below for managed workflow extraction compatibility.
+
+<prose>
 ## META
 
 - Goal: push the LLM to reconsider, refine, and improve its recent output.
@@ -59,3 +86,4 @@ Every method application must halt for the user's apply or discard decision befo
 
 - When invoked indirectly, return the enhanced section to the calling workflow after the user selects `x`.
 - Keep the elicitation focused on actionable improvements to the current content.
+</prose>

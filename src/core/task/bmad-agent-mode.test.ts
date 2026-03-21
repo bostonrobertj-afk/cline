@@ -6,6 +6,7 @@ import type { SkillMetadata } from "@/shared/skills"
 import {
 	buildBmadAgentActivationInstructions,
 	buildBmadAgentReminder,
+	buildBmadAgentRoleInstructions,
 	filterSkillsForBmadAgentMode,
 	getOwningBmadAgentForSkill,
 	isSkillAllowedForBmadAgent,
@@ -140,6 +141,104 @@ You must fully embody this test BMAD skill wrapper.
 		expect(reminder).to.include('<active_bmad_agent activated="true" reminder="true"')
 		expect(reminder).to.not.include('activated="false"')
 		expect(reminder).to.include("Remain in this persona until /bmad-exit.")
+	})
+
+	it("renders metadata, activation, and persona cleanly for the initial active-agent turn", async () => {
+		const workspaceDir = await fs.mkdtemp(path.join(os.tmpdir(), "bmad-agent-mode-render-"))
+		tempDirs.push(workspaceDir)
+
+		const personaPath = path.join(workspaceDir, "_bmad", "bmm", "agents", "tech-writer")
+		await fs.mkdir(personaPath, { recursive: true })
+		await fs.writeFile(
+			path.join(personaPath, "tech-writer.md"),
+			`---
+name: "tech writer"
+description: "Technical Writer"
+---
+
+\`\`\`xml
+<agent id="tech-writer.agent.yaml" name="Paige" title="Technical Writer" icon="📚" capabilities="documentation, diagrams">
+  <activation critical="MANDATORY">
+    <step n="1">Load config</step>
+    <step n="2">Respond in the user's language</step>
+  </activation>
+  <persona>
+    <role>Technical Documentation Specialist</role>
+    <identity>Turns complex systems into approachable docs.</identity>
+    <communication_style>Clear and structured.</communication_style>
+    <principles>- Clarity above all - Prefer diagrams when useful</principles>
+  </persona>
+</agent>
+\`\`\`
+`,
+			"utf8",
+		)
+
+		const instructions = await buildBmadAgentRoleInstructions(workspaceDir, "bmad-tech-writer", {
+			includeActivation: true,
+		})
+
+		expect(instructions).to.include("Agent Metadata")
+		expect(instructions).to.include("Name: Paige")
+		expect(instructions).to.include("Title: Technical Writer")
+		expect(instructions).to.include("Icon: 📚")
+		expect(instructions).to.include("Capabilities: documentation, diagrams")
+		expect(instructions).to.include("Activation")
+		expect(instructions).to.include("1. Load config")
+		expect(instructions).to.include("2. Respond in the user's language")
+		expect(instructions).to.include("Persona")
+		expect(instructions).to.include("Role: Technical Documentation Specialist")
+		expect(instructions).to.include("Identity: Turns complex systems into approachable docs.")
+		expect(instructions).to.include("Communication Style: Clear and structured.")
+		expect(instructions).to.include("Principles:")
+		expect(instructions).to.include("- Clarity above all")
+		expect(instructions).to.include("- Prefer diagrams when useful")
+		expect(instructions).to.not.include("<agent")
+		expect(instructions).to.not.include("<activation")
+		expect(instructions).to.not.include("<persona")
+		expect(instructions).to.not.include("<step")
+	})
+
+	it("renders only persona guidance on follow-up active-agent turns", async () => {
+		const workspaceDir = await fs.mkdtemp(path.join(os.tmpdir(), "bmad-agent-mode-render-persona-"))
+		tempDirs.push(workspaceDir)
+
+		const personaDir = path.join(workspaceDir, "_bmad", "bmm", "agents")
+		await fs.mkdir(personaDir, { recursive: true })
+		await fs.writeFile(
+			path.join(personaDir, "dev.md"),
+			`<agent id="dev.agent.yaml" name="Amelia" title="Developer Agent">
+  <activation>
+    <step n="1">Load config</step>
+  </activation>
+  <persona>
+    <role>Senior Software Engineer</role>
+    <identity>Executes approved stories precisely.</identity>
+    <communication_style>Ultra-succinct and evidence-based.</communication_style>
+    <principles>- Keep implementations small - Keep tests passing</principles>
+  </persona>
+</agent>`,
+			"utf8",
+		)
+
+		const instructions = await buildBmadAgentRoleInstructions(workspaceDir, "bmad-dev", {
+			includeActivation: false,
+		})
+
+		expect(instructions).to.equal(
+			[
+				"Persona",
+				"Role: Senior Software Engineer",
+				"Identity: Executes approved stories precisely.",
+				"Communication Style: Ultra-succinct and evidence-based.",
+				"Principles:",
+				"- Keep implementations small",
+				"- Keep tests passing",
+			].join("\n"),
+		)
+		expect(instructions).to.not.include("Agent Metadata")
+		expect(instructions).to.not.include("Activation")
+		expect(instructions).to.not.include("You are Cline")
 	})
 
 	describe("filterSkillsForBmadAgentMode", () => {

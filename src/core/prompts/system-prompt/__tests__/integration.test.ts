@@ -351,11 +351,18 @@ describe("Prompt System Integration Tests", () => {
 					enableNativeToolCalls: true,
 					useMinimalGptPrompt: true,
 					activeAgentId: "bmad-quick-flow-solo-dev",
-					activeAgentInstructions: '<active_bmad_agent activated="true">stub</active_bmad_agent>',
+					activeAgentRoleInstructions:
+						"Agent Metadata\nName: Barry\nTitle: Quick Flow Solo Dev\n\nActivation\n1. Load config\n\nPersona\nRole: Quick Flow Solo Dev",
 				},
 				"gpt-5.4-2026-03-05",
 				async ({ systemPrompt }) => {
-					expect(systemPrompt).to.include("You are Cline operating under the active BMAD agent persona")
+					expect(systemPrompt).to.include("Agent Metadata")
+					expect(systemPrompt).to.include("Persona")
+					expect(systemPrompt).to.not.include("You are Cline operating under the active BMAD agent persona")
+					expect(systemPrompt).to.not.include("<agent")
+					expect(systemPrompt).to.not.include("<activation")
+					expect(systemPrompt).to.not.include("<persona")
+					expect(systemPrompt.match(/Role: Quick Flow Solo Dev/g)?.length).to.equal(1)
 					expect(systemPrompt).to.not.include("# Tools")
 					expect(systemPrompt).to.not.include("## execute_command")
 					expect(systemPrompt).to.not.include("Description: Request to execute a CLI command")

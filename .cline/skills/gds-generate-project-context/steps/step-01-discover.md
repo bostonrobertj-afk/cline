@@ -1,5 +1,32 @@
+
 # Step 1: Context Discovery & Initialization
 
+## META
+- managed_workflow_extraction: enabled
+- phase_type: phase
+- source_format: procedural
+
+## EXECUTION
+<step n="1" goal="Review Detailed Guidance">
+  <action>Read the advisory, reference, and prose sections in this file completely before taking action.</action>
+</step>
+
+<step n="2" goal="Follow Phase Procedure">
+  <action>Execute this file in order, preserving every approval gate, routing rule, document update instruction, and constraint described below.</action>
+</step>
+
+## CHECKPOINT
+This phase can be marked complete only after the required outputs, approvals, and routing conditions in this file are satisfied.
+
+## ADVISORY
+- Treat the <prose> section as the authoritative detailed instructions for this file.
+- Preserve all existing user-input pauses, continuation checks, and referenced companion files.
+- Keep any document templates, frontmatter updates, and save instructions exactly as authored.
+
+## REFERENCE
+- Original authored procedure retained below for managed workflow extraction compatibility.
+
+<prose>
 ## MANDATORY EXECUTION RULES (READ FIRST):
 
 - NEVER generate content without user input
@@ -200,3 +227,4 @@ Ready to create/update your project context. This will help AI agents implement 
 After user selects [C] to continue, load `./step-02-generate.md` to collaboratively generate the specific project context rules.
 
 Remember: Do NOT proceed to step-02 until user explicitly selects [C] from the menu and discovery is confirmed!
+</prose>

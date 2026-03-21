@@ -4,9 +4,34 @@ description: 'Apply modifications to the teaching workflow based on edit plan'
 
 workflowPath: '../'
 ---
-
 # Edit Step 2: Apply Edits
 
+## META
+- managed_workflow_extraction: enabled
+- phase_type: phase
+- source_format: procedural
+
+## EXECUTION
+<step n="1" goal="Review Detailed Guidance">
+  <action>Read the advisory, reference, and prose sections in this file completely before taking action.</action>
+</step>
+
+<step n="2" goal="Follow Phase Procedure">
+  <action>Execute this file in order, preserving every approval gate, routing rule, document update instruction, and constraint described below.</action>
+</step>
+
+## CHECKPOINT
+This phase can be marked complete only after the required outputs, approvals, and routing conditions in this file are satisfied.
+
+## ADVISORY
+- Treat the <prose> section as the authoritative detailed instructions for this file.
+- Preserve all existing user-input pauses, continuation checks, and referenced companion files.
+- Keep any document templates, frontmatter updates, and save instructions exactly as authored.
+
+## REFERENCE
+- Original authored procedure retained below for managed workflow extraction compatibility.
+
+<prose>
 ## STEP GOAL:
 
 To apply the approved edits to the teach-me-testing workflow files while maintaining integrity and quality standards.
@@ -120,3 +145,4 @@ The teach-me-testing workflow has been updated.
 ✅ Edits applied to approved files only, changes validated, workflow integrity maintained, user informed of modifications.
 
 **Master Rule:** Show changes, get approval, apply edits, validate integrity.
+</prose>

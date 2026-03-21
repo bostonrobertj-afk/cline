@@ -4,9 +4,34 @@ description: 'Design test coverage, priorities, execution strategy, and estimate
 nextStepFile: './step-05-generate-output.md'
 outputFile: '{test_artifacts}/test-design-progress.md'
 ---
-
 # Step 4: Coverage Plan & Execution Strategy
 
+## META
+- managed_workflow_extraction: enabled
+- phase_type: phase
+- source_format: procedural
+
+## EXECUTION
+<step n="1" goal="Review Detailed Guidance">
+  <action>Read the advisory, reference, and prose sections in this file completely before taking action.</action>
+</step>
+
+<step n="2" goal="Follow Phase Procedure">
+  <action>Execute this file in order, preserving every approval gate, routing rule, document update instruction, and constraint described below.</action>
+</step>
+
+## CHECKPOINT
+This phase can be marked complete only after the required outputs, approvals, and routing conditions in this file are satisfied.
+
+## ADVISORY
+- Treat the <prose> section as the authoritative detailed instructions for this file.
+- Preserve all existing user-input pauses, continuation checks, and referenced companion files.
+- Keep any document templates, frontmatter updates, and save instructions exactly as authored.
+
+## REFERENCE
+- Original authored procedure retained below for managed workflow extraction compatibility.
+
+<prose>
 ## STEP GOAL
 
 Create the test coverage matrix, prioritize scenarios, and define execution strategy, resource estimates, and quality gates.
@@ -121,3 +146,4 @@ Load next step: `{nextStepFile}`
 
 - Skipped sequence steps or missing outputs
   **Master Rule:** Skipping steps is FORBIDDEN.
+</prose>

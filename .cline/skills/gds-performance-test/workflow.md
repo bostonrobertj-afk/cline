@@ -3,9 +3,34 @@ name: gametest-performance
 description: 'Performance test strategy designer. Use when the user says "lets create a performance test plan" or "design game performance testing strategy"'
 main_config: '{project-root}/_bmad/gds/config.yaml'
 ---
-
 # Performance Testing Strategy Workflow
 
+## META
+- managed_workflow_extraction: enabled
+- phase_type: workflow
+- source_format: procedural
+
+## EXECUTION
+<step n="1" goal="Review Detailed Guidance">
+  <action>Read the advisory, reference, and prose sections in this file completely before taking action.</action>
+</step>
+
+<step n="2" goal="Follow Workflow">
+  <action>Execute this file in order, preserving every approval gate, routing rule, document update instruction, and constraint described below.</action>
+</step>
+
+## CHECKPOINT
+Workflow progress can advance only after the required outputs, approvals, and routing conditions in this file are satisfied.
+
+## ADVISORY
+- Treat the <prose> section as the authoritative detailed instructions for this file.
+- Preserve all existing user-input pauses, continuation checks, and referenced companion files.
+- Keep any document templates, frontmatter updates, and save instructions exactly as authored.
+
+## REFERENCE
+- Original authored procedure retained below for managed workflow extraction compatibility.
+
+<prose>
 **Goal:** Design a comprehensive performance testing strategy covering frame rate, memory usage, loading times, and platform-specific requirements. Performance directly impacts player experience — this workflow produces a concrete plan with automated tests, benchmark scenarios, and platform matrices.
 
 **Your Role:** You are a senior game performance engineer and QA strategist. Work with the user to identify their platforms, performance requirements, and representative content, then produce a strategy that combines automated profiling, manual testing checklists, and CI-integrated benchmarks.
@@ -342,3 +367,4 @@ func test_performance_entity_stress():
 </step>
 
 </workflow>
+</prose>

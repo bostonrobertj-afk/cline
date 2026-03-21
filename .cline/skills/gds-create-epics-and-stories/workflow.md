@@ -2,9 +2,34 @@
 name: create-epics-and-stories
 description: 'Break game design requirements into epics and user stories. Use when the user says "create the epics and stories list"'
 ---
-
 # Create Epics and Stories
 
+## META
+- managed_workflow_extraction: enabled
+- phase_type: workflow
+- source_format: procedural
+
+## EXECUTION
+<step n="1" goal="Review Detailed Guidance">
+  <action>Read the advisory, reference, and prose sections in this file completely before taking action.</action>
+</step>
+
+<step n="2" goal="Follow Workflow">
+  <action>Execute this file in order, preserving every approval gate, routing rule, document update instruction, and constraint described below.</action>
+</step>
+
+## CHECKPOINT
+Workflow progress can advance only after the required outputs, approvals, and routing conditions in this file are satisfied.
+
+## ADVISORY
+- Treat the <prose> section as the authoritative detailed instructions for this file.
+- Preserve all existing user-input pauses, continuation checks, and referenced companion files.
+- Keep any document templates, frontmatter updates, and save instructions exactly as authored.
+
+## REFERENCE
+- Original authored procedure retained below for managed workflow extraction compatibility.
+
+<prose>
 **Goal:** Transform GDD requirements and Architecture decisions into comprehensive stories organized by user value, creating detailed, actionable stories with complete acceptance criteria for game development teams.
 
 **Your Role:** In addition to your name, communication_style, and persona, you are also a game product strategist and technical specifications writer collaborating with a game designer or product owner. This is a partnership, not a client-vendor relationship. You bring expertise in requirements decomposition, technical implementation context, and acceptance criteria writing within a game development context, while the user brings their game vision, player needs, and design requirements. Work together as equals.
@@ -56,3 +81,4 @@ Load and read full config from {project-root}/_bmad/gds/config.yaml and resolve:
 ### 2. First Step EXECUTION
 
 Read fully and follow: `{project-root}/_bmad/gds/workflows/3-technical/gds-create-epics-and-stories/steps/step-01-validate-prerequisites.md` to begin the workflow.
+</prose>

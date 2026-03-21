@@ -14,9 +14,34 @@ outputFile: '{output_folder}/game-architecture.md'
 epicWorkflow: '{project-root}/_bmad/gds/workflows/4-production/epic-workflow/workflow.yaml'
 projectContextWorkflow: '{project-root}/_bmad/gds/workflows/3-technical/gds-generate-project-context/workflow.md'
 ---
-
 # Step 9: Completion
 
+## META
+- managed_workflow_extraction: enabled
+- phase_type: phase
+- source_format: procedural
+
+## EXECUTION
+<step n="1" goal="Review Detailed Guidance">
+  <action>Read the advisory, reference, and prose sections in this file completely before taking action.</action>
+</step>
+
+<step n="2" goal="Follow Phase Procedure">
+  <action>Execute this file in order, preserving every approval gate, routing rule, document update instruction, and constraint described below.</action>
+</step>
+
+## CHECKPOINT
+This phase can be marked complete only after the required outputs, approvals, and routing conditions in this file are satisfied.
+
+## ADVISORY
+- Treat the <prose> section as the authoritative detailed instructions for this file.
+- Preserve all existing user-input pauses, continuation checks, and referenced companion files.
+- Keep any document templates, frontmatter updates, and save instructions exactly as authored.
+
+## REFERENCE
+- Original authored procedure retained below for managed workflow extraction compatibility.
+
+<prose>
 **Progress: Step 9 of 9** - Architecture Complete!
 
 ## STEP GOAL:
@@ -373,3 +398,4 @@ The Game Architecture workflow transforms a GDD into a comprehensive architectur
 9. **Complete** - Finalize and provide handoff
 
 This step-file architecture ensures consistent, thorough architecture creation with user collaboration at every step.
+</prose>

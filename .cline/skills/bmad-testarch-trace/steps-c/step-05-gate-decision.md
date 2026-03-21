@@ -3,9 +3,34 @@ name: 'step-05-gate-decision'
 description: 'Phase 2: Apply gate decision logic and generate outputs'
 outputFile: '{test_artifacts}/traceability-report.md'
 ---
-
 # Step 5: Phase 2 - Gate Decision
 
+## META
+- managed_workflow_extraction: enabled
+- phase_type: phase
+- source_format: procedural
+
+## EXECUTION
+<step n="1" goal="Review Detailed Guidance">
+  <action>Read the advisory, reference, and prose sections in this file completely before taking action.</action>
+</step>
+
+<step n="2" goal="Follow Phase Procedure">
+  <action>Execute this file in order, preserving every approval gate, routing rule, document update instruction, and constraint described below.</action>
+</step>
+
+## CHECKPOINT
+This phase can be marked complete only after the required outputs, approvals, and routing conditions in this file are satisfied.
+
+## ADVISORY
+- Treat the <prose> section as the authoritative detailed instructions for this file.
+- Preserve all existing user-input pauses, continuation checks, and referenced companion files.
+- Keep any document templates, frontmatter updates, and save instructions exactly as authored.
+
+## REFERENCE
+- Original authored procedure retained below for managed workflow extraction compatibility.
+
+<prose>
 ## STEP GOAL
 
 **Phase 2:** Read coverage matrix from Phase 1, apply deterministic gate decision logic, and generate traceability report.
@@ -264,3 +289,4 @@ Then append the gate decision summary (from section 5 above) to the end of the e
 - Report missing or incomplete
 
 **Master Rule:** Gate decision MUST be deterministic based on clear criteria (P0 100%, P1 90/80, overall >=80).
+</prose>

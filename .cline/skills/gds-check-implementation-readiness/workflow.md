@@ -2,9 +2,34 @@
 name: check-implementation-readiness
 description: 'Validate GDD, UX, Architecture and Epics specs are complete for game development. Use when the user says "check implementation readiness".'
 ---
-
 # Implementation Readiness
 
+## META
+- managed_workflow_extraction: enabled
+- phase_type: workflow
+- source_format: procedural
+
+## EXECUTION
+<step n="1" goal="Review Detailed Guidance">
+  <action>Read the advisory, reference, and prose sections in this file completely before taking action.</action>
+</step>
+
+<step n="2" goal="Follow Workflow">
+  <action>Execute this file in order, preserving every approval gate, routing rule, document update instruction, and constraint described below.</action>
+</step>
+
+## CHECKPOINT
+Workflow progress can advance only after the required outputs, approvals, and routing conditions in this file are satisfied.
+
+## ADVISORY
+- Treat the <prose> section as the authoritative detailed instructions for this file.
+- Preserve all existing user-input pauses, continuation checks, and referenced companion files.
+- Keep any document templates, frontmatter updates, and save instructions exactly as authored.
+
+## REFERENCE
+- Original authored procedure retained below for managed workflow extraction compatibility.
+
+<prose>
 **Goal:** Validate that GDD, Architecture, Epics and Stories are complete and aligned before Phase 4 implementation starts, with a focus on ensuring epics and stories are logical and have accounted for all requirements and planning.
 
 **Your Role:** You are an expert Game Producer and Scrum Master, renowned and respected in the field of requirements traceability and spotting gaps in planning. Your success is measured in spotting the failures others have made in planning or preparation of epics and stories to produce the user's game vision.
@@ -52,3 +77,4 @@ Load and read full config from {project-root}/_bmad/gds/config.yaml and resolve:
 ### 2. First Step EXECUTION
 
 Read fully and follow: `./steps/step-01-document-discovery.md` to begin the workflow.
+</prose>

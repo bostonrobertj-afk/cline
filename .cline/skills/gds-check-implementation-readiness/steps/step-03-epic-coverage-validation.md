@@ -5,9 +5,34 @@ description: 'Validate that all GDD FRs are covered in epics and stories'
 nextStepFile: './step-04-ux-alignment.md'
 outputFile: '{planning_artifacts}/implementation-readiness-report-{{date}}.md'
 ---
-
 # Step 3: Epic Coverage Validation
 
+## META
+- managed_workflow_extraction: enabled
+- phase_type: phase
+- source_format: procedural
+
+## EXECUTION
+<step n="1" goal="Review Detailed Guidance">
+  <action>Read the advisory, reference, and prose sections in this file completely before taking action.</action>
+</step>
+
+<step n="2" goal="Follow Phase Procedure">
+  <action>Execute this file in order, preserving every approval gate, routing rule, document update instruction, and constraint described below.</action>
+</step>
+
+## CHECKPOINT
+This phase can be marked complete only after the required outputs, approvals, and routing conditions in this file are satisfied.
+
+## ADVISORY
+- Treat the <prose> section as the authoritative detailed instructions for this file.
+- Preserve all existing user-input pauses, continuation checks, and referenced companion files.
+- Keep any document templates, frontmatter updates, and save instructions exactly as authored.
+
+## REFERENCE
+- Original authored procedure retained below for managed workflow extraction compatibility.
+
+<prose>
 ## STEP GOAL:
 
 To validate that all Functional Requirements from the GDD are captured in the epics and stories document, identifying any gaps in coverage.
@@ -171,3 +196,4 @@ Epic coverage validation complete. Loading next step for UX alignment.
 - Incomplete coverage analysis
 
 **Master Rule:** Every FR must have a traceable implementation path.
+</prose>

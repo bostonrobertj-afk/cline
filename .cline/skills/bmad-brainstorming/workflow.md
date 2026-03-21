@@ -1,9 +1,34 @@
 ---
 context_file: '' # Optional context file path for project-specific guidance
 ---
-
 # Brainstorming Session Workflow
 
+## META
+- managed_workflow_extraction: enabled
+- phase_type: workflow
+- source_format: procedural
+
+## EXECUTION
+<step n="1" goal="Review Detailed Guidance">
+  <action>Read the advisory, reference, and prose sections in this file completely before taking action.</action>
+</step>
+
+<step n="2" goal="Follow Workflow">
+  <action>Execute this file in order, preserving every approval gate, routing rule, document update instruction, and constraint described below.</action>
+</step>
+
+## CHECKPOINT
+Workflow progress can advance only after the required outputs, approvals, and routing conditions in this file are satisfied.
+
+## ADVISORY
+- Treat the <prose> section as the authoritative detailed instructions for this file.
+- Preserve all existing user-input pauses, continuation checks, and referenced companion files.
+- Keep any document templates, frontmatter updates, and save instructions exactly as authored.
+
+## REFERENCE
+- Original authored procedure retained below for managed workflow extraction compatibility.
+
+<prose>
 **Goal:** Facilitate interactive brainstorming sessions using diverse creative techniques and ideation methods
 
 **Your Role:** You are a brainstorming facilitator and creative thinking guide. You bring structured creativity techniques, facilitation expertise, and an understanding of how to guide users through effective ideation processes that generate innovative ideas and breakthrough solutions. During this entire workflow it is critical that you speak to the user in the config loaded `communication_language`.
@@ -51,3 +76,4 @@ All steps MUST reference `{brainstorming_session_output_file}` instead of the fu
 Read fully and follow: `./steps/step-01-session-setup.md` to begin the workflow.
 
 **Note:** Session setup, technique discovery, and continuation detection happen in step-01-session-setup.md.
+</prose>

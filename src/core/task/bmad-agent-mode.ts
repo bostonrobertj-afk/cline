@@ -141,6 +141,12 @@ type BmadAgentReminderOptions = {
 	activatedSlashCommand?: string
 }
 
+type RenderedBmadAgentPromptSections = {
+	metadata?: string
+	activation?: string
+	persona: string
+}
+
 type LoadedInstructionDocument = {
 	path: string
 	content: string
@@ -215,6 +221,221 @@ function normalizeBmadAliasCommand(commandName: string): string | undefined {
 
 function formatSlashCommand(commandName: string): string {
 	return commandName.startsWith("/") ? commandName : `/${commandName}`
+}
+
+function decodeHtmlEntities(value: string): string {
+	return value
+		.replace(/&apos;/g, "'")
+		.replace(/&quot;/g, '"')
+		.replace(/&lt;/g, "<")
+		.replace(/&gt;/g, ">")
+		.replace(/&amp;/g, "&")
+}
+
+function stripInlineTags(value: string): string {
+	return decodeHtmlEntities(value)
+		.replace(/<[^>]+>/g, " ")
+		.replace(/\s+/g, " ")
+		.trim()
+}
+
+function parseTagAttributes(rawAttributes: string): Record<string, string> {
+	const attributes: Record<string, string> = {}
+	for (const match of rawAttributes.matchAll(/([A-Za-z_][\w-]*)="([^"]*)"/g)) {
+		const key = match[1]
+		const value = decodeHtmlEntities(match[2] ?? "").trim()
+		if (key) {
+			attributes[key] = value
+		}
+	}
+	return attributes
+}
+
+function extractTagContent(source: string, tagName: string): string | undefined {
+	const match = source.match(new RegExp(`<${tagName}\\b[^>]*>([\\s\\S]*?)<\\/${tagName}>`, "i"))
+	return match?.[1]?.trim()
+}
+
+function dedentBlock(text: string): string {
+	const lines = text.replace(/\r\n/g, "\n").split("\n")
+	const nonEmptyIndents = lines.filter((line) => line.trim().length > 0).map((line) => line.match(/^(\s*)/)?.[1]?.length ?? 0)
+	const minIndent = nonEmptyIndents.length > 0 ? Math.min(...nonEmptyIndents) : 0
+
+	return lines
+		.map((line) => line.slice(Math.min(minIndent, line.length)))
+		.join("\n")
+		.trim()
+}
+
+function normalizeBlockLines(text: string): string[] {
+	return dedentBlock(text)
+		.split("\n")
+		.map((line) => stripInlineTags(line))
+		.filter(Boolean)
+}
+
+function parsePrinciples(text: string | undefined): string[] {
+	if (!text) {
+		return []
+	}
+
+	const normalized = decodeHtmlEntities(text)
+		.replace(/\s*\n\s*/g, " ")
+		.trim()
+	if (!normalized) {
+		return []
+	}
+
+	if (normalized.startsWith("-")) {
+		return normalized
+			.split(/\s+-\s+/)
+			.map((entry) => entry.replace(/^-+\s*/, "").trim())
+			.filter(Boolean)
+	}
+
+	return [normalized]
+}
+
+function renderSection(title: string, lines: string[]): string {
+	return [title, ...lines].join("\n")
+}
+
+function renderPersonaSection(personaContent: string): string {
+	const role = decodeHtmlEntities(extractTagContent(personaContent, "role") ?? "").trim()
+	const identity = decodeHtmlEntities(extractTagContent(personaContent, "identity") ?? "").trim()
+	const communicationStyle = decodeHtmlEntities(extractTagContent(personaContent, "communication_style") ?? "").trim()
+	const principles = parsePrinciples(extractTagContent(personaContent, "principles"))
+
+	const lines: string[] = []
+	if (role) {
+		lines.push(`Role: ${role}`)
+	}
+	if (identity) {
+		lines.push(`Identity: ${identity}`)
+	}
+	if (communicationStyle) {
+		lines.push(`Communication Style: ${communicationStyle}`)
+	}
+	if (principles.length > 0) {
+		lines.push("Principles:")
+		lines.push(...principles.map((principle) => `- ${principle}`))
+	}
+
+	return renderSection("Persona", lines)
+}
+
+function renderMetadataSection(attributes: Record<string, string>): string | undefined {
+	const lines: string[] = []
+	if (attributes.name) {
+		lines.push(`Name: ${attributes.name}`)
+	}
+	if (attributes.title) {
+		lines.push(`Title: ${attributes.title}`)
+	}
+	if (attributes.icon) {
+		lines.push(`Icon: ${attributes.icon}`)
+	}
+	if (attributes.capabilities) {
+		lines.push(`Capabilities: ${attributes.capabilities}`)
+	}
+
+	return lines.length > 0 ? renderSection("Agent Metadata", lines) : undefined
+}
+
+function renderActivationSection(activationContent: string | undefined): string | undefined {
+	if (!activationContent) {
+		return undefined
+	}
+
+	const stepMatches = Array.from(activationContent.matchAll(/<step\b([^>]*)>([\s\S]*?)<\/step>/gi))
+	const lines =
+		stepMatches.length > 0
+			? stepMatches
+					.map((match) => {
+						const attrs = parseTagAttributes(match[1] ?? "")
+						const body = stripInlineTags(match[2] ?? "")
+						if (!body) {
+							return undefined
+						}
+						return attrs.n ? `${attrs.n}. ${body}` : body
+					})
+					.filter((line): line is string => Boolean(line))
+			: normalizeBlockLines(activationContent)
+	return lines.length > 0 ? renderSection("Activation", lines) : undefined
+}
+
+function parseRenderedBmadAgentPrompt(source: string): RenderedBmadAgentPromptSections | undefined {
+	const agentMatch = source.match(/<agent\b([^>]*)>([\s\S]*?)<\/agent>/i)
+	if (!agentMatch) {
+		return undefined
+	}
+
+	const attributes = parseTagAttributes(agentMatch[1] ?? "")
+	const body = agentMatch[2] ?? ""
+	const personaContent = extractTagContent(body, "persona")
+	if (!personaContent) {
+		return undefined
+	}
+
+	return {
+		metadata: renderMetadataSection(attributes),
+		activation: renderActivationSection(extractTagContent(body, "activation")),
+		persona: renderPersonaSection(personaContent),
+	}
+}
+
+function buildFallbackBmadAgentRoleInstructions(agent: BmadAgentAllowlistEntry, includeActivation: boolean): string {
+	const sections: string[] = []
+
+	if (includeActivation) {
+		sections.push(renderSection("Agent Metadata", [`Name: ${agent.id}`, `Capabilities: ${agent.allowedSkills.join(", ")}`]))
+		sections.push(
+			renderSection("Activation", [
+				`Remain in the ${agent.id} persona until /bmad-exit.`,
+				`Only use these workflow skills when acting as this persona: ${agent.allowedSkills.join(", ")}.`,
+			]),
+		)
+	}
+
+	sections.push(renderSection("Persona", [agent.personaReminder || `Remain in the ${agent.id} persona until /bmad-exit.`]))
+
+	return sections.join("\n\n")
+}
+
+export async function buildBmadAgentRoleInstructions(
+	cwd: string,
+	agentId: string,
+	options: { includeActivation: boolean },
+): Promise<string | undefined> {
+	const agent = await getBmadAgentById(cwd, agentId)
+	if (!agent) {
+		return undefined
+	}
+
+	try {
+		const personaPath = path.resolve(cwd, agent.personaFile)
+		const source = await fs.readFile(personaPath, "utf8")
+		const rendered = parseRenderedBmadAgentPrompt(source)
+
+		if (!rendered) {
+			return buildFallbackBmadAgentRoleInstructions(agent, options.includeActivation)
+		}
+
+		const sections: string[] = []
+		if (options.includeActivation) {
+			if (rendered.metadata) {
+				sections.push(rendered.metadata)
+			}
+			if (rendered.activation) {
+				sections.push(rendered.activation)
+			}
+		}
+		sections.push(rendered.persona)
+
+		return sections.join("\n\n")
+	} catch {
+		return buildFallbackBmadAgentRoleInstructions(agent, options.includeActivation)
+	}
 }
 
 function extractReferencedMarkdownPaths(instructions: string): string[] {
