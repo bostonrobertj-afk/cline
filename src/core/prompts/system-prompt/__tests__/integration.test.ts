@@ -336,6 +336,14 @@ describe("Prompt System Integration Tests", () => {
 				async ({ systemPrompt }) => {
 					expect(systemPrompt).to.include("TOOL USE")
 					expect(systemPrompt).to.include("You have access to tools that run after user approval.")
+					expect(systemPrompt).to.include("RESPONSE TOOLS")
+					expect(systemPrompt).to.include(
+						"A reply reaches the human user only when you use the appropriate response tool.",
+					)
+					expect(systemPrompt).to.include("`attempt_completion`")
+					expect(systemPrompt).to.include("`ask_followup_question`")
+					expect(systemPrompt).to.include("`plan_mode_respond`")
+					expect(systemPrompt).to.include("The only tools that can deliver a reply to the user in this mode are")
 					expect(systemPrompt).to.not.include("# Tools")
 					expect(systemPrompt).to.not.include("## execute_command")
 				},

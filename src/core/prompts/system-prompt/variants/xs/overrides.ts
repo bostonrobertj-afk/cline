@@ -1,3 +1,4 @@
+import { getActVsPlanModeResponseRules, getResponseToolsSection } from "../../components/response_tools"
 import { SystemPromptContext } from "../../types"
 
 const XS_EDITING_FILES = `FILE EDITING RULES
@@ -5,7 +6,7 @@ const XS_EDITING_FILES = `FILE EDITING RULES
 - Match the file’s **final** (auto-formatted) state in SEARCH; use complete lines.
 - Use multiple small blocks in file order. Delete = empty REPLACE. Move = delete block + insert block.`
 
-const XS_ACT_PLAN_MODE = `MODES (STRICT)
+const XS_ACT_PLAN_MODE = (context: SystemPromptContext) => `MODES (STRICT)
 **PLAN MODE (read-only, collaborative & curious):**
 - Allowed: plan_mode_respond, read_file, list_files, list_code_definition_names, search_files, ask_followup_question, new_task, load_mcp_documentation.
 - **Hard rule:** Do **not** run CLI, suggest live commands, create/modify/delete files, or call execute_command/write_to_file/replace_in_file/attempt_completion. If commands/edits are needed, list them as future ACT steps.
@@ -16,7 +17,9 @@ const XS_ACT_PLAN_MODE = `MODES (STRICT)
 
 **ACT MODE:**
 - Allowed: all tools except plan_mode_respond.
-- Implement stepwise; one tool per message. When all prior steps are user-confirmed successful, use attempt_completion.`
+- Implement stepwise; one tool per message. When all prior steps are user-confirmed successful, use attempt_completion.
+
+${getActVsPlanModeResponseRules(context)}`
 
 const XS_CAPABILITIES = `CURIOSITY & FIRST CONTACT
 - Ambiguity or missing requirement/success criterion → use <ask_followup_question> (1–2 focused Qs; options allowed).
@@ -43,8 +46,12 @@ const XS_TOOLS_OVERRIDE = (context: SystemPromptContext) =>
 	context.enableNativeToolCalls
 		? `TOOLS
 
-You have access to a set of tools that you are expected to use to resolve the task.`
+You have access to a set of tools that you are expected to use to resolve the task.
+
+${getResponseToolsSection(context)}`
 		: `TOOLS
+
+${getResponseToolsSection(context)}
 
 **execute_command** — Run CLI in {{CWD}}.  
 Params: command, requires_approval.  

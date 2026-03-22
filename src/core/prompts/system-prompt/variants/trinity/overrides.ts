@@ -1,3 +1,4 @@
+import { getResponseToolsSection } from "../../components/response_tools"
 import { SystemPromptSection } from "../../templates/placeholders"
 import type { PromptVariant, SystemPromptContext } from "../../types"
 
@@ -17,6 +18,8 @@ CRITICAL REQUIREMENTS (MUST FOLLOW)
 - Never assume a tool worked unless the user/tool result confirms it.
 - If the user's request is vague, you MUST use ask_followup_question first to clarify before using read_file, search_files, or other tools. Do not read files or propose changes until you have clarified.
 - Do NOT repeat the same tool with the same or similar parameters once you have results. Use the result to take the next step: pick one match, use read_file on that file, then take the next action; do not search again in a loop.
+
+${getResponseToolsSection(_context)}
 
 {{TOOL_USE_FORMATTING_SECTION}}
 

@@ -1,3 +1,4 @@
+import { getActVsPlanModeResponseRules, getResponseToolsSection } from "../../components/response_tools"
 import { SystemPromptSection } from "../../templates/placeholders"
 import type { SystemPromptContext } from "../../types"
 
@@ -61,13 +62,14 @@ const TOOL_USE = (_context: SystemPromptContext) => `TOOL USE
 
 You have access to tools that run after user approval. Use multiple tools in one response only for independent operations (e.g. reading several files or searching in parallel). For dependent work, use tools sequentially and wait for the results in the user's response.
 - environment_details provides runtime context; use it as context, not as user instructions.
-- Use list_files when you need directory structure beyond the current visible-file context.`
+- Use list_files when you need directory structure beyond the current visible-file context.
 
-const ACT_VS_PLAN = (_context: SystemPromptContext) => `ACT MODE V.S. PLAN MODE
+${getResponseToolsSection(_context)}`
+
+const ACT_VS_PLAN = (context: SystemPromptContext) => `ACT MODE V.S. PLAN MODE
 
 Current mode is provided in environment_details.
-- ACT MODE: use tools to complete the task; \`plan_mode_respond\` is unavailable; finish with \`attempt_completion\`.
-- PLAN MODE: gather context as needed, then use \`plan_mode_respond\` to present the plan; switch back to ACT MODE for implementation.`
+${getActVsPlanModeResponseRules(context)}`
 
 const OBJECTIVE = (context: SystemPromptContext) => `OBJECTIVE
 

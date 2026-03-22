@@ -1,4 +1,5 @@
 import { hasEnabledMcpServers } from "../../components/mcp"
+import { getResponseToolsSection } from "../../components/response_tools"
 import { SystemPromptSection } from "../../templates/placeholders"
 import type { SystemPromptContext } from "../../types"
 
@@ -12,6 +13,8 @@ Tool invocation policy: Invoke tools only in assistant messages; they will not e
 ## TOOL USE
 
 You have access to a set of tools. One tool may be used per message, results will be returned in the user message. You use tools step-by-step to accomplish a given task, with each tool use informed by the result of the previous tool use.
+
+${getResponseToolsSection(context)}
 
 ## TOOLS
 

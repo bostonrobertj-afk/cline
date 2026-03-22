@@ -1,3 +1,4 @@
+import { getResponseToolsSection } from "../../components/response_tools"
 import { SystemPromptSection } from "../../templates/placeholders"
 import type { SystemPromptContext } from "../../types"
 
@@ -9,13 +10,17 @@ const HERMES_AGENT_ROLE_TEMPLATE = [
 	"with extensive knowledge in many programming languages, frameworks, design patterns, and best practices. ",
 ].join("")
 
-const HERMES_TOOL_USE_TEMPLATE = `Begin every task by exploring the codebase (e.g., list_files, search_files, read_file) and outlining the required changes. Do not implement until exploration yields enough context to state objectives, approach, affected files, and risks. Briefly summarize the plan, then proceed with implementation.
+const HERMES_TOOL_USE_TEMPLATE = (
+	context: SystemPromptContext,
+) => `Begin every task by exploring the codebase (e.g., list_files, search_files, read_file) and outlining the required changes. Do not implement until exploration yields enough context to state objectives, approach, affected files, and risks. Briefly summarize the plan, then proceed with implementation.
 
 Tool invocation policy: Invoke tools only in assistant messages; they will not execute if placed inside reasoning blocks. Use reasoning blocks solely for analysis/option-weighing; place all tool XML blocks in assistant messages to execute them.
 
 ## TOOL USE
 
 You have access to a set of tools. One tool may be used per message, results will be returned in the user message. You use tools step-by-step to accomplish a given task, with each tool use informed by the result of the previous tool use.
+
+${getResponseToolsSection(context)}
 
 ## TOOLS
 

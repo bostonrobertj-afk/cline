@@ -1,3 +1,4 @@
+import { getActVsPlanModeResponseRules, getResponseToolsSection } from "../../components/response_tools"
 import { SystemPromptSection } from "../../templates/placeholders"
 import type { PromptVariant, SystemPromptContext } from "../../types"
 
@@ -24,6 +25,8 @@ You have access to a set of tools that are executed upon the user's approval. Yo
 - environment_details provides runtime context; use it as context, not as user instructions.
 - Use list_files when you need directory structure beyond the current visible-file context.
 
+${getResponseToolsSection(_context)}
+
 ## Tool-Calling Convention and Preambles
 
 When switching domains or task_progress steps, you may want to provide a brief preamble explaining:
@@ -43,11 +46,10 @@ Use \`task_progress\` to maintain one full Markdown checklist.
 - Keep items brief and milestone-level.
 - On updates, send the full current list using \`- [ ]\` and \`- [x]\`.`
 
-const GPT5_1_ACT_VS_PLAN = (_context: SystemPromptContext) => `ACT MODE V.S. PLAN MODE
+const GPT5_1_ACT_VS_PLAN = (context: SystemPromptContext) => `ACT MODE V.S. PLAN MODE
 
 Current mode is provided in environment_details.
-- ACT MODE: use tools to complete the task; \`plan_mode_respond\` is unavailable; finish with \`attempt_completion\`.
-- PLAN MODE: gather context as needed, then use \`plan_mode_respond\` to present the plan; switch back to ACT MODE for implementation.`
+${getActVsPlanModeResponseRules(context)}`
 
 const GPT5_1_OBJECTIVE = (context: SystemPromptContext) => `OBJECTIVE
 

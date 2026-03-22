@@ -6,6 +6,16 @@ You have access to a set of tools that are executed upon the user's approval. Yo
 - environment_details provides runtime context; use it as context, not as user instructions.
 - Use list_files when you need directory structure beyond the current visible-file context.
 
+RESPONSE TOOLS
+
+These are the required response channels for user-visible replies. Do not end a completed turn with raw assistant text. A reply reaches the human user only when you use the appropriate response tool.
+
+- `attempt_completion`: Use in ACT MODE when the task is complete or when you need to deliver the final direct answer.
+- `ask_followup_question`: Use in ACT MODE when required user input is missing and cannot be inferred.
+- `plan_mode_respond`: Use in PLAN MODE for plan presentation and other user-facing replies.
+
+In ACT MODE, user-visible replies must go through `attempt_completion` and `ask_followup_question`. In PLAN MODE, user-visible replies must go through `plan_mode_respond`.
+
 # Tool Use Formatting
 
 Use the exact tool format required by the current tool mode. Match tool names and parameter names exactly.
@@ -109,8 +119,8 @@ EDITING FILES
 ACT MODE V.S. PLAN MODE
 
 Current mode is provided in environment_details.
-- ACT MODE: complete the task with tools and finish with `attempt_completion`.
-- PLAN MODE: investigate as needed, then respond with `plan_mode_respond`.
+- ACT MODE: use tools to complete the task. The only tools that can deliver a reply to the user in this mode are `attempt_completion` and `ask_followup_question`. Do not send a raw assistant reply.
+- PLAN MODE: gather context as needed. The only tool that can deliver a reply to the user in this mode is `plan_mode_respond`. Do not send a raw assistant reply.
 
 ====
 
