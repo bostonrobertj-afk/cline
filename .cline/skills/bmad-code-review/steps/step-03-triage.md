@@ -12,6 +12,7 @@
 - After you complete the final checklist item in this phase, stop and wait for the prompt to refresh into the presentation phase before doing any final reporting.
 - After you complete the final checklist item in this phase, stop and wait for the prompt to refresh before doing any work from the next phase.
 - Do not attempt checklist items from another phase while the current phase is active.
+- If the current step establishes a dynamic workflow-state value that later workflow text refers to by placeholder, store it immediately with `set_workflow_placeholders` using the exact placeholder key.
 
 ## EXECUTION
 

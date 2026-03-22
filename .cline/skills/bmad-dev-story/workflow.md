@@ -9,11 +9,34 @@
 - As soon as the current active checklist item is actually finished, call `complete_workflow_item` for that item before starting work from the next checklist item.
 - After you complete the final checklist item in this phase, stop and wait for the prompt to refresh before doing any work from the next phase.
 - Do not attempt checklist items from another phase while the current phase is active.
+- If the current step establishes a dynamic workflow-state value that later workflow text refers to by placeholder, store it immediately with `set_workflow_placeholders` using the exact placeholder key.
+
+## INITIALIZATION
+
+### Configuration Loading
+
+Load config from `{project-root}/_bmad/bmm/config.yaml` and resolve the stable placeholders used by this workflow:
+
+- `{project_name}`
+- `{user_name}`
+- `{communication_language}`
+- `{document_output_language}`
+- `{user_skill_level}`
+- `{implementation_artifacts}`
+- `{date}`
+
+### Dynamic Workflow State
+
+- `{{story_path}}` = explicit story path supplied by the user or discovered during step 1
+
+### Context Paths
+
+- `{project_context}` = `**/project-context.md` when present
 
 ## EXECUTION
 
 <step n="1" goal="Find the next ready story and load it" tag="sprint-status">
-  <action>Use `{story_path}` directly if the user already provided one.</action>
+  <action>Use `{{story_path}}` directly if the user already provided one.</action>
   <branch if="a sprint-status file exists" optional="true">
     <action>Read the complete sprint-status file and find the first story marked `ready-for-dev` that is not an epic or retrospective.</action>
     <branch if="no ready-for-dev story is found" optional="true">
@@ -90,7 +113,8 @@
 </step>
 
 <step n="9" goal="document files created, deleted, or modified during this run">
-  <action> update the `{story_path}` file's "File List" section with a complete list of all files that you created, deleted, or modified while executing this story. </action>
+  <action>Update the `{{story_path}}` file's "File List" section with a complete list of all files that you created, deleted, or modified while executing this story.</action>
+</step>
 
 <step n="10" goal="Mark the story ready for review" tag="sprint-status">
   <action>Re-scan the story file, run the full regression suite, and confirm the definition-of-done checks pass.</action>
@@ -105,4 +129,3 @@
   <output>Offer help with explanations, verification, or next steps such as code review.</output>
   <output>Remind the user to run bmad-code-review on the completed story before executing the next story</output>
 </step>
-

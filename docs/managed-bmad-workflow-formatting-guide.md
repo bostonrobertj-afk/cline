@@ -63,6 +63,36 @@ These rules are required because without them the model may:
 - try to complete checklist items from the wrong phase
 - produce valid work but fail managed workflow progression because it skipped explicit checklist completion
 
+## Required Placeholder Persistence Guidance
+
+This is a required authoring rule for managed workflow `workflow.md` files and step files whenever a step establishes a workflow-state value that later workflow text refers to by placeholder.
+
+If the current step creates, selects, derives, validates, or receives a runtime value that should be reused later in the same managed workflow, that same step must explicitly instruct the agent to call `set_workflow_placeholders` and must name the exact placeholder key to store.
+
+Required guidance:
+
+- the step that establishes the value must say to store it with `set_workflow_placeholders`
+- the step must name the exact placeholder key, not just describe the value informally
+- use this for dynamic workflow-state placeholders, typically written as `{{placeholder_name}}`
+- do not assume the agent can infer that a value will be needed later from future unseen steps
+
+Recommended authoring pattern:
+
+```xml
+<action>Store the selected session file as `brainstorming_session_output_file` using `set_workflow_placeholders`.</action>
+```
+
+Why this is required:
+
+- managed workflow prompt injection usually shows only the current phase checklist and current active step details
+- the agent often cannot see future step details that would reveal later placeholder reuse
+- generic top-of-file guidance is weaker than step-local instruction when the value is established in a specific branch or action
+
+Authoring implications:
+
+- if a placeholder value is seeded from runtime/config automatically, document it in the workflow initialization/declaration section
+- if a placeholder value becomes known only during execution, the step that learns it must persist it explicitly
+
 ## Canonical Tags
 
 ### `<step>`
