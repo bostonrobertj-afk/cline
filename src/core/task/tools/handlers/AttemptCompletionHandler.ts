@@ -237,6 +237,7 @@ export class AttemptCompletionHandler implements IToolHandler, IPartialBlockHand
 		if (config.taskState.managedWorkflowRun?.allRequiredComplete) {
 			// Fully completed managed workflows should stop cleanly here instead of opening a
 			// second completion ask that can be invalidated by unrelated message updates.
+			config.taskState.didAttemptCompletionEndTask = true
 			return prefix
 		}
 

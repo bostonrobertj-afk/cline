@@ -79,6 +79,7 @@ export class TaskState {
 	abort = false
 	didFinishAbortingStream = false
 	abandoned = false
+	didAttemptCompletionEndTask = false
 
 	// Hook execution tracking for cancellation
 	activeHookExecution?: HookExecution

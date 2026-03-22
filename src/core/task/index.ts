@@ -2964,6 +2964,7 @@ export class Task {
 			this.taskState.currentStreamingContentIndex = 0
 			this.taskState.assistantMessageContent = []
 			this.taskState.didCompleteReadingStream = false
+			this.taskState.didAttemptCompletionEndTask = false
 			this.taskState.userMessageContent = []
 			this.taskState.userMessageContentReady = false
 			this.taskState.didRejectTool = false
@@ -3374,6 +3375,10 @@ export class Task {
 
 				// Save checkpoint after all tools in this response have finished executing
 				await this.checkpointManager?.saveCheckpoint()
+
+				if (this.taskState.didAttemptCompletionEndTask) {
+					return true
+				}
 
 				// if the model did not tool use, then we need to tell it to either use a tool or attempt_completion
 				const didToolUse = this.taskState.assistantMessageContent.some((block) => block.type === "tool_use")
