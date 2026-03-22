@@ -5,6 +5,38 @@ import { Mode } from "@/shared/storage/types"
 import { ClineIgnoreController, LOCK_TEXT_SYMBOL } from "../ignore/ClineIgnoreController"
 
 const CONTEXT_WINDOW_WARNING_THRESHOLD_PERCENT = 50
+const INLINE_FINAL_FILE_CONTENT_MAX_CHARS = 2000
+
+function countLines(text: string): number {
+	if (!text) {
+		return 0
+	}
+
+	return text.split("\n").length
+}
+
+function formatSavedFileReference(relPath: string, finalContent: string | undefined): string {
+	if (!finalContent) {
+		return ""
+	}
+
+	if (finalContent.length <= INLINE_FINAL_FILE_CONTENT_MAX_CHARS) {
+		return (
+			`Here is the full, updated content of the file that was saved:\n\n` +
+			`<final_file_content path="${relPath.toPosix()}">\n${finalContent}\n</final_file_content>\n\n` +
+			`IMPORTANT: For any future changes to this file, use the final_file_content shown above as your reference. This content reflects the current state of the file, including any auto-formatting. Always base your SEARCH/REPLACE operations on this final version to ensure accuracy.\n\n`
+		)
+	}
+
+	return (
+		`The full updated file content was omitted to save context tokens.\n\n` +
+		`<final_file_summary path="${relPath.toPosix()}">\n` +
+		`chars=${finalContent.length}\n` +
+		`lines=${countLines(finalContent)}\n` +
+		`</final_file_summary>\n\n` +
+		`If you need the latest saved baseline for future edits, use read_file on ${relPath.toPosix()} before making additional changes.\n\n`
+	)
+}
 
 export const formatResponse = {
 	duplicateFileReadNotice: () =>
@@ -23,6 +55,11 @@ export const formatResponse = {
 	toolDenied: () => `The user denied this operation.`,
 
 	toolError: (error?: string) => `The tool execution failed with the following error:\n<error>\n${error}\n</error>`,
+
+	compactedToolResultNotice: (toolName: string) =>
+		`[NOTE] The older ${toolName} output was removed to save context window space. Re-run ${toolName} if you need the full result again.]`,
+
+	savedFileReference: (relPath: string, finalContent: string | undefined) => formatSavedFileReference(relPath, finalContent),
 
 	clineIgnoreError: (path: string) =>
 		`Access to ${path} is blocked by the .clineignore file settings. You must try to continue in the task without using this file, or ask the user to update the .clineignore file.`,
@@ -246,13 +283,12 @@ Otherwise, if you have not completed the task and do not need additional informa
 		(autoFormattingEdits
 			? `The user's editor also applied the following auto-formatting to your content:\n\n${autoFormattingEdits}\n\n(Note: Pay close attention to changes such as single quotes being converted to double quotes, semicolons being removed or added, long lines being broken into multiple lines, adjusting indentation style, adding/removing trailing commas, etc. This will help you ensure future SEARCH/REPLACE operations to this file are accurate.)\n\n`
 			: "") +
-		`The updated content, which includes both your original modifications and the additional edits, has been successfully saved to ${relPath.toPosix()}. Here is the full, updated content of the file that was saved:\n\n` +
-		`<final_file_content path="${relPath.toPosix()}">\n${finalContent}\n</final_file_content>\n\n` +
+		`The updated content, which includes both your original modifications and the additional edits, has been successfully saved to ${relPath.toPosix()}.\n\n` +
+		formatSavedFileReference(relPath, finalContent) +
 		`Please note:\n` +
 		`1. You do not need to re-write the file with these changes, as they have already been applied.\n` +
-		`2. Proceed with the task using this updated file content as the new baseline.\n` +
-		`3. If the user's edits have addressed part of the task or changed the requirements, adjust your approach accordingly.` +
-		`4. IMPORTANT: For any future changes to this file, use the final_file_content shown above as your reference. This content reflects the current state of the file, including both user edits and any auto-formatting (e.g., if you used single quotes but the formatter converted them to double quotes). Always base your SEARCH/REPLACE operations on this final version to ensure accuracy.\n` +
+		`2. Proceed with the task using this updated file state as the new baseline.\n` +
+		`3. If the user's edits have addressed part of the task or changed the requirements, adjust your approach accordingly.\n` +
 		`${newProblemsMessage}`,
 
 	fileEditWithoutUserChanges: (
@@ -265,9 +301,7 @@ Otherwise, if you have not completed the task and do not need additional informa
 		(autoFormattingEdits
 			? `Along with your edits, the user's editor applied the following auto-formatting to your content:\n\n${autoFormattingEdits}\n\n(Note: Pay close attention to changes such as single quotes being converted to double quotes, semicolons being removed or added, long lines being broken into multiple lines, adjusting indentation style, adding/removing trailing commas, etc. This will help you ensure future SEARCH/REPLACE operations to this file are accurate.)\n\n`
 			: "") +
-		`Here is the full, updated content of the file that was saved:\n\n` +
-		`<final_file_content path="${relPath.toPosix()}">\n${finalContent}\n</final_file_content>\n\n` +
-		`IMPORTANT: For any future changes to this file, use the final_file_content shown above as your reference. This content reflects the current state of the file, including any auto-formatting (e.g., if you used single quotes but the formatter converted them to double quotes). Always base your SEARCH/REPLACE operations on this final version to ensure accuracy.\n\n` +
+		formatSavedFileReference(relPath, finalContent) +
 		`${newProblemsMessage}`,
 
 	diffError: (relPath: string, originalContent: string | undefined) =>

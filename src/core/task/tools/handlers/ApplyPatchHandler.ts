@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises"
 import { resolve as resolvePath } from "node:path"
 import type { ToolUse } from "@core/assistant-message"
+import { formatResponse } from "@core/prompts/responses"
 import { resolveWorkspacePath } from "@core/workspace"
 import { processFilesIntoText } from "@integrations/misc/extract-text"
 import type { ClineSayTool } from "@shared/ExtensionMessage"
@@ -390,9 +391,7 @@ export class ApplyPatchHandler implements IFullyManagedTool {
 						responseLines.push(`\nAuto-formatting was applied to ${path}:\n${result.autoFormattingEdits}\n`)
 					}
 					if (result.finalContent) {
-						responseLines.push(`\n<final_file_content path="${path}">`)
-						responseLines.push(result.finalContent)
-						responseLines.push(`</final_file_content>`)
+						responseLines.push(`\n${formatResponse.savedFileReference(path, result.finalContent).trimEnd()}`)
 					}
 					if (result.newProblemsMessage) {
 						responseLines.push(`\n\n${result.newProblemsMessage}`)

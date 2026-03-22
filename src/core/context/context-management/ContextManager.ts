@@ -16,7 +16,24 @@ enum EditType {
 	READ_FILE_TOOL = 2,
 	ALTER_FILE_TOOL = 3,
 	FILE_MENTION = 4,
+	COMPACTED_TOOL_RESULT = 5,
 }
+
+const LARGE_HISTORICAL_TOOL_RESULT_TOOLS = new Set([
+	"search_files",
+	"list_files",
+	"list_code_definition_names",
+	"execute_command",
+	"use_subagents",
+	"browser_action",
+	"web_search",
+	"web_fetch",
+	"use_mcp_tool",
+	"access_mcp_resource",
+	"load_mcp_documentation",
+	"generate_explanation",
+])
+const LARGE_HISTORICAL_TOOL_RESULT_CHAR_THRESHOLD = 4000
 
 // array of string values allows us to cover all changes for message types currently supported
 type MessageContent = string[]
@@ -613,11 +630,14 @@ export class ContextManager {
 			startFromIndex,
 			timestamp,
 		)
+		const [toolResultCompactionBool, compactedToolResultIndices] =
+			this.findAndPotentiallySaveLargeToolResultContextHistoryUpdates(apiMessages, startFromIndex, timestamp)
 
 		// true if any context optimization steps alter state
-		const contextHistoryUpdated = fileReadUpdatesBool
+		const contextHistoryUpdated = fileReadUpdatesBool || toolResultCompactionBool
+		const updatedIndices = new Set<number>([...uniqueFileReadIndices, ...compactedToolResultIndices])
 
-		return [contextHistoryUpdated, uniqueFileReadIndices]
+		return [contextHistoryUpdated, updatedIndices]
 	}
 
 	/**
@@ -1182,6 +1202,68 @@ export class ContextManager {
 					innerMap.set(blockIndex, updates)
 				}
 			}
+		}
+
+		return [didUpdate, updatedMessageIndices]
+	}
+
+	private findAndPotentiallySaveLargeToolResultContextHistoryUpdates(
+		apiMessages: Anthropic.Messages.MessageParam[],
+		startFromIndex: number,
+		timestamp: number,
+	): [boolean, Set<number>] {
+		let didUpdate = false
+		const updatedMessageIndices = new Set<number>()
+		const preserveFromIndex = Math.max(startFromIndex, apiMessages.length - 2)
+
+		for (let i = startFromIndex; i < preserveFromIndex; i++) {
+			const message = apiMessages[i]
+			if (message.role !== "user" || !Array.isArray(message.content) || message.content.length === 0) {
+				continue
+			}
+
+			const firstBlock = message.content[0]
+			const firstBlockText = this.getTextFromBlock(firstBlock)
+			if (!firstBlockText) {
+				continue
+			}
+
+			const result = this.parseToolCallWithFormat(firstBlockText)
+			if (!result) {
+				continue
+			}
+
+			const [toolName, filePath, contentBlockIndex, headerText] = result
+			if (!LARGE_HISTORICAL_TOOL_RESULT_TOOLS.has(toolName)) {
+				continue
+			}
+
+			const targetBlock = message.content[contentBlockIndex]
+			const targetText = targetBlock ? this.getTextFromBlock(targetBlock) : null
+			if (!targetText || targetText.length < LARGE_HISTORICAL_TOOL_RESULT_CHAR_THRESHOLD) {
+				continue
+			}
+
+			const replacementText =
+				contentBlockIndex === 0
+					? `${headerText}\n${formatResponse.compactedToolResultNotice(toolName)}`
+					: formatResponse.compactedToolResultNotice(toolName)
+
+			const innerTuple = this.contextHistoryUpdates.get(i)
+			let innerMap: Map<number, ContextUpdate[]>
+			if (!innerTuple) {
+				innerMap = new Map<number, ContextUpdate[]>()
+				this.contextHistoryUpdates.set(i, [EditType.COMPACTED_TOOL_RESULT, innerMap])
+			} else {
+				innerMap = innerTuple[1]
+			}
+
+			const updates = innerMap.get(contentBlockIndex) || []
+			updates.push([timestamp, "text", [replacementText], [[toolName, filePath]]])
+			innerMap.set(contentBlockIndex, updates)
+
+			didUpdate = true
+			updatedMessageIndices.add(i)
 		}
 
 		return [didUpdate, updatedMessageIndices]

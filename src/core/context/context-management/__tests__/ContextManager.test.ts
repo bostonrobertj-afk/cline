@@ -304,6 +304,56 @@ describe("ContextManager", () => {
 			expect(indices.has(4)).to.equal(true)
 			expect(indices.has(8)).to.equal(false)
 		})
+
+		it("compacts older bulky search output while preserving the newest tool result", () => {
+			const hugeSearchOutput = "match\n".repeat(1200)
+			const latestSearchOutput = "recent\n".repeat(1200)
+			const messages: Anthropic.Messages.MessageParam[] = [
+				{ role: "user", content: "Initial task" },
+				{ role: "assistant", content: "Response" },
+				{
+					role: "user",
+					content: [
+						{
+							type: "text",
+							text: `[search_files for 'TODO'] Result:\n${hugeSearchOutput}`,
+						},
+					],
+				},
+				{ role: "assistant", content: "Older assistant response" },
+				{
+					role: "user",
+					content: [
+						{
+							type: "text",
+							text: `[search_files for 'FIXME'] Result:\n${latestSearchOutput}`,
+						},
+					],
+				},
+			]
+
+			const timestamp = Date.now()
+			const [didUpdate, indices] = contextManager.applyContextOptimizations(messages, 2, timestamp)
+
+			expect(didUpdate).to.equal(true)
+			expect(indices.has(2)).to.equal(true)
+			expect(indices.has(4)).to.equal(false)
+
+			const rewritten = contextManager.getTruncatedMessages(messages, undefined)
+			expect(rewritten[2].role).to.equal("user")
+			expect(rewritten[4].role).to.equal("user")
+
+			const olderContent = (
+				rewritten[2].content as Anthropic.Messages.ContentBlockParam[]
+			)[0] as Anthropic.Messages.TextBlockParam
+			const latestContent = (
+				rewritten[4].content as Anthropic.Messages.ContentBlockParam[]
+			)[0] as Anthropic.Messages.TextBlockParam
+
+			expect(olderContent.text).to.contain("older search_files output was removed")
+			expect(olderContent.text).to.not.contain(hugeSearchOutput.slice(0, 100))
+			expect(latestContent.text).to.contain(latestSearchOutput.slice(0, 100))
+		})
 	})
 
 	describe("getTruncatedMessages", () => {
