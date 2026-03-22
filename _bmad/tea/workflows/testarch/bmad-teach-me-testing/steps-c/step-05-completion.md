@@ -125,12 +125,12 @@ Load {certificateTemplate} and create {certificateFile} with:
 ```markdown
 ---
 certificate_type: tea-academy-completion
-user: { user_name }
-role: { role }
-completion_date: { current_date }
-started_date: { started_date }
-total_duration: { total_duration }
-average_score: { average_score }
+user: {{user_name}}
+role: {{role}}
+completion_date: {{current_date}}
+started_date: {{started_date}}
+total_duration: {{total_duration}}
+average_score: {{average_score}}
 ---
 
 # 🏆 TEA Academy Completion Certificate

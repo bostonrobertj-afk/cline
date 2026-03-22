@@ -1,5 +1,6 @@
 ---
 main_config: '{project-root}/_bmad/bmm/config.yaml'
+project_context: '**/project-context.md'
 ---
 
 # workflow
@@ -15,8 +16,8 @@ main_config: '{project-root}/_bmad/bmm/config.yaml'
 ## EXECUTION
 
 <step n="1" goal="Load review configuration and context">
-  <action>Resolve `project_name`, `planning_artifacts`, `implementation_artifacts`, `user_name`, `communication_language`, `document_output_language`, `user_skill_level`, and `date` from `{main_config}`.</action>
-  <action>Load `project_context` if it exists.</action>
+  <action>Resolve `{project_name}`, `{planning_artifacts}`, `{implementation_artifacts}`, `{user_name}`, `{communication_language}`, `{document_output_language}`, `{user_skill_level}`, and `{date}` from `{main_config}`.</action>
+  <action>Load `{project_context}` if it exists.</action>
   <action>Load `CLAUDE.md` or project memory files if they exist and are relevant.</action>
 </step>
 

@@ -335,7 +335,7 @@ findings.batches_completed: [
 <action>Validate document has all required sections</action>
 <action>Update state file with output generated</action>
 <action>PURGE detailed API data, keep only: "{{api_count}} endpoints documented"</action>
-<template-output>api_contracts\*{part_id}</template-output>
+<template-output>api_contracts_{part_id}</template-output>
   </branch>
 
 <branch if="requires_data_models == true" optional="true">
@@ -356,7 +356,7 @@ findings.batches_completed: [
 <action>Validate document completeness</action>
 <action>Update state file with output generated</action>
 <action>PURGE detailed schema data, keep only: "{{table_count}} tables documented"</action>
-<template-output>data_models\*{part_id}</template-output>
+<template-output>data_models_{part_id}</template-output>
   </branch>
 
 <branch if="requires_state_management == true" optional="true">
@@ -385,7 +385,7 @@ findings.batches_completed: [
 If yes, please provide paths or links. [Provide paths or type 'none']
 </ask>
 <action>Store hardware docs references</action>
-<template-output>hardware*documentation*{part_id}</template-output>
+<template-output>hardware_documentation_{part_id}</template-output>
   </branch>
 
 <branch if="requires_asset_inventory == true" optional="true">
@@ -408,7 +408,7 @@ If yes, please provide paths or links. [Provide paths or type 'none']
 
 <action>Apply scan_level strategy to each pattern scan (quick=glob only, deep/exhaustive=read files)</action>
 
-<template-output>comprehensive*analysis*{part_id}</template-output>
+<template-output>comprehensive_analysis_{part_id}</template-output>
 
 <action>Update state file:
 
@@ -766,10 +766,10 @@ When a document SHOULD be generated but wasn't (due to quick scan, missing data,
 ### Generated Documentation
 
 - [Project Overview](./project-overview.md)
-- [Architecture](./architecture{{#if multi-part}}-{part\*id}{{/if}}.md){{#unless architecture_file_exists}} (To be generated) {{/unless}}
+- [Architecture](./architecture{{#if multi-part}}-{part_id}{{/if}}.md){{#unless architecture_file_exists}} (To be generated) {{/unless}}
 - [Source Tree Analysis](./source-tree-analysis.md)
-- [Component Inventory](./component-inventory{{#if multi-part}}-{part\*id}{{/if}}.md){{#unless component_inventory_exists}} (To be generated) {{/unless}}
-- [Development Guide](./development-guide{{#if multi-part}}-{part\*id}{{/if}}.md){{#unless dev_guide_exists}} (To be generated) {{/unless}}
+- [Component Inventory](./component-inventory{{#if multi-part}}-{part_id}{{/if}}.md){{#unless component_inventory_exists}} (To be generated) {{/unless}}
+- [Development Guide](./development-guide{{#if multi-part}}-{part_id}{{/if}}.md){{#unless dev_guide_exists}} (To be generated) {{/unless}}
   {{#if deployment_found}}- [Deployment Guide](./deployment-guide.md){{#unless deployment_guide_exists}} (To be generated) {{/unless}}{{/if}}
   {{#if contribution_found}}- [Contribution Guide](./contribution-guide.md){{/if}}
   {{#if api_documented}}- [API Contracts](./api-contracts{{#if multi-part}}-{part_id}{{/if}}.md){{#unless api_contracts_exists}} (To be generated) {{/unless}}{{/if}}

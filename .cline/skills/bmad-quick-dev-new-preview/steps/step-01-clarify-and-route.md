@@ -17,7 +17,7 @@ spec_file: ''
 ## EXECUTION
 
 <step n="1" goal="Clarify the request, inspect artifacts, and route the workflow">
-  <action>List files in `{planning_artifacts}` and `{implementation_artifacts}` and inspect any relevant intent or spec files.</action>
+  <action>List files in {planning_artifacts} and {implementation_artifacts} and inspect any relevant intent or spec files.</action>
   <branch if="an active spec or work-in-progress file is found" optional="true">
     <output>Found an active spec. Ask the user whether to resume it or start a new one.</output>
     <ask>Resume the active spec or start a new workflow?</ask>
@@ -26,7 +26,7 @@ spec_file: ''
     <output>Explain the distinct goals, the coupling risk, and the recommended first goal.</output>
     <ask>Choose [S] split or [K] keep all goals together.</ask>
   </branch>
-  <action>Derive `{spec_file}` when the scope is clear and choose `one-shot` only when the blast radius is truly zero.</action>
+  <action>Derive {spec_file} when the scope is clear and choose `one-shot` only when the blast radius is truly zero.</action>
   <output>Route to the next step based on the chosen execution mode.</output>
   <detail>
     If the user selected an existing spec, set `execution_mode = "plan-code-review"` and route accordingly. If the request is small and isolated, use `one-shot`; otherwise default to `plan-code-review`.

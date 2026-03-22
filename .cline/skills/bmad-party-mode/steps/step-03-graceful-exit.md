@@ -12,7 +12,7 @@
 ## EXECUTION
 
 <step n="1" goal="Acknowledge the conclusion of the party mode session">
-  <output>Thank `{user_name}` for participating in the multi-agent discussion.</output>
+  <output>Thank {user_name} for participating in the multi-agent discussion.</output>
   <output>Acknowledge that the session is wrapping up and prepare the user for a short farewell sequence.</output>
   <detail>
     - Keep the tone warm, positive, and collaborative.

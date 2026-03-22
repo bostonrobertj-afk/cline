@@ -13,7 +13,7 @@
 ## EXECUTION
 
 <step n="1" goal="Finalize the spec and present the result">
-  <action>Update `{spec_file}` status to `done` in the frontmatter.</action>
+  <action>Update {spec_file} status to `done` in the frontmatter.</action>
   <action>If version control is available and the tree is dirty, create a local commit with a conventional message derived from the spec title.</action>
   <output>Summarize the work, include the commit hash if one was created, and offer to help with push or PR creation.</output>
 </step>

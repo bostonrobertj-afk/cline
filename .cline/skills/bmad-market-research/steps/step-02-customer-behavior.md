@@ -2,7 +2,7 @@
 
 - Progress: Step 2 of 6
 - Goal: analyze customer behavior and segmentation, then pause for confirmation.
-- Speak in `{communication_language}`.
+- Speak in {communication_language}.
 - Use current web-verified sources for factual claims.
 - Only the current phase checklist and the current active step's details are shown in the prompt at one time.
 - Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
@@ -10,7 +10,7 @@
 ## EXECUTION
 
 <step n="1" goal="Research customer behavior and segmentation">
-  <action>Search for current, authoritative sources on customer behavior patterns, demographic segments, psychographic characteristics, and behavior drivers relevant to `{{research_topic}}`.</action>
+  <action>Search for current, authoritative sources on customer behavior patterns, demographic segments, psychographic characteristics, and behavior drivers relevant to {{research_topic}}.</action>
   <detail>
     Prefer current customer research, analyst reports, survey-backed findings, and credible market publications.
   </detail>
@@ -29,7 +29,7 @@
 </step>
 
 <step n="4" goal="Present the findings and ask to continue">
-  <output>Summarize the strongest customer behavior findings and why they matter for `{{research_topic}}`.</output>
+  <output>Summarize the strongest customer behavior findings and why they matter for {{research_topic}}.</output>
   <ask>Ask the user to choose `[C] Continue` to move to customer pain points analysis or provide corrections and additions first.</ask>
   <branch if="the user selects `C`" optional="true">
     <action>Update frontmatter so `stepsCompleted` includes steps 1 and 2.</action>

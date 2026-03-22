@@ -2,7 +2,7 @@
 
 - Progress: Step 1 of 6
 - Goal: confirm the market research scope, explain the planned approach, and wait for explicit continuation.
-- Speak in `{communication_language}`.
+- Speak in {communication_language}.
 - Do not begin market research yet.
 - Only the current phase checklist and the current active step's details are shown in the prompt at one time.
 - Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
@@ -10,7 +10,7 @@
 ## EXECUTION
 
 <step n="1" goal="Confirm the research topic and goals">
-  <output>Restate the selected research topic `{{research_topic}}` and the current research goals `{{research_goals}}`.</output>
+  <output>Restate the selected research topic {{research_topic}} and the current research goals {{research_goals}}.</output>
   <detail>
     Keep the restatement focused on market research outcomes rather than product implementation or unrelated industry analysis.
   </detail>

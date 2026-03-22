@@ -1,7 +1,7 @@
 ---
 # File references (ONLY variables used in this step)
-prdFile: '{prd_file_path}'
-validationReport: '{validation_report_path}'  # If provided
+prdFile: '{{prd_file_path}}'
+validationReport: '{{validation_report_path}}'  # If provided
 prdPurpose: '{project-root}/_bmad/bmm/workflows/2-plan-workflows/create-prd/data/prd-purpose.md'
 ---
 
@@ -37,17 +37,17 @@ prdPurpose: '{project-root}/_bmad/bmm/workflows/2-plan-workflows/create-prd/data
 </step>
 
 <step n="3" goal="Prepare Change Plan Summary">
-  <action>Additions: {count} sections to add</action>
-  <action>Updates: {count} sections to update</action>
-  <action>Removals: {count} items to remove</action>
-  <action>Restructuring: {yes/no} if format conversion needed</action>
-  <action>Critical: {count} changes (must fix)</action>
+  <action>Summarize how many sections will be added.</action>
+  <action>Summarize how many sections will be updated.</action>
+  <action>Summarize how many items will be removed.</action>
+  <action>State whether format conversion is needed.</action>
+  <action>Summarize how many critical changes must be fixed.</action>
 </step>
 
 <step n="4" goal="Present Change Plan to User">
-  <action>Critical: {count} items</action>
-  <action>High: {count} items</action>
-  <action>Medium: {count} items</action>
+  <action>Report the number of critical items.</action>
+  <action>Report the number of high-priority items.</action>
+  <action>Report the number of medium-priority items.</action>
   <ask>Does this change plan align with what you had in mind?</ask>
   <ask>Any sections I should add/remove/reprioritize?</ask>
   <ask>Any concerns before I proceed with edits?</ask>

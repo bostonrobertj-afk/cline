@@ -19,7 +19,7 @@
     - `workflowType: architecture`
     - `lastStep: 8`
     - `status: complete`
-    - `completedAt: {{current_date}}`
+    - `completedAt: {date}`
   </detail>
 </step>
 

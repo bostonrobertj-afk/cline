@@ -34,7 +34,7 @@ bmad agent tea
 
 The workflow automatically detects existing progress and resumes where you left off. Your progress is saved at:
 
-- `{test_artifacts}/teaching-progress/{your-name}-tea-progress.yaml`
+- `{test_artifacts}/teaching-progress/{user_name}-tea-progress.yaml`
 
 ## Workflow Structure
 
@@ -70,9 +70,9 @@ Each session follows this pattern:
 
 Your progress is automatically saved after each session:
 
-- **Progress file:** `{test_artifacts}/teaching-progress/{your-name}-tea-progress.yaml`
-- **Session notes:** `{test_artifacts}/tea-academy/{your-name}/session-{N}-notes.md`
-- **Certificate:** `{test_artifacts}/tea-academy/{your-name}/tea-completion-certificate.md`
+- **Progress file:** `{test_artifacts}/teaching-progress/{user_name}-tea-progress.yaml`
+- **Session notes:** `{test_artifacts}/tea-academy/{user_name}/session-{N}-notes.md`
+- **Certificate:** `{test_artifacts}/tea-academy/{user_name}/tea-completion-certificate.md`
 
 ## Quiz Scoring
 

@@ -12,7 +12,7 @@
 ## EXECUTION
 
 <step n="1" goal="Load the agent manifest and build the conversation roster">
-  <action>Read `{project-root}/_bmad/_config/agent-manifest.csv`.</action>
+  <action>Read {project-root}/_bmad/_config/agent-manifest.csv.</action>
   <action>Parse each manifest row and extract the agent name, display name, title, icon, role, identity, communication style, principles, module, and file path.</action>
   <action>Build the complete party-mode roster using the manifest data and any needed agent file configuration.</action>
   <detail>
@@ -24,7 +24,7 @@
 
 <step n="2" goal="Introduce party mode and present the loaded roster">
   <output>Announce that party mode is activated and that the BMAD agent roster has been loaded.</output>
-  <output>Welcome `{user_name}` and explain that the session will use `{communication_language}` for user-facing discussion.</output>
+  <output>Welcome {user_name} and explain that the session will use {communication_language} for user-facing discussion.</output>
   <action>Show a diverse sample of 3-4 loaded agents with their icons, names, titles, and short role descriptions.</action>
   <detail>
     - Choose a representative mix of agents so the user can immediately see the breadth of available perspectives.

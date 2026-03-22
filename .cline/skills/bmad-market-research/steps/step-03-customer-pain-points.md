@@ -2,7 +2,7 @@
 
 - Progress: Step 3 of 6
 - Goal: analyze customer pain points, unmet needs, and barriers, then pause for confirmation.
-- Speak in `{communication_language}`.
+- Speak in {communication_language}.
 - Use current web-verified sources for factual claims.
 - Only the current phase checklist and the current active step's details are shown in the prompt at one time.
 - Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
@@ -10,7 +10,7 @@
 ## EXECUTION
 
 <step n="1" goal="Research customer pain points and unmet needs">
-  <action>Search for current sources on customer frustrations, unmet needs, adoption barriers, service pain points, and satisfaction gaps relevant to `{{research_topic}}`.</action>
+  <action>Search for current sources on customer frustrations, unmet needs, adoption barriers, service pain points, and satisfaction gaps relevant to {{research_topic}}.</action>
   <detail>
     Prefer current surveys, customer research, review synthesis, support-pattern reporting, and analyst-backed market observations.
   </detail>
@@ -29,7 +29,7 @@
 </step>
 
 <step n="4" goal="Present the findings and ask to continue">
-  <output>Summarize the strongest pain-point findings and why they matter for `{{research_topic}}`.</output>
+  <output>Summarize the strongest pain-point findings and why they matter for {{research_topic}}.</output>
   <ask>Ask the user to choose `[C] Continue` to move to customer decision-process analysis or provide corrections and additions first.</ask>
   <branch if="the user selects `C`" optional="true">
     <action>Update frontmatter so `stepsCompleted` includes steps 1 through 3.</action>

@@ -1,6 +1,6 @@
 ---
 # File references (ONLY variables used in this step)
-prdFile: '{prd_file_path}'
+prdFile: '{{prd_file_path}}'
 validationWorkflow: '{project-root}/_bmad/bmm/workflows/2-plan-workflows/create-prd/steps-v/step-v-01-discovery.md'
 ---
 
@@ -18,11 +18,11 @@ validationWorkflow: '{project-root}/_bmad/bmm/workflows/2-plan-workflows/create-
 ## EXECUTION
 
 <step n="1" goal="Compile Edit Summary">
-  <action>Sections added: {list with names}</action>
-  <action>Sections updated: {list with names}</action>
-  <action>Content removed: {list}</action>
-  <action>Structure changes: {description}</action>
-  <action>Total sections affected: {count}</action>
+  <action>List the sections that were added.</action>
+  <action>List the sections that were updated.</action>
+  <action>List the content that was removed.</action>
+  <action>Describe any structure changes.</action>
+  <action>Report the total number of sections affected.</action>
 </step>
 
 <step n="2" goal="Present Completion Summary">

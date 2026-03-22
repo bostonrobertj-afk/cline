@@ -17,7 +17,7 @@ Load config from `{project-root}/_bmad/bmm/config.yaml` and resolve:
 - `implementation_artifacts`
 - `planning_artifacts`
 - `date` as system-generated current datetime
-- YOU MUST ALWAYS SPEAK OUTPUT in your Agent communication style with the config `{communication_language}`
+- YOU MUST ALWAYS SPEAK OUTPUT in your Agent communication style with the config {communication_language}
 
 ### Paths
 
@@ -165,12 +165,12 @@ development_status:
 # - SM typically creates next story after previous one is 'done' to incorporate learnings
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
-generated: { date }
-last_updated: { date }
-project: { project_name }
-project_key: { project_key }
-tracking_system: { tracking_system }
-story_location: { story_location }
+generated: {date}
+last_updated: {date}
+project: {project_name}
+project_key: {project_key}
+tracking_system: {tracking_system}
+story_location: {story_location}
 
 development_status:
   # All epics, stories, and retrospectives in order

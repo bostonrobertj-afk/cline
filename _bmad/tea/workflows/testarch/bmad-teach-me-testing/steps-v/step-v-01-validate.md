@@ -157,7 +157,7 @@ Create {validationReport}:
 ```markdown
 ---
 workflow: teach-me-testing
-validation_date: { current_date }
+validation_date: {{current_date}}
 validator: TEA Validation Workflow
 overall_status: PASS / FAIL / PASS_WITH_WARNINGS
 ---

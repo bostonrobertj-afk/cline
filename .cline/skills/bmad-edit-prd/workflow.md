@@ -14,9 +14,9 @@ main_config: '{project-root}/_bmad/bmm/config.yaml'
 ## EXECUTION
 
 <step n="1" goal="Configuration Loading">
-  <action>project_name, output_folder, planning_artifacts, user_name</action>
-  <action>communication_language, document_output_language, user_skill_level</action>
-  <action>date as system-generated current datetime</action>
+  <action>Resolve {project_name}, {output_folder}, {planning_artifacts}, and {user_name}.</action>
+  <action>Resolve {communication_language}, {document_output_language}, and {user_skill_level}.</action>
+  <action>Resolve {date} as the system-generated current datetime.</action>
   <output>✅ YOU MUST ALWAYS WRITE all artifact and document content in {document_output_language}.</output>
 </step>
 

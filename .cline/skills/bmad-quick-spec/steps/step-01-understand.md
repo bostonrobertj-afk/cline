@@ -14,7 +14,7 @@ wipFile: '{implementation_artifacts}/tech-spec-wip.md'
 ## EXECUTION
 
 <step n="1" goal="Resolve work-in-progress state">
-  <action>Check whether `{wipFile}` exists.</action>
+  <action>Check whether {wipFile} exists.</action>
   <branch if="wip file exists" optional="true">
     <output>Found a tech-spec in progress.</output>
     <detail>
@@ -36,7 +36,7 @@ wipFile: '{implementation_artifacts}/tech-spec-wip.md'
       </branch>
     </branch>
     <branch if="user chooses archive and start fresh" optional="true">
-      <action>Rename `{wipFile}` to `{implementation_artifacts}/tech-spec-{slug}-archived-{date}.md`.</action>
+      <action>Rename {wipFile} to {implementation_artifacts}/tech-spec-{slug}-archived-{date}.md.</action>
       <detail>Then continue with the new-request path in this step.</detail>
       <goto step="2" />
     </branch>
@@ -50,7 +50,7 @@ wipFile: '{implementation_artifacts}/tech-spec-wip.md'
   </branch>
   <action>Do a rapid orient scan to understand the landscape.</action>
   <detail>
-    Check `{implementation_artifacts}` and `{planning_artifacts}` for PRDs, architecture docs, epics, and research.
+    Check {implementation_artifacts} and {planning_artifacts} for PRDs, architecture docs, epics, and research.
     Check for `**/project-context.md` and skim it if present.
     Search for any existing stories or specs related to the request.
   </detail>
@@ -65,7 +65,7 @@ wipFile: '{implementation_artifacts}/tech-spec-wip.md'
 <step n="3" goal="Ask informed questions and confirm the core understanding">
   <action>Ask clarifying questions informed by the quick scan.</action>
   <detail>
-    Adapt the questions to `{user_skill_level}`.
+    Adapt the questions to {user_skill_level}.
     Ask about architecture, patterns, constraints, and any existing docs that should shape the work.
   </detail>
   <ask>Confirm the title, slug, problem statement, solution, in-scope items, and out-of-scope items before proceeding.</ask>
@@ -79,7 +79,7 @@ wipFile: '{implementation_artifacts}/tech-spec-wip.md'
   </detail>
   <detail>Fill the Overview section with the problem statement, solution, and scope.</detail>
   <detail>Fill the Context for Development section with the technical preferences and constraints gathered during discovery.</detail>
-  <output>Created: `{wipFile}`</output>
+  <output>Created: {wipFile}</output>
   <detail>Capture the title, problem, and scope in the user-facing summary before continuing.</detail>
   <output>Display the checkpoint menu for this step.</output>
   <ask>Choose [A] Advanced Elicitation, [P] Party Mode, or [C] Continue to Deep Investigation (Step 2 of 4).</ask>

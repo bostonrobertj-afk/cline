@@ -108,14 +108,14 @@ Load {progressTemplate} and create {progressFile} with:
 ```yaml
 ---
 # TEA Academy Progress Tracking
-user: { user_name }
+user: {{user_name}}
 role: null # Will be set in assessment
 experience_level: null # Will be set in assessment
 learning_goals: null # Will be set in assessment
 pain_points: null # Optional, set in assessment
 
-started_date: { current_date }
-last_session_date: { current_date }
+started_date: {{current_date}}
+last_session_date: {{current_date}}
 
 sessions:
   - id: session-01-quickstart
@@ -188,7 +188,7 @@ next_recommended: session-01-quickstart
 
 stepsCompleted: ['step-01-init']
 lastStep: 'step-01-init'
-lastContinued: { current_date }
+lastContinued: {{current_date}}
 
 certificate_generated: false
 certificate_path: null

@@ -281,10 +281,10 @@ Create {sessionNotesFile} using {sessionNotesTemplate} with:
 ---
 session_id: session-01-quickstart
 session_name: 'Session 1: Quick Start'
-user: { user_name }
-role: { role }
-completed_date: { current_date }
-score: { score }
+user: {{user_name}}
+role: {{role}}
+completed_date: {{current_date}}
+score: {{score}}
 duration: '30 min'
 ---
 

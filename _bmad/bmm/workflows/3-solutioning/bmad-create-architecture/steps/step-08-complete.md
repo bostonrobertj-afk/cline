@@ -36,7 +36,7 @@ stepsCompleted: [1, 2, 3, 4, 5, 6, 7, 8]
 workflowType: 'architecture'
 lastStep: 8
 status: 'complete'
-completedAt: '{{current_date}}'
+completedAt: '{date}'
 ```
 
 ### 3. Next Steps Guidance

@@ -14,7 +14,7 @@ wipFile: '{implementation_artifacts}/tech-spec-wip.md'
 ## EXECUTION
 
 <step n="1" goal="Load the current state">
-  <action>Read `{wipFile}` and extract the Overview section plus any context gathered in Step 1.</action>
+  <action>Read {wipFile} and extract the Overview section plus any context gathered in Step 1.</action>
   <branch if="wip file is missing" optional="true">
     <output>The WIP file is missing. Return to Step 1 and initialize it first.</output>
     <exit />

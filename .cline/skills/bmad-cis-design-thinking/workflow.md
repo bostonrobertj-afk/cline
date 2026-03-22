@@ -3,6 +3,8 @@ name: bmad-cis-design-thinking
 description: 'Guide human-centered design processes using empathy-driven methodologies. Use when the user says "lets run design thinking" or "I want to apply design thinking"'
 standalone: true
 main_config: '{project-root}/_bmad/cis/config.yaml'
+design_methods_file: './design-methods.csv'
+default_output_file: '{output_folder}/design-thinking-{date}.md'
 ---
 
 # workflow

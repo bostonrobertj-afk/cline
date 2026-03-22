@@ -1,3 +1,7 @@
+---
+main_config: '{project-root}/_bmad/bmm/config.yaml'
+---
+
 # QA Generate E2E Tests Workflow
 
 ## META
@@ -11,6 +15,8 @@
 
 <step n="1" goal="Detect the test framework and identify the feature scope">
   <action>Inspect `package.json`, existing test files, and source structure to determine the project's current test framework.</action>
+  <action>Load and read the full config from {main_config}.</action>
+  <action>Resolve {implementation_artifacts} for the summary output path.</action>
   <branch if="no existing framework is found" optional="true">
     <action>Analyze the source stack and recommend the most appropriate current test framework for that stack.</action>
     <ask>Should I use the recommended framework, or would you like to confirm a different one?</ask>
@@ -32,6 +38,6 @@
 
 <step n="3" goal="Run tests and summarize the result">
   <action>Run the relevant project test command and fix failures that are directly caused by the new tests.</action>
-  <action>Write a markdown summary to `{implementation_artifacts}/tests/test-summary.md`.</action>
+  <action>Write a markdown summary to {implementation_artifacts}/tests/test-summary.md.</action>
   <output>Tests generated and verified. Review the checklist for validation.</output>
 </step>

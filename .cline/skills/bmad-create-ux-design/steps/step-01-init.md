@@ -19,7 +19,7 @@
 </step>
 
 <step n="2" goal="Discover and confirm supporting input documents for a fresh run">
-  <action>Search `{planning_artifacts}`, `{output_folder}`, `{product_knowledge}`, and `{project-root}/docs` for relevant inputs.</action>
+  <action>Search `{planning_artifacts}`, `{output_folder}`, `{project_knowledge}`, and `{project-root}/docs` for relevant inputs.</action>
   <detail>Look for whole files and sharded folders with `index.md`, especially product briefs, PRDs, project docs, and `project-context.md`.</detail>
   <ask>Ask the user to confirm which discovered files should be loaded and whether any additional documents should be included.</ask>
 </step>

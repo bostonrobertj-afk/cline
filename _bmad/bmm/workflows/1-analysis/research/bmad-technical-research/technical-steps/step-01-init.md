@@ -105,7 +105,7 @@ When user selects 'C', append scope confirmation:
 - Confidence level framework for uncertain information
 - Comprehensive technical coverage with architecture-specific insights
 
-**Scope Confirmed:** {{date}}
+**Scope Confirmed:** {date}
 ```
 
 ## SUCCESS METRICS:

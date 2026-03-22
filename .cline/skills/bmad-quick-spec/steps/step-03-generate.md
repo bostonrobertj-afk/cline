@@ -14,7 +14,7 @@ wipFile: '{implementation_artifacts}/tech-spec-wip.md'
 ## EXECUTION
 
 <step n="1" goal="Load the current state">
-  <action>Read `{wipFile}` completely and extract all frontmatter values, the Overview section, and the Context for Development section.</action>
+  <action>Read {wipFile} completely and extract all frontmatter values, the Overview section, and the Context for Development section.</action>
   <branch if="wip file is missing" optional="true">
     <output>The WIP file is missing. Return to Step 2 and create the investigation results first.</output>
     <exit />
@@ -62,7 +62,7 @@ wipFile: '{implementation_artifacts}/tech-spec-wip.md'
 </step>
 
 <step n="5" goal="Write the complete spec and hand off to review">
-  <action>Update `{wipFile}` with the full spec content.</action>
+  <action>Update {wipFile} with the full spec content.</action>
   <detail>
     Ensure all template sections are filled in, all placeholders are removed, all frontmatter values are current, and status is set to `review`.
   </detail>

@@ -15,9 +15,9 @@ main_config: '{project-root}/_bmad/bmm/config.yaml'
 ## EXECUTION
 
 <step n="1" goal="Load workflow configuration">
-  <action>Load and read the full config from `{main_config}`.</action>
+  <action>Load and read the full config from {main_config}.</action>
   <detail>
-    Resolve `project_name`, `planning_artifacts`, `implementation_artifacts`, `user_name`, `communication_language`, `document_output_language`, `user_skill_level`, `date`, and `project_context`.
+    Resolve {project_name}, {planning_artifacts}, {implementation_artifacts}, {user_name}, {communication_language}, {document_output_language}, {user_skill_level}, and {date}. Load any relevant project context file if present.
   </detail>
 </step>
 

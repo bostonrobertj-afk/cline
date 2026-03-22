@@ -15,15 +15,15 @@ specLoopIteration: 1
 ## EXECUTION
 
 <step n="1" goal="Move the spec into review and construct the review inputs">
-  <action>Update `{spec_file}` status to `in-review` in the frontmatter.</action>
+  <action>Update {spec_file} status to `in-review` in the frontmatter.</action>
   <branch if="execution_mode is plan-code-review" optional="true">
-    <action>Construct `{diff_output}` from `{baseline_commit}` covering tracked and untracked changes.</action>
+    <action>Construct {diff_output} from {baseline_commit} covering tracked and untracked changes.</action>
     <action>Launch the blind hunter, edge case hunter, and acceptance auditor review paths.</action>
   </branch>
   <branch if="execution_mode is one-shot" optional="true">
     <action>Invoke the adversarial review skill with the changed files.</action>
   </branch>
   <detail>
-    Deduplicate findings, classify them, and loop back only for intent gaps or bad spec issues. Append defer findings to `{deferred_work_file}`.
+    Deduplicate findings, classify them, and loop back only for intent gaps or bad spec issues. Append defer findings to {deferred_work_file}.
   </detail>
 </step>

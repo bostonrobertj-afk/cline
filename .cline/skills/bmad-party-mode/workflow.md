@@ -1,6 +1,11 @@
 ---
 ---
 
+---
+main_config: '{project-root}/_bmad/core/config.yaml'
+agent_manifest_path: '{project-root}/_bmad/_config/agent-manifest.csv'
+---
+
 # Party Mode Workflow
 
 ## META
@@ -13,10 +18,10 @@
 ## EXECUTION
 
 <step n="1" goal="Initialize Configuration and Party Mode State">
-  <action>Load config from `{project-root}/_bmad/core/config.yaml`.</action>
-  <action>Resolve `project_name`, `output_folder`, `user_name`, `communication_language`, `document_output_language`, `user_skill_level`, and `date`.</action>
-  <action>Resolve `agent_manifest_path` as `{project-root}/_bmad/_config/agent-manifest.csv`.</action>
-  <detail>Party mode is a standalone interactive workflow that keeps the conversation in `{communication_language}`.</detail>
+  <action>Load config from {main_config}.</action>
+  <action>Resolve {project_name}, {output_folder}, {user_name}, {communication_language}, {document_output_language}, {user_skill_level}, and {date}.</action>
+  <action>Resolve {agent_manifest_path} from the workflow configuration.</action>
+  <detail>Party mode is a standalone interactive workflow that keeps the conversation in {communication_language}.</detail>
 </step>
 
 <step n="2" goal="Load the Agent Roster and Start Party Mode">

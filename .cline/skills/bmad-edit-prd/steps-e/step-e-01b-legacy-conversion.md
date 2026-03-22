@@ -1,6 +1,6 @@
 ---
 # File references (ONLY variables used in this step)
-prdFile: '{prd_file_path}'
+prdFile: '{{prd_file_path}}'
 prdPurpose: '{project-root}/_bmad/bmm/workflows/2-plan-workflows/create-prd/data/prd-purpose.md'
 ---
 
@@ -27,7 +27,7 @@ prdPurpose: '{project-root}/_bmad/bmm/workflows/2-plan-workflows/create-prd/data
   <ask>If present: Is it complete and well-structured?</ask>
   <ask>If missing: What content exists that could migrate to this section?</ask>
   <output>Effort to create/complete: Minimal / Moderate / Significant</output>
-  <output>Core sections present: {count}/6</output>
+  <output>Core sections present: report the detected number of BMAD core sections out of 6.</output>
   <output>Note what's present and what's missing</output>
 </step>
 
@@ -37,11 +37,11 @@ prdPurpose: '{project-root}/_bmad/bmm/workflows/2-plan-workflows/create-prd/data
   <action>Total Conversion Effort: [Quick/Moderate/Substantial]</action>
   <action>Recommended: [Full restructuring / Targeted improvements]</action>
   <output>Present: [Yes/No/Partial]</output>
-  <output>Sections Present: {count}/6</output>
+  <output>Sections present: report the detected number of BMAD core sections out of 6.</output>
 </step>
 
 <step n="3" goal="Present Conversion Assessment">
-  <output>Core sections present: {count}/6</output>
+  <output>Core sections present: report the detected number of BMAD core sections out of 6.</output>
 </step>
 
 <step n="4" goal="Present MENU OPTIONS">

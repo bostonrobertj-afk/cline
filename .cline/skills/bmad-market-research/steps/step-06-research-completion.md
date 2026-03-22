@@ -2,7 +2,7 @@
 
 - Progress: Step 6 of 6
 - Goal: synthesize the completed market research into the final document, present the summary, and wait for explicit completion confirmation.
-- Speak in `{communication_language}`.
+- Speak in {communication_language}.
 - Verify any final synthesis claims that still need current-source confirmation before finalizing.
 - Only the current phase checklist and the current active step's details are shown in the prompt at one time.
 - Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
@@ -36,7 +36,7 @@
 </step>
 
 <step n="4" goal="Present the final market research summary">
-  <output>Summarize the most important market conclusions, strategic implications, and recommended next actions for `{{research_topic}}`.</output>
+  <output>Summarize the most important market conclusions, strategic implications, and recommended next actions for {{research_topic}}.</output>
 </step>
 
 <step n="5" goal="Handle completion confirmation">
@@ -56,6 +56,6 @@ Pause after the final synthesis is written and wait for explicit `[C] Complete` 
 
 ## ADVISORY
 
-- Keep the final document in `{document_output_language}`.
+- Keep the final document in {document_output_language}.
 - Preserve exact source references for downstream citation and auditing.
 - Prefer synthesis over repetition.

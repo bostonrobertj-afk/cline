@@ -1,6 +1,6 @@
 ---
 # File references (ONLY variables used in this step)
-prdFile: '{prd_file_path}'
+prdFile: '{{prd_file_path}}'
 prdPurpose: '{project-root}/_bmad/bmm/workflows/2-plan-workflows/create-prd/data/prd-purpose.md'
 ---
 
@@ -27,8 +27,8 @@ prdPurpose: '{project-root}/_bmad/bmm/workflows/2-plan-workflows/create-prd/data
   <action>Read current PRD section</action>
   <action>Apply specified changes</action>
   <action>Ensure BMAD PRD principles compliance:</action>
-  <action>Section to edit: {section_name}</action>
-  <action>Current content: {existing content}</action>
+  <action>Identify the selected section to edit.</action>
+  <action>Review the current content of that section.</action>
   <output>Return updated section content</output>
   <output>Load PRD section, apply changes, save</output>
 </step>

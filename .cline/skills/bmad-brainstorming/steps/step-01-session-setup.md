@@ -32,7 +32,7 @@
 <step n="2" goal="Initialize a fresh brainstorming session">
   <action>Create the brainstorming session directory if needed.</action>
   <action>Copy `../template.md` into `{brainstorming_session_output_file}`.</action>
-  <detail>If `context_file` is provided and readable, load it and use it to shape the discovery prompts.</detail>
+  <detail>If `{context_file}` is provided and readable, load it and use it to shape the discovery prompts.</detail>
   <ask>What are we brainstorming about, and what specific outcomes are you hoping for?</ask>
   <detail>Capture the topic and goals in session state before moving on.</detail>
 </step>
@@ -40,7 +40,7 @@
 <step n="3" goal="Confirm session parameters">
   <ask>Does this accurately capture what you want to achieve?</ask>
   <branch if="the user confirms" optional="true">
-    <action>Update the session frontmatter with `stepsCompleted: [1]`, `session_topic`, `session_goals`, and `context_file` if present.</action>
+    <action>Update the session frontmatter with `stepsCompleted: [1]`, `session_topic`, `session_goals`, and `{context_file}` if present.</action>
     <output>Session setup complete. Ready to explore technique approaches.</output>
   </branch>
   <branch if="the user revises the session focus" optional="true">

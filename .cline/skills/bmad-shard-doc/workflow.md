@@ -1,3 +1,8 @@
+---
+config_source: '{project-root}/_bmad/bmm/config.yaml'
+communication_language: '{config_source}:communication_language'
+---
+
 # Shard Document
 
 **Goal:** Split large markdown documents into smaller, organized files based on level 2 sections using `npx @kayvan/markdown-tree-parser`.
@@ -6,7 +11,7 @@
 
 - Execute the workflow in order.
 - Halt whenever a user response is required.
-- Speak in `communication_language`.
+- Speak in `{communication_language}`.
 - Keep the original document separate from the sharded output unless the user chooses otherwise.
 - Only the current phase checklist and the current active step's details are shown in the prompt at one time.
 - Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.

@@ -1,3 +1,8 @@
+---
+main_config: '{project-root}/_bmad/bmm/config.yaml'
+sprint_status_file: '{implementation_artifacts}/sprint-status.yaml'
+---
+
 # Retrospective Workflow
 
 ## META
@@ -12,14 +17,13 @@
 ## EXECUTION
 
 <step n="1" goal="Load configuration and retrospective context">
-  <action>Load config from `{project-root}/_bmad/bmm/config.yaml`.</action>
-  <action>Resolve `project_name`, `user_name`, `communication_language`, `document_output_language`, `user_skill_level`, `planning_artifacts`, `implementation_artifacts`, and `date`.</action>
-  <action>Resolve `sprint_status_file` as `{implementation_artifacts}/sprint-status.yaml`.</action>
-  <detail>Keep all responses in `{communication_language}` and all document output in `{document_output_language}`.</detail>
+  <action>Load config from {main_config}.</action>
+  <action>Resolve {project_name}, {user_name}, {communication_language}, {document_output_language}, {user_skill_level}, {planning_artifacts}, {implementation_artifacts}, and {date}.</action>
+  <detail>Keep all responses in {communication_language} and all document output in {document_output_language}.</detail>
 </step>
 
 <step n="2" goal="Identify the completed epic">
-  <action>Load `{project_context}` if it exists, then inspect `{sprint_status_file}` for the highest completed epic.</action>
+  <action>Load any project context file if it exists, then inspect {sprint_status_file} for the highest completed epic.</action>
   <branch if="a completed epic is detected" optional="true">
     <output>Based on sprint status, it looks like Epic {{detected_epic}} was recently completed.</output>
     <ask>Is that the epic you want to review, or would you like to specify a different one?</ask>

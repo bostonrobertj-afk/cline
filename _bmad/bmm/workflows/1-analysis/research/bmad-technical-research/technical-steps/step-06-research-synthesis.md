@@ -369,7 +369,7 @@ _Technical Communities: [Professional networks and technical communities]_
 
 ---
 
-**Technical Research Completion Date:** {{date}}
+**Technical Research Completion Date:** {date}
 **Research Period:** current comprehensive technical analysis
 **Document Length:** As needed for comprehensive technical coverage
 **Source Verification:** All technical facts cited with current sources

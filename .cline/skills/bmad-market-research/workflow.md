@@ -1,3 +1,7 @@
+---
+main_config: '{project-root}/_bmad/bmm/config.yaml'
+---
+
 # Market Research Workflow
 
 ## META
@@ -10,6 +14,8 @@
 ## EXECUTION
 
 <step n="1" goal="Discover the market research topic and confirm the research scope.">
+  <action>Load and read the full config from {main_config}.</action>
+  <action>Resolve {communication_language}, {document_output_language}, {planning_artifacts}, and {date}.</action>
   <detail>Use the configured communication language for all user-facing output.</detail>
   <output>Welcome the user and invite them to name the topic, problem, or area they want to research.</output>
   <ask>What topic, problem, or area do you want to research?</ask>

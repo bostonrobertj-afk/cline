@@ -73,13 +73,13 @@ prdPurpose: '{project-root}/_bmad/bmm/workflows/2-plan-workflows/create-prd/data
 </step>
 
 <step n="8" goal="Route Based on Format and Context">
-  <ask>Your edit goals: {user's requirements}. How would you like to proceed?</ask>
+  <ask>What are your edit goals? How would you like to proceed?</ask>
   <branch if="validation report provided or PRD is BMAD Standard/Variant">
-    <output>Display &quot;Edit Requirements Understood. PRD Format: {classification}. {If validation report: &quot;Validation Guide: Yes - will use validation report findings.&quot;} Edit Goals: {summary of user's requirements}. Proceeding to deep review and analysis...&quot;</output>
+    <output>Display a confirmation that the edit requirements are understood, name the detected PRD format, note whether a validation report will be used, and summarize the user’s edit goals before proceeding to deep review and analysis.</output>
     <handoff path="./step-e-02-review.md">Begin the deep review step.</handoff>
   </branch>
   <branch if="PRD is Legacy (Non-Standard) and no validation report" optional="true">
-    <output>Display &quot;Format Detected: Legacy PRD. This PRD does not follow BMAD standard structure (only {count}/6 core sections present).&quot;</output>
+    <output>Display that a legacy PRD format was detected and that the document does not follow the BMAD standard structure because only a subset of the core sections are present.</output>
   </branch>
 </step>
 

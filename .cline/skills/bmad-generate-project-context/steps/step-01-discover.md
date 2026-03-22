@@ -9,7 +9,7 @@
 
 <step n="1" goal="Check for existing context and discover project details">
   <branch if="an existing project-context file is found" optional="true">
-    <output>Found existing project context with {number_of_sections} sections. Would you like to update this or create a new one?</output>
+    <output>Found existing project context with {{number_of_sections}} sections. Would you like to update this or create a new one?</output>
     <ask>Choose update or create-new.</ask>
     <detail>
       Look for `{project_knowledge}/project-context.md` or `{project-root}/**/project-context.md` and read the complete file before asking.

@@ -14,7 +14,7 @@ wipFile: '{implementation_artifacts}/tech-spec-wip.md'
 ## EXECUTION
 
 <step n="1" goal="Load and present the complete spec">
-  <action>Read `{wipFile}` completely and extract `slug` from frontmatter for later use.</action>
+  <action>Read {wipFile} completely and extract `slug` from frontmatter for later use.</action>
   <output>Here's your complete tech-spec. Please review:</output>
   <detail>Display the complete spec content, including all sections.</detail>
   <detail>
@@ -28,7 +28,7 @@ wipFile: '{implementation_artifacts}/tech-spec-wip.md'
     <action>Proceed to finalization if the spec meets the READY FOR DEVELOPMENT standard.</action>
   </branch>
   <branch if="user chooses E" optional="true">
-    <action>Apply the requested edits to `{wipFile}` and re-present the affected sections.</action>
+    <action>Apply the requested edits to {wipFile} and re-present the affected sections.</action>
   </branch>
   <branch if="user chooses Q" optional="true">
     <output>Answer the user's questions and redisplay the review menu.</output>
@@ -48,8 +48,8 @@ wipFile: '{implementation_artifacts}/tech-spec-wip.md'
 
 <step n="3" goal="Finalize the spec">
   <branch if="user confirms the spec is good and it meets the READY FOR DEVELOPMENT standard" optional="true">
-    <action>Update `{wipFile}` frontmatter to `status: 'ready-for-dev'` and `stepsCompleted: [1, 2, 3, 4]`.</action>
-    <action>Rename `{wipFile}` to `{implementation_artifacts}/tech-spec-{slug}.md`.</action>
+    <action>Update {wipFile} frontmatter to `status: 'ready-for-dev'` and `stepsCompleted: [1, 2, 3, 4]`.</action>
+    <action>Rename {wipFile} to {implementation_artifacts}/tech-spec-{slug}.md.</action>
     <output>The spec has been finalized.</output>
   </branch>
 </step>
@@ -57,7 +57,7 @@ wipFile: '{implementation_artifacts}/tech-spec-wip.md'
 <step n="4" goal="Present the final menu">
   <output>Tech-Spec Complete!</output>
   <detail>
-    Saved to: `{implementation_artifacts}/tech-spec-{slug}.md`
+    Saved to: {implementation_artifacts}/tech-spec-{slug}.md
   </detail>
   <output>Display the final menu with Advanced Elicitation, Adversarial Review, Begin Development, Done, and Party Mode.</output>
   <detail>
@@ -68,14 +68,14 @@ wipFile: '{implementation_artifacts}/tech-spec-wip.md'
     <action>Invoke the advanced elicitation flow on the current spec content.</action>
   </branch>
   <branch if="user chooses R" optional="true">
-    <action>Run the adversarial review flow against `{implementation_artifacts}/tech-spec-{slug}.md`.</action>
+    <action>Run the adversarial review flow against {implementation_artifacts}/tech-spec-{slug}.md.</action>
     <detail>If zero findings are returned, stop and request user guidance.</detail>
   </branch>
   <branch if="user chooses B" optional="true">
-    <action>Invoke the quick-dev workflow with `{implementation_artifacts}/tech-spec-{slug}.md`.</action>
+    <action>Invoke the quick-dev workflow with {implementation_artifacts}/tech-spec-{slug}.md.</action>
   </branch>
   <branch if="user chooses D" optional="true">
-    <output>All done. The tech-spec is ready at `{implementation_artifacts}/tech-spec-{slug}.md`.</output>
+    <output>All done. The tech-spec is ready at {implementation_artifacts}/tech-spec-{slug}.md.</output>
     <exit />
   </branch>
   <branch if="user chooses P" optional="true">

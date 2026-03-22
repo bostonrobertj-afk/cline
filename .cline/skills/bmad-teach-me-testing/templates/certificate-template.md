@@ -1,11 +1,11 @@
 ---
 certificate_type: tea-academy-completion
-user: { { user_name } }
-role: { { role } }
-completion_date: { { completion_date } }
-started_date: { { started_date } }
-total_duration: { { total_duration } }
-average_score: { { average_score } }
+user: {{user_name}}
+role: {{role}}
+completion_date: {{completion_date}}
+started_date: {{started_date}}
+total_duration: {{total_duration}}
+average_score: {{average_score}}
 ---
 
 # 🏆 TEA Academy Completion Certificate
@@ -61,7 +61,7 @@ average_score: { { average_score } }
 ### Learning Artifacts
 
 All session notes and progress tracking available at:
-`{{artifacts_path}}`
+{{artifacts_path}}
 
 ---
 

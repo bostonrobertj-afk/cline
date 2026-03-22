@@ -25,7 +25,7 @@ outputFile: '{planning_artifacts}/product-brief-{{project_name}}-{{date}}.md'
 </step>
 
 <step n="2" goal="Discover and confirm the supporting input documents for a fresh run">
-  <action>Search for relevant planning, output, product-knowledge, and docs artifacts under `{planning_artifacts}`, `{output_folder}`, `{product_knowledge}`, and `{project-root}/docs`.</action>
+  <action>Search for relevant planning, output, project-knowledge, and docs artifacts under `{planning_artifacts}`, `{output_folder}`, `{project_knowledge}`, and `{project-root}/docs`.</action>
   <detail>When a whole markdown file is not present, also look for a sharded folder with an `index.md` file and use the full shard set when the user confirms it should be included.</detail>
   <ask>Ask the user to confirm which discovered files should be loaded and whether any additional files should be included before initialization proceeds.</ask>
   <output>Present a discovery summary covering brainstorming, research, project documentation, and project context files.</output>

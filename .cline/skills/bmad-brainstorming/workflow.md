@@ -14,8 +14,8 @@ context_file: '' # Optional context file path for project-specific guidance
 
 <step n="1" goal="Load configuration and initialize session state">
   <action>Load config from `{project-root}/_bmad/core/config.yaml`.</action>
-  <action>Resolve `project_name`, `output_folder`, `user_name`, `communication_language`, `document_output_language`, `user_skill_level`, and `date`.</action>
-  <action>Resolve `brainstorming_session_output_file` as `{output_folder}/brainstorming/brainstorming-session-{{date}}-{{time}}.md`.</action>
+  <action>Resolve `{project_name}`, `{output_folder}`, `{user_name}`, `{communication_language}`, `{document_output_language}`, `{user_skill_level}`, and `{date}`.</action>
+  <action>Resolve `{brainstorming_session_output_file}` as `{output_folder}/brainstorming/brainstorming-session-{{date}}-{{time}}.md`.</action>
   <detail>Use `{communication_language}` for agent communication and `{document_output_language}` for all session artifacts.</detail>
 </step>
 

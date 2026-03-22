@@ -1,3 +1,16 @@
+---
+config_source: '{project-root}/_bmad/bmm/config.yaml'
+project_name: '{config_source}:project_name'
+user_name: '{config_source}:user_name'
+communication_language: '{config_source}:communication_language'
+document_output_language: '{config_source}:document_output_language'
+user_skill_level: '{config_source}:user_skill_level'
+output_folder: '{config_source}:output_folder'
+planning_artifacts: '{config_source}:planning_artifacts'
+project_knowledge: '{config_source}:project_knowledge'
+date: system-generated current datetime
+---
+
 ## EXECUTION
 
 <step n="1" goal="Discover the technical research topic and goals.">
