@@ -69,10 +69,24 @@ prdPurpose: '../data/prd-purpose.md'
   <output>Summarize the selected PRD, the loaded input documents, and the validation report path.</output>
   <ask>Present the menu options `[A] Advanced Elicitation`, `[P] Party Mode`, and `[C] Format Detection`.</ask>
   <branch if="the user selects `A`" optional="true">
-    <action>Invoke the `bmad-advanced-elicitation` skill, then return to this setup menu.</action>
+    <action>
+      Dispatch a dedicated subagent for Advanced Elicitation.
+      <detail>
+        Instruct the subagent to call `use_skill` with `skill_name = "bmad-advanced-elicitation"`.
+        Prompt the subagent with the selected PRD, loaded input-document summary, and the instruction to surface missing assumptions or clarifications before validation begins.
+        Tell the subagent to return concise proposed improvements and questions, then return to this setup menu.
+      </detail>
+    </action>
   </branch>
   <branch if="the user selects `P`" optional="true">
-    <action>Invoke the `bmad-party-mode` skill, then return to this setup menu.</action>
+    <action>
+      Dispatch a dedicated subagent for Party Mode.
+      <detail>
+        Instruct the subagent to call `use_skill` with `skill_name = "bmad-party-mode"`.
+        Prompt the subagent with the selected PRD, loaded input-document summary, and the instruction to critique validation readiness from multiple perspectives.
+        Tell the subagent to return concise proposed improvements and decision guidance, then return to this setup menu.
+      </detail>
+    </action>
   </branch>
   <branch if="the user selects `C`" optional="true">
     <handoff path="{nextStepFile}" />

@@ -23,7 +23,14 @@
 </step>
 
 <step n="4" goal="Suggest relevant next workflows">
-  <action>Invoke the `bmad-help` skill so the user can choose the most relevant next workflow.</action>
+  <action>
+    Dispatch a dedicated subagent for next-step guidance.
+    <detail>
+      Instruct the subagent to call `use_skill` with `skill_name = "bmad-help"`.
+      Prompt the subagent with the completed UX specification context and the instruction to return the most relevant next workflow options.
+      Tell the subagent to return concise next-step recommendations that can be shown to the user in this thread.
+    </detail>
+  </action>
   <output>Explain that likely next workflows include architecture, epic creation, development planning, or later-stage visual design work.</output>
 </step>
 

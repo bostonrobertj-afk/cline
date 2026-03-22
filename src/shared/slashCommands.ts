@@ -103,6 +103,12 @@ export const BASE_SLASH_COMMANDS: SlashCommand[] = [
 		cliCompatible: true,
 	},
 	{
+		name: "bmad-tea",
+		description: "Activate the BMAD Test Architect persona for this task",
+		section: "default",
+		cliCompatible: true,
+	},
+	{
 		name: "bmad-tech-writer",
 		description: "Activate the BMAD tech writer persona for this task",
 		section: "default",

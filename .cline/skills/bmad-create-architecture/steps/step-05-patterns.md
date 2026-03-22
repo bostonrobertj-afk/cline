@@ -45,11 +45,25 @@
   <output>Present the drafted implementation-patterns content for the architecture document.</output>
   <ask>Ask whether the user wants Advanced Elicitation, Party Mode, or Continue.</ask>
   <branch if="the user chooses Advanced Elicitation" optional="true">
-    <action>Invoke `bmad-advanced-elicitation` to explore additional consistency rules and edge cases.</action>
+    <action>
+      Dispatch a dedicated subagent for Advanced Elicitation.
+      <detail>
+        Instruct the subagent to call `use_skill` with `skill_name = "bmad-advanced-elicitation"`.
+        Prompt the subagent with the current implementation-pattern draft and the instruction to explore additional consistency rules and edge cases.
+        Tell the subagent to return concise proposed improvements and any replacement text the user should review before acceptance.
+      </detail>
+    </action>
     <ask>Ask whether to accept the returned pattern refinements before returning to the menu.</ask>
   </branch>
   <branch if="the user chooses Party Mode" optional="true">
-    <action>Invoke `bmad-party-mode` to review implementation-pattern trade-offs from multiple perspectives.</action>
+    <action>
+      Dispatch a dedicated subagent for Party Mode.
+      <detail>
+        Instruct the subagent to call `use_skill` with `skill_name = "bmad-party-mode"`.
+        Prompt the subagent with the current implementation-pattern draft and the instruction to review implementation-pattern trade-offs from multiple perspectives.
+        Tell the subagent to return concise proposed improvements and decision guidance for the user to review before acceptance.
+      </detail>
+    </action>
     <ask>Ask whether to accept the returned pattern refinements before returning to the menu.</ask>
   </branch>
   <branch if="the user chooses Continue" optional="true">

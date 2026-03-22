@@ -43,11 +43,25 @@
   <output>Present the drafted Project Context Analysis content to the user.</output>
   <ask>Ask whether the user wants Advanced Elicitation, Party Mode, or Continue.</ask>
   <branch if="the user chooses Advanced Elicitation" optional="true">
-    <action>Invoke `bmad-advanced-elicitation` using the current context analysis as the focus.</action>
+    <action>
+      Dispatch a dedicated subagent for Advanced Elicitation.
+      <detail>
+        Instruct the subagent to call `use_skill` with `skill_name = "bmad-advanced-elicitation"`.
+        Prompt the subagent with the current context analysis and the instruction to deepen or clarify the architecture-relevant implications.
+        Tell the subagent to return concise proposed improvements and any replacement text the user should review before acceptance.
+      </detail>
+    </action>
     <ask>Ask whether to accept the returned enhancements before returning to the A/P/C menu.</ask>
   </branch>
   <branch if="the user chooses Party Mode" optional="true">
-    <action>Invoke `bmad-party-mode` using the current context analysis as the discussion focus.</action>
+    <action>
+      Dispatch a dedicated subagent for Party Mode.
+      <detail>
+        Instruct the subagent to call `use_skill` with `skill_name = "bmad-party-mode"`.
+        Prompt the subagent with the current context analysis and the instruction to critique it from multiple stakeholder perspectives.
+        Tell the subagent to return concise proposed improvements and decision guidance for the user to review before acceptance.
+      </detail>
+    </action>
     <ask>Ask whether to accept the returned improvements before returning to the A/P/C menu.</ask>
   </branch>
   <branch if="the user chooses Continue" optional="true">

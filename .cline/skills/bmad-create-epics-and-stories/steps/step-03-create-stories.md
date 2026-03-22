@@ -39,10 +39,24 @@
   <ask>Ask the user to choose whether to continue to final validation, use Advanced Elicitation, or use Party Mode.</ask>
   <detail>Keep the menu visible after answering side questions. Advance only when the user explicitly chooses Continue.</detail>
   <branch if="the user chooses Advanced Elicitation" optional="true">
-    <action>Invoke the `bmad-advanced-elicitation` skill using the current epic-and-story document as context.</action>
+    <action>
+      Dispatch a dedicated subagent for Advanced Elicitation.
+      <detail>
+        Instruct the subagent to call `use_skill` with `skill_name = "bmad-advanced-elicitation"`.
+        Prompt the subagent with the current epic-and-story document and the instruction to deepen story slicing, acceptance coverage, or sequencing.
+        Tell the subagent to return concise proposed improvements and any replacement text the user should review before acceptance.
+      </detail>
+    </action>
   </branch>
   <branch if="the user chooses Party Mode" optional="true">
-    <action>Invoke the `bmad-party-mode` skill using the current epic-and-story document as context.</action>
+    <action>
+      Dispatch a dedicated subagent for Party Mode.
+      <detail>
+        Instruct the subagent to call `use_skill` with `skill_name = "bmad-party-mode"`.
+        Prompt the subagent with the current epic-and-story document and the instruction to critique it from multiple stakeholder perspectives.
+        Tell the subagent to return concise proposed improvements and decision guidance for the user to review before acceptance.
+      </detail>
+    </action>
   </branch>
   <branch if="the user chooses Continue" optional="true">
     <action>Persist the current document state and workflow progress in `{planning_artifacts}/epics.md`.</action>

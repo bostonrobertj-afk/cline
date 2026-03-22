@@ -11,6 +11,11 @@ export const SUPPORTED_MANAGED_WORKFLOWS = [
 		strategyHints: ["workflow-steps", "ordered-lists", "bullet-groups", "heading-items"],
 	},
 	{
+		workflowId: "bmad-brainstorming",
+		module: "core",
+		strategyHints: ["workflow-steps", "ordered-lists", "bullet-groups"],
+	},
+	{
 		workflowId: "bmad-check-implementation-readiness",
 		module: "bmm",
 		strategyHints: ["numbered-headings", "ordered-lists", "bullet-groups"],
@@ -68,14 +73,69 @@ export const SUPPORTED_MANAGED_WORKFLOWS = [
 	{ workflowId: "bmad-dev-story", module: "bmm", strategyHints: ["workflow-steps", "template-outputs", "ordered-lists"] },
 	{ workflowId: "bmad-distillator", module: "core", strategyHints: ["ordered-lists", "bullet-groups", "heading-items"] },
 	{
+		workflowId: "bmad-domain-research",
+		module: "bmm",
+		strategyHints: ["workflow-steps", "ordered-lists", "bullet-groups"],
+	},
+	{
 		workflowId: "bmad-document-project",
 		module: "bmm",
 		workflowPathOverride: "instructions.md",
 		strategyHints: ["workflow-steps", "ordered-lists", "bullet-groups"],
 	},
 	{ workflowId: "bmad-edit-prd", module: "bmm", strategyHints: ["numbered-headings", "ordered-lists", "bullet-groups"] },
+	{
+		workflowId: "bmad-editorial-review-prose",
+		module: "core",
+		strategyHints: ["workflow-steps", "ordered-lists", "bullet-groups"],
+	},
+	{
+		workflowId: "bmad-editorial-review-structure",
+		module: "core",
+		strategyHints: ["workflow-steps", "ordered-lists", "bullet-groups"],
+	},
+	{
+		workflowId: "bmad-generate-project-context",
+		module: "bmm",
+		strategyHints: ["workflow-steps", "ordered-lists", "bullet-groups"],
+	},
 	{ workflowId: "bmad-help", module: "core", strategyHints: ["ordered-lists", "bullet-groups", "heading-items"] },
+	{
+		workflowId: "bmad-index-docs",
+		module: "core",
+		strategyHints: ["workflow-steps", "ordered-lists", "bullet-groups"],
+	},
+	{
+		workflowId: "bmad-market-research",
+		module: "bmm",
+		strategyHints: ["workflow-steps", "ordered-lists", "bullet-groups"],
+	},
+	{
+		workflowId: "bmad-party-mode",
+		module: "core",
+		strategyHints: ["workflow-steps", "ordered-lists", "bullet-groups"],
+	},
+	{
+		workflowId: "bmad-qa-generate-e2e-tests",
+		module: "bmm",
+		strategyHints: ["workflow-steps", "ordered-lists", "bullet-groups"],
+	},
 	{ workflowId: "bmad-quick-dev", module: "bmm", strategyHints: ["numbered-headings", "workflow-steps", "ordered-lists"] },
+	{
+		workflowId: "bmad-quick-dev-new-preview",
+		module: "bmm",
+		strategyHints: ["workflow-steps", "ordered-lists", "bullet-groups"],
+	},
+	{
+		workflowId: "bmad-quick-spec",
+		module: "bmm",
+		strategyHints: ["workflow-steps", "ordered-lists", "bullet-groups"],
+	},
+	{
+		workflowId: "bmad-retrospective",
+		module: "bmm",
+		strategyHints: ["workflow-steps", "ordered-lists", "bullet-groups"],
+	},
 	{
 		workflowId: "bmad-review-adversarial-general",
 		module: "core",
@@ -86,6 +146,11 @@ export const SUPPORTED_MANAGED_WORKFLOWS = [
 		module: "core",
 		strategyHints: ["numbered-headings", "ordered-lists", "bullet-groups"],
 	},
+	{
+		workflowId: "bmad-shard-doc",
+		module: "core",
+		strategyHints: ["workflow-steps", "ordered-lists", "bullet-groups"],
+	},
 	{ workflowId: "bmad-sprint-planning", module: "bmm", strategyHints: ["ordered-lists", "numbered-headings", "bullet-groups"] },
 	{
 		workflowId: "bmad-sprint-status",
@@ -93,5 +158,20 @@ export const SUPPORTED_MANAGED_WORKFLOWS = [
 		extractionMode: "branch-aware",
 		primaryStepRange: { min: 0, max: 5 },
 		strategyHints: ["workflow-steps", "template-outputs", "ordered-lists"],
+	},
+	{
+		workflowId: "bmad-teach-me-testing",
+		module: "tea",
+		strategyHints: ["workflow-steps", "ordered-lists", "bullet-groups"],
+	},
+	{
+		workflowId: "bmad-technical-research",
+		module: "bmm",
+		strategyHints: ["workflow-steps", "ordered-lists", "bullet-groups"],
+	},
+	{
+		workflowId: "bmad-validate-prd",
+		module: "bmm",
+		strategyHints: ["workflow-steps", "ordered-lists", "bullet-groups"],
 	},
 ]

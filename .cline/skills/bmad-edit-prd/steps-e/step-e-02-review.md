@@ -78,10 +78,16 @@ prdPurpose: '{project-root}/_bmad/bmm/workflows/2-plan-workflows/create-prd/data
     <handoff path="./step-e-03-edit.md">Begin the edit step.</handoff>
   </branch>
   <branch if="user selects A" optional="true">
-    <detail>Invoke the bmad-advanced-elicitation skill, then return to the discussion menu.</detail>
+    <detail>
+      Dispatch a dedicated subagent, instruct it to call `use_skill` with `skill_name = "bmad-advanced-elicitation"`, and prompt it with the current change plan plus the instruction to deepen missing requirements, fixes, or tradeoffs before editing.
+      Have the subagent return concise proposed improvements, then return to the discussion menu.
+    </detail>
   </branch>
   <branch if="user selects P" optional="true">
-    <detail>Invoke the bmad-party-mode skill, then return to the discussion menu.</detail>
+    <detail>
+      Dispatch a dedicated subagent, instruct it to call `use_skill` with `skill_name = "bmad-party-mode"`, and prompt it with the current change plan plus the instruction to critique it from multiple stakeholder perspectives before editing.
+      Have the subagent return concise proposed improvements and decision guidance, then return to the discussion menu.
+    </detail>
   </branch>
   <branch if="any other selection" optional="true">
     <detail>Discuss the request, then redisplay the menu.</detail>

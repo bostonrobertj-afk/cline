@@ -32,10 +32,24 @@
   <branch if="the user wants deeper exploration before approving" optional="true">
     <ask>Ask whether the user wants Advanced Elicitation or Party Mode before continuing the refinement.</ask>
     <branch if="the user chooses Advanced Elicitation" optional="true">
-      <action>Invoke the `bmad-advanced-elicitation` skill using the current epic-structure draft as context.</action>
+      <action>
+        Dispatch a dedicated subagent for Advanced Elicitation.
+        <detail>
+          Instruct the subagent to call `use_skill` with `skill_name = "bmad-advanced-elicitation"`.
+          Prompt the subagent with the current epic-structure draft and the instruction to deepen grouping logic, value boundaries, or requirement coverage.
+          Tell the subagent to return concise proposed improvements and any replacement text the user should review before acceptance.
+        </detail>
+      </action>
     </branch>
     <branch if="the user chooses Party Mode" optional="true">
-      <action>Invoke the `bmad-party-mode` skill using the current epic-structure draft as context.</action>
+      <action>
+        Dispatch a dedicated subagent for Party Mode.
+        <detail>
+          Instruct the subagent to call `use_skill` with `skill_name = "bmad-party-mode"`.
+          Prompt the subagent with the current epic-structure draft and the instruction to critique it from multiple stakeholder perspectives.
+          Tell the subagent to return concise proposed improvements and decision guidance for the user to review before acceptance.
+        </detail>
+      </action>
     </branch>
   </branch>
   <branch if="the user approves the epic structure" optional="true">
@@ -48,10 +62,24 @@
   <ask>Ask the user to choose whether to continue to story creation, use Advanced Elicitation, or use Party Mode.</ask>
   <detail>Keep the current menu available after conversational detours. Only advance when the user explicitly chooses Continue.</detail>
   <branch if="the user chooses Advanced Elicitation" optional="true">
-    <action>Invoke the `bmad-advanced-elicitation` skill against the approved or in-progress epic structure.</action>
+    <action>
+      Dispatch a dedicated subagent for Advanced Elicitation.
+      <detail>
+        Instruct the subagent to call `use_skill` with `skill_name = "bmad-advanced-elicitation"`.
+        Prompt the subagent with the approved or in-progress epic structure and the instruction to deepen or challenge it before story creation.
+        Tell the subagent to return concise proposed improvements and any replacement text the user should review before acceptance.
+      </detail>
+    </action>
   </branch>
   <branch if="the user chooses Party Mode" optional="true">
-    <action>Invoke the `bmad-party-mode` skill against the approved or in-progress epic structure.</action>
+    <action>
+      Dispatch a dedicated subagent for Party Mode.
+      <detail>
+        Instruct the subagent to call `use_skill` with `skill_name = "bmad-party-mode"`.
+        Prompt the subagent with the approved or in-progress epic structure and the instruction to critique it from multiple stakeholder perspectives.
+        Tell the subagent to return concise proposed improvements and decision guidance for the user to review before acceptance.
+      </detail>
+    </action>
   </branch>
   <branch if="the user chooses Continue" optional="true">
     <action>Persist the approved epic structure and workflow state in `{planning_artifacts}/epics.md`.</action>

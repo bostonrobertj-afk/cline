@@ -13,10 +13,11 @@
 
 <step n="1" goal="Normalize findings into a common structure">
   <action>
-    Normalize the Blind Hunter, Edge Case Hunter, and Acceptance Auditor outputs into one common finding format.
+    Normalize the Blind Hunter, Adversarial General, Edge Case Hunter, and Acceptance Auditor outputs into one common finding format.
     <detail>
       Expected source formats:
       - Blind Hunter: markdown list of descriptions
+      - Adversarial General: markdown list of findings with concise evidence
       - Edge Case Hunter: JSON array with `location`, `trigger_condition`, `guard_snippet`, and `potential_consequence`
       - Acceptance Auditor: markdown list with title, AC or constraint reference, and evidence
     </detail>
@@ -30,6 +31,7 @@
       - `title`
       - `detail`
       - `location` when available
+      - Use `blind`, `general`, `edge`, and `auditor` as the source labels before any source merging.
     </detail>
   </action>
   <branch if="a review layer returns malformed output" optional="true">

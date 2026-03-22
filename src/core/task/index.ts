@@ -997,7 +997,12 @@ export class Task {
 			return enabledSkills.filter((skill) => !isHumanInvokedBmadSkillName(skill.name))
 		}
 
-		return []
+		const activeAgent = await getBmadAgentById(this.cwd, this.taskState.activeAgentId)
+		if (!activeAgent) {
+			return []
+		}
+
+		return enabledSkills.filter((skill) => isSkillAllowedForBmadAgent(activeAgent, skill.name))
 	}
 
 	private hasHumanAuthoredInput(contentBlocks: ClineContent[]): boolean {

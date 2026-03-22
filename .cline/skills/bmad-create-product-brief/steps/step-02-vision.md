@@ -34,10 +34,24 @@ outputFile: '{planning_artifacts}/product-brief-{{project_name}}-{{date}}.md'
   <branch if="the user wants deeper exploration before approving" optional="true">
     <ask>Ask whether the user wants Advanced Elicitation or Party Mode for additional exploration.</ask>
     <branch if="the user chooses Advanced Elicitation" optional="true">
-      <action>Invoke the `bmad-advanced-elicitation` skill using the current vision draft as context.</action>
+      <action>
+        Dispatch a dedicated subagent for Advanced Elicitation.
+        <detail>
+          Instruct the subagent to call `use_skill` with `skill_name = "bmad-advanced-elicitation"`.
+          Prompt the subagent with the current vision draft and the instruction to deepen the problem statement, solution framing, or differentiation.
+          Tell the subagent to return concise proposed improvements and any replacement text the user should review before acceptance.
+        </detail>
+      </action>
     </branch>
     <branch if="the user chooses Party Mode" optional="true">
-      <action>Invoke the `bmad-party-mode` skill using the current vision draft as context.</action>
+      <action>
+        Dispatch a dedicated subagent for Party Mode.
+        <detail>
+          Instruct the subagent to call `use_skill` with `skill_name = "bmad-party-mode"`.
+          Prompt the subagent with the current vision draft and the instruction to critique it from multiple stakeholder perspectives.
+          Tell the subagent to return concise proposed improvements and decision guidance for the user to review before acceptance.
+        </detail>
+      </action>
     </branch>
   </branch>
   <branch if="the user approves the draft" optional="true">

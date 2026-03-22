@@ -7,6 +7,7 @@ import path from "path"
 import sinon from "sinon"
 import { HostProvider } from "@/hosts/host-provider"
 import { setVscodeHostProviderMock } from "@/test/host-provider-test-utils"
+import { startOrResumeManagedWorkflowRun } from "../../../managed-workflows/ManagedWorkflowController"
 import type { ManagedWorkflowRunState } from "../../../managed-workflows/types"
 import { TaskState } from "../../../TaskState"
 import type { TaskConfig } from "../../types/TaskConfig"
@@ -310,31 +311,71 @@ describe("Managed workflow handlers", () => {
 		}
 	})
 
-	it("rejects managed workflow aliases through use_skill and directs the model to the human slash command", async () => {
-		const handler = new UseSkillToolHandler()
-		const config = createConfig()
+	it("activates managed workflow aliases through use_skill and persists the workflow run", async () => {
+		const sandbox = sinon.createSandbox()
+		try {
+			const handler = new UseSkillToolHandler()
+			const config = createConfig()
+			const metadata = {} as any
+			const getMetadataStub = sandbox.stub(disk, "getTaskMetadata").resolves(metadata)
+			const saveMetadataStub = sandbox.stub(disk, "saveTaskMetadata").resolves()
 
-		const result = await handler.execute(config, {
-			type: "tool_use",
-			name: "use_skill",
-			params: {
-				skill_name: "bmad-problem-solving",
-			},
-			partial: false,
-		} as any)
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "use_skill",
+				params: {
+					skill_name: "bmad-problem-solving",
+				},
+				partial: false,
+			} as any)
 
-		expect(String(result)).to.contain("cannot be activated with use_skill")
-		expect(String(result)).to.contain("human user via their / command")
-		expect(String(result)).to.contain("`/bmad-cis-problem-solving`")
-		expect(config.taskState.managedWorkflowRun).to.equal(undefined)
-		expect(config.taskState.activeWorkflowId).to.equal(undefined)
-		expect(config.taskState.activeAgentId).to.equal(undefined)
-		expect((config.callbacks.updateFCListFromToolResponse as sinon.SinonStub).called).to.equal(false)
+			expect(String(result)).to.contain('Managed workflow "bmad-cis-problem-solving" is now active')
+			expect(config.taskState.managedWorkflowRun?.workflowId).to.equal("bmad-cis-problem-solving")
+			expect(config.taskState.activeWorkflowId).to.equal("bmad-cis-problem-solving")
+			expect(config.taskState.activeAgentId).to.equal(undefined)
+			expect(config.taskState.activeAgentInvokedSlashCommand).to.equal(undefined)
+			expect(getMetadataStub.calledOnce).to.equal(true)
+			expect(saveMetadataStub.calledOnce).to.equal(true)
+			expect((config.callbacks.updateFCListFromToolResponse as sinon.SinonStub).calledOnce).to.equal(true)
+		} finally {
+			sandbox.restore()
+		}
 	})
 
-	it("rejects managed workflows through use_skill even when a compatible BMAD agent is already active", async () => {
+	it("resumes a managed workflow through use_skill when the same workflow is already active", async () => {
+		const sandbox = sinon.createSandbox()
+		try {
+			const handler = new UseSkillToolHandler()
+			const config = createConfig()
+			config.taskState.managedWorkflowRun = (
+				await startOrResumeManagedWorkflowRun(config.cwd, "bmad-code-review", undefined, "bmad-code-review")
+			).run
+			config.taskState.activeWorkflowId = "bmad-code-review"
+			config.taskState.activeWorkflowJustStarted = false
+			const metadata = { activeWorkflowId: "bmad-code-review" } as any
+			sandbox.stub(disk, "getTaskMetadata").resolves(metadata)
+			sandbox.stub(disk, "saveTaskMetadata").resolves()
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "use_skill",
+				params: {
+					skill_name: "bmad-code-review",
+				},
+				partial: false,
+			} as any)
+
+			expect(String(result)).to.contain('Managed workflow "bmad-code-review" is active again')
+			expect(config.taskState.activeWorkflowId).to.equal("bmad-code-review")
+			expect(config.taskState.activeWorkflowJustStarted).to.equal(false)
+		} finally {
+			sandbox.restore()
+		}
+	})
+
+	it("rejects same-thread managed workflow activation when a BMAD agent is already active outside subagent execution", async () => {
 		const handler = new UseSkillToolHandler()
-		const config = createConfig()
+		const config = createConfig({ isSubagentExecution: false })
 		config.taskState.activeAgentId = "bmad-dev"
 		config.taskState.activeAgentSkillName = "bmad-dev"
 		config.taskState.activeAgentInvokedSlashCommand = "bmad-agent-bmm-dev"
@@ -349,30 +390,10 @@ describe("Managed workflow handlers", () => {
 			partial: false,
 		} as any)
 
-		expect(String(result)).to.contain("cannot be activated with use_skill")
-		expect(String(result)).to.contain("`/bmad-code-review`")
+		expect(String(result)).to.contain("must be activated from a dedicated subagent")
+		expect(String(result)).to.contain('call use_skill with "bmad-code-review"')
 		expect(config.taskState.managedWorkflowRun).to.equal(undefined)
 		expect(config.taskState.activeWorkflowId).to.equal(undefined)
 		expect(config.taskState.activeAgentId).to.equal("bmad-dev")
-		expect(config.taskState.activeAgentInvokedSlashCommand).to.equal("bmad-agent-bmm-dev")
-	})
-
-	it("rejects bmad-help through use_skill and directs the model to the human slash command", async () => {
-		const handler = new UseSkillToolHandler()
-		const config = createConfig()
-
-		const result = await handler.execute(config, {
-			type: "tool_use",
-			name: "use_skill",
-			params: {
-				skill_name: "bmad-help",
-			},
-			partial: false,
-		} as any)
-
-		expect(String(result)).to.contain("cannot be activated with use_skill")
-		expect(String(result)).to.contain("`/bmad-help`")
-		expect(config.taskState.activeWorkflowId).to.equal(undefined)
-		expect(config.taskState.managedWorkflowRun).to.equal(undefined)
 	})
 })

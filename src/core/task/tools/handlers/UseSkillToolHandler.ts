@@ -1,10 +1,12 @@
 import type { ToolUse } from "@core/assistant-message"
 import { discoverSkills, getAvailableSkills, getSkillContent } from "@core/context/instructions/user-instructions/skills"
+import { getTaskMetadata, saveTaskMetadata } from "@core/storage/disk"
+import { startOrResumeManagedWorkflowRun } from "@core/task/managed-workflows/ManagedWorkflowController"
 import { getManagedWorkflowDefinition } from "@core/task/managed-workflows/ManagedWorkflowRegistry"
 import type { SkillMetadata } from "@shared/skills"
 import { telemetryService } from "@/services/telemetry"
 import { ClineDefaultTool } from "@/shared/tools"
-import { getBmadAgentById, isHumanInvokedBmadSkillName, isSkillAllowedForBmadAgent } from "../../bmad-agent-mode"
+import { getBmadAgentById, getOwningBmadAgentForSkill, isSkillAllowedForBmadAgent } from "../../bmad-agent-mode"
 import type { ToolResponse } from "../../index"
 import type { IPartialBlockHandler, IToolHandler } from "../ToolExecutorCoordinator"
 import type { TaskConfig } from "../types/TaskConfig"
@@ -40,18 +42,61 @@ export class UseSkillToolHandler implements IToolHandler, IPartialBlockHandler {
 		const managedWorkflowDefinition = await getManagedWorkflowDefinition(config.cwd, skillName)
 		const resolvedSkillName = managedWorkflowDefinition?.skillName ?? skillName
 
-		if (isHumanInvokedBmadSkillName(resolvedSkillName)) {
-			const preferredSlashCommand = managedWorkflowDefinition?.slashCommand ?? resolvedSkillName
-			return `Error: BMAD workflows and BMAD help cannot be activated with use_skill. They must be started by the human user via their / command. Ask the user to invoke \`/${preferredSlashCommand}\` directly.`
-		}
-
+		const activeAgent = config.taskState.activeAgentId
+			? await getBmadAgentById(config.cwd, config.taskState.activeAgentId)
+			: undefined
 		if (config.taskState.activeAgentId) {
-			const activeAgent = await getBmadAgentById(config.cwd, config.taskState.activeAgentId)
 			if (activeAgent && !isSkillAllowedForBmadAgent(activeAgent, resolvedSkillName)) {
 				return `Error: Active agent "${activeAgent.id}" is not allowed to use skill "${skillName}". Allowed skills: ${activeAgent.allowedSkills.join(
 					", ",
 				)}. Use /bmad-exit to leave agent mode or switch to another /bmad-* agent.`
 			}
+		}
+
+		if (managedWorkflowDefinition) {
+			if (activeAgent && !config.isSubagentExecution) {
+				return `Error: Managed workflows must be activated from a dedicated subagent while BMAD agent "${activeAgent.id}" is active. Spawn a subagent, tell it to call use_skill with "${managedWorkflowDefinition.skillName}", and keep the current thread in the active agent persona.`
+			}
+
+			if (!activeAgent) {
+				const owningAgent = await getOwningBmadAgentForSkill(config.cwd, managedWorkflowDefinition.workflowId)
+				if (owningAgent) {
+					config.taskState.activeAgentId = owningAgent.id
+					config.taskState.activeAgentSkillName = owningAgent.id
+					config.taskState.activeAgentInvokedSlashCommand = managedWorkflowDefinition.slashCommand
+					config.taskState.activeAgentJustActivated = true
+				}
+			}
+
+			const { run, resumed } = await startOrResumeManagedWorkflowRun(
+				config.cwd,
+				managedWorkflowDefinition.workflowId,
+				config.taskState.managedWorkflowRun,
+				managedWorkflowDefinition.slashCommand,
+			)
+
+			config.taskState.managedWorkflowRun = run
+			config.taskState.activeWorkflowId = run.workflowId
+			config.taskState.activeWorkflowJustStarted = !resumed
+			config.taskState.consecutiveMistakeCount = 0
+
+			try {
+				const metadata = await getTaskMetadata(config.taskId)
+				metadata.activeAgentId = config.taskState.activeAgentId
+				metadata.activeAgentSkillName = config.taskState.activeAgentSkillName
+				metadata.activeAgentInvokedSlashCommand = config.taskState.activeAgentInvokedSlashCommand
+				metadata.activeWorkflowId = config.taskState.activeWorkflowId
+				metadata.managedWorkflowRun = config.taskState.managedWorkflowRun
+				await saveTaskMetadata(config.taskId, metadata)
+			} catch {
+				// Non-fatal: keep the workflow activation in memory even if persistence fails.
+			}
+
+			await config.callbacks.updateFCListFromToolResponse(undefined)
+
+			return resumed
+				? `Managed workflow "${run.workflowId}" is active again. Resume the workflow from its current phase and follow the active checklist.`
+				: `Managed workflow "${run.workflowId}" is now active. Follow the active checklist and current step instructions.`
 		}
 
 		// Discover skills on-demand (lazy loading)

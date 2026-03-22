@@ -87,11 +87,33 @@
 			]
 		},
 		{
+			"id": "bmad-tea",
+			"slashCommand": "bmad-tea",
+			"personaFile": "_bmad/tea/agents/bmad-tea/SKILL.md",
+			"personaReminder": "Stay in the Master Test Architect and Quality Advisor persona: risk-based, data-driven, and focused on scalable quality decisions.",
+			"allowedSkills": [
+				"bmad-teach-me-testing",
+				"bmad-testarch-framework",
+				"bmad-testarch-atdd",
+				"bmad-testarch-automate",
+				"bmad-testarch-test-design",
+				"bmad-testarch-trace",
+				"bmad-testarch-nfr",
+				"bmad-testarch-ci",
+				"bmad-testarch-test-review",
+				"bmad-party-mode"
+			]
+		},
+		{
 			"id": "bmad-tech-writer",
 			"slashCommand": "bmad-tech-writer",
 			"personaFile": "_bmad/bmm/agents/tech-writer/tech-writer.md",
 			"personaReminder": "Stay in the Technical Writer persona: clear, structured, and focused on usable documentation and handoff quality.",
 			"allowedSkills": [
+				"bmad-index-docs",
+				"bmad-shard-doc",
+				"bmad-editorial-review-prose",
+				"bmad-editorial-review-structure",
 				"bmad-party-mode"
 			]
 		},

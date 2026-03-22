@@ -26,6 +26,42 @@
 		]
 	},
 	{
+		"workflowId": "bmad-brainstorming",
+		"slashCommand": "bmad-brainstorming",
+		"skillName": "bmad-brainstorming",
+		"module": "core",
+		"skillPath": ".cline/skills/bmad-brainstorming/SKILL.md",
+		"workflowPath": ".cline/skills/bmad-brainstorming/workflow.md",
+		"aliases": [],
+		"phaseRoots": [
+			".cline/skills/bmad-brainstorming/steps"
+		],
+		"checklistPath": null,
+		"supportsManagedExecution": true,
+		"strategyHints": [
+			"workflow-steps",
+			"ordered-lists",
+			"bullet-groups"
+		],
+		"extractionMode": "linear",
+		"primaryStepRange": null,
+		"packagedAssetPaths": [
+			".cline/skills/bmad-brainstorming/bmad-skill-manifest.yaml",
+			".cline/skills/bmad-brainstorming/brain-methods.csv",
+			".cline/skills/bmad-brainstorming/SKILL.md",
+			".cline/skills/bmad-brainstorming/steps/step-01-session-setup.md",
+			".cline/skills/bmad-brainstorming/steps/step-01b-continue.md",
+			".cline/skills/bmad-brainstorming/steps/step-02a-user-selected.md",
+			".cline/skills/bmad-brainstorming/steps/step-02b-ai-recommended.md",
+			".cline/skills/bmad-brainstorming/steps/step-02c-random-selection.md",
+			".cline/skills/bmad-brainstorming/steps/step-02d-progressive-flow.md",
+			".cline/skills/bmad-brainstorming/steps/step-03-technique-execution.md",
+			".cline/skills/bmad-brainstorming/steps/step-04-idea-organization.md",
+			".cline/skills/bmad-brainstorming/template.md",
+			".cline/skills/bmad-brainstorming/workflow.md"
+		]
+	},
+	{
 		"workflowId": "bmad-check-implementation-readiness",
 		"slashCommand": "bmad-check-implementation-readiness",
 		"skillName": "bmad-check-implementation-readiness",
@@ -376,7 +412,9 @@
 		"skillPath": ".cline/skills/bmad-create-story/SKILL.md",
 		"workflowPath": ".cline/skills/bmad-create-story/workflow.md",
 		"aliases": [],
-		"phaseRoots": [],
+		"phaseRoots": [
+			".cline/skills/bmad-create-story/steps"
+		],
 		"checklistPath": ".cline/skills/bmad-create-story/checklist.md",
 		"supportsManagedExecution": true,
 		"strategyHints": [
@@ -391,6 +429,12 @@
 			".cline/skills/bmad-create-story/checklist.md",
 			".cline/skills/bmad-create-story/discover-inputs.md",
 			".cline/skills/bmad-create-story/SKILL.md",
+			".cline/skills/bmad-create-story/steps/step-01-determine-target-story.md",
+			".cline/skills/bmad-create-story/steps/step-02-load-and-analyze-core-artifacts.md",
+			".cline/skills/bmad-create-story/steps/step-03-architecture-analysis-for-developer-guardrails.md",
+			".cline/skills/bmad-create-story/steps/step-04-web-research-for-latest-technical-specifics.md",
+			".cline/skills/bmad-create-story/steps/step-05-create-comprehensive-story-file.md",
+			".cline/skills/bmad-create-story/steps/step-06-update-sprint-status-and-finalize.md",
 			".cline/skills/bmad-create-story/template.md",
 			".cline/skills/bmad-create-story/workflow.md"
 		]
@@ -530,6 +574,39 @@
 		]
 	},
 	{
+		"workflowId": "bmad-domain-research",
+		"slashCommand": "bmad-domain-research",
+		"skillName": "bmad-domain-research",
+		"module": "bmm",
+		"skillPath": ".cline/skills/bmad-domain-research/SKILL.md",
+		"workflowPath": ".cline/skills/bmad-domain-research/workflow.md",
+		"aliases": [],
+		"phaseRoots": [
+			".cline/skills/bmad-domain-research/domain-steps"
+		],
+		"checklistPath": null,
+		"supportsManagedExecution": true,
+		"strategyHints": [
+			"workflow-steps",
+			"ordered-lists",
+			"bullet-groups"
+		],
+		"extractionMode": "linear",
+		"primaryStepRange": null,
+		"packagedAssetPaths": [
+			".cline/skills/bmad-domain-research/bmad-skill-manifest.yaml",
+			".cline/skills/bmad-domain-research/domain-steps/step-01-init.md",
+			".cline/skills/bmad-domain-research/domain-steps/step-02-domain-analysis.md",
+			".cline/skills/bmad-domain-research/domain-steps/step-03-competitive-landscape.md",
+			".cline/skills/bmad-domain-research/domain-steps/step-04-regulatory-focus.md",
+			".cline/skills/bmad-domain-research/domain-steps/step-05-technical-trends.md",
+			".cline/skills/bmad-domain-research/domain-steps/step-06-research-synthesis.md",
+			".cline/skills/bmad-domain-research/research.template.md",
+			".cline/skills/bmad-domain-research/SKILL.md",
+			".cline/skills/bmad-domain-research/workflow.md"
+		]
+	},
+	{
 		"workflowId": "bmad-edit-prd",
 		"slashCommand": "bmad-edit-prd",
 		"skillName": "bmad-edit-prd",
@@ -561,6 +638,84 @@
 		]
 	},
 	{
+		"workflowId": "bmad-editorial-review-prose",
+		"slashCommand": "bmad-editorial-review-prose",
+		"skillName": "bmad-editorial-review-prose",
+		"module": "core",
+		"skillPath": ".cline/skills/bmad-editorial-review-prose/SKILL.md",
+		"workflowPath": ".cline/skills/bmad-editorial-review-prose/workflow.md",
+		"aliases": [],
+		"phaseRoots": [],
+		"checklistPath": null,
+		"supportsManagedExecution": true,
+		"strategyHints": [
+			"workflow-steps",
+			"ordered-lists",
+			"bullet-groups"
+		],
+		"extractionMode": "linear",
+		"primaryStepRange": null,
+		"packagedAssetPaths": [
+			".cline/skills/bmad-editorial-review-prose/bmad-skill-manifest.yaml",
+			".cline/skills/bmad-editorial-review-prose/SKILL.md",
+			".cline/skills/bmad-editorial-review-prose/workflow.md"
+		]
+	},
+	{
+		"workflowId": "bmad-editorial-review-structure",
+		"slashCommand": "bmad-editorial-review-structure",
+		"skillName": "bmad-editorial-review-structure",
+		"module": "core",
+		"skillPath": ".cline/skills/bmad-editorial-review-structure/SKILL.md",
+		"workflowPath": ".cline/skills/bmad-editorial-review-structure/workflow.md",
+		"aliases": [],
+		"phaseRoots": [],
+		"checklistPath": null,
+		"supportsManagedExecution": true,
+		"strategyHints": [
+			"workflow-steps",
+			"ordered-lists",
+			"bullet-groups"
+		],
+		"extractionMode": "linear",
+		"primaryStepRange": null,
+		"packagedAssetPaths": [
+			".cline/skills/bmad-editorial-review-structure/bmad-skill-manifest.yaml",
+			".cline/skills/bmad-editorial-review-structure/SKILL.md",
+			".cline/skills/bmad-editorial-review-structure/workflow.md"
+		]
+	},
+	{
+		"workflowId": "bmad-generate-project-context",
+		"slashCommand": "bmad-generate-project-context",
+		"skillName": "bmad-generate-project-context",
+		"module": "bmm",
+		"skillPath": ".cline/skills/bmad-generate-project-context/SKILL.md",
+		"workflowPath": ".cline/skills/bmad-generate-project-context/workflow.md",
+		"aliases": [],
+		"phaseRoots": [
+			".cline/skills/bmad-generate-project-context/steps"
+		],
+		"checklistPath": null,
+		"supportsManagedExecution": true,
+		"strategyHints": [
+			"workflow-steps",
+			"ordered-lists",
+			"bullet-groups"
+		],
+		"extractionMode": "linear",
+		"primaryStepRange": null,
+		"packagedAssetPaths": [
+			".cline/skills/bmad-generate-project-context/bmad-skill-manifest.yaml",
+			".cline/skills/bmad-generate-project-context/project-context-template.md",
+			".cline/skills/bmad-generate-project-context/SKILL.md",
+			".cline/skills/bmad-generate-project-context/steps/step-01-discover.md",
+			".cline/skills/bmad-generate-project-context/steps/step-02-generate.md",
+			".cline/skills/bmad-generate-project-context/steps/step-03-complete.md",
+			".cline/skills/bmad-generate-project-context/workflow.md"
+		]
+	},
+	{
 		"workflowId": "bmad-help",
 		"slashCommand": "bmad-help",
 		"skillName": "bmad-help",
@@ -582,6 +737,117 @@
 			".cline/skills/bmad-help/bmad-skill-manifest.yaml",
 			".cline/skills/bmad-help/SKILL.md",
 			".cline/skills/bmad-help/workflow.md"
+		]
+	},
+	{
+		"workflowId": "bmad-index-docs",
+		"slashCommand": "bmad-index-docs",
+		"skillName": "bmad-index-docs",
+		"module": "core",
+		"skillPath": ".cline/skills/bmad-index-docs/SKILL.md",
+		"workflowPath": ".cline/skills/bmad-index-docs/workflow.md",
+		"aliases": [],
+		"phaseRoots": [],
+		"checklistPath": null,
+		"supportsManagedExecution": true,
+		"strategyHints": [
+			"workflow-steps",
+			"ordered-lists",
+			"bullet-groups"
+		],
+		"extractionMode": "linear",
+		"primaryStepRange": null,
+		"packagedAssetPaths": [
+			".cline/skills/bmad-index-docs/bmad-skill-manifest.yaml",
+			".cline/skills/bmad-index-docs/SKILL.md",
+			".cline/skills/bmad-index-docs/workflow.md"
+		]
+	},
+	{
+		"workflowId": "bmad-market-research",
+		"slashCommand": "bmad-market-research",
+		"skillName": "bmad-market-research",
+		"module": "bmm",
+		"skillPath": ".cline/skills/bmad-market-research/SKILL.md",
+		"workflowPath": ".cline/skills/bmad-market-research/workflow.md",
+		"aliases": [],
+		"phaseRoots": [
+			".cline/skills/bmad-market-research/steps"
+		],
+		"checklistPath": null,
+		"supportsManagedExecution": true,
+		"strategyHints": [
+			"workflow-steps",
+			"ordered-lists",
+			"bullet-groups"
+		],
+		"extractionMode": "linear",
+		"primaryStepRange": null,
+		"packagedAssetPaths": [
+			".cline/skills/bmad-market-research/bmad-skill-manifest.yaml",
+			".cline/skills/bmad-market-research/research.template.md",
+			".cline/skills/bmad-market-research/SKILL.md",
+			".cline/skills/bmad-market-research/steps/step-01-init.md",
+			".cline/skills/bmad-market-research/steps/step-02-customer-behavior.md",
+			".cline/skills/bmad-market-research/steps/step-03-customer-pain-points.md",
+			".cline/skills/bmad-market-research/steps/step-04-customer-decisions.md",
+			".cline/skills/bmad-market-research/steps/step-05-competitive-analysis.md",
+			".cline/skills/bmad-market-research/steps/step-06-research-completion.md",
+			".cline/skills/bmad-market-research/workflow.md"
+		]
+	},
+	{
+		"workflowId": "bmad-party-mode",
+		"slashCommand": "bmad-party-mode",
+		"skillName": "bmad-party-mode",
+		"module": "core",
+		"skillPath": ".cline/skills/bmad-party-mode/SKILL.md",
+		"workflowPath": ".cline/skills/bmad-party-mode/workflow.md",
+		"aliases": [],
+		"phaseRoots": [
+			".cline/skills/bmad-party-mode/steps"
+		],
+		"checklistPath": null,
+		"supportsManagedExecution": true,
+		"strategyHints": [
+			"workflow-steps",
+			"ordered-lists",
+			"bullet-groups"
+		],
+		"extractionMode": "linear",
+		"primaryStepRange": null,
+		"packagedAssetPaths": [
+			".cline/skills/bmad-party-mode/bmad-skill-manifest.yaml",
+			".cline/skills/bmad-party-mode/SKILL.md",
+			".cline/skills/bmad-party-mode/steps/step-01-agent-loading.md",
+			".cline/skills/bmad-party-mode/steps/step-02-discussion-orchestration.md",
+			".cline/skills/bmad-party-mode/steps/step-03-graceful-exit.md",
+			".cline/skills/bmad-party-mode/workflow.md"
+		]
+	},
+	{
+		"workflowId": "bmad-qa-generate-e2e-tests",
+		"slashCommand": "bmad-qa-generate-e2e-tests",
+		"skillName": "bmad-qa-generate-e2e-tests",
+		"module": "bmm",
+		"skillPath": ".cline/skills/bmad-qa-generate-e2e-tests/SKILL.md",
+		"workflowPath": ".cline/skills/bmad-qa-generate-e2e-tests/workflow.md",
+		"aliases": [],
+		"phaseRoots": [],
+		"checklistPath": ".cline/skills/bmad-qa-generate-e2e-tests/checklist.md",
+		"supportsManagedExecution": true,
+		"strategyHints": [
+			"workflow-steps",
+			"ordered-lists",
+			"bullet-groups"
+		],
+		"extractionMode": "linear",
+		"primaryStepRange": null,
+		"packagedAssetPaths": [
+			".cline/skills/bmad-qa-generate-e2e-tests/bmad-skill-manifest.yaml",
+			".cline/skills/bmad-qa-generate-e2e-tests/checklist.md",
+			".cline/skills/bmad-qa-generate-e2e-tests/SKILL.md",
+			".cline/skills/bmad-qa-generate-e2e-tests/workflow.md"
 		]
 	},
 	{
@@ -614,6 +880,93 @@
 			".cline/skills/bmad-quick-dev/steps/step-05-adversarial-review.md",
 			".cline/skills/bmad-quick-dev/steps/step-06-resolve-findings.md",
 			".cline/skills/bmad-quick-dev/workflow.md"
+		]
+	},
+	{
+		"workflowId": "bmad-quick-dev-new-preview",
+		"slashCommand": "bmad-quick-dev-new-preview",
+		"skillName": "bmad-quick-dev-new-preview",
+		"module": "bmm",
+		"skillPath": ".cline/skills/bmad-quick-dev-new-preview/SKILL.md",
+		"workflowPath": ".cline/skills/bmad-quick-dev-new-preview/workflow.md",
+		"aliases": [],
+		"phaseRoots": [
+			".cline/skills/bmad-quick-dev-new-preview/steps"
+		],
+		"checklistPath": null,
+		"supportsManagedExecution": true,
+		"strategyHints": [
+			"workflow-steps",
+			"ordered-lists",
+			"bullet-groups"
+		],
+		"extractionMode": "linear",
+		"primaryStepRange": null,
+		"packagedAssetPaths": [
+			".cline/skills/bmad-quick-dev-new-preview/bmad-skill-manifest.yaml",
+			".cline/skills/bmad-quick-dev-new-preview/SKILL.md",
+			".cline/skills/bmad-quick-dev-new-preview/steps/step-01-clarify-and-route.md",
+			".cline/skills/bmad-quick-dev-new-preview/steps/step-02-plan.md",
+			".cline/skills/bmad-quick-dev-new-preview/steps/step-03-implement.md",
+			".cline/skills/bmad-quick-dev-new-preview/steps/step-04-review.md",
+			".cline/skills/bmad-quick-dev-new-preview/steps/step-05-present.md",
+			".cline/skills/bmad-quick-dev-new-preview/tech-spec-template.md",
+			".cline/skills/bmad-quick-dev-new-preview/workflow.md"
+		]
+	},
+	{
+		"workflowId": "bmad-quick-spec",
+		"slashCommand": "bmad-quick-spec",
+		"skillName": "bmad-quick-spec",
+		"module": "bmm",
+		"skillPath": ".cline/skills/bmad-quick-spec/SKILL.md",
+		"workflowPath": ".cline/skills/bmad-quick-spec/workflow.md",
+		"aliases": [],
+		"phaseRoots": [
+			".cline/skills/bmad-quick-spec/steps"
+		],
+		"checklistPath": null,
+		"supportsManagedExecution": true,
+		"strategyHints": [
+			"workflow-steps",
+			"ordered-lists",
+			"bullet-groups"
+		],
+		"extractionMode": "linear",
+		"primaryStepRange": null,
+		"packagedAssetPaths": [
+			".cline/skills/bmad-quick-spec/bmad-skill-manifest.yaml",
+			".cline/skills/bmad-quick-spec/SKILL.md",
+			".cline/skills/bmad-quick-spec/steps/step-01-understand.md",
+			".cline/skills/bmad-quick-spec/steps/step-02-investigate.md",
+			".cline/skills/bmad-quick-spec/steps/step-03-generate.md",
+			".cline/skills/bmad-quick-spec/steps/step-04-review.md",
+			".cline/skills/bmad-quick-spec/tech-spec-template.md",
+			".cline/skills/bmad-quick-spec/workflow.md"
+		]
+	},
+	{
+		"workflowId": "bmad-retrospective",
+		"slashCommand": "bmad-retrospective",
+		"skillName": "bmad-retrospective",
+		"module": "bmm",
+		"skillPath": ".cline/skills/bmad-retrospective/SKILL.md",
+		"workflowPath": ".cline/skills/bmad-retrospective/workflow.md",
+		"aliases": [],
+		"phaseRoots": [],
+		"checklistPath": null,
+		"supportsManagedExecution": true,
+		"strategyHints": [
+			"workflow-steps",
+			"ordered-lists",
+			"bullet-groups"
+		],
+		"extractionMode": "linear",
+		"primaryStepRange": null,
+		"packagedAssetPaths": [
+			".cline/skills/bmad-retrospective/bmad-skill-manifest.yaml",
+			".cline/skills/bmad-retrospective/SKILL.md",
+			".cline/skills/bmad-retrospective/workflow.md"
 		]
 	},
 	{
@@ -662,6 +1015,30 @@
 			".cline/skills/bmad-review-edge-case-hunter/bmad-skill-manifest.yaml",
 			".cline/skills/bmad-review-edge-case-hunter/SKILL.md",
 			".cline/skills/bmad-review-edge-case-hunter/workflow.md"
+		]
+	},
+	{
+		"workflowId": "bmad-shard-doc",
+		"slashCommand": "bmad-shard-doc",
+		"skillName": "bmad-shard-doc",
+		"module": "core",
+		"skillPath": ".cline/skills/bmad-shard-doc/SKILL.md",
+		"workflowPath": ".cline/skills/bmad-shard-doc/workflow.md",
+		"aliases": [],
+		"phaseRoots": [],
+		"checklistPath": null,
+		"supportsManagedExecution": true,
+		"strategyHints": [
+			"workflow-steps",
+			"ordered-lists",
+			"bullet-groups"
+		],
+		"extractionMode": "linear",
+		"primaryStepRange": null,
+		"packagedAssetPaths": [
+			".cline/skills/bmad-shard-doc/bmad-skill-manifest.yaml",
+			".cline/skills/bmad-shard-doc/SKILL.md",
+			".cline/skills/bmad-shard-doc/workflow.md"
 		]
 	},
 	{
@@ -715,6 +1092,136 @@
 			".cline/skills/bmad-sprint-status/bmad-skill-manifest.yaml",
 			".cline/skills/bmad-sprint-status/SKILL.md",
 			".cline/skills/bmad-sprint-status/workflow.md"
+		]
+	},
+	{
+		"workflowId": "bmad-teach-me-testing",
+		"slashCommand": "bmad-teach-me-testing",
+		"skillName": "bmad-teach-me-testing",
+		"module": "tea",
+		"skillPath": ".cline/skills/bmad-teach-me-testing/SKILL.md",
+		"workflowPath": ".cline/skills/bmad-teach-me-testing/workflow.md",
+		"aliases": [],
+		"phaseRoots": [
+			".cline/skills/bmad-teach-me-testing/steps-c",
+			".cline/skills/bmad-teach-me-testing/steps-e",
+			".cline/skills/bmad-teach-me-testing/steps-v"
+		],
+		"checklistPath": ".cline/skills/bmad-teach-me-testing/checklist.md",
+		"supportsManagedExecution": true,
+		"strategyHints": [
+			"workflow-steps",
+			"ordered-lists",
+			"bullet-groups"
+		],
+		"extractionMode": "linear",
+		"primaryStepRange": null,
+		"packagedAssetPaths": [
+			".cline/skills/bmad-teach-me-testing/bmad-skill-manifest.yaml",
+			".cline/skills/bmad-teach-me-testing/checklist.md",
+			".cline/skills/bmad-teach-me-testing/data/curriculum.yaml",
+			".cline/skills/bmad-teach-me-testing/data/quiz-questions.yaml",
+			".cline/skills/bmad-teach-me-testing/data/role-paths.yaml",
+			".cline/skills/bmad-teach-me-testing/data/session-content-map.yaml",
+			".cline/skills/bmad-teach-me-testing/data/tea-resources-index.yaml",
+			".cline/skills/bmad-teach-me-testing/instructions.md",
+			".cline/skills/bmad-teach-me-testing/SKILL.md",
+			".cline/skills/bmad-teach-me-testing/steps-c/step-01-init.md",
+			".cline/skills/bmad-teach-me-testing/steps-c/step-01b-continue.md",
+			".cline/skills/bmad-teach-me-testing/steps-c/step-02-assess.md",
+			".cline/skills/bmad-teach-me-testing/steps-c/step-03-session-menu.md",
+			".cline/skills/bmad-teach-me-testing/steps-c/step-04-session-01.md",
+			".cline/skills/bmad-teach-me-testing/steps-c/step-04-session-02.md",
+			".cline/skills/bmad-teach-me-testing/steps-c/step-04-session-03.md",
+			".cline/skills/bmad-teach-me-testing/steps-c/step-04-session-04.md",
+			".cline/skills/bmad-teach-me-testing/steps-c/step-04-session-05.md",
+			".cline/skills/bmad-teach-me-testing/steps-c/step-04-session-06.md",
+			".cline/skills/bmad-teach-me-testing/steps-c/step-04-session-07.md",
+			".cline/skills/bmad-teach-me-testing/steps-c/step-05-completion.md",
+			".cline/skills/bmad-teach-me-testing/steps-e/step-e-01-assess-workflow.md",
+			".cline/skills/bmad-teach-me-testing/steps-e/step-e-02-apply-edits.md",
+			".cline/skills/bmad-teach-me-testing/steps-v/step-v-01-validate.md",
+			".cline/skills/bmad-teach-me-testing/templates/certificate-template.md",
+			".cline/skills/bmad-teach-me-testing/templates/progress-template.yaml",
+			".cline/skills/bmad-teach-me-testing/templates/session-notes-template.md",
+			".cline/skills/bmad-teach-me-testing/workflow-plan-teach-me-testing.md",
+			".cline/skills/bmad-teach-me-testing/workflow.md"
+		]
+	},
+	{
+		"workflowId": "bmad-technical-research",
+		"slashCommand": "bmad-technical-research",
+		"skillName": "bmad-technical-research",
+		"module": "bmm",
+		"skillPath": ".cline/skills/bmad-technical-research/SKILL.md",
+		"workflowPath": ".cline/skills/bmad-technical-research/workflow.md",
+		"aliases": [],
+		"phaseRoots": [
+			".cline/skills/bmad-technical-research/technical-steps"
+		],
+		"checklistPath": null,
+		"supportsManagedExecution": true,
+		"strategyHints": [
+			"workflow-steps",
+			"ordered-lists",
+			"bullet-groups"
+		],
+		"extractionMode": "linear",
+		"primaryStepRange": null,
+		"packagedAssetPaths": [
+			".cline/skills/bmad-technical-research/bmad-skill-manifest.yaml",
+			".cline/skills/bmad-technical-research/research.template.md",
+			".cline/skills/bmad-technical-research/SKILL.md",
+			".cline/skills/bmad-technical-research/technical-steps/step-01-init.md",
+			".cline/skills/bmad-technical-research/technical-steps/step-02-technical-overview.md",
+			".cline/skills/bmad-technical-research/technical-steps/step-03-integration-patterns.md",
+			".cline/skills/bmad-technical-research/technical-steps/step-04-architectural-patterns.md",
+			".cline/skills/bmad-technical-research/technical-steps/step-05-implementation-research.md",
+			".cline/skills/bmad-technical-research/technical-steps/step-06-research-synthesis.md",
+			".cline/skills/bmad-technical-research/workflow.md"
+		]
+	},
+	{
+		"workflowId": "bmad-validate-prd",
+		"slashCommand": "bmad-validate-prd",
+		"skillName": "bmad-validate-prd",
+		"module": "bmm",
+		"skillPath": ".cline/skills/bmad-validate-prd/SKILL.md",
+		"workflowPath": ".cline/skills/bmad-validate-prd/workflow.md",
+		"aliases": [],
+		"phaseRoots": [
+			".cline/skills/bmad-validate-prd/steps-v"
+		],
+		"checklistPath": null,
+		"supportsManagedExecution": true,
+		"strategyHints": [
+			"workflow-steps",
+			"ordered-lists",
+			"bullet-groups"
+		],
+		"extractionMode": "linear",
+		"primaryStepRange": null,
+		"packagedAssetPaths": [
+			".cline/skills/bmad-validate-prd/bmad-skill-manifest.yaml",
+			".cline/skills/bmad-validate-prd/data/domain-complexity.csv",
+			".cline/skills/bmad-validate-prd/data/prd-purpose.md",
+			".cline/skills/bmad-validate-prd/data/project-types.csv",
+			".cline/skills/bmad-validate-prd/SKILL.md",
+			".cline/skills/bmad-validate-prd/steps-v/step-v-01-discovery.md",
+			".cline/skills/bmad-validate-prd/steps-v/step-v-02-format-detection.md",
+			".cline/skills/bmad-validate-prd/steps-v/step-v-02b-parity-check.md",
+			".cline/skills/bmad-validate-prd/steps-v/step-v-03-density-validation.md",
+			".cline/skills/bmad-validate-prd/steps-v/step-v-04-brief-coverage-validation.md",
+			".cline/skills/bmad-validate-prd/steps-v/step-v-05-measurability-validation.md",
+			".cline/skills/bmad-validate-prd/steps-v/step-v-06-traceability-validation.md",
+			".cline/skills/bmad-validate-prd/steps-v/step-v-07-implementation-leakage-validation.md",
+			".cline/skills/bmad-validate-prd/steps-v/step-v-08-domain-compliance-validation.md",
+			".cline/skills/bmad-validate-prd/steps-v/step-v-09-project-type-validation.md",
+			".cline/skills/bmad-validate-prd/steps-v/step-v-10-smart-validation.md",
+			".cline/skills/bmad-validate-prd/steps-v/step-v-11-holistic-quality-validation.md",
+			".cline/skills/bmad-validate-prd/steps-v/step-v-12-completeness-validation.md",
+			".cline/skills/bmad-validate-prd/steps-v/step-v-13-report-complete.md",
+			".cline/skills/bmad-validate-prd/workflow.md"
 		]
 	}
 ]

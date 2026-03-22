@@ -28,10 +28,24 @@
   <output>Prepare the project-understanding content that will be added to the UX design specification.</output>
   <ask>Present the content and ask whether the user wants Advanced Elicitation, Party Mode, or to continue.</ask>
   <branch if="the user chooses Advanced Elicitation" optional="true">
-    <action>Invoke `bmad-advanced-elicitation` using the current discovery draft as context.</action>
+    <action>
+      Dispatch a dedicated subagent for Advanced Elicitation.
+      <detail>
+        Instruct the subagent to call `use_skill` with `skill_name = "bmad-advanced-elicitation"`.
+        Prompt the subagent with the current discovery draft and the instruction to deepen user, product, and UX framing before the next step.
+        Tell the subagent to return concise proposed improvements and any replacement text the user should review before acceptance.
+      </detail>
+    </action>
   </branch>
   <branch if="the user chooses Party Mode" optional="true">
-    <action>Invoke `bmad-party-mode` using the current discovery draft as context.</action>
+    <action>
+      Dispatch a dedicated subagent for Party Mode.
+      <detail>
+        Instruct the subagent to call `use_skill` with `skill_name = "bmad-party-mode"`.
+        Prompt the subagent with the current discovery draft and the instruction to critique it from multiple stakeholder perspectives.
+        Tell the subagent to return concise proposed improvements and decision guidance for the user to review before acceptance.
+      </detail>
+    </action>
   </branch>
   <branch if="the user chooses Continue" optional="true">
     <action>Save the approved discovery content, append this step to `stepsCompleted`, and persist the updated workflow state.</action>

@@ -22,7 +22,14 @@
 <step n="3" goal="Offer validation and next-step options">
   <output>Present `bmad-check-implementation-readiness` as the validation path and explain when it is valuable.</output>
   <ask>Ask whether the user wants to run validation now or proceed directly to later workflows.</ask>
-  <action>Invoke the `bmad-help` skill so the user can see the most relevant next workflow options for architecture, UX, epics, or validation.</action>
+  <action>
+    Dispatch a dedicated subagent for next-step guidance.
+    <detail>
+      Instruct the subagent to call `use_skill` with `skill_name = "bmad-help"`.
+      Prompt the subagent with the completed PRD path at `{outputFile}` and the instruction to return the most relevant next workflow options for architecture, UX, epics, or validation.
+      Tell the subagent to return concise next-step recommendations that can be shown to the user in this thread.
+    </detail>
+  </action>
 </step>
 
 <step n="4" goal="Confirm completion clearly">

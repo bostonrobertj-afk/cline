@@ -70,10 +70,24 @@
   <ask>Ask the user to choose whether to continue to epic design, use Advanced Elicitation, or use Party Mode.</ask>
   <detail>Keep the menu visible after answering side questions. Only move forward when the user explicitly chooses the continuation path.</detail>
   <branch if="the user chooses Advanced Elicitation" optional="true">
-    <action>Invoke the `bmad-advanced-elicitation` skill against the current requirements inventory context.</action>
+    <action>
+      Dispatch a dedicated subagent for Advanced Elicitation.
+      <detail>
+        Instruct the subagent to call `use_skill` with `skill_name = "bmad-advanced-elicitation"`.
+        Prompt the subagent with the current requirements inventory context and the instruction to surface missing assumptions, gaps, or ambiguities before epic design.
+        Tell the subagent to return concise proposed improvements and any replacement text the user should review before acceptance.
+      </detail>
+    </action>
   </branch>
   <branch if="the user chooses Party Mode" optional="true">
-    <action>Invoke the `bmad-party-mode` skill against the current requirements inventory context.</action>
+    <action>
+      Dispatch a dedicated subagent for Party Mode.
+      <detail>
+        Instruct the subagent to call `use_skill` with `skill_name = "bmad-party-mode"`.
+        Prompt the subagent with the current requirements inventory context and the instruction to critique it from multiple stakeholder perspectives before epic design.
+        Tell the subagent to return concise proposed improvements and decision guidance for the user to review before acceptance.
+      </detail>
+    </action>
   </branch>
   <branch if="the user chooses Continue" optional="true">
     <action>Persist the approved requirements inventory and workflow state in `{planning_artifacts}/epics.md`.</action>

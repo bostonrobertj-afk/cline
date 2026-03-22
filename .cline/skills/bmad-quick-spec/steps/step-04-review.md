@@ -34,11 +34,25 @@ wipFile: '{implementation_artifacts}/tech-spec-wip.md'
     <output>Answer the user's questions and redisplay the review menu.</output>
   </branch>
   <branch if="user chooses A" optional="true">
-    <action>Invoke the advanced elicitation flow on the current spec content.</action>
+    <action>
+      Dispatch a dedicated subagent for Advanced Elicitation.
+      <detail>
+        Instruct the subagent to call `use_skill` with `skill_name = "bmad-advanced-elicitation"`.
+        Prompt the subagent with the current spec content from `{wipFile}` and the instruction to improve clarity, completeness, and developer usefulness before finalization.
+        Tell the subagent to return concise proposed improvements and any replacement text the user should review before acceptance.
+      </detail>
+    </action>
     <detail>If the user accepts the improvements, update the spec and redisplay the review menu.</detail>
   </branch>
   <branch if="user chooses P" optional="true">
-    <action>Invoke the party mode flow on the current spec content.</action>
+    <action>
+      Dispatch a dedicated subagent for Party Mode.
+      <detail>
+        Instruct the subagent to call `use_skill` with `skill_name = "bmad-party-mode"`.
+        Prompt the subagent with the current spec content from `{wipFile}` and the instruction to critique the plan from multiple perspectives before finalization.
+        Tell the subagent to return concise proposed improvements and decision guidance for the user to review before acceptance.
+      </detail>
+    </action>
     <detail>If the user accepts the changes, update the spec and redisplay the review menu.</detail>
   </branch>
   <detail>
@@ -65,20 +79,48 @@ wipFile: '{implementation_artifacts}/tech-spec-wip.md'
   </detail>
   <ask>Choose [A], [R], [B], [D], or [P].</ask>
   <branch if="user chooses A" optional="true">
-    <action>Invoke the advanced elicitation flow on the current spec content.</action>
+    <action>
+      Dispatch a dedicated subagent for Advanced Elicitation.
+      <detail>
+        Instruct the subagent to call `use_skill` with `skill_name = "bmad-advanced-elicitation"`.
+        Prompt the subagent with the finalized spec content at `{implementation_artifacts}/tech-spec-{slug}.md` and the instruction to suggest high-value refinements only.
+        Tell the subagent to return concise proposed improvements and any replacement text the user should review before acceptance.
+      </detail>
+    </action>
   </branch>
   <branch if="user chooses R" optional="true">
-    <action>Run the adversarial review flow against {implementation_artifacts}/tech-spec-{slug}.md.</action>
+    <action>
+      Dispatch a dedicated subagent for adversarial review.
+      <detail>
+        Instruct the subagent to call `use_skill` with `skill_name = "bmad-review-adversarial-general"`.
+        Prompt the subagent with `{implementation_artifacts}/tech-spec-{slug}.md` and tell it to perform a skeptical review of the finalized spec.
+        Tell the subagent to return concise markdown findings with titles, evidence, and concrete risks.
+      </detail>
+    </action>
     <detail>If zero findings are returned, stop and request user guidance.</detail>
   </branch>
   <branch if="user chooses B" optional="true">
-    <action>Invoke the quick-dev workflow with {implementation_artifacts}/tech-spec-{slug}.md.</action>
+    <action>
+      Dispatch a fresh implementation subagent.
+      <detail>
+        Instruct the subagent to call `use_skill` with `skill_name = "bmad-quick-dev"`.
+        Prompt the subagent with `{implementation_artifacts}/tech-spec-{slug}.md` and tell it to begin the quick-dev workflow from that finalized tech spec in a fresh thread.
+        Tell the subagent to acknowledge the spec path and continue implementation work in its own thread.
+      </detail>
+    </action>
   </branch>
   <branch if="user chooses D" optional="true">
     <output>All done. The tech-spec is ready at {implementation_artifacts}/tech-spec-{slug}.md.</output>
     <exit />
   </branch>
   <branch if="user chooses P" optional="true">
-    <action>Invoke the party mode flow on the current spec content.</action>
+    <action>
+      Dispatch a dedicated subagent for Party Mode.
+      <detail>
+        Instruct the subagent to call `use_skill` with `skill_name = "bmad-party-mode"`.
+        Prompt the subagent with the finalized spec content at `{implementation_artifacts}/tech-spec-{slug}.md` and the instruction to critique it from multiple perspectives.
+        Tell the subagent to return concise proposed improvements and decision guidance for the user to review before acceptance.
+      </detail>
+    </action>
   </branch>
 </step>

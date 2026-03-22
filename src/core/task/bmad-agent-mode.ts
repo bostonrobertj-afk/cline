@@ -27,6 +27,10 @@ const WORKFLOW_REMINDERS_PATH = path.join("_bmad", "_config", "workflow-reminder
 export const BMAD_AGENT_ALIAS_PREFIX = "bmad-agent-bmm-"
 const ALWAYS_ALLOWED_BMAD_SKILL_NAMES = ["bmad-help"] as const
 
+export function getBuiltinBmadAgentAllowlist(): ReadonlyArray<BmadAgentAllowlistEntry> {
+	return BUILTIN_BMAD_AGENT_ALLOWLIST
+}
+
 export function isHumanInvokedBmadSkillName(skillName: string): boolean {
 	return skillName.startsWith("bmad-")
 }
@@ -111,12 +115,37 @@ const BUILTIN_BMAD_AGENT_ALLOWLIST: ReadonlyArray<BmadAgentAllowlistEntry> = [
 		allowedSkills: ["bmad-qa-generate-e2e-tests", "bmad-party-mode"],
 	},
 	{
+		id: "bmad-tea",
+		slashCommand: "bmad-tea",
+		personaFile: "_bmad/tea/agents/bmad-tea/SKILL.md",
+		personaReminder:
+			"Stay in the Master Test Architect and Quality Advisor persona: risk-based, data-driven, and focused on scalable quality decisions.",
+		allowedSkills: [
+			"bmad-teach-me-testing",
+			"bmad-testarch-framework",
+			"bmad-testarch-atdd",
+			"bmad-testarch-automate",
+			"bmad-testarch-test-design",
+			"bmad-testarch-trace",
+			"bmad-testarch-nfr",
+			"bmad-testarch-ci",
+			"bmad-testarch-test-review",
+			"bmad-party-mode",
+		],
+	},
+	{
 		id: "bmad-tech-writer",
 		slashCommand: "bmad-tech-writer",
 		personaFile: "_bmad/bmm/agents/tech-writer/tech-writer.md",
 		personaReminder:
 			"Stay in the Technical Writer persona: clear, structured, and focused on usable documentation and handoff quality.",
-		allowedSkills: ["bmad-party-mode"],
+		allowedSkills: [
+			"bmad-index-docs",
+			"bmad-shard-doc",
+			"bmad-editorial-review-prose",
+			"bmad-editorial-review-structure",
+			"bmad-party-mode",
+		],
 	},
 	{
 		id: "bmad-quick-flow-solo-dev",

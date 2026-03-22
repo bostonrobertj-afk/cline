@@ -61,11 +61,25 @@ wipFile: '{implementation_artifacts}/tech-spec-wip.md'
   <output>Display the checkpoint menu for Step 2.</output>
   <ask>Choose [A] Advanced Elicitation, [P] Party Mode, or [C] Continue to Generate Spec (Step 3 of 4).</ask>
   <branch if="user chooses A" optional="true">
-    <action>Invoke the advanced elicitation flow on the current tech-spec content.</action>
+    <action>
+      Dispatch a dedicated subagent for Advanced Elicitation.
+      <detail>
+        Instruct the subagent to call `use_skill` with `skill_name = "bmad-advanced-elicitation"`.
+        Prompt the subagent with the current tech-spec draft from `{wipFile}`, the investigation findings, and the instruction to probe for missing constraints, anchor points, or technical risks.
+        Tell the subagent to return concise proposed improvements and any replacement text the user should review before acceptance.
+      </detail>
+    </action>
     <detail>If the user accepts the improvements, update the WIP file and redisplay the menu.</detail>
   </branch>
   <branch if="user chooses P" optional="true">
-    <action>Invoke the party mode flow on the current tech-spec content.</action>
+    <action>
+      Dispatch a dedicated subagent for Party Mode.
+      <detail>
+        Instruct the subagent to call `use_skill` with `skill_name = "bmad-party-mode"`.
+        Prompt the subagent with the current tech-spec draft from `{wipFile}`, the investigation findings, and the instruction to challenge the planned approach from multiple perspectives.
+        Tell the subagent to return concise proposed improvements and decision guidance for the user to review before acceptance.
+      </detail>
+    </action>
     <detail>If the user accepts the changes, update the WIP file and redisplay the menu.</detail>
   </branch>
   <branch if="user chooses C" optional="true">

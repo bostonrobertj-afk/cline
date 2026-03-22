@@ -17,22 +17,43 @@ failed_layers: '' # set at runtime: comma-separated list of layers that failed o
 
 <step n="1" goal="Launch the review layers">
   <action>
-    Launch the Blind Hunter review layer with `{diff_output}` only.
+    Dispatch a separate subagent for the Blind Hunter review.
     <detail>
-      Use `bmad-review-adversarial-general` with no spec and no project access.
+      There is no dedicated Blind Hunter workflow, so instruct the subagent to call `use_skill` with `skill_name = "bmad-review-adversarial-general"`.
+      Prompt the subagent to review `{diff_output}` only.
+      Do not give it `{spec_file}`, project files, or project context.
+      Tell it: `Act as a diff-only Blind Hunter reviewer. Stay grounded only in the provided diff. Return concise markdown findings with a short title, the observed issue, and evidence from the diff when available.`
     </detail>
   </action>
   <action>
-    Launch the Edge Case Hunter review layer with `{diff_output}`.
+    Dispatch a separate subagent for the Adversarial General review.
     <detail>
-      Use `bmad-review-edge-case-hunter` with project read access.
+      Instruct the subagent to call `use_skill` with `skill_name = "bmad-review-adversarial-general"`.
+      Prompt the subagent with `{diff_output}` plus any already loaded project context that helps ground the review.
+      When `{review_mode} = `full``, also include `{spec_file}` as supporting context, but tell the subagent to stay focused on general adversarial review rather than AC-by-AC auditing.
+      Tell it: `Review this change skeptically. Return concise markdown findings with titles, evidence, and file locations when available.`
+    </detail>
+  </action>
+  <action>
+    Dispatch a separate subagent for the Edge Case Hunter review.
+    <detail>
+      Instruct the subagent to call `use_skill` with `skill_name = "bmad-review-edge-case-hunter"`.
+      Prompt the subagent with `{diff_output}` and project read access.
+      Tell it: `Inspect reachable boundary conditions and branching paths in the changed scope only. Return only the JSON array format expected by the edge-case hunter workflow.`
     </detail>
   </action>
   <branch if="{review_mode} = `full`" optional="true">
     <action>
-      Launch the Acceptance Auditor review layer with `{diff_output}`, `{spec_file}`, and any loaded context docs.
+      Dispatch a separate subagent for the Acceptance Auditor review.
       <detail>
-        Prompt the reviewer to check for acceptance-criteria violations, deviations from spec intent, missing specified behavior, and contradictions between spec constraints and the actual code. Its output should be a markdown list where each finding includes a one-line title, the violated AC or constraint, and evidence from the diff.
+        Use a general-purpose subagent if no dedicated Acceptance Auditor workflow exists.
+        Do not call `use_skill` unless a dedicated Acceptance Auditor workflow is introduced later.
+        Prompt that subagent with `{diff_output}`, `{spec_file}`, and any loaded context docs.
+        Tell it:
+        - You are an Acceptance Auditor.
+        - Review this diff against the spec and context docs.
+        - Check for acceptance-criteria violations, deviations from spec intent, missing specified behavior, and contradictions between spec constraints and the actual code.
+        - Return a markdown list where each finding includes a one-line title, the violated AC or constraint, and evidence from the diff.
       </detail>
     </action>
   </branch>
@@ -51,6 +72,7 @@ failed_layers: '' # set at runtime: comma-separated list of layers that failed o
       Generate fallback prompt files in `{implementation_artifacts}` for each active reviewer.
       <detail>
         - `review-blind-hunter.md` always
+        - `review-adversarial-general.md` always
         - `review-edge-case-hunter.md` always
         - `review-acceptance-auditor.md` only when `{review_mode} = `full``
       </detail>
@@ -74,5 +96,6 @@ Halt if fallback prompt files were generated and wait for the user to paste back
 ## ADVISORY
 
 - Keep the Blind Hunter diff-only.
+- Keep the Adversarial General layer grounded in the diff plus available project context.
 - Keep the Edge Case Hunter focused on reachable edge cases in the changed scope.
 - Only run the Acceptance Auditor when a usable spec context exists.
