@@ -2,6 +2,7 @@ import { strict as assert } from "node:assert"
 import * as coreApi from "@core/api"
 import * as skills from "@core/context/instructions/user-instructions/skills"
 import { PromptRegistry } from "@core/prompts/system-prompt"
+import type { ManagedWorkflowRunState } from "@core/task/managed-workflows/types"
 import type { TaskConfig } from "@core/task/tools/types/TaskConfig"
 import { afterEach, describe, it } from "mocha"
 import sinon from "sinon"
@@ -571,6 +572,104 @@ describe("SubagentRunner", () => {
 		assert.equal(createMessage.callCount, 1)
 	})
 
+	it("narrows visible skills from an explicit use_skill assignment in the delegated prompt", async () => {
+		const createMessage = sinon.stub().callsFake(async function* () {
+			yield {
+				type: "tool_calls",
+				tool_call: {
+					function: {
+						id: "toolu_subagent_assigned_skill_1",
+						name: ClineDefaultTool.ATTEMPT,
+						arguments: JSON.stringify({ result: "done" }),
+					},
+				},
+			}
+		})
+
+		const promptRegistry = PromptRegistry.getInstance()
+		sinon.stub(promptRegistry, "get").callsFake(async (context) => {
+			assert.ok(context.skills)
+			assert.deepEqual(
+				context.skills.map((skill) => skill.name),
+				["bmad-review-edge-case-hunter"],
+			)
+			promptRegistry.nativeTools = undefined
+			return "system prompt"
+		})
+		sinon.stub(SubagentBuilder.prototype, "getConfiguredSkills").returns(undefined)
+		sinon.stub(skills, "discoverSkills").resolves([])
+		sinon.stub(skills, "getAvailableSkills").returns([
+			{
+				name: "bmad-review-edge-case-hunter",
+				description: "Edge case review",
+				path: "/skills/bmad-review-edge-case-hunter/SKILL.md",
+				source: "project",
+			},
+			{
+				name: "bmad-review-adversarial-general",
+				description: "Adversarial review",
+				path: "/skills/bmad-review-adversarial-general/SKILL.md",
+				source: "project",
+			},
+		])
+		stubApiHandler(createMessage)
+		initializeHostProvider()
+
+		const runner = new SubagentRunner(createTaskConfig(false))
+		const result = await runner.run(
+			`Edge case review. Skill: use_skill('bmad-review-edge-case-hunter'). Review only the provided bundle.`,
+			() => {},
+		)
+
+		assert.equal(result.status, "completed")
+		assert.equal(createMessage.callCount, 1)
+	})
+
+	it("auto-activates an explicitly assigned managed workflow before the first subagent turn", async () => {
+		const createMessage = sinon.stub().callsFake(async function* () {
+			yield {
+				type: "tool_calls",
+				tool_call: {
+					function: {
+						id: "toolu_subagent_autoworkflow_1",
+						name: ClineDefaultTool.ATTEMPT,
+						arguments: JSON.stringify({ result: "done" }),
+					},
+				},
+			}
+		})
+
+		const promptRegistry = PromptRegistry.getInstance()
+		sinon.stub(promptRegistry, "get").callsFake(async (context) => {
+			assert.equal(context.managedWorkflowActive, true)
+			assert.ok(context.activeWorkflowReminder)
+			assert.match(context.activeWorkflowReminder!, /<active_bmad_workflow/)
+			assert.match(context.activeWorkflowReminder!, /bmad-review-edge-case-hunter/)
+			promptRegistry.nativeTools = undefined
+			return "system prompt"
+		})
+		sinon.stub(SubagentBuilder.prototype, "getConfiguredSkills").returns(undefined)
+		sinon.stub(skills, "discoverSkills").resolves([])
+		sinon.stub(skills, "getAvailableSkills").returns([
+			{
+				name: "bmad-review-edge-case-hunter",
+				description: "Edge case review",
+				path: "/skills/bmad-review-edge-case-hunter/SKILL.md",
+				source: "project",
+			},
+		])
+		stubApiHandler(createMessage)
+		initializeHostProvider()
+
+		const config = createTaskConfig(false)
+		config.cwd = process.cwd()
+		const runner = new SubagentRunner(config)
+		const result = await runner.run(`Skill: use_skill('bmad-review-edge-case-hunter')`, () => {})
+
+		assert.equal(result.status, "completed")
+		assert.equal(createMessage.callCount, 1)
+	})
+
 	it("logs a warning when a configured skill is not available", async () => {
 		const createMessage = sinon.stub().callsFake(async function* () {
 			yield {
@@ -609,7 +708,68 @@ describe("SubagentRunner", () => {
 
 		assert.equal(result.status, "completed")
 		assert.equal(createMessage.callCount, 1)
-		sinon.assert.calledWith(warnStub, "[SubagentRunner] Configured skill 'missing-skill' not found for subagent run.")
+		sinon.assert.calledWith(
+			warnStub,
+			"[SubagentRunner] Configured or assigned skill 'missing-skill' not found for subagent run.",
+		)
+	})
+
+	it("builds workflow reminder context from the subagent's local workflow state", async () => {
+		const runner = new SubagentRunner(createTaskConfig(false))
+		const state = new TaskState()
+		const run = {
+			workflowId: "bmad-review-edge-case-hunter",
+			slashCommand: "bmad-review-edge-case-hunter",
+			status: "active",
+			currentPhaseIndex: 0,
+			createdAt: Date.now(),
+			updatedAt: Date.now(),
+			allRequiredComplete: false,
+			phases: [
+				{
+					id: "workflow",
+					title: "Workflow",
+					sourcePath: ".cline/skills/bmad-review-edge-case-hunter/workflow.md",
+					sourceContent: "# workflow",
+					completed: false,
+					items: [
+						{ id: "workflow::step-1", label: "Load review input", sourceText: "Load review input", completed: false },
+					],
+					execution: {
+						steps: [
+							{
+								id: "workflow::step-1",
+								goal: "Load review input",
+								instructions: [],
+							},
+						],
+					},
+				},
+			],
+		} as ManagedWorkflowRunState
+		state.managedWorkflowRun = run
+		state.activeWorkflowId = run.workflowId
+
+		const context = await (runner as any).buildPromptContext({
+			state,
+			hostIde: "test",
+			providerInfo: {
+				providerId: "anthropic",
+				model: { id: "anthropic/claude-sonnet-4.5", info: { contextWindow: 200_000 } },
+				mode: "act",
+				customPrompt: undefined,
+			},
+			availableSkills: [],
+			configuredSkillNames: undefined,
+			assignedSkillNames: [],
+			nativeToolCallsRequested: false,
+		})
+
+		assert.equal(context.activeAgentId, undefined)
+		assert.equal(context.managedWorkflowActive, true)
+		assert.ok(context.activeWorkflowReminder)
+		assert.match(context.activeWorkflowReminder!, /<active_bmad_workflow/)
+		assert.match(context.activeWorkflowReminder!, /bmad-review-edge-case-hunter/)
 	})
 
 	it("includes workspace metadata only in the initial user message", async () => {

@@ -19,7 +19,7 @@ failed_layers: '' # set at runtime: comma-separated list of layers that failed o
   <action>
     Dispatch a separate subagent for the Blind Hunter review.
     <detail>
-      There is no dedicated Blind Hunter workflow, so instruct the subagent to call `use_skill` with `skill_name = "bmad-review-adversarial-general"`.
+      There is no dedicated Blind Hunter workflow, so assign the workflow skill with a prompt line like `Skill: use_skill('bmad-review-adversarial-general')`.
       Prompt the subagent to review `{diff_output}` only.
       Do not give it `{spec_file}`, project files, or project context.
       Tell it:
@@ -30,7 +30,7 @@ failed_layers: '' # set at runtime: comma-separated list of layers that failed o
   <action>
     Dispatch a separate subagent for the Adversarial General review.
     <detail>
-      Instruct the subagent to call `use_skill` with `skill_name = "bmad-review-adversarial-general"`.
+      Assign the workflow skill with a prompt line like `Skill: use_skill('bmad-review-adversarial-general')`.
       Prompt the subagent with `{diff_output}` plus any already loaded project context that helps ground the review.
       When `{review_mode} = `full``, also include `{spec_file}` as supporting context, but tell the subagent to stay focused on general adversarial review rather than AC-by-AC auditing.
       Tell it:
@@ -41,7 +41,7 @@ failed_layers: '' # set at runtime: comma-separated list of layers that failed o
   <action>
     Dispatch a separate subagent for the Edge Case Hunter review.
     <detail>
-      Instruct the subagent to call `use_skill` with `skill_name = "bmad-review-edge-case-hunter"`.
+      Assign the workflow skill with a prompt line like `Skill: use_skill('bmad-review-edge-case-hunter')`.
       Prompt the subagent with `{diff_output}` and project read access.
       Tell it:
       - if `{review_input_type} = "diff"`: `Inspect reachable boundary conditions and branching paths in the changed scope only. Return only the JSON array format expected by the edge-case hunter workflow.`

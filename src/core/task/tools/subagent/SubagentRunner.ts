@@ -6,9 +6,14 @@ import { discoverSkills, getAvailableSkills } from "@core/context/instructions/u
 import { formatResponse } from "@core/prompts/responses"
 import { PromptRegistry } from "@core/prompts/system-prompt"
 import type { SystemPromptContext } from "@core/prompts/system-prompt/types"
+import { buildBmadAgentRoleInstructions, getBmadWorkflowReminder, getOwningBmadAgentForSkill } from "@core/task/bmad-agent-mode"
+import { startOrResumeManagedWorkflowRun } from "@core/task/managed-workflows/ManagedWorkflowController"
+import { getManagedWorkflowDefinition } from "@core/task/managed-workflows/ManagedWorkflowRegistry"
+import { buildManagedWorkflowPrompt } from "@core/task/managed-workflows/ManagedWorkflowRenderer"
 import { StreamResponseHandler } from "@core/task/StreamResponseHandler"
 import { ClineAssistantToolUseBlock, ClineStorageMessage, ClineTextContentBlock, ClineUserContent } from "@shared/messages"
 import { Logger } from "@shared/services/Logger"
+import type { SkillMetadata } from "@shared/skills"
 import { ClineDefaultTool, ClineTool } from "@shared/tools"
 import { ContextManager } from "@/core/context/context-management/ContextManager"
 import { checkContextWindowExceededError } from "@/core/context/context-management/context-error-handling"
@@ -182,6 +187,29 @@ function resolveToolUseId(call: { id?: string; call_id?: string; name?: string }
 	return fallbackId
 }
 
+function extractAssignedSkillNames(prompt: string): string[] {
+	const explicitCalls = Array.from(prompt.matchAll(/use_skill\(\s*['"]([^'"\n]+)['"]\s*\)/g)).map((match) => match[1])
+	const explicitParams = Array.from(prompt.matchAll(/skill_name\s*=\s*['"]([^'"\n]+)['"]/g)).map((match) => match[1])
+	return Array.from(new Set([...explicitCalls, ...explicitParams].map((name) => name.trim()).filter(Boolean)))
+}
+
+function buildAssignedSkillDirective(assignedSkillNames: string[]): string {
+	if (assignedSkillNames.length === 0) {
+		return ""
+	}
+
+	const skillList = assignedSkillNames.map((skill) => `- ${skill}`).join("\n")
+
+	return `\n\n# Assigned Workflow Activation
+This subagent has been assigned the following workflow skill${assignedSkillNames.length === 1 ? "" : "s"}:
+${skillList}
+
+Before you read project files, search the repo, or analyze code, call \`use_skill\` with the exact assigned skill name.
+Do not substitute a different skill.
+Do not manually search for workflow files unless \`use_skill\` fails.
+Once the assigned workflow is active, follow its injected instructions instead of the default research-subagent behavior.`
+}
+
 function toAssistantToolUseBlock(call: SubagentToolCall): ClineAssistantToolUseBlock {
 	return {
 		type: "tool_use",
@@ -339,44 +367,10 @@ export class SubagentRunner {
 			const discoveredSkills = await discoverSkills(this.baseConfig.cwd)
 			const availableSkills = getAvailableSkills(discoveredSkills)
 			const configuredSkillNames = this.agent.getConfiguredSkills()
-			const skills =
-				configuredSkillNames !== undefined
-					? configuredSkillNames
-							.map((skillName) => {
-								const skill = availableSkills.find((candidate) => candidate.name === skillName)
-								if (!skill) {
-									Logger.warn(`[SubagentRunner] Configured skill '${skillName}' not found for subagent run.`)
-								}
-								return skill
-							})
-							.filter((skill): skill is (typeof availableSkills)[number] => Boolean(skill))
-					: availableSkills
-
-			const context: SystemPromptContext = {
-				providerInfo,
-				cwd: this.baseConfig.cwd,
-				ide: host?.platform || "Unknown",
-				skills,
-				focusChainSettings: this.baseConfig.focusChainSettings,
-				browserSettings: this.baseConfig.browserSettings,
-				yoloModeToggled: false,
-				enableNativeToolCalls: nativeToolCallsRequested,
-				enableParallelToolCalling: false,
-				isSubagentRun: true,
-			}
-
+			const assignedSkillNames = extractAssignedSkillNames(prompt)
+			await this.autoActivateAssignedManagedWorkflow(state, assignedSkillNames)
 			const promptRegistry = PromptRegistry.getInstance()
-			const generatedSystemPrompt = await promptRegistry.get(context)
-			const systemPrompt = this.agent.buildSystemPrompt(generatedSystemPrompt)
-			const useNativeToolCalls = !!promptRegistry.nativeTools?.length
-			const nativeTools = useNativeToolCalls ? this.agent.buildNativeTools(context) : undefined
 			const workspaceMetadataEnvironmentBlock = await this.getWorkspaceMetadataEnvironmentBlock()
-
-			if (useNativeToolCalls && (!nativeTools || nativeTools.length === 0)) {
-				const error = "Subagent tool requires native tool calling support."
-				onProgress({ status: "failed", error, stats })
-				return { status: "failed", error, stats }
-			}
 
 			if (this.shouldAbort()) {
 				await this.abort()
@@ -408,6 +402,33 @@ export class SubagentRunner {
 			]
 
 			while (true) {
+				const context = await this.buildPromptContext({
+					state,
+					hostIde: host?.platform || "Unknown",
+					providerInfo,
+					availableSkills,
+					configuredSkillNames,
+					assignedSkillNames,
+					nativeToolCallsRequested,
+				})
+				const generatedSystemPrompt = await promptRegistry.get(context)
+				const baseSystemPrompt = this.agent.buildSystemPrompt(generatedSystemPrompt)
+				const systemPrompt =
+					assignedSkillNames.length > 0 && !state.activeWorkflowId && !state.managedWorkflowRun
+						? `${baseSystemPrompt}${buildAssignedSkillDirective(assignedSkillNames)}`
+						: baseSystemPrompt
+				const useNativeToolCalls = !!promptRegistry.nativeTools?.length
+				const nativeTools = useNativeToolCalls ? this.agent.buildNativeTools(context) : undefined
+
+				if (useNativeToolCalls && (!nativeTools || nativeTools.length === 0)) {
+					const error = "Subagent tool requires native tool calling support."
+					onProgress({ status: "failed", error, stats })
+					return { status: "failed", error, stats }
+				}
+
+				state.activeAgentJustActivated = false
+				state.activeWorkflowJustStarted = false
+
 				if (
 					usageState.lastRequest &&
 					this.shouldCompactBeforeNextRequest(usageState.lastRequest.totalTokens, api, providerInfo.model.id)
@@ -724,6 +745,110 @@ export class SubagentRunner {
 				},
 			},
 		}
+	}
+
+	private async buildPromptContext(params: {
+		state: TaskState
+		hostIde: string
+		providerInfo: SystemPromptContext["providerInfo"]
+		availableSkills: SkillMetadata[]
+		configuredSkillNames?: string[]
+		assignedSkillNames: string[]
+		nativeToolCallsRequested: boolean
+	}): Promise<SystemPromptContext> {
+		const skills = this.resolvePromptSkills(params.availableSkills, params.configuredSkillNames, params.assignedSkillNames)
+
+		let activeAgentRoleInstructions: string | undefined
+		let activeWorkflowReminder: string | undefined
+
+		if (params.state.activeAgentId) {
+			activeAgentRoleInstructions = await buildBmadAgentRoleInstructions(this.baseConfig.cwd, params.state.activeAgentId, {
+				includeActivation: params.state.activeAgentJustActivated,
+			})
+		}
+
+		if (params.state.managedWorkflowRun) {
+			activeWorkflowReminder = buildManagedWorkflowPrompt(params.state.managedWorkflowRun)
+		} else if (params.state.activeWorkflowId) {
+			activeWorkflowReminder = await getBmadWorkflowReminder(this.baseConfig.cwd, params.state.activeWorkflowId)
+		}
+
+		return {
+			providerInfo: params.providerInfo,
+			cwd: this.baseConfig.cwd,
+			ide: params.hostIde,
+			skills,
+			activeAgentId: params.state.activeAgentId,
+			activeAgentRoleInstructions,
+			activeWorkflowReminder,
+			managedWorkflowActive: !!params.state.managedWorkflowRun,
+			focusChainSettings: this.baseConfig.focusChainSettings,
+			browserSettings: this.baseConfig.browserSettings,
+			yoloModeToggled: false,
+			enableNativeToolCalls: params.nativeToolCallsRequested,
+			enableParallelToolCalling: false,
+			isSubagentRun: true,
+		}
+	}
+
+	private async autoActivateAssignedManagedWorkflow(state: TaskState, assignedSkillNames: string[]): Promise<void> {
+		if (assignedSkillNames.length !== 1 || state.managedWorkflowRun || state.activeWorkflowId) {
+			return
+		}
+
+		const assignedSkill = assignedSkillNames[0]
+		const managedWorkflowDefinition = await getManagedWorkflowDefinition(this.baseConfig.cwd, assignedSkill)
+		if (!managedWorkflowDefinition) {
+			return
+		}
+
+		if (!state.activeAgentId) {
+			const owningAgent = await getOwningBmadAgentForSkill(this.baseConfig.cwd, managedWorkflowDefinition.workflowId)
+			if (owningAgent) {
+				state.activeAgentId = owningAgent.id
+				state.activeAgentSkillName = owningAgent.id
+				state.activeAgentInvokedSlashCommand = managedWorkflowDefinition.slashCommand
+				state.activeAgentJustActivated = true
+			}
+		}
+
+		const { run, resumed } = await startOrResumeManagedWorkflowRun(
+			this.baseConfig.cwd,
+			managedWorkflowDefinition.workflowId,
+			state.managedWorkflowRun,
+			managedWorkflowDefinition.slashCommand,
+		)
+
+		state.managedWorkflowRun = run
+		state.activeWorkflowId = run.workflowId
+		state.activeWorkflowJustStarted = !resumed
+	}
+
+	private resolvePromptSkills(
+		availableSkills: SkillMetadata[],
+		configuredSkillNames: string[] | undefined,
+		assignedSkillNames: string[],
+	): SkillMetadata[] {
+		const preferredSkillNames =
+			assignedSkillNames.length > 0
+				? assignedSkillNames
+				: configuredSkillNames && configuredSkillNames.length > 0
+					? configuredSkillNames
+					: undefined
+
+		if (!preferredSkillNames) {
+			return availableSkills
+		}
+
+		return preferredSkillNames
+			.map((skillName) => {
+				const skill = availableSkills.find((candidate) => candidate.name === skillName)
+				if (!skill) {
+					Logger.warn(`[SubagentRunner] Configured or assigned skill '${skillName}' not found for subagent run.`)
+				}
+				return skill
+			})
+			.filter((skill): skill is SkillMetadata => Boolean(skill))
 	}
 
 	private shouldRetryInitialStreamError(error: unknown, providerId: string, modelId: string): boolean {

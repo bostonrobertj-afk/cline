@@ -16,7 +16,8 @@ export async function getSkillsSection(_variant: PromptVariant, context: SystemP
 Allowed workflow skills for the active BMAD agent: ${skillNames}
 
 If you need to run one of these workflows, do not activate it in the current thread.
-Spawn a dedicated subagent, tell that subagent which workflow to run, and instruct it to call \`use_skill\` with the exact skill name.`
+Spawn a dedicated subagent and assign it the exact workflow skill in the prompt using a line like \`Skill: use_skill('workflow-skill-name')\`.
+The subagent runtime will activate that assigned workflow before analysis begins.`
 		}
 
 		return `SKILLS
@@ -36,10 +37,9 @@ When this active BMAD agent needs one of the workflows above, do not activate it
 
 Instead:
 1. Spawn a dedicated subagent for that workflow run
-2. Tell the subagent exactly which workflow to run
-3. Instruct the subagent to call use_skill with the exact skill name
-4. Give the subagent the specific input context and expected output format for that workflow
-5. Have the subagent report back, then continue the parent workflow in the current thread`
+2. Assign the exact workflow skill in the subagent prompt using a line like \`Skill: use_skill('workflow-skill-name')\`
+3. Give the subagent the specific input context and expected output format for that workflow
+4. Have the subagent report back, then continue the parent workflow in the current thread`
 	}
 
 	const skillsList = skills.map((skill) => `  - "${skill.name}": ${skill.description}`).join("\n")
