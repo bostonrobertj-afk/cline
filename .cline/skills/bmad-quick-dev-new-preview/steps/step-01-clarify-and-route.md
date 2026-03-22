@@ -8,7 +8,7 @@ spec_file: ''
 
 ## META
 
-- Speak in the configured communication language.
+- High-Level Goal: Take a user request from intent through implementation, adversarial review, and PR creation in one flow.
 - Treat the user prompt as the starting intent, not as a substitute for investigation.
 - Do not skip clarification, planning, implementation, review, or presentation steps.
 - Only the current phase checklist and the current active step's details are shown in the prompt at one time.

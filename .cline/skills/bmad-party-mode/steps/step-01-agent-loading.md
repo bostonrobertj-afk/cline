@@ -2,7 +2,8 @@
 
 ## META
 
-- Goal: Load the complete BMAD agent roster, activate party mode, and route into live discussion.
+- High-Level Goal: Orchestrate group discussions between installed BMAD agents in a structured managed workflow.
+- Goal for this Phase: Load the complete BMAD agent roster, activate party mode, and route into live discussion.
 - Execute this file in order.
 - Halt whenever user input, confirmation, or workflow gating is required.
 - Use structured execution tags only.

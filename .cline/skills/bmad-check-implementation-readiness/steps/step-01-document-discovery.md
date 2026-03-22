@@ -6,7 +6,8 @@ outputFile: '{planning_artifacts}/implementation-readiness-report-{{date}}.md'
 
 ## META
 
-- Goal: Discover, inventory, and confirm the set of project documents to use for the readiness assessment.
+- High-Level Goal: - Goal: Validate that the PRD, Architecture, Epics, Stories, and UX inputs are complete and aligned before implementation begins.
+- Goal for this Phase: Discover, inventory, and confirm the set of project documents to use for the readiness assessment.
 - Only the current phase checklist and the current active step's details are shown in the prompt at one time.
 - Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
 - As soon as the current active checklist item is actually finished, call `complete_workflow_item` for that item before starting work from the next checklist item.

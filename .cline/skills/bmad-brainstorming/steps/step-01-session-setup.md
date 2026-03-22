@@ -2,7 +2,8 @@
 
 ## META
 
-- Goal: Detect whether the brainstorming session should continue or start fresh, then route to the right technique path.
+- High-Level Goal: - Goal: Facilitate interactive brainstorming sessions using diverse creative techniques and ideation methods.
+- Phase 1 Goal: Detect whether the brainstorming session should continue or start fresh, then route to the right technique path.
 - Execute the current phase in order.
 - Halt whenever user input, confirmation, or workflow gating is required.
 - Use structured execution tags only.

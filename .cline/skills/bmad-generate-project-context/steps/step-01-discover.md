@@ -2,7 +2,8 @@
 
 ## META
 
-- Goal: Discover the project stack, identify implementation patterns, and initialize the project context file.
+- High-Level Goal: Create a concise `project-context.md` file containing the critical implementation rules AI agents need.
+- Goal for this Phase: Discover the project stack, identify implementation patterns, and initialize the project context file.
 - Stay collaborative and do not proceed until the user confirms the next step.
 - As soon as the current active checklist item is actually finished, call `complete_workflow_item` for that item before starting work from the next checklist item.
 - After you complete the final checklist item in this phase, stop and wait for the prompt to refresh before doing any work from the next phase.

@@ -1,7 +1,7 @@
 ## META
 
-- Progress: Step 1 of 6
-- Goal: confirm the market research scope, explain the planned approach, and wait for explicit continuation.
+- High-Level Goal: Conduct comprehensive market research using current web data and verified sources.
+- Goal for this Phase: confirm the market research scope, explain the planned approach, and wait for explicit continuation.
 - Speak in {communication_language}.
 - Do not begin market research yet.
 - Only the current phase checklist and the current active step's details are shown in the prompt at one time.

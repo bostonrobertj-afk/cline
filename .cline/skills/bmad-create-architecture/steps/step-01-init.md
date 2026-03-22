@@ -2,7 +2,8 @@
 
 ## META
 
-- Goal: detect continuation state, discover the core input documents, and initialize the architecture document.
+- High-Level Goal: create a complete architecture document through collaborative discovery and explicit architectural decisions.
+- Goal for this Phase: detect continuation state, discover the core input documents, and initialize the architecture document.
 - Execute the current phase in order.
 - Halt whenever user input, confirmation, or workflow gating is required.
 - Focus on setup only. Do not start making architecture decisions yet.

@@ -7,7 +7,8 @@ prdPurpose: '{project-root}/_bmad/bmm/workflows/2-plan-workflows/create-prd/data
 
 ## META
 
-- Goal: Understand what the user wants to edit in the PRD, detect PRD format/type, check for validation report guidance, and route appropriately.
+- High-Level Goal: Edit and improve existing PRDs through structured enhancement workflow.
+- Goal for this Phase: Understand what the user wants to edit in the PRD, detect PRD format/type, check for validation report guidance, and route appropriately.
 - Execute this file in order.
 - Halt whenever user input, confirmation, or workflow gating is required.
 - Use structured execution tags only.

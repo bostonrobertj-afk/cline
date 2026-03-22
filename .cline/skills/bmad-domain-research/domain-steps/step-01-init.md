@@ -1,7 +1,7 @@
 ## META
 
-- Progress: Step 1 of 6
-- Goal: confirm the domain research scope, explain the research approach, and wait for explicit continuation.
+- High-Level Goal: Conduct comprehensive domain and industry research using current web data and verified sources.
+- Goal for this Phase: confirm the domain research scope, explain the research approach, and wait for explicit continuation.
 - Speak in `{communication_language}`.
 - Do not begin web research yet.
 - Only the current phase checklist and the current active step's details are shown in the prompt at one time.

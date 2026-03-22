@@ -2,7 +2,8 @@
 
 ## META
 
-- Goal: Validate that all required input documents exist and extract the requirements inventory needed for epic and story creation.
+- High-Level Goal: Transform PRD requirements and Architecture decisions into comprehensive stories organized by user value, creating detailed, actionable stories with complete acceptance criteria for development teams.
+- Goal for this Phase: Validate that all required input documents exist and extract the requirements inventory needed for epic and story creation.
 - Only the current phase checklist and the current active step's details are shown in the prompt at one time.
 - Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
 - As soon as the current active checklist item is actually finished, call `complete_workflow_item` for that item before starting work from the next checklist item.
