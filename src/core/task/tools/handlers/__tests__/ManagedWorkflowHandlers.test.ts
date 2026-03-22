@@ -151,8 +151,10 @@ describe("Managed workflow handlers", () => {
 		} as any)
 
 		expect(String(result)).to.not.contain("Managed workflow")
+		expect(String(result)).to.contain("[attempt_completion] Result: Done")
 		expect(config.taskState.consecutiveMistakeCount).to.equal(0)
 		expect((config.callbacks.say as sinon.SinonStub).calledWith("completion_result", "done")).to.equal(true)
+		expect((config.callbacks.ask as sinon.SinonStub).called).to.equal(false)
 	})
 
 	it("persists managed workflow item completion to task metadata", async () => {
