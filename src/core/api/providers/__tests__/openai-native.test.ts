@@ -106,7 +106,14 @@ describe("OpenAiNativeHandler", () => {
 		infoStub.firstCall.args[0].should.containEql("[OpenAI] Native Responses request path")
 		infoStub.firstCall.args[0].should.containEql('"usingPreviousResponseId":false')
 		infoStub.firstCall.args[0].should.containEql('"usingFullHistoryFallback":false')
-		infoStub.secondCall.args[0].should.containEql("[OpenAI] Native Responses request completed without previous_response_id")
+		infoStub
+			.getCalls()
+			.some((call) => call.args[0].includes("[OpenAI] Native Responses request completed without previous_response_id"))
+			.should.equal(true)
+		infoStub
+			.getCalls()
+			.some((call) => call.args[0].includes("Total tokens from Responses API usage:"))
+			.should.equal(true)
 	})
 
 	it("should log native fallback usage when previous_response_id retry falls back to full history", async () => {

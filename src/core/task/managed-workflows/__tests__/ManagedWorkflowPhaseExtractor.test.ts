@@ -73,7 +73,7 @@ describe("ManagedWorkflowPhaseExtractor", () => {
 			"Read, classify, and validate sprint status",
 			"Select the next workflow recommendation",
 			"Display the sprint summary",
-			"Offer interactive actions",
+			"Present interactive action options and close cleanly",
 			"Stop before advancing whenever the sprint status file is missing, a status value must be corrected, or the user must choose an action.",
 		])
 		expect(phases[0].items.some((item) => item.label.includes("Data mode output"))).to.equal(false)

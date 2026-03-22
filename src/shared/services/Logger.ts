@@ -2,9 +2,33 @@
  * Simple Logger utility for the extension's backend code.
  */
 export class Logger {
-	private static isVerbose = process.env.IS_DEV === "true"
+	private static readonly levelPriority = {
+		trace: 10,
+		debug: 20,
+		log: 30,
+		info: 40,
+		warn: 50,
+		error: 60,
+	} as const
 
 	private static subscribers: Set<(msg: string) => void> = new Set()
+
+	private static isVerbose(): boolean {
+		return Logger.getConfiguredLevel() <= Logger.levelPriority.log
+	}
+
+	private static getConfiguredLevel(): number {
+		const configured = (process.env.CLINE_LOG_LEVEL || "").trim().toLowerCase()
+		if (configured && configured in Logger.levelPriority) {
+			return Logger.levelPriority[configured as keyof typeof Logger.levelPriority]
+		}
+
+		return process.env.IS_DEV === "true" ? Logger.levelPriority.debug : Logger.levelPriority.info
+	}
+
+	private static shouldEmit(level: keyof typeof Logger.levelPriority): boolean {
+		return Logger.levelPriority[level] >= Logger.getConfiguredLevel()
+	}
 
 	private static output(msg: string): void {
 		for (const subscriber of Logger.subscribers) {
@@ -23,38 +47,51 @@ export class Logger {
 		Logger.subscribers.add(outputFn)
 	}
 
+	static unsubscribe(outputFn: (msg: string) => void) {
+		Logger.subscribers.delete(outputFn)
+	}
+
 	static error(message: string, ...args: any[]) {
-		Logger.#output("ERROR", message, undefined, args)
+		Logger.#output("error", "ERROR", message, undefined, args)
 	}
 
 	static warn(message: string, ...args: any[]) {
-		Logger.#output("WARN", message, undefined, args)
+		Logger.#output("warn", "WARN", message, undefined, args)
 	}
 
 	static log(message: string, ...args: any[]) {
-		Logger.#output("LOG", message, undefined, args)
+		Logger.#output("log", "LOG", message, undefined, args)
 	}
 
 	static debug(message: string, ...args: any[]) {
-		Logger.#output("DEBUG", message, undefined, args)
+		Logger.#output("debug", "DEBUG", message, undefined, args)
 	}
 
 	static info(message: string, ...args: any[]) {
-		Logger.#output("INFO", message, undefined, args)
+		Logger.#output("info", "INFO", message, undefined, args)
 	}
 
 	static trace(message: string, ...args: any[]) {
-		Logger.#output("TRACE", message, undefined, args)
+		Logger.#output("trace", "TRACE", message, undefined, args)
 	}
 
-	static #output(level: string, message: string, error: Error | undefined, args: any[]) {
+	static #output(
+		levelKey: keyof typeof Logger.levelPriority,
+		levelLabel: string,
+		message: string,
+		error: Error | undefined,
+		args: any[],
+	) {
 		try {
+			if (!Logger.shouldEmit(levelKey)) {
+				return
+			}
 			let fullMessage = message
-			if (Logger.isVerbose && args.length > 0) {
+			if (Logger.isVerbose() && args.length > 0) {
 				fullMessage += ` ${args.map((arg) => JSON.stringify(arg)).join(" ")}`
 			}
 			const errorSuffix = error?.message ? ` ${error.message}` : ""
-			Logger.output(`${level} ${fullMessage}${errorSuffix}`.trimEnd())
+			Logger.output(`${levelLabel} ${fullMessage}${errorSuffix}`.trimEnd())
 		} catch {
 			// do nothing if Logger fails
 		}

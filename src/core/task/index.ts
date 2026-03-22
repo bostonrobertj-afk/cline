@@ -122,6 +122,7 @@ import { StreamChunkCoordinator } from "./StreamChunkCoordinator"
 import { StreamResponseHandler } from "./StreamResponseHandler"
 import { TaskState } from "./TaskState"
 import { ToolExecutor } from "./ToolExecutor"
+import { buildTokenEstimateLogPayload, estimateRequestTokenUsage } from "./tokenUsageLogging"
 import { extractProviderDomainFromUrl, updateApiReqMsg } from "./utils"
 import { buildUserFeedbackContent } from "./utils/buildUserFeedbackContent"
 import { hasExplicitMentionSyntax, hasUserContentTag } from "./utils/userContentProcessing"
@@ -2192,6 +2193,20 @@ export class Task {
 		}
 
 		// Response API requires native tool calls to be enabled
+		const requestTokenEstimate = estimateRequestTokenUsage(
+			effectiveSystemPrompt,
+			contextManagementMetadata.truncatedConversationHistory,
+		)
+		const tokenEstimateLogPayload = buildTokenEstimateLogPayload({
+			taskId: this.taskId,
+			ulid: this.ulid,
+			apiRequestCount: this.taskState.apiRequestCount,
+			modelId: providerInfo.model.id,
+			providerId: providerInfo.providerId,
+			estimate: requestTokenEstimate,
+		})
+		Logger.info(`[TokenEstimate] ${JSON.stringify(tokenEstimateLogPayload)}`)
+
 		const stream = this.api.createMessage(
 			effectiveSystemPrompt,
 			contextManagementMetadata.truncatedConversationHistory,

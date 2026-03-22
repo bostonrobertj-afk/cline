@@ -161,7 +161,7 @@ export async function* handleResponsesApiStreamResponse(
 			const cacheWriteTokens = 0
 			const totalTokens = usage.total_tokens || 0
 			const totalCost = await calculateCost(modelInfo, inputTokens, outputTokens, cacheWriteTokens, cacheReadTokens)
-			Logger.log(`Total tokens from Responses API usage: ${totalTokens}`)
+			Logger.info(`Total tokens from Responses API usage: ${totalTokens}`)
 			const nonCachedInputTokens = Math.max(0, inputTokens - cacheReadTokens)
 			yield {
 				type: "usage",
