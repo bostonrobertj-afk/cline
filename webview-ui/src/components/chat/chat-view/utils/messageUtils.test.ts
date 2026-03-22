@@ -1,6 +1,6 @@
 import type { ClineMessage } from "@shared/ExtensionMessage"
 import { describe, expect, it } from "vitest"
-import { groupLowStakesTools, isToolGroup } from "./messageUtils"
+import { filterVisibleMessages, groupLowStakesTools, isToolGroup } from "./messageUtils"
 
 const createTextMessage = (ts: number, text: string): ClineMessage => ({
 	type: "say",
@@ -20,6 +20,51 @@ const createReasoningMessage = (ts: number, text: string): ClineMessage => ({
 	type: "say",
 	say: "reasoning",
 	text,
+	ts,
+})
+
+const createUseSubagentsMessage = (ts: number, prompts: string[], subagentBatchId?: string): ClineMessage => ({
+	type: "ask",
+	ask: "use_subagents",
+	text: JSON.stringify({ prompts, subagentBatchId }),
+	ts,
+})
+
+const createSubagentStatusMessage = (
+	ts: number,
+	subagentBatchId?: string,
+	status: "running" | "completed" | "failed" = "running",
+): ClineMessage => ({
+	type: "say",
+	say: "subagent",
+	text: JSON.stringify({
+		subagentBatchId,
+		status,
+		total: 1,
+		completed: status === "running" ? 0 : 1,
+		successes: status === "completed" ? 1 : 0,
+		failures: status === "failed" ? 1 : 0,
+		toolCalls: 0,
+		inputTokens: 0,
+		outputTokens: 0,
+		contextWindow: 0,
+		maxContextTokens: 0,
+		maxContextUsagePercentage: 0,
+		items: [
+			{
+				index: 1,
+				prompt: "review",
+				status: status === "running" ? "running" : status,
+				toolCalls: 0,
+				inputTokens: 0,
+				outputTokens: 0,
+				totalCost: 0,
+				contextTokens: 0,
+				contextWindow: 0,
+				contextUsagePercentage: 0,
+			},
+		],
+	}),
 	ts,
 })
 
@@ -81,5 +126,47 @@ describe("groupLowStakesTools", () => {
 		expect(grouped).toHaveLength(2)
 		expect(grouped[0]).toMatchObject({ type: "say", say: "reasoning", text: "Planning next read" })
 		expect(isToolGroup(grouped[1])).toBe(true)
+	})
+})
+
+describe("filterVisibleMessages", () => {
+	it("keeps only the latest subagent status row for a batch id", () => {
+		const filtered = filterVisibleMessages([
+			createSubagentStatusMessage(1, "batch-1", "running"),
+			createSubagentStatusMessage(2, "batch-1", "completed"),
+		])
+
+		expect(filtered).toHaveLength(1)
+		expect(filtered[0]).toMatchObject({ type: "say", say: "subagent", ts: 2 })
+	})
+
+	it("hides the use_subagents row when a later subagent status row has the same batch id", () => {
+		const filtered = filterVisibleMessages([
+			createUseSubagentsMessage(1, ["first", "second"], "batch-1"),
+			createSubagentStatusMessage(2, "batch-1", "running"),
+		])
+
+		expect(filtered).toHaveLength(1)
+		expect(filtered[0]).toMatchObject({ type: "say", say: "subagent", ts: 2 })
+	})
+
+	it("keeps separate subagent batches visible", () => {
+		const filtered = filterVisibleMessages([
+			createSubagentStatusMessage(1, "batch-1", "completed"),
+			createSubagentStatusMessage(2, "batch-2", "completed"),
+		])
+
+		expect(filtered).toHaveLength(2)
+		expect(filtered.map((message) => message.ts)).toEqual([1, 2])
+	})
+
+	it("preserves legacy broad hiding behavior when use_subagents has no batch id", () => {
+		const filtered = filterVisibleMessages([
+			createUseSubagentsMessage(1, ["first"]),
+			createSubagentStatusMessage(2, "batch-1", "running"),
+		])
+
+		expect(filtered).toHaveLength(1)
+		expect(filtered[0]).toMatchObject({ type: "say", say: "subagent", ts: 2 })
 	})
 })

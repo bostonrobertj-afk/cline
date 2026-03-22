@@ -288,6 +288,7 @@ export interface SubagentStatusItem {
 }
 
 export interface ClineSaySubagentStatus {
+	subagentBatchId?: string
 	status: "running" | "completed" | "failed"
 	total: number
 	completed: number
@@ -318,6 +319,7 @@ export interface ClineAskUseMcpServer {
 }
 
 export interface ClineAskUseSubagents {
+	subagentBatchId?: string
 	prompts: string[]
 }
 

@@ -19,6 +19,12 @@ import { ToolResultUtils } from "../utils/ToolResultUtils"
 
 const MAX_SUBAGENT_PROMPTS = 5
 const PROMPT_KEYS = ["prompt_1", "prompt_2", "prompt_3", "prompt_4", "prompt_5"] as const
+let subagentBatchCounter = 0
+
+function createSubagentBatchId(taskUlid: string): string {
+	subagentBatchCounter += 1
+	return `${taskUlid}:subagents:${Date.now().toString(36)}:${subagentBatchCounter.toString(36)}`
+}
 
 function resolveConfiguredSubagentName(toolName: string): string | undefined {
 	return AgentConfigLoader.getInstance().resolveSubagentNameForTool(toolName)
@@ -107,7 +113,8 @@ export class UseSubagentsToolHandler implements IFullyManagedTool {
 		const apiConfig = config.services.stateManager.getApiConfiguration()
 		const currentMode = config.services.stateManager.getGlobalSettingsKey("mode")
 		const provider = (currentMode === "plan" ? apiConfig.planModeApiProvider : apiConfig.actModeApiProvider) as string
-		const approvalPayload: ClineAskUseSubagents = { prompts }
+		const subagentBatchId = createSubagentBatchId(config.ulid)
+		const approvalPayload: ClineAskUseSubagents = { prompts, subagentBatchId }
 		const approvalBody = JSON.stringify(approvalPayload)
 
 		const autoApproveResult = config.autoApprover?.shouldAutoApproveTool(this.name)
@@ -186,6 +193,7 @@ export class UseSubagentsToolHandler implements IFullyManagedTool {
 			const maxContextUsagePercentage = entries.reduce((acc, entry) => Math.max(acc, entry.contextUsagePercentage || 0), 0)
 
 			const payload: ClineSaySubagentStatus = {
+				subagentBatchId,
 				status,
 				total: entries.length,
 				completed,

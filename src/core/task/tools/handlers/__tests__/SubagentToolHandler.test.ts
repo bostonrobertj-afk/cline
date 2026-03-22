@@ -168,6 +168,7 @@ describe("SubagentToolHandler", () => {
 
 		const payload = JSON.parse(callbacks.ask.firstCall.args[1])
 		assert.deepEqual(payload.prompts, ["first prompt", "second prompt"])
+		assert.equal(typeof payload.subagentBatchId, "undefined")
 		sinon.assert.notCalled(callbacks.say)
 	})
 
@@ -196,6 +197,7 @@ describe("SubagentToolHandler", () => {
 
 		const payload = JSON.parse(callbacks.say.firstCall.args[1])
 		assert.deepEqual(payload.prompts, ["first prompt", "second prompt"])
+		assert.equal(typeof payload.subagentBatchId, "undefined")
 		sinon.assert.notCalled(callbacks.ask)
 	})
 
@@ -313,6 +315,11 @@ describe("SubagentToolHandler", () => {
 
 		const subagentStatusCalls = callbacks.say.getCalls().filter((call) => call.args[0] === "subagent")
 		assert.ok(subagentStatusCalls.length >= 2)
+		const parsedStatuses = subagentStatusCalls.map((call) => JSON.parse(call.args[1]))
+		assert.ok(
+			parsedStatuses.every((payload) => typeof payload.subagentBatchId === "string" && payload.subagentBatchId.length > 0),
+		)
+		assert.equal(new Set(parsedStatuses.map((payload) => payload.subagentBatchId)).size, 1)
 		const finalCall = subagentStatusCalls[subagentStatusCalls.length - 1]
 		assert.equal(finalCall.args[4], false)
 
@@ -325,6 +332,52 @@ describe("SubagentToolHandler", () => {
 		assert.equal(usagePayload.cacheWrites, 0)
 		assert.equal(usagePayload.cacheReads, 0)
 		assert.equal(usagePayload.cost, 0.75)
+	})
+
+	it("uses a different subagentBatchId for separate executions", async () => {
+		const { config, callbacks } = createConfig({ autoApproveSafe: true, autoApproveAll: true })
+		sinon.stub(SubagentRunner.prototype, "run").resolves({
+			status: "completed",
+			result: "done",
+			stats: {
+				toolCalls: 1,
+				inputTokens: 2,
+				outputTokens: 3,
+				cacheWriteTokens: 0,
+				cacheReadTokens: 0,
+				totalCost: 0.25,
+				contextTokens: 5,
+				contextWindow: 200000,
+				contextUsagePercentage: 0.0025,
+			},
+		})
+
+		const handler = new UseSubagentsToolHandler()
+		await handler.execute(config, {
+			type: "tool_use",
+			name: ClineDefaultTool.USE_SUBAGENTS,
+			params: {
+				prompt_1: "one",
+			},
+			partial: false,
+		})
+		await handler.execute(config, {
+			type: "tool_use",
+			name: ClineDefaultTool.USE_SUBAGENTS,
+			params: {
+				prompt_1: "two",
+			},
+			partial: false,
+		})
+
+		const approvalCalls = callbacks.ask.getCalls().filter((call) => call.args[0] === "use_subagents")
+		assert.equal(approvalCalls.length, 0)
+
+		const subagentStatusCalls = callbacks.say.getCalls().filter((call) => call.args[0] === "subagent")
+		const finalStatuses = subagentStatusCalls.filter((call) => call.args[4] === false).map((call) => JSON.parse(call.args[1]))
+
+		assert.equal(finalStatuses.length, 2)
+		assert.notEqual(finalStatuses[0].subagentBatchId, finalStatuses[1].subagentBatchId)
 	})
 
 	it("continues after per-subagent failures and reports both outcomes", async () => {

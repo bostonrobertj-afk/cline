@@ -4,7 +4,13 @@
 
 import { combineApiRequests } from "@shared/combineApiRequests"
 import { combineCommandSequences } from "@shared/combineCommandSequences"
-import type { ClineMessage, ClineSayBrowserAction, ClineSayTool } from "@shared/ExtensionMessage"
+import type {
+	ClineAskUseSubagents,
+	ClineMessage,
+	ClineSayBrowserAction,
+	ClineSaySubagentStatus,
+	ClineSayTool,
+} from "@shared/ExtensionMessage"
 import { FileIcon, FolderOpenDotIcon, FolderOpenIcon, SearchIcon, ShapesIcon, WrenchIcon } from "lucide-react"
 
 /**
@@ -47,11 +53,35 @@ export function processMessages(messages: ClineMessage[]): ClineMessage[] {
 	return combineApiRequests(combineCommandSequences(messages))
 }
 
+function getSubagentBatchId(message: ClineMessage): string | undefined {
+	if (!message.text) {
+		return undefined
+	}
+
+	if (message.ask !== "use_subagents" && message.say !== "use_subagents" && message.say !== "subagent") {
+		return undefined
+	}
+
+	try {
+		if (message.say === "subagent") {
+			const parsed = JSON.parse(message.text) as ClineSaySubagentStatus
+			return parsed.subagentBatchId?.trim() || undefined
+		}
+
+		const parsed = JSON.parse(message.text) as ClineAskUseSubagents
+		return parsed.subagentBatchId?.trim() || undefined
+	} catch {
+		return undefined
+	}
+}
+
 /**
  * Filter messages that should be visible in the chat
  */
 export function filterVisibleMessages(messages: ClineMessage[]): ClineMessage[] {
 	return messages.filter((message, index, arr) => {
+		const subagentBatchId = getSubagentBatchId(message)
+
 		switch (message.ask) {
 			case "completion_result":
 				// don't show a chat row for a completion_result ask without text. This specific type of message only occurs if cline wants to execute a command as part of its completion result, in which case we interject the completion_result tool with the execute_command tool.
@@ -64,7 +94,19 @@ export function filterVisibleMessages(messages: ClineMessage[]): ClineMessage[] 
 			case "resume_completed_task":
 				return false
 			case "use_subagents":
-				if (arr.slice(index + 1).some((candidate) => candidate.type === "say" && candidate.say === "subagent")) {
+				if (
+					arr.slice(index + 1).some((candidate) => {
+						if (candidate.type !== "say" || candidate.say !== "subagent") {
+							return false
+						}
+
+						if (!subagentBatchId) {
+							return true
+						}
+
+						return getSubagentBatchId(candidate) === subagentBatchId
+					})
+				) {
 					return false
 				}
 				break
@@ -100,7 +142,34 @@ export function filterVisibleMessages(messages: ClineMessage[]): ClineMessage[] 
 			case "mcp_server_request_started":
 				return false
 			case "use_subagents":
-				if (arr.slice(index + 1).some((candidate) => candidate.type === "say" && candidate.say === "subagent")) {
+				if (
+					arr.slice(index + 1).some((candidate) => {
+						if (candidate.type !== "say" || candidate.say !== "subagent") {
+							return false
+						}
+
+						if (!subagentBatchId) {
+							return true
+						}
+
+						return getSubagentBatchId(candidate) === subagentBatchId
+					})
+				) {
+					return false
+				}
+				break
+			case "subagent":
+				if (
+					subagentBatchId &&
+					arr
+						.slice(index + 1)
+						.some(
+							(candidate) =>
+								candidate.type === "say" &&
+								candidate.say === "subagent" &&
+								getSubagentBatchId(candidate) === subagentBatchId,
+						)
+				) {
 					return false
 				}
 				break
