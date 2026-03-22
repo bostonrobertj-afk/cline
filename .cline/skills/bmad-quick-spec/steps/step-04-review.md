@@ -10,6 +10,9 @@ wipFile: '{implementation_artifacts}/tech-spec-wip.md'
 - Final step.
 - Present the complete spec content and iterate until the user is satisfied.
 - Speak in the configured communication language.
+- As soon as the current active checklist item is actually finished, call `complete_workflow_item` for that item before starting work from the next checklist item.
+- After you complete the final checklist item in this phase, stop and wait for the prompt to refresh before doing any work from the next phase.
+- Do not attempt checklist items from another phase while the current phase is active.
 
 ## EXECUTION
 

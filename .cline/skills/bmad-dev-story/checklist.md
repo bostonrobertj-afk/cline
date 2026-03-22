@@ -20,6 +20,10 @@ validation-rules:
 
 # 🎯 Enhanced Definition of Done Checklist
 
+<critical>Call complete_workflow_item as soon as the current active checklist item is actually finished before moving to the next item.</critical>
+<critical>After the final checklist item in this phase is complete, stop and wait for the prompt to refresh before doing work from the next phase.</critical>
+<critical>Do not attempt checklist items from another phase while the current phase is active.</critical>
+
 **Critical validation:** Story is truly ready for review only when ALL items below are satisfied
 
 ## 📋 Context & Requirements Validation

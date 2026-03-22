@@ -4,6 +4,9 @@
 
 - Goal: Turn discovery into lean, high-value implementation rules.
 - Keep the content concise and optimized for LLM context.
+- As soon as the current active checklist item is actually finished, call `complete_workflow_item` for that item before starting work from the next checklist item.
+- After you complete the final checklist item in this phase, stop and wait for the prompt to refresh before doing any work from the next phase.
+- Do not attempt checklist items from another phase while the current phase is active.
 
 ## EXECUTION
 

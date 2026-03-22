@@ -10,6 +10,9 @@ outputFile: '{planning_artifacts}/product-brief-{{project_name}}-{{date}}.md'
 - Goal: Define the core problem, solution vision, and differentiators through collaborative product-vision discovery.
 - Only the current phase checklist and the current active step's details are shown in the prompt at one time.
 - Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
+- As soon as the current active checklist item is actually finished, call `complete_workflow_item` for that item before starting work from the next checklist item.
+- After you complete the final checklist item in this phase, stop and wait for the prompt to refresh before doing any work from the next phase.
+- Do not attempt checklist items from another phase while the current phase is active.
 ## EXECUTION
 
 <step n="1" goal="Facilitate product-vision discovery from problem space to solution space">

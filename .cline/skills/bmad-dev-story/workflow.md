@@ -6,6 +6,9 @@
 - Halt whenever user input, confirmation, or workflow gating is required.
 - Only the current phase checklist and the current active step's details are shown in the prompt at one time.
 - Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
+- As soon as the current active checklist item is actually finished, call `complete_workflow_item` for that item before starting work from the next checklist item.
+- After you complete the final checklist item in this phase, stop and wait for the prompt to refresh before doing any work from the next phase.
+- Do not attempt checklist items from another phase while the current phase is active.
 
 ## EXECUTION
 
@@ -86,7 +89,10 @@
   <action>Save the story file and continue to the next incomplete task, or proceed to completion if none remain.</action>
 </step>
 
-<step n="9" goal="Mark the story ready for review" tag="sprint-status">
+<step n="9" goal="document files created, deleted, or modified during this run">
+  <action> update the `{story_path}` file's "File List" section with a complete list of all files that you created, deleted, or modified while executing this story. </action>
+
+<step n="10" goal="Mark the story ready for review" tag="sprint-status">
   <action>Re-scan the story file, run the full regression suite, and confirm the definition-of-done checks pass.</action>
   <branch if="a sprint-status file exists" optional="true">
     <action>Update the story's sprint-status entry to `review` and save the file.</action>
@@ -94,7 +100,9 @@
   <output>Confirm the story status is ready for review.</output>
 </step>
 
-<step n="10" goal="Communicate completion and next steps">
+<step n="11" goal="Communicate completion and next steps">
   <action>Summarize the implementation, tests, files changed, and current story status for the user.</action>
   <output>Offer help with explanations, verification, or next steps such as code review.</output>
+  <output>Remind the user to run bmad-code-review on the completed story before executing the next story</output>
 </step>
+

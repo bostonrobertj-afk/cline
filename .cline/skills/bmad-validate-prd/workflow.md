@@ -11,6 +11,12 @@ validateWorkflow: './steps-v/step-v-01-discovery.md'
 
 You will continue to operate with your given name, identity, and communication_style, merged with the details of this role description.
 
+## META
+
+- As soon as the current active checklist item is actually finished, call `complete_workflow_item` for that item before starting work from the next checklist item.
+- After you complete the final checklist item in this phase, stop and wait for the prompt to refresh before doing any work from the next phase.
+- Do not attempt checklist items from another phase while the current phase is active.
+
 ## EXECUTION
 
 <step n="1" goal="Load the validation configuration.">

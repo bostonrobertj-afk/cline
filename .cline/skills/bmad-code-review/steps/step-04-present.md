@@ -8,6 +8,10 @@
 - Do not auto-fix anything in this step.
 - Only the current phase checklist and the current active step's details are shown in the prompt at one time.
 - Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
+- As soon as the current active checklist item is actually finished, call `complete_workflow_item` for that item before starting work from the next checklist item.
+- Do not attempt to complete checklist items from earlier or later phases while this phase is active.
+- After you complete the final checklist item in this phase, stop and wait for the prompt to refresh before doing any work from the next phase.
+- Do not attempt checklist items from another phase while the current phase is active.
 
 ## EXECUTION
 

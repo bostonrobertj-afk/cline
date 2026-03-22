@@ -39,6 +39,30 @@ Use this mental model when authoring:
 - supporting detail = `<detail>` and other non-checklist annotations
 - checkpoint gating = `## CHECKPOINT`
 
+## Required Phase Progression Guidance
+
+This is a required authoring rule for managed workflow `workflow.md` files, step files such as `step-*.md`, and checklist-style managed phase docs.
+
+Because managed workflow prompt injection only shows the current phase checklist and the current active item, each managed workflow document must explicitly tell the agent how checklist progression works.
+
+Required guidance:
+
+- tell the agent to call `complete_workflow_item` as soon as the current active checklist item is actually finished
+- tell the agent not to begin work from the next checklist item until the current one has been marked complete
+- tell the agent that after the final checklist item in the current phase is complete, it must stop and wait for the prompt to refresh before doing work from the next phase
+- tell the agent not to attempt checklist items from another phase while the current phase is active
+
+Recommended placement:
+
+- for files that use `## META`, include these rules in `## META`
+- for checklist-style files that use another top-of-file guidance format, include equivalent language in that file's top-level critical/meta guidance block
+
+These rules are required because without them the model may:
+
+- continue into triage or presentation work while still operating on a stale earlier-phase prompt
+- try to complete checklist items from the wrong phase
+- produce valid work but fail managed workflow progression because it skipped explicit checklist completion
+
 ## Canonical Tags
 
 ### `<step>`
@@ -663,6 +687,9 @@ When writing or reviewing a workflow file, check for these:
 17. Are `<detail>` blocks nested under the exact item they qualify whenever possible?
 18. Does the final file avoid internal duplication through `## REFERENCE`, `<prose>`, or mirrored legacy blocks?
 19. If meaningful guidance used to live in `## ADVISORY`, has that guidance been rewritten into structured execution content where needed?
+20. Does the file explicitly instruct the agent to call `complete_workflow_item` as soon as the current active checklist item is finished?
+21. Does the file explicitly instruct the agent to stop after the final item in the current phase and wait for the prompt to refresh before doing next-phase work?
+22. Does the file explicitly forbid attempting checklist items from another phase while the current phase is active?
 
 ## Migration Summary
 
@@ -675,6 +702,7 @@ During broad conversion work, prefer these rewrites:
 - annotation-only tags -> detail layer
 - duplicated `## REFERENCE` / `<prose>` workflow copies -> rewrite meaning into the structured layer, then remove the duplicate
 - checkpoint-as-step hacks -> `## CHECKPOINT`
+- missing phase-progression rules -> add explicit `complete_workflow_item`, prompt-refresh, and current-phase-only guidance to the file's top-level meta/critical instructions
 
 ## Scope Note
 

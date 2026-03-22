@@ -12,6 +12,10 @@ failed_layers: '' # set at runtime: comma-separated list of layers that failed o
 - Keep the reviewer roles distinct and preserve the review context boundaries for each layer.
 - Only the current phase checklist and the current active step's details are shown in the prompt at one time.
 - Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
+- As soon as the current active checklist item is actually finished, call `complete_workflow_item` for that item before starting work from the next checklist item.
+- After you complete the final checklist item in this phase, stop and wait for the prompt to refresh into the next phase before doing any triage or presentation work.
+- After you complete the final checklist item in this phase, stop and wait for the prompt to refresh before doing any work from the next phase.
+- Do not attempt checklist items from another phase while the current phase is active.
 
 ## EXECUTION
 
@@ -89,7 +93,12 @@ failed_layers: '' # set at runtime: comma-separated list of layers that failed o
   </branch>
 </step>
 
-<step n="3" goal="Collect the findings for triage">
+<step n="3" goal="Collect the raw findings for triage">
+  <detail>
+    This step is only for collecting and preserving the raw reviewer outputs.
+    Do not normalize, deduplicate, classify, summarize, or present the review findings in this phase.
+    Once the findings bundle is collected, mark this item complete and stop so the workflow can advance to triage on a refreshed prompt.
+  </detail>
   <action>Collect all findings from the completed review layers.</action>
   <branch if="{failed_layers} is non-empty" optional="true">
     <output>Keep note of which review layers failed so the triage step can warn about incomplete coverage.</output>
@@ -106,3 +115,4 @@ Halt if fallback prompt files were generated and wait for the user to paste back
 - Keep the Adversarial General layer grounded in the provided review input plus any explicitly loaded project context.
 - Keep the Edge Case Hunter focused on reachable edge cases in the provided review scope.
 - Only run the Acceptance Auditor when a usable spec context exists.
+- Do not attempt `step-03-triage::*` or `step-04-present::*` checklist items while the current phase is still `step-02-review`.

@@ -23,11 +23,15 @@ templateFile: '{workflow_path}/template.md'
 # Step 5: Create Comprehensive Story File
 
 ## META
+
 - current_phase: workflow::step-5
 - goal: Assemble the final story file so the developer receives the complete implementation guide.
 - Speak in `{communication_language}` and write the artifact in `{document_output_language}`.
 - Only the current phase checklist and the current active step's details are shown in the prompt at one time.
 - Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
+- As soon as the current active checklist item is actually finished, call `complete_workflow_item` for that item before starting work from the next checklist item.
+- After you complete the final checklist item in this phase, stop and wait for the prompt to refresh before doing any work from the next phase.
+- Do not attempt checklist items from another phase while the current phase is active.
 ## EXECUTION
 <step n="1" goal="Initialize the output file">
   <action>Create the story file at `{outputFile}` from `{templateFile}`.</action>
