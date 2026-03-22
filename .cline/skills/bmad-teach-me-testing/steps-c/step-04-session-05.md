@@ -1,6 +1,6 @@
 ---
 name: 'step-04-session-05'
-description: 'Session 5: ATDD & Automate - TDD red-green approach, generate tests (60 min)'
+description: 'Session 5: ATDD & Automate - red-green development, automation coverage, and API testing'
 
 progressFile: '{test_artifacts}/teaching-progress/{user_name}-tea-progress.yaml'
 sessionNotesTemplate: '../templates/session-notes-template.md'
@@ -12,223 +12,63 @@ partyModeWorkflow: '{project-root}/_bmad/core/workflows/party-mode/workflow.md'
 
 # Step 4: Session 5 - ATDD & Automate
 
-## STEP GOAL:
-
-To teach ATDD (red-green TDD) and Automate workflows for test generation in a 60-minute session.
-
-## MANDATORY EXECUTION RULES (READ FIRST):
-
-### Universal Rules:
-
-- 🛑 NEVER generate content without user input
-- 📖 CRITICAL: Read complete step file before action
-- ✅ YOU MUST ALWAYS SPEAK OUTPUT In {communication_language}
-
-### Role Reinforcement:
-
-- ✅ Master Test Architect and Teaching Guide
-- ✅ Collaborative learning
-
-### Step-Specific Rules:
-
-- 🎯 Focus on Session 5 (ATDD & Automate)
-- 💬 Teach TDD approach
-
-## EXECUTION PROTOCOLS:
-
-- 🎯 Load docs just-in-time
-- 💾 Generate notes
-- 📖 Update progress
-- ⏭️ Return to hub
-
-## MANDATORY SEQUENCE
-
-### 1. Welcome
-
-"🧪 **Session 5: ATDD & Automate** (60 minutes)
-
-**Objective:** Generate tests with TDD red-green approach
-
-**What you'll learn:**
-
-- ATDD workflow (failing tests first)
-- Automate workflow (expand coverage)
-- Component TDD
-- API testing patterns
-
-Let's generate some tests!"
-
-### 2. Update Progress (Started)
-
-Load {progressFile} and update session-05-atdd-automate:
-
-- Set `status: 'in-progress'`
-- Set `started_date: {current_date}` if not already set
-
-Save the updated progress file.
-
-### 3. Teaching: ATDD Workflow
-
-"### 🔴 ATDD: Acceptance-Driven Test Development
-
-**TDD Red Phase:** Write failing tests FIRST
-
-**ATDD Workflow:**
-
-1. **Preflight:** Check prerequisites
-2. **Test Strategy:** Define what to test
-3. **Generate FAILING Tests:** Red phase (tests fail because code doesn't exist yet)
-4. **Implement Code:** Green phase (make tests pass)
-
-**Why Failing Tests First:**
-
-- Validates tests actually test something
-- Prevents false positives
-- Drives implementation (tests define behavior)
-
-{Role-adapted example}
-
-**Documentation:** <https://bmad-code-org.github.io/bmad-method-test-architecture-enterprise/how-to/workflows/run-atdd/>"
-
-### 4. Teaching: Automate Workflow
-
-"### 🤖 Automate: Expand Test Coverage
-
-**Purpose:** Generate tests for existing features
-
-**Automate Workflow:**
-
-1. **Identify Targets:** What needs testing
-2. **Generate Tests:** API and/or E2E tests
-3. **Review & Run:** Tests should pass (code already exists)
-
-**Difference from ATDD:**
-
-- ATDD: Tests first, then code (red → green)
-- Automate: Code first, then tests (coverage expansion)
-
-{Role-adapted example}
-
-**Documentation:** <https://bmad-code-org.github.io/bmad-method-test-architecture-enterprise/how-to/workflows/run-automate/>"
-
-### 5. Teaching: Component TDD
-
-"### 🔄 Component TDD Red-Green Loop
-
-**Pattern:**
-
-1. **Red:** Write failing test
-2. **Green:** Minimal code to pass
-3. **Refactor:** Improve code, tests stay green
-4. **Repeat:** Next requirement
-
-**Example:**
-
-```typescript
-// RED: Test fails (function doesn't exist)
-test('calculates total price', () => {
-  expect(calculateTotal([10, 20])).toBe(30);
-});
-
-// GREEN: Minimal implementation
-function calculateTotal(prices) {
-  return prices.reduce((a, b) => a + b, 0);
-}
-
-// REFACTOR: Add validation, tests still green
-```
-
-{Role-adapted example}
-
-**Knowledge Fragment:** component-tdd.md"
-
-### 6. Teaching: API Testing Patterns
-
-"### 🌐 API Testing Patterns
-
-**Pure API Testing (no browser):**
-
-- Fast execution
-- Test business logic
-- Validate responses
-- Schema validation
-
-**Pattern:**
-
-```typescript
-test('GET /users returns user list', async ({ request }) => {
-  const response = await request.get('/api/users');
-  expect(response.ok()).toBeTruthy();
-  const users = await response.json();
-  expect(users).toHaveLength(10);
-});
-```
-
-{Role-adapted example}
-
-**Knowledge Fragment:** api-testing-patterns.md, api-request.md"
-
-### 7. Quiz (3 questions)
-
-**Q1:** "What is the 'red' phase in TDD?
-A) Tests fail (code doesn't exist yet)
-B) Tests pass
-C) Code is refactored
-D) Tests are deleted"
-
-Correct: A
-
-**Q2:** "What's the difference between ATDD and Automate workflows?
-A) ATDD generates E2E, Automate generates API tests
-B) ATDD writes tests first (red phase), Automate tests existing code
-C) ATDD is faster than Automate
-D) They're the same workflow"
-
-Correct: B
-
-**Q3:** "Why use pure API tests without a browser?
-A) They look prettier
-B) They're easier to debug
-C) They're faster and test business logic directly
-D) They're required by TEA"
-
-Correct: C
-
-Calculate score, handle <70% retry.
-
-### 8. Generate Session Notes
-
-Create {sessionNotesFile} with Session 5 content:
-
-- ATDD workflow (red-green TDD)
-- Automate workflow (coverage expansion)
-- Component TDD
-- API testing patterns
-- Docs: ATDD, Automate
-- Fragments: component-tdd.md, api-testing-patterns.md, api-request.md
-- Quiz results
-
-### 9. Update Progress (Completed)
-
-Update session-05-atdd-automate: completed, score, notes.
-Increment sessions_completed, update percentage.
-Append 'step-04-session-05' to stepsCompleted.
-Set next_recommended: 'session-06-quality-trace'.
-
-### 10. Complete Message
-
-"🎉 **Session 5 Complete!** Score: {score}/100
-You can now generate tests with ATDD and Automate!
-Progress: {completion_percentage}%"
-
-### 11. Menu
-
-[A] Advanced Elicitation [P] Party Mode [C] Continue to Session Menu
-
-Return to {nextStepFile}.
-
----
-
-## 🚨 SUCCESS METRICS
-
-✅ ATDD and Automate taught, TDD explained, quiz passed, notes generated, progress updated, returned to hub.
+## META
+
+- Goal: teach red-green development, test generation for existing features, and practical API testing patterns.
+- Keep the session focused on implementation and coverage growth.
+
+## EXECUTION
+
+<step n="1" goal="Welcome the learner and mark the session in progress">
+  <output>Introduce Session 5, its objective, and the 60-minute ATDD &amp; Automate path.</output>
+  <action>Update `session-05-atdd-automate` to `status: 'in-progress'` and set `started_date` to `{current_date}`.</action>
+</step>
+
+<step n="2" goal="Teach ATDD">
+  <output>Explain that ATDD starts with failing tests, then moves to implementation, so the test defines the behavior.</output>
+  <detail>Connect the red phase to behavior discovery and the green phase to minimal implementation.</detail>
+</step>
+
+<step n="3" goal="Teach Automate">
+  <output>Explain that Automate expands coverage for existing features by generating tests for known targets.</output>
+  <detail>Make the difference from ATDD explicit: Automate starts from existing code, not from a failing specification.</detail>
+</step>
+
+<step n="4" goal="Teach supporting patterns">
+  <output>Explain the component TDD red-green-refactor loop and the role of pure API tests in fast, direct validation.</output>
+  <branch if="role == QA">
+    <detail>Highlight coverage growth and stable regression checks.</detail>
+  </branch>
+  <branch if="role == Dev">
+    <detail>Highlight test-first implementation discipline and quick feedback loops.</detail>
+  </branch>
+  <branch if="role == Lead">
+    <detail>Highlight adoption patterns that balance speed with consistency.</detail>
+  </branch>
+  <branch if="role == VP">
+    <detail>Highlight scalable quality practices that reduce manual teaching overhead.</detail>
+  </branch>
+</step>
+
+<step n="5" goal="Check understanding">
+  <ask>Ask three short knowledge-check questions about red-green TDD, the difference between ATDD and Automate, and why API tests are useful.</ask>
+  <action>Score the answers and require at least 70% before continuing.</action>
+</step>
+
+<step n="6" goal="Generate notes and update progress">
+  <action>Create `{sessionNotesFile}` from `{sessionNotesTemplate}` with the session summary, docs used, fragments referenced, and quiz result.</action>
+  <action>Mark `session-05-atdd-automate` complete, store the score, append `step-04-session-05` to `stepsCompleted`, and update the next recommendation.</action>
+</step>
+
+<step n="7" goal="Return to the hub">
+  <output>Confirm completion, share the score, and present the A/P/C menu before loading `./step-03-session-menu.md`.</output>
+</step>
+
+## CHECKPOINT
+
+Pause for quiz answers and for the user’s choice at the A/P/C menu.
+
+## ADVISORY
+
+- Keep the testing examples focused on behavior and feedback speed.
+- Distinguish clearly between generating tests for new behavior and expanding tests for existing behavior.

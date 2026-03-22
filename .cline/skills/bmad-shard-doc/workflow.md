@@ -2,99 +2,96 @@
 
 **Goal:** Split large markdown documents into smaller, organized files based on level 2 sections using `npx @kayvan/markdown-tree-parser`.
 
-## CRITICAL RULES
+## META
 
-- MANDATORY: Execute ALL steps in the EXECUTION section IN EXACT ORDER
-- DO NOT skip steps or change the sequence
-- HALT immediately when halt-conditions are met
-- Each action within a step is a REQUIRED action to complete that step
+- Execute the workflow in order.
+- Halt whenever a user response is required.
+- Speak in `communication_language`.
+- Keep the original document separate from the sharded output unless the user chooses otherwise.
 
 ## EXECUTION
 
-### Step 1: Get Source Document
+<step n="1" goal="Get and validate the source document path.">
+  <ask if="the source document path has not already been provided">
+    Ask for the source document path.
+  </ask>
+  <action>Verify the file exists and is accessible.</action>
+  <action>Verify the file has a `.md` extension.</action>
+  <branch if="the file is missing or is not markdown">
+    <output>Halt with an error message that the source must be an accessible markdown file.</output>
+  </branch>
+  <detail>Use the validated source path for the rest of the workflow.</detail>
+</step>
 
-- Ask user for the source document path if not provided already
-- Verify file exists and is accessible
-- Verify file is markdown format (.md extension)
-- If file not found or not markdown: HALT with error message
+<step n="2" goal="Choose and validate the destination folder.">
+  <action>Set the default destination to a folder beside the source file with the same base name and no `.md` extension.</action>
+  <output>Present the default destination path and ask whether to use it or provide a custom path.</output>
+  <ask>Use the suggested destination folder, or provide a different writable folder path.</ask>
+  <branch if="the user accepts the default destination">
+    <action>Use the suggested destination path.</action>
+  </branch>
+  <branch if="the user provides a custom destination">
+    <action>Use the custom destination path.</action>
+  </branch>
+  <action>Verify the destination folder exists or can be created.</action>
+  <action>Check write permission for the destination path.</action>
+  <branch if="permission is denied or the destination cannot be created">
+    <output>Halt with an error message that the destination folder is not writable or cannot be created.</output>
+  </branch>
+</step>
 
-### Step 2: Get Destination Folder
+<step n="3" goal="Run the sharding command.">
+  <output>Tell the user that sharding is starting.</output>
+  <action>Execute `npx @kayvan/markdown-tree-parser explode [source-document] [destination-folder]`.</action>
+  <action>Capture command output and any errors.</action>
+  <branch if="the command fails">
+    <output>Halt and show the error to the user.</output>
+  </branch>
+</step>
 
-- Determine default destination: same location as source file, folder named after source file without .md extension
-  - Example: `/path/to/architecture.md` --> `/path/to/architecture/`
-- Ask user for the destination folder path (`[y]` to confirm use of default: `[suggested-path]`, else enter a new path)
-- If user accepts default: use the suggested destination path
-- If user provides custom path: use the custom destination path
-- Verify destination folder exists or can be created
-- Check write permissions for destination
-- If permission denied: HALT with error message
+<step n="4" goal="Verify the shard output.">
+  <action>Check that the destination folder contains sharded files.</action>
+  <action>Verify that `index.md` was created in the destination folder.</action>
+  <action>Count the number of files created.</action>
+  <branch if="no files were created">
+    <output>Halt with an error message that no shard files were produced.</output>
+  </branch>
+  <branch if="index.md is missing">
+    <output>Halt with an error message that `index.md` was not created.</output>
+  </branch>
+</step>
 
-### Step 3: Execute Sharding
+<step n="5" goal="Report completion.">
+  <output>Present a completion report with the source path, destination path, number of section files created, confirmation that `index.md` exists, and any warnings or tool output worth noting.</output>
+  <output>Confirm that sharding completed successfully.</output>
+</step>
 
-- Inform user that sharding is beginning
-- Execute command: `npx @kayvan/markdown-tree-parser explode [source-document] [destination-folder]`
-- Capture command output and any errors
-- If command fails: HALT and display error to user
+<step n="6" goal="Handle the original document.">
+  <output>Ask what should happen to the original source document: delete, move to archive, or keep.</output>
+  <ask>Choose `[d]` delete, `[m]` move to archive, or `[k]` keep.</ask>
+  <detail>
+    - `d`: delete the original source file
+    - `m`: move it to an `archive` subfolder by default, or a custom archive path if provided
+    - `k`: keep the original in place, with a warning that duplicate sources can cause confusion
+  </detail>
+  <branch if="the user selects delete">
+    <action>Delete the original source document file.</action>
+    <output>Confirm deletion of the original document.</output>
+    <detail>The document can be reconstructed by concatenating the shard files in order.</detail>
+  </branch>
+  <branch if="the user selects move">
+    <action>Set the default archive location to an `archive` subfolder beside the source file.</action>
+    <ask>Use the default archive path or provide a custom archive path.</ask>
+    <action>Create the archive directory if it does not exist.</action>
+    <action>Move the original document to the archive path.</action>
+    <output>Confirm the archive location.</output>
+  </branch>
+  <branch if="the user selects keep">
+    <output>Warn that keeping both versions is not recommended and confirm the source path if the user still wants to keep it.</output>
+  </branch>
+</step>
 
-### Step 4: Verify Output
+## CHECKPOINT
 
-- Check that destination folder contains sharded files
-- Verify index.md was created in destination folder
-- Count the number of files created
-- If no files created: HALT with error message
-
-### Step 5: Report Completion
-
-- Display completion report to user including:
-  - Source document path and name
-  - Destination folder path
-  - Number of section files created
-  - Confirmation that index.md was created
-  - Any tool output or warnings
-- Inform user that sharding completed successfully
-
-### Step 6: Handle Original Document
-
-> **Critical:** Keeping both the original and sharded versions defeats the purpose of sharding and can cause confusion.
-
-Present user with options for the original document:
-
-> What would you like to do with the original document `[source-document-name]`?
->
-> Options:
-> - `[d]` Delete - Remove the original (recommended - shards can always be recombined)
-> - `[m]` Move to archive - Move original to a backup/archive location
-> - `[k]` Keep - Leave original in place (NOT recommended - defeats sharding purpose)
->
-> Your choice (d/m/k):
-
-#### If user selects `d` (delete)
-
-- Delete the original source document file
-- Confirm deletion to user: "Original document deleted: [source-document-path]"
-- Note: The document can be reconstructed from shards by concatenating all section files in order
-
-#### If user selects `m` (move)
-
-- Determine default archive location: same directory as source, in an `archive` subfolder
-  - Example: `/path/to/architecture.md` --> `/path/to/archive/architecture.md`
-- Ask: Archive location (`[y]` to use default: `[default-archive-path]`, or provide custom path)
-- If user accepts default: use default archive path
-- If user provides custom path: use custom archive path
-- Create archive directory if it does not exist
-- Move original document to archive location
-- Confirm move to user: "Original document moved to: [archive-path]"
-
-#### If user selects `k` (keep)
-
-- Display warning to user:
-  - Keeping both original and sharded versions is NOT recommended
-  - The discover_inputs protocol may load the wrong version
-  - Updates to one will not reflect in the other
-  - Duplicate content taking up space
-  - Consider deleting or archiving the original document
-- Confirm user choice: "Original document kept at: [source-document-path]"
-
-## HALT CONDITIONS
-
-- HALT if npx command fails or produces no output files
+- Halt if the `npx` command fails or produces no shard files.
+- Do not proceed to the original-document decision until the shard output is verified.

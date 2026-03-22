@@ -1,6 +1,6 @@
 ---
 name: 'step-04-session-06'
-description: 'Session 6: Quality & Trace - Test review, traceability, quality metrics (45 min)'
+description: 'Session 6: Quality & Trace - test review, traceability, and release gate decisions'
 
 progressFile: '{test_artifacts}/teaching-progress/{user_name}-tea-progress.yaml'
 sessionNotesTemplate: '../templates/session-notes-template.md'
@@ -12,198 +12,63 @@ partyModeWorkflow: '{project-root}/_bmad/core/workflows/party-mode/workflow.md'
 
 # Step 4: Session 6 - Quality & Trace
 
-## STEP GOAL:
-
-To teach test quality auditing and requirements traceability using Test Review and Trace workflows in a 45-minute session.
-
-## MANDATORY EXECUTION RULES (READ FIRST):
-
-### Universal Rules:
-
-- 🛑 NEVER generate _unsolicited_ content without user input (session flow content is allowed once session begins)
-- 📖 CRITICAL: Read complete step file before action
-- ✅ SPEAK OUTPUT In {communication_language}
-
-### Role Reinforcement:
-
-- ✅ Master Test Architect and Teaching Guide
-- ✅ Collaborative learning
-
-### Step-Specific Rules:
-
-- 🎯 Focus on Session 6 (Quality & Trace)
-- 💬 Teach quality metrics
-
-## EXECUTION PROTOCOLS:
-
-- 🎯 Load docs just-in-time
-- 💾 Generate notes
-- 📖 Update progress
-- ⏭️ Return to hub
-
-## MANDATORY SEQUENCE
-
-### 1. Welcome
-
-"🧪 **Session 6: Quality & Trace** (45 minutes)
-
-**Objective:** Audit quality and ensure traceability
-
-**What you'll learn:**
-
-- Test Review workflow (quality scoring)
-- 5 dimensions of test quality
-- Trace workflow (requirements traceability)
-- Release gate decisions
-
-Let's ensure quality!"
-
-### 2. Update Progress (Started)
-
-Set session-06-quality-trace `status: 'in-progress'`.
-
-### 3. Teaching: Test Review Workflow
-
-"### 🔍 Test Review Workflow
-
-**Purpose:** Audit test quality with 0-100 scoring
-
-**5 Dimensions of Quality:**
-
-**1. Determinism (0-100)**
-
-- Tests pass/fail consistently
-- No flakiness, no randomness
-- Proper async handling
-
-**2. Isolation (0-100)**
-
-- Tests run independently
-- No shared state
-- Parallelizable
-
-**3. Assertions (0-100)**
-
-- Correct checks for expected behavior
-- Meaningful assertions (not just presence)
-- Fails for the right reasons
-
-**4. Structure (0-100)**
-
-- Readable test code
-- Clear organization and naming
-- Minimal duplication
-
-**5. Performance (0-100)**
-
-- Test execution speed
-- Resource usage
-- Parallel efficiency
-
-**Overall Score = Average of 5 dimensions**
-
-{Role-adapted example}
-
-**Documentation:** <https://bmad-code-org.github.io/bmad-method-test-architecture-enterprise/how-to/workflows/run-test-review/>"
-
-### 4. Teaching: Trace Workflow
-
-"### 🔗 Trace Workflow: Requirements Traceability
-
-**Purpose:** Map tests to requirements, make release gate decision
-
-**Trace Workflow:**
-
-1. **Load Context:** Understand acceptance criteria
-2. **Discover Tests:** Find all test files
-3. **Map Criteria:** Link tests to requirements
-4. **Analyze Gaps:** What's not tested?
-5. **Gate Decision:** GREEN (ship) or RED (block)
-
-**Release Gate Logic:**
-
-- **GREEN:** All P0/P1 criteria have tests, gaps are P2/P3
-- **YELLOW:** Some P1 gaps, assess risk
-- **RED:** P0 gaps exist, DO NOT SHIP
-
-{Role-adapted example}
-
-**Documentation:** <https://bmad-code-org.github.io/bmad-method-test-architecture-enterprise/how-to/workflows/run-trace/>"
-
-### 5. Teaching: Quality Metrics
-
-"### 📊 Quality Metrics That Matter
-
-**Track:**
-
-- **P0/P1 Coverage %** (not total line coverage)
-- **Flakiness Rate** (flaky tests / total tests)
-- **Test Execution Time** (feedback loop speed)
-- **Determinism Score** (from Test Review)
-
-**Don't Track (Vanity Metrics):**
-
-- Total line coverage % (tells you nothing about risk)
-- Number of tests (quantity ≠ quality)
-- Test file count (irrelevant)
-
-{Role-adapted example}
-
-**Goal:** High P0/P1 coverage, zero flakiness, fast execution."
-
-### 6. Quiz (3 questions)
-
-**Q1:** "What are the 5 dimensions in Test Review workflow?
-A) Speed, cost, coverage, bugs, time
-B) Determinism, Isolation, Assertions, Structure, Performance
-C) Unit, integration, E2E, manual, exploratory
-D) P0, P1, P2, P3, P4"
-
-Correct: B
-
-**Q2:** "When should the Trace workflow gate decision be RED (block release)?
-A) Any test failures exist
-B) P0 gaps exist (critical requirements not tested)
-C) Code coverage is below 80%
-D) Tests are slow"
-
-Correct: B
-
-**Q3:** "Which metric matters most for quality?
-A) Total line coverage %
-B) Number of tests written
-C) P0/P1 coverage %
-D) Test file count"
-
-Correct: C
-
-Calculate score, handle <70% retry.
-
-### 7. Generate Session Notes
-
-Create {sessionNotesFile} with Session 6 content, Test Review + Trace workflows, quality metrics.
-
-### 8. Update Progress (Completed)
-
-Update session-06-quality-trace: completed, score, notes.
-Increment sessions_completed, update percentage.
-Append 'step-04-session-06' to stepsCompleted.
-Set next_recommended: 'session-07-advanced'.
-
-### 9. Complete Message
-
-"🎉 **Session 6 Complete!** Score: {score}/100
-You can now audit quality and ensure traceability!
-Progress: {completion_percentage}%"
-
-### 10. Menu
-
-[A] Advanced Elicitation [P] Party Mode [C] Continue to Session Menu
-
-Return to {nextStepFile}.
-
----
-
-## 🚨 SUCCESS METRICS
-
-✅ Test Review and Trace taught, quality dimensions explained, quiz passed, notes generated, returned to hub.
+## META
+
+- Goal: teach test quality review, requirements traceability, and release gate reasoning.
+- Keep the session focused on quality assurance and shipping decisions.
+
+## EXECUTION
+
+<step n="1" goal="Welcome the learner and mark the session in progress">
+  <output>Introduce Session 6, its objective, and the 45-minute Quality &amp; Trace path.</output>
+  <action>Update `session-06-quality-trace` to `status: 'in-progress'` and set `started_date` to `{current_date}`.</action>
+</step>
+
+<step n="2" goal="Teach Test Review">
+  <output>Explain the five quality dimensions: determinism, isolation, assertions, structure, and performance.</output>
+  <detail>Show that quality review is about more than whether the tests run.</detail>
+</step>
+
+<step n="3" goal="Teach Trace">
+  <output>Explain how Trace maps requirements to tests and turns that mapping into a release gate decision.</output>
+  <detail>Use GREEN, YELLOW, and RED as simple gate outcomes based on coverage gaps and risk.</detail>
+</step>
+
+<step n="4" goal="Teach the metrics that matter">
+  <output>Explain why P0/P1 coverage, flakiness rate, execution time, and determinism matter more than vanity metrics like total line coverage or test count.</output>
+  <branch if="role == QA">
+    <detail>Emphasize quality scoring and release readiness language.</detail>
+  </branch>
+  <branch if="role == Dev">
+    <detail>Emphasize feedback speed and reliable automation language.</detail>
+  </branch>
+  <branch if="role == Lead">
+    <detail>Emphasize gatekeeping, risk visibility, and team standards language.</detail>
+  </branch>
+  <branch if="role == VP">
+    <detail>Emphasize shipping confidence and measurable quality outcomes.</detail>
+  </branch>
+</step>
+
+<step n="5" goal="Check understanding">
+  <ask>Ask three short knowledge-check questions about Test Review, Trace gate decisions, and the metrics that matter.</ask>
+  <action>Score the answers and require at least 70% before continuing.</action>
+</step>
+
+<step n="6" goal="Generate notes and update progress">
+  <action>Create `{sessionNotesFile}` from `{sessionNotesTemplate}` with the session summary and quiz result.</action>
+  <action>Mark `session-06-quality-trace` complete, store the score, append `step-04-session-06` to `stepsCompleted`, and update the next recommendation.</action>
+</step>
+
+<step n="7" goal="Return to the hub">
+  <output>Confirm completion, share the score, and present the A/P/C menu before loading `./step-03-session-menu.md`.</output>
+</step>
+
+## CHECKPOINT
+
+Pause for quiz answers and for the user’s choice at the A/P/C menu.
+
+## ADVISORY
+
+- Keep the review metrics explicit and actionable.
+- Frame Trace as a release confidence tool, not just a documentation exercise.

@@ -1,25 +1,46 @@
-# workflow
+---
+name: bmad-review-adversarial-general
+description: 'Perform a critical review and produce a findings report. Use when the user requests a skeptical review.'
+---
+
+# Adversarial Review Workflow
 
 ## META
 
-- Goal: Cynically review content and produce findings.
-- Execute this file in order.
-- Halt whenever user input, confirmation, or workflow gating is required.
-- Use the structured sections for extraction; use the prose block for additional agent context.
+- Goal: Find specific, evidence-based problems, gaps, and risks in the provided content.
+- Execute the steps in order.
+- Pause whenever the user must supply content, choose a mode, or approve a workflow gate.
+- Be skeptical, but do not invent issues. If the content is genuinely clean, say so.
+- Communicate in the conversation language and tailor detail to the task context.
 
 ## EXECUTION
 
-<step n="1" goal="Step 1: Receive Content">
-  <action>- Load the content to review from provided input or context - If content to review is empty, ask for clarification and abort - Identify content type (diff, branch, uncommitted changes, document, etc.)</action>
+<step n="1" goal="Receive content and determine review scope">
+  <branch if="content is empty or unreadable">
+    <ask>Ask the user for valid content to review and stop.</ask>
+  </branch>
+  <action>Load the provided content from the prompt or surrounding context.</action>
+  <action>Identify the content type and review scope, such as diff, file, section, plan, or specification.</action>
+  <action>If `also_consider` was provided, include those areas in the review scope.</action>
 </step>
 
-<step n="2" goal="Step 2: Adversarial Analysis">
-  <action>Review with extreme skepticism — assume problems exist.</action>
-  <action>Find at least ten issues to fix or improve in the provided content.</action>
+<step n="2" goal="Perform adversarial analysis">
+  <action>Inspect the content for missing requirements, incorrect claims, edge cases, risks, regressions, and maintainability problems.</action>
+  <action>Compare stated intent to observable evidence and call out anything unsupported.</action>
+  <action>Prioritize findings that are specific, actionable, and grounded in the provided material.</action>
+  <detail>
+    - Favor real defects over speculative complaints.
+    - Do not pad the review with invented problems.
+    - If the content is a diff, focus on changed lines and nearby context.
+    - If the content is a full file or spec, review the entire provided scope.
+    - If the result is genuinely clean, report that honestly.
+  </detail>
 </step>
 
-<step n="3" goal="Step 3: Present Findings">
-  <action>Output findings as a Markdown list (descriptions only).</action>
+<step n="3" goal="Present findings">
+  <action>Output findings in the format requested by the caller.</action>
+  <action>Order findings by severity and include concrete locations when available.</action>
+  <action>Keep the report concise and specific.</action>
 </step>
 
 ## CHECKPOINT
@@ -28,39 +49,6 @@ Halt for any required user confirmation, menu selection, continuation gate, or m
 
 ## ADVISORY
 
-- Use the prose block below for the full agent-facing guidance that complements the structured execution steps.
-
-## REFERENCE
-
-<prose>
-**Goal:** Cynically review content and produce findings.
-
-**Your Role:** You are a cynical, jaded reviewer with zero patience for sloppy work. The content was submitted by a clueless weasel and you expect to find problems. Be skeptical of everything. Look for what's missing, not just what's wrong. Use a precise, professional tone — no profanity or personal attacks.
-
-**Inputs:**
-- **content** — Content to review: diff, spec, story, doc, or any artifact
-- **also_consider** (optional) — Areas to keep in mind during review alongside normal adversarial analysis
-
-
-## EXECUTION
-
-### Step 1: Receive Content
-
-- Load the content to review from provided input or context
-- If content to review is empty, ask for clarification and abort
-- Identify content type (diff, branch, uncommitted changes, document, etc.)
-
-### Step 2: Adversarial Analysis
-
-Review with extreme skepticism — assume problems exist. Find at least ten issues to fix or improve in the provided content.
-
-### Step 3: Present Findings
-
-Output findings as a Markdown list (descriptions only).
-
-
-## HALT CONDITIONS
-
-- HALT if zero findings — this is suspicious, re-analyze or ask for guidance
-- HALT if content is empty or unreadable
-</prose>
+- Use the structured steps as the authoritative execution path.
+- Keep the review professional and skeptical without becoming theatrical.
+- Prefer clear evidence, direct language, and minimal filler.

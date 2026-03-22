@@ -1,6 +1,6 @@
 ---
 name: 'step-e-01-assess-workflow'
-description: 'Assess what needs to be edited in the teaching workflow'
+description: 'Assess what the learner wants to change in the teaching workflow'
 
 nextStepFile: './step-e-02-apply-edits.md'
 workflowPath: '../'
@@ -10,132 +10,42 @@ partyModeWorkflow: '{project-root}/_bmad/core/workflows/party-mode/workflow.md'
 
 # Edit Step 1: Assess What to Edit
 
-## STEP GOAL:
+## META
 
-To identify what the user wants to edit in the teach-me-testing workflow and gather requirements for the modifications.
+- Goal: capture the desired workflow changes before any edits are made.
+- Keep this step in discovery mode.
 
-## MANDATORY EXECUTION RULES (READ FIRST):
+## EXECUTION
 
-### Universal Rules:
+<step n="1" goal="Ask what should be edited">
+  <output>Invite the user to describe the change they want in the teaching workflow.</output>
+  <detail>Common topics include session content, quiz questions, fragment lists, templates, resource references, and role-based examples.</detail>
+</step>
 
-- 🛑 NEVER generate content without user input
-- 📖 CRITICAL: Read complete step file before action
-- ✅ SPEAK OUTPUT In {communication_language}
+<step n="2" goal="Clarify the edit scope">
+  <action>Ask follow-up questions that identify the target session or file, the exact change, and the reason for the change.</action>
+  <detail>Keep the questions specific so the edit plan is actionable.</detail>
+</step>
 
-### Role Reinforcement:
+<step n="3" goal="Load relevant source material">
+  <action>Load the current workflow or step files that are relevant to the requested change.</action>
+  <action>Show the user the current content that will be edited.</action>
+</step>
 
-- ✅ You are a workflow architect helping with modifications
-- ✅ Collaborative dialogue for understanding edit needs
+<step n="4" goal="Document the edit plan">
+  <output>Summarize the target files, required changes, and reason for the edits, then ask whether to proceed.</output>
+</step>
 
-### Step-Specific Rules:
+<step n="5" goal="Offer routing options">
+  <ask>Offer `A` for Advanced Elicitation, `P` for Party Mode, or `C` to continue to the apply-edits step.</ask>
+  <action>If the user chooses `C`, load and follow `./step-e-02-apply-edits.md`.</action>
+</step>
 
-- 🎯 Focus on understanding what to edit
-- 🚫 FORBIDDEN to make edits yet
-- 💬 Ask questions to clarify requirements
+## CHECKPOINT
 
-## EXECUTION PROTOCOLS:
+Pause until the user approves the edit plan or chooses a routing option.
 
-- 🎯 Understand edit requirements
-- 💾 Document what needs editing
-- 📖 Prepare for edits in next step
+## ADVISORY
 
-## MANDATORY SEQUENCE
-
-### 1. Welcome to Edit Mode
-
-"**Edit Mode: Teach Me Testing Workflow**
-
-What would you like to edit?
-
-**Common edits:**
-
-- Update session content (new concepts, updated examples)
-- Modify quiz questions
-- Add/remove knowledge fragments from session 7
-- Update TEA resource references
-- Change session durations or structure
-- Update role-based examples
-
-**Tell me what you'd like to change.**"
-
-### 2. Gather Edit Requirements
-
-Ask targeted questions based on their response:
-
-**If editing session content:**
-
-- Which session? (1-7)
-- What specific content needs updating?
-- Why the change? (outdated, incorrect, needs improvement)
-
-**If editing quiz questions:**
-
-- Which session's quiz?
-- Which question(s)?
-- What's wrong with current questions?
-
-**If editing session 7 fragments:**
-
-- Add new fragment category?
-- Update existing fragment references?
-- Change organization?
-
-**If editing templates:**
-
-- Progress template?
-- Session notes template?
-- Certificate template?
-- What fields need changing?
-
-**If editing data files:**
-
-- Curriculum structure?
-- Role customizations?
-- Resource mappings?
-
-### 3. Load Current Content
-
-Based on what they want to edit, load the relevant files:
-
-- Session step files (steps-c/step-04-session-\*.md)
-- Templates (`templates/*.md` or `*.yaml`)
-- Data files (data/\*.yaml)
-
-Show user the current content.
-
-### 4. Document Edit Plan
-
-"**Edit Plan:**
-
-**Target Files:**
-
-- {list files to be modified}
-
-**Changes Required:**
-
-- {list specific changes}
-
-**Reason:**
-
-- {why these edits are needed}
-
-Ready to proceed with edits?"
-
-### 5. Menu
-
-Display: **Select an Option:** [A] Advanced Elicitation [P] Party Mode [C] Continue to Apply Edits
-
-#### Menu Handling Logic:
-
-- IF A: Execute {advancedElicitationTask}, redisplay menu
-- IF P: Execute {partyModeWorkflow}, redisplay menu
-- IF C: Load, read entire file, then execute {nextStepFile}
-- IF Any other: help user, redisplay menu
-
----
-
-## 🚨 SUCCESS METRICS
-
-✅ Edit requirements clearly understood, target files identified, edit plan documented, user approves plan.
-
-**Master Rule:** Understand before editing. Get clear requirements first.
+- Understand the change before making it.
+- Keep the current workflow file set as the only editing target.

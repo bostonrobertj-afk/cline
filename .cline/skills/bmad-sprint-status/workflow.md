@@ -1,69 +1,120 @@
+---
+name: 'bmad-sprint-status'
+description: 'Summarize sprint status and surface risks. Use when the user says "check sprint status" or "show sprint status"'
+config_source: '{project-root}/_bmad/bmm/config.yaml'
+project_name: '{config_source}:project_name'
+user_name: '{config_source}:user_name'
+communication_language: '{config_source}:communication_language'
+document_output_language: '{config_source}:document_output_language'
+implementation_artifacts: '{config_source}:implementation_artifacts'
+project_context: '**/project-context.md'
+sprint_status_file: '{implementation_artifacts}/sprint-status.yaml'
+date: system-generated current datetime
+---
+
+# Sprint Status Workflow
+
 ## META
 
 - Goal: summarize sprint status, surface risks, and recommend the next workflow action.
-- Role: Scrum Master providing clear and actionable sprint visibility.
 - Speak in `{communication_language}`.
-- Input file: `{implementation_artifacts}/sprint-status.yaml`
-- Optional context file: `project-context.md`
+- Execute the steps in order.
+- Halt whenever the sprint status file is missing, validation is required, or the user must choose an action.
+- Use `project_context` when it exists and is relevant.
 
 ## EXECUTION
 
-<mode name="interactive" default="true">
-<workflow>
-
-<step n="0" goal="Determine execution mode">
-  <action>Set `mode = {{mode}}` if the caller provided it. Otherwise set `mode = interactive`.</action>
+<step n="0" goal="Determine execution mode and route to the matching path">
+  <action>Set `mode = {{mode}}` when the caller provides it; otherwise use `interactive`.</action>
+  <branch if="mode == data">
+    <action>Proceed to step 20.</action>
+  </branch>
+  <branch if="mode == validate">
+    <action>Proceed to step 30.</action>
+  </branch>
+  <branch if="mode == interactive">
+    <action>Proceed to step 1.</action>
+  </branch>
 </step>
 
-<step n="1" goal="Locate sprint status file">
-  <action>Load `project-context.md` if it exists and is relevant.</action>
-  <action>Try to read `{sprint_status_file}`.</action>
-  <check if="file not found">
-    <output>Report that `sprint-status.yaml` was not found and direct the user to run sprint-planning before retrying.</output>
-    <action>Exit the workflow.</action>
-  </check>
+<step n="1" goal="Load context and locate the sprint status file">
+  <action>Load `project_context` if it exists and adds useful project-wide guidance.</action>
+  <action>Read `sprint_status_file`.</action>
+  <branch if="the file does not exist">
+    <output>`sprint-status.yaml` was not found.</output>
+    <output>Run `sprint-planning` to create it, then try sprint status again.</output>
+    <action>Stop the workflow.</action>
+  </branch>
 </step>
 
-<step n="2" goal="Read and parse sprint status">
-  <action>Read the full sprint status file.</action>
-  <action>Parse metadata fields, development status entries, epic/story/retrospective groupings, and legacy status aliases.</action>
-  <action>Validate status values against the allowed story, epic, and retrospective status sets.</action>
-  <check if="unrecognized statuses exist">
+<step n="2" goal="Read, classify, and validate sprint status">
+  <action>Read the full sprint status file from top to bottom.</action>
+  <action>Parse `generated`, `last_updated`, `project`, `project_key`, `tracking_system`, `story_location`, and `development_status`.</action>
+  <action>Classify `development_status` entries as stories, epics, or retrospectives.</action>
+  <detail>
+    - Epics start with `epic-` and do not end with `-retrospective`
+    - Retrospectives end with `-retrospective`
+    - Stories are every other key
+  </detail>
+  <action>Normalize legacy statuses when encountered in an existing file.</action>
+  <detail>
+    - `drafted` should be treated as `ready-for-dev`
+    - `contexted` should be treated as `in-progress`
+  </detail>
+  <action>Count story, epic, and retrospective statuses.</action>
+  <action>Validate every status against the supported value sets.</action>
+  <branch if="unrecognized statuses exist">
+    <output>Unknown status values were found in `sprint-status.yaml`.</output>
     <output>Show the invalid entries and the valid status values.</output>
-    <ask>Ask the user how the invalid statuses should be corrected or whether they want to skip correction.</ask>
-    <action>If corrections are provided, update the file and re-parse it.</action>
-  </check>
+    <ask>How should these be corrected? You can provide replacements or choose to skip correction.</ask>
+    <branch if="the user provides corrections">
+      <action>Update `sprint-status.yaml` with the corrected values.</action>
+      <action>Re-read and re-parse the file.</action>
+    </branch>
+  </branch>
   <action>Detect risks such as stale status data, orphaned stories, in-progress epics without stories, and workflow recommendation conflicts.</action>
 </step>
 
-<step n="3" goal="Select next action recommendation">
-  <action>Choose the recommended next workflow using status priority: in-progress story, review story, ready-for-dev story, backlog story, optional retrospective, or completion.</action>
-  <action>Store `next_story_id`, `next_workflow_id`, and `next_agent` for use in the response.</action>
+<step n="3" goal="Select the next workflow recommendation">
+  <action>Choose the next recommended workflow using this priority.</action>
+  <detail>
+    - first in-progress story
+    - first review story
+    - first ready-for-dev story
+    - first backlog story
+    - optional retrospective
+    - completion when nothing remains
+  </detail>
+  <action>When choosing the first story in a status group, preserve file order and sort by epic number, then story number.</action>
+  <action>Store `next_story_id`, `next_workflow_id`, and `next_agent` for the response.</action>
 </step>
 
-<step n="4" goal="Display sprint summary">
-  <output>Display the sprint status summary, counts by story and epic status, the recommended next workflow, and any detected risks.</output>
+<step n="4" goal="Display the sprint summary">
+  <output>Show the sprint summary, story and epic counts, the recommendation, and any detected risks.</output>
 </step>
 
 <step n="5" goal="Offer interactive actions">
-  <ask>Ask the user whether to run the recommended workflow, show stories grouped by status, show the raw sprint-status file, or exit.</ask>
-  <action>If the user chooses the recommendation path, tell them which workflow to run and include `story_key` when applicable.</action>
-  <action>If the user chooses grouped stories, display the grouped story status summary.</action>
-  <action>If the user chooses raw file output, display the full sprint-status file.</action>
-  <action>If the user chooses exit, end the workflow cleanly.</action>
+  <ask>Ask whether to run the recommended workflow, show stories grouped by status, show the raw sprint status file, or exit.</ask>
+  <branch if="the user chooses the recommendation path">
+    <output>Run the recommended workflow and include `story_key={{next_story_id}}` when the target is a story.</output>
+  </branch>
+  <branch if="the user chooses grouped stories">
+    <output>Show the grouped story status summary.</output>
+  </branch>
+  <branch if="the user chooses raw file output">
+    <output>Display the full sprint status file.</output>
+  </branch>
+  <branch if="the user chooses exit">
+    <action>Stop the workflow cleanly.</action>
+  </branch>
 </step>
 
-</workflow>
-</mode>
-
-<mode name="data">
-<workflow>
-
-<step n="20" goal="Data mode output">
-  <action>Load and parse `{sprint_status_file}` using the same parsing logic as the interactive path.</action>
+<step n="20" goal="Produce structured data-mode output">
+  <action>Load and parse `sprint_status_file` using the same logic as the interactive path.</action>
   <action>Compute the same recommendation fields as the interactive path.</action>
   <template-output>next_workflow_id = {{next_workflow_id}}</template-output>
   <template-output>next_story_id = {{next_story_id}}</template-output>
+  <template-output>next_agent = {{next_agent}}</template-output>
   <template-output>count_backlog = {{count_backlog}}</template-output>
   <template-output>count_ready = {{count_ready}}</template-output>
   <template-output>count_in_progress = {{count_in_progress}}</template-output>
@@ -76,55 +127,45 @@
   <action>Return to the caller.</action>
 </step>
 
-</workflow>
-</mode>
-
-<mode name="validate">
-<workflow>
-
-<step n="30" goal="Validate sprint-status file">
-  <action>Check that `{sprint_status_file}` exists.</action>
-  <check if="missing">
+<step n="30" goal="Validate the sprint status file">
+  <action>Check that `sprint_status_file` exists.</action>
+  <branch if="the file is missing">
     <template-output>is_valid = false</template-output>
     <template-output>error = "sprint-status.yaml missing"</template-output>
     <template-output>suggestion = "Run sprint-planning to create it"</template-output>
     <action>Return.</action>
-  </check>
-  <action>Read and parse `{sprint_status_file}`.</action>
-  <action>Validate required metadata fields and confirm the development status section exists with at least one entry.</action>
-  <check if="required metadata is missing">
+  </branch>
+  <action>Read and parse `sprint_status_file`.</action>
+  <action>Validate required metadata fields and confirm that `development_status` exists with at least one entry.</action>
+  <branch if="required metadata is missing">
     <template-output>is_valid = false</template-output>
     <template-output>error = "Missing required field(s): {{missing_fields}}"</template-output>
     <template-output>suggestion = "Re-run sprint-planning or add the missing fields manually"</template-output>
     <action>Return.</action>
-  </check>
-  <check if="development_status is missing or empty">
+  </branch>
+  <branch if="development_status is missing or empty">
     <template-output>is_valid = false</template-output>
     <template-output>error = "development_status missing or empty"</template-output>
     <template-output>suggestion = "Re-run sprint-planning or repair the file manually"</template-output>
     <action>Return.</action>
-  </check>
+  </branch>
   <action>Validate every status value against the known valid status sets.</action>
-  <check if="invalid statuses exist">
+  <branch if="invalid statuses exist">
     <template-output>is_valid = false</template-output>
     <template-output>error = "Invalid status values: {{invalid_entries}}"</template-output>
     <template-output>suggestion = "Fix invalid statuses in sprint-status.yaml"</template-output>
     <action>Return.</action>
-  </check>
+  </branch>
   <template-output>is_valid = true</template-output>
   <template-output>message = "sprint-status.yaml valid: metadata complete, all statuses recognized"</template-output>
 </step>
 
-</workflow>
-</mode>
+## CHECKPOINT
+
+Stop before advancing whenever the sprint status file is missing, a status value must be corrected, or the user must choose an action.
 
 ## ADVISORY
 
-- The interactive mode is the default managed workflow path.
-- Data and validate modes are alternate entry paths for callers that need structured outputs or validation-only behavior.
-
-## REFERENCE
-
-- Story status values: backlog, ready-for-dev, in-progress, review, done.
-- Epic status values: backlog, in-progress, done.
-- Retrospective status values: optional, done.
+- Interactive mode is the default managed workflow path.
+- Data and validate modes are alternate entry paths for structured callers.
+- Legacy status values may be normalized when encountered in an existing file.
