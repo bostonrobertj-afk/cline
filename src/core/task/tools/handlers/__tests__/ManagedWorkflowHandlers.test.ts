@@ -1,12 +1,18 @@
 import * as disk from "@core/storage/disk"
 import { expect } from "chai"
+import fs from "fs/promises"
 import { describe, it } from "mocha"
+import os from "os"
+import path from "path"
 import sinon from "sinon"
+import { HostProvider } from "@/hosts/host-provider"
+import { setVscodeHostProviderMock } from "@/test/host-provider-test-utils"
 import type { ManagedWorkflowRunState } from "../../../managed-workflows/types"
 import { TaskState } from "../../../TaskState"
 import type { TaskConfig } from "../../types/TaskConfig"
 import { AttemptCompletionHandler } from "../AttemptCompletionHandler"
 import { CompleteWorkflowItemToolHandler } from "../CompleteWorkflowItemToolHandler"
+import { SetWorkflowPlaceholdersToolHandler } from "../SetWorkflowPlaceholdersToolHandler"
 import { UseSkillToolHandler } from "../UseSkillToolHandler"
 
 function createManagedWorkflowRun(): ManagedWorkflowRunState {
@@ -182,6 +188,94 @@ describe("Managed workflow handlers", () => {
 			expect(restoredRun.phases[0].items[0].completed).to.equal(true)
 		} finally {
 			sandbox.restore()
+		}
+	})
+
+	it("persists managed workflow placeholders to task metadata", async () => {
+		const sandbox = sinon.createSandbox()
+		try {
+			const handler = new SetWorkflowPlaceholdersToolHandler()
+			const config = createConfig()
+			config.taskState.managedWorkflowRun = createManagedWorkflowRun()
+			config.taskState.activeWorkflowId = "bmad-code-review"
+
+			const metadata = { activeWorkflowId: "bmad-code-review" } as any
+			const getMetadataStub = sandbox.stub(disk, "getTaskMetadata").resolves(metadata)
+			const saveMetadataStub = sandbox.stub(disk, "saveTaskMetadata").resolves()
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "set_workflow_placeholders",
+				params: {
+					values: {
+						research_topic: "token resolution",
+						validation_report_path: "reports/validation.md",
+					},
+				},
+				partial: false,
+			} as any)
+
+			expect(String(result)).to.contain("Stored 2 workflow placeholders")
+			expect(getMetadataStub.calledOnce).to.equal(true)
+			expect(saveMetadataStub.calledOnce).to.equal(true)
+			expect(config.taskState.managedWorkflowRun?.dynamicPlaceholders).to.deep.equal({
+				research_topic: "token resolution",
+				validation_report_path: "reports/validation.md",
+			})
+			expect(config.taskState.managedWorkflowRun?.updatedAt).to.be.greaterThan(0)
+			expect((config.callbacks.updateFCListFromToolResponse as sinon.SinonStub).calledOnce).to.equal(true)
+		} finally {
+			sandbox.restore()
+		}
+	})
+
+	it("round-trips managed workflow placeholder state through task metadata save and reload", async () => {
+		const tempGlobalStorageDir = await fs.mkdtemp(path.join(os.tmpdir(), "managed-workflow-metadata-"))
+		try {
+			const handler = new SetWorkflowPlaceholdersToolHandler()
+			const config = createConfig({
+				taskId: "task-managed-workflow-metadata",
+			})
+			config.taskState.managedWorkflowRun = {
+				...createManagedWorkflowRun(),
+				stablePlaceholders: {
+					project_name: "Cline",
+					communication_language: "English",
+				},
+				dynamicPlaceholders: {
+					research_topic: "token resolution",
+				},
+			}
+			config.taskState.activeWorkflowId = "bmad-code-review"
+
+			setVscodeHostProviderMock({
+				globalStorageFsPath: tempGlobalStorageDir,
+			})
+
+			await handler.execute(config, {
+				type: "tool_use",
+				name: "set_workflow_placeholders",
+				params: {
+					values: {
+						validation_report_path: "reports/validation.md",
+					},
+				},
+				partial: false,
+			} as any)
+
+			const reloadedMetadata = await disk.getTaskMetadata(config.taskId)
+			expect(reloadedMetadata.managedWorkflowRun).to.exist
+			expect(reloadedMetadata.managedWorkflowRun?.stablePlaceholders).to.deep.equal({
+				project_name: "Cline",
+				communication_language: "English",
+			})
+			expect(reloadedMetadata.managedWorkflowRun?.dynamicPlaceholders).to.deep.equal({
+				research_topic: "token resolution",
+				validation_report_path: "reports/validation.md",
+			})
+		} finally {
+			await fs.rm(tempGlobalStorageDir, { recursive: true, force: true })
+			HostProvider.reset()
 		}
 	})
 

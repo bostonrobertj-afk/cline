@@ -1,5 +1,6 @@
 import { extractManagedWorkflowPhases } from "./ManagedWorkflowPhaseExtractor"
 import { getManagedWorkflowDefinition } from "./ManagedWorkflowRegistry"
+import { buildManagedWorkflowStablePlaceholders, mergeManagedWorkflowPlaceholderMaps } from "./placeholders"
 import type { ManagedWorkflowDefinition, ManagedWorkflowItemState, ManagedWorkflowRunState } from "./types"
 
 function isRequiredManagedWorkflowItem(item: ManagedWorkflowItemState): boolean {
@@ -68,8 +69,19 @@ export async function startOrResumeManagedWorkflowRun(
 			}
 		}
 
+		const resumedRun: ManagedWorkflowRunState = {
+			...existingRun,
+			slashCommand: slashCommand ?? existingRun.slashCommand,
+			stablePlaceholders: freshRun.stablePlaceholders,
+			dynamicPlaceholders: mergeManagedWorkflowPlaceholderMaps(
+				freshRun.dynamicPlaceholders,
+				existingRun.dynamicPlaceholders,
+			),
+			updatedAt: Date.now(),
+		}
+
 		return {
-			run: slashCommand ? { ...existingRun, slashCommand, updatedAt: Date.now() } : existingRun,
+			run: resumedRun,
 			resumed: true,
 		}
 	}
@@ -95,6 +107,7 @@ export async function createManagedWorkflowRunFromDefinition(
 ): Promise<ManagedWorkflowRunState> {
 	const phases = await extractManagedWorkflowPhases(cwd, definition)
 	const now = Date.now()
+	const stablePlaceholders = await buildManagedWorkflowStablePlaceholders(cwd, definition.module)
 	return {
 		workflowId: definition.workflowId,
 		slashCommand,
@@ -104,6 +117,8 @@ export async function createManagedWorkflowRunFromDefinition(
 		createdAt: now,
 		updatedAt: now,
 		allRequiredComplete: false,
+		stablePlaceholders,
+		dynamicPlaceholders: {},
 	}
 }
 

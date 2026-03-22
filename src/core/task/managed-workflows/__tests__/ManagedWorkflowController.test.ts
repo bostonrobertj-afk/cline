@@ -22,6 +22,15 @@ describe("ManagedWorkflowController", () => {
 		expect(run.phases).to.have.length(4)
 		expect(run.phases[0].sourcePath).to.equal(".cline/skills/bmad-code-review/steps/step-01-gather-context.md")
 		expect(run.phases[0].items.length).to.be.greaterThan(1)
+		expect(run.stablePlaceholders).to.include({
+			"project-root": cwd,
+			project_root: cwd,
+			user_name: "Rob",
+			communication_language: "English",
+			document_output_language: "English",
+			user_skill_level: "intermediate",
+		})
+		expect(run.stablePlaceholders?.output_folder).to.equal(`${cwd}/_bmad-output`)
 
 		const firstPhaseItemIds = run.phases[0].items.map((item) => item.id)
 
@@ -47,14 +56,67 @@ describe("ManagedWorkflowController", () => {
 		const prompt = buildManagedWorkflowPrompt(run)
 		const taskProgress = renderManagedWorkflowTaskProgress(run)
 
-		expect(prompt).to.contain("Current active step: Detect review intent from invocation text.")
+		expect(prompt).to.contain("Current active step: Determine the review target")
 		expect(prompt).to.contain("Actions:")
 		expect(prompt).to.contain("Branches:")
 		expect(prompt).to.contain("Details:")
 		expect(prompt).to.not.contain("<managed_workflow_phase")
 		expect(prompt).to.not.contain("<step n=")
-		expect(taskProgress).to.contain("step 01 gather context: Detect review intent from invocation text.")
+		expect(taskProgress).to.contain("step 01 gather context: Determine the review target")
 		expect(taskProgress).to.not.contain("staged changes")
+	})
+
+	it("resolves stable and dynamic managed workflow placeholders in the rendered prompt", () => {
+		const run: ManagedWorkflowRunState = {
+			workflowId: "synthetic-workflow",
+			slashCommand: "synthetic-workflow",
+			status: "active",
+			currentPhaseIndex: 0,
+			createdAt: Date.now(),
+			updatedAt: Date.now(),
+			allRequiredComplete: false,
+			stablePlaceholders: {
+				"project-root": "/workspace/project",
+				project_root: "/workspace/project",
+				project_name: "Cline",
+				user_name: "Rob",
+				communication_language: "English",
+				output_folder: "/workspace/project/output",
+			},
+			dynamicPlaceholders: {
+				research_topic: "token resolution",
+				validation_report_path: "reports/validation.md",
+			},
+			phases: [
+				{
+					id: "phase-1",
+					title: "Review {project_name}",
+					sourcePath: "phase-1.md",
+					sourceContent: "# Phase 1",
+					completed: false,
+					checkpointText: "Confirm {validation_report_path}",
+					items: [
+						{
+							id: "phase-1::item-1",
+							label: "Ask {user_name} about {{research_topic}}",
+							sourceText: "Ask {user_name} about {{research_topic}}",
+							completed: false,
+							blocked: true,
+						},
+					],
+					execution: {
+						steps: [],
+					},
+				},
+			],
+		}
+
+		const prompt = buildManagedWorkflowPrompt(run)
+		const taskProgress = renderManagedWorkflowTaskProgress(run)
+
+		expect(prompt).to.contain("Current phase: Review Cline")
+		expect(prompt).to.contain("Current checkpoint: Confirm reports/validation.md")
+		expect(taskProgress).to.contain("Review Cline: Ask Rob about token resolution")
 	})
 
 	it("falls back to the authored skill file when a managed workflow does not ship a separate workflow.md", async () => {
@@ -66,7 +128,7 @@ describe("ManagedWorkflowController", () => {
 		expect(run.phases).to.have.length(1)
 		expect(run.phases[0].sourcePath).to.equal(".cline/skills/bmad-distillator/SKILL.md")
 		expect(run.phases[0].items.length).to.be.greaterThan(1)
-		expect(renderedChecklist).to.contain("Validate inputs.")
+		expect(renderedChecklist).to.contain("Validate inputs")
 	})
 
 	it("resolves the compatibility alias bmad-problem-solving to the canonical managed workflow", async () => {

@@ -150,5 +150,6 @@ export const createAdvancedVariant = (family: ModelFamily) =>
 			ClineDefaultTool.MCP_DOCS,
 			ClineDefaultTool.TODO,
 			ClineDefaultTool.COMPLETE_WORKFLOW_ITEM,
+			ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
 			ClineDefaultTool.USE_SUBAGENTS,
 		)

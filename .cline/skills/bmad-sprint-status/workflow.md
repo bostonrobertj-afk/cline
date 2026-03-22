@@ -20,7 +20,7 @@ date: system-generated current datetime
 - Speak in `{communication_language}`.
 - Execute the steps in order.
 - Halt whenever the sprint status file is missing, validation is required, or the user must choose an action.
-- Use `project_context` when it exists and is relevant.
+- Use `{project_context}` when it exists and is relevant.
 - Only the current phase checklist and the current active step's details are shown in the prompt at one time.
 - Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
 
@@ -40,8 +40,8 @@ date: system-generated current datetime
 </step>
 
 <step n="1" goal="Load context and locate the sprint status file">
-  <action>Load `project_context` if it exists and adds useful project-wide guidance.</action>
-  <action>Read `sprint_status_file`.</action>
+  <action>Load `{project_context}` if it exists and adds useful project-wide guidance.</action>
+  <action>Read `{sprint_status_file}`.</action>
   <branch if="the file does not exist" optional="true">
     <output>`sprint-status.yaml` was not found.</output>
     <output>Run `sprint-planning` to create it, then try sprint status again.</output>
@@ -112,7 +112,7 @@ date: system-generated current datetime
 </step>
 
 <step n="20" goal="Produce structured data-mode output">
-  <action>Load and parse `sprint_status_file` using the same logic as the interactive path.</action>
+  <action>Load and parse {sprint_status_file} using the same logic as the interactive path.</action>
   <action>Compute the same recommendation fields as the interactive path.</action>
   <template-output>next_workflow_id = {{next_workflow_id}}</template-output>
   <template-output>next_story_id = {{next_story_id}}</template-output>
@@ -130,14 +130,14 @@ date: system-generated current datetime
 </step>
 
 <step n="30" goal="Validate the sprint status file">
-  <action>Check that `sprint_status_file` exists.</action>
+  <action>Check that {sprint_status_file} exists.</action>
   <branch if="the file is missing" optional="true">
     <template-output>is_valid = false</template-output>
     <template-output>error = "sprint-status.yaml missing"</template-output>
     <template-output>suggestion = "Run sprint-planning to create it"</template-output>
     <return />
   </branch>
-  <action>Read and parse `sprint_status_file`.</action>
+  <action>Read and parse `{sprint_status_file}`.</action>
   <action>Validate required metadata fields and confirm that `development_status` exists with at least one entry.</action>
   <branch if="required metadata is missing" optional="true">
     <template-output>is_valid = false</template-output>

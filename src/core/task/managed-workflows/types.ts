@@ -86,4 +86,6 @@ export interface ManagedWorkflowRunState {
 	createdAt: number
 	updatedAt: number
 	allRequiredComplete: boolean
+	stablePlaceholders?: Record<string, string>
+	dynamicPlaceholders?: Record<string, string>
 }

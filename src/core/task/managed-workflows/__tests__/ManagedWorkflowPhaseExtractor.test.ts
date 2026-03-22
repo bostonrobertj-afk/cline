@@ -16,19 +16,48 @@ describe("ManagedWorkflowPhaseExtractor", () => {
 		const gatherContextPhase = phases.find((phase) => phase.id === "step-01-gather-context")
 
 		expect(gatherContextPhase).to.exist
-		expect(gatherContextPhase!.execution?.steps).to.have.length(6)
+		expect(gatherContextPhase!.execution?.steps).to.have.length(4)
 		expect(gatherContextPhase!.items.map((item) => item.label)).to.deep.equal([
-			"Detect review intent from invocation text.",
-			"HALT. Ask the user: What do you want to review?",
-			"Construct {diff_output} from the chosen source.",
-			"Ask the user for files containing context",
-			"Load referenced documents",
-			"Sanity check",
-			"Present a summary before proceeding: diff stats (files changed, lines added/removed), {review_mode}, and loaded spec/context docs (if any). HALT and wait for user confirmation to proceed.",
+			"Determine the review target",
+			"Construct {diff_output} from the chosen source",
+			"Load spec and context documents when available",
+			"Check review size and confirm readiness",
+			"Halt after presenting the summary and wait for the user to confirm that review should proceed.",
 		])
 		expect(gatherContextPhase!.items.some((item) => item.label.includes("staged changes"))).to.equal(false)
 		expect(gatherContextPhase!.execution?.steps[0]?.instructions.some((node) => node.type === "branch")).to.equal(true)
-		expect(gatherContextPhase!.checkpointText).to.contain("Present a summary before proceeding")
+		expect(gatherContextPhase!.checkpointText).to.contain("Halt after presenting the summary")
+	})
+
+	it("preserves workflow placeholders during extraction instead of stripping them from step content", async () => {
+		clearManagedWorkflowRegistryCache(cwd)
+		const workflow = await getManagedWorkflowDefinition(cwd, "bmad-code-review")
+		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "managed-workflow-placeholder-extraction-"))
+
+		try {
+			const phaseRoot = path.join(tempRoot, ".cline", "skills", "bmad-code-review", "steps")
+			await fs.mkdir(phaseRoot, { recursive: true })
+			await fs.writeFile(
+				path.join(phaseRoot, "step-01-gather-context.md"),
+				[
+					"# Gather Context",
+					"",
+					"## EXECUTION",
+					"",
+					'<step n="1" goal="Load {{research_topic}} for {project_name}">',
+					"  <action>Review {{research_topic}} in {project_name}</action>",
+					"</step>",
+				].join("\n"),
+				"utf8",
+			)
+
+			const phases = await extractManagedWorkflowPhases(tempRoot, workflow!)
+			expect(phases).to.have.length(1)
+			expect(phases[0].execution?.steps[0]?.goal).to.equal("Load {{research_topic}} for {project_name}")
+			expect(phases[0].execution?.steps[0]?.instructions[0]?.text).to.equal("Review {{research_topic}} in {project_name}")
+		} finally {
+			await fs.rm(tempRoot, { recursive: true, force: true })
+		}
 	})
 
 	it("preserves branch and detail content without turning them into sprint-status checklist rows", async () => {
@@ -39,13 +68,13 @@ describe("ManagedWorkflowPhaseExtractor", () => {
 		expect(phases).to.have.length(1)
 		expect(phases[0].execution?.steps).to.have.length(6)
 		expect(phases[0].items.map((item) => item.label)).to.deep.equal([
-			"Determine execution mode",
-			"Locate sprint status file",
-			"Read and parse sprint status",
-			"Select next action recommendation",
-			"Display sprint summary",
+			"Determine execution mode and route to the matching path",
+			"Load context and locate the sprint status file",
+			"Read, classify, and validate sprint status",
+			"Select the next workflow recommendation",
+			"Display the sprint summary",
 			"Offer interactive actions",
-			"Workflow progress can advance only after the required outputs, approvals, and routing conditions in this file are satisfied.",
+			"Stop before advancing whenever the sprint status file is missing, a status value must be corrected, or the user must choose an action.",
 		])
 		expect(phases[0].items.some((item) => item.label.includes("Data mode output"))).to.equal(false)
 		expect(phases[0].items.some((item) => item.label.includes("next_workflow_id"))).to.equal(false)
@@ -59,9 +88,9 @@ describe("ManagedWorkflowPhaseExtractor", () => {
 		const starterPhase = phases.find((phase) => phase.id === "step-03-starter")
 
 		expect(starterPhase).to.exist
-		const starterPresentation = starterPhase!.execution?.steps.find((step) => step.number === 7)
+		const starterPresentation = starterPhase!.execution?.steps.find((step) => step.number === 3)
 		expect(starterPresentation).to.exist
-		expect(starterPresentation!.goal).to.equal("Present starter options")
+		expect(starterPresentation!.goal).to.equal("Present the starter recommendation")
 		expect(starterPresentation!.instructions.filter((node) => node.type === "branch")).to.have.length(3)
 		expect(starterPhase!.items.some((item) => item.label.includes("well-maintained starter"))).to.equal(false)
 	})

@@ -29,7 +29,6 @@ function stripMarkdown(text: string): string {
 		.replace(/&lt;/g, "<")
 		.replace(/&gt;/g, ">")
 		.replace(/<\/?[^>]+>/g, " ")
-		.replace(/\{\{[^}]+\}\}/g, " ")
 		.replace(/\s+/g, " ")
 		.trim()
 }

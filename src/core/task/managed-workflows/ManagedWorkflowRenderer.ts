@@ -1,3 +1,4 @@
+import { getManagedWorkflowPlaceholderMap, resolveManagedWorkflowPlaceholderText } from "./placeholders"
 import type {
 	ManagedWorkflowInstructionNode,
 	ManagedWorkflowPhaseState,
@@ -8,10 +9,13 @@ import type {
 function flattenPhaseItems(
 	run: ManagedWorkflowRunState,
 ): Array<{ phase: ManagedWorkflowPhaseState; label: string; completed: boolean; required: boolean; advisory: boolean }> {
+	const placeholders = getManagedWorkflowPlaceholderMap(run)
 	return run.phases.flatMap((phase) =>
 		phase.items.map((item) => ({
 			phase,
-			label: `${phase.title}: ${item.label}`,
+			label: `${resolveManagedWorkflowPlaceholderText(phase.title, placeholders) ?? phase.title}: ${
+				resolveManagedWorkflowPlaceholderText(item.label, placeholders) ?? item.label
+			}`,
 			completed: item.completed,
 			required: item.required !== false && item.optional !== true,
 			advisory: item.advisory === true || item.required === false,
@@ -36,12 +40,13 @@ function findStepForItem(phase: ManagedWorkflowPhaseState, itemId?: string): Man
 	return phase.execution.steps.find((step) => step.id === itemId)
 }
 
-function formatRoute(node: ManagedWorkflowInstructionNode): string {
+function formatRoute(node: ManagedWorkflowInstructionNode, placeholders: Record<string, string>): string {
+	const routeTarget = resolveManagedWorkflowPlaceholderText(node.routeTarget, placeholders)
 	switch (node.routeKind) {
 		case "goto":
-			return `Go to step ${node.routeTarget ?? "the specified step"}`
+			return `Go to step ${routeTarget ?? "the specified step"}`
 		case "handoff":
-			return `Read fully and follow ${node.routeTarget ?? "the specified workflow file"}`
+			return `Read fully and follow ${routeTarget ?? "the specified workflow file"}`
 		case "return":
 			return "Return to the caller"
 		case "exit":
@@ -64,17 +69,22 @@ function groupInstructionNodes(nodes: ManagedWorkflowInstructionNode[]) {
 	}
 }
 
-function renderInstructionLeaf(node: ManagedWorkflowInstructionNode): string {
-	const labelPrefix = node.condition ? `If ${node.condition}: ` : ""
-	const baseText = node.type === "route" ? formatRoute(node) : (node.text ?? "")
+function renderInstructionLeaf(node: ManagedWorkflowInstructionNode, placeholders: Record<string, string>): string {
+	const condition = resolveManagedWorkflowPlaceholderText(node.condition, placeholders)
+	const labelPrefix = condition ? `If ${condition}: ` : ""
+	const baseText =
+		node.type === "route"
+			? formatRoute(node, placeholders)
+			: (resolveManagedWorkflowPlaceholderText(node.text, placeholders) ?? node.text ?? "")
 	const leaf = `${labelPrefix}${baseText}`.trim()
-	const childDetails = node.children?.length ? renderGroupedInstructionContent(node.children, 1) : ""
+	const childDetails = node.children?.length ? renderGroupedInstructionContent(node.children, 1, placeholders) : ""
 	return childDetails ? `${leaf}\n${childDetails}` : leaf
 }
 
-function renderBranch(node: ManagedWorkflowInstructionNode, level = 0): string {
-	const heading = `${"  ".repeat(level)}If ${node.condition ?? "the branch condition applies"}:`
-	const body = renderGroupedInstructionContent(node.children ?? [], level + 1)
+function renderBranch(node: ManagedWorkflowInstructionNode, level = 0, placeholders: Record<string, string>): string {
+	const condition = resolveManagedWorkflowPlaceholderText(node.condition, placeholders)
+	const heading = `${"  ".repeat(level)}If ${condition ?? "the branch condition applies"}:`
+	const body = renderGroupedInstructionContent(node.children ?? [], level + 1, placeholders)
 	return body ? `${heading}\n${body}` : `${heading}\n${"  ".repeat(level + 1)}- Follow this branch`
 }
 
@@ -88,7 +98,11 @@ function renderGroupedSection(title: string, entries: string[], level = 0): stri
 	return `${prefix}${title}:\n${bullets}`
 }
 
-function renderGroupedInstructionContent(nodes: ManagedWorkflowInstructionNode[], level = 0): string {
+function renderGroupedInstructionContent(
+	nodes: ManagedWorkflowInstructionNode[],
+	level = 0,
+	placeholders: Record<string, string> = {},
+): string {
 	if (nodes.length === 0) {
 		return ""
 	}
@@ -97,44 +111,44 @@ function renderGroupedInstructionContent(nodes: ManagedWorkflowInstructionNode[]
 	const sections = [
 		renderGroupedSection(
 			"Actions",
-			grouped.actions.map((node) => renderInstructionLeaf(node)),
+			grouped.actions.map((node) => renderInstructionLeaf(node, placeholders)),
 			level,
 		),
 		renderGroupedSection(
 			"Asks",
-			grouped.asks.map((node) => renderInstructionLeaf(node)),
+			grouped.asks.map((node) => renderInstructionLeaf(node, placeholders)),
 			level,
 		),
 		renderGroupedSection(
 			"Outputs",
-			grouped.outputs.map((node) => renderInstructionLeaf(node)),
+			grouped.outputs.map((node) => renderInstructionLeaf(node, placeholders)),
 			level,
 		),
 		renderGroupedSection(
 			"Details",
-			grouped.details.map((node) => renderInstructionLeaf(node)),
+			grouped.details.map((node) => renderInstructionLeaf(node, placeholders)),
 			level,
 		),
 		renderGroupedSection(
 			"Template Outputs",
-			grouped.templateOutputs.map((node) => renderInstructionLeaf(node)),
+			grouped.templateOutputs.map((node) => renderInstructionLeaf(node, placeholders)),
 			level,
 		),
 		renderGroupedSection(
 			"Annotations",
 			grouped.annotations.map((node) =>
-				`${node.annotationKind ? `${node.annotationKind}: ` : ""}${renderInstructionLeaf(node)}`.trim(),
+				`${node.annotationKind ? `${node.annotationKind}: ` : ""}${renderInstructionLeaf(node, placeholders)}`.trim(),
 			),
 			level,
 		),
 		renderGroupedSection(
 			"Routes",
-			grouped.routes.map((node) => renderInstructionLeaf(node)),
+			grouped.routes.map((node) => renderInstructionLeaf(node, placeholders)),
 			level,
 		),
 		renderGroupedSection(
 			"Branches",
-			grouped.branches.map((node) => renderBranch(node, level + 1).trimStart()),
+			grouped.branches.map((node) => renderBranch(node, level + 1, placeholders).trimStart()),
 			level,
 		),
 	].filter(Boolean)
@@ -150,6 +164,7 @@ export function renderManagedWorkflowTaskProgress(run: ManagedWorkflowRunState):
 
 export function buildManagedWorkflowPrompt(run: ManagedWorkflowRunState): string {
 	const currentPhase = run.phases[run.currentPhaseIndex]
+	const placeholders = getManagedWorkflowPlaceholderMap(run)
 	if (!currentPhase) {
 		return `<active_bmad_workflow workflow_id="${run.workflowId}">
 The managed workflow ${run.workflowId} is active and all required phases are complete.
@@ -160,18 +175,20 @@ Do not call attempt_completion until the user's request is otherwise fully satis
 	const items = currentPhase.items
 		.map(
 			(item) =>
-				`- [${item.completed ? "x" : " "}] ${item.label}${item.required === false ? " (advisory)" : ""} (\`${item.id}\`)`,
+				`- [${item.completed ? "x" : " "}] ${
+					resolveManagedWorkflowPlaceholderText(item.label, placeholders) ?? item.label
+				}${item.required === false ? " (advisory)" : ""} (\`${item.id}\`)`,
 		)
 		.join("\n")
 	const activeItem = findActiveWorkflowItem(run)
 	const activeStep = findStepForItem(currentPhase, activeItem?.stepId)
 	const activeStepInstructions =
 		activeStep && activeStep.instructions.length > 0
-			? `Current active step: ${activeStep.goal} (\`${activeStep.id}\`)\n\n${renderGroupedInstructionContent(activeStep.instructions)}`
+			? `Current active step: ${resolveManagedWorkflowPlaceholderText(activeStep.goal, placeholders) ?? activeStep.goal} (\`${activeStep.id}\`)\n\n${renderGroupedInstructionContent(activeStep.instructions, 0, placeholders)}`
 			: activeItem?.blocked && currentPhase.checkpointText
-				? `Current checkpoint: ${currentPhase.checkpointText}`
+				? `Current checkpoint: ${resolveManagedWorkflowPlaceholderText(currentPhase.checkpointText, placeholders) ?? currentPhase.checkpointText}`
 				: activeItem
-					? `Current active step: ${activeItem.label} (\`${activeItem.id}\`)`
+					? `Current active step: ${resolveManagedWorkflowPlaceholderText(activeItem.label, placeholders) ?? activeItem.label} (\`${activeItem.id}\`)`
 					: "No active workflow item remains in this phase."
 
 	return `<active_bmad_workflow workflow_id="${run.workflowId}" managed="true" phase_id="${currentPhase.id}">
@@ -180,7 +197,7 @@ This is a backend-managed workflow. Do not invent or rewrite the checklist manua
 Use the complete_workflow_item tool to mark items complete one at a time.
 Do not advance beyond the current phase until all required items are complete.
 
-Current phase: ${currentPhase.title}
+Current phase: ${resolveManagedWorkflowPlaceholderText(currentPhase.title, placeholders) ?? currentPhase.title}
 
 Current phase checklist:
 ${items}

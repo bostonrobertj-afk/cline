@@ -33,6 +33,7 @@ export enum ClineDefaultTool {
 	GENERATE_EXPLANATION = "generate_explanation",
 	USE_SKILL = "use_skill",
 	COMPLETE_WORKFLOW_ITEM = "complete_workflow_item",
+	SET_WORKFLOW_PLACEHOLDERS = "set_workflow_placeholders",
 	USE_SUBAGENTS = "use_subagents",
 }
 

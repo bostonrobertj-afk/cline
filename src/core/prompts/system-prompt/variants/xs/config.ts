@@ -50,6 +50,7 @@ export const config = createVariant(ModelFamily.XS)
 		ClineDefaultTool.ATTEMPT,
 		ClineDefaultTool.PLAN_MODE,
 		ClineDefaultTool.COMPLETE_WORKFLOW_ITEM,
+		ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
 		ClineDefaultTool.USE_SUBAGENTS,
 	)
 	.placeholders({

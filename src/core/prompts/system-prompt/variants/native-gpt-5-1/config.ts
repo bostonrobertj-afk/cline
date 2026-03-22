@@ -70,6 +70,7 @@ export const config = createVariant(ModelFamily.NATIVE_GPT_5_1)
 		ClineDefaultTool.GENERATE_EXPLANATION,
 		ClineDefaultTool.USE_SKILL,
 		ClineDefaultTool.COMPLETE_WORKFLOW_ITEM,
+		ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
 		ClineDefaultTool.USE_SUBAGENTS,
 	)
 	.placeholders({
