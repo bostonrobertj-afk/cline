@@ -4,76 +4,19 @@ main_config: '{project-root}/_bmad/bmm/config.yaml'
 
 # Quick Dev New Preview Workflow
 
-**Goal:** Take a user request from intent through implementation, adversarial review, and PR creation in a single unified flow.
+## META
 
-**Your Role:** You are an elite developer. You clarify intent, plan precisely, implement autonomously, review adversarially, and present findings honestly. Minimum ceremony, maximum signal.
+- Goal: Take a user request from intent through implementation, adversarial review, and PR creation in one flow.
+- Role: clarify intent, plan, implement, review, and present results honestly.
+- Only the current phase checklist and the current active step's details are shown in the prompt at one time.
+- Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
 
+## EXECUTION
 
-## READY FOR DEVELOPMENT STANDARD
-
-A specification is "Ready for Development" when:
-
-- **Actionable**: Every task has a file path and specific action.
-- **Logical**: Tasks ordered by dependency.
-- **Testable**: All ACs use Given/When/Then.
-- **Complete**: No placeholders or TBDs.
-
-
-## SCOPE STANDARD
-
-A specification should target a **single user-facing goal** within **900–1600 tokens**:
-
-- **Single goal**: One cohesive feature, even if it spans multiple layers/files. Multi-goal means >=2 **top-level independent shippable deliverables** — each could be reviewed, tested, and merged as a separate PR without breaking the others. Never count surface verbs, "and" conjunctions, or noun phrases. Never split cross-layer implementation details inside one user goal.
-  - Split: "add dark mode toggle AND refactor auth to JWT AND build admin dashboard"
-  - Don't split: "add validation and display errors" / "support drag-and-drop AND paste AND retry"
-- **900–1600 tokens**: Optimal range for LLM consumption. Below 900 risks ambiguity; above 1600 risks context-rot in implementation agents.
-- **Neither limit is a gate.** Both are proposals with user override.
-
-
-## WORKFLOW ARCHITECTURE
-
-This uses **step-file architecture** for disciplined execution:
-
-- **Micro-file Design**: Each step is self-contained and followed exactly
-- **Just-In-Time Loading**: Only load the current step file
-- **Sequential Enforcement**: Complete steps in order, no skipping
-- **State Tracking**: Persist progress via spec frontmatter and in-memory variables
-- **Append-Only Building**: Build artifacts incrementally
-
-### Step Processing Rules
-
-1. **READ COMPLETELY**: Read the entire step file before acting
-2. **FOLLOW SEQUENCE**: Execute sections in order
-3. **WAIT FOR INPUT**: Halt at checkpoints and wait for human
-4. **LOAD NEXT**: When directed, load the next step file
-
-### Critical Rules (NO EXCEPTIONS)
-
-- **NEVER** load multiple step files simultaneously
-- **ALWAYS** read entire step file before execution
-- **NEVER** skip steps or optimize the sequence
-- **ALWAYS** follow the exact instructions in the step file
-- **ALWAYS** halt at checkpoints and wait for human input
-
-
-## INITIALIZATION SEQUENCE
-
-### 1. Configuration Loading
-
-Load and read full config from `{main_config}` and resolve:
-
-- `project_name`, `planning_artifacts`, `implementation_artifacts`, `user_name`
-- `communication_language`, `document_output_language`, `user_skill_level`
-- `date` as system-generated current datetime
-- `project_context` = `**/project-context.md` (load if exists)
-- CLAUDE.md / memory files (load if exist)
-
-YOU MUST ALWAYS SPEAK OUTPUT in your Agent communication style with the config `{communication_language}`.
-
-### 2. Paths
-
-- `wipFile` = `{implementation_artifacts}/tech-spec-wip.md`
-
-### 3. First Step Execution
-
-Start with `./steps/step-01-clarify-and-route.md` to begin the workflow.
+<step n="1" goal="Load configuration and route into the preview workflow">
+  <action>Load the workflow config, project context, and any local memory files that apply.</action>
+  <detail>
+    Keep the workflow strictly step-file driven and avoid skipping the clarification, planning, review, or present phases.
+  </detail>
+  <handoff path="./steps/step-01-clarify-and-route.md" />
+</step>

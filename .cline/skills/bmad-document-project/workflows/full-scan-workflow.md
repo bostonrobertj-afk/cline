@@ -31,4 +31,6 @@ Load config from `{project-root}/_bmad/bmm/config.yaml` and resolve:
 
 ## EXECUTION
 
-Read fully and follow: `./full-scan-instructions.md`
+<step n="1" goal="Load the full scan instructions.">
+  <handoff path="./full-scan-instructions.md" />
+</step>

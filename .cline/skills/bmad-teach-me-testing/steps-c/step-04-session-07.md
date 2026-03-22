@@ -14,6 +14,10 @@ partyModeWorkflow: '{project-root}/_bmad/core/workflows/party-mode/workflow.md'
 
 ## META
 
+- Goal: teach advanced testing patterns, capture learner responses, and return to the session menu with updated progress.
+- Only the current phase checklist and the current active step's details are shown in the prompt at one time.
+- Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
+
 - Goal: let the learner explore advanced TEA knowledge fragments in a menu-driven, repeatable format.
 - No quiz is required in this session.
 
@@ -40,16 +44,16 @@ partyModeWorkflow: '{project-root}/_bmad/core/workflows/party-mode/workflow.md'
 </step>
 
 <step n="3" goal="Support the exploration loop">
-  <branch if="the learner selects a category">
+  <branch if="the learner selects a category" optional="true">
     <action>Show the fragments in that category and ask which fragment to open.</action>
   </branch>
-  <branch if="the learner selects a fragment">
+  <branch if="the learner selects a fragment" optional="true">
     <action>Present the fragment's key concepts, a role-adapted example, and the source link.</action>
   </branch>
-  <branch if="the learner wants another fragment">
+  <branch if="the learner wants another fragment" optional="true">
     <action>Return to the category list and continue the loop.</action>
   </branch>
-  <branch if="the learner chooses X">
+  <branch if="the learner chooses X" optional="true">
     <action>Proceed to the session summary and completion flow.</action>
   </branch>
 </step>
@@ -61,7 +65,8 @@ partyModeWorkflow: '{project-root}/_bmad/core/workflows/party-mode/workflow.md'
 </step>
 
 <step n="5" goal="Return to the hub">
-  <output>Confirm completion, share the fragment summary, and present the A/P/C menu before loading `./step-03-session-menu.md`.</output>
+  <output>Confirm completion, share the fragment summary, and present the A/P/C menu.</output>
+  <handoff path="./step-03-session-menu.md" />
 </step>
 
 <detail>
@@ -76,8 +81,3 @@ partyModeWorkflow: '{project-root}/_bmad/core/workflows/party-mode/workflow.md'
 ## CHECKPOINT
 
 Pause for every fragment choice, every return-to-categories decision, and the final A/P/C menu.
-
-## ADVISORY
-
-- Keep exploration user-driven and repeatable.
-- Treat the knowledge fragments as the source of truth for this session.

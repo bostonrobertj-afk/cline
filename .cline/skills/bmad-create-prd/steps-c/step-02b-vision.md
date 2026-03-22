@@ -1,29 +1,30 @@
 ## META
 
-- Goal: refine the product vision now that the project classification is known.
+- Goal: Refine the product vision now that the project classification is known.
 - Speak to the user in `{communication_language}`.
 - Stay focused on what makes the product meaningful and distinct.
+- Only the current phase checklist and the current active step's details are shown in the prompt at one time.
+- Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
 
 ## EXECUTION
 
-<step n="1" goal="Acknowledge the established context">
+<step n="1" goal="Re-anchor the session in the confirmed discovery context">
   <action>Summarize the confirmed project classification and the context already gathered.</action>
   <action>Use that context to frame the vision discussion.</action>
 </step>
 
 <step n="2" goal="Explore what makes the product special">
   <ask>Ask what differentiates this product, why it matters, and what experience or value it should deliver better than alternatives.</ask>
+  <detail>The vision should stay strategic and product-level rather than turning into a feature-by-feature list.</detail>
 </step>
 
-<step n="3" goal="Capture and validate the vision">
-  <output>Draft a concise vision summary that reflects the user’s goals, audience, and differentiators.</output>
+<step n="3" goal="Capture, validate, and persist the vision">
+  <output>Draft a concise vision summary that reflects the user's goals, audience, and differentiators.</output>
   <ask>Ask the user to validate or refine the draft before it is saved.</ask>
-</step>
-
-<step n="4" goal="Persist the vision and continue">
-  <action>Save the confirmed vision material to the PRD document or frontmatter as appropriate.</action>
-  <ask>Present the continuation menu for moving to executive summary generation.</ask>
-  <action>If the user chooses to continue, append this step to `stepsCompleted` and load `./step-02c-executive-summary.md`.</action>
+  <branch if="the user confirms the vision" optional="true">
+    <action>Save the confirmed vision material to the PRD or frontmatter as appropriate.</action>
+    <handoff path="./step-02c-executive-summary.md">Proceed to executive summary generation.</handoff>
+  </branch>
 </step>
 
 ## CHECKPOINT
@@ -33,7 +34,3 @@ Wait for the user to confirm the vision summary before saving it.
 ## ADVISORY
 
 - The vision should stay product-level and strategic, not become a feature list.
-
-## REFERENCE
-
-- Later success, scope, and journey work should trace back to the validated vision.

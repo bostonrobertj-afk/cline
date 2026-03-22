@@ -14,6 +14,10 @@ partyModeWorkflow: '{project-root}/_bmad/core/workflows/party-mode/workflow.md'
 
 ## META
 
+- Goal: teach quality-review and traceability concepts, capture learner responses, and return to the session menu with updated progress.
+- Only the current phase checklist and the current active step's details are shown in the prompt at one time.
+- Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
+
 - Goal: teach test quality review, requirements traceability, and release gate reasoning.
 - Keep the session focused on quality assurance and shipping decisions.
 
@@ -36,16 +40,16 @@ partyModeWorkflow: '{project-root}/_bmad/core/workflows/party-mode/workflow.md'
 
 <step n="4" goal="Teach the metrics that matter">
   <output>Explain why P0/P1 coverage, flakiness rate, execution time, and determinism matter more than vanity metrics like total line coverage or test count.</output>
-  <branch if="role == QA">
+  <branch if="role == QA" optional="true">
     <detail>Emphasize quality scoring and release readiness language.</detail>
   </branch>
-  <branch if="role == Dev">
+  <branch if="role == Dev" optional="true">
     <detail>Emphasize feedback speed and reliable automation language.</detail>
   </branch>
-  <branch if="role == Lead">
+  <branch if="role == Lead" optional="true">
     <detail>Emphasize gatekeeping, risk visibility, and team standards language.</detail>
   </branch>
-  <branch if="role == VP">
+  <branch if="role == VP" optional="true">
     <detail>Emphasize shipping confidence and measurable quality outcomes.</detail>
   </branch>
 </step>
@@ -61,14 +65,10 @@ partyModeWorkflow: '{project-root}/_bmad/core/workflows/party-mode/workflow.md'
 </step>
 
 <step n="7" goal="Return to the hub">
-  <output>Confirm completion, share the score, and present the A/P/C menu before loading `./step-03-session-menu.md`.</output>
+  <output>Confirm completion, share the score, and present the A/P/C menu.</output>
+  <handoff path="./step-03-session-menu.md" />
 </step>
 
 ## CHECKPOINT
 
 Pause for quiz answers and for the user’s choice at the A/P/C menu.
-
-## ADVISORY
-
-- Keep the review metrics explicit and actionable.
-- Frame Trace as a release confidence tool, not just a documentation exercise.

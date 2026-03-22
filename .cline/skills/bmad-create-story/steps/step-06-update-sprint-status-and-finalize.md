@@ -26,7 +26,8 @@ templateFile: '{workflow_path}/template.md'
 - current_phase: workflow::step-6
 - goal: Validate the final story file, update sprint tracking, and report completion.
 - Speak in `{communication_language}`.
-
+- Only the current phase checklist and the current active step's details are shown in the prompt at one time.
+- Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
 ## EXECUTION
 <step n="1" goal="Validate the final story file">
   <action>Validate `{storyFile}` against `{checklistFile}` and fix any required issues before finalizing.</action>
@@ -39,7 +40,7 @@ templateFile: '{workflow_path}/template.md'
 </step>
 
 <step n="3" goal="Update sprint status when available">
-  <branch if="the sprint status file exists">
+  <branch if="the sprint status file exists" optional="true">
     <action>Load the full sprint status file and find the entry matching `{{story_key}}`.</action>
     <action>Verify the current status is `backlog` before updating it.</action>
     <action>Update the story status to `ready-for-dev`.</action>

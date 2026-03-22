@@ -17,9 +17,11 @@ completionFile: './step-05-completion.md'
 
 ## META
 
-- Goal: act as the routing hub for all seven sessions.
+- Goal: act as the routing hub for all seven sessions, show progress, and route to the chosen teaching session or completion path.
 - Show progress clearly before asking the learner to choose a path.
 - Keep this step focused on navigation, not teaching.
+- Only the current phase checklist and the current active step's details are shown in the prompt at one time.
+- Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
 
 ## EXECUTION
 
@@ -43,13 +45,14 @@ completionFile: './step-05-completion.md'
 </step>
 
 <step n="3" goal="Route based on completion state">
-  <branch if="all sessions are complete and certificate_generated is not true">
-    <output>Celebrate completion and load `./step-05-completion.md`.</output>
+  <branch if="all sessions are complete and certificate_generated is not true" optional="true">
+    <output>Celebrate completion.</output>
+    <handoff path="./step-05-completion.md" />
   </branch>
-  <branch if="all sessions are complete and certificate_generated is true">
+  <branch if="all sessions are complete and certificate_generated is true" optional="true">
     <output>The certificate already exists; keep the hub available so the learner can revisit sessions or exit.</output>
   </branch>
-  <branch if="sessions remain">
+  <branch if="sessions remain" optional="true">
     <ask>Ask the learner to choose a session number or `X` to exit.</ask>
     <detail>The learner can also ask questions before choosing; keep the hub visible and wait for a selection.</detail>
   </branch>
@@ -63,8 +66,3 @@ completionFile: './step-05-completion.md'
 ## CHECKPOINT
 
 Halt for any user choice at the hub, especially session selection, exit, or completion routing.
-
-## ADVISORY
-
-- Return to this hub after every session.
-- Keep the menu aligned to the saved progress state.

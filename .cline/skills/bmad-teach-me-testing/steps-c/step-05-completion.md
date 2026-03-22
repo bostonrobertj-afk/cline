@@ -14,13 +14,16 @@ certificateFile: '{test_artifacts}/tea-academy/{user_name}/tea-completion-certif
 
 - Goal: verify the learner has completed all seven sessions, create the certificate, and finalize the record.
 - This is the terminal step for the teaching workflow.
+- Only the current phase checklist and the current active step's details are shown in the prompt at one time.
+- Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
 
 ## EXECUTION
 
 <step n="1" goal="Verify completion state">
   <action>Read `{progressFile}` completely and confirm that all seven sessions are marked completed and `sessions_completed` is 7.</action>
-  <branch if="any session is incomplete">
+  <branch if="any session is incomplete" optional="true">
     <output>Explain how many sessions remain and route the learner back to the session menu.</output>
+    <handoff path="./step-03-session-menu.md" />
   </branch>
 </step>
 
@@ -50,8 +53,3 @@ certificateFile: '{test_artifacts}/tea-academy/{user_name}/tea-completion-certif
 ## CHECKPOINT
 
 Stop if the progress file does not show all seven sessions complete.
-
-## ADVISORY
-
-- Use the session 7 notes when assembling the final certificate artifacts.
-- Do not continue to any further step after completion.

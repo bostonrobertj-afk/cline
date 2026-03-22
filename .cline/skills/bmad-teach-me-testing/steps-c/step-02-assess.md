@@ -13,6 +13,8 @@ progressFile: '{test_artifacts}/teaching-progress/{user_name}-tea-progress.yaml'
 - Goal: gather learner context so teaching examples and recommendations can be personalized.
 - Ask one question at a time and validate each required answer.
 - Keep the step focused on assessment only.
+- Only the current phase checklist and the current active step's details are shown in the prompt at one time.
+- Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
 
 ## EXECUTION
 
@@ -47,14 +49,9 @@ progressFile: '{test_artifacts}/teaching-progress/{user_name}-tea-progress.yaml'
 
 <step n="7" goal="Preview next session choices">
   <output>Show a short recommendation based on the learner's experience level and explain that the session menu comes next.</output>
-  <output>Load and follow `./step-03-session-menu.md`.</output>
+  <handoff path="./step-03-session-menu.md" />
 </step>
 
 ## CHECKPOINT
 
 Pause only if validation fails or the learner needs to clarify an answer.
-
-## ADVISORY
-
-- Keep the questions separate so the learner is never overloaded.
-- Use the stored assessment data to guide the session recommendations.

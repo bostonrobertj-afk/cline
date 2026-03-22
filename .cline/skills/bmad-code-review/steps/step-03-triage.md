@@ -2,109 +2,84 @@
 
 ## META
 
-- Goal: Triage
+- Goal: normalize, deduplicate, and classify the review findings.
 - Execute this file in order.
 - Halt whenever user input, confirmation, or workflow gating is required.
-- Use the structured sections for extraction; use the prose block for additional agent context.
+- Be conservative when classifying findings and avoid inventing certainty.
+- Only the current phase checklist and the current active step's details are shown in the prompt at one time.
+- Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
 
 ## EXECUTION
 
-<step n="1" goal="Normalize findings into a common format">
-  <action>Normalize findings into a common format. Expected input formats:</action>
-  <action>Adversarial (Blind Hunter): markdown list of descriptions</action>
-  <action>Edge Case Hunter: JSON array with location, trigger_condition, guard_snippet, potential_consequence fields</action>
-  <action>Acceptance Auditor: markdown list with title, AC/constraint reference, and evidence</action>
-  <action>id -- sequential integer</action>
+<step n="1" goal="Normalize findings into a common structure">
+  <action>
+    Normalize the Blind Hunter, Edge Case Hunter, and Acceptance Auditor outputs into one common finding format.
+    <detail>
+      Expected source formats:
+      - Blind Hunter: markdown list of descriptions
+      - Edge Case Hunter: JSON array with `location`, `trigger_condition`, `guard_snippet`, and `potential_consequence`
+      - Acceptance Auditor: markdown list with title, AC or constraint reference, and evidence
+    </detail>
+  </action>
+  <action>
+    Convert each parsed finding into a unified structure.
+    <detail>
+      Include:
+      - `id`
+      - `source`
+      - `title`
+      - `detail`
+      - `location` when available
+    </detail>
+  </action>
+  <branch if="a review layer returns malformed output" optional="true">
+    <output>Note the parsing issue for the user, but keep any best-effort findings that can still be recovered.</output>
+  </branch>
 </step>
 
-<step n="2" goal="Deduplicate">
-  <action>Deduplicate. If two or more findings describe the same issue, merge them into one:</action>
-  <action>Use the most specific finding as the base (prefer edge-case JSON with location over adversarial prose).</action>
-  <action>Append any unique detail, reasoning, or location references from the other finding(s) into the surviving detail field.</action>
-  <action>Set source to the merged sources (e.g., blind+edge).</action>
+<step n="2" goal="Deduplicate overlapping findings">
+  <action>
+    Merge findings that describe the same underlying issue.
+    <detail>
+      Prefer the most specific finding as the base, especially one with a concrete location. Preserve unique details and reasoning from the duplicates in the surviving record, and merge the source labels.
+    </detail>
+  </action>
 </step>
 
-<step n="3" goal="Classify each finding into exactly one bucket:">
-  <action>Classify each finding into exactly one bucket:</action>
-  <action>intent_gap -- The spec/intent is incomplete; cannot resolve from existing information. Only possible if {review_mode} = &quot;full&quot;.</action>
-  <action>bad_spec -- The spec should have prevented this; spec is wrong or ambiguous. Only possible if {review_mode} = &quot;full&quot;.</action>
-  <action>patch -- Code issue that is trivially fixable without human input. Just needs a code change.</action>
-  <action>defer -- Pre-existing issue not caused by the current change. Real but not actionable now.</action>
+<step n="3" goal="Classify each finding into the review buckets">
+  <action>
+    Classify each finding into exactly one bucket: `intent_gap`, `bad_spec`, `patch`, `defer`, or `reject`.
+    <detail>
+      - `intent_gap`: the captured intent is incomplete and cannot be resolved from what is available
+      - `bad_spec`: the spec should have prevented the issue but is wrong or ambiguous
+      - `patch`: the code issue is directly fixable without new human input
+      - `defer`: the issue is real but pre-existing or not actionable in the current change
+      - `reject`: noise, duplicate noise, false positive, or already handled elsewhere
+    </detail>
+  </action>
+  <branch if="{review_mode} = `no-spec` and a finding would otherwise be `intent_gap` or `bad_spec`" optional="true">
+    <action>Reclassify that finding as `patch` if it is code-fixable, otherwise reclassify it as `defer`.</action>
+  </branch>
 </step>
 
-<step n="4" goal="Drop all reject findings">
-  <action>Drop all reject findings. Record the reject count for the summary.</action>
-  <action>Record the reject count for the summary.</action>
-</step>
-
-<step n="5" goal="If {failed_layers} is non-empty, report which layers failed before announcing results">
-  <action>If zero findings remain after dropping rejects AND {failed_layers} is non-empty, warn the user that the review may be incomplete rather than announcing a clean review.</action>
-  <ask>If {failed_layers} is non-empty, report which layers failed before announcing results. If zero findings remain after dropping rejects AND {failed_layers} is non-empty, warn the user that the review may be incomplete rather than announcing a clean review.</ask>
-</step>
-
-<step n="6" goal="If zero findings remain after dropping rejects and no layers failed, note clean review">
-  <action>If zero findings remain after dropping rejects and no layers failed, note clean review.</action>
+<step n="4" goal="Drop rejected findings and assess review completeness">
+  <action>Drop all findings classified as `reject` and record the reject count for the summary.</action>
+  <branch if="{failed_layers} is non-empty" optional="true">
+    <output>Record which review layers failed so the presentation step can warn that the review may be incomplete.</output>
+  </branch>
+  <branch if="zero findings remain after rejects are removed and {failed_layers} is empty" optional="true">
+    <output>Mark the review as clean.</output>
+  </branch>
+  <branch if="zero findings remain after rejects are removed and {failed_layers} is non-empty" optional="true">
+    <output>Mark the review as inconclusive rather than clean because one or more review layers failed.</output>
+  </branch>
 </step>
 
 ## CHECKPOINT
 
-Complete the current required actions in order before moving to the next workflow phase.
+Complete normalization, deduplication, and classification before moving on to presentation.
 
 ## ADVISORY
 
-- Next handoff: ./step-04-present.md
-
-## REFERENCE
-
-<prose>
----
----
-
-# Step 3: Triage
-
-## RULES
-
-- YOU MUST ALWAYS SPEAK OUTPUT in your Agent communication style with the config `{communication_language}`
-- Be precise. When uncertain between categories, prefer the more conservative classification.
-
-## INSTRUCTIONS
-
-1. **Normalize** findings into a common format. Expected input formats:
-   - Adversarial (Blind Hunter): markdown list of descriptions
-   - Edge Case Hunter: JSON array with `location`, `trigger_condition`, `guard_snippet`, `potential_consequence` fields
-   - Acceptance Auditor: markdown list with title, AC/constraint reference, and evidence
-
-   If a layer's output does not match its expected format, attempt best-effort parsing. Note any parsing issues for the user.
-
-   Convert all to a unified list where each finding has:
-   - `id` -- sequential integer
-   - `source` -- `blind`, `edge`, `auditor`, or merged sources (e.g., `blind+edge`)
-   - `title` -- one-line summary
-   - `detail` -- full description
-   - `location` -- file and line reference (if available)
-
-2. **Deduplicate.** If two or more findings describe the same issue, merge them into one:
-   - Use the most specific finding as the base (prefer edge-case JSON with location over adversarial prose).
-   - Append any unique detail, reasoning, or location references from the other finding(s) into the surviving `detail` field.
-   - Set `source` to the merged sources (e.g., `blind+edge`).
-
-3. **Classify** each finding into exactly one bucket:
-   - **intent_gap** -- The spec/intent is incomplete; cannot resolve from existing information. Only possible if `{review_mode}` = `"full"`.
-   - **bad_spec** -- The spec should have prevented this; spec is wrong or ambiguous. Only possible if `{review_mode}` = `"full"`.
-   - **patch** -- Code issue that is trivially fixable without human input. Just needs a code change.
-   - **defer** -- Pre-existing issue not caused by the current change. Real but not actionable now.
-   - **reject** -- Noise, false positive, or handled elsewhere.
-
-   If `{review_mode}` = `"no-spec"` and a finding would otherwise be `intent_gap` or `bad_spec`, reclassify it as `patch` (if code-fixable) or `defer` (if not).
-
-4. **Drop** all `reject` findings. Record the reject count for the summary.
-
-5. If `{failed_layers}` is non-empty, report which layers failed before announcing results. If zero findings remain after dropping rejects AND `{failed_layers}` is non-empty, warn the user that the review may be incomplete rather than announcing a clean review.
-
-6. If zero findings remain after dropping rejects and no layers failed, note clean review.
-
-
-## NEXT
-
-Read fully and follow `./step-04-present.md`
-</prose>
+- Prefer the more conservative classification when a finding sits on a boundary.
+- Do not keep `reject` findings in the final presentation set.

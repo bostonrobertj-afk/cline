@@ -1,174 +1,146 @@
 # Editorial Review - Structure
 
-**Goal:** Review document structure and propose substantive changes to improve clarity and flow -- run this BEFORE copy editing.
-
-**Your Role:** You are a structural editor focused on HIGH-VALUE DENSITY. Brevity IS clarity: concise writing respects limited attention spans and enables effective scanning. Every section must justify its existence -- cut anything that delays understanding. True redundancy is failure. Follow ALL steps in the STEPS section IN EXACT ORDER. DO NOT skip steps or change the sequence. HALT immediately when halt-conditions are met. Each action within a step is a REQUIRED action to complete that step.
-
-> **STYLE GUIDE OVERRIDE:** If a style_guide input is provided, it overrides ALL generic principles in this task (including human-reader-principles, llm-reader-principles, reader_type-specific priorities, structure-models selection, and the Microsoft Writing Style Guide baseline). The ONLY exception is CONTENT IS SACROSANCT -- never change what ideas say, only how they're expressed. When style guide conflicts with this task, style guide wins.
-
-**Inputs:**
-- **content** (required) -- Document to review (markdown, plain text, or structured content)
-- **style_guide** (optional) -- Project-specific style guide. When provided, overrides all generic principles in this task (except CONTENT IS SACROSANCT). The style guide is the final authority on tone, structure, and language choices.
-- **purpose** (optional) -- Document's intended purpose (e.g., 'quickstart tutorial', 'API reference', 'conceptual overview')
-- **target_audience** (optional) -- Who reads this? (e.g., 'new users', 'experienced developers', 'decision makers')
-- **reader_type** (optional, default: "humans") -- 'humans' (default) preserves comprehension aids; 'llm' optimizes for precision and density
-- **length_target** (optional) -- Target reduction (e.g., '30% shorter', 'half the length', 'no limit')
-
-## Principles
-
-- Comprehension through calibration: Optimize for the minimum words needed to maintain understanding
-- Front-load value: Critical information comes first; nice-to-know comes last (or goes)
-- One source of truth: If information appears identically twice, consolidate
-- Scope discipline: Content that belongs in a different document should be cut or linked
-- Propose, don't execute: Output recommendations -- user decides what to accept
-- **CONTENT IS SACROSANCT: Never challenge ideas -- only optimize how they're organized.**
-
-## Human-Reader Principles
-
-These elements serve human comprehension and engagement -- preserve unless clearly wasteful:
-
-- Visual aids: Diagrams, images, and flowcharts anchor understanding
-- Expectation-setting: "What You'll Learn" helps readers confirm they're in the right place
-- Reader's Journey: Organize content biologically (linear progression), not logically (database)
-- Mental models: Overview before details prevents cognitive overload
-- Warmth: Encouraging tone reduces anxiety for new users
-- Whitespace: Admonitions and callouts provide visual breathing room
-- Summaries: Recaps help retention; they're reinforcement, not redundancy
-- Examples: Concrete illustrations make abstract concepts accessible
-- Engagement: "Flow" techniques (transitions, variety) are functional, not "fluff" -- they maintain attention
-
-## LLM-Reader Principles
-
-When reader_type='llm', optimize for PRECISION and UNAMBIGUITY:
-
-- Dependency-first: Define concepts before usage to minimize hallucination risk
-- Cut emotional language, encouragement, and orientation sections
-- IF concept is well-known from training (e.g., "conventional commits", "REST APIs"): Reference the standard -- don't re-teach it. ELSE: Be explicit -- don't assume the LLM will infer correctly.
-- Use consistent terminology -- same word for same concept throughout
-- Eliminate hedging ("might", "could", "generally") -- use direct statements
-- Prefer structured formats (tables, lists, YAML) over prose
-- Reference known standards ("conventional commits", "Google style guide") to leverage training
-- STILL PROVIDE EXAMPLES even for known standards -- grounds the LLM in your specific expectation
-- Unambiguous references -- no unclear antecedents ("it", "this", "the above")
-- Note: LLM documents may be LONGER than human docs in some areas (more explicit) while shorter in others (no warmth)
-
-## Structure Models
-
-### Tutorial/Guide (Linear)
-**Applicability:** Tutorials, detailed guides, how-to articles, walkthroughs
-- Prerequisites: Setup/Context MUST precede action
-- Sequence: Steps must follow strict chronological or logical dependency order
-- Goal-oriented: clear 'Definition of Done' at the end
-
-### Reference/Database
-**Applicability:** API docs, glossaries, configuration references, cheat sheets
-- Random Access: No narrative flow required; user jumps to specific item
-- MECE: Topics are Mutually Exclusive and Collectively Exhaustive
-- Consistent Schema: Every item follows identical structure (e.g., Signature to Params to Returns)
-
-### Explanation (Conceptual)
-**Applicability:** Deep dives, architecture overviews, conceptual guides, whitepapers, project context
-- Abstract to Concrete: Definition to Context to Implementation/Example
-- Scaffolding: Complex ideas built on established foundations
-
-### Prompt/Task Definition (Functional)
-**Applicability:** BMAD tasks, prompts, system instructions, XML definitions
-- Meta-first: Inputs, usage constraints, and context defined before instructions
-- Separation of Concerns: Instructions (logic) separate from Data (content)
-- Step-by-step: Execution flow must be explicit and ordered
-
-### Strategic/Context (Pyramid)
-**Applicability:** PRDs, research reports, proposals, decision records
-- Top-down: Conclusion/Status/Recommendation starts the document
-- Grouping: Supporting context grouped logically below the headline
-- Ordering: Most critical information first
-- MECE: Arguments/Groups are Mutually Exclusive and Collectively Exhaustive
-- Evidence: Data supports arguments, never leads
+## META
+- Goal: Review document structure and propose substantive changes to improve clarity and flow before copy editing.
+- Only the current phase checklist and the current active step's details are shown in the prompt at one time.
+- Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
 
 ## STEPS
 
-### Step 1: Validate Input
+<step n="1" goal="Validate the input and classify the document">
+  <detail>
+    Inputs:
+    - `content` is required and may be markdown, plain text, or structured content
+    - `style_guide` is optional and overrides the generic guidance below except for CONTENT IS SACROSANCT
+    - `purpose`, `target_audience`, and `length_target` are optional
+    - `reader_type` defaults to `humans`
+  </detail>
+  <action>Check whether `content` is empty or contains fewer than 3 words.</action>
+  <branch if="content is empty or fewer than 3 words" optional="true">
+    <output>Content too short for substantive review (minimum 3 words required).</output>
+    <exit />
+  </branch>
+  <action>Validate `reader_type` as `humans` or `llm`, defaulting to `humans` when omitted.</action>
+  <branch if="reader_type is invalid" optional="true">
+    <output>Invalid reader_type. Must be 'humans' or 'llm'.</output>
+    <exit />
+  </branch>
+  <action>Identify the document type and structure, including headings, sections, lists, and major organization patterns.</action>
+  <action>Count the words and sections in the current document.</action>
+</step>
 
-- Check if content is empty or contains fewer than 3 words
-- If empty or fewer than 3 words, HALT with error: "Content too short for substantive review (minimum 3 words required)"
-- Validate reader_type is "humans" or "llm" (or not provided, defaulting to "humans")
-- If reader_type is invalid, HALT with error: "Invalid reader_type. Must be 'humans' or 'llm'"
-- Identify document type and structure (headings, sections, lists, etc.)
-- Note the current word count and section count
+<step n="2" goal="Understand the document purpose, audience, and operating lens">
+  <action>Use `purpose` if provided; otherwise infer the purpose from the content.</action>
+  <action>Use `target_audience` if provided; otherwise infer the audience from the content.</action>
+  <action>Identify the core question the document answers.</action>
+  <output>State in one sentence: "This document exists to help [audience] accomplish [goal]".</output>
+  <action>Select the most appropriate structural model from the available models based on purpose and audience.</action>
+  <detail>
+    Structure models:
+    - Tutorial/Guide (Linear): prerequisites before action, strict sequence, clear done state
+    - Reference/Database: random access, MECE coverage, consistent schema
+    - Explanation (Conceptual): abstract to concrete, scaffolding for complex ideas
+    - Prompt/Task Definition (Functional): meta-first, separation of concerns, explicit step-by-step execution
+    - Strategic/Context (Pyramid): top-down, grouped support, evidence below the headline
+  </detail>
+  <detail>
+    Reader principles:
+    - For humans, preserve visual aids, expectation-setting, mental models, warmth, whitespace, summaries, examples, and flow
+    - For llm, prioritize precision, direct language, consistent terminology, structured formats, and examples without emotional filler
+  </detail>
+</step>
 
-### Step 2: Understand Purpose
+<step n="3" goal="Perform the structural analysis">
+  <branch if="style_guide is provided" optional="true">
+    <action>Consult the style guide and note its key requirements for this review.</action>
+    <detail>Style guide requirements override the default structural and reader principles for the rest of the analysis.</detail>
+  </branch>
+  <action>Map the document structure by listing each major section with its word count.</action>
+  <action>Evaluate the structure against the selected model's primary rules.</action>
+  <action>For each section, decide whether it directly serves the stated purpose.</action>
+  <branch if="reader_type is humans" optional="true">
+    <action>Review each comprehension aid, including visuals, summaries, examples, and callouts, for usefulness.</action>
+  </branch>
+  <action>Identify sections that could be cut, merged, moved, or split.</action>
+  <action>Identify true redundancies, scope violations, and buried critical information.</action>
+  <detail>
+    Core principles to apply:
+    - Optimize for the minimum words needed to maintain understanding
+    - Put critical information first
+    - Consolidate identical information
+    - Cut content that belongs in a different document
+    - Preserve content meaning; only reorganize or re-express it
+  </detail>
+</step>
 
-- If purpose was provided, use it; otherwise infer from content
-- If target_audience was provided, use it; otherwise infer from content
-- Identify the core question the document answers
-- State in one sentence: "This document exists to help [audience] accomplish [goal]"
-- Select the most appropriate structural model from Structure Models based on purpose/audience
-- Note reader_type and which principles apply (Human-Reader Principles or LLM-Reader Principles)
+<step n="4" goal="Analyze flow and reader journey">
+  <action>Assess whether the sequence matches how readers will use the document.</action>
+  <action>Identify premature detail, missing scaffolding, and anti-patterns such as duplicated overviews or unnecessary appendices.</action>
+  <branch if="reader_type is humans" optional="true">
+    <action>Assess pacing, whitespace, and visual variety for readability and engagement.</action>
+  </branch>
+  <detail>
+    - Reader journeys should feel natural and linear when the document is meant to teach or guide
+    - Missing context should be added before dependent detail
+    - Repeated overviews that merely restate the body should be merged or removed
+  </detail>
+</step>
 
-### Step 3: Structural Analysis (CRITICAL)
+<step n="5" goal="Generate prioritized recommendations">
+  <action>Compile all findings into prioritized recommendations.</action>
+  <detail>
+    Categorize each recommendation as `CUT`, `MERGE`, `MOVE`, `CONDENSE`, `QUESTION`, or `PRESERVE`.
+  </detail>
+  <action>State the rationale for each recommendation in one sentence.</action>
+  <action>Estimate the word impact for each recommendation.</action>
+  <action>If `length_target` is provided, assess whether the recommendations meet it.</action>
+  <branch if="reader_type is humans and recommendations would cut comprehension aids" optional="true">
+    <output>This cut may impact reader comprehension/engagement.</output>
+  </branch>
+  <detail>
+    - `PRESERVE` is for elements that look cuttable but materially help comprehension
+    - `QUESTION` is for changes that require author judgment
+    - Treat identical duplication as redundant, but do not count summaries or reinforcement as redundancy
+  </detail>
+</step>
 
-- If style_guide provided, consult style_guide now and note its key requirements -- these override default principles for this analysis
-- Map the document structure: list each major section with its word count
-- Evaluate structure against the selected model's primary rules (e.g., 'Does recommendation come first?' for Pyramid)
-- For each section, answer: Does this directly serve the stated purpose?
-- If reader_type='humans', for each comprehension aid (visual, summary, example, callout), answer: Does this help readers understand or stay engaged?
-- Identify sections that could be: cut entirely, merged with another, moved to a different location, or split
-- Identify true redundancies: identical information repeated without purpose (not summaries or reinforcement)
-- Identify scope violations: content that belongs in a different document
-- Identify burying: critical information hidden deep in the document
+<step n="6" goal="Output the review results">
+  <output>Present the document summary, recommendation list, and estimated total reduction.</output>
+  <detail>
+    Use this markdown shape for the final response:
 
-### Step 4: Flow Analysis
+    ```markdown
+    ## Document Summary
+    - **Purpose:** [inferred or provided purpose]
+    - **Audience:** [inferred or provided audience]
+    - **Reader type:** [selected reader type]
+    - **Structure model:** [selected structure model]
+    - **Current length:** [X] words across [Y] sections
 
-- Assess the reader's journey: Does the sequence match how readers will use this?
-- Identify premature detail: explanation given before the reader needs it
-- Identify missing scaffolding: complex ideas without adequate setup
-- Identify anti-patterns: FAQs that should be inline, appendices that should be cut, overviews that repeat the body verbatim
-- If reader_type='humans', assess pacing: Is there enough whitespace and visual variety to maintain attention?
+    ## Recommendations
 
-### Step 5: Generate Recommendations
+    ### 1. [CUT/MERGE/MOVE/CONDENSE/QUESTION/PRESERVE] - [Section or element name]
+    **Rationale:** [One sentence explanation]
+    **Impact:** ~[X] words
+    **Comprehension note:** [If applicable, note impact on reader understanding]
 
-- Compile all findings into prioritized recommendations
-- Categorize each recommendation: CUT (remove entirely), MERGE (combine sections), MOVE (reorder), CONDENSE (shorten significantly), QUESTION (needs author decision), PRESERVE (explicitly keep -- for elements that might seem cuttable but serve comprehension)
-- For each recommendation, state the rationale in one sentence
-- Estimate impact: how many words would this save (or cost, for PRESERVE)?
-- If length_target was provided, assess whether recommendations meet it
-- If reader_type='humans' and recommendations would cut comprehension aids, flag with warning: "This cut may impact reader comprehension/engagement"
+    ### 2. ...
 
-### Step 6: Output Results
+    ## Summary
+    - **Total recommendations:** [N]
+    - **Estimated reduction:** [X] words ([Y]% of original)
+    - **Meets length target:** [Yes/No/No target specified]
+    - **Comprehension trade-offs:** [Note any cuts that sacrifice reader engagement for brevity]
+    ```
+  </detail>
+  <branch if="no structural issues are found" optional="true">
+    <output>No substantive changes recommended. Document structure is sound.</output>
+  </branch>
+  <detail>
+    If the source is malformed beyond recovery or the workflow cannot proceed, stop with the most relevant error message rather than fabricating recommendations.
+  </detail>
+</step>
 
-- Output document summary (purpose, audience, reader_type, current length)
-- Output the recommendation list in priority order
-- Output estimated total reduction if all recommendations accepted
-- If no recommendations, output: "No substantive changes recommended -- document structure is sound"
+## CHECKPOINT
 
-Use the following output format:
-
-```markdown
-## Document Summary
-- **Purpose:** [inferred or provided purpose]
-- **Audience:** [inferred or provided audience]
-- **Reader type:** [selected reader type]
-- **Structure model:** [selected structure model]
-- **Current length:** [X] words across [Y] sections
-
-## Recommendations
-
-### 1. [CUT/MERGE/MOVE/CONDENSE/QUESTION/PRESERVE] - [Section or element name]
-**Rationale:** [One sentence explanation]
-**Impact:** ~[X] words
-**Comprehension note:** [If applicable, note impact on reader understanding]
-
-### 2. ...
-
-## Summary
-- **Total recommendations:** [N]
-- **Estimated reduction:** [X] words ([Y]% of original)
-- **Meets length target:** [Yes/No/No target specified]
-- **Comprehension trade-offs:** [Note any cuts that sacrifice reader engagement for brevity]
-```
-
-## HALT CONDITIONS
-
-- HALT with error if content is empty or fewer than 3 words
-- HALT with error if reader_type is not "humans" or "llm"
-- If no structural issues found, output "No substantive changes recommended" (this is valid completion, not an error)
+Stop if the content is empty, the reader type is invalid, or the review cannot proceed because the source is malformed beyond recovery.

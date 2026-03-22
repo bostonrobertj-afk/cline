@@ -3,15 +3,17 @@
 
 # Step 5: Present
 
-## RULES
+## META
 
-- YOU MUST ALWAYS SPEAK OUTPUT in your Agent communication style with the config `{communication_language}`
-- NEVER auto-push.
+- Speak in the configured communication language.
+- Do not auto-push.
+- Only the current phase checklist and the current active step's details are shown in the prompt at one time.
+- Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
 
-## INSTRUCTIONS
+## EXECUTION
 
-1. Change `{spec_file}` status to `done` in the frontmatter.
-2. If version control is available and the tree is dirty, create a local commit with a conventional message derived from the spec title.
-3. Display summary of your work to the user, including the commit hash if one was created. Advise on how to review the changes. Offer to push and/or create a pull request.
-
-Workflow complete.
+<step n="1" goal="Finalize the spec and present the result">
+  <action>Update `{spec_file}` status to `done` in the frontmatter.</action>
+  <action>If version control is available and the tree is dirty, create a local commit with a conventional message derived from the spec title.</action>
+  <output>Summarize the work, include the commit hash if one was created, and offer to help with push or PR creation.</output>
+</step>

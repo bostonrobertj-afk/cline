@@ -1,124 +1,44 @@
 # Step 1b: Workflow Continuation
 
-## MANDATORY EXECUTION RULES (READ FIRST):
+## META
 
-- ✅ YOU ARE A CONTINUATION FACILITATOR, not a fresh starter
-- 🎯 RESPECT EXISTING WORKFLOW state and progress
-- 📋 UNDERSTAND PREVIOUS SESSION context and outcomes
-- 🔍 SEAMLESSLY RESUME from where user left off
-- 💬 MAINTAIN CONTINUITY in session flow and rapport
-- ✅ YOU MUST ALWAYS SPEAK OUTPUT In your Agent communication style with the `communication_language`
+- Goal: Resume an existing brainstorming session without repeating completed setup.
+- Execute the current phase in order.
+- Halt whenever user input, confirmation, or workflow gating is required.
+- Use structured execution tags only.
+- Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
 
-## EXECUTION PROTOCOLS:
+## EXECUTION
 
-- 🎯 Load and analyze existing document thoroughly
-- 💾 Update frontmatter with continuation state
-- 📖 Present current status and next options clearly
-- 🚫 FORBIDDEN repeating completed work or asking same questions
+<step n="1" goal="Analyze existing session state">
+  <action>Load `{brainstorming_session_output_file}` and inspect the frontmatter plus the visible session summary.</action>
+  <detail>Capture `stepsCompleted`, `session_topic`, `session_goals`, `selected_approach`, `techniques_used`, and `ideas_generated` if present.</detail>
+  <output>Welcome back {{user_name}}. I found your existing brainstorming session and will resume from the current state.</output>
+</step>
 
-## CONTEXT BOUNDARIES:
+<step n="2" goal="Assess whether the session is complete">
+  <branch if="the session appears complete" optional="true">
+    <ask>Your brainstorming session appears to be complete. Would you like to review results, start a new session, or extend the session?</ask>
+    <branch if="the user wants to review results" optional="true">
+      <detail>Route to the organization or completion path that best matches the current state.</detail>
+    </branch>
+    <branch if="the user wants a new session" optional="true">
+      <detail>Return to step-01-session-setup.md and start fresh.</detail>
+    </branch>
+    <branch if="the user wants to extend the session" optional="true">
+      <detail>Continue with the next technique or phase.</detail>
+    </branch>
+  </branch>
+  <branch if="the session is still in progress" optional="true">
+    <output>Let's continue where you left off.</output>
+  </branch>
+</step>
 
-- Existing document with frontmatter is available
-- Previous steps completed indicate session progress
-- Brain techniques CSV loaded when needed for remaining steps
-- User may want to continue, modify, or restart
+<step n="3" goal="Restore session routing state">
+  <action>Update session frontmatter to note continuation state and preserve the existing `stepsCompleted` values.</action>
+  <detail>Do not repeat the completed setup questions; move straight to the next unresolved workflow choice.</detail>
+</step>
 
-## YOUR TASK:
+## CHECKPOINT
 
-Analyze existing brainstorming session state and provide seamless continuation options.
-
-## CONTINUATION SEQUENCE:
-
-### 1. Analyze Existing Session
-
-Load existing document and analyze current state:
-
-**Document Analysis:**
-
-- Read existing `{brainstorming_session_output_file}`
-- Examine frontmatter for `stepsCompleted`, `session_topic`, `session_goals`
-- Review content to understand session progress and outcomes
-- Identify current stage and next logical steps
-
-**Session Status Assessment:**
-"Welcome back {{user_name}}! I can see your brainstorming session on **[session_topic]** from **[date]**.
-
-**Current Session Status:**
-
-- **Steps Completed:** [List completed steps]
-- **Techniques Used:** [List techniques from frontmatter]
-- **Ideas Generated:** [Number from frontmatter]
-- **Current Stage:** [Assess where they left off]
-
-**Session Progress:**
-[Brief summary of what was accomplished and what remains]"
-
-### 2. Present Continuation Options
-
-Based on session analysis, provide appropriate options:
-
-**If Session Completed:**
-"Your brainstorming session appears to be complete!
-
-**Options:**
-[1] Review Results - Go through your documented ideas and insights
-[2] Start New Session - Begin brainstorming on a new topic
-[3] Extend Session - Add more techniques or explore new angles"
-
-**HALT — wait for user selection before proceeding.**
-
-**If Session In Progress:**
-"Let's continue where we left off!
-
-**Current Progress:**
-[Description of current stage and accomplishments]
-
-**Next Steps:**
-[Continue with appropriate next step based on workflow state]"
-
-### 3. Handle User Choice
-
-Route to appropriate next step based on selection:
-
-**Review Results:** Load appropriate review/navigation step
-**New Session:** Start fresh workflow initialization
-**Extend Session:** Continue with next technique or phase
-**Continue Progress:** Resume from current workflow step
-
-### 4. Update Session State
-
-Update frontmatter to reflect continuation:
-
-```yaml
----
-stepsCompleted: [existing_steps]
-session_continued: true
-continuation_date: { { current_date } }
----
-```
-
-## SUCCESS METRICS:
-
-✅ Existing session state accurately analyzed and understood
-✅ Seamless continuation without loss of context or rapport
-✅ Appropriate continuation options presented based on progress
-✅ User choice properly routed to next workflow step
-✅ Session continuity maintained throughout interaction
-
-## FAILURE MODES:
-
-❌ Not properly analyzing existing document state
-❌ Asking user to repeat information already provided
-❌ Losing continuity in session flow or context
-❌ Not providing appropriate continuation options
-
-## CONTINUATION PROTOCOLS:
-
-- Always acknowledge previous work and progress
-- Maintain established rapport and session dynamics
-- Build upon existing ideas and insights rather than starting over
-- Respect user's time by avoiding repetitive questions
-
-## NEXT STEP:
-
-Route to appropriate workflow step based on user's continuation choice and current session state.
+Halt for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.

@@ -25,6 +25,8 @@ templateFile: '{workflow_path}/template.md'
 - current_phase: workflow::step-2
 - goal: Build the story foundation from planning artifacts and prior work.
 - Speak in `{communication_language}`.
+- Only the current phase checklist and the current active step's details are shown in the prompt at one time.
+- Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
 
 ## EXECUTION
 <step n="1" goal="Load the relevant source material">
@@ -38,7 +40,7 @@ templateFile: '{workflow_path}/template.md'
 </step>
 
 <step n="3" goal="Extract previous-story intelligence when applicable">
-  <branch if="story_num > 1">
+  <branch if="story_num > 1" optional="true">
     <action>Find the closest previous story file in the same epic and load it completely.</action>
     <action>Extract actionable learnings that could affect the current story.</action>
     <detail>Focus on dev notes, review feedback, created or modified files, testing patterns, solved problems, and conventions established by prior work.</detail>
@@ -46,7 +48,7 @@ templateFile: '{workflow_path}/template.md'
 </step>
 
 <step n="4" goal="Capture git intelligence when available">
-  <branch if="a git repository is detected and prior story context exists">
+  <branch if="a git repository is detected and prior story context exists" optional="true">
     <action>Inspect recent commits for implementation patterns relevant to the story.</action>
     <detail>Look for files changed, dependencies added or updated, architecture decisions, and testing approaches.</detail>
   </branch>

@@ -26,6 +26,8 @@ templateFile: '{workflow_path}/template.md'
 - current_phase: workflow::step-1
 - goal: Resolve the target story before any content is created.
 - Speak in `{communication_language}`.
+- Only the current phase checklist and the current active step's details are shown in the prompt at one time.
+- Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
 
 ## EXECUTION
 <step n="1" goal="Resolve the target from explicit input first">
@@ -35,28 +37,28 @@ templateFile: '{workflow_path}/template.md'
 
 <step n="2" goal="Fall back to sprint tracking when needed">
   <action>Check whether `{sprintStatusFile}` exists when no explicit target is provided.</action>
-  <branch if="the sprint status file does not exist">
+  <branch if="the sprint status file does not exist" optional="true">
     <output>No sprint status file was found and no story was specified.</output>
     <output>Provide an epic-story number, provide a story docs path, or run sprint planning first.</output>
     <ask>Choose [1] to initialize sprint tracking, provide an epic-story number, provide a story docs path, or choose [q] to quit.</ask>
-    <branch if="the user chooses q">
+    <branch if="the user chooses q" optional="true">
       <action>Halt without making changes.</action>
     </branch>
-    <branch if="the user chooses 1">
+    <branch if="the user chooses 1" optional="true">
       <output>Run sprint planning first to create `sprint-status.yaml`.</output>
       <action>Halt until sprint tracking exists.</action>
     </branch>
-    <branch if="the user provides an epic-story number or path">
+    <branch if="the user provides an epic-story number or path" optional="true">
       <action>Parse `epic_num`, `story_num`, `story_title`, and `story_key` when available.</action>
       <action>Store the provided path as `story_path` when the user supplies story documents.</action>
       <action>Continue once the target is resolved.</action>
     </branch>
   </branch>
-  <branch if="the sprint status file exists and no explicit target was provided">
+  <branch if="the sprint status file exists and no explicit target was provided" optional="true">
     <action>Load the full sprint-status file from start to end.</action>
     <detail>Preserve order while scanning and parse the `development_status` section completely.</detail>
     <action>Find the first backlog story key that matches the `number-number-name` pattern and is not an epic or retrospective entry.</action>
-    <branch if="no backlog story is found">
+    <branch if="no backlog story is found" optional="true">
       <output>No backlog stories were found in `sprint-status.yaml`.</output>
       <output>All stories are already created, in progress, or done.</output>
       <output>Refresh sprint tracking, add more stories, or run a retrospective.</output>
@@ -65,20 +67,20 @@ templateFile: '{workflow_path}/template.md'
     <action>Extract `epic_num`, `story_num`, `story_title`, and `story_key` from the found key.</action>
     <action>Set `story_id` to `{{epic_num}}.{{story_num}}`.</action>
     <action>Check whether this is the first story in epic `{{epic_num}}`.</action>
-    <branch if="this is the first story in the epic">
+    <branch if="this is the first story in the epic" optional="true">
       <action>Load the sprint status file and inspect epic `epic-{{epic_num}}`.</action>
-      <branch if="epic status is backlog or legacy contexted">
+      <branch if="epic status is backlog or legacy contexted" optional="true">
         <action>Update the epic status to `in-progress`.</action>
         <output>Epic `{{epic_num}}` status updated to in-progress.</output>
       </branch>
-      <branch if="epic status is in-progress">
+      <branch if="epic status is in-progress" optional="true">
         <action>No change is needed.</action>
       </branch>
-      <branch if="epic status is done">
+      <branch if="epic status is done" optional="true">
         <output>Cannot create a story in a completed epic.</output>
         <action>Halt.</action>
       </branch>
-      <branch if="epic status is anything else">
+      <branch if="epic status is anything else" optional="true">
         <output>Invalid epic status `{{epic_status}}`.</output>
         <action>Halt.</action>
       </branch>

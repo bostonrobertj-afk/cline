@@ -31,4 +31,6 @@ Load config from `{project-root}/_bmad/bmm/config.yaml` and resolve:
 
 ## EXECUTION
 
-Read fully and follow: `./deep-dive-instructions.md`
+<step n="1" goal="Load the deep-dive instructions.">
+  <handoff path="./deep-dive-instructions.md" />
+</step>

@@ -4,182 +4,95 @@ wipFile: '{implementation_artifacts}/tech-spec-wip.md'
 
 # Step 1: Analyze Requirement Delta
 
-**Progress: Step 1 of 4** - Next: Deep Investigation
+## META
 
-## RULES:
+- Progress: Step 1 of 4
+- Next: Deep Investigation
+- Focus on the requirement delta and scope.
+- Speak in the configured communication language.
 
-- MUST NOT skip steps.
-- MUST NOT optimize sequence.
-- MUST follow exact instructions.
-- MUST NOT look ahead to future steps.
-- ✅ YOU MUST ALWAYS SPEAK OUTPUT In your Agent communication style with the config `{communication_language}`
+## EXECUTION
 
-## CONTEXT:
+<step n="1" goal="Resolve work-in-progress state">
+  <action>Check whether `{wipFile}` exists.</action>
+  <branch if="wip file exists" optional="true">
+    <output>Found a tech-spec in progress.</output>
+    <detail>
+      Read the frontmatter and extract `title`, `slug`, and `stepsCompleted`.
+      Report the current step progress as `lastStep = max(stepsCompleted)`.
+    </detail>
+    <ask>Do you want to continue the current tech-spec or archive it and start something new?</ask>
+    <detail>Use `[Y]` to continue and `[N]` to archive or start fresh.</detail>
+    <branch if="user chooses continue" optional="true">
+      <detail>Route directly to the next needed step based on `stepsCompleted`.</detail>
+      <branch if="stepsCompleted = [1]" optional="true">
+        <goto step="2" />
+      </branch>
+      <branch if="stepsCompleted = [1, 2]" optional="true">
+        <goto step="3" />
+      </branch>
+      <branch if="stepsCompleted = [1, 2, 3]" optional="true">
+        <goto step="4" />
+      </branch>
+    </branch>
+    <branch if="user chooses archive and start fresh" optional="true">
+      <action>Rename `{wipFile}` to `{implementation_artifacts}/tech-spec-{slug}-archived-{date}.md`.</action>
+      <detail>Then continue with the new-request path in this step.</detail>
+      <goto step="2" />
+    </branch>
+  </branch>
+</step>
 
-- Variables from `workflow.md` are available in memory.
-- Focus: Define the technical requirement delta and scope.
-- Investigation: Perform surface-level code scans ONLY to verify the delta. Reserve deep dives into implementation consequences for Step 2.
-- Objective: Establish a verifiable delta between current state and target state.
+<step n="2" goal="Gather the initial request and orient quickly">
+  <branch if="wip file does not exist or the current file was archived" optional="true">
+    <ask>What are we building today?</ask>
+    <detail>Do not ask detailed questions yet. Gather just enough to know where to look.</detail>
+  </branch>
+  <action>Do a rapid orient scan to understand the landscape.</action>
+  <detail>
+    Check `{implementation_artifacts}` and `{planning_artifacts}` for PRDs, architecture docs, epics, and research.
+    Check for `**/project-context.md` and skim it if present.
+    Search for any existing stories or specs related to the request.
+  </detail>
+  <branch if="user mentioned specific code or features" optional="true">
+    <action>Search for the relevant files, classes, or functions and note the visible patterns and file locations.</action>
+  </branch>
+  <branch if="no relevant code is found" optional="true">
+    <action>Identify the likely target directory and the standard project utilities or boilerplate that should be used.</action>
+  </branch>
+</step>
 
-## SEQUENCE OF INSTRUCTIONS
+<step n="3" goal="Ask informed questions and confirm the core understanding">
+  <action>Ask clarifying questions informed by the quick scan.</action>
+  <detail>
+    Adapt the questions to `{user_skill_level}`.
+    Ask about architecture, patterns, constraints, and any existing docs that should shape the work.
+  </detail>
+  <ask>Confirm the title, slug, problem statement, solution, in-scope items, and out-of-scope items before proceeding.</ask>
+  <detail>Present the captured understanding back to the user so they can approve it.</detail>
+</step>
 
-### 0. Check for Work in Progress
-
-a) **Before anything else, check if `{wipFile}` exists:**
-
-b) **IF WIP FILE EXISTS:**
-
-1. Read the frontmatter and extract: `title`, `slug`, `stepsCompleted`
-2. Calculate progress: `lastStep = max(stepsCompleted)`
-3. Present to user:
-
-```
-Hey {user_name}! Found a tech-spec in progress:
-
-**{title}** - Step {lastStep} of 4 complete
-
-Is this what you're here to continue?
-
-[Y] Yes, pick up where I left off
-[N] No, archive it and start something new
-```
-
-4. **HALT and wait for user selection.**
-
-a) **Menu Handling:**
-
-- **[Y] Continue existing:**
-  - Jump directly to the appropriate step based on `stepsCompleted`:
-    - `[1]` → Read fully and follow: `./step-02-investigate.md` (Step 2)
-    - `[1, 2]` → Read fully and follow: `./step-03-generate.md` (Step 3)
-    - `[1, 2, 3]` → Read fully and follow: `./step-04-review.md` (Step 4)
-- **[N] Archive and start fresh:**
-  - Rename `{wipFile}` to `{implementation_artifacts}/tech-spec-{slug}-archived-{date}.md`
-
-### 1. Greet and Ask for Initial Request
-
-a) **Greet the user briefly:**
-
-"Hey {user_name}! What are we building today?"
-
-b) **Get their initial description.** Don't ask detailed questions yet - just understand enough to know where to look.
-
-### 2. Quick Orient Scan
-
-a) **Before asking detailed questions, do a rapid scan to understand the landscape:**
-
-b) **Check for existing context docs:**
-
-- Check `{implementation_artifacts}` and `{planning_artifacts}`for planning documents (PRD, architecture, epics, research)
-- Check for `**/project-context.md` - if it exists, skim for patterns and conventions
-- Check for any existing stories or specs related to user's request
-
-c) **If user mentioned specific code/features, do a quick scan:**
-
-- Search for relevant files/classes/functions they mentioned
-- Skim the structure (don't deep-dive yet - that's Step 2)
-- Note: tech stack, obvious patterns, file locations
-
-d) **Build mental model:**
-
-- What's the likely landscape for this feature?
-- What's the likely scope based on what you found?
-- What questions do you NOW have, informed by the code?
-
-**This scan should take < 30 seconds. Just enough to ask smart questions.**
-
-### 3. Ask Informed Questions
-
-a) **Now ask clarifying questions - but make them INFORMED by what you found:**
-
-Instead of generic questions like "What's the scope?", ask specific ones like:
-- "`AuthService` handles validation in the controller — should the new field follow that pattern or move it to a dedicated validator?"
-- "`NavigationSidebar` component uses local state for the 'collapsed' toggle — should we stick with that or move it to the global store?"
-- "The epics doc mentions X - is this related?"
-
-**Adapt to {user_skill_level}.** Technical users want technical questions. Non-technical users need translation.
-
-b) **If no existing code is found:**
-
-- Ask about intended architecture, patterns, constraints
-- Ask what similar systems they'd like to emulate
-
-### 4. Capture Core Understanding
-
-a) **From the conversation, extract and confirm:**
-
-- **Title**: A clear, concise name for this work
-- **Slug**: URL-safe version of title (lowercase, hyphens, no spaces)
-- **Problem Statement**: What problem are we solving?
-- **Solution**: High-level approach (1-2 sentences)
-- **In Scope**: What's included
-- **Out of Scope**: What's explicitly NOT included
-
-b) **Ask the user to confirm the captured understanding before proceeding.**
-
-### 5. Initialize WIP File
-
-a) **Create the tech-spec WIP file:**
-
-1. Copy template from `../tech-spec-template.md`
-2. Write to `{wipFile}`
-3. Update frontmatter with captured values:
-   ```yaml
-   ---
-   title: '{title}'
-   slug: '{slug}'
-   created: '{date}'
-   status: 'in-progress'
-   stepsCompleted: [1]
-   tech_stack: []
-   files_to_modify: []
-   code_patterns: []
-   test_patterns: []
-   ---
-   ```
-4. Fill in Overview section with Problem Statement, Solution, and Scope
-5. Fill in Context for Development section with any technical preferences or constraints gathered during informed discovery.
-6. Write the file
-
-b) **Report to user:**
-
-"Created: `{wipFile}`
-
-**Captured:**
-
-- Title: {title}
-- Problem: {problem_statement_summary}
-- Scope: {scope_summary}"
-
-### 6. Present Checkpoint Menu
-
-a) **Display menu:**
-
-Display: "**Select:** [A] Advanced Elicitation [P] Party Mode [C] Continue to Deep Investigation (Step 2 of 4)"
-
-b) **HALT and wait for user selection.**
-
-#### Menu Handling Logic:
-
-- IF A: Invoke the `bmad-advanced-elicitation` skill with current tech-spec content, process enhanced insights, ask user "Accept improvements? (y/n)", if yes update WIP file then redisplay menu, if no keep original then redisplay menu
-- IF P: Invoke the `bmad-party-mode` skill with current tech-spec content, process collaborative insights, ask user "Accept changes? (y/n)", if yes update WIP file then redisplay menu, if no keep original then redisplay menu
-- IF C: Verify `{wipFile}` has `stepsCompleted: [1]`, then read fully and follow: `./step-02-investigate.md`
-- IF Any other comments or queries: respond helpfully then redisplay menu
-
-#### EXECUTION RULES:
-
-- ALWAYS halt and wait for user input after presenting menu
-- ONLY proceed to next step when user selects 'C'
-- After A or P execution, return to this menu
-
----
-
-## REQUIRED OUTPUTS:
-
-- MUST initialize WIP file with captured metadata.
-
-## VERIFICATION CHECKLIST:
-
-- [ ] WIP check performed FIRST before any greeting.
-- [ ] `{wipFile}` created with correct frontmatter, Overview, Context for Development, and `stepsCompleted: [1]`.
-- [ ] User selected [C] to continue.
+<step n="4" goal="Initialize the WIP file and present the checkpoint menu">
+  <action>Create the tech-spec WIP file from `../tech-spec-template.md`.</action>
+  <detail>
+    Populate frontmatter with `title`, `slug`, `created`, `status: in-progress`, `stepsCompleted: [1]`, `tech_stack: []`, `files_to_modify: []`, `code_patterns: []`, and `test_patterns: []`.
+  </detail>
+  <detail>Fill the Overview section with the problem statement, solution, and scope.</detail>
+  <detail>Fill the Context for Development section with the technical preferences and constraints gathered during discovery.</detail>
+  <output>Created: `{wipFile}`</output>
+  <detail>Capture the title, problem, and scope in the user-facing summary before continuing.</detail>
+  <output>Display the checkpoint menu for this step.</output>
+  <ask>Choose [A] Advanced Elicitation, [P] Party Mode, or [C] Continue to Deep Investigation (Step 2 of 4).</ask>
+  <branch if="user chooses A" optional="true">
+    <action>Invoke the advanced elicitation flow against the current tech-spec content.</action>
+    <detail>If the user accepts the improvements, update the WIP file and redisplay the menu.</detail>
+  </branch>
+  <branch if="user chooses P" optional="true">
+    <action>Invoke the party mode flow against the current tech-spec content.</action>
+    <detail>If the user accepts the changes, update the WIP file and redisplay the menu.</detail>
+  </branch>
+  <branch if="user chooses C" optional="true">
+    <goto step="2" />
+  </branch>
+  <detail>If the user asks an unrelated question at the menu, answer briefly and redisplay the menu.</detail>
+</step>

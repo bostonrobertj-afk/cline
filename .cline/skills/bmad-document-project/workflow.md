@@ -24,4 +24,7 @@ Load config from `{project-root}/_bmad/bmm/config.yaml` and resolve:
 
 ## EXECUTION
 
-Read fully and follow: `./instructions.md`
+<step n="1" goal="Load configuration and hand off to the router.">
+  <action>Resolve the project configuration values listed above.</action>
+  <handoff path="./instructions.md" />
+</step>

@@ -21,29 +21,31 @@ date: system-generated current datetime
 - Execute the steps in order.
 - Halt whenever the sprint status file is missing, validation is required, or the user must choose an action.
 - Use `project_context` when it exists and is relevant.
+- Only the current phase checklist and the current active step's details are shown in the prompt at one time.
+- Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
 
 ## EXECUTION
 
 <step n="0" goal="Determine execution mode and route to the matching path">
   <action>Set `mode = {{mode}}` when the caller provides it; otherwise use `interactive`.</action>
-  <branch if="mode == data">
-    <action>Proceed to step 20.</action>
+  <branch if="mode == data" optional="true">
+    <goto step="20" />
   </branch>
-  <branch if="mode == validate">
-    <action>Proceed to step 30.</action>
+  <branch if="mode == validate" optional="true">
+    <goto step="30" />
   </branch>
-  <branch if="mode == interactive">
-    <action>Proceed to step 1.</action>
+  <branch if="mode == interactive" optional="true">
+    <goto step="1" />
   </branch>
 </step>
 
 <step n="1" goal="Load context and locate the sprint status file">
   <action>Load `project_context` if it exists and adds useful project-wide guidance.</action>
   <action>Read `sprint_status_file`.</action>
-  <branch if="the file does not exist">
+  <branch if="the file does not exist" optional="true">
     <output>`sprint-status.yaml` was not found.</output>
     <output>Run `sprint-planning` to create it, then try sprint status again.</output>
-    <action>Stop the workflow.</action>
+    <exit />
   </branch>
 </step>
 
@@ -63,11 +65,11 @@ date: system-generated current datetime
   </detail>
   <action>Count story, epic, and retrospective statuses.</action>
   <action>Validate every status against the supported value sets.</action>
-  <branch if="unrecognized statuses exist">
+  <branch if="unrecognized statuses exist" optional="true">
     <output>Unknown status values were found in `sprint-status.yaml`.</output>
     <output>Show the invalid entries and the valid status values.</output>
     <ask>How should these be corrected? You can provide replacements or choose to skip correction.</ask>
-    <branch if="the user provides corrections">
+    <branch if="the user provides corrections" optional="true">
       <action>Update `sprint-status.yaml` with the corrected values.</action>
       <action>Re-read and re-parse the file.</action>
     </branch>
@@ -95,17 +97,17 @@ date: system-generated current datetime
 
 <step n="5" goal="Offer interactive actions">
   <ask>Ask whether to run the recommended workflow, show stories grouped by status, show the raw sprint status file, or exit.</ask>
-  <branch if="the user chooses the recommendation path">
+  <branch if="the user chooses the recommendation path" optional="true">
     <output>Run the recommended workflow and include `story_key={{next_story_id}}` when the target is a story.</output>
   </branch>
-  <branch if="the user chooses grouped stories">
+  <branch if="the user chooses grouped stories" optional="true">
     <output>Show the grouped story status summary.</output>
   </branch>
-  <branch if="the user chooses raw file output">
+  <branch if="the user chooses raw file output" optional="true">
     <output>Display the full sprint status file.</output>
   </branch>
-  <branch if="the user chooses exit">
-    <action>Stop the workflow cleanly.</action>
+  <branch if="the user chooses exit" optional="true">
+    <exit />
   </branch>
 </step>
 
@@ -124,48 +126,43 @@ date: system-generated current datetime
   <template-output>epic_in_progress = {{epic_in_progress}}</template-output>
   <template-output>epic_done = {{epic_done}}</template-output>
   <template-output>risks = {{risks}}</template-output>
-  <action>Return to the caller.</action>
+  <return />
 </step>
 
 <step n="30" goal="Validate the sprint status file">
   <action>Check that `sprint_status_file` exists.</action>
-  <branch if="the file is missing">
+  <branch if="the file is missing" optional="true">
     <template-output>is_valid = false</template-output>
     <template-output>error = "sprint-status.yaml missing"</template-output>
     <template-output>suggestion = "Run sprint-planning to create it"</template-output>
-    <action>Return.</action>
+    <return />
   </branch>
   <action>Read and parse `sprint_status_file`.</action>
   <action>Validate required metadata fields and confirm that `development_status` exists with at least one entry.</action>
-  <branch if="required metadata is missing">
+  <branch if="required metadata is missing" optional="true">
     <template-output>is_valid = false</template-output>
     <template-output>error = "Missing required field(s): {{missing_fields}}"</template-output>
     <template-output>suggestion = "Re-run sprint-planning or add the missing fields manually"</template-output>
-    <action>Return.</action>
+    <return />
   </branch>
-  <branch if="development_status is missing or empty">
+  <branch if="development_status is missing or empty" optional="true">
     <template-output>is_valid = false</template-output>
     <template-output>error = "development_status missing or empty"</template-output>
     <template-output>suggestion = "Re-run sprint-planning or repair the file manually"</template-output>
-    <action>Return.</action>
+    <return />
   </branch>
   <action>Validate every status value against the known valid status sets.</action>
-  <branch if="invalid statuses exist">
+  <branch if="invalid statuses exist" optional="true">
     <template-output>is_valid = false</template-output>
     <template-output>error = "Invalid status values: {{invalid_entries}}"</template-output>
     <template-output>suggestion = "Fix invalid statuses in sprint-status.yaml"</template-output>
-    <action>Return.</action>
+    <return />
   </branch>
   <template-output>is_valid = true</template-output>
   <template-output>message = "sprint-status.yaml valid: metadata complete, all statuses recognized"</template-output>
+  <return />
 </step>
 
 ## CHECKPOINT
 
 Stop before advancing whenever the sprint status file is missing, a status value must be corrected, or the user must choose an action.
-
-## ADVISORY
-
-- Interactive mode is the default managed workflow path.
-- Data and validate modes are alternate entry paths for structured callers.
-- Legacy status values may be normalized when encountered in an existing file.

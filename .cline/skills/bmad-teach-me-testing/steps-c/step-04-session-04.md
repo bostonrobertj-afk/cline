@@ -14,6 +14,10 @@ partyModeWorkflow: '{project-root}/_bmad/core/workflows/party-mode/workflow.md'
 
 ## META
 
+- Goal: teach test-design concepts, capture learner responses, and return to the session menu with updated progress.
+- Only the current phase checklist and the current active step's details are shown in the prompt at one time.
+- Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
+
 - Goal: teach risk assessment, coverage planning, and the TEA Test Design workflow.
 - Keep the session focused on planning before implementation.
 
@@ -32,16 +36,16 @@ partyModeWorkflow: '{project-root}/_bmad/core/workflows/party-mode/workflow.md'
 <step n="3" goal="Teach risk and testability assessment">
   <output>Explain risk as probability multiplied by impact and use it to identify P0 through P3 priorities.</output>
   <output>Explain testability as a separate check on whether a feature can be tested cleanly and efficiently.</output>
-  <branch if="role == QA">
+  <branch if="role == QA" optional="true">
     <detail>Use test coverage defense and risk calibration language.</detail>
   </branch>
-  <branch if="role == Dev">
+  <branch if="role == Dev" optional="true">
     <detail>Use implementation and dependency management language.</detail>
   </branch>
-  <branch if="role == Lead">
+  <branch if="role == Lead" optional="true">
     <detail>Use scope, prioritization, and planning language.</detail>
   </branch>
-  <branch if="role == VP">
+  <branch if="role == VP" optional="true">
     <detail>Use impact, efficiency, and investment language.</detail>
   </branch>
 </step>
@@ -62,14 +66,10 @@ partyModeWorkflow: '{project-root}/_bmad/core/workflows/party-mode/workflow.md'
 </step>
 
 <step n="7" goal="Return to the hub">
-  <output>Confirm completion, share the score, and present the A/P/C menu before loading `./step-03-session-menu.md`.</output>
+  <output>Confirm completion, share the score, and present the A/P/C menu.</output>
+  <handoff path="./step-03-session-menu.md" />
 </step>
 
 ## CHECKPOINT
 
 Pause for quiz answers and for the user’s choice at the A/P/C menu.
-
-## ADVISORY
-
-- Keep the planning logic explicit so the learner can apply it to new work.
-- Reinforce the difference between risk and testability.

@@ -26,15 +26,17 @@ date: system-generated current datetime
 - Goal: Generate sprint status tracking from epics, detect current story statuses, and build a complete `sprint-status.yaml` file.
 - Speak in `{communication_language}`.
 - Halt whenever user input, confirmation, or workflow gating is required.
+- Only the current phase checklist and the current active step's details are shown in the prompt at one time.
+- Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
 
 ## EXECUTION
 <step n="1" goal="Load epic source material and map all work items">
   <action>Load `{project_context}` if it exists and is relevant.</action>
   <action>Search `{epics_location}` for files matching `{epics_pattern}`.</action>
-  <branch if="no epic files are found">
+  <branch if="no epic files are found" optional="true">
     <output>No epic files were found in `{epics_location}`.</output>
     <output>Run the epic and story planning workflow first, then re-run sprint planning.</output>
-    <action>Halt.</action>
+    <exit />
   </branch>
   <action>Prefer a single whole epic document when one exists; otherwise load the sharded epic index and every listed epic section.</action>
   <action>Read each epic file completely and extract every epic number, story ID, story title, and source ordering cue.</action>
@@ -43,6 +45,7 @@ date: system-generated current datetime
     - Story headers typically look like `### Story 1.1: ...`
     - Convert `1.1` to `1-1` and title text to kebab-case for story keys
     - Preserve the source ordering from the epic files
+    - Use the project config as the source of truth for language and artifact paths
   </detail>
   <action>Build a complete inventory of all epics, stories, and retrospectives implied by the source files.</action>
 </step>
@@ -67,6 +70,7 @@ date: system-generated current datetime
     - Never downgrade a status
     - Treat `drafted` as legacy only if encountered in an existing file
     - Treat `contexted` as legacy epic status only if encountered in an existing file
+    - Preserve existing progress instead of resetting statuses during regeneration
   </detail>
   <action>Apply the standard status flow: epic `backlog` → `in-progress` → `done`; story `backlog` → `ready-for-dev` → `in-progress` → `review` → `done`; retrospective `optional` ↔ `done`.</action>
 </step>
@@ -77,6 +81,7 @@ date: system-generated current datetime
     - Include the metadata keys required by downstream workflows: `generated`, `last_updated`, `project`, `project_key`, `tracking_system`, `story_location`
     - Keep the documentation comments and YAML fields aligned, but do not duplicate the same explanatory prose in separate sections
     - Write the full `development_status` map in the exact source order
+    - Keep the generated order as epic, then story, then retrospective for each epic
   </detail>
   <action>Ensure the output is valid YAML and that metadata values are populated from config-resolved variables.</action>
 </step>
@@ -91,9 +96,3 @@ date: system-generated current datetime
 
 ## CHECKPOINT
 Stop if the epic source files are missing, malformed beyond recovery, or if a user decision is required before writing the output file.
-
-## ADVISORY
-- Use the project config as the source of truth for language and artifact paths.
-- Preserve existing statuses instead of resetting progress.
-- Prefer the whole epic document when available, but support sharded epic sources when that is the existing layout.
-- Keep the generated sprint status ordered by epic, then story, then retrospective.

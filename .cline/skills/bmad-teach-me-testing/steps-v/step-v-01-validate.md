@@ -13,6 +13,8 @@ validationReport: '{test_artifacts}/workflow-validation/teach-me-testing-validat
 
 - Goal: validate workflow structure, step formatting, session content, and state-management consistency.
 - Keep the validation focused on this workflow family.
+- Only the current phase checklist and the current active step's details are shown in the prompt at one time.
+- Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
 
 ## EXECUTION
 
@@ -41,8 +43,3 @@ validationReport: '{test_artifacts}/workflow-validation/teach-me-testing-validat
 ## CHECKPOINT
 
 Pause for any missing input, validation failure, or report generation problem.
-
-## ADVISORY
-
-- Use the report to capture gaps without changing unrelated files.
-- Keep the validation output deterministic and easy to review.

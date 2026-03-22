@@ -12,31 +12,30 @@ web_bundle: true
 - Follow the current mode and current step only.
 - Keep the active prompt focused on the present phase; do not invent future checklist items.
 - Speak in `{communication_language}`.
+- Only the current phase checklist and the current active step's details are shown in the prompt at one time.
+- Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
 
 ## EXECUTION
 
 <step n="1" goal="Load workflow configuration and route by mode">
   <action>Load and read `{project-root}/_bmad/tea/config.yaml` or the installed module config, then resolve `project_name`, `user_name`, `communication_language`, and `test_artifacts`.</action>
   <action>Determine whether the user wants `create`, `validate`, or `edit` based on the invocation.</action>
-  <branch if="mode is unclear">
+  <branch if="mode is unclear" optional="true">
     <ask>Ask the user which mode they want: create, validate, or edit.</ask>
   </branch>
-  <branch if="mode is create">
-    <output>Start the teaching workflow by loading and following `./steps-c/step-01-init.md`.</output>
+  <branch if="mode is create" optional="true">
+    <handoff path="./steps-c/step-01-init.md" />
   </branch>
-  <branch if="mode is validate">
-    <output>Ask which workflow should be validated, then load and follow `./steps-v/step-v-01-validate.md`.</output>
+  <branch if="mode is validate" optional="true">
+    <ask>Which workflow should be validated?</ask>
+    <handoff path="./steps-v/step-v-01-validate.md" />
   </branch>
-  <branch if="mode is edit">
-    <output>Ask what should be edited in the teaching workflow, then load and follow `./steps-e/step-e-01-assess-workflow.md`.</output>
+  <branch if="mode is edit" optional="true">
+    <ask>What should be edited in the teaching workflow?</ask>
+    <handoff path="./steps-e/step-e-01-assess-workflow.md" />
   </branch>
 </step>
 
 ## CHECKPOINT
 
 Halt whenever mode selection, workflow selection, or other user input is required before continuing.
-
-## ADVISORY
-
-- Only the current mode-specific step file should be loaded next.
-- Keep the workflow state aligned with the active session or edit path.

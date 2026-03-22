@@ -1,36 +1,33 @@
 ## META
 
-- Goal: define the non-functional requirements that matter for this product.
+- Goal: Define the non-functional requirements that matter for this product.
 - Speak to the user in `{communication_language}`.
 - Only include categories that are relevant to this project.
+- Only the current phase checklist and the current active step's details are shown in the prompt at one time.
+- Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
 
 ## EXECUTION
 
-<step n="1" goal="Frame the NFR discussion">
+<step n="1" goal="Frame the non-functional requirements discussion">
   <action>Explain that non-functional requirements define quality attributes and operational expectations rather than product features.</action>
 </step>
 
-<step n="2" goal="Assess relevant NFR categories">
+<step n="2" goal="Assess the relevant NFR categories">
   <action>Review the project context and determine which NFR categories are actually relevant, such as performance, security, scalability, accessibility, or integration.</action>
 </step>
 
-<step n="3" goal="Explore the relevant categories">
+<step n="3" goal="Explore and sharpen the relevant categories">
   <ask>Ask targeted questions for each relevant NFR category so the resulting requirements are specific and measurable.</ask>
-</step>
-
-<step n="4" goal="Make NFRs specific">
   <action>Convert vague quality expectations into concrete standards, thresholds, or operational expectations wherever possible.</action>
 </step>
 
-<step n="5" goal="Generate NFR content">
+<step n="4" goal="Generate, review, and save the NFR section">
   <output>Create PRD-ready non-functional requirements content covering only the relevant categories.</output>
-</step>
-
-<step n="6" goal="Review, save, and continue">
   <ask>Present the NFR section to the user for review and refinement.</ask>
-  <action>Save the approved NFRs into the PRD.</action>
-  <ask>Present the continuation menu for moving to document polish.</ask>
-  <action>If the user chooses to continue, append this step to `stepsCompleted` and load `./step-11-polish.md`.</action>
+  <branch if="the user approves the NFRs" optional="true">
+    <action>Save the approved NFRs into the PRD.</action>
+    <handoff path="./step-11-polish.md">Proceed to document polish.</handoff>
+  </branch>
 </step>
 
 ## CHECKPOINT
@@ -40,7 +37,3 @@ Wait for the user to approve the non-functional requirements before saving them.
 ## ADVISORY
 
 - Exclude generic NFR boilerplate that does not materially apply to the project.
-
-## REFERENCE
-
-- The NFR section should help architecture and delivery teams understand the product’s quality bar.

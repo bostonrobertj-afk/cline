@@ -1,52 +1,54 @@
 ## META
 
 - Progress: Step 1 of 11
-- Goal: initialize the PRD workflow, discover input documents, and prepare the output document.
+- Goal: Initialize the PRD workflow, discover input documents, and prepare the output document.
 - Speak to the user in `{communication_language}`.
 - Do not generate product content in this step.
+- Only the current phase checklist and the current active step's details are shown in the prompt at one time.
+- Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
 
 ## EXECUTION
 
-<step n="1" goal="Check for existing workflow state">
+<step n="1" goal="Detect whether this is a fresh run or a continuation">
   <action>Check whether `{outputFile}` already exists.</action>
-  <action>If it exists, read the full file including frontmatter and existing workflow state.</action>
+  <branch if="the output file exists and represents an unfinished PRD workflow" optional="true">
+    <action>Read the full file including frontmatter and saved workflow state.</action>
+    <handoff path="./step-01b-continue.md">Resume the in-progress workflow instead of reinitializing it.</handoff>
+  </branch>
+  <branch if="the output file does not exist or is not an unfinished workflow" optional="true">
+    <output>State that this run will initialize a fresh PRD workflow.</output>
+  </branch>
 </step>
 
-<step n="2" goal="Route continuation runs correctly">
-  <action>If the document exists and `stepsCompleted` is present but `step-12-complete` is not present, immediately load `./step-01b-continue.md`.</action>
-  <action>Do not perform fresh initialization tasks when the workflow should continue from an existing document.</action>
+<step n="2" goal="Discover and confirm the input context for a fresh run">
+  <action>Search `{planning_artifacts}`, `{output_folder}`, `{project_knowledge}`, and `docs` for relevant source documents.</action>
+  <detail>Search both whole markdown files and sharded folders with `index.md`, especially for product briefs, research documents, project documentation, and `project-context.md`.</detail>
+  <ask>Ask the user to confirm which discovered files should be loaded and whether any additional files should be included before continuing.</ask>
 </step>
 
-<step n="3" goal="Discover and confirm initialization inputs">
-  <action>If this is a fresh workflow, discover relevant documents from `{planning_artifacts}`, `{output_folder}`, `{project_knowledge}`, and `docs`.</action>
-  <action>Search for both whole markdown files and sharded folders with `index.md` files.</action>
-  <action>Look for product briefs, research documents, project documentation, and `project-context.md`.</action>
-  <ask>Confirm the discovered files with the user and ask whether any additional documents should be included before continuing.</ask>
-</step>
-
-<step n="4" goal="Load confirmed inputs and prepare the PRD workspace">
+<step n="3" goal="Create the PRD workspace and load the confirmed inputs">
   <action>Load all user-confirmed input documents completely.</action>
-  <action>Track all successfully loaded files in frontmatter `inputDocuments`.</action>
-  <action>Copy `../templates/prd-template.md` to `{outputFile}` and initialize frontmatter for the workflow.</action>
+  <action>Track the successfully loaded files in frontmatter `inputDocuments`.</action>
+  <action>Copy `../templates/prd-template.md` to `{outputFile}` and initialize the workflow frontmatter.</action>
+  <output>Summarize the initialized PRD workspace, the files that were loaded, and whether the project currently appears brownfield or greenfield.</output>
 </step>
 
-<step n="5" goal="Report initialization results and offer continuation">
-  <output>Summarize the initialized PRD workspace, the files that were discovered and loaded, and whether this appears to be a brownfield or greenfield project.</output>
-  <ask>Present the menu `[C] Continue - Save this and move to Project Discovery (Step 2 of 11)` and ask whether the user wants to continue or provide additional files.</ask>
-  <action>If the user provides additional files, load them, update frontmatter, and redisplay the initialization summary.</action>
-  <action>If the user selects `C`, update frontmatter so this step is appended to `stepsCompleted`, then load `./step-02-discovery.md`.</action>
+<step n="4" goal="Offer continuation from initialization">
+  <ask>Present the continuation menu for moving to Project Discovery and ask whether the user wants to continue or provide additional files.</ask>
+  <branch if="the user provides additional files" optional="true">
+    <action>Load the additional files, update frontmatter, and re-present the initialization summary.</action>
+  </branch>
+  <branch if="the user chooses Continue" optional="true">
+    <action>Append this step to `stepsCompleted` and persist the updated workflow state.</action>
+    <handoff path="./step-02-discovery.md">Proceed to project discovery.</handoff>
+  </branch>
 </step>
 
 ## CHECKPOINT
 
-Wait for explicit user confirmation of the discovered or provided input documents, and wait again for explicit `C` selection before loading the next step.
+Wait for explicit user confirmation of the discovered or provided input documents, and wait again for explicit continuation selection before loading the next step.
 
 ## ADVISORY
 
 - Bias future discovery toward any relevant `project-context.md` content that was loaded.
 - Preserve counts for briefs, research, brainstorming, and project docs in frontmatter if the workflow tracks them.
-
-## REFERENCE
-
-- Fresh initialization only happens when the output document does not already represent an unfinished workflow.
-- The initialization summary should make it clear where the PRD file lives and what context was loaded.

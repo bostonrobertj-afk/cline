@@ -2,88 +2,73 @@
 
 ## META
 
-- Goal: Present
+- Goal: present the triaged findings clearly and recommend next actions.
 - Execute this file in order.
 - Halt whenever user input, confirmation, or workflow gating is required.
-- Use the structured sections for extraction; use the prose block for additional agent context.
+- Do not auto-fix anything in this step.
+- Only the current phase checklist and the current active step's details are shown in the prompt at one time.
+- Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
 
 ## EXECUTION
 
-<step n="1" goal="Group remaining findings by category">
-  <action>Group remaining findings by category.</action>
+<step n="1" goal="Group the triaged findings for presentation">
+  <action>Group the remaining findings by category: `intent_gap`, `bad_spec`, `patch`, and `defer`.</action>
 </step>
 
-<step n="2" goal="Present to the user in this order (include a section only if findings exist in that category):">
-  <action>Present to the user in this order (include a section only if findings exist in that category):</action>
-  <action>Intent Gaps: &quot;These findings suggest the captured intent is incomplete. Consider clarifying intent before proceeding.&quot;</action>
-  <action>List each with title + detail.</action>
-  <action>Bad Spec: &quot;These findings suggest the spec should be amended. Consider regenerating or amending the spec with this context:&quot;</action>
-  <action>List each with title + detail + suggested spec amendment.</action>
+<step n="2" goal="Present findings in severity-aware category order">
+  <branch if="intent_gap findings exist" optional="true">
+    <output>
+      Present the Intent Gaps section and explain that these findings suggest the captured intent is incomplete and should be clarified before work continues.
+      <detail>List each finding with its title and detail.</detail>
+    </output>
+  </branch>
+  <branch if="bad_spec findings exist" optional="true">
+    <output>
+      Present the Bad Spec section and explain that the spec should likely be amended before implementation continues.
+      <detail>List each finding with its title, detail, and suggested spec amendment when one is available.</detail>
+    </output>
+  </branch>
+  <branch if="patch findings exist" optional="true">
+    <output>
+      Present the Patch section and explain that these are directly fixable code issues.
+      <detail>List each finding with its title, detail, and location when available.</detail>
+    </output>
+  </branch>
+  <branch if="defer findings exist" optional="true">
+    <output>
+      Present the Defer section and explain that these are real issues but are not actionable in the current change.
+      <detail>List each finding with its title and detail.</detail>
+    </output>
+  </branch>
 </step>
 
-<step n="3" goal="Summary line: X intent_gap, Y bad_spec, Z patch, W defer findings">
-  <action>Summary line: X intent_gap, Y bad_spec, Z patch, W defer findings. R findings rejected as noise.</action>
-  <action>R findings rejected as noise.</action>
+<step n="3" goal="Summarize the review outcome">
+  <output>Provide a summary line with the counts for `intent_gap`, `bad_spec`, `patch`, `defer`, and rejected-noise findings.</output>
+  <branch if="the review is clean" optional="true">
+    <output>State whether no findings were raised at all or whether raised findings were ultimately rejected as noise.</output>
+  </branch>
+  <branch if="{failed_layers} is non-empty" optional="true">
+    <output>Warn that the review may be incomplete because some review layers failed or returned no usable results.</output>
+  </branch>
 </step>
 
-<step n="4" goal="If clean review (zero findings across all layers after triage): state that N findings were raised but all were classified as noise, or that no findings were raised at all (as applicable)">
-  <action>If clean review (zero findings across all layers after triage): state that N findings were raised but all were classified as noise, or that no findings were raised at all (as applicable).</action>
-</step>
-
-<step n="5" goal="Offer the user next steps (recommendations, not automated actions):">
-  <action>Offer the user next steps (recommendations, not automated actions):</action>
-  <action>If patch findings exist: &quot;These can be addressed in a follow-up implementation pass or manually.&quot;</action>
-  <action>If intent_gap or bad_spec findings exist: &quot;Consider running the planning workflow to clarify intent or amend the spec before continuing.&quot;</action>
-  <action>If only defer findings remain: &quot;No action needed for this change. Deferred items are noted for future attention.&quot;</action>
+<step n="4" goal="Offer next-step recommendations">
+  <branch if="patch findings exist" optional="true">
+    <output>Recommend addressing the patch findings in a follow-up implementation pass or by manual fixes.</output>
+  </branch>
+  <branch if="intent_gap or bad_spec findings exist" optional="true">
+    <output>Recommend clarifying intent or amending the spec before continuing implementation.</output>
+  </branch>
+  <branch if="only defer findings remain" optional="true">
+    <output>Explain that no action is required for the current change and that the deferred items can be tracked for future work.</output>
+  </branch>
 </step>
 
 ## CHECKPOINT
 
-Complete the current required actions in order before moving to the next workflow phase.
+Present the findings and recommendations without taking automated corrective action.
 
 ## ADVISORY
 
-- Use the prose block below for the full agent-facing guidance that complements the structured execution steps.
-
-## REFERENCE
-
-<prose>
----
----
-
-# Step 4: Present
-
-## RULES
-
-- YOU MUST ALWAYS SPEAK OUTPUT in your Agent communication style with the config `{communication_language}`
-- Do NOT auto-fix anything. Present findings and let the user decide next steps.
-
-## INSTRUCTIONS
-
-1. Group remaining findings by category.
-
-2. Present to the user in this order (include a section only if findings exist in that category):
-
-   - **Intent Gaps**: "These findings suggest the captured intent is incomplete. Consider clarifying intent before proceeding."
-     - List each with title + detail.
-
-   - **Bad Spec**: "These findings suggest the spec should be amended. Consider regenerating or amending the spec with this context:"
-     - List each with title + detail + suggested spec amendment.
-
-   - **Patch**: "These are fixable code issues:"
-     - List each with title + detail + location (if available).
-
-   - **Defer**: "Pre-existing issues surfaced by this review (not caused by current changes):"
-     - List each with title + detail.
-
-3. Summary line: **X** intent_gap, **Y** bad_spec, **Z** patch, **W** defer findings. **R** findings rejected as noise.
-
-4. If clean review (zero findings across all layers after triage): state that N findings were raised but all were classified as noise, or that no findings were raised at all (as applicable).
-
-5. Offer the user next steps (recommendations, not automated actions):
-   - If `patch` findings exist: "These can be addressed in a follow-up implementation pass or manually."
-   - If `intent_gap` or `bad_spec` findings exist: "Consider running the planning workflow to clarify intent or amend the spec before continuing."
-   - If only `defer` findings remain: "No action needed for this change. Deferred items are noted for future attention."
-
-Workflow complete.
-</prose>
+- Keep the final report concise, specific, and evidence-based.
+- Preserve the distinction between fix-now issues and deferred or intent-level concerns.

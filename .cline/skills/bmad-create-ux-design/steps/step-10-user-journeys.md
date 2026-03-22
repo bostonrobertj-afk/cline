@@ -2,322 +2,35 @@
 
 ## META
 
-- Goal: user journeys
-- Execute this file in order.
-- Halt whenever user input, confirmation, or workflow gating is required.
-- Use the structured sections for extraction; use the prose block for additional agent context.
-
+- Goal: Define the product's key user journeys from a UX perspective.
+- Only the current phase checklist and the current active step's details are shown in the prompt at one time.
+- Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
 ## EXECUTION
 
-<step n="1" goal="Load PRD User Journeys as Foundation">
-  <action>[Critical journey 1 identified from PRD narratives]</action>
-  <action>[Critical journey 2 identified from PRD narratives]</action>
-  <action>[Critical journey 3 identified from PRD narratives]</action>
+<step n="1" goal="Identify the critical journeys to design">
+  <ask>Ask which user flows matter most, where onboarding or activation happens, and which flows carry the highest UX risk.</ask>
 </step>
 
-<step n="2" goal="Design Each Journey Flow">
-  <ask>How do users start this journey? (entry point)</ask>
-  <ask>What information do they need at each step?</ask>
-  <ask>What decisions do they need to make?</ask>
+<step n="2" goal="Map the journey structure">
+  <action>Break each critical journey into stages, moments of friction, decisions, handoffs, and success states.</action>
+  <detail>Focus on the experience arc and UX implications rather than restating product requirements in a different format.</detail>
 </step>
 
-<step n="3" goal="Create Flow Diagrams">
-  <action>Entry points and triggers</action>
-  <action>Decision points and branches</action>
-  <action>Success and failure paths</action>
-  <action>Error recovery mechanisms</action>
-  <action>Progressive disclosure of information</action>
-</step>
-
-<step n="4" goal="Optimize for Efficiency and Delight">
-  <action>Minimizing steps to value (getting users to success quickly)</action>
-  <action>Reducing cognitive load at each decision point</action>
-  <action>Providing clear feedback and progress indicators</action>
-  <action>Creating moments of delight or accomplishment</action>
-  <action>Handling edge cases and error recovery gracefully</action>
-</step>
-
-<step n="5" goal="Document Journey Patterns">
-  <action>[Navigation pattern 1]</action>
-  <action>[Navigation pattern 2]</action>
-  <action>[Decision pattern 1]</action>
-  <action>[Decision pattern 2]</action>
-  <action>[Feedback pattern 1]</action>
-</step>
-
-<step n="6" goal="Generate User Journey Content">
-  <output>Prepare the content to append to the document: #### Content Structure: When saving to document, append these Level 2 and Level 3 sections:</output>
-</step>
-
-<step n="7" goal="Present Content and Menu">
-  <action>These flows will guide the detailed design of each user interaction.</action>
-  <ask>Here's what I'll add to the document: [Show the complete markdown content from step 6] What would you like to do?</ask>
-  <output>Show the generated user journey content and present choices: &quot;I've designed detailed user journey flows for .</output>
-  <output>[A] Advanced Elicitation - Let's refine our user journey designs [P] Party Mode - Bring different perspectives on user flows [C] Continue - Save this to the document and move to component strategy</output>
-</step>
-
-<step n="8" goal="Handle Menu Selection">
-  <action>Invoke the bmad-advanced-elicitation skill with the current user journey content</action>
-  <action>Process the enhanced journey insights that come back</action>
-  <action>Invoke the bmad-party-mode skill with the current user journeys</action>
-  <action>Process the collaborative journey insights that come back</action>
-  <action>Load ./step-11-component-strategy.md</action>
-  <ask>Ask user: &quot;Accept these improvements to the user journeys? (y/n)&quot;</ask>
-  <ask>Ask user: &quot;Accept these changes to the user journeys? (y/n)&quot;</ask>
-  <output>If yes: Update content with improvements, then return to A/P/C menu</output>
-  <output>If no: Keep original content, then return to A/P/C menu</output>
-  <output>Append the final content to {planning_artifacts}/ux-design-specification.md</output>
+<step n="3" goal="Draft, review, and save the user-journeys section">
+  <output>Prepare the user-journey content for the UX specification.</output>
+  <ask>Present the content and ask whether the user wants Advanced Elicitation, Party Mode, or to continue.</ask>
+  <branch if="the user chooses Advanced Elicitation" optional="true">
+    <action>Invoke `bmad-advanced-elicitation` using the journey draft as context.</action>
+  </branch>
+  <branch if="the user chooses Party Mode" optional="true">
+    <action>Invoke `bmad-party-mode` using the journey draft as context.</action>
+  </branch>
+  <branch if="the user chooses Continue" optional="true">
+    <action>Save the approved content and append this step to `stepsCompleted`.</action>
+    <handoff path="./step-11-component-strategy.md">Proceed to component strategy.</handoff>
+  </branch>
 </step>
 
 ## CHECKPOINT
 
 Halt for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.
-
-## ADVISORY
-
-- Persist workflow state updates whenever this phase writes or updates a managed artifact.
-
-## REFERENCE
-
-<prose>
-## MANDATORY EXECUTION RULES (READ FIRST):
-
-- 🛑 NEVER generate content without user input
-
-- 📖 CRITICAL: ALWAYS read the complete step file before taking any action - partial understanding leads to incomplete decisions
-- 🔄 CRITICAL: When loading next step with 'C', ensure the entire file is read and understood before proceeding
-- ✅ ALWAYS treat this as collaborative discovery between UX facilitator and stakeholder
-- 📋 YOU ARE A UX FACILITATOR, not a content generator
-- 💬 FOCUS on designing user flows and journey interactions
-- 🎯 COLLABORATIVE flow design, not assumption-based layouts
-- ✅ YOU MUST ALWAYS SPEAK OUTPUT In your Agent communication style with the config `{communication_language}`
-- ✅ YOU MUST ALWAYS WRITE all artifact and document content in `{document_output_language}`
-
-## EXECUTION PROTOCOLS:
-
-- 🎯 Show your analysis before taking any action
-- ⚠️ Present A/P/C menu after generating user journey content
-- 💾 ONLY save when user chooses C (Continue)
-- 📖 Update output file frontmatter, adding this step to the end of the list of stepsCompleted.
-- 🚫 FORBIDDEN to load next step until C is selected
-
-## COLLABORATION MENUS (A/P/C):
-
-This step will generate content and present choices:
-
-- **A (Advanced Elicitation)**: Use discovery protocols to develop deeper journey insights
-- **P (Party Mode)**: Bring multiple perspectives to design user flows
-- **C (Continue)**: Save the content to the document and proceed to next step
-
-## PROTOCOL INTEGRATION:
-
-- When 'A' selected: Invoke the `bmad-advanced-elicitation` skill
-- When 'P' selected: Invoke the `bmad-party-mode` skill
-- PROTOCOLS always return to this step's A/P/C menu
-- User accepts/rejects protocol changes before proceeding
-
-## CONTEXT BOUNDARIES:
-
-- Current document and frontmatter from previous steps are available
-- Design direction from step 9 informs flow layout and visual design
-- Core experience from step 7 defines key journey interactions
-- Focus on designing detailed user flows with Mermaid diagrams
-
-## YOUR TASK:
-
-Design detailed user journey flows for critical user interactions.
-
-## USER JOURNEY FLOWS SEQUENCE:
-
-### 1. Load PRD User Journeys as Foundation
-
-Start with user journeys already defined in the PRD:
-"Great! Since we have the PRD available, let's build on the user journeys already documented there.
-
-**Existing User Journeys from PRD:**
-I've already loaded these user journeys from your PRD:
-[Journey narratives from PRD input documents]
-
-These journeys tell us **who** users are and **why** they take certain actions. Now we need to design **how** those journeys work in detail.
-
-**Critical Journeys to Design Flows For:**
-Looking at the PRD journeys, I need to design detailed interaction flows for:
-
-- [Critical journey 1 identified from PRD narratives]
-- [Critical journey 2 identified from PRD narratives]
-- [Critical journey 3 identified from PRD narratives]
-
-The PRD gave us the stories - now we design the mechanics!"
-
-### 2. Design Each Journey Flow
-
-For each critical journey, design detailed flow:
-
-**For [Journey Name]:**
-"Let's design the flow for users accomplishing [journey goal].
-
-**Flow Design Questions:**
-
-- How do users start this journey? (entry point)
-- What information do they need at each step?
-- What decisions do they need to make?
-- How do they know they're progressing successfully?
-- What does success look like for this journey?
-- Where might they get confused or stuck?
-- How do they recover from errors?"
-
-### 3. Create Flow Diagrams
-
-Visualize each journey with Mermaid diagrams:
-"I'll create detailed flow diagrams for each journey showing:
-
-**[Journey Name] Flow:**
-
-- Entry points and triggers
-- Decision points and branches
-- Success and failure paths
-- Error recovery mechanisms
-- Progressive disclosure of information
-
-Each diagram will map the complete user experience from start to finish."
-
-### 4. Optimize for Efficiency and Delight
-
-Refine flows for optimal user experience:
-"**Flow Optimization:**
-For each journey, let's ensure we're:
-
-- Minimizing steps to value (getting users to success quickly)
-- Reducing cognitive load at each decision point
-- Providing clear feedback and progress indicators
-- Creating moments of delight or accomplishment
-- Handling edge cases and error recovery gracefully
-
-**Specific Optimizations:**
-
-- [Optimization 1 for journey efficiency]
-- [Optimization 2 for user delight]
-- [Optimization 3 for error handling]"
-
-### 5. Document Journey Patterns
-
-Extract reusable patterns across journeys:
-"**Journey Patterns:**
-Across these flows, I'm seeing some common patterns we can standardize:
-
-**Navigation Patterns:**
-
-- [Navigation pattern 1]
-- [Navigation pattern 2]
-
-**Decision Patterns:**
-
-- [Decision pattern 1]
-- [Decision pattern 2]
-
-**Feedback Patterns:**
-
-- [Feedback pattern 1]
-- [Feedback pattern 2]
-
-These patterns will ensure consistency across all user experiences."
-
-### 6. Generate User Journey Content
-
-Prepare the content to append to the document:
-
-#### Content Structure:
-
-When saving to document, append these Level 2 and Level 3 sections:
-
-```markdown
-## User Journey Flows
-
-### [Journey 1 Name]
-
-[Journey 1 description and Mermaid diagram]
-
-### [Journey 2 Name]
-
-[Journey 2 description and Mermaid diagram]
-
-### Journey Patterns
-
-[Journey patterns identified based on conversation]
-
-### Flow Optimization Principles
-
-[Flow optimization principles based on conversation]
-```
-
-### 7. Present Content and Menu
-
-Show the generated user journey content and present choices:
-"I've designed detailed user journey flows for {{project_name}}. These flows will guide the detailed design of each user interaction.
-
-**Here's what I'll add to the document:**
-
-[Show the complete markdown content from step 6]
-
-**What would you like to do?**
-[A] Advanced Elicitation - Let's refine our user journey designs
-[P] Party Mode - Bring different perspectives on user flows
-[C] Continue - Save this to the document and move to component strategy
-
-### 8. Handle Menu Selection
-
-#### If 'A' (Advanced Elicitation):
-
-- Invoke the `bmad-advanced-elicitation` skill with the current user journey content
-- Process the enhanced journey insights that come back
-- Ask user: "Accept these improvements to the user journeys? (y/n)"
-- If yes: Update content with improvements, then return to A/P/C menu
-- If no: Keep original content, then return to A/P/C menu
-
-#### If 'P' (Party Mode):
-
-- Invoke the `bmad-party-mode` skill with the current user journeys
-- Process the collaborative journey insights that come back
-- Ask user: "Accept these changes to the user journeys? (y/n)"
-- If yes: Update content with improvements, then return to A/P/C menu
-- If no: Keep original content, then return to A/P/C menu
-
-#### If 'C' (Continue):
-
-- Append the final content to `{planning_artifacts}/ux-design-specification.md`
-- Update frontmatter: append step to end of stepsCompleted array
-- Load `./step-11-component-strategy.md`
-
-## APPEND TO DOCUMENT:
-
-When user selects 'C', append the content directly to the document using the structure from step 6.
-
-## SUCCESS METRICS:
-
-✅ Critical user journeys identified and designed
-✅ Detailed flow diagrams created for each journey
-✅ Flows optimized for efficiency and user delight
-✅ Common journey patterns extracted and documented
-✅ A/P/C menu presented and handled correctly
-✅ Content properly appended to document when C selected
-
-## FAILURE MODES:
-
-❌ Not identifying all critical user journeys
-❌ Flows too complex or not optimized for user success
-❌ Missing error recovery paths
-❌ Not extracting reusable patterns across journeys
-❌ Flow diagrams unclear or incomplete
-❌ Not presenting A/P/C menu after content generation
-❌ Appending content without user selecting 'C'
-
-❌ **CRITICAL**: Reading only partial step file - leads to incomplete understanding and poor decisions
-❌ **CRITICAL**: Proceeding with 'C' without fully reading and understanding the next step file
-❌ **CRITICAL**: Making decisions without complete understanding of step requirements and protocols
-
-## NEXT STEP:
-
-After user selects 'C' and content is saved to document, load `./step-11-component-strategy.md` to define component library strategy.
-
-Remember: Do NOT proceed to step-11 until user explicitly selects 'C' from the A/P/C menu and content is saved!
-</prose>

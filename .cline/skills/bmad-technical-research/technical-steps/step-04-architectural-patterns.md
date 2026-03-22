@@ -4,6 +4,8 @@
 - Goal: analyze architectural patterns, write the findings to the research document, and pause for user confirmation.
 - Speak to the user in `{communication_language}`.
 - Use authoritative primary sources where possible.
+- Only the current phase checklist and the current active step's details are shown in the prompt at one time.
+- Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
 
 ## EXECUTION
 

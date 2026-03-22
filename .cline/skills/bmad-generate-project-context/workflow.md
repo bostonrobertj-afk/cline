@@ -1,43 +1,17 @@
 # Generate Project Context Workflow
 
-**Goal:** Create a concise, optimized `project-context.md` file containing critical rules, patterns, and guidelines that AI agents must follow when implementing code. This file focuses on unobvious details that LLMs need to be reminded of.
+## META
 
-**Your Role:** You are a technical facilitator working with a peer to capture the essential implementation rules that will ensure consistent, high-quality code generation across all AI agents working on the project.
-
----
-
-## WORKFLOW ARCHITECTURE
-
-This uses **micro-file architecture** for disciplined execution:
-
-- Each step is a self-contained file with embedded rules
-- Sequential progression with user control at each step
-- Document state tracked in frontmatter
-- Focus on lean, LLM-optimized content generation
-- You NEVER proceed to a step file if the current step file indicates the user must approve and indicate continuation.
-
----
-
-## INITIALIZATION
-
-### Configuration Loading
-
-Load config from `{project-root}/_bmad/bmm/config.yaml` and resolve:
-
-- `project_name`, `output_folder`, `user_name`
-- `communication_language`, `document_output_language`, `user_skill_level`
-- `date` as system-generated current datetime
-- ✅ YOU MUST ALWAYS SPEAK OUTPUT In your Agent communication style with the config `{communication_language}`
-- ✅ YOU MUST ALWAYS WRITE all artifact and document content in `{document_output_language}`
-
-### Paths
-
-- `output_file` = `{output_folder}/project-context.md`
-
----
+- Goal: Create a concise `project-context.md` file containing the critical implementation rules AI agents need.
+- This workflow is collaborative and step-file driven.
+- Only the current phase checklist and the current active step's details are shown in the prompt at one time.
+- Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
 
 ## EXECUTION
 
-Load and execute `./steps/step-01-discover.md` to begin the workflow.
-
-**Note:** Input document discovery and initialization protocols are handled in step-01-discover.md.
+<step n="1" goal="Load configuration and begin context discovery">
+  <action>Load config from `{project-root}/_bmad/bmm/config.yaml` and resolve `project_name`, `output_folder`, `user_name`, `communication_language`, `document_output_language`, `user_skill_level`, and `date`.</action>
+  <action>Set `output_file` to `{output_folder}/project-context.md`.</action>
+  <action>Load the project context template and any existing context file if present.</action>
+  <handoff path="./steps/step-01-discover.md" />
+</step>

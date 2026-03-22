@@ -4,137 +4,72 @@ wipFile: '{implementation_artifacts}/tech-spec-wip.md'
 
 # Step 2: Map Technical Constraints & Anchor Points
 
-**Progress: Step 2 of 4** - Next: Generate Plan
+## META
 
-## RULES:
+- Progress: Step 2 of 4
+- Next: Generate Plan
+- Focus on the codebase anchor points and constraints.
+- Speak in the configured communication language.
 
-- MUST NOT skip steps.
-- MUST NOT optimize sequence.
-- MUST follow exact instructions.
-- MUST NOT generate the full spec yet (that's Step 3).
-- ✅ YOU MUST ALWAYS SPEAK OUTPUT In your Agent communication style with the config `{communication_language}`
+## EXECUTION
 
-## CONTEXT:
+<step n="1" goal="Load the current state">
+  <action>Read `{wipFile}` and extract the Overview section plus any context gathered in Step 1.</action>
+  <branch if="wip file is missing" optional="true">
+    <output>The WIP file is missing. Return to Step 1 and initialize it first.</output>
+    <exit />
+  </branch>
+</step>
 
-- Requires `{wipFile}` from Step 1 with the "Problem Statement" defined.
-- Focus: Map the problem statement to specific anchor points in the codebase.
-- Output: Exact files to touch, classes/patterns to extend, and technical constraints identified.
-- Objective: Provide the implementation-ready ground truth for the plan.
+<step n="2" goal="Perform the technical investigation">
+  <ask>Are there other files or directories I should investigate deeply?</ask>
+  <detail>Keep the prompt specific by naming the likely files, directories, or patterns that were already found.</detail>
+  <branch if="user provides additional files or directories" optional="true">
+    <action>Read the provided files completely and extract the relevant patterns, dependencies, and test files.</action>
+  </branch>
+  <branch if="no relevant code is found" optional="true">
+    <action>Identify the target directory where the feature should live and the boilerplate or utilities that should be used.</action>
+    <detail>Label this outcome as a confirmed clean slate when there is no legacy constraint to preserve.</detail>
+  </branch>
+  <action>Document the technical context the spec needs.</action>
+  <detail>
+    Capture tech stack, code patterns, files to modify or create, and test patterns.
+  </detail>
+  <branch if="project-context.md exists and was not already loaded" optional="true">
+    <action>Load it now and extract any additional patterns or conventions that apply.</action>
+  </branch>
+</step>
 
-## SEQUENCE OF INSTRUCTIONS
+<step n="3" goal="Update the WIP file with the investigation results">
+  <action>Update the WIP frontmatter with `stepsCompleted: [1, 2]` and the captured stack, files, patterns, and test patterns.</action>
+  <detail>
+    Populate the Context for Development section with:
+    - codebase patterns from the investigation
+    - files reviewed and files to reference
+    - technical decisions made during discovery
+  </detail>
+  <output>Context Gathered:</output>
+  <detail>
+    - Tech Stack: summarize the stack
+    - Files to Modify: summarize the files identified
+    - Patterns: summarize the code and workflow patterns
+    - Tests: summarize the test patterns
+  </detail>
+</step>
 
-### 1. Load Current State
-
-**Read `{wipFile}` and extract:**
-
-- Problem statement and scope from Overview section
-- Any context gathered in Step 1
-
-### 2. Execute Investigation Path
-
-**Universal Code Investigation:**
-
-_Isolate deep exploration in sub-agents/tasks where available. Return distilled summaries only to prevent context snowballing._
-
-a) **Build on Step 1's Quick Scan**
-
-Review what was found in Step 1's orient scan. Then ask:
-
-"Based on my quick look, I see [files/patterns found]. Are there other files or directories I should investigate deeply?"
-
-b) **Read and Analyze Code**
-
-For each file/directory provided:
-
-- Read the complete file(s)
-- Identify patterns, conventions, coding style
-- Note dependencies and imports
-- Find related test files
-
-**If NO relevant code is found (Clean Slate):**
-
-- Identify the target directory where the feature should live.
-- Scan parent directories for architectural context.
-- Identify standard project utilities or boilerplate that SHOULD be used.
-- Document this as "Confirmed Clean Slate" - establishing that no legacy constraints exist.
-
-
-c) **Document Technical Context**
-
-Capture and confirm with user:
-
-- **Tech Stack**: Languages, frameworks, libraries
-- **Code Patterns**: Architecture patterns, naming conventions, file structure
-- **Files to Modify/Create**: Specific files that will need changes or new files to be created
-- **Test Patterns**: How tests are structured, test frameworks used
-
-d) **Look for project-context.md**
-
-If `**/project-context.md` exists and wasn't loaded in Step 1:
-
-- Load it now
-- Extract patterns and conventions
-- Note any rules that must be followed
-
-### 3. Update WIP File
-
-**Update `{wipFile}` frontmatter:**
-
-```yaml
----
-# ... existing frontmatter ...
-stepsCompleted: [1, 2]
-tech_stack: ['{captured_tech_stack}']
-files_to_modify: ['{captured_files}']
-code_patterns: ['{captured_patterns}']
-test_patterns: ['{captured_test_patterns}']
----
-```
-
-**Update the Context for Development section:**
-
-Fill in:
-
-- Codebase Patterns (from investigation)
-- Files to Reference table (files reviewed)
-- Technical Decisions (any decisions made during investigation)
-
-**Report to user:**
-
-"**Context Gathered:**
-
-- Tech Stack: {tech_stack_summary}
-- Files to Modify: {files_count} files identified
-- Patterns: {patterns_summary}
-- Tests: {test_patterns_summary}"
-
-### 4. Present Checkpoint Menu
-
-Display: "**Select:** [A] Advanced Elicitation [P] Party Mode [C] Continue to Generate Spec (Step 3 of 4)"
-
-**HALT and wait for user selection.**
-
-#### Menu Handling Logic:
-
-- IF A: Invoke the `bmad-advanced-elicitation` skill with current tech-spec content, process enhanced insights, ask user "Accept improvements? (y/n)", if yes update WIP file then redisplay menu, if no keep original then redisplay menu
-- IF P: Invoke the `bmad-party-mode` skill with current tech-spec content, process collaborative insights, ask user "Accept changes? (y/n)", if yes update WIP file then redisplay menu, if no keep original then redisplay menu
-- IF C: Verify frontmatter updated with `stepsCompleted: [1, 2]`, then read fully and follow: `./step-03-generate.md`
-- IF Any other comments or queries: respond helpfully then redisplay menu
-
-#### EXECUTION RULES:
-
-- ALWAYS halt and wait for user input after presenting menu
-- ONLY proceed to next step when user selects 'C'
-- After A or P execution, return to this menu
-
----
-
-## REQUIRED OUTPUTS:
-
-- MUST document technical context (stack, patterns, files identified).
-- MUST update `{wipFile}` with functional context.
-
-## VERIFICATION CHECKLIST:
-
-- [ ] Technical mapping performed and documented.
-- [ ] `stepsCompleted: [1, 2]` set in frontmatter.
+<step n="4" goal="Present the checkpoint menu">
+  <output>Display the checkpoint menu for Step 2.</output>
+  <ask>Choose [A] Advanced Elicitation, [P] Party Mode, or [C] Continue to Generate Spec (Step 3 of 4).</ask>
+  <branch if="user chooses A" optional="true">
+    <action>Invoke the advanced elicitation flow on the current tech-spec content.</action>
+    <detail>If the user accepts the improvements, update the WIP file and redisplay the menu.</detail>
+  </branch>
+  <branch if="user chooses P" optional="true">
+    <action>Invoke the party mode flow on the current tech-spec content.</action>
+    <detail>If the user accepts the changes, update the WIP file and redisplay the menu.</detail>
+  </branch>
+  <branch if="user chooses C" optional="true">
+    <goto step="3" />
+  </branch>
+  <detail>If the user asks an unrelated question at the menu, answer briefly and redisplay the menu.</detail>
+</step>

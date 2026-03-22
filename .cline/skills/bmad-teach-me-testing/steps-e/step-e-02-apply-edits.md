@@ -11,6 +11,8 @@ workflowPath: '../'
 
 - Goal: apply only the edits that were approved in the assessment step.
 - Preserve workflow structure and avoid unapproved changes.
+- Only the current phase checklist and the current active step's details are shown in the prompt at one time.
+- Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
 
 ## EXECUTION
 
@@ -38,8 +40,3 @@ workflowPath: '../'
 ## CHECKPOINT
 
 Halt for any unapproved change, failed validation, or user rejection.
-
-## ADVISORY
-
-- Show changes before applying them.
-- Keep the edits limited to the approved workflow family.

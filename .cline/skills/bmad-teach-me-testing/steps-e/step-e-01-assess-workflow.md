@@ -14,6 +14,8 @@ partyModeWorkflow: '{project-root}/_bmad/core/workflows/party-mode/workflow.md'
 
 - Goal: capture the desired workflow changes before any edits are made.
 - Keep this step in discovery mode.
+- Only the current phase checklist and the current active step's details are shown in the prompt at one time.
+- Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
 
 ## EXECUTION
 
@@ -37,15 +39,12 @@ partyModeWorkflow: '{project-root}/_bmad/core/workflows/party-mode/workflow.md'
 </step>
 
 <step n="5" goal="Offer routing options">
-  <ask>Offer `A` for Advanced Elicitation, `P` for Party Mode, or `C` to continue to the apply-edits step.</ask>
-  <action>If the user chooses `C`, load and follow `./step-e-02-apply-edits.md`.</action>
+  <ask>Ask the user to choose `A` for Advanced Elicitation, `P` for Party Mode, or `C` to continue to the apply-edits step.</ask>
+  <branch if="the user chooses `C`" optional="true">
+    <handoff path="./step-e-02-apply-edits.md" />
+  </branch>
 </step>
 
 ## CHECKPOINT
 
 Pause until the user approves the edit plan or chooses a routing option.
-
-## ADVISORY
-
-- Understand the change before making it.
-- Keep the current workflow file set as the only editing target.

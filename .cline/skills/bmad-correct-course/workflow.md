@@ -2,477 +2,199 @@
 
 ## META
 
-- Goal: Manage significant changes during sprint execution by analyzing impact across all project artifacts and producing a structured Sprint Change Proposal.
-- Execute this file in order.
+- Goal: manage significant sprint-time changes by assessing impact across project artifacts and producing a structured Sprint Change Proposal.
+- Execute this workflow in order.
 - Halt whenever user input, confirmation, or workflow gating is required.
-- Use the structured sections for extraction; use the prose block for additional agent context.
+- Treat this workflow as change-navigation and proposal authoring, not silent replanning.
+- Only the current phase checklist and the current active step's details are shown in the prompt at one time.
+- Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
 
 ## EXECUTION
 
-<step n="1" goal="Initialize Change Navigation">
-  <action>Load **/project-context.md for coding standards and project-wide patterns (if exists)</action>
-  <action>Confirm change trigger and gather user description of the issue</action>
-  <action>Ask: "What specific issue or change has been identified that requires navigation?"</action>
-  <action>Verify access to required project documents:</action>
-    - PRD (Product Requirements Document)
-    - Current Epics and Stories
-    - Architecture documentation
-    - UI/UX specifications
-  <action>Ask user for mode preference:</action>
-    - **Incremental** (recommended): Refine each edit collaboratively
-    - **Batch**: Present all changes at once for review
-  <action>Store mode selection for use throughout workflow</action>
-
-<action if="change trigger is unclear">HALT: "Cannot navigate change without clear understanding of the triggering issue. Please provide specific details about what needs to change and why."</action>
-
-<action if="core documents are unavailable">HALT: "Need access to project documents (PRD, Epics, Architecture, UI/UX) to assess change impact. Please ensure these documents are accessible."</action>
+<step n="1" goal="Initialize the change-navigation workflow">
+  <action>Load `**/project-context.md` if it exists and contains useful project-wide patterns or standards.</action>
+  <ask>Ask what specific issue, change, or newly discovered problem requires course correction.</ask>
+  <ask>
+    Ask which collaboration mode the user wants:
+    <detail>
+      - `Incremental` (recommended): refine each proposal collaboratively
+      - `Batch`: review the full proposal set at the end
+    </detail>
+  </ask>
+  <action>Store the selected mode for use throughout the workflow.</action>
+  <action>
+    Verify access to the core planning artifacts needed for impact analysis.
+    <detail>
+      Check for:
+      - PRD
+      - current epics and stories
+      - architecture documentation
+      - UI/UX specifications
+    </detail>
+  </action>
+  <branch if="the change trigger is still unclear after the initial question" optional="true">
+    <ask>HALT and ask the user to provide specific details about what must change and why.</ask>
+  </branch>
+  <branch if="core project documents are unavailable" optional="true">
+    <ask>HALT and ask the user to make the essential project documents accessible before impact analysis continues.</ask>
+  </branch>
 </step>
 
-<step n="2" goal="Execute Change Analysis Checklist">
-  <action>Read fully and follow the systematic analysis from: checklist.md</action>
-  <action>Work through each checklist section interactively with the user</action>
-  <action>Record status for each checklist item:</action>
-    - [x] Done - Item completed successfully
-    - [N/A] Skip - Item not applicable to this change
-    - [!] Action-needed - Item requires attention or follow-up
-  <action>Maintain running notes of findings and impacts discovered</action>
-  <action>Present checklist progress after each major section</action>
-
-<action if="checklist cannot be completed">Identify blocking issues and work with user to resolve before continuing</action>
+<step n="2" goal="Work through the change-analysis checklist">
+  <action>Load `checklist.md` and use it as the systematic analysis framework for the remainder of this step.</action>
+  <action>Work through each checklist section interactively with the user.</action>
+  <action>
+    Record status for each checklist item.
+    <detail>
+      - `[x] Done` -> completed successfully
+      - `[N/A] Skip` -> not applicable to this change
+      - `[!] Action-needed` -> requires attention or follow-up
+    </detail>
+  </action>
+  <action>Maintain running notes of findings, impacts, and open questions discovered during checklist review.</action>
+  <output>Present checklist progress after each major section.</output>
+  <branch if="the checklist cannot be completed because of blockers or missing information" optional="true">
+    <output>Identify the blocking issues clearly.</output>
+    <ask>Work with the user to resolve the blockers before the workflow continues.</ask>
+  </branch>
 </step>
 
-<step n="3" goal="Draft Specific Change Proposals">
-<action>Based on checklist findings, create explicit edit proposals for each identified artifact</action>
-
-<action>For Story changes:</action>
-
-- Show old → new text format
-- Include story ID and section being modified
-- Provide rationale for each change
-- Example format:
-
-  ```
-  Story: [STORY-123] User Authentication
-  Section: Acceptance Criteria
-
-  OLD:
-  - User can log in with email/password
-
-  NEW:
-  - User can log in with email/password
-  - User can enable 2FA via authenticator app
-
-  Rationale: Security requirement identified during implementation
-  ```
-
-<action>For PRD modifications:</action>
-
-- Specify exact sections to update
-- Show current content and proposed changes
-- Explain impact on MVP scope and requirements
-
-<action>For Architecture changes:</action>
-
-- Identify affected components, patterns, or technology choices
-- Describe diagram updates needed
-- Note any ripple effects on other components
-
-<action>For UI/UX specification updates:</action>
-
-- Reference specific screens or components
-- Show wireframe or flow changes needed
-- Connect changes to user experience impact
-
-<check if="mode is Incremental">
-  <action>Present each edit proposal individually</action>
-  <ask>Review and refine this change? Options: Approve [a], Edit [e], Skip [s]</ask>
-  <action>Iterate on each proposal based on user feedback</action>
-</check>
-
-<action if="mode is Batch">Collect all edit proposals and present together at end of step</action>
-
+<step n="3" goal="Draft explicit change proposals for affected artifacts">
+  <action>Translate the checklist findings into concrete edit proposals for each affected artifact.</action>
+  <action>
+    Draft story-level changes with before-and-after wording and rationale.
+    <detail>
+      Include the story ID, the section being modified, the current text, the proposed text, and the rationale for the change.
+    </detail>
+  </action>
+  <action>
+    Draft PRD updates with exact affected sections, current content, proposed changes, and impact on scope or requirements.
+  </action>
+  <action>
+    Draft architecture updates with the affected components, patterns, technology choices, and ripple effects.
+  </action>
+  <action>
+    Draft UI/UX updates with the affected screens, components, flows, and user-experience implications.
+  </action>
+  <branch if="mode is Incremental" optional="true">
+    <output>Present each edit proposal individually as it is drafted.</output>
+    <ask>Ask whether to approve, edit, or skip each proposal: `[a] Approve`, `[e] Edit`, `[s] Skip`.</ask>
+    <action>Iterate on each proposal based on the user's feedback before moving to the next one.</action>
+  </branch>
+  <branch if="mode is Batch" optional="true">
+    <action>Collect all proposals and defer presentation until the end of this step.</action>
+  </branch>
 </step>
 
-<step n="4" goal="Generate Sprint Change Proposal">
-<action>Compile comprehensive Sprint Change Proposal document with following sections:</action>
-
-<action>Section 1: Issue Summary</action>
-
-- Clear problem statement describing what triggered the change
-- Context about when/how the issue was discovered
-- Evidence or examples demonstrating the issue
-
-<action>Section 2: Impact Analysis</action>
-
-- Epic Impact: Which epics are affected and how
-- Story Impact: Current and future stories requiring changes
-- Artifact Conflicts: PRD, Architecture, UI/UX documents needing updates
-- Technical Impact: Code, infrastructure, or deployment implications
-
-<action>Section 3: Recommended Approach</action>
-
-- Present chosen path forward from checklist evaluation:
-  - Direct Adjustment: Modify/add stories within existing plan
-  - Potential Rollback: Revert completed work to simplify resolution
-  - MVP Review: Reduce scope or modify goals
-- Provide clear rationale for recommendation
-- Include effort estimate, risk assessment, and timeline impact
-
-<action>Section 4: Detailed Change Proposals</action>
-
-- Include all refined edit proposals from Step 3
-- Group by artifact type (Stories, PRD, Architecture, UI/UX)
-- Ensure each change includes before/after and justification
-
-<action>Section 5: Implementation Handoff</action>
-
-- Categorize change scope:
-  - Minor: Direct implementation by dev team
-  - Moderate: Backlog reorganization needed (PO/SM)
-  - Major: Fundamental replan required (PM/Architect)
-- Specify handoff recipients and their responsibilities
-- Define success criteria for implementation
-
-<action>Present complete Sprint Change Proposal to user</action>
-<action>Write Sprint Change Proposal document to {default_output_file}</action>
-<ask>Review complete proposal. Continue [c] or Edit [e]?</ask>
+<step n="4" goal="Compile the Sprint Change Proposal document">
+  <action>
+    Build the Sprint Change Proposal document at `{default_output_file}`.
+    <detail>
+      Include:
+      - Issue Summary
+      - Impact Analysis
+      - Recommended Approach
+      - Detailed Change Proposals
+      - Implementation Handoff
+    </detail>
+  </action>
+  <action>
+    Populate the Issue Summary with the triggering problem, discovery context, and supporting evidence.
+  </action>
+  <action>
+    Populate the Impact Analysis with epic impact, story impact, artifact conflicts, and technical implications.
+  </action>
+  <action>
+    Populate the Recommended Approach with the chosen path forward, rationale, risk, and expected delivery impact.
+    <detail>
+      Typical recommendation shapes:
+      - direct adjustment
+      - potential rollback
+      - MVP review or scope reduction
+    </detail>
+  </action>
+  <action>
+    Populate the Detailed Change Proposals section by grouping the approved proposals by artifact type.
+  </action>
+  <action>
+    Populate the Implementation Handoff section with scope classification, recipients, responsibilities, and success criteria.
+    <detail>
+      Scope classes:
+      - `Minor`
+      - `Moderate`
+      - `Major`
+    </detail>
+  </action>
+  <output>Present the completed Sprint Change Proposal to the user.</output>
+  <ask>Ask whether to continue with the proposal as written or edit it: `[c] Continue`, `[e] Edit`.</ask>
 </step>
 
-<step n="5" goal="Finalize and Route for Implementation">
-<action>Get explicit user approval for complete proposal</action>
-<ask>Do you approve this Sprint Change Proposal for implementation? (yes/no/revise)</ask>
-
-<check if="no or revise">
-  <action>Gather specific feedback on what needs adjustment</action>
-  <action>Return to appropriate step to address concerns</action>
-  <goto step="3">If changes needed to edit proposals</goto>
-  <goto step="4">If changes needed to overall proposal structure</goto>
-
-</check>
-
-<check if="yes the proposal is approved by the user">
-  <action>Finalize Sprint Change Proposal document</action>
-  <action>Determine change scope classification:</action>
-
-- **Minor**: Can be implemented directly by development team
-- **Moderate**: Requires backlog reorganization and PO/SM coordination
-- **Major**: Needs fundamental replan with PM/Architect involvement
-
-<action>Provide appropriate handoff based on scope:</action>
-
-</check>
-
-<check if="Minor scope">
-  <action>Route to: Development team for direct implementation</action>
-  <action>Deliverables: Finalized edit proposals and implementation tasks</action>
-</check>
-
-<check if="Moderate scope">
-  <action>Route to: Product Owner / Scrum Master agents</action>
-  <action>Deliverables: Sprint Change Proposal + backlog reorganization plan</action>
-</check>
-
-<check if="Major scope">
-  <action>Route to: Product Manager / Solution Architect</action>
-  <action>Deliverables: Complete Sprint Change Proposal + escalation notice</action>
-
-<action>Confirm handoff completion and next steps with user</action>
-<action>Document handoff in workflow execution log</action>
-</check>
-
+<step n="5" goal="Approve and route the final proposal">
+  <ask>Ask whether the user approves the Sprint Change Proposal for implementation: `yes`, `no`, or `revise`.</ask>
+  <branch if="the user responds `no` or `revise`" optional="true">
+    <action>Gather the specific feedback about what needs to change.</action>
+    <branch if="the requested changes affect the detailed edit proposals" optional="true">
+      <goto step="3" />
+    </branch>
+    <branch if="the requested changes affect the overall proposal framing or recommendation" optional="true">
+      <goto step="4" />
+    </branch>
+  </branch>
+  <branch if="the user approves the proposal" optional="true">
+    <action>Finalize the Sprint Change Proposal document.</action>
+    <action>
+      Determine the change scope classification.
+      <detail>
+        - `Minor` -> can be implemented directly by the development team
+        - `Moderate` -> requires backlog reorganization and PO/SM coordination
+        - `Major` -> requires a broader PM/Architect replan
+      </detail>
+    </action>
+    <branch if="scope is Minor" optional="true">
+      <output>Route the result to the development team for direct implementation.</output>
+      <output>Deliver finalized edit proposals and implementation tasks.</output>
+    </branch>
+    <branch if="scope is Moderate" optional="true">
+      <output>Route the result to the Product Owner and Scrum Master.</output>
+      <output>Deliver the Sprint Change Proposal plus a backlog-reorganization plan.</output>
+    </branch>
+    <branch if="scope is Major" optional="true">
+      <output>Route the result to the Product Manager and Solution Architect.</output>
+      <output>Deliver the complete Sprint Change Proposal plus an escalation notice.</output>
+    </branch>
+    <output>Confirm the chosen handoff path and next steps with the user.</output>
+  </branch>
 </step>
 
-<step n="6" goal="Workflow Completion">
-<action>Summarize workflow execution:</action>
-  - Issue addressed: {{change_trigger}}
-  - Change scope: {{scope_classification}}
-  - Artifacts modified: {{list_of_artifacts}}
-  - Routed to: {{handoff_recipients}}
-
-<action>Confirm all deliverables produced:</action>
-
-- Sprint Change Proposal document
-- Specific edit proposals with before/after
-- Implementation handoff plan
-
-<action>Report workflow completion to user with personalized message: "Correct Course workflow complete, {user_name}!"</action>
-<action>Remind user of success criteria and next steps for implementation team</action>
+<step n="6" goal="Close the workflow">
+  <output>
+    Summarize the workflow execution.
+    <detail>
+      Include:
+      - issue addressed: `{{change_trigger}}`
+      - change scope: `{{scope_classification}}`
+      - artifacts modified: `{{list_of_artifacts}}`
+      - routed to: `{{handoff_recipients}}`
+    </detail>
+  </output>
+  <output>
+    Confirm that the deliverables were produced.
+    <detail>
+      - Sprint Change Proposal document
+      - specific edit proposals with before/after wording
+      - implementation handoff plan
+    </detail>
+  </output>
+  <output>Report workflow completion to the user with a concise completion message.</output>
+  <output>Remind the user of the success criteria and next steps for the implementation team.</output>
 </step>
 
 ## CHECKPOINT
 
-Halt for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.
+Halt whenever user confirmation, proposal approval, or blocker resolution is required before advancing.
 
 ## ADVISORY
 
-- Use the prose block below for the full agent-facing guidance that complements the structured execution steps.
-
-## REFERENCE
-
-<prose>
-**Goal:** Manage significant changes during sprint execution by analyzing impact across all project artifacts and producing a structured Sprint Change Proposal.
-
-**Your Role:** You are a Scrum Master navigating change management. Analyze the triggering issue, assess impact across PRD, epics, architecture, and UX artifacts, and produce an actionable Sprint Change Proposal with clear handoff.
-
----
-
-## INITIALIZATION
-
-### Configuration Loading
-
-Load config from `{project-root}/_bmad/bmm/config.yaml` and resolve:
-
-- `project_name`, `user_name`
-- `communication_language`, `document_output_language`
-- `user_skill_level`
-- `implementation_artifacts`
-- `planning_artifacts`
-- `project_knowledge`
-- `date` as system-generated current datetime
-- YOU MUST ALWAYS SPEAK OUTPUT in your Agent communication style with the config `{communication_language}`
-- Language MUST be tailored to `{user_skill_level}`
-- Generate all documents in `{document_output_language}`
-- DOCUMENT OUTPUT: Updated epics, stories, or PRD sections. Clear, actionable changes. User skill level (`{user_skill_level}`) affects conversation style ONLY, not document updates.
-
-### Paths
-
-- `default_output_file` = `{planning_artifacts}/sprint-change-proposal-{date}.md`
-
-### Input Files
-
-| Input | Path | Load Strategy |
-|-------|------|---------------|
-| PRD | `{planning_artifacts}/*prd*.md` (whole) or `{planning_artifacts}/*prd*/*.md` (sharded) | FULL_LOAD |
-| Epics | `{planning_artifacts}/*epic*.md` (whole) or `{planning_artifacts}/*epic*/*.md` (sharded) | FULL_LOAD |
-| Architecture | `{planning_artifacts}/*architecture*.md` (whole) or `{planning_artifacts}/*architecture*/*.md` (sharded) | FULL_LOAD |
-| UX Design | `{planning_artifacts}/*ux*.md` (whole) or `{planning_artifacts}/*ux*/*.md` (sharded) | FULL_LOAD |
-| Tech Spec | `{planning_artifacts}/*tech-spec*.md` (whole) | FULL_LOAD |
-| Document Project | `{project_knowledge}/index.md` (sharded) | INDEX_GUIDED |
-
-### Context
-
-- Load `**/project-context.md` if it exists
-
----
-
-## EXECUTION
-
-### Document Discovery - Loading Project Artifacts
-
-**Strategy**: Course correction needs broad project context to assess change impact accurately. Load all available planning artifacts.
-
-**Discovery Process for FULL_LOAD documents (PRD, Epics, Architecture, UX Design, Tech Spec):**
-
-1. **Search for whole document first** - Look for files matching the whole-document pattern (e.g., `*prd*.md`, `*epic*.md`, `*architecture*.md`, `*ux*.md`, `*tech-spec*.md`)
-2. **Check for sharded version** - If whole document not found, look for a directory with `index.md` (e.g., `prd/index.md`, `epics/index.md`)
-3. **If sharded version found**:
-   - Read `index.md` to understand the document structure
-   - Read ALL section files listed in the index
-   - Process the combined content as a single document
-4. **Priority**: If both whole and sharded versions exist, use the whole document
-
-**Discovery Process for INDEX_GUIDED documents (Document Project):**
-
-1. **Search for index file** - Look for `{project_knowledge}/index.md`
-2. **If found**: Read the index to understand available documentation sections
-3. **Selectively load sections** based on relevance to the change being analyzed — do NOT load everything, only sections that relate to the impacted areas
-4. **This document is optional** — skip if `{project_knowledge}` does not exist (greenfield projects)
-
-**Fuzzy matching**: Be flexible with document names — users may use variations like `prd.md`, `bmm-prd.md`, `product-requirements.md`, etc.
-
-**Missing documents**: Not all documents may exist. PRD and Epics are essential; Architecture, UX Design, Tech Spec, and Document Project are loaded if available. HALT if PRD or Epics cannot be found.
-
-<workflow>
-
-<step n="1" goal="Initialize Change Navigation">
-  <action>Load **/project-context.md for coding standards and project-wide patterns (if exists)</action>
-  <action>Confirm change trigger and gather user description of the issue</action>
-  <action>Ask: "What specific issue or change has been identified that requires navigation?"</action>
-  <action>Verify access to required project documents:</action>
-    - PRD (Product Requirements Document)
-    - Current Epics and Stories
-    - Architecture documentation
-    - UI/UX specifications
-  <action>Ask user for mode preference:</action>
-    - **Incremental** (recommended): Refine each edit collaboratively
-    - **Batch**: Present all changes at once for review
-  <action>Store mode selection for use throughout workflow</action>
-
-<action if="change trigger is unclear">HALT: "Cannot navigate change without clear understanding of the triggering issue. Please provide specific details about what needs to change and why."</action>
-
-<action if="core documents are unavailable">HALT: "Need access to project documents (PRD, Epics, Architecture, UI/UX) to assess change impact. Please ensure these documents are accessible."</action>
-</step>
-
-<step n="2" goal="Execute Change Analysis Checklist">
-  <action>Read fully and follow the systematic analysis from: checklist.md</action>
-  <action>Work through each checklist section interactively with the user</action>
-  <action>Record status for each checklist item:</action>
-    - [x] Done - Item completed successfully
-    - [N/A] Skip - Item not applicable to this change
-    - [!] Action-needed - Item requires attention or follow-up
-  <action>Maintain running notes of findings and impacts discovered</action>
-  <action>Present checklist progress after each major section</action>
-
-<action if="checklist cannot be completed">Identify blocking issues and work with user to resolve before continuing</action>
-</step>
-
-<step n="3" goal="Draft Specific Change Proposals">
-<action>Based on checklist findings, create explicit edit proposals for each identified artifact</action>
-
-<action>For Story changes:</action>
-
-- Show old → new text format
-- Include story ID and section being modified
-- Provide rationale for each change
-- Example format:
-
-  ```
-  Story: [STORY-123] User Authentication
-  Section: Acceptance Criteria
-
-  OLD:
-  - User can log in with email/password
-
-  NEW:
-  - User can log in with email/password
-  - User can enable 2FA via authenticator app
-
-  Rationale: Security requirement identified during implementation
-  ```
-
-<action>For PRD modifications:</action>
-
-- Specify exact sections to update
-- Show current content and proposed changes
-- Explain impact on MVP scope and requirements
-
-<action>For Architecture changes:</action>
-
-- Identify affected components, patterns, or technology choices
-- Describe diagram updates needed
-- Note any ripple effects on other components
-
-<action>For UI/UX specification updates:</action>
-
-- Reference specific screens or components
-- Show wireframe or flow changes needed
-- Connect changes to user experience impact
-
-<check if="mode is Incremental">
-  <action>Present each edit proposal individually</action>
-  <ask>Review and refine this change? Options: Approve [a], Edit [e], Skip [s]</ask>
-  <action>Iterate on each proposal based on user feedback</action>
-</check>
-
-<action if="mode is Batch">Collect all edit proposals and present together at end of step</action>
-
-</step>
-
-<step n="4" goal="Generate Sprint Change Proposal">
-<action>Compile comprehensive Sprint Change Proposal document with following sections:</action>
-
-<action>Section 1: Issue Summary</action>
-
-- Clear problem statement describing what triggered the change
-- Context about when/how the issue was discovered
-- Evidence or examples demonstrating the issue
-
-<action>Section 2: Impact Analysis</action>
-
-- Epic Impact: Which epics are affected and how
-- Story Impact: Current and future stories requiring changes
-- Artifact Conflicts: PRD, Architecture, UI/UX documents needing updates
-- Technical Impact: Code, infrastructure, or deployment implications
-
-<action>Section 3: Recommended Approach</action>
-
-- Present chosen path forward from checklist evaluation:
-  - Direct Adjustment: Modify/add stories within existing plan
-  - Potential Rollback: Revert completed work to simplify resolution
-  - MVP Review: Reduce scope or modify goals
-- Provide clear rationale for recommendation
-- Include effort estimate, risk assessment, and timeline impact
-
-<action>Section 4: Detailed Change Proposals</action>
-
-- Include all refined edit proposals from Step 3
-- Group by artifact type (Stories, PRD, Architecture, UI/UX)
-- Ensure each change includes before/after and justification
-
-<action>Section 5: Implementation Handoff</action>
-
-- Categorize change scope:
-  - Minor: Direct implementation by dev team
-  - Moderate: Backlog reorganization needed (PO/SM)
-  - Major: Fundamental replan required (PM/Architect)
-- Specify handoff recipients and their responsibilities
-- Define success criteria for implementation
-
-<action>Present complete Sprint Change Proposal to user</action>
-<action>Write Sprint Change Proposal document to {default_output_file}</action>
-<ask>Review complete proposal. Continue [c] or Edit [e]?</ask>
-</step>
-
-<step n="5" goal="Finalize and Route for Implementation">
-<action>Get explicit user approval for complete proposal</action>
-<ask>Do you approve this Sprint Change Proposal for implementation? (yes/no/revise)</ask>
-
-<check if="no or revise">
-  <action>Gather specific feedback on what needs adjustment</action>
-  <action>Return to appropriate step to address concerns</action>
-  <goto step="3">If changes needed to edit proposals</goto>
-  <goto step="4">If changes needed to overall proposal structure</goto>
-
-</check>
-
-<check if="yes the proposal is approved by the user">
-  <action>Finalize Sprint Change Proposal document</action>
-  <action>Determine change scope classification:</action>
-
-- **Minor**: Can be implemented directly by development team
-- **Moderate**: Requires backlog reorganization and PO/SM coordination
-- **Major**: Needs fundamental replan with PM/Architect involvement
-
-<action>Provide appropriate handoff based on scope:</action>
-
-</check>
-
-<check if="Minor scope">
-  <action>Route to: Development team for direct implementation</action>
-  <action>Deliverables: Finalized edit proposals and implementation tasks</action>
-</check>
-
-<check if="Moderate scope">
-  <action>Route to: Product Owner / Scrum Master agents</action>
-  <action>Deliverables: Sprint Change Proposal + backlog reorganization plan</action>
-</check>
-
-<check if="Major scope">
-  <action>Route to: Product Manager / Solution Architect</action>
-  <action>Deliverables: Complete Sprint Change Proposal + escalation notice</action>
-
-<action>Confirm handoff completion and next steps with user</action>
-<action>Document handoff in workflow execution log</action>
-</check>
-
-</step>
-
-<step n="6" goal="Workflow Completion">
-<action>Summarize workflow execution:</action>
-  - Issue addressed: {{change_trigger}}
-  - Change scope: {{scope_classification}}
-  - Artifacts modified: {{list_of_artifacts}}
-  - Routed to: {{handoff_recipients}}
-
-<action>Confirm all deliverables produced:</action>
-
-- Sprint Change Proposal document
-- Specific edit proposals with before/after
-- Implementation handoff plan
-
-<action>Report workflow completion to user with personalized message: "Correct Course workflow complete, {user_name}!"</action>
-<action>Remind user of success criteria and next steps for implementation team</action>
-</step>
-
-</workflow>
-</prose>
+- Use `checklist.md` as the analysis framework, but keep the workflow prompt self-contained.
+- Keep the workflow collaborative and explicit about impact across PRD, epics, architecture, and UX.
+- Treat alternative branches and scope routes as conditional, non-simultaneous paths.

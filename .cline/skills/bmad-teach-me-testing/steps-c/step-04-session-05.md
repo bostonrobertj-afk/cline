@@ -14,6 +14,10 @@ partyModeWorkflow: '{project-root}/_bmad/core/workflows/party-mode/workflow.md'
 
 ## META
 
+- Goal: teach ATDD and automation concepts, capture learner responses, and return to the session menu with updated progress.
+- Only the current phase checklist and the current active step's details are shown in the prompt at one time.
+- Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
+
 - Goal: teach red-green development, test generation for existing features, and practical API testing patterns.
 - Keep the session focused on implementation and coverage growth.
 
@@ -36,16 +40,16 @@ partyModeWorkflow: '{project-root}/_bmad/core/workflows/party-mode/workflow.md'
 
 <step n="4" goal="Teach supporting patterns">
   <output>Explain the component TDD red-green-refactor loop and the role of pure API tests in fast, direct validation.</output>
-  <branch if="role == QA">
+  <branch if="role == QA" optional="true">
     <detail>Highlight coverage growth and stable regression checks.</detail>
   </branch>
-  <branch if="role == Dev">
+  <branch if="role == Dev" optional="true">
     <detail>Highlight test-first implementation discipline and quick feedback loops.</detail>
   </branch>
-  <branch if="role == Lead">
+  <branch if="role == Lead" optional="true">
     <detail>Highlight adoption patterns that balance speed with consistency.</detail>
   </branch>
-  <branch if="role == VP">
+  <branch if="role == VP" optional="true">
     <detail>Highlight scalable quality practices that reduce manual teaching overhead.</detail>
   </branch>
 </step>
@@ -61,14 +65,10 @@ partyModeWorkflow: '{project-root}/_bmad/core/workflows/party-mode/workflow.md'
 </step>
 
 <step n="7" goal="Return to the hub">
-  <output>Confirm completion, share the score, and present the A/P/C menu before loading `./step-03-session-menu.md`.</output>
+  <output>Confirm completion, share the score, and present the A/P/C menu.</output>
+  <handoff path="./step-03-session-menu.md" />
 </step>
 
 ## CHECKPOINT
 
 Pause for quiz answers and for the user’s choice at the A/P/C menu.
-
-## ADVISORY
-
-- Keep the testing examples focused on behavior and feedback speed.
-- Distinguish clearly between generating tests for new behavior and expanding tests for existing behavior.

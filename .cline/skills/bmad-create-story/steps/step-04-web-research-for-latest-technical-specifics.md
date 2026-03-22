@@ -25,7 +25,8 @@ templateFile: '{workflow_path}/template.md'
 - current_phase: workflow::step-4
 - goal: Verify version-sensitive technologies before the story file is written.
 - Speak in `{communication_language}`.
-
+- Only the current phase checklist and the current active step's details are shown in the prompt at one time.
+- Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
 ## EXECUTION
 <step n="1" goal="Identify version-sensitive technologies">
   <action>Use the architecture guardrails to decide which libraries, APIs, frameworks, or tools need current verification.</action>
@@ -39,7 +40,7 @@ templateFile: '{workflow_path}/template.md'
 
 <step n="3" goal="Translate research into implementation guidance">
   <action>Summarize the research as story-ready guidance that a fresh developer can apply directly.</action>
-  <branch if="no version-sensitive technology is involved">
+  <branch if="no version-sensitive technology is involved" optional="true">
     <action>Record that no external verification was required for this story.</action>
   </branch>
   <detail>Only the current phase detail is visible now. If a branch was intentionally skipped, mark it complete before advancing so the next phase can surface.</detail>

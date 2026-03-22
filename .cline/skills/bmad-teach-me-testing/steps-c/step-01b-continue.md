@@ -13,6 +13,8 @@ nextStepFile: './step-03-session-menu.md'
 - Goal: resume the learner from saved state, show progress, and route to the session menu.
 - Do not teach new content here.
 - Treat this as a continuation-only step.
+- Only the current phase checklist and the current active step's details are shown in the prompt at one time.
+- Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
 
 ## EXECUTION
 
@@ -27,14 +29,10 @@ nextStepFile: './step-03-session-menu.md'
 </step>
 
 <step n="3" goal="Route to the hub">
-  <output>After showing the dashboard, load and follow `./step-03-session-menu.md`.</output>
+  <output>After showing the dashboard, continue to the session menu.</output>
+  <handoff path="./step-03-session-menu.md" />
 </step>
 
 ## CHECKPOINT
 
 Halt if the progress file cannot be read or if the stored state needs user correction.
-
-## ADVISORY
-
-- Keep the dashboard accurate to the saved progress state.
-- Do not jump directly into a session from this step.

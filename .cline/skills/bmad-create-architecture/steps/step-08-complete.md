@@ -2,109 +2,39 @@
 
 ## META
 
-- Goal: complete
-- Execute this file in order.
+- Goal: finalize the architecture workflow, mark completion, and guide the user to the next phase.
+- Execute the current phase in order.
 - Halt whenever user input, confirmation, or workflow gating is required.
-- Use the structured sections for extraction; use the prose block for additional agent context.
+- Treat this step as completion, handoff, and celebration.
+- Only the current phase checklist and the current active step's details are shown in the prompt at one time.
+- Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
 
 ## EXECUTION
 
-<step n="1" goal="Congratulate the User on Completion">
-  <action>Both you and the User completed something amazing here - give a summary of what you achieved together and really congratulate the user on a job well done.</action>
+<step n="1" goal="Finalize architecture workflow state">
+  <action>Update the architecture document frontmatter to reflect workflow completion.</action>
+  <detail>
+    Mark:
+    - `stepsCompleted: [1, 2, 3, 4, 5, 6, 7, 8]`
+    - `workflowType: architecture`
+    - `lastStep: 8`
+    - `status: complete`
+    - `completedAt: {{current_date}}`
+  </detail>
 </step>
 
-<step n="2" goal="Next Steps Guidance">
-  <action>Architecture complete.</action>
-  <action>Invoke the bmad-help skill.</action>
-  <action>## WORKFLOW COMPLETE: This is the final step of the Architecture workflow.</action>
-  <action>The user now has a complete, validated architecture document ready for AI agent implementation.</action>
-  <action>The architecture will serve as the single source of truth for all technical decisions, ensuring consistent implementation across the entire project development lifecycle.</action>
-  <ask>Upon Completion of task output: offer to answer any questions about the Architecture Document.</ask>
+<step n="2" goal="Present completion summary and next-step guidance">
+  <output>Congratulate the user and summarize what was accomplished in the completed architecture workflow.</output>
+  <output>Explain that the architecture document is now the technical source of truth for implementation agents.</output>
+  <output>Recommend the next phase, including invoking `bmad-help` if the user wants guidance on what to do next.</output>
+  <ask>Offer to answer questions about the completed architecture document.</ask>
 </step>
 
 ## CHECKPOINT
 
-Complete the current required actions in order before moving to the next workflow phase.
+Complete the final summary and workflow-state update before ending the workflow.
 
 ## ADVISORY
 
-- Persist workflow state updates whenever this phase writes or updates a managed artifact.
-
-## REFERENCE
-
-<prose>
-## MANDATORY EXECUTION RULES (READ FIRST):
-
-- 🛑 NEVER generate content without user input
-
-- 📖 CRITICAL: ALWAYS read the complete step file before taking any action - partial understanding leads to incomplete decisions
-- ✅ ALWAYS treat this as collaborative completion between architectural peers
-- 📋 YOU ARE A FACILITATOR, not a content generator
-- 💬 FOCUS on successful workflow completion and implementation handoff
-- 🎯 PROVIDE clear next steps for implementation phase
-- ⚠️ ABSOLUTELY NO TIME ESTIMATES - AI development speed has fundamentally changed
-- ✅ YOU MUST ALWAYS SPEAK OUTPUT In your Agent communication style with the config `{communication_language}`
-
-## EXECUTION PROTOCOLS:
-
-- 🎯 Show your analysis before taking any action
-- 🎯 Present completion summary and implementation guidance
-- 📖 Update frontmatter with final workflow state
-- 🚫 THIS IS THE FINAL STEP IN THIS WORKFLOW
-
-## YOUR TASK:
-
-Complete the architecture workflow, provide a comprehensive completion summary, and guide the user to the next phase of their project development.
-
-## COMPLETION SEQUENCE:
-
-### 1. Congratulate the User on Completion
-
-Both you and the User completed something amazing here - give a summary of what you achieved together and really congratulate the user on a job well done.
-
-### 2. Update the created document's frontmatter
-
-```yaml
-stepsCompleted: [1, 2, 3, 4, 5, 6, 7, 8]
-workflowType: 'architecture'
-lastStep: 8
-status: 'complete'
-completedAt: '{{current_date}}'
-```
-
-### 3. Next Steps Guidance
-
-Architecture complete. Invoke the `bmad-help` skill.
-
-Upon Completion of task output: offer to answer any questions about the Architecture Document.
-
-
-## SUCCESS METRICS:
-
-✅ Complete architecture document delivered with all sections
-✅ All architectural decisions documented and validated
-✅ Implementation patterns and consistency rules finalized
-✅ Project structure complete with all files and directories
-✅ User provided with clear next steps and implementation guidance
-✅ Workflow status properly updated
-✅ User collaboration maintained throughout completion process
-
-## FAILURE MODES:
-
-❌ Not providing clear implementation guidance
-❌ Missing final validation of document completeness
-❌ Not updating workflow status appropriately
-❌ Failing to celebrate the successful completion
-❌ Not providing specific next steps for the user
-❌ Rushing completion without proper summary
-
-❌ **CRITICAL**: Reading only partial step file - leads to incomplete understanding and poor decisions
-❌ **CRITICAL**: Proceeding with 'C' without fully reading and understanding the next step file
-❌ **CRITICAL**: Making decisions without complete understanding of step requirements and protocols
-
-## WORKFLOW COMPLETE:
-
-This is the final step of the Architecture workflow. The user now has a complete, validated architecture document ready for AI agent implementation.
-
-The architecture will serve as the single source of truth for all technical decisions, ensuring consistent implementation across the entire project development lifecycle.
-</prose>
+- Celebrate completion without overselling certainty.
+- Keep the next-step guidance practical and implementation-oriented.

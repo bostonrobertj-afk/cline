@@ -46,7 +46,7 @@ This workflow uses a single comprehensive CSV file to intelligently document you
 <step n="0.6" goal="Check for existing documentation and determine workflow mode">
 <action>Check if {project_knowledge}/index.md exists</action>
 
-<check if="index.md exists">
+<branch if="index.md exists" optional="true">
   <action>Read existing index.md to extract metadata (date, project structure, parts count)</action>
   <action>Store as {{existing_doc_date}}, {{existing_structure}}</action>
 
@@ -61,32 +61,34 @@ What would you like to do?
 Your choice [1/2/3]:
 </ask>
 
-  <check if="user selects 1">
+  <branch if="user selects 1" optional="true">
     <action>Set workflow_mode = "full_rescan"</action>
-    <action>Continue to scan level selection below</action>
-  </check>
+    <goto step="0.7" />
+  </branch>
 
-  <check if="user selects 2">
+  <branch if="user selects 2" optional="true">
     <action>Set workflow_mode = "deep_dive"</action>
     <action>Set scan_level = "exhaustive"</action>
     <action>Initialize state file with mode=deep_dive, scan_level=exhaustive</action>
-    <action>Jump to Step 13</action>
-  </check>
+    <goto step="13" />
+  </branch>
 
-  <check if="user selects 3">
+  <branch if="user selects 3" optional="true">
     <action>Display message: "Keeping existing documentation. Exiting workflow."</action>
-    <action>Exit workflow</action>
-  </check>
-</check>
+    <exit />
+  </branch>
+</branch>
 
-<check if="index.md does not exist">
+<branch if="index.md does not exist" optional="true">
   <action>Set workflow_mode = "initial_scan"</action>
-  <action>Continue to scan level selection below</action>
-</check>
+  <goto step="0.7" />
+  </branch>
 
-<action if="workflow_mode != deep_dive">Select Scan Level</action>
+<branch if="workflow_mode != deep_dive" optional="true">
+  <action>Select Scan Level</action>
+</branch>
 
-<check if="workflow_mode == initial_scan OR workflow_mode == full_rescan">
+<step n="0.7" goal="Select scan level and initialize the state file." if="workflow_mode == initial_scan OR workflow_mode == full_rescan">
   <ask>Choose your scan depth level:
 
 **1. Quick Scan** (2-5 minutes) [DEFAULT]
@@ -113,20 +115,20 @@ Your choice [1/2/3]:
 Your choice [1/2/3] (default: 1):
 </ask>
 
-  <action if="user selects 1 OR user presses enter">
+  <branch if="user selects 1 OR user presses enter" optional="true">
     <action>Set scan_level = "quick"</action>
     <action>Display: "Using Quick Scan (pattern-based, no source file reading)"</action>
-  </action>
+  </branch>
 
-  <action if="user selects 2">
+  <branch if="user selects 2" optional="true">
     <action>Set scan_level = "deep"</action>
     <action>Display: "Using Deep Scan (reading critical files per project type)"</action>
-  </action>
+  </branch>
 
-  <action if="user selects 3">
+  <branch if="user selects 3" optional="true">
     <action>Set scan_level = "exhaustive"</action>
     <action>Display: "Using Exhaustive Scan (reading all source files)"</action>
-  </action>
+  </branch>
 
 <action>Initialize state file: {project_knowledge}/project-scan-report.json</action>
 <critical>Every time you touch the state file, record: step id, human-readable summary (what you actually did), precise timestamp, and any outputs written. Vague phrases are unacceptable.</critical>
@@ -145,8 +147,8 @@ Your choice [1/2/3] (default: 1):
 "resume_instructions": "Starting from step 1"
 }
 </action>
-<action>Continue with standard workflow from Step 1</action>
-</check>
+<goto step="1" />
+  </step>
 </step>
 
 <step n="1" goal="Detect project structure and classify project type" if="workflow_mode != deep_dive">
@@ -167,7 +169,7 @@ Your choice [1/2/3] (default: 1):
 - **Multi-part**: Separate client/server or similar architecture
   </action>
 
-<check if="multiple distinct parts detected (e.g., client/ and server/ folders)">
+<branch if="multiple distinct parts detected (e.g., client/ and server/ folders)" optional="true">
   <action>List detected parts with their paths</action>
   <ask>I detected multiple parts in this project:
   {{detected_parts_list}}
@@ -175,18 +177,21 @@ Your choice [1/2/3] (default: 1):
 Is this correct? Should I document each part separately? [y/n]
 </ask>
 
-<action if="user confirms">Set repository_type = "monorepo" or "multi-part"</action>
-<action if="user confirms">For each detected part: - Identify root path - Run project type detection using key_file_patterns from documentation-requirements.csv - Store as part in project_parts array
-</action>
+  <branch if="user confirms" optional="true">
+    <action>Set repository_type = "monorepo" or "multi-part"</action>
+    <action>For each detected part: - Identify root path - Run project type detection using key_file_patterns from documentation-requirements.csv - Store as part in project_parts array</action>
+  </branch>
 
-<action if="user denies or corrects">Ask user to specify correct parts and their paths</action>
-</check>
+  <branch if="user denies or corrects" optional="true">
+    <action>Ask user to specify correct parts and their paths</action>
+  </branch>
+</branch>
 
-<check if="single cohesive project detected">
+<branch if="single cohesive project detected" optional="true">
   <action>Set repository_type = "monolith"</action>
   <action>Create single part in project_parts array with root_path = {{project_root_path}}</action>
   <action>Run project type detection using key_file_patterns from documentation-requirements.csv</action>
-</check>
+  </branch>
 
 <action>For each part, match detected technologies and file patterns against key_file_patterns column in documentation-requirements.csv</action>
 <action>Assign project_type_id to each part</action>
@@ -288,7 +293,7 @@ Are there any other important documents or key areas I should focus on while ana
 
 <critical>BATCHING STRATEGY FOR DEEP/EXHAUSTIVE SCANS</critical>
 
-<check if="scan_level == deep OR scan_level == exhaustive">
+<branch if="scan_level == deep OR scan_level == exhaustive" optional="true">
   <action>This step requires file reading. Apply batching strategy:</action>
 
 <action>Identify subfolders to process based on: - scan_level == "deep": Use critical_directories from documentation_requirements - scan_level == "exhaustive": Get ALL subfolders recursively (excluding node_modules, .git, dist, build, coverage)
@@ -302,28 +307,28 @@ findings.batches_completed: [
 {"path": "{{subfolder_path}}", "files_scanned": {{count}}, "summary": "{{brief_summary}}"}
 ]
 </action>
-</check>
+  </branch>
 
-<check if="scan_level == quick">
+<branch if="scan_level == quick" optional="true">
   <action>Use pattern matching only - do NOT read source files</action>
   <action>Use glob/grep to identify file locations and patterns</action>
   <action>Extract information from filenames, directory structure, and config files only</action>
-</check>
+  </branch>
 
 <action>For each part, check documentation_requirements boolean flags and execute corresponding scans:</action>
 
-<check if="requires_api_scan == true">
+<branch if="requires_api_scan == true" optional="true">
   <action>Scan for API routes and endpoints using integration_scan_patterns</action>
   <action>Look for: controllers/, routes/, api/, handlers/, endpoints/</action>
 
-  <check if="scan_level == quick">
+  <branch if="scan_level == quick" optional="true">
     <action>Use glob to find route files, extract patterns from filenames and folder structure</action>
-  </check>
+  </branch>
 
-  <check if="scan_level == deep OR scan_level == exhaustive">
+  <branch if="scan_level == deep OR scan_level == exhaustive" optional="true">
     <action>Read files in batches (one subfolder at a time)</action>
     <action>Extract: HTTP methods, paths, request/response types from actual code</action>
-  </check>
+  </branch>
 
 <action>Build API contracts catalog</action>
 <action>IMMEDIATELY write to: {project_knowledge}/api-contracts-{part_id}.md</action>
@@ -331,20 +336,20 @@ findings.batches_completed: [
 <action>Update state file with output generated</action>
 <action>PURGE detailed API data, keep only: "{{api_count}} endpoints documented"</action>
 <template-output>api_contracts\*{part_id}</template-output>
-</check>
+  </branch>
 
-<check if="requires_data_models == true">
+<branch if="requires_data_models == true" optional="true">
   <action>Scan for data models using schema_migration_patterns</action>
   <action>Look for: models/, schemas/, entities/, migrations/, prisma/, ORM configs</action>
 
-  <check if="scan_level == quick">
+  <branch if="scan_level == quick" optional="true">
     <action>Identify schema files via glob, parse migration file names for table discovery</action>
-  </check>
+  </branch>
 
-  <check if="scan_level == deep OR scan_level == exhaustive">
+  <branch if="scan_level == deep OR scan_level == exhaustive" optional="true">
     <action>Read model files in batches (one subfolder at a time)</action>
     <action>Extract: table names, fields, relationships, constraints from actual code</action>
-  </check>
+  </branch>
 
 <action>Build database schema documentation</action>
 <action>IMMEDIATELY write to: {project_knowledge}/data-models-{part_id}.md</action>
@@ -352,24 +357,24 @@ findings.batches_completed: [
 <action>Update state file with output generated</action>
 <action>PURGE detailed schema data, keep only: "{{table_count}} tables documented"</action>
 <template-output>data_models\*{part_id}</template-output>
-</check>
+  </branch>
 
-<check if="requires_state_management == true">
+<branch if="requires_state_management == true" optional="true">
   <action>Analyze state management patterns</action>
   <action>Look for: Redux, Context API, MobX, Vuex, Pinia, Provider patterns</action>
   <action>Identify: stores, reducers, actions, state structure</action>
   <template-output>state_management_patterns_{part_id}</template-output>
-</check>
+  </branch>
 
-<check if="requires_ui_components == true">
+<branch if="requires_ui_components == true" optional="true">
   <action>Inventory UI component library</action>
   <action>Scan: components/, ui/, widgets/, views/ folders</action>
   <action>Categorize: Layout, Form, Display, Navigation, etc.</action>
   <action>Identify: Design system, component patterns, reusable elements</action>
   <template-output>ui_component_inventory_{part_id}</template-output>
-</check>
+  </branch>
 
-<check if="requires_hardware_docs == true">
+<branch if="requires_hardware_docs == true" optional="true">
   <action>Look for hardware schematics using hardware_interface_patterns</action>
   <ask>This appears to be an embedded/hardware project. Do you have:
   - Pinout diagrams
@@ -381,14 +386,14 @@ If yes, please provide paths or links. [Provide paths or type 'none']
 </ask>
 <action>Store hardware docs references</action>
 <template-output>hardware*documentation*{part_id}</template-output>
-</check>
+  </branch>
 
-<check if="requires_asset_inventory == true">
+<branch if="requires_asset_inventory == true" optional="true">
   <action>Scan and catalog assets using asset_patterns</action>
   <action>Categorize by: Images, Audio, 3D Models, Sprites, Textures, etc.</action>
   <action>Calculate: Total size, file counts, formats used</action>
   <template-output>asset_inventory_{part_id}</template-output>
-</check>
+  </branch>
 
 <action>Scan for additional patterns based on doc requirements:
 
@@ -432,7 +437,9 @@ If yes, please provide paths or links. [Provide paths or type 'none']
 - Integration points noted (for multi-part projects)
   </action>
 
-<action if="multi-part project">Show how parts are organized and where they interface</action>
+<branch if="multi-part project" optional="true">
+  <action>Show how parts are organized and where they interface</action>
+</branch>
 
 <action>Create formatted source tree with descriptions:
 
@@ -485,14 +492,14 @@ project-root/
 - Infrastructure as Code (terraform/, pulumi/)
   </action>
 
-<action if="CONTRIBUTING.md or similar found">
+<branch if="CONTRIBUTING.md or similar found" optional="true">
   <action>Extract contribution guidelines:
     - Code style rules
     - PR process
     - Commit conventions
     - Testing requirements
   </action>
-</action>
+</branch>
 
 <template-output>development_instructions</template-output>
 <template-output>deployment_configuration</template-output>
@@ -551,13 +558,13 @@ project-root/
     * Testing Strategy (from test patterns)
 </action>
 
-<action if="single part project">
-  - Generate: architecture.md (no part suffix)
-</action>
+<branch if="single part project" optional="true">
+  <action>Generate: architecture.md (no part suffix)</action>
+</branch>
 
-<action if="multi-part project">
-  - Generate: architecture-{part_id}.md for each part
-</action>
+<branch if="multi-part project" optional="true">
+  <action>Generate: architecture-{part_id}.md for each part</action>
+</branch>
 
 <action>For each architecture file generated:
 
@@ -620,7 +627,7 @@ project-root/
   </action>
   <action>IMMEDIATELY write each development guide to disk and validate</action>
 
-<action if="deployment configuration found">
+<branch if="deployment configuration found" optional="true">
   <action>Generate deployment-guide.md with:
     - Infrastructure requirements
     - Deployment process
@@ -628,9 +635,9 @@ project-root/
     - CI/CD pipeline details
   </action>
   <action>IMMEDIATELY write to disk and validate</action>
-</action>
+</branch>
 
-<action if="contribution guidelines found">
+<branch if="contribution guidelines found" optional="true">
   <action>Generate contribution-guide.md with:
     - Code style and conventions
     - PR process
@@ -638,9 +645,9 @@ project-root/
     - Documentation standards
   </action>
   <action>IMMEDIATELY write to disk and validate</action>
-</action>
+</branch>
 
-<action if="API contracts documented">
+<branch if="API contracts documented" optional="true">
   <action>Generate api-contracts.md (or per-part) with:
     - All API endpoints
     - Request/response schemas
@@ -648,9 +655,9 @@ project-root/
     - Example requests
   </action>
   <action>IMMEDIATELY write to disk and validate</action>
-</action>
+</branch>
 
-<action if="Data models documented">
+<branch if="Data models documented" optional="true">
   <action>Generate data-models.md (or per-part) with:
     - Database schema
     - Table relationships
@@ -658,9 +665,9 @@ project-root/
     - Migration strategy
   </action>
   <action>IMMEDIATELY write to disk and validate</action>
-</action>
+</branch>
 
-<action if="multi-part project">
+<branch if="multi-part project" optional="true">
   <action>Generate integration-architecture.md with:
     - How parts communicate
     - Integration points diagram/description
@@ -677,7 +684,7 @@ project-root/
       "integration_points": [ ... ]
     }
     `
-</action>
+</branch>
 <action>IMMEDIATELY write to disk</action>
 </action>
 
@@ -707,7 +714,7 @@ When a document SHOULD be generated but wasn't (due to quick scan, missing data,
 
 <action>Create index.md with intelligent navigation based on project structure</action>
 
-<action if="single part project">
+<branch if="single part project" optional="true">
   <action>Generate simple index with:
     - Project name and type
     - Quick reference (tech stack, architecture type)
@@ -715,9 +722,9 @@ When a document SHOULD be generated but wasn't (due to quick scan, missing data,
     - Links to discovered existing docs
     - Getting started section
   </action>
-</action>
+</branch>
 
-<action if="multi-part project">
+<branch if="multi-part project" optional="true">
   <action>Generate comprehensive index with:
     - Project overview and structure summary
     - Part-based navigation section
@@ -726,7 +733,7 @@ When a document SHOULD be generated but wasn't (due to quick scan, missing data,
     - Links to all generated and existing docs
     - Getting started per part
   </action>
-</action>
+</branch>
 
 <action>Include in index.md:
 
@@ -898,7 +905,7 @@ Would you like to:
 Your choice:
 </ask>
 
-<check if="user selects option 1 (generate incomplete)">
+<branch if="user selects option 1 (generate incomplete)" optional="true">
   <ask>Which incomplete items would you like to generate?
 
 {{#each incomplete_docs_list}}
@@ -1028,28 +1035,32 @@ Enter number(s) separated by commas (e.g., "1,3,5"), or type 'all':
 
 <action>Update state file with all generation activities</action>
 
-<action>Return to Step 11 menu (loop back to check for any remaining incomplete items)</action>
-</check>
+<goto step="11" />
+  </branch>
 
-<action if="user requests other changes (options 2-3)">Make requested modifications and regenerate affected files</action>
-<action if="user selects finalize (option 4 or 5)">Proceed to Step 12 completion</action>
+<branch if="user requests other changes (options 2-3)" optional="true">
+  <action>Make requested modifications and regenerate affected files</action>
+</branch>
+<branch if="user selects finalize (option 4 or 5)" optional="true">
+  <action>Proceed to Step 12 completion</action>
+</branch>
 
-<check if="not finalizing">
+<branch if="not finalizing" optional="true">
   <action>Update state file:
 - Add to completed_steps: {"step": "step_11_iteration", "status": "completed", "timestamp": "{{now}}", "summary": "Review iteration complete"}
 - Keep current_step = "step_11" (for loop back)
 - Update last_updated timestamp
   </action>
   <action>Loop back to beginning of Step 11 (re-scan for remaining incomplete docs)</action>
-</check>
+</branch>
 
-<check if="finalizing">
+<branch if="finalizing" optional="true">
   <action>Update state file:
 - Add to completed_steps: {"step": "step_11", "status": "completed", "timestamp": "{{now}}", "summary": "Validation and review complete"}
 - Update current_step = "step_12"
   </action>
   <action>Proceed to Step 12</action>
-</check>
+</branch>
 </step>
 
 <step n="12" goal="Finalize and provide next steps" if="workflow_mode != deep_dive">

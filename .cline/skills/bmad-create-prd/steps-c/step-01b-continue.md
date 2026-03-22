@@ -1,34 +1,40 @@
 ## META
 
-- Goal: restore context for an in-progress PRD workflow and route the user back to the correct next step.
+- Goal: Restore context for an in-progress PRD workflow and route the user to the correct next step.
 - Speak to the user in `{communication_language}`.
 - Do not restart the workflow from scratch.
+- Only the current phase checklist and the current active step's details are shown in the prompt at one time.
+- Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
 
 ## EXECUTION
 
-<step n="1" goal="Analyze the current PRD state">
+<step n="1" goal="Analyze the saved PRD state">
   <action>Read the existing PRD document and its frontmatter completely.</action>
   <action>Identify `stepsCompleted`, `inputDocuments`, saved classification data, and the last completed workflow step.</action>
+  <output>Summarize the current PRD status and the saved context that can be restored.</output>
 </step>
 
-<step n="2" goal="Restore input context">
+<step n="2" goal="Restore the saved input context">
   <action>Reload every document listed in frontmatter `inputDocuments`.</action>
-  <action>If any referenced input file is missing, tell the user exactly what is missing and continue with the remaining available context.</action>
+  <branch if="a referenced input file is missing" optional="true">
+    <output>Tell the user exactly which file is missing and continue with the remaining available context.</output>
+  </branch>
 </step>
 
 <step n="3" goal="Determine the correct continuation target">
-  <action>If `step-12-complete` is already present, treat the workflow as finished and route to completion handling.</action>
-  <action>Otherwise determine the next unfinished step from `stepsCompleted` and prepare to continue from that step.</action>
+  <branch if="`step-12-complete` is already present" optional="true">
+    <output>State that the PRD workflow is already complete and switch to completion-style guidance.</output>
+  </branch>
+  <branch if="the workflow is not complete" optional="true">
+    <action>Determine the next unfinished step from `stepsCompleted` and prepare that as the continuation target.</action>
+  </branch>
 </step>
 
-<step n="4" goal="Handle fully completed workflows">
-  <output>If the PRD workflow is already complete, summarize the completed PRD and explain that no further step loading is required unless the user wants to edit or extend the document.</output>
-</step>
-
-<step n="5" goal="Summarize progress and present continuation options">
-  <output>Summarize completed work, loaded context, and the next recommended PRD step.</output>
-  <ask>Present continuation options so the user can continue from the recommended next step, revisit a previous step, or stop.</ask>
-  <action>If the user chooses to continue, load the determined next step file and resume there.</action>
+<step n="4" goal="Present continuation options">
+  <ask>Ask whether the user wants to continue from the recommended next step, revisit a previous step, or stop.</ask>
+  <branch if="the user chooses to continue" optional="true">
+    <detail>Route to the next unfinished step based on the saved workflow state rather than restarting the workflow.</detail>
+  </branch>
 </step>
 
 ## CHECKPOINT
@@ -39,7 +45,3 @@ Wait for the user to confirm whether to continue from the recommended next step 
 
 - Preserve the existing workflow state rather than rewriting completed sections unnecessarily.
 - If the workflow is already complete, transition into wrap-up behavior instead of reopening unfinished-step menus.
-
-## REFERENCE
-
-- Continuation exists to restore state safely, not to duplicate initialization logic.

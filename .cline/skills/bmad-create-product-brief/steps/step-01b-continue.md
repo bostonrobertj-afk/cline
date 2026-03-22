@@ -7,55 +7,65 @@ outputFile: '{planning_artifacts}/product-brief-{{project_name}}-{{date}}.md'
 
 ## META
 
-- Goal: Resume the product brief workflow from where it was left off, ensuring smooth continuation with full context restoration.
-- Execute this file in order.
-- Halt whenever user input, confirmation, or workflow gating is required.
-- Use the structured sections for extraction; use the prose block for additional agent context.
+- Goal: Resume the product brief workflow from the saved document state with the same supporting context restored.
+- Only the current phase checklist and the current active step's details are shown in the prompt at one time.
+- Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
 
 ## EXECUTION
 
-<step n="1" goal="Analyze Current State">
-  <action>lastStep: The most recently completed step number</action>
-  <action>inputDocuments: What context was already loaded</action>
-  <action>All other frontmatter variables</action>
-  <ask>stepsCompleted: Which steps are already done</ask>
+<step n="1" goal="Analyze the saved workflow state">
+  <action>Review the frontmatter values in `{outputFile}`, including `stepsCompleted`, `lastStep`, `inputDocuments`, and the other saved workflow variables.</action>
+  <output>Present a short progress summary covering the completed steps, the last completed step, and the number of saved context documents.</output>
 </step>
 
-<step n="2" goal="Restore Context Documents">
-  <action>For each document in inputDocuments, load the complete file</action>
-  <action>This ensures you have full context for continuation</action>
-  <action>Don't discover new documents - only reload what was previously processed</action>
-  <action>Maintain the same context as when workflow was interrupted</action>
+<step n="2" goal="Restore only the previously confirmed context">
+  <action>Reload each file listed in `inputDocuments`.</action>
+  <detail>Do not perform new discovery during continuation. The goal here is to restore the previously confirmed context, not to expand it.</detail>
 </step>
 
-<step n="3" goal="Present Current Progress">
-  <action>Steps completed: {stepsCompleted}</action>
-  <action>Last worked on: Step {lastStep}</action>
-  <action>Context documents available: {len(inputDocuments)} files</action>
-  <action>Current product brief is ready with all completed sections</action>
-  <action>Ready to continue from where we left off</action>
+<step n="3" goal="Determine the next step from the saved state">
+  <branch if="lastStep = 1" optional="true">
+    <output>Set the next step to `./step-02-vision.md`.</output>
+  </branch>
+  <branch if="lastStep = 2" optional="true">
+    <output>Set the next step to `./step-03-users.md`.</output>
+  </branch>
+  <branch if="lastStep = 3" optional="true">
+    <output>Set the next step to `./step-04-metrics.md`.</output>
+  </branch>
+  <branch if="lastStep = 4" optional="true">
+    <output>Set the next step to `./step-05-scope.md`.</output>
+  </branch>
+  <branch if="lastStep = 5" optional="true">
+    <output>Set the next step to `./step-06-complete.md`.</output>
+  </branch>
+  <branch if="lastStep = 6" optional="true">
+    <output>State that the workflow is already complete and shift into completion guidance instead of resuming a drafting step.</output>
+  </branch>
 </step>
 
-<step n="4" goal="Determine Continuation Path">
-  <action>If lastStep = 1 → Load ./step-02-vision.md</action>
-  <action>If lastStep = 2 → Load ./step-03-users.md</action>
-  <action>If lastStep = 3 → Load ./step-04-metrics.md</action>
-  <action>Continue this pattern for all steps</action>
-  <action>If lastStep = 6 → Workflow already complete</action>
-</step>
-
-<step n="5" goal="Handle Workflow Completion">
-  <action>Review the completed product brief with you</action>
-  <action>Suggest next workflow steps (like PRD creation)</action>
-  <action>Start a new product brief revision</action>
-</step>
-
-<step n="6" goal="Present MENU OPTIONS">
-  <action>ONLY proceed to next step when user selects 'C'</action>
-  <ask>User can chat or ask questions about current progress</ask>
-  <output>IF C: Read fully and follow the appropriate next step file based on lastStep</output>
-  <output>IF Any other comments or queries: respond and redisplay menu</output>
-  <output>ALWAYS halt and wait for user input after presenting menu</output>
+<step n="4" goal="Ask the user whether to continue from the detected point">
+  <ask>Ask the user whether the restored progress looks correct and whether they want to continue from the detected next step.</ask>
+  <branch if="the workflow is already complete" optional="true">
+    <output>Offer to review the completed product brief, suggest next workflows, or start a revision pass.</output>
+  </branch>
+  <branch if="the user confirms continuation" optional="true">
+    <branch if="lastStep = 1" optional="true">
+      <handoff path="./step-02-vision.md">Resume at product vision discovery.</handoff>
+    </branch>
+    <branch if="lastStep = 2" optional="true">
+      <handoff path="./step-03-users.md">Resume at target-user discovery.</handoff>
+    </branch>
+    <branch if="lastStep = 3" optional="true">
+      <handoff path="./step-04-metrics.md">Resume at success-metrics definition.</handoff>
+    </branch>
+    <branch if="lastStep = 4" optional="true">
+      <handoff path="./step-05-scope.md">Resume at MVP scope definition.</handoff>
+    </branch>
+    <branch if="lastStep = 5" optional="true">
+      <handoff path="./step-06-complete.md">Resume at workflow completion.</handoff>
+    </branch>
+  </branch>
 </step>
 
 ## CHECKPOINT
@@ -65,159 +75,3 @@ Halt for any required user confirmation, menu selection, continuation gate, or m
 ## ADVISORY
 
 - Persist workflow state updates whenever this phase writes or updates a managed artifact.
-
-## REFERENCE
-
-<prose>
-## STEP GOAL:
-
-Resume the product brief workflow from where it was left off, ensuring smooth continuation with full context restoration.
-
-## MANDATORY EXECUTION RULES (READ FIRST):
-
-### Universal Rules:
-
-- 🛑 NEVER generate content without user input
-- 📖 CRITICAL: Read the complete step file before taking any action
-- 🔄 CRITICAL: When loading next step with 'C', ensure entire file is read
-- 📋 YOU ARE A FACILITATOR, not a content generator
-- ✅ YOU MUST ALWAYS SPEAK OUTPUT In your Agent communication style with the config `{communication_language}`
-
-### Role Reinforcement:
-
-- ✅ You are a product-focused Business Analyst facilitator
-- ✅ If you already have been given a name, communication_style and persona, continue to use those while playing this new role
-- ✅ We engage in collaborative dialogue, not command-response
-- ✅ You bring structured thinking and facilitation skills, while the user brings domain expertise and product vision
-- ✅ Maintain collaborative continuation tone throughout
-
-### Step-Specific Rules:
-
-- 🎯 Focus only on understanding where we left off and continuing appropriately
-- 🚫 FORBIDDEN to modify content completed in previous steps
-- 💬 Approach: Systematic state analysis with clear progress reporting
-- 📋 Resume workflow from exact point where it was interrupted
-
-## EXECUTION PROTOCOLS:
-
-- 🎯 Show your analysis of current state before taking any action
-- 💾 Keep existing frontmatter `stepsCompleted` values
-- 📖 Only load documents that were already tracked in `inputDocuments`
-- 🚫 FORBIDDEN to discover new input documents during continuation
-
-## CONTEXT BOUNDARIES:
-
-- Available context: Current document and frontmatter are already loaded
-- Focus: Workflow state analysis and continuation logic only
-- Limits: Don't assume knowledge beyond what's in the document
-- Dependencies: Existing workflow state from previous session
-
-## Sequence of Instructions (Do not deviate, skip, or optimize)
-
-### 1. Analyze Current State
-
-**State Assessment:**
-Review the frontmatter to understand:
-
-- `stepsCompleted`: Which steps are already done
-- `lastStep`: The most recently completed step number
-- `inputDocuments`: What context was already loaded
-- All other frontmatter variables
-
-### 2. Restore Context Documents
-
-**Context Reloading:**
-
-- For each document in `inputDocuments`, load the complete file
-- This ensures you have full context for continuation
-- Don't discover new documents - only reload what was previously processed
-- Maintain the same context as when workflow was interrupted
-
-### 3. Present Current Progress
-
-**Progress Report to User:**
-"Welcome back {{user_name}}! I'm resuming our product brief collaboration for {{project_name}}.
-
-**Current Progress:**
-
-- Steps completed: {stepsCompleted}
-- Last worked on: Step {lastStep}
-- Context documents available: {len(inputDocuments)} files
-
-**Document Status:**
-
-- Current product brief is ready with all completed sections
-- Ready to continue from where we left off
-
-Does this look right, or do you want to make any adjustments before we proceed?"
-
-### 4. Determine Continuation Path
-
-**Next Step Logic:**
-Based on `lastStep` value, determine which step to load next:
-
-- If `lastStep = 1` → Load `./step-02-vision.md`
-- If `lastStep = 2` → Load `./step-03-users.md`
-- If `lastStep = 3` → Load `./step-04-metrics.md`
-- Continue this pattern for all steps
-- If `lastStep = 6` → Workflow already complete
-
-### 5. Handle Workflow Completion
-
-**If workflow already complete (`lastStep = 6`):**
-"Great news! It looks like we've already completed the product brief workflow for {{project_name}}.
-
-The final document is ready at `{outputFile}` with all sections completed through step 6.
-
-Would you like me to:
-
-- Review the completed product brief with you
-- Suggest next workflow steps (like PRD creation)
-- Start a new product brief revision
-
-What would be most helpful?"
-
-### 6. Present MENU OPTIONS
-
-**If workflow not complete:**
-Display: "Ready to continue with Step {nextStepNumber}: {nextStepTitle}?
-
-**Select an Option:** [C] Continue to Step {nextStepNumber}"
-
-#### Menu Handling Logic:
-
-- IF C: Read fully and follow the appropriate next step file based on `lastStep`
-- IF Any other comments or queries: respond and redisplay menu
-
-#### EXECUTION RULES:
-
-- ALWAYS halt and wait for user input after presenting menu
-- ONLY proceed to next step when user selects 'C'
-- User can chat or ask questions about current progress
-
-## CRITICAL STEP COMPLETION NOTE
-
-ONLY WHEN [C continue option] is selected and [current state confirmed], will you then read fully and follow the appropriate next step file to resume the workflow.
-
----
-
-## 🚨 SYSTEM SUCCESS/FAILURE METRICS
-
-### ✅ SUCCESS:
-
-- All previous input documents successfully reloaded
-- Current workflow state accurately analyzed and presented
-- User confirms understanding of progress before continuation
-- Correct next step identified and prepared for loading
-- Proper continuation path determined based on `lastStep`
-
-### ❌ SYSTEM FAILURE:
-
-- Discovering new input documents instead of reloading existing ones
-- Modifying content from already completed steps
-- Loading wrong next step based on `lastStep` value
-- Proceeding without user confirmation of current state
-- Not maintaining context consistency from previous session
-
-**Master Rule:** Skipping steps, optimizing sequences, or not following exact instructions is FORBIDDEN and constitutes SYSTEM FAILURE.
-</prose>

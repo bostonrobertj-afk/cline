@@ -14,6 +14,10 @@ partyModeWorkflow: '{project-root}/_bmad/core/workflows/party-mode/workflow.md'
 
 ## META
 
+- Goal: teach the quick-start session, capture learner responses, and return to the session menu with updated progress.
+- Only the current phase checklist and the current active step's details are shown in the prompt at one time.
+- Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
+
 - Goal: introduce TEA, show the TEA Lite learning model, validate understanding, and create session notes.
 - Keep the session focused on the Quick Start experience.
 
@@ -36,16 +40,16 @@ partyModeWorkflow: '{project-root}/_bmad/core/workflows/party-mode/workflow.md'
 
 <step n="3" goal="Show how TEA Lite and Automate fit together">
   <output>Explain the Automate workflow as a practical way to generate tests from described targets and project structure.</output>
-  <branch if="role == QA">
+  <branch if="role == QA" optional="true">
     <detail>Emphasize coverage expansion and reduced boilerplate.</detail>
   </branch>
-  <branch if="role == Dev">
+  <branch if="role == Dev" optional="true">
     <detail>Emphasize maintainable tests that follow fixture patterns and implementation-friendly structure.</detail>
   </branch>
-  <branch if="role == Lead">
+  <branch if="role == Lead" optional="true">
     <detail>Emphasize standardization across the team and repeatable test architecture.</detail>
   </branch>
-  <branch if="role == VP">
+  <branch if="role == VP" optional="true">
     <detail>Emphasize scalable onboarding and broader testing adoption without manual training overhead.</detail>
   </branch>
 </step>
@@ -62,14 +66,10 @@ partyModeWorkflow: '{project-root}/_bmad/core/workflows/party-mode/workflow.md'
 </step>
 
 <step n="6" goal="Return to the hub">
-  <output>Confirm completion, share the score, and present the A/P/C menu before loading `./step-03-session-menu.md`.</output>
+  <output>Confirm completion, share the score, and present the A/P/C menu.</output>
+  <handoff path="./step-03-session-menu.md" />
 </step>
 
 ## CHECKPOINT
 
 Pause for quiz answers and for the user’s choice at the A/P/C menu.
-
-## ADVISORY
-
-- Keep the explanations conceptual rather than implementation-specific.
-- Use the user's role to shape the examples without changing the core teaching points.

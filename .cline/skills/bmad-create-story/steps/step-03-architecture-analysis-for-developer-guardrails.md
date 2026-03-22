@@ -25,6 +25,8 @@ templateFile: '{workflow_path}/template.md'
 - current_phase: workflow::step-3
 - goal: Convert architecture context into concrete implementation guardrails.
 - Speak in `{communication_language}`.
+- Only the current phase checklist and the current active step's details are shown in the prompt at one time.
+- Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
 
 ## EXECUTION
 <step n="1" goal="Load and inspect the architecture context">
@@ -38,7 +40,7 @@ templateFile: '{workflow_path}/template.md'
 </step>
 
 <step n="3" goal="Capture overrides and special cases">
-  <branch if="the architecture introduces a decision that overrides a previous convention">
+  <branch if="the architecture introduces a decision that overrides a previous convention" optional="true">
     <action>Record the override clearly so the story does not point the developer toward the older pattern.</action>
   </branch>
 </step>

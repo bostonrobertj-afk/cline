@@ -8,7 +8,8 @@
 - Halt whenever a user response is required.
 - Speak in `communication_language`.
 - Keep the original document separate from the sharded output unless the user chooses otherwise.
-
+- Only the current phase checklist and the current active step's details are shown in the prompt at one time.
+- Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
 ## EXECUTION
 
 <step n="1" goal="Get and validate the source document path.">
@@ -17,7 +18,7 @@
   </ask>
   <action>Verify the file exists and is accessible.</action>
   <action>Verify the file has a `.md` extension.</action>
-  <branch if="the file is missing or is not markdown">
+  <branch if="the file is missing or is not markdown" optional="true">
     <output>Halt with an error message that the source must be an accessible markdown file.</output>
   </branch>
   <detail>Use the validated source path for the rest of the workflow.</detail>
@@ -27,15 +28,15 @@
   <action>Set the default destination to a folder beside the source file with the same base name and no `.md` extension.</action>
   <output>Present the default destination path and ask whether to use it or provide a custom path.</output>
   <ask>Use the suggested destination folder, or provide a different writable folder path.</ask>
-  <branch if="the user accepts the default destination">
+  <branch if="the user accepts the default destination" optional="true">
     <action>Use the suggested destination path.</action>
   </branch>
-  <branch if="the user provides a custom destination">
+  <branch if="the user provides a custom destination" optional="true">
     <action>Use the custom destination path.</action>
   </branch>
   <action>Verify the destination folder exists or can be created.</action>
   <action>Check write permission for the destination path.</action>
-  <branch if="permission is denied or the destination cannot be created">
+  <branch if="permission is denied or the destination cannot be created" optional="true">
     <output>Halt with an error message that the destination folder is not writable or cannot be created.</output>
   </branch>
 </step>
@@ -44,7 +45,7 @@
   <output>Tell the user that sharding is starting.</output>
   <action>Execute `npx @kayvan/markdown-tree-parser explode [source-document] [destination-folder]`.</action>
   <action>Capture command output and any errors.</action>
-  <branch if="the command fails">
+  <branch if="the command fails" optional="true">
     <output>Halt and show the error to the user.</output>
   </branch>
 </step>
@@ -53,10 +54,10 @@
   <action>Check that the destination folder contains sharded files.</action>
   <action>Verify that `index.md` was created in the destination folder.</action>
   <action>Count the number of files created.</action>
-  <branch if="no files were created">
+  <branch if="no files were created" optional="true">
     <output>Halt with an error message that no shard files were produced.</output>
   </branch>
-  <branch if="index.md is missing">
+  <branch if="index.md is missing" optional="true">
     <output>Halt with an error message that `index.md` was not created.</output>
   </branch>
 </step>
@@ -74,19 +75,19 @@
     - `m`: move it to an `archive` subfolder by default, or a custom archive path if provided
     - `k`: keep the original in place, with a warning that duplicate sources can cause confusion
   </detail>
-  <branch if="the user selects delete">
+  <branch if="the user selects delete" optional="true">
     <action>Delete the original source document file.</action>
     <output>Confirm deletion of the original document.</output>
     <detail>The document can be reconstructed by concatenating the shard files in order.</detail>
   </branch>
-  <branch if="the user selects move">
+  <branch if="the user selects move" optional="true">
     <action>Set the default archive location to an `archive` subfolder beside the source file.</action>
     <ask>Use the default archive path or provide a custom archive path.</ask>
     <action>Create the archive directory if it does not exist.</action>
     <action>Move the original document to the archive path.</action>
     <output>Confirm the archive location.</output>
   </branch>
-  <branch if="the user selects keep">
+  <branch if="the user selects keep" optional="true">
     <output>Warn that keeping both versions is not recommended and confirm the source path if the user still wants to keep it.</output>
   </branch>
 </step>

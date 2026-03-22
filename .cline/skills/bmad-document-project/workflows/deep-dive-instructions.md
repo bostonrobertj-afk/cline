@@ -78,7 +78,9 @@ Estimated files to analyze: {{estimated_file_count}}
 This will read EVERY file in this area. Proceed? [y/n]
 </action>
 
-<action if="user confirms 'n'">Return to Step 13a (select different area)</action>
+<branch if="user confirms 'n'" optional="true">
+  <goto step="13a" />
+</branch>
 </step>
 
 <step n="13b" goal="Comprehensive exhaustive scan of target area">
@@ -86,7 +88,7 @@ This will read EVERY file in this area. Proceed? [y/n]
   <action>Initialize file_inventory = []</action>
   <critical>You must read every line of every file in scope and capture a plain-language explanation (what the file does, side effects, why it matters) that future developer agents can act on. No shortcuts.</critical>
 
-  <check if="target_type == folder">
+  <branch if="target_type == folder" optional="true">
     <action>Get complete recursive file list from {{target_path}}</action>
     <action>Filter out: node_modules/, .git/, dist/, build/, coverage/, *.min.js, *.map</action>
     <action>For EVERY remaining file in folder:
@@ -101,17 +103,17 @@ This will read EVERY file in this area. Proceed? [y/n]
       - Capture per-file contributor guidance: `contributor_note`, `risks`, `verification_steps`, `suggested_tests`
       - Store in file_inventory
     </action>
-  </check>
+  </branch>
 
-  <check if="target_type == file">
+  <branch if="target_type == file" optional="true">
     <action>Read complete file at {{target_path}}</action>
     <action>Extract all information as above</action>
     <action>Read all files it imports (follow import chain 1 level deep)</action>
     <action>Find all files that import this file (dependents via grep)</action>
     <action>Store all in file_inventory</action>
-  </check>
+  </branch>
 
-  <check if="target_type == api_group">
+  <branch if="target_type == api_group" optional="true">
     <action>Identify all route/controller files in API group</action>
     <action>Read all route handlers completely</action>
     <action>Read associated middleware, controllers, services</action>
@@ -119,21 +121,21 @@ This will read EVERY file in this area. Proceed? [y/n]
     <action>Extract complete request/response schemas</action>
     <action>Document authentication and authorization requirements</action>
     <action>Store all in file_inventory</action>
-  </check>
+  </branch>
 
-  <check if="target_type == feature">
+  <branch if="target_type == feature" optional="true">
     <action>Search codebase for all files related to feature name</action>
     <action>Include: UI components, API endpoints, models, services, tests</action>
     <action>Read each file completely</action>
     <action>Store all in file_inventory</action>
-  </check>
+  </branch>
 
-  <check if="target_type == component_group">
+  <branch if="target_type == component_group" optional="true">
     <action>Get all component files in group</action>
     <action>Read each component completely</action>
     <action>Extract: Props interfaces, hooks used, child components, state management</action>
     <action>Store all in file_inventory</action>
-  </check>
+  </branch>
 
 <action>For each file in file\*inventory, document: - **File Path:** Full path - **Purpose:** What this file does (1-2 sentences) - **Lines of Code:** Total LOC - **Exports:** Complete list with signatures
 
@@ -209,7 +211,7 @@ This will read EVERY file in this area. Proceed? [y/n]
 
 <action>Check if "Deep-Dive Documentation" section exists</action>
 
-  <check if="section does not exist">
+  <branch if="section does not exist" optional="true">
     <action>Add new section after "Generated Documentation":
 
 ## Deep-Dive Documentation
@@ -218,7 +220,7 @@ Detailed exhaustive analysis of specific areas:
 
     </action>
 
-  </check>
+  </branch>
 
 <action>Add link to new deep-dive doc:
 
@@ -269,12 +271,12 @@ Detailed exhaustive analysis of specific areas:
 Your choice [1/2]:
 </ask>
 
-  <action if="user selects 1">
+  <branch if="user selects 1" optional="true">
     <action>Clear current deep_dive_target</action>
     <action>Go to Step 13a (select new area)</action>
-  </action>
+  </branch>
 
-  <action if="user selects 2">
+  <branch if="user selects 2" optional="true">
     <action>Display final message:
 
 All deep-dive documentation complete!
@@ -290,9 +292,8 @@ These comprehensive docs are now ready for:
 - Brownfield PRD creation
 
 Thank you for using the document-project workflow!
-</action>
-<action>Exit workflow</action>
-</action>
+    <exit />
+  </branch>
 </step>
 </step>
 

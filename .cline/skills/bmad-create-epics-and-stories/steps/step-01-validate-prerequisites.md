@@ -2,96 +2,83 @@
 
 ## META
 
-- Goal: To validate that all required input documents exist and extract all requirements (FRs, NFRs, and additional requirements from UX/Architecture) needed for epic and story creation.
-- Execute this file in order.
-- Halt whenever user input, confirmation, or workflow gating is required.
-- Use the structured sections for extraction; use the prose block for additional agent context.
+- Goal: Validate that all required input documents exist and extract the requirements inventory needed for epic and story creation.
+- Only the current phase checklist and the current active step's details are shown in the prompt at one time.
+- Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
 
 ## EXECUTION
 
-<step n="1" goal="Welcome and Overview">
-  <action>PRD.md - Contains requirements (FRs and NFRs) and product scope</action>
-  <action>Architecture.md - Contains technical decisions, API contracts, data models</action>
-  <action>UX Design.md (if UI exists) - Contains interaction patterns, mockups, user flows</action>
+<step n="1" goal="Discover the input documents and confirm the analysis set">
+  <action>Search for the PRD using whole-document and sharded index patterns under {planning_artifacts}.</action>
+  <action>Search for the Architecture document using whole-document and sharded index patterns under {planning_artifacts}.</action>
+  <branch if="a UX document exists" optional="true">
+    <action>Search for the UX Design document using whole-document and sharded index patterns under {planning_artifacts}.</action>
+    <detail>Treat the UX document as a first-class source when it exists; do not treat it as optional flavor text.</detail>
+  </branch>
+  <ask>Ask the user whether any discovered planning documents should be excluded and whether any additional documents should be included in the analysis set.</ask>
+  <output>Present the discovered document set, clearly identifying which files will be used as the confirmed analysis inputs.</output>
 </step>
 
-<step n="2" goal="Document Discovery and Validation">
-  <action>{planning_artifacts}/prd.md (whole document)</action>
-  <action>{planning_artifacts}/prd/index.md (sharded version)</action>
-  <action>{planning_artifacts}/architecture.md (whole document)</action>
-  <action>{planning_artifacts}/architecture/index.md (sharded version)</action>
-  <action>{planning_artifacts}/ux.md (whole document)</action>
-  <ask>{planning_artifacts}/ux/index.md (sharded version) Before proceeding, Ask the user if there are any other documents to include for analysis, and if anything found should be excluded.</ask>
-  <output>Once confirmed, create the {planning_artifacts}/epics.md from the ../templates/epics-template.md and in the front matter list the files in the array of inputDocuments: [].</output>
+<step n="2" goal="Initialize the epics document from the template once the input set is confirmed">
+  <action>Load `../templates/epics-template.md`.</action>
+  <action>Create or refresh `{planning_artifacts}/epics.md` from the template.</action>
+  <output>Write the confirmed input document list into the `inputDocuments` frontmatter array in `{planning_artifacts}/epics.md`.</output>
 </step>
 
-<step n="3" goal="Extract Functional Requirements (FRs)">
-  <action>Look for numbered items like &quot;FR1:&quot;, &quot;Functional Requirement 1:&quot;, or similar</action>
-  <action>Identify requirement statements that describe what the system must DO</action>
-  <action>Include user actions, system behaviors, and business rules</action>
+<step n="3" goal="Extract the requirements inventory from the confirmed sources">
+  <action>Read the full PRD content from the chosen source and extract every functional requirement.</action>
+  <action>Extract every non-functional requirement from the chosen PRD source.</action>
+  <detail>Functional requirements should describe what the system must do. Non-functional requirements should capture quality attributes, constraints, standards, and compliance needs.</detail>
+  <action>Review the Architecture document for technical requirements that affect epic and story design.</action>
+  <branch if="the Architecture document specifies a starter or greenfield template" optional="true">
+    <action>Record the starter-template requirement prominently so Epic 1 Story 1 can reflect it.</action>
+    <detail>This should influence the first implementation story rather than being buried in a generic technical-notes section.</detail>
+  </branch>
+  <branch if="a UX document exists" optional="true">
+    <action>Extract actionable UX design requirements as a separate UX-specific requirements section.</action>
+    <detail>Call out design tokens, reusable components, accessibility work, responsive behaviors, interaction patterns, and browser or device requirements as discrete implementation requirements.</detail>
+    <output>List every UX requirement concretely. If the UX spec identifies six components, list all six instead of summarizing them as generic component work.</output>
+  </branch>
 </step>
 
-<step n="4" goal="Extract Non-Functional Requirements (NFRs)">
-  <action>Look for performance, security, usability, reliability requirements</action>
-  <action>Identify constraints and quality attributes</action>
-  <action>Include technical standards and compliance requirements</action>
+<step n="4" goal="Write the extracted inventory into the epics document">
+  <action>Populate the Functional Requirements section with the complete FR list.</action>
+  <action>Populate the Non-Functional Requirements section with the complete NFR list.</action>
+  <action>Populate the additional technical-requirements section with Architecture-derived requirements.</action>
+  <branch if="UX requirements were extracted" optional="true">
+    <action>Populate the dedicated UX requirements section with the extracted UX design requirements.</action>
+  </branch>
 </step>
 
-<step n="5" goal="Extract Additional Requirements from Architecture">
-  <action>Starter Template: Does Architecture specify a starter/greenfield template? If YES, document this for Epic 1 Story 1</action>
-  <action>Infrastructure and deployment requirements</action>
-  <action>Integration requirements with external systems</action>
-  <action>Data migration or setup requirements</action>
-  <action>Monitoring and logging requirements</action>
-  <ask>Review the Architecture document for technical requirements that impact epic and story creation: Look for: - Starter Template: Does Architecture specify a starter/greenfield template?</ask>
+<step n="5" goal="Review the extracted requirements with the user and capture corrections">
+  <output>Show the count of extracted functional requirements and a representative sample.</output>
+  <output>Show the count of extracted non-functional requirements and the key constraints they express.</output>
+  <output>Summarize the Architecture-derived requirements that affect epic and story creation.</output>
+  <branch if="UX requirements were extracted" optional="true">
+    <output>Show the count of extracted UX requirements and highlight the most consequential UX implementation items.</output>
+  </branch>
+  <ask>Ask whether any requirements are missing, misclassified, or incorrectly worded.</ask>
+  <branch if="the user requests corrections" optional="true">
+    <action>Update the extracted inventory in `{planning_artifacts}/epics.md` and re-present the revised inventory for confirmation.</action>
+  </branch>
+  <branch if="the user confirms the inventory is accurate" optional="true">
+    <output>State that the requirements inventory is approved and ready for epic design.</output>
+  </branch>
 </step>
 
-<step n="6" goal="Extract UX Design Requirements (if UX document exists)">
-  <action>Design token work: Color systems, spacing scales, typography tokens that need implementation or consolidation</action>
-  <action>Component proposals: Reusable UI components identified in the UX spec (e.g., ConfirmActions, StatusMessage, EmptyState, FocusIndicator)</action>
-  <action>Visual standardization: Semantic CSS classes, consistent color palette usage, design pattern consolidation</action>
-  <action>Accessibility requirements: Contrast audit fixes, ARIA patterns, keyboard navigation, screen reader support</action>
-  <action>Responsive design requirements: Breakpoints, layout adaptations, mobile-specific interactions</action>
-  <output>If the UX spec identifies 6 reusable components, list all 6 — not &quot;create reusable components.&quot;</output>
-</step>
-
-<step n="7" goal="Load and Initialize Template">
-  <action>Copy the entire template to {planning_artifacts}/epics.md</action>
-  <action>Replace with the actual project name</action>
-  <action>Replace placeholder sections with extracted requirements:</action>
-  <action>Leave and as placeholders for now</action>
-  <output>Load ../templates/epics-template.md and initialize {planning_artifacts}/epics.md: 1.</output>
-</step>
-
-<step n="8" goal="Present Extracted Requirements">
-  <action>Show count of FRs found</action>
-  <action>Display the first few FRs as examples</action>
-  <action>Ask if any FRs are missing or incorrectly captured</action>
-  <action>Show count of NFRs found</action>
-  <action>Display key NFRs</action>
-  <ask>Display to user: Functional Requirements Extracted: - Show count of FRs found - Display the first few FRs as examples - Ask if any FRs are missing or incorrectly captured Non-Functional Requirements Extracted: - Show count of NFRs found - Display key NFRs - Ask if any constraints were missed Additional Requirements (Architecture): - Summarize technical requirements from Architecture - Verify completeness UX Design Requirements (if applicable): - Show count of UX-DRs found - Display key UX Design requirements (design tokens, components, accessibility) - Verify each UX-DR is specific enough for story creation</ask>
-  <output>Display to user: Functional Requirements Extracted: - Show count of FRs found - Display the first few FRs as examples - Ask if any FRs are missing or incorrectly captured Non-Functional Requirements Extracted: - Show count of NFRs found - Display key NFRs - Ask if any constraints were missed Additional Requirements (Architecture): - Summarize technical requirements from Architecture - Verify completeness UX Design Requirements (if applicable): - Show count of UX-DRs found - Display key UX Design requirements (design tokens, components, accessibility) - Verify each UX-DR is specific enough for story creation</output>
-</step>
-
-<step n="9" goal="Get User Confirmation">
-  <action>Complete FR list in section</action>
-  <action>Complete NFR list in section</action>
-  <action>All additional requirements in section</action>
-  <action>UX Design requirements in section (if UX document exists)</action>
-  <ask>Ask: &quot;Do these extracted requirements accurately represent what needs to be built?</ask>
-  <ask>Any additions or corrections?&quot; Update the requirements based on user feedback until confirmation is received.</ask>
-  <output>Ask: &quot;Do these extracted requirements accurately represent what needs to be built?</output>
-  <output>## CONTENT TO SAVE TO DOCUMENT: After extraction and confirmation, update {planning_artifacts}/epics.md with: - Complete FR list in section - Complete NFR list in section - All additional requirements in section - UX Design requirements in section (if UX document exists)</output>
-</step>
-
-<step n="10" goal="Present MENU OPTIONS">
-  <action>ALWAYS halt and wait for user input after presenting menu</action>
-  <action>ONLY proceed to next step when user selects 'C'</action>
-  <action>User can chat or ask questions - always respond and then end with display again of the menu option</action>
-  <action>IF C: Save all to {planning_artifacts}/epics.md, update frontmatter, then read fully and follow: ./step-02-design-epics.md</action>
-  <action>IF Any other comments or queries: help user respond then Redisplay Menu Options</action>
-  <ask>Display: Confirm the Requirements are complete and correct to [C] continue: #### EXECUTION RULES: - ALWAYS halt and wait for user input after presenting menu - ONLY proceed to next step when user selects 'C' - User can chat or ask questions - always respond and then end with display again of the menu option #### Menu Handling Logic: - IF C: Save all to {planning_artifacts}/epics.md, update frontmatter, then read fully and follow: ./step-02-design-epics.md - IF Any other comments or queries: help user respond then Redisplay Menu Options</ask>
-  <output>Display: Confirm the Requirements are complete and correct to [C] continue: #### EXECUTION RULES: - ALWAYS halt and wait for user input after presenting menu - ONLY proceed to next step when user selects 'C' - User can chat or ask questions - always respond and then end with display again of the menu option #### Menu Handling Logic: - IF C: Save all to {planning_artifacts}/epics.md, update frontmatter, then read fully and follow: ./step-02-design-epics.md - IF Any other comments or queries: help user respond then Redisplay Menu Options</output>
+<step n="6" goal="Present the continuation menu for moving into epic design">
+  <ask>Ask the user to choose whether to continue to epic design, use Advanced Elicitation, or use Party Mode.</ask>
+  <detail>Keep the menu visible after answering side questions. Only move forward when the user explicitly chooses the continuation path.</detail>
+  <branch if="the user chooses Advanced Elicitation" optional="true">
+    <action>Invoke the `bmad-advanced-elicitation` skill against the current requirements inventory context.</action>
+  </branch>
+  <branch if="the user chooses Party Mode" optional="true">
+    <action>Invoke the `bmad-party-mode` skill against the current requirements inventory context.</action>
+  </branch>
+  <branch if="the user chooses Continue" optional="true">
+    <action>Persist the approved requirements inventory and workflow state in `{planning_artifacts}/epics.md`.</action>
+    <handoff path="./step-02-design-epics.md">Proceed to collaborative epic design.</handoff>
+  </branch>
 </step>
 
 ## CHECKPOINT
@@ -101,261 +88,3 @@ Halt for any required user confirmation, menu selection, continuation gate, or m
 ## ADVISORY
 
 - Persist workflow state updates whenever this phase writes or updates a managed artifact.
-
-## REFERENCE
-
-<prose>
-## STEP GOAL:
-
-To validate that all required input documents exist and extract all requirements (FRs, NFRs, and additional requirements from UX/Architecture) needed for epic and story creation.
-
-## MANDATORY EXECUTION RULES (READ FIRST):
-
-### Universal Rules:
-
-- 🛑 NEVER generate content without user input
-- 📖 CRITICAL: Read the complete step file before taking any action
-- 🔄 CRITICAL: When loading next step with 'C', ensure entire file is read
-- 📋 YOU ARE A FACILITATOR, not a content generator
-- ✅ YOU MUST ALWAYS SPEAK OUTPUT In your Agent communication style with the config `{communication_language}`
-
-### Role Reinforcement:
-
-- ✅ You are a product strategist and technical specifications writer
-- ✅ If you already have been given communication or persona patterns, continue to use those while playing this new role
-- ✅ We engage in collaborative dialogue, not command-response
-- ✅ You bring requirements extraction expertise
-- ✅ User brings their product vision and context
-
-### Step-Specific Rules:
-
-- 🎯 Focus ONLY on extracting and organizing requirements
-- 🚫 FORBIDDEN to start creating epics or stories in this step
-- 💬 Extract requirements from ALL available documents
-- 🚪 POPULATE the template sections exactly as needed
-
-## EXECUTION PROTOCOLS:
-
-- 🎯 Extract requirements systematically from all documents
-- 💾 Populate {planning_artifacts}/epics.md with extracted requirements
-- 📖 Update frontmatter with extraction progress
-- 🚫 FORBIDDEN to load next step until user selects 'C' and requirements are extracted
-
-## REQUIREMENTS EXTRACTION PROCESS:
-
-### 1. Welcome and Overview
-
-Welcome {user_name} to comprehensive epic and story creation!
-
-**CRITICAL PREREQUISITE VALIDATION:**
-
-Verify required documents exist and are complete:
-
-1. **PRD.md** - Contains requirements (FRs and NFRs) and product scope
-2. **Architecture.md** - Contains technical decisions, API contracts, data models
-3. **UX Design.md** (if UI exists) - Contains interaction patterns, mockups, user flows
-
-### 2. Document Discovery and Validation
-
-Search for required documents using these patterns (sharded means a large document was split into multiple small files with an index.md into a folder) - if the whole document is found, use that instead of the sharded version:
-
-**PRD Document Search Priority:**
-
-1. `{planning_artifacts}/*prd*.md` (whole document)
-2. `{planning_artifacts}/*prd*/index.md` (sharded version)
-
-**Architecture Document Search Priority:**
-
-1. `{planning_artifacts}/*architecture*.md` (whole document)
-2. `{planning_artifacts}/*architecture*/index.md` (sharded version)
-
-**UX Design Document Search (Optional):**
-
-1. `{planning_artifacts}/*ux*.md` (whole document)
-2. `{planning_artifacts}/*ux*/index.md` (sharded version)
-
-Before proceeding, Ask the user if there are any other documents to include for analysis, and if anything found should be excluded. Wait for user confirmation. Once confirmed, create the {planning_artifacts}/epics.md from the ../templates/epics-template.md and in the front matter list the files in the array of `inputDocuments: []`.
-
-### 3. Extract Functional Requirements (FRs)
-
-From the PRD document (full or sharded), read then entire document and extract ALL functional requirements:
-
-**Extraction Method:**
-
-- Look for numbered items like "FR1:", "Functional Requirement 1:", or similar
-- Identify requirement statements that describe what the system must DO
-- Include user actions, system behaviors, and business rules
-
-**Format the FR list as:**
-
-```
-FR1: [Clear, testable requirement description]
-FR2: [Clear, testable requirement description]
-...
-```
-
-### 4. Extract Non-Functional Requirements (NFRs)
-
-From the PRD document, extract ALL non-functional requirements:
-
-**Extraction Method:**
-
-- Look for performance, security, usability, reliability requirements
-- Identify constraints and quality attributes
-- Include technical standards and compliance requirements
-
-**Format the NFR list as:**
-
-```
-NFR1: [Performance/Security/Usability requirement]
-NFR2: [Performance/Security/Usability requirement]
-...
-```
-
-### 5. Extract Additional Requirements from Architecture
-
-Review the Architecture document for technical requirements that impact epic and story creation:
-
-**Look for:**
-
-- **Starter Template**: Does Architecture specify a starter/greenfield template? If YES, document this for Epic 1 Story 1
-- Infrastructure and deployment requirements
-- Integration requirements with external systems
-- Data migration or setup requirements
-- Monitoring and logging requirements
-- API versioning or compatibility requirements
-- Security implementation requirements
-
-**IMPORTANT**: If a starter template is mentioned in Architecture, note it prominently. This will impact Epic 1 Story 1.
-
-**Format Additional Requirements as:**
-
-```
-- [Technical requirement from Architecture that affects implementation]
-- [Infrastructure setup requirement]
-- [Integration requirement]
-...
-```
-
-### 6. Extract UX Design Requirements (if UX document exists)
-
-**IMPORTANT**: The UX Design Specification is a first-class input document, not supplementary material. Requirements from the UX spec must be extracted with the same rigor as PRD functional requirements.
-
-Read the FULL UX Design document and extract ALL actionable work items:
-
-**Look for:**
-
-- **Design token work**: Color systems, spacing scales, typography tokens that need implementation or consolidation
-- **Component proposals**: Reusable UI components identified in the UX spec (e.g., ConfirmActions, StatusMessage, EmptyState, FocusIndicator)
-- **Visual standardization**: Semantic CSS classes, consistent color palette usage, design pattern consolidation
-- **Accessibility requirements**: Contrast audit fixes, ARIA patterns, keyboard navigation, screen reader support
-- **Responsive design requirements**: Breakpoints, layout adaptations, mobile-specific interactions
-- **Interaction patterns**: Animations, transitions, loading states, error handling UX
-- **Browser/device compatibility**: Target platforms, progressive enhancement requirements
-
-**Format UX Design Requirements as a SEPARATE section (not merged into Additional Requirements):**
-
-```
-UX-DR1: [Actionable UX design requirement with clear implementation scope]
-UX-DR2: [Actionable UX design requirement with clear implementation scope]
-...
-```
-
-**🚨 CRITICAL**: Do NOT reduce UX requirements to vague summaries. Each UX-DR must be specific enough to generate a story with testable acceptance criteria. If the UX spec identifies 6 reusable components, list all 6 — not "create reusable components."
-
-### 7. Load and Initialize Template
-
-Load ../templates/epics-template.md and initialize {planning_artifacts}/epics.md:
-
-1. Copy the entire template to {planning_artifacts}/epics.md
-2. Replace {{project_name}} with the actual project name
-3. Replace placeholder sections with extracted requirements:
-   - {{fr_list}} → extracted FRs
-   - {{nfr_list}} → extracted NFRs
-   - {{additional_requirements}} → extracted additional requirements (from Architecture)
-   - {{ux_design_requirements}} → extracted UX Design Requirements (if UX document exists)
-4. Leave {{requirements_coverage_map}} and {{epics_list}} as placeholders for now
-
-### 8. Present Extracted Requirements
-
-Display to user:
-
-**Functional Requirements Extracted:**
-
-- Show count of FRs found
-- Display the first few FRs as examples
-- Ask if any FRs are missing or incorrectly captured
-
-**Non-Functional Requirements Extracted:**
-
-- Show count of NFRs found
-- Display key NFRs
-- Ask if any constraints were missed
-
-**Additional Requirements (Architecture):**
-
-- Summarize technical requirements from Architecture
-- Verify completeness
-
-**UX Design Requirements (if applicable):**
-
-- Show count of UX-DRs found
-- Display key UX Design requirements (design tokens, components, accessibility)
-- Verify each UX-DR is specific enough for story creation
-
-### 9. Get User Confirmation
-
-Ask: "Do these extracted requirements accurately represent what needs to be built? Any additions or corrections?"
-
-Update the requirements based on user feedback until confirmation is received.
-
-## CONTENT TO SAVE TO DOCUMENT:
-
-After extraction and confirmation, update {planning_artifacts}/epics.md with:
-
-- Complete FR list in {{fr_list}} section
-- Complete NFR list in {{nfr_list}} section
-- All additional requirements in {{additional_requirements}} section
-- UX Design requirements in {{ux_design_requirements}} section (if UX document exists)
-
-### 10. Present MENU OPTIONS
-
-Display: `**Confirm the Requirements are complete and correct to [C] continue:**`
-
-#### EXECUTION RULES:
-
-- ALWAYS halt and wait for user input after presenting menu
-- ONLY proceed to next step when user selects 'C'
-- User can chat or ask questions - always respond and then end with display again of the menu option
-
-#### Menu Handling Logic:
-
-- IF C: Save all to {planning_artifacts}/epics.md, update frontmatter, then read fully and follow: ./step-02-design-epics.md
-- IF Any other comments or queries: help user respond then [Redisplay Menu Options](#10-present-menu-options)
-
-## CRITICAL STEP COMPLETION NOTE
-
-ONLY WHEN C is selected and all requirements are saved to document and frontmatter is updated, will you then read fully and follow: ./step-02-design-epics.md to begin epic design step.
-
----
-
-## 🚨 SYSTEM SUCCESS/FAILURE METRICS
-
-### ✅ SUCCESS:
-
-- All required documents found and validated
-- All FRs extracted and formatted correctly
-- All NFRs extracted and formatted correctly
-- Additional requirements from Architecture/UX identified
-- Template initialized with requirements
-- User confirms requirements are complete and accurate
-
-### ❌ SYSTEM FAILURE:
-
-- Missing required documents
-- Incomplete requirements extraction
-- Template not properly initialized
-- Not saving requirements to output file
-
-**Master Rule:** Skipping steps, optimizing sequences, or not following exact instructions is FORBIDDEN and constitutes SYSTEM FAILURE.
-</prose>

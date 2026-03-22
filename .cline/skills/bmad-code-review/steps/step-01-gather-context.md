@@ -8,120 +8,135 @@ review_mode: '' # set at runtime: "full" or "no-spec"
 
 ## META
 
-- Goal: gather context
+- Goal: determine what to review, construct the diff input, and load any spec context needed for the review.
 - Execute this file in order.
 - Halt whenever user input, confirmation, or workflow gating is required.
-- Use the structured sections for extraction; use the prose block for additional agent context.
+- This phase is read-only. Do not modify project files while gathering review context.
+- Only the current phase checklist and the current active step's details are shown in the prompt at one time.
+- Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
 
 ## EXECUTION
 
-<step n="1" goal="Detect review intent from invocation text">
-  <action>&quot;staged&quot; / &quot;staged changes&quot; → Staged changes only</action>
-  <action>&quot;uncommitted&quot; / &quot;working tree&quot; / &quot;all changes&quot; → Uncommitted changes (staged + unstaged)</action>
-  <action>&quot;branch diff&quot; / &quot;vs main&quot; / &quot;against main&quot; / &quot;compared to {branch}&quot; → Branch diff (extract base branch if mentioned)</action>
-  <action>&quot;commit range&quot; / &quot;last N commits&quot; / &quot;{sha}..{sha}&quot; → Specific commit range</action>
-  <action>&quot;this diff&quot; / &quot;provided diff&quot; / &quot;paste&quot; → User-provided diff (do not match bare &quot;diff&quot; — it appears in other modes)</action>
-  <ask>Detect review intent from invocation text. Check the triggering prompt for phrases that map to a review mode:</ask>
+<step n="1" goal="Determine the review target">
+  <action>
+    Detect review intent from the triggering prompt before asking the user to choose manually.
+    <detail>
+      - "staged" / "staged changes" -> staged changes only
+      - "uncommitted" / "working tree" / "all changes" -> staged + unstaged changes
+      - "branch diff" / "vs main" / "against main" / "compared to {branch}" -> branch diff
+      - "commit range" / "last N commits" / "{sha}..{sha}" -> specific commit range
+      - "this diff" / "provided diff" / "paste" -> user-provided diff
+      - when multiple phrases match, prefer the most specific match
+    </detail>
+  </action>
+  <branch if="a clear review mode is detected from the triggering prompt" optional="true">
+    <output>Announce the detected review mode and proceed with that source.</output>
+  </branch>
+  <branch if="no clear review mode is detected from the triggering prompt" optional="true">
+    <action>
+      Check sprint tracking for stories currently in `review` status.
+      <detail>
+        Look for a sprint status file in `{implementation_artifacts}` or `{planning_artifacts}` and scan for stories in `review`.
+      </detail>
+    </action>
+    <branch if="exactly one review story is found" optional="true">
+      <ask>Ask whether the user wants to review that story's changes. Offer `[Y] Yes` or `[N] No, let me choose`.</ask>
+      <branch if="the user confirms the suggested story" optional="true">
+        <action>Use the selected story context to determine the diff source.</action>
+      </branch>
+      <branch if="the user declines the suggested story" optional="true">
+        <ask>
+          Ask what to review and present these options: uncommitted changes, staged changes only, branch diff, specific commit range, or provided diff/file list.
+        </ask>
+      </branch>
+    </branch>
+    <branch if="multiple review stories are found" optional="true">
+      <ask>Present the review stories as numbered options plus a manual-choice option, then wait for the user to choose.</ask>
+      <branch if="the user selects one of the review stories" optional="true">
+        <action>Use the selected story context to determine the diff source.</action>
+      </branch>
+      <branch if="the user chooses a manual review source instead" optional="true">
+        <ask>
+          Ask what to review and present these options: uncommitted changes, staged changes only, branch diff, specific commit range, or provided diff/file list.
+        </ask>
+      </branch>
+    </branch>
+    <branch if="no review story is found in sprint tracking" optional="true">
+      <ask>
+        Ask what to review and present these options: uncommitted changes, staged changes only, branch diff, specific commit range, or provided diff/file list.
+      </ask>
+    </branch>
+  </branch>
 </step>
 
-<step n="2" goal="Complete ordered workflow item">
-  <action>Uncommitted changes (staged + unstaged)</action>
-  <action>Staged changes only</action>
-  <action>Provided diff or file list (user pastes or provides a path)</action>
-  <ask>HALT. Ask the user: What do you want to review? Present these options:</ask>
-  <ask>Branch diff vs a base branch (ask which base branch)</ask>
-  <ask>Specific commit range (ask for the range)</ask>
+<step n="2" goal="Construct `{diff_output}` from the chosen source">
+  <branch if="the chosen source is a branch diff" optional="true">
+    <action>Verify the base branch exists before running `git diff`.</action>
+    <ask if="the base branch does not exist">HALT and ask the user for a valid branch.</ask>
+    <action>Construct `{diff_output}` from the selected branch diff.</action>
+  </branch>
+  <branch if="the chosen source is a commit range" optional="true">
+    <action>Verify the range resolves before using it.</action>
+    <ask if="the range does not resolve">HALT and ask the user for a valid commit range.</ask>
+    <action>Construct `{diff_output}` from the selected commit range.</action>
+  </branch>
+  <branch if="the chosen source is a provided diff" optional="true">
+    <action>Validate that the provided content is non-empty and parseable as a unified diff.</action>
+    <ask if="the provided diff is empty or not parseable">HALT and ask the user to provide a valid diff.</ask>
+    <action>Use the validated provided diff as `{diff_output}`.</action>
+  </branch>
+  <branch if="the chosen source is a provided file list" optional="true">
+    <action>
+      Validate each path exists in the working tree, then construct `{diff_output}` from those paths.
+      <detail>
+        - use `git diff HEAD -- <paths>` for tracked files with uncommitted changes
+        - use `git diff --no-index /dev/null <path>` for untracked files that should be reviewed as new files
+      </detail>
+    </action>
+    <ask if="any provided path does not exist">HALT and ask the user to correct the file list.</ask>
+    <ask if="the resulting diff is empty">Ask whether to review the full file contents or choose a different baseline.</ask>
+  </branch>
+  <branch if="the chosen source is staged or uncommitted changes" optional="true">
+    <action>Construct `{diff_output}` from the selected working-tree state.</action>
+  </branch>
+  <action>Verify `{diff_output}` is non-empty after construction.</action>
+  <ask if="{diff_output} is empty">HALT and tell the user there is nothing to review.</ask>
 </step>
 
-<step n="3" goal="Construct {diff_output} from the chosen source">
-  <action>Construct {diff_output} from the chosen source.</action>
-  <ask>For branch diff: verify the base branch exists before running git diff. If it does not exist, HALT and ask the user for a valid branch.</ask>
-  <ask>For commit range: verify the range resolves. If it does not, HALT and ask the user for a valid range.</ask>
-  <ask>For provided diff: validate the content is non-empty and parseable as a unified diff. If it is not parseable, HALT and ask the user to provide a valid diff.</ask>
-  <output>After constructing {diff_output}, verify it is non-empty regardless of source type. If empty, HALT and tell the user there is nothing to review.</output>
+<step n="3" goal="Load spec and context documents when available">
+  <ask>Ask the user whether there is a spec or story file that provides context for these changes.</ask>
+  <branch if="the user provides a spec or story file" optional="true">
+    <action>Set `{spec_file}` to the provided path and verify the file exists and is readable.</action>
+    <action>Set `{review_mode}` to `full`.</action>
+    <action>
+      If the file has a `context` field in its frontmatter listing additional docs, load each referenced document.
+      <detail>Warn the user about any referenced docs that cannot be found.</detail>
+    </action>
+  </branch>
+  <branch if="the user does not provide a spec or story file" optional="true">
+    <action>Set `{review_mode}` to `no-spec`.</action>
+  </branch>
 </step>
 
-<step n="4" goal="Is there a spec or story file that provides context for these changes">
-  <action>If yes: set {spec_file} to the path provided, verify the file exists and is readable, then set {review_mode} = &quot;full&quot;.</action>
-  <action>If no: set {review_mode} = &quot;no-spec&quot;.</action>
-  <ask>Ask the user: Is there a spec or story file that provides context for these changes?</ask>
-</step>
-
-<step n="5" goal="If {review_mode} = &quot;full&quot; and the file at {spec_file} has a context field in its frontmatter listing additional docs, load each referenced document">
-  <action>If {review_mode} = &quot;full&quot; and the file at {spec_file} has a context field in its frontmatter listing additional docs, load each referenced document. Warn the user about any docs that cannot be found.</action>
-  <action>Warn the user about any docs that cannot be found.</action>
-</step>
-
-<step n="6" goal="Sanity check: if {diff_output} exceeds approximately 3000 lines, warn the user and offer to chunk the review by file group">
-  <action>Sanity check: if {diff_output} exceeds approximately 3000 lines, warn the user and offer to chunk the review by file group.</action>
-  <action>If the user opts to chunk: agree on the first group, narrow {diff_output} accordingly, and list the remaining groups for the user to note for follow-up runs.</action>
-  <action>If the user declines: proceed as-is with the full diff.</action>
+<step n="4" goal="Check review size and confirm readiness">
+  <action>Estimate whether `{diff_output}` exceeds roughly 3000 lines.</action>
+  <branch if="{diff_output} exceeds roughly 3000 lines" optional="true">
+    <output>Warn the user that the diff is large and offer to chunk the review by file group.</output>
+    <branch if="the user opts to chunk the review" optional="true">
+      <action>Agree on the first file group, narrow `{diff_output}` to that group, and list the remaining groups for follow-up runs.</action>
+    </branch>
+    <branch if="the user declines chunking" optional="true">
+      <action>Proceed with the full diff.</action>
+    </branch>
+  </branch>
+  <output>Present a summary with diff stats, `{review_mode}`, and any loaded spec/context docs.</output>
 </step>
 
 ## CHECKPOINT
 
-Present a summary before proceeding: diff stats (files changed, lines added/removed), {review_mode}, and loaded spec/context docs (if any). HALT and wait for user confirmation to proceed.
+Halt after presenting the summary and wait for the user to confirm that review should proceed.
 
 ## ADVISORY
 
-- Next handoff: ./step-02-review.md
-- Persist workflow state updates whenever this phase writes or updates a managed artifact.
-- Treat this phase as read-only unless the instructions explicitly call for a write action.
-
-## REFERENCE
-
-<prose>
-## RULES
-
-- YOU MUST ALWAYS SPEAK OUTPUT in your Agent communication style with the config `{communication_language}`
-- The prompt that triggered this workflow IS the intent — not a hint.
-- Do not modify any files. This step is read-only.
-
-## INSTRUCTIONS
-
-1. **Detect review intent from invocation text.** Check the triggering prompt for phrases that map to a review mode:
-   - "staged" / "staged changes" → Staged changes only
-   - "uncommitted" / "working tree" / "all changes" → Uncommitted changes (staged + unstaged)
-   - "branch diff" / "vs main" / "against main" / "compared to {branch}" → Branch diff (extract base branch if mentioned)
-   - "commit range" / "last N commits" / "{sha}..{sha}" → Specific commit range
-   - "this diff" / "provided diff" / "paste" → User-provided diff (do not match bare "diff" — it appears in other modes)
-   - When multiple phrases match, prefer the most specific match (e.g., "branch diff" over bare "diff").
-   - **If a clear match is found:** Announce the detected mode (e.g., "Detected intent: review staged changes only") and proceed directly to constructing `{diff_output}` using the corresponding sub-case from instruction 3. Skip to instruction 4 (spec question).
-   - **If no match from invocation text, check sprint tracking.** Look for a sprint status file (`*sprint-status*`) in `{implementation_artifacts}` or `{planning_artifacts}`. If found, scan for any story with status `review`. Handle as follows:
-     - **Exactly one `review` story:** Suggest it: "I found story {{story-id}} in `review` status. Would you like to review its changes? [Y] Yes / [N] No, let me choose". If confirmed, use the story context to determine the diff source (branch name derived from story slug, or uncommitted changes). If declined, fall through to instruction 2.
-     - **Multiple `review` stories:** Present them as numbered options alongside a manual choice option. Wait for user selection. Then use the selected story's context to determine the diff source as in the single-story case above, and proceed to instruction 3.
-   - **If no match and no sprint tracking:** Fall through to instruction 2.
-
-2. HALT. Ask the user: **What do you want to review?** Present these options:
-   - **Uncommitted changes** (staged + unstaged)
-   - **Staged changes only**
-   - **Branch diff** vs a base branch (ask which base branch)
-   - **Specific commit range** (ask for the range)
-   - **Provided diff or file list** (user pastes or provides a path)
-
-3. Construct `{diff_output}` from the chosen source.
-   - For **branch diff**: verify the base branch exists before running `git diff`. If it does not exist, HALT and ask the user for a valid branch.
-   - For **commit range**: verify the range resolves. If it does not, HALT and ask the user for a valid range.
-   - For **provided diff**: validate the content is non-empty and parseable as a unified diff. If it is not parseable, HALT and ask the user to provide a valid diff.
-   - For **file list**: validate each path exists in the working tree. Construct `{diff_output}` by running `git diff HEAD -- <path1> <path2> ...`. If any paths are untracked (new files not yet staged), use `git diff --no-index /dev/null <path>` to include them. If the diff is empty (files have no uncommitted changes and are not untracked), ask the user whether to review the full file contents or to specify a different baseline.
-   - After constructing `{diff_output}`, verify it is non-empty regardless of source type. If empty, HALT and tell the user there is nothing to review.
-
-4. Ask the user: **Is there a spec or story file that provides context for these changes?**
-   - If yes: set `{spec_file}` to the path provided, verify the file exists and is readable, then set `{review_mode}` = `"full"`.
-   - If no: set `{review_mode}` = `"no-spec"`.
-
-5. If `{review_mode}` = `"full"` and the file at `{spec_file}` has a `context` field in its frontmatter listing additional docs, load each referenced document. Warn the user about any docs that cannot be found.
-
-6. Sanity check: if `{diff_output}` exceeds approximately 3000 lines, warn the user and offer to chunk the review by file group.
-   - If the user opts to chunk: agree on the first group, narrow `{diff_output}` accordingly, and list the remaining groups for the user to note for follow-up runs.
-   - If the user declines: proceed as-is with the full diff.
-
-### CHECKPOINT
-
-Present a summary before proceeding: diff stats (files changed, lines added/removed), `{review_mode}`, and loaded spec/context docs (if any). HALT and wait for user confirmation to proceed.
-
-
-## NEXT
-
-Read fully and follow `./step-02-review.md`
-</prose>
+- Treat this phase as read-only unless the workflow explicitly says otherwise.
+- Keep the gathered context focused on enabling the next review phase, not on starting the review early.

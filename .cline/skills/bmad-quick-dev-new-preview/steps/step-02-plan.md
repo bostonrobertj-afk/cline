@@ -5,31 +5,27 @@ deferred_work_file: '{implementation_artifacts}/deferred-work.md'
 
 # Step 2: Plan
 
-## RULES
+## META
 
-- YOU MUST ALWAYS SPEAK OUTPUT in your Agent communication style with the config `{communication_language}`
-- No intermediate approvals.
+- Speak in the configured communication language.
+- Keep the plan grounded in the clarified intent and observed codebase patterns.
+- Only the current phase checklist and the current active step's details are shown in the prompt at one time.
+- Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
 
-## INSTRUCTIONS
+## EXECUTION
 
-1. Investigate codebase. _Isolate deep exploration in sub-agents/tasks where available. To prevent context snowballing, instruct subagents to give you distilled summaries only._
-2. Read `../tech-spec-template.md` fully. Fill it out based on the intent and investigation, and write the result to `{wipFile}`.
-3. Self-review against READY FOR DEVELOPMENT standard.
-4. If intent gaps exist, do not fantasize, do not leave open questions, HALT and ask the human.
-5. Token count check (see SCOPE STANDARD). If spec exceeds 1600 tokens:
-   - Show user the token count.
-   - HALT and ask human: `[S] Split — carve off secondary goals` | `[K] Keep full spec — accept the risks`
-   - On **S**: Propose the split — name each secondary goal. Append deferred goals to `{deferred_work_file}`. Rewrite the current spec to cover only the main goal — do not surgically carve sections out; regenerate the spec for the narrowed scope. Continue to checkpoint.
-   - On **K**: Continue to checkpoint with full spec.
-
-### CHECKPOINT 1
-
-Present summary. If token count exceeded 1600 and user chose [K], include the token count and explain why it may be a problem. HALT and ask human: `[A] Approve` | `[E] Edit`
-
-- **A**: Rename `{wipFile}` to `{spec_file}`, set status `ready-for-dev`. Everything inside `<frozen-after-approval>` is now locked — only the human can change it. → Step 3.
-- **E**: Apply changes, then return to CHECKPOINT 1.
-
-
-## NEXT
-
-`./step-03-implement.md`
+<step n="1" goal="Investigate the codebase and write the working spec">
+  <action>Inspect the codebase and, when useful, use sub-agents for distilled summaries only.</action>
+  <action>Read `../tech-spec-template.md` fully and write the drafted spec to `{wipFile}`.</action>
+  <action>Self-review the draft against the Ready for Development standard.</action>
+  <branch if="the intent is still ambiguous or underspecified" optional="true">
+    <ask>Ask the user the missing questions before proceeding.</ask>
+  </branch>
+  <branch if="the draft exceeds 1600 tokens" optional="true">
+    <ask>Choose [S] split the scope or [K] keep the full spec.</ask>
+  </branch>
+  <output>Present the summary and checkpoint the user before freezing the spec.</output>
+  <detail>
+    If the user approves, rename `{wipFile}` to `{spec_file}`, set status to `ready-for-dev`, and lock the frozen section against further edits.
+  </detail>
+</step>

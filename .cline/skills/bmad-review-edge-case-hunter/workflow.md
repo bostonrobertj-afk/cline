@@ -4,16 +4,21 @@
 
 - Goal: Walk every branching path and boundary condition in provided content and report only unhandled edge cases.
 - Execute this workflow in order.
-- Halt whenever the input is missing, user input is required, or workflow gating is needed.
-- Use the structured execution tags below as the source of truth.
-
+- Only the current phase checklist and the current active step's details are shown in the prompt at one time.
+- Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
 ## EXECUTION
 
 <step n="1" goal="Load the review input and determine scope">
-  <action>Read the provided content exactly as given.</action>
-  <detail>If the content is empty or cannot be decoded as text, return `[{"location":"N/A","trigger_condition":"Input empty or undecodable","guard_snippet":"Provide valid content to review","potential_consequence":"Review skipped — no analysis performed"}]` and stop.</detail>
-  <action>Identify whether the input is a diff, full file, or function.</action>
-  <action>Capture any optional `also_consider` areas and include them in scope.</action>
+  <detail>Halt whenever the input is missing, user input is required, or workflow gating is needed.</detail>
+  <branch if="content is empty or cannot be decoded as text">
+    <output>Return `[{"location":"N/A","trigger_condition":"Input empty or undecodable","guard_snippet":"Provide valid content to review","potential_consequence":"Review skipped - no analysis performed"}]` and stop.</output>
+    <exit />
+  </branch>
+  <branch if="content is provided" optional="true">
+    <action>Read the provided content exactly as given.</action>
+    <action>Identify whether the input is a diff, full file, or function.</action>
+    <detail>Capture any optional `also_consider` areas and include them in scope.</detail>
+  </branch>
 </step>
 
 <step n="2" goal="Analyze every reachable edge case within scope">
@@ -35,17 +40,9 @@
   <action>Return only a valid JSON array of objects.</action>
   <detail>Each object must contain exactly `location`, `trigger_condition`, `guard_snippet`, and `potential_consequence`.</detail>
   <detail>If no unhandled paths are found, return `[]`.</detail>
+  <detail>Keep the review mechanical and exhaustive, and report only unhandled paths.</detail>
 </step>
 
 ## CHECKPOINT
 
 Halt for missing input, required user confirmation, or workflow gating before proceeding.
-
-## ADVISORY
-
-- Keep the review mechanical and exhaustive.
-- Do not editorialize or judge code quality; report only missing handling.
-- If the input is a diff, keep findings limited to directly reachable issues introduced or exposed by the changed lines.
-- If the input is a full file or function, analyze the entire provided scope only.
-- Do not load or rely on broader repository context unless the provided content explicitly points to it.
-- If no findings exist, return an empty array rather than an explanation.

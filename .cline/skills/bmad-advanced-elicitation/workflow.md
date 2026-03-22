@@ -4,46 +4,62 @@ agent_party: '{project-root}/_bmad/_config/agent-manifest.csv'
 
 ## META
 
-- Goal: push the LLM to reconsider, refine, and improve its recent output.
-- Execute the flow in order.
-- Halt whenever a user response is required.
-- Speak in `communication_language`.
+- Goal: Push the LLM to reconsider, refine, and improve its recent output.
 
 ## EXECUTION
 
-<step n="1" goal="Load elicitation methods and analyze context">
+<step n="1" goal="Load elicitation methods and analyze the current context">
   <action>Load and read `./methods.csv` and `{agent_party}`.</action>
   <action>Review the current section or content being enhanced.</action>
-  <action>Analyze content type, complexity, stakeholder needs, risk level, and creative potential.</action>
-  <action>Select 5 methods that best match the current context.</action>
+  <action>Analyze the content type, complexity, stakeholder needs, risk level, and creative potential.</action>
+  <action>Select five elicitation methods that best fit the current context.</action>
+  <detail>Select methods intentionally rather than randomly. The chosen methods should fit the specific content and the kind of improvement the user needs.</detail>
 </step>
 
-<step n="2" goal="Present elicitation choices">
-  <output>Display the advanced elicitation menu with options 1-5, `r`, `a`, and `x`.</output>
-  <ask>Ask the user to choose a method, reshuffle, list all methods, provide direct feedback, or proceed.</ask>
+<step n="2" goal="Present the elicitation menu">
+  <output>Display the advanced-elicitation menu with five current methods plus `r` for reshuffle, `a` for all methods, and `x` to exit.</output>
+  <ask>Ask the user to choose a method, reshuffle the menu, list all methods, provide direct feedback, or finish elicitation.</ask>
 </step>
 
-<step n="3" goal="Execute numbered method selections">
-  <action>If the user selects one or more numbered methods, execute the chosen method descriptions from the CSV against the current enhanced content.</action>
-  <output>Show the enhanced content or improvements produced by the method application.</output>
-  <ask>Ask whether the proposed changes should be applied to the document.</ask>
-  <action>If the user approves, apply the changes. If the user rejects them, discard the proposed changes.</action>
-  <action>Re-present the elicitation menu after each completed method cycle.</action>
+<step n="3" goal="Handle numbered-method selections with approval gating">
+  <branch if="the user selects one or more numbered methods" optional="true">
+    <action>Execute the selected method or methods against the current enhanced content.</action>
+    <output>Show the improved content or the proposed changes produced by the method application.</output>
+    <ask>Ask whether the proposed changes should be applied.</ask>
+    <branch if="the user approves the changes" optional="true">
+      <action>Apply the proposed changes to the working version of the content.</action>
+    </branch>
+    <branch if="the user rejects the changes" optional="true">
+      <action>Discard the proposed changes and keep the prior working version.</action>
+    </branch>
+    <detail>Each completed method cycle should build on the current approved version rather than resetting to the original draft.</detail>
+  </branch>
 </step>
 
 <step n="4" goal="Handle reshuffle and list-all requests">
-  <action>If the user selects `r`, choose 5 new diverse methods and re-present the menu.</action>
-  <action>If the user selects `a`, list all methods compactly with descriptions and allow selection by number or name.</action>
+  <branch if="the user selects `r`" optional="true">
+    <action>Choose five new diverse methods and re-present the menu.</action>
+  </branch>
+  <branch if="the user selects `a`" optional="true">
+    <output>List all available methods compactly with short descriptions and allow selection by number or name.</output>
+  </branch>
 </step>
 
-<step n="5" goal="Handle direct feedback and multi-method requests">
-  <action>If the user gives direct feedback, apply it to the current content and re-present the choices.</action>
-  <action>If the user selects multiple methods, execute them in sequence on the current enhanced content before returning to the menu.</action>
+<step n="5" goal="Handle direct feedback and iterative refinement requests">
+  <branch if="the user gives direct feedback instead of choosing a named method" optional="true">
+    <action>Apply the user's feedback to the current working content.</action>
+    <output>Show the revised content and return to the elicitation menu.</output>
+  </branch>
+  <branch if="the user wants to continue refining after any completed cycle" optional="true">
+    <output>Re-present the elicitation menu so the user can choose another method or exit.</output>
+  </branch>
 </step>
 
-<step n="6" goal="Complete elicitation cleanly">
-  <action>If the user selects `x`, stop elicitation and treat the current enhanced content as the final result.</action>
-  <output>Return the enhanced content to the invoking workflow or process.</output>
+<step n="6" goal="Exit elicitation cleanly">
+  <branch if="the user selects `x`" optional="true">
+    <action>Stop elicitation and treat the current approved version as the final result.</action>
+    <output>Return the enhanced content to the invoking workflow or process.</output>
+  </branch>
 </step>
 
 ## CHECKPOINT
@@ -54,8 +70,3 @@ Every method application must halt for the user's apply or discard decision befo
 
 - Each method application should build on the current enhanced version rather than restarting from the original draft.
 - Use the CSV descriptions and output patterns as guidance, not rigid formatting constraints.
-
-## REFERENCE
-
-- When invoked indirectly, return the enhanced section to the calling workflow after the user selects `x`.
-- Keep the elicitation focused on actionable improvements to the current content.

@@ -114,7 +114,23 @@ Example:
 </ask>
 ```
 
-Do not model clear user questions as `<output>`.
+Hard rules:
+
+- If the agent must ask the user something and wait for a response, use `<ask>`.
+- Do not model user prompts, confirmations, selections, approvals, or clarification requests as `<action>`.
+- Do not model clear user questions as `<output>`.
+- If a step both presents information and asks for a decision, use `<output>` for the presentation and `<ask>` for the actual question.
+
+Common migration mistakes:
+
+- wrong: `<action>Ask the user which mode to use.</action>`
+- wrong: `<output>Which mode would you like to use?</output>`
+- right:
+
+```xml
+<output>Explain the available modes and what each one does.</output>
+<ask>Ask the user which mode they want to use.</ask>
+```
 
 ### `<output>`
 
@@ -134,6 +150,12 @@ Example:
 </output>
 ```
 
+Hard rules:
+
+- Use `<output>` when the agent is presenting, reporting, summarizing, or showing something to the user.
+- Do not use `<output>` for questions that require a user response.
+- Do not use `<output>` as a generic wrapper for mixed logic. If the agent needs to present information and then take a different path based on user response or state, separate that into `<output>`, `<ask>`, and `<branch if="...">` as needed.
+
 ### `<branch if="...">`
 
 `<branch>` is the canonical conditional container.
@@ -151,6 +173,52 @@ Example:
 ```
 
 Use `<branch>` instead of nested same-tag structures like `<action><action>...</action></action>`.
+
+Hard rules:
+
+- If the workflow path changes based on a condition, use `<branch if="...">`.
+- If several alternatives all achieve one semantic step goal, keep them inside one `<step>` and express the variants as sibling `<branch if="...">` blocks.
+- Do not flatten conditional logic into sequential top-level steps when the steps are really alternative paths through the same outcome.
+- Do not leave branch logic as plain prose if the condition materially affects what the agent should do.
+
+Common cases that should almost always become `<branch if="...">`:
+
+- user chooses one of several modes
+- artifact exists vs does not exist
+- new document vs existing document
+- continue vs start fresh
+- parsing/validation succeeds vs fails
+- one of several mutually exclusive review or generation paths applies
+
+Migration examples:
+
+Wrong:
+
+```xml
+<step n="1" goal="Prepare the session">
+  <action>Detect whether the user is continuing an existing session.</action>
+</step>
+<step n="2" goal="Handle existing session">
+  <action>Load the existing session state.</action>
+</step>
+<step n="3" goal="Handle new session">
+  <action>Create a fresh session state.</action>
+</step>
+```
+
+Right:
+
+```xml
+<step n="1" goal="Prepare the session">
+  <action>Determine whether the user is continuing an existing session or starting a new one.</action>
+  <branch if="user is continuing an existing session" optional="true">
+    <action>Load the existing session state.</action>
+  </branch>
+  <branch if="user is starting a new session" optional="true">
+    <action>Create a fresh session state.</action>
+  </branch>
+</step>
+```
 
 ### `<detail>`
 
@@ -185,6 +253,8 @@ Formatting rules:
 - Do not use a sibling `<detail>` as a substitute for item-specific detail when the detail clearly belongs to a single ask, action, or output.
 - If a detail block qualifies content inside a `<branch>`, place it inside the relevant child item whenever possible. Use a branch-level `<detail>` only when the guidance applies to the whole branch.
 - Prefer nested `<detail>` over expanding the parent tag into a long prose blob.
+- Do not leave examples, heuristics, warnings, or formatting guidance stranded in legacy duplicated sections when they really belong as `<detail>`.
+- Do not use `<detail>` as a dumping ground for a second copy of the procedure. `<detail>` should support the action path, not duplicate it.
 
 Examples:
 
@@ -256,6 +326,15 @@ Examples:
 - advisory branches
 - optional follow-up suggestions
 - branches where exactly one of several alternatives may happen
+- mutually exclusive alternatives inside one semantic step
+- new-vs-existing, success-vs-failure, or mode-selection variants where only some branches execute
+
+Hard rules:
+
+- When sibling branches are alternatives rather than cumulative requirements, mark the branches `optional="true"`.
+- When a branch may be skipped because its condition is not met, mark it `optional="true"` unless the runtime is expected to enforce it as blocking.
+- Do not force every conditional branch to look mandatory when the workflow clearly intends only one path to execute.
+- Use `optional="true"` on item-level asks/actions/outputs only when that specific item is itself non-blocking or conditionally skippable.
 
 Target behavior:
 
@@ -324,6 +403,11 @@ Examples:
 
 Until extractor/runtime support is updated, these tags define the target authoring style for new and migrated workflows.
 
+Hard migration rule:
+
+- Final converted files should not rely on prose-only routing like `Read fully and follow`, `Jump to Step`, `Continue below`, or `Return to the earlier section`.
+- Rewrite that logic into explicit structured control flow and surrounding step/branch content.
+
 ## Legacy Tags and Migration Rules
 
 ### `<check if="...">`
@@ -338,6 +422,10 @@ Why:
 
 - `<check>` is being used as a first-class control-flow container in many files
 - `<branch>` is clearer and aligns better with the target schema
+
+Final-state rule:
+
+- Do not leave `<check if="...">` in a completed migrated file.
 
 ### `<template-output>`
 
@@ -433,6 +521,7 @@ Additional authoring rules:
 - If several top-level steps are really just conditional ways to achieve one outcome, collapse them into one `<step>` with `<branch if="...">` children.
 - Do not split "detect state", "handle existing case", and "handle new case" into separate top-level steps when they are all part of one setup/preparation step.
 - Keep document-write steps scoped to the actual lifecycle they support. If a write/update action can apply to both new and existing documents, write the step that way instead of scoping it only to brand-new documents.
+- If a top-level step mainly exists to carry examples, caveats, or sub-bullets, those belong in `<detail>` under the real step instead.
 
 Example:
 
@@ -518,6 +607,10 @@ Instead:
 - use `<detail>` to carry nuance, examples, heuristics, and supporting guidance
 - use explicit routing tags such as `<handoff>`, `<goto>`, `<return>`, and `<exit>` for movement through the workflow
 
+Related rule:
+
+- If a legacy `## ADVISORY` section contains operational guidance the model needs during execution, rewrite that meaning into step/branch/item-level `<detail>` instead of assuming the advisory section will be shown to the model.
+
 The file should remain understandable and executable even if the model only sees the rendered step content, not the original markdown file as a whole.
 
 ## Transitional `<prose>` Handling
@@ -534,6 +627,18 @@ Short-term guidance:
 Long-term direction:
 
 - once the structured layer fully captures the intended behavior, `<prose>` can be reduced or removed
+
+Final-state rule for completed migrations:
+
+- A fully migrated workflow file should have one authoritative structured layer.
+- Do not leave a second internally duplicated copy of the workflow in `## REFERENCE`, `<prose>`, or another mirrored block once the structured layer has been completed.
+- Do not duplicate the file body into a legacy appendix and then also keep the structured version above it.
+- If meaningful legacy content exists only in the duplicated layer, rewrite that meaning into `<step>`, `<branch>`, `<ask>`, `<output>`, `<action>`, and nested `<detail>`, then remove the duplicated layer.
+
+Practical migration rule:
+
+- During conversion, treat duplicated legacy content as source material.
+- In the final converted file, keep only the rewritten structured version unless there is an explicit temporary reason to preserve the legacy block.
 
 ## Authoring Checklist
 
@@ -552,6 +657,12 @@ When writing or reviewing a workflow file, check for these:
 11. If a phase is inherently iterative, does the file model that as a loop-like step rather than a misleading one-pass sequence?
 12. If several branches serve one semantic purpose, are they grouped under one top-level step instead of split into separate checklist steps?
 13. Do the instructions still make sense when rendered into the prompt without telling the model to "read this file" or "review the prose below"?
+14. Are user prompts authored as `<ask>` rather than `<action>`?
+15. If a step contains alternatives, are those alternatives represented as `<branch if="...">` instead of separate pseudo-steps or prose?
+16. If sibling branches are mutually exclusive or conditionally skipped, are they marked `optional="true"` where appropriate?
+17. Are `<detail>` blocks nested under the exact item they qualify whenever possible?
+18. Does the final file avoid internal duplication through `## REFERENCE`, `<prose>`, or mirrored legacy blocks?
+19. If meaningful guidance used to live in `## ADVISORY`, has that guidance been rewritten into structured execution content where needed?
 
 ## Migration Summary
 
@@ -560,7 +671,9 @@ During broad conversion work, prefer these rewrites:
 - `<check if="...">` -> `<branch if="...">`
 - prose routing directives -> `<goto/>`, `<handoff/>`, `<return/>`, `<exit/>`
 - giant mixed action blobs -> `action + detail` or `branch + action/ask/output`
+- user-facing prompts inside `<action>` -> `<ask>`
 - annotation-only tags -> detail layer
+- duplicated `## REFERENCE` / `<prose>` workflow copies -> rewrite meaning into the structured layer, then remove the duplicate
 - checkpoint-as-step hacks -> `## CHECKPOINT`
 
 ## Scope Note

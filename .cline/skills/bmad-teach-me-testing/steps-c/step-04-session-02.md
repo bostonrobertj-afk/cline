@@ -14,6 +14,10 @@ partyModeWorkflow: '{project-root}/_bmad/core/workflows/party-mode/workflow.md'
 
 ## META
 
+- Goal: teach core testing concepts, capture learner responses, and return to the session menu with updated progress.
+- Only the current phase checklist and the current active step's details are shown in the prompt at one time.
+- Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
+
 - Goal: teach testing as engineering, risk-based testing, and TEA quality standards.
 - Keep the session focused on the core mental models behind the curriculum.
 
@@ -32,16 +36,16 @@ partyModeWorkflow: '{project-root}/_bmad/core/workflows/party-mode/workflow.md'
 <step n="3" goal="Teach risk-based testing and the TEA quality bar">
   <output>Explain the P0-P3 risk matrix and how probability multiplied by impact drives coverage priority.</output>
   <output>Explain TEA's quality standards: no flaky tests, no hard waits, stateless execution, no order dependence, and self-cleaning tests.</output>
-  <branch if="role == QA">
+  <branch if="role == QA" optional="true">
     <detail>Use coverage reporting and quality defense language.</detail>
   </branch>
-  <branch if="role == Dev">
+  <branch if="role == Dev" optional="true">
     <detail>Use implementation and refactoring language that mirrors production code practices.</detail>
   </branch>
-  <branch if="role == Lead">
+  <branch if="role == Lead" optional="true">
     <detail>Use architecture, budget, and team consistency language.</detail>
   </branch>
-  <branch if="role == VP">
+  <branch if="role == VP" optional="true">
     <detail>Use risk, ROI, and quality-metric language.</detail>
   </branch>
 </step>
@@ -57,14 +61,10 @@ partyModeWorkflow: '{project-root}/_bmad/core/workflows/party-mode/workflow.md'
 </step>
 
 <step n="6" goal="Return to the hub">
-  <output>Confirm completion, share the score, and present the A/P/C menu before loading `./step-03-session-menu.md`.</output>
+  <output>Confirm completion, share the score, and present the A/P/C menu.</output>
+  <handoff path="./step-03-session-menu.md" />
 </step>
 
 ## CHECKPOINT
 
 Pause for quiz answers and for the user’s choice at the A/P/C menu.
-
-## ADVISORY
-
-- Keep the quality bar explicit so the learner can reuse it later.
-- Frame risk in business terms as well as technical terms.

@@ -4,6 +4,8 @@
 - Goal: confirm research scope, verify the starting state, and prepare the technical research workspace.
 - Speak to the user in `{communication_language}`.
 - Do not begin web research yet.
+- Only the current phase checklist and the current active step's details are shown in the prompt at one time.
+- Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
 
 ## EXECUTION
 
@@ -13,9 +15,9 @@
 </step>
 
 <step n="2" goal="Route continuation runs correctly">
-  <branch if="the document exists and has unfinished steps">
-    <action>Handoff to `./step-01b-continue.md` immediately.</action>
-    <return />
+  <branch if="the document exists and has unfinished steps" optional="true">
+    <output>Resume the existing research document state and continue with the next technical step.</output>
+    <handoff path="./step-02-technical-overview.md" />
   </branch>
 </step>
 

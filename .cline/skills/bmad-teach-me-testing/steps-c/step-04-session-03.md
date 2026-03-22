@@ -14,6 +14,10 @@ partyModeWorkflow: '{project-root}/_bmad/core/workflows/party-mode/workflow.md'
 
 ## META
 
+- Goal: teach architecture and testing-pattern concepts, capture learner responses, and return to the session menu with updated progress.
+- Only the current phase checklist and the current active step's details are shown in the prompt at one time.
+- Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
+
 - Goal: teach the architecture patterns behind TEA, including fixtures, network control, and workflow structure.
 - Keep the session focused on reusable patterns and why they matter.
 
@@ -32,16 +36,16 @@ partyModeWorkflow: '{project-root}/_bmad/core/workflows/party-mode/workflow.md'
 <step n="3" goal="Teach network-first patterns and data factories">
   <output>Explain how network-first setup removes timing races and makes tests deterministic.</output>
   <output>Explain how data factories replace hard-coded test data with reusable builders and override-friendly defaults.</output>
-  <branch if="role == QA">
+  <branch if="role == QA" optional="true">
     <detail>Connect the patterns to flake reduction and coverage reliability.</detail>
   </branch>
-  <branch if="role == Dev">
+  <branch if="role == Dev" optional="true">
     <detail>Connect the patterns to implementation speed and maintainability.</detail>
   </branch>
-  <branch if="role == Lead">
+  <branch if="role == Lead" optional="true">
     <detail>Connect the patterns to standardization and shared team conventions.</detail>
   </branch>
-  <branch if="role == VP">
+  <branch if="role == VP" optional="true">
     <detail>Connect the patterns to onboarding scale and repeatable quality.</detail>
   </branch>
 </step>
@@ -62,14 +66,10 @@ partyModeWorkflow: '{project-root}/_bmad/core/workflows/party-mode/workflow.md'
 </step>
 
 <step n="7" goal="Return to the hub">
-  <output>Confirm completion, share the score, and present the A/P/C menu before loading `./step-03-session-menu.md`.</output>
+  <output>Confirm completion, share the score, and present the A/P/C menu.</output>
+  <handoff path="./step-03-session-menu.md" />
 </step>
 
 ## CHECKPOINT
 
 Pause for quiz answers and for the user’s choice at the A/P/C menu.
-
-## ADVISORY
-
-- Anchor the examples in patterns the learner can reuse immediately.
-- Keep the workflow-specific architecture explanation concise and practical.

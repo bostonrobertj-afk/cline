@@ -2,63 +2,23 @@
 
 ## META
 
-- Goal: Create comprehensive UX design specifications through collaborative visual exploration and informed decision-making where you act as a UX facilitator working with a product stakeholder.
-- Execute this file in order.
-- Halt whenever user input, confirmation, or workflow gating is required.
-- Use the structured sections for extraction; use the prose block for additional agent context.
-
+- Goal: Create comprehensive UX design specifications through collaborative visual exploration and informed decision-making.
+- Only the current phase checklist and the current active step's details are shown in the prompt at one time.
+- Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
 ## EXECUTION
 
-<step n="1" goal="Create comprehensive UX design specifications through collaborative visual exploration and informed decision-making where you act as a UX facilitator working with a product stakeholder.">
-  <action>Load the context, configuration, and prerequisites referenced for workflow.</action>
-  <action>Execute the instructions in this file in order without skipping required work.</action>
-  <output>When this file is complete, continue with ./steps/step-01-init.md.</output>
+<step n="1" goal="Load configuration and begin the UX design workflow">
+  <action>Load the workflow configuration values needed for this run, including {project_name}, {output_folder}, {planning_artifacts}, {user_name}, {communication_language}, {document_output_language}, {user_skill_level}, and {date}.</action>
+  <action>Use {communication_language} for agent-facing communication and {document_output_language} for artifact content.</action>
+  <handoff path="./steps/step-01-init.md">Begin by initializing or resuming the UX design specification workflow.</handoff>
 </step>
 
 ## CHECKPOINT
 
-Complete the current required actions in order before moving to the next workflow phase.
+Halt for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.
 
 ## ADVISORY
 
-- Next handoff: ./steps/step-01-init.md
-- Persist workflow state updates whenever this phase writes or updates a managed artifact.
-
-## REFERENCE
-
-<prose>
-**Goal:** Create comprehensive UX design specifications through collaborative visual exploration and informed decision-making where you act as a UX facilitator working with a product stakeholder.
-
----
-
-## WORKFLOW ARCHITECTURE
-
-This uses **micro-file architecture** for disciplined execution:
-
-- Each step is a self-contained file with embedded rules
-- Sequential progression with user control at each step
-- Document state tracked in frontmatter
-- Append-only document building through conversation
-
----
-
-## INITIALIZATION
-
-### Configuration Loading
-
-Load config from `{project-root}/_bmad/bmm/config.yaml` and resolve:
-
-- `project_name`, `output_folder`, `planning_artifacts`, `user_name`
-- `communication_language`, `document_output_language`, `user_skill_level`
-- `date` as system-generated current datetime
-
-### Paths
-
-- `default_output_file` = `{planning_artifacts}/ux-design-specification.md`
-
-## EXECUTION
-
-- ✅ YOU MUST ALWAYS SPEAK OUTPUT In your Agent communication style with the config `{communication_language}`
-- ✅ YOU MUST ALWAYS WRITE all artifact and document content in `{document_output_language}`
-- Read fully and follow: `./steps/step-01-init.md` to begin the UX design workflow.
-</prose>
+- Persist workflow state updates whenever this workflow writes or updates a managed artifact.
+- Only the current phase checklist and the current active step's details are shown in the prompt at one time.
+- Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
