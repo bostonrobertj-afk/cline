@@ -11,6 +11,22 @@ import type { IPartialBlockHandler, IToolHandler } from "../ToolExecutorCoordina
 import type { TaskConfig } from "../types/TaskConfig"
 import type { StronglyTypedUIHelpers } from "../types/UIHelpers"
 
+function formatFollowupAnswerPayload(question: string, answer: string | undefined, selectedOption?: string): string {
+	const lines = [
+		"<answer>",
+		"Source: user",
+		"Tool: ask_followup_question",
+		`Question: ${question}`,
+		`Response kind: ${selectedOption ? "selected_option" : "freeform"}`,
+		selectedOption ? `Selected option: ${selectedOption}` : undefined,
+		"Answer:",
+		answer ?? "",
+		"</answer>",
+	].filter((line): line is string => line !== undefined)
+
+	return lines.join("\n")
+}
+
 export class AskFollowupQuestionToolHandler implements IToolHandler, IPartialBlockHandler {
 	readonly name = ClineDefaultTool.ASK
 
@@ -67,6 +83,7 @@ export class AskFollowupQuestionToolHandler implements IToolHandler, IPartialBlo
 		} satisfies ClineAskQuestion
 
 		const options = parsePartialArrayString(optionsRaw || "[]")
+		let selectedOption: string | undefined
 
 		// Ask the question
 		const {
@@ -77,6 +94,7 @@ export class AskFollowupQuestionToolHandler implements IToolHandler, IPartialBlo
 
 		// Check if options contains the text response
 		if (optionsRaw && text && options.includes(text)) {
+			selectedOption = text
 			telemetryService.captureOptionSelected(config.ulid, options.length, "act")
 
 			// Valid option selected, update last followup message with selected option
@@ -101,6 +119,6 @@ export class AskFollowupQuestionToolHandler implements IToolHandler, IPartialBlo
 			fileContentString = await processFilesIntoText(followupFiles)
 		}
 
-		return formatResponse.toolResult(`<answer>\n${text}\n</answer>`, images, fileContentString)
+		return formatResponse.toolResult(formatFollowupAnswerPayload(question, text, selectedOption), images, fileContentString)
 	}
 }

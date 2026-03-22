@@ -4,7 +4,7 @@ import type { PromptVariant, SystemPromptContext } from "../types"
  * Generate the skills section for the system prompt.
  */
 export async function getSkillsSection(_variant: PromptVariant, context: SystemPromptContext): Promise<string | undefined> {
-	const skills = context.skills
+	const skills = (context.skills ?? []).filter((skill) => (context.activeAgentId ? true : !skill.name.startsWith("bmad-")))
 	if (!skills || skills.length === 0) return undefined
 
 	if (context.useMinimalGptPrompt === true) {

@@ -146,6 +146,19 @@ describe("SubagentRunner", () => {
 		HostProvider.reset()
 	})
 
+	it("does not reuse the parent ask callback inside subagent task configs", async () => {
+		const config = createTaskConfig(true)
+		const parentAsk = config.callbacks.ask as sinon.SinonStub
+		const runner = new SubagentRunner(config)
+		const subagentConfig = (runner as any).createSubagentTaskConfig(new TaskState()) as TaskConfig
+
+		const result = await subagentConfig.callbacks.ask("tool", "test prompt", false)
+
+		assert.deepEqual(result, { response: "yesButtonClicked" })
+		sinon.assert.notCalled(parentAsk)
+		assert.equal(await subagentConfig.callbacks.shouldAutoApproveToolWithPath(ClineDefaultTool.FILE_READ, "foo.ts"), true)
+	})
+
 	it("emits native tool_use blocks with matching tool_result tool_use_id across turns", async () => {
 		const createMessage = sinon.stub()
 		createMessage.onFirstCall().callsFake(async function* () {

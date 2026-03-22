@@ -380,6 +380,39 @@ describe("Prompt System Integration Tests", () => {
 				},
 			)
 		})
+
+		it("does not list BMAD workflow skills in non-agent prompts", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
+					enableNativeToolCalls: true,
+					useMinimalGptPrompt: true,
+					skills: [
+						{
+							name: "bmad-code-review",
+							description: "workflow",
+							path: "/skills/bmad-code-review/SKILL.md",
+							source: "project",
+						},
+						{
+							name: "create-pull-request",
+							description: "Create a pull request",
+							path: "/skills/create-pull-request/SKILL.md",
+							source: "global",
+						},
+					],
+				},
+				"gpt-5.4-2026-03-05",
+				async ({ systemPrompt }) => {
+					expect(systemPrompt).to.include("Installed skills available on this turn")
+					expect(systemPrompt).to.include("create-pull-request")
+					expect(systemPrompt).to.not.include("bmad-code-review")
+					expect(systemPrompt).to.not.include("Allowed workflow skills for the active BMAD agent")
+				},
+			)
+		})
 	})
 
 	describe("Error Handling", () => {

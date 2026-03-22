@@ -477,13 +477,10 @@ export class Controller {
 				Logger.log(`[Controller.cancelTask] Task not found in history: ${error}`)
 			}
 
-			// Only re-initialize if we found a history item, otherwise just clear
-			if (historyItem) {
-				// Re-initialize task to keep it visible in UI with resume button
-				await this.initTask(undefined, undefined, undefined, historyItem, undefined)
-			} else {
-				await this.clearTask()
-			}
+			// After an explicit cancel, leave the UI in a neutral state so the user can type
+			// immediately instead of being forced through a blocking resume prompt.
+			// The cancelled task remains in history and can be reopened manually later.
+			await this.clearTask()
 
 			await this.postStateToWebview()
 		} finally {

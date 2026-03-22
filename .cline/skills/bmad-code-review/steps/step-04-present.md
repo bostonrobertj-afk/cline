@@ -62,11 +62,15 @@
   <branch if="only defer findings remain" optional="true">
     <output>Explain that no action is required for the current change and that the deferred items can be tracked for future work.</output>
   </branch>
+  <ask>
+    Ask what the user wants to do next before leaving the workflow.
+    Offer options that match the review outcome, such as: finish the review, refine the summary, change the review scope and rerun, or move on to a fix/planning workflow.
+  </ask>
 </step>
 
 ## CHECKPOINT
 
-Present the findings and recommendations without taking automated corrective action.
+Present the findings and recommendations, then wait for the user's direction before taking any automated corrective action or leaving the workflow.
 
 ## ADVISORY
 

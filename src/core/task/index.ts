@@ -1770,13 +1770,9 @@ export class Task {
 						askType = "resume_task"
 					}
 
-					// Present the resume ask - this will show the resume button in the UI
-					// We don't await this because we want to set the abort flag immediately
-					// The ask will be waiting when the user decides to resume
-					this.ask(askType).catch((error) => {
-						// If ask fails (e.g., task was cleared), that's okay - just log it
-						Logger.log("[TaskCancel] Resume ask failed (task may have been cleared):", error)
-					})
+					// Do not immediately enqueue a blocking resume ask here.
+					// Controller.cancelTask() decides what UI state should follow cancellation.
+					Logger.log(`[TaskCancel] Cancellation completed; resume type would have been "${askType}"`)
 				} catch (error) {
 					// TaskCancel hook failed - non-fatal, just log
 					Logger.error("[TaskCancel Hook] Failed (non-fatal):", error)

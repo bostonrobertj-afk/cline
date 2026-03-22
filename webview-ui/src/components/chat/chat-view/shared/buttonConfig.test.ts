@@ -22,6 +22,20 @@ describe("getButtonConfig", () => {
 		expect(config).toEqual(BUTTON_CONFIGS.partial)
 	})
 
+	it("keeps steering available while a response is streaming", () => {
+		const streamingMessage: ClineMessage = {
+			type: "say",
+			say: "api_req_started",
+			partial: true,
+			ts: Date.now(),
+		}
+		const config = getButtonConfig(streamingMessage)
+		expect(config.sendingDisabled).toBe(false)
+		expect(config.primaryText).toBe("Steer")
+		expect(config.primaryAction).toBe("steer")
+		expect(config.secondaryText).toBe("Cancel")
+	})
+
 	// Test error recovery states
 	describe("Error Recovery States", () => {
 		const errorStates = ["api_req_failed", "mistake_limit_reached"]
@@ -131,6 +145,19 @@ describe("getButtonConfig", () => {
 		}
 		const config = getButtonConfig(apiReqMessage)
 		expect(config).toEqual(BUTTON_CONFIGS.api_req_active)
+	})
+
+	it("shows steer and cancel controls for active API requests", () => {
+		const apiReqMessage: ClineMessage = {
+			type: "say",
+			say: "api_req_started",
+			ts: Date.now(),
+		}
+		const config = getButtonConfig(apiReqMessage)
+		expect(config.sendingDisabled).toBe(false)
+		expect(config.primaryText).toBe("Steer")
+		expect(config.primaryAction).toBe("steer")
+		expect(config.secondaryText).toBe("Cancel")
 	})
 
 	// Test mode parameter (though not extensively used in the current implementation)

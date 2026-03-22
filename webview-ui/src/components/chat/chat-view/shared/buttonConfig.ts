@@ -8,6 +8,7 @@ export type ButtonActionType =
 	| "approve" // Send yesButtonClicked
 	| "reject" // Send noButtonClicked
 	| "proceed" // Send messageResponse or yesButtonClicked
+	| "steer" // Send messageResponse while a task is actively running
 	| "new_task" // Start a new task
 	| "cancel" // Cancel streaming
 	| "utility" // Execute utility function (condense, report_bug)
@@ -180,11 +181,11 @@ export const BUTTON_CONFIGS: Record<string, ButtonConfig> = {
 
 	// Streaming/partial states - disable interaction during streaming
 	partial: {
-		sendingDisabled: true,
+		sendingDisabled: false,
 		enableButtons: true,
-		primaryText: undefined,
+		primaryText: "Steer",
 		secondaryText: "Cancel",
-		primaryAction: undefined,
+		primaryAction: "steer",
 		secondaryAction: "cancel",
 	},
 
@@ -198,11 +199,11 @@ export const BUTTON_CONFIGS: Record<string, ButtonConfig> = {
 		secondaryAction: undefined,
 	},
 	api_req_active: {
-		sendingDisabled: true,
+		sendingDisabled: false,
 		enableButtons: true,
-		primaryText: undefined,
+		primaryText: "Steer",
 		secondaryText: "Cancel",
-		primaryAction: undefined,
+		primaryAction: "steer",
 		secondaryAction: "cancel",
 	},
 }

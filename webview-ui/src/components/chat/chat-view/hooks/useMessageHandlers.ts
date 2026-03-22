@@ -236,6 +236,10 @@ export function useMessageHandlers(messages: ClineMessage[], chatState: ChatStat
 					clearInputState()
 					break
 
+				case "steer":
+					await handleSendMessage(trimmedInput ?? "", images ?? [], files ?? [])
+					break
+
 				case "new_task":
 					if (clineAsk === "new_task") {
 						await TaskServiceClient.newTask(

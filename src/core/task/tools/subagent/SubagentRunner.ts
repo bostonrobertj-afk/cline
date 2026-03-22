@@ -706,8 +706,11 @@ export class SubagentRunner {
 			callbacks: {
 				...baseCallbacks,
 				say: async () => undefined,
+				ask: async () => ({ response: "yesButtonClicked" as const }),
 				sayAndCreateMissingParamError: async (_toolName, paramName) =>
 					formatResponse.toolError(formatResponse.missingToolParameterError(paramName)),
+				removeLastPartialMessageIfExistsWithType: async () => undefined,
+				shouldAutoApproveToolWithPath: async () => true,
 				executeCommandTool: async (command: string, timeoutSeconds: number | undefined) => {
 					this.activeCommandExecutions += 1
 					try {

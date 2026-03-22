@@ -22,7 +22,9 @@ failed_layers: '' # set at runtime: comma-separated list of layers that failed o
       There is no dedicated Blind Hunter workflow, so instruct the subagent to call `use_skill` with `skill_name = "bmad-review-adversarial-general"`.
       Prompt the subagent to review `{diff_output}` only.
       Do not give it `{spec_file}`, project files, or project context.
-      Tell it: `Act as a diff-only Blind Hunter reviewer. Stay grounded only in the provided diff. Return concise markdown findings with a short title, the observed issue, and evidence from the diff when available.`
+      Tell it:
+      - if `{review_input_type} = "diff"`: `Act as a diff-only Blind Hunter reviewer. Stay grounded only in the provided diff. Return concise markdown findings with a short title, the observed issue, and evidence from the diff when available.`
+      - if `{review_input_type} = "file-bundle"`: `Act as a file-scoped Blind Hunter reviewer. Stay grounded only in the provided files and story-described scope. Do not go searching for commits or unrelated project files. Return concise markdown findings with a short title, the observed issue, and evidence from the provided files when available.`
     </detail>
   </action>
   <action>
@@ -31,7 +33,9 @@ failed_layers: '' # set at runtime: comma-separated list of layers that failed o
       Instruct the subagent to call `use_skill` with `skill_name = "bmad-review-adversarial-general"`.
       Prompt the subagent with `{diff_output}` plus any already loaded project context that helps ground the review.
       When `{review_mode} = `full``, also include `{spec_file}` as supporting context, but tell the subagent to stay focused on general adversarial review rather than AC-by-AC auditing.
-      Tell it: `Review this change skeptically. Return concise markdown findings with titles, evidence, and file locations when available.`
+      Tell it:
+      - if `{review_input_type} = "diff"`: `Review this change skeptically. Stay focused on the provided diff and nearby directly relevant context. Return concise markdown findings with titles, evidence, and file locations when available.`
+      - if `{review_input_type} = "file-bundle"`: `Review this implemented story skeptically using only the provided file bundle and loaded story/spec context. Do not infer a commit range or search for a different baseline unless the parent prompt explicitly gives one. Return concise markdown findings with titles, evidence, and file locations when available.`
     </detail>
   </action>
   <action>
@@ -39,7 +43,9 @@ failed_layers: '' # set at runtime: comma-separated list of layers that failed o
     <detail>
       Instruct the subagent to call `use_skill` with `skill_name = "bmad-review-edge-case-hunter"`.
       Prompt the subagent with `{diff_output}` and project read access.
-      Tell it: `Inspect reachable boundary conditions and branching paths in the changed scope only. Return only the JSON array format expected by the edge-case hunter workflow.`
+      Tell it:
+      - if `{review_input_type} = "diff"`: `Inspect reachable boundary conditions and branching paths in the changed scope only. Return only the JSON array format expected by the edge-case hunter workflow.`
+      - if `{review_input_type} = "file-bundle"`: `Inspect reachable boundary conditions and branching paths in the provided files only. Treat the provided file bundle as the full review scope for this story. Return only the JSON array format expected by the edge-case hunter workflow.`
     </detail>
   </action>
   <branch if="{review_mode} = `full`" optional="true">
@@ -51,9 +57,10 @@ failed_layers: '' # set at runtime: comma-separated list of layers that failed o
         Prompt that subagent with `{diff_output}`, `{spec_file}`, and any loaded context docs.
         Tell it:
         - You are an Acceptance Auditor.
-        - Review this diff against the spec and context docs.
+        - Review the provided implementation scope against the spec and context docs.
         - Check for acceptance-criteria violations, deviations from spec intent, missing specified behavior, and contradictions between spec constraints and the actual code.
-        - Return a markdown list where each finding includes a one-line title, the violated AC or constraint, and evidence from the diff.
+        - If the review input is a file bundle instead of a diff, treat the provided files as the authoritative implementation scope and do not search for old commits unless one was explicitly provided.
+        - Return a markdown list where each finding includes a one-line title, the violated AC or constraint, and evidence from the provided review input.
       </detail>
     </action>
   </branch>
@@ -95,7 +102,7 @@ Halt if fallback prompt files were generated and wait for the user to paste back
 
 ## ADVISORY
 
-- Keep the Blind Hunter diff-only.
-- Keep the Adversarial General layer grounded in the diff plus available project context.
-- Keep the Edge Case Hunter focused on reachable edge cases in the changed scope.
+- Keep the Blind Hunter grounded only in the provided review input.
+- Keep the Adversarial General layer grounded in the provided review input plus any explicitly loaded project context.
+- Keep the Edge Case Hunter focused on reachable edge cases in the provided review scope.
 - Only run the Acceptance Auditor when a usable spec context exists.
