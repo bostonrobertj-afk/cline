@@ -75,13 +75,18 @@ sprint_status_file: '{implementation_artifacts}/sprint-status.yaml'
 </step>
 
 <step n="8" goal="Offer next steps">
-  <ask>Would you like to run validation, make edits to the retrospective, or finish with a summary?</ask>
+  <output>Present the most relevant next-step options, such as validation, retrospective edits, or finishing with the completed summary.</output>
   <branch if="the user chooses validation" optional="true">
     <detail>Route to the validation workflow for the retrospective output.</detail>
   </branch>
   <branch if="the user chooses edits" optional="true">
     <detail>Return to the appropriate retrospective editing path if one is available in the parent workflow.</detail>
   </branch>
+  <detail>
+    Do not ask a new follow-up question just to keep the workflow open.
+    If the user already requested a specific next action in the same task, acknowledge it in the closing guidance.
+    Otherwise, stop cleanly after presenting the summary and options.
+  </detail>
 </step>
 
 ## CHECKPOINT

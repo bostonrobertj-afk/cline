@@ -19,17 +19,15 @@
   </branch>
 </step>
 
-<step n="3" goal="Offer validation and next-step options">
+<step n="3" goal="Present validation and next-step options">
   <output>Present `bmad-check-implementation-readiness` as the validation path and explain when it is valuable.</output>
-  <ask>Ask whether the user wants to run validation now or proceed directly to later workflows.</ask>
-  <action>
-    Dispatch a dedicated subagent for next-step guidance.
-    <detail>
-      Instruct the subagent to call `use_skill` with `skill_name = "bmad-help"`.
-      Prompt the subagent with the completed PRD path at `{outputFile}` and the instruction to return the most relevant next workflow options for architecture, UX, epics, or validation.
-      Tell the subagent to return concise next-step recommendations that can be shown to the user in this thread.
-    </detail>
-  </action>
+  <output>Recommend the most relevant next workflow paths for architecture, UX, epics, or validation based on the completed PRD.</output>
+  <detail>
+    Do not ask a new follow-up question just to keep the workflow open.
+    Do not dispatch a new helper subagent at completion time solely to suggest next steps.
+    If the user already requested a specific next action in the same task, reflect that in the closing guidance.
+    Otherwise, stop cleanly after presenting the recommendations.
+  </detail>
 </step>
 
 <step n="4" goal="Confirm completion clearly">
@@ -38,7 +36,7 @@
 
 ## CHECKPOINT
 
-Wait for the user to choose whether to run validation now or proceed to later workflows.
+Finish the completion summary and next-step guidance, then stop cleanly unless the user explicitly requested another action in the same task.
 
 ## ADVISORY
 

@@ -17,12 +17,10 @@ outputFile: '{planning_artifacts}/product-brief-{{project_name}}-{{date}}.md'
   <output>Summarize the major completed sections, including the executive summary, core vision, target users, success metrics, and MVP scope.</output>
 </step>
 
-<step n="2" goal="Perform a final quality and alignment check with the user">
-  <ask>Ask whether the executive summary clearly communicates the vision and problem.</ask>
-  <ask>Ask whether the target users and personas feel accurate and actionable.</ask>
-  <ask>Ask whether the success metrics and MVP scope align with the intended business and user outcomes.</ask>
-  <branch if="the user identifies final adjustments" optional="true">
-    <action>Incorporate the final adjustments into `{outputFile}` before closing the workflow.</action>
+<step n="2" goal="Perform a final quality and alignment check">
+  <output>Call out the final quality-check lenses: executive-summary clarity, user/persona accuracy, and alignment between success metrics, MVP scope, and intended outcomes.</output>
+  <branch if="the user already requested final adjustments in the current task" optional="true">
+    <action>Incorporate those final adjustments into `{outputFile}` before closing the workflow.</action>
   </branch>
 </step>
 
@@ -39,7 +37,14 @@ outputFile: '{planning_artifacts}/product-brief-{{project_name}}-{{date}}.md'
 
 <step n="4" goal="Close the workflow cleanly">
   <action>Mark the workflow complete in the document state.</action>
-  <output>Offer to answer follow-up questions or help the user choose the next workflow.</output>
+  <output>
+    Conclude the workflow after presenting the completed outcome and next-step guidance.
+    <detail>
+      Do not ask a new follow-up question just to keep the workflow open.
+      If the user already requested a particular next action in the same task, acknowledge it in the closing guidance.
+      Otherwise, stop cleanly after the completion summary.
+    </detail>
+  </output>
 </step>
 
 ## CHECKPOINT

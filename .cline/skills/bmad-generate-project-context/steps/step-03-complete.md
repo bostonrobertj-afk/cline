@@ -18,5 +18,12 @@
   <action>Save the completed context file to `{output_folder}/project-context.md`.</action>
 
   <output>Project context complete and optimized for LLM consumption.</output>
-  <ask>Need any explanation of the rules or how the context file should be maintained?</ask>
+  <output>
+    Conclude the workflow after reporting the completed context artifact.
+    <detail>
+      Do not ask a new follow-up question just to keep the workflow open.
+      If the user already asked for explanation or maintenance guidance in the same task, include that explanation in the closing message.
+      Otherwise, stop cleanly after confirming completion.
+    </detail>
+  </output>
 </step>

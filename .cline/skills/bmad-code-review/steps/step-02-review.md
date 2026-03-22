@@ -10,27 +10,12 @@ failed_layers: '' # set at runtime: comma-separated list of layers that failed o
 - Execute this file in order.
 - Halt whenever user input, confirmation, or workflow gating is required.
 - Keep the reviewer roles distinct and preserve the review context boundaries for each layer.
-- Launch the review layers with one batched `use_subagents` call whenever subagents are available.
-- Put one prompt in that batched call for each active reviewer layer and do not add exploratory or duplicate reviewer prompts.
-- Dispatch each active reviewer at most once during this phase unless its run clearly failed, timed out, or returned no usable findings.
-- Do not launch extra reviewer reruns just to get shorter wording, a different format, or more hidden detail.
 - Only the current phase checklist and the current active step's details are shown in the prompt at one time.
 - Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
 
 ## EXECUTION
 
 <step n="1" goal="Launch the review layers">
-  <action>
-    Build exactly one subagent prompt per active reviewer layer, then dispatch them together in a single batched `use_subagents` call.
-    <detail>
-      - Blind Hunter always
-      - Adversarial General always
-      - Edge Case Hunter always
-      - Acceptance Auditor only when `{review_mode} = `full``
-      Do not dispatch any extra summarizer, parser, formatter, or backup reviewer subagents during the initial launch.
-      Do not split one reviewer layer across multiple subagents unless the user explicitly asked for that.
-    </detail>
-  </action>
   <action>
     Dispatch a separate subagent for the Blind Hunter review.
     <detail>
@@ -40,7 +25,6 @@ failed_layers: '' # set at runtime: comma-separated list of layers that failed o
       Tell it:
       - if `{review_input_type} = "diff"`: `Act as a diff-only Blind Hunter reviewer. Stay grounded only in the provided diff. Return concise markdown findings with a short title, the observed issue, and evidence from the diff when available.`
       - if `{review_input_type} = "file-bundle"`: `Act as a file-scoped Blind Hunter reviewer. Stay grounded only in the provided files and story-described scope. Do not go searching for commits or unrelated project files. Return concise markdown findings with a short title, the observed issue, and evidence from the provided files when available.`
-      - add: `Return one final findings list only. Do not propose follow-up reviewer runs.`
     </detail>
   </action>
   <action>
@@ -52,7 +36,6 @@ failed_layers: '' # set at runtime: comma-separated list of layers that failed o
       Tell it:
       - if `{review_input_type} = "diff"`: `Review this change skeptically. Stay focused on the provided diff and nearby directly relevant context. Return concise markdown findings with titles, evidence, and file locations when available.`
       - if `{review_input_type} = "file-bundle"`: `Review this implemented story skeptically using only the provided file bundle and loaded story/spec context. Do not infer a commit range or search for a different baseline unless the parent prompt explicitly gives one. Return concise markdown findings with titles, evidence, and file locations when available.`
-      - add: `Return one final findings list only. Do not propose follow-up reviewer runs.`
     </detail>
   </action>
   <action>
@@ -63,7 +46,6 @@ failed_layers: '' # set at runtime: comma-separated list of layers that failed o
       Tell it:
       - if `{review_input_type} = "diff"`: `Inspect reachable boundary conditions and branching paths in the changed scope only. Return only the JSON array format expected by the edge-case hunter workflow.`
       - if `{review_input_type} = "file-bundle"`: `Inspect reachable boundary conditions and branching paths in the provided files only. Treat the provided file bundle as the full review scope for this story. Return only the JSON array format expected by the edge-case hunter workflow.`
-      - add: `Return one final result only. Do not propose follow-up reviewer runs.`
     </detail>
   </action>
   <branch if="{review_mode} = `full`" optional="true">
@@ -79,7 +61,6 @@ failed_layers: '' # set at runtime: comma-separated list of layers that failed o
         - Check for acceptance-criteria violations, deviations from spec intent, missing specified behavior, and contradictions between spec constraints and the actual code.
         - If the review input is a file bundle instead of a diff, treat the provided files as the authoritative implementation scope and do not search for old commits unless one was explicitly provided.
         - Return a markdown list where each finding includes a one-line title, the violated AC or constraint, and evidence from the provided review input.
-        - Return one final findings list only. Do not propose follow-up reviewer runs.
       </detail>
     </action>
   </branch>
@@ -91,15 +72,7 @@ failed_layers: '' # set at runtime: comma-separated list of layers that failed o
 <step n="2" goal="Handle review-layer failures and fallback paths">
   <action>Track any review layer that fails, times out, or returns empty results by appending its layer name to `{failed_layers}`.</action>
   <branch if="subagents are available" optional="true">
-    <action>
-      Proceed with the completed review layers and keep collecting their findings.
-      <detail>
-        The expected initial launch count is:
-        - 3 subagents when `{review_mode} = `no-spec``
-        - 4 subagents when `{review_mode} = `full``
-        Treat any larger upfront launch count as a workflow-execution mistake rather than intended behavior.
-      </detail>
-    </action>
+    <action>Proceed with the completed review layers and keep collecting their findings.</action>
   </branch>
   <branch if="subagents are not available" optional="true">
     <action>
@@ -117,14 +90,7 @@ failed_layers: '' # set at runtime: comma-separated list of layers that failed o
 </step>
 
 <step n="3" goal="Collect the findings for triage">
-  <action>
-    Collect all findings from the completed review layers.
-    <detail>
-      Treat the first-pass outputs from the launched reviewers as the input set for triage.
-      Do not dispatch new reviewer subagents during collection just to restate, shorten, or reformat findings.
-      Only re-dispatch a reviewer if its original run clearly failed, timed out, or returned no usable output at all.
-    </detail>
-  </action>
+  <action>Collect all findings from the completed review layers.</action>
   <branch if="{failed_layers} is non-empty" optional="true">
     <output>Keep note of which review layers failed so the triage step can warn about incomplete coverage.</output>
   </branch>

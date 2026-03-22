@@ -39,27 +39,20 @@ prdFile: '{prd_file_path}'
   <output>Present the completed validation summary conversationally and explain the recommendation.</output>
 </step>
 
-<step n="4" goal="Offer next-step options">
-  <ask>Ask whether the user wants to review detailed findings, use the edit workflow, fix simpler items, or exit.</ask>
-  <branch if="the user selects detailed review" optional="true">
-    <output>Walk through the validation report section by section, then return to the menu.</output>
-  </branch>
-  <branch if="the user selects edit workflow" optional="true">
-    <action>Explain that `bmad-edit-prd` is the best path for systematic remediation and offer to launch it with the validation report as context.</action>
-  </branch>
-  <branch if="the user selects simpler fixes" optional="true">
-    <ask>Ask which simple fixes should be applied first.</ask>
-  </branch>
-  <branch if="the user selects exit" optional="true">
-    <output>Report the saved validation report path and the final overall recommendation.</output>
-    <action>Suggest the `bmad-help` skill for follow-up workflow guidance if needed.</action>
-    <exit />
-  </branch>
+<step n="4" goal="Present next-step options and close cleanly">
+  <output>Present the available next-step paths: review detailed findings, use `bmad-edit-prd` for systematic remediation, fix simpler items manually, or stop.</output>
+  <output>Report the saved validation report path and the final overall recommendation.</output>
+  <action>Suggest the `bmad-help` skill for follow-up workflow guidance if needed.</action>
+  <detail>
+    Do not ask a new follow-up question just to keep the workflow open.
+    If the user already requested a specific remediation path in the same task, acknowledge it in the closing guidance.
+    Otherwise, stop cleanly after presenting the report and options.
+  </detail>
 </step>
 
 ## CHECKPOINT
 
-Pause after presenting the final summary until the user chooses a next-step option.
+Present the final summary and next-step options, then stop cleanly unless the user explicitly requested another action in the same task.
 
 ## ADVISORY
 

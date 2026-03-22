@@ -27,7 +27,14 @@
   <output>Congratulate the user and summarize what was accomplished in the completed architecture workflow.</output>
   <output>Explain that the architecture document is now the technical source of truth for implementation agents.</output>
   <output>Recommend the next phase, including invoking `bmad-help` if the user wants guidance on what to do next.</output>
-  <ask>Offer to answer questions about the completed architecture document.</ask>
+  <output>
+    Conclude the workflow after presenting the summary and next-step guidance.
+    <detail>
+      Do not ask a new follow-up question just to keep the workflow open.
+      If the user already requested a specific follow-up in the same task, acknowledge it in the closing guidance.
+      Otherwise, stop cleanly after the completion summary.
+    </detail>
+  </output>
 </step>
 
 ## CHECKPOINT

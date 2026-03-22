@@ -95,8 +95,8 @@ date: system-generated current datetime
   <output>Show the sprint summary, story and epic counts, the recommendation, and any detected risks.</output>
 </step>
 
-<step n="5" goal="Offer interactive actions">
-  <ask>Ask whether to run the recommended workflow, show stories grouped by status, show the raw sprint status file, or exit.</ask>
+<step n="5" goal="Present interactive action options and close cleanly">
+  <output>Present the available actions: run the recommended workflow, show stories grouped by status, show the raw sprint status file, or exit.</output>
   <branch if="the user chooses the recommendation path" optional="true">
     <output>Run the recommended workflow and include `story_key={{next_story_id}}` when the target is a story.</output>
   </branch>
@@ -109,6 +109,11 @@ date: system-generated current datetime
   <branch if="the user chooses exit" optional="true">
     <exit />
   </branch>
+  <detail>
+    Do not ask a new follow-up question just to keep the workflow open.
+    If the user already requested one of these actions in the same task, carry that through in the response.
+    Otherwise, stop cleanly after presenting the summary and available actions.
+  </detail>
 </step>
 
 <step n="20" goal="Produce structured data-mode output">
