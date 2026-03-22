@@ -1,50 +1,36 @@
+## META
 
-# Technical Research Workflow
+- Goal: guide the user from topic discovery into the managed technical research workflow.
+- Execute the flow in order.
+- Halt whenever user input or workflow gating is required.
+- Speak in `{communication_language}`.
+- Do not begin web research until the topic and scope are confirmed.
 
-**Goal:** Conduct comprehensive technical research using current web data and verified sources to produce complete research documents with compelling narratives and proper citations.
+## EXECUTION
 
-**Your Role:** You are a technical research facilitator working with an expert partner. This is a collaboration where you bring research methodology and web search capabilities, while your partner brings domain knowledge and research direction.
+<step n="1" goal="Discover the technical research topic and goals">
+  <action>Load `{project-root}/_bmad/bmm/config.yaml` and resolve `project_name`, `output_folder`, `planning_artifacts`, `user_name`, `communication_language`, `document_output_language`, `user_skill_level`, and `date`.</action>
+  <output>Welcome {user_name}. Ask what technology, tool, or technical area they want to research.</output>
+  <ask>What specific aspect of the topic should we focus on, what outcomes should this research support, and how broad should the scope be?</ask>
+  <detail>
+    Capture `research_topic` and `research_goals` from the conversation.
+    Keep the discussion focused on technical architecture, implementation, integration, and adoption concerns.
+  </detail>
+</step>
 
-## PREREQUISITE
+<step n="2" goal="Route into the managed technical research workflow">
+  <action>Set `research_type = "technical"`.</action>
+  <action>Set `research_topic` and `research_goals` from the confirmed discussion.</action>
+  <action>Create `{planning_artifacts}/research/technical-{{research_topic}}-research-{{date}}.md` by copying `./research.template.md` exactly.</action>
+  <handoff path="./technical-steps/step-01-init.md" />
+</step>
 
-**⛔ Web search required.** If unavailable, abort and tell the user.
+## CHECKPOINT
 
-## CONFIGURATION
+Do not hand off until the topic, primary focus, research goals, and desired scope are clear.
 
-Load config from `{project-root}/_bmad/bmm/config.yaml` and resolve:
-- `project_name`, `output_folder`, `planning_artifacts`, `user_name`
-- `communication_language`, `document_output_language`, `user_skill_level`
-- `date` as a system-generated value
+## ADVISORY
 
-## QUICK TOPIC DISCOVERY
-
-"Welcome {{user_name}}! Let's get started with your **technical research**.
-
-**What technology, tool, or technical area do you want to research?**
-
-For example:
-- 'React vs Vue for large-scale applications'
-- 'GraphQL vs REST API architectures'
-- 'Serverless deployment options for Node.js'
-- 'Or any other technical topic you have in mind...'"
-
-### Topic Clarification
-
-Based on the user's topic, briefly clarify:
-1. **Core Technology**: "What specific aspect of [technology] are you most interested in?"
-2. **Research Goals**: "What do you hope to achieve with this research?"
-3. **Scope**: "Should we focus broadly or dive deep into specific aspects?"
-
-## ROUTE TO TECHNICAL RESEARCH STEPS
-
-After gathering the topic and goals:
-
-1. Set `research_type = "technical"`
-2. Set `research_topic = [discovered topic from discussion]`
-3. Set `research_goals = [discovered goals from discussion]`
-4. Create the starter output file: `{planning_artifacts}/research/technical-{{research_topic}}-research-{{date}}.md` with exact copy of the `./research.template.md` contents
-5. Load: `./technical-steps/step-01-init.md` with topic context
-
-**Note:** The discovered topic from the discussion should be passed to the initialization step, so it doesn't need to ask "What do you want to research?" again - it can focus on refining the scope for technical research.
-
-**✅ YOU MUST ALWAYS SPEAK OUTPUT In your Agent communication style with the config `{communication_language}`**
+- Keep the discovery conversation brief and practical.
+- Pass the confirmed topic into the first technical step so it can refine scope instead of restarting discovery.
+- Keep all user-facing text in `{communication_language}`.

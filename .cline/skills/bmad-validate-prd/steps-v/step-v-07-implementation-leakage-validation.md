@@ -175,7 +175,7 @@ Total Violations: {count} ({severity})
 
 **Proceeding to next validation check...**"
 
-Without delay, read fully and follow: {nextStepFile} (step-v-08-domain-compliance-validation.md)
+Without delay, continue with {nextStepFile} (step-v-08-domain-compliance-validation.md)
 
 ---
 

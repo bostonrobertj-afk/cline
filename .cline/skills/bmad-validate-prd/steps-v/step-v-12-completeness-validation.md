@@ -209,7 +209,7 @@ Overall Completeness: {percentage}% ({severity})
 
 **Proceeding to final step...**"
 
-Without delay, read fully and follow: {nextStepFile} (step-v-13-report-complete.md)
+Without delay, continue with {nextStepFile} (step-v-13-report-complete.md)
 
 ---
 

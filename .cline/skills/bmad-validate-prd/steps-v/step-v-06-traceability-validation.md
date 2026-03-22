@@ -186,7 +186,7 @@ Total Issues: {count} ({severity})
 
 **Proceeding to next validation check...**"
 
-Without delay, read fully and follow: {nextStepFile} (step-v-07-implementation-leakage-validation.md)
+Without delay, continue with {nextStepFile} (step-v-07-implementation-leakage-validation.md)
 
 ---
 

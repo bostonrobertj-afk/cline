@@ -30,7 +30,7 @@ This uses **step-file architecture** for disciplined execution:
 3. **WAIT FOR INPUT**: If a menu is presented, halt and wait for user selection
 4. **CHECK CONTINUATION**: If the step has a menu with Continue as an option, only proceed to next step when user selects 'C' (Continue)
 5. **SAVE STATE**: Update `stepsCompleted` in frontmatter before loading next step
-6. **LOAD NEXT**: When directed, read fully and follow the next step file
+6. **LOAD NEXT**: When directed, continue with the next step file
 
 ### Critical Rules (NO EXCEPTIONS)
 
@@ -59,4 +59,4 @@ Load and read full config from {main_config} and resolve:
 
 "**Validate Mode: Validating an existing PRD against BMAD standards.**"
 
-Then read fully and follow: `{validateWorkflow}` (steps-v/step-v-01-discovery.md)
+Then route to `{validateWorkflow}` (steps-v/step-v-01-discovery.md)

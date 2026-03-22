@@ -192,7 +192,7 @@ Display: **Select an Option:** [A] Advanced Elicitation [P] Party Mode [C] Conti
 
 - IF A: Invoke the `bmad-advanced-elicitation` skill, and when finished redisplay the menu
 - IF P: Invoke the `bmad-party-mode` skill, and when finished redisplay the menu
-- IF C: Read fully and follow: {nextStepFile} to begin format detection
+- IF C: Continue with {nextStepFile} to begin format detection
 - IF user provides additional document: Load it, update report, redisplay summary
 - IF Any other: help user, then redisplay menu
 

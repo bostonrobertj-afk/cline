@@ -176,7 +176,7 @@ FR Quality: {percentage}% with acceptable scores ({severity})
 
 **Proceeding to next validation check...**"
 
-Without delay, read fully and follow: {nextStepFile} (step-v-11-holistic-quality-validation.md)
+Without delay, continue with {nextStepFile} (step-v-11-holistic-quality-validation.md)
 
 ---
 

@@ -229,7 +229,7 @@ Overall Rating: {rating}/5 - {label}
 
 **Proceeding to final validation checks...**"
 
-Without delay, read fully and follow: {nextStepFile} (step-v-12-completeness-validation.md)
+Without delay, continue with {nextStepFile} (step-v-12-completeness-validation.md)
 
 ---
 

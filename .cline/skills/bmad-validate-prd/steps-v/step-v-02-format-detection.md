@@ -133,7 +133,7 @@ Display: "**Format Detected:** {classification}
 
 Proceeding to systematic validation checks..."
 
-Without delay, read fully and follow: {nextStepFile} (step-v-03-density-validation.md)
+Without delay, continue with {nextStepFile} (step-v-03-density-validation.md)
 
 **IF format is Non-Standard (< 3 core sections):**
 
@@ -158,8 +158,8 @@ Present MENU OPTIONS below for user selection
 
 #### Menu Handling Logic:
 
-- IF A (Parity Check): Read fully and follow: {altStepFile} (step-v-02b-parity-check.md)
-- IF B (Validate As-Is): Display "Proceeding with validation..." then read fully and follow: {nextStepFile}
+- IF A (Parity Check): Continue with {altStepFile} (step-v-02b-parity-check.md)
+- IF B (Validate As-Is): Display "Proceeding with validation..." then continue with {nextStepFile}
 - IF C (Exit): Display format findings summary and exit validation
 - IF Any other: help user respond, then redisplay menu
 
