@@ -1,5 +1,5 @@
 import { hasEnabledMcpServers } from "../../components/mcp"
-import { getActVsPlanModeResponseRules, getResponseToolsSection } from "../../components/response_tools"
+import { getResponseToolsSection } from "../../components/response_tools"
 import { SystemPromptSection } from "../../templates/placeholders"
 import type { SystemPromptContext } from "../../types"
 
@@ -82,8 +82,6 @@ ${getManagedWorkflowPlaceholderToolGuidance(context)}`
 const ACT_VS_PLAN = (context: SystemPromptContext) => `ACT MODE V.S. PLAN MODE
 
 In each user message, the environment_details will specify the current mode. There are two modes:
-
-${getActVsPlanModeResponseRules(context)}
 
 ## What is PLAN MODE?
 

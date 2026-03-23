@@ -1,4 +1,4 @@
-import { getActVsPlanModeResponseRules, getResponseToolsSection } from "../../components/response_tools"
+import { getResponseToolsSection } from "../../components/response_tools"
 import { SystemPromptContext } from "../../types"
 
 const XS_EDITING_FILES = `FILE EDITING RULES
@@ -18,8 +18,7 @@ const XS_ACT_PLAN_MODE = (context: SystemPromptContext) => `MODES (STRICT)
 **ACT MODE:**
 - Allowed: all tools except generate_plan_output.
 - Implement stepwise; one tool per message. When all prior steps are user-confirmed successful, use attempt_completion.
-
-${getActVsPlanModeResponseRules(context)}`
+`
 
 const XS_CAPABILITIES = `CURIOSITY & FIRST CONTACT
 - Ambiguity or missing requirement/success criterion → use <ask_followup_question> (1–2 focused Qs; options allowed).

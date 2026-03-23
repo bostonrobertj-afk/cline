@@ -1,4 +1,4 @@
-import { getActVsPlanModeResponseRules, getResponseToolsSection } from "../../components/response_tools"
+import { getResponseToolsSection } from "../../components/response_tools"
 import { SystemPromptSection } from "../../templates/placeholders"
 import type { PromptVariant, SystemPromptContext } from "../../types"
 
@@ -151,8 +151,6 @@ When user is providing you with feedback on how you could improve, you can let t
 const GEMINI_3_ACT_VS_PLAN_TEMPLATE = (context: SystemPromptContext) => `ACT MODE V.S. PLAN MODE
 
 In each user message, the environment_details will specify the current mode. There are two modes:
-
-${getActVsPlanModeResponseRules(context)}
 
 ## Plan Mode Workflow
 

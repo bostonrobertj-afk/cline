@@ -379,8 +379,7 @@ describe("Prompt System Integration Tests", () => {
 					expect(systemPrompt).to.not.include("<agent")
 					expect(systemPrompt).to.not.include("<activation")
 					expect(systemPrompt).to.not.include("<persona")
-					expect(systemPrompt).to.include("Allowed workflow skills for the active BMAD agent")
-					expect(systemPrompt).to.include("Spawn a dedicated subagent")
+					expect(systemPrompt).to.include("Installed skills and workflow activations available on this turn")
 					expect(systemPrompt).to.include("bmad-code-review")
 					expect(systemPrompt.match(/Role: Quick Flow Solo Dev/g)?.length).to.equal(1)
 					expect(systemPrompt).to.not.include("# Tools")
@@ -431,7 +430,6 @@ describe("Prompt System Integration Tests", () => {
 					expect(systemPrompt).to.include("create-pull-request")
 					expect(systemPrompt).to.include("address-pr-comments.md")
 					expect(systemPrompt).to.not.include("bmad-dev")
-					expect(systemPrompt).to.not.include("Allowed workflow skills for the active BMAD agent")
 				},
 			)
 		})

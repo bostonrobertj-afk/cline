@@ -1,5 +1,5 @@
 import { hasEnabledMcpServers } from "../../components/mcp"
-import { getActVsPlanModeResponseRules, getResponseToolsSection } from "../../components/response_tools"
+import { getResponseToolsSection } from "../../components/response_tools"
 import { SystemPromptSection } from "../../templates/placeholders"
 import type { SystemPromptContext } from "../../types"
 
@@ -65,7 +65,7 @@ Use \`task_progress\` to maintain one full Markdown checklist.
 const ACT_VS_PLAN = (context: SystemPromptContext) => `ACT MODE V.S. PLAN MODE
 
 Current mode is provided in environment_details.
-${getActVsPlanModeResponseRules(context)}`
+`
 
 const TOOL_USE = (context: SystemPromptContext) => `TOOL USE
 

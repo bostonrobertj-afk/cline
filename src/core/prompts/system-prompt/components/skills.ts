@@ -17,36 +17,9 @@ export async function getSkillsSection(_variant: PromptVariant, context: SystemP
 	if (context.useMinimalGptPrompt === true) {
 		const skillNames = skills.map((skill) => `\`${skill.name}\``).join(", ")
 
-		if (context.activeAgentId) {
-			return `SKILLS
-
-Allowed workflow skills for the active BMAD agent: ${skillNames}
-
-If you need to run one of these workflows, do not activate it in the current thread.
-Spawn a dedicated subagent and assign it the exact workflow skill in the prompt using a line like \`Skill: use_skill('workflow-skill-name')\`.
-The subagent runtime will activate that assigned workflow before analysis begins.`
-		}
-
 		return `SKILLS
 
 Installed skills and workflow activations available on this turn: ${skillNames}`
-	}
-
-	if (context.activeAgentId) {
-		const skillsList = skills.map((skill) => `  - "${skill.name}": ${skill.description}`).join("\n")
-
-		return `SKILLS
-
-Allowed workflow skills for the active BMAD agent:
-${skillsList}
-
-When this active BMAD agent needs one of the workflows above, do not activate it in the current thread. Starting a workflow in the current thread can change or replace the current persona context.
-
-Instead:
-1. Spawn a dedicated subagent for that workflow run
-2. Assign the exact workflow skill in the subagent prompt using a line like \`Skill: use_skill('workflow-skill-name')\`
-3. Give the subagent the specific input context and expected output format for that workflow
-4. Have the subagent report back, then continue the parent workflow in the current thread`
 	}
 
 	const skillsList = skills.map((skill) => `  - "${skill.name}": ${skill.description}`).join("\n")

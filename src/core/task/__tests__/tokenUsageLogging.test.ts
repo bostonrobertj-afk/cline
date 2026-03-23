@@ -12,7 +12,7 @@ Use attempt_completion.
 
 SKILLS
 
-Allowed workflow skills for the active BMAD agent: bmad-code-review
+Installed skills and workflow activations available on this turn: bmad-code-review
 ====
 
 <active_bmad_workflow workflow_id="bmad-code-review" managed="true" phase_id="step-01">

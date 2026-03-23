@@ -1,4 +1,4 @@
-import { getActVsPlanModeResponseRules, getResponseToolsSection } from "../../components/response_tools"
+import { getResponseToolsSection } from "../../components/response_tools"
 import { SystemPromptSection } from "../../templates/placeholders"
 import type { PromptVariant, SystemPromptContext } from "../../types"
 
@@ -55,7 +55,7 @@ Use \`task_progress\` to maintain one full Markdown checklist.
 const GPT5_1_ACT_VS_PLAN = (context: SystemPromptContext) => `ACT MODE V.S. PLAN MODE
 
 Current mode is provided in environment_details.
-${getActVsPlanModeResponseRules(context)}`
+`
 
 const GPT5_1_OBJECTIVE = (context: SystemPromptContext) => `OBJECTIVE
 

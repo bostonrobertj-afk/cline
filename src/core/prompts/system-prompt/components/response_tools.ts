@@ -51,11 +51,3 @@ ${responseToolLines.join("\n")}
 
 In ACT MODE, respond using these: ${actModeResponseTools}. In PLAN MODE, respond using these: ${planModeResponseTools}.`
 }
-
-export function getActVsPlanModeResponseRules(context: SystemPromptContext): string {
-	const actModeResponseTools = joinToolNames(getActModeResponseTools(context))
-	const planModeResponseTools = joinToolNames(getPlanModeResponseTools(context))
-
-	return `- ACT MODE: Engage in dialogue and execute tasks/workflows. To message the user, use these: ${actModeResponseTools}.
-- PLAN MODE: Engage in dialogue focused on planning out future tasks. To message the user, use these: ${planModeResponseTools}. Do not send a raw assistant reply.`
-}

@@ -1,13 +1,10 @@
 import { SystemPromptSection } from "../templates/placeholders"
 import { TemplateEngine } from "../templates/TemplateEngine"
 import type { PromptVariant, SystemPromptContext } from "../types"
-import { getActVsPlanModeResponseRules } from "./response_tools"
 
 const getActVsPlanModeTemplateText = (context: SystemPromptContext) => `ACT MODE V.S. PLAN MODE
 
 In each user message, the environment_details will specify the current mode. There are two modes:
-
-${getActVsPlanModeResponseRules(context)}
 
 ## What is PLAN MODE?
 
@@ -22,8 +19,7 @@ export async function getActVsPlanModeSection(variant: PromptVariant, context: S
 		return new TemplateEngine().resolve(
 			`ACT MODE V.S. PLAN MODE
 
-Current mode is provided in environment_details.
-${getActVsPlanModeResponseRules(context)}`,
+Current mode is provided in environment_details.`,
 			context,
 			{},
 		)

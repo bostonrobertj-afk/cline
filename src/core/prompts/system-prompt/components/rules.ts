@@ -47,8 +47,6 @@ export async function getRulesSection(variant: PromptVariant, context: SystemPro
 
 - Operate from \`{{CWD}}\`; pass explicit paths instead of assuming directory changes.
 - Verify important command/edit results before completion.
-- Use ask_followup_question when clarification from the user would materially improve correctness or unblock the task. Prefer tools when they can answer directly, but do not avoid normal collaborative questions when the human can clarify the next step.
-- Keep responses direct, technical, and final when completing the task.
 - Use complete-line SEARCH blocks in \`replace_in_file\` and preserve marker syntax exactly.`,
 			context,
 			{ CWD: context.cwd || process.cwd() },
