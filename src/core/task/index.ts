@@ -2635,6 +2635,11 @@ export class Task {
 			throw new Error("Task instance aborted")
 		}
 
+		// Reset per-turn consecutive tool tracking. This keeps guards like
+		// act_mode_respond's no-consecutive-use rule scoped to a single
+		// assistant request/turn instead of leaking across later turns.
+		this.taskState.lastToolName = ""
+
 		// Increment API request counter for focus chain list management
 		this.taskState.apiRequestCount++
 		this.taskState.apiRequestsSinceLastTodoUpdate++
