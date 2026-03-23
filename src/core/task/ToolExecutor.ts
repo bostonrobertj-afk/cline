@@ -13,6 +13,7 @@ import { ClineAsk, ClineSay } from "@shared/ExtensionMessage"
 import { ClineContent } from "@shared/messages/content"
 import { ClineDefaultTool, toolUseNames } from "@shared/tools"
 import { ClineAskResponse } from "@shared/WebviewMessage"
+import { Logger } from "@/shared/services/Logger"
 import { isParallelToolCallingEnabled, modelDoesntSupportWebp } from "@/utils/model-utils"
 import { ToolUse } from "../assistant-message"
 import { ContextManager } from "../context/context-management/ContextManager"
@@ -571,9 +572,11 @@ export class ToolExecutor {
 			}
 
 			// Execute the actual tool
+			Logger.info(`[ToolExecutor ${config.taskId}] starting tool ${block.name} (call_id=${block.call_id ?? "none"})`)
 			toolResult = await this.coordinator.execute(config, block)
 			toolWasExecuted = true
 			this.pushToolResult(toolResult, block)
+			Logger.info(`[ToolExecutor ${config.taskId}] completed tool ${block.name} (call_id=${block.call_id ?? "none"})`)
 
 			// Track the last executed tool for consecutive call detection (used by act_mode_respond)
 			this.taskState.lastToolName = block.name
@@ -599,6 +602,7 @@ export class ToolExecutor {
 				}
 			}
 		} catch (error) {
+			Logger.error(`[ToolExecutor ${config.taskId}] failed tool ${block.name} (call_id=${block.call_id ?? "none"})`, error)
 			executionSuccess = false
 			toolResult = formatResponse.toolError(`Tool execution failed: ${error}`)
 

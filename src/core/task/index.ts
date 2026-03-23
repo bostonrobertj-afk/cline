@@ -2561,6 +2561,9 @@ export class Task {
 				break
 			}
 			case "tool_use":
+				Logger.info(
+					`[Task ${this.taskId}] presentAssistantMessage executing tool ${block.name} at index ${this.taskState.currentStreamingContentIndex + 1}/${this.taskState.assistantMessageContent.length} (call_id=${block.call_id ?? "none"})`,
+				)
 				// If we have a pending initial commit, we must block unsafe tools until it finishes.
 				// Safe tools (read-only) can run in parallel.
 				if (this.initialCheckpointCommitPromise) {
@@ -2570,6 +2573,9 @@ export class Task {
 					}
 				}
 				await this.toolExecutor.executeTool(block)
+				Logger.info(
+					`[Task ${this.taskId}] presentAssistantMessage completed tool ${block.name} at index ${this.taskState.currentStreamingContentIndex + 1}/${this.taskState.assistantMessageContent.length}; userMessageContent blocks=${this.taskState.userMessageContent.length}`,
+				)
 				if (block.call_id) {
 					Session.get().updateToolCall(block.call_id, block.name)
 				}
@@ -2593,6 +2599,9 @@ export class Task {
 				// its okay that we increment if !didCompleteReadingStream, it'll just return bc out of bounds and as streaming continues it will call presentAssistantMessage if a new block is ready. if streaming is finished then we set userMessageContentReady to true when out of bounds. This gracefully allows the stream to continue on and all potential content blocks be presented.
 				// last block is complete and it is finished executing
 				this.taskState.userMessageContentReady = true // will allow pwaitfor to continue
+				Logger.info(
+					`[Task ${this.taskId}] userMessageContentReady=true after completing block index ${this.taskState.currentStreamingContentIndex + 1}/${this.taskState.assistantMessageContent.length}`,
+				)
 			}
 
 			// call next block if it exists (if not then read stream will call it when its ready)
@@ -3446,7 +3455,13 @@ export class Task {
 				// 	this.userMessageContentReady = true
 				// }
 
+				Logger.info(
+					`[Task ${this.taskId}] waiting for userMessageContentReady after stream completion; blocks=${this.taskState.assistantMessageContent.length}, currentIndex=${this.taskState.currentStreamingContentIndex}, didCompleteReadingStream=${this.taskState.didCompleteReadingStream}`,
+				)
 				await pWaitFor(() => this.taskState.userMessageContentReady)
+				Logger.info(
+					`[Task ${this.taskId}] userMessageContentReady wait released; userMessageContent blocks=${this.taskState.userMessageContent.length}`,
+				)
 
 				// Save checkpoint after all tools in this response have finished executing
 				await this.checkpointManager?.saveCheckpoint()
@@ -3741,6 +3756,11 @@ export class Task {
 		}
 
 		this.taskState.assistantMessageContent = [...textBlocks, ...toolBlocks]
+		Logger.info(
+			`[Task ${this.taskId}] processNativeToolCalls scheduled ${toolBlocks.length} native tool call(s): ${toolBlocks
+				.map((block) => `${block.name}(call_id=${block.call_id ?? "none"}, partial=${String(block.partial)})`)
+				.join(", ")}`,
+		)
 
 		// Reset index to the first tool block position so they can be executed
 		// This fixes the issue where tools remain unexecuted because the index
