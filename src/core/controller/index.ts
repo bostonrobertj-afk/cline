@@ -467,10 +467,8 @@ export class Controller {
 			//await new Promise((resolve) => setTimeout(resolve, 100))
 
 			// NOW try to get history after abort has finished (hook may have saved messages)
-			let historyItem: HistoryItem | undefined
 			try {
-				const result = await this.getTaskWithId(this.task.taskId)
-				historyItem = result.historyItem
+				await this.getTaskWithId(this.task.taskId)
 			} catch (error) {
 				// Task not in history yet (new task with no messages); catch the
 				// error to enable the agent to continue making progress.
@@ -485,6 +483,82 @@ export class Controller {
 			await this.postStateToWebview()
 		} finally {
 			// Always clear the flag, even if cancellation fails
+			this.cancelInProgress = false
+		}
+	}
+
+	isTaskActivelyRunning(): boolean {
+		return !!(
+			this.task &&
+			(this.task.taskState.isStreaming || this.task.taskState.isWaitingForFirstChunk || this.backgroundCommandRunning)
+		)
+	}
+
+	async interruptTaskWithFeedback(text?: string, images?: string[], files?: string[]) {
+		if (this.cancelInProgress) {
+			Logger.log(`[Controller.interruptTaskWithFeedback] Task transition already in progress, ignoring duplicate request`)
+			return
+		}
+
+		if (!this.task) {
+			return
+		}
+
+		const interruptedTaskId = this.task.taskId
+		this.cancelInProgress = true
+
+		try {
+			this.updateBackgroundCommandState(false)
+
+			try {
+				await this.task.abortTask()
+			} catch (error) {
+				Logger.error("Failed to abort task for steering", error)
+			}
+
+			await pWaitFor(
+				() =>
+					this.task === undefined ||
+					this.task.taskState.isStreaming === false ||
+					this.task.taskState.didFinishAbortingStream ||
+					this.task.taskState.isWaitingForFirstChunk,
+				{
+					timeout: 3_000,
+				},
+			).catch(() => {
+				Logger.error("Failed to abort task for steering")
+			})
+
+			if (this.task) {
+				// Prevent the interrupted task instance from posting stale updates after we resume.
+				this.task.taskState.abandoned = true
+			}
+
+			const { historyItem } = await this.getTaskWithId(interruptedTaskId)
+			await this.initTask(undefined, undefined, undefined, historyItem)
+
+			const resumedTask = this.task
+			if (!resumedTask) {
+				return
+			}
+
+			await pWaitFor(
+				() => {
+					const lastMessage = resumedTask.messageStateHandler.getClineMessages().at(-1)
+					return (
+						lastMessage?.type === "ask" &&
+						(lastMessage.ask === "resume_task" || lastMessage.ask === "resume_completed_task")
+					)
+				},
+				{
+					timeout: 3_000,
+				},
+			)
+
+			await resumedTask.handleWebviewAskResponse("messageResponse", text, images, files)
+		} catch (error) {
+			Logger.error("[Controller.interruptTaskWithFeedback] Failed to steer active task", error)
+		} finally {
 			this.cancelInProgress = false
 		}
 	}
@@ -688,7 +762,7 @@ export class Controller {
 		let apiKey: string
 		try {
 			const response = await axios.post("https://openrouter.ai/api/v1/auth/keys", { code }, getAxiosSettings())
-			if (response.data && response.data.key) {
+			if (response.data?.key) {
 				apiKey = response.data.key
 			} else {
 				throw new Error("Invalid response from OpenRouter API")

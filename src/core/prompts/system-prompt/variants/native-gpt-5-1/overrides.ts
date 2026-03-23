@@ -2,6 +2,11 @@ import { getActVsPlanModeResponseRules, getResponseToolsSection } from "../../co
 import { SystemPromptSection } from "../../templates/placeholders"
 import type { PromptVariant, SystemPromptContext } from "../../types"
 
+const getManagedWorkflowPlaceholderToolGuidance = (context: SystemPromptContext) =>
+	context.managedWorkflowActive
+		? `- When an active managed workflow step establishes, confirms, selects, derives, or receives a runtime placeholder value referenced in the workflow instructions (for example \`{{output_file}}\`), use \`set_workflow_placeholders\` to persist it. Use the exact placeholder keys from the workflow instructions and store only resolved string values.`
+		: ""
+
 const GPT5_1_AGENT_ROLE = (_context: SystemPromptContext) =>
 	`You are Cline, a highly skilled software engineer with extensive knowledge in many programming languages, frameworks, design patterns, and best practices. You excel at problem-solving, writing clean and efficient code, and leveraging a wide range of tools to accomplish complex tasks. Your goal is to assist users by understanding their requests, breaking down tasks into manageable steps, and utilizing available tools effectively to deliver high-quality solutions. You communicate clearly and concisely, ensuring that users are informed and engaged via concise preambles throughout the process. You are adaptable and continuously learn from interactions to improve your performance over time. You are friendly, professional, and always focused on delivering value to the user. You speak in the first person when referring to yourself, and ask the user questions and refer to them as you would in a normal conversation. You always respond using tools. Whether these tools are used to read, edit, or communicate, they must be used as the only method of responding to the user.
 `
@@ -26,6 +31,7 @@ You have access to a set of tools that are executed upon the user's approval. Yo
 - Use list_files when you need directory structure beyond the current visible-file context.
 
 ${getResponseToolsSection(_context)}
+${getManagedWorkflowPlaceholderToolGuidance(_context)}
 
 ## Tool-Calling Convention and Preambles
 

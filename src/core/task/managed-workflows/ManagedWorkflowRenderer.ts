@@ -199,9 +199,10 @@ This is a backend-managed workflow. Do not invent or rewrite the checklist manua
 You MUST limit your scope to the detailed instructions for the active step under current phase checklist.
 You MUST mark each step as complete using the complete_workflow_item tool before moving on, even if you are skipping an optional step.
 You MUST NOT attempt to mark multiple steps complete simultaneously. The system will not accept batched completion attempts.
-Do not advance beyond the current phase until all required items are complete.
 The workflow may be broken into phases, each with distinct phase checklists.
+The workflow will present details for the next step or phase as you complete existing items on the list.
 Do not assume that you are done with this workflow until you see a message indicating "all required phases are complete".
+
 
 Current phase: ${resolveManagedWorkflowPlaceholderText(currentPhase.title, placeholders) ?? currentPhase.title}
 

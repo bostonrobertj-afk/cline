@@ -35,6 +35,11 @@ export async function askResponse(controller: Controller, request: AskResponseRe
 				return Empty.create()
 		}
 
+		if (responseType === "messageResponse" && controller.isTaskActivelyRunning()) {
+			await controller.interruptTaskWithFeedback(request.text, request.images, request.files)
+			return Empty.create()
+		}
+
 		// Call the task's handler for webview responses
 		await controller.task.handleWebviewAskResponse(responseType, request.text, request.images, request.files)
 
