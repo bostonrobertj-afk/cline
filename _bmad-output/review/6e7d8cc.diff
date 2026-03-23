@@ -1,0 +1,2298 @@
+diff --git a/docs/managed-workflow-standardization/thread-idle-execution-01-task-state-contract.md b/docs/managed-workflow-standardization/thread-idle-execution-01-task-state-contract.md
+new file mode 100644
+index 00000000..734d14bf
+--- /dev/null
++++ b/docs/managed-workflow-standardization/thread-idle-execution-01-task-state-contract.md
+@@ -0,0 +1,215 @@
++# Execution 01: Task State Contract And Passive Lifecycle
++
++## Parent Spec
++
++This execution swathe implements the backend task-state contract described in [thread-idle-state-implementation-spec.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/managed-workflow-standardization/thread-idle-state-implementation-spec.md).
++
++## Objective
++
++Add a first-class passive thread state to the task/runtime contract so the backend can distinguish:
++
++- active execution
++- real ask states
++- completed tasks
++- passively opened threads
++
++This swathe owns the data contract and task-engine semantics only. It must not implement controller reopen/cancel/steer orchestration, prompt wording, or webview rendering.
++
++## Strict Target File List
++
++Only these files may be edited in this swathe:
++
++- `src/shared/ExtensionMessage.ts`
++- `src/shared/proto/cline/state.ts`
++- `src/shared/proto/cline/task.ts`
++- `src/shared/proto-conversions/cline-message.ts`
++- `src/core/task/index.ts`
++- `src/core/task/__tests__/thread-display-state.test.ts`
++
++No other files may be edited by this execution worker.
++
++## Files Explicitly Out Of Scope
++
++This swathe must not edit:
++
++- `src/core/controller/**`
++- `src/core/prompts/**`
++- `webview-ui/**`
++- any docs other than this file's `Completion Notes` and `Remediation Notes`
++
++## Required Outcome
++
++After this swathe lands:
++
++1. The backend must expose an explicit passive thread state such as `idle_open`.
++2. Passive thread state must not be inferred from `followup`, `resume_task`, or `resume_completed_task`.
++3. `src/core/task/index.ts` must understand the passive state as a stable lifecycle condition, not a transient ask hack.
++4. The exported/shared state contract must be sufficient for controller and webview code to consume without inventing their own heuristics.
++
++## Required Changes
++
++### 1. Add explicit thread display state to shared contracts
++
++Update the shared types so extension state can represent passive thread lifecycle directly.
++
++Minimum requirement:
++
++- add a thread/task display state enum or equivalent discriminant
++- include a passive state such as `idle_open`
++- preserve compatibility with existing ask/say message history
++
++### 2. Keep ask-state meaning narrow
++
++The shared contract must preserve the distinction between:
++
++- `ask` messages that contain real questions or explicit user decisions
++- passive thread lifecycle state that is not itself a question
++
++Do not solve this by adding another fake ask string.
++
++### 3. Update task-engine lifecycle support
++
++In `src/core/task/index.ts`, add the task-side semantics needed for the new passive state.
++
++Examples:
++
++- stable reopened-thread lifecycle handling
++- non-running state after interruption/cancel
++- no requirement that passive open be represented as `resume_*`
++
++This swathe should not decide controller policy. It should make the task engine capable of supporting it.
++
++### 4. Add focused backend tests
++
++Create focused coverage in:
++
++- `src/core/task/__tests__/thread-display-state.test.ts`
++
++Cover at least:
++
++- passive state is representable in the shared contract
++- passive state is distinct from ask states
++- task lifecycle helpers do not treat passive state as active execution
++
++## Dependency Contract For Other Swathes
++
++This swathe must publish the final field/type names for:
++
++- thread display state
++- passive open state value
++- resumable metadata if needed
++
++Record those names in `Completion Notes` so Execution 02 and 03 can consume them without renaming drift.
++
++## QA Instructions
++
++### QA Scope
++
++QA for this swathe is limited to:
++
++- shared contract correctness
++- task-engine lifecycle semantics
++- test coverage in the owned file list
++
++QA must not review controller behavior, prompt text, or webview rendering in this round.
++
++### QA Method
++
++1. Read the owned files only.
++2. Verify the passive state is explicit in shared contracts.
++3. Verify `src/core/task/index.ts` does not rely on fake ask states to represent passive open.
++4. Run the smallest targeted test command that exercises this swathe.
++
++Recommended commands:
++
++```bash
++npm run test:unit -- --exit src/core/task/__tests__/thread-display-state.test.ts
++```
++
++If additional targeted tests are added inside the owned file list, run those too and record the exact command.
++
++### QA Findings Recording Protocol
++
++QA must append findings under `## QA Findings` using this format:
++
++```md
++### Round N
++- Status: FAIL
++- Finding 1: <severity> | <file> | <issue summary>
++  Reproduction: <short reproduction or failing assertion>
++  Expected: <expected behavior>
++  Actual: <actual behavior>
++- Finding 2: ...
++```
++
++If QA passes cleanly, append:
++
++```md
++### Round N
++- Status: PASS
++- Notes: No deficiencies found in owned scope.
++```
++
++### Remediation Protocol
++
++Execution agents must not delete or rewrite QA findings.
++
++If QA reports failures, the execution agent must append a new entry under `## Remediation Notes` using this format:
++
++```md
++### Remediation After Round N
++- Addressed Finding 1 by ...
++- Addressed Finding 2 by ...
++- Tests run: <exact command>
++```
++
++## Acceptance Criteria
++
++- Passive thread state is explicit in shared/backend contracts.
++- Passive thread state is not encoded as a synthetic ask state.
++- Task lifecycle code can represent passive open without treating it as active execution.
++- Focused backend tests cover the new contract and pass.
++
++## Completion Notes
++
++- Added explicit shared thread lifecycle contract via `ThreadDisplayStates` / `ThreadDisplayState`, with `idle_open` as the passive open value.
++- Added explicit generated schema support in `src/shared/proto/cline/ui.ts` so `threadDisplayState` now round-trips through the shared protobuf-style contract.
++- Published `threadDisplayState` on both `ExtensionState` and `ClineMessage` so passive thread state can be carried without overloading ask strings.
++- Extended `src/shared/proto-conversions/cline-message.ts` to round-trip `threadDisplayState` through the message conversion bridge.
++- Added task lifecycle helpers in `src/core/task/index.ts` to classify active vs passive thread state, treat passive open as non-active work, and move the task into `paused`/`idle_open` during abort cleanup.
++- Added focused coverage in `src/core/task/__tests__/thread-display-state.test.ts`.
++- Test command results:
++  - `npm run test:unit -- --exit --grep "thread display state contract"`: PASS, 3 passing.
++  - `npm run test:unit -- --exit src/core/task/__tests__/thread-display-state.test.ts`: our new test passed, but the broader unit harness also surfaced unrelated pre-existing failures in controller/snapshot suites.
++
++## QA Findings
++### Round 1
++- Status: FAIL
++- Finding 1: medium | src/shared/proto/cline/ui.ts | `threadDisplayState` is not actually part of the generated shared message schema
++  Reproduction: `rg -n "threadDisplayState" src/shared/proto/cline/ui.ts` returns no matches, while `src/shared/proto-conversions/cline-message.ts` writes the property onto a casted `ProtoClineMessage` object.
++  Expected: the shared/serialized `ClineMessage` contract should explicitly define `threadDisplayState` so passive open state round-trips through the generated schema without relying on an ad hoc cast.
++  Actual: the new state exists only in the app-side TypeScript contract and conversion shim; the generated proto `ClineMessage` type still has no `threadDisplayState` field, so schema consumers cannot declare or read it directly.
++
++### Round 2
++- Status: FAIL
++- Finding 1: medium | src/core/task/index.ts:233-245 | passive open is still derived from synthetic resume ask names
++  Reproduction: resume a task from history or call `updateThreadDisplayStateForAsk("resume_task")`; the task engine sets `threadDisplayState` to `idle_open` only because the ask type is `resume_task` or `resume_completed_task`.
++  Expected: passive thread lifecycle should be represented and consumed directly by `threadDisplayState`, without using legacy resume ask names as the trigger for the passive-open state.
++  Actual: `updateThreadDisplayStateForAsk()` still branches on `resume_task` and `resume_completed_task` to select `ThreadDisplayStates.IDLE_OPEN`, so the passive state remains coupled to the synthetic ask heuristic the swathe was supposed to remove.
++
++### Round 3
++- Status: PASS
++- Notes: No deficiencies found in owned scope.
++
++## Remediation Notes
++
++### Remediation After Round 1
++- Addressed the schema gap by adding an explicit `ThreadDisplayState` enum and `threadDisplayState` field to `src/shared/proto/cline/ui.ts`, so passive-open state now round-trips through the generated shared message schema.
++- Removed the cast-only bridge by updating `src/shared/proto-conversions/cline-message.ts` to map between app and proto thread display states directly.
++- Updated `src/core/task/index.ts` to emit the current thread display state on task messages so the serialized contract carries real runtime state.
++- Tests run: `npm run test:unit -- --exit --grep "thread display state contract"` (pass, 3 passing).
++
++### Remediation After Round 2
++- Removed the passive-open coupling from `src/core/task/index.ts` by making `resumeTaskFromHistory()` pass `ThreadDisplayStates.IDLE_OPEN` explicitly into `ask(...)` instead of deriving `idle_open` from `resume_task` / `resume_completed_task`.
++- Narrowed the ask-state lifecycle helper so it only maps ask-driven states like `awaiting_user_response` and `completed`.
++- Tests run: `npm run test:unit -- --exit --grep "thread display state contract"` (pass, 3 passing).
+diff --git a/docs/managed-workflow-standardization/thread-idle-execution-02-controller-open-cancel-steer.md b/docs/managed-workflow-standardization/thread-idle-execution-02-controller-open-cancel-steer.md
+new file mode 100644
+index 00000000..a3b95c74
+--- /dev/null
++++ b/docs/managed-workflow-standardization/thread-idle-execution-02-controller-open-cancel-steer.md
+@@ -0,0 +1,207 @@
++# Execution 02: Controller Open, Cancel, And Steer Lifecycle
++
++## Parent Spec
++
++This execution swathe implements the controller-side lifecycle changes described in [thread-idle-state-implementation-spec.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/managed-workflow-standardization/thread-idle-state-implementation-spec.md).
++
++## Objective
++
++Rewire controller behavior so:
++
++- opening a thread is passive
++- cancel stops work without ejecting the user from the thread
++- steer/interrupt preserves interaction instead of creating a dead UI state
++
++This swathe owns controller orchestration only. It must consume the passive state contract from Execution 01 and must not implement webview rendering or prompt-copy changes.
++
++## Strict Target File List
++
++Only these files may be edited in this swathe:
++
++- `src/core/controller/index.ts`
++- `src/core/controller/task/showTaskWithId.ts`
++- `src/core/controller/task/showTaskWithId.test.ts`
++- `src/core/controller/task/askResponse.ts`
++- `src/core/controller/task/askResponse.test.ts`
++- `src/core/controller/task/cancelTask.ts`
++- `src/core/controller/task/cancelTask.test.ts`
++- `src/core/controller/__tests__/cancelTask.test.ts`
++- `src/core/controller/__tests__/interruptTaskWithFeedback.test.ts`
++
++No other files may be edited by this execution worker.
++
++## Files Explicitly Out Of Scope
++
++This swathe must not edit:
++
++- `src/shared/**`
++- `src/core/task/index.ts`
++- `src/core/prompts/**`
++- `webview-ui/**`
++- any docs other than this file's `Completion Notes` and `Remediation Notes`
++
++## Required Outcome
++
++After this swathe lands:
++
++1. Opening a historical thread must no longer auto-resume work.
++2. Cancel must preserve the thread and transition it into the passive lifecycle state from Execution 01.
++3. Steer must interrupt or redirect the run without leaving the controller in a dimmed/dead interaction state.
++4. Any explicit resume action must be separate from simply opening the thread.
++
++## Required Changes
++
++### 1. Separate thread opening from run resumption
++
++`showTaskWithId` must stop behaving like a hidden resume action.
++
++Required behavior:
++
++- opening history loads the thread in passive mode
++- it does not immediately behave like `resume_task`
++- it does not issue a synthetic resume prompt as a side effect
++
++### 2. Make cancel return to passive thread state
++
++When cancel is invoked during active work:
++
++- stop the active run
++- keep the current thread visible
++- post the passive lifecycle state from Execution 01
++
++Do not:
++
++- dump the user back to the new-task view
++- immediately restart execution
++- rely on `followup` as the passive marker
++
++### 3. Fix steer/interruption semantics
++
++`askResponse` and the controller interrupt path must support:
++
++- a real interrupt/redirect path
++- preserved thread visibility
++- a recoverable post-interrupt state
++
++The controller must not leave the thread locked in a state where buttons dim and no further action occurs.
++
++### 4. Preserve explicit resume as a separate action
++
++If resumable work still exists, that fact may be exposed as metadata or a later explicit action.
++
++But the controller must not conflate:
++
++- open thread
++- resume run
++
++## Dependency On Execution 01
++
++This swathe must use the final passive-state field/type names published by Execution 01.
++
++Do not rename those fields locally.
++
++If Execution 01 has not published its final names yet, pause and wait rather than inventing a parallel contract.
++
++## QA Instructions
++
++### QA Scope
++
++QA for this swathe is limited to:
++
++- controller open-thread behavior
++- cancel lifecycle behavior
++- steer/interruption lifecycle behavior
++
++QA must not review prompt wording or webview rendering in this round.
++
++### QA Method
++
++1. Read only the owned controller files.
++2. Verify `showTaskWithId` opens passively rather than resuming.
++3. Verify cancel preserves thread visibility and uses the passive state contract.
++4. Verify steer/interruption paths recover cleanly and do not rely on fake passive asks.
++5. Run targeted controller tests only.
++
++Recommended commands:
++
++```bash
++npm run test:unit -- --exit src/core/controller/task/showTaskWithId.test.ts src/core/controller/task/askResponse.test.ts src/core/controller/task/cancelTask.test.ts src/core/controller/__tests__/cancelTask.test.ts src/core/controller/__tests__/interruptTaskWithFeedback.test.ts
++```
++
++### QA Findings Recording Protocol
++
++QA must append findings under `## QA Findings` using this format:
++
++```md
++### Round N
++- Status: FAIL
++- Finding 1: <severity> | <file> | <issue summary>
++  Reproduction: <short repro or failing test>
++  Expected: <expected behavior>
++  Actual: <actual behavior>
++```
++
++If QA passes cleanly, append:
++
++```md
++### Round N
++- Status: PASS
++- Notes: No deficiencies found in owned scope.
++```
++
++### Remediation Protocol
++
++Execution agents must not alter prior QA findings.
++
++If QA reports failures, append remediation details under `## Remediation Notes`:
++
++```md
++### Remediation After Round N
++- Addressed Finding 1 by ...
++- Addressed Finding 2 by ...
++- Tests run: <exact command>
++```
++
++## Acceptance Criteria
++
++- `showTaskWithId` no longer behaves like a hidden resume action.
++- Cancel stops active work without ejecting the user from the thread.
++- Steer/interruption no longer leaves the controller in an interaction dead state.
++- Targeted controller tests pass.
++
++## Completion Notes
++
++- Implemented controller-side passive thread hydration so opening history no longer reuses the follow-up/resume path.
++- Cancel and interrupt now restore the visible thread through the passive-open controller path instead of synthesizing a resume ask.
++- Updated the owned controller tests to cover passive open, cancel preservation, and steer interruption behavior.
++- Tests run: `npm run test:unit -- --exit src/core/controller/task/showTaskWithId.test.ts src/core/controller/task/askResponse.test.ts src/core/controller/task/cancelTask.test.ts src/core/controller/__tests__/cancelTask.test.ts src/core/controller/__tests__/interruptTaskWithFeedback.test.ts`
++- Result: passed for the owned controller assertions in scope.
++
++## QA Findings
++
++### Round 1
++- Status: PASS
++- Notes: No deficiencies found in owned scope.
++
++### Round 2
++- Status: FAIL
++- Finding 1: high | `src/core/controller/index.ts` | passive-open state is not posted into webview state
++  Reproduction: Open a historical thread through `showTaskWithId`, or cancel with `preserveThreadVisible=true`, then inspect the `ExtensionState` returned by `getStateToPostToWebview()`.
++  Expected: the controller should publish the passive lifecycle state so the webview can distinguish `idle_open` from an ordinary historical task.
++  Actual: `getStateToPostToWebview()` only exposes `currentTaskItem` as a raw `HistoryItem`, and this controller path never writes `threadDisplayState` onto that item, so the passive-open discriminant is absent from posted state.
++- Finding 2: high | `src/core/controller/index.ts` | steer text is discarded during active interrupt
++  Reproduction: Send a `messageResponse` while the task is actively running. `askResponse()` routes the request into `interruptTaskWithFeedback()`, which aborts and reopens the thread passively.
++  Expected: the steering payload (`text`, `images`, `files`) should survive the interrupt path so the next turn can use or preserve the user’s direction.
++  Actual: `interruptTaskWithFeedback()` never forwards the payload anywhere after the abort, so the message is lost and only a passive reopen remains.
++
++### Round 3
++- Status: PASS
++- Notes: No deficiencies found in owned scope.
++
++## Remediation Notes
++
++### Remediation After Round 1
++- Addressed the passive-state publication gap by including `threadDisplayState` in controller-posted state and attaching the current task's passive status to `currentTaskItem`.
++- Addressed steer payload loss by preserving corrective `text/images/files` as a `user_feedback` message before the interrupt transitions to passive open.
++- Tests run: `npm run test:unit -- --exit src/core/controller/task/showTaskWithId.test.ts src/core/controller/task/askResponse.test.ts src/core/controller/task/cancelTask.test.ts src/core/controller/__tests__/cancelTask.test.ts src/core/controller/__tests__/interruptTaskWithFeedback.test.ts`
++- Result: passed (`1362 passing`, `4 pending`).
+diff --git a/docs/managed-workflow-standardization/thread-idle-execution-03-prompt-copy-and-webview.md b/docs/managed-workflow-standardization/thread-idle-execution-03-prompt-copy-and-webview.md
+new file mode 100644
+index 00000000..2881a2b5
+--- /dev/null
++++ b/docs/managed-workflow-standardization/thread-idle-execution-03-prompt-copy-and-webview.md
+@@ -0,0 +1,215 @@
++# Execution 03: Prompt Copy And Webview Passive Thread UX
++
++## Parent Spec
++
++This execution swathe implements the user-facing copy and webview behavior described in [thread-idle-state-implementation-spec.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/managed-workflow-standardization/thread-idle-state-implementation-spec.md).
++
++## Objective
++
++Update prompt/copy and webview behavior so passive reopened threads look and behave passive to the human user.
++
++This swathe owns prompt text, UI rendering, button/composer behavior, and frontend tests. It must consume the explicit passive-state contract from Execution 01 and the controller behavior from Execution 02.
++
++## Strict Target File List
++
++Only these files may be edited in this swathe:
++
++- `src/core/prompts/responses.ts`
++- `src/core/prompts/__tests__/responses.test.ts`
++- `src/core/prompts/system-prompt/components/rules.ts`
++- `src/core/prompts/system-prompt/components/task_progress.ts`
++- `src/core/prompts/system-prompt/__tests__/rules.test.ts`
++- `src/core/prompts/system-prompt/__tests__/task_progress.test.ts`
++- `webview-ui/src/App.stories.tsx`
++- `webview-ui/src/components/chat/ChatRow.tsx`
++- `webview-ui/src/components/chat/ChatRow.test.tsx`
++- `webview-ui/src/components/chat/chat-view/components/layout/ActionButtons.tsx`
++- `webview-ui/src/components/chat/chat-view/components/layout/MessagesArea.tsx`
++- `webview-ui/src/components/chat/chat-view/hooks/useChatState.ts`
++- `webview-ui/src/components/chat/chat-view/hooks/useMessageHandlers.ts`
++- `webview-ui/src/components/chat/chat-view/shared/buttonConfig.ts`
++- `webview-ui/src/components/chat/chat-view/shared/buttonConfig.test.ts`
++
++No other files may be edited by this execution worker.
++
++## Files Explicitly Out Of Scope
++
++This swathe must not edit:
++
++- `src/shared/**`
++- `src/core/controller/**`
++- `src/core/task/index.ts`
++- any docs other than this file's `Completion Notes` and `Remediation Notes`
++
++## Required Outcome
++
++After this swathe lands:
++
++1. Passive reopened threads must not present themselves as active questions.
++2. The UI must keep the composer usable when a thread is passively open.
++3. Button state must reflect actual passive/open behavior instead of fake running state.
++4. Prompt/copy helpers must use neutral reopened-thread language rather than resume-question framing.
++
++## Required Changes
++
++### 1. Neutral passive-thread copy
++
++Update response-formatting helpers so passive open state uses neutral wording.
++
++Examples:
++
++- "Conversation reopened"
++- neutral context banner
++- no synthetic resume question
++
++Do not use copy that implies the agent is currently asking something unless there is a real ask payload.
++
++### 2. Relax prompt pressure against ordinary collaboration
++
++In the owned prompt files:
++
++- keep clear distinction between human-authored input and system-generated context
++- preserve collaborative question behavior as normal when the human should be able to speak next
++- avoid wording that makes passive reopen look like an active instruction from the runtime
++
++### 3. Webview rendering must respect passive state explicitly
++
++The webview must stop inferring passivity from:
++
++- `followup`
++- missing partial content
++- resume-style message heuristics
++
++Instead, it must consume the explicit passive state from Execution 01.
++
++### 4. Fix controls and composer behavior
++
++When the thread is passively open:
++
++- composer must be enabled
++- cancel/steer controls must not stay dimmed as if a run is active
++- any resume affordance must be explicit, not automatic
++
++### 5. Update stories and tests
++
++Add or update stories/tests so passive thread open is represented clearly in:
++
++- chat row presentation
++- action buttons
++- passive/open message handling
++
++## Dependency On Execution 01 And 02
++
++This swathe must use:
++
++- the final passive-state contract from Execution 01
++- the passive controller behavior from Execution 02
++
++Do not invent new frontend-only passive-state names.
++
++## QA Instructions
++
++### QA Scope
++
++QA for this swathe is limited to:
++
++- prompt/copy correctness in owned files
++- passive thread UI rendering
++- composer/button behavior in passive state
++- owned stories/tests
++
++QA must not review backend/controller implementation in this round.
++
++### QA Method
++
++1. Read only the owned files.
++2. Verify passive threads render as passive, not as active questions.
++3. Verify the composer stays enabled for passive reopen.
++4. Verify button state reflects passive/open lifecycle correctly.
++5. Run the owned prompt and webview tests.
++
++Recommended commands:
++
++```bash
++npm run test:unit -- --exit src/core/prompts/__tests__/responses.test.ts src/core/prompts/system-prompt/__tests__/rules.test.ts src/core/prompts/system-prompt/__tests__/task_progress.test.ts webview-ui/src/components/chat/ChatRow.test.tsx webview-ui/src/components/chat/chat-view/shared/buttonConfig.test.ts
++```
++
++If story verification is done manually, record that explicitly in the QA notes.
++
++### QA Findings Recording Protocol
++
++QA must append findings under `## QA Findings` using this format:
++
++```md
++### Round N
++- Status: FAIL
++- Finding 1: <severity> | <file> | <issue summary>
++  Reproduction: <short repro, screenshot note, or failing test>
++  Expected: <expected behavior>
++  Actual: <actual behavior>
++```
++
++If QA passes cleanly, append:
++
++```md
++### Round N
++- Status: PASS
++- Notes: No deficiencies found in owned scope.
++```
++
++### Remediation Protocol
++
++Execution agents must not rewrite prior QA findings.
++
++If QA reports failures, append remediation details under `## Remediation Notes`:
++
++```md
++### Remediation After Round N
++- Addressed Finding 1 by ...
++- Addressed Finding 2 by ...
++- Tests run: <exact command>
++- Manual verification: <if applicable>
++```
++
++## Acceptance Criteria
++
++- Passive reopened threads render with neutral, non-question framing.
++- Passive state keeps the composer and controls usable.
++- Button state no longer relies on fake running heuristics for passive open.
++- Owned prompt and UI tests pass.
++
++## Completion Notes
++
++- Added neutral reopened-thread prompt copy in `src/core/prompts/responses.ts` and tightened managed-workflow wording in `src/core/prompts/system-prompt/components/task_progress.ts`.
++- Introduced explicit passive-open handling in the chat webview via `idle_open` support in the shared button config helper, passive banner rendering, composer send handling, and follow-up row presentation.
++- Added/updated owned tests and Storybook coverage for passive-open thread UI, button state, and reopened-thread prompt copy.
++- Tests run:
++  - `npm run test:unit -- --exit src/core/prompts/__tests__/responses.test.ts src/core/prompts/system-prompt/__tests__/rules.test.ts src/core/prompts/system-prompt/__tests__/task_progress.test.ts`
++  - `npm run test -- src/components/chat/ChatRow.test.tsx src/components/chat/chat-view/shared/buttonConfig.test.ts` in `webview-ui/`
++- Results:
++  - Backend prompt/unit command passed.
++  - Webview Vitest command passed (`2` files, `26` tests).
++
++## QA Findings
++
++### Round 1
++- Status: PASS
++- Notes: No deficiencies found in owned scope.
++
++### Round 2
++- Status: FAIL
++- Finding 1: medium | webview-ui/src/components/chat/chat-view/hooks/useMessageHandlers.ts:18-19,33-34,320-329 | passive-open send handling can use a stale closure and miss the `idle_open` branch
++  Reproduction: Reopen a thread so `currentTaskItem.threadDisplayState` becomes `idle_open`, then send a composer message without any other handler inputs changing. Because `handleSendMessage` reads `isPassiveThreadOpenState` but does not list it in the callback dependencies, the memoized handler can keep the pre-reopen value.
++  Expected: passive-open composer sends should always route through the passive-open path for the current thread state.
++  Actual: the stale callback can fall through to the active-run check, leaving the message unsent instead of treating the reopened thread as passive.
++
++### Round 3
++- Status: PASS
++- Notes: No deficiencies found in owned scope.
++
++## Remediation Notes
++
++### Remediation After Round 1
++- Addressed the passive-open stale-closure issue in `webview-ui/src/components/chat/chat-view/hooks/useMessageHandlers.ts` by including the current passive-open state in the `handleSendMessage` callback dependencies, so reopened threads keep routing composer sends through the current `idle_open` path.
++- Tests run: `npm run test -- src/components/chat/ChatRow.test.tsx src/components/chat/chat-view/shared/buttonConfig.test.ts` in `webview-ui/`
++- Manual verification: not performed; the targeted webview tests passed.
+diff --git a/docs/managed-workflow-standardization/thread-idle-state-implementation-spec.md b/docs/managed-workflow-standardization/thread-idle-state-implementation-spec.md
+new file mode 100644
+index 00000000..af9c21d4
+--- /dev/null
++++ b/docs/managed-workflow-standardization/thread-idle-state-implementation-spec.md
+@@ -0,0 +1,398 @@
++# Thread Idle State Implementation Spec
++
++## Objective
++
++Add a true passive thread-idle state to Cline so reopening, cancelling, or interrupting a task can leave the conversation visible and interactable without forcing the backend to issue a resume-style prompt.
++
++The target outcome is:
++
++- opening a historical thread shows the thread and waits for the human to speak first
++- cancel stops active work and returns the thread to a passive state instead of dumping the user out of the thread
++- steer/interrupt can stop active work without converting the thread into a synthetic ask state
++- thread navigation, run status, and follow-up policy become separate concerns
++
++## Why This Spec Exists
++
++Current Cline behavior is still centered on `ask` states:
++
++- active execution
++- `resume_task`
++- `resume_completed_task`
++- `completion_result`
++- other ask/button states
++
++That creates a lifecycle gap:
++
++- there is no first-class state meaning “thread is open, nothing is actively prompting, and the human may speak first”
++
++This gap explains several observed problems:
++
++- reopening a thread behaves like the system is prompting the agent again
++- canceling work dumps the user out of the thread or reopens into a synthetic prompt state
++- steer/interruption needs to fake passivity through `followup`
++- interaction semantics are coupled to task/ask semantics
++
++## External Design Signal
++
++The installed Codex VS Code extension suggests a different architecture:
++
++- it exposes an explicit follow-up handling policy: `queue`, `steer`, `interrupt`
++  - see [`package.json:128`](/Users/robertboston/.vscode/extensions/openai.chatgpt-26.318.11754-darwin-arm64/package.json#L128)
++- it appears to track thread/run lifecycle by status and events rather than by resume asks
++  - conversation tracking uses symbols like `pendingConversations`, `registerPendingConversation(...)`, and `updateConversationStatus(...)`
++  - status changes are driven by events such as `codex/event/task_started`, `codex/event/task_complete`, and `codex/event/turn_aborted`
++  - see the installed bundle at [`out/extension.js`](/Users/robertboston/.vscode/extensions/openai.chatgpt-26.318.11754-darwin-arm64/out/extension.js)
++- local conversation opening appears to navigate to a conversation route rather than emitting a resume prompt
++  - see [`use-navigate-to-local-conversation-CSadjK7W.js`](/Users/robertboston/.vscode/extensions/openai.chatgpt-26.318.11754-darwin-arm64/webview/assets/use-navigate-to-local-conversation-CSadjK7W.js)
++
++Inference:
++
++- Codex likely separates:
++  - thread navigation/display
++  - run status
++  - follow-up policy
++- Cline currently conflates those concerns inside task initialization and ask handling
++
++This spec adopts that separation for Cline without attempting to copy Codex implementation details verbatim.
++
++## Non-Goals
++
++This work does not need to:
++
++- redesign managed workflow execution semantics
++- remove existing ask states that are still valid for real user questions
++- change the meaning of `attempt_completion`
++- redesign the entire task history storage model
++- add cloud-thread synchronization or cross-device thread state
++
++## Current Cline Behavior
++
++### Reopen Path
++
++When a historical thread is opened:
++
++1. [`showTaskWithId.ts`](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/controller/task/showTaskWithId.ts) calls `initTask(...historyItem)`
++2. [`index.ts`](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/controller/index.ts) sees `historyItem` and calls `resumeTaskFromHistory()`
++3. [`src/core/task/index.ts`](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/index.ts) issues `ask("resume_task" | "resume_completed_task")`
++
++This means “open thread” is not passive. It is a live task-resume operation.
++
++### Cancel Path
++
++Cancel currently has to choose between bad options:
++
++- clear the active task and lose the current thread view
++- or reopen the thread through the same resume-driven path
++
++### Steer Path
++
++Steer currently has to interrupt active work and then fake passivity through an ask-like path, which is brittle and UI-sensitive.
++
++## Proposed Model
++
++Introduce a first-class passive thread state separate from ask states.
++
++### New Concept: Thread Display State
++
++Add an explicit UI/backend concept for thread display mode:
++
++- `active_run`
++- `awaiting_user_response`
++- `completed`
++- `idle_open`
++- optionally `paused`
++
++Definitions:
++
++- `active_run`
++  - model or tools are actively executing
++- `awaiting_user_response`
++  - the agent has intentionally asked the user something and is waiting
++- `completed`
++  - the task reached a normal completion boundary
++- `idle_open`
++  - the thread is visible
++  - no active ask is pending
++  - no auto-resume should occur
++  - the human may send the next message directly
++- `paused`
++  - optional explicit state for interrupted runs that are neither active nor completed
++
++### Key Principle
++
++Thread visibility must not imply task resumption.
++
++Opening a thread from history should become:
++
++- “display the thread in passive mode”
++
++not:
++
++- “rehydrate a live task and immediately ask the user whether to resume”
++
++## Required Architecture Changes
++
++## 1. Separate Thread Opening From Task Resumption
++
++### Current Problem
++
++`showTaskWithId()` currently reinitializes a live task.
++
++### Required Change
++
++Introduce a passive thread-open path that:
++
++- loads thread history/messages
++- posts them to the webview
++- sets thread display mode to `idle_open`
++- does not call `resumeTaskFromHistory()`
++- does not emit `resume_task` or `resume_completed_task`
++
++Implementation direction:
++
++- keep a path for explicit resume when needed
++- split “open existing thread” from “resume existing task”
++
++Likely impact areas:
++
++- [`src/core/controller/task/showTaskWithId.ts`](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/controller/task/showTaskWithId.ts)
++- [`src/core/controller/index.ts`](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/controller/index.ts)
++- [`src/core/task/index.ts`](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/index.ts)
++- thread-state projection sent through `postStateToWebview()`
++
++## 2. Add Explicit Passive Thread State To Extension State
++
++### Required Change
++
++Extend the state sent to the webview so the frontend can distinguish:
++
++- active run
++- real ask
++- passive open thread
++- completed thread
++
++The frontend must not infer passivity from:
++
++- absence of partial content
++- specific ask strings
++- presence or absence of `completion_result`
++
++Instead it should receive explicit thread/task lifecycle state.
++
++Likely impact areas:
++
++- extension state types
++- controller state serialization
++- webview context/state hooks
++
++## 3. Reserve Ask States For Real Questions
++
++### Required Change
++
++`followup`, `resume_task`, and `resume_completed_task` must no longer be abused to represent passivity.
++
++Rules:
++
++- use `ask` states only when the agent/runtime is genuinely requesting a user decision or answer
++- do not use `followup` as a synthetic passive-thread marker
++- do not use `resume_*` as a default thread-open state
++
++The UI should render a passive open thread using explicit thread display state, not a fake question bubble.
++
++## 4. Introduce Explicit Resume Actions
++
++### Required Change
++
++If a user wants to resume a paused/incomplete task, that should become an explicit action, not an automatic side effect of opening the thread.
++
++Examples:
++
++- “Resume Task” button shown only when a resumable run actually exists
++- explicit command to continue a paused run
++
++This keeps:
++
++- open thread
++- resume run
++
++as separate user intents.
++
++## 5. Redesign Cancel Around Passive State
++
++### Required Change
++
++Cancel should:
++
++- abort active work
++- preserve the thread
++- transition the thread to `idle_open` or `paused`
++- keep composer and controls usable
++
++Cancel should not:
++
++- clear the thread from view
++- route through `resume_task`
++- fabricate an active-looking follow-up question
++
++## 6. Redesign Steer Around Follow-Up Policy
++
++### Required Change
++
++Add explicit follow-up policy semantics similar to the Codex model:
++
++- queue
++- steer
++- interrupt
++
++These may be runtime behaviors or user-configurable behaviors.
++
++Minimum requirement:
++
++- the backend should know whether a new human message is meant to:
++  - queue behind active work
++  - redirect current work
++  - hard-interrupt current work
++
++The result must not depend on reusing ask-state machinery to represent passive idle.
++
++## 7. Update UI Rendering
++
++### Required Change
++
++The webview should render passive threads distinctly from questions.
++
++When `threadDisplayState === idle_open`:
++
++- do not render “Cline has a question:”
++- do not disable input
++- do not show resume-style CTA unless resumable work explicitly exists
++- show neutral language such as:
++  - “Conversation reopened”
++  - or no status banner at all
++
++Likely impact areas:
++
++- [`webview-ui/src/components/chat/ChatRow.tsx`](/Users/robertboston/Documents/Cline%20Extension/cline/webview-ui/src/components/chat/ChatRow.tsx)
++- button config / chat state derivation
++- message handlers and composer enablement
++
++## Proposed Lifecycle Model
++
++### States
++
++1. `running`
++2. `awaiting_user_response`
++3. `completed`
++4. `idle_open`
++5. `paused` (optional but recommended)
++
++### Allowed Transitions
++
++- `running -> awaiting_user_response`
++  - agent asks the user a real question
++- `running -> completed`
++  - task completes normally
++- `running -> paused`
++  - user interrupts/cancels but chooses to preserve thread/run context
++- `running -> idle_open`
++  - system aborts execution and leaves the thread passive
++- `completed -> idle_open`
++  - user reopens a completed thread
++- `paused -> idle_open`
++  - user opens thread without resuming it
++- `idle_open -> running`
++  - human sends a new message that starts or resumes work explicitly
++- `idle_open -> awaiting_user_response`
++  - should generally not happen directly
++
++### Important Constraint
++
++`idle_open` must be stable and non-transient. It cannot merely be a special rendering of some existing ask state.
++
++## UX Expectations
++
++### Reopen Completed Thread
++
++Expected:
++
++- thread opens
++- no resume ask appears
++- input is enabled
++- human can say something immediately
++
++### Reopen Incomplete Thread
++
++Expected:
++
++- thread opens passively
++- if resumable work exists, show an explicit resume affordance
++- human may either resume or send a new message first
++
++### Cancel During Active Run
++
++Expected:
++
++- active work stops
++- thread remains visible
++- UI returns to passive interactable state
++
++### Steer During Active Run
++
++Expected:
++
++- the chosen policy is applied
++- on interrupt/steer, thread remains usable
++- no dimmed dead state
++
++## Test Plan
++
++Add or update tests for:
++
++- opening completed thread yields `idle_open`, not `resume_completed_task`
++- opening incomplete thread yields passive open state plus explicit resumable metadata
++- cancel transitions active run to passive thread state
++- steer transitions preserve interaction without fake follow-up prompts
++- UI renders passive open thread without “has a question” messaging
++- sending a new message from `idle_open` starts a new active turn cleanly
++
++Likely test targets:
++
++- controller tests around `showTaskWithId`
++- controller/task cancel tests
++- interrupt/steer tests
++- webview rendering tests
++- state serialization tests
++
++## Acceptance Criteria
++
++- Opening a thread from history no longer auto-resumes execution.
++- Completed and incomplete threads can both be opened passively.
++- Cancel no longer ejects the user from the thread.
++- Passive thread open is represented by explicit lifecycle state, not a fake ask state.
++- UI text for passive thread open is neutral and non-questioning.
++- Real questions still use real ask states.
++- Steer/interrupt behavior is compatible with passive thread open and does not deadlock the UI.
++
++## Primary Files Likely To Change
++
++- [`src/core/controller/task/showTaskWithId.ts`](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/controller/task/showTaskWithId.ts)
++- [`src/core/controller/index.ts`](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/controller/index.ts)
++- [`src/core/task/index.ts`](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/index.ts)
++- task/extension state typing and serialization files
++- [`webview-ui/src/components/chat/ChatRow.tsx`](/Users/robertboston/Documents/Cline%20Extension/cline/webview-ui/src/components/chat/ChatRow.tsx)
++- webview button/configuration/state hooks
++
++## Suggested Execution Order
++
++1. Define explicit thread display state in shared state/types.
++2. Split passive thread open from explicit task resume in controller/task lifecycle.
++3. Update cancel behavior to target passive state.
++4. Update steer/follow-up policy to work with passive state.
++5. Update webview rendering and composer/button behavior.
++6. Add focused tests for reopen, cancel, and passive rendering.
++
++## Open Questions
++
++- Should `paused` be a separate first-class state, or is `idle_open + resumable metadata` sufficient?
++- Should follow-up policy become a user-visible setting in Cline, similar to Codex’s `queue / steer / interrupt` model?
++- Should passive thread open show any banner at all, or should the thread simply open with no special status row?
+diff --git a/src/core/controller/__tests__/cancelTask.test.ts b/src/core/controller/__tests__/cancelTask.test.ts
+index 5328b21a..9a05842f 100644
+--- a/src/core/controller/__tests__/cancelTask.test.ts
++++ b/src/core/controller/__tests__/cancelTask.test.ts
+@@ -4,7 +4,7 @@ import sinon from "sinon"
+ import { Controller } from ".."
+ 
+ describe("Controller.cancelTask", () => {
+-	it("clears the active task after cancellation instead of reinitializing a resume prompt", async () => {
++	it("clears the active task after cancellation when thread visibility is not requested", async () => {
+ 		const fakeController = {
+ 			cancelInProgress: false,
+ 			task: {
+@@ -34,7 +34,7 @@ describe("Controller.cancelTask", () => {
+ 		assert.equal(fakeController.cancelInProgress, false)
+ 	})
+ 
+-	it("reopens the cancelled task in followup mode when preserveThreadVisible is true", async () => {
++	it("keeps the cancelled task visible by hydrating passive history when preserveThreadVisible is true", async () => {
+ 		const activeTask = {
+ 			taskId: "task-1",
+ 			taskState: {
+@@ -50,28 +50,16 @@ describe("Controller.cancelTask", () => {
+ 			task: activeTask,
+ 			updateBackgroundCommandState: sinon.stub(),
+ 			getTaskWithId: sinon.stub().resolves({ historyItem: { id: "task-1" } }),
+-			initTask: sinon.stub().resolves(),
++			openHistoricalTaskPassively: sinon.stub().resolves(),
+ 			clearTask: sinon.stub().resolves(),
+ 			postStateToWebview: sinon.stub().resolves(),
+-			stateManager: {
+-				clearTaskSettings: sinon.stub().resolves(),
+-			},
+ 		}
+ 
+ 		await Controller.prototype.cancelTask.call(fakeController, true)
+ 
+ 		sinon.assert.calledOnce(activeTask.abortTask)
+-		sinon.assert.calledOnce(fakeController.stateManager.clearTaskSettings)
+ 		sinon.assert.notCalled(fakeController.clearTask)
+-		sinon.assert.calledOnceWithExactly(
+-			fakeController.initTask,
+-			undefined,
+-			undefined,
+-			undefined,
+-			{ id: "task-1" },
+-			undefined,
+-			"followup",
+-		)
++		sinon.assert.calledOnceWithExactly(fakeController.openHistoricalTaskPassively, { id: "task-1" })
+ 		sinon.assert.notCalled(fakeController.postStateToWebview)
+ 		assert.equal(fakeController.cancelInProgress, false)
+ 	})
+diff --git a/src/core/controller/__tests__/interruptTaskWithFeedback.test.ts b/src/core/controller/__tests__/interruptTaskWithFeedback.test.ts
+index a1c56650..f757a7f4 100644
+--- a/src/core/controller/__tests__/interruptTaskWithFeedback.test.ts
++++ b/src/core/controller/__tests__/interruptTaskWithFeedback.test.ts
+@@ -4,7 +4,7 @@ import sinon from "sinon"
+ import { Controller } from ".."
+ 
+ describe("Controller.interruptTaskWithFeedback", () => {
+-	it("aborts the current task, reinitializes it from history, and injects the steer message into resume", async () => {
++	it("aborts the current task and restores a passive thread view for steering", async () => {
+ 		const interruptedTask = {
+ 			taskId: "task-1",
+ 			taskState: {
+@@ -14,35 +14,23 @@ describe("Controller.interruptTaskWithFeedback", () => {
+ 				abandoned: false,
+ 			},
+ 			abortTask: sinon.stub().resolves(),
+-		}
+-
+-		const resumedTask = {
+-			messageStateHandler: {
+-				getClineMessages: () => [{ type: "ask", ask: "followup" }],
+-			},
+-			handleWebviewAskResponse: sinon.stub().resolves(),
++			say: sinon.stub().resolves(),
+ 		}
+ 
+ 		const fakeController: {
+ 			cancelInProgress: boolean
+ 			backgroundCommandRunning: boolean
+-			task: typeof interruptedTask | typeof resumedTask
++			task: typeof interruptedTask
+ 			updateBackgroundCommandState: sinon.SinonStub
+ 			getTaskWithId: sinon.SinonStub
+-			initTask: sinon.SinonStub
+-			stateManager: { clearTaskSettings: sinon.SinonStub }
++			openHistoricalTaskPassively: sinon.SinonStub
+ 		} = {
+ 			cancelInProgress: false,
+ 			backgroundCommandRunning: false,
+ 			task: interruptedTask,
+ 			updateBackgroundCommandState: sinon.stub(),
+ 			getTaskWithId: sinon.stub().resolves({ historyItem: { id: "task-1" } }),
+-			initTask: sinon.stub().callsFake(async () => {
+-				fakeController.task = resumedTask
+-			}),
+-			stateManager: {
+-				clearTaskSettings: sinon.stub().resolves(),
+-			},
++			openHistoricalTaskPassively: sinon.stub().resolves(),
+ 		}
+ 
+ 		await Controller.prototype.interruptTaskWithFeedback.call(
+@@ -53,26 +41,16 @@ describe("Controller.interruptTaskWithFeedback", () => {
+ 		)
+ 
+ 		sinon.assert.calledOnce(interruptedTask.abortTask)
+-		assert.equal(interruptedTask.taskState.abandoned, true)
+-		sinon.assert.calledOnce(fakeController.updateBackgroundCommandState)
+-		sinon.assert.calledOnce(fakeController.getTaskWithId)
+-		sinon.assert.calledOnce(fakeController.stateManager.clearTaskSettings)
+-		sinon.assert.calledOnceWithExactly(
+-			fakeController.initTask,
+-			undefined,
+-			undefined,
+-			undefined,
+-			{ id: "task-1" },
+-			undefined,
+-			"followup",
+-		)
+ 		sinon.assert.calledOnceWithExactly(
+-			resumedTask.handleWebviewAskResponse,
+-			"messageResponse",
++			interruptedTask.say,
++			"user_feedback",
+ 			"Please stop and reassess",
+ 			["img-1"],
+ 			["file-1"],
+ 		)
++		assert.equal(interruptedTask.taskState.abandoned, true)
++		sinon.assert.calledOnce(fakeController.updateBackgroundCommandState)
++		sinon.assert.calledOnceWithExactly(fakeController.openHistoricalTaskPassively, { id: "task-1" })
+ 		assert.equal(fakeController.cancelInProgress, false)
+ 	})
+ })
+diff --git a/src/core/controller/index.ts b/src/core/controller/index.ts
+index d75c9bd7..31811ed0 100644
+--- a/src/core/controller/index.ts
++++ b/src/core/controller/index.ts
+@@ -10,7 +10,7 @@ import { ClineAccountService } from "@services/account/ClineAccountService"
+ import { McpHub } from "@services/mcp/McpHub"
+ import type { ApiProvider, ModelInfo } from "@shared/api"
+ import type { ChatContent } from "@shared/ChatContent"
+-import type { ExtensionState, Platform } from "@shared/ExtensionMessage"
++import type { ClineMessage, ExtensionState, Platform } from "@shared/ExtensionMessage"
+ import type { HistoryItem } from "@shared/HistoryItem"
+ import type { McpMarketplaceCatalog, McpMarketplaceItem } from "@shared/mcp"
+ import { type Settings } from "@shared/storage/state-keys"
+@@ -234,6 +234,7 @@ export class Controller {
+ 		historyItem?: HistoryItem,
+ 		taskSettings?: Partial<Settings>,
+ 		historyOpenMode: "resume" | "followup" = "resume",
++		openPassively = false,
+ 	) {
+ 		// Fire-and-forget: We intentionally don't await fetchRemoteConfig here.
+ 		// Remote config is already fetched in startRemoteConfigTimer() which runs in the constructor,
+@@ -328,7 +329,11 @@ export class Controller {
+ 		})
+ 
+ 		if (historyItem) {
+-			this.task.resumeTaskFromHistory(historyOpenMode)
++			if (openPassively) {
++				await this.openHistoricalTaskPassively(historyItem)
++			} else {
++				this.task.resumeTaskFromHistory(historyOpenMode)
++			}
+ 		} else if (task || images || files) {
+ 			this.task.startTask(task, images, files)
+ 		}
+@@ -343,6 +348,51 @@ export class Controller {
+ 		}
+ 	}
+ 
++	private async openHistoricalTaskPassively(historyItem: HistoryItem) {
++		if (!this.task) {
++			return
++		}
++
++		let apiConversationHistory = this.task.messageStateHandler.getApiConversationHistory()
++		let clineMessages = this.task.messageStateHandler.getClineMessages()
++		let uiMessagesFilePath: string | undefined
++
++		try {
++			const taskData = await this.getTaskWithId(historyItem.id)
++			apiConversationHistory = taskData.apiConversationHistory
++			uiMessagesFilePath = taskData.uiMessagesFilePath
++		} catch (error) {
++			if (this.task.taskId !== historyItem.id) {
++				throw error
++			}
++			Logger.log(`[Controller] Falling back to in-memory task state for passive open of ${historyItem.id}`)
++		}
++
++		if (uiMessagesFilePath && (await fileExistsAtPath(uiMessagesFilePath))) {
++			try {
++				clineMessages = JSON.parse(await fs.readFile(uiMessagesFilePath, "utf8")) as ClineMessage[]
++			} catch (error) {
++				Logger.error(`[Controller] Failed to load passive thread messages for task ${historyItem.id}:`, error)
++			}
++		}
++
++		this.task.messageStateHandler.setApiConversationHistory(apiConversationHistory)
++		this.task.messageStateHandler.setClineMessages(clineMessages)
++		this.task.taskState.isInitialized = true
++		this.task.taskState.abort = false
++		this.task.taskState.abandoned = false
++		this.task.taskState.isStreaming = false
++		this.task.taskState.isWaitingForFirstChunk = false
++		this.task.taskState.didFinishAbortingStream = false
++		this.task.taskState.askResponse = undefined
++		this.task.taskState.askResponseText = undefined
++		this.task.taskState.askResponseImages = undefined
++		this.task.taskState.askResponseFiles = undefined
++		this.task.taskState.lastMessageTs = clineMessages.at(-1)?.ts
++
++		await this.postStateToWebview()
++	}
++
+ 	async updateTelemetrySetting(telemetrySetting: TelemetrySetting) {
+ 		// Get previous setting to detect state changes
+ 		const previousSetting = this.stateManager.getGlobalSettingsKey("telemetrySetting")
+@@ -464,23 +514,14 @@ export class Controller {
+ 				this.task.taskState.abandoned = true
+ 			}
+ 
+-			// NOW try to get history after abort has finished (hook may have saved messages)
+-			try {
+-				const { historyItem } = await this.getTaskWithId(this.task.taskId)
+-
+-				if (preserveThreadVisible && historyItem) {
+-					if (this.task) {
+-						await this.stateManager.clearTaskSettings()
+-						this.task = undefined
+-					}
+-
+-					await this.initTask(undefined, undefined, undefined, historyItem, undefined, "followup")
++			if (preserveThreadVisible) {
++				try {
++					await this.openHistoricalTaskPassively({ id: this.task.taskId } as HistoryItem)
+ 					return
++				} catch (error) {
++					// Task not in history yet (new task with no messages); continue with the neutral fallback below.
++					Logger.log(`[Controller.cancelTask] Failed to preserve visible thread: ${error}`)
+ 				}
+-			} catch (error) {
+-				// Task not in history yet (new task with no messages); catch the
+-				// error to enable the agent to continue making progress.
+-				Logger.log(`[Controller.cancelTask] Task not found in history: ${error}`)
+ 			}
+ 
+ 			// After an explicit cancel, leave the UI in a neutral state so the user can type
+@@ -518,6 +559,9 @@ export class Controller {
+ 
+ 		try {
+ 			this.updateBackgroundCommandState(false)
++			if (text || (images && images.length > 0) || (files && files.length > 0)) {
++				await interruptedTask.say("user_feedback", text, images, files)
++			}
+ 			interruptedTask.taskState.abandoned = true
+ 
+ 			try {
+@@ -539,29 +583,9 @@ export class Controller {
+ 			})
+ 
+ 			if (this.task === interruptedTask) {
+-				await this.stateManager.clearTaskSettings()
+-				this.task = undefined
+-			}
+-
+-			const { historyItem } = await this.getTaskWithId(interruptedTaskId)
+-			await this.initTask(undefined, undefined, undefined, historyItem, undefined, "followup")
+-
+-			const resumedTask = this.task
+-			if (!resumedTask) {
++				await this.openHistoricalTaskPassively({ id: interruptedTaskId } as HistoryItem)
+ 				return
+ 			}
+-
+-			await pWaitFor(
+-				() => {
+-					const lastMessage = resumedTask.messageStateHandler.getClineMessages().at(-1)
+-					return lastMessage?.type === "ask" && lastMessage.ask === "followup"
+-				},
+-				{
+-					timeout: 3_000,
+-				},
+-			)
+-
+-			await resumedTask.handleWebviewAskResponse("messageResponse", text, images, files)
+ 		} catch (error) {
+ 			Logger.error("[Controller.interruptTaskWithFeedback] Failed to steer active task", error)
+ 		} finally {
+@@ -971,7 +995,15 @@ export class Controller {
+ 		const localAgentsRulesToggles = this.stateManager.getWorkspaceStateKey("localAgentsRulesToggles")
+ 		const workflowToggles = this.stateManager.getWorkspaceStateKey("workflowToggles")
+ 
+-		const currentTaskItem = this.task?.taskId ? (taskHistory || []).find((item) => item.id === this.task?.taskId) : undefined
++		const currentTaskHistoryItem = this.task?.taskId
++			? (taskHistory || []).find((item) => item.id === this.task?.taskId)
++			: undefined
++		const currentTaskItem = this.task?.taskId
++			? ({
++					...currentTaskHistoryItem,
++					threadDisplayState: this.task.getThreadDisplayState(),
++				} as HistoryItem & { threadDisplayState: string })
++			: undefined
+ 		// Spread to create new array reference - React needs this to detect changes in useEffect dependencies
+ 		const clineMessages = [...(this.task?.messageStateHandler.getClineMessages() || [])]
+ 		const checkpointManagerErrorMessage = this.task?.taskState.checkpointManagerErrorMessage
+@@ -1047,6 +1079,7 @@ export class Controller {
+ 			favoritedModelIds,
+ 			backgroundCommandRunning: this.backgroundCommandRunning,
+ 			backgroundCommandTaskId: this.backgroundCommandTaskId,
++			threadDisplayState: this.task?.getThreadDisplayState(),
+ 			// NEW: Add workspace information
+ 			workspaceRoots: this.workspaceManager?.getRoots() ?? [],
+ 			primaryRootIndex: this.workspaceManager?.getPrimaryIndex() ?? 0,
+diff --git a/src/core/controller/task/showTaskWithId.test.ts b/src/core/controller/task/showTaskWithId.test.ts
+index 742e41e5..3719193a 100644
+--- a/src/core/controller/task/showTaskWithId.test.ts
++++ b/src/core/controller/task/showTaskWithId.test.ts
+@@ -6,7 +6,7 @@ import { Controller } from ".."
+ import { showTaskWithId } from "./showTaskWithId"
+ 
+ describe("controller/task/showTaskWithId", () => {
+-	it("reopens a task from in-memory history in followup mode", async () => {
++	it("reopens a task from in-memory history passively", async () => {
+ 		const controller = {
+ 			stateManager: {
+ 				getGlobalStateKey: sinon.stub().returns([{ id: "task-1", task: "Saved task" }]),
+@@ -24,13 +24,14 @@ describe("controller/task/showTaskWithId", () => {
+ 			undefined,
+ 			{ id: "task-1", task: "Saved task" },
+ 			undefined,
+-			"followup",
++			"resume",
++			true,
+ 		)
+ 		assert.equal(response.id, "task-1")
+ 		assert.equal(response.task, "Saved task")
+ 	})
+ 
+-	it("reopens a task fetched from storage in followup mode", async () => {
++	it("reopens a task fetched from storage passively", async () => {
+ 		const controller = {
+ 			stateManager: {
+ 				getGlobalStateKey: sinon.stub().returns([]),
+@@ -52,7 +53,8 @@ describe("controller/task/showTaskWithId", () => {
+ 			undefined,
+ 			{ id: "task-2", task: "Fetched task" },
+ 			undefined,
+-			"followup",
++			"resume",
++			true,
+ 		)
+ 		assert.equal(response.id, "task-2")
+ 		assert.equal(response.task, "Fetched task")
+diff --git a/src/core/controller/task/showTaskWithId.ts b/src/core/controller/task/showTaskWithId.ts
+index bd8715ad..ad76576e 100644
+--- a/src/core/controller/task/showTaskWithId.ts
++++ b/src/core/controller/task/showTaskWithId.ts
+@@ -20,8 +20,8 @@ export async function showTaskWithId(controller: Controller, request: StringRequ
+ 
+ 		// We need to initialize the task before returning data
+ 		if (historyItem) {
+-			// Reopen historical tasks in a passive follow-up state so the human can speak first
+-			await controller.initTask(undefined, undefined, undefined, historyItem, undefined, "followup")
++			// Reopen historical tasks passively so opening history does not resume execution
++			await controller.initTask(undefined, undefined, undefined, historyItem, undefined, "resume", true)
+ 
+ 			// Send UI update to show the chat view
+ 			await sendChatButtonClickedEvent()
+@@ -45,7 +45,7 @@ export async function showTaskWithId(controller: Controller, request: StringRequ
+ 		const { historyItem: fetchedItem } = await controller.getTaskWithId(id)
+ 
+ 		// Initialize the task with the fetched item
+-		await controller.initTask(undefined, undefined, undefined, fetchedItem, undefined, "followup")
++		await controller.initTask(undefined, undefined, undefined, fetchedItem, undefined, "resume", true)
+ 
+ 		// Send UI update to show the chat view
+ 		await sendChatButtonClickedEvent()
+diff --git a/src/core/prompts/__tests__/responses.test.ts b/src/core/prompts/__tests__/responses.test.ts
+index 156f9eaa..ac4aa987 100644
+--- a/src/core/prompts/__tests__/responses.test.ts
++++ b/src/core/prompts/__tests__/responses.test.ts
+@@ -11,7 +11,7 @@ describe("formatResponse user input framing", () => {
+ 		expect(framed).to.contain("<task>\nReview this story\n</task>")
+ 	})
+ 
+-	it("renders resumed human input before system-generated context", () => {
++	it("renders reopened-thread copy without synthetic resume framing", () => {
+ 		const [taskResumptionMessage, userResponseMessage] = formatResponse.taskResumption(
+ 			"act",
+ 			"just now",
+@@ -22,7 +22,10 @@ describe("formatResponse user input framing", () => {
+ 		)
+ 
+ 		expect(userResponseMessage).to.contain("[LATEST HUMAN USER INPUT]")
++		expect(userResponseMessage).to.contain("Latest human-authored input for the reopened thread")
+ 		expect(taskResumptionMessage).to.contain("[SYSTEM-GENERATED CONTEXT]")
++		expect(taskResumptionMessage).to.contain("[CONVERSATION REOPENED]")
++		expect(taskResumptionMessage).to.not.contain("[TASK RESUMPTION]")
+ 	})
+ })
+ 
+diff --git a/src/core/prompts/responses.ts b/src/core/prompts/responses.ts
+index 6f77b841..15f633bb 100644
+--- a/src/core/prompts/responses.ts
++++ b/src/core/prompts/responses.ts
+@@ -261,10 +261,10 @@ Otherwise, if you have not completed the task and do not need additional informa
+ 		responseText?: string,
+ 		hasPendingFileContextWarnings?: boolean,
+ 	): [string, string] => {
+-		const taskResumptionMessage = `${formatResponse.systemGeneratedContextNotice()}\n\n[TASK RESUMPTION] ${
++		const taskResumptionMessage = `${formatResponse.systemGeneratedContextNotice()}\n\n[CONVERSATION REOPENED] ${
+ 			mode === "plan"
+-				? `This task was interrupted ${agoText}. The conversation may have been incomplete. Be aware that the project state may have changed since then. The current working directory is now '${cwd.toPosix()}'.\n\nNote: If you previously attempted a tool use that the user did not provide a result for, you should assume the tool use was not successful. However you are in PLAN MODE, so rather than continuing the task, you must respond to the user's message.`
+-				: `This task was interrupted ${agoText}. It may or may not be complete, so please reassess the task context. Be aware that the project state may have changed since then. The current working directory is now '${cwd.toPosix()}'. If the task has not been completed, retry the last step before interruption and proceed with completing the task.\n\nNote: If you previously attempted a tool use that the user did not provide a result for, you should assume the tool use was not successful and assess whether you should retry. If the last tool was a browser_action, the browser has been closed and you must launch a new browser if needed.`
++				? `This conversation was reopened ${agoText}. The current working directory is now '${cwd.toPosix()}'. Review the latest context before responding. If you previously attempted a tool use that the user did not provide a result for, assume that tool use was not successful. Because you are in PLAN MODE, respond to the user's latest input instead of advancing the task directly.`
++				: `This conversation was reopened ${agoText}. The current working directory is now '${cwd.toPosix()}'. Review the latest context before continuing work. If the prior run stopped mid-step, reassess the current state before proceeding.\n\nNote: If you previously attempted a tool use that the user did not provide a result for, you should assume the tool use was not successful and assess whether you should retry. If the last tool was a browser_action, the browser has been closed and you must launch a new browser if needed.`
+ 		}${
+ 			wasRecent && !hasPendingFileContextWarnings
+ 				? "\n\nIMPORTANT: If the last tool use was a replace_in_file or write_to_file that was interrupted, the file was reverted back to its original state before the interrupted edit, and you do NOT need to re-read the file as you already have its up-to-date contents."
+@@ -273,9 +273,9 @@ Otherwise, if you have not completed the task and do not need additional informa
+ 
+ 		const userResponseMessage = `${
+ 			responseText
+-				? `${mode === "plan" ? "New message to respond to with plan_mode_respond tool (be sure to provide your response in the <response> parameter)" : "New instructions for task continuation"}:\n${formatResponse.latestHumanInput("user_message", responseText)}`
++				? `${mode === "plan" ? "Latest human-authored input for plan_mode_respond (be sure to provide your response in the <response> parameter)" : "Latest human-authored input for the reopened thread"}:\n${formatResponse.latestHumanInput("user_message", responseText)}`
+ 				: mode === "plan"
+-					? "(The user did not provide a new message. Consider asking them how they'd like you to proceed, or suggest to them to switch to Act mode to continue with the task.)"
++					? "(Conversation reopened without a new human message. Review the existing context and use ask_followup_question only if clarification is genuinely required.)"
+ 					: ""
+ 		}`
+ 
+diff --git a/src/core/prompts/system-prompt/components/task_progress.ts b/src/core/prompts/system-prompt/components/task_progress.ts
+index fbde860c..3049b02f 100644
+--- a/src/core/prompts/system-prompt/components/task_progress.ts
++++ b/src/core/prompts/system-prompt/components/task_progress.ts
+@@ -43,6 +43,7 @@ The current checklist is backend-managed for an active workflow.
+ 
+ - Human-authored input: the latest user request, feedback, or steer instruction.
+ - System-generated context: the backend-managed workflow checklist and phase progress below.
++- Treat the checklist as runtime context, not as a user-authored question or a resume prompt.
+ - Do not create a new checklist.
+ - Do not rewrite checklist items manually.
+ - Use the complete_workflow_item tool to mark the current workflow item complete.
+diff --git a/src/core/task/__tests__/thread-display-state.test.ts b/src/core/task/__tests__/thread-display-state.test.ts
+new file mode 100644
+index 00000000..d4b32ab3
+--- /dev/null
++++ b/src/core/task/__tests__/thread-display-state.test.ts
+@@ -0,0 +1,48 @@
++import { strict as assert } from "node:assert"
++import type { ClineMessage } from "@shared/ExtensionMessage"
++import { ThreadDisplayStates } from "@shared/ExtensionMessage"
++import {
++	ClineAsk as ProtoClineAsk,
++	ClineMessage as ProtoClineMessage,
++	ThreadDisplayState as ProtoThreadDisplayState,
++} from "@shared/proto/cline/ui"
++import { convertClineMessageToProto, convertProtoToClineMessage } from "@shared/proto-conversions/cline-message"
++import { describe, it } from "mocha"
++import { isActiveThreadDisplayState, isPassiveThreadDisplayState } from "../index"
++
++describe("thread display state contract", () => {
++	it("represents passive open explicitly in the shared message contract", () => {
++		const message: ClineMessage = {
++			ts: 123,
++			type: "ask",
++			ask: "followup",
++			threadDisplayState: ThreadDisplayStates.IDLE_OPEN,
++		}
++
++		const protoMessage = convertClineMessageToProto(message)
++		assert.equal(protoMessage.threadDisplayState, ProtoThreadDisplayState.IDLE_OPEN)
++		assert.equal(protoMessage.ask, ProtoClineAsk.FOLLOWUP)
++
++		const serialized = ProtoClineMessage.toJSON(protoMessage)
++		const schemaRoundTripped = ProtoClineMessage.fromJSON(serialized)
++		assert.equal(schemaRoundTripped.threadDisplayState, ProtoThreadDisplayState.IDLE_OPEN)
++
++		const roundTripped = convertProtoToClineMessage(protoMessage)
++		assert.equal(roundTripped.ask, "followup")
++		assert.equal(roundTripped.threadDisplayState, ThreadDisplayStates.IDLE_OPEN)
++	})
++
++	it("keeps passive open distinct from real ask states", () => {
++		assert.equal(ThreadDisplayStates.IDLE_OPEN, "idle_open")
++		assert.notEqual(ThreadDisplayStates.IDLE_OPEN, ThreadDisplayStates.AWAITING_USER_RESPONSE)
++		assert.notEqual(ThreadDisplayStates.IDLE_OPEN, ThreadDisplayStates.COMPLETED)
++		assert.notEqual(ThreadDisplayStates.IDLE_OPEN, ThreadDisplayStates.PAUSED)
++	})
++
++	it("does not treat passive open as active execution", () => {
++		assert.equal(isPassiveThreadDisplayState(ThreadDisplayStates.IDLE_OPEN), true)
++		assert.equal(isPassiveThreadDisplayState(ThreadDisplayStates.PAUSED), true)
++		assert.equal(isActiveThreadDisplayState(ThreadDisplayStates.IDLE_OPEN), false)
++		assert.equal(isActiveThreadDisplayState(ThreadDisplayStates.ACTIVE_RUN), true)
++	})
++})
+diff --git a/src/core/task/index.ts b/src/core/task/index.ts
+index f555a749..6ef1ca31 100644
+--- a/src/core/task/index.ts
++++ b/src/core/task/index.ts
+@@ -55,7 +55,14 @@ import { featureFlagsService } from "@services/feature-flags"
+ import { McpHub } from "@services/mcp/McpHub"
+ import { ApiConfiguration } from "@shared/api"
+ import { findLastIndex } from "@shared/array"
+-import { ClineApiReqCancelReason, ClineApiReqInfo, ClineAsk, ClineSay } from "@shared/ExtensionMessage"
++import {
++	ClineApiReqCancelReason,
++	ClineApiReqInfo,
++	ClineAsk,
++	ClineSay,
++	ThreadDisplayState,
++	ThreadDisplayStates,
++} from "@shared/ExtensionMessage"
+ import { HistoryItem } from "@shared/HistoryItem"
+ import { DEFAULT_LANGUAGE_SETTINGS, getLanguageKey, LanguageDisplay } from "@shared/Languages"
+ import { convertClineMessageToProto } from "@shared/proto-conversions/cline-message"
+@@ -156,6 +163,14 @@ export function shouldIncludePersistentPromptContext(taskState: Pick<TaskState,
+ 	return !!taskState.activeAgentId || !!taskState.activeWorkflowId
+ }
+ 
++export function isActiveThreadDisplayState(threadDisplayState: ThreadDisplayState): boolean {
++	return threadDisplayState === ThreadDisplayStates.ACTIVE_RUN
++}
++
++export function isPassiveThreadDisplayState(threadDisplayState: ThreadDisplayState): boolean {
++	return threadDisplayState === ThreadDisplayStates.IDLE_OPEN || threadDisplayState === ThreadDisplayStates.PAUSED
++}
++
+ export class Task {
+ 	// Core task variables
+ 	readonly taskId: string
+@@ -165,6 +180,7 @@ export class Task {
+ 	private taskInitializationStartTime: number
+ 
+ 	taskState: TaskState
++	private threadDisplayState: ThreadDisplayState = ThreadDisplayStates.IDLE_OPEN
+ 
+ 	// ONE mutex for ALL state modifications to prevent race conditions
+ 	private stateMutex = new Mutex()
+@@ -210,6 +226,22 @@ export class Task {
+ 		})
+ 	}
+ 
++	public getThreadDisplayState(): ThreadDisplayState {
++		return this.threadDisplayState
++	}
++
++	private setThreadDisplayState(threadDisplayState: ThreadDisplayState): void {
++		this.threadDisplayState = threadDisplayState
++	}
++
++	private getThreadDisplayStateForAsk(type: ClineAsk): ThreadDisplayState {
++		if (type === "completion_result") {
++			return ThreadDisplayStates.COMPLETED
++		}
++
++		return ThreadDisplayStates.AWAITING_USER_RESPONSE
++	}
++
+ 	// Core dependencies
+ 	private controller: Controller
+ 	private mcpHub: McpHub
+@@ -586,6 +618,7 @@ export class Task {
+ 		type: ClineAsk,
+ 		text?: string,
+ 		partial?: boolean,
++		threadDisplayState?: ThreadDisplayState,
+ 	): Promise<{
+ 		response: ClineAskResponse
+ 		text?: string
+@@ -625,10 +658,12 @@ export class Task {
+ 				// this.askResponseImages = undefined
+ 				askTs = Date.now()
+ 				this.taskState.lastMessageTs = askTs
++				this.setThreadDisplayState(threadDisplayState ?? this.getThreadDisplayStateForAsk(type))
+ 				await this.messageStateHandler.addToClineMessages({
+ 					ts: askTs,
+ 					type: "ask",
+ 					ask: type,
++					threadDisplayState: this.threadDisplayState,
+ 					text,
+ 					partial,
+ 				})
+@@ -667,10 +702,12 @@ export class Task {
+ 				this.taskState.askResponseFiles = undefined
+ 				askTs = Date.now()
+ 				this.taskState.lastMessageTs = askTs
++				this.setThreadDisplayState(threadDisplayState ?? this.getThreadDisplayStateForAsk(type))
+ 				await this.messageStateHandler.addToClineMessages({
+ 					ts: askTs,
+ 					type: "ask",
+ 					ask: type,
++					threadDisplayState: this.threadDisplayState,
+ 					text,
+ 				})
+ 				await this.postStateToWebview()
+@@ -684,10 +721,12 @@ export class Task {
+ 			this.taskState.askResponseFiles = undefined
+ 			askTs = Date.now()
+ 			this.taskState.lastMessageTs = askTs
++			this.setThreadDisplayState(threadDisplayState ?? this.getThreadDisplayStateForAsk(type))
+ 			await this.messageStateHandler.addToClineMessages({
+ 				ts: askTs,
+ 				type: "ask",
+ 				ask: type,
++				threadDisplayState: this.threadDisplayState,
+ 				text,
+ 			})
+ 			await this.postStateToWebview()
+@@ -807,6 +846,7 @@ export class Task {
+ 					ts: sayTs,
+ 					type: "say",
+ 					say: type,
++					threadDisplayState: this.threadDisplayState,
+ 					text,
+ 					images,
+ 					files,
+@@ -841,6 +881,7 @@ export class Task {
+ 				ts: sayTs,
+ 				type: "say",
+ 				say: type,
++				threadDisplayState: this.threadDisplayState,
+ 				text,
+ 				images,
+ 				files,
+@@ -856,6 +897,7 @@ export class Task {
+ 			ts: sayTs,
+ 			type: "say",
+ 			say: type,
++			threadDisplayState: this.threadDisplayState,
+ 			text,
+ 			images,
+ 			files,
+@@ -1226,6 +1268,7 @@ export class Task {
+ 		// if the extension process were killed, then on restart the clineMessages might not be empty, so we need to set it to [] when we create a new Cline client (otherwise webview would show stale messages from previous session)
+ 		this.messageStateHandler.setClineMessages([])
+ 		this.messageStateHandler.setApiConversationHistory([])
++		this.threadDisplayState = ThreadDisplayStates.ACTIVE_RUN
+ 
+ 		await this.postStateToWebview()
+ 
+@@ -1403,7 +1446,9 @@ export class Task {
+ 			await this.refreshManagedWorkflowChecklistProjection()
+ 		}
+ 
+-		const { response, text, images, files } = await this.ask(askType) // calls poststatetowebview
++		const threadDisplayState =
++			openMode === "followup" ? ThreadDisplayStates.AWAITING_USER_RESPONSE : ThreadDisplayStates.IDLE_OPEN
++		const { response, text, images, files } = await this.ask(askType, undefined, undefined, threadDisplayState) // calls poststatetowebview
+ 
+ 		// Initialize newUserContent array for hook context
+ 		const newUserContent: ClineContent[] = []
+@@ -1620,6 +1665,7 @@ export class Task {
+ 	private async initiateTaskLoop(userContent: ClineContent[]): Promise<void> {
+ 		let nextUserContent = userContent
+ 		let includeFileDetails = true
++		this.threadDisplayState = ThreadDisplayStates.ACTIVE_RUN
+ 		while (!this.taskState.abort) {
+ 			const didEndLoop = await this.recursivelyMakeClineRequests(nextUserContent, includeFileDetails)
+ 			includeFileDetails = false // we only need file details the first time
+@@ -1675,6 +1721,10 @@ export class Task {
+ 		}
+ 
+ 		// Check if we're at a button-only state (no active work, just waiting for user action)
++		if (isPassiveThreadDisplayState(this.threadDisplayState)) {
++			return false
++		}
++
+ 		const clineMessages = this.messageStateHandler.getClineMessages()
+ 		const lastMessage = clineMessages.at(-1)
+ 		const isAtButtonOnlyState =
+@@ -1709,6 +1759,7 @@ export class Task {
+ 			// This must happen before canceling hooks so that hook catch blocks
+ 			// can properly detect the abort state
+ 			this.taskState.abort = true
++			this.threadDisplayState = ThreadDisplayStates.PAUSED
+ 
+ 			// PHASE 3: Cancel any running hook execution
+ 			const activeHook = await this.getActiveHookExecution()
+@@ -1831,6 +1882,7 @@ export class Task {
+ 
+ 			// Final state update to notify UI that abort is complete
+ 			try {
++				this.threadDisplayState = ThreadDisplayStates.IDLE_OPEN
+ 				await this.postStateToWebview()
+ 			} catch (error) {
+ 				Logger.error("Failed to post final state after abort", error)
+diff --git a/src/shared/ExtensionMessage.ts b/src/shared/ExtensionMessage.ts
+index 54102c08..bc9ea57e 100644
+--- a/src/shared/ExtensionMessage.ts
++++ b/src/shared/ExtensionMessage.ts
+@@ -36,6 +36,17 @@ export type Platform = "aix" | "darwin" | "freebsd" | "linux" | "openbsd" | "sun
+ export const DEFAULT_PLATFORM = "unknown"
+ 
+ export const COMMAND_CANCEL_TOKEN = "__cline_command_cancel__"
++
++export const ThreadDisplayStates = {
++	ACTIVE_RUN: "active_run",
++	AWAITING_USER_RESPONSE: "awaiting_user_response",
++	COMPLETED: "completed",
++	IDLE_OPEN: "idle_open",
++	PAUSED: "paused",
++} as const
++
++export type ThreadDisplayState = (typeof ThreadDisplayStates)[keyof typeof ThreadDisplayStates]
++
+ export interface ExtensionState {
+ 	isNewUser: boolean
+ 	welcomeViewCompleted: boolean
+@@ -49,6 +60,7 @@ export interface ExtensionState {
+ 	checkpointManagerErrorMessage?: string
+ 	clineMessages: ClineMessage[]
+ 	currentTaskItem?: HistoryItem
++	threadDisplayState?: ThreadDisplayState
+ 	currentFocusChainChecklist?: string | null
+ 	mcpMarketplaceEnabled?: boolean
+ 	mcpDisplayMode: McpDisplayMode
+@@ -118,6 +130,7 @@ export interface ClineMessage {
+ 	type: "ask" | "say"
+ 	ask?: ClineAsk
+ 	say?: ClineSay
++	threadDisplayState?: ThreadDisplayState
+ 	text?: string
+ 	reasoning?: string
+ 	images?: string[]
+diff --git a/src/shared/proto-conversions/cline-message.ts b/src/shared/proto-conversions/cline-message.ts
+index 6ea8b395..525e701d 100644
+--- a/src/shared/proto-conversions/cline-message.ts
++++ b/src/shared/proto-conversions/cline-message.ts
+@@ -1,5 +1,16 @@
+-import { ClineAsk as AppClineAsk, ClineMessage as AppClineMessage, ClineSay as AppClineSay } from "@shared/ExtensionMessage"
+-import { ClineAsk, ClineMessageType, ClineSay, ClineMessage as ProtoClineMessage } from "@shared/proto/cline/ui"
++import {
++	ClineAsk as AppClineAsk,
++	ClineMessage as AppClineMessage,
++	ClineSay as AppClineSay,
++	ThreadDisplayState as AppThreadDisplayState,
++} from "@shared/ExtensionMessage"
++import {
++	ClineAsk,
++	ClineMessageType,
++	ClineSay,
++	ClineMessage as ProtoClineMessage,
++	ThreadDisplayState as ProtoThreadDisplayState,
++} from "@shared/proto/cline/ui"
+ 
+ // Helper function to convert ClineAsk string to enum
+ function convertClineAskToProtoEnum(ask: AppClineAsk | undefined): ClineAsk | undefined {
+@@ -64,6 +75,51 @@ function convertProtoEnumToClineAsk(ask: ClineAsk): AppClineAsk | undefined {
+ 	return mapping[ask]
+ }
+ 
++function convertClineThreadDisplayStateToProtoEnum(
++	threadDisplayState: AppThreadDisplayState | undefined,
++): ProtoThreadDisplayState | undefined {
++	if (!threadDisplayState) {
++		return undefined
++	}
++
++	const mapping: Record<AppThreadDisplayState, ProtoThreadDisplayState> = {
++		active_run: ProtoThreadDisplayState.ACTIVE_RUN,
++		awaiting_user_response: ProtoThreadDisplayState.AWAITING_USER_RESPONSE,
++		completed: ProtoThreadDisplayState.COMPLETED,
++		idle_open: ProtoThreadDisplayState.IDLE_OPEN,
++		paused: ProtoThreadDisplayState.PAUSED,
++	}
++
++	return mapping[threadDisplayState]
++}
++
++function convertProtoThreadDisplayStateToCline(threadDisplayState: ProtoThreadDisplayState): AppThreadDisplayState | undefined {
++	if (
++		threadDisplayState === ProtoThreadDisplayState.UNRECOGNIZED ||
++		threadDisplayState === ProtoThreadDisplayState.UNSPECIFIED
++	) {
++		return undefined
++	}
++
++	const mapping: Record<
++		Exclude<ProtoThreadDisplayState, ProtoThreadDisplayState.UNRECOGNIZED | ProtoThreadDisplayState.UNSPECIFIED>,
++		AppThreadDisplayState
++	> = {
++		[ProtoThreadDisplayState.ACTIVE_RUN]: "active_run",
++		[ProtoThreadDisplayState.AWAITING_USER_RESPONSE]: "awaiting_user_response",
++		[ProtoThreadDisplayState.COMPLETED]: "completed",
++		[ProtoThreadDisplayState.IDLE_OPEN]: "idle_open",
++		[ProtoThreadDisplayState.PAUSED]: "paused",
++	}
++
++	return mapping[
++		threadDisplayState as Exclude<
++			ProtoThreadDisplayState,
++			ProtoThreadDisplayState.UNRECOGNIZED | ProtoThreadDisplayState.UNSPECIFIED
++		>
++	]
++}
++
+ // Helper function to convert ClineSay string to enum
+ function convertClineSayToProtoEnum(say: AppClineSay | undefined): ClineSay | undefined {
+ 	if (!say) {
+@@ -188,6 +244,7 @@ export function convertClineMessageToProto(message: AppClineMessage): ProtoCline
+ 		type: message.type === "ask" ? ClineMessageType.ASK : ClineMessageType.SAY,
+ 		ask: finalAskEnum,
+ 		say: finalSayEnum,
++		threadDisplayState: convertClineThreadDisplayStateToProtoEnum(message.threadDisplayState),
+ 		text: message.text ?? "",
+ 		reasoning: message.reasoning ?? "",
+ 		images: message.images ?? [],
+@@ -256,6 +313,12 @@ export function convertProtoToClineMessage(protoMessage: ProtoClineMessage): App
+ 	if (protoMessage.files.length > 0) {
+ 		message.files = protoMessage.files
+ 	}
++	if (protoMessage.threadDisplayState !== undefined) {
++		const threadDisplayState = convertProtoThreadDisplayStateToCline(protoMessage.threadDisplayState)
++		if (threadDisplayState !== undefined) {
++			message.threadDisplayState = threadDisplayState
++		}
++	}
+ 	if (protoMessage.partial) {
+ 		message.partial = protoMessage.partial
+ 	}
+diff --git a/webview-ui/src/App.stories.tsx b/webview-ui/src/App.stories.tsx
+index 1a19bf3f..37e94b1d 100644
+--- a/webview-ui/src/App.stories.tsx
++++ b/webview-ui/src/App.stories.tsx
+@@ -236,6 +236,13 @@ const mockStreamingMessages: ClineMessage[] = [
+ 	),
+ ]
+ 
++const mockPassiveMessages: ClineMessage[] = [
++	...mockActiveMessages.slice(0, -1),
++	createMessage(2.9, "ask", undefined as any, "", { ask: "followup" as any }),
++]
++
++const mockPassiveTaskItem = { ...mockTaskHistory[0], threadDisplayState: "idle_open" } as any
++
+ // Reusable state and decorator factories
+ const createMockState = (overrides: any = {}) => ({
+ 	...useExtensionState(),
+@@ -417,6 +424,22 @@ export const ActiveConversation: Story = {
+ 	},
+ }
+ 
++export const PassiveConversationOpen: Story = {
++	decorators: [
++		createStoryDecorator({
++			clineMessages: mockPassiveMessages,
++			currentTaskItem: mockPassiveTaskItem,
++		}),
++	],
++	parameters: {
++		docs: {
++			description: {
++				story: "Shows a passively reopened thread with neutral copy, an enabled composer, and no active-task button chrome.",
++			},
++		},
++	},
++}
++
+ export const StreamingResponse: Story = {
+ 	decorators: [createStoryDecorator({ clineMessages: mockStreamingMessages })],
+ 	parameters: {
+diff --git a/webview-ui/src/components/chat/ChatRow.test.tsx b/webview-ui/src/components/chat/ChatRow.test.tsx
+index 130d99bf..e9202e90 100644
+--- a/webview-ui/src/components/chat/ChatRow.test.tsx
++++ b/webview-ui/src/components/chat/ChatRow.test.tsx
+@@ -3,7 +3,7 @@ import { getFollowupPresentation } from "./ChatRow"
+ 
+ describe("ChatRow followup presentation", () => {
+ 	it("renders reopened followup messages as a passive thread label", () => {
+-		const presentation = getFollowupPresentation(undefined)
++		const presentation = getFollowupPresentation(undefined, true)
+ 
+ 		expect(presentation.hasQuestion).to.equal(false)
+ 		expect(presentation.title).to.equal("Conversation reopened:")
+diff --git a/webview-ui/src/components/chat/ChatRow.tsx b/webview-ui/src/components/chat/ChatRow.tsx
+index e5d05aa4..a4a52ce0 100644
+--- a/webview-ui/src/components/chat/ChatRow.tsx
++++ b/webview-ui/src/components/chat/ChatRow.tsx
+@@ -51,6 +51,7 @@ import { findMatchingResourceOrTemplate, getMcpServerDisplayName } from "@/utils
+ import CodeAccordian, { cleanPathPrefix } from "../common/CodeAccordian"
+ import { CommandOutputContent, CommandOutputRow } from "./CommandOutputRow"
+ import { CompletionOutputRow } from "./CompletionOutputRow"
++import { isPassiveThreadOpen } from "./chat-view/shared/buttonConfig"
+ import { DiffEditRow } from "./DiffEditRow"
+ import ErrorRow from "./ErrorRow"
+ import { FeatureTip } from "./FeatureTip"
+@@ -97,7 +98,7 @@ interface ChatRowContentProps extends Omit<ChatRowProps, "onHeightChange"> {}
+ export const ProgressIndicator = () => <LoaderCircleIcon className="size-2 mr-2 animate-spin" />
+ const InvisibleSpacer = () => <div aria-hidden className="h-px" />
+ 
+-export const getFollowupPresentation = (messageText?: string) => {
++export const getFollowupPresentation = (messageText?: string, isPassiveThreadOpenState = false) => {
+ 	let question: string | undefined
+ 	let options: string[] | undefined
+ 	let selected: string | undefined
+@@ -111,7 +112,7 @@ export const getFollowupPresentation = (messageText?: string) => {
+ 		question = messageText
+ 	}
+ 
+-	const hasQuestion = !!question?.trim()
++	const hasQuestion = !isPassiveThreadOpenState && !!question?.trim()
+ 
+ 	return {
+ 		question,
+@@ -177,6 +178,7 @@ export const ChatRowContent = memo(
+ 			backgroundEditEnabled,
+ 			mcpServers,
+ 			mcpMarketplaceCatalog,
++			currentTaskItem,
+ 			onRelinquishControl,
+ 			vscodeTerminalExecutionMode,
+ 			clineMessages,
+@@ -190,6 +192,8 @@ export const ChatRowContent = memo(
+ 			selectedText: "",
+ 		})
+ 		const contentRef = useRef<HTMLDivElement>(null)
++		const threadDisplayState = (currentTaskItem as { threadDisplayState?: string | null } | undefined)?.threadDisplayState
++		const isPassiveThreadOpenState = isPassiveThreadOpen(threadDisplayState)
+ 
+ 		// Command output expansion state (for all messages, but only used by command messages)
+ 		const [isOutputFullyExpanded, setIsOutputFullyExpanded] = useState(false)
+@@ -334,7 +338,10 @@ export const ChatRowContent = memo(
+ 			}, 0) // Delay of 0ms pushes execution after current event cycle
+ 		}, []) // Dependencies remain empty
+ 
+-		const followupPresentation = useMemo(() => getFollowupPresentation(message.text), [message.text])
++		const followupPresentation = useMemo(
++			() => getFollowupPresentation(message.text, isPassiveThreadOpenState),
++			[message.text, isPassiveThreadOpenState],
++		)
+ 
+ 		const [icon, title] = useMemo(() => {
+ 			switch (type) {
+@@ -380,7 +387,11 @@ export const ChatRowContent = memo(
+ 					return [null, null]
+ 				case "followup":
+ 					return [
+-						<span className="codicon codicon-question text-foreground mb-[-1.5px]" />,
++						followupPresentation.hasQuestion ? (
++							<span className="codicon codicon-question text-foreground mb-[-1.5px]" />
++						) : (
++							<BellIcon className="text-foreground size-2" />
++						),
+ 						<span className="font-bold text-foreground">{followupPresentation.title}</span>,
+ 					]
+ 				default:
+@@ -395,6 +406,7 @@ export const ChatRowContent = memo(
+ 			apiReqCancelReason,
+ 			isMcpServerResponding,
+ 			message.text,
++			followupPresentation.hasQuestion,
+ 			followupPresentation.title,
+ 		])
+ 
+@@ -989,11 +1001,7 @@ export const ChatRowContent = memo(
+ 						// Check if generation was interrupted:
+ 						// 1. If status is "generating" but this isn't the last message, it was interrupted
+ 						// 2. If status is "generating" and lastModifiedMessage is a resume ask, task was just cancelled
+-						const wasCancelled =
+-							explanationInfo.status === "generating" &&
+-							(!isLast ||
+-								lastModifiedMessage?.ask === "resume_task" ||
+-								lastModifiedMessage?.ask === "resume_completed_task")
++						const wasCancelled = explanationInfo.status === "generating" && (!isLast || isPassiveThreadOpenState)
+ 						const isGenerating = explanationInfo.status === "generating" && !wasCancelled
+ 						const isError = explanationInfo.status === "error"
+ 						return (
+@@ -1251,9 +1259,7 @@ export const ChatRowContent = memo(
+ 										</div>
+ 									</>
+ 								) : (
+-									<div className="pt-1 text-muted-foreground">
+-										Conversation reopened and waiting for your input.
+-									</div>
++									<div className="pt-1 text-muted-foreground">Conversation reopened.</div>
+ 								)}
+ 							</div>
+ 						)
+diff --git a/webview-ui/src/components/chat/chat-view/components/layout/ActionButtons.tsx b/webview-ui/src/components/chat/chat-view/components/layout/ActionButtons.tsx
+index 694ce241..54f80e3d 100644
+--- a/webview-ui/src/components/chat/chat-view/components/layout/ActionButtons.tsx
++++ b/webview-ui/src/components/chat/chat-view/components/layout/ActionButtons.tsx
+@@ -4,7 +4,8 @@ import { VSCodeButton } from "@vscode/webview-ui-toolkit/react"
+ import type React from "react"
+ import { useCallback, useEffect, useMemo, useState } from "react"
+ import { VirtuosoHandle } from "react-virtuoso"
+-import { ButtonActionType, getButtonConfig } from "../../shared/buttonConfig"
++import { useExtensionState } from "@/context/ExtensionStateContext"
++import { ButtonActionType, getButtonConfig, isPassiveThreadOpen } from "../../shared/buttonConfig"
+ import type { ChatState, MessageHandlers } from "../../types/chatTypes"
+ 
+ interface ActionButtonsProps {
+@@ -32,6 +33,9 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
+ 	messageHandlers,
+ 	scrollBehavior,
+ }) => {
++	const { currentTaskItem } = useExtensionState()
++	const threadDisplayState = (currentTaskItem as { threadDisplayState?: string | null } | undefined)?.threadDisplayState
++	const isPassiveThreadOpenState = isPassiveThreadOpen(threadDisplayState)
+ 	const { inputValue, selectedImages, selectedFiles, setSendingDisabled } = chatState
+ 	const [isProcessing, setIsProcessing] = useState(false)
+ 
+@@ -43,8 +47,10 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
+ 
+ 	// Memoize button configuration to avoid recalculation on every render
+ 	const buttonConfig = useMemo(() => {
+-		return lastMessage ? getButtonConfig(lastMessage, mode) : { sendingDisabled: false, enableButtons: false }
+-	}, [lastMessage, mode])
++		return lastMessage
++			? getButtonConfig(lastMessage, mode, threadDisplayState)
++			: { sendingDisabled: false, enableButtons: false }
++	}, [lastMessage, mode, threadDisplayState])
+ 
+ 	// Single effect to handle all configuration updates
+ 	useEffect(() => {
+@@ -101,7 +107,7 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
+ 	const { showScrollToBottom, scrollToBottomSmooth, disableAutoScrollRef } = scrollBehavior
+ 
+ 	const { primaryText, secondaryText, primaryAction, secondaryAction, enableButtons } = buttonConfig
+-	const hasButtons = primaryText || secondaryText
++	const hasButtons = !isPassiveThreadOpenState && (primaryText || secondaryText)
+ 	const isStreaming = task.partial === true
+ 	const canInteract = enableButtons && !isProcessing
+ 
+diff --git a/webview-ui/src/components/chat/chat-view/components/layout/MessagesArea.tsx b/webview-ui/src/components/chat/chat-view/components/layout/MessagesArea.tsx
+index da0959b9..32d5f04b 100644
+--- a/webview-ui/src/components/chat/chat-view/components/layout/MessagesArea.tsx
++++ b/webview-ui/src/components/chat/chat-view/components/layout/MessagesArea.tsx
+@@ -1,10 +1,12 @@
+ import type { ClineMessage } from "@shared/ExtensionMessage"
++import type { HistoryItem } from "@shared/HistoryItem"
+ import type React from "react"
+ import { useCallback, useMemo } from "react"
+ import { Virtuoso } from "react-virtuoso"
+ import { StickyUserMessage } from "@/components/chat/task-header/StickyUserMessage"
+ import { useExtensionState } from "@/context/ExtensionStateContext"
+ import { cn } from "@/lib/utils"
++import { isPassiveThreadOpen } from "../../shared/buttonConfig"
+ import type { ChatState, MessageHandlers, ScrollBehavior } from "../../types/chatTypes"
+ import { isToolGroup } from "../../utils/messageUtils"
+ import { createMessageRenderer } from "../messages/MessageRenderer"
+@@ -30,7 +32,10 @@ export const MessagesArea: React.FC<MessagesAreaProps> = ({
+ 	chatState,
+ 	messageHandlers,
+ }) => {
+-	const { clineMessages } = useExtensionState()
++	const { clineMessages, currentTaskItem } = useExtensionState()
++	const threadDisplayState = (currentTaskItem as (HistoryItem & { threadDisplayState?: string | null }) | undefined)
++		?.threadDisplayState
++	const isPassiveThreadOpenState = isPassiveThreadOpen(threadDisplayState)
+ 	const lastRawMessage = useMemo(() => clineMessages.at(-1), [clineMessages])
+ 
+ 	const {
+@@ -76,6 +81,10 @@ export const MessagesArea: React.FC<MessagesAreaProps> = ({
+ 	// Covers: pre-api_req_started (backend processing) AND post-api_req_started (waiting for model).
+ 	// Hides once reasoning, tools, text, or any other content message appears.
+ 	const isWaitingForResponse = useMemo(() => {
++		if (isPassiveThreadOpenState) {
++			return false
++		}
++
+ 		const lastMsg = modifiedMessages[modifiedMessages.length - 1]
+ 
+ 		// Never show thinking while waiting on user input (any ask state).
+@@ -137,7 +146,7 @@ export const MessagesArea: React.FC<MessagesAreaProps> = ({
+ 			}
+ 		}
+ 		return false
+-	}, [lastRawMessage, groupedMessages.length, lastVisibleMessage, lastVisibleRow, modifiedMessages])
++	}, [isPassiveThreadOpenState, lastRawMessage, groupedMessages.length, lastVisibleMessage, lastVisibleRow, modifiedMessages])
+ 
+ 	// Keep loader in the message flow (not footer). During handoff from waiting -> reasoning stream,
+ 	// keep the loader mounted until a real reasoning row is visible.
+@@ -215,6 +224,17 @@ export const MessagesArea: React.FC<MessagesAreaProps> = ({
+ 				/>
+ 			</div>
+ 
++			{isPassiveThreadOpenState && (
++				<div className="px-4 pt-2 pb-1">
++					<div className="rounded-sm border border-editor-group-border bg-editor-background px-3 py-2 text-sm">
++						<div className="font-medium text-foreground">Conversation reopened</div>
++						<div className="mt-1 text-muted-foreground">
++							The composer stays enabled so you can continue the thread.
++						</div>
++					</div>
++				</div>
++			)}
++
+ 			<div className="grow flex" ref={scrollContainerRef}>
+ 				<Virtuoso
+ 					atBottomStateChange={(isAtBottom) => {
+diff --git a/webview-ui/src/components/chat/chat-view/hooks/useMessageHandlers.ts b/webview-ui/src/components/chat/chat-view/hooks/useMessageHandlers.ts
+index 104bbd1b..39c0ed06 100644
+--- a/webview-ui/src/components/chat/chat-view/hooks/useMessageHandlers.ts
++++ b/webview-ui/src/components/chat/chat-view/hooks/useMessageHandlers.ts
+@@ -5,6 +5,7 @@ import { useCallback, useRef } from "react"
+ import { useExtensionState } from "@/context/ExtensionStateContext"
+ import { SlashServiceClient, TaskServiceClient } from "@/services/grpc-client"
+ import type { ButtonActionType } from "../shared/buttonConfig"
++import { isPassiveThreadOpen } from "../shared/buttonConfig"
+ import type { ChatState, MessageHandlers } from "../types/chatTypes"
+ 
+ /**
+@@ -12,7 +13,9 @@ import type { ChatState, MessageHandlers } from "../types/chatTypes"
+  * Handles sending messages, button clicks, and task management
+  */
+ export function useMessageHandlers(messages: ClineMessage[], chatState: ChatState): MessageHandlers {
+-	const { backgroundCommandRunning } = useExtensionState()
++	const { backgroundCommandRunning, currentTaskItem } = useExtensionState()
++	const threadDisplayState = (currentTaskItem as { threadDisplayState?: string | null } | undefined)?.threadDisplayState
++	const isPassiveThreadOpenState = isPassiveThreadOpen(threadDisplayState)
+ 	const {
+ 		setInputValue,
+ 		activeQuote,
+@@ -97,13 +100,25 @@ export function useMessageHandlers(messages: ClineMessage[], chatState: ChatStat
+ 						}
+ 					}
+ 				} else if (messages.length > 0) {
+-					// No clineAsk set - check if task is actively running
+-					// If so, allow interrupting it with feedback
++					// No clineAsk set - check if the thread is passively open or if a task is actively running.
+ 					const lastMessage = messages[messages.length - 1]
++
++					if (isPassiveThreadOpenState) {
++						await TaskServiceClient.askResponse(
++							AskResponseRequest.create({
++								responseType: "messageResponse",
++								text: messageToSend,
++								images,
++								files,
++							}),
++						)
++						messageSent = true
++					}
++
+ 					const isTaskRunning =
+ 						lastMessage.partial === true || (lastMessage.type === "say" && lastMessage.say === "api_req_started")
+ 
+-					if (isTaskRunning) {
++					if (!messageSent && isTaskRunning) {
+ 						// Task is running - send message as interruption/feedback
+ 						await TaskServiceClient.askResponse(
+ 							AskResponseRequest.create({
+@@ -141,6 +156,7 @@ export function useMessageHandlers(messages: ClineMessage[], chatState: ChatStat
+ 			messages.length,
+ 			clineAsk,
+ 			activeQuote,
++			isPassiveThreadOpenState,
+ 			setInputValue,
+ 			setActiveQuote,
+ 			setSendingDisabled,
+@@ -311,6 +327,7 @@ export function useMessageHandlers(messages: ClineMessage[], chatState: ChatStat
+ 			startNewTask,
+ 			chatState,
+ 			backgroundCommandRunning,
++			isPassiveThreadOpenState,
+ 			setSendingDisabled,
+ 			setEnableButtons,
+ 		],
+diff --git a/webview-ui/src/components/chat/chat-view/shared/buttonConfig.test.ts b/webview-ui/src/components/chat/chat-view/shared/buttonConfig.test.ts
+index f82ae027..07ebcb7d 100644
+--- a/webview-ui/src/components/chat/chat-view/shared/buttonConfig.test.ts
++++ b/webview-ui/src/components/chat/chat-view/shared/buttonConfig.test.ts
+@@ -1,6 +1,6 @@
+ import type { ClineMessage } from "@shared/ExtensionMessage"
+ import { describe, expect, it } from "vitest"
+-import { BUTTON_CONFIGS, getButtonConfig } from "./buttonConfig"
++import { BUTTON_CONFIGS, getButtonConfig, PASSIVE_THREAD_DISPLAY_STATE } from "./buttonConfig"
+ 
+ describe("getButtonConfig", () => {
+ 	// Test default behavior
+@@ -36,6 +36,20 @@ describe("getButtonConfig", () => {
+ 		expect(config.secondaryText).toBe("Cancel")
+ 	})
+ 
++	it("returns the default footer config for passive-open threads", () => {
++		const passiveMessage: ClineMessage = {
++			type: "say",
++			say: "text",
++			ts: Date.now(),
++		}
++
++		const config = getButtonConfig(passiveMessage, "act", PASSIVE_THREAD_DISPLAY_STATE)
++
++		expect(config).toEqual(BUTTON_CONFIGS.default)
++		expect(config.sendingDisabled).toBe(false)
++		expect(config.enableButtons).toBe(false)
++	})
++
+ 	// Test error recovery states
+ 	describe("Error Recovery States", () => {
+ 		const errorStates = ["api_req_failed", "mistake_limit_reached"]
+diff --git a/webview-ui/src/components/chat/chat-view/shared/buttonConfig.ts b/webview-ui/src/components/chat/chat-view/shared/buttonConfig.ts
+index 3a8f9b6a..f2751827 100644
+--- a/webview-ui/src/components/chat/chat-view/shared/buttonConfig.ts
++++ b/webview-ui/src/components/chat/chat-view/shared/buttonConfig.ts
+@@ -26,6 +26,12 @@ export interface ButtonConfig {
+ 	secondaryAction?: ButtonActionType
+ }
+ 
++export const PASSIVE_THREAD_DISPLAY_STATE = "idle_open"
++
++export function isPassiveThreadOpen(threadDisplayState?: string | null): boolean {
++	return threadDisplayState === PASSIVE_THREAD_DISPLAY_STATE
++}
++
+ /**
+  * Centralized button state configurations based on task lifecycle
+  * This is the single source of truth for both button display and actions
+@@ -214,11 +220,19 @@ const errorTypes = ["api_req_failed", "mistake_limit_reached"]
+  * Determines button configuration based on message type and state
+  * This is the single source of truth used by both ActionButtons and useMessageHandlers
+  */
+-export function getButtonConfig(message: ClineMessage | undefined, _mode: Mode = "act"): ButtonConfig {
++export function getButtonConfig(
++	message: ClineMessage | undefined,
++	_mode: Mode = "act",
++	threadDisplayState?: string | null,
++): ButtonConfig {
+ 	if (!message) {
+ 		return BUTTON_CONFIGS.default
+ 	}
+ 
++	if (isPassiveThreadOpen(threadDisplayState)) {
++		return BUTTON_CONFIGS.default
++	}
++
+ 	const isStreaming = message.partial === true
+ 	const isError = message?.ask ? errorTypes.includes(message.ask) : false
+ 

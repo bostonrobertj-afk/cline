@@ -153,7 +153,7 @@ export function applyManagedWorkflowDynamicPlaceholders(
 
 		const resolvedValue = resolveManagedWorkflowPlaceholderText(rawValue, current)
 		if (resolvedValue) {
-			if (updatedDynamicPlaceholders[key] === resolvedValue) {
+			if (current[key] === resolvedValue) {
 				unchangedKeys.push(key)
 				continue
 			}

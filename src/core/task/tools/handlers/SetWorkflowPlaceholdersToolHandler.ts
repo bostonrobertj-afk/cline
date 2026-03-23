@@ -65,7 +65,7 @@ export class SetWorkflowPlaceholdersToolHandler implements IToolHandler, IPartia
 		if (changedKeys.length === 0) {
 			config.taskState.consecutiveMistakeCount = 0
 			const unchangedSummary = unchangedKeys.length > 0 ? unchangedKeys.join(", ") : keys.join(", ")
-			return `No workflow placeholder values changed. Existing stored values already match: ${unchangedSummary}. Do not call set_workflow_placeholders again unless one of those values changes; continue the current workflow step or call complete_workflow_item if that step is finished.`
+			return `Success: workflow placeholder values were already available and matched the requested values: ${unchangedSummary}. Do not call set_workflow_placeholders again unless one of those values changes; continue the current workflow step or call complete_workflow_item if that step is finished.`
 		}
 
 		try {

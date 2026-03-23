@@ -370,6 +370,49 @@ describe("Managed workflow handlers", () => {
 		}
 	})
 
+	it("treats stable managed workflow placeholder values as already available", async () => {
+		const sandbox = sinon.createSandbox()
+		try {
+			const handler = new SetWorkflowPlaceholdersToolHandler()
+			const config = createConfig()
+			const run = createManagedWorkflowRun()
+			run.stablePlaceholders = {
+				project_name: "cline",
+				user_name: "Rob",
+			}
+			run.updatedAt = 123
+			config.taskState.managedWorkflowRun = run
+			config.taskState.activeWorkflowId = "bmad-code-review"
+
+			const getMetadataStub = sandbox
+				.stub(disk, "getTaskMetadata")
+				.resolves({ activeWorkflowId: "bmad-code-review" } as any)
+			const saveMetadataStub = sandbox.stub(disk, "saveTaskMetadata").resolves()
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "set_workflow_placeholders",
+				params: {
+					values: {
+						project_name: "cline",
+						user_name: "Rob",
+					},
+				},
+				partial: false,
+			} as any)
+
+			expect(String(result)).to.contain("Success: workflow placeholder values were already available")
+			expect(String(result)).to.contain("project_name, user_name")
+			expect(getMetadataStub.called).to.equal(false)
+			expect(saveMetadataStub.called).to.equal(false)
+			expect(config.taskState.managedWorkflowRun?.dynamicPlaceholders).to.equal(undefined)
+			expect(config.taskState.managedWorkflowRun?.updatedAt).to.equal(123)
+			expect((config.callbacks.updateFCListFromToolResponse as sinon.SinonStub).called).to.equal(false)
+		} finally {
+			sandbox.restore()
+		}
+	})
+
 	it("round-trips managed workflow placeholder state through task metadata save and reload", async () => {
 		const tempGlobalStorageDir = await fs.mkdtemp(path.join(os.tmpdir(), "managed-workflow-metadata-"))
 		try {
