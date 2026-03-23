@@ -179,8 +179,8 @@ export function buildManagedWorkflowPrompt(run: ManagedWorkflowRunState): string
 The managed workflow ${run.workflowId} is active and all required phases are complete.
 How to finalize and exit this workflow:
 - call complete_workflow_item for all remaining regular checklist steps
-- resolve the final checkpoint with attempt_completion, not complete_workflow_item
-- Call attempt_completion and include your full final report to the user.
+- ensure the final checkpoint has already been resolved through the workflow-native checkpoint path
+- once the workflow itself is complete, call attempt_completion with your full final report to the user
 - STOP and await further instruction from the user.</active_bmad_workflow>`
 	}
 
@@ -219,7 +219,7 @@ This is a backend-managed workflow. Do not invent or rewrite the checklist manua
 You MUST limit your scope to the detailed instructions for the active step and checkpoint rules shown below.
 Use complete_workflow_item only for regular checklist steps.
 Never use complete_workflow_item for a checkpoint item or any item whose id ends with ::checkpoint.
-Resolve checkpoints only with attempt_completion after the regular checklist steps in the current phase are complete and any required user interaction is satisfied.
+Resolve checkpoints only through the workflow-native checkpoint progression path after the regular checklist steps in the current phase are complete and any required user interaction is satisfied.
 You MUST mark each regular checklist step as complete using the complete_workflow_item tool before moving on, even if you are skipping an optional step.
 You MUST NOT attempt to mark multiple steps complete simultaneously. The system will not accept batched completion attempts.
 Checkpoints are completion gates, not regular steps.
@@ -240,7 +240,7 @@ ${checkpoints}
 
 Checkpoint rule:
 - Do NOT use complete_workflow_item for the checkpoint above.
-- Use attempt_completion only when the checkpoint text has been satisfied.
+- Use the workflow-native checkpoint progression path only when the checkpoint text has been satisfied.
 - Treat the checkpoint as the phase-exit gate, not as a normal step.
 `
 		: ""

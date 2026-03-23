@@ -244,7 +244,8 @@ export function convertClineMessageToProto(message: AppClineMessage): ProtoCline
 		type: message.type === "ask" ? ClineMessageType.ASK : ClineMessageType.SAY,
 		ask: finalAskEnum,
 		say: finalSayEnum,
-		threadDisplayState: convertClineThreadDisplayStateToProtoEnum(message.threadDisplayState),
+		threadDisplayState:
+			convertClineThreadDisplayStateToProtoEnum(message.threadDisplayState) ?? ProtoThreadDisplayState.UNSPECIFIED,
 		text: message.text ?? "",
 		reasoning: message.reasoning ?? "",
 		images: message.images ?? [],

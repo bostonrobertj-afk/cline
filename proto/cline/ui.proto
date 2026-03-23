@@ -14,6 +14,16 @@ enum ClineMessageType {
   SAY = 1;
 }
 
+// Enum for passive/active thread display lifecycle
+enum ThreadDisplayState {
+  UNSPECIFIED = 0;
+  ACTIVE_RUN = 1;
+  AWAITING_USER_RESPONSE = 2;
+  COMPLETED = 3;
+  IDLE_OPEN = 4;
+  PAUSED = 5;
+}
+
 // Enum for ClineAsk types
 enum ClineAsk {
   FOLLOWUP = 0;
@@ -226,6 +236,7 @@ message ClineMessage {
   ClineAskNewTask ask_new_task = 21;
   ClineApiReqInfo api_req_info = 22;
   ClineModelInfo model_info = 23;
+  ThreadDisplayState thread_display_state = 24;
 }
 
 message ShowWebviewEvent {
