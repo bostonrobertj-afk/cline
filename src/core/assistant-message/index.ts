@@ -34,6 +34,7 @@ export const toolParamNames = [
 	"uri",
 	"question",
 	"options",
+	"message",
 	"response",
 	"result",
 	"context",

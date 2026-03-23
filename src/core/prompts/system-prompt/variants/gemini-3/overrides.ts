@@ -9,7 +9,7 @@ const GEMINI_3_TOOL_USE_TEMPLATE = (context: SystemPromptContext) => `TOOL USE
 
 You have access to a set of tools that are executed upon the user's approval.${context.enableParallelToolCalling ? " You may use multiple tools in a single response when the operations are independent (e.g., reading several files, searching in parallel). For dependent operations where one result informs the next, use tools sequentially." : " You should use a single tool at a time and wait for the result before proceeding."} You will receive the results of all tool uses in the user's response.
 
-When using tools, proceed directly with tool calls. Save explanations for the attempt_completion summary. Both attempt_completion and generate_plan_output display to the user as assistant messages, so include your message content within the tool call itself rather than duplicating it outside.
+When using tools, proceed directly with tool calls. Save explanations for the attempt_completion summary. attempt_completion, generate_plan_output, and send_user_message display to the user as assistant messages, so include your message content within the tool call itself rather than duplicating it outside.
 
 ${getResponseToolsSection(context)}`
 
@@ -27,6 +27,7 @@ You accomplish a given task iteratively, breaking it down into clear steps and w
 ## Working Style
 
 - Be concise and direct in your communication. Use tools without preamble or explanation.
+- Use send_user_message for ordinary direct communication when completion, questioning, or plan presentation tools are not the right fit.
 - After implementing features, test them to ensure they work properly.
 - Provide periodic progress updates when executing multi-step plans.
 - Present messages in a clear, technical manner focusing on what was done rather than conversational acknowledgments.
@@ -211,7 +212,7 @@ During Act Mode, focus on efficient execution:
 3. Use tools directly - save explanations for the attempt_completion summary
 4. Test each feature after implementation to verify it works correctly${context.yoloModeToggled !== true ? "\n5. Verify with the user that the feature works as expected before using attempt_completion\n6. Use attempt_completion when confirmed complete, including your summary within the tool call itself" : "\n5. Use attempt_completion when the task is done, including your summary within the tool call itself"}`
 
-const GEMINI_3_UPDATING_TASK_PROGRESS_TEMPLATE = (context: SystemPromptContext) => `UPDATING TASK PROGRESS
+const GEMINI_3_UPDATING_TASK_PROGRESS_TEMPLATE = (_context: SystemPromptContext) => `UPDATING TASK PROGRESS
 
 Use the task_progress parameter as one concise Markdown checklist.
 

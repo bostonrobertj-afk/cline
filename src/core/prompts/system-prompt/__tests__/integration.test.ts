@@ -343,7 +343,8 @@ describe("Prompt System Integration Tests", () => {
 					expect(systemPrompt).to.include("`attempt_completion`")
 					expect(systemPrompt).to.include("`ask_followup_question`")
 					expect(systemPrompt).to.include("`generate_plan_output`")
-					expect(systemPrompt).to.include("The only tools that can deliver a reply to the user in this mode are")
+					expect(systemPrompt).to.include("`send_user_message`")
+					expect(systemPrompt).to.include("In ACT MODE, respond using these:")
 					expect(systemPrompt).to.not.include("# Tools")
 					expect(systemPrompt).to.not.include("## execute_command")
 				},
@@ -389,7 +390,7 @@ describe("Prompt System Integration Tests", () => {
 			)
 		})
 
-		it("does not list BMAD workflow skills in non-agent prompts", async function () {
+		it("lists managed BMAD workflows but excludes BMAD persona entries in non-agent prompts", async function () {
 			await runPromptTest(
 				this,
 				{
@@ -400,8 +401,8 @@ describe("Prompt System Integration Tests", () => {
 					skills: [
 						{
 							name: "bmad-code-review",
-							description: "workflow",
-							path: "/skills/bmad-code-review/SKILL.md",
+							description: "Managed workflow: bmad-code-review",
+							path: "managed-workflow://bmad-code-review",
 							source: "project",
 						},
 						{
@@ -410,13 +411,26 @@ describe("Prompt System Integration Tests", () => {
 							path: "/skills/create-pull-request/SKILL.md",
 							source: "global",
 						},
+						{
+							name: "address-pr-comments.md",
+							description: "Workspace workflow: address-pr-comments.md",
+							path: "/project/.clinerules/workflows/address-pr-comments.md",
+							source: "project",
+						},
+						{
+							name: "bmad-dev",
+							description: "BMAD Developer persona",
+							path: "/skills/bmad-dev/SKILL.md",
+							source: "project",
+						},
 					],
 				},
 				"gpt-5.4-2026-03-05",
 				async ({ systemPrompt }) => {
-					expect(systemPrompt).to.include("Installed skills available on this turn")
+					expect(systemPrompt).to.include("Installed skills and workflow activations available on this turn")
 					expect(systemPrompt).to.include("create-pull-request")
-					expect(systemPrompt).to.not.include("bmad-code-review")
+					expect(systemPrompt).to.include("address-pr-comments.md")
+					expect(systemPrompt).to.not.include("bmad-dev")
 					expect(systemPrompt).to.not.include("Allowed workflow skills for the active BMAD agent")
 				},
 			)

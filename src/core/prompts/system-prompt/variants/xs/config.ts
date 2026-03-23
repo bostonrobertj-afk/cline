@@ -48,6 +48,7 @@ export const config = createVariant(ModelFamily.XS)
 		ClineDefaultTool.SEARCH,
 		ClineDefaultTool.ASK,
 		ClineDefaultTool.ATTEMPT,
+		ClineDefaultTool.SEND_USER_MESSAGE,
 		ClineDefaultTool.PLAN_MODE,
 		ClineDefaultTool.COMPLETE_WORKFLOW_ITEM,
 		ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,

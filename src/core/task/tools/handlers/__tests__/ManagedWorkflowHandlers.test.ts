@@ -93,6 +93,7 @@ function createConfig(overrides: Partial<TaskConfig> = {}): TaskConfig {
 				getGlobalStateKey: () => undefined,
 				getGlobalSettingsKey: () => undefined,
 				getWorkspaceStateKey: () => undefined,
+				getRemoteConfigSettings: () => ({}),
 				getApiConfiguration: () => ({ planModeApiProvider: "openai", actModeApiProvider: "openai" }),
 			},
 		} as any,
@@ -578,5 +579,108 @@ describe("Managed workflow handlers", () => {
 		expect(config.taskState.managedWorkflowRun).to.equal(undefined)
 		expect(config.taskState.activeWorkflowId).to.equal(undefined)
 		expect(config.taskState.activeAgentId).to.equal("bmad-dev")
+	})
+
+	it("activates local workflows through use_skill", async () => {
+		const sandbox = sinon.createSandbox()
+		try {
+			const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "use-skill-local-"))
+			const workflowPath = path.join(tempDir, "local-review.md")
+			await fs.writeFile(workflowPath, "# Local review\nInspect the staged diff.", "utf8")
+
+			const handler = new UseSkillToolHandler()
+			const config = createConfig({
+				services: {
+					stateManager: {
+						getGlobalStateKey: () => ({}),
+						getGlobalSettingsKey: (key: string) => (key === "globalWorkflowToggles" ? {} : undefined),
+						getWorkspaceStateKey: (key: string) => (key === "workflowToggles" ? { [workflowPath]: true } : undefined),
+						getRemoteConfigSettings: () => ({}),
+						getApiConfiguration: () => ({ planModeApiProvider: "openai", actModeApiProvider: "openai" }),
+					},
+				} as any,
+			})
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "use_skill",
+				params: {
+					skill_name: "local-review.md",
+				},
+				partial: false,
+			} as any)
+
+			expect(String(result)).to.contain('# Workflow "local-review.md" is now active')
+			expect(String(result)).to.contain("Inspect the staged diff.")
+			expect(config.taskState.activeWorkflowId).to.equal("local-review.md")
+			expect(config.taskState.activeWorkflowJustStarted).to.equal(true)
+		} finally {
+			sandbox.restore()
+		}
+	})
+
+	it("activates global workflows through use_skill when no local workflow shadows them", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "use-skill-global-"))
+		const workflowPath = path.join(tempDir, "global-review.md")
+		await fs.writeFile(workflowPath, "# Global review\nReview the release notes.", "utf8")
+
+		const handler = new UseSkillToolHandler()
+		const config = createConfig({
+			services: {
+				stateManager: {
+					getGlobalStateKey: () => ({}),
+					getGlobalSettingsKey: (key: string) =>
+						key === "globalWorkflowToggles" ? { [workflowPath]: true } : undefined,
+					getWorkspaceStateKey: () => ({}),
+					getRemoteConfigSettings: () => ({}),
+					getApiConfiguration: () => ({ planModeApiProvider: "openai", actModeApiProvider: "openai" }),
+				},
+			} as any,
+		})
+
+		const result = await handler.execute(config, {
+			type: "tool_use",
+			name: "use_skill",
+			params: {
+				skill_name: "global-review.md",
+			},
+			partial: false,
+		} as any)
+
+		expect(String(result)).to.contain('# Workflow "global-review.md" is now active')
+		expect(String(result)).to.contain("Review the release notes.")
+		expect(config.taskState.activeWorkflowId).to.equal("global-review.md")
+	})
+
+	it("activates remote workflows through use_skill", async () => {
+		const handler = new UseSkillToolHandler()
+		const config = createConfig({
+			services: {
+				stateManager: {
+					getGlobalStateKey: (key: string) => (key === "remoteWorkflowToggles" ? {} : undefined),
+					getGlobalSettingsKey: () => ({}),
+					getWorkspaceStateKey: () => ({}),
+					getRemoteConfigSettings: () => ({
+						remoteGlobalWorkflows: [
+							{ name: "remote-review", contents: "# Remote review\nCheck the config.", alwaysEnabled: true },
+						],
+					}),
+					getApiConfiguration: () => ({ planModeApiProvider: "openai", actModeApiProvider: "openai" }),
+				},
+			} as any,
+		})
+
+		const result = await handler.execute(config, {
+			type: "tool_use",
+			name: "use_skill",
+			params: {
+				skill_name: "remote-review",
+			},
+			partial: false,
+		} as any)
+
+		expect(String(result)).to.contain('# Workflow "remote-review" is now active')
+		expect(String(result)).to.contain("Check the config.")
+		expect(config.taskState.activeWorkflowId).to.equal("remote-review")
 	})
 })

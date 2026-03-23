@@ -1,11 +1,23 @@
 import type { SystemPromptContext } from "../types"
 
 function getActModeResponseTools(context: SystemPromptContext): string[] {
-	return context.yoloModeToggled !== true ? ["`attempt_completion`", "`ask_followup_question`"] : ["`act_mode_respond`"]
+	const tools = ["`attempt_completion`", "`send_user_message`"]
+
+	if (context.yoloModeToggled !== true) {
+		tools.splice(1, 0, "`ask_followup_question`")
+	}
+
+	return tools
 }
 
-function getPlanModeResponseTools(): string[] {
-	return ["`generate_plan_output`", "`ask_followup_question`"]
+function getPlanModeResponseTools(context: SystemPromptContext): string[] {
+	const tools = ["`generate_plan_output`", "`send_user_message`"]
+
+	if (context.yoloModeToggled !== true) {
+		tools.splice(1, 0, "`ask_followup_question`")
+	}
+
+	return tools
 }
 
 function joinToolNames(toolNames: string[]): string {
@@ -17,26 +29,32 @@ function joinToolNames(toolNames: string[]): string {
 }
 
 export function getResponseToolsSection(context: SystemPromptContext): string {
-	const actModeTools = getActModeResponseTools(context)
-	const responseToolLines = ["- `attempt_completion`: Use at the end of a workflow or task"]
+	const actModeResponseTools = joinToolNames(getActModeResponseTools(context))
+	const planModeResponseTools = joinToolNames(getPlanModeResponseTools(context))
+	const responseToolLines = [
+		"- `attempt_completion`: Use in ACT MODE when the task is complete or when you need to deliver the final direct answer.",
+		"- `send_user_message`: Use in either ACT MODE or PLAN MODE when other, more specialized response tools are not appropriate or available.",
+	]
 
 	if (context.yoloModeToggled !== true) {
-		responseToolLines.push("- `ask_followup_question`: Use to ask the user a question at any time")
+		responseToolLines.push(
+			"- `ask_followup_question`: Use when you need a direct answer from the user to improve correctness or unblock the next step.",
+		)
 	}
 
-	responseToolLines.push("- `generate_plan_output`: Use in PLAN MODE for plan presentation and other user-facing replies.")
+	responseToolLines.push("- `generate_plan_output`: Use in PLAN MODE to present a plan or otherwise respond during planning.")
 
 	return `RESPONSE TOOLS
-Use these tools to respond to the user. Responses that fail to use these tools will not reach the user.
+Use these tools to respond to the user. A reply reaches the human user only when you use the appropriate response tool.
 
 ${responseToolLines.join("\n")}
 
-In ACT MODE, respond using these: ${joinToolNames(actModeTools)}. In PLAN MODE, respond using \`generate_plan_output\`.`
+In ACT MODE, respond using these: ${actModeResponseTools}. In PLAN MODE, respond using these: ${planModeResponseTools}.`
 }
 
 export function getActVsPlanModeResponseRules(context: SystemPromptContext): string {
 	const actModeResponseTools = joinToolNames(getActModeResponseTools(context))
-	const planModeResponseTools = joinToolNames(getPlanModeResponseTools())
+	const planModeResponseTools = joinToolNames(getPlanModeResponseTools(context))
 
 	return `- ACT MODE: Engage in dialogue and execute tasks/workflows. To message the user, use these: ${actModeResponseTools}.
 - PLAN MODE: Engage in dialogue focused on planning out future tasks. To message the user, use these: ${planModeResponseTools}. Do not send a raw assistant reply.`

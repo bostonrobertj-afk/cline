@@ -58,6 +58,7 @@ export const config = createVariant(ModelFamily.GEMINI_3)
 		ClineDefaultTool.MCP_ACCESS,
 		ClineDefaultTool.ASK,
 		ClineDefaultTool.ATTEMPT,
+		ClineDefaultTool.SEND_USER_MESSAGE,
 		ClineDefaultTool.NEW_TASK,
 		ClineDefaultTool.PLAN_MODE,
 		ClineDefaultTool.ACT_MODE,

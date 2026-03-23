@@ -2,8 +2,9 @@ import type { ToolUse } from "@core/assistant-message"
 import { discoverSkills, getAvailableSkills, getSkillContent } from "@core/context/instructions/user-instructions/skills"
 import { getTaskMetadata, saveTaskMetadata } from "@core/storage/disk"
 import { startOrResumeManagedWorkflowRun } from "@core/task/managed-workflows/ManagedWorkflowController"
-import { getManagedWorkflowDefinition } from "@core/task/managed-workflows/ManagedWorkflowRegistry"
 import type { SkillMetadata } from "@shared/skills"
+import { loadResolvedWorkflowContent } from "@/core/workflows/resolution/loadResolvedWorkflowContent"
+import { resolveWorkflowByName } from "@/core/workflows/resolution/resolveAvailableWorkflows"
 import { telemetryService } from "@/services/telemetry"
 import { ClineDefaultTool } from "@/shared/tools"
 import { getBmadAgentById, getOwningBmadAgentForSkill, isSkillAllowedForBmadAgent } from "../../bmad-agent-mode"
@@ -33,14 +34,29 @@ export class UseSkillToolHandler implements IToolHandler, IPartialBlockHandler {
 
 	async execute(config: TaskConfig, block: ToolUse): Promise<ToolResponse> {
 		const skillName: string | undefined = block.params.skill_name
+		const stateManager = config.services.stateManager
 
 		if (!skillName) {
 			config.taskState.consecutiveMistakeCount++
 			return `Error: Missing required parameter 'skill_name'. Please provide the name of the skill to activate.`
 		}
 
-		const managedWorkflowDefinition = await getManagedWorkflowDefinition(config.cwd, skillName)
-		const resolvedSkillName = managedWorkflowDefinition?.skillName ?? skillName
+		const localWorkflowToggles = stateManager.getWorkspaceStateKey("workflowToggles") ?? {}
+		const globalWorkflowToggles = stateManager.getGlobalSettingsKey("globalWorkflowToggles") ?? {}
+		const remoteWorkflowToggles = stateManager.getGlobalStateKey("remoteWorkflowToggles") ?? {}
+		const remoteConfigSettings = stateManager.getRemoteConfigSettings()
+		const remoteWorkflows = remoteConfigSettings?.remoteGlobalWorkflows ?? []
+		const resolvedWorkflow = await resolveWorkflowByName(
+			{
+				cwd: config.cwd,
+				localWorkflowToggles,
+				globalWorkflowToggles,
+				remoteWorkflowToggles,
+				remoteWorkflows,
+			},
+			skillName,
+		)
+		const resolvedSkillName = resolvedWorkflow?.skillName ?? skillName
 
 		const activeAgent = config.taskState.activeAgentId
 			? await getBmadAgentById(config.cwd, config.taskState.activeAgentId)
@@ -53,26 +69,26 @@ export class UseSkillToolHandler implements IToolHandler, IPartialBlockHandler {
 			}
 		}
 
-		if (managedWorkflowDefinition) {
+		if (resolvedWorkflow?.source === "managed" && resolvedWorkflow.workflowId && resolvedWorkflow.slashCommand) {
 			if (activeAgent && !config.isSubagentExecution) {
-				return `Error: Managed workflows must be activated from a dedicated subagent while BMAD agent "${activeAgent.id}" is active. Spawn a subagent, tell it to call use_skill with "${managedWorkflowDefinition.skillName}", and keep the current thread in the active agent persona.`
+				return `Error: Managed workflows must be activated from a dedicated subagent while BMAD agent "${activeAgent.id}" is active. Spawn a subagent, tell it to call use_skill with "${resolvedWorkflow.skillName ?? resolvedWorkflow.name}", and keep the current thread in the active agent persona.`
 			}
 
 			if (!activeAgent) {
-				const owningAgent = await getOwningBmadAgentForSkill(config.cwd, managedWorkflowDefinition.workflowId)
+				const owningAgent = await getOwningBmadAgentForSkill(config.cwd, resolvedWorkflow.workflowId)
 				if (owningAgent) {
 					config.taskState.activeAgentId = owningAgent.id
 					config.taskState.activeAgentSkillName = owningAgent.id
-					config.taskState.activeAgentInvokedSlashCommand = managedWorkflowDefinition.slashCommand
+					config.taskState.activeAgentInvokedSlashCommand = resolvedWorkflow.slashCommand
 					config.taskState.activeAgentJustActivated = true
 				}
 			}
 
 			const { run, resumed } = await startOrResumeManagedWorkflowRun(
 				config.cwd,
-				managedWorkflowDefinition.workflowId,
+				resolvedWorkflow.workflowId,
 				config.taskState.managedWorkflowRun,
-				managedWorkflowDefinition.slashCommand,
+				resolvedWorkflow.slashCommand,
 			)
 
 			config.taskState.managedWorkflowRun = run
@@ -99,12 +115,61 @@ export class UseSkillToolHandler implements IToolHandler, IPartialBlockHandler {
 				: `Managed workflow "${run.workflowId}" is now active. Follow the active checklist and current step instructions.`
 		}
 
+		const apiConfig = stateManager.getApiConfiguration()
+		const currentMode = stateManager.getGlobalSettingsKey("mode")
+		const provider = currentMode === "plan" ? apiConfig.planModeApiProvider : apiConfig.actModeApiProvider
+
+		// Show tool message
+		const message = JSON.stringify({ tool: "useSkill", path: skillName })
+		if (!config.isSubagentExecution) {
+			await config.callbacks.say("tool", message, undefined, undefined, false)
+		}
+
+		if (resolvedWorkflow) {
+			try {
+				const workflowContent = await loadResolvedWorkflowContent(resolvedWorkflow)
+				if (!workflowContent || workflowContent.kind !== "instructions") {
+					return `Error: Workflow "${skillName}" could not be loaded.`
+				}
+
+				config.taskState.consecutiveMistakeCount = 0
+				config.taskState.activeWorkflowId = resolvedWorkflow.name
+				config.taskState.activeWorkflowJustStarted = true
+
+				telemetryService.safeCapture(
+					() =>
+						telemetryService.captureSkillUsed({
+							ulid: config.ulid,
+							skillName: resolvedWorkflow.name,
+							skillSource: resolvedWorkflow.source === "local" ? "project" : "global",
+							skillsAvailableGlobal: 0,
+							skillsAvailableProject: 0,
+							provider,
+							modelId: config.api.getModel().id,
+						}),
+					"UseSkillToolHandler.execute",
+				)
+
+				const locationHint = workflowContent.displayPath
+					? ` You may access the workflow file at: ${workflowContent.displayPath}`
+					: ""
+
+				return `# Workflow "${resolvedWorkflow.name}" is now active
+
+${workflowContent.contents}
+
+---
+IMPORTANT: The workflow is now loaded. Do NOT call use_skill again for this task unless a later step explicitly requires a different workflow.${locationHint}`
+			} catch (error) {
+				return `Error loading workflow "${skillName}": ${(error as Error)?.message}`
+			}
+		}
+
 		// Discover skills on-demand (lazy loading)
 		const allSkills = await discoverSkills(config.cwd)
 		const resolvedSkills = getAvailableSkills(allSkills)
 
 		// Filter by toggle state
-		const stateManager = config.services.stateManager
 		const globalSkillsToggles = stateManager.getGlobalSettingsKey("globalSkillsToggles") ?? {}
 		const localSkillsToggles = stateManager.getWorkspaceStateKey("localSkillsToggles") ?? {}
 		const availableSkills = resolvedSkills.filter((skill) => {
@@ -118,16 +183,6 @@ export class UseSkillToolHandler implements IToolHandler, IPartialBlockHandler {
 
 		const globalCount = availableSkills.filter((skill) => skill.source === "global").length
 		const projectCount = availableSkills.filter((skill) => skill.source === "project").length
-
-		const apiConfig = config.services.stateManager.getApiConfiguration()
-		const currentMode = config.services.stateManager.getGlobalSettingsKey("mode")
-		const provider = currentMode === "plan" ? apiConfig.planModeApiProvider : apiConfig.actModeApiProvider
-
-		// Show tool message
-		const message = JSON.stringify({ tool: "useSkill", path: skillName })
-		if (!config.isSubagentExecution) {
-			await config.callbacks.say("tool", message, undefined, undefined, false)
-		}
 
 		config.taskState.consecutiveMistakeCount = 0
 

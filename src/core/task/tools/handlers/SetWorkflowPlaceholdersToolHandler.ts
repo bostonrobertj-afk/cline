@@ -16,7 +16,7 @@ function parseWorkflowPlaceholderValues(values: unknown): Record<string, unknown
 }
 
 function getWorkflowPlaceholderValues(block: ToolUse): Record<string, unknown> | undefined {
-	return parseWorkflowPlaceholderValues((block.params as Record<string, unknown>)["values"])
+	return parseWorkflowPlaceholderValues((block.params as Record<string, unknown>).values)
 }
 
 export class SetWorkflowPlaceholdersToolHandler implements IToolHandler, IPartialBlockHandler {
@@ -58,14 +58,28 @@ export class SetWorkflowPlaceholdersToolHandler implements IToolHandler, IPartia
 			await config.callbacks.say("tool", message, undefined, undefined, false)
 		}
 
-		const { run: updatedRun, changedKeys, unchangedKeys } = applyManagedWorkflowDynamicPlaceholders(currentRun, values)
+		const {
+			run: updatedRun,
+			changedKeys,
+			unchangedKeys,
+			unchangedDynamicKeys,
+			unchangedStableKeys,
+		} = applyManagedWorkflowDynamicPlaceholders(currentRun, values)
 		config.taskState.managedWorkflowRun = updatedRun
 		config.taskState.activeWorkflowId = config.taskState.managedWorkflowRun.workflowId
 
 		if (changedKeys.length === 0) {
 			config.taskState.consecutiveMistakeCount = 0
+			if (unchangedDynamicKeys.length > 0 && unchangedStableKeys.length === 0) {
+				return `No workflow placeholder values changed. Existing stored values already matched the requested values: ${unchangedDynamicKeys.join(", ")}. Do not call set_workflow_placeholders again unless one of those values changes; continue the current workflow step or call complete_workflow_item if that step is finished.`
+			}
+
+			if (unchangedStableKeys.length > 0 && unchangedDynamicKeys.length === 0) {
+				return `Success: workflow placeholder values were already available and matched the requested values: ${unchangedStableKeys.join(", ")}. Do not call set_workflow_placeholders again unless one of those values changes; continue the current workflow step or call complete_workflow_item if that step is finished.`
+			}
+
 			const unchangedSummary = unchangedKeys.length > 0 ? unchangedKeys.join(", ") : keys.join(", ")
-			return `Success: workflow placeholder values were already available and matched the requested values: ${unchangedSummary}. Do not call set_workflow_placeholders again unless one of those values changes; continue the current workflow step or call complete_workflow_item if that step is finished.`
+			return `No workflow placeholder values changed. Existing workflow placeholders already matched the requested values: ${unchangedSummary}. Do not call set_workflow_placeholders again unless one of those values changes; continue the current workflow step or call complete_workflow_item if that step is finished.`
 		}
 
 		try {

@@ -18,6 +18,7 @@ import { new_task_variants } from "./new_task"
 import { read_file_variants } from "./read_file"
 import { replace_in_file_variants } from "./replace_in_file"
 import { search_files_variants } from "./search_files"
+import { send_user_message_variants } from "./send_user_message"
 import { set_workflow_placeholders_variants } from "./set_workflow_placeholders"
 import { subagent_variants } from "./subagent"
 import { use_mcp_tool_variants } from "./use_mcp_tool"
@@ -51,6 +52,7 @@ export function registerClineToolSets(): void {
 		...read_file_variants,
 		...replace_in_file_variants,
 		...search_files_variants,
+		...send_user_message_variants,
 		...set_workflow_placeholders_variants,
 		...subagent_variants,
 		...use_mcp_tool_variants,

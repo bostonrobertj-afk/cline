@@ -39,6 +39,7 @@ import {
 	saveTaskMetadata,
 } from "@core/storage/disk"
 import { releaseTaskLock } from "@core/task/TaskLockUtils"
+import { createWorkflowSkillMetadata, resolveAvailableWorkflows } from "@core/workflows/resolution/resolveAvailableWorkflows"
 import { isMultiRootEnabled } from "@core/workspace/multi-root-utils"
 import { WorkspaceRootManager } from "@core/workspace/WorkspaceRootManager"
 import { buildCheckpointManager, shouldUseMultiRoot } from "@integrations/checkpoints/factory"
@@ -118,7 +119,6 @@ import {
 	getBmadAgentById,
 	getBmadWorkflowReminder,
 	getOwningBmadAgentForSkill,
-	isHumanInvokedBmadSkillName,
 	isSkillAllowedForBmadAgent,
 } from "./bmad-agent-mode"
 import { FocusChainManager } from "./focus-chain"
@@ -1046,7 +1046,14 @@ export class Task {
 
 	private async buildPromptSkillScope(enabledSkills: SkillMetadata[]): Promise<SkillMetadata[]> {
 		if (!this.taskState.activeAgentId) {
-			return enabledSkills.filter((skill) => !isHumanInvokedBmadSkillName(skill.name))
+			const promptVisibility = await Promise.all(
+				enabledSkills.map(async (skill) => ({
+					skill,
+					matchingAgent: await getBmadAgentById(this.cwd, skill.name),
+				})),
+			)
+
+			return promptVisibility.filter(({ matchingAgent }) => !matchingAgent).map(({ skill }) => skill)
 		}
 
 		const activeAgent = await getBmadAgentById(this.cwd, this.taskState.activeAgentId)
@@ -1055,6 +1062,20 @@ export class Task {
 		}
 
 		return enabledSkills.filter((skill) => isSkillAllowedForBmadAgent(activeAgent, skill.name))
+	}
+
+	private mergePromptSkillEntries(skills: SkillMetadata[], workflows: SkillMetadata[]): SkillMetadata[] {
+		const merged = new Map<string, SkillMetadata>()
+
+		for (const skill of skills) {
+			merged.set(skill.name, skill)
+		}
+
+		for (const workflow of workflows) {
+			merged.set(workflow.name, workflow)
+		}
+
+		return [...merged.values()]
 	}
 
 	private hasHumanAuthoredInput(contentBlocks: ClineContent[]): boolean {
@@ -2192,7 +2213,18 @@ export class Task {
 			// If toggle exists, use it; otherwise default to enabled (true)
 			return toggles[skill.path] !== false
 		})
-		const promptSkills = shouldIncludeBmadPromptContext ? await this.buildPromptSkillScope(availableSkills) : []
+		const workflowEntries = await resolveAvailableWorkflows({
+			cwd: this.cwd,
+			localWorkflowToggles: this.stateManager.getWorkspaceStateKey("workflowToggles") ?? {},
+			globalWorkflowToggles: this.stateManager.getGlobalSettingsKey("globalWorkflowToggles") ?? {},
+			remoteWorkflowToggles: this.stateManager.getGlobalStateKey("remoteWorkflowToggles") ?? {},
+			remoteWorkflows: this.stateManager.getRemoteConfigSettings()?.remoteGlobalWorkflows ?? [],
+		})
+		const promptSkills = shouldIncludeBmadPromptContext
+			? await this.buildPromptSkillScope(
+					this.mergePromptSkillEntries(availableSkills, createWorkflowSkillMetadata(workflowEntries)),
+				)
+			: []
 		const { activeAgentRoleInstructions, activeAgentCatalogInstructions, activeWorkflowReminder } =
 			shouldIncludeBmadPromptContext ? await this.buildBmadPromptInstructions() : {}
 

@@ -11,6 +11,7 @@ import { startOrResumeManagedWorkflowRun } from "@core/task/managed-workflows/Ma
 import { getManagedWorkflowDefinition } from "@core/task/managed-workflows/ManagedWorkflowRegistry"
 import { buildManagedWorkflowPrompt } from "@core/task/managed-workflows/ManagedWorkflowRenderer"
 import { StreamResponseHandler } from "@core/task/StreamResponseHandler"
+import { createWorkflowSkillMetadata, resolveAvailableWorkflows } from "@core/workflows/resolution/resolveAvailableWorkflows"
 import { ClineAssistantToolUseBlock, ClineStorageMessage, ClineTextContentBlock, ClineUserContent } from "@shared/messages"
 import { Logger } from "@shared/services/Logger"
 import type { SkillMetadata } from "@shared/skills"
@@ -365,7 +366,17 @@ export class SubagentRunner {
 
 			const host = HostRegistryInfo.get()
 			const discoveredSkills = await discoverSkills(this.baseConfig.cwd)
-			const availableSkills = getAvailableSkills(discoveredSkills)
+			const workflowEntries = await resolveAvailableWorkflows({
+				cwd: this.baseConfig.cwd,
+				localWorkflowToggles: this.baseConfig.services.stateManager.getWorkspaceStateKey("workflowToggles") ?? {},
+				globalWorkflowToggles: this.baseConfig.services.stateManager.getGlobalSettingsKey("globalWorkflowToggles") ?? {},
+				remoteWorkflowToggles: this.baseConfig.services.stateManager.getGlobalStateKey("remoteWorkflowToggles") ?? {},
+				remoteWorkflows: this.baseConfig.services.stateManager.getRemoteConfigSettings()?.remoteGlobalWorkflows ?? [],
+			})
+			const availableSkills = this.mergePromptSkillEntries(
+				getAvailableSkills(discoveredSkills),
+				createWorkflowSkillMetadata(workflowEntries),
+			)
 			const configuredSkillNames = this.agent.getConfiguredSkills()
 			const assignedSkillNames = extractAssignedSkillNames(prompt)
 			await this.autoActivateAssignedManagedWorkflow(state, assignedSkillNames)
@@ -822,6 +833,22 @@ export class SubagentRunner {
 		state.managedWorkflowRun = run
 		state.activeWorkflowId = run.workflowId
 		state.activeWorkflowJustStarted = !resumed
+	}
+
+	private mergePromptSkillEntries(skills: SkillMetadata[], workflows: SkillMetadata[]): SkillMetadata[] {
+		const merged = new Map<string, SkillMetadata>()
+
+		for (const skill of skills) {
+			merged.set(skill.name, skill)
+		}
+
+		for (const workflow of workflows) {
+			if (!merged.has(workflow.name)) {
+				merged.set(workflow.name, workflow)
+			}
+		}
+
+		return [...merged.values()]
 	}
 
 	private resolvePromptSkills(

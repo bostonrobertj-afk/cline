@@ -8,6 +8,7 @@ export type ClineTool = OpenAITool | AnthropicTool | GoogleTool
 export enum ClineDefaultTool {
 	ASK = "ask_followup_question",
 	ATTEMPT = "attempt_completion",
+	SEND_USER_MESSAGE = "send_user_message",
 	BASH = "execute_command",
 	FILE_EDIT = "replace_in_file",
 	FILE_READ = "read_file",
@@ -62,6 +63,7 @@ export const READ_ONLY_TOOLS = [
 	ClineDefaultTool.LIST_CODE_DEF,
 	ClineDefaultTool.BROWSER,
 	ClineDefaultTool.ASK,
+	ClineDefaultTool.SEND_USER_MESSAGE,
 	ClineDefaultTool.WEB_SEARCH,
 	ClineDefaultTool.WEB_FETCH,
 	ClineDefaultTool.USE_SKILL,

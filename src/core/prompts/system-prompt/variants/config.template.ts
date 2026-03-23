@@ -59,6 +59,7 @@ export const config: Omit<PromptVariant, "id"> = createVariant(ModelFamily.GENER
 		ClineDefaultTool.MCP_ACCESS,
 		ClineDefaultTool.ASK,
 		ClineDefaultTool.ATTEMPT,
+		ClineDefaultTool.SEND_USER_MESSAGE,
 		ClineDefaultTool.NEW_TASK,
 		ClineDefaultTool.PLAN_MODE,
 		ClineDefaultTool.MCP_DOCS,
@@ -111,7 +112,12 @@ export const createMinimalVariant = (family: ModelFamily) =>
 			SystemPromptSection.RULES,
 			SystemPromptSection.SYSTEM_INFO,
 		)
-		.tools(ClineDefaultTool.FILE_READ, ClineDefaultTool.FILE_NEW, ClineDefaultTool.ATTEMPT)
+		.tools(
+			ClineDefaultTool.FILE_READ,
+			ClineDefaultTool.FILE_NEW,
+			ClineDefaultTool.ATTEMPT,
+			ClineDefaultTool.SEND_USER_MESSAGE,
+		)
 
 // Full-featured variant for advanced models
 export const createAdvancedVariant = (family: ModelFamily) =>
@@ -145,6 +151,7 @@ export const createAdvancedVariant = (family: ModelFamily) =>
 			ClineDefaultTool.MCP_ACCESS,
 			ClineDefaultTool.ASK,
 			ClineDefaultTool.ATTEMPT,
+			ClineDefaultTool.SEND_USER_MESSAGE,
 			ClineDefaultTool.NEW_TASK,
 			ClineDefaultTool.PLAN_MODE,
 			ClineDefaultTool.MCP_DOCS,

@@ -139,11 +139,15 @@ export function applyManagedWorkflowDynamicPlaceholders(
 	run: ManagedWorkflowRunState
 	changedKeys: string[]
 	unchangedKeys: string[]
+	unchangedDynamicKeys: string[]
+	unchangedStableKeys: string[]
 } {
 	const current = getManagedWorkflowPlaceholderMap(run)
 	const updatedDynamicPlaceholders = { ...(run.dynamicPlaceholders ?? {}) }
 	const changedKeys: string[] = []
 	const unchangedKeys: string[] = []
+	const unchangedDynamicKeys: string[] = []
+	const unchangedStableKeys: string[] = []
 
 	for (const [key, value] of Object.entries(values)) {
 		const rawValue = toPlaceholderString(value)
@@ -155,6 +159,11 @@ export function applyManagedWorkflowDynamicPlaceholders(
 		if (resolvedValue) {
 			if (current[key] === resolvedValue) {
 				unchangedKeys.push(key)
+				if (run.dynamicPlaceholders?.[key] === resolvedValue) {
+					unchangedDynamicKeys.push(key)
+				} else if (run.stablePlaceholders?.[key] === resolvedValue) {
+					unchangedStableKeys.push(key)
+				}
 				continue
 			}
 
@@ -165,7 +174,7 @@ export function applyManagedWorkflowDynamicPlaceholders(
 	}
 
 	if (changedKeys.length === 0) {
-		return { run, changedKeys, unchangedKeys }
+		return { run, changedKeys, unchangedKeys, unchangedDynamicKeys, unchangedStableKeys }
 	}
 
 	return {
@@ -176,5 +185,7 @@ export function applyManagedWorkflowDynamicPlaceholders(
 		},
 		changedKeys,
 		unchangedKeys,
+		unchangedDynamicKeys,
+		unchangedStableKeys,
 	}
 }

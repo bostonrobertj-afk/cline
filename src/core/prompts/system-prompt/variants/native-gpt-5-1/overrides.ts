@@ -94,7 +94,8 @@ This ensures your work aligns with the existing codebase structure and avoids un
    - Use act_mode_respond when starting a new logical phase of work (e.g., moving from backend to frontend, or from one feature to another)
    - Use act_mode_respond during long sequences of operations to provide progress updates
    - Use act_mode_respond to explain your reasoning when changing approaches or encountering issues/mistakes
-   
+   - Use send_user_message when you need to send a normal direct message to the user and the better fit is not attempt_completion, ask_followup_question, or generate_plan_output
+
    This tool is non-blocking, so using it frequently improves user experience and ensures long tasks are completed successfully.
 
    Additionally, you MUST NOT call act_mode_respond more than once in a row. After using act_mode_respond, your next assistant message MUST either call a different tool or perform additional work without using act_mode_respond again. If you attempt to call act_mode_respond consecutively, the tool call will fail with an explicit error and you must choose a different action instead.

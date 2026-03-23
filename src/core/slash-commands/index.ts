@@ -1,7 +1,7 @@
 import type { ApiProviderInfo } from "@core/api"
 import { ClineRulesToggles } from "@shared/cline-rules"
 import { McpPromptResponse } from "@shared/mcp"
-import fs from "fs/promises"
+import type { GlobalInstructionsFile } from "@shared/remote-config/schema"
 import { telemetryService } from "@/services/telemetry"
 import { Logger } from "@/shared/services/Logger"
 import { isNativeToolCallingConfig } from "@/utils/model-utils"
@@ -15,7 +15,8 @@ import {
 } from "../prompts/commands"
 import { StateManager } from "../storage/StateManager"
 import { isBmadExitCommand, resolveBmadAgentActivation } from "../task/bmad-agent-mode"
-import { getManagedWorkflowDefinitionBySlashCommand } from "../task/managed-workflows/ManagedWorkflowRegistry"
+import { loadResolvedWorkflowContent } from "../workflows/resolution/loadResolvedWorkflowContent"
+import { resolveWorkflowByName } from "../workflows/resolution/resolveAvailableWorkflows"
 
 export type PersistentSlashCommandAction =
 	| { type: "activate_managed_workflow"; workflowId: string; slashCommand: string }
@@ -26,21 +27,6 @@ export type PersistentSlashCommandAction =
  * Callback type for fetching MCP prompts
  */
 export type McpPromptFetcher = (serverName: string, promptName: string) => Promise<McpPromptResponse | null>
-
-type FileBasedWorkflow = {
-	fullPath: string
-	fileName: string
-	isRemote: false
-}
-
-type RemoteWorkflow = {
-	fullPath: string
-	fileName: string
-	isRemote: true
-	contents: string
-}
-
-type Workflow = FileBasedWorkflow | RemoteWorkflow
 
 /**
  * Processes text for slash commands and transforms them with appropriate instructions
@@ -158,22 +144,42 @@ export async function parseSlashCommands(
 				return text
 			}
 
-			if (cwd) {
-				const managedWorkflow = await getManagedWorkflowDefinitionBySlashCommand(cwd, commandName)
-				if (managedWorkflow) {
-					const textWithoutSlashCommand = removeMatchedCommand()
-					telemetryService.captureSlashCommandUsed(ulid, commandName, "workflow")
-					return {
-						processedText: textWithoutSlashCommand,
-						needsClinerulesFileCheck: false,
-						persistentSlashCommandAction: {
-							type: "activate_managed_workflow",
-							workflowId: managedWorkflow.workflowId,
-							slashCommand: managedWorkflow.slashCommand,
-						},
-					}
-				}
+			let remoteWorkflowToggles: Record<string, boolean> = {}
+			let remoteWorkflows: GlobalInstructionsFile[] = []
+			try {
+				const stateManager = StateManager.get()
+				const remoteConfigSettings = stateManager.getRemoteConfigSettings()
+				remoteWorkflowToggles = stateManager.getGlobalStateKey("remoteWorkflowToggles") || {}
+				remoteWorkflows = remoteConfigSettings?.remoteGlobalWorkflows || []
+			} catch {
+				// StateManager is not always initialized in isolated slash-command tests.
+			}
+			const resolvedWorkflow = await resolveWorkflowByName(
+				{
+					cwd,
+					localWorkflowToggles,
+					globalWorkflowToggles,
+					remoteWorkflowToggles,
+					remoteWorkflows,
+				},
+				commandName,
+			)
 
+			if (resolvedWorkflow?.source === "managed" && resolvedWorkflow.workflowId && resolvedWorkflow.slashCommand) {
+				const textWithoutSlashCommand = removeMatchedCommand()
+				telemetryService.captureSlashCommandUsed(ulid, commandName, "workflow")
+				return {
+					processedText: textWithoutSlashCommand,
+					needsClinerulesFileCheck: false,
+					persistentSlashCommandAction: {
+						type: "activate_managed_workflow",
+						workflowId: resolvedWorkflow.workflowId,
+						slashCommand: resolvedWorkflow.slashCommand,
+					},
+				}
+			}
+
+			if (cwd) {
 				const activation = await resolveBmadAgentActivation(cwd, commandName)
 				if (activation) {
 					const textWithoutSlashCommand = removeMatchedCommand()
@@ -254,54 +260,11 @@ export async function parseSlashCommands(
 				}
 			}
 
-			const globalWorkflows: Workflow[] = Object.entries(globalWorkflowToggles)
-				.filter(([_, enabled]) => enabled)
-				.map(([filePath, _]) => ({
-					fullPath: filePath,
-					fileName: filePath.replace(/^.*[/\\]/, ""),
-					isRemote: false,
-				}))
-
-			const localWorkflows: Workflow[] = Object.entries(localWorkflowToggles)
-				.filter(([_, enabled]) => enabled)
-				.map(([filePath, _]) => ({
-					fullPath: filePath,
-					fileName: filePath.replace(/^.*[/\\]/, ""),
-					isRemote: false,
-				}))
-
-			// Get remote workflows from remote config
-			const stateManager = StateManager.get()
-			const remoteConfigSettings = stateManager.getRemoteConfigSettings()
-			const remoteWorkflows = remoteConfigSettings.remoteGlobalWorkflows || []
-			const remoteWorkflowToggles = stateManager.getGlobalStateKey("remoteWorkflowToggles") || {}
-
-			const enabledRemoteWorkflows: Workflow[] = remoteWorkflows
-				.filter((workflow) => {
-					// If alwaysEnabled, always include; otherwise check toggle
-					return workflow.alwaysEnabled || remoteWorkflowToggles[workflow.name] !== false
-				})
-				.map((workflow) => ({
-					fullPath: "",
-					fileName: workflow.name,
-					isRemote: true,
-					contents: workflow.contents,
-				}))
-
-			// local workflows have precedence over global workflows, which have precedence over remote workflows
-			const enabledWorkflows: Workflow[] = [...localWorkflows, ...globalWorkflows, ...enabledRemoteWorkflows]
-
-			// Then check if the command matches any enabled workflow filename
-			const matchingWorkflow = enabledWorkflows.find((workflow) => workflow.fileName === commandName)
-
-			if (matchingWorkflow) {
+			if (resolvedWorkflow && resolvedWorkflow.source !== "managed") {
 				try {
-					// Get workflow content - either from file or from remote config
-					let workflowContent: string
-					if (matchingWorkflow.isRemote) {
-						workflowContent = matchingWorkflow.contents.trim()
-					} else {
-						workflowContent = (await fs.readFile(matchingWorkflow.fullPath, "utf8")).trim()
+					const loadedWorkflow = await loadResolvedWorkflowContent(resolvedWorkflow)
+					if (!loadedWorkflow || loadedWorkflow.kind !== "instructions") {
+						continue
 					}
 
 					// remove the slash command and add custom instructions at the top of this message
@@ -310,7 +273,7 @@ export async function parseSlashCommands(
 					}
 					const textWithoutSlashCommand = removeMatchedCommand()
 					const processedText =
-						`<explicit_instructions type="${matchingWorkflow.fileName}">\n${workflowContent}\n</explicit_instructions>\n` +
+						`<explicit_instructions type="${resolvedWorkflow.fileName}">\n${loadedWorkflow.contents}\n</explicit_instructions>\n` +
 						textWithoutSlashCommand
 
 					// Track telemetry for workflow command usage
@@ -318,7 +281,9 @@ export async function parseSlashCommands(
 
 					return { processedText, needsClinerulesFileCheck: false }
 				} catch (error) {
-					Logger.error(`Error reading workflow file ${matchingWorkflow.fullPath}: ${error}`)
+					Logger.error(
+						`Error reading workflow for slash command ${resolvedWorkflow.name}${resolvedWorkflow.fullPath ? ` (${resolvedWorkflow.fullPath})` : ""}: ${error}`,
+					)
 				}
 			}
 		}

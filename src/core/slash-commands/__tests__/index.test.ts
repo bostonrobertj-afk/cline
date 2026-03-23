@@ -1,6 +1,10 @@
 import type { McpPromptResponse } from "@shared/mcp"
 import { expect } from "chai"
+import fs from "fs/promises"
+import os from "os"
+import path from "path"
 import * as sinon from "sinon"
+import { StateManager } from "../../storage/StateManager"
 import * as bmadAgentMode from "../../task/bmad-agent-mode"
 import { formatMcpPromptResponse, McpPromptFetcher, parseSlashCommands } from "../index"
 
@@ -244,6 +248,65 @@ describe("slash-commands", () => {
 				skillName: "bmad-quick-flow-solo-dev",
 				invokedSlashCommand: "bmad-agent-bmm-quick-flow-solo-dev",
 			})
+		})
+	})
+
+	describe("parseSlashCommands workflow resolution", () => {
+		it("loads local workflows through the shared resolver", async () => {
+			const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "slash-local-"))
+			const workflowPath = path.join(tempDir, "local-flow.md")
+			await fs.writeFile(workflowPath, "# Local Flow\nDo the local thing.", "utf8")
+			sinon.stub(StateManager, "get").returns({
+				getRemoteConfigSettings: () => ({}),
+				getGlobalStateKey: () => ({}),
+			} as any)
+
+			const result = await parseSlashCommands(
+				"<task>/local-flow.md continue</task>",
+				{ [workflowPath]: true },
+				{},
+				"test-ulid",
+			)
+
+			expect(result.processedText).to.include('<explicit_instructions type="local-flow.md">')
+			expect(result.processedText).to.include("Do the local thing.")
+		})
+
+		it("prefers local workflows over global workflows with the same name", async () => {
+			const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "slash-precedence-"))
+			const localPath = path.join(tempDir, "shared-flow.md")
+			const globalPath = path.join(tempDir, "global-shared", "shared-flow.md")
+			await fs.mkdir(path.dirname(globalPath), { recursive: true })
+			await fs.writeFile(localPath, "local body", "utf8")
+			await fs.writeFile(globalPath, "global body", "utf8")
+			sinon.stub(StateManager, "get").returns({
+				getRemoteConfigSettings: () => ({}),
+				getGlobalStateKey: () => ({}),
+			} as any)
+
+			const result = await parseSlashCommands(
+				"<task>/shared-flow.md now</task>",
+				{ [localPath]: true },
+				{ [globalPath]: true },
+				"test-ulid",
+			)
+
+			expect(result.processedText).to.include("local body")
+			expect(result.processedText).to.not.include("global body")
+		})
+
+		it("loads remote workflows through the shared resolver", async () => {
+			sinon.stub(StateManager, "get").returns({
+				getRemoteConfigSettings: () => ({
+					remoteGlobalWorkflows: [{ name: "remote-flow", contents: "remote body", alwaysEnabled: true }],
+				}),
+				getGlobalStateKey: () => ({}),
+			} as any)
+
+			const result = await parseSlashCommands("<task>/remote-flow please</task>", {}, {}, "test-ulid")
+
+			expect(result.processedText).to.include('<explicit_instructions type="remote-flow">')
+			expect(result.processedText).to.include("remote body")
 		})
 	})
 })

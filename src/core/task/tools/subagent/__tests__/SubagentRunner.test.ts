@@ -4,7 +4,8 @@ import * as skills from "@core/context/instructions/user-instructions/skills"
 import { PromptRegistry } from "@core/prompts/system-prompt"
 import type { ManagedWorkflowRunState } from "@core/task/managed-workflows/types"
 import type { TaskConfig } from "@core/task/tools/types/TaskConfig"
-import { afterEach, describe, it } from "mocha"
+import * as workflowResolution from "@core/workflows/resolution/resolveAvailableWorkflows"
+import { afterEach, beforeEach, describe, it } from "mocha"
 import sinon from "sinon"
 import { HostProvider } from "@/hosts/host-provider"
 import { ApiFormat } from "@/shared/proto/cline/models"
@@ -65,6 +66,7 @@ function createTaskConfig(nativeToolCallEnabled: boolean): TaskConfig {
 		},
 		services: {
 			stateManager: {
+				getWorkspaceStateKey: () => undefined,
 				getGlobalSettingsKey: (key: string) => {
 					if (key === "mode") {
 						return "act"
@@ -75,6 +77,7 @@ function createTaskConfig(nativeToolCallEnabled: boolean): TaskConfig {
 					return undefined
 				},
 				getGlobalStateKey: (key: string) => (key === "nativeToolCallEnabled" ? nativeToolCallEnabled : undefined),
+				getRemoteConfigSettings: () => undefined,
 				getApiConfiguration: () => ({
 					actModeApiProvider: "anthropic",
 					planModeApiProvider: "anthropic",
@@ -142,6 +145,10 @@ function stubApiHandler(createMessage: sinon.SinonStub) {
 }
 
 describe("SubagentRunner", () => {
+	beforeEach(() => {
+		sinon.stub(workflowResolution, "resolveAvailableWorkflows").resolves([])
+	})
+
 	afterEach(() => {
 		sinon.restore()
 		HostProvider.reset()
@@ -561,6 +568,61 @@ describe("SubagentRunner", () => {
 		sinon.stub(skills, "getAvailableSkills").returns([
 			{ name: "alpha-skill", description: "Alpha", path: "/skills/alpha/SKILL.md", source: "project" },
 			{ name: "beta-skill", description: "Beta", path: "/skills/beta/SKILL.md", source: "project" },
+		])
+		stubApiHandler(createMessage)
+		initializeHostProvider()
+
+		const runner = new SubagentRunner(createTaskConfig(false))
+		const result = await runner.run("Run task", () => {})
+
+		assert.equal(result.status, "completed")
+		assert.equal(createMessage.callCount, 1)
+	})
+
+	it("includes workflow-backed activations in subagent prompt context", async () => {
+		const createMessage = sinon.stub().callsFake(async function* () {
+			yield {
+				type: "tool_calls",
+				tool_call: {
+					function: {
+						id: "toolu_subagent_workflow_context_1",
+						name: ClineDefaultTool.ATTEMPT,
+						arguments: JSON.stringify({ result: "done" }),
+					},
+				},
+			}
+		})
+
+		const promptRegistry = PromptRegistry.getInstance()
+		sinon.stub(promptRegistry, "get").callsFake(async (context) => {
+			assert.ok(context.skills)
+			assert.deepEqual(
+				context.skills.map((skill) => skill.name),
+				["alpha-skill", "address-pr-comments.md", "remote-review"],
+			)
+			promptRegistry.nativeTools = undefined
+			return "system prompt"
+		})
+		sinon.stub(SubagentBuilder.prototype, "getConfiguredSkills").returns(undefined)
+		sinon.stub(skills, "discoverSkills").resolves([])
+		sinon
+			.stub(skills, "getAvailableSkills")
+			.returns([{ name: "alpha-skill", description: "Alpha", path: "/skills/alpha/SKILL.md", source: "project" }])
+		;(workflowResolution.resolveAvailableWorkflows as sinon.SinonStub).resolves([
+			{
+				name: "address-pr-comments.md",
+				source: "local",
+				description: "Workspace workflow: address-pr-comments.md",
+				fileName: "address-pr-comments.md",
+				fullPath: "/project/.clinerules/workflows/address-pr-comments.md",
+			},
+			{
+				name: "remote-review",
+				source: "remote",
+				description: "Remote workflow: remote-review",
+				fileName: "remote-review",
+				contents: "# remote",
+			},
 		])
 		stubApiHandler(createMessage)
 		initializeHostProvider()
