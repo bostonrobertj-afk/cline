@@ -5,6 +5,7 @@ import { useCallback, useRef } from "react"
 import { useExtensionState } from "@/context/ExtensionStateContext"
 import { SlashServiceClient, TaskServiceClient } from "@/services/grpc-client"
 import type { ButtonActionType } from "../shared/buttonConfig"
+import { isPassiveThreadOpen } from "../shared/buttonConfig"
 import type { ChatState, MessageHandlers } from "../types/chatTypes"
 
 /**
@@ -12,7 +13,9 @@ import type { ChatState, MessageHandlers } from "../types/chatTypes"
  * Handles sending messages, button clicks, and task management
  */
 export function useMessageHandlers(messages: ClineMessage[], chatState: ChatState): MessageHandlers {
-	const { backgroundCommandRunning } = useExtensionState()
+	const { backgroundCommandRunning, currentTaskItem } = useExtensionState()
+	const threadDisplayState = (currentTaskItem as { threadDisplayState?: string | null } | undefined)?.threadDisplayState
+	const isPassiveThreadOpenState = isPassiveThreadOpen(threadDisplayState)
 	const {
 		setInputValue,
 		activeQuote,
@@ -97,13 +100,25 @@ export function useMessageHandlers(messages: ClineMessage[], chatState: ChatStat
 						}
 					}
 				} else if (messages.length > 0) {
-					// No clineAsk set - check if task is actively running
-					// If so, allow interrupting it with feedback
+					// No clineAsk set - check if the thread is passively open or if a task is actively running.
 					const lastMessage = messages[messages.length - 1]
+
+					if (isPassiveThreadOpenState) {
+						await TaskServiceClient.askResponse(
+							AskResponseRequest.create({
+								responseType: "messageResponse",
+								text: messageToSend,
+								images,
+								files,
+							}),
+						)
+						messageSent = true
+					}
+
 					const isTaskRunning =
 						lastMessage.partial === true || (lastMessage.type === "say" && lastMessage.say === "api_req_started")
 
-					if (isTaskRunning) {
+					if (!messageSent && isTaskRunning) {
 						// Task is running - send message as interruption/feedback
 						await TaskServiceClient.askResponse(
 							AskResponseRequest.create({
@@ -141,6 +156,7 @@ export function useMessageHandlers(messages: ClineMessage[], chatState: ChatStat
 			messages.length,
 			clineAsk,
 			activeQuote,
+			isPassiveThreadOpenState,
 			setInputValue,
 			setActiveQuote,
 			setSendingDisabled,
@@ -311,6 +327,7 @@ export function useMessageHandlers(messages: ClineMessage[], chatState: ChatStat
 			startNewTask,
 			chatState,
 			backgroundCommandRunning,
+			isPassiveThreadOpenState,
 			setSendingDisabled,
 			setEnableButtons,
 		],

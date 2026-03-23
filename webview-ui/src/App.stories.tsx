@@ -236,6 +236,13 @@ const mockStreamingMessages: ClineMessage[] = [
 	),
 ]
 
+const mockPassiveMessages: ClineMessage[] = [
+	...mockActiveMessages.slice(0, -1),
+	createMessage(2.9, "ask", undefined as any, "", { ask: "followup" as any }),
+]
+
+const mockPassiveTaskItem = { ...mockTaskHistory[0], threadDisplayState: "idle_open" } as any
+
 // Reusable state and decorator factories
 const createMockState = (overrides: any = {}) => ({
 	...useExtensionState(),
@@ -412,6 +419,22 @@ export const ActiveConversation: Story = {
 		docs: {
 			description: {
 				story: "An active conversation showing a typical interaction with Cline, including task creation, tool usage, and AI responses.",
+			},
+		},
+	},
+}
+
+export const PassiveConversationOpen: Story = {
+	decorators: [
+		createStoryDecorator({
+			clineMessages: mockPassiveMessages,
+			currentTaskItem: mockPassiveTaskItem,
+		}),
+	],
+	parameters: {
+		docs: {
+			description: {
+				story: "Shows a passively reopened thread with neutral copy, an enabled composer, and no active-task button chrome.",
 			},
 		},
 	},

@@ -3,7 +3,7 @@ import { getFollowupPresentation } from "./ChatRow"
 
 describe("ChatRow followup presentation", () => {
 	it("renders reopened followup messages as a passive thread label", () => {
-		const presentation = getFollowupPresentation(undefined)
+		const presentation = getFollowupPresentation(undefined, true)
 
 		expect(presentation.hasQuestion).to.equal(false)
 		expect(presentation.title).to.equal("Conversation reopened:")

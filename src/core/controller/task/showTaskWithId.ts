@@ -20,8 +20,8 @@ export async function showTaskWithId(controller: Controller, request: StringRequ
 
 		// We need to initialize the task before returning data
 		if (historyItem) {
-			// Reopen historical tasks in a passive follow-up state so the human can speak first
-			await controller.initTask(undefined, undefined, undefined, historyItem, undefined, "followup")
+			// Reopen historical tasks passively so opening history does not resume execution
+			await controller.initTask(undefined, undefined, undefined, historyItem, undefined, "resume", true)
 
 			// Send UI update to show the chat view
 			await sendChatButtonClickedEvent()
@@ -45,7 +45,7 @@ export async function showTaskWithId(controller: Controller, request: StringRequ
 		const { historyItem: fetchedItem } = await controller.getTaskWithId(id)
 
 		// Initialize the task with the fetched item
-		await controller.initTask(undefined, undefined, undefined, fetchedItem, undefined, "followup")
+		await controller.initTask(undefined, undefined, undefined, fetchedItem, undefined, "resume", true)
 
 		// Send UI update to show the chat view
 		await sendChatButtonClickedEvent()

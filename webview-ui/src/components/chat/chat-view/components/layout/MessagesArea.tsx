@@ -1,10 +1,12 @@
 import type { ClineMessage } from "@shared/ExtensionMessage"
+import type { HistoryItem } from "@shared/HistoryItem"
 import type React from "react"
 import { useCallback, useMemo } from "react"
 import { Virtuoso } from "react-virtuoso"
 import { StickyUserMessage } from "@/components/chat/task-header/StickyUserMessage"
 import { useExtensionState } from "@/context/ExtensionStateContext"
 import { cn } from "@/lib/utils"
+import { isPassiveThreadOpen } from "../../shared/buttonConfig"
 import type { ChatState, MessageHandlers, ScrollBehavior } from "../../types/chatTypes"
 import { isToolGroup } from "../../utils/messageUtils"
 import { createMessageRenderer } from "../messages/MessageRenderer"
@@ -30,7 +32,10 @@ export const MessagesArea: React.FC<MessagesAreaProps> = ({
 	chatState,
 	messageHandlers,
 }) => {
-	const { clineMessages } = useExtensionState()
+	const { clineMessages, currentTaskItem } = useExtensionState()
+	const threadDisplayState = (currentTaskItem as (HistoryItem & { threadDisplayState?: string | null }) | undefined)
+		?.threadDisplayState
+	const isPassiveThreadOpenState = isPassiveThreadOpen(threadDisplayState)
 	const lastRawMessage = useMemo(() => clineMessages.at(-1), [clineMessages])
 
 	const {
@@ -76,6 +81,10 @@ export const MessagesArea: React.FC<MessagesAreaProps> = ({
 	// Covers: pre-api_req_started (backend processing) AND post-api_req_started (waiting for model).
 	// Hides once reasoning, tools, text, or any other content message appears.
 	const isWaitingForResponse = useMemo(() => {
+		if (isPassiveThreadOpenState) {
+			return false
+		}
+
 		const lastMsg = modifiedMessages[modifiedMessages.length - 1]
 
 		// Never show thinking while waiting on user input (any ask state).
@@ -137,7 +146,7 @@ export const MessagesArea: React.FC<MessagesAreaProps> = ({
 			}
 		}
 		return false
-	}, [lastRawMessage, groupedMessages.length, lastVisibleMessage, lastVisibleRow, modifiedMessages])
+	}, [isPassiveThreadOpenState, lastRawMessage, groupedMessages.length, lastVisibleMessage, lastVisibleRow, modifiedMessages])
 
 	// Keep loader in the message flow (not footer). During handoff from waiting -> reasoning stream,
 	// keep the loader mounted until a real reasoning row is visible.
@@ -214,6 +223,17 @@ export const MessagesArea: React.FC<MessagesAreaProps> = ({
 					onScrollToMessage={handleScrollToUserMessage}
 				/>
 			</div>
+
+			{isPassiveThreadOpenState && (
+				<div className="px-4 pt-2 pb-1">
+					<div className="rounded-sm border border-editor-group-border bg-editor-background px-3 py-2 text-sm">
+						<div className="font-medium text-foreground">Conversation reopened</div>
+						<div className="mt-1 text-muted-foreground">
+							The composer stays enabled so you can continue the thread.
+						</div>
+					</div>
+				</div>
+			)}
 
 			<div className="grow flex" ref={scrollContainerRef}>
 				<Virtuoso

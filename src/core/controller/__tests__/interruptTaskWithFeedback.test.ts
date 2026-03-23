@@ -4,7 +4,7 @@ import sinon from "sinon"
 import { Controller } from ".."
 
 describe("Controller.interruptTaskWithFeedback", () => {
-	it("aborts the current task, reinitializes it from history, and injects the steer message into resume", async () => {
+	it("aborts the current task and restores a passive thread view for steering", async () => {
 		const interruptedTask = {
 			taskId: "task-1",
 			taskState: {
@@ -14,35 +14,23 @@ describe("Controller.interruptTaskWithFeedback", () => {
 				abandoned: false,
 			},
 			abortTask: sinon.stub().resolves(),
-		}
-
-		const resumedTask = {
-			messageStateHandler: {
-				getClineMessages: () => [{ type: "ask", ask: "followup" }],
-			},
-			handleWebviewAskResponse: sinon.stub().resolves(),
+			say: sinon.stub().resolves(),
 		}
 
 		const fakeController: {
 			cancelInProgress: boolean
 			backgroundCommandRunning: boolean
-			task: typeof interruptedTask | typeof resumedTask
+			task: typeof interruptedTask
 			updateBackgroundCommandState: sinon.SinonStub
 			getTaskWithId: sinon.SinonStub
-			initTask: sinon.SinonStub
-			stateManager: { clearTaskSettings: sinon.SinonStub }
+			openHistoricalTaskPassively: sinon.SinonStub
 		} = {
 			cancelInProgress: false,
 			backgroundCommandRunning: false,
 			task: interruptedTask,
 			updateBackgroundCommandState: sinon.stub(),
 			getTaskWithId: sinon.stub().resolves({ historyItem: { id: "task-1" } }),
-			initTask: sinon.stub().callsFake(async () => {
-				fakeController.task = resumedTask
-			}),
-			stateManager: {
-				clearTaskSettings: sinon.stub().resolves(),
-			},
+			openHistoricalTaskPassively: sinon.stub().resolves(),
 		}
 
 		await Controller.prototype.interruptTaskWithFeedback.call(
@@ -53,26 +41,16 @@ describe("Controller.interruptTaskWithFeedback", () => {
 		)
 
 		sinon.assert.calledOnce(interruptedTask.abortTask)
-		assert.equal(interruptedTask.taskState.abandoned, true)
-		sinon.assert.calledOnce(fakeController.updateBackgroundCommandState)
-		sinon.assert.calledOnce(fakeController.getTaskWithId)
-		sinon.assert.calledOnce(fakeController.stateManager.clearTaskSettings)
 		sinon.assert.calledOnceWithExactly(
-			fakeController.initTask,
-			undefined,
-			undefined,
-			undefined,
-			{ id: "task-1" },
-			undefined,
-			"followup",
-		)
-		sinon.assert.calledOnceWithExactly(
-			resumedTask.handleWebviewAskResponse,
-			"messageResponse",
+			interruptedTask.say,
+			"user_feedback",
 			"Please stop and reassess",
 			["img-1"],
 			["file-1"],
 		)
+		assert.equal(interruptedTask.taskState.abandoned, true)
+		sinon.assert.calledOnce(fakeController.updateBackgroundCommandState)
+		sinon.assert.calledOnceWithExactly(fakeController.openHistoricalTaskPassively, { id: "task-1" })
 		assert.equal(fakeController.cancelInProgress, false)
 	})
 })

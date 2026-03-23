@@ -36,6 +36,17 @@ export type Platform = "aix" | "darwin" | "freebsd" | "linux" | "openbsd" | "sun
 export const DEFAULT_PLATFORM = "unknown"
 
 export const COMMAND_CANCEL_TOKEN = "__cline_command_cancel__"
+
+export const ThreadDisplayStates = {
+	ACTIVE_RUN: "active_run",
+	AWAITING_USER_RESPONSE: "awaiting_user_response",
+	COMPLETED: "completed",
+	IDLE_OPEN: "idle_open",
+	PAUSED: "paused",
+} as const
+
+export type ThreadDisplayState = (typeof ThreadDisplayStates)[keyof typeof ThreadDisplayStates]
+
 export interface ExtensionState {
 	isNewUser: boolean
 	welcomeViewCompleted: boolean
@@ -49,6 +60,7 @@ export interface ExtensionState {
 	checkpointManagerErrorMessage?: string
 	clineMessages: ClineMessage[]
 	currentTaskItem?: HistoryItem
+	threadDisplayState?: ThreadDisplayState
 	currentFocusChainChecklist?: string | null
 	mcpMarketplaceEnabled?: boolean
 	mcpDisplayMode: McpDisplayMode
@@ -118,6 +130,7 @@ export interface ClineMessage {
 	type: "ask" | "say"
 	ask?: ClineAsk
 	say?: ClineSay
+	threadDisplayState?: ThreadDisplayState
 	text?: string
 	reasoning?: string
 	images?: string[]

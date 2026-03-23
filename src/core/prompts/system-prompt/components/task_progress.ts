@@ -43,6 +43,7 @@ The current checklist is backend-managed for an active workflow.
 
 - Human-authored input: the latest user request, feedback, or steer instruction.
 - System-generated context: the backend-managed workflow checklist and phase progress below.
+- Treat the checklist as runtime context, not as a user-authored question or a resume prompt.
 - Do not create a new checklist.
 - Do not rewrite checklist items manually.
 - Use the complete_workflow_item tool to mark the current workflow item complete.

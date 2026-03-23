@@ -6,7 +6,7 @@ import { Controller } from ".."
 import { showTaskWithId } from "./showTaskWithId"
 
 describe("controller/task/showTaskWithId", () => {
-	it("reopens a task from in-memory history in followup mode", async () => {
+	it("reopens a task from in-memory history passively", async () => {
 		const controller = {
 			stateManager: {
 				getGlobalStateKey: sinon.stub().returns([{ id: "task-1", task: "Saved task" }]),
@@ -24,13 +24,14 @@ describe("controller/task/showTaskWithId", () => {
 			undefined,
 			{ id: "task-1", task: "Saved task" },
 			undefined,
-			"followup",
+			"resume",
+			true,
 		)
 		assert.equal(response.id, "task-1")
 		assert.equal(response.task, "Saved task")
 	})
 
-	it("reopens a task fetched from storage in followup mode", async () => {
+	it("reopens a task fetched from storage passively", async () => {
 		const controller = {
 			stateManager: {
 				getGlobalStateKey: sinon.stub().returns([]),
@@ -52,7 +53,8 @@ describe("controller/task/showTaskWithId", () => {
 			undefined,
 			{ id: "task-2", task: "Fetched task" },
 			undefined,
-			"followup",
+			"resume",
+			true,
 		)
 		assert.equal(response.id, "task-2")
 		assert.equal(response.task, "Fetched task")

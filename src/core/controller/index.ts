@@ -10,7 +10,7 @@ import { ClineAccountService } from "@services/account/ClineAccountService"
 import { McpHub } from "@services/mcp/McpHub"
 import type { ApiProvider, ModelInfo } from "@shared/api"
 import type { ChatContent } from "@shared/ChatContent"
-import type { ExtensionState, Platform } from "@shared/ExtensionMessage"
+import type { ClineMessage, ExtensionState, Platform } from "@shared/ExtensionMessage"
 import type { HistoryItem } from "@shared/HistoryItem"
 import type { McpMarketplaceCatalog, McpMarketplaceItem } from "@shared/mcp"
 import { type Settings } from "@shared/storage/state-keys"
@@ -234,6 +234,7 @@ export class Controller {
 		historyItem?: HistoryItem,
 		taskSettings?: Partial<Settings>,
 		historyOpenMode: "resume" | "followup" = "resume",
+		openPassively = false,
 	) {
 		// Fire-and-forget: We intentionally don't await fetchRemoteConfig here.
 		// Remote config is already fetched in startRemoteConfigTimer() which runs in the constructor,
@@ -328,7 +329,11 @@ export class Controller {
 		})
 
 		if (historyItem) {
-			this.task.resumeTaskFromHistory(historyOpenMode)
+			if (openPassively) {
+				await this.openHistoricalTaskPassively(historyItem)
+			} else {
+				this.task.resumeTaskFromHistory(historyOpenMode)
+			}
 		} else if (task || images || files) {
 			this.task.startTask(task, images, files)
 		}
@@ -341,6 +346,51 @@ export class Controller {
 		if (history) {
 			await this.initTask(undefined, undefined, undefined, history.historyItem)
 		}
+	}
+
+	private async openHistoricalTaskPassively(historyItem: HistoryItem) {
+		if (!this.task) {
+			return
+		}
+
+		let apiConversationHistory = this.task.messageStateHandler.getApiConversationHistory()
+		let clineMessages = this.task.messageStateHandler.getClineMessages()
+		let uiMessagesFilePath: string | undefined
+
+		try {
+			const taskData = await this.getTaskWithId(historyItem.id)
+			apiConversationHistory = taskData.apiConversationHistory
+			uiMessagesFilePath = taskData.uiMessagesFilePath
+		} catch (error) {
+			if (this.task.taskId !== historyItem.id) {
+				throw error
+			}
+			Logger.log(`[Controller] Falling back to in-memory task state for passive open of ${historyItem.id}`)
+		}
+
+		if (uiMessagesFilePath && (await fileExistsAtPath(uiMessagesFilePath))) {
+			try {
+				clineMessages = JSON.parse(await fs.readFile(uiMessagesFilePath, "utf8")) as ClineMessage[]
+			} catch (error) {
+				Logger.error(`[Controller] Failed to load passive thread messages for task ${historyItem.id}:`, error)
+			}
+		}
+
+		this.task.messageStateHandler.setApiConversationHistory(apiConversationHistory)
+		this.task.messageStateHandler.setClineMessages(clineMessages)
+		this.task.taskState.isInitialized = true
+		this.task.taskState.abort = false
+		this.task.taskState.abandoned = false
+		this.task.taskState.isStreaming = false
+		this.task.taskState.isWaitingForFirstChunk = false
+		this.task.taskState.didFinishAbortingStream = false
+		this.task.taskState.askResponse = undefined
+		this.task.taskState.askResponseText = undefined
+		this.task.taskState.askResponseImages = undefined
+		this.task.taskState.askResponseFiles = undefined
+		this.task.taskState.lastMessageTs = clineMessages.at(-1)?.ts
+
+		await this.postStateToWebview()
 	}
 
 	async updateTelemetrySetting(telemetrySetting: TelemetrySetting) {
@@ -464,23 +514,14 @@ export class Controller {
 				this.task.taskState.abandoned = true
 			}
 
-			// NOW try to get history after abort has finished (hook may have saved messages)
-			try {
-				const { historyItem } = await this.getTaskWithId(this.task.taskId)
-
-				if (preserveThreadVisible && historyItem) {
-					if (this.task) {
-						await this.stateManager.clearTaskSettings()
-						this.task = undefined
-					}
-
-					await this.initTask(undefined, undefined, undefined, historyItem, undefined, "followup")
+			if (preserveThreadVisible) {
+				try {
+					await this.openHistoricalTaskPassively({ id: this.task.taskId } as HistoryItem)
 					return
+				} catch (error) {
+					// Task not in history yet (new task with no messages); continue with the neutral fallback below.
+					Logger.log(`[Controller.cancelTask] Failed to preserve visible thread: ${error}`)
 				}
-			} catch (error) {
-				// Task not in history yet (new task with no messages); catch the
-				// error to enable the agent to continue making progress.
-				Logger.log(`[Controller.cancelTask] Task not found in history: ${error}`)
 			}
 
 			// After an explicit cancel, leave the UI in a neutral state so the user can type
@@ -518,6 +559,9 @@ export class Controller {
 
 		try {
 			this.updateBackgroundCommandState(false)
+			if (text || (images && images.length > 0) || (files && files.length > 0)) {
+				await interruptedTask.say("user_feedback", text, images, files)
+			}
 			interruptedTask.taskState.abandoned = true
 
 			try {
@@ -539,29 +583,9 @@ export class Controller {
 			})
 
 			if (this.task === interruptedTask) {
-				await this.stateManager.clearTaskSettings()
-				this.task = undefined
-			}
-
-			const { historyItem } = await this.getTaskWithId(interruptedTaskId)
-			await this.initTask(undefined, undefined, undefined, historyItem, undefined, "followup")
-
-			const resumedTask = this.task
-			if (!resumedTask) {
+				await this.openHistoricalTaskPassively({ id: interruptedTaskId } as HistoryItem)
 				return
 			}
-
-			await pWaitFor(
-				() => {
-					const lastMessage = resumedTask.messageStateHandler.getClineMessages().at(-1)
-					return lastMessage?.type === "ask" && lastMessage.ask === "followup"
-				},
-				{
-					timeout: 3_000,
-				},
-			)
-
-			await resumedTask.handleWebviewAskResponse("messageResponse", text, images, files)
 		} catch (error) {
 			Logger.error("[Controller.interruptTaskWithFeedback] Failed to steer active task", error)
 		} finally {
@@ -971,7 +995,15 @@ export class Controller {
 		const localAgentsRulesToggles = this.stateManager.getWorkspaceStateKey("localAgentsRulesToggles")
 		const workflowToggles = this.stateManager.getWorkspaceStateKey("workflowToggles")
 
-		const currentTaskItem = this.task?.taskId ? (taskHistory || []).find((item) => item.id === this.task?.taskId) : undefined
+		const currentTaskHistoryItem = this.task?.taskId
+			? (taskHistory || []).find((item) => item.id === this.task?.taskId)
+			: undefined
+		const currentTaskItem = this.task?.taskId
+			? ({
+					...currentTaskHistoryItem,
+					threadDisplayState: this.task.getThreadDisplayState(),
+				} as HistoryItem & { threadDisplayState: string })
+			: undefined
 		// Spread to create new array reference - React needs this to detect changes in useEffect dependencies
 		const clineMessages = [...(this.task?.messageStateHandler.getClineMessages() || [])]
 		const checkpointManagerErrorMessage = this.task?.taskState.checkpointManagerErrorMessage
@@ -1047,6 +1079,7 @@ export class Controller {
 			favoritedModelIds,
 			backgroundCommandRunning: this.backgroundCommandRunning,
 			backgroundCommandTaskId: this.backgroundCommandTaskId,
+			threadDisplayState: this.task?.getThreadDisplayState(),
 			// NEW: Add workspace information
 			workspaceRoots: this.workspaceManager?.getRoots() ?? [],
 			primaryRootIndex: this.workspaceManager?.getPrimaryIndex() ?? 0,

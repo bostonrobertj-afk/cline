@@ -1,6 +1,6 @@
 import type { ClineMessage } from "@shared/ExtensionMessage"
 import { describe, expect, it } from "vitest"
-import { BUTTON_CONFIGS, getButtonConfig } from "./buttonConfig"
+import { BUTTON_CONFIGS, getButtonConfig, PASSIVE_THREAD_DISPLAY_STATE } from "./buttonConfig"
 
 describe("getButtonConfig", () => {
 	// Test default behavior
@@ -34,6 +34,20 @@ describe("getButtonConfig", () => {
 		expect(config.primaryText).toBe("Steer")
 		expect(config.primaryAction).toBe("steer")
 		expect(config.secondaryText).toBe("Cancel")
+	})
+
+	it("returns the default footer config for passive-open threads", () => {
+		const passiveMessage: ClineMessage = {
+			type: "say",
+			say: "text",
+			ts: Date.now(),
+		}
+
+		const config = getButtonConfig(passiveMessage, "act", PASSIVE_THREAD_DISPLAY_STATE)
+
+		expect(config).toEqual(BUTTON_CONFIGS.default)
+		expect(config.sendingDisabled).toBe(false)
+		expect(config.enableButtons).toBe(false)
 	})
 
 	// Test error recovery states

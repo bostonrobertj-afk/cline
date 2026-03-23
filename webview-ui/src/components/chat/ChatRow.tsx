@@ -51,6 +51,7 @@ import { findMatchingResourceOrTemplate, getMcpServerDisplayName } from "@/utils
 import CodeAccordian, { cleanPathPrefix } from "../common/CodeAccordian"
 import { CommandOutputContent, CommandOutputRow } from "./CommandOutputRow"
 import { CompletionOutputRow } from "./CompletionOutputRow"
+import { isPassiveThreadOpen } from "./chat-view/shared/buttonConfig"
 import { DiffEditRow } from "./DiffEditRow"
 import ErrorRow from "./ErrorRow"
 import { FeatureTip } from "./FeatureTip"
@@ -97,7 +98,7 @@ interface ChatRowContentProps extends Omit<ChatRowProps, "onHeightChange"> {}
 export const ProgressIndicator = () => <LoaderCircleIcon className="size-2 mr-2 animate-spin" />
 const InvisibleSpacer = () => <div aria-hidden className="h-px" />
 
-export const getFollowupPresentation = (messageText?: string) => {
+export const getFollowupPresentation = (messageText?: string, isPassiveThreadOpenState = false) => {
 	let question: string | undefined
 	let options: string[] | undefined
 	let selected: string | undefined
@@ -111,7 +112,7 @@ export const getFollowupPresentation = (messageText?: string) => {
 		question = messageText
 	}
 
-	const hasQuestion = !!question?.trim()
+	const hasQuestion = !isPassiveThreadOpenState && !!question?.trim()
 
 	return {
 		question,
@@ -177,6 +178,7 @@ export const ChatRowContent = memo(
 			backgroundEditEnabled,
 			mcpServers,
 			mcpMarketplaceCatalog,
+			currentTaskItem,
 			onRelinquishControl,
 			vscodeTerminalExecutionMode,
 			clineMessages,
@@ -190,6 +192,8 @@ export const ChatRowContent = memo(
 			selectedText: "",
 		})
 		const contentRef = useRef<HTMLDivElement>(null)
+		const threadDisplayState = (currentTaskItem as { threadDisplayState?: string | null } | undefined)?.threadDisplayState
+		const isPassiveThreadOpenState = isPassiveThreadOpen(threadDisplayState)
 
 		// Command output expansion state (for all messages, but only used by command messages)
 		const [isOutputFullyExpanded, setIsOutputFullyExpanded] = useState(false)
@@ -334,7 +338,10 @@ export const ChatRowContent = memo(
 			}, 0) // Delay of 0ms pushes execution after current event cycle
 		}, []) // Dependencies remain empty
 
-		const followupPresentation = useMemo(() => getFollowupPresentation(message.text), [message.text])
+		const followupPresentation = useMemo(
+			() => getFollowupPresentation(message.text, isPassiveThreadOpenState),
+			[message.text, isPassiveThreadOpenState],
+		)
 
 		const [icon, title] = useMemo(() => {
 			switch (type) {
@@ -380,7 +387,11 @@ export const ChatRowContent = memo(
 					return [null, null]
 				case "followup":
 					return [
-						<span className="codicon codicon-question text-foreground mb-[-1.5px]" />,
+						followupPresentation.hasQuestion ? (
+							<span className="codicon codicon-question text-foreground mb-[-1.5px]" />
+						) : (
+							<BellIcon className="text-foreground size-2" />
+						),
 						<span className="font-bold text-foreground">{followupPresentation.title}</span>,
 					]
 				default:
@@ -395,6 +406,7 @@ export const ChatRowContent = memo(
 			apiReqCancelReason,
 			isMcpServerResponding,
 			message.text,
+			followupPresentation.hasQuestion,
 			followupPresentation.title,
 		])
 
@@ -989,11 +1001,7 @@ export const ChatRowContent = memo(
 						// Check if generation was interrupted:
 						// 1. If status is "generating" but this isn't the last message, it was interrupted
 						// 2. If status is "generating" and lastModifiedMessage is a resume ask, task was just cancelled
-						const wasCancelled =
-							explanationInfo.status === "generating" &&
-							(!isLast ||
-								lastModifiedMessage?.ask === "resume_task" ||
-								lastModifiedMessage?.ask === "resume_completed_task")
+						const wasCancelled = explanationInfo.status === "generating" && (!isLast || isPassiveThreadOpenState)
 						const isGenerating = explanationInfo.status === "generating" && !wasCancelled
 						const isError = explanationInfo.status === "error"
 						return (
@@ -1251,9 +1259,7 @@ export const ChatRowContent = memo(
 										</div>
 									</>
 								) : (
-									<div className="pt-1 text-muted-foreground">
-										Conversation reopened and waiting for your input.
-									</div>
+									<div className="pt-1 text-muted-foreground">Conversation reopened.</div>
 								)}
 							</div>
 						)

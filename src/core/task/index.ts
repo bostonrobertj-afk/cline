@@ -55,7 +55,14 @@ import { featureFlagsService } from "@services/feature-flags"
 import { McpHub } from "@services/mcp/McpHub"
 import { ApiConfiguration } from "@shared/api"
 import { findLastIndex } from "@shared/array"
-import { ClineApiReqCancelReason, ClineApiReqInfo, ClineAsk, ClineSay } from "@shared/ExtensionMessage"
+import {
+	ClineApiReqCancelReason,
+	ClineApiReqInfo,
+	ClineAsk,
+	ClineSay,
+	ThreadDisplayState,
+	ThreadDisplayStates,
+} from "@shared/ExtensionMessage"
 import { HistoryItem } from "@shared/HistoryItem"
 import { DEFAULT_LANGUAGE_SETTINGS, getLanguageKey, LanguageDisplay } from "@shared/Languages"
 import { convertClineMessageToProto } from "@shared/proto-conversions/cline-message"
@@ -156,6 +163,14 @@ export function shouldIncludePersistentPromptContext(taskState: Pick<TaskState, 
 	return !!taskState.activeAgentId || !!taskState.activeWorkflowId
 }
 
+export function isActiveThreadDisplayState(threadDisplayState: ThreadDisplayState): boolean {
+	return threadDisplayState === ThreadDisplayStates.ACTIVE_RUN
+}
+
+export function isPassiveThreadDisplayState(threadDisplayState: ThreadDisplayState): boolean {
+	return threadDisplayState === ThreadDisplayStates.IDLE_OPEN || threadDisplayState === ThreadDisplayStates.PAUSED
+}
+
 export class Task {
 	// Core task variables
 	readonly taskId: string
@@ -165,6 +180,7 @@ export class Task {
 	private taskInitializationStartTime: number
 
 	taskState: TaskState
+	private threadDisplayState: ThreadDisplayState = ThreadDisplayStates.IDLE_OPEN
 
 	// ONE mutex for ALL state modifications to prevent race conditions
 	private stateMutex = new Mutex()
@@ -208,6 +224,22 @@ export class Task {
 		return await this.withStateLock(() => {
 			return this.taskState.activeHookExecution
 		})
+	}
+
+	public getThreadDisplayState(): ThreadDisplayState {
+		return this.threadDisplayState
+	}
+
+	private setThreadDisplayState(threadDisplayState: ThreadDisplayState): void {
+		this.threadDisplayState = threadDisplayState
+	}
+
+	private getThreadDisplayStateForAsk(type: ClineAsk): ThreadDisplayState {
+		if (type === "completion_result") {
+			return ThreadDisplayStates.COMPLETED
+		}
+
+		return ThreadDisplayStates.AWAITING_USER_RESPONSE
 	}
 
 	// Core dependencies
@@ -586,6 +618,7 @@ export class Task {
 		type: ClineAsk,
 		text?: string,
 		partial?: boolean,
+		threadDisplayState?: ThreadDisplayState,
 	): Promise<{
 		response: ClineAskResponse
 		text?: string
@@ -625,10 +658,12 @@ export class Task {
 				// this.askResponseImages = undefined
 				askTs = Date.now()
 				this.taskState.lastMessageTs = askTs
+				this.setThreadDisplayState(threadDisplayState ?? this.getThreadDisplayStateForAsk(type))
 				await this.messageStateHandler.addToClineMessages({
 					ts: askTs,
 					type: "ask",
 					ask: type,
+					threadDisplayState: this.threadDisplayState,
 					text,
 					partial,
 				})
@@ -667,10 +702,12 @@ export class Task {
 				this.taskState.askResponseFiles = undefined
 				askTs = Date.now()
 				this.taskState.lastMessageTs = askTs
+				this.setThreadDisplayState(threadDisplayState ?? this.getThreadDisplayStateForAsk(type))
 				await this.messageStateHandler.addToClineMessages({
 					ts: askTs,
 					type: "ask",
 					ask: type,
+					threadDisplayState: this.threadDisplayState,
 					text,
 				})
 				await this.postStateToWebview()
@@ -684,10 +721,12 @@ export class Task {
 			this.taskState.askResponseFiles = undefined
 			askTs = Date.now()
 			this.taskState.lastMessageTs = askTs
+			this.setThreadDisplayState(threadDisplayState ?? this.getThreadDisplayStateForAsk(type))
 			await this.messageStateHandler.addToClineMessages({
 				ts: askTs,
 				type: "ask",
 				ask: type,
+				threadDisplayState: this.threadDisplayState,
 				text,
 			})
 			await this.postStateToWebview()
@@ -807,6 +846,7 @@ export class Task {
 					ts: sayTs,
 					type: "say",
 					say: type,
+					threadDisplayState: this.threadDisplayState,
 					text,
 					images,
 					files,
@@ -841,6 +881,7 @@ export class Task {
 				ts: sayTs,
 				type: "say",
 				say: type,
+				threadDisplayState: this.threadDisplayState,
 				text,
 				images,
 				files,
@@ -856,6 +897,7 @@ export class Task {
 			ts: sayTs,
 			type: "say",
 			say: type,
+			threadDisplayState: this.threadDisplayState,
 			text,
 			images,
 			files,
@@ -1226,6 +1268,7 @@ export class Task {
 		// if the extension process were killed, then on restart the clineMessages might not be empty, so we need to set it to [] when we create a new Cline client (otherwise webview would show stale messages from previous session)
 		this.messageStateHandler.setClineMessages([])
 		this.messageStateHandler.setApiConversationHistory([])
+		this.threadDisplayState = ThreadDisplayStates.ACTIVE_RUN
 
 		await this.postStateToWebview()
 
@@ -1403,7 +1446,9 @@ export class Task {
 			await this.refreshManagedWorkflowChecklistProjection()
 		}
 
-		const { response, text, images, files } = await this.ask(askType) // calls poststatetowebview
+		const threadDisplayState =
+			openMode === "followup" ? ThreadDisplayStates.AWAITING_USER_RESPONSE : ThreadDisplayStates.IDLE_OPEN
+		const { response, text, images, files } = await this.ask(askType, undefined, undefined, threadDisplayState) // calls poststatetowebview
 
 		// Initialize newUserContent array for hook context
 		const newUserContent: ClineContent[] = []
@@ -1620,6 +1665,7 @@ export class Task {
 	private async initiateTaskLoop(userContent: ClineContent[]): Promise<void> {
 		let nextUserContent = userContent
 		let includeFileDetails = true
+		this.threadDisplayState = ThreadDisplayStates.ACTIVE_RUN
 		while (!this.taskState.abort) {
 			const didEndLoop = await this.recursivelyMakeClineRequests(nextUserContent, includeFileDetails)
 			includeFileDetails = false // we only need file details the first time
@@ -1675,6 +1721,10 @@ export class Task {
 		}
 
 		// Check if we're at a button-only state (no active work, just waiting for user action)
+		if (isPassiveThreadDisplayState(this.threadDisplayState)) {
+			return false
+		}
+
 		const clineMessages = this.messageStateHandler.getClineMessages()
 		const lastMessage = clineMessages.at(-1)
 		const isAtButtonOnlyState =
@@ -1709,6 +1759,7 @@ export class Task {
 			// This must happen before canceling hooks so that hook catch blocks
 			// can properly detect the abort state
 			this.taskState.abort = true
+			this.threadDisplayState = ThreadDisplayStates.PAUSED
 
 			// PHASE 3: Cancel any running hook execution
 			const activeHook = await this.getActiveHookExecution()
@@ -1831,6 +1882,7 @@ export class Task {
 
 			// Final state update to notify UI that abort is complete
 			try {
+				this.threadDisplayState = ThreadDisplayStates.IDLE_OPEN
 				await this.postStateToWebview()
 			} catch (error) {
 				Logger.error("Failed to post final state after abort", error)

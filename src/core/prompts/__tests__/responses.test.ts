@@ -11,7 +11,7 @@ describe("formatResponse user input framing", () => {
 		expect(framed).to.contain("<task>\nReview this story\n</task>")
 	})
 
-	it("renders resumed human input before system-generated context", () => {
+	it("renders reopened-thread copy without synthetic resume framing", () => {
 		const [taskResumptionMessage, userResponseMessage] = formatResponse.taskResumption(
 			"act",
 			"just now",
@@ -22,7 +22,10 @@ describe("formatResponse user input framing", () => {
 		)
 
 		expect(userResponseMessage).to.contain("[LATEST HUMAN USER INPUT]")
+		expect(userResponseMessage).to.contain("Latest human-authored input for the reopened thread")
 		expect(taskResumptionMessage).to.contain("[SYSTEM-GENERATED CONTEXT]")
+		expect(taskResumptionMessage).to.contain("[CONVERSATION REOPENED]")
+		expect(taskResumptionMessage).to.not.contain("[TASK RESUMPTION]")
 	})
 })
 

@@ -26,6 +26,12 @@ export interface ButtonConfig {
 	secondaryAction?: ButtonActionType
 }
 
+export const PASSIVE_THREAD_DISPLAY_STATE = "idle_open"
+
+export function isPassiveThreadOpen(threadDisplayState?: string | null): boolean {
+	return threadDisplayState === PASSIVE_THREAD_DISPLAY_STATE
+}
+
 /**
  * Centralized button state configurations based on task lifecycle
  * This is the single source of truth for both button display and actions
@@ -214,8 +220,16 @@ const errorTypes = ["api_req_failed", "mistake_limit_reached"]
  * Determines button configuration based on message type and state
  * This is the single source of truth used by both ActionButtons and useMessageHandlers
  */
-export function getButtonConfig(message: ClineMessage | undefined, _mode: Mode = "act"): ButtonConfig {
+export function getButtonConfig(
+	message: ClineMessage | undefined,
+	_mode: Mode = "act",
+	threadDisplayState?: string | null,
+): ButtonConfig {
 	if (!message) {
+		return BUTTON_CONFIGS.default
+	}
+
+	if (isPassiveThreadOpen(threadDisplayState)) {
 		return BUTTON_CONFIGS.default
 	}
 

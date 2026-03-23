@@ -4,7 +4,8 @@ import { VSCodeButton } from "@vscode/webview-ui-toolkit/react"
 import type React from "react"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { VirtuosoHandle } from "react-virtuoso"
-import { ButtonActionType, getButtonConfig } from "../../shared/buttonConfig"
+import { useExtensionState } from "@/context/ExtensionStateContext"
+import { ButtonActionType, getButtonConfig, isPassiveThreadOpen } from "../../shared/buttonConfig"
 import type { ChatState, MessageHandlers } from "../../types/chatTypes"
 
 interface ActionButtonsProps {
@@ -32,6 +33,9 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
 	messageHandlers,
 	scrollBehavior,
 }) => {
+	const { currentTaskItem } = useExtensionState()
+	const threadDisplayState = (currentTaskItem as { threadDisplayState?: string | null } | undefined)?.threadDisplayState
+	const isPassiveThreadOpenState = isPassiveThreadOpen(threadDisplayState)
 	const { inputValue, selectedImages, selectedFiles, setSendingDisabled } = chatState
 	const [isProcessing, setIsProcessing] = useState(false)
 
@@ -43,8 +47,10 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
 
 	// Memoize button configuration to avoid recalculation on every render
 	const buttonConfig = useMemo(() => {
-		return lastMessage ? getButtonConfig(lastMessage, mode) : { sendingDisabled: false, enableButtons: false }
-	}, [lastMessage, mode])
+		return lastMessage
+			? getButtonConfig(lastMessage, mode, threadDisplayState)
+			: { sendingDisabled: false, enableButtons: false }
+	}, [lastMessage, mode, threadDisplayState])
 
 	// Single effect to handle all configuration updates
 	useEffect(() => {
@@ -101,7 +107,7 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
 	const { showScrollToBottom, scrollToBottomSmooth, disableAutoScrollRef } = scrollBehavior
 
 	const { primaryText, secondaryText, primaryAction, secondaryAction, enableButtons } = buttonConfig
-	const hasButtons = primaryText || secondaryText
+	const hasButtons = !isPassiveThreadOpenState && (primaryText || secondaryText)
 	const isStreaming = task.partial === true
 	const canInteract = enableButtons && !isProcessing
 

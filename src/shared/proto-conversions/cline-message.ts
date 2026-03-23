@@ -1,5 +1,16 @@
-import { ClineAsk as AppClineAsk, ClineMessage as AppClineMessage, ClineSay as AppClineSay } from "@shared/ExtensionMessage"
-import { ClineAsk, ClineMessageType, ClineSay, ClineMessage as ProtoClineMessage } from "@shared/proto/cline/ui"
+import {
+	ClineAsk as AppClineAsk,
+	ClineMessage as AppClineMessage,
+	ClineSay as AppClineSay,
+	ThreadDisplayState as AppThreadDisplayState,
+} from "@shared/ExtensionMessage"
+import {
+	ClineAsk,
+	ClineMessageType,
+	ClineSay,
+	ClineMessage as ProtoClineMessage,
+	ThreadDisplayState as ProtoThreadDisplayState,
+} from "@shared/proto/cline/ui"
 
 // Helper function to convert ClineAsk string to enum
 function convertClineAskToProtoEnum(ask: AppClineAsk | undefined): ClineAsk | undefined {
@@ -62,6 +73,51 @@ function convertProtoEnumToClineAsk(ask: ClineAsk): AppClineAsk | undefined {
 	}
 
 	return mapping[ask]
+}
+
+function convertClineThreadDisplayStateToProtoEnum(
+	threadDisplayState: AppThreadDisplayState | undefined,
+): ProtoThreadDisplayState | undefined {
+	if (!threadDisplayState) {
+		return undefined
+	}
+
+	const mapping: Record<AppThreadDisplayState, ProtoThreadDisplayState> = {
+		active_run: ProtoThreadDisplayState.ACTIVE_RUN,
+		awaiting_user_response: ProtoThreadDisplayState.AWAITING_USER_RESPONSE,
+		completed: ProtoThreadDisplayState.COMPLETED,
+		idle_open: ProtoThreadDisplayState.IDLE_OPEN,
+		paused: ProtoThreadDisplayState.PAUSED,
+	}
+
+	return mapping[threadDisplayState]
+}
+
+function convertProtoThreadDisplayStateToCline(threadDisplayState: ProtoThreadDisplayState): AppThreadDisplayState | undefined {
+	if (
+		threadDisplayState === ProtoThreadDisplayState.UNRECOGNIZED ||
+		threadDisplayState === ProtoThreadDisplayState.UNSPECIFIED
+	) {
+		return undefined
+	}
+
+	const mapping: Record<
+		Exclude<ProtoThreadDisplayState, ProtoThreadDisplayState.UNRECOGNIZED | ProtoThreadDisplayState.UNSPECIFIED>,
+		AppThreadDisplayState
+	> = {
+		[ProtoThreadDisplayState.ACTIVE_RUN]: "active_run",
+		[ProtoThreadDisplayState.AWAITING_USER_RESPONSE]: "awaiting_user_response",
+		[ProtoThreadDisplayState.COMPLETED]: "completed",
+		[ProtoThreadDisplayState.IDLE_OPEN]: "idle_open",
+		[ProtoThreadDisplayState.PAUSED]: "paused",
+	}
+
+	return mapping[
+		threadDisplayState as Exclude<
+			ProtoThreadDisplayState,
+			ProtoThreadDisplayState.UNRECOGNIZED | ProtoThreadDisplayState.UNSPECIFIED
+		>
+	]
 }
 
 // Helper function to convert ClineSay string to enum
@@ -188,6 +244,7 @@ export function convertClineMessageToProto(message: AppClineMessage): ProtoCline
 		type: message.type === "ask" ? ClineMessageType.ASK : ClineMessageType.SAY,
 		ask: finalAskEnum,
 		say: finalSayEnum,
+		threadDisplayState: convertClineThreadDisplayStateToProtoEnum(message.threadDisplayState),
 		text: message.text ?? "",
 		reasoning: message.reasoning ?? "",
 		images: message.images ?? [],
@@ -255,6 +312,12 @@ export function convertProtoToClineMessage(protoMessage: ProtoClineMessage): App
 	}
 	if (protoMessage.files.length > 0) {
 		message.files = protoMessage.files
+	}
+	if (protoMessage.threadDisplayState !== undefined) {
+		const threadDisplayState = convertProtoThreadDisplayStateToCline(protoMessage.threadDisplayState)
+		if (threadDisplayState !== undefined) {
+			message.threadDisplayState = threadDisplayState
+		}
 	}
 	if (protoMessage.partial) {
 		message.partial = protoMessage.partial

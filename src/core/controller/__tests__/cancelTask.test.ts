@@ -4,7 +4,7 @@ import sinon from "sinon"
 import { Controller } from ".."
 
 describe("Controller.cancelTask", () => {
-	it("clears the active task after cancellation instead of reinitializing a resume prompt", async () => {
+	it("clears the active task after cancellation when thread visibility is not requested", async () => {
 		const fakeController = {
 			cancelInProgress: false,
 			task: {
@@ -34,7 +34,7 @@ describe("Controller.cancelTask", () => {
 		assert.equal(fakeController.cancelInProgress, false)
 	})
 
-	it("reopens the cancelled task in followup mode when preserveThreadVisible is true", async () => {
+	it("keeps the cancelled task visible by hydrating passive history when preserveThreadVisible is true", async () => {
 		const activeTask = {
 			taskId: "task-1",
 			taskState: {
@@ -50,28 +50,16 @@ describe("Controller.cancelTask", () => {
 			task: activeTask,
 			updateBackgroundCommandState: sinon.stub(),
 			getTaskWithId: sinon.stub().resolves({ historyItem: { id: "task-1" } }),
-			initTask: sinon.stub().resolves(),
+			openHistoricalTaskPassively: sinon.stub().resolves(),
 			clearTask: sinon.stub().resolves(),
 			postStateToWebview: sinon.stub().resolves(),
-			stateManager: {
-				clearTaskSettings: sinon.stub().resolves(),
-			},
 		}
 
 		await Controller.prototype.cancelTask.call(fakeController, true)
 
 		sinon.assert.calledOnce(activeTask.abortTask)
-		sinon.assert.calledOnce(fakeController.stateManager.clearTaskSettings)
 		sinon.assert.notCalled(fakeController.clearTask)
-		sinon.assert.calledOnceWithExactly(
-			fakeController.initTask,
-			undefined,
-			undefined,
-			undefined,
-			{ id: "task-1" },
-			undefined,
-			"followup",
-		)
+		sinon.assert.calledOnceWithExactly(fakeController.openHistoricalTaskPassively, { id: "task-1" })
 		sinon.assert.notCalled(fakeController.postStateToWebview)
 		assert.equal(fakeController.cancelInProgress, false)
 	})
