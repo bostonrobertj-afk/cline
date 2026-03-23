@@ -51,6 +51,7 @@ import { findMatchingResourceOrTemplate, getMcpServerDisplayName } from "@/utils
 import CodeAccordian, { cleanPathPrefix } from "../common/CodeAccordian"
 import { CommandOutputContent, CommandOutputRow } from "./CommandOutputRow"
 import { CompletionOutputRow } from "./CompletionOutputRow"
+import { getActiveAssistantName } from "./chat-view/shared/assistantName"
 import { isPassiveThreadOpen } from "./chat-view/shared/buttonConfig"
 import { DiffEditRow } from "./DiffEditRow"
 import ErrorRow from "./ErrorRow"
@@ -98,7 +99,7 @@ interface ChatRowContentProps extends Omit<ChatRowProps, "onHeightChange"> {}
 export const ProgressIndicator = () => <LoaderCircleIcon className="size-2 mr-2 animate-spin" />
 const InvisibleSpacer = () => <div aria-hidden className="h-px" />
 
-export const getFollowupPresentation = (messageText?: string, isPassiveThreadOpenState = false) => {
+export const getFollowupPresentation = (messageText?: string, isPassiveThreadOpenState = false, assistantName = "Cline") => {
 	let question: string | undefined
 	let options: string[] | undefined
 	let selected: string | undefined
@@ -119,7 +120,7 @@ export const getFollowupPresentation = (messageText?: string, isPassiveThreadOpe
 		options,
 		selected,
 		hasQuestion,
-		title: hasQuestion ? "Cline has a question:" : "Conversation reopened:",
+		title: hasQuestion ? `${assistantName} has a question:` : "Conversation reopened:",
 	}
 }
 
@@ -194,6 +195,7 @@ export const ChatRowContent = memo(
 		const contentRef = useRef<HTMLDivElement>(null)
 		const threadDisplayState = (currentTaskItem as { threadDisplayState?: string | null } | undefined)?.threadDisplayState
 		const isPassiveThreadOpenState = isPassiveThreadOpen(threadDisplayState)
+		const assistantName = getActiveAssistantName(currentTaskItem)
 
 		// Command output expansion state (for all messages, but only used by command messages)
 		const [isOutputFullyExpanded, setIsOutputFullyExpanded] = useState(false)
@@ -339,8 +341,8 @@ export const ChatRowContent = memo(
 		}, []) // Dependencies remain empty
 
 		const followupPresentation = useMemo(
-			() => getFollowupPresentation(message.text, isPassiveThreadOpenState),
-			[message.text, isPassiveThreadOpenState],
+			() => getFollowupPresentation(message.text, isPassiveThreadOpenState, assistantName),
+			[assistantName, message.text, isPassiveThreadOpenState],
 		)
 
 		const [icon, title] = useMemo(() => {

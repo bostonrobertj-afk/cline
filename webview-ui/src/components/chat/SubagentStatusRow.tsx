@@ -16,7 +16,9 @@ import {
 	NetworkIcon,
 } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
+import { useExtensionState } from "@/context/ExtensionStateContext"
 import MarkdownBlock from "../common/MarkdownBlock"
+import { getActiveAssistantName } from "./chat-view/shared/assistantName"
 
 interface SubagentStatusRowProps {
 	message: ClineMessage
@@ -178,6 +180,7 @@ function SubagentPromptText({ prompt, isExpanded, onShowMore }: SubagentPromptTe
 }
 
 export default function SubagentStatusRow({ message, isLast, lastModifiedMessage }: SubagentStatusRowProps) {
+	const { currentTaskItem } = useExtensionState()
 	const [expandedItems, setExpandedItems] = useState<Record<number, boolean>>({})
 	const [expandedPrompts, setExpandedPrompts] = useState<Record<number, boolean>>({})
 	const data = useMemo(() => parseSubagentRowData(message), [message])
@@ -197,7 +200,8 @@ export default function SubagentStatusRow({ message, isLast, lastModifiedMessage
 			resumedBeforeNextVisibleMessage)
 
 	const singular = data.items.length === 1
-	const title = singular ? "Cline wants to use a subagent:" : "Cline wants to use subagents:"
+	const assistantName = getActiveAssistantName(currentTaskItem)
+	const title = singular ? `${assistantName} wants to use a subagent:` : `${assistantName} wants to use subagents:`
 	const isPromptConstructionRow = message.ask === "use_subagents" || message.say === "use_subagents"
 	const toggleItem = (index: number) => {
 		setExpandedItems((prev) => ({

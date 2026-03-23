@@ -21,11 +21,17 @@ type WorkflowReminderEntry = {
 }
 
 type WorkflowReminderConfig = Record<string, WorkflowReminderEntry>
+type BmadAgentManifestCacheEntry = {
+	raw: string
+	displayNamesById: Map<string, string>
+}
 
 const CONFIG_PATH = path.join("_bmad", "_config", "agent-workflow-allowlist.json")
+const AGENT_MANIFEST_PATH = path.join("_bmad", "_config", "agent-manifest.csv")
 const WORKFLOW_REMINDERS_PATH = path.join("_bmad", "_config", "workflow-reminders.json")
 export const BMAD_AGENT_ALIAS_PREFIX = "bmad-agent-bmm-"
 const ALWAYS_ALLOWED_BMAD_SKILL_NAMES = ["bmad-help"] as const
+const bmadAgentManifestCache = new Map<string, BmadAgentManifestCacheEntry>()
 
 export function getBuiltinBmadAgentAllowlist(): ReadonlyArray<BmadAgentAllowlistEntry> {
 	return BUILTIN_BMAD_AGENT_ALLOWLIST
@@ -203,6 +209,88 @@ async function loadAgentAllowlistConfig(cwd: string): Promise<BmadAgentAllowlist
 
 async function getConfiguredBmadAgentAllowlist(cwd: string): Promise<BmadAgentAllowlistConfig | undefined> {
 	return loadAgentAllowlistConfig(cwd)
+}
+
+function parseCsvRow(line: string): string[] {
+	const fields: string[] = []
+	let current = ""
+	let inQuotes = false
+
+	for (let index = 0; index < line.length; index++) {
+		const char = line[index]
+
+		if (char === '"') {
+			if (inQuotes && line[index + 1] === '"') {
+				current += '"'
+				index++
+			} else {
+				inQuotes = !inQuotes
+			}
+			continue
+		}
+
+		if (char === "," && !inQuotes) {
+			fields.push(current)
+			current = ""
+			continue
+		}
+
+		current += char
+	}
+
+	fields.push(current)
+	return fields
+}
+
+function parseBmadAgentDisplayNames(csv: string): Map<string, string> {
+	const lines = csv
+		.split(/\r?\n/)
+		.map((line) => line.trim())
+		.filter(Boolean)
+
+	if (lines.length === 0) {
+		return new Map()
+	}
+
+	const header = parseCsvRow(lines[0])
+	const canonicalIdIndex = header.indexOf("canonicalId")
+	const displayNameIndex = header.indexOf("displayName")
+
+	if (canonicalIdIndex === -1 || displayNameIndex === -1) {
+		return new Map()
+	}
+
+	const displayNamesById = new Map<string, string>()
+
+	for (const line of lines.slice(1)) {
+		const row = parseCsvRow(line)
+		const canonicalId = row[canonicalIdIndex]?.trim()
+		const displayName = row[displayNameIndex]?.trim()
+
+		if (canonicalId && displayName) {
+			displayNamesById.set(canonicalId, displayName)
+		}
+	}
+
+	return displayNamesById
+}
+
+async function getBmadAgentDisplayNamesById(cwd: string): Promise<Map<string, string>> {
+	const fullPath = path.resolve(cwd, AGENT_MANIFEST_PATH)
+
+	try {
+		const raw = await fs.readFile(fullPath, "utf8")
+		const cached = bmadAgentManifestCache.get(fullPath)
+		if (cached?.raw === raw) {
+			return cached.displayNamesById
+		}
+
+		const displayNamesById = parseBmadAgentDisplayNames(raw)
+		bmadAgentManifestCache.set(fullPath, { raw, displayNamesById })
+		return displayNamesById
+	} catch {
+		return bmadAgentManifestCache.get(fullPath)?.displayNamesById ?? new Map()
+	}
 }
 
 function findMatchingBmadAgent(
@@ -659,6 +747,15 @@ export async function getBmadAgentById(cwd: string, agentId: string): Promise<Bm
 		configuredAgents.find((agent) => agent.id === agentId) ??
 		BUILTIN_BMAD_AGENT_ALLOWLIST.find((agent) => agent.id === agentId)
 	)
+}
+
+export async function getBmadAgentDisplayName(cwd: string, agentId?: string): Promise<string | undefined> {
+	if (!agentId) {
+		return undefined
+	}
+
+	const displayNamesById = await getBmadAgentDisplayNamesById(cwd)
+	return displayNamesById.get(agentId)
 }
 
 export function isSkillAllowedForBmadAgent(
