@@ -48,4 +48,5 @@
 
 ## CHECKPOINT
 
-Halt for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.
+After ensuring that all task list items have been marked complete (one-by-one, in order, using the complete_workflow_item tool):
+use the attempt_completion tool to inform the user that you have finished the final step of the worklfow, then halt for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.

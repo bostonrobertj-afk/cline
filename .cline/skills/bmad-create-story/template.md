@@ -21,6 +21,8 @@ so that {{benefit}}.
 - [ ] Task 2 (AC: #)
   - [ ] Subtask 2.1
 
+## Senior Developer QA Findings
+
 ## Dev Notes
 
 - Relevant architecture patterns and constraints
@@ -47,3 +49,4 @@ so that {{benefit}}.
 ### Completion Notes List
 
 ### File List
+

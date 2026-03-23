@@ -233,15 +233,8 @@ export class AttemptCompletionHandler implements IToolHandler, IPartialBlockHand
 			waitingForUserInput: false,
 		})
 
-		const prefix = "[attempt_completion] Result: Done"
-		if (config.taskState.managedWorkflowRun?.allRequiredComplete) {
-			// Fully completed managed workflows should stop cleanly here instead of opening a
-			// second completion ask that can be invalidated by unrelated message updates.
-			config.taskState.didAttemptCompletionEndTask = true
-			return prefix
-		}
-
 		const { response, text, images, files: completionFiles } = await config.callbacks.ask("completion_result", "", false)
+		const prefix = "[attempt_completion] Result: Done"
 		if (response === "yesButtonClicked") {
 			return prefix // signals to recursive loop to stop (for now this never happens since yesButtonClicked will trigger a new task)
 		}

@@ -28,6 +28,7 @@ failed_layers: '' # set at runtime: comma-separated list of layers that failed o
       Prompt the subagent to review `{diff_output}` only.
       Do not give it `{spec_file}`, project files, or project context.
       Tell it:
+      - limit your scope to only the files necessary to perform your assigned task. Do not perform broad-reaching file reads.
       - if `{review_input_type} = "diff"`: `Act as a diff-only Blind Hunter reviewer. Stay grounded only in the provided diff. Return concise markdown findings with a short title, the observed issue, and evidence from the diff when available.`
       - if `{review_input_type} = "file-bundle"`: `Act as a file-scoped Blind Hunter reviewer. Stay grounded only in the provided files and story-described scope. Do not go searching for commits or unrelated project files. Return concise markdown findings with a short title, the observed issue, and evidence from the provided files when available.`
     </detail>

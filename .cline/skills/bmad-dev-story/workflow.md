@@ -129,3 +129,7 @@ Load config from `{project-root}/_bmad/bmm/config.yaml` and resolve the stable p
   <output>Offer help with explanations, verification, or next steps such as code review.</output>
   <output>Remind the user to run bmad-code-review on the completed story before executing the next story</output>
 </step>
+
+## CHECKPOINT
+After ensuring that all task list items are complete (one-by-one, in order, using the complete_workflow_item tool),
+Use the attempt_completion tool to send a final message to the user informing them that this workflow is complete, then HALT and await further instruction.

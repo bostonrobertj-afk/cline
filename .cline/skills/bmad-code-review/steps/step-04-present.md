@@ -79,8 +79,8 @@
 
 ## CHECKPOINT
 
-Present the findings and recommendations, then stop cleanly unless the user explicitly requested another action in the same task.
-
+After ensuring that all task list items are complete (one-by-one, in order, using the complete_workflow_item tool),
+Use the attempt_completion tool to send a final message to the user informing them that this workflow is complete, then HALT and await further instruction.
 ## ADVISORY
 
 - Keep the final report concise, specific, and evidence-based.

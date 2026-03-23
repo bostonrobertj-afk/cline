@@ -35,7 +35,8 @@ outputFile: '{planning_artifacts}/implementation-readiness-report-{{date}}.md'
 
 ## CHECKPOINT
 
-Complete the current required actions in order before moving to the next workflow phase.
+After ensuring that all task list items are complete (one-by-one, in order, using the complete_workflow_item tool),
+Use the attempt_completion tool to send a final message to the user informing them that this workflow is complete, then HALT and await further instruction.
 
 ## ADVISORY
 

@@ -68,7 +68,8 @@ agent_party: '{project-root}/_bmad/_config/agent-manifest.csv'
 
 ## CHECKPOINT
 
-Every method application must halt for the user's apply or discard decision before the workflow continues.
+After ensuring that all task list items are completed (one-by-one, in order, using complete_worklfow_item tool):
+Use the attempt_completion tool to send a final response to the user indicating that this workflow is complete, then halt and await further instruction.
 
 ## ADVISORY
 

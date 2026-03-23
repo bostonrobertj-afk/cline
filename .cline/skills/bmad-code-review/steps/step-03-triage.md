@@ -82,6 +82,13 @@
   </branch>
 </step>
 
+<step n="5" goal="Document findings">
+  <branch if="the review target is a completed story file" optional="true">
+    <action> update the existing story file by documenting qa findings under the Senior Developer QA Findings section header, then add steps necessary to address QA findings under the tasks/subtasks header, then update "status" to "ready-for-dev" </action>
+  <branch if="the review target is not a completed story file">
+    <action> create a new file titled "code-review-findings" and document your QA findings with a tasklist for remediation. </action>
+</step>
+
 ## CHECKPOINT
 
 Complete normalization, deduplication, and classification before moving on to presentation.
@@ -91,3 +98,4 @@ Complete normalization, deduplication, and classification before moving on to pr
 - Prefer the more conservative classification when a finding sits on a boundary.
 - Do not keep `reject` findings in the final presentation set.
 - Do not present the final review report from this phase; hand off only triaged findings and completeness state.
+

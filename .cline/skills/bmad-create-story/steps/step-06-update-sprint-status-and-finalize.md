@@ -60,8 +60,8 @@ templateFile: '{workflow_path}/template.md'
 </step>
 
 ## CHECKPOINT
-This phase can be marked complete only after the required outputs, approvals, and routing conditions are satisfied.
-
+After ensuring that all task list items are complete (one-by-one, in order, using the complete_workflow_item tool),
+Use the attempt_completion tool to send a final message to the user informing them that this workflow is complete, then HALT and await further instruction.
 ## ADVISORY
 - Keep all user-facing text in `{communication_language}`.
 - Update sprint tracking only when it exists.

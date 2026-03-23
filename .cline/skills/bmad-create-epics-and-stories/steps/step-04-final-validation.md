@@ -51,8 +51,8 @@
 
 ## CHECKPOINT
 
-Halt for any required user confirmation, menu selection, continuation gate, or missing input before proceeding.
-
+After ensuring that all task list items are complete (one-by-one, in order, using the complete_workflow_item tool),
+Use the attempt_completion tool to send a final message to the user informing them that this workflow is complete, then HALT and await further instruction.
 ## ADVISORY
 
 - Persist workflow state updates whenever this phase writes or updates a managed artifact.

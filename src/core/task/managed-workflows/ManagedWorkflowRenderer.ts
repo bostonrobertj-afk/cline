@@ -168,8 +168,10 @@ export function buildManagedWorkflowPrompt(run: ManagedWorkflowRunState): string
 	if (!currentPhase) {
 		return `<active_bmad_workflow workflow_id="${run.workflowId}">
 The managed workflow ${run.workflowId} is active and all required phases are complete.
-Do not call attempt_completion until the user's request is otherwise fully satisfied.
-</active_bmad_workflow>`
+How to finalize and exit this workflow:
+- call complete_workflow_item for all items in the task list, up to and including the final item
+- Call attempt_completion and include your full final report to the user.
+- STOP and await further instruction from the user.</active_bmad_workflow>`
 	}
 
 	const items = currentPhase.items
@@ -194,8 +196,12 @@ Do not call attempt_completion until the user's request is otherwise fully satis
 	return `<active_bmad_workflow workflow_id="${run.workflowId}" managed="true" phase_id="${currentPhase.id}">
 The active BMAD workflow for this task is ${run.workflowId}.
 This is a backend-managed workflow. Do not invent or rewrite the checklist manually.
-Use the complete_workflow_item tool to mark items complete one at a time.
+You MUST limit your scope to the detailed instructions for the active step under current phase checklist.
+You MUST mark each step as complete using the complete_workflow_item tool before moving on, even if you are skipping an optional step.
+You MUST NOT attempt to mark multiple steps complete simultaneously. The system will not accept batched completion attempts.
 Do not advance beyond the current phase until all required items are complete.
+The workflow may be broken into phases, each with distinct phase checklists.
+Do not assume that you are done with this workflow until you see a message indicating "all required phases are complete".
 
 Current phase: ${resolveManagedWorkflowPlaceholderText(currentPhase.title, placeholders) ?? currentPhase.title}
 

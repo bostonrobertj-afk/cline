@@ -153,9 +153,10 @@ describe("Managed workflow handlers", () => {
 		expect(String(result)).to.not.contain("Managed workflow")
 		expect(String(result)).to.contain("[attempt_completion] Result: Done")
 		expect(config.taskState.consecutiveMistakeCount).to.equal(0)
-		expect(config.taskState.didAttemptCompletionEndTask).to.equal(true)
+		expect(config.taskState.didAttemptCompletionEndTask).to.equal(false)
 		expect((config.callbacks.say as sinon.SinonStub).calledWith("completion_result", "done")).to.equal(true)
-		expect((config.callbacks.ask as sinon.SinonStub).called).to.equal(false)
+		expect((config.callbacks.ask as sinon.SinonStub).calledOnce).to.equal(true)
+		expect((config.callbacks.ask as sinon.SinonStub).calledWith("completion_result", "", false)).to.equal(true)
 	})
 
 	it("ends the task cleanly for managed workflow completion even when attempt_completion includes a command", async () => {
@@ -179,11 +180,12 @@ describe("Managed workflow handlers", () => {
 		} as any)
 
 		expect(String(result)).to.contain("[attempt_completion] Result: Done")
-		expect(config.taskState.didAttemptCompletionEndTask).to.equal(true)
+		expect(config.taskState.didAttemptCompletionEndTask).to.equal(false)
 		expect((config.callbacks.executeCommandTool as sinon.SinonStub).calledWith("git status --short", undefined)).to.equal(
 			true,
 		)
-		expect((config.callbacks.ask as sinon.SinonStub).called).to.equal(false)
+		expect((config.callbacks.ask as sinon.SinonStub).calledOnce).to.equal(true)
+		expect((config.callbacks.ask as sinon.SinonStub).calledWith("completion_result", "", false)).to.equal(true)
 	})
 
 	it("persists managed workflow item completion to task metadata", async () => {

@@ -45,3 +45,7 @@
 <step n="5" goal="Report completion.">
   <output>Summarize the indexed directory, the groups created, and any files that were skipped or could not be read.</output>
 </step>
+
+## CHECKPOINT
+After ensuring that all task list items are complete (one-by-one, in order, using the complete_workflow_item tool),
+Use the attempt_completion tool to send a final message to the user informing them that this workflow is complete, then HALT and await further instruction.

@@ -14,7 +14,7 @@ review_input_type: '' # set at runtime: "diff" or "file-bundle"
 - Halt whenever user input, confirmation, or workflow gating is required.
 - This phase is read-only. Do not modify project files while gathering review context.
 - Do not start the substantive code review in this phase.
-- Do not perform QA, bug hunting, acceptance checking, or architectural critique while identifying the review source.
+- Do not perform QA, bug hunting, acceptance checking, or architectural critique unless the workflow clearly instructs you to.
 - Only inspect files far enough to determine scope, construct the normalized review input, and load declared context.
 - Only the current phase checklist and the current active step's details are shown in the prompt at one time.
 - Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.

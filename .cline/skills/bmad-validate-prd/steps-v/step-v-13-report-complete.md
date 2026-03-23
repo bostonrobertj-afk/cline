@@ -56,8 +56,8 @@ prdFile: '{prd_file_path}'
 
 ## CHECKPOINT
 
-Present the final summary and next-step options, then stop cleanly unless the user explicitly requested another action in the same task.
-
+After ensuring that all task list items are complete (one-by-one, in order, using the complete_workflow_item tool),
+Use the attempt_completion tool to send a final message to the user informing them that this workflow is complete, then HALT and await further instruction.
 ## ADVISORY
 
 - Do not add new findings in the final summary; synthesize only what the validation steps already established.

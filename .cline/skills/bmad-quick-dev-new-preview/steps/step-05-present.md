@@ -21,3 +21,8 @@
   <action>If version control is available and the tree is dirty, create a local commit with a conventional message derived from the spec title.</action>
   <output>Summarize the work, include the commit hash if one was created, and offer to help with push or PR creation.</output>
 </step>
+
+## CHECKPOINT
+
+After ensuring that all task list items are complete (one-by-one, in order, using the complete_workflow_item tool),
+Use the attempt_completion tool to send a final message to the user informing them that this workflow is complete, then HALT and await further instruction.

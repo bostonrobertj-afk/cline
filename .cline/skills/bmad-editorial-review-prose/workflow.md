@@ -77,3 +77,8 @@ This workflow reviews prose for communication issues that impede comprehension a
 - HALT with error if content is empty or fewer than 3 words
 - HALT with error if reader_type is not `humans` or `llm`
 - If no issues found after thorough review, output "No editorial issues identified" (this is valid completion, not an error)
+
+## CHECKPOINT
+
+After ensuring that all task list items are complete (one-by-one, in order, using the complete_workflow_item tool),
+Use the attempt_completion tool to send a final message to the user informing them that this workflow is complete, then HALT and await further instruction.
