@@ -74,7 +74,7 @@ export function useMessageHandlers(messages: ClineMessage[], chatState: ChatStat
 						// All other ask types use messageResponse
 						switch (clineAsk) {
 							case "followup":
-							case "plan_mode_respond":
+							case "generate_plan_output":
 							case "tool":
 							case "browser_action_launch":
 							case "command":

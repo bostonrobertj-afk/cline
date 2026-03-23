@@ -128,7 +128,7 @@ export const BUTTON_CONFIGS: Record<string, ButtonConfig> = {
 		primaryAction: undefined,
 		secondaryAction: undefined,
 	},
-	plan_mode_respond: {
+	generate_plan_output: {
 		sendingDisabled: false,
 		enableButtons: false,
 		primaryText: undefined,
@@ -290,8 +290,8 @@ export function getButtonConfig(
 				return BUTTON_CONFIGS.use_mcp_server
 			case "use_subagents":
 				return BUTTON_CONFIGS.use_subagents
-			case "plan_mode_respond":
-				return BUTTON_CONFIGS.plan_mode_respond
+			case "generate_plan_output":
+				return BUTTON_CONFIGS.generate_plan_output
 
 			// Task lifecycle
 			case "completion_result":

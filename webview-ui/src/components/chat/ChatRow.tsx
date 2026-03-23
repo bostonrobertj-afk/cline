@@ -1295,7 +1295,7 @@ export const ChatRowContent = memo(
 								<ReportBugPreview data={message.text || ""} />
 							</div>
 						)
-					case "plan_mode_respond": {
+					case "generate_plan_output": {
 						let response: string | undefined
 						let options: string[] | undefined
 						let selected: string | undefined
@@ -1317,7 +1317,7 @@ export const ChatRowContent = memo(
 								<OptionsButtons
 									inputValue={inputValue}
 									isActive={
-										(isLast && lastModifiedMessage?.ask === "plan_mode_respond") ||
+										(isLast && lastModifiedMessage?.ask === "generate_plan_output") ||
 										(!selected && options && options.length > 0)
 									}
 									options={options}

@@ -89,7 +89,7 @@ The following tools are currently registered:
 - `list_files`
 - `load_mcp_documentation`
 - `new_task`
-- `plan_mode_respond`
+- `generate_plan_output`
 - `read_file`
 - `replace_in_file`
 - `search_files`

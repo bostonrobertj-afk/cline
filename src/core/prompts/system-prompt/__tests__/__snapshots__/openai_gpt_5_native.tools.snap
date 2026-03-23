@@ -288,7 +288,7 @@
   {
     "type": "function",
     "function": {
-      "name": "plan_mode_respond",
+      "name": "generate_plan_output",
       "description": "Present a concrete plan when the task is in PLAN MODE.",
       "strict": false,
       "parameters": {

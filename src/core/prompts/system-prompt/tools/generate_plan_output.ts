@@ -3,21 +3,21 @@ import { ClineDefaultTool } from "@/shared/tools"
 import type { ClineToolSpec } from "../spec"
 
 /**
- * ## plan_mode_respond
+ * ## generate_plan_output
 Description: Respond to the user's inquiry in an effort to plan a solution to the user's task. This tool should ONLY be used when you have already explored the relevant files and are ready to present a concrete plan. DO NOT use this tool to announce what files you're going to read - just read them first. This tool is only available in PLAN MODE. The environment_details will specify the current mode; if it is not PLAN_MODE then you should not use this tool.
 However, if while writing your response you realize you actually need to do more exploration before providing a complete plan, you can add the optional needs_more_exploration parameter to indicate this. This allows you to acknowledge that you should have done more exploration first, and signals that your next message will use exploration tools instead.
 Parameters:
-- response: (required) The response to provide to the user. Do not try to use tools in this parameter, this is simply a chat response. (You MUST use the response parameter, do not simply place the response text directly within <plan_mode_respond> tags.)
+- response: (required) The response to provide to the user. Do not try to use tools in this parameter, this is simply a chat response. (You MUST use the response parameter, do not simply place the response text directly within <generate_plan_output> tags.)
 - needs_more_exploration: (optional) Set to true if while formulating your response that you found you need to do more exploration with tools, for example reading files. (Remember, you can explore the project with tools like read_file in PLAN MODE without the user having to toggle to ACT MODE.) Defaults to false if not specified.
 ${focusChainSettings.enabled ? `- task_progress: (optional) A checklist showing task progress after this tool use is completed. (See 'Updating Task Progress' section for more details)` : "" }
 Usage:
-<plan_mode_respond>
+<generate_plan_output>
 <response>Your response here</response>
 <needs_more_exploration>true or false (optional, but you MUST set to true if in <response> you need to read files or use other exploration tools)</needs_more_exploration>
 ${focusChainSettings.enabled ? `<task_progress>
 Checklist here (If you have presented the user with concrete steps or requirements, you can optionally include a todo list outlining these steps.)
 </task_progress>` : "" }
-</plan_mode_respond>
+</generate_plan_output>
  */
 
 const id = ClineDefaultTool.PLAN_MODE
@@ -25,14 +25,14 @@ const id = ClineDefaultTool.PLAN_MODE
 const generic: ClineToolSpec = {
 	variant: ModelFamily.GENERIC,
 	id,
-	name: "plan_mode_respond",
+	name: "generate_plan_output",
 	description: `Respond to the user's inquiry in an effort to plan a solution to the user's task. This tool should ONLY be used when you have already explored the relevant files and are ready to present a concrete plan. DO NOT use this tool to announce what files you're going to read - just read them first. This tool is only available in PLAN MODE. The environment_details will specify the current mode; if it is not PLAN_MODE then you should not use this tool.
 However, if while writing your response you realize you actually need to do more exploration before providing a complete plan, you can add the optional needs_more_exploration parameter to indicate this. This allows you to acknowledge that you should have done more exploration first, and signals that your next message will use exploration tools instead.`,
 	parameters: [
 		{
 			name: "response",
 			required: true,
-			instruction: `The response to provide to the user. Do not try to use tools in this parameter, this is simply a chat response. (You MUST use the response parameter, do not simply place the response text directly within <plan_mode_respond> tags.)`,
+			instruction: `The response to provide to the user. Do not try to use tools in this parameter, this is simply a chat response. (You MUST use the response parameter, do not simply place the response text directly within <generate_plan_output> tags.)`,
 			usage: "Your response here",
 		},
 		{
@@ -58,7 +58,7 @@ However, if while writing your response you realize you actually need to do more
 const NATIVE_GPT_5: ClineToolSpec = {
 	variant: ModelFamily.NATIVE_GPT_5,
 	id,
-	name: "plan_mode_respond",
+	name: "generate_plan_output",
 	description: `Respond to the user's inquiry in an effort to plan a solution to the user's task. This tool should ONLY be used when you have already explored the relevant files and are ready to present a concrete plan. DO NOT use this tool to announce what files you're going to read - just read them first. This tool is only available in PLAN MODE. The environment_details will specify the current mode; if it is not PLAN_MODE then you should not use this tool.
 However, if while writing your response you realize you actually need to do more exploration before providing a complete plan, you can add the optional needs_more_exploration parameter to indicate this. This allows you to acknowledge that you should have done more exploration first, and signals that your next message will use exploration tools instead.`,
 	parameters: [
@@ -78,9 +78,9 @@ However, if while writing your response you realize you actually need to do more
 const GEMINI_3: ClineToolSpec = {
 	variant: ModelFamily.GEMINI_3,
 	id,
-	name: "plan_mode_respond",
+	name: "generate_plan_output",
 	description: `Respond with a plan that outlines a solution to the user's request. This tool should ONLY be used when you have already explored the relevant files and are ready to present a concrete plan. Only use this tool after you have explored relevant files and collected sufficient context to create a detailed, accurate plan. This tool is only available in PLAN MODE, as indicated by the environment_details.
-If it becomes apparent that additional exploration is required while the plan_mode_respond response is being generated, the optional needs_more_exploration parameter can be toggled to enable further research. This allows you to acknowledge that more exploration is required before the final plan_mode_respond is generated, and signals that your next message will use exploration tools instead.`,
+If it becomes apparent that additional exploration is required while the generate_plan_output response is being generated, the optional needs_more_exploration parameter can be toggled to enable further research. This allows you to acknowledge that more exploration is required before the final generate_plan_output is generated, and signals that your next message will use exploration tools instead.`,
 	parameters: [
 		{
 			name: "response",
@@ -111,4 +111,4 @@ const NATIVE_NEXT_GEN: ClineToolSpec = {
 	variant: ModelFamily.NATIVE_NEXT_GEN,
 }
 
-export const plan_mode_respond_variants = [generic, NATIVE_GPT_5, NATIVE_NEXT_GEN, GEMINI_3]
+export const generate_plan_output_variants = [generic, NATIVE_GPT_5, NATIVE_NEXT_GEN, GEMINI_3]

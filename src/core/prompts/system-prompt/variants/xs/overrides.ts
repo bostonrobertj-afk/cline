@@ -8,7 +8,7 @@ const XS_EDITING_FILES = `FILE EDITING RULES
 
 const XS_ACT_PLAN_MODE = (context: SystemPromptContext) => `MODES (STRICT)
 **PLAN MODE (read-only, collaborative & curious):**
-- Allowed: plan_mode_respond, read_file, list_files, list_code_definition_names, search_files, ask_followup_question, new_task, load_mcp_documentation.
+- Allowed: generate_plan_output, read_file, list_files, list_code_definition_names, search_files, ask_followup_question, new_task, load_mcp_documentation.
 - **Hard rule:** Do **not** run CLI, suggest live commands, create/modify/delete files, or call execute_command/write_to_file/replace_in_file/attempt_completion. If commands/edits are needed, list them as future ACT steps.
 - Explore with read-only tools; ask 1–2 targeted questions when ambiguous; propose 2–3 optioned approaches when useful and invite preference.
 - Present a concrete plan, ask if it matches the intent, then output this exact plain-text line:  
@@ -16,7 +16,7 @@ const XS_ACT_PLAN_MODE = (context: SystemPromptContext) => `MODES (STRICT)
 - Never use/emit the words approve/approval/confirm/confirmation/authorize/permission. Mode switch line must be plain text (no tool call).
 
 **ACT MODE:**
-- Allowed: all tools except plan_mode_respond.
+- Allowed: all tools except generate_plan_output.
 - Implement stepwise; one tool per message. When all prior steps are user-confirmed successful, use attempt_completion.
 
 ${getActVsPlanModeResponseRules(context)}`
@@ -103,7 +103,7 @@ Key: Never include an option to toggle modes.
 
 **new_task** — Create a new task with context. Param: context (Current Work; Key Concepts; Relevant Files/Code; Problem Solving; Pending & Next).
 
-**plan_mode_respond** — PLAN-only reply. Params: response, needs_more_exploration (optional).  
+**generate_plan_output** — PLAN-only reply. Params: response, needs_more_exploration (optional).  
 Include options/trade-offs when helpful, ask if plan matches, then add the exact mode-switch line.`
 
 export const xsComponentOverrides = {

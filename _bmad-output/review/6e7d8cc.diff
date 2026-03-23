@@ -1487,8 +1487,8 @@ index 6f77b841..15f633bb 100644
  
  		const userResponseMessage = `${
  			responseText
--				? `${mode === "plan" ? "New message to respond to with plan_mode_respond tool (be sure to provide your response in the <response> parameter)" : "New instructions for task continuation"}:\n${formatResponse.latestHumanInput("user_message", responseText)}`
-+				? `${mode === "plan" ? "Latest human-authored input for plan_mode_respond (be sure to provide your response in the <response> parameter)" : "Latest human-authored input for the reopened thread"}:\n${formatResponse.latestHumanInput("user_message", responseText)}`
+-				? `${mode === "plan" ? "New message to respond to with generate_plan_output tool (be sure to provide your response in the <response> parameter)" : "New instructions for task continuation"}:\n${formatResponse.latestHumanInput("user_message", responseText)}`
++				? `${mode === "plan" ? "Latest human-authored input for generate_plan_output (be sure to provide your response in the <response> parameter)" : "Latest human-authored input for the reopened thread"}:\n${formatResponse.latestHumanInput("user_message", responseText)}`
  				: mode === "plan"
 -					? "(The user did not provide a new message. Consider asking them how they'd like you to proceed, or suggest to them to switch to Act mode to continue with the task.)"
 +					? "(Conversation reopened without a new human message. Review the existing context and use ask_followup_question only if clarification is genuinely required.)"

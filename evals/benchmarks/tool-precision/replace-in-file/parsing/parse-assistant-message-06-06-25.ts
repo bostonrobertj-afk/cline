@@ -18,7 +18,7 @@ export const toolUseNames = [
 	"use_mcp_tool",
 	"access_mcp_resource",
 	"ask_followup_question",
-	"plan_mode_respond",
+	"generate_plan_output",
 	"load_mcp_documentation",
 	"attempt_completion",
 	"new_task",

@@ -5,7 +5,7 @@ function getActModeResponseTools(context: SystemPromptContext): string[] {
 }
 
 function getPlanModeResponseTools(): string[] {
-	return ["`plan_mode_respond`", "`ask_followup_question`"]
+	return ["`generate_plan_output`", "`ask_followup_question`"]
 }
 
 function joinToolNames(toolNames: string[]): string {
@@ -24,14 +24,14 @@ export function getResponseToolsSection(context: SystemPromptContext): string {
 		responseToolLines.push("- `ask_followup_question`: Use to ask the user a question at any time")
 	}
 
-	responseToolLines.push("- `plan_mode_respond`: Use in PLAN MODE for plan presentation and other user-facing replies.")
+	responseToolLines.push("- `generate_plan_output`: Use in PLAN MODE for plan presentation and other user-facing replies.")
 
 	return `RESPONSE TOOLS
 Use these tools to respond to the user. Responses that fail to use these tools will not reach the user.
 
 ${responseToolLines.join("\n")}
 
-In ACT MODE, respond using these: ${joinToolNames(actModeTools)}. In PLAN MODE, respond using \`plan_mode_respond\`.`
+In ACT MODE, respond using these: ${joinToolNames(actModeTools)}. In PLAN MODE, respond using \`generate_plan_output\`.`
 }
 
 export function getActVsPlanModeResponseRules(context: SystemPromptContext): string {

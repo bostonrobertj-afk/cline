@@ -225,7 +225,7 @@ function handleMessageForPipeMode(message: ClineMessage, verbose: boolean): void
 			process.stderr.write(`Waiting for approval (use --yolo for auto-approve): ${message.ask}\n`)
 		} else if (verbose) {
 			// Verbose output goes to stderr
-			if (message.ask === "plan_mode_respond" || message.ask === "act_mode_respond") {
+			if (message.ask === "generate_plan_output" || message.ask === "act_mode_respond") {
 				if (fullText) {
 					process.stderr.write(`${fullText}\n`)
 				}

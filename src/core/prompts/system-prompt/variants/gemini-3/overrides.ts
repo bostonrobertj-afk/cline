@@ -9,7 +9,7 @@ const GEMINI_3_TOOL_USE_TEMPLATE = (context: SystemPromptContext) => `TOOL USE
 
 You have access to a set of tools that are executed upon the user's approval.${context.enableParallelToolCalling ? " You may use multiple tools in a single response when the operations are independent (e.g., reading several files, searching in parallel). For dependent operations where one result informs the next, use tools sequentially." : " You should use a single tool at a time and wait for the result before proceeding."} You will receive the results of all tool uses in the user's response.
 
-When using tools, proceed directly with tool calls. Save explanations for the attempt_completion summary. Both attempt_completion and plan_mode_respond display to the user as assistant messages, so include your message content within the tool call itself rather than duplicating it outside.
+When using tools, proceed directly with tool calls. Save explanations for the attempt_completion summary. Both attempt_completion and generate_plan_output display to the user as assistant messages, so include your message content within the tool call itself rather than duplicating it outside.
 
 ${getResponseToolsSection(context)}`
 
@@ -169,7 +169,7 @@ Perform comprehensive research to build complete understanding of the codebase. 
 
 ### Phase 2: Plan Presentation
 
-Once research is complete, use plan_mode_respond to present your detailed plan. Follow this required structure:
+Once research is complete, use generate_plan_output to present your detailed plan. Follow this required structure:
 
 **Required Plan Format:**
 

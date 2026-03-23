@@ -55,7 +55,7 @@ const ASK_TYPE_PERMISSION_MAP: Partial<Record<ClineAsk, ClinePermissionOption[]>
 
 /**
  * ClineAsk types that require permission handling.
- * Other ask types (like followup, plan_mode_respond) don't need permission UI.
+ * Other ask types (like followup, generate_plan_output) don't need permission UI.
  */
 const PERMISSION_REQUIRING_ASK_TYPES: Set<ClineAsk> = new Set([
 	"command",

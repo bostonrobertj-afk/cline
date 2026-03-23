@@ -147,7 +147,7 @@ export interface ClineMessage {
 
 export type ClineAsk =
 	| "followup"
-	| "plan_mode_respond"
+	| "generate_plan_output"
 	| "act_mode_respond"
 	| "command"
 	| "command_output"

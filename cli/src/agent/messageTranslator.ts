@@ -404,17 +404,17 @@ function translateAskMessage(
 
 	switch (ask) {
 		case "followup":
-		case "plan_mode_respond":
+		case "generate_plan_output":
 			// These are questions to the user - send as agent message and await next prompt
 			if (message.text) {
 				let textToSend = message.text
 
 				// Try to parse JSON and extract the response/question field
-				// plan_mode_respond uses { response: string, options?: string[] }
+				// generate_plan_output uses { response: string, options?: string[] }
 				// followup uses { question: string, options?: string[] }
 				try {
 					const parsed = JSON.parse(message.text)
-					if (ask === "plan_mode_respond" && parsed.response !== undefined) {
+					if (ask === "generate_plan_output" && parsed.response !== undefined) {
 						textToSend = parsed.response
 					} else if (ask === "followup" && parsed.question !== undefined) {
 						textToSend = parsed.question

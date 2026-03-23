@@ -770,7 +770,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, mode, isStrea
 	}
 
 	// Plan mode response
-	if (type === "ask" && ask === "plan_mode_respond" && text) {
+	if (type === "ask" && ask === "generate_plan_output" && text) {
 		const parsed = jsonParseSafe(text, { response: undefined as string | undefined })
 		if (parsed.response) {
 			return (

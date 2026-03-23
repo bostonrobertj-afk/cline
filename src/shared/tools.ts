@@ -20,7 +20,7 @@ export enum ClineDefaultTool {
 	MCP_ACCESS = "access_mcp_resource",
 	MCP_DOCS = "load_mcp_documentation",
 	NEW_TASK = "new_task",
-	PLAN_MODE = "plan_mode_respond",
+	PLAN_MODE = "generate_plan_output",
 	ACT_MODE = "act_mode_respond",
 	TODO = "focus_chain",
 	WEB_FETCH = "web_fetch",

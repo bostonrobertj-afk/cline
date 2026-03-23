@@ -117,7 +117,7 @@ const BUTTON_CONFIGS: Record<string, ButtonConfig> = {
 		primaryAction: undefined,
 		secondaryAction: undefined,
 	},
-	plan_mode_respond: {
+	generate_plan_output: {
 		sendingDisabled: false,
 		enableButtons: false,
 		primaryText: undefined,
@@ -194,7 +194,7 @@ const errorTypes = ["api_req_failed", "mistake_limit_reached"]
 /**
  * Get button configuration based on message type and state
  */
-export function getButtonConfig(message: ClineMessage | undefined, isStreaming: boolean = false): ButtonConfig {
+export function getButtonConfig(message: ClineMessage | undefined, isStreaming = false): ButtonConfig {
 	if (!message) {
 		return BUTTON_CONFIGS.default
 	}
@@ -242,8 +242,8 @@ export function getButtonConfig(message: ClineMessage | undefined, isStreaming: 
 				return BUTTON_CONFIGS.browser_action_launch
 			case "use_mcp_server":
 				return BUTTON_CONFIGS.use_mcp_server
-			case "plan_mode_respond":
-				return BUTTON_CONFIGS.plan_mode_respond
+			case "generate_plan_output":
+				return BUTTON_CONFIGS.generate_plan_output
 
 			// Task lifecycle
 			case "completion_result":

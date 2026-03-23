@@ -132,15 +132,15 @@ Param: context (Current Work; Key Concepts; Relevant Files/Code; Problem Solving
 <context>context to preload new task with</context>
 </new_task>
 
-**plan_mode_respond** — PLAN-only reply.
+**generate_plan_output** — PLAN-only reply.
 Params: response, needs_more_exploration (optional).  
 Include options/trade-offs when helpful, ask if plan matches, then add the exact mode-switch line.
 *Example:*
-<plan_mode_respond>
+<generate_plan_output>
 <response>Your response here</response>
 <needs_more_exploration>true or false (optional, but you MUST set to true if in <response> you need to read files or use other exploration tools)</needs_more_exploration>
 <task_progress>Checklist here (If you have presented the user with concrete steps or requirements, you can optionally include a todo list outlining these steps.)</task_progress>
-</plan_mode_respond>`
+</generate_plan_output>`
 }
 
 const GLM_OBJECTIVE_TEMPLATE = `OBJECTIVE

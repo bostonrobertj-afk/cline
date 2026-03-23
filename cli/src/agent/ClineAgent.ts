@@ -751,7 +751,7 @@ export class ClineAgent implements acp.Agent {
 			const askType = message.ask as ClineAsk
 			if (
 				askType === "followup" ||
-				askType === "plan_mode_respond" ||
+				askType === "generate_plan_output" ||
 				askType === "act_mode_respond" ||
 				askType === "completion_result" ||
 				askType === "resume_task" ||
@@ -777,7 +777,7 @@ export class ClineAgent implements acp.Agent {
 	 * while computing deltas for text content to avoid sending duplicate content during
 	 * streaming updates.
 	 *
-	 * For text-streaming messages (text, reasoning, followup, plan_mode_respond):
+	 * For text-streaming messages (text, reasoning, followup, generate_plan_output):
 	 * - Computes delta between current and last-sent content
 	 * - Only sends the new portion to avoid duplicates
 	 *
@@ -800,17 +800,17 @@ export class ClineAgent implements acp.Agent {
 			(message.type === "say" &&
 				(message.say === "text" || message.say === "reasoning" || message.say === "completion_result")) ||
 			(message.type === "ask" &&
-				(message.ask === "followup" || message.ask === "plan_mode_respond" || message.ask === "completion_result"))
+				(message.ask === "followup" || message.ask === "generate_plan_output" || message.ask === "completion_result"))
 
 		if (isTextStreamingMessage && message.text) {
 			// Extract the actual text content for JSON-wrapped messages
-			// plan_mode_respond uses { response: string, options?: string[] }
+			// generate_plan_output uses { response: string, options?: string[] }
 			// followup uses { question: string, options?: string[] }
 			let textContent = message.text
-			if (message.type === "ask" && (message.ask === "plan_mode_respond" || message.ask === "followup")) {
+			if (message.type === "ask" && (message.ask === "generate_plan_output" || message.ask === "followup")) {
 				try {
 					const parsed = JSON.parse(message.text)
-					if (message.ask === "plan_mode_respond" && parsed.response !== undefined) {
+					if (message.ask === "generate_plan_output" && parsed.response !== undefined) {
 						textContent = parsed.response
 					} else if (message.ask === "followup" && parsed.question !== undefined) {
 						textContent = parsed.question

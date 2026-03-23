@@ -939,14 +939,14 @@ describe("translateMessage - ask messages", () => {
 	})
 
 	describe("plan mode respond", () => {
-		it("should translate ask:plan_mode_respond to agent_message_chunk", () => {
+		it("should translate ask:generate_plan_output to agent_message_chunk", () => {
 			const planResponse = {
 				response: "Here is my plan for the task...",
 				options: ["Approve", "Revise"],
 			}
 			const message = createClineMessage({
 				type: "ask",
-				ask: "plan_mode_respond",
+				ask: "generate_plan_output",
 				text: JSON.stringify(planResponse),
 			})
 

@@ -287,7 +287,7 @@ const YOLO_INTERACTIVE_ASKS = new Set<ClineAsk>([
 	// to let the user choose whether to run the suggested verification command after task completion.
 	"command",
 	"followup",
-	"plan_mode_respond",
+	"generate_plan_output",
 	"resume_task",
 	"resume_completed_task",
 	"new_task",
@@ -303,7 +303,7 @@ function isYoloSuppressed(yolo: boolean, ask: ClineAsk | undefined): boolean {
 function getAskPromptType(ask: ClineAsk, text: string): "confirmation" | "text" | "options" | "none" {
 	switch (ask) {
 		case "followup":
-		case "plan_mode_respond": {
+		case "generate_plan_output": {
 			const parts = jsonParseSafe(text, { options: undefined as string[] | undefined })
 			if (parts.options && parts.options.length > 0) {
 				return "options"
@@ -694,7 +694,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
 		// exceeds the height of the user's terminal, it causes flashing issues
 		// (Ink uses clearTerminal when output >= terminal rows).
 		// These messages wait until complete before showing directly in static.
-		const skipDynamicTypes = new Set(["completion_result", "plan_mode_respond"])
+		const skipDynamicTypes = new Set(["completion_result", "generate_plan_output"])
 
 		// Check if a followup message has options but no selection yet
 		const isUnselectedFollowup = (msg: (typeof displayMessages)[0]) => {

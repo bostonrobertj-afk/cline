@@ -342,7 +342,7 @@ describe("Prompt System Integration Tests", () => {
 					)
 					expect(systemPrompt).to.include("`attempt_completion`")
 					expect(systemPrompt).to.include("`ask_followup_question`")
-					expect(systemPrompt).to.include("`plan_mode_respond`")
+					expect(systemPrompt).to.include("`generate_plan_output`")
 					expect(systemPrompt).to.include("The only tools that can deliver a reply to the user in this mode are")
 					expect(systemPrompt).to.not.include("# Tools")
 					expect(systemPrompt).to.not.include("## execute_command")

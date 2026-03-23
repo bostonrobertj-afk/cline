@@ -10,11 +10,11 @@ import { complete_workflow_item_variants } from "./complete_workflow_item"
 import { execute_command_variants } from "./execute_command"
 import { focus_chain_variants } from "./focus_chain"
 import { generate_explanation_variants } from "./generate_explanation"
+import { generate_plan_output_variants } from "./generate_plan_output"
 import { list_code_definition_names_variants } from "./list_code_definition_names"
 import { list_files_variants } from "./list_files"
 import { load_mcp_documentation_variants } from "./load_mcp_documentation"
 import { new_task_variants } from "./new_task"
-import { plan_mode_respond_variants } from "./plan_mode_respond"
 import { read_file_variants } from "./read_file"
 import { replace_in_file_variants } from "./replace_in_file"
 import { search_files_variants } from "./search_files"
@@ -47,7 +47,7 @@ export function registerClineToolSets(): void {
 		...list_files_variants,
 		...load_mcp_documentation_variants,
 		...new_task_variants,
-		...plan_mode_respond_variants,
+		...generate_plan_output_variants,
 		...read_file_variants,
 		...replace_in_file_variants,
 		...search_files_variants,

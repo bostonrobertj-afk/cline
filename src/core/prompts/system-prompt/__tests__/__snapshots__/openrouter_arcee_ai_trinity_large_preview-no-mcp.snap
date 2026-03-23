@@ -19,9 +19,9 @@ These are the required response channels for user-visible replies. Do not end a 
 
 - `attempt_completion`: Use in ACT MODE when the task is complete or when you need to deliver the final direct answer.
 - `ask_followup_question`: Use in ACT MODE when clarification from the user would improve correctness, reduce risk, or unblock the next step.
-- `plan_mode_respond`: Use in PLAN MODE for plan presentation and other user-facing replies.
+- `generate_plan_output`: Use in PLAN MODE for plan presentation and other user-facing replies.
 
-In ACT MODE, user-visible replies must go through `attempt_completion` and `ask_followup_question`. In PLAN MODE, user-visible replies must go through `plan_mode_respond`.
+In ACT MODE, user-visible replies must go through `attempt_completion` and `ask_followup_question`. In PLAN MODE, user-visible replies must go through `generate_plan_output`.
 
 # Tool Use Formatting
 
@@ -248,19 +248,19 @@ Usage:
 <task_progress>Checklist here (required if you used task_progress in previous tool uses)</task_progress>
 </attempt_completion>
 
-## plan_mode_respond
+## generate_plan_output
 Description: Respond to the user's inquiry in an effort to plan a solution to the user's task. This tool should ONLY be used when you have already explored the relevant files and are ready to present a concrete plan. DO NOT use this tool to announce what files you're going to read - just read them first. This tool is only available in PLAN MODE. The environment_details will specify the current mode; if it is not PLAN_MODE then you should not use this tool.
 However, if while writing your response you realize you actually need to do more exploration before providing a complete plan, you can add the optional needs_more_exploration parameter to indicate this. This allows you to acknowledge that you should have done more exploration first, and signals that your next message will use exploration tools instead.
 Parameters:
-- response: (required) The response to provide to the user. Do not try to use tools in this parameter, this is simply a chat response. (You MUST use the response parameter, do not simply place the response text directly within <plan_mode_respond> tags.)
+- response: (required) The response to provide to the user. Do not try to use tools in this parameter, this is simply a chat response. (You MUST use the response parameter, do not simply place the response text directly within <generate_plan_output> tags.)
 - needs_more_exploration: (optional) Set to true if while formulating your response that you found you need to do more exploration with tools, for example reading files. (Remember, you can explore the project with tools like read_file in PLAN MODE without the user having to toggle to ACT MODE.) Defaults to false if not specified.
 - task_progress: (optional)  A checklist showing task progress after this tool use is completed. (See 'Updating Task Progress' section for more details)
 Usage:
-<plan_mode_respond>
+<generate_plan_output>
 <response>Your response here</response>
 <needs_more_exploration>true or false (optional, but you MUST set to true if in <response> you need to read files or use other exploration tools)</needs_more_exploration>
 <task_progress>Checklist here (If you have presented the user with concrete steps or requirements, you can optionally include a todo list outlining these steps.)</task_progress>
-</plan_mode_respond>
+</generate_plan_output>
 
 ## load_mcp_documentation
 Description: Load documentation about creating MCP servers. This tool should be used when the user requests to create or install an MCP server (the user may ask you something along the lines of "add a tool" that does some function, in other words to create an MCP server that provides tools and resources that may connect to external APIs for example. You have the ability to create an MCP server and add it to a configuration file that will then expose the tools and resources for you to use with `use_mcp_tool` and `access_mcp_resource`). The documentation provides detailed information about the MCP server creation process, including setup instructions, best practices, and examples.
@@ -528,13 +528,13 @@ ACT MODE V.S. PLAN MODE
 In each user message, the environment_details will specify the current mode. There are two modes:
 
 - ACT MODE: use tools to complete the task. The only tools that can deliver a reply to the user in this mode are `attempt_completion` and `ask_followup_question`. Do not send a raw assistant reply.
-- PLAN MODE: gather context as needed. The only tool that can deliver a reply to the user in this mode is `plan_mode_respond`. Do not send a raw assistant reply.
+- PLAN MODE: gather context as needed. The only tool that can deliver a reply to the user in this mode is `generate_plan_output`. Do not send a raw assistant reply.
 
 ## What is PLAN MODE?
 
 - While you are usually in ACT MODE, the user may switch to PLAN MODE in order to have a back and forth with you to plan how to best accomplish the task. 
 - When starting in PLAN MODE, depending on the user's request, you may need to do some information gathering e.g. using read_file or search_files to get more context about the task. You may also ask the user clarifying questions with ask_followup_question to get a better understanding of the task.
-- Once you've gained more context about the user's request, you should architect a detailed plan for how you will accomplish the task. Present the plan to the user using the plan_mode_respond tool.
+- Once you've gained more context about the user's request, you should architect a detailed plan for how you will accomplish the task. Present the plan to the user using the generate_plan_output tool.
 - Then you might ask the user if they are pleased with this plan, or if they would like to make any changes. Think of this as a brainstorming session where you can discuss the task and plan the best way to accomplish it.
 - Finally once it seems like you've reached a good plan, ask the user to switch you back to ACT MODE to implement the solution.
 

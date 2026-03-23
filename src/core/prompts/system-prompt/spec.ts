@@ -449,7 +449,7 @@ function getNativeToolDescription(tool: ClineToolSpec, context: SystemPromptCont
 			return "Present the final result to the user when the task is complete."
 		case "ask_followup_question":
 			return "Ask the user one concise follow-up question when required input cannot be inferred."
-		case "plan_mode_respond":
+		case "generate_plan_output":
 			return "Present a concrete plan when the task is in PLAN MODE."
 		case "use_skill":
 			return "Activate a skill by exact name when the request matches an available skill."

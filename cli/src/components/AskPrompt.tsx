@@ -30,7 +30,7 @@ function getPromptType(ask: ClineAsk, text: string): PromptType {
 			}
 			return "text"
 		}
-		case "plan_mode_respond": {
+		case "generate_plan_output": {
 			const parts = jsonParseSafe(text, {
 				question: undefined as string | undefined,
 				options: undefined as string[] | undefined,
@@ -258,7 +258,7 @@ export const AskPrompt: React.FC<AskPromptProps> = ({ onRespond }) => {
 			)
 		}
 
-		case "plan_mode_respond": {
+		case "generate_plan_output": {
 			const parts = jsonParseSafe(text, {
 				question: undefined as string | undefined,
 				options: undefined as string[] | undefined,
@@ -396,7 +396,7 @@ function getCliMessagePrefixIcon(message: ClineMessage): string {
 				return "🌐"
 			case "use_mcp_server":
 				return "🔌"
-			case "plan_mode_respond":
+			case "generate_plan_output":
 				return "📋"
 			default:
 				return "❔"

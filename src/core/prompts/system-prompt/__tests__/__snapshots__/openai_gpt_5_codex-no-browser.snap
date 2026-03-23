@@ -12,9 +12,9 @@ These are the required response channels for user-visible replies. Do not end a 
 
 - `attempt_completion`: Use in ACT MODE when the task is complete or when you need to deliver the final direct answer.
 - `ask_followup_question`: Use in ACT MODE when clarification from the user would improve correctness, reduce risk, or unblock the next step.
-- `plan_mode_respond`: Use in PLAN MODE for plan presentation and other user-facing replies.
+- `generate_plan_output`: Use in PLAN MODE for plan presentation and other user-facing replies.
 
-In ACT MODE, user-visible replies must go through `attempt_completion` and `ask_followup_question`. In PLAN MODE, user-visible replies must go through `plan_mode_respond`.
+In ACT MODE, user-visible replies must go through `attempt_completion` and `ask_followup_question`. In PLAN MODE, user-visible replies must go through `generate_plan_output`.
 
 ====
 
@@ -31,7 +31,7 @@ ACT MODE V.S. PLAN MODE
 
 Current mode is provided in environment_details.
 - ACT MODE: use tools to complete the task. The only tools that can deliver a reply to the user in this mode are `attempt_completion` and `ask_followup_question`. Do not send a raw assistant reply.
-- PLAN MODE: gather context as needed. The only tool that can deliver a reply to the user in this mode is `plan_mode_respond`. Do not send a raw assistant reply.
+- PLAN MODE: gather context as needed. The only tool that can deliver a reply to the user in this mode is `generate_plan_output`. Do not send a raw assistant reply.
 
 ====
 

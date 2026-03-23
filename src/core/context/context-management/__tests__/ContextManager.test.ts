@@ -232,7 +232,7 @@ describe("ContextManager", () => {
 		it("detects duplicate file reads with native tool calling format (tool_result blocks)", () => {
 			const messages: Anthropic.Messages.MessageParam[] = [
 				{ role: "user", content: "Initial task" },
-				{ role: "assistant", content: [{ type: "tool_use", id: "toolu_001", name: "plan_mode_respond", input: {} }] },
+				{ role: "assistant", content: [{ type: "tool_use", id: "toolu_001", name: "generate_plan_output", input: {} }] },
 				{
 					role: "user",
 					content: [
@@ -242,7 +242,7 @@ describe("ContextManager", () => {
 							content: [
 								{
 									type: "text",
-									text: "[plan_mode_respond] Result:\n<user_message>\n'test2.txt' (see below for file content)\n</user_message>\n\n<file_content path=\"/Users/toshi/Desktop/cline_testing_repo/test2.txt\">\ntest\n\n</file_content>",
+									text: "[generate_plan_output] Result:\n<user_message>\n'test2.txt' (see below for file content)\n</user_message>\n\n<file_content path=\"/Users/toshi/Desktop/cline_testing_repo/test2.txt\">\ntest\n\n</file_content>",
 								},
 							],
 						},
@@ -273,7 +273,7 @@ describe("ContextManager", () => {
 							type: "text",
 							text: "[TASK RESUMPTION] This task was interrupted just now. The conversation may have been incomplete.",
 						},
-						{ type: "text", text: "New message to respond to with plan_mode_respond tool" },
+						{ type: "text", text: "New message to respond to with generate_plan_output tool" },
 					],
 				},
 				{ role: "assistant", content: [{ type: "tool_use", id: "toolu_004", name: "replace_in_file", input: {} }] },
