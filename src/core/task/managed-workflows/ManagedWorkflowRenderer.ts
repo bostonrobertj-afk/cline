@@ -226,6 +226,7 @@ Checkpoints are completion gates, not regular steps.
 The workflow may be broken into phases, each with distinct phase checklists.
 The workflow will present details for the next step or phase as you complete existing items on the list.
 Do not assume that you are done with this workflow until you see a message indicating "all required phases are complete".
+If you believe you should do somethhing that the workflow steps have instructed you to do, either stop and ask the user first or default to staying within the scope of the active step. Trust that more detailed steps will be revealed as you complete the steps in front of you, and those upcoming steps likely focus on what you currently perceive as a gap in the workflow design.
 
 
 Current phase: ${resolveManagedWorkflowPlaceholderText(currentPhase.title, placeholders) ?? currentPhase.title}

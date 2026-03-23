@@ -347,7 +347,7 @@ describe("ManagedWorkflowController", () => {
 		expect(run.currentPhaseIndex).to.equal(run.phases.length)
 		expect(buildManagedWorkflowPrompt(run)).to.contain("all required phases are complete")
 		expect(buildManagedWorkflowPrompt(run)).to.contain(
-			"resolve the final checkpoint with attempt_completion, not complete_workflow_item",
+			"ensure the final checkpoint has already been resolved through the workflow-native checkpoint path",
 		)
 	})
 

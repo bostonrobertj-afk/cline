@@ -559,9 +559,6 @@ export class Controller {
 
 		try {
 			this.updateBackgroundCommandState(false)
-			if (text || (images && images.length > 0) || (files && files.length > 0)) {
-				await interruptedTask.say("user_feedback", text, images, files)
-			}
 			interruptedTask.taskState.abandoned = true
 
 			try {
@@ -583,6 +580,16 @@ export class Controller {
 			})
 
 			if (this.task === interruptedTask) {
+				if (text || (images && images.length > 0) || (files && files.length > 0)) {
+					await interruptedTask.resumeTaskFromHistory("followup", {
+						response: "messageResponse",
+						text,
+						images,
+						files,
+					})
+					return
+				}
+
 				await this.openHistoricalTaskPassively({ id: interruptedTaskId } as HistoryItem)
 				return
 			}

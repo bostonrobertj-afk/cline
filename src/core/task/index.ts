@@ -1381,7 +1381,15 @@ export class Task {
 		await this.initiateTaskLoop(userContent)
 	}
 
-	public async resumeTaskFromHistory(openMode: "resume" | "followup" = "resume") {
+	public async resumeTaskFromHistory(
+		openMode: "resume" | "followup" = "resume",
+		injectedResponse?: {
+			response: ClineAskResponse
+			text?: string
+			images?: string[]
+			files?: string[]
+		},
+	) {
 		try {
 			await this.clineIgnoreController.initialize()
 		} catch (error) {
@@ -1441,14 +1449,27 @@ export class Task {
 
 		this.taskState.isInitialized = true
 		this.taskState.abort = false // Reset abort flag when resuming task
+		this.taskState.abandoned = false
 		await this.restoreBmadStateFromMetadata()
 		if (this.taskState.managedWorkflowRun) {
 			await this.refreshManagedWorkflowChecklistProjection()
 		}
 
-		const threadDisplayState =
-			openMode === "followup" ? ThreadDisplayStates.AWAITING_USER_RESPONSE : ThreadDisplayStates.IDLE_OPEN
-		const { response, text, images, files } = await this.ask(askType, undefined, undefined, threadDisplayState) // calls poststatetowebview
+		let response: ClineAskResponse
+		let text: string | undefined
+		let images: string[] | undefined
+		let files: string[] | undefined
+
+		if (injectedResponse) {
+			response = injectedResponse.response
+			text = injectedResponse.text
+			images = injectedResponse.images
+			files = injectedResponse.files
+		} else {
+			const threadDisplayState =
+				openMode === "followup" ? ThreadDisplayStates.AWAITING_USER_RESPONSE : ThreadDisplayStates.IDLE_OPEN
+			;({ response, text, images, files } = await this.ask(askType, undefined, undefined, threadDisplayState)) // calls poststatetowebview
+		}
 
 		// Initialize newUserContent array for hook context
 		const newUserContent: ClineContent[] = []
