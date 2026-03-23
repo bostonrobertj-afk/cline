@@ -50,6 +50,21 @@ describe("getButtonConfig", () => {
 		expect(config.enableButtons).toBe(false)
 	})
 
+	it("treats paused threads as passive for footer/button decisions", () => {
+		const pausedMessage: ClineMessage = {
+			type: "say",
+			say: "api_req_started",
+			partial: true,
+			ts: Date.now(),
+		}
+
+		const config = getButtonConfig(pausedMessage, "act", "paused")
+
+		expect(config).toEqual(BUTTON_CONFIGS.default)
+		expect(config.sendingDisabled).toBe(false)
+		expect(config.enableButtons).toBe(false)
+	})
+
 	// Test error recovery states
 	describe("Error Recovery States", () => {
 		const errorStates = ["api_req_failed", "mistake_limit_reached"]

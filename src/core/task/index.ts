@@ -762,6 +762,15 @@ export class Task {
 		this.taskState.askResponseText = undefined
 		this.taskState.askResponseImages = undefined
 		this.taskState.askResponseFiles = undefined
+
+		// Once an ask resolves, execution is resuming inside the task loop again.
+		// Restore the thread to active-run so post-approval/post-followup work doesn't
+		// remain visually or semantically stuck in the ask state.
+		if (!this.taskState.abort && type !== "completion_result") {
+			this.threadDisplayState = ThreadDisplayStates.ACTIVE_RUN
+			await this.postStateToWebview()
+		}
+
 		return result
 	}
 
@@ -1687,6 +1696,7 @@ export class Task {
 		let nextUserContent = userContent
 		let includeFileDetails = true
 		this.threadDisplayState = ThreadDisplayStates.ACTIVE_RUN
+		await this.postStateToWebview()
 		while (!this.taskState.abort) {
 			const didEndLoop = await this.recursivelyMakeClineRequests(nextUserContent, includeFileDetails)
 			includeFileDetails = false // we only need file details the first time

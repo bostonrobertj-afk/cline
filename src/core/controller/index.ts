@@ -357,15 +357,20 @@ export class Controller {
 		let clineMessages = this.task.messageStateHandler.getClineMessages()
 		let uiMessagesFilePath: string | undefined
 
-		try {
-			const taskData = await this.getTaskWithId(historyItem.id)
-			apiConversationHistory = taskData.apiConversationHistory
-			uiMessagesFilePath = taskData.uiMessagesFilePath
-		} catch (error) {
-			if (this.task.taskId !== historyItem.id) {
-				throw error
+		const shouldPreferInMemory =
+			this.task.taskId === historyItem.id && apiConversationHistory.length > 0 && clineMessages.length > 0
+
+		if (!shouldPreferInMemory) {
+			try {
+				const taskData = await this.getTaskWithId(historyItem.id)
+				apiConversationHistory = taskData.apiConversationHistory
+				uiMessagesFilePath = taskData.uiMessagesFilePath
+			} catch (error) {
+				if (this.task.taskId !== historyItem.id) {
+					throw error
+				}
+				Logger.log(`[Controller] Falling back to in-memory task state for passive open of ${historyItem.id}`)
 			}
-			Logger.log(`[Controller] Falling back to in-memory task state for passive open of ${historyItem.id}`)
 		}
 
 		if (uiMessagesFilePath && (await fileExistsAtPath(uiMessagesFilePath))) {
@@ -541,6 +546,24 @@ export class Controller {
 			this.task &&
 			(this.task.taskState.isStreaming || this.task.taskState.isWaitingForFirstChunk || this.backgroundCommandRunning)
 		)
+	}
+
+	async resumePassiveTaskWithFeedback(text?: string, images?: string[], files?: string[]) {
+		if (!this.task) {
+			return
+		}
+
+		const hasPayload = !!(text || (images && images.length > 0) || (files && files.length > 0))
+		if (!hasPayload) {
+			return
+		}
+
+		await this.task.resumeTaskFromHistory("followup", {
+			response: "messageResponse",
+			text,
+			images,
+			files,
+		})
 	}
 
 	async interruptTaskWithFeedback(text?: string, images?: string[], files?: string[]) {
@@ -921,9 +944,6 @@ export class Controller {
 				}
 			}
 		}
-		// if we tried to get a task that doesn't exist, remove it from state
-		// FIXME: this seems to happen sometimes when the json file doesn't save to disk for some reason
-		await this.deleteTaskFromState(id)
 		throw new Error("Task not found")
 	}
 

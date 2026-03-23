@@ -32,6 +32,29 @@ describe("thread display state contract", () => {
 		assert.equal(roundTripped.threadDisplayState, ThreadDisplayStates.IDLE_OPEN)
 	})
 
+	it("round-trips the full passive/active thread display state contract", () => {
+		const states = [
+			ThreadDisplayStates.ACTIVE_RUN,
+			ThreadDisplayStates.AWAITING_USER_RESPONSE,
+			ThreadDisplayStates.COMPLETED,
+			ThreadDisplayStates.IDLE_OPEN,
+			ThreadDisplayStates.PAUSED,
+		] as const
+
+		for (const threadDisplayState of states) {
+			const message: ClineMessage = {
+				ts: 456,
+				type: "say",
+				say: "text",
+				threadDisplayState,
+			}
+
+			const protoMessage = convertClineMessageToProto(message)
+			const roundTripped = convertProtoToClineMessage(protoMessage)
+			assert.equal(roundTripped.threadDisplayState, threadDisplayState)
+		}
+	})
+
 	it("keeps passive open distinct from real ask states", () => {
 		assert.equal(ThreadDisplayStates.IDLE_OPEN, "idle_open")
 		assert.notEqual(ThreadDisplayStates.IDLE_OPEN, ThreadDisplayStates.AWAITING_USER_RESPONSE)

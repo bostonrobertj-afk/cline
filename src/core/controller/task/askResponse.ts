@@ -2,7 +2,7 @@ import { Empty } from "@shared/proto/cline/common"
 import { AskResponseRequest } from "@shared/proto/cline/task"
 import { Logger } from "@/shared/services/Logger"
 import { ClineAskResponse } from "../../../shared/WebviewMessage"
-import { Controller } from ".."
+import type { Controller } from ".."
 
 /**
  * Handles a response from the webview for a previous ask operation
@@ -35,9 +35,23 @@ export async function askResponse(controller: Controller, request: AskResponseRe
 				return Empty.create()
 		}
 
-		if (responseType === "messageResponse" && controller.isTaskActivelyRunning()) {
-			await controller.interruptTaskWithFeedback(request.text, request.images, request.files)
-			return Empty.create()
+		if (responseType === "messageResponse") {
+			const threadDisplayState = controller.task.getThreadDisplayState?.()
+
+			if (controller.isTaskActivelyRunning()) {
+				await controller.interruptTaskWithFeedback(request.text, request.images, request.files)
+				return Empty.create()
+			}
+
+			if (threadDisplayState === "active_run") {
+				await controller.interruptTaskWithFeedback(request.text, request.images, request.files)
+				return Empty.create()
+			}
+
+			if (threadDisplayState === "idle_open" || threadDisplayState === "paused") {
+				await controller.resumePassiveTaskWithFeedback(request.text, request.images, request.files)
+				return Empty.create()
+			}
 		}
 
 		// Call the task's handler for webview responses

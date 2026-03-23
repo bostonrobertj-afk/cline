@@ -104,6 +104,9 @@ export function useMessageHandlers(messages: ClineMessage[], chatState: ChatStat
 					const lastMessage = messages[messages.length - 1]
 
 					if (isPassiveThreadOpenState) {
+						// Passive-open threads are conversationally open without a pending ask.
+						// Route the message through the controller's explicit passive-thread continuation path
+						// and keep the composer semantics aligned with interruption-style sends.
 						await TaskServiceClient.askResponse(
 							AskResponseRequest.create({
 								responseType: "messageResponse",
@@ -113,6 +116,7 @@ export function useMessageHandlers(messages: ClineMessage[], chatState: ChatStat
 							}),
 						)
 						messageSent = true
+						sentAsInterruption = true
 					}
 
 					const isTaskRunning =

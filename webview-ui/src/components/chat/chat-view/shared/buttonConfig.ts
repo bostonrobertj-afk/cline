@@ -26,10 +26,14 @@ export interface ButtonConfig {
 	secondaryAction?: ButtonActionType
 }
 
-export const PASSIVE_THREAD_DISPLAY_STATE = "idle_open"
+export const PASSIVE_THREAD_DISPLAY_STATES = ["idle_open", "paused"] as const
+export const PASSIVE_THREAD_DISPLAY_STATE = PASSIVE_THREAD_DISPLAY_STATES[0]
 
 export function isPassiveThreadOpen(threadDisplayState?: string | null): boolean {
-	return threadDisplayState === PASSIVE_THREAD_DISPLAY_STATE
+	return (
+		!!threadDisplayState &&
+		PASSIVE_THREAD_DISPLAY_STATES.includes(threadDisplayState as (typeof PASSIVE_THREAD_DISPLAY_STATES)[number])
+	)
 }
 
 /**

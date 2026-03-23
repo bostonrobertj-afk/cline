@@ -20,5 +20,11 @@ Module.prototype.require = function (path: string) {
 	return originalRequire.call(this, path)
 }
 
-// Required to have access to String.prototype.toPosix
-import "../utils/path"
+// Keep the unit-test bootstrap lightweight and fully CommonJS-compatible.
+// Mocha loads this file via `--require`, so avoid importing runtime modules that
+// bring in app aliases or ESM-only dependency chains just to install the helper.
+if (typeof (String.prototype as any).toPosix !== "function") {
+	;(String.prototype as any).toPosix = function (this: string): string {
+		return this.replace(/\\/g, "/")
+	}
+}
