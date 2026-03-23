@@ -27,7 +27,7 @@ enum ThreadDisplayState {
 // Enum for ClineAsk types
 enum ClineAsk {
   FOLLOWUP = 0;
-  generate_plan_output = 1;
+  GENERATE_PLAN_OUTPUT = 1;
   COMMAND = 2;
   COMMAND_OUTPUT = 3;
   COMPLETION_RESULT = 4;
