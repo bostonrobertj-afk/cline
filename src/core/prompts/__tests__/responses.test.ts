@@ -3,6 +3,29 @@ import { describe, it } from "mocha"
 import path from "path"
 import { formatResponse } from "../responses"
 
+describe("formatResponse user input framing", () => {
+	it("labels the latest human input explicitly", () => {
+		const framed = formatResponse.latestHumanInput("task", "Review this story")
+
+		expect(framed).to.contain("[LATEST HUMAN USER INPUT]")
+		expect(framed).to.contain("<task>\nReview this story\n</task>")
+	})
+
+	it("renders resumed human input before system-generated context", () => {
+		const [taskResumptionMessage, userResponseMessage] = formatResponse.taskResumption(
+			"act",
+			"just now",
+			"/workspace/project",
+			false,
+			"Continue the review",
+			false,
+		)
+
+		expect(userResponseMessage).to.contain("[LATEST HUMAN USER INPUT]")
+		expect(taskResumptionMessage).to.contain("[SYSTEM-GENERATED CONTEXT]")
+	})
+})
+
 describe("formatResponse file save summaries", () => {
 	it("keeps final_file_content for smaller files", () => {
 		const response = formatResponse.fileEditWithoutUserChanges(

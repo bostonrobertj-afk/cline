@@ -56,6 +56,10 @@ describe("ManagedWorkflowController", () => {
 		const prompt = buildManagedWorkflowPrompt(run)
 		const taskProgress = renderManagedWorkflowTaskProgress(run)
 
+		expect(prompt).to.contain("Current phase regular steps:")
+		expect(prompt).to.contain("Current phase checkpoint:")
+		expect(prompt).to.contain("Checkpoint rule:")
+		expect(prompt).to.contain("Never use complete_workflow_item for a checkpoint item")
 		expect(prompt).to.contain("Current active step: Determine the review target")
 		expect(prompt).to.contain("Actions:")
 		expect(prompt).to.contain("Branches:")
@@ -63,6 +67,7 @@ describe("ManagedWorkflowController", () => {
 		expect(prompt).to.not.contain("<managed_workflow_phase")
 		expect(prompt).to.not.contain("<step n=")
 		expect(taskProgress).to.contain("step 01 gather context: Determine the review target")
+		expect(taskProgress).to.contain("(Checkpoint) step 01 gather context: Halt after presenting the summary")
 		expect(taskProgress).to.not.contain("staged changes")
 	})
 
@@ -116,7 +121,9 @@ describe("ManagedWorkflowController", () => {
 
 		expect(prompt).to.contain("Current phase: Review Cline")
 		expect(prompt).to.contain("Current checkpoint: Confirm reports/validation.md")
+		expect(prompt).to.contain("Current phase checkpoint:")
 		expect(taskProgress).to.contain("Review Cline: Ask Rob about token resolution")
+		expect(taskProgress).to.contain("(Checkpoint)")
 	})
 
 	it("falls back to the authored skill file when a managed workflow does not ship a separate workflow.md", async () => {
@@ -313,6 +320,9 @@ describe("ManagedWorkflowController", () => {
 		expect(run.allRequiredComplete).to.equal(true)
 		expect(run.currentPhaseIndex).to.equal(run.phases.length)
 		expect(buildManagedWorkflowPrompt(run)).to.contain("all required phases are complete")
+		expect(buildManagedWorkflowPrompt(run)).to.contain(
+			"resolve the final checkpoint with attempt_completion, not complete_workflow_item",
+		)
 	})
 
 	it("does not allow duplicate completion of an already completed item", () => {

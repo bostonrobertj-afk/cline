@@ -6,9 +6,14 @@ import type {
 	ManagedWorkflowStepDefinition,
 } from "./types"
 
-function flattenPhaseItems(
-	run: ManagedWorkflowRunState,
-): Array<{ phase: ManagedWorkflowPhaseState; label: string; completed: boolean; required: boolean; advisory: boolean }> {
+function flattenPhaseItems(run: ManagedWorkflowRunState): Array<{
+	phase: ManagedWorkflowPhaseState
+	label: string
+	completed: boolean
+	required: boolean
+	advisory: boolean
+	blocked: boolean
+}> {
 	const placeholders = getManagedWorkflowPlaceholderMap(run)
 	return run.phases.flatMap((phase) =>
 		phase.items.map((item) => ({
@@ -19,6 +24,7 @@ function flattenPhaseItems(
 			completed: item.completed,
 			required: item.required !== false && item.optional !== true,
 			advisory: item.advisory === true || item.required === false,
+			blocked: item.blocked === true,
 		})),
 	)
 }
@@ -158,7 +164,10 @@ function renderGroupedInstructionContent(
 
 export function renderManagedWorkflowTaskProgress(run: ManagedWorkflowRunState): string {
 	return flattenPhaseItems(run)
-		.map((entry) => `- [${entry.completed ? "x" : " "}] ${entry.advisory ? "(Advisory) " : ""}${entry.label}`)
+		.map(
+			(entry) =>
+				`- [${entry.completed ? "x" : " "}] ${entry.blocked ? "(Checkpoint) " : entry.advisory ? "(Advisory) " : ""}${entry.label}`,
+		)
 		.join("\n")
 }
 
@@ -169,17 +178,28 @@ export function buildManagedWorkflowPrompt(run: ManagedWorkflowRunState): string
 		return `<active_bmad_workflow workflow_id="${run.workflowId}">
 The managed workflow ${run.workflowId} is active and all required phases are complete.
 How to finalize and exit this workflow:
-- call complete_workflow_item for all items in the task list, up to and including the final item
+- call complete_workflow_item for all remaining regular checklist steps
+- resolve the final checkpoint with attempt_completion, not complete_workflow_item
 - Call attempt_completion and include your full final report to the user.
 - STOP and await further instruction from the user.</active_bmad_workflow>`
 	}
 
-	const items = currentPhase.items
+	const regularItems = currentPhase.items.filter((item) => item.blocked !== true)
+	const checkpointItems = currentPhase.items.filter((item) => item.blocked === true)
+	const items = regularItems
 		.map(
 			(item) =>
 				`- [${item.completed ? "x" : " "}] ${
 					resolveManagedWorkflowPlaceholderText(item.label, placeholders) ?? item.label
 				}${item.required === false ? " (advisory)" : ""} (\`${item.id}\`)`,
+		)
+		.join("\n")
+	const checkpoints = checkpointItems
+		.map(
+			(item) =>
+				`- [${item.completed ? "x" : " "}] ${
+					resolveManagedWorkflowPlaceholderText(item.label, placeholders) ?? item.label
+				} (\`${item.id}\`)`,
 		)
 		.join("\n")
 	const activeItem = findActiveWorkflowItem(run)
@@ -196,9 +216,13 @@ How to finalize and exit this workflow:
 	return `<active_bmad_workflow workflow_id="${run.workflowId}" managed="true" phase_id="${currentPhase.id}">
 The active BMAD workflow for this task is ${run.workflowId}.
 This is a backend-managed workflow. Do not invent or rewrite the checklist manually.
-You MUST limit your scope to the detailed instructions for the active step under current phase checklist.
-You MUST mark each step as complete using the complete_workflow_item tool before moving on, even if you are skipping an optional step.
+You MUST limit your scope to the detailed instructions for the active step and checkpoint rules shown below.
+Use complete_workflow_item only for regular checklist steps.
+Never use complete_workflow_item for a checkpoint item or any item whose id ends with ::checkpoint.
+Resolve checkpoints only with attempt_completion after the regular checklist steps in the current phase are complete and any required user interaction is satisfied.
+You MUST mark each regular checklist step as complete using the complete_workflow_item tool before moving on, even if you are skipping an optional step.
 You MUST NOT attempt to mark multiple steps complete simultaneously. The system will not accept batched completion attempts.
+Checkpoints are completion gates, not regular steps.
 The workflow may be broken into phases, each with distinct phase checklists.
 The workflow will present details for the next step or phase as you complete existing items on the list.
 Do not assume that you are done with this workflow until you see a message indicating "all required phases are complete".
@@ -206,8 +230,21 @@ Do not assume that you are done with this workflow until you see a message indic
 
 Current phase: ${resolveManagedWorkflowPlaceholderText(currentPhase.title, placeholders) ?? currentPhase.title}
 
-Current phase checklist:
-${items}
+Current phase regular steps:
+${items || "- No regular checklist steps remain in this phase."}
+
+${
+	checkpoints
+		? `Current phase checkpoint:
+${checkpoints}
+
+Checkpoint rule:
+- Do NOT use complete_workflow_item for the checkpoint above.
+- Use attempt_completion only when the checkpoint text has been satisfied.
+- Treat the checkpoint as the phase-exit gate, not as a normal step.
+`
+		: ""
+} 
 
 ${activeStepInstructions}
 </active_bmad_workflow>`
