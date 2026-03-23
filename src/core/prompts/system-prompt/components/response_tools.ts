@@ -1,7 +1,11 @@
 import type { SystemPromptContext } from "../types"
 
 function getActModeResponseTools(context: SystemPromptContext): string[] {
-	return context.yoloModeToggled !== true ? ["`attempt_completion`", "`ask_followup_question`"] : ["`attempt_completion`"]
+	return context.yoloModeToggled !== true ? ["`attempt_completion`", "`ask_followup_question`"] : ["`act_mode_respond`"]
+}
+
+function getPlanModeResponseTools(): string[] {
+	return ["`plan_mode_respond`", "`ask_followup_question`"]
 }
 
 function joinToolNames(toolNames: string[]): string {
@@ -14,30 +18,26 @@ function joinToolNames(toolNames: string[]): string {
 
 export function getResponseToolsSection(context: SystemPromptContext): string {
 	const actModeTools = getActModeResponseTools(context)
-	const responseToolLines = [
-		"- `attempt_completion`: Use in ACT MODE when the task is complete or when you need to deliver the final direct answer.",
-	]
+	const responseToolLines = ["- `attempt_completion`: Use at the end of a workflow or task"]
 
 	if (context.yoloModeToggled !== true) {
-		responseToolLines.push(
-			"- `ask_followup_question`: Use in ACT MODE when clarification from the user would improve correctness, reduce risk, or unblock the next step.",
-		)
+		responseToolLines.push("- `ask_followup_question`: Use to ask the user a question at any time")
 	}
 
 	responseToolLines.push("- `plan_mode_respond`: Use in PLAN MODE for plan presentation and other user-facing replies.")
 
 	return `RESPONSE TOOLS
-
-These are the required response channels for user-visible replies. Do not end a completed turn with raw assistant text. A reply reaches the human user only when you use the appropriate response tool.
+Use these tools to respond to the user. Responses that fail to use these tools will not reach the user.
 
 ${responseToolLines.join("\n")}
 
-In ACT MODE, user-visible replies must go through ${joinToolNames(actModeTools)}. In PLAN MODE, user-visible replies must go through \`plan_mode_respond\`.`
+In ACT MODE, respond using these: ${joinToolNames(actModeTools)}. In PLAN MODE, respond using \`plan_mode_respond\`.`
 }
 
 export function getActVsPlanModeResponseRules(context: SystemPromptContext): string {
 	const actModeResponseTools = joinToolNames(getActModeResponseTools(context))
+	const planModeResponseTools = joinToolNames(getPlanModeResponseTools())
 
-	return `- ACT MODE: use tools to complete the task. The only tools that can deliver a reply to the user in this mode are ${actModeResponseTools}. Do not send a raw assistant reply.
-- PLAN MODE: gather context as needed. The only tool that can deliver a reply to the user in this mode is \`plan_mode_respond\`. Do not send a raw assistant reply.`
+	return `- ACT MODE: Engage in dialogue and execute tasks/workflows. To message the user, use these: ${actModeResponseTools}.
+- PLAN MODE: Engage in dialogue focused on planning out future tasks. To message the user, use these: ${planModeResponseTools}. Do not send a raw assistant reply.`
 }
