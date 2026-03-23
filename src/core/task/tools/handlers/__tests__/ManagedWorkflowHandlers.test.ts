@@ -324,6 +324,52 @@ describe("Managed workflow handlers", () => {
 		}
 	})
 
+	it("treats duplicate managed workflow placeholder values as a no-op", async () => {
+		const sandbox = sinon.createSandbox()
+		try {
+			const handler = new SetWorkflowPlaceholdersToolHandler()
+			const config = createConfig()
+			const run = createManagedWorkflowRun()
+			run.dynamicPlaceholders = {
+				research_topic: "token resolution",
+				validation_report_path: "reports/validation.md",
+			}
+			run.updatedAt = 123
+			config.taskState.managedWorkflowRun = run
+			config.taskState.activeWorkflowId = "bmad-code-review"
+
+			const getMetadataStub = sandbox
+				.stub(disk, "getTaskMetadata")
+				.resolves({ activeWorkflowId: "bmad-code-review" } as any)
+			const saveMetadataStub = sandbox.stub(disk, "saveTaskMetadata").resolves()
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "set_workflow_placeholders",
+				params: {
+					values: {
+						research_topic: "token resolution",
+						validation_report_path: "reports/validation.md",
+					},
+				},
+				partial: false,
+			} as any)
+
+			expect(String(result)).to.contain("No workflow placeholder values changed")
+			expect(String(result)).to.contain("Do not call set_workflow_placeholders again")
+			expect(getMetadataStub.called).to.equal(false)
+			expect(saveMetadataStub.called).to.equal(false)
+			expect(config.taskState.managedWorkflowRun?.dynamicPlaceholders).to.deep.equal({
+				research_topic: "token resolution",
+				validation_report_path: "reports/validation.md",
+			})
+			expect(config.taskState.managedWorkflowRun?.updatedAt).to.equal(123)
+			expect((config.callbacks.updateFCListFromToolResponse as sinon.SinonStub).called).to.equal(false)
+		} finally {
+			sandbox.restore()
+		}
+	})
+
 	it("round-trips managed workflow placeholder state through task metadata save and reload", async () => {
 		const tempGlobalStorageDir = await fs.mkdtemp(path.join(os.tmpdir(), "managed-workflow-metadata-"))
 		try {

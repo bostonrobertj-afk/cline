@@ -1,6 +1,6 @@
 import type { ToolUse } from "@core/assistant-message"
 import { getTaskMetadata, saveTaskMetadata } from "@core/storage/disk"
-import { updateManagedWorkflowDynamicPlaceholders } from "@core/task/managed-workflows/placeholders"
+import { applyManagedWorkflowDynamicPlaceholders } from "@core/task/managed-workflows/placeholders"
 import { ClineDefaultTool } from "@/shared/tools"
 import type { ToolResponse } from "../../index"
 import type { IPartialBlockHandler, IToolHandler } from "../ToolExecutorCoordinator"
@@ -58,8 +58,15 @@ export class SetWorkflowPlaceholdersToolHandler implements IToolHandler, IPartia
 			await config.callbacks.say("tool", message, undefined, undefined, false)
 		}
 
-		config.taskState.managedWorkflowRun = updateManagedWorkflowDynamicPlaceholders(currentRun, values)
+		const { run: updatedRun, changedKeys, unchangedKeys } = applyManagedWorkflowDynamicPlaceholders(currentRun, values)
+		config.taskState.managedWorkflowRun = updatedRun
 		config.taskState.activeWorkflowId = config.taskState.managedWorkflowRun.workflowId
+
+		if (changedKeys.length === 0) {
+			config.taskState.consecutiveMistakeCount = 0
+			const unchangedSummary = unchangedKeys.length > 0 ? unchangedKeys.join(", ") : keys.join(", ")
+			return `No workflow placeholder values changed. Existing stored values already match: ${unchangedSummary}. Do not call set_workflow_placeholders again unless one of those values changes; continue the current workflow step or call complete_workflow_item if that step is finished.`
+		}
 
 		try {
 			const metadata = await getTaskMetadata(config.taskId)
@@ -73,6 +80,7 @@ export class SetWorkflowPlaceholdersToolHandler implements IToolHandler, IPartia
 		await config.callbacks.updateFCListFromToolResponse(undefined)
 		config.taskState.consecutiveMistakeCount = 0
 
-		return `Stored ${keys.length} workflow placeholder${keys.length === 1 ? "" : "s"}: ${keys.join(", ")}`
+		const unchangedSuffix = unchangedKeys.length > 0 ? ` Unchanged existing values: ${unchangedKeys.join(", ")}.` : ""
+		return `Stored ${changedKeys.length} workflow placeholder${changedKeys.length === 1 ? "" : "s"}: ${changedKeys.join(", ")}.${unchangedSuffix}`
 	}
 }

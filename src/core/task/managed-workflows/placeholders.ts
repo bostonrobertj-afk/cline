@@ -129,8 +129,21 @@ export function updateManagedWorkflowDynamicPlaceholders(
 	run: ManagedWorkflowRunState,
 	values: Record<string, unknown>,
 ): ManagedWorkflowRunState {
+	return applyManagedWorkflowDynamicPlaceholders(run, values).run
+}
+
+export function applyManagedWorkflowDynamicPlaceholders(
+	run: ManagedWorkflowRunState,
+	values: Record<string, unknown>,
+): {
+	run: ManagedWorkflowRunState
+	changedKeys: string[]
+	unchangedKeys: string[]
+} {
 	const current = getManagedWorkflowPlaceholderMap(run)
 	const updatedDynamicPlaceholders = { ...(run.dynamicPlaceholders ?? {}) }
+	const changedKeys: string[] = []
+	const unchangedKeys: string[] = []
 
 	for (const [key, value] of Object.entries(values)) {
 		const rawValue = toPlaceholderString(value)
@@ -140,14 +153,28 @@ export function updateManagedWorkflowDynamicPlaceholders(
 
 		const resolvedValue = resolveManagedWorkflowPlaceholderText(rawValue, current)
 		if (resolvedValue) {
+			if (updatedDynamicPlaceholders[key] === resolvedValue) {
+				unchangedKeys.push(key)
+				continue
+			}
+
 			updatedDynamicPlaceholders[key] = resolvedValue
 			current[key] = resolvedValue
+			changedKeys.push(key)
 		}
 	}
 
+	if (changedKeys.length === 0) {
+		return { run, changedKeys, unchangedKeys }
+	}
+
 	return {
-		...run,
-		dynamicPlaceholders: updatedDynamicPlaceholders,
-		updatedAt: Date.now(),
+		run: {
+			...run,
+			dynamicPlaceholders: updatedDynamicPlaceholders,
+			updatedAt: Date.now(),
+		},
+		changedKeys,
+		unchangedKeys,
 	}
 }
