@@ -97,6 +97,31 @@ interface ChatRowContentProps extends Omit<ChatRowProps, "onHeightChange"> {}
 export const ProgressIndicator = () => <LoaderCircleIcon className="size-2 mr-2 animate-spin" />
 const InvisibleSpacer = () => <div aria-hidden className="h-px" />
 
+export const getFollowupPresentation = (messageText?: string) => {
+	let question: string | undefined
+	let options: string[] | undefined
+	let selected: string | undefined
+	try {
+		const parsedMessage = JSON.parse(messageText || "{}") as ClineAskQuestion
+		question = parsedMessage.question
+		options = parsedMessage.options
+		selected = parsedMessage.selected
+	} catch (_e) {
+		// legacy messages would pass question directly
+		question = messageText
+	}
+
+	const hasQuestion = !!question?.trim()
+
+	return {
+		question,
+		options,
+		selected,
+		hasQuestion,
+		title: hasQuestion ? "Cline has a question:" : "Conversation reopened:",
+	}
+}
+
 const ChatRow = memo(
 	(props: ChatRowProps) => {
 		const { isLast, onHeightChange, message } = props
@@ -309,6 +334,8 @@ export const ChatRowContent = memo(
 			}, 0) // Delay of 0ms pushes execution after current event cycle
 		}, []) // Dependencies remain empty
 
+		const followupPresentation = useMemo(() => getFollowupPresentation(message.text), [message.text])
+
 		const [icon, title] = useMemo(() => {
 			switch (type) {
 				case "error":
@@ -354,7 +381,7 @@ export const ChatRowContent = memo(
 				case "followup":
 					return [
 						<span className="codicon codicon-question text-foreground mb-[-1.5px]" />,
-						<span className="font-bold text-foreground">Cline has a question:</span>,
+						<span className="font-bold text-foreground">{followupPresentation.title}</span>,
 					]
 				default:
 					return [null, null]
@@ -368,6 +395,7 @@ export const ChatRowContent = memo(
 			apiReqCancelReason,
 			isMcpServerResponding,
 			message.text,
+			followupPresentation.title,
 		])
 
 		const tool = useMemo(() => {
@@ -903,7 +931,7 @@ export const ChatRowContent = memo(
 									showTitle={true}
 									title={isReasoningStreaming ? "Thinking..." : "Thinking"}
 								/>
-						{isReasoningStreaming && <FeatureTip />}
+								{isReasoningStreaming && <FeatureTip />}
 							</div>
 						)
 					}
@@ -1181,19 +1209,6 @@ export const ChatRowContent = memo(
 						// Virtuoso cannot handle zero-height items; render a spacer instead of null
 						return <InvisibleSpacer />
 					case "followup":
-						let question: string | undefined
-						let options: string[] | undefined
-						let selected: string | undefined
-						try {
-							const parsedMessage = JSON.parse(message.text || "{}") as ClineAskQuestion
-							question = parsedMessage.question
-							options = parsedMessage.options
-							selected = parsedMessage.selected
-						} catch (_e) {
-							// legacy messages would pass question directly
-							question = message.text
-						}
-
 						return (
 							<div>
 								{title && (
@@ -1202,34 +1217,44 @@ export const ChatRowContent = memo(
 										{title}
 									</div>
 								)}
-								<WithCopyButton
-									className="pt-1"
-									onMouseUp={handleMouseUp}
-									position="bottom-right"
-									ref={contentRef}
-									textToCopy={question}>
-									<MarkdownRow markdown={question} />
-									{quoteButtonState.visible && (
-										<QuoteButton
-											left={quoteButtonState.left}
-											onClick={() => {
-												handleQuoteClick()
-											}}
-											top={quoteButtonState.top}
-										/>
-									)}
-								</WithCopyButton>
-								<div className="pt-3">
-									<OptionsButtons
-										inputValue={inputValue}
-										isActive={
-											(isLast && lastModifiedMessage?.ask === "followup") ||
-											(!selected && options && options.length > 0)
-										}
-										options={options}
-										selected={selected}
-									/>
-								</div>
+								{followupPresentation.hasQuestion ? (
+									<>
+										<WithCopyButton
+											className="pt-1"
+											onMouseUp={handleMouseUp}
+											position="bottom-right"
+											ref={contentRef}
+											textToCopy={followupPresentation.question || ""}>
+											<MarkdownRow markdown={followupPresentation.question || ""} />
+											{quoteButtonState.visible && (
+												<QuoteButton
+													left={quoteButtonState.left}
+													onClick={() => {
+														handleQuoteClick()
+													}}
+													top={quoteButtonState.top}
+												/>
+											)}
+										</WithCopyButton>
+										<div className="pt-3">
+											<OptionsButtons
+												inputValue={inputValue}
+												isActive={
+													(isLast && lastModifiedMessage?.ask === "followup") ||
+													(!followupPresentation.selected &&
+														followupPresentation.options &&
+														followupPresentation.options.length > 0)
+												}
+												options={followupPresentation.options}
+												selected={followupPresentation.selected}
+											/>
+										</div>
+									</>
+								) : (
+									<div className="pt-1 text-muted-foreground">
+										Conversation reopened and waiting for your input.
+									</div>
+								)}
 							</div>
 						)
 					case "new_task":

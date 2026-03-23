@@ -1338,7 +1338,7 @@ export class Task {
 		await this.initiateTaskLoop(userContent)
 	}
 
-	public async resumeTaskFromHistory() {
+	public async resumeTaskFromHistory(openMode: "resume" | "followup" = "resume") {
 		try {
 			await this.clineIgnoreController.initialize()
 		} catch (error) {
@@ -1388,7 +1388,9 @@ export class Task {
 			.find((m) => !(m.ask === "resume_task" || m.ask === "resume_completed_task")) // could be multiple resume tasks
 
 		let askType: ClineAsk
-		if (lastClineMessage?.ask === "completion_result") {
+		if (openMode === "followup") {
+			askType = "followup"
+		} else if (lastClineMessage?.ask === "completion_result") {
 			askType = "resume_completed_task"
 		} else {
 			askType = "resume_task"

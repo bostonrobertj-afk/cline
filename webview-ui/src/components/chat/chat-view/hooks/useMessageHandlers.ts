@@ -43,6 +43,7 @@ export function useMessageHandlers(messages: ClineMessage[], chatState: ChatStat
 			if (hasContent) {
 				console.log("[ChatView] handleSendMessage - Sending message:", messageToSend)
 				let messageSent = false
+				let sentAsInterruption = false
 
 				if (messages.length === 0) {
 					await TaskServiceClient.newTask(
@@ -113,6 +114,7 @@ export function useMessageHandlers(messages: ClineMessage[], chatState: ChatStat
 							}),
 						)
 						messageSent = true
+						sentAsInterruption = true
 					}
 				}
 
@@ -120,10 +122,13 @@ export function useMessageHandlers(messages: ClineMessage[], chatState: ChatStat
 				if (messageSent) {
 					setInputValue("")
 					setActiveQuote(null)
-					setSendingDisabled(true)
 					setSelectedImages([])
 					setSelectedFiles([])
-					setEnableButtons(false)
+
+					if (!sentAsInterruption) {
+						setSendingDisabled(true)
+						setEnableButtons(false)
+					}
 
 					// Reset auto-scroll
 					if ("disableAutoScrollRef" in chatState) {

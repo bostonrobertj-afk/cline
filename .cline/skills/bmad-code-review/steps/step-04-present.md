@@ -13,7 +13,7 @@
 - After you complete the final checklist item in this phase, stop and wait for the prompt to refresh before doing any work from the next phase.
 - Do not attempt checklist items from another phase while the current phase is active.
 - If the current step establishes a dynamic workflow-state value that later workflow text refers to by placeholder, store it immediately with `set_workflow_placeholders` using the exact placeholder key.
-- Never try to complete checkpoints using the complete_workflow_item tool. The correct tool for checkpoints is attempt_completion.
+- Never try to complete checkpoints using the complete_workflow_item tool. Resolve checkpoints using the workflow-native checkpoint-resolution mechanism.
 
 ## EXECUTION
 
@@ -74,9 +74,8 @@
 
 ## CHECKPOINT
 
-If you have completed every numbered step in the workflow, you can complete and exit the workflow by using the attempt_completion tool to send a final message to the user informing them that this workflow is complete, then HALT and await further instruction.
+If you have completed every numbered step in the workflow, resolve the checkpoint using the workflow-native checkpoint-resolution mechanism, then use the attempt_completion tool to send a final message to the user informing them that this workflow is complete, then HALT and await further instruction.
 ## ADVISORY
 
 - Keep the final report concise, specific, and evidence-based.
 - Preserve the distinction between fix-now issues and deferred or intent-level concerns.
-

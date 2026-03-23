@@ -104,7 +104,13 @@ const BUILTIN_BMAD_AGENT_ALLOWLIST: ReadonlyArray<BmadAgentAllowlistEntry> = [
 		personaFile: "_bmad/bmm/agents/dev.md",
 		personaReminder:
 			"Stay in the Developer persona: concise, implementation-first, and anchored in files, tasks, tests, and code quality.",
-		allowedSkills: ["bmad-dev-story", "bmad-code-review", "bmad-party-mode"],
+		allowedSkills: [
+			"bmad-dev-story",
+			"bmad-code-review",
+			"bmad-review-adversarial-general",
+			"bmad-review-edge-case-hunter",
+			"bmad-party-mode",
+		],
 	},
 	{
 		id: "bmad-qa",

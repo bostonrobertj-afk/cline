@@ -233,6 +233,7 @@ export class Controller {
 		files?: string[],
 		historyItem?: HistoryItem,
 		taskSettings?: Partial<Settings>,
+		historyOpenMode: "resume" | "followup" = "resume",
 	) {
 		// Fire-and-forget: We intentionally don't await fetchRemoteConfig here.
 		// Remote config is already fetched in startRemoteConfigTimer() which runs in the constructor,
@@ -327,7 +328,7 @@ export class Controller {
 		})
 
 		if (historyItem) {
-			this.task.resumeTaskFromHistory()
+			this.task.resumeTaskFromHistory(historyOpenMode)
 		} else if (task || images || files) {
 			this.task.startTask(task, images, files)
 		}
@@ -422,7 +423,7 @@ export class Controller {
 		return false
 	}
 
-	async cancelTask() {
+	async cancelTask(preserveThreadVisible = false) {
 		// Prevent duplicate cancellations from spam clicking
 		if (this.cancelInProgress) {
 			Logger.log(`[Controller.cancelTask] Cancellation already in progress, ignoring duplicate request`)
@@ -463,12 +464,19 @@ export class Controller {
 				this.task.taskState.abandoned = true
 			}
 
-			// Small delay to ensure state manager has persisted the history update
-			//await new Promise((resolve) => setTimeout(resolve, 100))
-
 			// NOW try to get history after abort has finished (hook may have saved messages)
 			try {
-				await this.getTaskWithId(this.task.taskId)
+				const { historyItem } = await this.getTaskWithId(this.task.taskId)
+
+				if (preserveThreadVisible && historyItem) {
+					if (this.task) {
+						await this.stateManager.clearTaskSettings()
+						this.task = undefined
+					}
+
+					await this.initTask(undefined, undefined, undefined, historyItem, undefined, "followup")
+					return
+				}
 			} catch (error) {
 				// Task not in history yet (new task with no messages); catch the
 				// error to enable the agent to continue making progress.
@@ -504,24 +512,25 @@ export class Controller {
 			return
 		}
 
-		const interruptedTaskId = this.task.taskId
+		const interruptedTask = this.task
+		const interruptedTaskId = interruptedTask.taskId
 		this.cancelInProgress = true
 
 		try {
 			this.updateBackgroundCommandState(false)
+			interruptedTask.taskState.abandoned = true
 
 			try {
-				await this.task.abortTask()
+				await interruptedTask.abortTask()
 			} catch (error) {
 				Logger.error("Failed to abort task for steering", error)
 			}
 
 			await pWaitFor(
 				() =>
-					this.task === undefined ||
-					this.task.taskState.isStreaming === false ||
-					this.task.taskState.didFinishAbortingStream ||
-					this.task.taskState.isWaitingForFirstChunk,
+					interruptedTask.taskState.isStreaming === false ||
+					interruptedTask.taskState.didFinishAbortingStream ||
+					interruptedTask.taskState.isWaitingForFirstChunk,
 				{
 					timeout: 3_000,
 				},
@@ -529,13 +538,13 @@ export class Controller {
 				Logger.error("Failed to abort task for steering")
 			})
 
-			if (this.task) {
-				// Prevent the interrupted task instance from posting stale updates after we resume.
-				this.task.taskState.abandoned = true
+			if (this.task === interruptedTask) {
+				await this.stateManager.clearTaskSettings()
+				this.task = undefined
 			}
 
 			const { historyItem } = await this.getTaskWithId(interruptedTaskId)
-			await this.initTask(undefined, undefined, undefined, historyItem)
+			await this.initTask(undefined, undefined, undefined, historyItem, undefined, "followup")
 
 			const resumedTask = this.task
 			if (!resumedTask) {
@@ -545,10 +554,7 @@ export class Controller {
 			await pWaitFor(
 				() => {
 					const lastMessage = resumedTask.messageStateHandler.getClineMessages().at(-1)
-					return (
-						lastMessage?.type === "ask" &&
-						(lastMessage.ask === "resume_task" || lastMessage.ask === "resume_completed_task")
-					)
+					return lastMessage?.type === "ask" && lastMessage.ask === "followup"
 				},
 				{
 					timeout: 3_000,

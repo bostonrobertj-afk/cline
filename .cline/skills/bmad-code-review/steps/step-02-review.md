@@ -17,43 +17,50 @@ failed_layers: '' # set at runtime: comma-separated list of layers that failed o
 - After you complete the final checklist item in this phase, stop and wait for the prompt to refresh before doing any work from the next phase.
 - Do not attempt checklist items from another phase while the current phase is active.
 - If the current step establishes a dynamic workflow-state value that later workflow text refers to by placeholder, store it immediately with `set_workflow_placeholders` using the exact placeholder key.
-- NEVER attempt to complete checkpoints using the complete_workflow_item tool. Checkpoints must be completed using the attempt_completion tool.
+- NEVER attempt to complete checkpoints using the complete_workflow_item tool. Checkpoints must be completed using the workflow-native checkpoint-resolution mechanism.
 
 ## EXECUTION
 
 <step n="1" goal="Launch the review layers">
 <detail> Your job is not to perform direct code review. Your job is to dispatch subagents, ensure they perform their assigned review procedures, and collect their findings before moving on to the next phase of this workflow.</detail>
+<detail>Never assign `bmad-code-review` to any of the review-layer subagents in this phase. Use the dedicated reviewer skills named below, or a plain general-purpose subagent when the workflow explicitly says no dedicated reviewer exists.</detail>
   <action>
     Dispatch a separate subagent for the Blind Hunter review.
     <detail>
       There is no dedicated Blind Hunter workflow, so assign the workflow skill with a prompt line like `Skill: use_skill('bmad-review-adversarial-general')`.
+      Do not tell the subagent to run `bmad-code-review`.
       Prompt the subagent to review `{diff_output}` only.
       Do not give it `{spec_file}`, project files, or project context.
       Tell it:
       - limit your scope to only the files necessary to perform your assigned task. Do not perform broad-reaching file reads.
       - if `{review_input_type} = "diff"`: `Act as a diff-only Blind Hunter reviewer. Stay grounded only in the provided diff. Return concise markdown findings with a short title, the observed issue, and evidence from the diff when available.`
       - if `{review_input_type} = "file-bundle"`: `Act as a file-scoped Blind Hunter reviewer. Stay grounded only in the provided files and story-described scope. Do not go searching for commits or unrelated project files. Return concise markdown findings with a short title, the observed issue, and evidence from the provided files when available.`
+      - if `{review_input_type} = "file-scope"`: `Act as a file-scope Blind Hunter reviewer. Start from the provided story file and scope manifest. Read only the specific files you need to validate a suspected issue. Do not bulk-read every scoped file up front. Return concise markdown findings with a short title, the observed issue, and evidence from the files you actually inspected.`
     </detail>
   </action>
   <action>
     Dispatch a separate subagent for the Adversarial General review.
     <detail>
       Assign the workflow skill with a prompt line like `Skill: use_skill('bmad-review-adversarial-general')`.
+      Do not tell the subagent to run `bmad-code-review`.
       Prompt the subagent with `{diff_output}` plus any already loaded project context that helps ground the review.
       When `{review_mode} = `full``, also include `{spec_file}` as supporting context, but tell the subagent to stay focused on general adversarial review rather than AC-by-AC auditing.
       Tell it:
       - if `{review_input_type} = "diff"`: `Review this change skeptically. Stay focused on the provided diff and nearby directly relevant context. Return concise markdown findings with titles, evidence, and file locations when available.`
       - if `{review_input_type} = "file-bundle"`: `Review this implemented story skeptically using only the provided file bundle and loaded story/spec context. Do not infer a commit range or search for a different baseline unless the parent prompt explicitly gives one. Return concise markdown findings with titles, evidence, and file locations when available.`
+      - if `{review_input_type} = "file-scope"`: `Review this implemented story skeptically using the provided story file and file-scope manifest as the review boundary. Read only the files you actually need. Do not bulk-read every scoped file or infer a commit range unless the parent prompt explicitly gives one. Return concise markdown findings with titles, evidence, and file locations when available.`
     </detail>
   </action>
   <action>
     Dispatch a separate subagent for the Edge Case Hunter review.
     <detail>
       Assign the workflow skill with a prompt line like `Skill: use_skill('bmad-review-edge-case-hunter')`.
+      Do not tell the subagent to run `bmad-code-review`.
       Prompt the subagent with `{diff_output}` and project read access.
       Tell it:
       - if `{review_input_type} = "diff"`: `Inspect reachable boundary conditions and branching paths in the changed scope only. Return only the JSON array format expected by the edge-case hunter workflow.`
       - if `{review_input_type} = "file-bundle"`: `Inspect reachable boundary conditions and branching paths in the provided files only. Treat the provided file bundle as the full review scope for this story. Return only the JSON array format expected by the edge-case hunter workflow.`
+      - if `{review_input_type} = "file-scope"`: `Inspect reachable boundary conditions and branching paths within the story-described scoped files only. Start from the scope manifest, then selectively read only the files required to reason about an edge case. Do not bulk-read every scoped file. Return only the JSON array format expected by the edge-case hunter workflow.`
     </detail>
   </action>
   <branch if="{review_mode} = `full`" optional="true">
@@ -62,12 +69,14 @@ failed_layers: '' # set at runtime: comma-separated list of layers that failed o
       <detail>
         Use a general-purpose subagent if no dedicated Acceptance Auditor workflow exists.
         Do not call `use_skill` unless a dedicated Acceptance Auditor workflow is introduced later.
+        Do not tell this subagent to run `bmad-code-review`.
         Prompt that subagent with `{diff_output}`, `{spec_file}`, and any loaded context docs.
         Tell it:
         - You are an Acceptance Auditor.
         - Review the provided implementation scope against the spec and context docs.
         - Check for acceptance-criteria violations, deviations from spec intent, missing specified behavior, and contradictions between spec constraints and the actual code.
         - If the review input is a file bundle instead of a diff, treat the provided files as the authoritative implementation scope and do not search for old commits unless one was explicitly provided.
+        - If the review input is a file-scope manifest, start from the story file and manifest, then selectively read only the files required to verify the acceptance criteria or spec constraints you are checking.
         - Return a markdown list where each finding includes a one-line title, the violated AC or constraint, and evidence from the provided review input.
       </detail>
     </action>
@@ -112,7 +121,7 @@ failed_layers: '' # set at runtime: comma-separated list of layers that failed o
 ## CHECKPOINT
 
 Halt if fallback prompt files were generated and wait for the user to paste back the review-layer findings before proceeding.
-Once you're confident that you have collected all review findings, use the attempt_completion tool to resolve this checkpoint and unlock the next phase.
+Once you're confident that you have collected all review findings, use the workflow-native checkpoint-resolution mechanism to resolve this checkpoint and unlock the next phase.
 
 ## ADVISORY
 
@@ -121,4 +130,3 @@ Once you're confident that you have collected all review findings, use the attem
 - Keep the Edge Case Hunter focused on reachable edge cases in the provided review scope.
 - Only run the Acceptance Auditor when a usable spec context exists.
 - Do not attempt `step-03-triage::*` or `step-04-present::*` checklist items while the current phase is still `step-02-review`.
-

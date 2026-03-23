@@ -2,6 +2,7 @@ import { expect } from "chai"
 import { describe, it } from "mocha"
 import {
 	completeManagedWorkflowItem,
+	resolveManagedWorkflowCheckpoint,
 	startManagedWorkflowRun,
 	startOrResumeManagedWorkflowRun,
 } from "../ManagedWorkflowController"
@@ -32,17 +33,21 @@ describe("ManagedWorkflowController", () => {
 		})
 		expect(run.stablePlaceholders?.output_folder).to.equal(`${cwd}/_bmad-output`)
 
-		const firstPhaseItemIds = run.phases[0].items.map((item) => item.id)
+		const regularPhaseItemIds = run.phases[0].items.filter((item) => !item.blocked).map((item) => item.id)
+		const checkpointItem = run.phases[0].items.find((item) => item.blocked)
 
-		run = completeManagedWorkflowItem(run, firstPhaseItemIds[0])
+		expect(checkpointItem).to.exist
+		expect(regularPhaseItemIds).to.have.length.greaterThan(1)
+
+		run = completeManagedWorkflowItem(run, regularPhaseItemIds[0])
 		expect(run.currentPhaseIndex).to.equal(0)
 		expect(run.phases[0].completed).to.equal(false)
 
-		for (const itemId of firstPhaseItemIds.slice(1, -1)) {
+		for (const itemId of regularPhaseItemIds.slice(1)) {
 			run = completeManagedWorkflowItem(run, itemId)
 		}
 
-		run = completeManagedWorkflowItem(run, firstPhaseItemIds[firstPhaseItemIds.length - 1])
+		run = resolveManagedWorkflowCheckpoint(run, checkpointItem!.id)
 
 		expect(run.currentPhaseIndex).to.equal(1)
 		expect(run.phases[0].completed).to.equal(true)
@@ -215,7 +220,7 @@ describe("ManagedWorkflowController", () => {
 		expect(refreshedRun.phases[0].items.length).to.be.greaterThan(2)
 	})
 
-	it("prevents checkpoint items from completing before earlier required items are done", async () => {
+	it("rejects regular item completion for checkpoint items", async () => {
 		clearManagedWorkflowRegistryCache(cwd)
 
 		const run = await startManagedWorkflowRun(cwd, "bmad-code-review", "bmad-code-review")
@@ -223,8 +228,29 @@ describe("ManagedWorkflowController", () => {
 
 		expect(checkpointItem).to.exist
 		expect(() => completeManagedWorkflowItem(run, checkpointItem!.id)).to.throw(
-			`not the active workflow item. Complete "${run.phases[0].items[0].id}" first`,
+			"is a checkpoint and cannot be completed as a regular workflow item",
 		)
+	})
+
+	it("resolves checkpoint items through the checkpoint-specific workflow path", async () => {
+		clearManagedWorkflowRegistryCache(cwd)
+
+		const run = await startManagedWorkflowRun(cwd, "bmad-code-review", "bmad-code-review")
+		const regularItemIds = run.phases[0].items.filter((item) => !item.blocked).map((item) => item.id)
+		const checkpointItem = run.phases[0].items.find((item) => item.blocked)
+
+		expect(checkpointItem).to.exist
+
+		let updatedRun = run
+		for (const itemId of regularItemIds) {
+			updatedRun = completeManagedWorkflowItem(updatedRun, itemId)
+		}
+
+		updatedRun = resolveManagedWorkflowCheckpoint(updatedRun, checkpointItem!.id)
+
+		expect(updatedRun.phases[0].items.find((item) => item.id === checkpointItem!.id)?.completed).to.equal(true)
+		expect(updatedRun.currentPhaseIndex).to.equal(1)
+		expect(updatedRun.phases[0].completed).to.equal(true)
 	})
 
 	it("prevents later items from bypassing an unresolved blocked checkpoint", () => {

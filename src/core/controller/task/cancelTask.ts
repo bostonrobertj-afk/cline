@@ -8,6 +8,6 @@ import { Controller } from ".."
  * @returns Empty response
  */
 export async function cancelTask(controller: Controller, _request: EmptyRequest): Promise<Empty> {
-	await controller.cancelTask()
+	await controller.cancelTask(true)
 	return Empty.create()
 }

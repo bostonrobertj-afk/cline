@@ -20,7 +20,7 @@ export function getResponseToolsSection(context: SystemPromptContext): string {
 
 	if (context.yoloModeToggled !== true) {
 		responseToolLines.push(
-			"- `ask_followup_question`: Use in ACT MODE when required user input is missing and cannot be inferred.",
+			"- `ask_followup_question`: Use in ACT MODE when clarification from the user would improve correctness, reduce risk, or unblock the next step.",
 		)
 	}
 

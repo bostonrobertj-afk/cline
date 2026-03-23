@@ -225,6 +225,67 @@ describe("Managed workflow handlers", () => {
 		}
 	})
 
+	it("resolves checkpoint items through the complete_workflow_item handler without requiring attempt_completion", async () => {
+		const sandbox = sinon.createSandbox()
+		try {
+			const handler = new CompleteWorkflowItemToolHandler()
+			const config = createConfig()
+			config.taskState.managedWorkflowRun = {
+				workflowId: "bmad-code-review",
+				slashCommand: "bmad-code-review",
+				status: "active",
+				currentPhaseIndex: 0,
+				createdAt: Date.now(),
+				updatedAt: Date.now(),
+				allRequiredComplete: false,
+				phases: [
+					{
+						id: "step-01-gather-context",
+						title: "Gather Context",
+						sourcePath: ".cline/skills/bmad-code-review/steps/step-01-gather-context.md",
+						sourceContent: "# Step 1",
+						completed: false,
+						items: [
+							{
+								id: "step-01-gather-context::item-1",
+								label: "Load context",
+								sourceText: "Load context",
+								completed: true,
+							},
+							{
+								id: "step-01-gather-context::checkpoint",
+								label: "Confirm the summary",
+								sourceText: "Confirm the summary",
+								completed: false,
+								blocked: true,
+							},
+						],
+					},
+				],
+			}
+			config.taskState.activeWorkflowId = "bmad-code-review"
+
+			const metadata = { activeWorkflowId: "bmad-code-review" } as any
+			sandbox.stub(disk, "getTaskMetadata").resolves(metadata)
+			sandbox.stub(disk, "saveTaskMetadata").resolves()
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "complete_workflow_item",
+				params: {
+					item_id: "step-01-gather-context::checkpoint",
+				},
+				partial: false,
+			} as any)
+
+			expect(String(result)).to.contain('Marked checkpoint "step-01-gather-context::checkpoint" complete.')
+			expect(String(result)).to.contain("All required workflow phases are complete.")
+			expect(config.taskState.managedWorkflowRun?.phases[0].items[1].completed).to.equal(true)
+		} finally {
+			sandbox.restore()
+		}
+	})
+
 	it("persists managed workflow placeholders to task metadata", async () => {
 		const sandbox = sinon.createSandbox()
 		try {

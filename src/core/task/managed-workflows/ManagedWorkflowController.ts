@@ -7,6 +7,10 @@ function isRequiredManagedWorkflowItem(item: ManagedWorkflowItemState): boolean 
 	return item.required !== false && item.optional !== true
 }
 
+function isCheckpointManagedWorkflowItem(item: ManagedWorkflowItemState): boolean {
+	return item.blocked === true
+}
+
 function canResumeManagedWorkflowRun(existingRun: ManagedWorkflowRunState, freshRun: ManagedWorkflowRunState): boolean {
 	if (existingRun.status !== "active") {
 		return false
@@ -126,7 +130,11 @@ export function getCurrentManagedWorkflowItems(run: ManagedWorkflowRunState): Ma
 	return run.phases[run.currentPhaseIndex]?.items ?? []
 }
 
-export function completeManagedWorkflowItem(run: ManagedWorkflowRunState, itemId: string): ManagedWorkflowRunState {
+function advanceManagedWorkflowItem(
+	run: ManagedWorkflowRunState,
+	itemId: string,
+	mode: "step" | "checkpoint",
+): ManagedWorkflowRunState {
 	if (run.status !== "active") {
 		throw new Error(`Managed workflow "${run.workflowId}" is not active.`)
 	}
@@ -140,6 +148,14 @@ export function completeManagedWorkflowItem(run: ManagedWorkflowRunState, itemId
 	const targetItem = targetItemIndex >= 0 ? phase.items[targetItemIndex] : undefined
 	if (!targetItem) {
 		throw new Error(`Item "${itemId}" is not in the current phase "${phase.id}".`)
+	}
+
+	const targetIsCheckpoint = isCheckpointManagedWorkflowItem(targetItem)
+	if (mode === "step" && targetIsCheckpoint) {
+		throw new Error(`Item "${itemId}" is a checkpoint and cannot be completed as a regular workflow item.`)
+	}
+	if (mode === "checkpoint" && !targetIsCheckpoint) {
+		throw new Error(`Item "${itemId}" is not a checkpoint.`)
 	}
 
 	if (targetItem.completed) {
@@ -158,7 +174,7 @@ export function completeManagedWorkflowItem(run: ManagedWorkflowRunState, itemId
 
 	const earlierItems = phase.items.slice(0, targetItemIndex)
 	const hasIncompleteEarlierRequiredItems = earlierItems.some((item) => !item.completed && isRequiredManagedWorkflowItem(item))
-	if (targetItem.blocked && hasIncompleteEarlierRequiredItems) {
+	if (targetIsCheckpoint && hasIncompleteEarlierRequiredItems) {
 		throw new Error(`Item "${itemId}" is blocked until earlier required workflow items are complete.`)
 	}
 
@@ -202,4 +218,12 @@ export function completeManagedWorkflowItem(run: ManagedWorkflowRunState, itemId
 		updatedAt: Date.now(),
 		allRequiredComplete,
 	}
+}
+
+export function completeManagedWorkflowItem(run: ManagedWorkflowRunState, itemId: string): ManagedWorkflowRunState {
+	return advanceManagedWorkflowItem(run, itemId, "step")
+}
+
+export function resolveManagedWorkflowCheckpoint(run: ManagedWorkflowRunState, itemId: string): ManagedWorkflowRunState {
+	return advanceManagedWorkflowItem(run, itemId, "checkpoint")
 }

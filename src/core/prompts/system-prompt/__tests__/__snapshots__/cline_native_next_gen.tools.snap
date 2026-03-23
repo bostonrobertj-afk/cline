@@ -3,7 +3,7 @@
     "type": "function",
     "function": {
       "name": "ask_followup_question",
-      "description": "Ask user a question for clarifying or gathering information needed to complete the task. For example, ask the user clarifying questions about a key implementation decision. You should only ask one question.",
+      "description": "Ask user a concise question for clarifying or gathering information needed to complete the task. For example, ask the user clarifying questions about a key implementation decision.",
       "strict": false,
       "parameters": {
         "type": "object",

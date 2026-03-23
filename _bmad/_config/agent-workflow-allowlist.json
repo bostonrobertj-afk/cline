@@ -73,6 +73,8 @@
 			"allowedSkills": [
 				"bmad-dev-story",
 				"bmad-code-review",
+				"bmad-review-adversarial-general",
+				"bmad-review-edge-case-hunter",
 				"bmad-party-mode"
 			]
 		},

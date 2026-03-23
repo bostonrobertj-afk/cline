@@ -18,7 +18,7 @@ describe("Controller.interruptTaskWithFeedback", () => {
 
 		const resumedTask = {
 			messageStateHandler: {
-				getClineMessages: () => [{ type: "ask", ask: "resume_task" }],
+				getClineMessages: () => [{ type: "ask", ask: "followup" }],
 			},
 			handleWebviewAskResponse: sinon.stub().resolves(),
 		}
@@ -30,6 +30,7 @@ describe("Controller.interruptTaskWithFeedback", () => {
 			updateBackgroundCommandState: sinon.SinonStub
 			getTaskWithId: sinon.SinonStub
 			initTask: sinon.SinonStub
+			stateManager: { clearTaskSettings: sinon.SinonStub }
 		} = {
 			cancelInProgress: false,
 			backgroundCommandRunning: false,
@@ -39,6 +40,9 @@ describe("Controller.interruptTaskWithFeedback", () => {
 			initTask: sinon.stub().callsFake(async () => {
 				fakeController.task = resumedTask
 			}),
+			stateManager: {
+				clearTaskSettings: sinon.stub().resolves(),
+			},
 		}
 
 		await Controller.prototype.interruptTaskWithFeedback.call(
@@ -52,7 +56,16 @@ describe("Controller.interruptTaskWithFeedback", () => {
 		assert.equal(interruptedTask.taskState.abandoned, true)
 		sinon.assert.calledOnce(fakeController.updateBackgroundCommandState)
 		sinon.assert.calledOnce(fakeController.getTaskWithId)
-		sinon.assert.calledOnce(fakeController.initTask)
+		sinon.assert.calledOnce(fakeController.stateManager.clearTaskSettings)
+		sinon.assert.calledOnceWithExactly(
+			fakeController.initTask,
+			undefined,
+			undefined,
+			undefined,
+			{ id: "task-1" },
+			undefined,
+			"followup",
+		)
 		sinon.assert.calledOnceWithExactly(
 			resumedTask.handleWebviewAskResponse,
 			"messageResponse",

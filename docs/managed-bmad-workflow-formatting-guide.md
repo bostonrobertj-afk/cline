@@ -411,10 +411,11 @@ Present a summary before proceeding: diff stats, review mode, and loaded context
 Why this stays special:
 
 - checkpoints are distinct from ordinary steps
-- current managed workflow runtime already has special checkpoint semantics
+- checkpoints are resolved by the runtime-owned checkpoint mechanism, not by `attempt_completion`
 - keeping them explicit avoids turning ordinary step logic into controller-level gates accidentally
 
 Do not use a normal `<step>` as a substitute for checkpoint semantics unless the runtime is explicitly updated to treat it that way.
+Do not instruct the agent to use `attempt_completion` to resolve a checkpoint.
 
 ## Routing and Control Flow
 

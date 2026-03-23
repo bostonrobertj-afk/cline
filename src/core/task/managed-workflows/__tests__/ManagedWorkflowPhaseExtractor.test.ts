@@ -12,21 +12,23 @@ describe("ManagedWorkflowPhaseExtractor", () => {
 	it("extracts step-only checklist items for the converted bmad-code-review gather-context phase", async () => {
 		clearManagedWorkflowRegistryCache(cwd)
 		const workflow = await getManagedWorkflowDefinition(cwd, "bmad-code-review")
-		const phases = await extractManagedWorkflowPhases(cwd, workflow!)
+		expect(workflow).to.exist
+		const phases = await extractManagedWorkflowPhases(cwd, workflow as NonNullable<typeof workflow>)
 		const gatherContextPhase = phases.find((phase) => phase.id === "step-01-gather-context")
-
 		expect(gatherContextPhase).to.exist
-		expect(gatherContextPhase!.execution?.steps).to.have.length(4)
-		expect(gatherContextPhase!.items.map((item) => item.label)).to.deep.equal([
+		const definedGatherContextPhase = gatherContextPhase as NonNullable<typeof gatherContextPhase>
+
+		expect(definedGatherContextPhase.execution?.steps).to.have.length(4)
+		expect(definedGatherContextPhase.items.map((item) => item.label)).to.deep.equal([
 			"Determine the review target",
 			"Construct {diff_output} from the chosen source",
 			"Load spec and context documents when available",
 			"Check review size and confirm readiness",
 			"Halt after presenting the summary and wait for the user to confirm that review should proceed.",
 		])
-		expect(gatherContextPhase!.items.some((item) => item.label.includes("staged changes"))).to.equal(false)
-		expect(gatherContextPhase!.execution?.steps[0]?.instructions.some((node) => node.type === "branch")).to.equal(true)
-		expect(gatherContextPhase!.checkpointText).to.contain("Halt after presenting the summary")
+		expect(definedGatherContextPhase.items.some((item) => item.label.includes("staged changes"))).to.equal(false)
+		expect(definedGatherContextPhase.execution?.steps[0]?.instructions.some((node) => node.type === "branch")).to.equal(true)
+		expect(definedGatherContextPhase.checkpointText).to.contain("Halt after presenting the summary")
 	})
 
 	it("preserves workflow placeholders during extraction instead of stripping them from step content", async () => {
@@ -51,7 +53,8 @@ describe("ManagedWorkflowPhaseExtractor", () => {
 				"utf8",
 			)
 
-			const phases = await extractManagedWorkflowPhases(tempRoot, workflow!)
+			expect(workflow).to.exist
+			const phases = await extractManagedWorkflowPhases(tempRoot, workflow as NonNullable<typeof workflow>)
 			expect(phases).to.have.length(1)
 			expect(phases[0].execution?.steps[0]?.goal).to.equal("Load {{research_topic}} for {project_name}")
 			expect(phases[0].execution?.steps[0]?.instructions[0]?.text).to.equal("Review {{research_topic}} in {project_name}")
@@ -63,7 +66,8 @@ describe("ManagedWorkflowPhaseExtractor", () => {
 	it("preserves branch and detail content without turning them into sprint-status checklist rows", async () => {
 		clearManagedWorkflowRegistryCache(cwd)
 		const workflow = await getManagedWorkflowDefinition(cwd, "bmad-sprint-status")
-		const phases = await extractManagedWorkflowPhases(cwd, workflow!)
+		expect(workflow).to.exist
+		const phases = await extractManagedWorkflowPhases(cwd, workflow as NonNullable<typeof workflow>)
 
 		expect(phases).to.have.length(1)
 		expect(phases[0].execution?.steps).to.have.length(6)
@@ -74,7 +78,7 @@ describe("ManagedWorkflowPhaseExtractor", () => {
 			"Select the next workflow recommendation",
 			"Display the sprint summary",
 			"Present interactive action options and close cleanly",
-			"Stop before advancing whenever the sprint status file is missing, a status value must be corrected, or the user must choose an action.",
+			"After ensuring that all task list items are complete (one-by-one, in order, using the complete_workflow_item tool),",
 		])
 		expect(phases[0].items.some((item) => item.label.includes("Data mode output"))).to.equal(false)
 		expect(phases[0].items.some((item) => item.label.includes("next_workflow_id"))).to.equal(false)
@@ -84,15 +88,17 @@ describe("ManagedWorkflowPhaseExtractor", () => {
 	it("parses branch-based starter presentation guidance as step detail rather than checklist rows", async () => {
 		clearManagedWorkflowRegistryCache(cwd)
 		const workflow = await getManagedWorkflowDefinition(cwd, "bmad-create-architecture")
-		const phases = await extractManagedWorkflowPhases(cwd, workflow!)
+		expect(workflow).to.exist
+		const phases = await extractManagedWorkflowPhases(cwd, workflow as NonNullable<typeof workflow>)
 		const starterPhase = phases.find((phase) => phase.id === "step-03-starter")
-
 		expect(starterPhase).to.exist
-		const starterPresentation = starterPhase!.execution?.steps.find((step) => step.number === 3)
+		const definedStarterPhase = starterPhase as NonNullable<typeof starterPhase>
+
+		const starterPresentation = definedStarterPhase.execution?.steps.find((step) => step.number === 3)
 		expect(starterPresentation).to.exist
-		expect(starterPresentation!.goal).to.equal("Present the starter recommendation")
-		expect(starterPresentation!.instructions.filter((node) => node.type === "branch")).to.have.length(3)
-		expect(starterPhase!.items.some((item) => item.label.includes("well-maintained starter"))).to.equal(false)
+		expect(starterPresentation?.goal).to.equal("Present the starter recommendation")
+		expect(starterPresentation?.instructions.filter((node) => node.type === "branch")).to.have.length(3)
+		expect(definedStarterPhase.items.some((item) => item.label.includes("well-maintained starter"))).to.equal(false)
 	})
 
 	it("does not silently fall back to workflow.md when an explicit phase-root workflow is missing its step files", async () => {
@@ -115,7 +121,7 @@ describe("ManagedWorkflowPhaseExtractor", () => {
 
 			let thrownError: unknown
 			try {
-				await extractManagedWorkflowPhases(tempRoot, workflow!)
+				await extractManagedWorkflowPhases(tempRoot, workflow as NonNullable<typeof workflow>)
 			} catch (error) {
 				thrownError = error
 			}

@@ -2,7 +2,7 @@
 diff_output: '' # set at runtime
 spec_file: '' # set at runtime (path or empty)
 review_mode: '' # set at runtime: "full" or "no-spec"
-review_input_type: '' # set at runtime: "diff" or "file-bundle"
+review_input_type: '' # set at runtime: "diff", "file-bundle", or "file-scope"
 ---
 
 # step 01 gather context
@@ -23,7 +23,7 @@ review_input_type: '' # set at runtime: "diff" or "file-bundle"
 - After you complete the final checklist item in this phase, stop and wait for the prompt to refresh before doing any work from the next phase.
 - Do not attempt checklist items from another phase while the current phase is active.
 - If the current step establishes a dynamic workflow-state value that later workflow text refers to by placeholder, store it immediately with `set_workflow_placeholders` using the exact placeholder key.
-- Remember: complete_workflow_item is your tool to mark checklist items as complete, attempt_completion is your tool to mark the checkpoint at the end of the phase complete.
+- Remember: complete_workflow_item is your tool to mark checklist items as complete, and the workflow-native checkpoint-resolution mechanism is what marks the phase checkpoint complete.
 
 ## EXECUTION
 
@@ -97,29 +97,31 @@ review_input_type: '' # set at runtime: "diff" or "file-bundle"
         - parse status, acceptance criteria, completion notes, change log, and Dev Agent Record sections
         - look specifically for the story's File List or equivalent list of changed files
         - if the story describes what changed and which files were touched, use that information before considering commits
+        - do not read the full contents of every listed implementation file in this phase unless the user explicitly supplied that file content already
       </detail>
     </action>
     <action>Set `{spec_file}` to the story file path and set `{review_mode}` to `full`.</action>
     <branch if="the story file has a usable File List" optional="true">
       <action>
-        Build a scoped review bundle from the listed files.
+        Build a lightweight scoped review manifest from the listed files.
         <detail>
           - validate each listed path exists when it should still be present
-          - read the current contents of each listed file
-          - assemble `{diff_output}` as a labeled file bundle with clear per-file headers so downstream reviewers can inspect the resulting implementation
-          - set `{review_input_type}` to `file-bundle`
+          - capture only the path list, file count, and any story-described notes about what changed
+          - do not bulk-read full file contents here
+          - assemble `{diff_output}` as a labeled scope manifest that downstream review layers can use to selectively inspect only the files they truly need
+          - set `{review_input_type}` to `file-scope`
         </detail>
       </action>
     </branch>
     <branch if="the story file lacks a usable File List but names changed files elsewhere" optional="true">
       <action>
-        Build the same scoped file bundle from the paths documented in completion notes, change log, or other story sections.
+        Build the same lightweight scope manifest from the paths documented in completion notes, change log, or other story sections.
       </action>
-      <action>Set `{review_input_type}` to `file-bundle`.</action>
+      <action>Set `{review_input_type}` to `file-scope`.</action>
     </branch>
     <branch if="the story file documents a specific commit range or reviewable diff source explicitly" optional="true">
       <action>
-        Use that documented range or diff source only when it is explicitly available and more faithful than the file bundle.
+        Use that documented range or diff source only when it is explicitly available and more faithful than the lightweight file scope manifest.
       </action>
     </branch>
     <branch if="the story file does not identify changed files well enough to build scope" optional="true">
@@ -231,11 +233,10 @@ review_input_type: '' # set at runtime: "diff" or "file-bundle"
 ## CHECKPOINT
 
 Halt after presenting the summary and wait for the user to confirm that review should proceed.
-Once the indicate alignment with proceeding, use attempt_completion to resolve this checkpoint and unlock the next phase.
+Once the user indicates alignment with proceeding, use the workflow-native checkpoint-resolution mechanism to resolve this checkpoint and unlock the next phase.
 
 ## ADVISORY
 
 - Treat this phase as read-only unless the workflow explicitly says otherwise.
 - Keep the gathered context focused on enabling the next review phase, not on starting the review early.
 - If you notice a possible defect while gathering context, do not pursue it yet. Carry that concern into the actual review phase instead of doing ad hoc QA here.
-

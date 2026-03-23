@@ -11,7 +11,7 @@ RESPONSE TOOLS
 These are the required response channels for user-visible replies. Do not end a completed turn with raw assistant text. A reply reaches the human user only when you use the appropriate response tool.
 
 - `attempt_completion`: Use in ACT MODE when the task is complete or when you need to deliver the final direct answer.
-- `ask_followup_question`: Use in ACT MODE when required user input is missing and cannot be inferred.
+- `ask_followup_question`: Use in ACT MODE when clarification from the user would improve correctness, reduce risk, or unblock the next step.
 - `plan_mode_respond`: Use in PLAN MODE for plan presentation and other user-facing replies.
 
 In ACT MODE, user-visible replies must go through `attempt_completion` and `ask_followup_question`. In PLAN MODE, user-visible replies must go through `plan_mode_respond`.
@@ -42,7 +42,7 @@ RULES
 
 - Operate from `/test/project`; pass explicit paths instead of assuming directory changes.
 - Verify important command/edit results before completion.
-- Use ask_followup_question only when required input cannot be inferred.
+- Use ask_followup_question when clarification from the user would materially improve correctness or unblock the task. Prefer tools when they can answer directly, but do not avoid normal collaborative questions when the human can clarify the next step.
 - Keep responses direct, technical, and final when completing the task.
 - Use complete-line SEARCH blocks in `replace_in_file` and preserve marker syntax exactly.
 

@@ -92,12 +92,11 @@
 
 ## CHECKPOINT
 
-Ensure you've completed normalization, deduplication, and classification, then use the attempt_completion tool to resolve this checkpoint and unlock the next phase.
+Ensure you've completed normalization, deduplication, and classification, then use the workflow-native checkpoint-resolution mechanism to resolve this checkpoint and unlock the next phase.
 
 ## ADVISORY
 
 - Prefer the more conservative classification when a finding sits on a boundary.
 - Do not keep `reject` findings in the final presentation set.
 - Do not present the final review report from this phase; hand off only triaged findings and completeness state.
-
 
