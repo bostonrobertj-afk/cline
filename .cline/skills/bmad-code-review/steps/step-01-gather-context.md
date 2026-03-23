@@ -23,6 +23,7 @@ review_input_type: '' # set at runtime: "diff" or "file-bundle"
 - After you complete the final checklist item in this phase, stop and wait for the prompt to refresh before doing any work from the next phase.
 - Do not attempt checklist items from another phase while the current phase is active.
 - If the current step establishes a dynamic workflow-state value that later workflow text refers to by placeholder, store it immediately with `set_workflow_placeholders` using the exact placeholder key.
+- Remember: complete_workflow_item is your tool to mark checklist items as complete, attempt_completion is your tool to mark the checkpoint at the end of the phase complete.
 
 ## EXECUTION
 
@@ -230,9 +231,11 @@ review_input_type: '' # set at runtime: "diff" or "file-bundle"
 ## CHECKPOINT
 
 Halt after presenting the summary and wait for the user to confirm that review should proceed.
+Once the indicate alignment with proceeding, use attempt_completion to resolve this checkpoint and unlock the next phase.
 
 ## ADVISORY
 
 - Treat this phase as read-only unless the workflow explicitly says otherwise.
 - Keep the gathered context focused on enabling the next review phase, not on starting the review early.
 - If you notice a possible defect while gathering context, do not pursue it yet. Carry that concern into the actual review phase instead of doing ad hoc QA here.
+

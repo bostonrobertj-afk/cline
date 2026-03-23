@@ -13,6 +13,7 @@
 - After you complete the final checklist item in this phase, stop and wait for the prompt to refresh before doing any work from the next phase.
 - Do not attempt checklist items from another phase while the current phase is active.
 - If the current step establishes a dynamic workflow-state value that later workflow text refers to by placeholder, store it immediately with `set_workflow_placeholders` using the exact placeholder key.
+- You will unlock detailed instructions regarding exactly where to document review findings in the 5th step of this phase.
 
 ## EXECUTION
 
@@ -91,11 +92,12 @@
 
 ## CHECKPOINT
 
-Complete normalization, deduplication, and classification before moving on to presentation.
+Ensure you've completed normalization, deduplication, and classification, then use the attempt_completion tool to resolve this checkpoint and unlock the next phase.
 
 ## ADVISORY
 
 - Prefer the more conservative classification when a finding sits on a boundary.
 - Do not keep `reject` findings in the final presentation set.
 - Do not present the final review report from this phase; hand off only triaged findings and completeness state.
+
 

@@ -17,10 +17,12 @@ failed_layers: '' # set at runtime: comma-separated list of layers that failed o
 - After you complete the final checklist item in this phase, stop and wait for the prompt to refresh before doing any work from the next phase.
 - Do not attempt checklist items from another phase while the current phase is active.
 - If the current step establishes a dynamic workflow-state value that later workflow text refers to by placeholder, store it immediately with `set_workflow_placeholders` using the exact placeholder key.
+- NEVER attempt to complete checkpoints using the complete_workflow_item tool. Checkpoints must be completed using the attempt_completion tool.
 
 ## EXECUTION
 
 <step n="1" goal="Launch the review layers">
+<detail> Your job is not to perform direct code review. Your job is to dispatch subagents, ensure they perform their assigned review procedures, and collect their findings before moving on to the next phase of this workflow.</detail>
   <action>
     Dispatch a separate subagent for the Blind Hunter review.
     <detail>
@@ -110,6 +112,7 @@ failed_layers: '' # set at runtime: comma-separated list of layers that failed o
 ## CHECKPOINT
 
 Halt if fallback prompt files were generated and wait for the user to paste back the review-layer findings before proceeding.
+Once you're confident that you have collected all review findings, use the attempt_completion tool to resolve this checkpoint and unlock the next phase.
 
 ## ADVISORY
 
@@ -118,3 +121,4 @@ Halt if fallback prompt files were generated and wait for the user to paste back
 - Keep the Edge Case Hunter focused on reachable edge cases in the provided review scope.
 - Only run the Acceptance Auditor when a usable spec context exists.
 - Do not attempt `step-03-triage::*` or `step-04-present::*` checklist items while the current phase is still `step-02-review`.
+

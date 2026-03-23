@@ -3,8 +3,8 @@
 ## META
 
 - Goal: present the triaged findings clearly and recommend next actions.
-- Execute this file in order.
-- Halt whenever user input, confirmation, or workflow gating is required.
+- This is the final phase of the workflow.
+- Halt whenever user input, confirmation, or workflow gating is required. Engage in dialogue with the user to ensure they understand your findings and recommendations.
 - Do not auto-fix anything in this step.
 - Only the current phase checklist and the current active step's details are shown in the prompt at one time.
 - Mark an optional branch complete when it is intentionally skipped so the next step's details can be revealed.
@@ -13,6 +13,7 @@
 - After you complete the final checklist item in this phase, stop and wait for the prompt to refresh before doing any work from the next phase.
 - Do not attempt checklist items from another phase while the current phase is active.
 - If the current step establishes a dynamic workflow-state value that later workflow text refers to by placeholder, store it immediately with `set_workflow_placeholders` using the exact placeholder key.
+- Never try to complete checkpoints using the complete_workflow_item tool. The correct tool for checkpoints is attempt_completion.
 
 ## EXECUTION
 
@@ -48,6 +49,7 @@
 </step>
 
 <step n="3" goal="Summarize the review outcome">
+<detail>This step should involve dialogue with the user. Give the user a chance to ask questions about your findings before marking this step as complete.</detail>
   <output>Provide a summary line with the counts for `intent_gap`, `bad_spec`, `patch`, `defer`, and rejected-noise findings.</output>
   <branch if="the review is clean" optional="true">
     <output>State whether no findings were raised at all or whether raised findings were ultimately rejected as noise.</output>
@@ -58,6 +60,7 @@
 </step>
 
 <step n="4" goal="Offer next-step recommendations">
+<detail> If the target of this review was a completed story, ensure that you added the QA findings to the story's document with suggested remediation tasks, and inform the user that the standard procedure is for the user to dispatch a separate dev agent assigned to the bmad-dev-story workflow and have them execute remediation for the story.</detail>
   <branch if="patch findings exist" optional="true">
     <output>Recommend addressing the patch findings in a follow-up implementation pass or by manual fixes.</output>
   </branch>
@@ -67,21 +70,13 @@
   <branch if="only defer findings remain" optional="true">
     <output>Explain that no action is required for the current change and that the deferred items can be tracked for future work.</output>
   </branch>
-  <output>
-    Conclude the review after presenting the recommendations unless the user explicitly asked for another workflow or follow-up action in the same request.
-    <detail>
-      Do not ask a new follow-up question just to keep the workflow open.
-      If the user already requested a next action as part of the same task, acknowledge that recommended handoff in the summary.
-      Otherwise, finish the review and stop cleanly.
-    </detail>
-  </output>
 </step>
 
 ## CHECKPOINT
 
-After ensuring that all task list items are complete (one-by-one, in order, using the complete_workflow_item tool),
-Use the attempt_completion tool to send a final message to the user informing them that this workflow is complete, then HALT and await further instruction.
+If you have completed every numbered step in the workflow, you can complete and exit the workflow by using the attempt_completion tool to send a final message to the user informing them that this workflow is complete, then HALT and await further instruction.
 ## ADVISORY
 
 - Keep the final report concise, specific, and evidence-based.
 - Preserve the distinction between fix-now issues and deferred or intent-level concerns.
+
