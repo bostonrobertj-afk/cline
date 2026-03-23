@@ -376,36 +376,6 @@
   {
     "type": "function",
     "function": {
-      "name": "generate_explanation",
-      "description": "Opens a multi-file diff view and generates AI-powered inline comments explaining the changes between two git references.",
-      "strict": false,
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "title": {
-            "type": "string",
-            "description": "A descriptive title for the diff view (e.g., 'Changes in commit abc123', 'PR #42: Add authentication', 'Changes between main and feature-branch')"
-          },
-          "from_ref": {
-            "type": "string",
-            "description": "The git reference for the 'before' state."
-          },
-          "to_ref": {
-            "type": "string",
-            "description": "The git reference for the 'after' state."
-          }
-        },
-        "required": [
-          "title",
-          "from_ref"
-        ],
-        "additionalProperties": false
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
       "name": "use_subagents",
       "description": "Run up to five focused in-process subagents in parallel.",
       "strict": false,

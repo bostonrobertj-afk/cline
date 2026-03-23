@@ -687,6 +687,8 @@ export class OpenAiNativeHandler implements ApiHandler {
 		modelInfo: ModelInfo,
 	): ApiStream {
 		const functionCallByItemId = new Map<string, { call_id?: string; name?: string; id?: string }>()
+		const functionCallItemsWithArgumentDeltas = new Set<string>()
+		const functionCallItemsWithFallbackArgumentsEmitted = new Set<string>()
 
 		for await (const chunk of stream) {
 			Logger.debug(`OpenAI Responses Chunk: ${JSON.stringify(chunk)}`)
@@ -695,18 +697,6 @@ export class OpenAiNativeHandler implements ApiHandler {
 				const item = chunk.item
 				if (item.type === "function_call" && item.id) {
 					functionCallByItemId.set(item.id, { call_id: item.call_id, name: item.name, id: item.id })
-					yield {
-						type: "tool_calls",
-						id: item.id,
-						tool_call: {
-							call_id: item.call_id,
-							function: {
-								id: item.id,
-								name: item.name,
-								arguments: item.arguments,
-							},
-						},
-					}
 				}
 				if (item.type === "reasoning" && item.encrypted_content && item.id) {
 					yield {
@@ -723,17 +713,26 @@ export class OpenAiNativeHandler implements ApiHandler {
 					if (item.id) {
 						functionCallByItemId.set(item.id, { call_id: item.call_id, name: item.name, id: item.id })
 					}
-					yield {
-						type: "tool_calls",
-						id: item.id || item.call_id,
-						tool_call: {
-							call_id: item.call_id,
-							function: {
-								id: item.id,
-								name: item.name,
-								arguments: item.arguments,
+					const itemId = item.id || item.call_id
+					if (
+						itemId &&
+						item.arguments &&
+						!functionCallItemsWithArgumentDeltas.has(itemId) &&
+						!functionCallItemsWithFallbackArgumentsEmitted.has(itemId)
+					) {
+						functionCallItemsWithFallbackArgumentsEmitted.add(itemId)
+						yield {
+							type: "tool_calls",
+							id: itemId,
+							tool_call: {
+								call_id: item.call_id,
+								function: {
+									id: item.id,
+									name: item.name,
+									arguments: item.arguments,
+								},
 							},
-						},
+						}
 					}
 				}
 				if (item.type === "reasoning") {
@@ -790,6 +789,7 @@ export class OpenAiNativeHandler implements ApiHandler {
 				const callId = pendingCall?.call_id
 				const functionName = pendingCall?.name
 				const functionId = pendingCall?.id || chunk.item_id
+				functionCallItemsWithArgumentDeltas.add(chunk.item_id)
 
 				yield {
 					type: "tool_calls",
@@ -804,10 +804,17 @@ export class OpenAiNativeHandler implements ApiHandler {
 				}
 			}
 			if (chunk.type === "response.function_call_arguments.done") {
-				if (chunk.item_id && chunk.name && chunk.arguments) {
+				if (
+					chunk.item_id &&
+					chunk.name &&
+					chunk.arguments &&
+					!functionCallItemsWithArgumentDeltas.has(chunk.item_id) &&
+					!functionCallItemsWithFallbackArgumentsEmitted.has(chunk.item_id)
+				) {
 					const pendingCall = functionCallByItemId.get(chunk.item_id)
 					const callId = pendingCall?.call_id
 					const functionId = pendingCall?.id || chunk.item_id
+					functionCallItemsWithFallbackArgumentsEmitted.add(chunk.item_id)
 
 					yield {
 						type: "tool_calls",

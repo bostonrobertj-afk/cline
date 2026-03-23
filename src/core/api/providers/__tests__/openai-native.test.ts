@@ -245,4 +245,57 @@ describe("OpenAiNativeHandler", () => {
 		usageChunk.cacheReadTokens.should.equal(20)
 		usageChunk.outputTokens.should.equal(100)
 	})
+
+	it("should avoid duplicating Responses function call arguments when delta and done events both arrive", async () => {
+		const handler = new OpenAiNativeHandler({
+			openAiNativeApiKey: "test-api-key",
+			apiModelId: "gpt-5.4-mini-2026-03-17",
+		})
+
+		const chunks = createAsyncIterable([
+			{
+				type: "response.output_item.added",
+				item: {
+					type: "function_call",
+					id: "fc_test_123",
+					call_id: "call_test_123",
+					name: "complete_workflow_item",
+					arguments: "",
+				},
+			},
+			{
+				type: "response.function_call_arguments.delta",
+				item_id: "fc_test_123",
+				delta: '{"item_id":"step-1"}',
+			},
+			{
+				type: "response.function_call_arguments.done",
+				item_id: "fc_test_123",
+				name: "complete_workflow_item",
+				arguments: '{"item_id":"step-1"}',
+			},
+			{
+				type: "response.output_item.done",
+				item: {
+					type: "function_call",
+					id: "fc_test_123",
+					call_id: "call_test_123",
+					name: "complete_workflow_item",
+					arguments: '{"item_id":"step-1"}',
+				},
+			},
+		] as any[])
+
+		const toolCallChunks: any[] = []
+		for await (const chunk of (handler as any).processResponsesEvents(chunks as any, handler.getModel().info)) {
+			if (chunk.type === "tool_calls") {
+				toolCallChunks.push(chunk)
+			}
+		}
+
+		toolCallChunks.should.have.length(1)
+		toolCallChunks[0].tool_call.call_id.should.equal("call_test_123")
+		toolCallChunks[0].tool_call.function.name.should.equal("complete_workflow_item")
+		toolCallChunks[0].tool_call.function.arguments.should.equal('{"item_id":"step-1"}')
+	})
 })
