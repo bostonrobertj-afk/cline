@@ -990,8 +990,17 @@ export class Task {
 			)
 			this.taskState.managedWorkflowRun = run
 			this.taskState.activeWorkflowId = run.workflowId
+			this.taskState.activePlaceholderWorkflowId = undefined
+			this.taskState.activePlaceholderWorkflowValues = undefined
 			this.taskState.activeWorkflowJustStarted = !resumed
 			await this.refreshManagedWorkflowChecklistProjection()
+		} else if (action.type === "activate_placeholder_workflow") {
+			const workflowChanged = this.taskState.activePlaceholderWorkflowId !== action.workflowId
+			this.taskState.activePlaceholderWorkflowId = action.workflowId
+			this.taskState.activePlaceholderWorkflowValues = workflowChanged
+				? undefined
+				: this.taskState.activePlaceholderWorkflowValues
+			this.taskState.activeWorkflowJustStarted = true
 		} else if (action.type === "activate_bmad_agent") {
 			const targetAgent = await getBmadAgentById(this.cwd, action.agentId)
 			if (this.taskState.managedWorkflowRun && targetAgent) {
@@ -1011,6 +1020,8 @@ export class Task {
 			this.taskState.activeAgentJustActivated = true
 			if (!this.taskState.managedWorkflowRun) {
 				this.taskState.activeWorkflowId = undefined
+				this.taskState.activePlaceholderWorkflowId = undefined
+				this.taskState.activePlaceholderWorkflowValues = undefined
 				this.taskState.activeWorkflowJustStarted = false
 			} else if (hadManagedWorkflowRun) {
 				await this.refreshManagedWorkflowChecklistProjection()
@@ -1024,6 +1035,8 @@ export class Task {
 			this.taskState.activeAgentJustActivated = false
 			if (!this.taskState.managedWorkflowRun) {
 				this.taskState.activeWorkflowId = undefined
+				this.taskState.activePlaceholderWorkflowId = undefined
+				this.taskState.activePlaceholderWorkflowValues = undefined
 				this.taskState.activeWorkflowJustStarted = false
 			}
 			if (hadManagedWorkflowRun && !this.taskState.managedWorkflowRun) {
@@ -1037,6 +1050,8 @@ export class Task {
 			taskMetadata.activeAgentSkillName = this.taskState.activeAgentSkillName
 			taskMetadata.activeAgentInvokedSlashCommand = this.taskState.activeAgentInvokedSlashCommand
 			taskMetadata.activeWorkflowId = this.taskState.activeWorkflowId
+			taskMetadata.activePlaceholderWorkflowId = this.taskState.activePlaceholderWorkflowId
+			taskMetadata.activePlaceholderWorkflowValues = this.taskState.activePlaceholderWorkflowValues
 			taskMetadata.managedWorkflowRun = this.taskState.managedWorkflowRun
 			await saveTaskMetadata(this.taskId, taskMetadata)
 		} catch {
@@ -1162,6 +1177,8 @@ export class Task {
 			this.taskState.activeAgentInvokedSlashCommand = metadata.activeAgentInvokedSlashCommand
 			this.taskState.activeAgentJustActivated = false
 			this.taskState.activeWorkflowId = metadata.activeWorkflowId
+			this.taskState.activePlaceholderWorkflowId = metadata.activePlaceholderWorkflowId
+			this.taskState.activePlaceholderWorkflowValues = metadata.activePlaceholderWorkflowValues
 			this.taskState.activeWorkflowJustStarted = false
 			this.taskState.managedWorkflowRun = metadata.managedWorkflowRun
 		} catch {
@@ -2249,6 +2266,8 @@ export class Task {
 			activeAgentRoleInstructions,
 			activeAgentCatalogInstructions,
 			activeWorkflowReminder,
+			activeWorkflowSupportsPlaceholders:
+				!!this.taskState.managedWorkflowRun || !!this.taskState.activePlaceholderWorkflowId,
 			managedWorkflowActive: !!this.taskState.managedWorkflowRun,
 			isPromptRefreshTurn,
 			useMinimalGptPrompt,

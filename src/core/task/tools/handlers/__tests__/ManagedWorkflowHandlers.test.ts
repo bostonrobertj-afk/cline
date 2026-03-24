@@ -464,6 +464,42 @@ describe("Managed workflow handlers", () => {
 		}
 	})
 
+	it("persists placeholders for active non-managed workflows", async () => {
+		const sandbox = sinon.createSandbox()
+		try {
+			const handler = new SetWorkflowPlaceholdersToolHandler()
+			const config = createConfig()
+			config.taskState.activePlaceholderWorkflowId = "dev-story"
+
+			const metadata = { activeWorkflowId: "dev-story" } as any
+			const getMetadataStub = sandbox.stub(disk, "getTaskMetadata").resolves(metadata)
+			const saveMetadataStub = sandbox.stub(disk, "saveTaskMetadata").resolves()
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "set_workflow_placeholders",
+				params: {
+					values: {
+						research_topic: "workflow gating",
+						report_path: "docs/workflow-gating.md",
+					},
+				},
+				partial: false,
+			} as any)
+
+			expect(String(result)).to.contain("Stored 2 workflow placeholders")
+			expect(getMetadataStub.calledOnce).to.equal(true)
+			expect(saveMetadataStub.calledOnce).to.equal(true)
+			expect(config.taskState.managedWorkflowRun).to.equal(undefined)
+			expect(config.taskState.activePlaceholderWorkflowValues).to.deep.equal({
+				research_topic: "workflow gating",
+				report_path: "docs/workflow-gating.md",
+			})
+		} finally {
+			sandbox.restore()
+		}
+	})
+
 	it("reports workflow completion instead of a stale current phase on the final required item", async () => {
 		const sandbox = sinon.createSandbox()
 		try {
@@ -612,7 +648,8 @@ describe("Managed workflow handlers", () => {
 
 			expect(String(result)).to.contain('# Workflow "local-review.md" is now active')
 			expect(String(result)).to.contain("Inspect the staged diff.")
-			expect(config.taskState.activeWorkflowId).to.equal("local-review.md")
+			expect(config.taskState.activeWorkflowId).to.equal(undefined)
+			expect(config.taskState.activePlaceholderWorkflowId).to.equal("local-review.md")
 			expect(config.taskState.activeWorkflowJustStarted).to.equal(true)
 		} finally {
 			sandbox.restore()
@@ -649,7 +686,8 @@ describe("Managed workflow handlers", () => {
 
 		expect(String(result)).to.contain('# Workflow "global-review.md" is now active')
 		expect(String(result)).to.contain("Review the release notes.")
-		expect(config.taskState.activeWorkflowId).to.equal("global-review.md")
+		expect(config.taskState.activeWorkflowId).to.equal(undefined)
+		expect(config.taskState.activePlaceholderWorkflowId).to.equal("global-review.md")
 	})
 
 	it("activates remote workflows through use_skill", async () => {
@@ -681,6 +719,7 @@ describe("Managed workflow handlers", () => {
 
 		expect(String(result)).to.contain('# Workflow "remote-review" is now active')
 		expect(String(result)).to.contain("Check the config.")
-		expect(config.taskState.activeWorkflowId).to.equal("remote-review")
+		expect(config.taskState.activeWorkflowId).to.equal(undefined)
+		expect(config.taskState.activePlaceholderWorkflowId).to.equal("remote-review")
 	})
 })

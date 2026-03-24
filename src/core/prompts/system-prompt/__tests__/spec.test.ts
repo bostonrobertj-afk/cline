@@ -4,6 +4,7 @@ import { ModelFamily } from "@/shared/prompts"
 import { ClineDefaultTool } from "@/shared/tools"
 import type { ClineToolSpec } from "../spec"
 import { toolSpecFunctionDeclarations, toolSpecFunctionDefinition, toolSpecInputSchema } from "../spec"
+import { set_workflow_placeholders_variants } from "../tools/set_workflow_placeholders"
 import type { SystemPromptContext } from "../types"
 
 const mockContext: SystemPromptContext = {
@@ -92,6 +93,18 @@ describe("Gemini and Anthropic parameter descriptions match", () => {
 		const anthropicDesc = (anthropic.input_schema as any).properties["path"]?.description
 
 		expect(geminiDesc).to.equal(anthropicDesc)
+	})
+})
+
+describe("workflow placeholder tool gating", () => {
+	it("enables set_workflow_placeholders for active non-managed workflows", () => {
+		const tool = set_workflow_placeholders_variants[0]
+		expect(
+			tool.contextRequirements?.({
+				...mockContext,
+				activeWorkflowSupportsPlaceholders: true,
+			}),
+		).to.equal(true)
 	})
 })
 

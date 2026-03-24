@@ -35,5 +35,7 @@ export interface TaskMetadata {
 	activeAgentSkillName?: string
 	activeAgentInvokedSlashCommand?: string
 	activeWorkflowId?: string
+	activePlaceholderWorkflowId?: string
+	activePlaceholderWorkflowValues?: Record<string, string>
 	managedWorkflowRun?: ManagedWorkflowRunState
 }

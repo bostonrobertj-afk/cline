@@ -270,6 +270,10 @@ describe("slash-commands", () => {
 
 			expect(result.processedText).to.include('<explicit_instructions type="local-flow.md">')
 			expect(result.processedText).to.include("Do the local thing.")
+			expect(result.persistentSlashCommandAction).to.deep.equal({
+				type: "activate_placeholder_workflow",
+				workflowId: "local-flow.md",
+			})
 		})
 
 		it("prefers local workflows over global workflows with the same name", async () => {
@@ -293,6 +297,10 @@ describe("slash-commands", () => {
 
 			expect(result.processedText).to.include("local body")
 			expect(result.processedText).to.not.include("global body")
+			expect(result.persistentSlashCommandAction).to.deep.equal({
+				type: "activate_placeholder_workflow",
+				workflowId: "shared-flow.md",
+			})
 		})
 
 		it("loads remote workflows through the shared resolver", async () => {
@@ -307,6 +315,10 @@ describe("slash-commands", () => {
 
 			expect(result.processedText).to.include('<explicit_instructions type="remote-flow">')
 			expect(result.processedText).to.include("remote body")
+			expect(result.persistentSlashCommandAction).to.deep.equal({
+				type: "activate_placeholder_workflow",
+				workflowId: "remote-flow",
+			})
 		})
 	})
 })

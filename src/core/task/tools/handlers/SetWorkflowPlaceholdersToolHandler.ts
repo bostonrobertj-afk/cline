@@ -1,6 +1,7 @@
 import type { ToolUse } from "@core/assistant-message"
 import { getTaskMetadata, saveTaskMetadata } from "@core/storage/disk"
 import { applyManagedWorkflowDynamicPlaceholders } from "@core/task/managed-workflows/placeholders"
+import type { ManagedWorkflowRunState } from "@core/task/managed-workflows/types"
 import { ClineDefaultTool } from "@/shared/tools"
 import type { ToolResponse } from "../../index"
 import type { IPartialBlockHandler, IToolHandler } from "../ToolExecutorCoordinator"
@@ -22,6 +23,26 @@ function getWorkflowPlaceholderValues(block: ToolUse): Record<string, unknown> |
 export class SetWorkflowPlaceholdersToolHandler implements IToolHandler, IPartialBlockHandler {
 	readonly name = ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS
 
+	private applyGenericWorkflowPlaceholders(
+		workflowId: string,
+		currentPlaceholders: Record<string, string> | undefined,
+		values: Record<string, unknown>,
+	) {
+		const syntheticRun: ManagedWorkflowRunState = {
+			workflowId,
+			slashCommand: workflowId,
+			status: "active",
+			currentPhaseIndex: 0,
+			phases: [],
+			createdAt: 0,
+			updatedAt: 0,
+			allRequiredComplete: false,
+			dynamicPlaceholders: currentPlaceholders,
+		}
+
+		return applyManagedWorkflowDynamicPlaceholders(syntheticRun, values)
+	}
+
 	getDescription(block: ToolUse): string {
 		const values = getWorkflowPlaceholderValues(block)
 		const keys = values ? Object.keys(values) : []
@@ -41,9 +62,10 @@ export class SetWorkflowPlaceholdersToolHandler implements IToolHandler, IPartia
 
 	async execute(config: TaskConfig, block: ToolUse): Promise<ToolResponse> {
 		const currentRun = config.taskState.managedWorkflowRun
-		if (!currentRun) {
+		const genericWorkflowId = !currentRun ? config.taskState.activePlaceholderWorkflowId : undefined
+		if (!currentRun && !genericWorkflowId) {
 			config.taskState.consecutiveMistakeCount++
-			return "Error: No managed workflow is currently active."
+			return "Error: No active workflow with placeholder support is currently active."
 		}
 
 		const values = getWorkflowPlaceholderValues(block) ?? {}
@@ -58,15 +80,31 @@ export class SetWorkflowPlaceholdersToolHandler implements IToolHandler, IPartia
 			await config.callbacks.say("tool", message, undefined, undefined, false)
 		}
 
-		const {
-			run: updatedRun,
-			changedKeys,
-			unchangedKeys,
-			unchangedDynamicKeys,
-			unchangedStableKeys,
-		} = applyManagedWorkflowDynamicPlaceholders(currentRun, values)
-		config.taskState.managedWorkflowRun = updatedRun
-		config.taskState.activeWorkflowId = config.taskState.managedWorkflowRun.workflowId
+		let changedKeys: string[]
+		let unchangedKeys: string[]
+		let unchangedDynamicKeys: string[]
+		let unchangedStableKeys: string[]
+
+		if (currentRun) {
+			const managedResult = applyManagedWorkflowDynamicPlaceholders(currentRun, values)
+			config.taskState.managedWorkflowRun = managedResult.run
+			config.taskState.activeWorkflowId = config.taskState.managedWorkflowRun.workflowId
+			changedKeys = managedResult.changedKeys
+			unchangedKeys = managedResult.unchangedKeys
+			unchangedDynamicKeys = managedResult.unchangedDynamicKeys
+			unchangedStableKeys = managedResult.unchangedStableKeys
+		} else {
+			const genericResult = this.applyGenericWorkflowPlaceholders(
+				genericWorkflowId!,
+				config.taskState.activePlaceholderWorkflowValues,
+				values,
+			)
+			config.taskState.activePlaceholderWorkflowValues = genericResult.run.dynamicPlaceholders
+			changedKeys = genericResult.changedKeys
+			unchangedKeys = genericResult.unchangedKeys
+			unchangedDynamicKeys = genericResult.unchangedDynamicKeys
+			unchangedStableKeys = genericResult.unchangedStableKeys
+		}
 
 		if (changedKeys.length === 0) {
 			config.taskState.consecutiveMistakeCount = 0
@@ -85,6 +123,8 @@ export class SetWorkflowPlaceholdersToolHandler implements IToolHandler, IPartia
 		try {
 			const metadata = await getTaskMetadata(config.taskId)
 			metadata.activeWorkflowId = config.taskState.activeWorkflowId
+			metadata.activePlaceholderWorkflowId = config.taskState.activePlaceholderWorkflowId
+			metadata.activePlaceholderWorkflowValues = config.taskState.activePlaceholderWorkflowValues
 			metadata.managedWorkflowRun = config.taskState.managedWorkflowRun
 			await saveTaskMetadata(config.taskId, metadata)
 		} catch {

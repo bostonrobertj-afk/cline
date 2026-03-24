@@ -2,6 +2,8 @@ import { getBuiltinBmadAgentAllowlist } from "@/core/task/bmad-agent-mode"
 import type { PromptVariant, SystemPromptContext } from "../types"
 
 const builtinBmadAgentSkillNames = new Set(getBuiltinBmadAgentAllowlist().map((agent) => agent.id))
+// Do not switch this gate back on unless a human user has given direct, clear authorization.
+const SKILLS_PROMPT_SECTION_GATE: number = 2 // 1 = on, 2 = off
 
 function isPromptVisibleSkillName(skillName: string): boolean {
 	return !builtinBmadAgentSkillNames.has(skillName)
@@ -11,6 +13,10 @@ function isPromptVisibleSkillName(skillName: string): boolean {
  * Generate the skills section for the system prompt.
  */
 export async function getSkillsSection(_variant: PromptVariant, context: SystemPromptContext): Promise<string | undefined> {
+	if (SKILLS_PROMPT_SECTION_GATE !== 1) {
+		return undefined
+	}
+
 	const skills = (context.skills ?? []).filter((skill) => (context.activeAgentId ? true : isPromptVisibleSkillName(skill.name)))
 	if (!skills || skills.length === 0) return undefined
 

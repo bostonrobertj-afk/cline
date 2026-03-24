@@ -66,6 +66,8 @@ export class TaskState {
 	activeAgentInvokedSlashCommand?: string
 	activeAgentJustActivated = false
 	activeWorkflowId?: string
+	activePlaceholderWorkflowId?: string
+	activePlaceholderWorkflowValues?: Record<string, string>
 	activeWorkflowJustStarted = false
 	managedWorkflowRun?: ManagedWorkflowRunState
 

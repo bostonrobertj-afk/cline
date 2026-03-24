@@ -379,8 +379,8 @@ describe("Prompt System Integration Tests", () => {
 					expect(systemPrompt).to.not.include("<agent")
 					expect(systemPrompt).to.not.include("<activation")
 					expect(systemPrompt).to.not.include("<persona")
-					expect(systemPrompt).to.include("Installed skills and workflow activations available on this turn")
-					expect(systemPrompt).to.include("bmad-code-review")
+					expect(systemPrompt).to.not.include("Installed skills and workflow activations available on this turn")
+					expect(systemPrompt).to.not.include("\nSKILLS\n")
 					expect(systemPrompt.match(/Role: Quick Flow Solo Dev/g)?.length).to.equal(1)
 					expect(systemPrompt).to.not.include("# Tools")
 					expect(systemPrompt).to.not.include("## execute_command")
@@ -426,9 +426,8 @@ describe("Prompt System Integration Tests", () => {
 				},
 				"gpt-5.4-2026-03-05",
 				async ({ systemPrompt }) => {
-					expect(systemPrompt).to.include("Installed skills and workflow activations available on this turn")
-					expect(systemPrompt).to.include("create-pull-request")
-					expect(systemPrompt).to.include("address-pr-comments.md")
+					expect(systemPrompt).to.not.include("Installed skills and workflow activations available on this turn")
+					expect(systemPrompt).to.not.include("\nSKILLS\n")
 					expect(systemPrompt).to.not.include("bmad-dev")
 				},
 			)

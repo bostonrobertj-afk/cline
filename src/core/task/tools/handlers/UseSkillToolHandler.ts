@@ -93,6 +93,8 @@ export class UseSkillToolHandler implements IToolHandler, IPartialBlockHandler {
 
 			config.taskState.managedWorkflowRun = run
 			config.taskState.activeWorkflowId = run.workflowId
+			config.taskState.activePlaceholderWorkflowId = undefined
+			config.taskState.activePlaceholderWorkflowValues = undefined
 			config.taskState.activeWorkflowJustStarted = !resumed
 			config.taskState.consecutiveMistakeCount = 0
 
@@ -133,7 +135,9 @@ export class UseSkillToolHandler implements IToolHandler, IPartialBlockHandler {
 				}
 
 				config.taskState.consecutiveMistakeCount = 0
-				config.taskState.activeWorkflowId = resolvedWorkflow.name
+				config.taskState.activeWorkflowId = undefined
+				config.taskState.activePlaceholderWorkflowId = resolvedWorkflow.name
+				config.taskState.activePlaceholderWorkflowValues = undefined
 				config.taskState.activeWorkflowJustStarted = true
 
 				telemetryService.safeCapture(
@@ -209,6 +213,8 @@ IMPORTANT: The workflow is now loaded. Do NOT call use_skill again for this task
 			)
 
 			config.taskState.activeWorkflowId = skillName
+			config.taskState.activePlaceholderWorkflowId = undefined
+			config.taskState.activePlaceholderWorkflowValues = undefined
 			config.taskState.activeWorkflowJustStarted = true
 
 			return `# Skill "${skillContent.name}" is now active

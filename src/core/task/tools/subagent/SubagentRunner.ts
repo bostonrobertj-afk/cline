@@ -425,7 +425,10 @@ export class SubagentRunner {
 				const generatedSystemPrompt = await promptRegistry.get(context)
 				const baseSystemPrompt = this.agent.buildSystemPrompt(generatedSystemPrompt)
 				const systemPrompt =
-					assignedSkillNames.length > 0 && !state.activeWorkflowId && !state.managedWorkflowRun
+					assignedSkillNames.length > 0 &&
+					!state.activeWorkflowId &&
+					!state.managedWorkflowRun &&
+					!state.activePlaceholderWorkflowId
 						? `${baseSystemPrompt}${buildAssignedSkillDirective(assignedSkillNames)}`
 						: baseSystemPrompt
 				const useNativeToolCalls = !!promptRegistry.nativeTools?.length
@@ -792,6 +795,7 @@ export class SubagentRunner {
 			activeAgentId: params.state.activeAgentId,
 			activeAgentRoleInstructions,
 			activeWorkflowReminder,
+			activeWorkflowSupportsPlaceholders: !!params.state.managedWorkflowRun || !!params.state.activePlaceholderWorkflowId,
 			managedWorkflowActive: !!params.state.managedWorkflowRun,
 			focusChainSettings: this.baseConfig.focusChainSettings,
 			browserSettings: this.baseConfig.browserSettings,
@@ -803,7 +807,12 @@ export class SubagentRunner {
 	}
 
 	private async autoActivateAssignedManagedWorkflow(state: TaskState, assignedSkillNames: string[]): Promise<void> {
-		if (assignedSkillNames.length !== 1 || state.managedWorkflowRun || state.activeWorkflowId) {
+		if (
+			assignedSkillNames.length !== 1 ||
+			state.managedWorkflowRun ||
+			state.activeWorkflowId ||
+			state.activePlaceholderWorkflowId
+		) {
 			return
 		}
 
@@ -832,6 +841,8 @@ export class SubagentRunner {
 
 		state.managedWorkflowRun = run
 		state.activeWorkflowId = run.workflowId
+		state.activePlaceholderWorkflowId = undefined
+		state.activePlaceholderWorkflowValues = undefined
 		state.activeWorkflowJustStarted = !resumed
 	}
 

@@ -20,6 +20,7 @@ import { resolveWorkflowByName } from "../workflows/resolution/resolveAvailableW
 
 export type PersistentSlashCommandAction =
 	| { type: "activate_managed_workflow"; workflowId: string; slashCommand: string }
+	| { type: "activate_placeholder_workflow"; workflowId: string }
 	| { type: "activate_bmad_agent"; agentId: string; skillName: string; invokedSlashCommand: string }
 	| { type: "exit_bmad_agent" }
 
@@ -279,7 +280,14 @@ export async function parseSlashCommands(
 					// Track telemetry for workflow command usage
 					telemetryService.captureSlashCommandUsed(ulid, commandName, "workflow")
 
-					return { processedText, needsClinerulesFileCheck: false }
+					return {
+						processedText,
+						needsClinerulesFileCheck: false,
+						persistentSlashCommandAction: {
+							type: "activate_placeholder_workflow",
+							workflowId: resolvedWorkflow.name,
+						},
+					}
 				} catch (error) {
 					Logger.error(
 						`Error reading workflow for slash command ${resolvedWorkflow.name}${resolvedWorkflow.fullPath ? ` (${resolvedWorkflow.fullPath})` : ""}: ${error}`,

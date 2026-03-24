@@ -834,6 +834,32 @@ describe("SubagentRunner", () => {
 		assert.match(context.activeWorkflowReminder!, /bmad-review-edge-case-hunter/)
 	})
 
+	it("does not inject persistent workflow reminders for placeholder-only subagent workflows", async () => {
+		const runner = new SubagentRunner(createTaskConfig(false))
+		const state = new TaskState()
+		state.activePlaceholderWorkflowId = "local-review.md"
+		state.activePlaceholderWorkflowValues = { story_id: "1.1" }
+
+		const context = await (runner as any).buildPromptContext({
+			state,
+			hostIde: "test",
+			providerInfo: {
+				providerId: "anthropic",
+				model: { id: "anthropic/claude-sonnet-4.5", info: { contextWindow: 200_000 } },
+				mode: "act",
+				customPrompt: undefined,
+			},
+			availableSkills: [],
+			configuredSkillNames: undefined,
+			assignedSkillNames: [],
+			nativeToolCallsRequested: false,
+		})
+
+		assert.equal(context.managedWorkflowActive, false)
+		assert.equal(context.activeWorkflowReminder, undefined)
+		assert.equal(context.activeWorkflowSupportsPlaceholders, true)
+	})
+
 	it("includes workspace metadata only in the initial user message", async () => {
 		const createMessage = sinon.stub()
 		createMessage.onFirstCall().callsFake(async function* (_systemPrompt: string, conversation: unknown[]) {
