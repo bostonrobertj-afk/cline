@@ -32,8 +32,8 @@ export function getResponseToolsSection(context: SystemPromptContext): string {
 	const actModeResponseTools = joinToolNames(getActModeResponseTools(context))
 	const planModeResponseTools = joinToolNames(getPlanModeResponseTools(context))
 	const responseToolLines = [
-		"- `attempt_completion`: Use in ACT MODE when the task is complete or when you need to deliver the final direct answer.",
-		"- `send_user_message`: Use in either ACT MODE or PLAN MODE when other, more specialized response tools are not appropriate or available.",
+		"- `attempt_completion`: Use in ACT MODE. You must ONLY use this tool to deliver structured final outcomes, such as a completion report or QA findings. NEVER use this tool for conversational dialogue.",
+		"- `send_user_message`: Use in either ACT MODE or PLAN MODE when other, more specialized response tools are not appropriate or available. This is the appropriate response tool for general dialogue.",
 	]
 
 	if (context.yoloModeToggled !== true) {
