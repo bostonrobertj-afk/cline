@@ -94,8 +94,13 @@ export class SetWorkflowPlaceholdersToolHandler implements IToolHandler, IPartia
 			unchangedDynamicKeys = managedResult.unchangedDynamicKeys
 			unchangedStableKeys = managedResult.unchangedStableKeys
 		} else {
+			if (!genericWorkflowId) {
+				config.taskState.consecutiveMistakeCount++
+				return "Error: No active workflow with placeholder support is currently active."
+			}
+
 			const genericResult = this.applyGenericWorkflowPlaceholders(
-				genericWorkflowId!,
+				genericWorkflowId,
 				config.taskState.activePlaceholderWorkflowValues,
 				values,
 			)
@@ -124,6 +129,7 @@ export class SetWorkflowPlaceholdersToolHandler implements IToolHandler, IPartia
 			const metadata = await getTaskMetadata(config.taskId)
 			metadata.activeWorkflowId = config.taskState.activeWorkflowId
 			metadata.activePlaceholderWorkflowId = config.taskState.activePlaceholderWorkflowId
+			metadata.activePlaceholderWorkflowSource = config.taskState.activePlaceholderWorkflowSource
 			metadata.activePlaceholderWorkflowValues = config.taskState.activePlaceholderWorkflowValues
 			metadata.managedWorkflowRun = config.taskState.managedWorkflowRun
 			await saveTaskMetadata(config.taskId, metadata)

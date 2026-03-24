@@ -1,6 +1,7 @@
 import { FocusChainSettings } from "@shared/FocusChainSettings"
 import * as chokidar from "chokidar"
 import * as fs from "fs/promises"
+import { getActivePlaceholderWorkflowStepDetails } from "@/core/workflows/placeholder-workflow-step-details"
 import { telemetryService } from "@/services/telemetry"
 import { Logger } from "@/shared/services/Logger"
 import { ClineSay } from "../../../shared/ExtensionMessage"
@@ -149,7 +150,7 @@ export class FocusChainManager {
 	 * @requires this.taskState with current focus chain list state and API request counts
 	 * @returns string - Formatted markdown instructions for focus chain list management, varies by context
 	 */
-	public generateFocusChainInstructions(): string {
+	public async generateFocusChainInstructions(): Promise<string> {
 		if (this.taskState.managedWorkflowRun) {
 			const currentChecklist = renderManagedWorkflowTaskProgress(this.taskState.managedWorkflowRun)
 			return `\n
@@ -172,6 +173,14 @@ export class FocusChainManager {
 			const listCurrentProgress = `**Current Progress: ${completedItems}/${totalItems} items completed (${percentComplete}%)**`
 			const userHasUpdatedList =
 				"**CRITICAL INFORMATION:** The user has modified this todo list - review ALL changes carefully"
+
+			const placeholderWorkflowStepPrompt = await this.buildPlaceholderWorkflowStepPrompt(
+				this.taskState.currentFocusChainChecklist,
+				listCurrentProgress,
+			)
+			if (placeholderWorkflowStepPrompt) {
+				return placeholderWorkflowStepPrompt
+			}
 
 			// If user has updated the list, inform the model (and provide latest copy)
 			if (this.taskState.todoListWasUpdatedByUser) {
@@ -230,6 +239,45 @@ export class FocusChainManager {
 			return FocusChainPrompts.recommended
 		}
 		return FocusChainPrompts.apiRequestCount.replace("{{apiRequestCount}}", this.taskState.apiRequestCount.toString())
+	}
+
+	private async buildPlaceholderWorkflowStepPrompt(
+		currentChecklist: string,
+		listCurrentProgress: string,
+	): Promise<string | undefined> {
+		if (!this.taskState.activePlaceholderWorkflowSource) {
+			return undefined
+		}
+
+		try {
+			const stepDetails = await getActivePlaceholderWorkflowStepDetails({
+				checklistMarkdown: currentChecklist,
+				source: this.taskState.activePlaceholderWorkflowSource,
+			})
+			if (!stepDetails) {
+				return undefined
+			}
+
+			const userUpdatedWarning = this.taskState.todoListWasUpdatedByUser
+				? "\n**CRITICAL INFORMATION:** I updated this checklist manually. Review the current checklist carefully before you continue.\n"
+				: ""
+
+			return `\n
+				# TODO LIST UPDATE REQUIRED - You MUST include the task_progress parameter in your NEXT tool call.\n
+				${listCurrentProgress}\n
+				${currentChecklist}\n
+				${userUpdatedWarning}
+				# CURRENT WORKFLOW STEP\n
+				You are currently on this step: ${stepDetails.checklistLabel}\n
+				${stepDetails.details}\n
+				Focus on completing this step.\n
+				If you are done with this step, include the \`task_progress\` parameter in your next tool call.\n
+				Once you do, I'll give you the next step's details if they can be resolved from the workflow source.\n
+			`
+		} catch (error) {
+			Logger.warn(`[Task ${this.taskId}] Failed to resolve placeholder workflow step details`, error)
+			return undefined
+		}
 	}
 
 	public async refreshManagedWorkflowChecklistProjection(): Promise<void> {

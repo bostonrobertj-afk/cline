@@ -39,15 +39,11 @@ export async function getUpdatingTaskProgress(variant: PromptVariant, context: S
 	if (context.managedWorkflowActive) {
 		return `UPDATING TASK PROGRESS
 
-The current checklist is backend-managed for an active workflow.
+The current checklist was built for you by the user at the beginning of the conversation.
 
-- Human-authored input: the latest user request, feedback, or steer instruction.
-- System-generated context: the backend-managed workflow checklist and phase progress below.
-- Treat the checklist as runtime context, not as a user-authored question or a resume prompt.
-- Do not create a new checklist.
-- Do not rewrite checklist items manually.
-- Use the complete_workflow_item tool to mark the current workflow item complete.
-- task_progress is rendered from backend workflow state.`
+- The checklist shows you tasks which you must complete, then mark as done using the complete_workflow_item tool.
+- The system automatically shows you extra details for the 1st incomplete task if any were provided by the user.
+- task_progress is rendered based on the user's provided steps and the steps you've marked as complete.`
 	}
 
 	// Check for component override first

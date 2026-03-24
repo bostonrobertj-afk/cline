@@ -66,11 +66,6 @@ Use these tools in one response when they are not dependent on one another; if u
 
 ${getResponseToolsSection(_context)}`
 
-const ACT_VS_PLAN = (context: SystemPromptContext) => `ACT MODE V.S. PLAN MODE
-
-Current mode is provided in environment_details.
-`
-
 const OBJECTIVE = (context: SystemPromptContext) => `OBJECTIVE
 
 Complete the user's task methodically.
@@ -79,7 +74,7 @@ Complete the user's task methodically.
 2. Work through those goals step by step, using tools where helpful. You may use multiple tools in one response only for independent work.
 3. Before using a tool, use the available context - including environment_details - to decide whether all required parameters are present or can be inferred. If a required value is missing, do not call the tool${context.yoloModeToggled !== true ? "; ask for it with ask_followup_question instead" : ""}. Do not ask for optional parameters unless needed.
 4. When the task is complete, use attempt_completion to present the result. You may include a simple command to review the result when useful.
-5. If the task is not actionable, use attempt_completion to explain why or give a direct answer.`
+5. If the task is not actionable, use send_user_message to explain why or give a direct answer.`
 
 const FEEDBACK = (_context: SystemPromptContext) => `FEEDBACK
 
@@ -92,5 +87,4 @@ export const GPT_5_TEMPLATE_OVERRIDES = {
 	TOOL_USE,
 	OBJECTIVE,
 	FEEDBACK,
-	ACT_VS_PLAN,
 } as const

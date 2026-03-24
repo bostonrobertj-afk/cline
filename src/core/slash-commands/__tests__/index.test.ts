@@ -259,7 +259,7 @@ describe("slash-commands", () => {
 			sinon.stub(StateManager, "get").returns({
 				getRemoteConfigSettings: () => ({}),
 				getGlobalStateKey: () => ({}),
-			} as any)
+			} as unknown as StateManager)
 
 			const result = await parseSlashCommands(
 				"<task>/local-flow.md continue</task>",
@@ -273,6 +273,11 @@ describe("slash-commands", () => {
 			expect(result.persistentSlashCommandAction).to.deep.equal({
 				type: "activate_placeholder_workflow",
 				workflowId: "local-flow.md",
+				workflowSource: {
+					type: "local",
+					name: "local-flow.md",
+					path: workflowPath,
+				},
 			})
 		})
 
@@ -286,7 +291,7 @@ describe("slash-commands", () => {
 			sinon.stub(StateManager, "get").returns({
 				getRemoteConfigSettings: () => ({}),
 				getGlobalStateKey: () => ({}),
-			} as any)
+			} as unknown as StateManager)
 
 			const result = await parseSlashCommands(
 				"<task>/shared-flow.md now</task>",
@@ -300,6 +305,11 @@ describe("slash-commands", () => {
 			expect(result.persistentSlashCommandAction).to.deep.equal({
 				type: "activate_placeholder_workflow",
 				workflowId: "shared-flow.md",
+				workflowSource: {
+					type: "local",
+					name: "shared-flow.md",
+					path: localPath,
+				},
 			})
 		})
 
@@ -309,7 +319,7 @@ describe("slash-commands", () => {
 					remoteGlobalWorkflows: [{ name: "remote-flow", contents: "remote body", alwaysEnabled: true }],
 				}),
 				getGlobalStateKey: () => ({}),
-			} as any)
+			} as unknown as StateManager)
 
 			const result = await parseSlashCommands("<task>/remote-flow please</task>", {}, {}, "test-ulid")
 
@@ -318,6 +328,11 @@ describe("slash-commands", () => {
 			expect(result.persistentSlashCommandAction).to.deep.equal({
 				type: "activate_placeholder_workflow",
 				workflowId: "remote-flow",
+				workflowSource: {
+					type: "remote",
+					name: "remote-flow",
+					contents: "remote body",
+				},
 			})
 		})
 	})

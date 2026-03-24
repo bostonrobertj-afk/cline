@@ -15,12 +15,16 @@ import {
 } from "../prompts/commands"
 import { StateManager } from "../storage/StateManager"
 import { isBmadExitCommand, resolveBmadAgentActivation } from "../task/bmad-agent-mode"
+import {
+	type ActivePlaceholderWorkflowSource,
+	buildActivePlaceholderWorkflowSource,
+} from "../workflows/placeholder-workflow-step-details"
 import { loadResolvedWorkflowContent } from "../workflows/resolution/loadResolvedWorkflowContent"
 import { resolveWorkflowByName } from "../workflows/resolution/resolveAvailableWorkflows"
 
 export type PersistentSlashCommandAction =
 	| { type: "activate_managed_workflow"; workflowId: string; slashCommand: string }
-	| { type: "activate_placeholder_workflow"; workflowId: string }
+	| { type: "activate_placeholder_workflow"; workflowId: string; workflowSource: ActivePlaceholderWorkflowSource }
 	| { type: "activate_bmad_agent"; agentId: string; skillName: string; invokedSlashCommand: string }
 	| { type: "exit_bmad_agent" }
 
@@ -267,6 +271,10 @@ export async function parseSlashCommands(
 					if (!loadedWorkflow || loadedWorkflow.kind !== "instructions") {
 						continue
 					}
+					const workflowSource = buildActivePlaceholderWorkflowSource(resolvedWorkflow, loadedWorkflow.contents)
+					if (!workflowSource) {
+						continue
+					}
 
 					// remove the slash command and add custom instructions at the top of this message
 					if (!slashMatch) {
@@ -286,6 +294,7 @@ export async function parseSlashCommands(
 						persistentSlashCommandAction: {
 							type: "activate_placeholder_workflow",
 							workflowId: resolvedWorkflow.name,
+							workflowSource,
 						},
 					}
 				} catch (error) {

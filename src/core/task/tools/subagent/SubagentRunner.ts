@@ -842,6 +842,7 @@ export class SubagentRunner {
 		state.managedWorkflowRun = run
 		state.activeWorkflowId = run.workflowId
 		state.activePlaceholderWorkflowId = undefined
+		state.activePlaceholderWorkflowSource = undefined
 		state.activePlaceholderWorkflowValues = undefined
 		state.activeWorkflowJustStarted = !resumed
 	}

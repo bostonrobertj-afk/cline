@@ -1,4 +1,5 @@
 import type { ManagedWorkflowRunState } from "@/core/task/managed-workflows/types"
+import type { ActivePlaceholderWorkflowSource } from "@/core/workflows/placeholder-workflow-step-details"
 
 // Type definitions for FileContextTracker
 export interface FileMetadataEntry {
@@ -36,6 +37,7 @@ export interface TaskMetadata {
 	activeAgentInvokedSlashCommand?: string
 	activeWorkflowId?: string
 	activePlaceholderWorkflowId?: string
+	activePlaceholderWorkflowSource?: ActivePlaceholderWorkflowSource
 	activePlaceholderWorkflowValues?: Record<string, string>
 	managedWorkflowRun?: ManagedWorkflowRunState
 }

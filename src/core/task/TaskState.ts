@@ -1,6 +1,7 @@
 import { Anthropic } from "@anthropic-ai/sdk"
 import { AssistantMessageContent } from "@core/assistant-message"
 import { ClineAskResponse } from "@shared/WebviewMessage"
+import type { ActivePlaceholderWorkflowSource } from "@/core/workflows/placeholder-workflow-step-details"
 import type { ManagedWorkflowRunState } from "./managed-workflows/types"
 import type { HookExecution } from "./types/HookExecution"
 
@@ -67,6 +68,7 @@ export class TaskState {
 	activeAgentJustActivated = false
 	activeWorkflowId?: string
 	activePlaceholderWorkflowId?: string
+	activePlaceholderWorkflowSource?: ActivePlaceholderWorkflowSource
 	activePlaceholderWorkflowValues?: Record<string, string>
 	activeWorkflowJustStarted = false
 	managedWorkflowRun?: ManagedWorkflowRunState

@@ -3,6 +3,7 @@ import { discoverSkills, getAvailableSkills, getSkillContent } from "@core/conte
 import { getTaskMetadata, saveTaskMetadata } from "@core/storage/disk"
 import { startOrResumeManagedWorkflowRun } from "@core/task/managed-workflows/ManagedWorkflowController"
 import type { SkillMetadata } from "@shared/skills"
+import { buildActivePlaceholderWorkflowSource } from "@/core/workflows/placeholder-workflow-step-details"
 import { loadResolvedWorkflowContent } from "@/core/workflows/resolution/loadResolvedWorkflowContent"
 import { resolveWorkflowByName } from "@/core/workflows/resolution/resolveAvailableWorkflows"
 import { telemetryService } from "@/services/telemetry"
@@ -15,8 +16,6 @@ import type { StronglyTypedUIHelpers } from "../types/UIHelpers"
 
 export class UseSkillToolHandler implements IToolHandler, IPartialBlockHandler {
 	readonly name = ClineDefaultTool.USE_SKILL
-
-	constructor() {}
 
 	getDescription(block: ToolUse): string {
 		const skillName = block.params.skill_name
@@ -94,6 +93,7 @@ export class UseSkillToolHandler implements IToolHandler, IPartialBlockHandler {
 			config.taskState.managedWorkflowRun = run
 			config.taskState.activeWorkflowId = run.workflowId
 			config.taskState.activePlaceholderWorkflowId = undefined
+			config.taskState.activePlaceholderWorkflowSource = undefined
 			config.taskState.activePlaceholderWorkflowValues = undefined
 			config.taskState.activeWorkflowJustStarted = !resumed
 			config.taskState.consecutiveMistakeCount = 0
@@ -104,6 +104,9 @@ export class UseSkillToolHandler implements IToolHandler, IPartialBlockHandler {
 				metadata.activeAgentSkillName = config.taskState.activeAgentSkillName
 				metadata.activeAgentInvokedSlashCommand = config.taskState.activeAgentInvokedSlashCommand
 				metadata.activeWorkflowId = config.taskState.activeWorkflowId
+				metadata.activePlaceholderWorkflowId = config.taskState.activePlaceholderWorkflowId
+				metadata.activePlaceholderWorkflowSource = config.taskState.activePlaceholderWorkflowSource
+				metadata.activePlaceholderWorkflowValues = config.taskState.activePlaceholderWorkflowValues
 				metadata.managedWorkflowRun = config.taskState.managedWorkflowRun
 				await saveTaskMetadata(config.taskId, metadata)
 			} catch {
@@ -137,8 +140,24 @@ export class UseSkillToolHandler implements IToolHandler, IPartialBlockHandler {
 				config.taskState.consecutiveMistakeCount = 0
 				config.taskState.activeWorkflowId = undefined
 				config.taskState.activePlaceholderWorkflowId = resolvedWorkflow.name
+				config.taskState.activePlaceholderWorkflowSource = buildActivePlaceholderWorkflowSource(
+					resolvedWorkflow,
+					workflowContent.contents,
+				)
 				config.taskState.activePlaceholderWorkflowValues = undefined
 				config.taskState.activeWorkflowJustStarted = true
+
+				try {
+					const metadata = await getTaskMetadata(config.taskId)
+					metadata.activeWorkflowId = config.taskState.activeWorkflowId
+					metadata.activePlaceholderWorkflowId = config.taskState.activePlaceholderWorkflowId
+					metadata.activePlaceholderWorkflowSource = config.taskState.activePlaceholderWorkflowSource
+					metadata.activePlaceholderWorkflowValues = config.taskState.activePlaceholderWorkflowValues
+					metadata.managedWorkflowRun = config.taskState.managedWorkflowRun
+					await saveTaskMetadata(config.taskId, metadata)
+				} catch {
+					// Non-fatal: keep the placeholder workflow activation in memory even if persistence fails.
+				}
 
 				telemetryService.safeCapture(
 					() =>
@@ -214,6 +233,7 @@ IMPORTANT: The workflow is now loaded. Do NOT call use_skill again for this task
 
 			config.taskState.activeWorkflowId = skillName
 			config.taskState.activePlaceholderWorkflowId = undefined
+			config.taskState.activePlaceholderWorkflowSource = undefined
 			config.taskState.activePlaceholderWorkflowValues = undefined
 			config.taskState.activeWorkflowJustStarted = true
 

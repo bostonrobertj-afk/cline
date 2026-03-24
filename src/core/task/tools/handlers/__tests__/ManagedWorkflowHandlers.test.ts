@@ -215,12 +215,13 @@ describe("Managed workflow handlers", () => {
 			expect(saveMetadataStub.calledOnce).to.equal(true)
 			const [, savedMetadata] = saveMetadataStub.firstCall.args
 			expect(savedMetadata.managedWorkflowRun).to.exist
-			expect(savedMetadata.managedWorkflowRun!.phases[0].items[0].completed).to.equal(true)
+			expect(savedMetadata.managedWorkflowRun?.phases[0].items[0].completed).to.equal(true)
 			expect((config.callbacks.updateFCListFromToolResponse as sinon.SinonStub).calledOnce).to.equal(true)
 
-			const restoredRun = savedMetadata.managedWorkflowRun!
-			expect(restoredRun.workflowId).to.equal("bmad-code-review")
-			expect(restoredRun.phases[0].items[0].completed).to.equal(true)
+			const restoredRun = savedMetadata.managedWorkflowRun
+			expect(restoredRun).to.exist
+			expect(restoredRun?.workflowId).to.equal("bmad-code-review")
+			expect(restoredRun?.phases[0].items[0].completed).to.equal(true)
 		} finally {
 			sandbox.restore()
 		}
@@ -619,10 +620,14 @@ describe("Managed workflow handlers", () => {
 
 	it("activates local workflows through use_skill", async () => {
 		const sandbox = sinon.createSandbox()
+		let tempDir: string | undefined
 		try {
-			const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "use-skill-local-"))
+			tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "use-skill-local-"))
 			const workflowPath = path.join(tempDir, "local-review.md")
 			await fs.writeFile(workflowPath, "# Local review\nInspect the staged diff.", "utf8")
+			const metadata = {} as any
+			sandbox.stub(disk, "getTaskMetadata").resolves(metadata)
+			const saveMetadataStub = sandbox.stub(disk, "saveTaskMetadata").resolves()
 
 			const handler = new UseSkillToolHandler()
 			const config = createConfig({
@@ -650,76 +655,117 @@ describe("Managed workflow handlers", () => {
 			expect(String(result)).to.contain("Inspect the staged diff.")
 			expect(config.taskState.activeWorkflowId).to.equal(undefined)
 			expect(config.taskState.activePlaceholderWorkflowId).to.equal("local-review.md")
+			expect(config.taskState.activePlaceholderWorkflowSource).to.deep.equal({
+				type: "local",
+				name: "local-review.md",
+				path: workflowPath,
+			})
 			expect(config.taskState.activeWorkflowJustStarted).to.equal(true)
+			expect(saveMetadataStub.calledOnce).to.equal(true)
+			expect(saveMetadataStub.firstCall.args[1].activePlaceholderWorkflowSource).to.deep.equal({
+				type: "local",
+				name: "local-review.md",
+				path: workflowPath,
+			})
 		} finally {
 			sandbox.restore()
+			if (tempDir) {
+				await fs.rm(tempDir, { recursive: true, force: true })
+			}
 		}
 	})
 
 	it("activates global workflows through use_skill when no local workflow shadows them", async () => {
+		const sandbox = sinon.createSandbox()
 		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "use-skill-global-"))
 		const workflowPath = path.join(tempDir, "global-review.md")
 		await fs.writeFile(workflowPath, "# Global review\nReview the release notes.", "utf8")
+		sandbox.stub(disk, "getTaskMetadata").resolves({} as any)
+		const saveMetadataStub = sandbox.stub(disk, "saveTaskMetadata").resolves()
 
-		const handler = new UseSkillToolHandler()
-		const config = createConfig({
-			services: {
-				stateManager: {
-					getGlobalStateKey: () => ({}),
-					getGlobalSettingsKey: (key: string) =>
-						key === "globalWorkflowToggles" ? { [workflowPath]: true } : undefined,
-					getWorkspaceStateKey: () => ({}),
-					getRemoteConfigSettings: () => ({}),
-					getApiConfiguration: () => ({ planModeApiProvider: "openai", actModeApiProvider: "openai" }),
+		try {
+			const handler = new UseSkillToolHandler()
+			const config = createConfig({
+				services: {
+					stateManager: {
+						getGlobalStateKey: () => ({}),
+						getGlobalSettingsKey: (key: string) =>
+							key === "globalWorkflowToggles" ? { [workflowPath]: true } : undefined,
+						getWorkspaceStateKey: () => ({}),
+						getRemoteConfigSettings: () => ({}),
+						getApiConfiguration: () => ({ planModeApiProvider: "openai", actModeApiProvider: "openai" }),
+					},
+				} as any,
+			})
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "use_skill",
+				params: {
+					skill_name: "global-review.md",
 				},
-			} as any,
-		})
+				partial: false,
+			} as any)
 
-		const result = await handler.execute(config, {
-			type: "tool_use",
-			name: "use_skill",
-			params: {
-				skill_name: "global-review.md",
-			},
-			partial: false,
-		} as any)
-
-		expect(String(result)).to.contain('# Workflow "global-review.md" is now active')
-		expect(String(result)).to.contain("Review the release notes.")
-		expect(config.taskState.activeWorkflowId).to.equal(undefined)
-		expect(config.taskState.activePlaceholderWorkflowId).to.equal("global-review.md")
+			expect(String(result)).to.contain('# Workflow "global-review.md" is now active')
+			expect(String(result)).to.contain("Review the release notes.")
+			expect(config.taskState.activeWorkflowId).to.equal(undefined)
+			expect(config.taskState.activePlaceholderWorkflowId).to.equal("global-review.md")
+			expect(config.taskState.activePlaceholderWorkflowSource).to.deep.equal({
+				type: "global",
+				name: "global-review.md",
+				path: workflowPath,
+			})
+			expect(saveMetadataStub.calledOnce).to.equal(true)
+		} finally {
+			sandbox.restore()
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
 	})
 
 	it("activates remote workflows through use_skill", async () => {
-		const handler = new UseSkillToolHandler()
-		const config = createConfig({
-			services: {
-				stateManager: {
-					getGlobalStateKey: (key: string) => (key === "remoteWorkflowToggles" ? {} : undefined),
-					getGlobalSettingsKey: () => ({}),
-					getWorkspaceStateKey: () => ({}),
-					getRemoteConfigSettings: () => ({
-						remoteGlobalWorkflows: [
-							{ name: "remote-review", contents: "# Remote review\nCheck the config.", alwaysEnabled: true },
-						],
-					}),
-					getApiConfiguration: () => ({ planModeApiProvider: "openai", actModeApiProvider: "openai" }),
+		const sandbox = sinon.createSandbox()
+		sandbox.stub(disk, "getTaskMetadata").resolves({} as any)
+		const saveMetadataStub = sandbox.stub(disk, "saveTaskMetadata").resolves()
+		try {
+			const handler = new UseSkillToolHandler()
+			const config = createConfig({
+				services: {
+					stateManager: {
+						getGlobalStateKey: (key: string) => (key === "remoteWorkflowToggles" ? {} : undefined),
+						getGlobalSettingsKey: () => ({}),
+						getWorkspaceStateKey: () => ({}),
+						getRemoteConfigSettings: () => ({
+							remoteGlobalWorkflows: [
+								{ name: "remote-review", contents: "# Remote review\nCheck the config.", alwaysEnabled: true },
+							],
+						}),
+						getApiConfiguration: () => ({ planModeApiProvider: "openai", actModeApiProvider: "openai" }),
+					},
+				} as any,
+			})
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "use_skill",
+				params: {
+					skill_name: "remote-review",
 				},
-			} as any,
-		})
+				partial: false,
+			} as any)
 
-		const result = await handler.execute(config, {
-			type: "tool_use",
-			name: "use_skill",
-			params: {
-				skill_name: "remote-review",
-			},
-			partial: false,
-		} as any)
-
-		expect(String(result)).to.contain('# Workflow "remote-review" is now active')
-		expect(String(result)).to.contain("Check the config.")
-		expect(config.taskState.activeWorkflowId).to.equal(undefined)
-		expect(config.taskState.activePlaceholderWorkflowId).to.equal("remote-review")
+			expect(String(result)).to.contain('# Workflow "remote-review" is now active')
+			expect(String(result)).to.contain("Check the config.")
+			expect(config.taskState.activeWorkflowId).to.equal(undefined)
+			expect(config.taskState.activePlaceholderWorkflowId).to.equal("remote-review")
+			expect(config.taskState.activePlaceholderWorkflowSource).to.deep.equal({
+				type: "remote",
+				name: "remote-review",
+				contents: "# Remote review\nCheck the config.",
+			})
+			expect(saveMetadataStub.calledOnce).to.equal(true)
+		} finally {
+			sandbox.restore()
+		}
 	})
 })

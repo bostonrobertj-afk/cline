@@ -42,7 +42,6 @@ failed_layers: '' # set at runtime: comma-separated list of layers that failed o
     Dispatch a separate subagent for the Adversarial General review.
     <detail>
       Assign the workflow skill with a prompt line like `Skill: use_skill('bmad-review-adversarial-general')`.
-      Do not tell the subagent to run `bmad-code-review`.
       Prompt the subagent with `{diff_output}` plus any already loaded project context that helps ground the review.
       When `{review_mode} = `full``, also include `{spec_file}` as supporting context, but tell the subagent to stay focused on general adversarial review rather than AC-by-AC auditing.
       Tell it:

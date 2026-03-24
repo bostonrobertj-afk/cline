@@ -39,6 +39,7 @@ import {
 	saveTaskMetadata,
 } from "@core/storage/disk"
 import { releaseTaskLock } from "@core/task/TaskLockUtils"
+import { isSameActivePlaceholderWorkflowSource } from "@core/workflows/placeholder-workflow-step-details"
 import { createWorkflowSkillMetadata, resolveAvailableWorkflows } from "@core/workflows/resolution/resolveAvailableWorkflows"
 import { isMultiRootEnabled } from "@core/workspace/multi-root-utils"
 import { WorkspaceRootManager } from "@core/workspace/WorkspaceRootManager"
@@ -991,12 +992,16 @@ export class Task {
 			this.taskState.managedWorkflowRun = run
 			this.taskState.activeWorkflowId = run.workflowId
 			this.taskState.activePlaceholderWorkflowId = undefined
+			this.taskState.activePlaceholderWorkflowSource = undefined
 			this.taskState.activePlaceholderWorkflowValues = undefined
 			this.taskState.activeWorkflowJustStarted = !resumed
 			await this.refreshManagedWorkflowChecklistProjection()
 		} else if (action.type === "activate_placeholder_workflow") {
-			const workflowChanged = this.taskState.activePlaceholderWorkflowId !== action.workflowId
+			const workflowChanged =
+				this.taskState.activePlaceholderWorkflowId !== action.workflowId ||
+				!isSameActivePlaceholderWorkflowSource(this.taskState.activePlaceholderWorkflowSource, action.workflowSource)
 			this.taskState.activePlaceholderWorkflowId = action.workflowId
+			this.taskState.activePlaceholderWorkflowSource = action.workflowSource
 			this.taskState.activePlaceholderWorkflowValues = workflowChanged
 				? undefined
 				: this.taskState.activePlaceholderWorkflowValues
@@ -1021,6 +1026,7 @@ export class Task {
 			if (!this.taskState.managedWorkflowRun) {
 				this.taskState.activeWorkflowId = undefined
 				this.taskState.activePlaceholderWorkflowId = undefined
+				this.taskState.activePlaceholderWorkflowSource = undefined
 				this.taskState.activePlaceholderWorkflowValues = undefined
 				this.taskState.activeWorkflowJustStarted = false
 			} else if (hadManagedWorkflowRun) {
@@ -1036,6 +1042,7 @@ export class Task {
 			if (!this.taskState.managedWorkflowRun) {
 				this.taskState.activeWorkflowId = undefined
 				this.taskState.activePlaceholderWorkflowId = undefined
+				this.taskState.activePlaceholderWorkflowSource = undefined
 				this.taskState.activePlaceholderWorkflowValues = undefined
 				this.taskState.activeWorkflowJustStarted = false
 			}
@@ -1051,6 +1058,7 @@ export class Task {
 			taskMetadata.activeAgentInvokedSlashCommand = this.taskState.activeAgentInvokedSlashCommand
 			taskMetadata.activeWorkflowId = this.taskState.activeWorkflowId
 			taskMetadata.activePlaceholderWorkflowId = this.taskState.activePlaceholderWorkflowId
+			taskMetadata.activePlaceholderWorkflowSource = this.taskState.activePlaceholderWorkflowSource
 			taskMetadata.activePlaceholderWorkflowValues = this.taskState.activePlaceholderWorkflowValues
 			taskMetadata.managedWorkflowRun = this.taskState.managedWorkflowRun
 			await saveTaskMetadata(this.taskId, taskMetadata)
@@ -1178,6 +1186,7 @@ export class Task {
 			this.taskState.activeAgentJustActivated = false
 			this.taskState.activeWorkflowId = metadata.activeWorkflowId
 			this.taskState.activePlaceholderWorkflowId = metadata.activePlaceholderWorkflowId
+			this.taskState.activePlaceholderWorkflowSource = metadata.activePlaceholderWorkflowSource
 			this.taskState.activePlaceholderWorkflowValues = metadata.activePlaceholderWorkflowValues
 			this.taskState.activeWorkflowJustStarted = false
 			this.taskState.managedWorkflowRun = metadata.managedWorkflowRun
@@ -3772,7 +3781,7 @@ export class Task {
 
 		// Add focus chain instructions if needed
 		if (!useCompactPrompt && this.FocusChainManager?.shouldIncludeFocusChainInstructions()) {
-			const focusChainInstructions = this.FocusChainManager.generateFocusChainInstructions()
+			const focusChainInstructions = await this.FocusChainManager.generateFocusChainInstructions()
 			if (focusChainInstructions.trim()) {
 				processedUserContent.push({
 					type: "text",

@@ -44,14 +44,13 @@ export const config = createVariant(ModelFamily.NATIVE_GPT_5)
 	})
 	.template(GPT_5_TEMPLATE_OVERRIDES.BASE)
 	.components(
+		SystemPromptSection.USER_INSTRUCTIONS,
 		SystemPromptSection.AGENT_ROLE,
 		SystemPromptSection.TOOL_USE,
 		SystemPromptSection.TASK_PROGRESS,
-		SystemPromptSection.ACT_VS_PLAN,
 		SystemPromptSection.FEEDBACK,
 		SystemPromptSection.RULES,
 		SystemPromptSection.SYSTEM_INFO,
-		SystemPromptSection.USER_INSTRUCTIONS,
 		SystemPromptSection.SKILLS,
 	)
 	.tools(
@@ -93,9 +92,6 @@ export const config = createVariant(ModelFamily.NATIVE_GPT_5)
 	})
 	.overrideComponent(SystemPromptSection.TOOL_USE, {
 		template: GPT_5_TEMPLATE_OVERRIDES.TOOL_USE,
-	})
-	.overrideComponent(SystemPromptSection.ACT_VS_PLAN, {
-		template: GPT_5_TEMPLATE_OVERRIDES.ACT_VS_PLAN,
 	})
 	.overrideComponent(SystemPromptSection.FEEDBACK, {
 		template: GPT_5_TEMPLATE_OVERRIDES.FEEDBACK,
