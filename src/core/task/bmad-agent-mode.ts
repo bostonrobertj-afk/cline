@@ -685,27 +685,6 @@ ${personaSection}
 </active_bmad_agent>`
 }
 
-function parseAgentReference(referenceMarkdown: string): Array<{ agentName: string; scope: string; agentId: string }> {
-	return referenceMarkdown
-		.split("\n")
-		.map((line) => line.trim())
-		.filter((line) => line.startsWith("|"))
-		.map((line) =>
-			line
-				.split("|")
-				.slice(1, -1)
-				.map((column) => column.trim()),
-		)
-		.filter((columns) => columns.length >= 3)
-		.filter(([agentName, scope]) => agentName !== "Agent" && scope !== "---")
-		.map(([agentName, scope, rawCommand]) => {
-			const normalizedCommand = rawCommand.replace(/`/g, "").trim()
-			const agentId = normalizedCommand.replace(/^\//, "").replace(/\.md$/, "")
-			return { agentName, scope, agentId }
-		})
-		.filter((entry) => entry.agentId.startsWith("bmad-"))
-}
-
 export function toPreferredBmadAgentActivationCommand(agentId: string): string {
 	return `${BMAD_AGENT_ALIAS_PREFIX}${getAgentAliasSuffix(agentId)}`
 }
@@ -821,41 +800,6 @@ export async function resolvePlaceholderWorkflowManagedVariant(
 export async function isBmadExitCommand(cwd: string, commandName: string): Promise<boolean> {
 	const configuredExitCommand = (await getConfiguredBmadAgentAllowlist(cwd))?.exitCommand
 	return (configuredExitCommand ?? "bmad-exit") === commandName
-}
-
-export async function getBmadAgentReference(cwd: string): Promise<string | undefined> {
-	try {
-		const referencePath = path.resolve(cwd, "_bmad", "_config", "agent-reference.md")
-		return (await fs.readFile(referencePath, "utf8")).trim()
-	} catch {
-		return undefined
-	}
-}
-
-export async function buildBmadAgentCatalogInstructions(cwd: string, activeAgentId?: string): Promise<string | undefined> {
-	const referenceMarkdown = await getBmadAgentReference(cwd)
-	if (!referenceMarkdown) {
-		return undefined
-	}
-
-	const entries = parseAgentReference(referenceMarkdown).filter((entry) => entry.agentId !== activeAgentId)
-	if (entries.length === 0) {
-		return undefined
-	}
-
-	const agentLines = entries
-		.map(
-			(entry) =>
-				`- ${entry.agentName} — ${entry.scope} — ${formatSlashCommand(toPreferredBmadAgentActivationCommand(entry.agentId))}`,
-		)
-		.join("\n")
-
-	return `<available_bmad_agents>
-Other BMAD agents available for new-thread handoff if the user's request is outside your scope:
-${agentLines}
-
-If you recommend another BMAD agent, tell the user to start a new thread with that command rather than switching personas implicitly in this thread.
-</available_bmad_agents>`
 }
 
 export async function getBmadWorkflowReminder(cwd: string, workflowId: string): Promise<string | undefined> {

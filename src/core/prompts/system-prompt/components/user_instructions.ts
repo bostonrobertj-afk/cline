@@ -11,7 +11,6 @@ If this turn includes a new message directly from the user, it will be found und
 
 export async function getUserInstructions(variant: PromptVariant, context: SystemPromptContext): Promise<string | undefined> {
 	const customInstructions = buildUserInstructions(
-		context.activeAgentCatalogInstructions,
 		context.activeWorkflowReminder,
 		context.globalClineRulesFileInstructions,
 		context.localClineRulesFileInstructions,
@@ -36,7 +35,6 @@ export async function getUserInstructions(variant: PromptVariant, context: Syste
 }
 
 function buildUserInstructions(
-	activeAgentCatalogInstructions?: string,
 	activeWorkflowReminder?: string,
 	globalClineRulesFileInstructions?: string,
 	localClineRulesFileInstructions?: string,
@@ -48,9 +46,6 @@ function buildUserInstructions(
 	preferredLanguageInstructions?: string,
 ): string | undefined {
 	const customInstructions = []
-	if (activeAgentCatalogInstructions) {
-		customInstructions.push(activeAgentCatalogInstructions)
-	}
 	if (activeWorkflowReminder) {
 		customInstructions.push(activeWorkflowReminder)
 	}

@@ -103,7 +103,6 @@ export interface SystemPromptContext {
 	readonly mcpHub?: McpHub
 	readonly activeAgentId?: string
 	readonly activeAgentRoleInstructions?: string
-	readonly activeAgentCatalogInstructions?: string
 	readonly activeWorkflowReminder?: string
 	readonly activeWorkflowSupportsPlaceholders?: boolean
 	readonly managedWorkflowActive?: boolean

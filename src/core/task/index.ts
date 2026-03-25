@@ -118,7 +118,6 @@ import { Controller } from "../controller"
 import { executeHook } from "../hooks/hook-executor"
 import { StateManager } from "../storage/StateManager"
 import {
-	buildBmadAgentCatalogInstructions,
 	buildBmadAgentRoleInstructions,
 	getBmadAgentById,
 	getBmadWorkflowReminder,
@@ -1193,21 +1192,15 @@ export class Task {
 
 	private async buildBmadPromptInstructions(): Promise<{
 		activeAgentRoleInstructions?: string
-		activeAgentCatalogInstructions?: string
 		activeWorkflowReminder?: string
 	}> {
 		let activeAgentRoleInstructions: string | undefined
-		let activeAgentCatalogInstructions: string | undefined
 		let activeWorkflowReminder: string | undefined
 
 		if (this.taskState.activeAgentId) {
 			activeAgentRoleInstructions = await buildBmadAgentRoleInstructions(this.cwd, this.taskState.activeAgentId, {
 				includeActivation: this.taskState.activeAgentJustActivated,
 			})
-
-			if (this.taskState.activeAgentJustActivated || this.isPromptRefreshTurn()) {
-				activeAgentCatalogInstructions = await buildBmadAgentCatalogInstructions(this.cwd, this.taskState.activeAgentId)
-			}
 		}
 
 		if (this.taskState.managedWorkflowRun) {
@@ -1216,7 +1209,7 @@ export class Task {
 			activeWorkflowReminder = await getBmadWorkflowReminder(this.cwd, this.taskState.activeWorkflowId)
 		}
 
-		return { activeAgentRoleInstructions, activeAgentCatalogInstructions, activeWorkflowReminder }
+		return { activeAgentRoleInstructions, activeWorkflowReminder }
 	}
 
 	private getPromptRefreshInterval(): number {
@@ -2342,8 +2335,9 @@ export class Task {
 					this.mergePromptSkillEntries(availableSkills, createWorkflowSkillMetadata(workflowEntries)),
 				)
 			: []
-		const { activeAgentRoleInstructions, activeAgentCatalogInstructions, activeWorkflowReminder } =
-			shouldIncludeBmadPromptContext ? await this.buildBmadPromptInstructions() : {}
+		const { activeAgentRoleInstructions, activeWorkflowReminder } = shouldIncludeBmadPromptContext
+			? await this.buildBmadPromptInstructions()
+			: {}
 
 		// Snapshot editor tabs so prompt tools can decide whether to include
 		// filetype-specific instructions (e.g. notebooks) without adding bespoke flags.
@@ -2364,7 +2358,6 @@ export class Task {
 			mcpHub: this.mcpHub,
 			activeAgentId: shouldIncludeBmadPromptContext ? this.taskState.activeAgentId : undefined,
 			activeAgentRoleInstructions,
-			activeAgentCatalogInstructions,
 			activeWorkflowReminder,
 			activeWorkflowSupportsPlaceholders:
 				!!this.taskState.managedWorkflowRun || !!this.taskState.activePlaceholderWorkflowId,
