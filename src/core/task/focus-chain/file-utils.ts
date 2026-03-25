@@ -2,6 +2,7 @@ import { isFocusChainItem } from "@shared/focus-chain-utils"
 import * as fs from "fs/promises"
 import * as path from "path"
 import { ensureTaskDirectoryExists } from "../../storage/disk"
+import type { FocusChainChecklistUpdateResult, ParsedFocusChainItem } from "./types"
 
 /**
  * Generate the standard file path for a task's focusChain markdown file
@@ -42,6 +43,81 @@ export function extractFocusChainItemsFromText(text: string): string[] {
 export function extractFocusChainListFromText(text: string): string | null {
 	const focusChainLines = extractFocusChainItemsFromText(text)
 	return focusChainLines.length > 0 ? focusChainLines.join("\n") : null
+}
+
+export function normalizeFocusChainItemLabel(label: string): string {
+	return label.trim().replace(/\s+/g, " ")
+}
+
+export function parseFocusChainChecklistItems(text: string): ParsedFocusChainItem[] {
+	return extractFocusChainItemsFromText(text)
+		.map((line) => {
+			const trimmedLine = line.trim()
+			const checkedMatch = /^\s*-\s*\[([ xX])\]\s*(.+)$/.exec(trimmedLine)
+			if (!checkedMatch) {
+				return undefined
+			}
+
+			const label = checkedMatch[2].trim()
+			return {
+				checked: checkedMatch[1] === "x" || checkedMatch[1] === "X",
+				label,
+				normalizedLabel: normalizeFocusChainItemLabel(label),
+			}
+		})
+		.filter((item): item is ParsedFocusChainItem => !!item)
+}
+
+export function formatFocusChainChecklistItem(checked: boolean, label: string): string {
+	return `${checked ? "- [x]" : "- [ ]"} ${label.trim()}`
+}
+
+export function evaluateFocusChainChecklistUpdate(
+	existingChecklist: string,
+	incomingChecklist: string,
+): FocusChainChecklistUpdateResult {
+	const existingItems = parseFocusChainChecklistItems(existingChecklist)
+	const incomingItems = parseFocusChainChecklistItems(incomingChecklist)
+
+	if (existingItems.length !== incomingItems.length) {
+		return {
+			accepted: false,
+			feedback: buildFocusChainChecklistRejectionFeedback(existingChecklist),
+		}
+	}
+
+	for (let i = 0; i < existingItems.length; i++) {
+		if (existingItems[i].normalizedLabel !== incomingItems[i].normalizedLabel) {
+			return {
+				accepted: false,
+				feedback: buildFocusChainChecklistRejectionFeedback(existingChecklist),
+			}
+		}
+	}
+
+	return {
+		accepted: true,
+		checklist:
+			existingItems.length === 0
+				? incomingChecklist.trim()
+				: existingItems
+						.map((existingItem, index) =>
+							formatFocusChainChecklistItem(incomingItems[index].checked, existingItem.label),
+						)
+						.join("\n"),
+	}
+}
+
+export function buildFocusChainChecklistRejectionFeedback(existingChecklist: string): string {
+	return [
+		"A task list already exists.",
+		"Do not replace it with a different shape. Only checkbox states may change.",
+		"Complete it or ask the human to cancel it before creating a new one.",
+		"Current checklist:",
+		existingChecklist.trim(),
+	]
+		.filter((part) => part.length > 0)
+		.join("\n\n")
 }
 
 /**

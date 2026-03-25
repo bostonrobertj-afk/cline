@@ -51,7 +51,7 @@ CRITICAL CONSTRAINT: You MUST NOT call this tool more than once in a row. After 
 		{
 			name: "task_progress",
 			required: false,
-			instruction: "A checklist showing task progress with the latest status of each subtasks included previously if any.",
+			instruction: "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool.",
 		},
 	],
 }

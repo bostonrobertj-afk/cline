@@ -8,8 +8,7 @@ const generic: ClineToolSpec = {
 	id,
 	variant: ModelFamily.GENERIC,
 	name: "set_workflow_placeholders",
-	description:
-		"Persist a workflow-state value for the active workflow when the current step establishes it. This tool is typically used for dynamic workflow placeholders written as {{placeholder_name}}. Use it when the workflow creates, selects, derives, validates, or receives a named runtime value that the workflow instructions refer to by placeholder key, such as an active file path, generated output path, selected artifact, confirmed topic, or other workflow-state value.",
+	description: "Persist a workflow placeholder value for the active step.",
 	contextRequirements: (context) =>
 		context.managedWorkflowActive === true || context.activeWorkflowSupportsPlaceholders === true,
 	parameters: [
@@ -18,7 +17,7 @@ const generic: ClineToolSpec = {
 			required: true,
 			type: "object",
 			instruction:
-				'An object map of placeholder names to their resolved string values. Use the exact placeholder key named in the workflow instructions. This is typically for dynamic workflow-state placeholders such as {{research_topic}} or {{output_file}}. Example: {"research_topic": "user onboarding", "validation_report_path": "docs/validation-report.md"}',
+				'Object map of placeholder keys to string values. Not an array of {name,value} or {key,value}. Example: {"story_path":"docs/story.md","project_context":"docs/project-context.md"}',
 			additionalProperties: {
 				type: "string",
 			},

@@ -61,6 +61,7 @@ Inspect the prepared review input and write findings.
 			expect(prompt).to.contain("Determine what to review from the user's prompt")
 			expect(prompt).to.contain("If you are done with this step, include the `task_progress` parameter")
 			expect(prompt).to.match(/^# TODO LIST UPDATE SUGGESTED/m)
+			expect(prompt).to.contain("```text")
 			expect(prompt).to.match(/^- \[ \] Step 1: Gather Context/m)
 			expect(prompt).to.match(/^# CURRENT WORKFLOW STEP/m)
 		} finally {
@@ -167,6 +168,7 @@ Inspect the prepared review input and write findings.
 	})
 
 	it("seeds a placeholder checklist projection and writes the focus-chain markdown file", async () => {
+		const sandbox = sinon.createSandbox()
 		const taskId = `task-focus-chain-placeholder-${Date.now()}`
 		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "focus-chain-placeholder-seed-"))
 		const workflowPath = path.join(tempDir, "local-review.md")
@@ -186,7 +188,7 @@ Inspect the prepared review input and write findings.
 		try {
 			const taskDir = path.join(tempDir, "task-dir")
 			await fs.mkdir(taskDir, { recursive: true })
-			const ensureTaskDirectoryExistsStub = sinon.stub(disk, "ensureTaskDirectoryExists").resolves(taskDir)
+			const ensureTaskDirectoryExistsStub = sandbox.stub(disk, "ensureTaskDirectoryExists").resolves(taskDir)
 			const taskState = new TaskState()
 			taskState.activePlaceholderWorkflowId = "local-review.md"
 			taskState.activePlaceholderWorkflowSource = {
@@ -213,6 +215,7 @@ Inspect the prepared review input and write findings.
 			expect(fileContent).to.contain("- [ ] Step 1: Gather Context")
 			expect(fileContent).to.contain("- [ ] Step 2: Review")
 		} finally {
+			sandbox.restore()
 			await fs.rm(tempDir, { recursive: true, force: true })
 		}
 	})
@@ -253,6 +256,131 @@ Determine what to review from the user's prompt before asking follow-up question
 			expect(taskState.currentFocusChainChecklist).to.equal("- [ ] Existing checklist item")
 			sinon.assert.notCalled(say)
 		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("accepts same-shape updates and preserves the existing checklist labels", async () => {
+		const sandbox = sinon.createSandbox()
+		const taskId = `task-focus-chain-placeholder-${Date.now()}`
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "focus-chain-placeholder-accept-"))
+		try {
+			sandbox.stub(disk, "ensureTaskDirectoryExists").resolves(tempDir)
+			const taskState = new TaskState()
+			taskState.currentFocusChainChecklist = "- [ ] Step 1: Gather Context\n- [ ] Step 2: Review"
+
+			const say = sinon.stub().resolves(undefined)
+			const manager = new FocusChainManager({
+				...createDependencies(taskState),
+				taskId,
+				say,
+			})
+
+			const result = await manager.updateFCListFromToolResponse("- [x]  Step 1: Gather Context \n- [ ] Step 2: Review")
+
+			expect(result.accepted).to.equal(true)
+			expect(taskState.currentFocusChainChecklist).to.equal("- [x] Step 1: Gather Context\n- [ ] Step 2: Review")
+			sinon.assert.calledOnce(say)
+			sinon.assert.calledWith(say, "task_progress", "- [x] Step 1: Gather Context\n- [ ] Step 2: Review")
+
+			const focusChainFilePath = getFocusChainFilePath(tempDir, taskId)
+			const written = await fs.readFile(focusChainFilePath, "utf8")
+			expect(written).to.contain("- [x] Step 1: Gather Context")
+			expect(written).to.contain("- [ ] Step 2: Review")
+		} finally {
+			sandbox.restore()
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("rejects shape changes for an existing placeholder checklist and preserves the file", async () => {
+		const sandbox = sinon.createSandbox()
+		const taskId = `task-focus-chain-placeholder-${Date.now()}`
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "focus-chain-placeholder-reject-"))
+		const workflowPath = path.join(tempDir, "local-review.md")
+		await fs.writeFile(
+			workflowPath,
+			`# Review Workflow
+
+## Step 1: Gather Context
+Determine what to review from the user's prompt before asking follow-up questions.
+
+## Step 2: Review
+Inspect the prepared review input and write findings.
+`,
+			"utf8",
+		)
+
+		try {
+			sandbox.stub(disk, "ensureTaskDirectoryExists").resolves(tempDir)
+			const taskState = new TaskState()
+			taskState.activePlaceholderWorkflowId = "local-review.md"
+			taskState.activePlaceholderWorkflowSource = {
+				type: "local",
+				name: "local-review.md",
+				path: workflowPath,
+			}
+
+			const say = sinon.stub().resolves(undefined)
+			const manager = new FocusChainManager({
+				...createDependencies(taskState),
+				taskId,
+				say,
+			})
+
+			await manager.refreshPlaceholderWorkflowChecklistProjection(true)
+			const focusChainFilePath = getFocusChainFilePath(tempDir, taskId)
+			const before = await fs.readFile(focusChainFilePath, "utf8")
+
+			const result = await manager.updateFCListFromToolResponse("- [ ] Step 1: Gather Context\n- [ ] Step 2: Triage")
+
+			expect(result.accepted).to.equal(false)
+			expect(result.feedback).to.contain("A task list already exists.")
+			expect(taskState.currentFocusChainChecklist).to.equal("- [ ] Step 1: Gather Context\n- [ ] Step 2: Review")
+			expect(await fs.readFile(focusChainFilePath, "utf8")).to.equal(before)
+			sinon.assert.calledOnce(say)
+		} finally {
+			sandbox.restore()
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("protects a checklist that already exists on disk even before task state has loaded it", async () => {
+		const sandbox = sinon.createSandbox()
+		const taskId = `task-focus-chain-disk-${Date.now()}`
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "focus-chain-placeholder-disk-"))
+		try {
+			sandbox.stub(disk, "ensureTaskDirectoryExists").resolves(tempDir)
+			const focusChainFilePath = getFocusChainFilePath(tempDir, taskId)
+			await fs.writeFile(
+				focusChainFilePath,
+				`# Focus Chain List for Task ${taskId}
+
+- [ ] Step 1: Gather Context
+- [ ] Step 2: Review
+`,
+				"utf8",
+			)
+
+			const taskState = new TaskState()
+			const say = sinon.stub().resolves(undefined)
+			const manager = new FocusChainManager({
+				...createDependencies(taskState),
+				taskId,
+				say,
+			})
+
+			const result = await manager.updateFCListFromToolResponse("- [ ] Reassess interrupted changes")
+
+			expect(result.accepted).to.equal(false)
+			expect(result.feedback).to.contain("A task list already exists.")
+			expect(taskState.currentFocusChainChecklist).to.equal("- [ ] Step 1: Gather Context\n- [ ] Step 2: Review")
+			const fileContent = await fs.readFile(focusChainFilePath, "utf8")
+			expect(fileContent).to.contain("- [ ] Step 1: Gather Context")
+			expect(fileContent).to.contain("- [ ] Step 2: Review")
+			sinon.assert.notCalled(say)
+		} finally {
+			sandbox.restore()
 			await fs.rm(tempDir, { recursive: true, force: true })
 		}
 	})

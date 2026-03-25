@@ -16,12 +16,15 @@ import { renderManagedWorkflowTaskProgress } from "../managed-workflows/ManagedW
 import { TaskState } from "../TaskState"
 import { logFocusChainDiagnosticEvent, summarizeFocusChainText, summarizeFocusChainTextBlocks } from "./diagnostics"
 import {
+	buildFocusChainChecklistRejectionFeedback,
 	createFocusChainMarkdownContent,
+	evaluateFocusChainChecklistUpdate,
 	extractFocusChainItemsFromText,
 	extractFocusChainListFromText,
 	getFocusChainFilePath,
 } from "./file-utils"
 import { FocusChainPrompts } from "./prompts"
+import type { FocusChainChecklistUpdateResult } from "./types"
 import { parseFocusChainListCounts } from "./utils"
 
 export interface FocusChainDependencies {
@@ -76,6 +79,10 @@ export class FocusChainManager {
 			.map((section) => (typeof section === "string" ? section.trim() : ""))
 			.filter((section): section is string => !!section)
 			.join("\n\n")
+	}
+
+	private renderChecklistForPrompt(checklist: string): string {
+		return ["```text", checklist.trim(), "```"].join("\n")
 	}
 
 	public getFocusChainInstructionsDecision(): FocusChainInstructionDecision {
@@ -207,7 +214,7 @@ export class FocusChainManager {
 			const currentChecklist = renderManagedWorkflowTaskProgress(this.taskState.managedWorkflowRun)
 			return this.joinPromptSections(
 				"# WORKFLOW PROGRESS IS BACKEND MANAGED",
-				currentChecklist,
+				this.renderChecklistForPrompt(currentChecklist),
 				"Use the complete_workflow_item tool to mark the active workflow item complete.\nDo not create or rewrite task_progress manually.",
 			)
 		}
@@ -237,7 +244,7 @@ export class FocusChainManager {
 				return this.joinPromptSections(
 					introUpdateRequired,
 					listCurrentProgress,
-					this.taskState.currentFocusChainChecklist,
+					this.renderChecklistForPrompt(this.taskState.currentFocusChainChecklist),
 					userHasUpdatedList,
 					FocusChainPrompts.reminder,
 				)
@@ -267,7 +274,7 @@ export class FocusChainManager {
 			return this.joinPromptSections(
 				introUpdateRequired,
 				listCurrentProgress,
-				this.taskState.currentFocusChainChecklist,
+				this.renderChecklistForPrompt(this.taskState.currentFocusChainChecklist),
 				FocusChainPrompts.reminder,
 				progressBasedMessageStub,
 			)
@@ -336,7 +343,7 @@ export class FocusChainManager {
 			return this.joinPromptSections(
 				"# TODO LIST UPDATE SUGGESTED: If you have completed any steps on the checklist, include the task_progress parameter in your NEXT tool call.",
 				listCurrentProgress,
-				currentChecklist,
+				this.renderChecklistForPrompt(currentChecklist),
 				userUpdatedWarning,
 				[
 					"# CURRENT WORKFLOW STEP",
@@ -532,54 +539,99 @@ export class FocusChainManager {
 	 * @requires this.taskState, this.say method, and telemetryService to be available
 	 * @returns Promise<void> - Updates taskState.currentFocusChainChecklist and sends UI messages
 	 */
-	public async updateFCListFromToolResponse(taskProgress: string | undefined) {
+	public async updateFCListFromToolResponse(taskProgress: string | undefined): Promise<FocusChainChecklistUpdateResult> {
 		try {
 			if (this.taskState.managedWorkflowRun) {
 				await this.refreshManagedWorkflowChecklistProjection()
-				return
+				return { accepted: true }
 			}
 			if (!taskProgress && this.taskState.activePlaceholderWorkflowSource && !this.taskState.currentFocusChainChecklist) {
 				await this.refreshPlaceholderWorkflowChecklistProjection()
-				return
+				return { accepted: true }
 			}
 
-			// Reset the counter if task_progress was provided
 			if (taskProgress && taskProgress.trim()) {
-				this.taskState.apiRequestsSinceLastTodoUpdate = 0
-			}
+				const trimmedTaskProgress = taskProgress.trim()
+				const currentChecklist = this.taskState.currentFocusChainChecklist ?? (await this.readFocusChainFromDisk())
 
-			// If model provides task_progress update, write it to the markdown file
-			if (taskProgress && taskProgress.trim()) {
-				const previousList = this.taskState.currentFocusChainChecklist
-				this.taskState.currentFocusChainChecklist = taskProgress.trim()
-				Logger.debug(
-					`[Task ${this.taskId}] focus chain list: LLM provided focus chain list update via task_progress parameter. Length ${previousList?.length || 0} > ${this.taskState.currentFocusChainChecklist.length}`,
-				)
-
-				// Parse focus chain list counts for telemetry
-				const { totalItems, completedItems } = parseFocusChainListCounts(taskProgress.trim())
-
-				// Track first progress creation
-				if (!this.hasTrackedFirstProgress && totalItems > 0) {
-					telemetryService.captureFocusChainProgressFirst(this.taskId, totalItems)
-					this.hasTrackedFirstProgress = true
-				}
-				// Track progress updates (only if not the first, and has items)
-				else if (this.hasTrackedFirstProgress && totalItems > 0) {
-					telemetryService.captureFocusChainProgressUpdate(this.taskId, totalItems, completedItems)
+				if (!this.taskState.currentFocusChainChecklist && currentChecklist) {
+					this.taskState.currentFocusChainChecklist = currentChecklist
 				}
 
-				// Write the model's update to the markdown file
-				try {
-					await this.writeFocusChainToDisk(taskProgress.trim())
+				if (currentChecklist) {
+					const updateResult = evaluateFocusChainChecklistUpdate(currentChecklist, trimmedTaskProgress)
+					if (!updateResult.accepted) {
+						return {
+							accepted: false,
+							feedback: updateResult.feedback ?? buildFocusChainChecklistRejectionFeedback(currentChecklist),
+						}
+					}
 
-					// Send the task_progress message to the UI immediately
-					await this.say("task_progress", taskProgress.trim())
-				} catch (error) {
-					Logger.error(`[Task ${this.taskId}] focus chain list: Failed to write to markdown file:`, error)
-					// Fall back to creating a task_progress message directly if file write fails
-					await this.say("task_progress", taskProgress.trim())
-					Logger.log(`[Task ${this.taskId}] focus chain list: Sent fallback task_progress message to UI`)
+					const mergedChecklist = updateResult.checklist || trimmedTaskProgress
+					const previousList = this.taskState.currentFocusChainChecklist
+					this.taskState.apiRequestsSinceLastTodoUpdate = 0
+					this.taskState.currentFocusChainChecklist = mergedChecklist
+					Logger.debug(
+						`[Task ${this.taskId}] focus chain list: LLM provided focus chain list update via task_progress parameter. Length ${previousList?.length || 0} > ${this.taskState.currentFocusChainChecklist.length}`,
+					)
+
+					// Parse focus chain list counts for telemetry
+					const { totalItems, completedItems } = parseFocusChainListCounts(mergedChecklist)
+
+					// Track first progress creation
+					if (!this.hasTrackedFirstProgress && totalItems > 0) {
+						telemetryService.captureFocusChainProgressFirst(this.taskId, totalItems)
+						this.hasTrackedFirstProgress = true
+					}
+					// Track progress updates (only if not the first, and has items)
+					else if (this.hasTrackedFirstProgress && totalItems > 0) {
+						telemetryService.captureFocusChainProgressUpdate(this.taskId, totalItems, completedItems)
+					}
+
+					// Write the model's update to the markdown file
+					try {
+						await this.writeFocusChainToDisk(mergedChecklist)
+
+						// Send the task_progress message to the UI immediately
+						await this.say("task_progress", mergedChecklist)
+					} catch (error) {
+						Logger.error(`[Task ${this.taskId}] focus chain list: Failed to write to markdown file:`, error)
+						// Fall back to creating a task_progress message directly if file write fails
+						await this.say("task_progress", mergedChecklist)
+						Logger.log(`[Task ${this.taskId}] focus chain list: Sent fallback task_progress message to UI`)
+					}
+				} else {
+					this.taskState.apiRequestsSinceLastTodoUpdate = 0
+					this.taskState.currentFocusChainChecklist = trimmedTaskProgress
+					Logger.debug(
+						`[Task ${this.taskId}] focus chain list: LLM provided focus chain list update via task_progress parameter. Length 0 > ${this.taskState.currentFocusChainChecklist.length}`,
+					)
+
+					// Parse focus chain list counts for telemetry
+					const { totalItems, completedItems } = parseFocusChainListCounts(trimmedTaskProgress)
+
+					// Track first progress creation
+					if (!this.hasTrackedFirstProgress && totalItems > 0) {
+						telemetryService.captureFocusChainProgressFirst(this.taskId, totalItems)
+						this.hasTrackedFirstProgress = true
+					}
+					// Track progress updates (only if not the first, and has items)
+					else if (this.hasTrackedFirstProgress && totalItems > 0) {
+						telemetryService.captureFocusChainProgressUpdate(this.taskId, totalItems, completedItems)
+					}
+
+					// Write the model's update to the markdown file
+					try {
+						await this.writeFocusChainToDisk(trimmedTaskProgress)
+
+						// Send the task_progress message to the UI immediately
+						await this.say("task_progress", trimmedTaskProgress)
+					} catch (error) {
+						Logger.error(`[Task ${this.taskId}] focus chain list: Failed to write to markdown file:`, error)
+						// Fall back to creating a task_progress message directly if file write fails
+						await this.say("task_progress", trimmedTaskProgress)
+						Logger.log(`[Task ${this.taskId}] focus chain list: Sent fallback task_progress message to UI`)
+					}
 				}
 			} else {
 				// No model update provided, check if markdown file exists and load it
@@ -594,8 +646,10 @@ export class FocusChainManager {
 					Logger.debug(`[Task ${this.taskId}] focus chain list: No valid task progress to update with`)
 				}
 			}
+			return { accepted: true }
 		} catch (error) {
 			Logger.error(`[Task ${this.taskId}] focus chain list: Error in updateFCListFromToolResponse:`, error)
+			return { accepted: false, feedback: "Failed to update task progress." }
 		}
 	}
 

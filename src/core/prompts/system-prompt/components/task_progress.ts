@@ -3,7 +3,7 @@ import { PromptVariant, SystemPromptContext, SystemPromptSection, TemplateEngine
 
 const UPDATING_TASK_PROGRESS = `UPDATING TASK PROGRESS
 
-Use the task_progress tool parameter to track the task with a concise Markdown checklist.
+Use \`task_progress\` only as a checklist parameter on the next tool call, not a standalone tool.
 
 - Create the checklist when switching from PLAN MODE to ACT MODE.
 - Keep items brief and milestone-based.
@@ -13,7 +13,7 @@ Use the task_progress tool parameter to track the task with a concise Markdown c
 
 const UPDATING_TASK_PROGRESS_NATIVE_NEXT_GEN = `UPDATING TASK PROGRESS
 
-Use the task_progress tool parameter to track the task with a concise Markdown checklist.
+Use \`task_progress\` only as a checklist parameter on the next tool call, not a standalone tool.
 
 - Create the checklist when switching from PLAN MODE to ACT MODE.
 - Keep items brief and milestone-based.
@@ -23,7 +23,7 @@ Use the task_progress tool parameter to track the task with a concise Markdown c
 
 const UPDATING_TASK_PROGRESS_NATIVE_GPT5 = `UPDATING TASK PROGRESS
 
-Use the task_progress tool parameter to track the task with a concise Markdown checklist.
+Use \`task_progress\` only as a checklist parameter on the next tool call, not a standalone tool.
 
 - Create the checklist when switching from PLAN MODE to ACT MODE.
 - Keep items brief and milestone-based.

@@ -4,7 +4,7 @@ import type { PromptVariant, SystemPromptContext } from "../../types"
 
 const getWorkflowPlaceholderToolGuidance = (context: SystemPromptContext) =>
 	context.managedWorkflowActive || context.activeWorkflowSupportsPlaceholders
-		? `- When an active workflow step establishes, confirms, selects, derives, or receives a runtime placeholder value referenced in the workflow instructions (for example \`{{output_file}}\`), use \`set_workflow_placeholders\` to persist it. Use the exact placeholder keys from the workflow instructions and store only resolved string values.`
+		? `- When a step sets a placeholder value, use \`set_workflow_placeholders\`.`
 		: ""
 
 const GPT5_1_AGENT_ROLE = (_context: SystemPromptContext) =>
@@ -47,7 +47,7 @@ After receiving the tool result, briefly reflect on whether the result matches y
 
 const GPT5_1_TASK_PROGRESS = (_context: SystemPromptContext) => `UPDATING TASK PROGRESS
 
-Use \`task_progress\` to maintain one full Markdown checklist.
+Use \`task_progress\` only as a checklist parameter on the next tool call, not a standalone tool.
 - Create it when switching from PLAN MODE to ACT MODE.
 - Keep items brief and milestone-level.
 - On updates, send the full current list using \`- [ ]\` and \`- [x]\`.`

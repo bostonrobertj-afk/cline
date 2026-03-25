@@ -176,6 +176,8 @@ describe("Task.loadContext placeholder workflow focus chain prompting", () => {
 		const promptText = collectTextValues(processedUserContent).join("\n")
 
 		expect(promptText).to.contain("TODO LIST UPDATE SUGGESTED")
+		expect(promptText).to.contain("```text")
+		expect(promptText).to.contain("- [ ] Step 1: Determine Review Source")
 		expect(promptText).to.contain("# CURRENT WORKFLOW STEP")
 		expect(promptText).to.contain("You are currently on this step: Step 1: Determine Review Source")
 		expect(environmentDetails).to.equal("ENVIRONMENT: reduced")

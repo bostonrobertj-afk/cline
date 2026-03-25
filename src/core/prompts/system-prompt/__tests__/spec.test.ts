@@ -177,7 +177,40 @@ describe("native tool placeholder replacement", () => {
 		)
 		expect(openAI.function.parameters.properties.input.description).to.equal("Complete `apply_patch` command to execute.")
 		expect(openAI.function.parameters.properties.task_progress.description).to.equal(
-			"Optional Markdown checklist of current task progress.",
+			"Markdown checklist as a top-level parameter on a tool call. Not a standalone tool.",
+		)
+	})
+
+	it("compacts native set_workflow_placeholders.values to an object map description", () => {
+		const context: SystemPromptContext = {
+			...mockContext,
+			enableNativeToolCalls: true,
+			useMinimalGptPrompt: true,
+			providerInfo: {
+				providerId: "openai",
+				model: { id: "gpt-5.4-2026-03-05", info: { supportsPromptCache: false } },
+				mode: "act",
+			},
+		}
+		const tool = makeTool({
+			name: "set_workflow_placeholders",
+			description: "Persist a workflow placeholder value for the active step.",
+			parameters: [
+				{
+					name: "values",
+					required: true,
+					type: "object",
+					instruction:
+						'Object map of placeholder keys to string values. Not an array of {name,value} or {key,value}. Example: {"story_path":"docs/story.md","project_context":"docs/project-context.md"}',
+					additionalProperties: { type: "string" },
+				},
+			],
+		})
+
+		const openAI = toolSpecFunctionDefinition(tool, context) as any
+
+		expect(openAI.function.parameters.properties.values.description).to.equal(
+			"Object map of placeholder keys to strings. Not arrays of {name,value} or {key,value}.",
 		)
 	})
 })

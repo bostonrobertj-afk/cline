@@ -21,6 +21,7 @@ import { formatResponse } from "../prompts/responses"
 import { StateManager } from "../storage/StateManager"
 import { WorkspaceRootManager } from "../workspace"
 import { ToolResponse } from "."
+import type { FocusChainChecklistUpdateResult } from "./focus-chain/types"
 import { MessageStateHandler } from "./message-state"
 import { TaskState } from "./TaskState"
 import { AutoApprove } from "./tools/autoApprove"
@@ -110,7 +111,7 @@ export class ToolExecutor {
 		) => Promise<[boolean, any]>,
 		private cancelRunningCommandTool: () => Promise<boolean>,
 		private doesLatestTaskCompletionHaveNewChanges: () => Promise<boolean>,
-		private updateFCListFromToolResponse: (taskProgress: string | undefined) => Promise<void>,
+		private updateFCListFromToolResponse: (taskProgress: string | undefined) => Promise<FocusChainChecklistUpdateResult>,
 		private switchToActMode: () => Promise<boolean>,
 		private cancelTask: () => Promise<void>,
 
@@ -564,11 +565,26 @@ export class ToolExecutor {
 		let toolResult: any = null
 		let toolWasExecuted = false
 		const executionStartTime = Date.now()
+		let skipPostExecutionFocusChainUpdate = false
 
 		try {
 			// Final abort check immediately before tool execution
 			if (this.taskState.abort) {
 				return
+			}
+
+			if (
+				!block.partial &&
+				block.name === ClineDefaultTool.ATTEMPT &&
+				this.stateManager.getGlobalSettingsKey("focusChainSettings").enabled
+			) {
+				const focusChainUpdate = await this.updateFCListFromToolResponse(block.params.task_progress)
+				skipPostExecutionFocusChainUpdate = true
+				if (focusChainUpdate.feedback) {
+					toolResult = formatResponse.toolError(focusChainUpdate.feedback)
+					this.pushToolResult(toolResult, block)
+					return
+				}
 			}
 
 			// Execute the actual tool
@@ -637,8 +653,18 @@ export class ToolExecutor {
 		}
 
 		// Handle focus chain updates
-		if (!block.partial && this.stateManager.getGlobalSettingsKey("focusChainSettings").enabled) {
-			await this.updateFCListFromToolResponse(block.params.task_progress)
+		if (
+			!skipPostExecutionFocusChainUpdate &&
+			!block.partial &&
+			this.stateManager.getGlobalSettingsKey("focusChainSettings").enabled
+		) {
+			const focusChainUpdate = await this.updateFCListFromToolResponse(block.params.task_progress)
+			if (focusChainUpdate.feedback) {
+				this.taskState.userMessageContent.push({
+					type: "text",
+					text: focusChainUpdate.feedback,
+				})
+			}
 		}
 	}
 }

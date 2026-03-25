@@ -40,7 +40,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Optional Markdown checklist of current task progress."
+            "description": "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool."
           }
         },
         "required": [
@@ -65,7 +65,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Optional Markdown checklist of current task progress."
+            "description": "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool."
           }
         },
         "required": [
@@ -98,7 +98,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Optional Markdown checklist of current task progress."
+            "description": "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool."
           }
         },
         "required": [
@@ -128,7 +128,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Optional Markdown checklist of current task progress."
+            "description": "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool."
           }
         },
         "required": [
@@ -153,7 +153,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Optional Markdown checklist of current task progress."
+            "description": "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool."
           }
         },
         "required": [
@@ -215,7 +215,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Optional Markdown checklist of current task progress."
+            "description": "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool."
           }
         },
         "required": [
@@ -245,7 +245,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Optional Markdown checklist of current task progress."
+            "description": "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool."
           }
         },
         "required": [
@@ -275,7 +275,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Optional Markdown checklist of current task progress."
+            "description": "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool."
           }
         },
         "required": [
@@ -321,7 +321,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Optional Markdown checklist of current task progress."
+            "description": "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool."
           }
         },
         "required": [

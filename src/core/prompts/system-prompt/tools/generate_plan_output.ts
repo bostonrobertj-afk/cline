@@ -70,7 +70,7 @@ However, if while writing your response you realize you actually need to do more
 		{
 			name: "task_progress",
 			required: false,
-			instruction: "A checklist showing task progress with the latest status of each subtasks included previously if any.",
+			instruction: "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool.",
 		},
 	],
 }

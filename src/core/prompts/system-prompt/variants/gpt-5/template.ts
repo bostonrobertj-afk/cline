@@ -5,7 +5,7 @@ import type { SystemPromptContext } from "../../types"
 
 const getWorkflowPlaceholderToolGuidance = (context: SystemPromptContext) =>
 	context.managedWorkflowActive || context.activeWorkflowSupportsPlaceholders
-		? `- When an active workflow step establishes, confirms, selects, derives, or receives a runtime placeholder value referenced in the workflow instructions (for example \`{{output_file}}\`), use \`set_workflow_placeholders\` to persist it. Use the exact placeholder keys from the workflow instructions and store only resolved string values.`
+		? `- When a step sets a placeholder value, use \`set_workflow_placeholders\`.`
 		: ""
 
 /**
@@ -57,7 +57,7 @@ export const BASE = `{{${SystemPromptSection.AGENT_ROLE}}}
 
 const TASK_PROGRESS = `UPDATING TASK PROGRESS
 
-Use \`task_progress\` to maintain one full Markdown checklist.
+Use \`task_progress\` only as a checklist parameter on the next tool call, not a standalone tool.
 - Create it when switching from PLAN MODE to ACT MODE.
 - Keep items brief and milestone-level.
 - On updates, send the full current list using \`- [ ]\` and \`- [x]\`.`

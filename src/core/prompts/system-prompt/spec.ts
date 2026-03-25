@@ -471,7 +471,11 @@ function getNativeToolParameterDescription(
 	}
 
 	if (param.name === "task_progress") {
-		return "Optional Markdown checklist of current task progress."
+		return "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool."
+	}
+
+	if (tool.name === "set_workflow_placeholders" && param.name === "values") {
+		return "Object map of placeholder keys to strings. Not arrays of {name,value} or {key,value}."
 	}
 
 	if (tool.name === "apply_patch" && param.name === "input") {

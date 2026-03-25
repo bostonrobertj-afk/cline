@@ -169,11 +169,6 @@ export class AttemptCompletionHandler implements IToolHandler, IPartialBlockHand
 				await config.callbacks.saveCheckpoint(true)
 			}
 
-			// Attempt completion is a special tool where we want to update the focus chain list before the user provides response
-			if (!block.partial && config.focusChainSettings.enabled) {
-				await config.callbacks.updateFCListFromToolResponse(block.params.task_progress)
-			}
-
 			// Check if command should be auto-approved
 			// attempt_completion commands don't have requires_approval param, so we treat them as safe commands
 			const autoApproveResult = config.autoApprover?.shouldAutoApproveTool(ClineDefaultTool.BASH)
@@ -217,10 +212,6 @@ export class AttemptCompletionHandler implements IToolHandler, IPartialBlockHand
 		// in case last command was interactive and in partial state, the UI is expecting an ask response. This ends the command ask response, freeing up the UI to proceed with the completion ask.
 		if (config.messageState.getClineMessages().at(-1)?.ask === "command_output") {
 			await config.callbacks.say("command_output", "")
-		}
-
-		if (!block.partial && config.focusChainSettings.enabled) {
-			await config.callbacks.updateFCListFromToolResponse(block.params.task_progress)
 		}
 
 		// Run TaskComplete hook BEFORE presenting the "Start New Task" button

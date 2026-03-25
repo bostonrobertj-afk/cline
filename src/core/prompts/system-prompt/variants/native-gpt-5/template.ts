@@ -44,7 +44,7 @@ export const BASE = `{{${SystemPromptSection.AGENT_ROLE}}}
 
 const TASK_PROGRESS = `UPDATING TASK PROGRESS
 
-Use \`task_progress\` to maintain one full Markdown checklist.
+Use \`task_progress\` only as a checklist parameter on the next tool call, not a standalone tool.
 - Create it when switching from PLAN MODE to ACT MODE.
 - Keep items brief and milestone-level.
 - On updates, send the full current list using \`- [ ]\` and \`- [x]\`.`

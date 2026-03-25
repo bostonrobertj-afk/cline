@@ -5,7 +5,7 @@ import type { SystemPromptContext } from "../../types"
 
 const getWorkflowPlaceholderToolGuidance = (context: SystemPromptContext) =>
 	context.managedWorkflowActive || context.activeWorkflowSupportsPlaceholders
-		? `- When an active workflow step establishes, confirms, selects, derives, or receives a runtime placeholder value referenced in the workflow instructions (for example \`{{output_file}}\`), use \`set_workflow_placeholders\` to persist it. Use the exact placeholder keys from the workflow instructions and store only resolved string values.`
+		? `- When a step sets a placeholder value, use \`set_workflow_placeholders\`.`
 		: ""
 
 /**

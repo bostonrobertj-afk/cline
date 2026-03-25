@@ -32,7 +32,7 @@
         },
         "task_progress": {
           "type": "STRING",
-          "description": "A checklist showing task progress after this tool use is completed. The task_progress parameter must be included as a separate parameter inside of the parent tool call, it must be separate from other parameters such as content, arguments, etc. (See 'UPDATING TASK PROGRESS' section for more details)"
+          "description": "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool."
         }
       },
       "required": [
@@ -56,7 +56,7 @@
         },
         "task_progress": {
           "type": "STRING",
-          "description": "A checklist showing task progress after this tool use is completed. The task_progress parameter must be included as a separate parameter inside of the parent tool call, it must be separate from other parameters such as content, arguments, etc. (See 'UPDATING TASK PROGRESS' section for more details)"
+          "description": "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool."
         }
       },
       "required": [
@@ -81,7 +81,7 @@
         },
         "task_progress": {
           "type": "STRING",
-          "description": "A checklist showing task progress after this tool use is completed. The task_progress parameter must be included as a separate parameter inside of the parent tool call, it must be separate from other parameters such as content, arguments, etc. (See 'UPDATING TASK PROGRESS' section for more details)"
+          "description": "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool."
         }
       },
       "required": [
@@ -110,7 +110,7 @@
         },
         "task_progress": {
           "type": "STRING",
-          "description": "A checklist showing task progress after this tool use is completed. The task_progress parameter must be included as a separate parameter inside of the parent tool call, it must be separate from other parameters such as content, arguments, etc. (See 'UPDATING TASK PROGRESS' section for more details)"
+          "description": "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool."
         }
       },
       "required": [
@@ -135,7 +135,7 @@
         },
         "task_progress": {
           "type": "STRING",
-          "description": "A checklist showing task progress after this tool use is completed. The task_progress parameter must be included as a separate parameter inside of the parent tool call, it must be separate from other parameters such as content, arguments, etc. (See 'UPDATING TASK PROGRESS' section for more details)"
+          "description": "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool."
         }
       },
       "required": [
@@ -155,7 +155,7 @@
         },
         "task_progress": {
           "type": "STRING",
-          "description": "A checklist showing task progress after this tool use is completed. The task_progress parameter must be included as a separate parameter inside of the parent tool call, it must be separate from other parameters such as content, arguments, etc. (See 'UPDATING TASK PROGRESS' section for more details)"
+          "description": "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool."
         }
       },
       "required": [
@@ -211,7 +211,7 @@
         },
         "task_progress": {
           "type": "STRING",
-          "description": "A checklist showing task progress after this tool use is completed. The task_progress parameter must be included as a separate parameter inside of the parent tool call, it must be separate from other parameters such as content, arguments, etc. (See 'UPDATING TASK PROGRESS' section for more details)"
+          "description": "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool."
         }
       },
       "required": [
@@ -237,7 +237,7 @@
         },
         "task_progress": {
           "type": "STRING",
-          "description": "A checklist showing task progress after this tool use is completed. The task_progress parameter must be included as a separate parameter inside of the parent tool call, it must be separate from other parameters such as content, arguments, etc. (See 'UPDATING TASK PROGRESS' section for more details)"
+          "description": "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool."
         }
       },
       "required": [
@@ -262,7 +262,7 @@
         },
         "task_progress": {
           "type": "STRING",
-          "description": "A checklist showing task progress after this tool use is completed. The task_progress parameter must be included as a separate parameter inside of the parent tool call, it must be separate from other parameters such as content, arguments, etc. (See 'UPDATING TASK PROGRESS' section for more details)"
+          "description": "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool."
         }
       },
       "required": [
@@ -286,7 +286,7 @@
         },
         "task_progress": {
           "type": "STRING",
-          "description": "A checklist showing task progress after this tool use is completed. (See 'Updating Task Progress' section for more details)"
+          "description": "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool."
         }
       },
       "required": [
@@ -362,7 +362,7 @@
         },
         "task_progress": {
           "type": "STRING",
-          "description": "A checklist showing task progress with the latest status of each subtasks included previously if any."
+          "description": "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool."
         }
       },
       "required": [

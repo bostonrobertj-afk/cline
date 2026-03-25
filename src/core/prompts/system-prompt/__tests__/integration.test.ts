@@ -335,7 +335,9 @@ describe("Prompt System Integration Tests", () => {
 				"gpt-5-codex",
 				async ({ systemPrompt }) => {
 					expect(systemPrompt).to.include("TOOL USE")
-					expect(systemPrompt).to.include("You have access to tools that run after user approval.")
+					expect(systemPrompt).to.include(
+						"Use `task_progress` only as a checklist parameter on the next tool call, not a standalone tool.",
+					)
 					expect(systemPrompt).to.include("RESPONSE TOOLS")
 					expect(systemPrompt).to.include(
 						"A reply reaches the human user only when you use the appropriate response tool.",
@@ -352,8 +354,9 @@ describe("Prompt System Integration Tests", () => {
 		})
 
 		it("includes set_workflow_placeholders guidance for placeholder workflows across prompt variants", async function () {
-			const guidanceSnippet =
-				"When an active workflow step establishes, confirms, selects, derives, or receives a runtime placeholder value referenced in the workflow instructions"
+			const guidanceSnippet = "When a step sets a placeholder value, use `set_workflow_placeholders`."
+			const taskProgressSnippet =
+				"Use `task_progress` only as a checklist parameter on the next tool call, not a standalone tool."
 
 			const cases = [
 				{
@@ -391,8 +394,7 @@ describe("Prompt System Integration Tests", () => {
 					testCase.name,
 					async ({ systemPrompt }) => {
 						expect(systemPrompt).to.include(guidanceSnippet)
-						expect(systemPrompt).to.include("use `set_workflow_placeholders` to persist it")
-						expect(systemPrompt).to.include("workflow instructions")
+						expect(systemPrompt).to.include(taskProgressSnippet)
 						expect(systemPrompt).to.not.include("managed workflow step")
 					},
 				)

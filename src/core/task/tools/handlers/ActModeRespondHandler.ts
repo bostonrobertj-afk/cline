@@ -29,7 +29,6 @@ export class ActModeRespondHandler implements IToolHandler, IPartialBlockHandler
 
 	async execute(config: TaskConfig, block: ToolUse): Promise<ToolResponse> {
 		const response: string | undefined = block.params.response
-		const taskProgress: string | undefined = block.params.task_progress
 
 		// Validate we're in ACT mode
 		if (config.mode !== "act") {
@@ -62,11 +61,6 @@ export class ActModeRespondHandler implements IToolHandler, IPartialBlockHandler
 		// Display complete message to user using "text" type (non-blocking)
 		// This allows us to show the progress update and immediately continue
 		await config.callbacks.say("text", response, undefined, undefined, false)
-
-		// Update focus chain if task_progress provided
-		if (taskProgress) {
-			await config.callbacks.updateFCListFromToolResponse(taskProgress)
-		}
 
 		// Note: lastToolName is tracked centrally by ToolExecutor after tool execution
 
