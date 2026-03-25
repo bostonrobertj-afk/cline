@@ -171,6 +171,64 @@ Respond in {communication_language} from {config_source}.
 		}
 	})
 
+	it("auto-binds the owning BMAD agent when a placeholder workflow maps to a managed BMAD twin", async () => {
+		const sandbox = sinon.createSandbox()
+		try {
+			sandbox.stub(disk, "getTaskMetadata").resolves({} as never)
+			const saveMetadataStub = sandbox.stub(disk, "saveTaskMetadata").resolves()
+			const fakeTask = createFakeTask("task-placeholder-autobind")
+
+			await (Task.prototype as any).applyPersistentSlashCommandAction.call(fakeTask, {
+				type: "activate_placeholder_workflow",
+				workflowId: "code-review",
+				workflowSource: {
+					type: "remote",
+					name: "code-review",
+					contents: "# Code review\nInspect the implementation.",
+				},
+			})
+
+			expect(fakeTask.taskState.activeAgentId).to.equal("bmad-dev")
+			expect(fakeTask.taskState.activeAgentSkillName).to.equal("bmad-dev")
+			expect(fakeTask.taskState.activeAgentInvokedSlashCommand).to.equal("code-review")
+			expect(fakeTask.taskState.activePlaceholderWorkflowId).to.equal("code-review")
+			expect(saveMetadataStub.calledOnce).to.equal(true)
+			const [, savedMetadata] = saveMetadataStub.firstCall.args
+			expect(savedMetadata.activeAgentId).to.equal("bmad-dev")
+		} finally {
+			sandbox.restore()
+		}
+	})
+
+	it("blocks mapped placeholder workflow activation when the active BMAD agent is not allowed for the managed twin", async () => {
+		const sandbox = sinon.createSandbox()
+		try {
+			sandbox.stub(disk, "getTaskMetadata").resolves({} as never)
+			const saveMetadataStub = sandbox.stub(disk, "saveTaskMetadata").resolves()
+			const fakeTask = createFakeTask("task-placeholder-incompatible-agent")
+			fakeTask.taskState.activeAgentId = "bmad-pm"
+			fakeTask.taskState.activeAgentSkillName = "bmad-pm"
+			fakeTask.taskState.activeAgentInvokedSlashCommand = "bmad-pm"
+			fakeTask.taskState.activeAgentJustActivated = false
+
+			await (Task.prototype as any).applyPersistentSlashCommandAction.call(fakeTask, {
+				type: "activate_placeholder_workflow",
+				workflowId: "code-review",
+				workflowSource: {
+					type: "remote",
+					name: "code-review",
+					contents: "# Code review\nInspect the implementation.",
+				},
+			})
+
+			expect(fakeTask.say.calledOnce).to.equal(true)
+			expect(fakeTask.taskState.activePlaceholderWorkflowId).to.equal(undefined)
+			expect(saveMetadataStub.called).to.equal(false)
+		} finally {
+			sandbox.restore()
+		}
+	})
+
 	it("persists placeholder workflow source through slash-command activation and survives the next prompt turn", async () => {
 		const sandbox = sinon.createSandbox()
 		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "slash-placeholder-persist-"))
@@ -212,6 +270,7 @@ Inspect the prepared review input and write findings.
 			)
 
 			expect(getMetadataStub.calledOnce).to.equal(true)
+			expect(fakeTask.taskState.activeAgentId).to.equal(undefined)
 			expect(fakeTask.taskState.activePlaceholderWorkflowId).to.equal("local-flow.md")
 			expect(fakeTask.taskState.activePlaceholderWorkflowSource).to.deep.equal({
 				type: "local",

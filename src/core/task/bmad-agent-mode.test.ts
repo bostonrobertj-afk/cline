@@ -11,6 +11,7 @@ import {
 	getOwningBmadAgentForSkill,
 	isSkillAllowedForBmadAgent,
 	resolveBmadAgentActivation,
+	resolvePlaceholderWorkflowManagedVariant,
 } from "./bmad-agent-mode"
 
 describe("bmad-agent-mode", () => {
@@ -302,6 +303,19 @@ description: "Technical Writer"
 					"bmad-help",
 				),
 			).to.equal(true)
+		})
+
+		it("resolves placeholder workflow names to managed BMAD twins and owners", async () => {
+			const variant = await resolvePlaceholderWorkflowManagedVariant(process.cwd(), "code-review.md")
+
+			expect(variant?.managedWorkflowId).to.equal("bmad-code-review")
+			expect(variant?.owningAgent?.id).to.equal("bmad-dev")
+		})
+
+		it("returns undefined when placeholder workflows do not have managed BMAD twins", async () => {
+			const variant = await resolvePlaceholderWorkflowManagedVariant(process.cwd(), "does-not-exist-placeholder")
+
+			expect(variant).to.equal(undefined)
 		})
 	})
 })

@@ -7,6 +7,7 @@ import path from "path"
 import sinon from "sinon"
 import { HostProvider } from "@/hosts/host-provider"
 import { setVscodeHostProviderMock } from "@/test/host-provider-test-utils"
+import { resolvePlaceholderWorkflowManagedVariant } from "../../../bmad-agent-mode"
 import { startOrResumeManagedWorkflowRun } from "../../../managed-workflows/ManagedWorkflowController"
 import type { ManagedWorkflowRunState } from "../../../managed-workflows/types"
 import { TaskState } from "../../../TaskState"
@@ -912,6 +913,155 @@ describe("Managed workflow handlers", () => {
 			expect(saveMetadataStub.calledOnce).to.equal(true)
 		} finally {
 			sandbox.restore()
+		}
+	})
+
+	it("auto-binds the owning BMAD agent when mapped placeholder workflows are activated through use_skill", async () => {
+		const sandbox = sinon.createSandbox()
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "use-skill-placeholder-autobind-"))
+		const managedWorkflowConfigPath = path.join(tempDir, "_bmad", "_config", "managed-workflows.json")
+		await fs.mkdir(path.dirname(managedWorkflowConfigPath), { recursive: true })
+		await fs.writeFile(
+			managedWorkflowConfigPath,
+			JSON.stringify([
+				{
+					workflowId: "bmad-code-review",
+					slashCommand: "bmad-code-review",
+					skillName: "bmad-code-review",
+					module: "bmm",
+					skillPath: ".cline/skills/bmad-code-review/SKILL.md",
+					workflowPath: ".cline/skills/bmad-code-review/workflow.md",
+					aliases: [],
+					phaseRoots: [],
+					checklistPath: null,
+					supportsManagedExecution: true,
+					strategyHints: [],
+					extractionMode: "linear",
+					primaryStepRange: null,
+					packagedAssetPaths: [],
+				},
+			]),
+			"utf8",
+		)
+		sandbox.stub(disk, "getTaskMetadata").resolves({} as any)
+		const saveMetadataStub = sandbox.stub(disk, "saveTaskMetadata").resolves()
+		try {
+			const resolvedVariant = await resolvePlaceholderWorkflowManagedVariant(tempDir, "code-review")
+			expect(resolvedVariant?.managedWorkflowId).to.equal("bmad-code-review")
+			expect(resolvedVariant?.owningAgent?.id).to.equal("bmad-dev")
+
+			const handler = new UseSkillToolHandler()
+			const config = createConfig({
+				cwd: tempDir,
+				services: {
+					stateManager: {
+						getGlobalStateKey: (key: string) => (key === "remoteWorkflowToggles" ? {} : undefined),
+						getGlobalSettingsKey: () => ({}),
+						getWorkspaceStateKey: () => ({}),
+						getRemoteConfigSettings: () => ({
+							remoteGlobalWorkflows: [
+								{
+									name: "code-review",
+									contents: "# Placeholder code review\nInspect the implementation.",
+									alwaysEnabled: true,
+								},
+							],
+						}),
+						getApiConfiguration: () => ({ planModeApiProvider: "openai", actModeApiProvider: "openai" }),
+					},
+				} as any,
+			})
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "use_skill",
+				params: {
+					skill_name: "code-review",
+				},
+				partial: false,
+			} as any)
+
+			expect(String(result)).to.contain('# Workflow "code-review" is now active')
+			expect(config.taskState.activeAgentId).to.equal("bmad-dev")
+			expect(config.taskState.activeAgentSkillName).to.equal("bmad-dev")
+			expect(config.taskState.activeAgentInvokedSlashCommand).to.equal("code-review")
+			expect(config.taskState.activePlaceholderWorkflowId).to.equal("code-review")
+			expect(saveMetadataStub.calledOnce).to.equal(true)
+			expect(saveMetadataStub.firstCall.args[1].activeAgentId).to.equal("bmad-dev")
+		} finally {
+			sandbox.restore()
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("blocks mapped placeholder workflows through use_skill when the active BMAD agent is incompatible", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "use-skill-placeholder-incompatible-"))
+		const managedWorkflowConfigPath = path.join(tempDir, "_bmad", "_config", "managed-workflows.json")
+		await fs.mkdir(path.dirname(managedWorkflowConfigPath), { recursive: true })
+		await fs.writeFile(
+			managedWorkflowConfigPath,
+			JSON.stringify([
+				{
+					workflowId: "bmad-code-review",
+					slashCommand: "bmad-code-review",
+					skillName: "bmad-code-review",
+					module: "bmm",
+					skillPath: ".cline/skills/bmad-code-review/SKILL.md",
+					workflowPath: ".cline/skills/bmad-code-review/workflow.md",
+					aliases: [],
+					phaseRoots: [],
+					checklistPath: null,
+					supportsManagedExecution: true,
+					strategyHints: [],
+					extractionMode: "linear",
+					primaryStepRange: null,
+					packagedAssetPaths: [],
+				},
+			]),
+			"utf8",
+		)
+
+		try {
+			const handler = new UseSkillToolHandler()
+			const config = createConfig({
+				cwd: tempDir,
+				services: {
+					stateManager: {
+						getGlobalStateKey: (key: string) => (key === "remoteWorkflowToggles" ? {} : undefined),
+						getGlobalSettingsKey: () => ({}),
+						getWorkspaceStateKey: () => ({}),
+						getRemoteConfigSettings: () => ({
+							remoteGlobalWorkflows: [
+								{
+									name: "code-review",
+									contents: "# Placeholder code review\nInspect the implementation.",
+									alwaysEnabled: true,
+								},
+							],
+						}),
+						getApiConfiguration: () => ({ planModeApiProvider: "openai", actModeApiProvider: "openai" }),
+					},
+				} as any,
+			})
+			config.taskState.activeAgentId = "bmad-pm"
+			config.taskState.activeAgentSkillName = "bmad-pm"
+			config.taskState.activeAgentInvokedSlashCommand = "bmad-pm"
+			config.taskState.activeAgentJustActivated = false
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "use_skill",
+				params: {
+					skill_name: "code-review",
+				},
+				partial: false,
+			} as any)
+
+			expect(String(result)).to.contain('Active agent "bmad-pm" is not allowed to use skill "code-review"')
+			expect(config.taskState.activePlaceholderWorkflowId).to.equal(undefined)
+			expect(config.taskState.activeAgentId).to.equal("bmad-pm")
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
 		}
 	})
 })

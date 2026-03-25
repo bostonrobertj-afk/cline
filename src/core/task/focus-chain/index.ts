@@ -169,7 +169,7 @@ export class FocusChainManager {
 			const percentComplete = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0
 
 			const introUpdateRequired =
-				"# TODO LIST UPDATE REQUIRED - You MUST include the task_progress parameter in your NEXT tool call."
+				"# TODO LIST UPDATE SUGGESTED: If you have completed any steps on the checklist, include the task_progress parameter on your next tool call."
 			const listCurrentProgress = `**Current Progress: ${completedItems}/${totalItems} items completed (${percentComplete}%)**`
 			const userHasUpdatedList =
 				"**CRITICAL INFORMATION:** The user has modified this todo list - review ALL changes carefully"
@@ -265,7 +265,7 @@ export class FocusChainManager {
 				: ""
 
 			return `\n
-				# TODO LIST UPDATE REQUIRED - You MUST include the task_progress parameter in your NEXT tool call.\n
+				# TODO LIST UPDATE SUGGESTED: If you have completed any steps on the checklist, include the task_progress parameter in your NEXT tool call.\n
 				${listCurrentProgress}\n
 				${currentChecklist}\n
 				${userUpdatedWarning}
@@ -273,11 +273,12 @@ export class FocusChainManager {
 				You are currently on this step: ${stepDetails.checklistLabel}\n
 				${stepDetails.details}\n
 				Focus on completing this step.\n
+				I track which step you're on based on your last update using \`task_progress\`.\n
 				If you are done with this step, include the \`task_progress\` parameter in your next tool call.\n
-				Once you do, I'll give you the next step's details if they can be resolved from the workflow source.\n
+				Once you do, I'll give you the next step's details.\n
 			`
 		} catch (error) {
-			Logger.warn(`[Task ${this.taskId}] Failed to resolve placeholder workflow step details`, error)
+			Logger.warn(`[Task ${this.taskId}] Failed to resolve workflow step details`, error)
 			return undefined
 		}
 	}

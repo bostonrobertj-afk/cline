@@ -26,6 +26,11 @@ type BmadAgentManifestCacheEntry = {
 	displayNamesById: Map<string, string>
 }
 
+export type PlaceholderManagedWorkflowVariant = {
+	managedWorkflowId: string
+	owningAgent?: BmadAgentAllowlistEntry
+}
+
 const CONFIG_PATH = path.join("_bmad", "_config", "agent-workflow-allowlist.json")
 const AGENT_MANIFEST_PATH = path.join("_bmad", "_config", "agent-manifest.csv")
 const WORKFLOW_REMINDERS_PATH = path.join("_bmad", "_config", "workflow-reminders.json")
@@ -785,6 +790,32 @@ export async function getOwningBmadAgentForSkill(cwd: string, skillName: string)
 
 	const allowedAgents = await getBmadAgentsAllowedForSkill(cwd, skillName)
 	return allowedAgents.length === 1 ? allowedAgents[0] : undefined
+}
+
+function normalizePlaceholderWorkflowName(workflowName: string): string {
+	return workflowName.trim().replace(/^\/+/, "").replace(/\.md$/i, "")
+}
+
+export async function resolvePlaceholderWorkflowManagedVariant(
+	cwd: string,
+	placeholderWorkflowName: string,
+): Promise<PlaceholderManagedWorkflowVariant | undefined> {
+	const normalizedName = normalizePlaceholderWorkflowName(placeholderWorkflowName)
+	if (!normalizedName || normalizedName.startsWith("bmad-")) {
+		return undefined
+	}
+
+	const managedWorkflowId = `bmad-${normalizedName}`
+	const { getManagedWorkflowDefinition } = await import("./managed-workflows/ManagedWorkflowRegistry")
+	const managedWorkflow = await getManagedWorkflowDefinition(cwd, managedWorkflowId)
+	if (!managedWorkflow?.workflowId) {
+		return undefined
+	}
+
+	return {
+		managedWorkflowId: managedWorkflow.workflowId,
+		owningAgent: await getOwningBmadAgentForSkill(cwd, managedWorkflow.workflowId),
+	}
 }
 
 export async function isBmadExitCommand(cwd: string, commandName: string): Promise<boolean> {

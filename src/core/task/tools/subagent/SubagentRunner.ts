@@ -6,7 +6,12 @@ import { discoverSkills, getAvailableSkills } from "@core/context/instructions/u
 import { formatResponse } from "@core/prompts/responses"
 import { PromptRegistry } from "@core/prompts/system-prompt"
 import type { SystemPromptContext } from "@core/prompts/system-prompt/types"
-import { buildBmadAgentRoleInstructions, getBmadWorkflowReminder, getOwningBmadAgentForSkill } from "@core/task/bmad-agent-mode"
+import {
+	buildBmadAgentRoleInstructions,
+	getBmadWorkflowReminder,
+	getOwningBmadAgentForSkill,
+	resolvePlaceholderWorkflowManagedVariant,
+} from "@core/task/bmad-agent-mode"
 import { getManagedWorkflowDefinition } from "@core/task/managed-workflows/ManagedWorkflowRegistry"
 import { buildManagedWorkflowPrompt } from "@core/task/managed-workflows/ManagedWorkflowRenderer"
 import { StreamResponseHandler } from "@core/task/StreamResponseHandler"
@@ -855,6 +860,16 @@ export class SubagentRunner {
 		const resolvedWorkflow = findResolvedWorkflowByName(workflowEntries, assignedSkill)
 		if (!resolvedWorkflow) {
 			return
+		}
+
+		if (!state.activeAgentId) {
+			const managedVariant = await resolvePlaceholderWorkflowManagedVariant(this.baseConfig.cwd, assignedSkill)
+			if (managedVariant?.owningAgent) {
+				state.activeAgentId = managedVariant.owningAgent.id
+				state.activeAgentSkillName = managedVariant.owningAgent.id
+				state.activeAgentInvokedSlashCommand = assignedSkill
+				state.activeAgentJustActivated = true
+			}
 		}
 
 		await activatePlaceholderWorkflowInTaskState({

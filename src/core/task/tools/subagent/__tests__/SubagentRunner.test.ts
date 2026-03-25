@@ -780,6 +780,37 @@ describe("SubagentRunner", () => {
 		assert.doesNotMatch(systemPrompt, /Assigned Workflow Activation/)
 	})
 
+	it("auto-binds the owning BMAD agent when an assigned placeholder workflow maps to a managed twin", async () => {
+		const config = createTaskConfig(false)
+		config.cwd = process.cwd()
+		const runner = new SubagentRunner(config)
+		const state = new TaskState()
+
+		const activatePlaceholderStub = sinon
+			.stub(workflowActivation, "activatePlaceholderWorkflowInTaskState")
+			.resolves(undefined)
+
+		await (runner as any).autoActivateAssignedWorkflow(
+			state,
+			["code-review"],
+			[
+				{
+					name: "code-review",
+					source: "remote",
+					description: "Remote workflow: code-review",
+					fileName: "code-review",
+					contents: "# Code review\nInspect implementation.",
+				},
+			],
+		)
+
+		sinon.assert.calledOnce(activatePlaceholderStub)
+		assert.equal(state.activeAgentId, "bmad-dev")
+		assert.equal(state.activeAgentSkillName, "bmad-dev")
+		assert.equal(state.activeAgentInvokedSlashCommand, "code-review")
+		assert.equal(state.activeAgentJustActivated, true)
+	})
+
 	it("falls back to the assigned-skill directive when the assigned skill is not a workflow", async () => {
 		const createMessage = sinon.stub().callsFake(async function* (_systemPrompt: string) {
 			yield {

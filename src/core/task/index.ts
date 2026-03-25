@@ -121,6 +121,7 @@ import {
 	getBmadWorkflowReminder,
 	getOwningBmadAgentForSkill,
 	isSkillAllowedForBmadAgent,
+	resolvePlaceholderWorkflowManagedVariant,
 } from "./bmad-agent-mode"
 import { FocusChainManager } from "./focus-chain"
 import { buildManagedWorkflowPrompt, renderManagedWorkflowTaskProgress } from "./managed-workflows/ManagedWorkflowRenderer"
@@ -991,6 +992,25 @@ export class Task {
 			})
 			await this.refreshManagedWorkflowChecklistProjection()
 		} else if (action.type === "activate_placeholder_workflow") {
+			const managedVariant = await resolvePlaceholderWorkflowManagedVariant(this.cwd, action.workflowId)
+			if (managedVariant) {
+				if (this.taskState.activeAgentId) {
+					const activeAgent = await getBmadAgentById(this.cwd, this.taskState.activeAgentId)
+					if (activeAgent && !isSkillAllowedForBmadAgent(activeAgent, managedVariant.managedWorkflowId)) {
+						await this.say(
+							"error",
+							`Cannot activate workflow "${action.workflowId}" while BMAD agent "${activeAgent.id}" is active. That workflow maps to managed workflow "${managedVariant.managedWorkflowId}", which is not in the active agent allowlist. Use /bmad-exit first or activate a compatible BMAD agent.`,
+						)
+						return
+					}
+				} else if (managedVariant.owningAgent) {
+					this.taskState.activeAgentId = managedVariant.owningAgent.id
+					this.taskState.activeAgentSkillName = managedVariant.owningAgent.id
+					this.taskState.activeAgentInvokedSlashCommand = action.workflowId
+					this.taskState.activeAgentJustActivated = true
+				}
+			}
+
 			const activation = await activatePlaceholderWorkflowInTaskState({
 				cwd: this.cwd,
 				taskState: this.taskState,
