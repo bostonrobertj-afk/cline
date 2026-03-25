@@ -177,6 +177,10 @@ export function isPassiveThreadDisplayState(threadDisplayState: ThreadDisplaySta
 	return threadDisplayState === ThreadDisplayStates.IDLE_OPEN || threadDisplayState === ThreadDisplayStates.PAUSED
 }
 
+export function hasAssistantResponseContent(assistantTextOnly: string, finalizedToolCallCount: number): boolean {
+	return assistantTextOnly.trim().length > 0 || finalizedToolCallCount > 0
+}
+
 export class Task {
 	// Core task variables
 	readonly taskId: string
@@ -3510,7 +3514,7 @@ export class Task {
 			// toolUseHandler may have accumulated tool_use blocks even when useNativeToolCalls is false
 			// (e.g., from Claude Code provider when the model returns native tool_use blocks).
 			const hasAccumulatedToolCalls = toolUseHandler.getAllFinalizedToolUses().length > 0
-			const assistantHasContent = assistantMessage.length > 0 || this.useNativeToolCalls || hasAccumulatedToolCalls
+			let assistantHasContent = hasAssistantResponseContent(assistantTextOnly, hasAccumulatedToolCalls ? 1 : 0)
 			if (assistantHasContent) {
 				telemetryService.captureConversationTurnEvent(
 					this.ulid,
@@ -3598,6 +3602,12 @@ export class Task {
 
 			if (partialBlocks.length > 0) {
 				await this.presentAssistantMessage() // if there is content to update then it will complete and update this.userMessageContentReady to true, which we pwaitfor before making the next request. all this is really doing is presenting the last partial message that we just set to complete
+			}
+
+			// If the stream produced no assistant blocks at all, fall back to the
+			// existing empty-response handling instead of waiting forever.
+			if (assistantHasContent && this.taskState.assistantMessageContent.length === 0) {
+				assistantHasContent = false
 			}
 
 			// now add to apiconversationhistory
