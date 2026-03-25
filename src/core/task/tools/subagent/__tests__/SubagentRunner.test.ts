@@ -168,6 +168,13 @@ function createFocusChainManager(taskState: TaskState, taskId = "task-1") {
 	})
 }
 
+function extractTextFromMessage(message: { content: Array<{ type?: string; text?: string }> }) {
+	return message.content
+		.filter((block) => block.type === "text")
+		.map((block) => block.text || "")
+		.join("\n")
+}
+
 describe("SubagentRunner", () => {
 	beforeEach(() => {
 		sinon.stub(workflowResolution, "resolveAvailableWorkflows").resolves([])
@@ -757,7 +764,7 @@ describe("SubagentRunner", () => {
 	})
 
 	it("auto-activates an explicitly assigned placeholder workflow before the first subagent turn", async () => {
-		const createMessage = sinon.stub().callsFake(async function* (_systemPrompt: string) {
+		const createMessage = sinon.stub().callsFake(async function* () {
 			yield {
 				type: "tool_calls",
 				tool_call: {
@@ -774,8 +781,7 @@ describe("SubagentRunner", () => {
 		sinon.stub(promptRegistry, "get").callsFake(async (context) => {
 			assert.equal(context.managedWorkflowActive, false)
 			assert.equal(context.activeWorkflowSupportsPlaceholders, true)
-			assert.ok(context.activeWorkflowReminder)
-			assert.match(context.activeWorkflowReminder!, /Edge case review instructions/)
+			assert.equal(context.activeWorkflowReminder, undefined)
 			promptRegistry.nativeTools = undefined
 			return "system prompt"
 		})
@@ -799,8 +805,98 @@ describe("SubagentRunner", () => {
 
 		assert.equal(result.status, "completed")
 		assert.equal(createMessage.callCount, 1)
+		const initialUser = createMessage.firstCall.args[1][0] as {
+			role: string
+			content: Array<{ type?: string; text?: string }>
+		}
+		const initialTexts = extractTextFromMessage(initialUser)
+		assert.match(initialTexts, /<explicit_instructions type="review-edge-case-hunter">/)
+		assert.match(initialTexts, /Edge case review instructions/)
+		assert.match(initialTexts, /# task_progress RECOMMENDED/)
 		const systemPrompt = createMessage.firstCall.args[0] as string
 		assert.doesNotMatch(systemPrompt, /Assigned Workflow Activation/)
+	})
+
+	it("injects placeholder workflow activation only on the first subagent turn and keeps focus-chain guidance on later turns", async () => {
+		const createMessage = sinon.stub()
+		createMessage.onFirstCall().callsFake(async function* () {
+			yield {
+				type: "tool_calls",
+				tool_call: {
+					function: {
+						id: "toolu_subagent_placeholder_followup_1",
+						name: ClineDefaultTool.LIST_FILES,
+						arguments: JSON.stringify({ path: ".", recursive: false }),
+					},
+				},
+			}
+		})
+		createMessage.onSecondCall().callsFake(async function* () {
+			yield {
+				type: "tool_calls",
+				tool_call: {
+					function: {
+						id: "toolu_subagent_placeholder_followup_complete_1",
+						name: ClineDefaultTool.ATTEMPT,
+						arguments: JSON.stringify({ result: "done" }),
+					},
+				},
+			}
+		})
+
+		const promptRegistry = PromptRegistry.getInstance()
+		sinon.stub(promptRegistry, "get").callsFake(async (context) => {
+			assert.equal(context.activeWorkflowReminder, undefined)
+			promptRegistry.nativeTools = undefined
+			return "system prompt"
+		})
+		sinon.stub(skills, "discoverSkills").resolves([])
+		sinon.stub(skills, "getAvailableSkills").returns([])
+		;(workflowResolution.resolveAvailableWorkflows as sinon.SinonStub).resolves([
+			{
+				name: "review-edge-case-hunter",
+				source: "remote",
+				description: "Remote workflow: review-edge-case-hunter",
+				fileName: "review-edge-case-hunter",
+				contents: `# Edge case review instructions
+
+## Step 1: Gather Context
+Inspect the provided bundle before running tools.
+
+## Step 2: Review
+Review the changed implementation for edge cases.`,
+			},
+		])
+		stubApiHandler(createMessage)
+		initializeHostProvider()
+
+		const runner = new SubagentRunner(createTaskConfig(false))
+		const result = await runner.run(`Skill: use_skill('review-edge-case-hunter')`, () => {})
+
+		assert.equal(result.status, "completed")
+		assert.equal(createMessage.callCount, 2)
+		const initialUser = createMessage.firstCall.args[1][0] as {
+			role: string
+			content: Array<{ type?: string; text?: string }>
+		}
+		const initialTexts = extractTextFromMessage(initialUser)
+		assert.match(initialTexts, /<explicit_instructions type="review-edge-case-hunter">/)
+		assert.match(initialTexts, /### Reminder:/)
+		assert.match(initialTexts, /# CURRENT WORKFLOW STEP/)
+
+		const secondConversation = createMessage.secondCall.args[1] as Array<{
+			role: string
+			content: Array<{ type?: string; text?: string }>
+		}>
+		const followUpUser = secondConversation[secondConversation.length - 1] as {
+			role: string
+			content: Array<{ type?: string; text?: string }>
+		}
+		const followUpTexts = extractTextFromMessage(followUpUser)
+		assert.doesNotMatch(followUpTexts, /<explicit_instructions type="review-edge-case-hunter">/)
+		assert.match(followUpTexts, /### Reminder:/)
+		assert.match(followUpTexts, /Current Progress: 0\/2 items completed/)
+		assert.match(followUpTexts, /# CURRENT WORKFLOW STEP/)
 	})
 
 	it("auto-binds the owning BMAD agent when an assigned placeholder workflow maps to a managed twin", async () => {

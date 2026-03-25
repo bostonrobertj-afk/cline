@@ -19,7 +19,7 @@ import { StreamResponseHandler } from "@core/task/StreamResponseHandler"
 import {
 	activateManagedWorkflowInTaskState,
 	activatePlaceholderWorkflowInTaskState,
-	renderActivePlaceholderWorkflowReminder,
+	buildActivePlaceholderWorkflowActivationInstructions,
 } from "@core/task/workflow-activation"
 import {
 	createWorkflowSkillMetadata,
@@ -185,6 +185,23 @@ function normalizeToolCallArguments(argumentsPayload: unknown): string {
 	} catch {
 		return "{}"
 	}
+}
+
+function toTextContentBlock(text: string): ClineTextContentBlock {
+	return {
+		type: "text",
+		text,
+	}
+}
+
+function ensureUserMessageContentArray(message: ClineStorageMessage): ClineUserContent[] {
+	if (Array.isArray(message.content)) {
+		return message.content as ClineUserContent[]
+	}
+
+	const normalized = [toTextContentBlock(String(message.content ?? ""))]
+	message.content = normalized
+	return normalized
 }
 
 function resolveToolUseId(call: { id?: string; call_id?: string; name?: string }, index: number): string {
@@ -467,6 +484,10 @@ export class SubagentRunner {
 			]
 
 			while (true) {
+				state.apiRequestCount += 1
+				state.apiRequestsSinceLastTodoUpdate += 1
+				await this.appendSubagentPromptInjections(conversation, state)
+
 				const context = await this.buildPromptContext({
 					state,
 					hostIde: host?.platform || "Unknown",
@@ -840,8 +861,6 @@ export class SubagentRunner {
 
 		if (params.state.managedWorkflowRun) {
 			activeWorkflowReminder = buildManagedWorkflowPrompt(params.state.managedWorkflowRun)
-		} else if (params.state.activePlaceholderWorkflowSource) {
-			activeWorkflowReminder = await renderActivePlaceholderWorkflowReminder(params.state)
 		} else if (params.state.activeWorkflowId) {
 			activeWorkflowReminder = await getBmadWorkflowReminder(this.baseConfig.cwd, params.state.activeWorkflowId)
 		}
@@ -932,6 +951,43 @@ export class SubagentRunner {
 
 		const focusChainManager = this.getOrCreateSubagentFocusChainManager(state)
 		await focusChainManager.refreshPlaceholderWorkflowChecklistProjection(force)
+	}
+
+	private async appendSubagentPromptInjections(conversation: ClineStorageMessage[], state: TaskState): Promise<void> {
+		const additions: ClineTextContentBlock[] = []
+
+		if (state.activeWorkflowJustStarted && state.activePlaceholderWorkflowSource) {
+			const activationInstructions = await buildActivePlaceholderWorkflowActivationInstructions(state)
+			if (activationInstructions?.trim()) {
+				additions.push(toTextContentBlock(activationInstructions))
+			}
+		}
+
+		const focusChainManager = this.getOrCreateSubagentFocusChainManager(state)
+		if (focusChainManager.shouldIncludeFocusChainInstructions()) {
+			const focusChainInstructions = await focusChainManager.generateFocusChainInstructions()
+			if (focusChainInstructions.trim()) {
+				additions.push(toTextContentBlock(focusChainInstructions))
+				state.apiRequestsSinceLastTodoUpdate = 0
+				state.todoListWasUpdatedByUser = false
+			}
+		}
+
+		if (additions.length === 0) {
+			return
+		}
+
+		const lastMessage = conversation[conversation.length - 1]
+		if (!lastMessage || lastMessage.role !== "user") {
+			conversation.push({
+				role: "user",
+				content: additions,
+			})
+			return
+		}
+
+		const content = ensureUserMessageContentArray(lastMessage)
+		content.push(...additions)
 	}
 
 	private mergePromptSkillEntries(skills: SkillMetadata[], workflows: SkillMetadata[]): SkillMetadata[] {

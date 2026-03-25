@@ -110,3 +110,16 @@ export async function renderActivePlaceholderWorkflowReminder(taskState: {
 		placeholderValues: taskState.activePlaceholderWorkflowValues,
 	})
 }
+
+export async function buildActivePlaceholderWorkflowActivationInstructions(taskState: {
+	activePlaceholderWorkflowSource?: ActivePlaceholderWorkflowSource
+	activePlaceholderWorkflowStableValues?: Record<string, string>
+	activePlaceholderWorkflowValues?: Record<string, string>
+}): Promise<string | undefined> {
+	const renderedWorkflowContents = await renderActivePlaceholderWorkflowReminder(taskState)
+	if (!renderedWorkflowContents || !taskState.activePlaceholderWorkflowSource) {
+		return undefined
+	}
+
+	return `<explicit_instructions type="${taskState.activePlaceholderWorkflowSource.name}">\n${renderedWorkflowContents}\n</explicit_instructions>\n`
+}

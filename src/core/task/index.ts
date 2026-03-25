@@ -39,10 +39,7 @@ import {
 	saveTaskMetadata,
 } from "@core/storage/disk"
 import { releaseTaskLock } from "@core/task/TaskLockUtils"
-import {
-	buildPlaceholderWorkflowChecklist,
-	getRenderedActivePlaceholderWorkflowSourceContents,
-} from "@core/workflows/placeholder-workflow-step-details"
+import { buildPlaceholderWorkflowChecklist } from "@core/workflows/placeholder-workflow-step-details"
 import { createWorkflowSkillMetadata, resolveAvailableWorkflows } from "@core/workflows/resolution/resolveAvailableWorkflows"
 import { isMultiRootEnabled } from "@core/workspace/multi-root-utils"
 import { WorkspaceRootManager } from "@core/workspace/WorkspaceRootManager"
@@ -137,7 +134,11 @@ import { buildTokenEstimateLogPayload, estimateRequestTokenUsage } from "./token
 import { extractProviderDomainFromUrl, updateApiReqMsg } from "./utils"
 import { buildUserFeedbackContent } from "./utils/buildUserFeedbackContent"
 import { hasExplicitMentionSyntax, hasUserContentTag } from "./utils/userContentProcessing"
-import { activateManagedWorkflowInTaskState, activatePlaceholderWorkflowInTaskState } from "./workflow-activation"
+import {
+	activateManagedWorkflowInTaskState,
+	activatePlaceholderWorkflowInTaskState,
+	buildActivePlaceholderWorkflowActivationInstructions,
+} from "./workflow-activation"
 
 export type ToolResponse = ClineToolResponseContent
 
@@ -1117,14 +1118,7 @@ export class Task {
 			return undefined
 		}
 
-		const source = this.taskState.activePlaceholderWorkflowSource
-		const renderedWorkflowContents = await getRenderedActivePlaceholderWorkflowSourceContents({
-			source,
-			stablePlaceholderValues: this.taskState.activePlaceholderWorkflowStableValues,
-			placeholderValues: this.taskState.activePlaceholderWorkflowValues,
-		})
-
-		return `<explicit_instructions type="${source.name}">\n${renderedWorkflowContents}\n</explicit_instructions>\n`
+		return await buildActivePlaceholderWorkflowActivationInstructions(this.taskState)
 	}
 
 	private async buildPromptSkillScope(enabledSkills: SkillMetadata[]): Promise<SkillMetadata[]> {
