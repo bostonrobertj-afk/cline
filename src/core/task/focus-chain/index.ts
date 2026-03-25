@@ -73,7 +73,7 @@ export class FocusChainManager {
 
 	private joinPromptSections(...sections: Array<string | undefined | false>): string {
 		return sections
-			.map((section) => section?.trim())
+			.map((section) => (typeof section === "string" ? section.trim() : ""))
 			.filter((section): section is string => !!section)
 			.join("\n\n")
 	}
@@ -445,7 +445,7 @@ export class FocusChainManager {
 	}
 
 	public async logFocusChainDecision(decision: FocusChainInstructionDecision): Promise<void> {
-		logFocusChainDiagnosticEvent(this.taskId, "focus_chain_decision", decision)
+		logFocusChainDiagnosticEvent(this.taskId, "focus_chain_decision", { ...decision })
 	}
 
 	public async logGeneratedFocusChainInstructions(result: string): Promise<void> {
