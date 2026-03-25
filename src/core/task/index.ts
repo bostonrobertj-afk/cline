@@ -127,6 +127,7 @@ import {
 	resolvePlaceholderWorkflowManagedVariant,
 } from "./bmad-agent-mode"
 import { FocusChainManager } from "./focus-chain"
+import { logFocusChainDiagnosticEvent, summarizeFocusChainText, summarizeFocusChainTextBlocks } from "./focus-chain/diagnostics"
 import { buildManagedWorkflowPrompt, renderManagedWorkflowTaskProgress } from "./managed-workflows/ManagedWorkflowRenderer"
 import { MessageStateHandler } from "./message-state"
 import { StreamChunkCoordinator } from "./StreamChunkCoordinator"
@@ -3869,6 +3870,7 @@ export class Task {
 		await this.applyPersistentSlashCommandAction(persistentSlashCommandAction)
 		const placeholderWorkflowActivationInstructions =
 			await this.buildPlaceholderWorkflowActivationInstructions(persistentSlashCommandAction)
+		const placeholderActivationInstructionsAppended = !!placeholderWorkflowActivationInstructions?.trim()
 		if (placeholderWorkflowActivationInstructions?.trim()) {
 			processedUserContent.push({
 				type: "text",
@@ -3876,9 +3878,46 @@ export class Task {
 			})
 		}
 
+		logFocusChainDiagnosticEvent(this.taskId, "load_context_snapshot", {
+			providerId: providerInfo.providerId,
+			modelId: providerInfo.model.id,
+			useCompactPrompt,
+			reducedEnvironmentDetails: !includeDetailedEnvironmentDetails,
+			focusChainManagerPresent: !!this.FocusChainManager,
+			activePlaceholderWorkflowId: this.taskState.activePlaceholderWorkflowId ?? null,
+			activePlaceholderWorkflowSourcePresent: !!this.taskState.activePlaceholderWorkflowSource,
+			currentFocusChainChecklistPresent: !!this.taskState.currentFocusChainChecklist,
+			currentFocusChainChecklistItemCount: this.taskState.currentFocusChainChecklist
+				? this.taskState.currentFocusChainChecklist.split("\n").filter((line) => line.trim().startsWith("- [")).length
+				: 0,
+			apiRequestCount: this.taskState.apiRequestCount,
+			apiRequestsSinceLastTodoUpdate: this.taskState.apiRequestsSinceLastTodoUpdate,
+			placeholderWorkflowJustStarted: this.taskState.activeWorkflowJustStarted,
+			placeholderActivationInstructionsAppended,
+		})
+
 		// Add focus chain instructions if needed
+		const focusChainDecision = this.FocusChainManager?.getFocusChainInstructionsDecision()
+		logFocusChainDiagnosticEvent(this.taskId, "focus_chain_decision", {
+			...(focusChainDecision ?? {
+				shouldInclude: false,
+				inPlanMode: false,
+				placeholderWorkflowActive: false,
+				justSwitchedFromPlanMode: false,
+				userUpdatedList: false,
+				reachedReminderInterval: false,
+				isFirstApiRequest: false,
+				hasNoTodoListAfterMultipleRequests: false,
+			}),
+			focusChainManagerPresent: !!this.FocusChainManager,
+			useCompactPrompt,
+		})
 		if (!useCompactPrompt && this.FocusChainManager?.shouldIncludeFocusChainInstructions()) {
 			const focusChainInstructions = await this.FocusChainManager.generateFocusChainInstructions()
+			logFocusChainDiagnosticEvent(this.taskId, "focus_chain_generation", {
+				...summarizeFocusChainText(focusChainInstructions),
+				willAppend: !!focusChainInstructions.trim(),
+			})
 			if (focusChainInstructions.trim()) {
 				processedUserContent.push({
 					type: "text",
@@ -3889,6 +3928,11 @@ export class Task {
 				this.taskState.todoListWasUpdatedByUser = false
 			}
 		}
+
+		logFocusChainDiagnosticEvent(this.taskId, "load_context_final_summary", {
+			...summarizeFocusChainTextBlocks(processedUserContent),
+			placeholderActivationInstructionsAppended,
+		})
 
 		return [processedUserContent, environmentDetails, clinerulesError]
 	}

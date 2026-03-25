@@ -60,6 +60,9 @@ Inspect the prepared review input and write findings.
 			expect(prompt).to.contain("You are currently on this step: Step 1: Gather Context")
 			expect(prompt).to.contain("Determine what to review from the user's prompt")
 			expect(prompt).to.contain("If you are done with this step, include the `task_progress` parameter")
+			expect(prompt).to.match(/^# TODO LIST UPDATE SUGGESTED/m)
+			expect(prompt).to.match(/^- \[ \] Step 1: Gather Context/m)
+			expect(prompt).to.match(/^# CURRENT WORKFLOW STEP/m)
 		} finally {
 			await fs.rm(tempDir, { recursive: true, force: true })
 		}

@@ -14,6 +14,7 @@ import { ensureTaskDirectoryExists } from "../../storage/disk"
 import { StateManager } from "../../storage/StateManager"
 import { renderManagedWorkflowTaskProgress } from "../managed-workflows/ManagedWorkflowRenderer"
 import { TaskState } from "../TaskState"
+import { logFocusChainDiagnosticEvent, summarizeFocusChainText, summarizeFocusChainTextBlocks } from "./diagnostics"
 import {
 	createFocusChainMarkdownContent,
 	extractFocusChainItemsFromText,
@@ -31,6 +32,17 @@ export interface FocusChainDependencies {
 	postStateToWebview: () => Promise<void>
 	say: (type: ClineSay, text?: string, images?: string[], files?: string[], partial?: boolean) => Promise<number | undefined>
 	focusChainSettings: FocusChainSettings
+}
+
+export interface FocusChainInstructionDecision {
+	shouldInclude: boolean
+	inPlanMode: boolean
+	placeholderWorkflowActive: boolean
+	justSwitchedFromPlanMode: boolean
+	userUpdatedList: boolean
+	reachedReminderInterval: boolean
+	isFirstApiRequest: boolean
+	hasNoTodoListAfterMultipleRequests: boolean
 }
 
 export class FocusChainManager {
@@ -57,6 +69,43 @@ export class FocusChainManager {
 		this.postStateToWebview = dependencies.postStateToWebview
 		this.say = dependencies.say
 		this.focusChainSettings = dependencies.focusChainSettings
+	}
+
+	private joinPromptSections(...sections: Array<string | undefined | false>): string {
+		return sections
+			.map((section) => section?.trim())
+			.filter((section): section is string => !!section)
+			.join("\n\n")
+	}
+
+	public getFocusChainInstructionsDecision(): FocusChainInstructionDecision {
+		const inPlanMode = this.stateManager.getGlobalSettingsKey("mode") === "plan"
+		const placeholderWorkflowActive = !!this.taskState.activePlaceholderWorkflowSource
+		const justSwitchedFromPlanMode = this.taskState.didRespondToPlanAskBySwitchingMode
+		const userUpdatedList = this.taskState.todoListWasUpdatedByUser
+		const reachedReminderInterval =
+			this.taskState.apiRequestsSinceLastTodoUpdate >= this.focusChainSettings.remindClineInterval
+		const isFirstApiRequest = this.taskState.apiRequestCount === 1 && !this.taskState.currentFocusChainChecklist
+		const hasNoTodoListAfterMultipleRequests =
+			!this.taskState.currentFocusChainChecklist && this.taskState.apiRequestCount >= 2
+
+		return {
+			shouldInclude:
+				placeholderWorkflowActive ||
+				reachedReminderInterval ||
+				justSwitchedFromPlanMode ||
+				userUpdatedList ||
+				inPlanMode ||
+				isFirstApiRequest ||
+				hasNoTodoListAfterMultipleRequests,
+			inPlanMode,
+			placeholderWorkflowActive,
+			justSwitchedFromPlanMode,
+			userUpdatedList,
+			reachedReminderInterval,
+			isFirstApiRequest,
+			hasNoTodoListAfterMultipleRequests,
+		}
 	}
 
 	/**
@@ -156,13 +205,11 @@ export class FocusChainManager {
 	public async generateFocusChainInstructions(): Promise<string> {
 		if (this.taskState.managedWorkflowRun) {
 			const currentChecklist = renderManagedWorkflowTaskProgress(this.taskState.managedWorkflowRun)
-			return `\n
-			# WORKFLOW PROGRESS IS BACKEND MANAGED
-
-			${currentChecklist}
-
-			Use the complete_workflow_item tool to mark the active workflow item complete.
-			Do not create or rewrite task_progress manually.\n`
+			return this.joinPromptSections(
+				"# WORKFLOW PROGRESS IS BACKEND MANAGED",
+				currentChecklist,
+				"Use the complete_workflow_item tool to mark the active workflow item complete.\nDo not create or rewrite task_progress manually.",
+			)
 		}
 
 		// If list exists already exists, we need to remind it to update rather than demand initialization
@@ -187,14 +234,13 @@ export class FocusChainManager {
 
 			// If user has updated the list, inform the model (and provide latest copy)
 			if (this.taskState.todoListWasUpdatedByUser) {
-				return `\n\n
-				${introUpdateRequired}\n
-				${listCurrentProgress}\n
-				\n
-				${this.taskState.currentFocusChainChecklist}\n
-				${userHasUpdatedList}\n
-				${FocusChainPrompts.reminder}\n
-			`
+				return this.joinPromptSections(
+					introUpdateRequired,
+					listCurrentProgress,
+					this.taskState.currentFocusChainChecklist,
+					userHasUpdatedList,
+					FocusChainPrompts.reminder,
+				)
 
 				// If there are no user changes, proceed with reminders based on list progress
 			}
@@ -218,14 +264,13 @@ export class FocusChainManager {
 			}
 
 			// Return with progress-based stub
-			return `\n
-				${introUpdateRequired}\n
-				${listCurrentProgress}\n
-				${this.taskState.currentFocusChainChecklist}\n
-				\n
-				${FocusChainPrompts.reminder}\n
-				${progressBasedMessageStub}\n
-				`
+			return this.joinPromptSections(
+				introUpdateRequired,
+				listCurrentProgress,
+				this.taskState.currentFocusChainChecklist,
+				FocusChainPrompts.reminder,
+				progressBasedMessageStub,
+			)
 		}
 		// When switching from Plan to Act, request that a new list be generated
 		if (this.taskState.didRespondToPlanAskBySwitchingMode) {
@@ -249,6 +294,13 @@ export class FocusChainManager {
 		listCurrentProgress: string,
 	): Promise<string | undefined> {
 		if (!this.taskState.activePlaceholderWorkflowSource) {
+			await logFocusChainDiagnosticEvent(this.taskId, "placeholder_step_prompt_resolution", {
+				entered: true,
+				resolved: false,
+				reason: "no_active_placeholder_workflow_source",
+				hasActivePlaceholderWorkflowSource: false,
+				currentChecklistItems: parseFocusChainListCounts(currentChecklist).totalItems,
+			})
 			return undefined
 		}
 
@@ -260,27 +312,51 @@ export class FocusChainManager {
 				placeholderValues: this.taskState.activePlaceholderWorkflowValues,
 			})
 			if (!stepDetails) {
+				logFocusChainDiagnosticEvent(this.taskId, "placeholder_step_prompt_resolution", {
+					entered: true,
+					resolved: false,
+					reason: "no_step_details",
+					hasActivePlaceholderWorkflowSource: !!this.taskState.activePlaceholderWorkflowSource,
+					currentChecklistItems: parseFocusChainListCounts(currentChecklist).totalItems,
+				})
 				return undefined
 			}
 
 			const userUpdatedWarning = this.taskState.todoListWasUpdatedByUser
-				? "\n**CRITICAL INFORMATION:** I updated this checklist manually. Review the current checklist carefully before you continue.\n"
+				? "**CRITICAL INFORMATION:** I updated this checklist manually. Review the current checklist carefully before you continue."
 				: ""
+			logFocusChainDiagnosticEvent(this.taskId, "placeholder_step_prompt_resolution", {
+				entered: true,
+				resolved: true,
+				checklistLabel: stepDetails.checklistLabel,
+				hasActivePlaceholderWorkflowSource: !!this.taskState.activePlaceholderWorkflowSource,
+				currentChecklistItems: parseFocusChainListCounts(currentChecklist).totalItems,
+			})
 
-			return `\n
-				# TODO LIST UPDATE SUGGESTED: If you have completed any steps on the checklist, include the task_progress parameter in your NEXT tool call.\n
-				${listCurrentProgress}\n
-				${currentChecklist}\n
-				${userUpdatedWarning}
-				# CURRENT WORKFLOW STEP\n
-				You are currently on this step: ${stepDetails.checklistLabel}\n
-				${stepDetails.details}\n
-				Focus on completing this step.\n
-				I track which step you're on based on your last update using \`task_progress\`.\n
-				If you are done with this step, include the \`task_progress\` parameter in your next tool call.\n
-				Once you do, I'll give you the next step's details.\n
-			`
+			return this.joinPromptSections(
+				"# TODO LIST UPDATE SUGGESTED: If you have completed any steps on the checklist, include the task_progress parameter in your NEXT tool call.",
+				listCurrentProgress,
+				currentChecklist,
+				userUpdatedWarning,
+				[
+					"# CURRENT WORKFLOW STEP",
+					`You are currently on this step: ${stepDetails.checklistLabel}`,
+					stepDetails.details.trim(),
+					"Focus on completing this step.",
+					"I track which step you're on based on your last update using `task_progress`.",
+					"If you are done with this step, include the `task_progress` parameter in your next tool call.",
+					"Once you do, I'll give you the next step's details.",
+				].join("\n\n"),
+			)
 		} catch (error) {
+			logFocusChainDiagnosticEvent(this.taskId, "placeholder_step_prompt_resolution", {
+				entered: true,
+				resolved: false,
+				reason: "error",
+				errorMessage: error instanceof Error ? error.message : String(error),
+				hasActivePlaceholderWorkflowSource: !!this.taskState.activePlaceholderWorkflowSource,
+				currentChecklistItems: parseFocusChainListCounts(currentChecklist).totalItems,
+			})
 			Logger.warn(`[Task ${this.taskId}] Failed to resolve workflow step details`, error)
 			return undefined
 		}
@@ -338,6 +414,51 @@ export class FocusChainManager {
 		}
 
 		await this.postStateToWebview()
+	}
+
+	public async logPromptAssemblySnapshot(context: {
+		useCompactPrompt: boolean
+		includeDetailedEnvironmentDetails: boolean
+		providerId: string
+		modelId: string
+		focusChainManagerPresent: boolean
+		placeholderActivationInstructionsAppended: boolean
+	}): Promise<void> {
+		const checklist = this.taskState.currentFocusChainChecklist
+		const checklistStats = checklist ? parseFocusChainListCounts(checklist) : undefined
+
+		logFocusChainDiagnosticEvent(this.taskId, "load_context_snapshot", {
+			providerId: context.providerId,
+			modelId: context.modelId,
+			useCompactPrompt: context.useCompactPrompt,
+			reducedEnvironmentDetails: !context.includeDetailedEnvironmentDetails,
+			focusChainManagerPresent: context.focusChainManagerPresent,
+			activePlaceholderWorkflowId: this.taskState.activePlaceholderWorkflowId ?? null,
+			activePlaceholderWorkflowSourcePresent: !!this.taskState.activePlaceholderWorkflowSource,
+			currentFocusChainChecklistPresent: !!checklist,
+			currentFocusChainChecklistItemCount: checklistStats?.totalItems ?? 0,
+			apiRequestCount: this.taskState.apiRequestCount,
+			apiRequestsSinceLastTodoUpdate: this.taskState.apiRequestsSinceLastTodoUpdate,
+			placeholderWorkflowJustStarted: this.taskState.activeWorkflowJustStarted,
+			placeholderActivationInstructionsAppended: context.placeholderActivationInstructionsAppended,
+		})
+	}
+
+	public async logFocusChainDecision(decision: FocusChainInstructionDecision): Promise<void> {
+		logFocusChainDiagnosticEvent(this.taskId, "focus_chain_decision", decision)
+	}
+
+	public async logGeneratedFocusChainInstructions(result: string): Promise<void> {
+		const summary = summarizeFocusChainText(result)
+		logFocusChainDiagnosticEvent(this.taskId, "focus_chain_generation", summary)
+	}
+
+	public async logFinalPromptContentSummary(processedUserContent: Array<{ type?: string; text?: string }>): Promise<void> {
+		logFocusChainDiagnosticEvent(
+			this.taskId,
+			"load_context_final_summary",
+			summarizeFocusChainTextBlocks(processedUserContent),
+		)
 	}
 
 	public async clearManagedWorkflowChecklistProjection(): Promise<void> {
