@@ -3,9 +3,9 @@ import { getResponseToolsSection } from "../../components/response_tools"
 import { SystemPromptSection } from "../../templates/placeholders"
 import type { SystemPromptContext } from "../../types"
 
-const getManagedWorkflowPlaceholderToolGuidance = (context: SystemPromptContext) =>
-	context.managedWorkflowActive
-		? `- When an active managed workflow step establishes, confirms, selects, derives, or receives a runtime placeholder value referenced in the workflow instructions (for example \`{{output_file}}\`), use \`set_workflow_placeholders\` to persist it. Use the exact placeholder keys from the workflow instructions and store only resolved string values.`
+const getWorkflowPlaceholderToolGuidance = (context: SystemPromptContext) =>
+	context.managedWorkflowActive || context.activeWorkflowSupportsPlaceholders
+		? `- When an active workflow step establishes, confirms, selects, derives, or receives a runtime placeholder value referenced in the workflow instructions (for example \`{{output_file}}\`), use \`set_workflow_placeholders\` to persist it. Use the exact placeholder keys from the workflow instructions and store only resolved string values.`
 		: ""
 
 /**
@@ -77,7 +77,7 @@ const TOOL_USE = (context: SystemPromptContext) => `TOOL USE
 You have access to a set of tools that are executed upon the user's approval.${context.enableParallelToolCalling ? " You may use multiple tools in a single response when the operations are independent (e.g., reading several files, searching in parallel). For dependent operations where one result informs the next, use tools sequentially." : ""} You will receive the results of all tool uses in the user's response.
 
 ${getResponseToolsSection(context)}
-${getManagedWorkflowPlaceholderToolGuidance(context)}`
+${getWorkflowPlaceholderToolGuidance(context)}`
 
 const ACT_VS_PLAN = (context: SystemPromptContext) => `ACT MODE V.S. PLAN MODE
 

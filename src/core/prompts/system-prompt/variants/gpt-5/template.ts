@@ -3,9 +3,9 @@ import { getResponseToolsSection } from "../../components/response_tools"
 import { SystemPromptSection } from "../../templates/placeholders"
 import type { SystemPromptContext } from "../../types"
 
-const getManagedWorkflowPlaceholderToolGuidance = (context: SystemPromptContext) =>
-	context.managedWorkflowActive
-		? `- When an active managed workflow step establishes, confirms, selects, derives, or receives a runtime placeholder value referenced in the workflow instructions (for example \`{{output_file}}\`), use \`set_workflow_placeholders\` to persist it. Use the exact placeholder keys from the workflow instructions and store only resolved string values.`
+const getWorkflowPlaceholderToolGuidance = (context: SystemPromptContext) =>
+	context.managedWorkflowActive || context.activeWorkflowSupportsPlaceholders
+		? `- When an active workflow step establishes, confirms, selects, derives, or receives a runtime placeholder value referenced in the workflow instructions (for example \`{{output_file}}\`), use \`set_workflow_placeholders\` to persist it. Use the exact placeholder keys from the workflow instructions and store only resolved string values.`
 		: ""
 
 /**
@@ -74,7 +74,7 @@ You have access to a set of tools that are executed upon the user's approval. Yo
 - Use list_files when you need directory structure beyond the current visible-file context.
 
 ${getResponseToolsSection(context)}
-${getManagedWorkflowPlaceholderToolGuidance(context)}
+${getWorkflowPlaceholderToolGuidance(context)}
 
 {{TOOL_USE_FORMATTING_SECTION}}
 

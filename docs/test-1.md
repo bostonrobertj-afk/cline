@@ -74,3 +74,5 @@ Remediation:
 Ensure that placeholder workflows seed a focus chain task markdown file
 Update prompting mechanisms so prompt tip re: set_workflow_placeholders is present when placeholder workflows are active
 Update diff-editors.ts so it stops treating bare @@ as an actual blank content line.
+
+Status: all remediation items complete.

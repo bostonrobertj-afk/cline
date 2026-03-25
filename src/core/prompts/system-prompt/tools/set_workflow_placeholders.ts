@@ -18,7 +18,7 @@ const generic: ClineToolSpec = {
 			required: true,
 			type: "object",
 			instruction:
-				'An object map of placeholder names to their resolved string values. Use the exact placeholder key named in the managed workflow instructions. This is typically for dynamic workflow-state placeholders such as {{research_topic}} or {{output_file}}. Example: {"research_topic": "user onboarding", "validation_report_path": "docs/validation-report.md"}',
+				'An object map of placeholder names to their resolved string values. Use the exact placeholder key named in the workflow instructions. This is typically for dynamic workflow-state placeholders such as {{research_topic}} or {{output_file}}. Example: {"research_topic": "user onboarding", "validation_report_path": "docs/validation-report.md"}',
 			additionalProperties: {
 				type: "string",
 			},

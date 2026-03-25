@@ -351,6 +351,54 @@ describe("Prompt System Integration Tests", () => {
 			)
 		})
 
+		it("includes set_workflow_placeholders guidance for placeholder workflows across prompt variants", async function () {
+			const guidanceSnippet =
+				"When an active workflow step establishes, confirms, selects, derives, or receives a runtime placeholder value referenced in the workflow instructions"
+
+			const cases = [
+				{
+					name: "GPT-5",
+					context: {
+						providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
+						enableNativeToolCalls: false,
+					},
+				},
+				{
+					name: "Native GPT-5.1",
+					context: {
+						providerInfo: makeProviderInfo("gpt-5-1", "openai"),
+						enableNativeToolCalls: true,
+					},
+				},
+				{
+					name: "Native Next Gen",
+					context: {
+						providerInfo: makeProviderInfo("claude-sonnet-4", "cline"),
+						enableNativeToolCalls: true,
+					},
+				},
+			] as const
+
+			for (const testCase of cases) {
+				await runPromptTest(
+					this,
+					{
+						...baseContext,
+						...testCase.context,
+						activeWorkflowSupportsPlaceholders: true,
+						managedWorkflowActive: false,
+					},
+					testCase.name,
+					async ({ systemPrompt }) => {
+						expect(systemPrompt).to.include(guidanceSnippet)
+						expect(systemPrompt).to.include("use `set_workflow_placeholders` to persist it")
+						expect(systemPrompt).to.include("workflow instructions")
+						expect(systemPrompt).to.not.include("managed workflow step")
+					},
+				)
+			}
+		})
+
 		it("does not inline the verbose tool catalog for BMAD-active GPT-5.4 OpenAI turns", async function () {
 			await runPromptTest(
 				this,
