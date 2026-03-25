@@ -6,6 +6,7 @@ import { ClineIgnoreController, LOCK_TEXT_SYMBOL } from "../ignore/ClineIgnoreCo
 
 const CONTEXT_WINDOW_WARNING_THRESHOLD_PERCENT = 50
 const INLINE_FINAL_FILE_CONTENT_MAX_CHARS = 2000
+const PATCH_SUMMARY_MAX_CHARS = 1400
 
 function countLines(text: string): number {
 	if (!text) {
@@ -15,12 +16,22 @@ function countLines(text: string): number {
 	return text.split("\n").length
 }
 
-function formatSavedFileReference(relPath: string, finalContent: string | undefined): string {
+function countChangedRegions(patch: string): number {
+	const matches = patch.match(/^@@/gm)
+	return matches?.length ?? (patch.trim() ? 1 : 0)
+}
+
+function formatSavedFileReference(
+	relPath: string,
+	previousContent: string | undefined,
+	finalContent: string | undefined,
+	isNewFile = false,
+): string {
 	if (!finalContent) {
 		return ""
 	}
 
-	if (finalContent.length <= INLINE_FINAL_FILE_CONTENT_MAX_CHARS) {
+	if (isNewFile && finalContent.length <= INLINE_FINAL_FILE_CONTENT_MAX_CHARS) {
 		return (
 			`Here is the full, updated content of the file that was saved:\n\n` +
 			`<final_file_content path="${relPath.toPosix()}">\n${finalContent}\n</final_file_content>\n\n` +
@@ -28,9 +39,43 @@ function formatSavedFileReference(relPath: string, finalContent: string | undefi
 		)
 	}
 
+	if (previousContent !== undefined) {
+		const prettyPatch = formatResponse.createPrettyPatch(relPath.toPosix(), previousContent, finalContent).trim()
+		const changedRegions = countChangedRegions(prettyPatch)
+
+		if (prettyPatch.length === 0) {
+			return (
+				`<final_file_patch_summary path="${relPath.toPosix()}">\n` +
+				`chars=${finalContent.length}\n` +
+				`lines=${countLines(finalContent)}\n` +
+				`changed_regions=0\n` +
+				`No textual differences were detected between the previous baseline and the saved file.\n` +
+				`</final_file_patch_summary>\n\n` +
+				`If you need the exact full saved baseline later, use read_file on ${relPath.toPosix()} before making additional changes.\n\n`
+			)
+		}
+
+		const patchText =
+			prettyPatch.length <= PATCH_SUMMARY_MAX_CHARS
+				? prettyPatch
+				: `${prettyPatch.slice(0, PATCH_SUMMARY_MAX_CHARS).trimEnd()}\n...[patch truncated]`
+
+		return (
+			`<final_file_patch_summary path="${relPath.toPosix()}">\n` +
+			`chars=${finalContent.length}\n` +
+			`lines=${countLines(finalContent)}\n` +
+			`changed_regions=${changedRegions}\n` +
+			`${prettyPatch.length > PATCH_SUMMARY_MAX_CHARS ? "patch_truncated=true\n" : ""}` +
+			`${patchText}\n` +
+			`</final_file_patch_summary>\n\n` +
+			`If you need the exact full saved baseline later, use read_file on ${relPath.toPosix()} before making additional changes.\n\n`
+		)
+	}
+
 	return (
-		`The full updated file content was omitted to save context tokens.\n\n` +
 		`<final_file_summary path="${relPath.toPosix()}">\n` +
+		`saved=true\n` +
+		`created_file=${isNewFile}\n` +
 		`chars=${finalContent.length}\n` +
 		`lines=${countLines(finalContent)}\n` +
 		`</final_file_summary>\n\n` +
@@ -74,7 +119,12 @@ export const formatResponse = {
 	compactedToolResultNotice: (toolName: string) =>
 		`[NOTE] The older ${toolName} output was removed to save context window space. Re-run ${toolName} if you need the full result again.]`,
 
-	savedFileReference: (relPath: string, finalContent: string | undefined) => formatSavedFileReference(relPath, finalContent),
+	savedFileReference: (
+		relPath: string,
+		previousContent: string | undefined,
+		finalContent: string | undefined,
+		isNewFile = false,
+	) => formatSavedFileReference(relPath, previousContent, finalContent, isNewFile),
 
 	clineIgnoreError: (path: string) =>
 		`Access to ${path} is blocked by the .clineignore file settings. You must try to continue in the task without using this file, or ask the user to update the .clineignore file.`,
@@ -291,7 +341,9 @@ Otherwise, if you have not completed the task and do not need additional informa
 		relPath: string,
 		userEdits: string,
 		autoFormattingEdits: string | undefined,
+		previousContent: string | undefined,
 		finalContent: string | undefined,
+		isNewFile: boolean,
 		newProblemsMessage: string | undefined,
 	) =>
 		`The user made the following updates to your content:\n\n${userEdits}\n\n` +
@@ -299,7 +351,7 @@ Otherwise, if you have not completed the task and do not need additional informa
 			? `The user's editor also applied the following auto-formatting to your content:\n\n${autoFormattingEdits}\n\n(Note: Pay close attention to changes such as single quotes being converted to double quotes, semicolons being removed or added, long lines being broken into multiple lines, adjusting indentation style, adding/removing trailing commas, etc. This will help you ensure future SEARCH/REPLACE operations to this file are accurate.)\n\n`
 			: "") +
 		`The updated content, which includes both your original modifications and the additional edits, has been successfully saved to ${relPath.toPosix()}.\n\n` +
-		formatSavedFileReference(relPath, finalContent) +
+		formatSavedFileReference(relPath, previousContent, finalContent, isNewFile) +
 		`Please note:\n` +
 		`1. You do not need to re-write the file with these changes, as they have already been applied.\n` +
 		`2. Proceed with the task using this updated file state as the new baseline.\n` +
@@ -309,14 +361,16 @@ Otherwise, if you have not completed the task and do not need additional informa
 	fileEditWithoutUserChanges: (
 		relPath: string,
 		autoFormattingEdits: string | undefined,
+		previousContent: string | undefined,
 		finalContent: string | undefined,
+		isNewFile: boolean,
 		newProblemsMessage: string | undefined,
 	) =>
 		`The content was successfully saved to ${relPath.toPosix()}.\n\n` +
 		(autoFormattingEdits
 			? `Along with your edits, the user's editor applied the following auto-formatting to your content:\n\n${autoFormattingEdits}\n\n(Note: Pay close attention to changes such as single quotes being converted to double quotes, semicolons being removed or added, long lines being broken into multiple lines, adjusting indentation style, adding/removing trailing commas, etc. This will help you ensure future SEARCH/REPLACE operations to this file are accurate.)\n\n`
 			: "") +
-		formatSavedFileReference(relPath, finalContent) +
+		formatSavedFileReference(relPath, previousContent, finalContent, isNewFile) +
 		`${newProblemsMessage}`,
 
 	diffError: (relPath: string, originalContent: string | undefined) =>

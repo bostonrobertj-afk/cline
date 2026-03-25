@@ -1,3 +1,4 @@
+import { expect } from "chai"
 import { describe, it } from "mocha"
 import "should"
 import { Anthropic } from "@anthropic-ai/sdk"
@@ -493,7 +494,7 @@ EOF`,
 			foundToolResult.should.be.true()
 		})
 
-		it("should reconstruct tool_result content with final_file_content for write_to_file", () => {
+		it("should preserve compact save summaries for write_to_file", () => {
 			const input: ClineStorageMessage[] = [
 				{
 					role: "assistant",
@@ -520,7 +521,7 @@ EOF`,
 							type: "tool_result",
 							tool_use_id: "toolu_write",
 							content:
-								"[write_to_file for 'new-file.ts'] Result:\nThe content was successfully saved to new-file.ts.\n\n<final_file_content path=\"new-file.ts\">\nexport const newVar = 42\n</final_file_content>\n\nIMPORTANT: For any future changes to this file, use the final_file_content shown above as your reference.",
+								"[write_to_file for 'new-file.ts'] Result:\nThe content was successfully saved to new-file.ts.\n\n<final_file_patch_summary path=\"new-file.ts\">\nchars=25\nlines=1\nchanged_regions=1\n@@\n+ export const newVar = 42\n</final_file_patch_summary>\n\nIf you need the exact full saved baseline later, use read_file on new-file.ts before making additional changes.",
 						},
 					],
 				},
@@ -541,11 +542,12 @@ EOF`,
 				}
 			}
 
-			reconstructedContent.should.match(/\[apply_patch for 'new-file\.ts'\]/)
-			reconstructedContent.should.match(/successfully saved/)
+			reconstructedContent.should.match(/\[write_to_file for 'new-file\.ts'\]/)
+			reconstructedContent.should.match(/<final_file_patch_summary/)
+			reconstructedContent.should.match(/use read_file/)
 		})
 
-		it("should reconstruct tool_result content with final_file_content for replace_in_file", () => {
+		it("should preserve compact save summaries for replace_in_file", () => {
 			const input: ClineStorageMessage[] = [
 				{
 					role: "assistant",
@@ -573,7 +575,7 @@ EOF`,
 							type: "tool_result",
 							tool_use_id: "toolu_replace",
 							content:
-								"[replace_in_file for 'existing.ts'] Result:\nThe content was successfully saved to existing.ts.\n\n<final_file_content path=\"existing.ts\">\nconst new = 2\n</final_file_content>\n\nIMPORTANT: For any future changes to this file, use the final_file_content shown above as your reference.",
+								"[replace_in_file for 'existing.ts'] Result:\nThe content was successfully saved to existing.ts.\n\n<final_file_patch_summary path=\"existing.ts\">\nchars=14\nlines=1\nchanged_regions=1\n@@\n- const old = 1\n+ const new = 2\n</final_file_patch_summary>\n\nIf you need the exact full saved baseline later, use read_file on existing.ts before making additional changes.",
 						},
 					],
 				},
@@ -594,10 +596,59 @@ EOF`,
 				}
 			}
 
-			reconstructedContent.should.match(/\[apply_patch for 'existing\.ts'\]/)
-			reconstructedContent.should.match(/successfully updated/)
-			reconstructedContent.should.match(/<final_file_content/)
-			reconstructedContent.should.match(/IMPORTANT: For any future changes/)
+			reconstructedContent.should.match(/\[replace_in_file for 'existing\.ts'\]/)
+			reconstructedContent.should.match(/<final_file_patch_summary/)
+			reconstructedContent.should.match(/use read_file/)
+		})
+
+		it("should preserve replace_in_file tool_result content when final_file_content is absent", () => {
+			const input: ClineStorageMessage[] = [
+				{
+					role: "assistant",
+					content: [
+						{
+							type: "tool_use",
+							id: "toolu_replace_compact",
+							name: "replace_in_file",
+							input: {
+								absolutePath: "compact.ts",
+								diff: `------- SEARCH
+const a = 1
+=======
+const a = 2
+++++++ REPLACE`,
+							},
+						},
+					],
+				},
+				{
+					role: "user",
+					content: [
+						{
+							type: "tool_result",
+							tool_use_id: "toolu_replace_compact",
+							content:
+								"[replace_in_file for 'compact.ts'] Result:\nThe content was successfully saved to compact.ts.\n\n<final_file_patch_summary path=\"compact.ts\">\nchars=14\nlines=1\nchanged_regions=1\n@@\n- const a = 1\n+ const a = 2\n</final_file_patch_summary>\n\nIf you need the exact full saved baseline later, use read_file on compact.ts before making additional changes.",
+						},
+					],
+				},
+			]
+
+			const result = transformToolCallMessages(input, [ClineDefaultTool.APPLY_PATCH])
+
+			let reconstructedContent = ""
+			for (const message of result) {
+				if (Array.isArray(message.content)) {
+					for (const block of message.content) {
+						if (block.type === "tool_result" && block.tool_use_id === "toolu_replace_compact") {
+							reconstructedContent = typeof block.content === "string" ? block.content : ""
+						}
+					}
+				}
+			}
+
+			expect(reconstructedContent).to.contain("<final_file_patch_summary")
+			expect(reconstructedContent).to.contain("use read_file")
 		})
 
 		it("should handle tool_result without final_file_content gracefully", () => {
@@ -1180,8 +1231,7 @@ export function bar(foo: string): Foo {
 				}
 			}
 
-			foundContent.should.match(/\[apply_patch for 'test\.ts'\]/)
-			foundContent.should.match(/successfully/)
+			foundContent.should.equal("Success without final_file_content")
 		})
 	})
 })

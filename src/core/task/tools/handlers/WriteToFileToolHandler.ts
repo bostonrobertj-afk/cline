@@ -352,6 +352,8 @@ export class WriteToFileToolHandler implements IFullyManagedTool {
 			// Mark the file as edited by Cline
 			config.services.fileContextTracker.markFileAsEditedByCline(relPath)
 
+			const previousContent = fileExists ? config.services.diffViewProvider.originalContent : undefined
+
 			// Save the changes and get the result
 			const { newProblemsMessage, userEdits, autoFormattingEdits, finalContent } =
 				await config.services.diffViewProvider.saveChanges()
@@ -399,11 +401,20 @@ export class WriteToFileToolHandler implements IFullyManagedTool {
 					relPath,
 					userEdits,
 					autoFormattingEdits,
+					previousContent,
 					finalContent,
+					!fileExists,
 					newProblemsMessage,
 				)
 			}
-			return formatResponse.fileEditWithoutUserChanges(relPath, autoFormattingEdits, finalContent, newProblemsMessage)
+			return formatResponse.fileEditWithoutUserChanges(
+				relPath,
+				autoFormattingEdits,
+				previousContent,
+				finalContent,
+				!fileExists,
+				newProblemsMessage,
+			)
 		} catch (error) {
 			// Reset diff view on error
 			await config.services.diffViewProvider.revertChanges()

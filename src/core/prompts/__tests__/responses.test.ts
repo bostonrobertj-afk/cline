@@ -30,16 +30,34 @@ describe("formatResponse user input framing", () => {
 })
 
 describe("formatResponse file save summaries", () => {
-	it("keeps final_file_content for smaller files", () => {
+	it("uses a compact patch summary for edited existing files", () => {
 		const response = formatResponse.fileEditWithoutUserChanges(
 			path.posix.join("src", "small.ts"),
 			undefined,
+			"export const value = 0\n",
 			"export const value = 1\n",
+			false,
+			undefined,
+		)
+
+		expect(response).to.not.contain("<final_file_content")
+		expect(response).to.contain("<final_file_patch_summary")
+		expect(response).to.contain("use read_file")
+		expect(response).to.contain("changed_regions=")
+	})
+
+	it("keeps final_file_content for tiny new files", () => {
+		const response = formatResponse.fileEditWithoutUserChanges(
+			path.posix.join("src", "small.ts"),
+			undefined,
+			undefined,
+			"export const value = 1\n",
+			true,
 			undefined,
 		)
 
 		expect(response).to.contain("<final_file_content")
-		expect(response).to.not.contain("<final_file_summary")
+		expect(response).to.not.contain("<final_file_patch_summary")
 	})
 
 	it("replaces large final file echoes with a compact summary", () => {
@@ -47,12 +65,30 @@ describe("formatResponse file save summaries", () => {
 		const response = formatResponse.fileEditWithoutUserChanges(
 			path.posix.join("src", "large.ts"),
 			undefined,
+			"const value = 0;\n",
 			largeContent,
+			false,
+			undefined,
+		)
+
+		expect(response).to.not.contain("<final_file_content")
+		expect(response).to.contain("<final_file_patch_summary")
+		expect(response).to.contain("use read_file")
+	})
+
+	it("falls back to a metadata summary when previousContent is unavailable", () => {
+		const response = formatResponse.fileEditWithoutUserChanges(
+			path.posix.join("src", "fallback.ts"),
+			undefined,
+			undefined,
+			"const value = 1\n",
+			false,
 			undefined,
 		)
 
 		expect(response).to.not.contain("<final_file_content")
 		expect(response).to.contain("<final_file_summary")
+		expect(response).to.contain("created_file=false")
 		expect(response).to.contain("use read_file")
 	})
 })

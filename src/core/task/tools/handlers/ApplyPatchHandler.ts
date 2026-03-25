@@ -361,6 +361,8 @@ export class ApplyPatchHandler implements IFullyManagedTool {
 					responseLines.push(`\n${path}: [deleted]`)
 				} else {
 					// Format response similar to WriteToFileToolHandler
+					const change = commit.changes[path] || Object.values(commit.changes).find((c) => c.movePath === path)
+
 					if (result.userEdits) {
 						// User made edits during approval
 						responseLines.push(`\nThe user made edits to the file:\n${result.userEdits}\n`)
@@ -375,7 +377,6 @@ export class ApplyPatchHandler implements IFullyManagedTool {
 
 						// Capture human edit telemetry: diff between agent's proposed content and user's pre-save edits
 						// Use applyPatch to reconstruct pre-save content from userEdits, excluding auto-formatting noise
-						const change = commit.changes[path] || Object.values(commit.changes).find((c) => c.movePath === path)
 						const preSaveContent = result.userEdits ? applyPatch(change?.newContent || "", result.userEdits) : false
 						captureAccepted({
 							ulid: config.ulid,
@@ -391,7 +392,11 @@ export class ApplyPatchHandler implements IFullyManagedTool {
 						responseLines.push(`\nAuto-formatting was applied to ${path}:\n${result.autoFormattingEdits}\n`)
 					}
 					if (result.finalContent) {
-						responseLines.push(`\n${formatResponse.savedFileReference(path, result.finalContent).trimEnd()}`)
+						const previousContent = change?.type === PatchActionType.ADD ? undefined : change?.oldContent
+						const isNewFile = change?.type === PatchActionType.ADD
+						responseLines.push(
+							`\n${formatResponse.savedFileReference(path, previousContent, result.finalContent, isNewFile).trimEnd()}`,
+						)
 					}
 					if (result.newProblemsMessage) {
 						responseLines.push(`\n\n${result.newProblemsMessage}`)

@@ -578,11 +578,8 @@ function reconstructWriteToFileResult(block: any, originalToolName: string, orig
 	const filePath = originalInput.absolutePath || originalInput.path || ""
 
 	if (!finalContentMatch) {
-		// If no final_file_content found, create a simple success message
-		if (originalToolName === "write_to_file") {
-			return `[apply_patch for '${filePath}'] Result:\nThe content was successfully saved to ${filePath}.\n\nThe file has been created/updated with the new content.`
-		}
-		return `[apply_patch for '${filePath}'] Result:\nThe content was successfully updated in ${filePath}.\n\nThe file has been modified.`
+		// If no final_file_content found, preserve the original tool_result content.
+		return block.content
 	}
 
 	const finalContent = finalContentMatch[2]
