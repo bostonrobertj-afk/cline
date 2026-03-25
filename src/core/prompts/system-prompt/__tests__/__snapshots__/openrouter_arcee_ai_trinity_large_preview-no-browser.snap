@@ -58,7 +58,7 @@ Usage:
 Description: Request to read the contents of a file at the specified path. Use this when you need to examine the contents of an existing file you do not know the contents of, for example to analyze code, review text files, or extract information from configuration files. Automatically extracts raw text from PDF and DOCX files. May not be suitable for other types of binary files, as it returns the raw content as a string. Do NOT use this tool to list the contents of a directory. Only use this tool on files.
 Parameters:
 - path: (required) The path of the file to read (relative to the current working directory /test/project)
-- task_progress: (optional) Markdown checklist as a top-level parameter on a tool call. Not a standalone tool.
+- task_progress: (optional) Full Markdown checklist as a top-level parameter on a tool call. Keep the same items in the same order, and mark completed items by changing only those checkboxes from `- [ ]` to `- [x]`. Not a standalone tool.
 Usage:
 <read_file>
 <path>File path here</path>
@@ -70,7 +70,7 @@ Description: Request to write content to a file at the specified path. If the fi
 Parameters:
 - path: (required) The path of the file to write to (relative to the current working directory /test/project)
 - content: (required) The content to write to the file. ALWAYS provide the COMPLETE intended content of the file, without any truncation or omissions. You MUST include ALL parts of the file, even if they haven't been modified.
-- task_progress: (optional) Markdown checklist as a top-level parameter on a tool call. Not a standalone tool.
+- task_progress: (optional) Full Markdown checklist as a top-level parameter on a tool call. Keep the same items in the same order, and mark completed items by changing only those checkboxes from `- [ ]` to `- [x]`. Not a standalone tool.
 Usage:
 <write_to_file>
 <path>File path here</path>
@@ -106,7 +106,7 @@ Parameters:
   4. Special operations:
      * To move code: Use two SEARCH/REPLACE blocks (one to delete from original + one to insert at new location)
      * To delete code: Use empty REPLACE section
-- task_progress: (optional) Markdown checklist as a top-level parameter on a tool call. Not a standalone tool.
+- task_progress: (optional) Full Markdown checklist as a top-level parameter on a tool call. Keep the same items in the same order, and mark completed items by changing only those checkboxes from `- [ ]` to `- [x]`. Not a standalone tool.
 Usage:
 <replace_in_file>
 <path>File path here</path>
@@ -120,7 +120,7 @@ Parameters:
 - path: (required) The path of the directory to search in (relative to the current working directory /test/project). This directory will be recursively searched.
 - regex: (required) The regular expression pattern to search for. Uses Rust regex syntax.
 - file_pattern: (optional) Glob pattern to filter files (e.g., '*.ts' for TypeScript files). If not provided, it will search all files (*).
-- task_progress: (optional) Markdown checklist as a top-level parameter on a tool call. Not a standalone tool.
+- task_progress: (optional) Full Markdown checklist as a top-level parameter on a tool call. Keep the same items in the same order, and mark completed items by changing only those checkboxes from `- [ ]` to `- [x]`. Not a standalone tool.
 Usage:
 <search_files>
 <path>Directory path here</path>
@@ -134,7 +134,7 @@ Description: Request to list files and directories within the specified director
 Parameters:
 - path: (required) The path of the directory to list contents for (relative to the current working directory /test/project)
 - recursive: (optional) Whether to list files recursively. Use true for recursive listing, false or omit for top-level only.
-- task_progress: (optional) Markdown checklist as a top-level parameter on a tool call. Not a standalone tool.
+- task_progress: (optional) Full Markdown checklist as a top-level parameter on a tool call. Keep the same items in the same order, and mark completed items by changing only those checkboxes from `- [ ]` to `- [x]`. Not a standalone tool.
 Usage:
 <list_files>
 <path>Directory path here</path>
@@ -146,7 +146,7 @@ Usage:
 Description: Request to list definition names (classes, functions, methods, etc.) used in source code files at the top level of the specified directory. This tool provides insights into the codebase structure and important constructs, encapsulating high-level concepts and relationships that are crucial for understanding the overall architecture.
 Parameters:
 - path: (required) The path of a directory (not a file) relative to the current working directory /test/project. Lists definitions across all source files in that directory. To inspect a single file, use read_file instead.
-- task_progress: (optional) Markdown checklist as a top-level parameter on a tool call. Not a standalone tool.
+- task_progress: (optional) Full Markdown checklist as a top-level parameter on a tool call. Keep the same items in the same order, and mark completed items by changing only those checkboxes from `- [ ]` to `- [x]`. Not a standalone tool.
 Usage:
 <list_code_definition_names>
 <path>Directory path here</path>
@@ -159,7 +159,7 @@ Parameters:
 - server_name: (required) The name of the MCP server providing the tool
 - tool_name: (required) The name of the tool to execute
 - arguments: (required) A JSON object containing the tool's input parameters, following the tool's input schema
-- task_progress: (optional) Markdown checklist as a top-level parameter on a tool call. Not a standalone tool.
+- task_progress: (optional) Full Markdown checklist as a top-level parameter on a tool call. Keep the same items in the same order, and mark completed items by changing only those checkboxes from `- [ ]` to `- [x]`. Not a standalone tool.
 Usage:
 <use_mcp_tool>
 <server_name>server name here</server_name>
@@ -178,7 +178,7 @@ Description: Request to access a resource provided by a connected MCP server. Re
 Parameters:
 - server_name: (required) The name of the MCP server providing the resource
 - uri: (required) The URI identifying the specific resource to access
-- task_progress: (optional) Markdown checklist as a top-level parameter on a tool call. Not a standalone tool.
+- task_progress: (optional) Full Markdown checklist as a top-level parameter on a tool call. Keep the same items in the same order, and mark completed items by changing only those checkboxes from `- [ ]` to `- [x]`. Not a standalone tool.
 Usage:
 <access_mcp_resource>
 <server_name>server name here</server_name>
@@ -191,7 +191,7 @@ Description: Ask the user a question to gather additional information needed to 
 Parameters:
 - question: (required) The question to ask the user. This should be a clear, specific question that addresses the information you need.
 - options: (optional) An array of 2-5 options for the user to choose from. Each option should be a string describing a possible answer. You may not always need to provide options, but it may be helpful in many cases where it can save the user from having to type out a response manually. IMPORTANT: NEVER include an option to toggle to Act mode, as this would be something you need to direct the user to do manually themselves if needed.
-- task_progress: (optional) Markdown checklist as a top-level parameter on a tool call. Not a standalone tool.
+- task_progress: (optional) Full Markdown checklist as a top-level parameter on a tool call. Keep the same items in the same order, and mark completed items by changing only those checkboxes from `- [ ]` to `- [x]`. Not a standalone tool.
 Usage:
 <ask_followup_question>
 <question>Your question here</question>
@@ -418,6 +418,8 @@ Use `task_progress` only as a checklist parameter on the next tool call, not a s
 - Create the checklist when switching from PLAN MODE to ACT MODE.
 - Keep items brief and milestone-based.
 - On each update, include the full current checklist.
+- Keep the same checklist items in the same order; only checkbox states should change.
+- Mark completed items by changing only those lines from "- [ ]" to "- [x]".
 - Use Markdown checkboxes: "- [ ]" and "- [x]".
 - Pass task_progress as its own tool parameter, not inside another field.
 

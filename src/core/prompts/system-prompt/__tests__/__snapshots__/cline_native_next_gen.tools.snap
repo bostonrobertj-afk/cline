@@ -18,7 +18,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool."
+            "description": "Full Markdown checklist as a top-level parameter on a tool call. Keep the same items in the same order, and mark completed items by changing only those checkboxes from `- [ ]` to `- [x]`. Not a standalone tool."
           }
         },
         "required": [
@@ -70,7 +70,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool."
+            "description": "Full Markdown checklist as a top-level parameter on a tool call. Keep the same items in the same order, and mark completed items by changing only those checkboxes from `- [ ]` to `- [x]`. Not a standalone tool."
           }
         },
         "required": [
@@ -99,7 +99,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool."
+            "description": "Full Markdown checklist as a top-level parameter on a tool call. Keep the same items in the same order, and mark completed items by changing only those checkboxes from `- [ ]` to `- [x]`. Not a standalone tool."
           }
         },
         "required": [
@@ -129,7 +129,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool."
+            "description": "Full Markdown checklist as a top-level parameter on a tool call. Keep the same items in the same order, and mark completed items by changing only those checkboxes from `- [ ]` to `- [x]`. Not a standalone tool."
           }
         },
         "required": [
@@ -163,7 +163,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool."
+            "description": "Full Markdown checklist as a top-level parameter on a tool call. Keep the same items in the same order, and mark completed items by changing only those checkboxes from `- [ ]` to `- [x]`. Not a standalone tool."
           }
         },
         "required": [
@@ -193,7 +193,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool."
+            "description": "Full Markdown checklist as a top-level parameter on a tool call. Keep the same items in the same order, and mark completed items by changing only those checkboxes from `- [ ]` to `- [x]`. Not a standalone tool."
           }
         },
         "required": [
@@ -218,7 +218,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool."
+            "description": "Full Markdown checklist as a top-level parameter on a tool call. Keep the same items in the same order, and mark completed items by changing only those checkboxes from `- [ ]` to `- [x]`. Not a standalone tool."
           }
         },
         "required": [
@@ -280,7 +280,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool."
+            "description": "Full Markdown checklist as a top-level parameter on a tool call. Keep the same items in the same order, and mark completed items by changing only those checkboxes from `- [ ]` to `- [x]`. Not a standalone tool."
           }
         },
         "required": [
@@ -314,7 +314,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool."
+            "description": "Full Markdown checklist as a top-level parameter on a tool call. Keep the same items in the same order, and mark completed items by changing only those checkboxes from `- [ ]` to `- [x]`. Not a standalone tool."
           }
         },
         "required": [
@@ -343,7 +343,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool."
+            "description": "Full Markdown checklist as a top-level parameter on a tool call. Keep the same items in the same order, and mark completed items by changing only those checkboxes from `- [ ]` to `- [x]`. Not a standalone tool."
           }
         },
         "required": [

@@ -40,7 +40,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool."
+            "description": "Full Markdown checklist as a top-level tool parameter. Keep the same items/order and change only completed checkboxes to `[x]`."
           }
         },
         "required": [
@@ -65,7 +65,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool."
+            "description": "Full Markdown checklist as a top-level tool parameter. Keep the same items/order and change only completed checkboxes to `[x]`."
           }
         },
         "required": [
@@ -98,7 +98,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool."
+            "description": "Full Markdown checklist as a top-level tool parameter. Keep the same items/order and change only completed checkboxes to `[x]`."
           }
         },
         "required": [
@@ -128,7 +128,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool."
+            "description": "Full Markdown checklist as a top-level tool parameter. Keep the same items/order and change only completed checkboxes to `[x]`."
           }
         },
         "required": [
@@ -153,7 +153,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool."
+            "description": "Full Markdown checklist as a top-level tool parameter. Keep the same items/order and change only completed checkboxes to `[x]`."
           }
         },
         "required": [
@@ -215,7 +215,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool."
+            "description": "Full Markdown checklist as a top-level tool parameter. Keep the same items/order and change only completed checkboxes to `[x]`."
           }
         },
         "required": [
@@ -245,7 +245,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool."
+            "description": "Full Markdown checklist as a top-level tool parameter. Keep the same items/order and change only completed checkboxes to `[x]`."
           }
         },
         "required": [
@@ -274,7 +274,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool."
+            "description": "Full Markdown checklist as a top-level tool parameter. Keep the same items/order and change only completed checkboxes to `[x]`."
           }
         },
         "required": [
@@ -345,7 +345,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool."
+            "description": "Full Markdown checklist as a top-level tool parameter. Keep the same items/order and change only completed checkboxes to `[x]`."
           }
         },
         "required": [
@@ -370,7 +370,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool."
+            "description": "Full Markdown checklist as a top-level tool parameter. Keep the same items/order and change only completed checkboxes to `[x]`."
           }
         },
         "required": [
