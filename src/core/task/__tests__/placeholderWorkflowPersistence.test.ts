@@ -128,7 +128,12 @@ Respond in {communication_language} from {config_source}.
 			)
 
 			expect(parseResult.persistentSlashCommandAction?.type).to.equal("activate_placeholder_workflow")
-			expect(parseResult.persistentSlashCommandAction?.workflowSource).to.deep.equal({
+			const placeholderAction = parseResult.persistentSlashCommandAction
+			expect(placeholderAction?.type).to.equal("activate_placeholder_workflow")
+			if (!placeholderAction || placeholderAction.type !== "activate_placeholder_workflow") {
+				throw new Error("Expected placeholder workflow activation")
+			}
+			expect(placeholderAction.workflowSource).to.deep.equal({
 				type: "local",
 				name: "custom-review.md",
 				path: workflowPath,
