@@ -128,17 +128,19 @@ export class SetWorkflowPlaceholdersToolHandler implements IToolHandler, IPartia
 			return `No workflow placeholder values changed. Existing workflow placeholders already matched the requested values: ${unchangedSummary}. Do not call set_workflow_placeholders again unless one of those values changes; continue the current workflow step or call complete_workflow_item if that step is finished.`
 		}
 
-		try {
-			const metadata = await getTaskMetadata(config.taskId)
-			metadata.activeWorkflowId = config.taskState.activeWorkflowId
-			metadata.activePlaceholderWorkflowId = config.taskState.activePlaceholderWorkflowId
-			metadata.activePlaceholderWorkflowSource = config.taskState.activePlaceholderWorkflowSource
-			metadata.activePlaceholderWorkflowStableValues = config.taskState.activePlaceholderWorkflowStableValues
-			metadata.activePlaceholderWorkflowValues = config.taskState.activePlaceholderWorkflowValues
-			metadata.managedWorkflowRun = config.taskState.managedWorkflowRun
-			await saveTaskMetadata(config.taskId, metadata)
-		} catch {
-			// Non-fatal: the in-memory managed workflow run remains canonical for the active task.
+		if (!config.isSubagentExecution) {
+			try {
+				const metadata = await getTaskMetadata(config.taskId)
+				metadata.activeWorkflowId = config.taskState.activeWorkflowId
+				metadata.activePlaceholderWorkflowId = config.taskState.activePlaceholderWorkflowId
+				metadata.activePlaceholderWorkflowSource = config.taskState.activePlaceholderWorkflowSource
+				metadata.activePlaceholderWorkflowStableValues = config.taskState.activePlaceholderWorkflowStableValues
+				metadata.activePlaceholderWorkflowValues = config.taskState.activePlaceholderWorkflowValues
+				metadata.managedWorkflowRun = config.taskState.managedWorkflowRun
+				await saveTaskMetadata(config.taskId, metadata)
+			} catch {
+				// Non-fatal: the in-memory managed workflow run remains canonical for the active task.
+			}
 		}
 
 		await config.callbacks.updateFCListFromToolResponse(undefined)

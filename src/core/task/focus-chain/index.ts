@@ -1,6 +1,7 @@
 import { FocusChainSettings } from "@shared/FocusChainSettings"
 import * as chokidar from "chokidar"
 import * as fs from "fs/promises"
+import * as path from "path"
 import {
 	buildPlaceholderWorkflowChecklist,
 	getActivePlaceholderWorkflowStepDetails,
@@ -21,6 +22,7 @@ import {
 	evaluateFocusChainChecklistUpdate,
 	extractFocusChainItemsFromText,
 	extractFocusChainListFromText,
+	type FocusChainStorageIdentity,
 	getFocusChainFilePath,
 } from "./file-utils"
 import { FocusChainPrompts } from "./prompts"
@@ -29,6 +31,9 @@ import { parseFocusChainListCounts } from "./utils"
 
 export interface FocusChainDependencies {
 	taskId: string
+	focusChainStorageTaskId?: string
+	focusChainStorageIdentity?: FocusChainStorageIdentity
+	focusChainDocumentLabel?: string
 	taskState: TaskState
 	mode: Mode
 	stateManager: StateManager
@@ -50,6 +55,9 @@ export interface FocusChainInstructionDecision {
 
 export class FocusChainManager {
 	private taskId: string
+	private focusChainStorageTaskId: string
+	private focusChainStorageIdentity?: FocusChainStorageIdentity
+	private focusChainDocumentLabel: string
 	private taskState: TaskState
 	private stateManager: StateManager
 	private postStateToWebview: () => Promise<void>
@@ -67,6 +75,9 @@ export class FocusChainManager {
 
 	constructor(dependencies: FocusChainDependencies) {
 		this.taskId = dependencies.taskId
+		this.focusChainStorageTaskId = dependencies.focusChainStorageTaskId ?? dependencies.taskId
+		this.focusChainStorageIdentity = dependencies.focusChainStorageIdentity
+		this.focusChainDocumentLabel = dependencies.focusChainDocumentLabel ?? `Task ${dependencies.taskId}`
 		this.taskState = dependencies.taskState
 		this.stateManager = dependencies.stateManager
 		this.postStateToWebview = dependencies.postStateToWebview
@@ -83,6 +94,11 @@ export class FocusChainManager {
 
 	private renderChecklistForPrompt(checklist: string): string {
 		return ["```text", checklist.trim(), "```"].join("\n")
+	}
+
+	private async resolveFocusChainFilePath(): Promise<string> {
+		const taskDir = await ensureTaskDirectoryExists(this.focusChainStorageTaskId)
+		return getFocusChainFilePath(taskDir, this.taskId, this.focusChainStorageIdentity)
 	}
 
 	public getFocusChainInstructionsDecision(): FocusChainInstructionDecision {
@@ -123,8 +139,7 @@ export class FocusChainManager {
 	 */
 	public async setupFocusChainFileWatcher() {
 		try {
-			const taskDir = await ensureTaskDirectoryExists(this.taskId)
-			const focusChainFilePath = getFocusChainFilePath(taskDir, this.taskId)
+			const focusChainFilePath = await this.resolveFocusChainFilePath()
 
 			// Initialize chokidar watcher
 			this.focusChainFileWatcher = chokidar.watch(focusChainFilePath, {
@@ -474,8 +489,7 @@ export class FocusChainManager {
 		this.taskState.apiRequestsSinceLastTodoUpdate = 0
 
 		try {
-			const taskDir = await ensureTaskDirectoryExists(this.taskId)
-			const todoFilePath = getFocusChainFilePath(taskDir, this.taskId)
+			const todoFilePath = await this.resolveFocusChainFilePath()
 			await fs.unlink(todoFilePath)
 		} catch {
 			// Missing focus chain file is fine when clearing projection state.
@@ -493,8 +507,7 @@ export class FocusChainManager {
 	 */
 	private async readFocusChainFromDisk(): Promise<string | null> {
 		try {
-			const taskDir = await ensureTaskDirectoryExists(this.taskId)
-			const todoFilePath = getFocusChainFilePath(taskDir, this.taskId)
+			const todoFilePath = await this.resolveFocusChainFilePath()
 			const markdownContent = await fs.readFile(todoFilePath, "utf8")
 			const todoList = extractFocusChainListFromText(markdownContent)
 
@@ -521,9 +534,9 @@ export class FocusChainManager {
 	 */
 	private async writeFocusChainToDisk(todoList: string): Promise<void> {
 		try {
-			const taskDir = await ensureTaskDirectoryExists(this.taskId)
-			const todoFilePath = getFocusChainFilePath(taskDir, this.taskId)
-			const fileContent = createFocusChainMarkdownContent(this.taskId, todoList)
+			const todoFilePath = await this.resolveFocusChainFilePath()
+			await fs.mkdir(path.dirname(todoFilePath), { recursive: true })
+			const fileContent = createFocusChainMarkdownContent(this.taskId, todoList, this.focusChainDocumentLabel)
 			await writeFile(todoFilePath, fileContent, "utf8")
 		} catch (error) {
 			Logger.error(`[Task ${this.taskId}] focus chain list: FILE WRITE FAILED - Error:`, error)

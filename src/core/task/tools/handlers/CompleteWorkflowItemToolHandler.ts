@@ -51,13 +51,15 @@ export class CompleteWorkflowItemToolHandler implements IToolHandler, IPartialBl
 		config.taskState.managedWorkflowRun = updatedRun
 		config.taskState.activeWorkflowId = updatedRun.workflowId
 
-		try {
-			const metadata = await getTaskMetadata(config.taskId)
-			metadata.activeWorkflowId = updatedRun.workflowId
-			metadata.managedWorkflowRun = updatedRun
-			await saveTaskMetadata(config.taskId, metadata)
-		} catch {
-			// Non-fatal: in-memory state remains canonical for the active task.
+		if (!config.isSubagentExecution) {
+			try {
+				const metadata = await getTaskMetadata(config.taskId)
+				metadata.activeWorkflowId = updatedRun.workflowId
+				metadata.managedWorkflowRun = updatedRun
+				await saveTaskMetadata(config.taskId, metadata)
+			} catch {
+				// Non-fatal: in-memory state remains canonical for the active task.
+			}
 		}
 
 		await config.callbacks.updateFCListFromToolResponse(undefined)

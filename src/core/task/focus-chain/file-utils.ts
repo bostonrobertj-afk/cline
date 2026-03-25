@@ -4,18 +4,36 @@ import * as path from "path"
 import { ensureTaskDirectoryExists } from "../../storage/disk"
 import type { FocusChainChecklistUpdateResult, ParsedFocusChainItem } from "./types"
 
+export interface FocusChainStorageIdentity {
+	key?: string
+	scope?: "task" | "subagent"
+}
+
+function sanitizeFocusChainStorageKey(storageKey: string): string {
+	return storageKey.replace(/[^a-zA-Z0-9._-]/g, "_")
+}
+
 /**
  * Generate the standard file path for a task's focusChain markdown file
  */
-export function getFocusChainFilePath(taskDir: string, taskId: string): string {
-	return path.join(taskDir, `focus_chain_taskid_${taskId}.md`)
+export function getFocusChainFilePath(taskDir: string, taskId: string, storageIdentity?: FocusChainStorageIdentity): string {
+	const storageKey = sanitizeFocusChainStorageKey(storageIdentity?.key ?? taskId)
+	if (storageIdentity?.scope === "subagent") {
+		return path.join(taskDir, "subagents", `focus_chain_subagent_${storageKey}.md`)
+	}
+
+	return path.join(taskDir, `focus_chain_taskid_${storageKey}.md`)
 }
 
 /**
  * Create the standard markdown content structure for a focusChain file
  */
-export function createFocusChainMarkdownContent(taskId: string, focusChainList: string): string {
-	return `# Focus Chain List for Task ${taskId}
+export function createFocusChainMarkdownContent(
+	taskId: string,
+	focusChainList: string,
+	documentLabel = `Task ${taskId}`,
+): string {
+	return `# Focus Chain List for ${documentLabel}
 
 <!-- Edit this markdown file to update your focus chain list -->
 <!-- Use the format: - [ ] for incomplete items and - [x] for completed items -->
@@ -124,9 +142,14 @@ export function buildFocusChainChecklistRejectionFeedback(existingChecklist: str
  * Ensure a focusChain file exists, creating it with provided content if it doesn't exist
  * Returns the file path
  */
-export async function ensureFocusChainFile(taskId: string, initialFocusChainContent?: string): Promise<string> {
+export async function ensureFocusChainFile(
+	taskId: string,
+	initialFocusChainContent?: string,
+	storageIdentity?: FocusChainStorageIdentity,
+	documentLabel?: string,
+): Promise<string> {
 	const taskDir = await ensureTaskDirectoryExists(taskId)
-	const focusChainFilePath = getFocusChainFilePath(taskDir, taskId)
+	const focusChainFilePath = getFocusChainFilePath(taskDir, taskId, storageIdentity)
 
 	// Check if file exists
 	let fileExists = false
@@ -145,7 +168,8 @@ export async function ensureFocusChainFile(taskId: string, initialFocusChainCont
 - [ ] Another checklist item
 - [x] Completed example item`
 
-		const fileContent = createFocusChainMarkdownContent(taskId, focusChainContent)
+		await fs.mkdir(path.dirname(focusChainFilePath), { recursive: true })
+		const fileContent = createFocusChainMarkdownContent(taskId, focusChainContent, documentLabel)
 		await fs.writeFile(focusChainFilePath, fileContent, "utf8")
 	}
 

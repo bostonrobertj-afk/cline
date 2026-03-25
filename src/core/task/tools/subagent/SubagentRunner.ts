@@ -30,6 +30,7 @@ import { ClineAssistantToolUseBlock, ClineStorageMessage, ClineTextContentBlock,
 import { Logger } from "@shared/services/Logger"
 import type { SkillMetadata } from "@shared/skills"
 import { ClineDefaultTool, ClineTool } from "@shared/tools"
+import { ulid } from "ulid"
 import { ContextManager } from "@/core/context/context-management/ContextManager"
 import { checkContextWindowExceededError } from "@/core/context/context-management/context-error-handling"
 import { getContextWindowInfo } from "@/core/context/context-management/context-window-utils"
@@ -277,6 +278,9 @@ export class SubagentRunner {
 	private abortRequested = false
 	private activeCommandExecutions = 0
 	private abortingCommands = false
+	private subagentFocusChainStorageKey?: string
+	private subagentFocusChainManager?: FocusChainManager
+	private subagentFocusChainState?: TaskState
 
 	constructor(
 		private baseConfig: TaskConfig,
@@ -312,6 +316,38 @@ export class SubagentRunner {
 		return this.abortRequested || this.baseConfig.taskState.abort
 	}
 
+	private ensureSubagentFocusChainStorageKey(): string {
+		if (!this.subagentFocusChainStorageKey) {
+			this.subagentFocusChainStorageKey = `subagent-${ulid()}`
+		}
+
+		return this.subagentFocusChainStorageKey
+	}
+
+	private getOrCreateSubagentFocusChainManager(state: TaskState): FocusChainManager {
+		if (!this.subagentFocusChainManager || this.subagentFocusChainState !== state) {
+			const storageKey = this.ensureSubagentFocusChainStorageKey()
+			this.subagentFocusChainManager = new FocusChainManager({
+				taskId: this.baseConfig.taskId,
+				focusChainStorageTaskId: this.baseConfig.taskId,
+				focusChainStorageIdentity: {
+					key: storageKey,
+					scope: "subagent",
+				},
+				focusChainDocumentLabel: `Subagent ${storageKey}`,
+				taskState: state,
+				mode: this.baseConfig.mode,
+				stateManager: this.baseConfig.services.stateManager,
+				postStateToWebview: async () => undefined,
+				say: async () => undefined,
+				focusChainSettings: this.baseConfig.focusChainSettings,
+			})
+			this.subagentFocusChainState = state
+		}
+
+		return this.subagentFocusChainManager
+	}
+
 	private async getWorkspaceMetadataEnvironmentBlock(): Promise<string | null> {
 		try {
 			const workspacesJson =
@@ -337,7 +373,11 @@ export class SubagentRunner {
 
 	async run(prompt: string, onProgress: (update: SubagentProgressUpdate) => void): Promise<SubagentRunResult> {
 		this.abortRequested = false
+		this.subagentFocusChainStorageKey = undefined
+		this.subagentFocusChainManager = undefined
+		this.subagentFocusChainState = undefined
 		const state = new TaskState()
+		this.getOrCreateSubagentFocusChainManager(state)
 		let emptyAssistantResponseRetries = 0
 		const contextState: SubagentContextState = {}
 		const contextManager = new ContextManager()
@@ -740,6 +780,7 @@ export class SubagentRunner {
 		const baseCallbacks = this.baseConfig.callbacks
 		const coordinator = new ToolExecutorCoordinator()
 		const validator = new ToolValidator(this.baseConfig.services.clineIgnoreController)
+		const focusChainManager = this.getOrCreateSubagentFocusChainManager(state)
 
 		for (const tool of this.allowedTools) {
 			coordinator.registerByName(tool, validator)
@@ -756,6 +797,8 @@ export class SubagentRunner {
 				...baseCallbacks,
 				say: async () => undefined,
 				ask: async () => ({ response: "yesButtonClicked" as const }),
+				updateFCListFromToolResponse: async (taskProgress: string | undefined) =>
+					focusChainManager.updateFCListFromToolResponse(taskProgress),
 				sayAndCreateMissingParamError: async (_toolName, paramName) =>
 					formatResponse.toolError(formatResponse.missingToolParameterError(paramName)),
 				removeLastPartialMessageIfExistsWithType: async () => undefined,
@@ -887,15 +930,7 @@ export class SubagentRunner {
 			return
 		}
 
-		const focusChainManager = new FocusChainManager({
-			taskId: this.baseConfig.taskId,
-			taskState: state,
-			mode: this.baseConfig.mode,
-			stateManager: this.baseConfig.services.stateManager,
-			postStateToWebview: async () => undefined,
-			say: async () => undefined,
-			focusChainSettings: this.baseConfig.focusChainSettings,
-		})
+		const focusChainManager = this.getOrCreateSubagentFocusChainManager(state)
 		await focusChainManager.refreshPlaceholderWorkflowChecklistProjection(force)
 	}
 

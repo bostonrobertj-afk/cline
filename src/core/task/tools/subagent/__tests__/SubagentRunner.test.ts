@@ -6,12 +6,18 @@ import type { ManagedWorkflowRunState } from "@core/task/managed-workflows/types
 import type { TaskConfig } from "@core/task/tools/types/TaskConfig"
 import * as workflowActivation from "@core/task/workflow-activation"
 import * as workflowResolution from "@core/workflows/resolution/resolveAvailableWorkflows"
+import fs from "fs/promises"
 import { afterEach, beforeEach, describe, it } from "mocha"
+import os from "os"
+import path from "path"
 import sinon from "sinon"
 import { HostProvider } from "@/hosts/host-provider"
 import { ApiFormat } from "@/shared/proto/cline/models"
 import { Logger } from "@/shared/services/Logger"
 import { ClineDefaultTool } from "@/shared/tools"
+import * as disk from "../../../../storage/disk"
+import { FocusChainManager } from "../../../focus-chain"
+import { getFocusChainFilePath } from "../../../focus-chain/file-utils"
 import { TaskState } from "../../../TaskState"
 import { SubagentBuilder } from "../SubagentBuilder"
 import { SubagentRunner } from "../SubagentRunner"
@@ -101,7 +107,7 @@ function createTaskConfig(nativeToolCallEnabled: boolean): TaskConfig {
 			executeCommandTool: sinon.stub().resolves([false, "ok"]),
 			cancelRunningCommandTool: sinon.stub().resolves(false),
 			doesLatestTaskCompletionHaveNewChanges: sinon.stub().resolves(false),
-			updateFCListFromToolResponse: sinon.stub().resolves(),
+			updateFCListFromToolResponse: sinon.stub().resolves({ accepted: true }),
 			shouldAutoApproveTool: sinon.stub().returns([true, true]),
 			shouldAutoApproveToolWithPath: sinon.stub().resolves(false),
 			postStateToWebview: sinon.stub().resolves(),
@@ -143,6 +149,23 @@ function stubApiHandler(createMessage: sinon.SinonStub) {
 		}),
 		createMessage,
 	} as never)
+}
+
+function createFocusChainManager(taskState: TaskState, taskId = "task-1") {
+	return new FocusChainManager({
+		taskId,
+		taskState,
+		mode: "act",
+		stateManager: {
+			getGlobalSettingsKey: sinon.stub().returns("act"),
+		} as any,
+		postStateToWebview: sinon.stub().resolves(),
+		say: sinon.stub().resolves(undefined),
+		focusChainSettings: {
+			enabled: true,
+			remindClineInterval: 6,
+		} as any,
+	})
 }
 
 describe("SubagentRunner", () => {
@@ -892,31 +915,158 @@ describe("SubagentRunner", () => {
 	})
 
 	it("seeds a placeholder checklist from step headings when auto-activating a subagent workflow", async () => {
-		const runner = new SubagentRunner(createTaskConfig(false))
-		const state = new TaskState()
+		const sandbox = sinon.createSandbox()
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "subagent-focus-chain-seed-"))
+		try {
+			sandbox.stub(disk, "ensureTaskDirectoryExists").resolves(tempDir)
+			const config = createTaskConfig(false)
+			config.taskState.currentFocusChainChecklist = "- [ ] Parent Step 1\n- [ ] Parent Step 2"
+			const parentManager = createFocusChainManager(config.taskState, config.taskId)
+			await parentManager.updateFCListFromToolResponse(config.taskState.currentFocusChainChecklist)
 
-		await (runner as any).autoActivateAssignedWorkflow(
-			state,
-			["review-edge-case-hunter"],
-			[
-				{
-					name: "review-edge-case-hunter",
-					source: "remote",
-					description: "Remote workflow: review-edge-case-hunter",
-					fileName: "review-edge-case-hunter",
-					contents: `# Edge case review
+			const runner = new SubagentRunner(config)
+			const state = new TaskState()
+
+			await (runner as any).autoActivateAssignedWorkflow(
+				state,
+				["review-edge-case-hunter"],
+				[
+					{
+						name: "review-edge-case-hunter",
+						source: "remote",
+						description: "Remote workflow: review-edge-case-hunter",
+						fileName: "review-edge-case-hunter",
+						contents: `# Edge case review
 
 ## Step 1: Gather Context
 Load the review target and confirm scope.
 
 ## Step 2: Review
 Inspect reachable edge cases in the changed code.`,
-				},
-			],
-		)
+					},
+				],
+			)
 
-		assert.equal(state.activePlaceholderWorkflowId, "review-edge-case-hunter")
-		assert.equal(state.currentFocusChainChecklist, "- [ ] Step 1: Gather Context\n- [ ] Step 2: Review")
+			assert.equal(state.activePlaceholderWorkflowId, "review-edge-case-hunter")
+			assert.equal(state.currentFocusChainChecklist, "- [ ] Step 1: Gather Context\n- [ ] Step 2: Review")
+
+			const parentFilePath = getFocusChainFilePath(tempDir, config.taskId)
+			const parentContent = await fs.readFile(parentFilePath, "utf8")
+			assert.match(parentContent, /Parent Step 1/)
+			assert.doesNotMatch(parentContent, /Step 1: Gather Context/)
+
+			const subagentStorageKey = (runner as any).subagentFocusChainStorageKey as string
+			assert.ok(subagentStorageKey)
+			const subagentFilePath = getFocusChainFilePath(tempDir, config.taskId, {
+				key: subagentStorageKey,
+				scope: "subagent",
+			})
+			const subagentContent = await fs.readFile(subagentFilePath, "utf8")
+			assert.match(subagentContent, /Step 1: Gather Context/)
+			assert.match(subagentContent, /Step 2: Review/)
+		} finally {
+			sandbox.restore()
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("routes subagent task_progress updates to subagent-local focus chain storage instead of the parent callback", async () => {
+		const sandbox = sinon.createSandbox()
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "subagent-focus-chain-update-"))
+		try {
+			sandbox.stub(disk, "ensureTaskDirectoryExists").resolves(tempDir)
+			const config = createTaskConfig(false)
+			config.taskState.currentFocusChainChecklist = "- [ ] Parent Step"
+			const parentManager = createFocusChainManager(config.taskState, config.taskId)
+			await parentManager.updateFCListFromToolResponse(config.taskState.currentFocusChainChecklist)
+
+			const runner = new SubagentRunner(config)
+			const subagentState = new TaskState()
+			const subagentConfig = (runner as any).createSubagentTaskConfig(subagentState) as TaskConfig
+
+			const result = await subagentConfig.callbacks.updateFCListFromToolResponse("- [ ] Child Step")
+
+			assert.equal(result.accepted, true)
+			sinon.assert.notCalled(config.callbacks.updateFCListFromToolResponse as sinon.SinonStub)
+			assert.equal(subagentState.currentFocusChainChecklist, "- [ ] Child Step")
+
+			const parentFilePath = getFocusChainFilePath(tempDir, config.taskId)
+			const parentContent = await fs.readFile(parentFilePath, "utf8")
+			assert.match(parentContent, /Parent Step/)
+			assert.doesNotMatch(parentContent, /Child Step/)
+
+			const subagentStorageKey = (runner as any).subagentFocusChainStorageKey as string
+			const subagentFilePath = getFocusChainFilePath(tempDir, config.taskId, {
+				key: subagentStorageKey,
+				scope: "subagent",
+			})
+			const subagentContent = await fs.readFile(subagentFilePath, "utf8")
+			assert.match(subagentContent, /Child Step/)
+		} finally {
+			sandbox.restore()
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("isolates focus-chain storage across multiple subagent runs under the same parent task", async () => {
+		const sandbox = sinon.createSandbox()
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "subagent-focus-chain-multi-"))
+		try {
+			sandbox.stub(disk, "ensureTaskDirectoryExists").resolves(tempDir)
+			const config = createTaskConfig(false)
+			const runnerOne = new SubagentRunner(config)
+			const runnerTwo = new SubagentRunner(config)
+			const stateOne = new TaskState()
+			const stateTwo = new TaskState()
+
+			await (runnerOne as any).autoActivateAssignedWorkflow(
+				stateOne,
+				["review-a"],
+				[
+					{
+						name: "review-a",
+						source: "remote",
+						description: "Remote workflow: review-a",
+						fileName: "review-a",
+						contents: `## Step 1: Alpha\nInspect alpha.`,
+					},
+				],
+			)
+			await (runnerTwo as any).autoActivateAssignedWorkflow(
+				stateTwo,
+				["review-b"],
+				[
+					{
+						name: "review-b",
+						source: "remote",
+						description: "Remote workflow: review-b",
+						fileName: "review-b",
+						contents: `## Step 1: Beta\nInspect beta.`,
+					},
+				],
+			)
+
+			const storageKeyOne = (runnerOne as any).subagentFocusChainStorageKey as string
+			const storageKeyTwo = (runnerTwo as any).subagentFocusChainStorageKey as string
+			assert.ok(storageKeyOne)
+			assert.ok(storageKeyTwo)
+			assert.notEqual(storageKeyOne, storageKeyTwo)
+
+			const subagentFileOne = getFocusChainFilePath(tempDir, config.taskId, {
+				key: storageKeyOne,
+				scope: "subagent",
+			})
+			const subagentFileTwo = getFocusChainFilePath(tempDir, config.taskId, {
+				key: storageKeyTwo,
+				scope: "subagent",
+			})
+			assert.notEqual(subagentFileOne, subagentFileTwo)
+			assert.match(await fs.readFile(subagentFileOne, "utf8"), /Step 1: Alpha/)
+			assert.match(await fs.readFile(subagentFileTwo, "utf8"), /Step 1: Beta/)
+		} finally {
+			sandbox.restore()
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
 	})
 
 	it("logs a warning when a configured skill is not available", async () => {

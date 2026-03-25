@@ -194,7 +194,7 @@ describe("Managed workflow handlers", () => {
 		const sandbox = sinon.createSandbox()
 		try {
 			const handler = new CompleteWorkflowItemToolHandler()
-			const config = createConfig()
+			const config = createConfig({ isSubagentExecution: false })
 			config.taskState.managedWorkflowRun = createManagedWorkflowRun()
 			config.taskState.activeWorkflowId = "bmad-code-review"
 
@@ -223,6 +223,40 @@ describe("Managed workflow handlers", () => {
 			expect(restoredRun).to.exist
 			expect(restoredRun?.workflowId).to.equal("bmad-code-review")
 			expect(restoredRun?.phases[0].items[0].completed).to.equal(true)
+		} finally {
+			sandbox.restore()
+		}
+	})
+
+	it("keeps managed workflow item completion subagent-local without overwriting parent metadata", async () => {
+		const sandbox = sinon.createSandbox()
+		try {
+			const handler = new CompleteWorkflowItemToolHandler()
+			const config = createConfig()
+			config.taskState.managedWorkflowRun = createManagedWorkflowRun()
+			config.taskState.activeWorkflowId = "bmad-code-review"
+
+			const parentMetadata = {
+				activeWorkflowId: "parent-workflow",
+				managedWorkflowRun: { workflowId: "parent-run" },
+			} as any
+			const getMetadataStub = sandbox.stub(disk, "getTaskMetadata").resolves(parentMetadata)
+			const saveMetadataStub = sandbox.stub(disk, "saveTaskMetadata").resolves()
+
+			await handler.execute(config, {
+				type: "tool_use",
+				name: "complete_workflow_item",
+				params: {
+					item_id: "step-01-gather-context::item-1",
+				},
+				partial: false,
+			} as any)
+
+			expect(config.taskState.managedWorkflowRun?.phases[0].items[0].completed).to.equal(true)
+			expect(getMetadataStub.called).to.equal(false)
+			expect(saveMetadataStub.called).to.equal(false)
+			expect(parentMetadata.activeWorkflowId).to.equal("parent-workflow")
+			expect((config.callbacks.updateFCListFromToolResponse as sinon.SinonStub).calledOnce).to.equal(true)
 		} finally {
 			sandbox.restore()
 		}
@@ -293,7 +327,7 @@ describe("Managed workflow handlers", () => {
 		const sandbox = sinon.createSandbox()
 		try {
 			const handler = new SetWorkflowPlaceholdersToolHandler()
-			const config = createConfig()
+			const config = createConfig({ isSubagentExecution: false })
 			config.taskState.managedWorkflowRun = createManagedWorkflowRun()
 			config.taskState.activeWorkflowId = "bmad-code-review"
 
@@ -321,6 +355,47 @@ describe("Managed workflow handlers", () => {
 				validation_report_path: "reports/validation.md",
 			})
 			expect(config.taskState.managedWorkflowRun?.updatedAt).to.be.greaterThan(0)
+			expect((config.callbacks.updateFCListFromToolResponse as sinon.SinonStub).calledOnce).to.equal(true)
+		} finally {
+			sandbox.restore()
+		}
+	})
+
+	it("keeps workflow placeholder updates subagent-local without overwriting parent metadata", async () => {
+		const sandbox = sinon.createSandbox()
+		try {
+			const handler = new SetWorkflowPlaceholdersToolHandler()
+			const config = createConfig()
+			config.taskState.activePlaceholderWorkflowId = "dev-story"
+
+			const parentMetadata = {
+				activeWorkflowId: "parent-workflow",
+				activePlaceholderWorkflowId: "parent-placeholder",
+				activePlaceholderWorkflowValues: { story_path: "parent.md" },
+			} as any
+			const getMetadataStub = sandbox.stub(disk, "getTaskMetadata").resolves(parentMetadata)
+			const saveMetadataStub = sandbox.stub(disk, "saveTaskMetadata").resolves()
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "set_workflow_placeholders",
+				params: {
+					values: {
+						research_topic: "workflow gating",
+						report_path: "docs/workflow-gating.md",
+					},
+				},
+				partial: false,
+			} as any)
+
+			expect(String(result)).to.contain("Stored 2 workflow placeholders")
+			expect(config.taskState.activePlaceholderWorkflowValues).to.deep.equal({
+				research_topic: "workflow gating",
+				report_path: "docs/workflow-gating.md",
+			})
+			expect(getMetadataStub.called).to.equal(false)
+			expect(saveMetadataStub.called).to.equal(false)
+			expect(parentMetadata.activePlaceholderWorkflowId).to.equal("parent-placeholder")
 			expect((config.callbacks.updateFCListFromToolResponse as sinon.SinonStub).calledOnce).to.equal(true)
 		} finally {
 			sandbox.restore()
@@ -422,6 +497,7 @@ describe("Managed workflow handlers", () => {
 			const handler = new SetWorkflowPlaceholdersToolHandler()
 			const config = createConfig({
 				taskId: "task-managed-workflow-metadata",
+				isSubagentExecution: false,
 			})
 			config.taskState.managedWorkflowRun = {
 				...createManagedWorkflowRun(),
@@ -470,7 +546,7 @@ describe("Managed workflow handlers", () => {
 		const sandbox = sinon.createSandbox()
 		try {
 			const handler = new SetWorkflowPlaceholdersToolHandler()
-			const config = createConfig()
+			const config = createConfig({ isSubagentExecution: false })
 			config.taskState.activePlaceholderWorkflowId = "dev-story"
 
 			const metadata = { activeWorkflowId: "dev-story" } as any
@@ -506,7 +582,7 @@ describe("Managed workflow handlers", () => {
 		const sandbox = sinon.createSandbox()
 		try {
 			const handler = new CompleteWorkflowItemToolHandler()
-			const config = createConfig()
+			const config = createConfig({ isSubagentExecution: false })
 			config.taskState.managedWorkflowRun = createManagedWorkflowRun()
 			config.taskState.activeWorkflowId = "bmad-code-review"
 			config.taskState.managedWorkflowRun.phases[0].items[0].completed = true
@@ -537,7 +613,7 @@ describe("Managed workflow handlers", () => {
 		const sandbox = sinon.createSandbox()
 		try {
 			const handler = new UseSkillToolHandler()
-			const config = createConfig()
+			const config = createConfig({ isSubagentExecution: false })
 			const metadata = {} as any
 			const getMetadataStub = sandbox.stub(disk, "getTaskMetadata").resolves(metadata)
 			const saveMetadataStub = sandbox.stub(disk, "saveTaskMetadata").resolves()
@@ -558,6 +634,36 @@ describe("Managed workflow handlers", () => {
 			expect(config.taskState.activeAgentInvokedSlashCommand).to.equal(undefined)
 			expect(getMetadataStub.calledOnce).to.equal(true)
 			expect(saveMetadataStub.calledOnce).to.equal(true)
+			expect((config.callbacks.updateFCListFromToolResponse as sinon.SinonStub).calledOnce).to.equal(true)
+		} finally {
+			sandbox.restore()
+		}
+	})
+
+	it("keeps managed workflow activation through use_skill subagent-local without overwriting parent metadata", async () => {
+		const sandbox = sinon.createSandbox()
+		try {
+			const handler = new UseSkillToolHandler()
+			const config = createConfig()
+			const parentMetadata = { activeWorkflowId: "parent-workflow" } as any
+			const getMetadataStub = sandbox.stub(disk, "getTaskMetadata").resolves(parentMetadata)
+			const saveMetadataStub = sandbox.stub(disk, "saveTaskMetadata").resolves()
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "use_skill",
+				params: {
+					skill_name: "bmad-problem-solving",
+				},
+				partial: false,
+			} as any)
+
+			expect(String(result)).to.contain('Managed workflow "bmad-cis-problem-solving" is now active')
+			expect(config.taskState.managedWorkflowRun?.workflowId).to.equal("bmad-cis-problem-solving")
+			expect(config.taskState.activeWorkflowId).to.equal("bmad-cis-problem-solving")
+			expect(getMetadataStub.called).to.equal(false)
+			expect(saveMetadataStub.called).to.equal(false)
+			expect(parentMetadata.activeWorkflowId).to.equal("parent-workflow")
 			expect((config.callbacks.updateFCListFromToolResponse as sinon.SinonStub).calledOnce).to.equal(true)
 		} finally {
 			sandbox.restore()
@@ -632,6 +738,7 @@ describe("Managed workflow handlers", () => {
 
 			const handler = new UseSkillToolHandler()
 			const config = createConfig({
+				isSubagentExecution: false,
 				services: {
 					stateManager: {
 						getGlobalStateKey: () => ({}),
@@ -668,6 +775,55 @@ describe("Managed workflow handlers", () => {
 				name: "local-review.md",
 				path: workflowPath,
 			})
+		} finally {
+			sandbox.restore()
+			if (tempDir) {
+				await fs.rm(tempDir, { recursive: true, force: true })
+			}
+		}
+	})
+
+	it("keeps placeholder workflow activation through use_skill subagent-local without overwriting parent metadata", async () => {
+		const sandbox = sinon.createSandbox()
+		let tempDir: string | undefined
+		try {
+			tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "use-skill-subagent-local-"))
+			const workflowPath = path.join(tempDir, "local-review.md")
+			await fs.writeFile(workflowPath, "# Local review\nInspect the staged diff.", "utf8")
+			const parentMetadata = {
+				activePlaceholderWorkflowId: "parent-placeholder",
+				activePlaceholderWorkflowSource: { type: "remote", name: "parent" },
+			} as any
+			const getMetadataStub = sandbox.stub(disk, "getTaskMetadata").resolves(parentMetadata)
+			const saveMetadataStub = sandbox.stub(disk, "saveTaskMetadata").resolves()
+
+			const handler = new UseSkillToolHandler()
+			const config = createConfig({
+				services: {
+					stateManager: {
+						getGlobalStateKey: () => ({}),
+						getGlobalSettingsKey: (key: string) => (key === "globalWorkflowToggles" ? {} : undefined),
+						getWorkspaceStateKey: (key: string) => (key === "workflowToggles" ? { [workflowPath]: true } : undefined),
+						getRemoteConfigSettings: () => ({}),
+						getApiConfiguration: () => ({ planModeApiProvider: "openai", actModeApiProvider: "openai" }),
+					},
+				} as any,
+			})
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "use_skill",
+				params: {
+					skill_name: "local-review.md",
+				},
+				partial: false,
+			} as any)
+
+			expect(String(result)).to.contain('# Workflow "local-review.md" is now active')
+			expect(config.taskState.activePlaceholderWorkflowId).to.equal("local-review.md")
+			expect(getMetadataStub.called).to.equal(false)
+			expect(saveMetadataStub.called).to.equal(false)
+			expect(parentMetadata.activePlaceholderWorkflowId).to.equal("parent-placeholder")
 		} finally {
 			sandbox.restore()
 			if (tempDir) {
@@ -757,6 +913,7 @@ Inspect the prepared review input and write findings.`,
 			const handler = new UseSkillToolHandler()
 			const config = createConfig({
 				cwd: tempDir,
+				isSubagentExecution: false,
 				services: {
 					stateManager: {
 						getGlobalStateKey: () => ({}),
@@ -810,6 +967,7 @@ Inspect the prepared review input and write findings.`,
 		try {
 			const handler = new UseSkillToolHandler()
 			const config = createConfig({
+				isSubagentExecution: false,
 				services: {
 					stateManager: {
 						getGlobalStateKey: () => ({}),
@@ -874,6 +1032,7 @@ Inspect the prepared review input and write findings.`,
 			const handler = new UseSkillToolHandler()
 			const config = createConfig({
 				cwd: tempDir,
+				isSubagentExecution: false,
 				services: {
 					stateManager: {
 						getGlobalStateKey: () => ({}),
@@ -934,6 +1093,7 @@ Inspect the prepared review input and write findings.`,
 		try {
 			const handler = new UseSkillToolHandler()
 			const config = createConfig({
+				isSubagentExecution: false,
 				services: {
 					stateManager: {
 						getGlobalStateKey: (key: string) => (key === "remoteWorkflowToggles" ? {} : undefined),
@@ -1010,6 +1170,7 @@ Inspect the prepared review input and write findings.`,
 			const handler = new UseSkillToolHandler()
 			const config = createConfig({
 				cwd: tempDir,
+				isSubagentExecution: false,
 				services: {
 					stateManager: {
 						getGlobalStateKey: (key: string) => (key === "remoteWorkflowToggles" ? {} : undefined),

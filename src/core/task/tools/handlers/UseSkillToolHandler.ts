@@ -101,20 +101,22 @@ export class UseSkillToolHandler implements IToolHandler, IPartialBlockHandler {
 
 			config.taskState.consecutiveMistakeCount = 0
 
-			try {
-				const metadata = await getTaskMetadata(config.taskId)
-				metadata.activeAgentId = config.taskState.activeAgentId
-				metadata.activeAgentSkillName = config.taskState.activeAgentSkillName
-				metadata.activeAgentInvokedSlashCommand = config.taskState.activeAgentInvokedSlashCommand
-				metadata.activeWorkflowId = config.taskState.activeWorkflowId
-				metadata.activePlaceholderWorkflowId = config.taskState.activePlaceholderWorkflowId
-				metadata.activePlaceholderWorkflowSource = config.taskState.activePlaceholderWorkflowSource
-				metadata.activePlaceholderWorkflowStableValues = config.taskState.activePlaceholderWorkflowStableValues
-				metadata.activePlaceholderWorkflowValues = config.taskState.activePlaceholderWorkflowValues
-				metadata.managedWorkflowRun = config.taskState.managedWorkflowRun
-				await saveTaskMetadata(config.taskId, metadata)
-			} catch {
-				// Non-fatal: keep the workflow activation in memory even if persistence fails.
+			if (!config.isSubagentExecution) {
+				try {
+					const metadata = await getTaskMetadata(config.taskId)
+					metadata.activeAgentId = config.taskState.activeAgentId
+					metadata.activeAgentSkillName = config.taskState.activeAgentSkillName
+					metadata.activeAgentInvokedSlashCommand = config.taskState.activeAgentInvokedSlashCommand
+					metadata.activeWorkflowId = config.taskState.activeWorkflowId
+					metadata.activePlaceholderWorkflowId = config.taskState.activePlaceholderWorkflowId
+					metadata.activePlaceholderWorkflowSource = config.taskState.activePlaceholderWorkflowSource
+					metadata.activePlaceholderWorkflowStableValues = config.taskState.activePlaceholderWorkflowStableValues
+					metadata.activePlaceholderWorkflowValues = config.taskState.activePlaceholderWorkflowValues
+					metadata.managedWorkflowRun = config.taskState.managedWorkflowRun
+					await saveTaskMetadata(config.taskId, metadata)
+				} catch {
+					// Non-fatal: keep the workflow activation in memory even if persistence fails.
+				}
 			}
 
 			await config.callbacks.updateFCListFromToolResponse(undefined)
@@ -155,20 +157,22 @@ export class UseSkillToolHandler implements IToolHandler, IPartialBlockHandler {
 
 				config.taskState.consecutiveMistakeCount = 0
 
-				try {
-					const metadata = await getTaskMetadata(config.taskId)
-					metadata.activeAgentId = config.taskState.activeAgentId
-					metadata.activeAgentSkillName = config.taskState.activeAgentSkillName
-					metadata.activeAgentInvokedSlashCommand = config.taskState.activeAgentInvokedSlashCommand
-					metadata.activeWorkflowId = config.taskState.activeWorkflowId
-					metadata.activePlaceholderWorkflowId = config.taskState.activePlaceholderWorkflowId
-					metadata.activePlaceholderWorkflowSource = config.taskState.activePlaceholderWorkflowSource
-					metadata.activePlaceholderWorkflowStableValues = config.taskState.activePlaceholderWorkflowStableValues
-					metadata.activePlaceholderWorkflowValues = config.taskState.activePlaceholderWorkflowValues
-					metadata.managedWorkflowRun = config.taskState.managedWorkflowRun
-					await saveTaskMetadata(config.taskId, metadata)
-				} catch {
-					// Non-fatal: keep the placeholder workflow activation in memory even if persistence fails.
+				if (!config.isSubagentExecution) {
+					try {
+						const metadata = await getTaskMetadata(config.taskId)
+						metadata.activeAgentId = config.taskState.activeAgentId
+						metadata.activeAgentSkillName = config.taskState.activeAgentSkillName
+						metadata.activeAgentInvokedSlashCommand = config.taskState.activeAgentInvokedSlashCommand
+						metadata.activeWorkflowId = config.taskState.activeWorkflowId
+						metadata.activePlaceholderWorkflowId = config.taskState.activePlaceholderWorkflowId
+						metadata.activePlaceholderWorkflowSource = config.taskState.activePlaceholderWorkflowSource
+						metadata.activePlaceholderWorkflowStableValues = config.taskState.activePlaceholderWorkflowStableValues
+						metadata.activePlaceholderWorkflowValues = config.taskState.activePlaceholderWorkflowValues
+						metadata.managedWorkflowRun = config.taskState.managedWorkflowRun
+						await saveTaskMetadata(config.taskId, metadata)
+					} catch {
+						// Non-fatal: keep the placeholder workflow activation in memory even if persistence fails.
+					}
 				}
 
 				if (activation.workflowChanged || !config.taskState.currentFocusChainChecklist) {
