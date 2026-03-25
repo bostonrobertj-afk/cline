@@ -3,7 +3,6 @@ import type { ToolUse } from "@core/assistant-message"
 import { getHookModelContext } from "@core/hooks/hook-model-context"
 import { getHooksEnabledSafe } from "@core/hooks/hooks-utils"
 import { formatResponse } from "@core/prompts/responses"
-import { processFilesIntoText } from "@integrations/misc/extract-text"
 import { showSystemNotification } from "@integrations/notifications"
 import { telemetryService } from "@services/telemetry"
 import { findLastIndex } from "@shared/array"
@@ -230,11 +229,17 @@ export class AttemptCompletionHandler implements IToolHandler, IPartialBlockHand
 			return prefix // signals to recursive loop to stop (for now this never happens since yesButtonClicked will trigger a new task)
 		}
 
-		await config.callbacks.say("user_feedback", text ?? "", images, completionFiles)
+		const hasPostCompletionReply = !!(
+			(text && text.trim().length > 0) ||
+			(images && images.length > 0) ||
+			(completionFiles && completionFiles.length > 0)
+		)
+		if (hasPostCompletionReply) {
+			await config.callbacks.say("user_feedback", text ?? "", images, completionFiles)
+		}
 
 		// Run UserPromptSubmit hook when user provides post-completion feedback
-		let hookContextModification: string | undefined
-		if (text || (images && images.length > 0) || (completionFiles && completionFiles.length > 0)) {
+		if (hasPostCompletionReply) {
 			const userContentForHook = await buildUserFeedbackContent(text, images, completionFiles)
 
 			const hookResult = await config.callbacks.runUserPromptSubmitHook(userContentForHook, "feedback")
@@ -243,8 +248,13 @@ export class AttemptCompletionHandler implements IToolHandler, IPartialBlockHand
 				return formatResponse.toolDenied()
 			}
 
-			// Capture hook context modification to add to tool results
-			hookContextModification = hookResult.contextModification
+			config.taskState.setPendingAttemptCompletionFollowup({
+				text,
+				images,
+				files: completionFiles,
+				hookContext: hookResult.contextModification,
+			})
+			config.taskState.didAttemptCompletionEndTask = true
 		}
 
 		const toolResults: (Anthropic.TextBlockParam | Anthropic.ImageBlockParam)[] = []
@@ -259,40 +269,11 @@ export class AttemptCompletionHandler implements IToolHandler, IPartialBlockHand
 			}
 		}
 
-		if (text) {
-			toolResults.push(
-				{
-					type: "text",
-					text: "The user has provided feedback on the results. Consider their input to continue the task, and then attempt completion again.",
-				},
-				{
-					type: "text",
-					text: `<feedback>\n${text}\n</feedback>`,
-				},
-			)
-		}
-
-		// Add hook context modification if provided
-		if (hookContextModification) {
-			toolResults.push({
-				type: "text" as const,
-				text: `<hook_context source="UserPromptSubmit">\n${hookContextModification}\n</hook_context>`,
-			})
-		}
-
-		const fileContentString = completionFiles?.length ? await processFilesIntoText(completionFiles) : ""
-		if (fileContentString) {
-			toolResults.push({
-				type: "text" as const,
-				text: fileContentString,
-			})
-		}
-
-		if (images && images.length > 0) {
-			toolResults.push(...formatResponse.imageBlocks(images))
-		}
-
 		// Return the tool results as a complex response
+		if (toolResults.length === 0) {
+			return prefix
+		}
+
 		return [
 			{
 				type: "text" as const,

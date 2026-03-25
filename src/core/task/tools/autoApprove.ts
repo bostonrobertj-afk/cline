@@ -43,6 +43,7 @@ export class AutoApprove {
 		if (this.stateManager.getGlobalSettingsKey("yoloModeToggled")) {
 			switch (toolName) {
 				case ClineDefaultTool.FILE_READ:
+				case ClineDefaultTool.FILE_READ_RANGE:
 				case ClineDefaultTool.LIST_FILES:
 				case ClineDefaultTool.LIST_CODE_DEF:
 				case ClineDefaultTool.SEARCH:
@@ -66,6 +67,7 @@ export class AutoApprove {
 		if (this.stateManager.getGlobalSettingsKey("autoApproveAllToggled")) {
 			switch (toolName) {
 				case ClineDefaultTool.FILE_READ:
+				case ClineDefaultTool.FILE_READ_RANGE:
 				case ClineDefaultTool.LIST_FILES:
 				case ClineDefaultTool.LIST_CODE_DEF:
 				case ClineDefaultTool.SEARCH:
@@ -89,6 +91,7 @@ export class AutoApprove {
 
 		switch (toolName) {
 			case ClineDefaultTool.FILE_READ:
+			case ClineDefaultTool.FILE_READ_RANGE:
 			case ClineDefaultTool.LIST_FILES:
 			case ClineDefaultTool.LIST_CODE_DEF:
 			case ClineDefaultTool.SEARCH:

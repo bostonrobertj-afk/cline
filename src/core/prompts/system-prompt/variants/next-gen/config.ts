@@ -50,6 +50,7 @@ export const config = createVariant(ModelFamily.NEXT_GEN)
 	.tools(
 		ClineDefaultTool.BASH,
 		ClineDefaultTool.FILE_READ,
+		ClineDefaultTool.FILE_READ_RANGE,
 		ClineDefaultTool.FILE_NEW,
 		ClineDefaultTool.FILE_EDIT,
 		ClineDefaultTool.SEARCH,

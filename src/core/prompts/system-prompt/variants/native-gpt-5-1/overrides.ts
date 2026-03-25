@@ -18,6 +18,7 @@ const GPT5_1_RULES = (_context: SystemPromptContext) => `RULES
 - When responding to the user outside of tool calls, include rich markdown formatting where applicable.
 - Ensure that any code snippets you provide are properly formatted with syntax highlighting for better readability.
 - When performing regex searches, try to craft search patterns that will not return an excessive amount of results.
+- For code exploration, prefer search_files first, then list_code_definition_names, then read_file for the first full-file pass, and read_file_range for focused follow-up reads. Avoid repeating full-file reads when a narrower range is enough.
 - MCP operations should be used one at a time, similar to other tool usage. Wait for confirmation of success before proceeding with additional operations.
 - Before calling a tool, use the available runtime context and ensure required parameters are present or can be reasonably inferred.
 - If a required tool parameter is missing, do not call the tool; use ask_followup_question when clarification is necessary.
@@ -77,7 +78,7 @@ When working in a codebase:
 - Always reference the **relevant module/file path** and **domain concept** before proposing or making edits
 - Track context across files, modules, and feature boundaries to ensure changes are coherent
 - If task scope is ambiguous, existing architecture is unclear, or constraints are undefined, ${context.yoloModeToggled !== true ? "**ask clarifying questions** using ask_followup_question rather than making assumptions" : "state your assumptions clearly before proceeding"}
-- When in doubt about existing patterns, conventions, or dependencies, **investigate first** using read_file and search_files before making changes
+- When in doubt about existing patterns, conventions, or dependencies, **investigate first** using search_files and list_code_definition_names before the first full read_file, then use read_file_range for focused follow-up checks whenever possible
 
 This ensures your work aligns with the existing codebase structure and avoids unintended side effects.
 

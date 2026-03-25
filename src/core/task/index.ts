@@ -133,6 +133,7 @@ import { ToolExecutor } from "./ToolExecutor"
 import { buildTokenEstimateLogPayload, estimateRequestTokenUsage } from "./tokenUsageLogging"
 import { extractProviderDomainFromUrl, updateApiReqMsg } from "./utils"
 import { buildUserFeedbackContent } from "./utils/buildUserFeedbackContent"
+import { buildUserMessageContent } from "./utils/buildUserMessageContent"
 import { hasExplicitMentionSyntax, hasUserContentTag } from "./utils/userContentProcessing"
 import {
 	activateManagedWorkflowInTaskState,
@@ -3634,6 +3635,16 @@ export class Task {
 				await this.checkpointManager?.saveCheckpoint()
 
 				if (this.taskState.didAttemptCompletionEndTask) {
+					const pendingAttemptCompletionFollowup = this.taskState.consumePendingAttemptCompletionFollowup()
+					if (pendingAttemptCompletionFollowup) {
+						const deferredUserContent = await buildUserMessageContent(
+							pendingAttemptCompletionFollowup.text,
+							pendingAttemptCompletionFollowup.images,
+							pendingAttemptCompletionFollowup.files,
+							pendingAttemptCompletionFollowup.hookContext,
+						)
+						return await this.recursivelyMakeClineRequests(deferredUserContent)
+					}
 					return true
 				}
 

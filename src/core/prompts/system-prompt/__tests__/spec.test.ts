@@ -4,6 +4,7 @@ import { ModelFamily } from "@/shared/prompts"
 import { ClineDefaultTool } from "@/shared/tools"
 import type { ClineToolSpec } from "../spec"
 import { toolSpecFunctionDeclarations, toolSpecFunctionDefinition, toolSpecInputSchema } from "../spec"
+import { read_file_range_variants } from "../tools/read_file_range"
 import { set_workflow_placeholders_variants } from "../tools/set_workflow_placeholders"
 import type { SystemPromptContext } from "../types"
 
@@ -212,5 +213,20 @@ describe("native tool placeholder replacement", () => {
 		expect(openAI.function.parameters.properties.values.description).to.equal(
 			"Object map of placeholder keys to strings. Not arrays of {name,value} or {key,value}.",
 		)
+	})
+
+	it("preserves integer types for read_file_range line parameters", () => {
+		const tool = read_file_range_variants[0]
+
+		const openAI = toolSpecFunctionDefinition(tool, mockContext) as any
+		const anthropic = toolSpecInputSchema(tool, mockContext) as any
+		const gemini = toolSpecFunctionDeclarations(tool, mockContext) as any
+
+		expect(openAI.function.parameters.properties.start_line.type).to.equal("integer")
+		expect(openAI.function.parameters.properties.end_line.type).to.equal("integer")
+		expect(anthropic.input_schema.properties.start_line.type).to.equal("integer")
+		expect(anthropic.input_schema.properties.end_line.type).to.equal("integer")
+		expect(gemini.parameters.properties.start_line.type).to.equal("NUMBER")
+		expect(gemini.parameters.properties.end_line.type).to.equal("NUMBER")
 	})
 })

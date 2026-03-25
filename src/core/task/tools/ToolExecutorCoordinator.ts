@@ -17,6 +17,7 @@ import { ListFilesToolHandler } from "./handlers/ListFilesToolHandler"
 import { LoadMcpDocumentationHandler } from "./handlers/LoadMcpDocumentationHandler"
 import { NewTaskHandler } from "./handlers/NewTaskHandler"
 import { PlanModeRespondHandler } from "./handlers/PlanModeRespondHandler"
+import { ReadFileRangeToolHandler } from "./handlers/ReadFileRangeToolHandler"
 import { ReadFileToolHandler } from "./handlers/ReadFileToolHandler"
 import { ReportBugHandler } from "./handlers/ReportBugHandler"
 import { SearchFilesToolHandler } from "./handlers/SearchFilesToolHandler"
@@ -87,6 +88,7 @@ export class ToolExecutorCoordinator {
 		[ClineDefaultTool.FILE_EDIT]: (v: ToolValidator) =>
 			new SharedToolHandler(ClineDefaultTool.FILE_EDIT, new WriteToFileToolHandler(v)),
 		[ClineDefaultTool.FILE_READ]: (v: ToolValidator) => new ReadFileToolHandler(v),
+		[ClineDefaultTool.FILE_READ_RANGE]: (v: ToolValidator) => new ReadFileRangeToolHandler(v),
 		[ClineDefaultTool.FILE_NEW]: (v: ToolValidator) => new WriteToFileToolHandler(v),
 		[ClineDefaultTool.SEARCH]: (v: ToolValidator) => new SearchFilesToolHandler(v),
 		[ClineDefaultTool.LIST_FILES]: (v: ToolValidator) => new ListFilesToolHandler(v),

@@ -51,6 +51,7 @@ export const config = createVariant(ModelFamily.NATIVE_GPT_5_1)
 	.tools(
 		ClineDefaultTool.BASH,
 		ClineDefaultTool.FILE_READ,
+		ClineDefaultTool.FILE_READ_RANGE,
 		// Should disable FILE_NEW and FILE_EDIT when enabled
 		ClineDefaultTool.APPLY_PATCH,
 		ClineDefaultTool.SEARCH,

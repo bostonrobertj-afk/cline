@@ -12,6 +12,7 @@ export enum ClineDefaultTool {
 	BASH = "execute_command",
 	FILE_EDIT = "replace_in_file",
 	FILE_READ = "read_file",
+	FILE_READ_RANGE = "read_file_range",
 	FILE_NEW = "write_to_file",
 	SEARCH = "search_files",
 	LIST_FILES = "list_files",
@@ -59,6 +60,7 @@ export function getToolUseNames(): string[] {
 export const READ_ONLY_TOOLS = [
 	ClineDefaultTool.LIST_FILES,
 	ClineDefaultTool.FILE_READ,
+	ClineDefaultTool.FILE_READ_RANGE,
 	ClineDefaultTool.SEARCH,
 	ClineDefaultTool.LIST_CODE_DEF,
 	ClineDefaultTool.BROWSER,

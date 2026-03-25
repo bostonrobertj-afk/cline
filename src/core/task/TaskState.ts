@@ -46,10 +46,23 @@ export class TaskState {
 	didAlreadyUseTool = false
 	didEditFile = false
 	lastToolName = "" // Track last tool used for consecutive call detection
+	pendingAttemptCompletionFollowupText?: string
+	pendingAttemptCompletionFollowupImages?: string[]
+	pendingAttemptCompletionFollowupFiles?: string[]
+	pendingAttemptCompletionFollowupHookContext?: string
+	hasPendingAttemptCompletionFollowup = false
 
-	// File read deduplication cache - prevents the model from endlessly reading the same files
-	// Maps absolute file path → { readCount: times read in this task, mtime: last modified timestamp, imageBlock: optional image data for multimodal models }
-	fileReadCache: Map<string, { readCount: number; mtime: number; imageBlock?: Anthropic.ImageBlockParam }> = new Map()
+	// File read cache - tracks recent reads so repeated reads can return compact unchanged notices or diffs
+	// instead of replaying the full file when the latest snapshot is still valid for this task.
+	fileReadCache: Map<
+		string,
+		{
+			readCount: number
+			mtime: number
+			imageBlock?: Anthropic.ImageBlockParam
+			snapshotText?: string
+		}
+	> = new Map()
 
 	// Error tracking
 	consecutiveMistakeCount = 0
@@ -92,4 +105,55 @@ export class TaskState {
 	// Auto-context summarization
 	currentlySummarizing = false
 	lastAutoCompactTriggerIndex?: number
+
+	setPendingAttemptCompletionFollowup(followup: {
+		text?: string
+		images?: string[]
+		files?: string[]
+		hookContext?: string
+	}): void {
+		this.pendingAttemptCompletionFollowupText = followup.text
+		this.pendingAttemptCompletionFollowupImages = followup.images?.length ? [...followup.images] : undefined
+		this.pendingAttemptCompletionFollowupFiles = followup.files?.length ? [...followup.files] : undefined
+		this.pendingAttemptCompletionFollowupHookContext = followup.hookContext
+		this.hasPendingAttemptCompletionFollowup = !!(
+			(followup.text && followup.text.trim().length > 0) ||
+			(followup.images && followup.images.length > 0) ||
+			(followup.files && followup.files.length > 0) ||
+			(followup.hookContext && followup.hookContext.trim().length > 0)
+		)
+	}
+
+	consumePendingAttemptCompletionFollowup():
+		| {
+				text?: string
+				images?: string[]
+				files?: string[]
+				hookContext?: string
+		  }
+		| undefined {
+		if (!this.hasPendingAttemptCompletionFollowup) {
+			return undefined
+		}
+
+		const followup = {
+			text: this.pendingAttemptCompletionFollowupText,
+			images: this.pendingAttemptCompletionFollowupImages,
+			files: this.pendingAttemptCompletionFollowupFiles,
+			hookContext: this.pendingAttemptCompletionFollowupHookContext,
+		}
+
+		this.clearPendingAttemptCompletionFollowup()
+		this.didAttemptCompletionEndTask = false
+
+		return followup
+	}
+
+	clearPendingAttemptCompletionFollowup(): void {
+		this.pendingAttemptCompletionFollowupText = undefined
+		this.pendingAttemptCompletionFollowupImages = undefined
+		this.pendingAttemptCompletionFollowupFiles = undefined
+		this.pendingAttemptCompletionFollowupHookContext = undefined
+		this.hasPendingAttemptCompletionFollowup = false
+	}
 }

@@ -45,6 +45,7 @@ export const config = createVariant(ModelFamily.GPT_5)
 	.tools(
 		ClineDefaultTool.BASH,
 		ClineDefaultTool.FILE_READ,
+		ClineDefaultTool.FILE_READ_RANGE,
 		ClineDefaultTool.FILE_NEW,
 		ClineDefaultTool.FILE_EDIT,
 		ClineDefaultTool.SEARCH,

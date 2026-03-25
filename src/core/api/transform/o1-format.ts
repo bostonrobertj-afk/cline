@@ -240,6 +240,7 @@ const toolNames = [
 	"list_code_definition_names",
 	"search_files",
 	"read_file",
+	"read_file_range",
 	"write_to_file",
 	"ask_followup_question",
 	"attempt_completion",
@@ -330,6 +331,7 @@ function validateToolInput(toolName: string, tool_input: Record<string, string>)
 		case "execute_command":
 			return "command" in tool_input
 		case "read_file":
+		case "read_file_range":
 		case "list_code_definition_names":
 		case "list_files":
 			return "path" in tool_input

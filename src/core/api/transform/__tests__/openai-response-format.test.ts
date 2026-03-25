@@ -1,6 +1,8 @@
+import { strict as assert } from "node:assert"
 import { describe, it } from "mocha"
 import "should"
 import { ClineStorageMessage } from "@/shared/messages/content"
+import { buildUserMessageContent } from "../../../task/utils/buildUserMessageContent"
 import { convertToOpenAIResponsesInput } from "../openai-response-format"
 
 describe("convertToOpenAIResponsesInput", () => {
@@ -190,5 +192,24 @@ describe("convertToOpenAIResponsesInput", () => {
 		;(fullContext.input[0] as any).call_id.should.equal("fc_0ad17b3bd677d97e0069bcce385b648193a2ccc93a433d1581")
 		;(fullContext.input[1] as any).type.should.equal("function_call_output")
 		;(fullContext.input[1] as any).call_id.should.equal("fc_0ad17b3bd677d97e0069bcce385b648193a2ccc93a433d1581")
+	})
+
+	it("should serialize deferred post-completion follow-up as a normal user message", async () => {
+		const messages: ClineStorageMessage[] = [
+			{
+				role: "user",
+				content: await buildUserMessageContent("one more change"),
+			},
+		]
+
+		const fullContext = convertToOpenAIResponsesInput(messages, { usePreviousResponseId: false })
+
+		fullContext.input.should.have.length(1)
+		;(fullContext.input[0] as any).type.should.equal("message")
+		;(fullContext.input[0] as any).role.should.equal("user")
+		;(fullContext.input[0] as any).content[0].type.should.equal("input_text")
+		fullContext.input.some((item: any) => item.type === "function_call_output").should.be.false()
+		assert.match(String((fullContext.input[0] as any).content[0].text), /<user_message>/)
+		assert.match(String((fullContext.input[0] as any).content[0].text), /one more change/)
 	})
 })

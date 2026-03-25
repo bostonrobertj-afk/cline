@@ -25,7 +25,7 @@ const generic: ClineToolSpec = {
 	id,
 	name: "search_files",
 	description:
-		"Request to perform a regex search across files in a specified directory, providing context-rich results. This tool searches for patterns or specific content across multiple files, displaying each match with encapsulating context.",
+		"Request to perform a regex search across files in a specified directory, providing context-rich results. Start here when you need to narrow candidate files or regions before using list_code_definition_names, read_file, or read_file_range.",
 	parameters: [
 		{
 			name: "path",
@@ -55,7 +55,7 @@ const NATIVE_NEXT_GEN: ClineToolSpec = {
 	id,
 	name: "search_files",
 	description:
-		"Request to perform a regex search across files in a specified directory, providing context-rich results. This tool searches for patterns or specific content across multiple files, displaying each match with encapsulating context.",
+		"Request to perform a regex search across files in a specified directory, providing context-rich results. Start here when you need to narrow candidate files or regions before using list_code_definition_names, read_file, or read_file_range.",
 	parameters: [
 		{
 			name: "path",

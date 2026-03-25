@@ -20,6 +20,7 @@ enum EditType {
 }
 
 const LARGE_HISTORICAL_TOOL_RESULT_TOOLS = new Set([
+	"read_file",
 	"search_files",
 	"list_files",
 	"list_code_definition_names",
@@ -1333,6 +1334,7 @@ export class ContextManager {
 		let didUpdate = false
 		const updatedMessageIndices = new Set<number>()
 		const preserveFromIndex = Math.max(startFromIndex, apiMessages.length - 2)
+		const latestLargeReadFileIndex = this.findLatestLargeReadFileResultIndex(apiMessages, startFromIndex, preserveFromIndex)
 
 		for (let i = startFromIndex; i < preserveFromIndex; i++) {
 			const message = apiMessages[i]
@@ -1353,6 +1355,9 @@ export class ContextManager {
 
 			const [toolName, filePath, contentBlockIndex, headerText] = result
 			if (!LARGE_HISTORICAL_TOOL_RESULT_TOOLS.has(toolName)) {
+				continue
+			}
+			if (toolName === "read_file" && i === latestLargeReadFileIndex) {
 				continue
 			}
 
@@ -1385,6 +1390,43 @@ export class ContextManager {
 		}
 
 		return [didUpdate, updatedMessageIndices]
+	}
+
+	private findLatestLargeReadFileResultIndex(
+		apiMessages: Anthropic.Messages.MessageParam[],
+		startFromIndex: number,
+		preserveFromIndex: number,
+	): number | undefined {
+		for (let i = preserveFromIndex - 1; i >= startFromIndex; i--) {
+			const message = apiMessages[i]
+			if (message.role !== "user" || !Array.isArray(message.content) || message.content.length === 0) {
+				continue
+			}
+
+			const firstBlock = message.content[0]
+			const firstBlockText = this.getTextFromBlock(firstBlock)
+			if (!firstBlockText) {
+				continue
+			}
+
+			const result = this.parseToolCallWithFormat(firstBlockText)
+			if (!result) {
+				continue
+			}
+
+			const [toolName, _filePath, contentBlockIndex] = result
+			if (toolName !== "read_file") {
+				continue
+			}
+
+			const targetBlock = message.content[contentBlockIndex]
+			const targetText = targetBlock ? this.getTextFromBlock(targetBlock) : null
+			if (targetText && targetText.length >= LARGE_HISTORICAL_TOOL_RESULT_CHAR_THRESHOLD) {
+				return i
+			}
+		}
+
+		return undefined
 	}
 
 	/**

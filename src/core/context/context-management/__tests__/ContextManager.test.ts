@@ -229,6 +229,94 @@ describe("ContextManager", () => {
 			expect(indices.size).to.equal(0)
 		})
 
+		it("compacts older large historical read_file outputs under token pressure", () => {
+			const contextManager = new ContextManager()
+			const olderBody = "a".repeat(5000)
+			const newerBody = "b".repeat(5000)
+			const messages: Anthropic.Messages.MessageParam[] = [
+				{ role: "user", content: "Initial task" },
+				{ role: "assistant", content: "Response" },
+				{
+					role: "user",
+					content: [
+						{
+							type: "text",
+							text: `[read_file for 'src/older.ts'] Result:\n${olderBody}`,
+						},
+					],
+				},
+				{ role: "assistant", content: "Response after older read" },
+				{
+					role: "user",
+					content: [
+						{
+							type: "text",
+							text: `[read_file for 'src/newer.ts'] Result:\n${newerBody}`,
+						},
+					],
+				},
+				{ role: "assistant", content: "Response after newer read" },
+				{ role: "user", content: "Newest turn stays intact" },
+			]
+
+			const [didUpdate, indices] = contextManager.applyContextOptimizations(messages, 2, Date.now())
+			const optimized = contextManager.getTruncatedMessages(messages, undefined)
+			const olderText = (
+				optimized[2].content as Anthropic.Messages.ContentBlockParam[]
+			)[0] as Anthropic.Messages.TextBlockParam
+			const newerText = (
+				optimized[4].content as Anthropic.Messages.ContentBlockParam[]
+			)[0] as Anthropic.Messages.TextBlockParam
+
+			expect(didUpdate).to.equal(true)
+			expect(indices.has(2)).to.equal(true)
+			expect(indices.has(4)).to.equal(false)
+			expect(olderText.text).to.contain("[read_file for 'src/older.ts'] Result:")
+			expect(olderText.text).to.contain("older read_file output was removed")
+			expect(olderText.text).to.not.contain(olderBody)
+			expect(newerText.text).to.contain(newerBody)
+		})
+
+		it("preserves the newest useful large read_file output while compacting older ones", () => {
+			const contextManager = new ContextManager()
+			const olderBody = "older\n".repeat(1200)
+			const newestUsefulBody = "newest\n".repeat(1200)
+			const messages: Anthropic.Messages.MessageParam[] = [
+				{ role: "user", content: "Initial task" },
+				{ role: "assistant", content: "Response" },
+				{
+					role: "user",
+					content: [{ type: "text", text: `[read_file for 'src/older.ts'] Result:\n${olderBody}` }],
+				},
+				{ role: "assistant", content: "Assistant after older read" },
+				{
+					role: "user",
+					content: [{ type: "text", text: `[read_file for 'src/newest.ts'] Result:\n${newestUsefulBody}` }],
+				},
+				{ role: "assistant", content: "Assistant after newest useful read" },
+				{ role: "user", content: "Non-tool user turn" },
+				{ role: "assistant", content: "Trailing assistant turn" },
+				{ role: "user", content: "Latest preserved user turn" },
+			]
+
+			const [didUpdate, indices] = contextManager.applyContextOptimizations(messages, 2, Date.now())
+			const optimized = contextManager.getTruncatedMessages(messages, undefined)
+			const olderText = (
+				optimized[2].content as Anthropic.Messages.ContentBlockParam[]
+			)[0] as Anthropic.Messages.TextBlockParam
+			const newestText = (
+				optimized[4].content as Anthropic.Messages.ContentBlockParam[]
+			)[0] as Anthropic.Messages.TextBlockParam
+
+			expect(didUpdate).to.equal(true)
+			expect(indices.has(2)).to.equal(true)
+			expect(indices.has(4)).to.equal(false)
+			expect(olderText.text).to.contain("older read_file output was removed")
+			expect(olderText.text).to.not.contain(olderBody)
+			expect(newestText.text).to.contain(newestUsefulBody)
+			expect(newestText.text).to.not.contain("older read_file output was removed")
+		})
+
 		it("detects duplicate file reads with native tool calling format (tool_result blocks)", () => {
 			const messages: Anthropic.Messages.MessageParam[] = [
 				{ role: "user", content: "Initial task" },

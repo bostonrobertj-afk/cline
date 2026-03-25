@@ -16,6 +16,7 @@ import { list_files_variants } from "./list_files"
 import { load_mcp_documentation_variants } from "./load_mcp_documentation"
 import { new_task_variants } from "./new_task"
 import { read_file_variants } from "./read_file"
+import { read_file_range_variants } from "./read_file_range"
 import { replace_in_file_variants } from "./replace_in_file"
 import { search_files_variants } from "./search_files"
 import { send_user_message_variants } from "./send_user_message"
@@ -50,6 +51,7 @@ export function registerClineToolSets(): void {
 		...new_task_variants,
 		...generate_plan_output_variants,
 		...read_file_variants,
+		...read_file_range_variants,
 		...replace_in_file_variants,
 		...search_files_variants,
 		...send_user_message_variants,
