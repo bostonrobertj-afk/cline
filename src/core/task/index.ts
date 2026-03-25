@@ -606,7 +606,8 @@ export class Task {
 			this.executeCommandTool.bind(this),
 			this.cancelBackgroundCommand.bind(this),
 			() => this.checkpointManager?.doesLatestTaskCompletionHaveNewChanges() ?? Promise.resolve(false),
-			this.FocusChainManager?.updateFCListFromToolResponse.bind(this.FocusChainManager) || (async () => {}),
+			this.FocusChainManager?.updateFCListFromToolResponse.bind(this.FocusChainManager) ||
+				(async () => ({ accepted: true })),
 			this.switchToActModeCallback.bind(this),
 			this.cancelTask,
 			// Atomic hook state helpers for ToolExecutor

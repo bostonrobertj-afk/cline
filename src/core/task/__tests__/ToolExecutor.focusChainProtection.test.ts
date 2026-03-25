@@ -88,8 +88,10 @@ describe("ToolExecutor focus chain protection", () => {
 
 		assert.equal(updateFCListFromToolResponse.calledOnce, true)
 		assert.equal(taskState.userMessageContent.length, 2)
-		assert.match(String(taskState.userMessageContent[1].text), /A task list already exists\./)
-		assert.match(String(taskState.userMessageContent[1].text), /Current checklist:/)
+		const feedbackBlock = taskState.userMessageContent[1] as { type?: string; text?: string }
+		assert.equal(feedbackBlock.type, "text")
+		assert.match(String(feedbackBlock.text), /A task list already exists\./)
+		assert.match(String(feedbackBlock.text), /Current checklist:/)
 	})
 
 	it("rejects attempt_completion in the same turn when task_progress would replace an existing checklist", async () => {
