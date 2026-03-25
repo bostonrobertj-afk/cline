@@ -241,7 +241,7 @@ export class FocusChainManager {
 			const percentComplete = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0
 
 			const introUpdateRequired =
-				"# TODO LIST UPDATE SUGGESTED: If you have completed any steps on the checklist, include the task_progress parameter on your next tool call."
+				"### Reminder: Detailed instructions are automatically sent for the first incomplete task in your task list. Failure to maintain your task list can lead to old instructions persisting, and prevent you from seeing the details for the step you're currently on. To update your task list, include the full current checklist as task_progress on your next tool call. Keep the step labels and order, and change only completed items from - [ ] to - [x]."
 			const listCurrentProgress = `**Current Progress: ${completedItems}/${totalItems} items completed (${percentComplete}%)**`
 			const userHasUpdatedList =
 				"**CRITICAL INFORMATION:** The user has modified this todo list - review ALL changes carefully"
@@ -356,9 +356,7 @@ export class FocusChainManager {
 			})
 
 			return this.joinPromptSections(
-				"# TODO LIST UPDATE SUGGESTED: If you have completed any steps on the checklist, include the task_progress parameter in your NEXT tool call.",
-				listCurrentProgress,
-				this.renderChecklistForPrompt(currentChecklist),
+				"### Reminder: Detailed instructions are automatically sent for the first incomplete task in your task list. Failure to maintain your task list can lead to old instructions persisting, and prevent you from seeing the details for the step you're currently on. To update your task list, include the full current checklist as task_progress on your next tool call. Keep the step labels and order, and change only completed items from - [ ] to - [x].",
 				userUpdatedWarning,
 				[
 					"# CURRENT WORKFLOW STEP",
