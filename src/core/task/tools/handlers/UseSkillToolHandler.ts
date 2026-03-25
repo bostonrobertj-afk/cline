@@ -3,6 +3,7 @@ import { discoverSkills, getAvailableSkills, getSkillContent } from "@core/conte
 import { getTaskMetadata, saveTaskMetadata } from "@core/storage/disk"
 import { activateManagedWorkflowInTaskState, activatePlaceholderWorkflowInTaskState } from "@core/task/workflow-activation"
 import type { SkillMetadata } from "@shared/skills"
+import { buildPlaceholderWorkflowChecklist } from "@/core/workflows/placeholder-workflow-step-details"
 import { resolveWorkflowByName } from "@/core/workflows/resolution/resolveAvailableWorkflows"
 import { telemetryService } from "@/services/telemetry"
 import { ClineDefaultTool } from "@/shared/tools"
@@ -168,6 +169,17 @@ export class UseSkillToolHandler implements IToolHandler, IPartialBlockHandler {
 					await saveTaskMetadata(config.taskId, metadata)
 				} catch {
 					// Non-fatal: keep the placeholder workflow activation in memory even if persistence fails.
+				}
+
+				if (activation.workflowChanged || !config.taskState.currentFocusChainChecklist) {
+					const checklist = await buildPlaceholderWorkflowChecklist({
+						source: config.taskState.activePlaceholderWorkflowSource!,
+						stablePlaceholderValues: config.taskState.activePlaceholderWorkflowStableValues,
+						placeholderValues: config.taskState.activePlaceholderWorkflowValues,
+					})
+					if (checklist) {
+						await config.callbacks.updateFCListFromToolResponse(checklist)
+					}
 				}
 
 				telemetryService.safeCapture(

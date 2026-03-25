@@ -1,7 +1,10 @@
 import { FocusChainSettings } from "@shared/FocusChainSettings"
 import * as chokidar from "chokidar"
 import * as fs from "fs/promises"
-import { getActivePlaceholderWorkflowStepDetails } from "@/core/workflows/placeholder-workflow-step-details"
+import {
+	buildPlaceholderWorkflowChecklist,
+	getActivePlaceholderWorkflowStepDetails,
+} from "@/core/workflows/placeholder-workflow-step-details"
 import { telemetryService } from "@/services/telemetry"
 import { Logger } from "@/shared/services/Logger"
 import { ClineSay } from "../../../shared/ExtensionMessage"
@@ -305,6 +308,38 @@ export class FocusChainManager {
 		await this.postStateToWebview()
 	}
 
+	public async refreshPlaceholderWorkflowChecklistProjection(force = false): Promise<void> {
+		if (!this.taskState.activePlaceholderWorkflowSource) {
+			return
+		}
+		if (!force && this.taskState.currentFocusChainChecklist) {
+			return
+		}
+
+		const checklist = await buildPlaceholderWorkflowChecklist({
+			source: this.taskState.activePlaceholderWorkflowSource,
+			stablePlaceholderValues: this.taskState.activePlaceholderWorkflowStableValues,
+			placeholderValues: this.taskState.activePlaceholderWorkflowValues,
+		})
+		if (!checklist) {
+			return
+		}
+
+		this.taskState.apiRequestsSinceLastTodoUpdate = 0
+		this.taskState.todoListWasUpdatedByUser = false
+		this.taskState.currentFocusChainChecklist = checklist
+
+		try {
+			await this.writeFocusChainToDisk(checklist)
+			await this.say("task_progress", checklist)
+		} catch (error) {
+			Logger.error(`[Task ${this.taskId}] placeholder workflow checklist projection refresh failed:`, error)
+			await this.say("task_progress", checklist)
+		}
+
+		await this.postStateToWebview()
+	}
+
 	public async clearManagedWorkflowChecklistProjection(): Promise<void> {
 		this.taskState.currentFocusChainChecklist = null
 		this.taskState.todoListWasUpdatedByUser = false
@@ -380,6 +415,10 @@ export class FocusChainManager {
 		try {
 			if (this.taskState.managedWorkflowRun) {
 				await this.refreshManagedWorkflowChecklistProjection()
+				return
+			}
+			if (!taskProgress && this.taskState.activePlaceholderWorkflowSource && !this.taskState.currentFocusChainChecklist) {
+				await this.refreshPlaceholderWorkflowChecklistProjection()
 				return
 			}
 

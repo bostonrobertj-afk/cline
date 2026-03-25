@@ -4,7 +4,9 @@ import { describe, it } from "mocha"
 import os from "os"
 import path from "path"
 import sinon from "sinon"
+import * as disk from "../../../storage/disk"
 import { TaskState } from "../../TaskState"
+import { getFocusChainFilePath } from "../file-utils"
 import { FocusChainDependencies, FocusChainManager } from "../index"
 
 function createDependencies(taskState: TaskState) {
@@ -159,6 +161,97 @@ Inspect the prepared review input and write findings.
 
 		expect(prompt).to.contain('Update the full "task_progress" checklist in your next tool call')
 		expect(prompt).to.not.contain("# CURRENT WORKFLOW STEP")
+	})
+
+	it("seeds a placeholder checklist projection and writes the focus-chain markdown file", async () => {
+		const taskId = `task-focus-chain-placeholder-${Date.now()}`
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "focus-chain-placeholder-seed-"))
+		const workflowPath = path.join(tempDir, "local-review.md")
+		await fs.writeFile(
+			workflowPath,
+			`# Review Workflow
+
+## Step 1: Gather Context
+Determine what to review from the user's prompt before asking follow-up questions.
+
+## Step 2: Review
+Inspect the prepared review input and write findings.
+`,
+			"utf8",
+		)
+
+		try {
+			const taskDir = path.join(tempDir, "task-dir")
+			await fs.mkdir(taskDir, { recursive: true })
+			const ensureTaskDirectoryExistsStub = sinon.stub(disk, "ensureTaskDirectoryExists").resolves(taskDir)
+			const taskState = new TaskState()
+			taskState.activePlaceholderWorkflowId = "local-review.md"
+			taskState.activePlaceholderWorkflowSource = {
+				type: "local",
+				name: "local-review.md",
+				path: workflowPath,
+			}
+
+			const say = sinon.stub().resolves(undefined)
+			const manager = new FocusChainManager({
+				...createDependencies(taskState),
+				taskId,
+				say,
+			})
+
+			await manager.refreshPlaceholderWorkflowChecklistProjection(true)
+
+			expect(taskState.currentFocusChainChecklist).to.equal("- [ ] Step 1: Gather Context\n- [ ] Step 2: Review")
+			sinon.assert.calledWith(say, "task_progress", "- [ ] Step 1: Gather Context\n- [ ] Step 2: Review")
+			sinon.assert.called(ensureTaskDirectoryExistsStub)
+
+			const focusChainFilePath = getFocusChainFilePath(taskDir, taskId)
+			const fileContent = await fs.readFile(focusChainFilePath, "utf8")
+			expect(fileContent).to.contain("- [ ] Step 1: Gather Context")
+			expect(fileContent).to.contain("- [ ] Step 2: Review")
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("does not clobber an existing placeholder checklist when reseeding is not forced", async () => {
+		const taskId = `task-focus-chain-placeholder-${Date.now()}`
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "focus-chain-placeholder-preserve-"))
+		const workflowPath = path.join(tempDir, "local-review.md")
+		await fs.writeFile(
+			workflowPath,
+			`# Review Workflow
+
+## Step 1: Gather Context
+Determine what to review from the user's prompt before asking follow-up questions.
+`,
+			"utf8",
+		)
+
+		try {
+			const taskState = new TaskState()
+			taskState.activePlaceholderWorkflowId = "local-review.md"
+			taskState.activePlaceholderWorkflowSource = {
+				type: "local",
+				name: "local-review.md",
+				path: workflowPath,
+			}
+			taskState.currentFocusChainChecklist = "- [ ] Existing checklist item"
+
+			const say = sinon.stub().resolves(undefined)
+			const manager = new FocusChainManager({
+				...createDependencies(taskState),
+				taskId,
+				say,
+			})
+
+			await manager.refreshPlaceholderWorkflowChecklistProjection()
+
+			expect(taskState.currentFocusChainChecklist).to.equal("- [ ] Existing checklist item")
+			sinon.assert.notCalled(say)
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
 	})
 
 	it("keeps the managed workflow branch unchanged", async () => {

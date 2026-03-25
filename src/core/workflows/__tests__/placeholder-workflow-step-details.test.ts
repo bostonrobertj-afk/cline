@@ -6,6 +6,7 @@ import path from "path"
 import {
 	type ActivePlaceholderWorkflowSource,
 	buildActivePlaceholderWorkflowSource,
+	buildPlaceholderWorkflowChecklist,
 	getActivePlaceholderWorkflowStepDetails,
 } from "../placeholder-workflow-step-details"
 
@@ -48,6 +49,48 @@ describe("placeholder workflow step details", () => {
 
 		expect(result?.stepNumber).to.equal(1)
 		expect(result?.stepTitle).to.equal("Gather Context")
+	})
+
+	it("builds checklist rows from step headings for remote workflows", async () => {
+		const checklist = await buildPlaceholderWorkflowChecklist({
+			source: {
+				type: "remote",
+				name: "remote-review",
+				contents: SAMPLE_WORKFLOW,
+			},
+		})
+
+		expect(checklist).to.equal("- [ ] Step 1: Gather Context\n- [ ] Step 2: Review")
+	})
+
+	it("builds checklist rows from ### Step N - Title headings without affecting detail extraction", async () => {
+		const workflow = `# Review Workflow
+
+### Step 1 - Gather Context
+Determine what to review from the user's prompt before asking follow-up questions.
+
+### Step 2 - Review
+Inspect the prepared review input and write findings.
+`
+
+		const checklist = await buildPlaceholderWorkflowChecklist({
+			source: {
+				type: "remote",
+				name: "remote-review",
+				contents: workflow,
+			},
+		})
+		const details = await getActivePlaceholderWorkflowStepDetails({
+			checklistMarkdown: checklist!,
+			source: {
+				type: "remote",
+				name: "remote-review",
+				contents: workflow,
+			},
+		})
+
+		expect(checklist).to.equal("- [ ] Step 1: Gather Context\n- [ ] Step 2: Review")
+		expect(details?.details).to.contain("Determine what to review from the user's prompt")
 	})
 
 	it("returns undefined when there are no incomplete checklist items", async () => {

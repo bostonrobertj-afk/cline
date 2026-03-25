@@ -42,6 +42,10 @@ type ParsedWorkflowStepSection = {
 	details: string
 }
 
+type ParseWorkflowStepSectionsOptions = {
+	includeEmptySections?: boolean
+}
+
 const INCOMPLETE_CHECKLIST_ITEM_REGEX = /^\s*-\s*\[\s\]\s*(.+?)\s*$/
 const STEP_LABEL_REGEX = /^step\s+(\d+)(?:\s*[:-]\s*(.+))?$/i
 const STEP_HEADING_REGEX = /^\s{0,3}#{2,6}\s+step\s+(\d+)(?:\s*[:-]\s*(.+?))?\s*$/i
@@ -242,6 +246,24 @@ export async function getActivePlaceholderWorkflowStepDetails(args: {
 	}
 }
 
+export async function buildPlaceholderWorkflowChecklist(args: {
+	source: ActivePlaceholderWorkflowSource
+	stablePlaceholderValues?: Record<string, string>
+	placeholderValues?: Record<string, string>
+}): Promise<string | undefined> {
+	const workflowContents = await getRenderedActivePlaceholderWorkflowSourceContents({
+		source: args.source,
+		stablePlaceholderValues: args.stablePlaceholderValues,
+		placeholderValues: args.placeholderValues,
+	})
+	const workflowSections = parseWorkflowStepSections(workflowContents, { includeEmptySections: true })
+	if (workflowSections.length === 0) {
+		return undefined
+	}
+
+	return workflowSections.map((section) => `- [ ] ${formatWorkflowStepChecklistLabel(section)}`).join("\n")
+}
+
 export async function getRenderedActivePlaceholderWorkflowSourceContents(args: {
 	source: ActivePlaceholderWorkflowSource
 	stablePlaceholderValues?: Record<string, string>
@@ -293,7 +315,10 @@ function parseChecklistLabel(label: string): ParsedChecklistItem {
 	}
 }
 
-function parseWorkflowStepSections(workflowMarkdown: string): ParsedWorkflowStepSection[] {
+function parseWorkflowStepSections(
+	workflowMarkdown: string,
+	options: ParseWorkflowStepSectionsOptions = {},
+): ParsedWorkflowStepSection[] {
 	const lines = workflowMarkdown.split(/\r?\n/)
 	const sections: ParsedWorkflowStepSection[] = []
 	let currentSection:
@@ -333,7 +358,7 @@ function parseWorkflowStepSections(workflowMarkdown: string): ParsedWorkflowStep
 		sections.push(finalizeWorkflowStepSection(currentSection))
 	}
 
-	return sections.filter((section) => section.details.length > 0)
+	return options.includeEmptySections ? sections : sections.filter((section) => section.details.length > 0)
 }
 
 function finalizeWorkflowStepSection(section: {
@@ -358,4 +383,13 @@ function normalizeTitle(value: string): string {
 		.replace(/[^a-z0-9]+/g, " ")
 		.trim()
 		.replace(/\s+/g, " ")
+}
+
+function formatWorkflowStepChecklistLabel(section: ParsedWorkflowStepSection): string {
+	if (section.stepNumber == null) {
+		return section.stepTitle
+	}
+
+	const defaultTitle = `Step ${section.stepNumber}`
+	return section.stepTitle === defaultTitle ? defaultTitle : `Step ${section.stepNumber}: ${section.stepTitle}`
 }

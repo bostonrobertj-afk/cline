@@ -891,6 +891,34 @@ describe("SubagentRunner", () => {
 		assert.deepEqual(state.activePlaceholderWorkflowValues, { review_focus: "security" })
 	})
 
+	it("seeds a placeholder checklist from step headings when auto-activating a subagent workflow", async () => {
+		const runner = new SubagentRunner(createTaskConfig(false))
+		const state = new TaskState()
+
+		await (runner as any).autoActivateAssignedWorkflow(
+			state,
+			["review-edge-case-hunter"],
+			[
+				{
+					name: "review-edge-case-hunter",
+					source: "remote",
+					description: "Remote workflow: review-edge-case-hunter",
+					fileName: "review-edge-case-hunter",
+					contents: `# Edge case review
+
+## Step 1: Gather Context
+Load the review target and confirm scope.
+
+## Step 2: Review
+Inspect reachable edge cases in the changed code.`,
+				},
+			],
+		)
+
+		assert.equal(state.activePlaceholderWorkflowId, "review-edge-case-hunter")
+		assert.equal(state.currentFocusChainChecklist, "- [ ] Step 1: Gather Context\n- [ ] Step 2: Review")
+	})
+
 	it("logs a warning when a configured skill is not available", async () => {
 		const createMessage = sinon.stub().callsFake(async function* () {
 			yield {

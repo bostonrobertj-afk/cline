@@ -676,6 +676,61 @@ describe("Managed workflow handlers", () => {
 		}
 	})
 
+	it("seeds a placeholder checklist through use_skill when the workflow exposes step headings", async () => {
+		const sandbox = sinon.createSandbox()
+		let tempDir: string | undefined
+		try {
+			tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "use-skill-local-checklist-"))
+			const workflowPath = path.join(tempDir, "local-review.md")
+			await fs.writeFile(
+				workflowPath,
+				`# Local review
+
+## Step 1: Gather Context
+Inspect the scoped story before asking follow-up questions.
+
+## Step 2: Review
+Inspect the prepared review input and write findings.`,
+				"utf8",
+			)
+			sandbox.stub(disk, "getTaskMetadata").resolves({} as any)
+			sandbox.stub(disk, "saveTaskMetadata").resolves()
+
+			const handler = new UseSkillToolHandler()
+			const config = createConfig({
+				services: {
+					stateManager: {
+						getGlobalStateKey: () => ({}),
+						getGlobalSettingsKey: (key: string) => (key === "globalWorkflowToggles" ? {} : undefined),
+						getWorkspaceStateKey: (key: string) => (key === "workflowToggles" ? { [workflowPath]: true } : undefined),
+						getRemoteConfigSettings: () => ({}),
+						getApiConfiguration: () => ({ planModeApiProvider: "openai", actModeApiProvider: "openai" }),
+					},
+				} as any,
+			})
+
+			await handler.execute(config, {
+				type: "tool_use",
+				name: "use_skill",
+				params: {
+					skill_name: "local-review.md",
+				},
+				partial: false,
+			} as any)
+
+			expect(
+				(config.callbacks.updateFCListFromToolResponse as sinon.SinonStub).calledOnceWithExactly(
+					"- [ ] Step 1: Gather Context\n- [ ] Step 2: Review",
+				),
+			).to.equal(true)
+		} finally {
+			sandbox.restore()
+			if (tempDir) {
+				await fs.rm(tempDir, { recursive: true, force: true })
+			}
+		}
+	})
+
 	it("computes stable placeholders for placeholder workflows through use_skill and persists them", async () => {
 		const sandbox = sinon.createSandbox()
 		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "use-skill-local-stable-"))
@@ -843,6 +898,7 @@ describe("Managed workflow handlers", () => {
 			config.taskState.activePlaceholderWorkflowValues = {
 				story_id: "1.2",
 			}
+			config.taskState.currentFocusChainChecklist = "- [ ] Existing checklist item"
 
 			const result = await handler.execute(config, {
 				type: "tool_use",
@@ -862,6 +918,7 @@ describe("Managed workflow handlers", () => {
 			expect(config.taskState.activePlaceholderWorkflowValues).to.deep.equal({
 				story_id: "1.2",
 			})
+			expect((config.callbacks.updateFCListFromToolResponse as sinon.SinonStub).called).to.equal(false)
 		} finally {
 			sandbox.restore()
 			if (tempDir) {

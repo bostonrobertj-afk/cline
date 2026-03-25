@@ -31,6 +31,7 @@ function createFakeTask(taskId: string) {
 		cwd: process.cwd(),
 		taskState: new TaskState(),
 		refreshManagedWorkflowChecklistProjection: sinon.stub().resolves(),
+		refreshPlaceholderWorkflowChecklistProjection: sinon.stub().resolves(),
 		clearManagedWorkflowChecklistProjection: sinon.stub().resolves(),
 		say: sinon.stub().resolves(undefined as unknown as ToolResponse),
 	}
@@ -275,6 +276,7 @@ Inspect the prepared review input and write findings.
 			)
 
 			expect(getMetadataStub.calledOnce).to.equal(true)
+			expect(fakeTask.refreshPlaceholderWorkflowChecklistProjection.calledOnceWith(true)).to.equal(true)
 			expect(fakeTask.taskState.activeAgentId).to.equal(undefined)
 			expect(fakeTask.taskState.activePlaceholderWorkflowId).to.equal("local-flow.md")
 			expect(fakeTask.taskState.activePlaceholderWorkflowSource).to.deep.equal({

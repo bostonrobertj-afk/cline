@@ -39,7 +39,10 @@ import {
 	saveTaskMetadata,
 } from "@core/storage/disk"
 import { releaseTaskLock } from "@core/task/TaskLockUtils"
-import { getRenderedActivePlaceholderWorkflowSourceContents } from "@core/workflows/placeholder-workflow-step-details"
+import {
+	buildPlaceholderWorkflowChecklist,
+	getRenderedActivePlaceholderWorkflowSourceContents,
+} from "@core/workflows/placeholder-workflow-step-details"
 import { createWorkflowSkillMetadata, resolveAvailableWorkflows } from "@core/workflows/resolution/resolveAvailableWorkflows"
 import { isMultiRootEnabled } from "@core/workspace/multi-root-utils"
 import { WorkspaceRootManager } from "@core/workspace/WorkspaceRootManager"
@@ -1039,6 +1042,9 @@ export class Task {
 				this.taskState.activePlaceholderWorkflowValues = undefined
 				this.taskState.activeWorkflowJustStarted = true
 			}
+			if (!activation || activation.workflowChanged || this.taskState.currentFocusChainChecklist == null) {
+				await this.refreshPlaceholderWorkflowChecklistProjection(!activation || activation.workflowChanged === true)
+			}
 		} else if (action.type === "activate_bmad_agent") {
 			const targetAgent = await getBmadAgentById(this.cwd, action.agentId)
 			if (this.taskState.managedWorkflowRun && targetAgent) {
@@ -1260,6 +1266,35 @@ export class Task {
 		}
 
 		this.taskState.currentFocusChainChecklist = renderManagedWorkflowTaskProgress(this.taskState.managedWorkflowRun)
+		this.taskState.todoListWasUpdatedByUser = false
+		this.taskState.apiRequestsSinceLastTodoUpdate = 0
+		await this.postStateToWebview()
+	}
+
+	private async refreshPlaceholderWorkflowChecklistProjection(force = false): Promise<void> {
+		if (!this.taskState.activePlaceholderWorkflowSource) {
+			return
+		}
+
+		if (this.FocusChainManager) {
+			await this.FocusChainManager.refreshPlaceholderWorkflowChecklistProjection(force)
+			return
+		}
+
+		if (!force && this.taskState.currentFocusChainChecklist) {
+			return
+		}
+
+		const checklist = await buildPlaceholderWorkflowChecklist({
+			source: this.taskState.activePlaceholderWorkflowSource,
+			stablePlaceholderValues: this.taskState.activePlaceholderWorkflowStableValues,
+			placeholderValues: this.taskState.activePlaceholderWorkflowValues,
+		})
+		if (!checklist) {
+			return
+		}
+
+		this.taskState.currentFocusChainChecklist = checklist
 		this.taskState.todoListWasUpdatedByUser = false
 		this.taskState.apiRequestsSinceLastTodoUpdate = 0
 		await this.postStateToWebview()

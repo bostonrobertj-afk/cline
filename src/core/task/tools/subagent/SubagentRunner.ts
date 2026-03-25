@@ -12,6 +12,7 @@ import {
 	getOwningBmadAgentForSkill,
 	resolvePlaceholderWorkflowManagedVariant,
 } from "@core/task/bmad-agent-mode"
+import { FocusChainManager } from "@core/task/focus-chain"
 import { getManagedWorkflowDefinition } from "@core/task/managed-workflows/ManagedWorkflowRegistry"
 import { buildManagedWorkflowPrompt } from "@core/task/managed-workflows/ManagedWorkflowRenderer"
 import { StreamResponseHandler } from "@core/task/StreamResponseHandler"
@@ -878,6 +879,24 @@ export class SubagentRunner {
 			workflow: resolvedWorkflow,
 			clearActiveWorkflowId: true,
 		})
+		await this.seedPlaceholderChecklistIfNeeded(state, true)
+	}
+
+	private async seedPlaceholderChecklistIfNeeded(state: TaskState, force = false): Promise<void> {
+		if (!state.activePlaceholderWorkflowSource) {
+			return
+		}
+
+		const focusChainManager = new FocusChainManager({
+			taskId: this.baseConfig.taskId,
+			taskState: state,
+			mode: this.baseConfig.mode,
+			stateManager: this.baseConfig.services.stateManager,
+			postStateToWebview: async () => undefined,
+			say: async () => undefined,
+			focusChainSettings: this.baseConfig.focusChainSettings,
+		})
+		await focusChainManager.refreshPlaceholderWorkflowChecklistProjection(force)
 	}
 
 	private mergePromptSkillEntries(skills: SkillMetadata[], workflows: SkillMetadata[]): SkillMetadata[] {
