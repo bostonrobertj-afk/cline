@@ -2412,13 +2412,15 @@ export class Task {
 		this.useNativeToolCalls = !!tools?.length
 		await this.writePromptMetadataArtifacts({ systemPrompt: effectiveSystemPrompt, providerInfo })
 
+		const taskDirectory = await ensureTaskDirectoryExists(this.taskId)
+		const apiConversationHistory = this.messageStateHandler.getApiConversationHistory()
 		const contextManagementMetadata = await this.contextManager.getNewContextMessagesAndMetadata(
-			this.messageStateHandler.getApiConversationHistory(),
+			apiConversationHistory,
 			this.messageStateHandler.getClineMessages(),
 			this.api,
 			this.taskState.conversationHistoryDeletedRange,
 			previousApiReqIndex,
-			await ensureTaskDirectoryExists(this.taskId),
+			taskDirectory,
 			this.stateManager.getGlobalSettingsKey("useAutoCondense") && isNextGenModelFamily(this.api.getModel().id),
 		)
 
@@ -2428,11 +2430,17 @@ export class Task {
 			// saves task history item which we use to keep track of conversation history deleted range
 		}
 
-		// Response API requires native tool calls to be enabled
-		const requestTokenEstimate = estimateRequestTokenUsage(
-			effectiveSystemPrompt,
-			contextManagementMetadata.truncatedConversationHistory,
+		let requestConversationHistory = contextManagementMetadata.truncatedConversationHistory
+		const alwaysOnDuplicateCompaction = await this.contextManager.applyAlwaysOnDuplicateFileCompaction(
+			apiConversationHistory,
+			this.taskState.conversationHistoryDeletedRange,
+			Date.now(),
+			taskDirectory,
 		)
+		requestConversationHistory = alwaysOnDuplicateCompaction.optimizedConversationHistory
+
+		// Response API requires native tool calls to be enabled
+		const requestTokenEstimate = estimateRequestTokenUsage(effectiveSystemPrompt, requestConversationHistory)
 		const tokenEstimateLogPayload = buildTokenEstimateLogPayload({
 			taskId: this.taskId,
 			ulid: this.ulid,
@@ -2443,11 +2451,7 @@ export class Task {
 		})
 		Logger.info(`[TokenEstimate] ${JSON.stringify(tokenEstimateLogPayload)}`)
 
-		const stream = this.api.createMessage(
-			effectiveSystemPrompt,
-			contextManagementMetadata.truncatedConversationHistory,
-			tools,
-		)
+		const stream = this.api.createMessage(effectiveSystemPrompt, requestConversationHistory, tools)
 
 		const iterator = stream[Symbol.asyncIterator]()
 

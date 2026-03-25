@@ -112,6 +112,26 @@ export class ContextManager {
 	}
 
 	/**
+	 * Normalize file paths tracked in context history so the same file is deduped consistently
+	 * across path separator variants and trailing slash differences.
+	 */
+	private normalizeTrackedFilePath(filePath: string): string {
+		const trimmed = filePath.trim()
+		if (trimmed.startsWith("\\\\?\\")) {
+			return trimmed
+		}
+
+		let normalized = path.normalize(trimmed).replace(/\\/g, "/")
+		if (normalized.length > 1 && normalized.endsWith("/")) {
+			normalized = normalized.slice(0, -1)
+		}
+		if (process.platform === "win32") {
+			normalized = normalized.toLowerCase()
+		}
+		return normalized
+	}
+
+	/**
 	 * public function for loading contextHistoryUpdates from disk, if it exists
 	 */
 	async initializeContextHistory(taskDirectory: string) {
@@ -625,19 +645,102 @@ export class ContextManager {
 		startFromIndex: number,
 		timestamp: number,
 	): [boolean, Set<number>] {
-		const [fileReadUpdatesBool, uniqueFileReadIndices] = this.findAndPotentiallySaveFileReadContextHistoryUpdates(
+		const [fileReadUpdatesBool, uniqueFileReadIndices] = this.applyDuplicateFileContextOptimizations(
 			apiMessages,
 			startFromIndex,
 			timestamp,
 		)
-		const [toolResultCompactionBool, compactedToolResultIndices] =
-			this.findAndPotentiallySaveLargeToolResultContextHistoryUpdates(apiMessages, startFromIndex, timestamp)
+		const [toolResultCompactionBool, compactedToolResultIndices] = this.applyLargeToolResultContextOptimizations(
+			apiMessages,
+			startFromIndex,
+			timestamp,
+		)
 
 		// true if any context optimization steps alter state
 		const contextHistoryUpdated = fileReadUpdatesBool || toolResultCompactionBool
 		const updatedIndices = new Set<number>([...uniqueFileReadIndices, ...compactedToolResultIndices])
 
 		return [contextHistoryUpdated, updatedIndices]
+	}
+
+	/**
+	 * Duplicate file-only compaction path used both by the token-pressure flow and the always-on request assembly flow.
+	 */
+	private applyDuplicateFileContextOptimizations(
+		apiMessages: Anthropic.Messages.MessageParam[],
+		startFromIndex: number,
+		timestamp: number,
+	): [boolean, Set<number>] {
+		return this.findAndPotentiallySaveFileReadContextHistoryUpdates(apiMessages, startFromIndex, timestamp)
+	}
+
+	/**
+	 * Large historical tool result compaction remains tied to the token-pressure flow.
+	 */
+	private applyLargeToolResultContextOptimizations(
+		apiMessages: Anthropic.Messages.MessageParam[],
+		startFromIndex: number,
+		timestamp: number,
+	): [boolean, Set<number>] {
+		return this.findAndPotentiallySaveLargeToolResultContextHistoryUpdates(apiMessages, startFromIndex, timestamp)
+	}
+
+	/**
+	 * Always-on duplicate file compaction over the full conversation history.
+	 * The caller must pass the untruncated API conversation history plus the current deleted range.
+	 * The returned conversation history is always rebuilt from that full history and deleted range.
+	 */
+	public applyAlwaysOnDuplicateFileCompactionInMemory(
+		fullApiConversationHistory: Anthropic.Messages.MessageParam[],
+		conversationHistoryDeletedRange: [number, number] | undefined,
+		timestamp: number,
+	): {
+		anyContextUpdates: boolean
+		optimizedConversationHistory: Anthropic.Messages.MessageParam[]
+	} {
+		const startIndex = conversationHistoryDeletedRange ? conversationHistoryDeletedRange[1] + 1 : 2
+		const [anyContextUpdates] = this.applyDuplicateFileContextOptimizations(fullApiConversationHistory, startIndex, timestamp)
+		const optimizedConversationHistory = this.getTruncatedMessages(
+			fullApiConversationHistory,
+			conversationHistoryDeletedRange,
+		)
+
+		if (!anyContextUpdates) {
+			return {
+				anyContextUpdates: false,
+				optimizedConversationHistory,
+			}
+		}
+
+		return {
+			anyContextUpdates: true,
+			optimizedConversationHistory,
+		}
+	}
+
+	/**
+	 * Always-on duplicate file compaction that persists history updates when needed.
+	 */
+	async applyAlwaysOnDuplicateFileCompaction(
+		apiConversationHistory: Anthropic.Messages.MessageParam[],
+		conversationHistoryDeletedRange: [number, number] | undefined,
+		timestamp: number,
+		taskDirectory: string,
+	): Promise<{
+		anyContextUpdates: boolean
+		optimizedConversationHistory: Anthropic.Messages.MessageParam[]
+	}> {
+		const result = this.applyAlwaysOnDuplicateFileCompactionInMemory(
+			apiConversationHistory,
+			conversationHistoryDeletedRange,
+			timestamp,
+		)
+
+		if (result.anyContextUpdates) {
+			await this.saveContextHistory(taskDirectory)
+		}
+
+		return result
 	}
 
 	/**
@@ -873,7 +976,9 @@ export class ContextManager {
 							// otherwise there are still file reads here we can overwrite, so still need to process this text chunk
 							// to do so we need to keep track of which files we've already replaced so we don't replace them again
 
-							thisExistingFileReads = blockUpdates[blockUpdates.length - 1][3][0]
+							thisExistingFileReads = blockUpdates[blockUpdates.length - 1][3][0].map((filePath) =>
+								this.normalizeTrackedFilePath(filePath),
+							)
 						}
 					} else {
 						// for all other cases we can assume that we dont need to check this again
@@ -981,10 +1086,11 @@ export class ContextManager {
 			foundMatch = true
 
 			const filePath = match[1]
-			filePaths.push(filePath) // we will record all unique paths from file mentions in this text
+			const normalizedFilePath = this.normalizeTrackedFilePath(filePath)
+			filePaths.push(normalizedFilePath) // we will record all unique paths from file mentions in this text
 
 			// we can assume that thisExistingFileReads does not have many entries
-			if (!thisExistingFileReads.includes(filePath)) {
+			if (!thisExistingFileReads.includes(normalizedFilePath)) {
 				// meaning we haven't already replaced this file read
 
 				const entireMatch = match[0] // The entire matched string
@@ -992,10 +1098,10 @@ export class ContextManager {
 				// Create the replacement text - keep the tags but replace the content
 				const replacementText = `<file_content path="${filePath}">${formatResponse.duplicateFileReadNotice()}</file_content>`
 
-				const indices = fileReadIndices.get(filePath) || []
+				const indices = fileReadIndices.get(normalizedFilePath) || []
 				// use the actual inner index where file mentions were found
 				indices.push([i, EditType.FILE_MENTION, entireMatch, replacementText, innerIndex])
-				fileReadIndices.set(filePath, indices)
+				fileReadIndices.set(normalizedFilePath, indices)
 			}
 		}
 
@@ -1035,7 +1141,8 @@ export class ContextManager {
 		contentBlockIndex: number,
 		headerText: string,
 	) {
-		const indices = fileReadIndices.get(filePath) || []
+		const normalizedFilePath = this.normalizeTrackedFilePath(filePath)
+		const indices = fileReadIndices.get(normalizedFilePath) || []
 
 		if (contentBlockIndex === 1) {
 			// the original tool call format
@@ -1053,7 +1160,7 @@ export class ContextManager {
 			])
 		}
 
-		fileReadIndices.set(filePath, indices)
+		fileReadIndices.set(normalizedFilePath, indices)
 	}
 
 	/**
@@ -1071,9 +1178,10 @@ export class ContextManager {
 		// check if this exists in the text, it won't exist if the user rejects the file change for example
 		if (pattern.test(blockText)) {
 			const replacementText = blockText.replace(pattern, `$1 ${formatResponse.duplicateFileReadNotice()} $2`)
-			const indices = fileReadIndices.get(filePath) || []
+			const normalizedFilePath = this.normalizeTrackedFilePath(filePath)
+			const indices = fileReadIndices.get(normalizedFilePath) || []
 			indices.push([i, EditType.ALTER_FILE_TOOL, "", replacementText, contentBlockIndex])
-			fileReadIndices.set(filePath, indices)
+			fileReadIndices.set(normalizedFilePath, indices)
 		}
 	}
 
@@ -1118,7 +1226,9 @@ export class ContextManager {
 								const blockUpdates = innerTuple[1].get(innerIndex)
 								if (blockUpdates && blockUpdates.length > 0) {
 									baseText = blockUpdates[blockUpdates.length - 1][2][0] // index 0 of MessageContent
-									prevFilesReplaced = blockUpdates[blockUpdates.length - 1][3][0] // previously overwritten file reads in this text
+									prevFilesReplaced = blockUpdates[blockUpdates.length - 1][3][0].map((filePath) =>
+										this.normalizeTrackedFilePath(filePath),
+									) // previously overwritten file reads in this text
 								}
 							}
 
@@ -1198,7 +1308,15 @@ export class ContextManager {
 				if (allFileReads) {
 					// we gather all the file reads possible in this text from messageFilePaths
 					// filePathsUpdated from fileMentionUpdates stores all the files reads we have replaced now & previously
-					updates.push([timestamp, "text", [updatedText], [filePathsUpdated, allFileReads]])
+					updates.push([
+						timestamp,
+						"text",
+						[updatedText],
+						[
+							filePathsUpdated.map((filePath) => this.normalizeTrackedFilePath(filePath)),
+							allFileReads.map((filePath) => this.normalizeTrackedFilePath(filePath)),
+						],
+					])
 					innerMap.set(blockIndex, updates)
 				}
 			}

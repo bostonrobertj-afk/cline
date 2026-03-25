@@ -356,6 +356,259 @@ describe("ContextManager", () => {
 		})
 	})
 
+	describe("applyAlwaysOnDuplicateFileCompactionInMemory", () => {
+		let contextManager: ContextManager
+
+		beforeEach(() => {
+			contextManager = new ContextManager()
+		})
+
+		function createReadFileMessage(path: string, content: string): Anthropic.Messages.MessageParam {
+			return {
+				role: "user",
+				content: [
+					{
+						type: "text",
+						text: `[read_file for '${path}'] Result:\n${content}`,
+					},
+				],
+			}
+		}
+
+		function createFileContentMessage(path: string, content: string): Anthropic.Messages.MessageParam {
+			return {
+				role: "user",
+				content: [
+					{
+						type: "text",
+						text: `[TASK RESUMPTION] This task was interrupted just now. The conversation may have been incomplete.`,
+					},
+					{
+						type: "text",
+						text: `New message to respond to:\n<user_message>\n'${path}' (see below for file content)\n</user_message>\n\n<file_content path="${path}">\n${content}\n\n</file_content>`,
+					},
+				],
+			}
+		}
+
+		function createFinalFileContentMessage(
+			path: string,
+			content: string,
+			toolName: "write_to_file" | "replace_in_file" = "write_to_file",
+		): Anthropic.Messages.MessageParam {
+			return {
+				role: "user",
+				content: [
+					{
+						type: "text",
+						text: `[${toolName} for '${path}'] Result:\nThe content was successfully saved.\n\n<final_file_content path="${path}">\n${content}\n\n</final_file_content>`,
+					},
+				],
+			}
+		}
+
+		it("compacts the older of two duplicate read_file results and keeps the newest one intact", () => {
+			const messages: Anthropic.Messages.MessageParam[] = [
+				{ role: "user", content: "Initial task" },
+				{ role: "assistant", content: "Response" },
+				createReadFileMessage("src/app.ts", "alpha contents"),
+				{ role: "assistant", content: "Response" },
+				createReadFileMessage("src/app.ts", "beta contents"),
+			]
+
+			const result = contextManager.applyAlwaysOnDuplicateFileCompactionInMemory(messages, undefined, Date.now())
+
+			expect(result.anyContextUpdates).to.equal(true)
+
+			const olderMessageText = (
+				result.optimizedConversationHistory[2].content as Anthropic.Messages.ContentBlockParam[]
+			)[0] as Anthropic.Messages.TextBlockParam
+			const newestMessageText = (
+				result.optimizedConversationHistory[4].content as Anthropic.Messages.ContentBlockParam[]
+			)[0] as Anthropic.Messages.TextBlockParam
+
+			expect(olderMessageText.text).to.contain("This file read has been removed")
+			expect(olderMessageText.text).to.not.contain("alpha contents")
+			expect(newestMessageText.text).to.contain("beta contents")
+
+			const replayed = contextManager.getTruncatedMessages(messages, undefined)
+			expect(replayed[2]).to.deep.equal(result.optimizedConversationHistory[2])
+		})
+
+		it("compacts all older duplicate read_file results and leaves the latest read intact", () => {
+			const messages: Anthropic.Messages.MessageParam[] = [
+				{ role: "user", content: "Initial task" },
+				{ role: "assistant", content: "Response" },
+				createReadFileMessage("src/config.ts", "first contents"),
+				{ role: "assistant", content: "Response" },
+				createReadFileMessage("src/config.ts", "second contents"),
+				{ role: "assistant", content: "Response" },
+				createReadFileMessage("src/config.ts", "third contents"),
+			]
+
+			const result = contextManager.applyAlwaysOnDuplicateFileCompactionInMemory(messages, undefined, Date.now())
+
+			expect(result.anyContextUpdates).to.equal(true)
+
+			const firstMessageText = (
+				result.optimizedConversationHistory[2].content as Anthropic.Messages.ContentBlockParam[]
+			)[0] as Anthropic.Messages.TextBlockParam
+			const secondMessageText = (
+				result.optimizedConversationHistory[4].content as Anthropic.Messages.ContentBlockParam[]
+			)[0] as Anthropic.Messages.TextBlockParam
+			const newestMessageText = (
+				result.optimizedConversationHistory[6].content as Anthropic.Messages.ContentBlockParam[]
+			)[0] as Anthropic.Messages.TextBlockParam
+
+			expect(firstMessageText.text).to.contain("This file read has been removed")
+			expect(secondMessageText.text).to.contain("This file read has been removed")
+			expect(newestMessageText.text).to.contain("third contents")
+		})
+
+		it("does not compact when duplicate file paths are not present", () => {
+			const messages: Anthropic.Messages.MessageParam[] = [
+				{ role: "user", content: "Initial task" },
+				{ role: "assistant", content: "Response" },
+				createReadFileMessage("src/alpha.ts", "alpha contents"),
+				{ role: "assistant", content: "Response" },
+				createReadFileMessage("src/beta.ts", "beta contents"),
+			]
+
+			const result = contextManager.applyAlwaysOnDuplicateFileCompactionInMemory(messages, undefined, Date.now())
+
+			expect(result.anyContextUpdates).to.equal(false)
+			expect(result.optimizedConversationHistory).to.deep.equal(messages)
+		})
+
+		it("compacts older duplicate <file_content> mentions and leaves the latest mention intact", () => {
+			const messages: Anthropic.Messages.MessageParam[] = [
+				{ role: "user", content: "Initial task" },
+				{ role: "assistant", content: "Response" },
+				createFileContentMessage("docs/spec.md", "old spec contents"),
+				{ role: "assistant", content: "Response" },
+				createFileContentMessage("docs/spec.md", "new spec contents"),
+			]
+
+			const result = contextManager.applyAlwaysOnDuplicateFileCompactionInMemory(messages, undefined, Date.now())
+
+			expect(result.anyContextUpdates).to.equal(true)
+
+			const olderBlockText = (
+				result.optimizedConversationHistory[2].content as Anthropic.Messages.ContentBlockParam[]
+			)[1] as Anthropic.Messages.TextBlockParam
+			const newerBlockText = (
+				result.optimizedConversationHistory[4].content as Anthropic.Messages.ContentBlockParam[]
+			)[1] as Anthropic.Messages.TextBlockParam
+
+			expect(olderBlockText.text).to.contain("This file read has been removed")
+			expect(olderBlockText.text).to.contain('<file_content path="docs/spec.md">')
+			expect(newerBlockText.text).to.contain("new spec contents")
+		})
+
+		it("compacts older duplicate final file snapshots and keeps the newest snapshot intact", () => {
+			const messages: Anthropic.Messages.MessageParam[] = [
+				{ role: "user", content: "Initial task" },
+				{ role: "assistant", content: "Response" },
+				createFinalFileContentMessage("src/output.txt", "old final contents", "write_to_file"),
+				{ role: "assistant", content: "Response" },
+				createFinalFileContentMessage("src/output.txt", "new final contents", "replace_in_file"),
+			]
+
+			const result = contextManager.applyAlwaysOnDuplicateFileCompactionInMemory(messages, undefined, Date.now())
+
+			expect(result.anyContextUpdates).to.equal(true)
+
+			const olderText = (
+				result.optimizedConversationHistory[2].content as Anthropic.Messages.ContentBlockParam[]
+			)[0] as Anthropic.Messages.TextBlockParam
+			const newerText = (
+				result.optimizedConversationHistory[4].content as Anthropic.Messages.ContentBlockParam[]
+			)[0] as Anthropic.Messages.TextBlockParam
+
+			expect(olderText.text).to.contain("This file read has been removed")
+			expect(olderText.text).to.contain('<final_file_content path="src/output.txt">')
+			expect(newerText.text).to.contain("new final contents")
+		})
+
+		it("does not compact large search tool results in the always-on file-only path", () => {
+			const hugeSearchOutput = "match\n".repeat(1200)
+			const messages: Anthropic.Messages.MessageParam[] = [
+				{ role: "user", content: "Initial task" },
+				{ role: "assistant", content: "Response" },
+				{
+					role: "user",
+					content: [
+						{
+							type: "text",
+							text: `[search_files for 'TODO'] Result:\n${hugeSearchOutput}`,
+						},
+					],
+				},
+			]
+
+			const result = contextManager.applyAlwaysOnDuplicateFileCompactionInMemory(messages, undefined, Date.now())
+
+			expect(result.anyContextUpdates).to.equal(false)
+			expect(result.optimizedConversationHistory).to.deep.equal(messages)
+		})
+
+		it("compacts duplicate read_file results correctly when a deleted range already exists", () => {
+			const messages: Anthropic.Messages.MessageParam[] = [
+				{ role: "user", content: "Initial task" },
+				{ role: "assistant", content: "Response" },
+				{ role: "user", content: "Truncated user message" },
+				{ role: "assistant", content: "Truncated assistant message" },
+				createReadFileMessage("src/truncated.ts", "older duplicate contents"),
+				{ role: "assistant", content: "Response" },
+				createReadFileMessage("src/truncated.ts", "latest duplicate contents"),
+				{ role: "assistant", content: "Response" },
+			]
+
+			const result = contextManager.applyAlwaysOnDuplicateFileCompactionInMemory(messages, [2, 3], Date.now())
+
+			expect(result.anyContextUpdates).to.equal(true)
+			expect(result.optimizedConversationHistory).to.have.lengthOf(6)
+
+			const olderMessageText = (
+				result.optimizedConversationHistory[2].content as Anthropic.Messages.ContentBlockParam[]
+			)[0] as Anthropic.Messages.TextBlockParam
+			const newestMessageText = (
+				result.optimizedConversationHistory[4].content as Anthropic.Messages.ContentBlockParam[]
+			)[0] as Anthropic.Messages.TextBlockParam
+
+			expect(olderMessageText.text).to.contain("This file read has been removed")
+			expect(newestMessageText.text).to.contain("latest duplicate contents")
+		})
+
+		it("compacts duplicate file-content mentions correctly when a deleted range already exists", () => {
+			const messages: Anthropic.Messages.MessageParam[] = [
+				{ role: "user", content: "Initial task" },
+				{ role: "assistant", content: "Response" },
+				{ role: "user", content: "Truncated user message" },
+				{ role: "assistant", content: "Truncated assistant message" },
+				createFileContentMessage("docs/guide.md", "older guide contents"),
+				{ role: "assistant", content: "Response" },
+				createFileContentMessage("docs/guide.md", "latest guide contents"),
+				{ role: "assistant", content: "Response" },
+			]
+
+			const result = contextManager.applyAlwaysOnDuplicateFileCompactionInMemory(messages, [2, 3], Date.now())
+
+			expect(result.anyContextUpdates).to.equal(true)
+			expect(result.optimizedConversationHistory).to.have.lengthOf(6)
+
+			const olderBlockText = (
+				result.optimizedConversationHistory[2].content as Anthropic.Messages.ContentBlockParam[]
+			)[1] as Anthropic.Messages.TextBlockParam
+			const newestBlockText = (
+				result.optimizedConversationHistory[4].content as Anthropic.Messages.ContentBlockParam[]
+			)[1] as Anthropic.Messages.TextBlockParam
+
+			expect(olderBlockText.text).to.contain("This file read has been removed")
+			expect(newestBlockText.text).to.contain("latest guide contents")
+		})
+	})
+
 	describe("getTruncatedMessages", () => {
 		let contextManager: ContextManager
 
