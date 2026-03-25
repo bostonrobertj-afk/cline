@@ -487,6 +487,9 @@ export class FocusChainManager {
 	public shouldIncludeFocusChainInstructions(): boolean {
 		// Always include when in Plan mode
 		const inPlanMode = this.stateManager.getGlobalSettingsKey("mode") === "plan"
+		// Always include when a placeholder workflow is active so the checklist and current-step details
+		// remain present on every turn after activation.
+		const placeholderWorkflowActive = !!this.taskState.activePlaceholderWorkflowSource
 		// Always include when switching from Plan > Act
 		const justSwitchedFromPlanMode = this.taskState.didRespondToPlanAskBySwitchingMode
 		// Always include when user had edited the list manually
@@ -501,6 +504,7 @@ export class FocusChainManager {
 			!this.taskState.currentFocusChainChecklist && this.taskState.apiRequestCount >= 2
 
 		const shouldInclude =
+			placeholderWorkflowActive ||
 			reachedReminderInterval ||
 			justSwitchedFromPlanMode ||
 			userUpdatedList ||

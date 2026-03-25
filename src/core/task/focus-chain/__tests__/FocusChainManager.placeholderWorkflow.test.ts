@@ -254,6 +254,23 @@ Determine what to review from the user's prompt before asking follow-up question
 		}
 	})
 
+	it("always includes focus chain instructions when a placeholder workflow is active", () => {
+		const taskState = new TaskState()
+		taskState.activePlaceholderWorkflowId = "local-review.md"
+		taskState.activePlaceholderWorkflowSource = {
+			type: "remote",
+			name: "local-review.md",
+			contents: "## Step 1: Gather Context\nDo the work.",
+		}
+		taskState.currentFocusChainChecklist = "- [ ] Step 1: Gather Context"
+		taskState.apiRequestCount = 3
+		taskState.apiRequestsSinceLastTodoUpdate = 0
+
+		const manager = new FocusChainManager(createDependencies(taskState))
+
+		expect(manager.shouldIncludeFocusChainInstructions()).to.equal(true)
+	})
+
 	it("keeps the managed workflow branch unchanged", async () => {
 		const taskState = new TaskState()
 		taskState.managedWorkflowRun = {
