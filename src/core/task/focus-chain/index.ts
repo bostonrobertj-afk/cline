@@ -357,6 +357,8 @@ export class FocusChainManager {
 
 			return this.joinPromptSections(
 				"### Reminder: Detailed instructions are automatically sent for the first incomplete task in your task list. Failure to maintain your task list can lead to old instructions persisting, and prevent you from seeing the details for the step you're currently on. To update your task list, include the full current checklist as task_progress on your next tool call. Keep the step labels and order, and change only completed items from - [ ] to - [x].",
+				listCurrentProgress,
+				this.renderChecklistForPrompt(currentChecklist),
 				userUpdatedWarning,
 				[
 					"# CURRENT WORKFLOW STEP",

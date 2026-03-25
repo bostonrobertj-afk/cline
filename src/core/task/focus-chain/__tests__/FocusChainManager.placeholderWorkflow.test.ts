@@ -63,7 +63,7 @@ Inspect the prepared review input and write findings.
 			expect(prompt).to.contain("Keep the same step labels in the same order.")
 			expect(prompt).to.contain("Change only this completed step from `- [ ]` to `- [x]`")
 			expect(prompt).to.contain("Do not resend the same unchanged all-unchecked checklist")
-			expect(prompt).to.match(/^# TODO LIST UPDATE SUGGESTED/m)
+			expect(prompt).to.match(/^### Reminder:/m)
 			expect(prompt).to.contain("```text")
 			expect(prompt).to.match(/^- \[ \] Step 1: Gather Context/m)
 			expect(prompt).to.match(/^# CURRENT WORKFLOW STEP/m)
