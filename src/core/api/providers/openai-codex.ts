@@ -1,5 +1,5 @@
 import { ModelInfo, OpenAiCodexModelId, openAiCodexDefaultModelId, openAiCodexModels } from "@shared/api"
-import { normalizeOpenaiReasoningEffort } from "@shared/storage/types"
+import { normalizeOpenaiReasoningEffort, normalizeOpenaiReasoningSummary } from "@shared/storage/types"
 import OpenAI from "openai"
 import type { ChatCompletionTool } from "openai/resources/chat/completions"
 import * as os from "os"
@@ -26,6 +26,7 @@ const CODEX_RESPONSES_WEBSOCKET_URL = "wss://chatgpt.com/backend-api/codex/respo
 
 interface OpenAiCodexHandlerOptions extends CommonApiHandlerOptions {
 	reasoningEffort?: string
+	reasoningSummary?: string
 	apiModelId?: string
 }
 
@@ -164,6 +165,7 @@ export class OpenAiCodexHandler implements ApiHandler {
 	): any {
 		// Determine reasoning effort
 		const reasoningEffort = normalizeOpenaiReasoningEffort(this.options.reasoningEffort)
+		const reasoningSummary = normalizeOpenaiReasoningSummary(this.options.reasoningSummary)
 		const includeReasoning = reasoningEffort !== "none"
 
 		const body: any = {
@@ -178,7 +180,7 @@ export class OpenAiCodexHandler implements ApiHandler {
 				? {
 						reasoning: {
 							effort: reasoningEffort,
-							summary: "auto",
+							...(reasoningSummary !== "none" ? { summary: reasoningSummary } : {}),
 						},
 					}
 				: {}),

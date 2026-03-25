@@ -147,6 +147,7 @@ function createHandlerForProvider(
 				openAiModelId: mode === "plan" ? options.planModeOpenAiModelId : options.actModeOpenAiModelId,
 				openAiModelInfo: mode === "plan" ? options.planModeOpenAiModelInfo : options.actModeOpenAiModelInfo,
 				reasoningEffort: mode === "plan" ? options.planModeReasoningEffort : options.actModeReasoningEffort,
+				reasoningSummary: mode === "plan" ? options.planModeReasoningSummary : options.actModeReasoningSummary,
 			})
 		case "ollama":
 			return new OllamaHandler({
@@ -182,6 +183,7 @@ function createHandlerForProvider(
 				onRetryAttempt: options.onRetryAttempt,
 				openAiNativeApiKey: options.openAiNativeApiKey,
 				reasoningEffort: mode === "plan" ? options.planModeReasoningEffort : options.actModeReasoningEffort,
+				reasoningSummary: mode === "plan" ? options.planModeReasoningSummary : options.actModeReasoningSummary,
 				apiModelId: mode === "plan" ? options.planModeApiModelId : options.actModeApiModelId,
 				thinkingBudgetTokens:
 					mode === "plan" ? options.planModeThinkingBudgetTokens : options.actModeThinkingBudgetTokens,
@@ -190,6 +192,7 @@ function createHandlerForProvider(
 			return new OpenAiCodexHandler({
 				onRetryAttempt: options.onRetryAttempt,
 				reasoningEffort: mode === "plan" ? options.planModeReasoningEffort : options.actModeReasoningEffort,
+				reasoningSummary: mode === "plan" ? options.planModeReasoningSummary : options.actModeReasoningSummary,
 				apiModelId: mode === "plan" ? options.planModeApiModelId : options.actModeApiModelId,
 			})
 		case "deepseek":

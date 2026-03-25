@@ -22,6 +22,7 @@ describe("OpenAiNativeHandler", () => {
 
 		const params = (handler as any).buildResponseCreateParams({
 			modelId: "gpt-5.4-2026-03-05",
+			modelInfo: handler.getModel().info,
 			systemPrompt: "system",
 			input: [],
 			tools: [],
@@ -31,6 +32,63 @@ describe("OpenAiNativeHandler", () => {
 
 		params.store.should.equal(true)
 		params.previous_response_id.should.equal("resp_123")
+		params.context_management.should.deepEqual([{ type: "compaction", compact_threshold: 200000 }])
+	})
+
+	it("should add server-side compaction to native GPT-5 Responses requests with a scaled threshold", () => {
+		const handler = new OpenAiNativeHandler({
+			openAiNativeApiKey: "test-api-key",
+			apiModelId: "gpt-5.4-mini-2026-03-17",
+		})
+
+		const params = (handler as any).buildResponseCreateParams({
+			modelId: "gpt-5.4-mini-2026-03-17",
+			modelInfo: handler.getModel().info,
+			systemPrompt: "system",
+			input: [],
+			tools: [],
+			store: true,
+		})
+
+		params.context_management.should.deepEqual([{ type: "compaction", compact_threshold: 200000 }])
+	})
+
+	it("should honor configured reasoning summary for Responses requests", () => {
+		const handler = new OpenAiNativeHandler({
+			openAiNativeApiKey: "test-api-key",
+			apiModelId: "gpt-5.4-mini-2026-03-17",
+			reasoningSummary: "concise",
+		})
+
+		const params = (handler as any).buildResponseCreateParams({
+			modelId: "gpt-5.4-mini-2026-03-17",
+			modelInfo: handler.getModel().info,
+			systemPrompt: "system",
+			input: [],
+			tools: [],
+			store: true,
+		})
+
+		params.reasoning.should.deepEqual({ effort: "medium", summary: "concise" })
+	})
+
+	it("should omit reasoning summary when configured as none", () => {
+		const handler = new OpenAiNativeHandler({
+			openAiNativeApiKey: "test-api-key",
+			apiModelId: "gpt-5.4-mini-2026-03-17",
+			reasoningSummary: "none",
+		})
+
+		const params = (handler as any).buildResponseCreateParams({
+			modelId: "gpt-5.4-mini-2026-03-17",
+			modelInfo: handler.getModel().info,
+			systemPrompt: "system",
+			input: [],
+			tools: [],
+			store: true,
+		})
+
+		params.reasoning.should.deepEqual({ effort: "medium" })
 	})
 
 	it("should retry with full context when OpenAI reports a missing stored item", () => {

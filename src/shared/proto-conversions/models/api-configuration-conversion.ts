@@ -16,7 +16,7 @@ import {
 	ModelInfo,
 	OcaModelInfo,
 } from "../../api"
-import { OpenaiReasoningEffort } from "../../storage/types"
+import { OpenaiReasoningEffort, OpenaiReasoningSummary } from "../../storage/types"
 
 // Convert application ThinkingConfig to proto ThinkingConfig
 function convertThinkingConfigToProto(config: ModelInfo["thinkingConfig"]): ThinkingConfig | undefined {
@@ -521,6 +521,7 @@ export function convertApiConfigurationToProto(config: ApiConfiguration): ProtoA
 		planModeThinkingBudgetTokens: config.planModeThinkingBudgetTokens,
 		geminiPlanModeThinkingLevel: config.geminiPlanModeThinkingLevel,
 		planModeReasoningEffort: config.planModeReasoningEffort,
+		planModeReasoningSummary: config.planModeReasoningSummary,
 		planModeVsCodeLmModelSelector: config.planModeVsCodeLmModelSelector,
 		planModeAwsBedrockCustomSelected: config.planModeAwsBedrockCustomSelected,
 		planModeAwsBedrockCustomModelBaseId: config.planModeAwsBedrockCustomModelBaseId as string | undefined,
@@ -565,6 +566,7 @@ export function convertApiConfigurationToProto(config: ApiConfiguration): ProtoA
 		actModeThinkingBudgetTokens: config.actModeThinkingBudgetTokens,
 		geminiActModeThinkingLevel: config.geminiActModeThinkingLevel,
 		actModeReasoningEffort: config.actModeReasoningEffort,
+		actModeReasoningSummary: config.actModeReasoningSummary,
 		actModeVsCodeLmModelSelector: config.actModeVsCodeLmModelSelector,
 		actModeAwsBedrockCustomSelected: config.actModeAwsBedrockCustomSelected,
 		actModeAwsBedrockCustomModelBaseId: config.actModeAwsBedrockCustomModelBaseId as string | undefined,
@@ -704,6 +706,7 @@ export function convertProtoToApiConfiguration(protoConfig: ProtoApiConfiguratio
 		planModeThinkingBudgetTokens: protoConfig.planModeThinkingBudgetTokens,
 		geminiPlanModeThinkingLevel: protoConfig.geminiPlanModeThinkingLevel,
 		planModeReasoningEffort: protoConfig.planModeReasoningEffort as OpenaiReasoningEffort | undefined,
+		planModeReasoningSummary: protoConfig.planModeReasoningSummary as OpenaiReasoningSummary | undefined,
 		planModeVsCodeLmModelSelector: protoConfig.planModeVsCodeLmModelSelector,
 		planModeAwsBedrockCustomSelected: protoConfig.planModeAwsBedrockCustomSelected,
 		planModeAwsBedrockCustomModelBaseId: protoConfig.planModeAwsBedrockCustomModelBaseId as BedrockModelId | undefined,
@@ -749,6 +752,7 @@ export function convertProtoToApiConfiguration(protoConfig: ProtoApiConfiguratio
 		actModeThinkingBudgetTokens: protoConfig.actModeThinkingBudgetTokens,
 		geminiActModeThinkingLevel: protoConfig.geminiActModeThinkingLevel,
 		actModeReasoningEffort: protoConfig.actModeReasoningEffort as OpenaiReasoningEffort | undefined,
+		actModeReasoningSummary: protoConfig.actModeReasoningSummary as OpenaiReasoningSummary | undefined,
 		actModeVsCodeLmModelSelector: protoConfig.actModeVsCodeLmModelSelector,
 		actModeAwsBedrockCustomSelected: protoConfig.actModeAwsBedrockCustomSelected,
 		actModeAwsBedrockCustomModelBaseId: protoConfig.actModeAwsBedrockCustomModelBaseId as BedrockModelId | undefined,

@@ -254,6 +254,7 @@ message ModelsApiOptions {
   optional string plan_mode_api_model_id = 101;
   optional int64 plan_mode_thinking_budget_tokens = 102;
   optional string plan_mode_reasoning_effort = 103;
+  optional string plan_mode_reasoning_summary = 237;
   optional LanguageModelChatSelector plan_mode_vs_code_lm_model_selector = 104;
   optional bool plan_mode_aws_bedrock_custom_selected = 105;
   optional string plan_mode_aws_bedrock_custom_model_base_id = 106;
@@ -293,6 +294,7 @@ message ModelsApiOptions {
   optional string act_mode_api_model_id = 201;
   optional int64 act_mode_thinking_budget_tokens = 202;
   optional string act_mode_reasoning_effort = 203;
+  optional string act_mode_reasoning_summary = 238;
   optional LanguageModelChatSelector act_mode_vs_code_lm_model_selector = 204;
   optional bool act_mode_aws_bedrock_custom_selected = 205;
   optional string act_mode_aws_bedrock_custom_model_base_id = 206;
@@ -606,6 +608,7 @@ message ModelsApiConfiguration {
   optional string plan_mode_api_model_id = 101;
   optional int64 plan_mode_thinking_budget_tokens = 102;
   optional string plan_mode_reasoning_effort = 103;
+  optional string plan_mode_reasoning_summary = 242;
   optional LanguageModelChatSelector plan_mode_vs_code_lm_model_selector = 104;
   optional bool plan_mode_aws_bedrock_custom_selected = 105;
   optional string plan_mode_aws_bedrock_custom_model_base_id = 106;
@@ -650,6 +653,7 @@ message ModelsApiConfiguration {
   optional string act_mode_api_model_id = 201;
   optional int64 act_mode_thinking_budget_tokens = 202;
   optional string act_mode_reasoning_effort = 203;
+  optional string act_mode_reasoning_summary = 243;
   optional LanguageModelChatSelector act_mode_vs_code_lm_model_selector = 204;
   optional bool act_mode_aws_bedrock_custom_selected = 205;
   optional string act_mode_aws_bedrock_custom_model_base_id = 206;

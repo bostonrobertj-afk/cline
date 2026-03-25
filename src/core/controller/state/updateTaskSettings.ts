@@ -4,6 +4,7 @@ import { convertProtoToApiProvider } from "@shared/proto-conversions/models/api-
 import { Mode } from "@/shared/storage/types"
 import { Controller } from ".."
 import { normalizeOpenaiReasoningEffort } from "./reasoningEffort"
+import { normalizeOpenaiReasoningSummary } from "./reasoningSummary"
 
 /**
  * Updates task-specific settings for the current task
@@ -36,6 +37,8 @@ export async function updateTaskSettings(controller: Controller, request: Update
 				autoApprovalSettings,
 				planModeReasoningEffort,
 				actModeReasoningEffort,
+				planModeReasoningSummary,
+				actModeReasoningSummary,
 				mode,
 				customPrompt,
 				planModeApiProvider,
@@ -80,6 +83,16 @@ export async function updateTaskSettings(controller: Controller, request: Update
 			if (actModeReasoningEffort !== undefined) {
 				const converted = normalizeOpenaiReasoningEffort(actModeReasoningEffort)
 				controller.stateManager.setTaskSettings(taskId, "actModeReasoningEffort", converted)
+			}
+
+			if (planModeReasoningSummary !== undefined) {
+				const converted = normalizeOpenaiReasoningSummary(planModeReasoningSummary)
+				controller.stateManager.setTaskSettings(taskId, "planModeReasoningSummary", converted)
+			}
+
+			if (actModeReasoningSummary !== undefined) {
+				const converted = normalizeOpenaiReasoningSummary(actModeReasoningSummary)
+				controller.stateManager.setTaskSettings(taskId, "actModeReasoningSummary", converted)
 			}
 
 			if (mode !== undefined) {

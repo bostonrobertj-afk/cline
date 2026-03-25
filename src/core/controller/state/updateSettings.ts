@@ -2,7 +2,7 @@ import { buildApiHandler } from "@core/api"
 import { Empty } from "@shared/proto/cline/common"
 import { PlanActMode, McpDisplayMode as ProtoMcpDisplayMode, UpdateSettingsRequest } from "@shared/proto/cline/state"
 import { convertProtoToApiProvider } from "@shared/proto-conversions/models/api-configuration-conversion"
-import { OpenaiReasoningEffort } from "@shared/storage/types"
+import { OpenaiReasoningEffort, OpenaiReasoningSummary } from "@shared/storage/types"
 import { TelemetrySetting } from "@shared/TelemetrySetting"
 import { ClineEnv } from "@/config"
 import { fetchRemoteConfig } from "@/core/storage/remote-config/fetch"
@@ -43,6 +43,8 @@ export async function updateSettings(controller: Controller, request: UpdateSett
 					: undefined,
 				planModeReasoningEffort: protoApiConfiguration.planModeReasoningEffort as OpenaiReasoningEffort | undefined,
 				actModeReasoningEffort: protoApiConfiguration.actModeReasoningEffort as OpenaiReasoningEffort | undefined,
+				planModeReasoningSummary: protoApiConfiguration.planModeReasoningSummary as OpenaiReasoningSummary | undefined,
+				actModeReasoningSummary: protoApiConfiguration.actModeReasoningSummary as OpenaiReasoningSummary | undefined,
 			}
 
 			controller.stateManager.setApiConfiguration(convertedApiConfigurationFromProto)

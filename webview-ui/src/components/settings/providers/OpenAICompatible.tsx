@@ -13,6 +13,7 @@ import { BaseUrlField } from "../common/BaseUrlField"
 import { DebouncedTextField } from "../common/DebouncedTextField"
 import { ModelInfoView } from "../common/ModelInfoView"
 import ReasoningEffortSelector from "../ReasoningEffortSelector"
+import ReasoningSummarySelector from "../ReasoningSummarySelector"
 import { parsePrice } from "../utils/pricingUtils"
 import { getModeSpecificFields, normalizeApiConfiguration, supportsReasoningEffortForModelId } from "../utils/providerUtils"
 import { useApiConfigurationHandlers } from "../utils/useApiConfigurationHandlers"
@@ -406,6 +407,7 @@ export const OpenAICompatibleProvider = ({ showModelOptions, isPopup, currentMod
 			{showModelOptions && (
 				<>
 					{showReasoningEffort && <ReasoningEffortSelector currentMode={currentMode} />}
+					{showReasoningEffort && <ReasoningSummarySelector currentMode={currentMode} />}
 					<ModelInfoView isPopup={isPopup} modelInfo={selectedModelInfo} selectedModelId={selectedModelId} />
 				</>
 			)}

@@ -14,6 +14,7 @@ import { telemetryService } from "../../../services/telemetry"
 import { Controller } from ".."
 import { accountLogoutClicked } from "../account/accountLogoutClicked"
 import { normalizeOpenaiReasoningEffort } from "./reasoningEffort"
+import { normalizeOpenaiReasoningSummary } from "./reasoningSummary"
 
 /**
  * Updates multiple extension settings in a single request
@@ -40,6 +41,8 @@ export async function updateSettingsCli(controller: Controller, request: UpdateS
 				autoApprovalSettings,
 				planModeReasoningEffort,
 				actModeReasoningEffort,
+				planModeReasoningSummary,
+				actModeReasoningSummary,
 				mode,
 				customPrompt,
 				planModeApiProvider,
@@ -95,6 +98,16 @@ export async function updateSettingsCli(controller: Controller, request: UpdateS
 			if (actModeReasoningEffort !== undefined) {
 				const converted = normalizeOpenaiReasoningEffort(actModeReasoningEffort)
 				controller.stateManager.setGlobalState("actModeReasoningEffort", converted)
+			}
+
+			if (planModeReasoningSummary !== undefined) {
+				const converted = normalizeOpenaiReasoningSummary(planModeReasoningSummary)
+				controller.stateManager.setGlobalState("planModeReasoningSummary", converted)
+			}
+
+			if (actModeReasoningSummary !== undefined) {
+				const converted = normalizeOpenaiReasoningSummary(actModeReasoningSummary)
+				controller.stateManager.setGlobalState("actModeReasoningSummary", converted)
 			}
 
 			if (mode !== undefined) {

@@ -5,7 +5,7 @@ import {
 	openAiNativeDefaultModelId,
 	openAiNativeModels,
 } from "@shared/api"
-import { normalizeOpenaiReasoningEffort } from "@shared/storage/types"
+import { normalizeOpenaiReasoningEffort, normalizeOpenaiReasoningSummary } from "@shared/storage/types"
 import { calculateApiCostOpenAI } from "@utils/cost"
 import OpenAI from "openai"
 import type {
@@ -32,10 +32,15 @@ import { getOpenAIToolParams, ToolCallProcessor } from "../transform/tool-call-p
 interface OpenAiNativeHandlerOptions extends CommonApiHandlerOptions {
 	openAiNativeApiKey?: string
 	reasoningEffort?: string
+	reasoningSummary?: string
 	thinkingBudgetTokens?: number
 	apiModelId?: string
 	openAiNativeUseResponsesWebsocket?: boolean
 }
+
+const OPENAI_SERVER_SIDE_COMPACTION_MAX_THRESHOLD = 200_000
+const OPENAI_SERVER_SIDE_COMPACTION_MIN_THRESHOLD = 120_000
+const OPENAI_SERVER_SIDE_COMPACTION_RATIO = 0.7
 
 export class OpenAiNativeHandler implements ApiHandler {
 	private options: OpenAiNativeHandlerOptions
@@ -222,6 +227,7 @@ export class OpenAiNativeHandler implements ApiHandler {
 
 		const params = this.buildResponseCreateParams({
 			modelId: model.id,
+			modelInfo: model.info,
 			systemPrompt,
 			input,
 			previousResponseId,
@@ -235,6 +241,7 @@ export class OpenAiNativeHandler implements ApiHandler {
 
 		const fallbackParams = this.buildResponseCreateParams({
 			modelId: model.id,
+			modelInfo: model.info,
 			systemPrompt,
 			input: fallbackInput,
 			tools: responseTools,
@@ -248,6 +255,10 @@ export class OpenAiNativeHandler implements ApiHandler {
 				previousResponseId,
 				usingPreviousResponseId: true,
 				usingFullHistoryFallback: false,
+				compactionThreshold:
+					params.context_management?.[0]?.type === "compaction"
+						? params.context_management[0].compact_threshold
+						: undefined,
 				inputItems: Array.isArray(params.input) ? params.input.length : undefined,
 			})
 			try {
@@ -273,6 +284,10 @@ export class OpenAiNativeHandler implements ApiHandler {
 					previousResponseId,
 					usingPreviousResponseId: true,
 					usingFullHistoryFallback: false,
+					compactionThreshold:
+						params.context_management?.[0]?.type === "compaction"
+							? params.context_management[0].compact_threshold
+							: undefined,
 					inputItems: Array.isArray(params.input) ? params.input.length : undefined,
 				})
 				yield* this.createResponseStreamHttp(model.info, params)
@@ -293,6 +308,10 @@ export class OpenAiNativeHandler implements ApiHandler {
 						previousResponseId,
 						usingPreviousResponseId: false,
 						usingFullHistoryFallback: true,
+						compactionThreshold:
+							fallbackParams.context_management?.[0]?.type === "compaction"
+								? fallbackParams.context_management[0].compact_threshold
+								: undefined,
 						inputItems: Array.isArray(fallbackParams.input) ? fallbackParams.input.length : undefined,
 					})
 					try {
@@ -323,6 +342,10 @@ export class OpenAiNativeHandler implements ApiHandler {
 			previousResponseId,
 			usingPreviousResponseId: false,
 			usingFullHistoryFallback: false,
+			compactionThreshold:
+				fallbackParams.context_management?.[0]?.type === "compaction"
+					? fallbackParams.context_management[0].compact_threshold
+					: undefined,
 			inputItems: Array.isArray(fallbackParams.input) ? fallbackParams.input.length : undefined,
 		})
 		try {
@@ -367,6 +390,7 @@ export class OpenAiNativeHandler implements ApiHandler {
 
 	private buildResponseCreateParams(args: {
 		modelId: string
+		modelInfo: ModelInfo
 		systemPrompt: string
 		input: OpenAI.Responses.ResponseInput
 		tools: OpenAI.Responses.Tool[]
@@ -374,12 +398,13 @@ export class OpenAiNativeHandler implements ApiHandler {
 		store: boolean
 	}): OpenAI.Responses.ResponseCreateParamsStreaming {
 		const requestedEffort = normalizeOpenaiReasoningEffort(this.options.reasoningEffort)
-		const reasoning: { effort: ChatCompletionReasoningEffort; summary: "auto" } | undefined =
+		const requestedSummary = normalizeOpenaiReasoningSummary(this.options.reasoningSummary)
+		const reasoning =
 			requestedEffort === "none"
 				? undefined
 				: {
-						effort: requestedEffort,
-						summary: "auto",
+						effort: requestedEffort as ChatCompletionReasoningEffort,
+						...(requestedSummary !== "none" ? { summary: requestedSummary } : {}),
 					}
 
 		return {
@@ -388,12 +413,35 @@ export class OpenAiNativeHandler implements ApiHandler {
 			input: args.input,
 			stream: true,
 			tools: args.tools,
+			...(this.buildContextManagement(args.modelId, args.modelInfo)
+				? { context_management: this.buildContextManagement(args.modelId, args.modelInfo) }
+				: {}),
 			// Keep HTTP response chains stored so future `previous_response_id` requests can
 			// continue across tool turns. Websocket mode manages storage separately.
 			store: args.store,
 			...(args.previousResponseId ? { previous_response_id: args.previousResponseId } : {}),
 			...(reasoning ? { reasoning } : {}),
 		}
+	}
+
+	private buildContextManagement(
+		modelId: string,
+		modelInfo: ModelInfo,
+	): OpenAI.Responses.ResponseCreateParamsStreaming["context_management"] | undefined {
+		if (!isGPT5ModelFamily(modelId)) {
+			return undefined
+		}
+
+		const contextWindow = modelInfo.contextWindow ?? OPENAI_SERVER_SIDE_COMPACTION_MAX_THRESHOLD
+		const compactThreshold = Math.min(
+			OPENAI_SERVER_SIDE_COMPACTION_MAX_THRESHOLD,
+			Math.max(
+				OPENAI_SERVER_SIDE_COMPACTION_MIN_THRESHOLD,
+				Math.floor(contextWindow * OPENAI_SERVER_SIDE_COMPACTION_RATIO),
+			),
+		)
+
+		return [{ type: "compaction", compact_threshold: compactThreshold }]
 	}
 
 	private async *createResponseStreamHttp(

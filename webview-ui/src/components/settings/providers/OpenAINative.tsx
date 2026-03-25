@@ -5,6 +5,7 @@ import { ApiKeyField } from "../common/ApiKeyField"
 import { ModelInfoView } from "../common/ModelInfoView"
 import { ModelSelector } from "../common/ModelSelector"
 import ReasoningEffortSelector from "../ReasoningEffortSelector"
+import ReasoningSummarySelector from "../ReasoningSummarySelector"
 import { normalizeApiConfiguration, supportsReasoningEffortForModelId } from "../utils/providerUtils"
 import { useApiConfigurationHandlers } from "../utils/useApiConfigurationHandlers"
 
@@ -52,6 +53,7 @@ export const OpenAINativeProvider = ({ showModelOptions, isPopup, currentMode }:
 						selectedModelId={selectedModelId}
 					/>
 					{showReasoningEffort && <ReasoningEffortSelector currentMode={currentMode} />}
+					{showReasoningEffort && <ReasoningSummarySelector currentMode={currentMode} />}
 
 					<ModelInfoView isPopup={isPopup} modelInfo={selectedModelInfo} selectedModelId={selectedModelId} />
 				</>

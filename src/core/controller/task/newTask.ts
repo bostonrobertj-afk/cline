@@ -6,6 +6,7 @@ import { convertProtoToApiProvider } from "@/shared/proto-conversions/models/api
 import { DEFAULT_BROWSER_SETTINGS } from "../../../shared/BrowserSettings"
 import { Controller } from ".."
 import { normalizeOpenaiReasoningEffort } from "../state/reasoningEffort"
+import { normalizeOpenaiReasoningSummary } from "../state/reasoningSummary"
 
 /**
  * Creates a new task with the given text and optional images
@@ -56,6 +57,12 @@ export async function newTask(controller: Controller, request: NewTaskRequest): 
 			}),
 			...(request.taskSettings?.actModeReasoningEffort !== undefined && {
 				actModeReasoningEffort: normalizeOpenaiReasoningEffort(request.taskSettings.actModeReasoningEffort),
+			}),
+			...(request.taskSettings?.planModeReasoningSummary !== undefined && {
+				planModeReasoningSummary: normalizeOpenaiReasoningSummary(request.taskSettings.planModeReasoningSummary),
+			}),
+			...(request.taskSettings?.actModeReasoningSummary !== undefined && {
+				actModeReasoningSummary: normalizeOpenaiReasoningSummary(request.taskSettings.actModeReasoningSummary),
 			}),
 			...(request.taskSettings?.mode !== undefined && {
 				mode: convertPlanActMode(request.taskSettings.mode),

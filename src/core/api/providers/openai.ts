@@ -7,7 +7,7 @@ import {
 	openAiModelInfoSaneDefaults,
 	openAiNativeModels,
 } from "@shared/api"
-import { normalizeOpenaiReasoningEffort } from "@shared/storage/types"
+import { normalizeOpenaiReasoningEffort, normalizeOpenaiReasoningSummary } from "@shared/storage/types"
 import OpenAI, { AzureOpenAI } from "openai"
 import { buildExternalBasicHeaders } from "@/services/EnvUtils"
 import { ClineStorageMessage } from "@/shared/messages/content"
@@ -32,6 +32,7 @@ interface OpenAiHandlerOptions extends CommonApiHandlerOptions {
 	openAiModelId?: string
 	openAiModelInfo?: OpenAiCompatibleModelInfo
 	reasoningEffort?: string
+	reasoningSummary?: string
 }
 
 export class OpenAiHandler implements ApiHandler {
@@ -292,6 +293,7 @@ export class OpenAiHandler implements ApiHandler {
 			temperature = openAiModelInfoSaneDefaults.temperature
 		}
 		let reasoningEffort: string | undefined
+		let reasoningSummary: string | undefined
 		const configuredMaxTokens =
 			this.options.openAiModelInfo?.maxTokens && this.options.openAiModelInfo.maxTokens > 0
 				? Number(this.options.openAiModelInfo.maxTokens)
@@ -322,6 +324,7 @@ export class OpenAiHandler implements ApiHandler {
 			})
 			const requestedEffort = normalizeOpenaiReasoningEffort(this.options.reasoningEffort)
 			reasoningEffort = requestedEffort === "none" ? undefined : requestedEffort
+			reasoningSummary = normalizeOpenaiReasoningSummary(this.options.reasoningSummary)
 
 			if (reasoningEffort) {
 				temperature = undefined // GPT-5.4 rejects temperature when reasoning effort is not none
@@ -378,7 +381,10 @@ export class OpenAiHandler implements ApiHandler {
 		}
 
 		if (reasoningEffort) {
-			const reasoning = { effort: reasoningEffort }
+			const reasoning = {
+				effort: reasoningEffort,
+				...(reasoningSummary && reasoningSummary !== "none" ? { summary: reasoningSummary } : {}),
+			}
 			request.reasoning = reasoning
 			fallbackRequest.reasoning = reasoning
 		}

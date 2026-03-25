@@ -648,6 +648,7 @@ export function getModeSpecificFields(apiConfiguration: ApiConfiguration | undef
 		thinkingBudgetTokens:
 			mode === "plan" ? apiConfiguration.planModeThinkingBudgetTokens : apiConfiguration.actModeThinkingBudgetTokens,
 		reasoningEffort: mode === "plan" ? apiConfiguration.planModeReasoningEffort : apiConfiguration.actModeReasoningEffort,
+		reasoningSummary: mode === "plan" ? apiConfiguration.planModeReasoningSummary : apiConfiguration.actModeReasoningSummary,
 		// Oracle Code Assist
 		ocaModelInfo: mode === "plan" ? apiConfiguration.planModeOcaModelInfo : apiConfiguration.actModeOcaModelInfo,
 	}
@@ -682,6 +683,8 @@ export async function syncModeConfigurations(
 		actModeThinkingBudgetTokens: sourceFields.thinkingBudgetTokens,
 		planModeReasoningEffort: sourceFields.reasoningEffort,
 		actModeReasoningEffort: sourceFields.reasoningEffort,
+		planModeReasoningSummary: sourceFields.reasoningSummary,
+		actModeReasoningSummary: sourceFields.reasoningSummary,
 	}
 
 	// Handle provider-specific fields

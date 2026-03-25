@@ -177,6 +177,76 @@ describe("OpenAiHandler", () => {
 		request.max_output_tokens.should.equal(16_384)
 	})
 
+	it("should include configured reasoning summary for reasoning model responses", async () => {
+		const handler = new OpenAiHandler({
+			openAiApiKey: "test-api-key",
+			openAiModelId: "gpt-5.4-mini-2026-03-17",
+			reasoningSummary: "concise",
+		})
+
+		const createStub = sinon.stub().resolves(
+			createAsyncIterable([
+				{
+					type: "response.completed",
+					response: {
+						id: "resp_reasoning_summary",
+						usage: {
+							input_tokens: 10,
+							output_tokens: 5,
+						},
+					},
+				},
+			]),
+		)
+		const fakeClient = {
+			responses: {
+				create: createStub,
+			},
+		}
+		sinon.stub(handler as any, "ensureClient").returns(fakeClient as any)
+
+		for await (const _chunk of handler.createMessage("system", [{ role: "user", content: "hi" }] as any, [])) {
+			// drain
+		}
+
+		createStub.firstCall.args[0].reasoning.should.deepEqual({ effort: "medium", summary: "concise" })
+	})
+
+	it("should omit reasoning summary when configured as none", async () => {
+		const handler = new OpenAiHandler({
+			openAiApiKey: "test-api-key",
+			openAiModelId: "gpt-5.4-mini-2026-03-17",
+			reasoningSummary: "none",
+		})
+
+		const createStub = sinon.stub().resolves(
+			createAsyncIterable([
+				{
+					type: "response.completed",
+					response: {
+						id: "resp_reasoning_summary_none",
+						usage: {
+							input_tokens: 10,
+							output_tokens: 5,
+						},
+					},
+				},
+			]),
+		)
+		const fakeClient = {
+			responses: {
+				create: createStub,
+			},
+		}
+		sinon.stub(handler as any, "ensureClient").returns(fakeClient as any)
+
+		for await (const _chunk of handler.createMessage("system", [{ role: "user", content: "hi" }] as any, [])) {
+			// drain
+		}
+
+		createStub.firstCall.args[0].reasoning.should.deepEqual({ effort: "medium" })
+	})
+
 	it("should log production-readable request path details without previous_response_id", async () => {
 		const handler = new OpenAiHandler({
 			openAiApiKey: "test-api-key",
