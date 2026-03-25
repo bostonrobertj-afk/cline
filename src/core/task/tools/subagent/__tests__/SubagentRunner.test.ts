@@ -4,6 +4,7 @@ import * as skills from "@core/context/instructions/user-instructions/skills"
 import { PromptRegistry } from "@core/prompts/system-prompt"
 import type { ManagedWorkflowRunState } from "@core/task/managed-workflows/types"
 import type { TaskConfig } from "@core/task/tools/types/TaskConfig"
+import * as workflowActivation from "@core/task/workflow-activation"
 import * as workflowResolution from "@core/workflows/resolution/resolveAvailableWorkflows"
 import { afterEach, beforeEach, describe, it } from "mocha"
 import sinon from "sinon"
@@ -730,6 +731,133 @@ describe("SubagentRunner", () => {
 
 		assert.equal(result.status, "completed")
 		assert.equal(createMessage.callCount, 1)
+	})
+
+	it("auto-activates an explicitly assigned placeholder workflow before the first subagent turn", async () => {
+		const createMessage = sinon.stub().callsFake(async function* (_systemPrompt: string) {
+			yield {
+				type: "tool_calls",
+				tool_call: {
+					function: {
+						id: "toolu_subagent_placeholder_1",
+						name: ClineDefaultTool.ATTEMPT,
+						arguments: JSON.stringify({ result: "done" }),
+					},
+				},
+			}
+		})
+
+		const promptRegistry = PromptRegistry.getInstance()
+		sinon.stub(promptRegistry, "get").callsFake(async (context) => {
+			assert.equal(context.managedWorkflowActive, false)
+			assert.equal(context.activeWorkflowSupportsPlaceholders, true)
+			assert.ok(context.activeWorkflowReminder)
+			assert.match(context.activeWorkflowReminder!, /Edge case review instructions/)
+			promptRegistry.nativeTools = undefined
+			return "system prompt"
+		})
+		sinon.stub(SubagentBuilder.prototype, "getConfiguredSkills").returns(undefined)
+		sinon.stub(skills, "discoverSkills").resolves([])
+		sinon.stub(skills, "getAvailableSkills").returns([])
+		;(workflowResolution.resolveAvailableWorkflows as sinon.SinonStub).resolves([
+			{
+				name: "review-edge-case-hunter",
+				source: "remote",
+				description: "Remote workflow: review-edge-case-hunter",
+				fileName: "review-edge-case-hunter",
+				contents: "# Edge case review instructions\nInspect the provided bundle.",
+			},
+		])
+		stubApiHandler(createMessage)
+		initializeHostProvider()
+
+		const runner = new SubagentRunner(createTaskConfig(false))
+		const result = await runner.run(`Skill: use_skill('review-edge-case-hunter')`, () => {})
+
+		assert.equal(result.status, "completed")
+		assert.equal(createMessage.callCount, 1)
+		const systemPrompt = createMessage.firstCall.args[0] as string
+		assert.doesNotMatch(systemPrompt, /Assigned Workflow Activation/)
+	})
+
+	it("falls back to the assigned-skill directive when the assigned skill is not a workflow", async () => {
+		const createMessage = sinon.stub().callsFake(async function* (_systemPrompt: string) {
+			yield {
+				type: "tool_calls",
+				tool_call: {
+					function: {
+						id: "toolu_subagent_nonworkflow_1",
+						name: ClineDefaultTool.ATTEMPT,
+						arguments: JSON.stringify({ result: "done" }),
+					},
+				},
+			}
+		})
+
+		const promptRegistry = PromptRegistry.getInstance()
+		sinon.stub(promptRegistry, "get").callsFake(async (context) => {
+			assert.equal(context.activeWorkflowReminder, undefined)
+			assert.equal(context.activeWorkflowSupportsPlaceholders, false)
+			promptRegistry.nativeTools = undefined
+			return "system prompt"
+		})
+		sinon.stub(SubagentBuilder.prototype, "getConfiguredSkills").returns(undefined)
+		sinon.stub(skills, "discoverSkills").resolves([])
+		sinon.stub(skills, "getAvailableSkills").returns([
+			{
+				name: "review-helper",
+				description: "Helper skill",
+				path: "/skills/review-helper/SKILL.md",
+				source: "project",
+			},
+		])
+		;(workflowResolution.resolveAvailableWorkflows as sinon.SinonStub).resolves([])
+		stubApiHandler(createMessage)
+		initializeHostProvider()
+
+		const runner = new SubagentRunner(createTaskConfig(false))
+		const result = await runner.run(`Skill: use_skill('review-helper')`, () => {})
+
+		assert.equal(result.status, "completed")
+		assert.equal(createMessage.callCount, 1)
+		const systemPrompt = createMessage.firstCall.args[0] as string
+		assert.match(systemPrompt, /Assigned Workflow Activation/)
+		assert.match(systemPrompt, /review-helper/)
+	})
+
+	it("does not re-activate a placeholder workflow that is already active in state", async () => {
+		const runner = new SubagentRunner(createTaskConfig(false))
+		const state = new TaskState()
+		state.activePlaceholderWorkflowId = "review-edge-case-hunter"
+		state.activePlaceholderWorkflowSource = {
+			type: "remote",
+			name: "review-edge-case-hunter",
+			contents: "# Edge case review instructions",
+		}
+		state.activePlaceholderWorkflowStableValues = { project_root: "/tmp" }
+		state.activePlaceholderWorkflowValues = { review_focus: "security" }
+
+		const activateManagedStub = sinon.stub(workflowActivation, "activateManagedWorkflowInTaskState")
+		const activatePlaceholderStub = sinon.stub(workflowActivation, "activatePlaceholderWorkflowInTaskState")
+
+		await (runner as any).autoActivateAssignedWorkflow(
+			state,
+			["review-edge-case-hunter"],
+			[
+				{
+					name: "review-edge-case-hunter",
+					source: "remote",
+					description: "Remote workflow: review-edge-case-hunter",
+					fileName: "review-edge-case-hunter",
+					contents: "# Edge case review instructions",
+				},
+			],
+		)
+
+		sinon.assert.notCalled(activateManagedStub)
+		sinon.assert.notCalled(activatePlaceholderStub)
+		assert.equal(state.activePlaceholderWorkflowId, "review-edge-case-hunter")
+		assert.deepEqual(state.activePlaceholderWorkflowValues, { review_focus: "security" })
 	})
 
 	it("logs a warning when a configured skill is not available", async () => {

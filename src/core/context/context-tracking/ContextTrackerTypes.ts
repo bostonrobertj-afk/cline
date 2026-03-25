@@ -38,6 +38,7 @@ export interface TaskMetadata {
 	activeWorkflowId?: string
 	activePlaceholderWorkflowId?: string
 	activePlaceholderWorkflowSource?: ActivePlaceholderWorkflowSource
+	activePlaceholderWorkflowStableValues?: Record<string, string>
 	activePlaceholderWorkflowValues?: Record<string, string>
 	managedWorkflowRun?: ManagedWorkflowRunState
 }

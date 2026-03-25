@@ -268,8 +268,7 @@ describe("slash-commands", () => {
 				"test-ulid",
 			)
 
-			expect(result.processedText).to.include('<explicit_instructions type="local-flow.md">')
-			expect(result.processedText).to.include("Do the local thing.")
+			expect(result.processedText).to.equal("<task> continue</task>")
 			expect(result.persistentSlashCommandAction).to.deep.equal({
 				type: "activate_placeholder_workflow",
 				workflowId: "local-flow.md",
@@ -277,6 +276,54 @@ describe("slash-commands", () => {
 					type: "local",
 					name: "local-flow.md",
 					path: workflowPath,
+				},
+			})
+		})
+
+		it("includes configPath metadata for local BMAD skill workflows when it can be resolved", async () => {
+			const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "slash-local-config-"))
+			const workflowPath = path.join(tempDir, ".cline", "skills", "custom-review", "custom-review.md")
+			const manifestPath = path.join(tempDir, "_bmad", "_config", "skill-manifest.csv")
+			const configPath = path.join(tempDir, "_bmad", "bmm", "config.yaml")
+			await fs.mkdir(path.dirname(workflowPath), { recursive: true })
+			await fs.mkdir(path.dirname(manifestPath), { recursive: true })
+			await fs.mkdir(path.dirname(configPath), { recursive: true })
+			await fs.writeFile(workflowPath, "# Custom review\nUse {communication_language}.", "utf8")
+			await fs.writeFile(
+				manifestPath,
+				[
+					"canonicalId,name,description,module,path,install_to_bmad",
+					'"custom-review","custom-review","Custom review workflow","bmm","_bmad/bmm/workflows/custom-review/SKILL.md","true"',
+				].join("\n"),
+				"utf8",
+			)
+			await fs.writeFile(configPath, 'communication_language: "English"\n', "utf8")
+			sinon.stub(StateManager, "get").returns({
+				getRemoteConfigSettings: () => ({}),
+				getGlobalStateKey: () => ({}),
+			} as unknown as StateManager)
+
+			const result = await parseSlashCommands(
+				"<task>/custom-review.md continue</task>",
+				{ [workflowPath]: true },
+				{},
+				"test-ulid",
+				undefined,
+				false,
+				undefined,
+				undefined,
+				tempDir,
+			)
+
+			expect(result.processedText).to.equal("<task> continue</task>")
+			expect(result.persistentSlashCommandAction).to.deep.equal({
+				type: "activate_placeholder_workflow",
+				workflowId: "custom-review.md",
+				workflowSource: {
+					type: "local",
+					name: "custom-review.md",
+					path: workflowPath,
+					configPath,
 				},
 			})
 		})
@@ -300,8 +347,7 @@ describe("slash-commands", () => {
 				"test-ulid",
 			)
 
-			expect(result.processedText).to.include("local body")
-			expect(result.processedText).to.not.include("global body")
+			expect(result.processedText).to.equal("<task> now</task>")
 			expect(result.persistentSlashCommandAction).to.deep.equal({
 				type: "activate_placeholder_workflow",
 				workflowId: "shared-flow.md",
@@ -323,8 +369,7 @@ describe("slash-commands", () => {
 
 			const result = await parseSlashCommands("<task>/remote-flow please</task>", {}, {}, "test-ulid")
 
-			expect(result.processedText).to.include('<explicit_instructions type="remote-flow">')
-			expect(result.processedText).to.include("remote body")
+			expect(result.processedText).to.equal("<task> please</task>")
 			expect(result.persistentSlashCommandAction).to.deep.equal({
 				type: "activate_placeholder_workflow",
 				workflowId: "remote-flow",

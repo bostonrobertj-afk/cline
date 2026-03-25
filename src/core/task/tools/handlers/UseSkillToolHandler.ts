@@ -1,10 +1,8 @@
 import type { ToolUse } from "@core/assistant-message"
 import { discoverSkills, getAvailableSkills, getSkillContent } from "@core/context/instructions/user-instructions/skills"
 import { getTaskMetadata, saveTaskMetadata } from "@core/storage/disk"
-import { startOrResumeManagedWorkflowRun } from "@core/task/managed-workflows/ManagedWorkflowController"
+import { activateManagedWorkflowInTaskState, activatePlaceholderWorkflowInTaskState } from "@core/task/workflow-activation"
 import type { SkillMetadata } from "@shared/skills"
-import { buildActivePlaceholderWorkflowSource } from "@/core/workflows/placeholder-workflow-step-details"
-import { loadResolvedWorkflowContent } from "@/core/workflows/resolution/loadResolvedWorkflowContent"
 import { resolveWorkflowByName } from "@/core/workflows/resolution/resolveAvailableWorkflows"
 import { telemetryService } from "@/services/telemetry"
 import { ClineDefaultTool } from "@/shared/tools"
@@ -83,19 +81,13 @@ export class UseSkillToolHandler implements IToolHandler, IPartialBlockHandler {
 				}
 			}
 
-			const { run, resumed } = await startOrResumeManagedWorkflowRun(
-				config.cwd,
-				resolvedWorkflow.workflowId,
-				config.taskState.managedWorkflowRun,
-				resolvedWorkflow.slashCommand,
-			)
+			const { run, resumed } = await activateManagedWorkflowInTaskState({
+				cwd: config.cwd,
+				taskState: config.taskState,
+				workflowId: resolvedWorkflow.workflowId,
+				slashCommand: resolvedWorkflow.slashCommand,
+			})
 
-			config.taskState.managedWorkflowRun = run
-			config.taskState.activeWorkflowId = run.workflowId
-			config.taskState.activePlaceholderWorkflowId = undefined
-			config.taskState.activePlaceholderWorkflowSource = undefined
-			config.taskState.activePlaceholderWorkflowValues = undefined
-			config.taskState.activeWorkflowJustStarted = !resumed
 			config.taskState.consecutiveMistakeCount = 0
 
 			try {
@@ -106,6 +98,7 @@ export class UseSkillToolHandler implements IToolHandler, IPartialBlockHandler {
 				metadata.activeWorkflowId = config.taskState.activeWorkflowId
 				metadata.activePlaceholderWorkflowId = config.taskState.activePlaceholderWorkflowId
 				metadata.activePlaceholderWorkflowSource = config.taskState.activePlaceholderWorkflowSource
+				metadata.activePlaceholderWorkflowStableValues = config.taskState.activePlaceholderWorkflowStableValues
 				metadata.activePlaceholderWorkflowValues = config.taskState.activePlaceholderWorkflowValues
 				metadata.managedWorkflowRun = config.taskState.managedWorkflowRun
 				await saveTaskMetadata(config.taskId, metadata)
@@ -132,26 +125,24 @@ export class UseSkillToolHandler implements IToolHandler, IPartialBlockHandler {
 
 		if (resolvedWorkflow) {
 			try {
-				const workflowContent = await loadResolvedWorkflowContent(resolvedWorkflow)
-				if (!workflowContent || workflowContent.kind !== "instructions") {
+				const activation = await activatePlaceholderWorkflowInTaskState({
+					cwd: config.cwd,
+					taskState: config.taskState,
+					workflow: resolvedWorkflow,
+					clearActiveWorkflowId: true,
+				})
+				if (!activation) {
 					return `Error: Workflow "${skillName}" could not be loaded.`
 				}
 
 				config.taskState.consecutiveMistakeCount = 0
-				config.taskState.activeWorkflowId = undefined
-				config.taskState.activePlaceholderWorkflowId = resolvedWorkflow.name
-				config.taskState.activePlaceholderWorkflowSource = buildActivePlaceholderWorkflowSource(
-					resolvedWorkflow,
-					workflowContent.contents,
-				)
-				config.taskState.activePlaceholderWorkflowValues = undefined
-				config.taskState.activeWorkflowJustStarted = true
 
 				try {
 					const metadata = await getTaskMetadata(config.taskId)
 					metadata.activeWorkflowId = config.taskState.activeWorkflowId
 					metadata.activePlaceholderWorkflowId = config.taskState.activePlaceholderWorkflowId
 					metadata.activePlaceholderWorkflowSource = config.taskState.activePlaceholderWorkflowSource
+					metadata.activePlaceholderWorkflowStableValues = config.taskState.activePlaceholderWorkflowStableValues
 					metadata.activePlaceholderWorkflowValues = config.taskState.activePlaceholderWorkflowValues
 					metadata.managedWorkflowRun = config.taskState.managedWorkflowRun
 					await saveTaskMetadata(config.taskId, metadata)
@@ -173,13 +164,13 @@ export class UseSkillToolHandler implements IToolHandler, IPartialBlockHandler {
 					"UseSkillToolHandler.execute",
 				)
 
-				const locationHint = workflowContent.displayPath
-					? ` You may access the workflow file at: ${workflowContent.displayPath}`
+				const locationHint = activation.workflowContent.displayPath
+					? ` You may access the workflow file at: ${activation.workflowContent.displayPath}`
 					: ""
 
 				return `# Workflow "${resolvedWorkflow.name}" is now active
 
-${workflowContent.contents}
+${activation.renderedWorkflowContents}
 
 ---
 IMPORTANT: The workflow is now loaded. Do NOT call use_skill again for this task unless a later step explicitly requires a different workflow.${locationHint}`
@@ -234,6 +225,7 @@ IMPORTANT: The workflow is now loaded. Do NOT call use_skill again for this task
 			config.taskState.activeWorkflowId = skillName
 			config.taskState.activePlaceholderWorkflowId = undefined
 			config.taskState.activePlaceholderWorkflowSource = undefined
+			config.taskState.activePlaceholderWorkflowStableValues = undefined
 			config.taskState.activePlaceholderWorkflowValues = undefined
 			config.taskState.activeWorkflowJustStarted = true
 

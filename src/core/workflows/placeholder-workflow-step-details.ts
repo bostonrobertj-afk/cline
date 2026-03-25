@@ -1,4 +1,6 @@
 import fs from "fs/promises"
+import path from "path"
+import { getPlaceholderWorkflowValueMap, resolvePlaceholderWorkflowText } from "./placeholder-workflow-rendering"
 import type { ResolvedWorkflowEntry } from "./resolution/resolveAvailableWorkflows"
 
 export type ActivePlaceholderWorkflowSource =
@@ -6,11 +8,13 @@ export type ActivePlaceholderWorkflowSource =
 			type: "local" | "global"
 			name: string
 			path: string
+			configPath?: string
 	  }
 	| {
 			type: "remote"
 			name: string
 			contents: string
+			configPath?: string
 	  }
 
 export type ActivePlaceholderWorkflowStepDetails = {
@@ -42,10 +46,103 @@ const INCOMPLETE_CHECKLIST_ITEM_REGEX = /^\s*-\s*\[\s\]\s*(.+?)\s*$/
 const STEP_LABEL_REGEX = /^step\s+(\d+)(?:\s*[:-]\s*(.+))?$/i
 const STEP_HEADING_REGEX = /^\s{0,3}#{2,6}\s+step\s+(\d+)(?:\s*[:-]\s*(.+?))?\s*$/i
 
-export function buildActivePlaceholderWorkflowSource(
+const SKILL_MANIFEST_PATH = path.join("_bmad", "_config", "skill-manifest.csv")
+
+function parseCsvRow(line: string): string[] {
+	const fields: string[] = []
+	let current = ""
+	let inQuotes = false
+
+	for (let index = 0; index < line.length; index++) {
+		const char = line[index]
+
+		if (char === '"') {
+			if (inQuotes && line[index + 1] === '"') {
+				current += '"'
+				index++
+			} else {
+				inQuotes = !inQuotes
+			}
+			continue
+		}
+
+		if (char === "," && !inQuotes) {
+			fields.push(current)
+			current = ""
+			continue
+		}
+
+		current += char
+	}
+
+	fields.push(current)
+	return fields
+}
+
+async function lookupSkillManifestModule(cwd: string, skillName: string): Promise<string | undefined> {
+	try {
+		const raw = await fs.readFile(path.resolve(cwd, SKILL_MANIFEST_PATH), "utf8")
+		const lines = raw
+			.split(/\r?\n/)
+			.map((line) => line.trim())
+			.filter(Boolean)
+		if (lines.length === 0) {
+			return undefined
+		}
+
+		const header = parseCsvRow(lines[0])
+		const canonicalIdIndex = header.indexOf("canonicalId")
+		const nameIndex = header.indexOf("name")
+		const moduleIndex = header.indexOf("module")
+		if (moduleIndex === -1) {
+			return undefined
+		}
+
+		for (const line of lines.slice(1)) {
+			const row = parseCsvRow(line)
+			const canonicalId = canonicalIdIndex >= 0 ? row[canonicalIdIndex]?.trim() : undefined
+			const name = nameIndex >= 0 ? row[nameIndex]?.trim() : undefined
+			const moduleName = row[moduleIndex]?.trim()
+			if (moduleName && (canonicalId === skillName || name === skillName)) {
+				return moduleName
+			}
+		}
+	} catch {
+		// Missing manifest is fine; this is a best-effort discovery path.
+	}
+
+	return undefined
+}
+
+async function resolveConfigPathForWorkflow(
+	cwd: string | undefined,
+	workflow: Pick<ResolvedWorkflowEntry, "source" | "fullPath" | "name">,
+): Promise<string | undefined> {
+	if (!cwd || workflow.source === "remote" || !workflow.fullPath) {
+		return undefined
+	}
+
+	const normalizedPath = workflow.fullPath.replace(/\\/g, "/")
+	const bmadMatch = normalizedPath.match(/(?:^|\/)_bmad\/([^/]+)\//)
+	if (bmadMatch) {
+		return path.resolve(cwd, "_bmad", bmadMatch[1], "config.yaml")
+	}
+
+	const clineSkillMatch = normalizedPath.match(/(?:^|\/)\.cline\/skills\/([^/]+)\//)
+	if (!clineSkillMatch) {
+		return undefined
+	}
+
+	const moduleName = await lookupSkillManifestModule(cwd, clineSkillMatch[1])
+	return moduleName ? path.resolve(cwd, "_bmad", moduleName, "config.yaml") : undefined
+}
+
+export async function buildActivePlaceholderWorkflowSource(
 	workflow: ResolvedWorkflowEntry,
 	workflowContents?: string,
-): ActivePlaceholderWorkflowSource | undefined {
+	cwd?: string,
+): Promise<ActivePlaceholderWorkflowSource | undefined> {
+	const configPath = await resolveConfigPathForWorkflow(cwd, workflow)
 	switch (workflow.source) {
 		case "local":
 		case "global":
@@ -57,6 +154,7 @@ export function buildActivePlaceholderWorkflowSource(
 				type: workflow.source,
 				name: workflow.name,
 				path: workflow.fullPath,
+				...(configPath ? { configPath } : {}),
 			}
 		case "remote": {
 			const contents = (workflowContents ?? workflow.contents ?? "").trim()
@@ -64,6 +162,7 @@ export function buildActivePlaceholderWorkflowSource(
 				type: "remote",
 				name: workflow.name,
 				contents,
+				...(configPath ? { configPath } : {}),
 			}
 		}
 		default:
@@ -83,6 +182,10 @@ export function isSameActivePlaceholderWorkflowSource(
 		return false
 	}
 
+	if (left.configPath !== right.configPath) {
+		return false
+	}
+
 	if (left.type === "remote" && right.type === "remote") {
 		return left.contents === right.contents
 	}
@@ -97,13 +200,19 @@ export function isSameActivePlaceholderWorkflowSource(
 export async function getActivePlaceholderWorkflowStepDetails(args: {
 	checklistMarkdown: string
 	source: ActivePlaceholderWorkflowSource
+	stablePlaceholderValues?: Record<string, string>
+	placeholderValues?: Record<string, string>
 }): Promise<ActivePlaceholderWorkflowStepDetails | undefined> {
 	const checklistItem = getFirstIncompleteChecklistItem(args.checklistMarkdown)
 	if (!checklistItem) {
 		return undefined
 	}
 
-	const workflowContents = await getPlaceholderWorkflowSourceContents(args.source)
+	const workflowContents = await getRenderedActivePlaceholderWorkflowSourceContents({
+		source: args.source,
+		stablePlaceholderValues: args.stablePlaceholderValues,
+		placeholderValues: args.placeholderValues,
+	})
 	const workflowSections = parseWorkflowStepSections(workflowContents)
 	if (workflowSections.length === 0) {
 		return undefined
@@ -131,6 +240,16 @@ export async function getActivePlaceholderWorkflowStepDetails(args: {
 		sourceName: args.source.name,
 		sourceType: args.source.type,
 	}
+}
+
+export async function getRenderedActivePlaceholderWorkflowSourceContents(args: {
+	source: ActivePlaceholderWorkflowSource
+	stablePlaceholderValues?: Record<string, string>
+	placeholderValues?: Record<string, string>
+}): Promise<string> {
+	const workflowContents = await getPlaceholderWorkflowSourceContents(args.source)
+	const placeholderValues = getPlaceholderWorkflowValueMap(args.stablePlaceholderValues, args.placeholderValues)
+	return resolvePlaceholderWorkflowText(workflowContents, placeholderValues) ?? workflowContents
 }
 
 async function getPlaceholderWorkflowSourceContents(source: ActivePlaceholderWorkflowSource): Promise<string> {

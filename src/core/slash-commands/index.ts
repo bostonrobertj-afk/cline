@@ -55,7 +55,7 @@ export async function parseSlashCommands(
 	const SUPPORTED_DEFAULT_COMMANDS = ["newtask", "smol", "compact", "newrule", "reportbug", "deep-planning", "explain-changes"]
 
 	// Determine if the current provider/model/setting actually uses native tool calling
-	const willUseNativeTools = isNativeToolCallingConfig(providerInfo!, enableNativeToolCalls || false)
+	const willUseNativeTools = providerInfo ? isNativeToolCallingConfig(providerInfo, enableNativeToolCalls ?? false) : false
 
 	const commandReplacements: Record<string, string> = {
 		newtask: newTaskToolResponse(willUseNativeTools),
@@ -132,7 +132,7 @@ export async function parseSlashCommands(
 
 			const removeMatchedCommand = () => {
 				if (slashMatch && slashCommandName === commandName) {
-					return removeCommand(text, contentStartIndex, slashMatch.index, slashMatch[1].length, "/" + slashMatch[2])
+					return removeCommand(text, contentStartIndex, slashMatch.index, slashMatch[1].length, `/${slashMatch[2]}`)
 				}
 
 				if (bareCommandAtStartMatch && bareCommandName === commandName) {
@@ -271,25 +271,27 @@ export async function parseSlashCommands(
 					if (!loadedWorkflow || loadedWorkflow.kind !== "instructions") {
 						continue
 					}
-					const workflowSource = buildActivePlaceholderWorkflowSource(resolvedWorkflow, loadedWorkflow.contents)
+					const workflowSource = await buildActivePlaceholderWorkflowSource(
+						resolvedWorkflow,
+						loadedWorkflow.contents,
+						cwd,
+					)
 					if (!workflowSource) {
 						continue
 					}
 
-					// remove the slash command and add custom instructions at the top of this message
+					// Remove the slash command and let the task layer inject rendered workflow
+					// instructions after the persistent activation state has been applied.
 					if (!slashMatch) {
 						continue
 					}
 					const textWithoutSlashCommand = removeMatchedCommand()
-					const processedText =
-						`<explicit_instructions type="${resolvedWorkflow.fileName}">\n${loadedWorkflow.contents}\n</explicit_instructions>\n` +
-						textWithoutSlashCommand
 
 					// Track telemetry for workflow command usage
 					telemetryService.captureSlashCommandUsed(ulid, commandName, "workflow")
 
 					return {
-						processedText,
+						processedText: textWithoutSlashCommand,
 						needsClinerulesFileCheck: false,
 						persistentSlashCommandAction: {
 							type: "activate_placeholder_workflow",

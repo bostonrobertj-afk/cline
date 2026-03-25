@@ -136,6 +136,10 @@ export async function resolveWorkflowByName(
 	name: string,
 ): Promise<ResolvedWorkflowEntry | undefined> {
 	const workflows = await resolveAvailableWorkflows(options)
+	return findResolvedWorkflowByName(workflows, name)
+}
+
+export function findResolvedWorkflowByName(workflows: ResolvedWorkflowEntry[], name: string): ResolvedWorkflowEntry | undefined {
 	const managedMatch = workflows.find(
 		(workflow) =>
 			workflow.source === "managed" &&

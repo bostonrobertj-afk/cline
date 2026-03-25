@@ -253,6 +253,8 @@ export class FocusChainManager {
 			const stepDetails = await getActivePlaceholderWorkflowStepDetails({
 				checklistMarkdown: currentChecklist,
 				source: this.taskState.activePlaceholderWorkflowSource,
+				stablePlaceholderValues: this.taskState.activePlaceholderWorkflowStableValues,
+				placeholderValues: this.taskState.activePlaceholderWorkflowValues,
 			})
 			if (!stepDetails) {
 				return undefined

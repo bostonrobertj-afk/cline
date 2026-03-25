@@ -7,11 +7,19 @@ import { formatResponse } from "@core/prompts/responses"
 import { PromptRegistry } from "@core/prompts/system-prompt"
 import type { SystemPromptContext } from "@core/prompts/system-prompt/types"
 import { buildBmadAgentRoleInstructions, getBmadWorkflowReminder, getOwningBmadAgentForSkill } from "@core/task/bmad-agent-mode"
-import { startOrResumeManagedWorkflowRun } from "@core/task/managed-workflows/ManagedWorkflowController"
 import { getManagedWorkflowDefinition } from "@core/task/managed-workflows/ManagedWorkflowRegistry"
 import { buildManagedWorkflowPrompt } from "@core/task/managed-workflows/ManagedWorkflowRenderer"
 import { StreamResponseHandler } from "@core/task/StreamResponseHandler"
-import { createWorkflowSkillMetadata, resolveAvailableWorkflows } from "@core/workflows/resolution/resolveAvailableWorkflows"
+import {
+	activateManagedWorkflowInTaskState,
+	activatePlaceholderWorkflowInTaskState,
+	renderActivePlaceholderWorkflowReminder,
+} from "@core/task/workflow-activation"
+import {
+	createWorkflowSkillMetadata,
+	findResolvedWorkflowByName,
+	resolveAvailableWorkflows,
+} from "@core/workflows/resolution/resolveAvailableWorkflows"
 import { ClineAssistantToolUseBlock, ClineStorageMessage, ClineTextContentBlock, ClineUserContent } from "@shared/messages"
 import { Logger } from "@shared/services/Logger"
 import type { SkillMetadata } from "@shared/skills"
@@ -379,7 +387,7 @@ export class SubagentRunner {
 			)
 			const configuredSkillNames = this.agent.getConfiguredSkills()
 			const assignedSkillNames = extractAssignedSkillNames(prompt)
-			await this.autoActivateAssignedManagedWorkflow(state, assignedSkillNames)
+			await this.autoActivateAssignedWorkflow(state, assignedSkillNames, workflowEntries)
 			const promptRegistry = PromptRegistry.getInstance()
 			const workspaceMetadataEnvironmentBlock = await this.getWorkspaceMetadataEnvironmentBlock()
 
@@ -783,6 +791,8 @@ export class SubagentRunner {
 
 		if (params.state.managedWorkflowRun) {
 			activeWorkflowReminder = buildManagedWorkflowPrompt(params.state.managedWorkflowRun)
+		} else if (params.state.activePlaceholderWorkflowSource) {
+			activeWorkflowReminder = await renderActivePlaceholderWorkflowReminder(params.state)
 		} else if (params.state.activeWorkflowId) {
 			activeWorkflowReminder = await getBmadWorkflowReminder(this.baseConfig.cwd, params.state.activeWorkflowId)
 		}
@@ -806,7 +816,11 @@ export class SubagentRunner {
 		}
 	}
 
-	private async autoActivateAssignedManagedWorkflow(state: TaskState, assignedSkillNames: string[]): Promise<void> {
+	private async autoActivateAssignedWorkflow(
+		state: TaskState,
+		assignedSkillNames: string[],
+		workflowEntries: Awaited<ReturnType<typeof resolveAvailableWorkflows>>,
+	): Promise<void> {
 		if (
 			assignedSkillNames.length !== 1 ||
 			state.managedWorkflowRun ||
@@ -818,33 +832,37 @@ export class SubagentRunner {
 
 		const assignedSkill = assignedSkillNames[0]
 		const managedWorkflowDefinition = await getManagedWorkflowDefinition(this.baseConfig.cwd, assignedSkill)
-		if (!managedWorkflowDefinition) {
+		if (managedWorkflowDefinition?.workflowId && managedWorkflowDefinition?.slashCommand) {
+			if (!state.activeAgentId) {
+				const owningAgent = await getOwningBmadAgentForSkill(this.baseConfig.cwd, managedWorkflowDefinition.workflowId)
+				if (owningAgent) {
+					state.activeAgentId = owningAgent.id
+					state.activeAgentSkillName = owningAgent.id
+					state.activeAgentInvokedSlashCommand = managedWorkflowDefinition.slashCommand
+					state.activeAgentJustActivated = true
+				}
+			}
+
+			await activateManagedWorkflowInTaskState({
+				cwd: this.baseConfig.cwd,
+				taskState: state,
+				workflowId: managedWorkflowDefinition.workflowId,
+				slashCommand: managedWorkflowDefinition.slashCommand,
+			})
 			return
 		}
 
-		if (!state.activeAgentId) {
-			const owningAgent = await getOwningBmadAgentForSkill(this.baseConfig.cwd, managedWorkflowDefinition.workflowId)
-			if (owningAgent) {
-				state.activeAgentId = owningAgent.id
-				state.activeAgentSkillName = owningAgent.id
-				state.activeAgentInvokedSlashCommand = managedWorkflowDefinition.slashCommand
-				state.activeAgentJustActivated = true
-			}
+		const resolvedWorkflow = findResolvedWorkflowByName(workflowEntries, assignedSkill)
+		if (!resolvedWorkflow) {
+			return
 		}
 
-		const { run, resumed } = await startOrResumeManagedWorkflowRun(
-			this.baseConfig.cwd,
-			managedWorkflowDefinition.workflowId,
-			state.managedWorkflowRun,
-			managedWorkflowDefinition.slashCommand,
-		)
-
-		state.managedWorkflowRun = run
-		state.activeWorkflowId = run.workflowId
-		state.activePlaceholderWorkflowId = undefined
-		state.activePlaceholderWorkflowSource = undefined
-		state.activePlaceholderWorkflowValues = undefined
-		state.activeWorkflowJustStarted = !resumed
+		await activatePlaceholderWorkflowInTaskState({
+			cwd: this.baseConfig.cwd,
+			taskState: state,
+			workflow: resolvedWorkflow,
+			clearActiveWorkflowId: true,
+		})
 	}
 
 	private mergePromptSkillEntries(skills: SkillMetadata[], workflows: SkillMetadata[]): SkillMetadata[] {

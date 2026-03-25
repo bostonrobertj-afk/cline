@@ -675,6 +675,74 @@ describe("Managed workflow handlers", () => {
 		}
 	})
 
+	it("computes stable placeholders for placeholder workflows through use_skill and persists them", async () => {
+		const sandbox = sinon.createSandbox()
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "use-skill-local-stable-"))
+		const workflowPath = path.join(tempDir, ".cline", "skills", "custom-review", "custom-review.md")
+		const manifestPath = path.join(tempDir, "_bmad", "_config", "skill-manifest.csv")
+		const configPath = path.join(tempDir, "_bmad", "bmm", "config.yaml")
+		await fs.mkdir(path.dirname(workflowPath), { recursive: true })
+		await fs.mkdir(path.dirname(manifestPath), { recursive: true })
+		await fs.mkdir(path.dirname(configPath), { recursive: true })
+		await fs.writeFile(workflowPath, "# Custom review\nRespond in {communication_language} from {config_source}.", "utf8")
+		await fs.writeFile(
+			manifestPath,
+			[
+				"canonicalId,name,description,module,path,install_to_bmad",
+				'"custom-review","custom-review","Custom review workflow","bmm","_bmad/bmm/workflows/custom-review/SKILL.md","true"',
+			].join("\n"),
+			"utf8",
+		)
+		await fs.writeFile(configPath, 'communication_language: "English"\n', "utf8")
+		sandbox.stub(disk, "getTaskMetadata").resolves({} as any)
+		const saveMetadataStub = sandbox.stub(disk, "saveTaskMetadata").resolves()
+
+		try {
+			const handler = new UseSkillToolHandler()
+			const config = createConfig({
+				cwd: tempDir,
+				services: {
+					stateManager: {
+						getGlobalStateKey: () => ({}),
+						getGlobalSettingsKey: (key: string) => (key === "globalWorkflowToggles" ? {} : undefined),
+						getWorkspaceStateKey: (key: string) => (key === "workflowToggles" ? { [workflowPath]: true } : undefined),
+						getRemoteConfigSettings: () => ({}),
+						getApiConfiguration: () => ({ planModeApiProvider: "openai", actModeApiProvider: "openai" }),
+					},
+				} as any,
+			})
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "use_skill",
+				params: {
+					skill_name: "custom-review.md",
+				},
+				partial: false,
+			} as any)
+
+			expect(String(result)).to.contain("Respond in English from _bmad/bmm/config.yaml.")
+			expect(config.taskState.activePlaceholderWorkflowSource).to.deep.equal({
+				type: "local",
+				name: "custom-review.md",
+				path: workflowPath,
+				configPath,
+			})
+			expect(config.taskState.activePlaceholderWorkflowStableValues).to.include({
+				communication_language: "English",
+				config_source: "_bmad/bmm/config.yaml",
+			})
+			expect(saveMetadataStub.calledOnce).to.equal(true)
+			expect(saveMetadataStub.firstCall.args[1].activePlaceholderWorkflowStableValues).to.include({
+				communication_language: "English",
+				config_source: "_bmad/bmm/config.yaml",
+			})
+		} finally {
+			sandbox.restore()
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
 	it("activates global workflows through use_skill when no local workflow shadows them", async () => {
 		const sandbox = sinon.createSandbox()
 		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "use-skill-global-"))
@@ -720,6 +788,84 @@ describe("Managed workflow handlers", () => {
 		} finally {
 			sandbox.restore()
 			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("renders preserved dynamic placeholder values when re-activating the same local workflow through use_skill", async () => {
+		const sandbox = sinon.createSandbox()
+		let tempDir: string | undefined
+		try {
+			tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "use-skill-local-rendered-"))
+			const workflowPath = path.join(tempDir, ".cline", "skills", "custom-review", "custom-review.md")
+			const manifestPath = path.join(tempDir, "_bmad", "_config", "skill-manifest.csv")
+			const configPath = path.join(tempDir, "_bmad", "bmm", "config.yaml")
+			await fs.mkdir(path.dirname(workflowPath), { recursive: true })
+			await fs.mkdir(path.dirname(manifestPath), { recursive: true })
+			await fs.mkdir(path.dirname(configPath), { recursive: true })
+			await fs.writeFile(workflowPath, "# Local review\nReview {{story_id}} before continuing.", "utf8")
+			await fs.writeFile(
+				manifestPath,
+				[
+					"canonicalId,name,description,module,path,install_to_bmad",
+					'"custom-review","custom-review","Custom review workflow","bmm","_bmad/bmm/workflows/custom-review/SKILL.md","true"',
+				].join("\n"),
+				"utf8",
+			)
+			await fs.writeFile(configPath, 'story_id: "1.0"\n', "utf8")
+			sandbox.stub(disk, "getTaskMetadata").resolves({} as any)
+			sandbox.stub(disk, "saveTaskMetadata").resolves()
+
+			const handler = new UseSkillToolHandler()
+			const config = createConfig({
+				cwd: tempDir,
+				services: {
+					stateManager: {
+						getGlobalStateKey: () => ({}),
+						getGlobalSettingsKey: (key: string) => (key === "globalWorkflowToggles" ? {} : undefined),
+						getWorkspaceStateKey: (key: string) => (key === "workflowToggles" ? { [workflowPath]: true } : undefined),
+						getRemoteConfigSettings: () => ({}),
+						getApiConfiguration: () => ({ planModeApiProvider: "openai", actModeApiProvider: "openai" }),
+					},
+				} as any,
+			})
+			config.taskState.activePlaceholderWorkflowId = "custom-review.md"
+			config.taskState.activePlaceholderWorkflowSource = {
+				type: "local",
+				name: "custom-review.md",
+				path: workflowPath,
+				configPath,
+			}
+			config.taskState.activePlaceholderWorkflowStableValues = {
+				story_id: "1.0",
+				config_source: "_bmad/bmm/config.yaml",
+			}
+			config.taskState.activePlaceholderWorkflowValues = {
+				story_id: "1.2",
+			}
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "use_skill",
+				params: {
+					skill_name: "custom-review.md",
+				},
+				partial: false,
+			} as any)
+
+			expect(String(result)).to.contain("Review 1.2 before continuing.")
+			expect(String(result)).to.not.contain("{{story_id}}")
+			expect(config.taskState.activePlaceholderWorkflowStableValues).to.include({
+				story_id: "1.0",
+				config_source: "_bmad/bmm/config.yaml",
+			})
+			expect(config.taskState.activePlaceholderWorkflowValues).to.deep.equal({
+				story_id: "1.2",
+			})
+		} finally {
+			sandbox.restore()
+			if (tempDir) {
+				await fs.rm(tempDir, { recursive: true, force: true })
+			}
 		}
 	})
 

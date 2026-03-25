@@ -5,6 +5,7 @@ import os from "os"
 import path from "path"
 import {
 	type ActivePlaceholderWorkflowSource,
+	buildActivePlaceholderWorkflowSource,
 	getActivePlaceholderWorkflowStepDetails,
 } from "../placeholder-workflow-step-details"
 
@@ -130,6 +131,49 @@ describe("placeholder workflow step details", () => {
 
 			expect(result?.sourceType).to.equal("global")
 			expect(result?.details).to.contain("Prefer the explicit story path")
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("discovers configPath for local placeholder workflows from the BMAD skill manifest", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "placeholder-workflow-config-discovery-"))
+		const workflowPath = path.join(tempDir, ".cline", "skills", "custom-review", "custom-review.md")
+		const manifestPath = path.join(tempDir, "_bmad", "_config", "skill-manifest.csv")
+		const configPath = path.join(tempDir, "_bmad", "bmm", "config.yaml")
+		await fs.mkdir(path.dirname(workflowPath), { recursive: true })
+		await fs.mkdir(path.dirname(manifestPath), { recursive: true })
+		await fs.mkdir(path.dirname(configPath), { recursive: true })
+		await fs.writeFile(workflowPath, SAMPLE_WORKFLOW, "utf8")
+		await fs.writeFile(
+			manifestPath,
+			[
+				"canonicalId,name,description,module,path,install_to_bmad",
+				'"custom-review","custom-review","Custom review workflow","bmm","_bmad/bmm/workflows/custom-review/SKILL.md","true"',
+			].join("\n"),
+			"utf8",
+		)
+		await fs.writeFile(configPath, 'communication_language: "English"\n', "utf8")
+
+		try {
+			const source = await buildActivePlaceholderWorkflowSource(
+				{
+					name: "custom-review.md",
+					source: "local",
+					description: "Workspace workflow: custom-review.md",
+					fileName: "custom-review.md",
+					fullPath: workflowPath,
+				},
+				SAMPLE_WORKFLOW,
+				tempDir,
+			)
+
+			expect(source).to.deep.equal({
+				type: "local",
+				name: "custom-review.md",
+				path: workflowPath,
+				configPath,
+			})
 		} finally {
 			await fs.rm(tempDir, { recursive: true, force: true })
 		}

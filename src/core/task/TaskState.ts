@@ -69,6 +69,7 @@ export class TaskState {
 	activeWorkflowId?: string
 	activePlaceholderWorkflowId?: string
 	activePlaceholderWorkflowSource?: ActivePlaceholderWorkflowSource
+	activePlaceholderWorkflowStableValues?: Record<string, string>
 	activePlaceholderWorkflowValues?: Record<string, string>
 	activeWorkflowJustStarted = false
 	managedWorkflowRun?: ManagedWorkflowRunState

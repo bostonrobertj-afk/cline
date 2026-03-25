@@ -46,6 +46,9 @@ Inspect the prepared review input and write findings.
 				name: "local-review.md",
 				path: workflowPath,
 			}
+			taskState.activePlaceholderWorkflowValues = {
+				story_id: "1.2",
+			}
 			taskState.currentFocusChainChecklist = "- [ ] Step 1: Gather Context\n- [ ] Step 2: Review"
 
 			const manager = new FocusChainManager(createDependencies(taskState))
@@ -55,6 +58,87 @@ Inspect the prepared review input and write findings.
 			expect(prompt).to.contain("You are currently on this step: Step 1: Gather Context")
 			expect(prompt).to.contain("Determine what to review from the user's prompt")
 			expect(prompt).to.contain("If you are done with this step, include the `task_progress` parameter")
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("renders stored dynamic placeholder values before extracting the current step", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "focus-chain-placeholder-dynamic-"))
+		const workflowPath = path.join(tempDir, "local-review.md")
+		await fs.writeFile(
+			workflowPath,
+			`# Review Workflow
+
+## Step 1: Gather Context
+Review the scoped story {{story_id}} before asking follow-up questions.
+
+## Step 2: Review
+Inspect the prepared review input and write findings.
+`,
+			"utf8",
+		)
+
+		try {
+			const taskState = new TaskState()
+			taskState.activePlaceholderWorkflowId = "local-review.md"
+			taskState.activePlaceholderWorkflowSource = {
+				type: "local",
+				name: "local-review.md",
+				path: workflowPath,
+			}
+			taskState.activePlaceholderWorkflowStableValues = {
+				story_id: "1.0",
+			}
+			taskState.activePlaceholderWorkflowValues = {
+				story_id: "1.2",
+			}
+			taskState.currentFocusChainChecklist = "- [ ] Step 1: Gather Context\n- [ ] Step 2: Review"
+
+			const manager = new FocusChainManager(createDependencies(taskState))
+			const prompt = await manager.generateFocusChainInstructions()
+
+			expect(prompt).to.contain("Review the scoped story 1.2 before asking follow-up questions.")
+			expect(prompt).to.not.contain("{{story_id}}")
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("renders stored stable placeholder values before extracting the current step", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "focus-chain-placeholder-stable-"))
+		const workflowPath = path.join(tempDir, "local-review.md")
+		await fs.writeFile(
+			workflowPath,
+			`# Review Workflow
+
+## Step 1: Gather Context
+Respond in {communication_language} before asking follow-up questions.
+
+## Step 2: Review
+Inspect the prepared review input and write findings.
+`,
+			"utf8",
+		)
+
+		try {
+			const taskState = new TaskState()
+			taskState.activePlaceholderWorkflowId = "local-review.md"
+			taskState.activePlaceholderWorkflowSource = {
+				type: "local",
+				name: "local-review.md",
+				path: workflowPath,
+			}
+			taskState.activePlaceholderWorkflowStableValues = {
+				communication_language: "English",
+			}
+			taskState.currentFocusChainChecklist = "- [ ] Step 1: Gather Context\n- [ ] Step 2: Review"
+
+			const manager = new FocusChainManager(createDependencies(taskState))
+			const prompt = await manager.generateFocusChainInstructions()
+
+			expect(prompt).to.contain("Respond in English before asking follow-up questions.")
+			expect(prompt).to.not.contain("{communication_language}")
 		} finally {
 			await fs.rm(tempDir, { recursive: true, force: true })
 		}

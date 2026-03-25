@@ -25,6 +25,7 @@ export class SetWorkflowPlaceholdersToolHandler implements IToolHandler, IPartia
 
 	private applyGenericWorkflowPlaceholders(
 		workflowId: string,
+		currentStablePlaceholders: Record<string, string> | undefined,
 		currentPlaceholders: Record<string, string> | undefined,
 		values: Record<string, unknown>,
 	) {
@@ -37,6 +38,7 @@ export class SetWorkflowPlaceholdersToolHandler implements IToolHandler, IPartia
 			createdAt: 0,
 			updatedAt: 0,
 			allRequiredComplete: false,
+			stablePlaceholders: currentStablePlaceholders,
 			dynamicPlaceholders: currentPlaceholders,
 		}
 
@@ -101,6 +103,7 @@ export class SetWorkflowPlaceholdersToolHandler implements IToolHandler, IPartia
 
 			const genericResult = this.applyGenericWorkflowPlaceholders(
 				genericWorkflowId,
+				config.taskState.activePlaceholderWorkflowStableValues,
 				config.taskState.activePlaceholderWorkflowValues,
 				values,
 			)
@@ -130,6 +133,7 @@ export class SetWorkflowPlaceholdersToolHandler implements IToolHandler, IPartia
 			metadata.activeWorkflowId = config.taskState.activeWorkflowId
 			metadata.activePlaceholderWorkflowId = config.taskState.activePlaceholderWorkflowId
 			metadata.activePlaceholderWorkflowSource = config.taskState.activePlaceholderWorkflowSource
+			metadata.activePlaceholderWorkflowStableValues = config.taskState.activePlaceholderWorkflowStableValues
 			metadata.activePlaceholderWorkflowValues = config.taskState.activePlaceholderWorkflowValues
 			metadata.managedWorkflowRun = config.taskState.managedWorkflowRun
 			await saveTaskMetadata(config.taskId, metadata)

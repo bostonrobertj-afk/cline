@@ -39,7 +39,7 @@ import {
 	saveTaskMetadata,
 } from "@core/storage/disk"
 import { releaseTaskLock } from "@core/task/TaskLockUtils"
-import { isSameActivePlaceholderWorkflowSource } from "@core/workflows/placeholder-workflow-step-details"
+import { getRenderedActivePlaceholderWorkflowSourceContents } from "@core/workflows/placeholder-workflow-step-details"
 import { createWorkflowSkillMetadata, resolveAvailableWorkflows } from "@core/workflows/resolution/resolveAvailableWorkflows"
 import { isMultiRootEnabled } from "@core/workspace/multi-root-utils"
 import { WorkspaceRootManager } from "@core/workspace/WorkspaceRootManager"
@@ -123,7 +123,6 @@ import {
 	isSkillAllowedForBmadAgent,
 } from "./bmad-agent-mode"
 import { FocusChainManager } from "./focus-chain"
-import { startOrResumeManagedWorkflowRun } from "./managed-workflows/ManagedWorkflowController"
 import { buildManagedWorkflowPrompt, renderManagedWorkflowTaskProgress } from "./managed-workflows/ManagedWorkflowRenderer"
 import { MessageStateHandler } from "./message-state"
 import { StreamChunkCoordinator } from "./StreamChunkCoordinator"
@@ -134,6 +133,7 @@ import { buildTokenEstimateLogPayload, estimateRequestTokenUsage } from "./token
 import { extractProviderDomainFromUrl, updateApiReqMsg } from "./utils"
 import { buildUserFeedbackContent } from "./utils/buildUserFeedbackContent"
 import { hasExplicitMentionSyntax, hasUserContentTag } from "./utils/userContentProcessing"
+import { activateManagedWorkflowInTaskState, activatePlaceholderWorkflowInTaskState } from "./workflow-activation"
 
 export type ToolResponse = ClineToolResponseContent
 
@@ -983,29 +983,42 @@ export class Task {
 				this.taskState.activeAgentJustActivated = true
 			}
 
-			const { run, resumed } = await startOrResumeManagedWorkflowRun(
-				this.cwd,
-				action.workflowId,
-				this.taskState.managedWorkflowRun,
-				action.slashCommand,
-			)
-			this.taskState.managedWorkflowRun = run
-			this.taskState.activeWorkflowId = run.workflowId
-			this.taskState.activePlaceholderWorkflowId = undefined
-			this.taskState.activePlaceholderWorkflowSource = undefined
-			this.taskState.activePlaceholderWorkflowValues = undefined
-			this.taskState.activeWorkflowJustStarted = !resumed
+			await activateManagedWorkflowInTaskState({
+				cwd: this.cwd,
+				taskState: this.taskState,
+				workflowId: action.workflowId,
+				slashCommand: action.slashCommand,
+			})
 			await this.refreshManagedWorkflowChecklistProjection()
 		} else if (action.type === "activate_placeholder_workflow") {
-			const workflowChanged =
-				this.taskState.activePlaceholderWorkflowId !== action.workflowId ||
-				!isSameActivePlaceholderWorkflowSource(this.taskState.activePlaceholderWorkflowSource, action.workflowSource)
-			this.taskState.activePlaceholderWorkflowId = action.workflowId
-			this.taskState.activePlaceholderWorkflowSource = action.workflowSource
-			this.taskState.activePlaceholderWorkflowValues = workflowChanged
-				? undefined
-				: this.taskState.activePlaceholderWorkflowValues
-			this.taskState.activeWorkflowJustStarted = true
+			const activation = await activatePlaceholderWorkflowInTaskState({
+				cwd: this.cwd,
+				taskState: this.taskState,
+				workflow:
+					action.workflowSource.type === "remote"
+						? {
+								name: action.workflowId,
+								source: "remote",
+								description: "",
+								fileName: action.workflowId,
+								contents: action.workflowSource.contents,
+							}
+						: {
+								name: action.workflowId,
+								source: action.workflowSource.type,
+								description: "",
+								fileName: action.workflowId,
+								fullPath: action.workflowSource.path,
+							},
+				clearActiveWorkflowId: false,
+			})
+			if (!activation) {
+				this.taskState.activePlaceholderWorkflowId = action.workflowId
+				this.taskState.activePlaceholderWorkflowSource = action.workflowSource
+				this.taskState.activePlaceholderWorkflowStableValues = undefined
+				this.taskState.activePlaceholderWorkflowValues = undefined
+				this.taskState.activeWorkflowJustStarted = true
+			}
 		} else if (action.type === "activate_bmad_agent") {
 			const targetAgent = await getBmadAgentById(this.cwd, action.agentId)
 			if (this.taskState.managedWorkflowRun && targetAgent) {
@@ -1027,6 +1040,7 @@ export class Task {
 				this.taskState.activeWorkflowId = undefined
 				this.taskState.activePlaceholderWorkflowId = undefined
 				this.taskState.activePlaceholderWorkflowSource = undefined
+				this.taskState.activePlaceholderWorkflowStableValues = undefined
 				this.taskState.activePlaceholderWorkflowValues = undefined
 				this.taskState.activeWorkflowJustStarted = false
 			} else if (hadManagedWorkflowRun) {
@@ -1043,6 +1057,7 @@ export class Task {
 				this.taskState.activeWorkflowId = undefined
 				this.taskState.activePlaceholderWorkflowId = undefined
 				this.taskState.activePlaceholderWorkflowSource = undefined
+				this.taskState.activePlaceholderWorkflowStableValues = undefined
 				this.taskState.activePlaceholderWorkflowValues = undefined
 				this.taskState.activeWorkflowJustStarted = false
 			}
@@ -1059,12 +1074,30 @@ export class Task {
 			taskMetadata.activeWorkflowId = this.taskState.activeWorkflowId
 			taskMetadata.activePlaceholderWorkflowId = this.taskState.activePlaceholderWorkflowId
 			taskMetadata.activePlaceholderWorkflowSource = this.taskState.activePlaceholderWorkflowSource
+			taskMetadata.activePlaceholderWorkflowStableValues = this.taskState.activePlaceholderWorkflowStableValues
 			taskMetadata.activePlaceholderWorkflowValues = this.taskState.activePlaceholderWorkflowValues
 			taskMetadata.managedWorkflowRun = this.taskState.managedWorkflowRun
 			await saveTaskMetadata(this.taskId, taskMetadata)
 		} catch {
 			// Non-fatal: prompt/runtime state should continue even if metadata persistence fails.
 		}
+	}
+
+	private async buildPlaceholderWorkflowActivationInstructions(
+		action?: PersistentSlashCommandAction,
+	): Promise<string | undefined> {
+		if (action?.type !== "activate_placeholder_workflow" || !this.taskState.activePlaceholderWorkflowSource) {
+			return undefined
+		}
+
+		const source = this.taskState.activePlaceholderWorkflowSource
+		const renderedWorkflowContents = await getRenderedActivePlaceholderWorkflowSourceContents({
+			source,
+			stablePlaceholderValues: this.taskState.activePlaceholderWorkflowStableValues,
+			placeholderValues: this.taskState.activePlaceholderWorkflowValues,
+		})
+
+		return `<explicit_instructions type="${source.name}">\n${renderedWorkflowContents}\n</explicit_instructions>\n`
 	}
 
 	private async buildPromptSkillScope(enabledSkills: SkillMetadata[]): Promise<SkillMetadata[]> {
@@ -1187,6 +1220,7 @@ export class Task {
 			this.taskState.activeWorkflowId = metadata.activeWorkflowId
 			this.taskState.activePlaceholderWorkflowId = metadata.activePlaceholderWorkflowId
 			this.taskState.activePlaceholderWorkflowSource = metadata.activePlaceholderWorkflowSource
+			this.taskState.activePlaceholderWorkflowStableValues = metadata.activePlaceholderWorkflowStableValues
 			this.taskState.activePlaceholderWorkflowValues = metadata.activePlaceholderWorkflowValues
 			this.taskState.activeWorkflowJustStarted = false
 			this.taskState.managedWorkflowRun = metadata.managedWorkflowRun
@@ -3778,6 +3812,14 @@ export class Task {
 			: false
 
 		await this.applyPersistentSlashCommandAction(persistentSlashCommandAction)
+		const placeholderWorkflowActivationInstructions =
+			await this.buildPlaceholderWorkflowActivationInstructions(persistentSlashCommandAction)
+		if (placeholderWorkflowActivationInstructions?.trim()) {
+			processedUserContent.push({
+				type: "text",
+				text: placeholderWorkflowActivationInstructions,
+			})
+		}
 
 		// Add focus chain instructions if needed
 		if (!useCompactPrompt && this.FocusChainManager?.shouldIncludeFocusChainInstructions()) {

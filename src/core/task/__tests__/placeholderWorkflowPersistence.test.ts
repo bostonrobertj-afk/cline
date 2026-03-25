@@ -28,6 +28,7 @@ function createFocusChainManager(taskState: TaskState) {
 function createFakeTask(taskId: string) {
 	return {
 		taskId,
+		cwd: process.cwd(),
 		taskState: new TaskState(),
 		refreshManagedWorkflowChecklistProjection: sinon.stub().resolves(),
 		clearManagedWorkflowChecklistProjection: sinon.stub().resolves(),
@@ -53,6 +54,9 @@ Determine what to review from the user's prompt before asking follow-up question
 Inspect the prepared review input and write findings.
 `,
 				},
+				activePlaceholderWorkflowStableValues: {
+					communication_language: "English",
+				},
 			}
 			sandbox.stub(disk, "getTaskMetadata").resolves(metadata as never)
 
@@ -61,6 +65,9 @@ Inspect the prepared review input and write findings.
 
 			expect(fakeTask.taskState.activePlaceholderWorkflowId).to.equal("remote-review")
 			expect(fakeTask.taskState.activePlaceholderWorkflowSource).to.deep.equal(metadata.activePlaceholderWorkflowSource)
+			expect(fakeTask.taskState.activePlaceholderWorkflowStableValues).to.deep.equal(
+				metadata.activePlaceholderWorkflowStableValues,
+			)
 
 			fakeTask.taskState.currentFocusChainChecklist = "- [ ] Step 1: Gather Context\n- [ ] Step 2: Review"
 			const manager = createFocusChainManager(fakeTask.taskState)
@@ -71,6 +78,96 @@ Inspect the prepared review input and write findings.
 			expect(prompt).to.contain("Determine what to review from the user's prompt")
 		} finally {
 			sandbox.restore()
+		}
+	})
+
+	it("computes stable placeholder values from slash-command activation metadata and renders them in activation instructions", async () => {
+		const sandbox = sinon.createSandbox()
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "slash-placeholder-stable-"))
+		try {
+			const workflowPath = path.join(tempDir, ".cline", "skills", "custom-review", "custom-review.md")
+			const manifestPath = path.join(tempDir, "_bmad", "_config", "skill-manifest.csv")
+			const configPath = path.join(tempDir, "_bmad", "bmm", "config.yaml")
+			await fs.mkdir(path.dirname(workflowPath), { recursive: true })
+			await fs.mkdir(path.dirname(manifestPath), { recursive: true })
+			await fs.mkdir(path.dirname(configPath), { recursive: true })
+			await fs.writeFile(
+				workflowPath,
+				`# Local Flow
+
+## Step 1: Gather Context
+Respond in {communication_language} from {config_source}.
+`,
+				"utf8",
+			)
+			await fs.writeFile(
+				manifestPath,
+				[
+					"canonicalId,name,description,module,path,install_to_bmad",
+					'"custom-review","custom-review","Custom review workflow","bmm","_bmad/bmm/workflows/custom-review/SKILL.md","true"',
+				].join("\n"),
+				"utf8",
+			)
+			await fs.writeFile(configPath, 'communication_language: "English"\n', "utf8")
+
+			sandbox.stub(StateManager, "get").returns({
+				getRemoteConfigSettings: () => ({}),
+				getGlobalStateKey: () => ({}),
+			} as unknown as StateManager)
+
+			const parseResult = await parseSlashCommands(
+				"<task>/custom-review.md continue</task>",
+				{ [workflowPath]: true },
+				{},
+				"test-ulid",
+				undefined,
+				false,
+				undefined,
+				undefined,
+				tempDir,
+			)
+
+			expect(parseResult.persistentSlashCommandAction?.type).to.equal("activate_placeholder_workflow")
+			expect(parseResult.persistentSlashCommandAction?.workflowSource).to.deep.equal({
+				type: "local",
+				name: "custom-review.md",
+				path: workflowPath,
+				configPath,
+			})
+
+			const getMetadataStub = sandbox.stub(disk, "getTaskMetadata").resolves({} as never)
+			const saveMetadataStub = sandbox.stub(disk, "saveTaskMetadata").resolves()
+			const fakeTask = {
+				...createFakeTask("task-slash-stable"),
+				cwd: tempDir,
+			}
+
+			await (Task.prototype as any).applyPersistentSlashCommandAction.call(
+				fakeTask,
+				parseResult.persistentSlashCommandAction,
+			)
+
+			expect(getMetadataStub.calledOnce).to.equal(true)
+			expect(fakeTask.taskState.activePlaceholderWorkflowStableValues).to.include({
+				communication_language: "English",
+				config_source: "_bmad/bmm/config.yaml",
+			})
+
+			const prompt = await (Task.prototype as any).buildPlaceholderWorkflowActivationInstructions.call(fakeTask, {
+				type: "activate_placeholder_workflow",
+				workflowId: "custom-review.md",
+				workflowSource: fakeTask.taskState.activePlaceholderWorkflowSource!,
+			})
+
+			expect(prompt).to.contain("Respond in English from _bmad/bmm/config.yaml.")
+			const [, savedMetadata] = saveMetadataStub.firstCall.args
+			expect(savedMetadata.activePlaceholderWorkflowStableValues).to.include({
+				communication_language: "English",
+				config_source: "_bmad/bmm/config.yaml",
+			})
+		} finally {
+			sandbox.restore()
+			await fs.rm(tempDir, { recursive: true, force: true })
 		}
 	})
 
@@ -92,7 +189,7 @@ Inspect the prepared review input and write findings.
 				"utf8",
 			)
 
-			sinon.stub(StateManager, "get").returns({
+			sandbox.stub(StateManager, "get").returns({
 				getRemoteConfigSettings: () => ({}),
 				getGlobalStateKey: () => ({}),
 			} as unknown as StateManager)
@@ -150,5 +247,62 @@ Inspect the prepared review input and write findings.
 			sandbox.restore()
 			await fs.rm(tempDir, { recursive: true, force: true })
 		}
+	})
+
+	it("renders stored dynamic placeholder values when building slash-activation instructions from task state", async () => {
+		const fakeTask = createFakeTask("task-slash-placeholder-render")
+		fakeTask.taskState.activePlaceholderWorkflowId = "remote-review"
+		fakeTask.taskState.activePlaceholderWorkflowSource = {
+			type: "remote",
+			name: "remote-review",
+			contents: `# Remote Review
+
+## Step 1: Gather Context
+Review {{story_id}} before asking follow-up questions.
+`,
+		}
+		fakeTask.taskState.activePlaceholderWorkflowValues = {
+			story_id: "1.2",
+		}
+
+		const prompt = await (Task.prototype as any).buildPlaceholderWorkflowActivationInstructions.call(fakeTask, {
+			type: "activate_placeholder_workflow",
+			workflowId: "remote-review",
+			workflowSource: fakeTask.taskState.activePlaceholderWorkflowSource!,
+		})
+
+		expect(prompt).to.contain('<explicit_instructions type="remote-review">')
+		expect(prompt).to.contain("Review 1.2 before asking follow-up questions.")
+		expect(prompt).to.not.contain("{{story_id}}")
+	})
+
+	it("lets dynamic placeholder values override stable values in activation instructions", async () => {
+		const fakeTask = createFakeTask("task-slash-placeholder-override")
+		fakeTask.taskState.activePlaceholderWorkflowId = "remote-review"
+		fakeTask.taskState.activePlaceholderWorkflowSource = {
+			type: "remote",
+			name: "remote-review",
+			contents: `# Remote Review
+
+## Step 1: Gather Context
+Review {{story_id}} in {communication_language}.
+`,
+		}
+		fakeTask.taskState.activePlaceholderWorkflowStableValues = {
+			story_id: "1.0",
+			communication_language: "English",
+		}
+		fakeTask.taskState.activePlaceholderWorkflowValues = {
+			story_id: "1.2",
+		}
+
+		const prompt = await (Task.prototype as any).buildPlaceholderWorkflowActivationInstructions.call(fakeTask, {
+			type: "activate_placeholder_workflow",
+			workflowId: "remote-review",
+			workflowSource: fakeTask.taskState.activePlaceholderWorkflowSource!,
+		})
+
+		expect(prompt).to.contain("Review 1.2 in English.")
+		expect(prompt).to.not.contain("{{story_id}}")
 	})
 })
