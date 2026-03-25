@@ -581,6 +581,39 @@ describe("Managed workflow handlers", () => {
 		}
 	})
 
+	it("accepts native serialized values payloads for active non-managed workflows", async () => {
+		const sandbox = sinon.createSandbox()
+		try {
+			const handler = new SetWorkflowPlaceholdersToolHandler()
+			const config = createConfig({ isSubagentExecution: false })
+			config.taskState.activePlaceholderWorkflowId = "dev-story"
+
+			const metadata = { activeWorkflowId: "dev-story" } as any
+			sandbox.stub(disk, "getTaskMetadata").resolves(metadata)
+			sandbox.stub(disk, "saveTaskMetadata").resolves()
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "set_workflow_placeholders",
+				params: {
+					values: JSON.stringify({
+						story_path: "docs/story.md",
+						project_context: "docs/project-context.md",
+					}),
+				},
+				partial: false,
+			} as any)
+
+			expect(String(result)).to.contain("Stored 2 workflow placeholders")
+			expect(config.taskState.activePlaceholderWorkflowValues).to.deep.equal({
+				story_path: "docs/story.md",
+				project_context: "docs/project-context.md",
+			})
+		} finally {
+			sandbox.restore()
+		}
+	})
+
 	it("uses placeholder-workflow-specific no-op guidance for active non-managed workflows", async () => {
 		const handler = new SetWorkflowPlaceholdersToolHandler()
 		const config = createConfig()

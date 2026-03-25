@@ -9,6 +9,17 @@ import type { TaskConfig } from "../types/TaskConfig"
 import type { StronglyTypedUIHelpers } from "../types/UIHelpers"
 
 function parseWorkflowPlaceholderValues(values: unknown): Record<string, unknown> {
+	if (typeof values === "string") {
+		try {
+			const parsed = JSON.parse(values)
+			if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+				return parsed as Record<string, unknown>
+			}
+		} catch {
+			return {}
+		}
+	}
+
 	if (!values || typeof values !== "object" || Array.isArray(values)) {
 		return {}
 	}
