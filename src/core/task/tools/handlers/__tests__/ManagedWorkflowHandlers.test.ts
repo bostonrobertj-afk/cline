@@ -573,9 +573,39 @@ describe("Managed workflow handlers", () => {
 				research_topic: "workflow gating",
 				report_path: "docs/workflow-gating.md",
 			})
+			expect(String(result)).to.contain("Continue the current placeholder workflow step.")
+			expect(String(result)).to.contain("include the full current checklist as task_progress")
+			expect(String(result)).to.contain("change only the completed step from `- [ ]` to `- [x]`")
 		} finally {
 			sandbox.restore()
 		}
+	})
+
+	it("uses placeholder-workflow-specific no-op guidance for active non-managed workflows", async () => {
+		const handler = new SetWorkflowPlaceholdersToolHandler()
+		const config = createConfig()
+		config.taskState.activePlaceholderWorkflowId = "dev-story"
+		config.taskState.activePlaceholderWorkflowValues = {
+			story_path: "docs/story.md",
+		}
+
+		const result = await handler.execute(config, {
+			type: "tool_use",
+			name: "set_workflow_placeholders",
+			params: {
+				values: {
+					story_path: "docs/story.md",
+				},
+			},
+			partial: false,
+		} as any)
+
+		expect(String(result)).to.contain("No workflow placeholder values changed")
+		expect(String(result)).to.contain("Do not call set_workflow_placeholders again unless one of those values changes.")
+		expect(String(result)).to.contain("Continue the current placeholder workflow step.")
+		expect(String(result)).to.contain("include the full current checklist as task_progress")
+		expect(String(result)).to.not.contain("complete_workflow_item")
+		expect((config.callbacks.updateFCListFromToolResponse as sinon.SinonStub).called).to.equal(false)
 	})
 
 	it("reports workflow completion instead of a stale current phase on the final required item", async () => {

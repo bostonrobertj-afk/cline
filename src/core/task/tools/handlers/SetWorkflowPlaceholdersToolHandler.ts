@@ -20,6 +20,14 @@ function getWorkflowPlaceholderValues(block: ToolUse): Record<string, unknown> |
 	return parseWorkflowPlaceholderValues((block.params as Record<string, unknown>).values)
 }
 
+function getNextStepGuidance(isManagedWorkflow: boolean): string {
+	if (isManagedWorkflow) {
+		return "Continue the current workflow step or call complete_workflow_item if that step is finished."
+	}
+
+	return "Continue the current placeholder workflow step. If that step is now complete, include the full current checklist as task_progress on your next tool call, keep the same step labels and order, change only the completed step from `- [ ]` to `- [x]`, and leave future steps unchecked."
+}
+
 export class SetWorkflowPlaceholdersToolHandler implements IToolHandler, IPartialBlockHandler {
 	readonly name = ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS
 
@@ -114,18 +122,20 @@ export class SetWorkflowPlaceholdersToolHandler implements IToolHandler, IPartia
 			unchangedStableKeys = genericResult.unchangedStableKeys
 		}
 
+		const nextStepGuidance = getNextStepGuidance(!!currentRun)
+
 		if (changedKeys.length === 0) {
 			config.taskState.consecutiveMistakeCount = 0
 			if (unchangedDynamicKeys.length > 0 && unchangedStableKeys.length === 0) {
-				return `No workflow placeholder values changed. Existing stored values already matched the requested values: ${unchangedDynamicKeys.join(", ")}. Do not call set_workflow_placeholders again unless one of those values changes; continue the current workflow step or call complete_workflow_item if that step is finished.`
+				return `No workflow placeholder values changed. Existing stored values already matched the requested values: ${unchangedDynamicKeys.join(", ")}. Do not call set_workflow_placeholders again unless one of those values changes. ${nextStepGuidance}`
 			}
 
 			if (unchangedStableKeys.length > 0 && unchangedDynamicKeys.length === 0) {
-				return `Success: workflow placeholder values were already available and matched the requested values: ${unchangedStableKeys.join(", ")}. Do not call set_workflow_placeholders again unless one of those values changes; continue the current workflow step or call complete_workflow_item if that step is finished.`
+				return `Success: workflow placeholder values were already available and matched the requested values: ${unchangedStableKeys.join(", ")}. Do not call set_workflow_placeholders again unless one of those values changes. ${nextStepGuidance}`
 			}
 
 			const unchangedSummary = unchangedKeys.length > 0 ? unchangedKeys.join(", ") : keys.join(", ")
-			return `No workflow placeholder values changed. Existing workflow placeholders already matched the requested values: ${unchangedSummary}. Do not call set_workflow_placeholders again unless one of those values changes; continue the current workflow step or call complete_workflow_item if that step is finished.`
+			return `No workflow placeholder values changed. Existing workflow placeholders already matched the requested values: ${unchangedSummary}. Do not call set_workflow_placeholders again unless one of those values changes. ${nextStepGuidance}`
 		}
 
 		if (!config.isSubagentExecution) {
@@ -147,6 +157,6 @@ export class SetWorkflowPlaceholdersToolHandler implements IToolHandler, IPartia
 		config.taskState.consecutiveMistakeCount = 0
 
 		const unchangedSuffix = unchangedKeys.length > 0 ? ` Unchanged existing values: ${unchangedKeys.join(", ")}.` : ""
-		return `Stored ${changedKeys.length} workflow placeholder${changedKeys.length === 1 ? "" : "s"}: ${changedKeys.join(", ")}.${unchangedSuffix}`
+		return `Stored ${changedKeys.length} workflow placeholder${changedKeys.length === 1 ? "" : "s"}: ${changedKeys.join(", ")}.${unchangedSuffix} ${nextStepGuidance}`.trim()
 	}
 }

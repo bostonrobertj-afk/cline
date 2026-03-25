@@ -365,8 +365,10 @@ export class FocusChainManager {
 					`You are currently on this step: ${stepDetails.checklistLabel}`,
 					stepDetails.details.trim(),
 					"Focus on completing this step.",
-					"I track which step you're on based on your last update using `task_progress`.",
-					"If you are done with this step, include the `task_progress` parameter in your next tool call.",
+					"I track which step you're on based on your last `task_progress` update.",
+					"If you finish this step, include the full current checklist as `task_progress` on your next tool call.",
+					"Keep the same step labels in the same order. Change only this completed step from `- [ ]` to `- [x]`, and leave future steps unchecked.",
+					"Do not resend the same unchanged all-unchecked checklist after you finish this step.",
 					"Once you do, I'll give you the next step's details.",
 				].join("\n\n"),
 			)

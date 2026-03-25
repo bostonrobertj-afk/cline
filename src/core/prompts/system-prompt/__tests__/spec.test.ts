@@ -177,7 +177,7 @@ describe("native tool placeholder replacement", () => {
 		)
 		expect(openAI.function.parameters.properties.input.description).to.equal("Complete `apply_patch` command to execute.")
 		expect(openAI.function.parameters.properties.task_progress.description).to.equal(
-			"Markdown checklist as a top-level parameter on a tool call. Not a standalone tool.",
+			"Full Markdown checklist as a top-level tool parameter. Keep the same items/order and change only completed checkboxes to `[x]`.",
 		)
 	})
 

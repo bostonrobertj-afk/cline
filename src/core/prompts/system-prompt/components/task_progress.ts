@@ -8,6 +8,8 @@ Use \`task_progress\` only as a checklist parameter on the next tool call, not a
 - Create the checklist when switching from PLAN MODE to ACT MODE.
 - Keep items brief and milestone-based.
 - On each update, include the full current checklist.
+- Keep the same checklist items in the same order; only checkbox states should change.
+- Mark completed items by changing only those lines from "- [ ]" to "- [x]".
 - Use Markdown checkboxes: "- [ ]" and "- [x]".
 - Pass task_progress as its own tool parameter, not inside another field.`
 
@@ -18,6 +20,8 @@ Use \`task_progress\` only as a checklist parameter on the next tool call, not a
 - Create the checklist when switching from PLAN MODE to ACT MODE.
 - Keep items brief and milestone-based.
 - On each update, include the full current checklist.
+- Keep the same checklist items in the same order; only checkbox states should change.
+- Mark completed items by changing only those lines from "- [ ]" to "- [x]".
 - Use Markdown checkboxes: "- [ ]" and "- [x]".
 - Pass task_progress as its own tool parameter, not inside another field.`
 
@@ -28,6 +32,8 @@ Use \`task_progress\` only as a checklist parameter on the next tool call, not a
 - Create the checklist when switching from PLAN MODE to ACT MODE.
 - Keep items brief and milestone-based.
 - On each update, include the full current checklist.
+- Keep the same checklist items in the same order; only checkbox states should change.
+- Mark completed items by changing only those lines from "- [ ]" to "- [x]".
 - Use Markdown checkboxes: "- [ ]" and "- [x]".
 - Pass task_progress as its own tool parameter, not inside another field.`
 

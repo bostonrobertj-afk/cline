@@ -277,7 +277,8 @@ export interface VariantSchema {
 export const TASK_PROGRESS_PARAMETER = {
 	name: "task_progress",
 	required: false,
-	instruction: "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool.",
+	instruction:
+		"Full Markdown checklist as a top-level parameter on a tool call. Keep the same items in the same order, and mark completed items by changing only those checkboxes from `- [ ]` to `- [x]`. Not a standalone tool.",
 	usage: "Checklist here (optional)",
 	dependencies: [ClineDefaultTool.TODO],
 }

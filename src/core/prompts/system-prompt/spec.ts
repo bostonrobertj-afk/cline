@@ -471,7 +471,7 @@ function getNativeToolParameterDescription(
 	}
 
 	if (param.name === "task_progress") {
-		return "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool."
+		return "Full Markdown checklist as a top-level tool parameter. Keep the same items/order and change only completed checkboxes to `[x]`."
 	}
 
 	if (tool.name === "set_workflow_placeholders" && param.name === "values") {

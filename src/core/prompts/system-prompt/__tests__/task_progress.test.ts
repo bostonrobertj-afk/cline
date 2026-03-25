@@ -29,11 +29,24 @@ const context: SystemPromptContext = {
 }
 
 describe("managed workflow task progress prompt", () => {
-	it("labels human-authored input separately from system-generated context", async () => {
+	it("directs managed workflows to use backend-managed completion instead of manual checklist edits", async () => {
 		const progress = await getUpdatingTaskProgress(variant, context)
 
-		expect(progress).to.contain("Human-authored input:")
-		expect(progress).to.contain("System-generated context:")
+		expect(progress).to.contain("The current checklist was built for you by the user at the beginning of the conversation.")
 		expect(progress).to.contain("complete_workflow_item")
+		expect(progress).to.contain("task_progress is rendered based on the user's provided steps")
+	})
+})
+
+describe("generic task progress prompt", () => {
+	it("explains checklist-shape preservation and checkbox progression semantics", async () => {
+		const progress = await getUpdatingTaskProgress(variant, {
+			...context,
+			managedWorkflowActive: false,
+		})
+
+		expect(progress).to.contain("On each update, include the full current checklist.")
+		expect(progress).to.contain("Keep the same checklist items in the same order; only checkbox states should change.")
+		expect(progress).to.contain('Mark completed items by changing only those lines from "- [ ]" to "- [x]".')
 	})
 })
