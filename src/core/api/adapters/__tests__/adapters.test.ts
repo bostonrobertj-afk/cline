@@ -74,7 +74,7 @@ EOF`,
 						toolName: "replace_in_file",
 						inputPath: "src/existing-file.ts",
 						inputDiff:
-							'------- SEARCH\n\nfunction oldFunction() {\n\treturn "old"\n}\n=======\n\nfunction oldFunction() {\n\treturn "new"\n}\n+++++++ REPLACE',
+							'------- SEARCH\nfunction oldFunction() {\n\treturn "old"\n}\n=======\nfunction oldFunction() {\n\treturn "new"\n}\n+++++++ REPLACE',
 					},
 				],
 			},
@@ -326,7 +326,7 @@ EOF`,
 						inputPath: "CONTRIBUTING.md",
 
 						inputDiff:
-							"------- SEARCH\n\n3. Install the necessary dependencies for the extension and webview-gui:\n\t```bash\n\tnpm run install:all\n\t```\n4. Generate Protocol Buffer files (required before first build):\n\t```bash\n\tnpm run protos\n\t```\n=======\n\n3. Install the necessary dependencies for the extension and webview-gui:\n\t```bash\n\tbun run install:all\n\t```\n4. Generate Protocol Buffer files (required before first build):\n\t```bash\n\tbun run protos\n\t```\n+++++++ REPLACE\n------- SEARCH\n\n1. Before creating a PR, generate a changeset entry:\n\t```bash\n\tnpm run changeset\n\t```\n=======\n\n1. Before creating a PR, generate a changeset entry:\n\t```bash\n\tbun run changeset\n\t```\n+++++++ REPLACE\n------- SEARCH\n\n4. Testing\n\n\t- Run `npm run test` to run tests locally. \n\t- Before submitting PR, run `npm run format:fix` to format your code\n=======\n\n4. Testing\n\n\t- Run `bun run test` to run tests locally. \n\t- Before submitting PR, run `bun run format:fix` to format your code\n+++++++ REPLACE\n------- SEARCH\n\n2. **Local Development**\n\t- Run `npm run install:all` to install dependencies\n\t- Run `npm run protos` to generate Protocol Buffer files (required before first build)\n\t- Run `npm run test` to run tests locally\n=======\n\n2. **Local Development**\n\t- Run `bun run install:all` to install dependencies\n\t- Run `bun run protos` to generate Protocol Buffer files (required before first build)\n\t- Run `bun run test` to run tests locally\n+++++++ REPLACE",
+							"------- SEARCH\n3. Install the necessary dependencies for the extension and webview-gui:\n\t```bash\n\tnpm run install:all\n\t```\n4. Generate Protocol Buffer files (required before first build):\n\t```bash\n\tnpm run protos\n\t```\n=======\n3. Install the necessary dependencies for the extension and webview-gui:\n\t```bash\n\tbun run install:all\n\t```\n4. Generate Protocol Buffer files (required before first build):\n\t```bash\n\tbun run protos\n\t```\n+++++++ REPLACE\n------- SEARCH\n1. Before creating a PR, generate a changeset entry:\n\t```bash\n\tnpm run changeset\n\t```\n=======\n1. Before creating a PR, generate a changeset entry:\n\t```bash\n\tbun run changeset\n\t```\n+++++++ REPLACE\n------- SEARCH\n4. Testing\n\n\t- Run `npm run test` to run tests locally. \n\t- Before submitting PR, run `npm run format:fix` to format your code\n=======\n4. Testing\n\n\t- Run `bun run test` to run tests locally. \n\t- Before submitting PR, run `bun run format:fix` to format your code\n+++++++ REPLACE\n------- SEARCH\n2. **Local Development**\n\t- Run `npm run install:all` to install dependencies\n\t- Run `npm run protos` to generate Protocol Buffer files (required before first build)\n\t- Run `npm run test` to run tests locally\n=======\n2. **Local Development**\n\t- Run `bun run install:all` to install dependencies\n\t- Run `bun run protos` to generate Protocol Buffer files (required before first build)\n\t- Run `bun run test` to run tests locally\n+++++++ REPLACE",
 					},
 				],
 			},
@@ -699,6 +699,91 @@ EOF`,
 			diffContent.should.match(/\+\+\+\+\+\+\+ REPLACE/)
 			diffContent.should.match(/old line/)
 			diffContent.should.match(/new line/)
+		})
+
+		it("should normalize insertion-only apply_patch update hunks with patch marker spaces", () => {
+			const input: ClineStorageMessage[] = [
+				{
+					role: "assistant",
+					content: [
+						{
+							type: "tool_use",
+							id: "toolu_story_patch",
+							name: "apply_patch",
+							input: {
+								input: `apply_patch <<"EOF"
+*** Begin Patch
+*** Update File: _bmad-output/implementation-artifacts/1-3-add-draft-revisions-and-response-baselines-for-authority-checks.md
+@@
+-Status: review
++Status: ready-for-dev
+@@
+ ## Tasks / Subtasks
+@@
+ - [x] Add an idempotency guard for accepted proposal queueing so replayed proposals do not accumulate duplicates.
++
++- [ ] Enforce top-level \`createDrafts\` / \`responseSpec\` equality against \`responseBaseline\` during create-start validation so durable baselines cannot be mismatched.
++- [ ] Align stale-proposal rejection with the legacy no-revision resume fallback so baseline-less legacy create records do not become replay-stuck.
+@@
+ ## Latest Review Findings
++
++- patch — \`src/stately-studio/actors/shared/workflow-registry.ts:295-305\`: create-start validation accepts a \`responseBaseline\` whose nested \`createDrafts\` / \`responseSpec\` can differ from the top-level event payload. That can persist a mismatched durable baseline and violate the exact-baseline contract.
++- patch — \`src/stately-studio/actors/shared/workflow-registry.ts:610-645, 929-943\` and \`src/stately-studio/actors/workflow-reducer.ts:287-299\`: legacy create records with durable artifacts but no revision metadata resume with \`draftRevision = 0\`, while stale-proposal validation still treats missing revision metadata as stale. Baseline-less legacy creates can become permanently unrouteable/replay-stuck.
+ 
+ 
+ ## Prior Review Findings
+*** End Patch
+EOF`,
+							},
+						},
+					],
+				},
+			]
+
+			const result = transformToolCallMessages(input, [ClineDefaultTool.FILE_EDIT, ClineDefaultTool.FILE_NEW])
+
+			let diffContent = ""
+			for (const message of result) {
+				if (Array.isArray(message.content)) {
+					for (const block of message.content) {
+						if (block.type === "tool_use" && block.name === "replace_in_file") {
+							diffContent = (block.input as any).diff
+						}
+					}
+				}
+			}
+
+			const expectedDiff = [
+				"------- SEARCH",
+				"Status: review",
+				"=======",
+				"Status: ready-for-dev",
+				`${"+".repeat(7)} REPLACE`,
+				"------- SEARCH",
+				"- [x] Add an idempotency guard for accepted proposal queueing so replayed proposals do not accumulate duplicates.",
+				"=======",
+				"- [x] Add an idempotency guard for accepted proposal queueing so replayed proposals do not accumulate duplicates.",
+				"",
+				"- [ ] Enforce top-level `createDrafts` / `responseSpec` equality against `responseBaseline` during create-start validation so durable baselines cannot be mismatched.",
+				"- [ ] Align stale-proposal rejection with the legacy no-revision resume fallback so baseline-less legacy create records do not become replay-stuck.",
+				`${"+".repeat(7)} REPLACE`,
+				"------- SEARCH",
+				"## Latest Review Findings",
+				"",
+				"",
+				"## Prior Review Findings",
+				"=======",
+				"## Latest Review Findings",
+				"",
+				"- patch — `src/stately-studio/actors/shared/workflow-registry.ts:295-305`: create-start validation accepts a `responseBaseline` whose nested `createDrafts` / `responseSpec` can differ from the top-level event payload. That can persist a mismatched durable baseline and violate the exact-baseline contract.",
+				"- patch — `src/stately-studio/actors/shared/workflow-registry.ts:610-645, 929-943` and `src/stately-studio/actors/workflow-reducer.ts:287-299`: legacy create records with durable artifacts but no revision metadata resume with `draftRevision = 0`, while stale-proposal validation still treats missing revision metadata as stale. Baseline-less legacy creates can become permanently unrouteable/replay-stuck.",
+				"",
+				"",
+				"## Prior Review Findings",
+				`${"+".repeat(7)} REPLACE`,
+			].join("\n")
+
+			diffContent.should.equal(expectedDiff)
 		})
 	})
 

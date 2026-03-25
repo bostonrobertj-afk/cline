@@ -169,14 +169,15 @@ function convertPatchToDiff(patchContent: string): string {
 
 			// Collect @@ context marker lines
 			// @@ prefix marks context lines. If @@something, then "something" is context.
-			// If just @@, then it's an empty context line.
+			// A bare @@ is just a hunk marker and should not emit content on its own.
 			while (i < lines.length && lines[i].trim().startsWith("@@")) {
 				const trimmedLine = lines[i].trim()
-				// Extract the actual context content after @@
-				const contextLine = trimmedLine.substring(2)
-				// Always add the context line (even if empty)
-				currentSearch.push(contextLine)
-				currentReplace.push(contextLine)
+				if (trimmedLine !== "@@") {
+					// Extract the actual context content after @@ and normalize the patch marker space.
+					const contextLine = stripPatchMarkerSpace(trimmedLine.substring(2))
+					currentSearch.push(contextLine)
+					currentReplace.push(contextLine)
+				}
 				i++
 			}
 
@@ -202,24 +203,15 @@ function convertPatchToDiff(patchContent: string): string {
 
 				if (hunkLine.startsWith("-")) {
 					hasChanges = true
-					// Strip the - prefix and exactly ONE space if present (but not if it's a tab)
-					let content = hunkLine.substring(1)
-					if (content.startsWith(" ") && !content.startsWith(" \t")) {
-						content = content.substring(1)
-					}
-					currentSearch.push(content)
+					currentSearch.push(stripPatchMarkerSpace(hunkLine.substring(1)))
 				} else if (hunkLine.startsWith("+")) {
 					hasChanges = true
-					// Strip the + prefix and exactly ONE space if present (but not if it's a tab)
-					let content = hunkLine.substring(1)
-					if (content.startsWith(" ") && !content.startsWith(" \t")) {
-						content = content.substring(1)
-					}
-					currentReplace.push(content)
+					currentReplace.push(stripPatchMarkerSpace(hunkLine.substring(1)))
 				} else {
-					// Context line without @@ prefix - add to both sides
-					currentSearch.push(hunkLine)
-					currentReplace.push(hunkLine)
+					// Context line without @@ prefix - normalize the patch marker space before preserving it.
+					const content = stripPatchMarkerSpace(hunkLine)
+					currentSearch.push(content)
+					currentReplace.push(content)
 				}
 			}
 
@@ -239,6 +231,10 @@ function convertPatchToDiff(patchContent: string): string {
 	}
 
 	return diffBlocks.join("\n")
+}
+
+function stripPatchMarkerSpace(line: string): string {
+	return line.startsWith(" ") && !line.startsWith(" \t") ? line.substring(1) : line
 }
 
 /**
@@ -585,9 +581,8 @@ function reconstructWriteToFileResult(block: any, originalToolName: string, orig
 		// If no final_file_content found, create a simple success message
 		if (originalToolName === "write_to_file") {
 			return `[apply_patch for '${filePath}'] Result:\nThe content was successfully saved to ${filePath}.\n\nThe file has been created/updated with the new content.`
-		} else {
-			return `[apply_patch for '${filePath}'] Result:\nThe content was successfully updated in ${filePath}.\n\nThe file has been modified.`
 		}
+		return `[apply_patch for '${filePath}'] Result:\nThe content was successfully updated in ${filePath}.\n\nThe file has been modified.`
 	}
 
 	const finalContent = finalContentMatch[2]
