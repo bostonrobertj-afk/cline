@@ -126,6 +126,8 @@ describe("AskFollowupQuestionToolHandler", () => {
 			selected: "Proceed",
 		})
 		sinon.assert.calledOnce(saveClineMessagesAndUpdateHistory)
+		assert.equal(config.taskState.responseToolTurnShouldEnd, false)
+		assert.equal(config.taskState.responseToolTurnCompletedBy, "ask_followup_question")
 	})
 
 	it("returns explicit user provenance and freeform details for non-option responses", async () => {
@@ -153,5 +155,7 @@ describe("AskFollowupQuestionToolHandler", () => {
 		sinon.assert.calledOnce(callbacks.say)
 		sinon.assert.calledWithExactly(callbacks.say, "user_feedback", "Please summarize the risks first.", undefined, undefined)
 		sinon.assert.notCalled(saveClineMessagesAndUpdateHistory)
+		assert.equal(config.taskState.responseToolTurnShouldEnd, false)
+		assert.equal(config.taskState.responseToolTurnCompletedBy, "ask_followup_question")
 	})
 })

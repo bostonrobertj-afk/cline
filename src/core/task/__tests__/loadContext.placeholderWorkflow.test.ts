@@ -17,11 +17,14 @@ const { Task } = proxyquireNoPreserveCache("../index", {
 	},
 })
 
-function createStateManager() {
+function createStateManager(promptRefreshFrequency = 5) {
 	return {
 		getGlobalSettingsKey: (key: string) => {
 			if (key === "focusChainSettings") {
 				return { enabled: true, remindClineInterval: 6 }
+			}
+			if (key === "promptRefreshFrequency") {
+				return promptRefreshFrequency
 			}
 			if (key === "mode") {
 				return "act"
@@ -43,19 +46,19 @@ function createStateManager() {
 	} as never
 }
 
-function createFocusChainManager(taskState: TaskState) {
+function createFocusChainManager(taskState: TaskState, promptRefreshFrequency = 5) {
 	return new FocusChainManager({
 		taskId: "task-load-context-placeholder",
 		taskState,
 		mode: "act",
-		stateManager: createStateManager(),
+		stateManager: createStateManager(promptRefreshFrequency),
 		postStateToWebview: sinon.stub().resolves(),
 		say: sinon.stub().resolves(undefined),
 		focusChainSettings: { enabled: true, remindClineInterval: 6 } as never,
 	})
 }
 
-function createFakeTask() {
+function createFakeTask(promptRefreshFrequency = 5) {
 	const taskState = new TaskState()
 	taskState.apiRequestCount = 2
 	taskState.apiRequestsSinceLastTodoUpdate = 1
@@ -81,9 +84,9 @@ Determine what to review from the user's prompt before asking follow-up question
 		cwd: process.cwd(),
 		taskState,
 		controller: {
-			stateManager: createStateManager(),
+			stateManager: createStateManager(promptRefreshFrequency),
 		},
-		stateManager: createStateManager(),
+		stateManager: createStateManager(promptRefreshFrequency),
 		mcpHub: {
 			getPrompt: sinon.stub().resolves(null),
 		},
@@ -114,7 +117,10 @@ Determine what to review from the user's prompt before asking follow-up question
 		buildPlaceholderWorkflowActivationInstructions: sinon.stub().resolves(undefined),
 	}
 
-	task.FocusChainManager = createFocusChainManager(taskState)
+	task.FocusChainManager = createFocusChainManager(taskState, promptRefreshFrequency)
+	task.hasHumanAuthoredInput = Task.prototype["hasHumanAuthoredInput"]
+	task.getPromptRefreshFrequency = Task.prototype["getPromptRefreshFrequency"]
+	task.shouldSendFullPromptAssemblyForCurrentTurn = Task.prototype["shouldSendFullPromptAssemblyForCurrentTurn"]
 	return task
 }
 
@@ -151,17 +157,13 @@ function collectTextValues(value: unknown): string[] {
 }
 
 describe("Task.loadContext placeholder workflow focus chain prompting", () => {
-	it("appends placeholder workflow checklist and current-step guidance on a non-reminder GPT-5 turn", async () => {
-		const fakeTask = createFakeTask()
+	it("appends placeholder workflow checklist and current-step guidance when full prompt assembly is required", async () => {
+		const fakeTask = createFakeTask(0)
 		const userContent = [
 			{
 				type: "tool_result",
 				tool_use_id: "tool-1",
 				content: [{ type: "text", text: "Review input available." }],
-			},
-			{
-				type: "text",
-				text: "Continue with the review.",
 			},
 		] as any
 
@@ -175,12 +177,29 @@ describe("Task.loadContext placeholder workflow focus chain prompting", () => {
 
 		const promptText = collectTextValues(processedUserContent).join("\n")
 
-		expect(promptText).to.contain("TODO LIST UPDATE SUGGESTED")
-		expect(promptText).to.contain("```text")
+		expect(promptText).to.contain("### Reminder:")
+		expect(promptText).to.contain("Current Progress: 0/2 items completed")
 		expect(promptText).to.contain("- [ ] Step 1: Determine Review Source")
 		expect(promptText).to.contain("# CURRENT WORKFLOW STEP")
 		expect(promptText).to.contain("You are currently on this step: Step 1: Determine Review Source")
 		expect(environmentDetails).to.equal("ENVIRONMENT: reduced")
 		expect(fakeTask.getEnvironmentDetails.calledOnceWith(false, false)).to.equal(true)
+	})
+
+	it("suppresses placeholder workflow checklist and current-step guidance on tool-only continuation turns before the refresh threshold", async () => {
+		const fakeTask = createFakeTask()
+		const userContent = [
+			{
+				type: "tool_result",
+				tool_use_id: "tool-1",
+				content: [{ type: "text", text: "Review input available." }],
+			},
+		] as any
+
+		const [processedUserContent] = await (Task.prototype as any).loadContext.call(fakeTask, userContent, false, false, false)
+		const promptText = collectTextValues(processedUserContent).join("\n")
+
+		expect(promptText).to.not.contain("TODO LIST UPDATE SUGGESTED")
+		expect(promptText).to.not.contain("# CURRENT WORKFLOW STEP")
 	})
 })

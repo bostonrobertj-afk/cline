@@ -4,6 +4,14 @@ import FeatureSettingsSection from "./FeatureSettingsSection"
 
 const mockUpdateSetting = vi.fn()
 
+class MockResizeObserver {
+	observe() {}
+	unobserve() {}
+	disconnect() {}
+}
+
+vi.stubGlobal("ResizeObserver", MockResizeObserver)
+
 vi.mock("@/context/ExtensionStateContext", () => ({
 	useExtensionState: vi.fn(() => ({
 		enableCheckpointsSetting: true,
@@ -16,6 +24,7 @@ vi.mock("@/context/ExtensionStateContext", () => ({
 		clineWebToolsEnabled: { user: true, featureFlag: true },
 		worktreesEnabled: { user: true, featureFlag: true },
 		focusChainSettings: { enabled: false, remindClineInterval: 6 },
+		promptRefreshFrequency: 5,
 		remoteConfigSettings: {},
 		nativeToolCallSetting: false,
 		enableParallelToolCalling: false,
@@ -50,5 +59,14 @@ describe("FeatureSettingsSection", () => {
 		fireEvent.click(hooksSwitch as Element)
 
 		expect(mockUpdateSetting).toHaveBeenCalledWith("hooksEnabled", true)
+	})
+
+	it("calls updateSetting with promptRefreshFrequency when the slider changes", () => {
+		render(<FeatureSettingsSection renderSectionHeader={() => null} />)
+
+		const slider = screen.getByRole("slider")
+		fireEvent.keyDown(slider, { key: "ArrowRight" })
+
+		expect(mockUpdateSetting).toHaveBeenCalledWith("promptRefreshFrequency", 6)
 	})
 })

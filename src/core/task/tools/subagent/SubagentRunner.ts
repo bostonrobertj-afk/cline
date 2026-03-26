@@ -13,8 +13,14 @@ import {
 	resolvePlaceholderWorkflowManagedVariant,
 } from "@core/task/bmad-agent-mode"
 import { FocusChainManager } from "@core/task/focus-chain"
+import { applyPostToolTaskProgressUpdate, applyPreToolTaskProgressUpdate } from "@core/task/focus-chain/updateFromToolResponse"
 import { getManagedWorkflowDefinition } from "@core/task/managed-workflows/ManagedWorkflowRegistry"
 import { buildManagedWorkflowPrompt } from "@core/task/managed-workflows/ManagedWorkflowRenderer"
+import {
+	getNextTurnsSinceFullPromptRefresh,
+	normalizePromptRefreshFrequency,
+	shouldSendFullPromptAssembly,
+} from "@core/task/prompt-refresh"
 import { StreamResponseHandler } from "@core/task/StreamResponseHandler"
 import {
 	activateManagedWorkflowInTaskState,
@@ -486,7 +492,13 @@ export class SubagentRunner {
 			while (true) {
 				state.apiRequestCount += 1
 				state.apiRequestsSinceLastTodoUpdate += 1
-				await this.appendSubagentPromptInjections(conversation, state)
+				const shouldSendFullPromptAssembly = this.shouldSendFullPromptAssembly(state)
+				state.turnsSinceFullPromptRefresh = getNextTurnsSinceFullPromptRefresh({
+					didSendFullPromptAssembly: shouldSendFullPromptAssembly,
+					hasHumanAuthoredInput: false,
+					turnsSinceFullPromptRefresh: state.turnsSinceFullPromptRefresh,
+				})
+				await this.appendSubagentPromptInjections(conversation, state, shouldSendFullPromptAssembly)
 
 				const context = await this.buildPromptContext({
 					state,
@@ -496,6 +508,7 @@ export class SubagentRunner {
 					configuredSkillNames,
 					assignedSkillNames,
 					nativeToolCallsRequested,
+					shouldSendFullPromptAssembly,
 				})
 				const generatedSystemPrompt = await promptRegistry.get(context)
 				const baseSystemPrompt = this.agent.buildSystemPrompt(generatedSystemPrompt)
@@ -714,8 +727,34 @@ export class SubagentRunner {
 				for (const call of finalizedToolCalls) {
 					const toolName = call.name as ClineDefaultTool
 					const toolCallParams = toToolUseParams(call.input)
+					const toolCallBlock: ToolUse = {
+						type: "tool_use",
+						name: toolName,
+						params: toolCallParams,
+						partial: false,
+						isNativeToolCall: call.isNativeToolCall,
+						call_id: call.call_id || call.toolUseId,
+						signature: call.signature,
+					}
+					const subagentConfig = this.createSubagentTaskConfig(state)
+					const focusChainEnabled = !!subagentConfig.focusChainSettings.enabled
+					const preToolTaskProgressUpdate = await applyPreToolTaskProgressUpdate({
+						block: toolCallBlock,
+						focusChainEnabled,
+						updateFCListFromToolResponse: subagentConfig.callbacks.updateFCListFromToolResponse,
+					})
 
 					if (toolName === ClineDefaultTool.ATTEMPT) {
+						if (preToolTaskProgressUpdate.skipToolExecution) {
+							pushSubagentToolResultBlock(
+								toolResultBlocks,
+								call,
+								toolName,
+								preToolTaskProgressUpdate.toolResult ?? formatResponse.toolError("Task progress update failed."),
+							)
+							continue
+						}
+
 						const completionResult = toolCallParams.result?.trim()
 						if (!completionResult) {
 							const missingResultError = formatResponse.missingToolParameterError("result")
@@ -735,16 +774,6 @@ export class SubagentRunner {
 						continue
 					}
 
-					const toolCallBlock: ToolUse = {
-						type: "tool_use",
-						name: toolName,
-						params: toolCallParams,
-						partial: false,
-						isNativeToolCall: call.isNativeToolCall,
-						call_id: call.call_id || call.toolUseId,
-						signature: call.signature,
-					}
-
 					if (call.call_id) {
 						state.toolUseIdMap.set(call.call_id, call.toolUseId)
 					}
@@ -752,7 +781,6 @@ export class SubagentRunner {
 					const latestToolCall = formatToolCallPreview(toolName, toolCallParams)
 					onProgress({ latestToolCall })
 
-					const subagentConfig = this.createSubagentTaskConfig(state)
 					const handler = this.baseConfig.coordinator.getHandler(toolName)
 					let toolResult: unknown
 
@@ -766,12 +794,25 @@ export class SubagentRunner {
 						}
 					}
 
+					const postToolTaskProgressUpdate = await applyPostToolTaskProgressUpdate({
+						block: toolCallBlock,
+						focusChainEnabled,
+						skipPostExecutionUpdate: preToolTaskProgressUpdate.skipPostExecutionUpdate,
+						updateFCListFromToolResponse: subagentConfig.callbacks.updateFCListFromToolResponse,
+					})
+
 					stats.toolCalls += 1
 					onProgress({ stats: { ...stats } })
 
 					const serializedToolResult = serializeToolResult(toolResult)
 					const toolDescription = handler?.getDescription(toolCallBlock) || `[${toolName}]`
 					pushSubagentToolResultBlock(toolResultBlocks, call, toolDescription, serializedToolResult)
+					if (postToolTaskProgressUpdate.feedback) {
+						toolResultBlocks.push({
+							type: "text",
+							text: postToolTaskProgressUpdate.feedback,
+						})
+					}
 				}
 
 				conversation.push({
@@ -847,21 +888,24 @@ export class SubagentRunner {
 		configuredSkillNames?: string[]
 		assignedSkillNames: string[]
 		nativeToolCallsRequested: boolean
+		shouldSendFullPromptAssembly: boolean
 	}): Promise<SystemPromptContext> {
-		const skills = this.resolvePromptSkills(params.availableSkills, params.configuredSkillNames, params.assignedSkillNames)
+		const skills = params.shouldSendFullPromptAssembly
+			? this.resolvePromptSkills(params.availableSkills, params.configuredSkillNames, params.assignedSkillNames)
+			: []
 
 		let activeAgentRoleInstructions: string | undefined
 		let activeWorkflowReminder: string | undefined
 
-		if (params.state.activeAgentId) {
+		if (params.shouldSendFullPromptAssembly && params.state.activeAgentId) {
 			activeAgentRoleInstructions = await buildBmadAgentRoleInstructions(this.baseConfig.cwd, params.state.activeAgentId, {
 				includeActivation: params.state.activeAgentJustActivated,
 			})
 		}
 
-		if (params.state.managedWorkflowRun) {
+		if (params.shouldSendFullPromptAssembly && params.state.managedWorkflowRun) {
 			activeWorkflowReminder = buildManagedWorkflowPrompt(params.state.managedWorkflowRun)
-		} else if (params.state.activeWorkflowId) {
+		} else if (params.shouldSendFullPromptAssembly && params.state.activeWorkflowId) {
 			activeWorkflowReminder = await getBmadWorkflowReminder(this.baseConfig.cwd, params.state.activeWorkflowId)
 		}
 
@@ -870,7 +914,7 @@ export class SubagentRunner {
 			cwd: this.baseConfig.cwd,
 			ide: params.hostIde,
 			skills,
-			activeAgentId: params.state.activeAgentId,
+			activeAgentId: params.shouldSendFullPromptAssembly ? params.state.activeAgentId : undefined,
 			activeAgentRoleInstructions,
 			activeWorkflowReminder,
 			activeWorkflowSupportsPlaceholders: !!params.state.managedWorkflowRun || !!params.state.activePlaceholderWorkflowId,
@@ -882,6 +926,24 @@ export class SubagentRunner {
 			enableParallelToolCalling: false,
 			isSubagentRun: true,
 		}
+	}
+
+	private getPromptRefreshFrequency(): number {
+		return normalizePromptRefreshFrequency(
+			this.baseConfig.services.stateManager.getGlobalSettingsKey("promptRefreshFrequency"),
+		)
+	}
+
+	private shouldSendFullPromptAssembly(state: TaskState): boolean {
+		return shouldSendFullPromptAssembly({
+			isFirstRequest: state.apiRequestCount === 1,
+			hasHumanAuthoredInput: false,
+			activeAgentJustActivated: state.activeAgentJustActivated,
+			activeWorkflowJustStarted: state.activeWorkflowJustStarted,
+			didRespondToPlanAskBySwitchingMode: false,
+			turnsSinceFullPromptRefresh: state.turnsSinceFullPromptRefresh,
+			promptRefreshFrequency: this.getPromptRefreshFrequency(),
+		})
 	}
 
 	private async autoActivateAssignedWorkflow(
@@ -953,7 +1015,15 @@ export class SubagentRunner {
 		await focusChainManager.refreshPlaceholderWorkflowChecklistProjection(force)
 	}
 
-	private async appendSubagentPromptInjections(conversation: ClineStorageMessage[], state: TaskState): Promise<void> {
+	private async appendSubagentPromptInjections(
+		conversation: ClineStorageMessage[],
+		state: TaskState,
+		shouldSendFullPromptAssembly: boolean,
+	): Promise<void> {
+		if (!shouldSendFullPromptAssembly) {
+			return
+		}
+
 		const additions: ClineTextContentBlock[] = []
 
 		if (state.activeWorkflowJustStarted && state.activePlaceholderWorkflowSource) {

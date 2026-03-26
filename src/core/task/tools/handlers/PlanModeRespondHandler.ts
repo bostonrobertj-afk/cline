@@ -6,10 +6,13 @@ import { ClinePlanModeResponse } from "@/shared/ExtensionMessage"
 import { Logger } from "@/shared/services/Logger"
 import { ClineDefaultTool } from "@/shared/tools"
 import type { ToolResponse } from "../../index"
+import { ResponseToolRuntime } from "../response/ResponseToolRuntime"
 import type { IPartialBlockHandler, IToolHandler } from "../ToolExecutorCoordinator"
 import type { TaskConfig } from "../types/TaskConfig"
 import type { StronglyTypedUIHelpers } from "../types/UIHelpers"
 import { getTaskCompletionTelemetry } from "../utils"
+
+const responseToolRuntime = new ResponseToolRuntime()
 
 export class PlanModeRespondHandler implements IToolHandler, IPartialBlockHandler {
 	readonly name = ClineDefaultTool.PLAN_MODE
@@ -96,7 +99,7 @@ export class PlanModeRespondHandler implements IToolHandler, IPartialBlockHandle
 			text,
 			images,
 			files: planResponseFiles,
-		} = await config.callbacks.ask(this.name, JSON.stringify(sharedMessage), false)
+		} = await responseToolRuntime.askForResponse(config, this.name, this.name, JSON.stringify(sharedMessage))
 
 		config.taskState.isAwaitingPlanResponse = false
 
@@ -146,9 +149,13 @@ export class PlanModeRespondHandler implements IToolHandler, IPartialBlockHandle
 			)
 			// Reset the flag after using it to prevent it from persisting
 			config.taskState.didRespondToPlanAskBySwitchingMode = false
-			return result
+			return responseToolRuntime.finalizeTool(config, this.name, result)
 		}
 		// if we didn't switch to ACT MODE, then we can just send the user_feedback message
-		return formatResponse.toolResult(`<user_message>\n${text}\n</user_message>`, images, fileContentString)
+		return responseToolRuntime.finalizeTool(
+			config,
+			this.name,
+			formatResponse.toolResult(`<user_message>\n${text}\n</user_message>`, images, fileContentString),
+		)
 	}
 }

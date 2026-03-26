@@ -287,6 +287,7 @@ message Settings {
   optional OpenRouterModelInfo act_mode_cline_model_info = 181;
   optional string plan_mode_reasoning_summary = 182;
   optional string act_mode_reasoning_summary = 183;
+  optional int32 prompt_refresh_frequency = 184;
 }
 
 message State {

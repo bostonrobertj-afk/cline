@@ -980,6 +980,7 @@ export class Controller {
 		const autoApprovalSettings = this.stateManager.getGlobalSettingsKey("autoApprovalSettings")
 		const browserSettings = this.stateManager.getGlobalSettingsKey("browserSettings")
 		const focusChainSettings = this.stateManager.getGlobalSettingsKey("focusChainSettings")
+		const promptRefreshFrequency = this.stateManager.getGlobalSettingsKey("promptRefreshFrequency")
 		const preferredLanguage = this.stateManager.getGlobalSettingsKey("preferredLanguage")
 		const mode = this.stateManager.getGlobalSettingsKey("mode")
 		const strictPlanModeEnabled = this.stateManager.getGlobalSettingsKey("strictPlanModeEnabled")
@@ -1072,6 +1073,7 @@ export class Controller {
 			autoApprovalSettings,
 			browserSettings,
 			focusChainSettings,
+			promptRefreshFrequency,
 			preferredLanguage,
 			mode,
 			strictPlanModeEnabled,

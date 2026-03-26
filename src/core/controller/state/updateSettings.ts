@@ -213,6 +213,10 @@ export async function updateSettings(controller: Controller, request: UpdateSett
 			}
 		}
 
+		if (request.promptRefreshFrequency !== undefined) {
+			controller.stateManager.setGlobalState("promptRefreshFrequency", request.promptRefreshFrequency)
+		}
+
 		// Update custom prompt choice
 		if (request.customPrompt !== undefined) {
 			const value = request.customPrompt === "compact" ? "compact" : undefined

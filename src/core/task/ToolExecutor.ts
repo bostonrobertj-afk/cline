@@ -22,6 +22,7 @@ import { StateManager } from "../storage/StateManager"
 import { WorkspaceRootManager } from "../workspace"
 import { ToolResponse } from "."
 import type { FocusChainChecklistUpdateResult } from "./focus-chain/types"
+import { applyPostToolTaskProgressUpdate, applyPreToolTaskProgressUpdate } from "./focus-chain/updateFromToolResponse"
 import { MessageStateHandler } from "./message-state"
 import { TaskState } from "./TaskState"
 import { AutoApprove } from "./tools/autoApprove"
@@ -331,6 +332,14 @@ export class ToolExecutor {
 				return true
 			}
 
+			if (this.taskState.responseToolTurnShouldEnd) {
+				const reason = block.partial
+					? "Tool was interrupted because a previous response tool already completed the current assistant turn."
+					: "Skipping tool because a previous response tool already completed the current assistant turn."
+				this.createToolRejectionMessage(block, reason)
+				return true
+			}
+
 			// Check if a tool has already been used in this message (only enforced when parallel tool calling is disabled)
 			if (!this.isParallelToolCallingEnabled() && this.taskState.didAlreadyUseTool) {
 				this.taskState.userMessageContent.push({
@@ -573,18 +582,16 @@ export class ToolExecutor {
 				return
 			}
 
-			if (
-				!block.partial &&
-				block.name === ClineDefaultTool.ATTEMPT &&
-				this.stateManager.getGlobalSettingsKey("focusChainSettings").enabled
-			) {
-				const focusChainUpdate = await this.updateFCListFromToolResponse(block.params.task_progress)
-				skipPostExecutionFocusChainUpdate = true
-				if (focusChainUpdate.feedback) {
-					toolResult = formatResponse.toolError(focusChainUpdate.feedback)
-					this.pushToolResult(toolResult, block)
-					return
-				}
+			const preToolTaskProgressUpdate = await applyPreToolTaskProgressUpdate({
+				block,
+				focusChainEnabled: this.stateManager.getGlobalSettingsKey("focusChainSettings").enabled,
+				updateFCListFromToolResponse: this.updateFCListFromToolResponse,
+			})
+			skipPostExecutionFocusChainUpdate = preToolTaskProgressUpdate.skipPostExecutionUpdate
+			if (preToolTaskProgressUpdate.skipToolExecution) {
+				toolResult = preToolTaskProgressUpdate.toolResult
+				this.pushToolResult(toolResult, block)
+				return
 			}
 
 			// Execute the actual tool
@@ -653,18 +660,17 @@ export class ToolExecutor {
 		}
 
 		// Handle focus chain updates
-		if (
-			!skipPostExecutionFocusChainUpdate &&
-			!block.partial &&
-			this.stateManager.getGlobalSettingsKey("focusChainSettings").enabled
-		) {
-			const focusChainUpdate = await this.updateFCListFromToolResponse(block.params.task_progress)
-			if (focusChainUpdate.feedback) {
-				this.taskState.userMessageContent.push({
-					type: "text",
-					text: focusChainUpdate.feedback,
-				})
-			}
+		const postToolTaskProgressUpdate = await applyPostToolTaskProgressUpdate({
+			block,
+			focusChainEnabled: this.stateManager.getGlobalSettingsKey("focusChainSettings").enabled,
+			skipPostExecutionUpdate: skipPostExecutionFocusChainUpdate,
+			updateFCListFromToolResponse: this.updateFCListFromToolResponse,
+		})
+		if (postToolTaskProgressUpdate.feedback) {
+			this.taskState.userMessageContent.push({
+				type: "text",
+				text: postToolTaskProgressUpdate.feedback,
+			})
 		}
 	}
 }

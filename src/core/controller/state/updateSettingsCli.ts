@@ -55,6 +55,7 @@ export async function updateSettingsCli(controller: Controller, request: UpdateS
 				worktreesEnabled,
 				subagentsEnabled,
 				focusChainSettings,
+				promptRefreshFrequency,
 				browserSettings,
 				defaultTerminalProfile,
 				...simpleSettings
@@ -203,6 +204,10 @@ export async function updateSettingsCli(controller: Controller, request: UpdateS
 				if (wasEnabled !== isEnabled) {
 					telemetryService.captureFocusChainToggle(isEnabled)
 				}
+			}
+
+			if (promptRefreshFrequency !== undefined) {
+				controller.stateManager.setGlobalState("promptRefreshFrequency", promptRefreshFrequency)
 			}
 
 			// Update browser settings (requires careful merging to avoid protobuf defaults)

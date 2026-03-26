@@ -1,11 +1,16 @@
 import { strict as assert } from "node:assert"
 import { afterEach, describe, it } from "mocha"
 import sinon from "sinon"
+import { ClineDefaultTool } from "@/shared/tools"
 import { TaskState } from "../../../TaskState"
 import type { TaskConfig } from "../../types/TaskConfig"
 import { AttemptCompletionHandler } from "../AttemptCompletionHandler"
 
-function createConfig(): { config: TaskConfig; callbacks: Record<string, sinon.SinonStub>; taskState: TaskState } {
+function createConfig(options?: { autoApproveCommand?: boolean }): {
+	config: TaskConfig
+	callbacks: Record<string, sinon.SinonStub>
+	taskState: TaskState
+} {
 	const taskState = new TaskState()
 	const callbacks = {
 		say: sinon.stub().resolves(undefined),
@@ -54,7 +59,7 @@ function createConfig(): { config: TaskConfig; callbacks: Record<string, sinon.S
 			actions: { executeSafeCommands: false, executeAllCommands: false },
 		},
 		autoApprover: {
-			shouldAutoApproveTool: sinon.stub().returns([false, false]),
+			shouldAutoApproveTool: sinon.stub().returns(options?.autoApproveCommand ? true : [false, false]),
 		},
 		browserSettings: {},
 		focusChainSettings: { enabled: false },
@@ -114,11 +119,38 @@ describe("AttemptCompletionHandler post-completion follow-up", () => {
 		assert.doesNotMatch(String(result), /<feedback>/)
 		sinon.assert.calledWithExactly(callbacks.say, "user_feedback", "one more change", undefined, undefined)
 		sinon.assert.calledOnce(callbacks.runUserPromptSubmitHook)
-		assert.equal(taskState.hasPendingAttemptCompletionFollowup, true)
-		assert.equal(taskState.pendingAttemptCompletionFollowupText, "one more change")
-		assert.equal(taskState.pendingAttemptCompletionFollowupImages, undefined)
-		assert.equal(taskState.pendingAttemptCompletionFollowupFiles, undefined)
-		assert.equal(taskState.pendingAttemptCompletionFollowupHookContext, "hook context")
 		assert.equal(taskState.didAttemptCompletionEndTask, true)
+		assert.equal(taskState.responseToolTurnShouldEnd, true)
+		assert.equal(taskState.responseToolTurnCompletedBy, ClineDefaultTool.ATTEMPT)
+		assert.deepEqual(taskState.pendingResponseToolFollowup, {
+			toolName: ClineDefaultTool.ATTEMPT,
+			route: "normal_user_turn",
+			text: "one more change",
+			images: undefined,
+			files: undefined,
+			hookContext: "hook context",
+		})
+	})
+
+	it("runs attempt_completion commands without opening blocking command_output asks", async () => {
+		const { config, callbacks } = createConfig({ autoApproveCommand: true })
+		;(callbacks.ask as sinon.SinonStub).resolves({
+			response: "yesButtonClicked",
+		})
+
+		const handler = new AttemptCompletionHandler()
+		await handler.execute(config, {
+			type: "tool_use",
+			name: "attempt_completion",
+			params: {
+				result: "done",
+				command: "echo hi",
+			},
+			partial: false,
+		} as any)
+
+		sinon.assert.calledWithExactly(callbacks.executeCommandTool, "echo hi", undefined, {
+			suppressBlockingAsk: true,
+		})
 	})
 })

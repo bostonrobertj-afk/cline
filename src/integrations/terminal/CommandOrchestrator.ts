@@ -62,6 +62,7 @@ export async function orchestrateCommandExecution(
 		onProceedWhileRunning,
 		terminalType = "vscode",
 		suppressUserInteraction = false,
+		suppressBlockingAsk = false,
 	} = options
 
 	const say = async (
@@ -139,6 +140,13 @@ export async function orchestrateCommandExecution(
 		outputBufferSize = 0
 
 		if (!didContinue) {
+			if (suppressBlockingAsk) {
+				didContinue = true
+				await say("command_output", chunk)
+				process.continue()
+				return
+			}
+
 			// Start timer to detect if buffer gets stuck
 			bufferStuckTimer = setTimeout(() => {
 				telemetryService.captureTerminalHang(TerminalHangStage.BUFFER_STUCK, terminalType)

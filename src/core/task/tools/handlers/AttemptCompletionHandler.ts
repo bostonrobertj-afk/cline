@@ -13,6 +13,7 @@ import type { ToolResponse } from "../../index"
 import { listIncompleteManagedWorkflowItems } from "../../managed-workflows/ManagedWorkflowRenderer"
 import { showNotificationForApproval } from "../../utils"
 import { buildUserFeedbackContent } from "../../utils/buildUserFeedbackContent"
+import { ResponseToolRuntime } from "../response/ResponseToolRuntime"
 import type { IPartialBlockHandler, IToolHandler } from "../ToolExecutorCoordinator"
 import type { TaskConfig } from "../types/TaskConfig"
 import type { StronglyTypedUIHelpers } from "../types/UIHelpers"
@@ -20,6 +21,7 @@ import { getTaskCompletionTelemetry } from "../utils"
 import { ToolResultUtils } from "../utils/ToolResultUtils"
 
 const TASK_PREVIEW_MAX_CHARS = 8000
+const responseToolRuntime = new ResponseToolRuntime()
 
 function getInitialTaskPreview(config: TaskConfig): string | undefined {
 	const firstTaskMessage = config.messageState
@@ -191,7 +193,11 @@ export class AttemptCompletionHandler implements IToolHandler, IPartialBlockHand
 			}
 
 			// Execute the command
-			const [userRejected, execCommandResult] = await config.callbacks.executeCommandTool(command!, undefined) // no timeout for attempt_completion command
+			const [userRejected, execCommandResult] = await config.callbacks.executeCommandTool(
+				command!,
+				undefined,
+				responseToolRuntime.getCommandExecutionOptions(this.name),
+			) // no timeout for attempt_completion command
 
 			if (userRejected) {
 				config.taskState.didRejectTool = true
@@ -207,12 +213,6 @@ export class AttemptCompletionHandler implements IToolHandler, IPartialBlockHand
 			telemetryService.captureTaskCompleted(config.ulid, getTaskCompletionTelemetry(config))
 		}
 
-		// we already sent completion_result says, an empty string asks relinquishes control over button and field
-		// in case last command was interactive and in partial state, the UI is expecting an ask response. This ends the command ask response, freeing up the UI to proceed with the completion ask.
-		if (config.messageState.getClineMessages().at(-1)?.ask === "command_output") {
-			await config.callbacks.say("command_output", "")
-		}
-
 		// Run TaskComplete hook BEFORE presenting the "Start New Task" button
 		// At this point we know: task is complete, checkpoint saved, result shown to user
 		await this.runTaskCompleteHook(config, block)
@@ -223,10 +223,15 @@ export class AttemptCompletionHandler implements IToolHandler, IPartialBlockHand
 			waitingForUserInput: false,
 		})
 
-		const { response, text, images, files: completionFiles } = await config.callbacks.ask("completion_result", "", false)
+		const {
+			response,
+			text,
+			images,
+			files: completionFiles,
+		} = await responseToolRuntime.askForResponse(config, this.name, "completion_result", "")
 		const prefix = "[attempt_completion] Result: Done"
 		if (response === "yesButtonClicked") {
-			return prefix // signals to recursive loop to stop (for now this never happens since yesButtonClicked will trigger a new task)
+			return responseToolRuntime.finalizeTool(config, this.name, prefix)
 		}
 
 		const hasPostCompletionReply = !!(
@@ -248,13 +253,14 @@ export class AttemptCompletionHandler implements IToolHandler, IPartialBlockHand
 				return formatResponse.toolDenied()
 			}
 
-			config.taskState.setPendingAttemptCompletionFollowup({
+			responseToolRuntime.queueFollowup(config, {
+				toolName: this.name,
+				route: "normal_user_turn",
 				text,
 				images,
 				files: completionFiles,
 				hookContext: hookResult.contextModification,
 			})
-			config.taskState.didAttemptCompletionEndTask = true
 		}
 
 		const toolResults: (Anthropic.TextBlockParam | Anthropic.ImageBlockParam)[] = []
@@ -271,16 +277,16 @@ export class AttemptCompletionHandler implements IToolHandler, IPartialBlockHand
 
 		// Return the tool results as a complex response
 		if (toolResults.length === 0) {
-			return prefix
+			return responseToolRuntime.finalizeTool(config, this.name, prefix)
 		}
 
-		return [
+		return responseToolRuntime.finalizeTool(config, this.name, [
 			{
 				type: "text" as const,
 				text: prefix,
 			},
 			...toolResults,
-		]
+		])
 	}
 
 	/**

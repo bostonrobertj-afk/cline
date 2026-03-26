@@ -355,6 +355,11 @@ export interface CommandExecutionOptions {
 	 * Command output is still captured and returned as the tool result.
 	 */
 	suppressUserInteraction?: boolean
+	/**
+	 * Suppress blocking command-output asks while still streaming output to the UI.
+	 * This is useful when a surrounding response flow needs to retain ask ownership.
+	 */
+	suppressBlockingAsk?: boolean
 }
 
 /**
@@ -409,6 +414,10 @@ export interface OrchestrationOptions {
 	 * Output is still collected and included in the final result.
 	 */
 	suppressUserInteraction?: boolean
+	/**
+	 * If true, command output is streamed via say() without opening a blocking ask().
+	 */
+	suppressBlockingAsk?: boolean
 }
 
 /**

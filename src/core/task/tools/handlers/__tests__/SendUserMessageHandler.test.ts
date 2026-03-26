@@ -28,7 +28,7 @@ describe("SendUserMessageHandler", () => {
 	})
 
 	it("displays a message in ACT mode", async () => {
-		const { config, callbacks } = createConfig("act")
+		const { config, callbacks, taskState } = createConfig("act")
 		const handler = new SendUserMessageHandler()
 
 		const result = await handler.execute(config, {
@@ -44,10 +44,12 @@ describe("SendUserMessageHandler", () => {
 		assert.match(result as string, /Message displayed/)
 		sinon.assert.calledOnce(callbacks.say)
 		sinon.assert.calledWithExactly(callbacks.say, "text", "That is a good choice.", undefined, undefined, false)
+		assert.equal(taskState.responseToolTurnShouldEnd, true)
+		assert.equal(taskState.responseToolTurnCompletedBy, ClineDefaultTool.SEND_USER_MESSAGE)
 	})
 
 	it("displays a message in PLAN mode", async () => {
-		const { config, callbacks } = createConfig("plan")
+		const { config, callbacks, taskState } = createConfig("plan")
 		const handler = new SendUserMessageHandler()
 
 		const result = await handler.execute(config, {
@@ -63,6 +65,8 @@ describe("SendUserMessageHandler", () => {
 		assert.match(result as string, /Message displayed/)
 		sinon.assert.calledOnce(callbacks.say)
 		sinon.assert.calledWithExactly(callbacks.say, "text", "I see the tradeoff here.", undefined, undefined, false)
+		assert.equal(taskState.responseToolTurnShouldEnd, true)
+		assert.equal(taskState.responseToolTurnCompletedBy, ClineDefaultTool.SEND_USER_MESSAGE)
 	})
 
 	it("allows consecutive send_user_message calls", async () => {

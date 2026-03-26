@@ -126,6 +126,11 @@ import { FocusChainManager } from "./focus-chain"
 import { logFocusChainDiagnosticEvent, summarizeFocusChainText, summarizeFocusChainTextBlocks } from "./focus-chain/diagnostics"
 import { buildManagedWorkflowPrompt, renderManagedWorkflowTaskProgress } from "./managed-workflows/ManagedWorkflowRenderer"
 import { MessageStateHandler } from "./message-state"
+import {
+	getNextTurnsSinceFullPromptRefresh,
+	normalizePromptRefreshFrequency,
+	shouldSendFullPromptAssembly,
+} from "./prompt-refresh"
 import { StreamChunkCoordinator } from "./StreamChunkCoordinator"
 import { StreamResponseHandler } from "./StreamResponseHandler"
 import { TaskState } from "./TaskState"
@@ -309,6 +314,8 @@ export class Task {
 	// Command executor for running shell commands (extracted from executeCommandTool)
 	private commandExecutor!: CommandExecutor
 	private nextApiRequestIncludesHumanAuthoredInput = false
+	private currentRequestHasHumanAuthoredInput = false
+	private currentRequestShouldSendFullPromptAssembly = true
 
 	constructor(params: TaskParams) {
 		const {
@@ -1211,19 +1218,30 @@ export class Task {
 		return { activeAgentRoleInstructions, activeWorkflowReminder }
 	}
 
-	private getPromptRefreshInterval(): number {
-		const focusChainSettings = this.stateManager.getGlobalSettingsKey("focusChainSettings")
-		return Math.max(1, focusChainSettings?.remindClineInterval ?? 6)
+	private getPromptRefreshFrequency(): number {
+		return normalizePromptRefreshFrequency(this.stateManager.getGlobalSettingsKey("promptRefreshFrequency"))
 	}
 
-	private isPromptRefreshTurn(): boolean {
-		const refreshInterval = this.getPromptRefreshInterval()
-		return (
-			this.taskState.apiRequestCount === 1 ||
-			this.taskState.activeAgentJustActivated ||
-			this.taskState.didRespondToPlanAskBySwitchingMode ||
-			this.taskState.apiRequestCount % refreshInterval === 0
-		)
+	private shouldSendFullPromptAssemblyForCurrentTurn(
+		hasHumanAuthoredInput = this.nextApiRequestIncludesHumanAuthoredInput,
+	): boolean {
+		return shouldSendFullPromptAssembly({
+			isFirstRequest: this.taskState.apiRequestCount === 1,
+			hasHumanAuthoredInput,
+			activeAgentJustActivated: this.taskState.activeAgentJustActivated,
+			activeWorkflowJustStarted: this.taskState.activeWorkflowJustStarted,
+			didRespondToPlanAskBySwitchingMode: this.taskState.didRespondToPlanAskBySwitchingMode,
+			turnsSinceFullPromptRefresh: this.taskState.turnsSinceFullPromptRefresh,
+			promptRefreshFrequency: this.getPromptRefreshFrequency(),
+		})
+	}
+
+	private updatePromptRefreshCounter(didSendFullPromptAssembly: boolean, hasHumanAuthoredInput: boolean): void {
+		this.taskState.turnsSinceFullPromptRefresh = getNextTurnsSinceFullPromptRefresh({
+			didSendFullPromptAssembly,
+			hasHumanAuthoredInput,
+			turnsSinceFullPromptRefresh: this.taskState.turnsSinceFullPromptRefresh,
+		})
 	}
 
 	private shouldUseMinimalGptPrompt(providerInfo: ApiProviderInfo): boolean {
@@ -2246,11 +2264,10 @@ export class Task {
 		})
 
 		const providerInfo = this.getCurrentProviderInfo()
-		const isPromptRefreshTurn = this.isPromptRefreshTurn()
+		const shouldSendFullPromptAssembly = this.currentRequestShouldSendFullPromptAssembly
 		const useMinimalGptPrompt = this.shouldUseMinimalGptPrompt(providerInfo)
-		const shouldIncludeDynamicPromptContext = this.nextApiRequestIncludesHumanAuthoredInput
-		const shouldIncludePersistentPromptContextForTurn = shouldIncludePersistentPromptContext(this.taskState)
-		const shouldIncludeBmadPromptContext = shouldIncludeDynamicPromptContext || shouldIncludePersistentPromptContextForTurn
+		const shouldIncludeDynamicPromptContext = shouldSendFullPromptAssembly
+		const shouldIncludeBmadPromptContext = shouldSendFullPromptAssembly
 		const host = await HostProvider.env.getHostVersion({})
 		const ide = host?.platform || "Unknown"
 		const isCliEnvironment = host.clineType === ClineClient.Cli
@@ -2361,7 +2378,7 @@ export class Task {
 			activeWorkflowSupportsPlaceholders:
 				!!this.taskState.managedWorkflowRun || !!this.taskState.activePlaceholderWorkflowId,
 			managedWorkflowActive: !!this.taskState.managedWorkflowRun,
-			isPromptRefreshTurn,
+			isPromptRefreshTurn: shouldSendFullPromptAssembly,
 			useMinimalGptPrompt,
 			skills: promptSkills,
 			focusChainSettings: this.stateManager.getGlobalSettingsKey("focusChainSettings"),
@@ -2786,6 +2803,7 @@ export class Task {
 		// act_mode_respond's no-consecutive-use rule scoped to a single
 		// assistant request/turn instead of leaking across later turns.
 		this.taskState.lastToolName = ""
+		this.taskState.clearResponseToolTurnState()
 
 		// Increment API request counter for focus chain list management
 		this.taskState.apiRequestCount++
@@ -2935,6 +2953,10 @@ export class Task {
 		const useReducedEnvironmentDetails = isGPT5ModelFamily(this.getCurrentProviderInfo().model.id)
 		let shouldCompact = false
 		const useAutoCondense = this.stateManager.getGlobalSettingsKey("useAutoCondense")
+		this.currentRequestHasHumanAuthoredInput = this.hasHumanAuthoredInput(userContent)
+		this.currentRequestShouldSendFullPromptAssembly = this.shouldSendFullPromptAssemblyForCurrentTurn(
+			this.currentRequestHasHumanAuthoredInput,
+		)
 
 		if (useAutoCondense && isNextGenModelFamily(this.api.getModel().id)) {
 			// When we initially trigger context cleanup, we increase the context window size, so we need state `currentlySummarizing`
@@ -3020,7 +3042,11 @@ export class Task {
 
 		// Replace userContent with parsed content that includes file details and command instructions.
 		userContent = parsedUserContent
-		this.nextApiRequestIncludesHumanAuthoredInput = this.hasHumanAuthoredInput(userContent)
+		this.nextApiRequestIncludesHumanAuthoredInput = this.currentRequestHasHumanAuthoredInput
+		this.updatePromptRefreshCounter(
+			this.currentRequestShouldSendFullPromptAssembly,
+			this.nextApiRequestIncludesHumanAuthoredInput,
+		)
 
 		// add environment details as its own text block, separate from tool results
 		// do not add environment details to the message which we are compacting the context window
@@ -3210,11 +3236,11 @@ export class Task {
 			this.taskState.currentStreamingContentIndex = 0
 			this.taskState.assistantMessageContent = []
 			this.taskState.didCompleteReadingStream = false
-			this.taskState.didAttemptCompletionEndTask = false
 			this.taskState.userMessageContent = []
 			this.taskState.userMessageContentReady = false
 			this.taskState.didRejectTool = false
 			this.taskState.didAlreadyUseTool = false
+			this.taskState.clearResponseToolTurnState()
 			this.taskState.presentAssistantMessageLocked = false
 			this.taskState.presentAssistantMessageHasPendingUpdates = false
 			this.taskState.didAutomaticallyRetryFailedApiRequest = false
@@ -3634,14 +3660,15 @@ export class Task {
 				// Save checkpoint after all tools in this response have finished executing
 				await this.checkpointManager?.saveCheckpoint()
 
-				if (this.taskState.didAttemptCompletionEndTask) {
-					const pendingAttemptCompletionFollowup = this.taskState.consumePendingAttemptCompletionFollowup()
-					if (pendingAttemptCompletionFollowup) {
+				const completedResponseTool = this.taskState.consumeCompletedResponseTool()
+				if (completedResponseTool) {
+					const pendingResponseToolFollowup = this.taskState.consumePendingResponseToolFollowup()
+					if (pendingResponseToolFollowup?.route === "normal_user_turn") {
 						const deferredUserContent = await buildUserMessageContent(
-							pendingAttemptCompletionFollowup.text,
-							pendingAttemptCompletionFollowup.images,
-							pendingAttemptCompletionFollowup.files,
-							pendingAttemptCompletionFollowup.hookContext,
+							pendingResponseToolFollowup.text,
+							pendingResponseToolFollowup.images,
+							pendingResponseToolFollowup.files,
+							pendingResponseToolFollowup.hookContext,
 						)
 						return await this.recursivelyMakeClineRequests(deferredUserContent)
 					}
@@ -3881,10 +3908,15 @@ export class Task {
 			: false
 
 		await this.applyPersistentSlashCommandAction(persistentSlashCommandAction)
+		const requestHasHumanAuthoredInput = this.hasHumanAuthoredInput(processedUserContent)
+		this.currentRequestHasHumanAuthoredInput = requestHasHumanAuthoredInput
+		const shouldSendFullPromptAssembly = this.shouldSendFullPromptAssemblyForCurrentTurn(requestHasHumanAuthoredInput)
+		this.currentRequestShouldSendFullPromptAssembly = shouldSendFullPromptAssembly
 		const placeholderWorkflowActivationInstructions =
 			await this.buildPlaceholderWorkflowActivationInstructions(persistentSlashCommandAction)
-		const placeholderActivationInstructionsAppended = !!placeholderWorkflowActivationInstructions?.trim()
-		if (placeholderWorkflowActivationInstructions?.trim()) {
+		const placeholderActivationInstructionsAppended =
+			shouldSendFullPromptAssembly && !!placeholderWorkflowActivationInstructions?.trim()
+		if (shouldSendFullPromptAssembly && placeholderWorkflowActivationInstructions?.trim()) {
 			processedUserContent.push({
 				type: "text",
 				text: placeholderWorkflowActivationInstructions,
@@ -3925,7 +3957,7 @@ export class Task {
 			focusChainManagerPresent: !!this.FocusChainManager,
 			useCompactPrompt,
 		})
-		if (!useCompactPrompt && this.FocusChainManager?.shouldIncludeFocusChainInstructions()) {
+		if (shouldSendFullPromptAssembly && !useCompactPrompt && this.FocusChainManager?.shouldIncludeFocusChainInstructions()) {
 			const focusChainInstructions = await this.FocusChainManager.generateFocusChainInstructions()
 			logFocusChainDiagnosticEvent(this.taskId, "focus_chain_generation", {
 				...summarizeFocusChainText(focusChainInstructions),

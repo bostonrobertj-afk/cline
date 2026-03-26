@@ -2,9 +2,12 @@ import type { ToolUse } from "@core/assistant-message"
 import { formatResponse } from "@core/prompts/responses"
 import { ClineDefaultTool } from "@shared/tools"
 import type { ToolResponse } from "../../index"
+import { ResponseToolRuntime } from "../response/ResponseToolRuntime"
 import type { IPartialBlockHandler, IToolHandler } from "../ToolExecutorCoordinator"
 import type { TaskConfig } from "../types/TaskConfig"
 import type { StronglyTypedUIHelpers } from "../types/UIHelpers"
+
+const responseToolRuntime = new ResponseToolRuntime()
 
 export class ActModeRespondHandler implements IToolHandler, IPartialBlockHandler {
 	readonly name = ClineDefaultTool.ACT_MODE
@@ -60,6 +63,7 @@ export class ActModeRespondHandler implements IToolHandler, IPartialBlockHandler
 
 		// Display complete message to user using "text" type (non-blocking)
 		// This allows us to show the progress update and immediately continue
+		await responseToolRuntime.prepareForResponseDelivery(config, this.name)
 		await config.callbacks.say("text", response, undefined, undefined, false)
 
 		// Note: lastToolName is tracked centrally by ToolExecutor after tool execution
@@ -67,10 +71,14 @@ export class ActModeRespondHandler implements IToolHandler, IPartialBlockHandler
 		// Return success immediately to allow LLM to continue execution
 		// The key difference from generate_plan_output: no blocking for user input
 		// NOTE: We explicitly tell the model to use a different tool next to prevent narration loops
-		return formatResponse.toolResult(
-			`[Message displayed. Now proceed with your next tool call - ` +
-				`it must be a different tool (read_file, replace_in_file, execute_command, etc.), ` +
-				`not act_mode_respond again.]`,
+		return responseToolRuntime.finalizeTool(
+			config,
+			this.name,
+			formatResponse.toolResult(
+				`[Message displayed. Now proceed with your next tool call - ` +
+					`it must be a different tool (read_file, replace_in_file, execute_command, etc.), ` +
+					`not act_mode_respond again.]`,
+			),
 		)
 	}
 }

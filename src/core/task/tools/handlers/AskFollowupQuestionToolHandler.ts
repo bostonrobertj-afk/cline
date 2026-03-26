@@ -8,9 +8,12 @@ import { ToolUse } from "../../../assistant-message"
 import { formatResponse } from "../../../prompts/responses"
 import { ToolResponse } from "../.."
 import { getBmadAgentDisplayName } from "../../bmad-agent-mode"
+import { ResponseToolRuntime } from "../response/ResponseToolRuntime"
 import type { IPartialBlockHandler, IToolHandler } from "../ToolExecutorCoordinator"
 import type { TaskConfig } from "../types/TaskConfig"
 import type { StronglyTypedUIHelpers } from "../types/UIHelpers"
+
+const responseToolRuntime = new ResponseToolRuntime()
 
 function formatFollowupAnswerPayload(question: string, answer: string | undefined, selectedOption?: string): string {
 	const lines = [
@@ -92,7 +95,7 @@ export class AskFollowupQuestionToolHandler implements IToolHandler, IPartialBlo
 			text,
 			images,
 			files: followupFiles,
-		} = await config.callbacks.ask("followup", JSON.stringify(sharedMessage), false)
+		} = await responseToolRuntime.askForResponse(config, this.name, "followup", JSON.stringify(sharedMessage))
 
 		// Check if options contains the text response
 		if (optionsRaw && text && options.includes(text)) {
@@ -121,6 +124,10 @@ export class AskFollowupQuestionToolHandler implements IToolHandler, IPartialBlo
 			fileContentString = await processFilesIntoText(followupFiles)
 		}
 
-		return formatResponse.toolResult(formatFollowupAnswerPayload(question, text, selectedOption), images, fileContentString)
+		return responseToolRuntime.finalizeTool(
+			config,
+			this.name,
+			formatResponse.toolResult(formatFollowupAnswerPayload(question, text, selectedOption), images, fileContentString),
+		)
 	}
 }

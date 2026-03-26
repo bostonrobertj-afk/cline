@@ -2,7 +2,9 @@ import { Anthropic } from "@anthropic-ai/sdk"
 import { AssistantMessageContent } from "@core/assistant-message"
 import { ClineAskResponse } from "@shared/WebviewMessage"
 import type { ActivePlaceholderWorkflowSource } from "@/core/workflows/placeholder-workflow-step-details"
+import type { ClineDefaultTool } from "@/shared/tools"
 import type { ManagedWorkflowRunState } from "./managed-workflows/types"
+import type { PendingResponseToolFollowup, ResponseToolTurnBehavior } from "./tools/response/types"
 import type { HookExecution } from "./types/HookExecution"
 
 export class TaskState {
@@ -46,11 +48,10 @@ export class TaskState {
 	didAlreadyUseTool = false
 	didEditFile = false
 	lastToolName = "" // Track last tool used for consecutive call detection
-	pendingAttemptCompletionFollowupText?: string
-	pendingAttemptCompletionFollowupImages?: string[]
-	pendingAttemptCompletionFollowupFiles?: string[]
-	pendingAttemptCompletionFollowupHookContext?: string
-	hasPendingAttemptCompletionFollowup = false
+	activeResponseToolName?: ClineDefaultTool
+	responseToolTurnShouldEnd = false
+	responseToolTurnCompletedBy?: ClineDefaultTool
+	pendingResponseToolFollowup?: PendingResponseToolFollowup
 
 	// File read cache - tracks recent reads so repeated reads can return compact unchanged notices or diffs
 	// instead of replaying the full file when the latest snapshot is still valid for this task.
@@ -90,6 +91,7 @@ export class TaskState {
 	// Focus Chain / Todo List Management
 	apiRequestCount = 0
 	apiRequestsSinceLastTodoUpdate = 0
+	turnsSinceFullPromptRefresh = 0
 	currentFocusChainChecklist: string | null = null
 	todoListWasUpdatedByUser = false
 
@@ -106,54 +108,58 @@ export class TaskState {
 	currentlySummarizing = false
 	lastAutoCompactTriggerIndex?: number
 
-	setPendingAttemptCompletionFollowup(followup: {
-		text?: string
-		images?: string[]
-		files?: string[]
-		hookContext?: string
-	}): void {
-		this.pendingAttemptCompletionFollowupText = followup.text
-		this.pendingAttemptCompletionFollowupImages = followup.images?.length ? [...followup.images] : undefined
-		this.pendingAttemptCompletionFollowupFiles = followup.files?.length ? [...followup.files] : undefined
-		this.pendingAttemptCompletionFollowupHookContext = followup.hookContext
-		this.hasPendingAttemptCompletionFollowup = !!(
+	markResponseToolTurnComplete(toolName: ClineDefaultTool, behavior: ResponseToolTurnBehavior): void {
+		this.activeResponseToolName = undefined
+		this.responseToolTurnCompletedBy = toolName
+		this.responseToolTurnShouldEnd = behavior === "end_turn"
+		this.didAttemptCompletionEndTask = toolName === "attempt_completion" && behavior === "end_turn"
+	}
+
+	consumeCompletedResponseTool(): ClineDefaultTool | undefined {
+		if (!this.responseToolTurnShouldEnd || !this.responseToolTurnCompletedBy) {
+			return undefined
+		}
+
+		const toolName = this.responseToolTurnCompletedBy
+		this.responseToolTurnCompletedBy = undefined
+		this.responseToolTurnShouldEnd = false
+		this.didAttemptCompletionEndTask = false
+
+		return toolName
+	}
+
+	setPendingResponseToolFollowup(followup: PendingResponseToolFollowup): void {
+		const hasContent = !!(
 			(followup.text && followup.text.trim().length > 0) ||
 			(followup.images && followup.images.length > 0) ||
 			(followup.files && followup.files.length > 0) ||
 			(followup.hookContext && followup.hookContext.trim().length > 0)
 		)
+
+		this.pendingResponseToolFollowup = hasContent
+			? {
+					...followup,
+					images: followup.images?.length ? [...followup.images] : undefined,
+					files: followup.files?.length ? [...followup.files] : undefined,
+				}
+			: undefined
 	}
 
-	consumePendingAttemptCompletionFollowup():
-		| {
-				text?: string
-				images?: string[]
-				files?: string[]
-				hookContext?: string
-		  }
-		| undefined {
-		if (!this.hasPendingAttemptCompletionFollowup) {
+	consumePendingResponseToolFollowup(): PendingResponseToolFollowup | undefined {
+		if (!this.pendingResponseToolFollowup) {
 			return undefined
 		}
 
-		const followup = {
-			text: this.pendingAttemptCompletionFollowupText,
-			images: this.pendingAttemptCompletionFollowupImages,
-			files: this.pendingAttemptCompletionFollowupFiles,
-			hookContext: this.pendingAttemptCompletionFollowupHookContext,
-		}
-
-		this.clearPendingAttemptCompletionFollowup()
-		this.didAttemptCompletionEndTask = false
-
+		const followup = this.pendingResponseToolFollowup
+		this.pendingResponseToolFollowup = undefined
 		return followup
 	}
 
-	clearPendingAttemptCompletionFollowup(): void {
-		this.pendingAttemptCompletionFollowupText = undefined
-		this.pendingAttemptCompletionFollowupImages = undefined
-		this.pendingAttemptCompletionFollowupFiles = undefined
-		this.pendingAttemptCompletionFollowupHookContext = undefined
-		this.hasPendingAttemptCompletionFollowup = false
+	clearResponseToolTurnState(): void {
+		this.activeResponseToolName = undefined
+		this.responseToolTurnShouldEnd = false
+		this.responseToolTurnCompletedBy = undefined
+		this.pendingResponseToolFollowup = undefined
+		this.didAttemptCompletionEndTask = false
 	}
 }

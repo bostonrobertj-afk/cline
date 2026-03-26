@@ -206,6 +206,7 @@ const FeatureSettingsSection = ({ renderSectionHeader }: FeatureSettingsSectionP
 		clineWebToolsEnabled,
 		worktreesEnabled,
 		focusChainSettings,
+		promptRefreshFrequency,
 		remoteConfigSettings,
 		nativeToolCallSetting,
 		enableParallelToolCalling,
@@ -219,6 +220,10 @@ const FeatureSettingsSection = ({ renderSectionHeader }: FeatureSettingsSectionP
 		},
 		[focusChainSettings],
 	)
+
+	const handlePromptRefreshFrequencyChange = useCallback((value: number) => {
+		updateSetting("promptRefreshFrequency", value)
+	}, [])
 
 	const isYoloRemoteLocked = remoteConfigSettings?.yoloModeToggled !== undefined
 
@@ -300,6 +305,16 @@ const FeatureSettingsSection = ({ renderSectionHeader }: FeatureSettingsSectionP
 									)}
 								</div>
 							))}
+							<SettingsSlider
+								description="0 = full prompt every eligible internal turn. 10 = full prompt every tenth eligible internal turn."
+								label="Prompt Refresh Frequency (0-10)"
+								max={10}
+								min={0}
+								onChange={handlePromptRefreshFrequencyChange}
+								step={1}
+								value={promptRefreshFrequency ?? 5}
+								valueWidth="w-6"
+							/>
 						</div>
 					</div>
 
