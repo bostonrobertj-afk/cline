@@ -68,6 +68,15 @@ async function compileProtos() {
 	const protoFiles = await globby("**/*.proto", { cwd: PROTO_DIR, realpath: true })
 	console.log(chalk.cyan(`Processing ${protoFiles.length} proto files from`), PROTO_DIR)
 
+	const packageDirs = new Set(
+		protoFiles.map((protoFile) => path.dirname(path.relative(PROTO_DIR, protoFile))).filter((dir) => dir && dir !== "."),
+	)
+	for (const outDir of [TS_OUT_DIR, GRPC_JS_OUT_DIR, NICE_JS_OUT_DIR]) {
+		for (const packageDir of packageDirs) {
+			await fs.mkdir(path.join(outDir, packageDir), { recursive: true })
+		}
+	}
+
 	tsProtoc(TS_OUT_DIR, protoFiles, TS_PROTO_OPTIONS)
 	// grpc-js is used to generate service impls for the ProtoBus service.
 	tsProtoc(GRPC_JS_OUT_DIR, protoFiles, ["outputServices=grpc-js", ...TS_PROTO_OPTIONS])

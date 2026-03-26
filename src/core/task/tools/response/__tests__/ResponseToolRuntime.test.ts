@@ -62,13 +62,13 @@ describe("ResponseToolRuntime", () => {
 	it("tracks and clears response-tool failure scaffolding on task state", () => {
 		const taskState = new TaskState()
 
-		taskState.recordResponseToolFailure(ClineDefaultTool.ASK, "missing question", "validation")
+		taskState.recordResponseToolFailure(ClineDefaultTool.ASK, "missing question", "missing_parameter")
 
 		assert.deepEqual(taskState.getResponseToolFailureState(), {
 			failureCount: 1,
 			lastFailedTool: ClineDefaultTool.ASK,
 			lastFailureMessage: "missing question",
-			lastFailureCause: "validation",
+			lastFailureCause: "missing_parameter",
 		})
 
 		taskState.clearResponseToolTurnState()

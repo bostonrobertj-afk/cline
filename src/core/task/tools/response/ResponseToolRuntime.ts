@@ -98,7 +98,12 @@ export class ResponseToolRuntime {
 		}
 	}
 
-	recordFailure(config: TaskConfig, toolName: string, message: string, cause?: string): ResponseToolFailureState {
+	recordFailure(
+		config: TaskConfig,
+		toolName: string,
+		message: string,
+		cause?: ResponseToolFailureCause,
+	): ResponseToolFailureState {
 		config.taskState.recordResponseToolFailure(toolName as any, message, cause)
 		return this.getFailureState(config)
 	}

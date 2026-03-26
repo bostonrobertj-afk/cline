@@ -72,13 +72,12 @@ function createExecutor() {
 		sinon.stub().resolves(undefined),
 		sinon.stub().resolves(undefined),
 		sinon.stub().resolves(undefined),
-		sinon.stub().resolves({}),
 	)
 
 	const coordinator = (executor as any).coordinator
 	sinon.stub(coordinator, "has").returns(true)
-	sinon.stub(coordinator, "getHandler").callsFake((toolName: string) => ({
-		getDescription: () => `[${toolName}]`,
+	sinon.stub(coordinator, "getHandler").callsFake((...args: unknown[]) => ({
+		getDescription: () => `[${String(args[0])}]`,
 	}))
 
 	const executeStub = sinon.stub(coordinator, "execute")
@@ -153,7 +152,7 @@ describe("ToolExecutor response tool failure budget", () => {
 
 		sinon.assert.notCalled(executeStub)
 		assert.equal(taskState.userMessageContent.length, 1)
-		assert.match(String(taskState.userMessageContent[0].text), /retry budget/)
+		assert.match(String((taskState.userMessageContent[0] as { text?: string }).text), /retry budget/)
 	})
 
 	it("does not block generate_plan_output internal control branches when the retry budget is exhausted", async () => {

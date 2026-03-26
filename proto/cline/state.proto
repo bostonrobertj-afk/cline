@@ -429,6 +429,7 @@ message UpdateSettingsRequest {
   optional bool opt_out_of_remote_config = 39;
   optional bool worktrees_enabled = 40;
   optional bool double_check_completion_enabled = 41;
+  optional int32 prompt_refresh_frequency = 42;
 }
 
 message UpdateTerminalConnectionTimeoutRequest {
