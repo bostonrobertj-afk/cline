@@ -30,13 +30,9 @@ Use \`task_progress\` only as a checklist parameter on the next tool call, not a
 
 const UPDATING_TASK_PROGRESS_PLACEHOLDER_WORKFLOW = `UPDATING TASK PROGRESS
 
-This is a placeholder workflow with a live checklist.
-
-- Use \`task_progress\` only as a checklist parameter on the next tool call, not a standalone tool.
-- Keep items brief and milestone-based.
-- When a step sets a placeholder value, use \`set_workflow_placeholders\` on that step's tool call.
-- To create or update the list, pass a full Markdown checklist as the \`task_progress\` parameter.
-- Use \`__COMPLETE_NEXT_STEP__\` as the \`task_progress\` value to complete the next incomplete step.`
+The user has triggered a workflow with a prebuilt checklist.
+- Instructions are automatically sent for the first incomplete item on the checklist each turn.
+- Use \`task_progress\` with \`__COMPLETE_NEXT_STEP__\` as the value when ready to complete a step.`
 
 export async function getUpdatingTaskProgress(variant: PromptVariant, context: SystemPromptContext): Promise<string | undefined> {
 	if (!context.focusChainSettings?.enabled) {
