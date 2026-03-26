@@ -1,7 +1,9 @@
 import { strict as assert } from "node:assert"
 import { afterEach, describe, it } from "mocha"
 import sinon from "sinon"
+import { ClineDefaultTool } from "@/shared/tools"
 import { TaskState } from "../../../TaskState"
+import { RESPONSE_TOOL_SUCCESS_MESSAGE } from "../../response/types"
 import type { TaskConfig } from "../../types/TaskConfig"
 import { AskFollowupQuestionToolHandler } from "../AskFollowupQuestionToolHandler"
 
@@ -94,7 +96,7 @@ describe("AskFollowupQuestionToolHandler", () => {
 		sinon.restore()
 	})
 
-	it("returns explicit user provenance and selected option details for option responses", async () => {
+	it("queues selected option responses as deferred next-turn human input", async () => {
 		const lastFollowupMessage = { ask: "followup", text: "{}" }
 		const { config, saveClineMessagesAndUpdateHistory } = createConfig({
 			askResult: { text: "Proceed" },
@@ -112,25 +114,25 @@ describe("AskFollowupQuestionToolHandler", () => {
 			partial: false,
 		} as any)
 
-		assert.equal(typeof result, "string")
-		assert.match(result as string, /<answer>/)
-		assert.match(result as string, /Source: user/)
-		assert.match(result as string, /Tool: ask_followup_question/)
-		assert.match(result as string, /Question: Proceed with the review summary\?/)
-		assert.match(result as string, /Response kind: selected_option/)
-		assert.match(result as string, /Selected option: Proceed/)
-		assert.match(result as string, /Answer:\nProceed/)
+		assert.equal(result, RESPONSE_TOOL_SUCCESS_MESSAGE)
 		assert.deepEqual(JSON.parse(lastFollowupMessage.text), {
 			question: "Proceed with the review summary?",
 			options: ["Proceed", "Hold"],
 			selected: "Proceed",
 		})
 		sinon.assert.calledOnce(saveClineMessagesAndUpdateHistory)
-		assert.equal(config.taskState.responseToolTurnShouldEnd, false)
-		assert.equal(config.taskState.responseToolTurnCompletedBy, "ask_followup_question")
+		assert.equal(config.taskState.responseToolTurnShouldEnd, true)
+		assert.equal(config.taskState.responseToolTurnCompletedBy, ClineDefaultTool.ASK)
+		assert.deepEqual(config.taskState.pendingResponseToolFollowup, {
+			toolName: ClineDefaultTool.ASK,
+			route: "normal_user_turn",
+			text: "Proceed",
+			images: undefined,
+			files: undefined,
+		})
 	})
 
-	it("returns explicit user provenance and freeform details for non-option responses", async () => {
+	it("queues freeform responses as deferred next-turn human input", async () => {
 		const { config, callbacks, saveClineMessagesAndUpdateHistory } = createConfig({
 			askResult: { text: "Please summarize the risks first." },
 		})
@@ -146,16 +148,18 @@ describe("AskFollowupQuestionToolHandler", () => {
 			partial: false,
 		} as any)
 
-		assert.equal(typeof result, "string")
-		assert.match(result as string, /<answer>/)
-		assert.match(result as string, /Source: user/)
-		assert.match(result as string, /Response kind: freeform/)
-		assert.doesNotMatch(result as string, /Selected option:/)
-		assert.match(result as string, /Answer:\nPlease summarize the risks first\./)
+		assert.equal(result, RESPONSE_TOOL_SUCCESS_MESSAGE)
 		sinon.assert.calledOnce(callbacks.say)
 		sinon.assert.calledWithExactly(callbacks.say, "user_feedback", "Please summarize the risks first.", undefined, undefined)
 		sinon.assert.notCalled(saveClineMessagesAndUpdateHistory)
-		assert.equal(config.taskState.responseToolTurnShouldEnd, false)
-		assert.equal(config.taskState.responseToolTurnCompletedBy, "ask_followup_question")
+		assert.equal(config.taskState.responseToolTurnShouldEnd, true)
+		assert.equal(config.taskState.responseToolTurnCompletedBy, ClineDefaultTool.ASK)
+		assert.deepEqual(config.taskState.pendingResponseToolFollowup, {
+			toolName: ClineDefaultTool.ASK,
+			route: "normal_user_turn",
+			text: "Please summarize the risks first.",
+			images: undefined,
+			files: undefined,
+		})
 	})
 })

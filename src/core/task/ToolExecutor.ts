@@ -26,6 +26,7 @@ import { applyPostToolTaskProgressUpdate, applyPreToolTaskProgressUpdate } from 
 import { MessageStateHandler } from "./message-state"
 import { TaskState } from "./TaskState"
 import { AutoApprove } from "./tools/autoApprove"
+import { ResponseToolRuntime } from "./tools/response/ResponseToolRuntime"
 import { IPartialBlockHandler, ToolExecutorCoordinator } from "./tools/ToolExecutorCoordinator"
 import { ToolValidator } from "./tools/ToolValidator"
 import { TaskConfig, validateTaskConfig } from "./tools/types/TaskConfig"
@@ -45,6 +46,7 @@ export function canonicalizeAttemptCompletionParams(block: ToolUse): boolean {
 export class ToolExecutor {
 	private autoApprover: AutoApprove
 	private coordinator: ToolExecutorCoordinator
+	private responseToolRuntime = new ResponseToolRuntime()
 
 	// Auto-approval methods using the AutoApprove class
 	private shouldAutoApproveTool(toolName: ClineDefaultTool): boolean | [boolean, boolean] {
@@ -332,6 +334,17 @@ export class ToolExecutor {
 				return true
 			}
 
+			if (
+				this.taskState.hasExhaustedResponseToolFailureBudget() &&
+				this.responseToolRuntime.isGovernedResponseAttempt({ config, block })
+			) {
+				const reason = block.partial
+					? "Tool was interrupted because governed response tool failures already exhausted the current turn's retry budget."
+					: "Skipping tool because governed response tool failures already exhausted the current turn's retry budget."
+				this.createToolRejectionMessage(block, reason)
+				return true
+			}
+
 			if (this.taskState.responseToolTurnShouldEnd) {
 				const reason = block.partial
 					? "Tool was interrupted because a previous response tool already completed the current assistant turn."
@@ -598,6 +611,7 @@ export class ToolExecutor {
 			Logger.info(`[ToolExecutor ${config.taskId}] starting tool ${block.name} (call_id=${block.call_id ?? "none"})`)
 			toolResult = await this.coordinator.execute(config, block)
 			toolWasExecuted = true
+			await this.handleGovernedResponseToolFailureIfNeeded(config, block, toolResult)
 			this.pushToolResult(toolResult, block)
 			Logger.info(`[ToolExecutor ${config.taskId}] completed tool ${block.name} (call_id=${block.call_id ?? "none"})`)
 
@@ -628,6 +642,7 @@ export class ToolExecutor {
 			Logger.error(`[ToolExecutor ${config.taskId}] failed tool ${block.name} (call_id=${block.call_id ?? "none"})`, error)
 			executionSuccess = false
 			toolResult = formatResponse.toolError(`Tool execution failed: ${error}`)
+			await this.handleGovernedResponseToolFailureIfNeeded(config, block, toolResult)
 
 			// Check abort before running PostToolUse hook (error path)
 			if (this.taskState.abort) {
@@ -671,6 +686,26 @@ export class ToolExecutor {
 				type: "text",
 				text: postToolTaskProgressUpdate.feedback,
 			})
+		}
+	}
+
+	private async handleGovernedResponseToolFailureIfNeeded(
+		config: TaskConfig,
+		block: ToolUse,
+		toolResult: ToolResponse,
+	): Promise<void> {
+		if (!this.responseToolRuntime.isGovernedResponseAttempt({ config, block })) {
+			return
+		}
+
+		const failure = this.responseToolRuntime.classifyFailureResult(toolResult)
+		if (!failure) {
+			return
+		}
+
+		const state = this.responseToolRuntime.recordFailure(config, block.name, failure.message, failure.cause)
+		if (state.failureCount === 2) {
+			await this.say("error", this.responseToolRuntime.buildSecondFailureUserMessage(block.name, failure))
 		}
 	}
 }

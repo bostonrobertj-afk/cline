@@ -14,7 +14,7 @@ const RESPONSE_TOOL_METADATA: Record<ClineDefaultTool, ResponseToolMetadata | un
 	},
 	[ClineDefaultTool.ASK]: {
 		toolName: ClineDefaultTool.ASK,
-		defaultTurnBehavior: "continue",
+		defaultTurnBehavior: "end_turn",
 		dismissCommandOutputAskBeforeBlockingAsk: true,
 		partialMessage: {
 			channel: "ask",
@@ -31,7 +31,7 @@ const RESPONSE_TOOL_METADATA: Record<ClineDefaultTool, ResponseToolMetadata | un
 	},
 	[ClineDefaultTool.PLAN_MODE]: {
 		toolName: ClineDefaultTool.PLAN_MODE,
-		defaultTurnBehavior: "continue",
+		defaultTurnBehavior: "end_turn",
 		dismissCommandOutputAskBeforeBlockingAsk: true,
 		partialMessage: {
 			channel: "ask",
@@ -40,7 +40,7 @@ const RESPONSE_TOOL_METADATA: Record<ClineDefaultTool, ResponseToolMetadata | un
 	},
 	[ClineDefaultTool.ACT_MODE]: {
 		toolName: ClineDefaultTool.ACT_MODE,
-		defaultTurnBehavior: "continue",
+		defaultTurnBehavior: "end_turn",
 		partialMessage: {
 			channel: "say",
 			type: "text",

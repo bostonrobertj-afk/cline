@@ -3,6 +3,7 @@ import { afterEach, describe, it } from "mocha"
 import sinon from "sinon"
 import { ClineDefaultTool } from "@/shared/tools"
 import { TaskState } from "../../../TaskState"
+import { RESPONSE_TOOL_SUCCESS_MESSAGE } from "../../response/types"
 import type { TaskConfig } from "../../types/TaskConfig"
 import { AttemptCompletionHandler } from "../AttemptCompletionHandler"
 
@@ -115,8 +116,7 @@ describe("AttemptCompletionHandler post-completion follow-up", () => {
 			partial: false,
 		} as any)
 
-		assert.equal(typeof result, "string")
-		assert.doesNotMatch(String(result), /<feedback>/)
+		assert.equal(result, RESPONSE_TOOL_SUCCESS_MESSAGE)
 		sinon.assert.calledWithExactly(callbacks.say, "user_feedback", "one more change", undefined, undefined)
 		sinon.assert.calledOnce(callbacks.runUserPromptSubmitHook)
 		assert.equal(taskState.didAttemptCompletionEndTask, true)

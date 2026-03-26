@@ -1,0 +1,124 @@
+import { strict as assert } from "node:assert"
+import { afterEach, describe, it } from "mocha"
+import sinon from "sinon"
+import { ClineDefaultTool } from "@/shared/tools"
+import { TaskState } from "../../../TaskState"
+import { RESPONSE_TOOL_SUCCESS_MESSAGE } from "../../response/types"
+import type { TaskConfig } from "../../types/TaskConfig"
+import { PlanModeRespondHandler } from "../PlanModeRespondHandler"
+
+function createConfig(options?: { askResult?: { text?: string; images?: string[]; files?: string[] }; lastPlanMessage?: any }) {
+	const taskState = new TaskState()
+	const clineMessages = options?.lastPlanMessage ? [options.lastPlanMessage] : []
+	const callbacks = {
+		say: sinon.stub().resolves(undefined),
+		ask: sinon.stub().resolves(options?.askResult ?? { text: "Proceed" }),
+		sayAndCreateMissingParamError: sinon.stub().resolves("missing"),
+		switchToActMode: sinon.stub().resolves(false),
+	}
+
+	const saveClineMessagesAndUpdateHistory = sinon.stub().resolves()
+
+	const config = {
+		taskId: "task-1",
+		ulid: "ulid-1",
+		mode: "plan",
+		yoloModeToggled: false,
+		taskState,
+		messageState: {
+			getClineMessages: () => clineMessages,
+			saveClineMessagesAndUpdateHistory,
+		},
+		services: {
+			stateManager: {
+				getGlobalSettingsKey: (key: string) => {
+					if (key === "mode") return "plan"
+					return undefined
+				},
+				getApiConfiguration: () => ({
+					planModeApiProvider: "openai",
+					actModeApiProvider: "openai",
+				}),
+			},
+		},
+		api: {
+			getModel: () => ({ id: "openai/gpt-5", info: {} }),
+		},
+		callbacks,
+	} as unknown as TaskConfig
+
+	return { config, callbacks, saveClineMessagesAndUpdateHistory }
+}
+
+describe("PlanModeRespondHandler", () => {
+	afterEach(() => {
+		sinon.restore()
+	})
+
+	it("queues selected option responses as deferred next-turn human input", async () => {
+		const lastPlanMessage = { ask: ClineDefaultTool.PLAN_MODE, text: "{}" }
+		const { config, saveClineMessagesAndUpdateHistory } = createConfig({
+			askResult: { text: "Proceed" },
+			lastPlanMessage,
+		})
+		const handler = new PlanModeRespondHandler()
+
+		const result = await handler.execute(config, {
+			type: "tool_use",
+			name: ClineDefaultTool.PLAN_MODE,
+			params: {
+				response: "Here is the plan.",
+				options: JSON.stringify(["Proceed", "Revise"]),
+			},
+			partial: false,
+		} as any)
+
+		assert.equal(result, RESPONSE_TOOL_SUCCESS_MESSAGE)
+		assert.deepEqual(JSON.parse(lastPlanMessage.text), {
+			response: "Here is the plan.",
+			options: ["Proceed", "Revise"],
+			selected: "Proceed",
+		})
+		sinon.assert.calledOnce(saveClineMessagesAndUpdateHistory)
+		assert.equal(config.taskState.responseToolTurnShouldEnd, true)
+		assert.equal(config.taskState.responseToolTurnCompletedBy, ClineDefaultTool.PLAN_MODE)
+		assert.deepEqual(config.taskState.pendingResponseToolFollowup, {
+			toolName: ClineDefaultTool.PLAN_MODE,
+			route: "normal_user_turn",
+			text: "Proceed",
+			images: undefined,
+			files: undefined,
+		})
+	})
+
+	it("queues freeform plan responses as deferred next-turn human input", async () => {
+		const { config, callbacks, saveClineMessagesAndUpdateHistory } = createConfig({
+			askResult: { text: "Please revise the rollout section." },
+		})
+		const handler = new PlanModeRespondHandler()
+
+		const result = await handler.execute(config, {
+			type: "tool_use",
+			name: ClineDefaultTool.PLAN_MODE,
+			params: {
+				response: "Here is the plan.",
+				options: JSON.stringify(["Proceed", "Revise"]),
+			},
+			partial: false,
+		} as any)
+
+		assert.equal(result, RESPONSE_TOOL_SUCCESS_MESSAGE)
+		sinon.assert.calledOnce(callbacks.say)
+		sinon.assert.calledWithExactly(callbacks.say, "user_feedback", "Please revise the rollout section.", undefined, undefined)
+		sinon.assert.notCalled(saveClineMessagesAndUpdateHistory)
+		assert.equal(config.taskState.responseToolTurnShouldEnd, true)
+		assert.equal(config.taskState.responseToolTurnCompletedBy, ClineDefaultTool.PLAN_MODE)
+		assert.deepEqual(config.taskState.pendingResponseToolFollowup, {
+			toolName: ClineDefaultTool.PLAN_MODE,
+			route: "normal_user_turn",
+			text: "Please revise the rollout section.",
+			images: undefined,
+			files: undefined,
+		})
+	})
+})

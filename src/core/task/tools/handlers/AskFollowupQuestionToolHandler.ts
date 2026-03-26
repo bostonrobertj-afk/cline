@@ -1,4 +1,3 @@
-import { processFilesIntoText } from "@integrations/misc/extract-text"
 import { showSystemNotification } from "@integrations/notifications"
 import { findLast, parsePartialArrayString } from "@shared/array"
 import { ClineAsk, ClineAskQuestion } from "@shared/ExtensionMessage"
@@ -14,22 +13,6 @@ import type { TaskConfig } from "../types/TaskConfig"
 import type { StronglyTypedUIHelpers } from "../types/UIHelpers"
 
 const responseToolRuntime = new ResponseToolRuntime()
-
-function formatFollowupAnswerPayload(question: string, answer: string | undefined, selectedOption?: string): string {
-	const lines = [
-		"<answer>",
-		"Source: user",
-		"Tool: ask_followup_question",
-		`Question: ${question}`,
-		`Response kind: ${selectedOption ? "selected_option" : "freeform"}`,
-		selectedOption ? `Selected option: ${selectedOption}` : undefined,
-		"Answer:",
-		answer ?? "",
-		"</answer>",
-	].filter((line): line is string => line !== undefined)
-
-	return lines.join("\n")
-}
 
 export class AskFollowupQuestionToolHandler implements IToolHandler, IPartialBlockHandler {
 	readonly name = ClineDefaultTool.ASK
@@ -88,7 +71,6 @@ export class AskFollowupQuestionToolHandler implements IToolHandler, IPartialBlo
 		} satisfies ClineAskQuestion
 
 		const options = parsePartialArrayString(optionsRaw || "[]")
-		let selectedOption: string | undefined
 
 		// Ask the question
 		const {
@@ -99,7 +81,6 @@ export class AskFollowupQuestionToolHandler implements IToolHandler, IPartialBlo
 
 		// Check if options contains the text response
 		if (optionsRaw && text && options.includes(text)) {
-			selectedOption = text
 			telemetryService.captureOptionSelected(config.ulid, options.length, "act")
 
 			// Valid option selected, update last followup message with selected option
@@ -118,16 +99,14 @@ export class AskFollowupQuestionToolHandler implements IToolHandler, IPartialBlo
 			await config.callbacks.say("user_feedback", text ?? "", images, followupFiles)
 		}
 
-		// Process any attached files
-		let fileContentString = ""
-		if (followupFiles && followupFiles.length > 0) {
-			fileContentString = await processFilesIntoText(followupFiles)
-		}
+		responseToolRuntime.queueFollowup(config, {
+			toolName: this.name,
+			route: "normal_user_turn",
+			text,
+			images,
+			files: followupFiles,
+		})
 
-		return responseToolRuntime.finalizeTool(
-			config,
-			this.name,
-			formatResponse.toolResult(formatFollowupAnswerPayload(question, text, selectedOption), images, fileContentString),
-		)
+		return responseToolRuntime.finalizeSuccess(config, this.name)
 	}
 }

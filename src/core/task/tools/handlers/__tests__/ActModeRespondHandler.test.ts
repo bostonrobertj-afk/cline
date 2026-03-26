@@ -3,6 +3,7 @@ import { afterEach, describe, it } from "mocha"
 import sinon from "sinon"
 import { ClineDefaultTool } from "@/shared/tools"
 import { TaskState } from "../../../TaskState"
+import { RESPONSE_TOOL_SUCCESS_MESSAGE } from "../../response/types"
 import type { TaskConfig } from "../../types/TaskConfig"
 import { ActModeRespondHandler } from "../ActModeRespondHandler"
 
@@ -41,10 +42,11 @@ describe("ActModeRespondHandler", () => {
 			partial: false,
 		})
 
-		assert.equal(typeof result, "string")
-		assert.match(result as string, /Message displayed/)
+		assert.equal(result, RESPONSE_TOOL_SUCCESS_MESSAGE)
 		sinon.assert.calledOnce(callbacks.say)
 		sinon.assert.calledWithExactly(callbacks.say, "text", "Reviewing the findings file now.", undefined, undefined, false)
+		assert.equal(config.taskState.responseToolTurnShouldEnd, true)
+		assert.equal(config.taskState.responseToolTurnCompletedBy, ClineDefaultTool.ACT_MODE)
 	})
 
 	it("blocks a consecutive act_mode_respond call in the same turn", async () => {
@@ -80,9 +82,10 @@ describe("ActModeRespondHandler", () => {
 			partial: false,
 		})
 
-		assert.equal(typeof result, "string")
-		assert.match(result as string, /Message displayed/)
+		assert.equal(result, RESPONSE_TOOL_SUCCESS_MESSAGE)
 		sinon.assert.calledOnce(callbacks.say)
 		sinon.assert.calledWithExactly(callbacks.say, "text", "Starting the next turn's work.", undefined, undefined, false)
+		assert.equal(config.taskState.responseToolTurnShouldEnd, true)
+		assert.equal(config.taskState.responseToolTurnCompletedBy, ClineDefaultTool.ACT_MODE)
 	})
 })

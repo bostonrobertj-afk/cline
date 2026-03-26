@@ -27,7 +27,8 @@ const generic: ClineToolSpec = {
 	id,
 	name: "generate_plan_output",
 	description: `Respond to the user's inquiry in an effort to plan a solution to the user's task. This tool should ONLY be used when you have already explored the relevant files and are ready to present a concrete plan. DO NOT use this tool to announce what files you're going to read - just read them first. This tool is only available in PLAN MODE. The environment_details will specify the current mode; if it is not PLAN_MODE then you should not use this tool.
-However, if while writing your response you realize you actually need to do more exploration before providing a complete plan, you can add the optional needs_more_exploration parameter to indicate this. This allows you to acknowledge that you should have done more exploration first, and signals that your next message will use exploration tools instead.`,
+If you are presenting a plan or other user-facing planning response, success displays the message to the user, returns \`[Message displayed.]\`, and ends your current turn. Any later user reply arrives on the following turn as normal human-authored input.
+However, if while writing your response you realize you actually need to do more exploration before providing a complete plan, you can add the optional needs_more_exploration parameter to indicate this. That branch is internal control flow rather than a governed user-facing response, so it does not use the shared response-tool turn-ending contract.`,
 	parameters: [
 		{
 			name: "response",
@@ -60,7 +61,8 @@ const NATIVE_GPT_5: ClineToolSpec = {
 	id,
 	name: "generate_plan_output",
 	description: `Respond to the user's inquiry in an effort to plan a solution to the user's task. This tool should ONLY be used when you have already explored the relevant files and are ready to present a concrete plan. DO NOT use this tool to announce what files you're going to read - just read them first. This tool is only available in PLAN MODE. The environment_details will specify the current mode; if it is not PLAN_MODE then you should not use this tool.
-However, if while writing your response you realize you actually need to do more exploration before providing a complete plan, you can add the optional needs_more_exploration parameter to indicate this. This allows you to acknowledge that you should have done more exploration first, and signals that your next message will use exploration tools instead.`,
+If you are presenting a plan or other user-facing planning response, success displays the message to the user, returns \`[Message displayed.]\`, and ends your current turn. Any later user reply arrives on the following turn as normal human-authored input.
+However, if while writing your response you realize you actually need to do more exploration before providing a complete plan, you can add the optional needs_more_exploration parameter to indicate this. That branch is internal control flow rather than a governed user-facing response, so it does not use the shared response-tool turn-ending contract.`,
 	parameters: [
 		{
 			name: "response",
@@ -80,7 +82,8 @@ const GEMINI_3: ClineToolSpec = {
 	id,
 	name: "generate_plan_output",
 	description: `Respond with a plan that outlines a solution to the user's request. This tool should ONLY be used when you have already explored the relevant files and are ready to present a concrete plan. Only use this tool after you have explored relevant files and collected sufficient context to create a detailed, accurate plan. This tool is only available in PLAN MODE, as indicated by the environment_details.
-If it becomes apparent that additional exploration is required while the generate_plan_output response is being generated, the optional needs_more_exploration parameter can be toggled to enable further research. This allows you to acknowledge that more exploration is required before the final generate_plan_output is generated, and signals that your next message will use exploration tools instead.`,
+If you are presenting a plan or other user-facing planning response, success displays the message to the user, returns \`[Message displayed.]\`, and ends your current turn. Any later user reply arrives on the following turn as normal human-authored input.
+If it becomes apparent that additional exploration is required while the generate_plan_output response is being generated, the optional needs_more_exploration parameter can be toggled to enable further research. That branch is internal control flow rather than a governed user-facing response, so it does not use the shared response-tool turn-ending contract.`,
 	parameters: [
 		{
 			name: "response",

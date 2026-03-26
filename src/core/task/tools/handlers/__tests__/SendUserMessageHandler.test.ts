@@ -3,6 +3,7 @@ import { afterEach, describe, it } from "mocha"
 import sinon from "sinon"
 import { ClineDefaultTool } from "@/shared/tools"
 import { TaskState } from "../../../TaskState"
+import { RESPONSE_TOOL_SUCCESS_MESSAGE } from "../../response/types"
 import type { TaskConfig } from "../../types/TaskConfig"
 import { SendUserMessageHandler } from "../SendUserMessageHandler"
 
@@ -40,8 +41,7 @@ describe("SendUserMessageHandler", () => {
 			partial: false,
 		})
 
-		assert.equal(typeof result, "string")
-		assert.match(result as string, /Message displayed/)
+		assert.equal(result, RESPONSE_TOOL_SUCCESS_MESSAGE)
 		sinon.assert.calledOnce(callbacks.say)
 		sinon.assert.calledWithExactly(callbacks.say, "text", "That is a good choice.", undefined, undefined, false)
 		assert.equal(taskState.responseToolTurnShouldEnd, true)
@@ -61,8 +61,7 @@ describe("SendUserMessageHandler", () => {
 			partial: false,
 		})
 
-		assert.equal(typeof result, "string")
-		assert.match(result as string, /Message displayed/)
+		assert.equal(result, RESPONSE_TOOL_SUCCESS_MESSAGE)
 		sinon.assert.calledOnce(callbacks.say)
 		sinon.assert.calledWithExactly(callbacks.say, "text", "I see the tradeoff here.", undefined, undefined, false)
 		assert.equal(taskState.responseToolTurnShouldEnd, true)
@@ -83,8 +82,7 @@ describe("SendUserMessageHandler", () => {
 			partial: false,
 		})
 
-		assert.equal(typeof result, "string")
-		assert.doesNotMatch(result as string, /\[BLOCKED\]/)
+		assert.equal(result, RESPONSE_TOOL_SUCCESS_MESSAGE)
 		sinon.assert.calledOnce(callbacks.say)
 	})
 

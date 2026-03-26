@@ -9,7 +9,7 @@ const GEMINI_3_TOOL_USE_TEMPLATE = (context: SystemPromptContext) => `TOOL USE
 
 You have access to a set of tools that are executed upon the user's approval.${context.enableParallelToolCalling ? " You may use multiple tools in a single response when the operations are independent (e.g., reading several files, searching in parallel). For dependent operations where one result informs the next, use tools sequentially." : " You should use a single tool at a time and wait for the result before proceeding."} You will receive the results of all tool uses in the user's response.
 
-When using tools, proceed directly with tool calls. Save explanations for the attempt_completion summary. attempt_completion, generate_plan_output, and send_user_message display to the user as assistant messages, so include your message content within the tool call itself rather than duplicating it outside.
+When using tools, proceed directly with tool calls. Save explanations for the appropriate response tool payload. Governed user-facing response tools display their content to the user, return \`[Message displayed.]\`, and end your current turn, so include the full user-visible message within the tool call itself rather than duplicating it outside.
 
 ${getResponseToolsSection(context)}`
 
@@ -207,7 +207,7 @@ During Act Mode, focus on efficient execution:
 
 1. Execute the established plan step-by-step
 2. Provide periodic progress updates indicating which step you're working on
-3. Use tools directly - save explanations for the attempt_completion summary
+3. Use tools directly - put user-visible explanations inside the appropriate response tool payload
 4. Test each feature after implementation to verify it works correctly${context.yoloModeToggled !== true ? "\n5. Verify with the user that the feature works as expected before using attempt_completion\n6. Use attempt_completion when confirmed complete, including your summary within the tool call itself" : "\n5. Use attempt_completion when the task is done, including your summary within the tool call itself"}`
 
 const GEMINI_3_UPDATING_TASK_PROGRESS_TEMPLATE = (_context: SystemPromptContext) => `UPDATING TASK PROGRESS

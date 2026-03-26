@@ -8,7 +8,7 @@ const generic: ClineToolSpec = {
 	id: ClineDefaultTool.ASK,
 	name: "ask_followup_question",
 	description:
-		"Ask the user a question to gather additional information needed to complete the task. Use this tool when clarification would improve correctness, reduce risk, or unblock the next step. It enables direct collaboration with the user, so keep the question concise and specific.",
+		"Ask the user a concise question when clarification or a direct answer is needed. On success, this tool displays the question to the user, returns `[Message displayed.]`, and ends your current turn. The user's answer arrives on the following turn as normal human-authored input rather than same-turn tool output.",
 	contextRequirements: (context) => !context.yoloModeToggled,
 	parameters: [
 		{
@@ -34,7 +34,7 @@ const NATIVE_NEXT_GEN: ClineToolSpec = {
 	id: ClineDefaultTool.ASK,
 	name: "ask_followup_question",
 	description:
-		"Ask user a concise question for clarifying or gathering information needed to complete the task. For example, ask the user clarifying questions about a key implementation decision.",
+		"Ask the user a concise question when clarification or a direct answer is needed. On success, this tool displays the question to the user, returns `[Message displayed.]`, and ends your current turn. The user's answer arrives on the following turn as normal human-authored input rather than same-turn tool output.",
 	contextRequirements: (context) => !context.yoloModeToggled,
 	parameters: [
 		{

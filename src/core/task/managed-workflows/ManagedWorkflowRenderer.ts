@@ -180,7 +180,7 @@ The managed workflow ${run.workflowId} is active and all required phases are com
 How to finalize and exit this workflow:
 - call complete_workflow_item for all remaining regular checklist steps
 - ensure the final checkpoint has already been resolved through the workflow-native checkpoint path
-- once the workflow itself is complete, call attempt_completion with your full final report to the user
+- once the workflow itself is complete, use the normal user-facing response flow to present your final report to the user; do not assume legacy attempt_completion-specific follow-up semantics
 - STOP and await further instruction from the user.</active_bmad_workflow>`
 	}
 

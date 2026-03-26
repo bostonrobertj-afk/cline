@@ -129,33 +129,19 @@ export class PlanModeRespondHandler implements IToolHandler, IPartialBlockHandle
 			}
 		}
 
-		let fileContentString = ""
-		if (planResponseFiles && planResponseFiles.length > 0) {
-			const { processFilesIntoText } = await import("@integrations/misc/extract-text")
-			fileContentString = await processFilesIntoText(planResponseFiles)
-		}
-
 		telemetryService.captureTaskCompleted(config.ulid, getTaskCompletionTelemetry(config))
 
-		// Handle mode switching response
-		if (config.taskState.didRespondToPlanAskBySwitchingMode) {
-			const result = formatResponse.toolResult(
-				`[The user has switched to ACT MODE, so you may now proceed with the task.]` +
-					(text
-						? `\n\nThe user also provided the following message when switching to ACT MODE:\n<user_message>\n${text}\n</user_message>`
-						: ""),
-				images,
-				fileContentString,
-			)
-			// Reset the flag after using it to prevent it from persisting
-			config.taskState.didRespondToPlanAskBySwitchingMode = false
-			return responseToolRuntime.finalizeTool(config, this.name, result)
-		}
-		// if we didn't switch to ACT MODE, then we can just send the user_feedback message
-		return responseToolRuntime.finalizeTool(
-			config,
-			this.name,
-			formatResponse.toolResult(`<user_message>\n${text}\n</user_message>`, images, fileContentString),
-		)
+		responseToolRuntime.queueFollowup(config, {
+			toolName: this.name,
+			route: "normal_user_turn",
+			text,
+			images,
+			files: planResponseFiles,
+		})
+
+		// Reset the flag after using it to prevent it from persisting across turns.
+		config.taskState.didRespondToPlanAskBySwitchingMode = false
+
+		return responseToolRuntime.finalizeSuccess(config, this.name)
 	}
 }

@@ -1,5 +1,4 @@
 import type { ToolUse } from "@core/assistant-message"
-import { formatResponse } from "@core/prompts/responses"
 import { ClineDefaultTool } from "@shared/tools"
 import type { ToolResponse } from "../../index"
 import { ResponseToolRuntime } from "../response/ResponseToolRuntime"
@@ -36,6 +35,6 @@ export class SendUserMessageHandler implements IToolHandler, IPartialBlockHandle
 		await responseToolRuntime.prepareForResponseDelivery(config, this.name)
 		await config.callbacks.say("text", message, undefined, undefined, false)
 
-		return responseToolRuntime.finalizeTool(config, this.name, formatResponse.toolResult("[Message displayed.]"))
+		return responseToolRuntime.finalizeSuccess(config, this.name)
 	}
 }

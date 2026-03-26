@@ -4,7 +4,12 @@ import { ClineAskResponse } from "@shared/WebviewMessage"
 import type { ActivePlaceholderWorkflowSource } from "@/core/workflows/placeholder-workflow-step-details"
 import type { ClineDefaultTool } from "@/shared/tools"
 import type { ManagedWorkflowRunState } from "./managed-workflows/types"
-import type { PendingResponseToolFollowup, ResponseToolTurnBehavior } from "./tools/response/types"
+import type {
+	PendingResponseToolFollowup,
+	ResponseToolFailureCause,
+	ResponseToolFailureState,
+	ResponseToolTurnBehavior,
+} from "./tools/response/types"
 import type { HookExecution } from "./types/HookExecution"
 
 export class TaskState {
@@ -52,6 +57,10 @@ export class TaskState {
 	responseToolTurnShouldEnd = false
 	responseToolTurnCompletedBy?: ClineDefaultTool
 	pendingResponseToolFollowup?: PendingResponseToolFollowup
+	responseToolFailureCount = 0
+	lastFailedResponseTool?: ClineDefaultTool
+	lastResponseToolFailureMessage?: string
+	lastResponseToolFailureCause?: ResponseToolFailureCause
 
 	// File read cache - tracks recent reads so repeated reads can return compact unchanged notices or diffs
 	// instead of replaying the full file when the latest snapshot is still valid for this task.
@@ -155,11 +164,39 @@ export class TaskState {
 		return followup
 	}
 
+	recordResponseToolFailure(toolName: ClineDefaultTool, message: string, cause?: ResponseToolFailureCause): void {
+		this.responseToolFailureCount += 1
+		this.lastFailedResponseTool = toolName
+		this.lastResponseToolFailureMessage = message
+		this.lastResponseToolFailureCause = cause
+	}
+
+	getResponseToolFailureState(): ResponseToolFailureState {
+		return {
+			failureCount: this.responseToolFailureCount,
+			lastFailedTool: this.lastFailedResponseTool,
+			lastFailureMessage: this.lastResponseToolFailureMessage,
+			lastFailureCause: this.lastResponseToolFailureCause,
+		}
+	}
+
+	clearResponseToolFailureState(): void {
+		this.responseToolFailureCount = 0
+		this.lastFailedResponseTool = undefined
+		this.lastResponseToolFailureMessage = undefined
+		this.lastResponseToolFailureCause = undefined
+	}
+
+	hasExhaustedResponseToolFailureBudget(): boolean {
+		return this.responseToolFailureCount >= 2
+	}
+
 	clearResponseToolTurnState(): void {
 		this.activeResponseToolName = undefined
 		this.responseToolTurnShouldEnd = false
 		this.responseToolTurnCompletedBy = undefined
 		this.pendingResponseToolFollowup = undefined
+		this.clearResponseToolFailureState()
 		this.didAttemptCompletionEndTask = false
 	}
 }

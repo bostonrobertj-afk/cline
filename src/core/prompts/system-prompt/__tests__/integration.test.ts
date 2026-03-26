@@ -353,6 +353,60 @@ describe("Prompt System Integration Tests", () => {
 			)
 		})
 
+		it("teaches the governed response-tool contract in the active prompt guidance", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: makeProviderInfo("gpt-3", "openai"),
+					enableNativeToolCalls: false,
+				},
+				"gpt-3",
+				async ({ systemPrompt }) => {
+					expect(systemPrompt).to.include("Governed user-facing response tools behave differently")
+					expect(systemPrompt).to.include("returns `[Message displayed.]`, and ends your current turn")
+					expect(systemPrompt).to.include("The next turn does not begin until the human user responds.")
+					expect(systemPrompt).to.include(
+						"Any human reply arrives on the following turn as normal human-authored input",
+					)
+					expect(systemPrompt).to.include("needs_more_exploration=true")
+					expect(systemPrompt).to.include("internal control flow")
+				},
+			)
+		})
+
+		it("keeps all five governed native tool specs aligned with the shared response-tool contract", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: makeProviderInfo("gpt-5-1", "openai"),
+					enableNativeToolCalls: true,
+				},
+				"gpt-5-1",
+				async ({ tools, systemPrompt }) => {
+					expect(systemPrompt).to.include("RESPONSE TOOLS")
+					expect(systemPrompt).to.include("`act_mode_respond`")
+
+					const nativeTools = (tools as any[]).map((tool) => (tool?.type === "function" ? tool.function : tool))
+					const byName = new Map(nativeTools.map((tool) => [tool.name, tool.description]))
+
+					expect(byName.get("attempt_completion")).to.include(
+						"returns `[Message displayed.]`, and ends your current turn",
+					)
+					expect(byName.get("send_user_message")).to.include(
+						"returns `[Message displayed.]`, and ends your current turn",
+					)
+					expect(byName.get("ask_followup_question")).to.include("following turn as normal human-authored input")
+					expect(byName.get("generate_plan_output")).to.include(
+						"internal control flow rather than a governed user-facing response",
+					)
+					expect(byName.get("act_mode_respond")).to.include("ends your current turn")
+					expect(byName.get("act_mode_respond")).to.include("wait for the user's next reply")
+				},
+			)
+		})
+
 		it("includes set_workflow_placeholders guidance for placeholder workflows across prompt variants", async function () {
 			const guidanceSnippet = "When a step sets a placeholder value, use `set_workflow_placeholders`."
 			const taskProgressSnippet =

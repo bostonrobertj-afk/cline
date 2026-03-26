@@ -4,7 +4,9 @@ import sinon from "sinon"
 import { ClineDefaultTool } from "@/shared/tools"
 import { TaskState } from "../../../TaskState"
 import type { TaskConfig } from "../../types/TaskConfig"
+import { ResponseToolRegistry } from "../ResponseToolRegistry"
 import { ResponseToolRuntime } from "../ResponseToolRuntime"
+import { RESPONSE_TOOL_SUCCESS_MESSAGE } from "../types"
 
 describe("ResponseToolRuntime", () => {
 	afterEach(() => {
@@ -42,5 +44,86 @@ describe("ResponseToolRuntime", () => {
 			suppressBlockingAsk: true,
 		})
 		assert.equal(runtime.getCommandExecutionOptions(ClineDefaultTool.SEND_USER_MESSAGE), undefined)
+	})
+
+	it("registers all governed response tools as turn-ending", () => {
+		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.ATTEMPT)?.defaultTurnBehavior, "end_turn")
+		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.SEND_USER_MESSAGE)?.defaultTurnBehavior, "end_turn")
+		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.ASK)?.defaultTurnBehavior, "end_turn")
+		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.PLAN_MODE)?.defaultTurnBehavior, "end_turn")
+		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.ACT_MODE)?.defaultTurnBehavior, "end_turn")
+	})
+
+	it("exposes the shared success result scaffold", () => {
+		const runtime = new ResponseToolRuntime()
+		assert.equal(runtime.getSuccessResult(), RESPONSE_TOOL_SUCCESS_MESSAGE)
+	})
+
+	it("tracks and clears response-tool failure scaffolding on task state", () => {
+		const taskState = new TaskState()
+
+		taskState.recordResponseToolFailure(ClineDefaultTool.ASK, "missing question", "validation")
+
+		assert.deepEqual(taskState.getResponseToolFailureState(), {
+			failureCount: 1,
+			lastFailedTool: ClineDefaultTool.ASK,
+			lastFailureMessage: "missing question",
+			lastFailureCause: "validation",
+		})
+
+		taskState.clearResponseToolTurnState()
+
+		assert.deepEqual(taskState.getResponseToolFailureState(), {
+			failureCount: 0,
+			lastFailedTool: undefined,
+			lastFailureMessage: undefined,
+			lastFailureCause: undefined,
+		})
+	})
+
+	it("classifies missing-parameter tool errors as governed response failures", () => {
+		const runtime = new ResponseToolRuntime()
+
+		assert.deepEqual(
+			runtime.classifyFailureResult(
+				"The tool execution failed with the following error:\n<error>\nMissing value for required parameter 'question'.\n</error>",
+			),
+			{
+				message: "Missing value for required parameter 'question'.",
+				cause: "missing_parameter",
+			},
+		)
+	})
+
+	it("treats plan-mode needs_more_exploration as non-governed internal control", () => {
+		const runtime = new ResponseToolRuntime()
+
+		assert.equal(
+			runtime.isGovernedResponseAttempt({
+				config: { mode: "plan", yoloModeToggled: false } as any,
+				block: {
+					name: ClineDefaultTool.PLAN_MODE,
+					params: { needs_more_exploration: "true" },
+				} as any,
+			}),
+			false,
+		)
+	})
+
+	it("formats a human-visible second-failure error message", () => {
+		const runtime = new ResponseToolRuntime()
+
+		assert.equal(
+			runtime.buildSecondFailureUserMessage(ClineDefaultTool.ASK, {
+				message: "Missing value for required parameter 'question'.",
+				cause: "missing_parameter",
+			}),
+			[
+				"Response tool failed twice in the current AI turn.",
+				`Tool: ${ClineDefaultTool.ASK}`,
+				"Error: Missing value for required parameter 'question'.",
+				"Detected cause: missing_parameter",
+			].join("\n"),
+		)
 	})
 })

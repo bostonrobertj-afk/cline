@@ -1,4 +1,3 @@
-import type Anthropic from "@anthropic-ai/sdk"
 import type { ToolUse } from "@core/assistant-message"
 import { getHookModelContext } from "@core/hooks/hook-model-context"
 import { getHooksEnabledSafe } from "@core/hooks/hooks-utils"
@@ -155,7 +154,6 @@ export class AttemptCompletionHandler implements IToolHandler, IPartialBlockHand
 			await config.messageState.saveClineMessagesAndUpdateHistory()
 		}
 
-		let commandResult: any
 		const lastMessage = config.messageState.getClineMessages().at(-1)
 
 		if (command) {
@@ -203,8 +201,6 @@ export class AttemptCompletionHandler implements IToolHandler, IPartialBlockHand
 				config.taskState.didRejectTool = true
 				return execCommandResult
 			}
-			// user didn't reject, but the command may have output
-			commandResult = execCommandResult
 		} else {
 			// Send the complete completion_result message (partial was already removed above)
 			const completionMessageTs = await config.callbacks.say("completion_result", result, undefined, undefined, false)
@@ -229,9 +225,8 @@ export class AttemptCompletionHandler implements IToolHandler, IPartialBlockHand
 			images,
 			files: completionFiles,
 		} = await responseToolRuntime.askForResponse(config, this.name, "completion_result", "")
-		const prefix = "[attempt_completion] Result: Done"
 		if (response === "yesButtonClicked") {
-			return responseToolRuntime.finalizeTool(config, this.name, prefix)
+			return responseToolRuntime.finalizeSuccess(config, this.name)
 		}
 
 		const hasPostCompletionReply = !!(
@@ -263,30 +258,7 @@ export class AttemptCompletionHandler implements IToolHandler, IPartialBlockHand
 			})
 		}
 
-		const toolResults: (Anthropic.TextBlockParam | Anthropic.ImageBlockParam)[] = []
-		if (commandResult) {
-			if (typeof commandResult === "string") {
-				toolResults.push({
-					type: "text",
-					text: commandResult,
-				})
-			} else if (Array.isArray(commandResult)) {
-				toolResults.push(...commandResult)
-			}
-		}
-
-		// Return the tool results as a complex response
-		if (toolResults.length === 0) {
-			return responseToolRuntime.finalizeTool(config, this.name, prefix)
-		}
-
-		return responseToolRuntime.finalizeTool(config, this.name, [
-			{
-				type: "text" as const,
-				text: prefix,
-			},
-			...toolResults,
-		])
+		return responseToolRuntime.finalizeSuccess(config, this.name)
 	}
 
 	/**

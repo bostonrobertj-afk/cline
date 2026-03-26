@@ -7,6 +7,10 @@ function getActModeResponseTools(context: SystemPromptContext): string[] {
 		tools.splice(1, 0, "`ask_followup_question`")
 	}
 
+	if (context.enableNativeToolCalls) {
+		tools.splice(tools.length - 1, 0, "`act_mode_respond`")
+	}
+
 	return tools
 }
 
@@ -32,7 +36,7 @@ export function getResponseToolsSection(context: SystemPromptContext): string {
 	const actModeResponseTools = joinToolNames(getActModeResponseTools(context))
 	const planModeResponseTools = joinToolNames(getPlanModeResponseTools(context))
 	const responseToolLines = [
-		"- `attempt_completion`: Use in ACT MODE. You must ONLY use this tool to deliver structured final outcomes, such as a completion report or QA findings. NEVER use this tool for conversational dialogue.",
+		"- `attempt_completion`: Use in ACT MODE when you are ready to present a structured final outcome, such as a completion report or QA findings.",
 		"- `send_user_message`: Use in either ACT MODE or PLAN MODE when other, more specialized response tools are not appropriate or available. This is the appropriate response tool for general dialogue.",
 	]
 
@@ -42,10 +46,22 @@ export function getResponseToolsSection(context: SystemPromptContext): string {
 		)
 	}
 
+	if (context.enableNativeToolCalls) {
+		responseToolLines.push(
+			"- `act_mode_respond`: Use in ACT MODE when you want to send a progress update or preamble to the user and then wait for their next reply before continuing.",
+		)
+	}
+
 	responseToolLines.push("- `generate_plan_output`: Use in PLAN MODE to present a plan or otherwise respond during planning.")
 
 	return `RESPONSE TOOLS
 Use these tools to respond to the user. A reply reaches the human user only when you use the appropriate response tool.
+Governed user-facing response flows share one contract:
+- Success displays the message, returns \`[Message displayed.]\`, and ends your current turn.
+- The next turn does not begin until the human user responds.
+- Any human reply arrives on the following turn as normal human-authored input, not same-turn tool output.
+- Only tool purpose and UI presentation differ.
+- If \`generate_plan_output\` sets \`needs_more_exploration=true\`, that branch is internal control flow and does not use this contract.
 
 ${responseToolLines.join("\n")}
 

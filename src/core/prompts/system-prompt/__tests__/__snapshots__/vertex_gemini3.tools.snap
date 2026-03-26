@@ -22,7 +22,7 @@
   },
   {
     "name": "read_file",
-    "description": "Request to read the contents of a file at the specified path. Use this when you need to examine the contents of an existing file you do not know the contents of, for example to analyze code, review text files, or extract information from configuration files. Automatically extracts raw text from PDF and DOCX files. May not be suitable for other types of binary files, as it returns the raw content as a string. Do NOT use this tool to list the contents of a directory. Only use this tool on files.",
+    "description": "Request to read the contents of a file at the specified path. Prefer using search_files and list_code_definition_names first to narrow the target, then use read_file for the first full pass on a file. For follow-up checks on a focused region, prefer read_file_range instead of rereading the entire file. Automatically extracts raw text from PDF and DOCX files. Do NOT use this tool to list the contents of a directory.",
     "parameters": {
       "type": "OBJECT",
       "properties": {
@@ -92,7 +92,7 @@
   },
   {
     "name": "search_files",
-    "description": "Request to perform a regex search across files in a specified directory, providing context-rich results. This tool searches for patterns or specific content across multiple files, displaying each match with encapsulating context.",
+    "description": "Request to perform a regex search across files in a specified directory, providing context-rich results. Start here when you need to narrow candidate files or regions before using list_code_definition_names, read_file, or read_file_range.",
     "parameters": {
       "type": "OBJECT",
       "properties": {
@@ -145,7 +145,7 @@
   },
   {
     "name": "list_code_definition_names",
-    "description": "Request to list definition names (classes, functions, methods, etc.) used in source code files at the top level of the specified directory. This tool provides insights into the codebase structure and important constructs, encapsulating high-level concepts and relationships that are crucial for understanding the overall architecture.",
+    "description": "Request to list definition names (classes, functions, methods, etc.) used in source code files at the top level of the specified directory. Results include human-friendly 1-based line numbers so you can target a later read_file or read_file_range call instead of loading large files blindly.",
     "parameters": {
       "type": "OBJECT",
       "properties": {
@@ -248,7 +248,7 @@
   },
   {
     "name": "ask_followup_question",
-    "description": "Ask the user a question to gather additional information needed to complete the task. Use this tool when clarification would improve correctness, reduce risk, or unblock the next step. It enables direct collaboration with the user, so keep the question concise and specific.",
+    "description": "Ask the user a concise question when clarification or a direct answer is needed. On success, this tool displays the question to the user, returns `[Message displayed.]`, and ends your current turn. The user's answer arrives on the following turn as normal human-authored input rather than same-turn tool output.",
     "parameters": {
       "type": "OBJECT",
       "properties": {
@@ -272,7 +272,7 @@
   },
   {
     "name": "attempt_completion",
-    "description": "After each tool use, the user will respond with the result of that tool use, i.e. if it succeeded or failed, along with any reasons for failure. Once you've received the results of tool uses and can confirm that the task is complete, use this tool to present the result of your work to the user. Optionally you may provide a CLI command to showcase the result of your work. The user may respond with feedback if they are not satisfied with the result, which you can use to make improvements and try again.\nIMPORTANT NOTE: This tool CANNOT be used until you've confirmed from the user that any previous tool uses were successful. Failure to do so will result in code corruption and system failure. Before using this tool, you must ask yourself in <thinking></thinking> tags if you've confirmed from the user that any previous tool uses were successful. If not, then DO NOT use this tool.",
+    "description": "Once you can confirm that the task is complete, use this tool to present the final result of your work to the user. Optionally you may provide a CLI command to showcase the result of your work. On success, this tool displays your message to the user, returns `[Message displayed.]`, and ends your current turn. If the user responds afterward, that reply arrives on the following turn as normal human-authored input, which you can use to continue or revise the work.\nIMPORTANT NOTE: This tool CANNOT be used until you've confirmed from the user that any previous tool uses were successful. Failure to do so will result in code corruption and system failure. Before using this tool, you must ask yourself in <thinking></thinking> tags if you've confirmed from the user that any previous tool uses were successful. If not, then DO NOT use this tool.",
     "parameters": {
       "type": "OBJECT",
       "properties": {
@@ -296,7 +296,7 @@
   },
   {
     "name": "send_user_message",
-    "description": "Send a direct user-visible message when other response tools are not appropriate or available. Use this for ordinary communication in either ACT MODE or PLAN MODE. Do not use it for final completion, follow-up questions, or formal plan presentation when a specialized response tool is the better fit.",
+    "description": "Send a direct user-visible message when other response tools are not appropriate or available. On success, this tool displays the message to the user, returns `[Message displayed.]`, and ends your current turn. Any later user reply arrives on the following turn as normal human-authored input.",
     "parameters": {
       "type": "OBJECT",
       "properties": {
@@ -328,7 +328,7 @@
   },
   {
     "name": "generate_plan_output",
-    "description": "Respond with a plan that outlines a solution to the user's request. This tool should ONLY be used when you have already explored the relevant files and are ready to present a concrete plan. Only use this tool after you have explored relevant files and collected sufficient context to create a detailed, accurate plan. This tool is only available in PLAN MODE, as indicated by the environment_details.\nIf it becomes apparent that additional exploration is required while the generate_plan_output response is being generated, the optional needs_more_exploration parameter can be toggled to enable further research. This allows you to acknowledge that more exploration is required before the final generate_plan_output is generated, and signals that your next message will use exploration tools instead.",
+    "description": "Respond with a plan that outlines a solution to the user's request. This tool should ONLY be used when you have already explored the relevant files and are ready to present a concrete plan. Only use this tool after you have explored relevant files and collected sufficient context to create a detailed, accurate plan. This tool is only available in PLAN MODE, as indicated by the environment_details.\nIf you are presenting a plan or other user-facing planning response, success displays the message to the user, returns `[Message displayed.]`, and ends your current turn. Any later user reply arrives on the following turn as normal human-authored input.\nIf it becomes apparent that additional exploration is required while the generate_plan_output response is being generated, the optional needs_more_exploration parameter can be toggled to enable further research. That branch is internal control flow rather than a governed user-facing response, so it does not use the shared response-tool turn-ending contract.",
     "parameters": {
       "type": "OBJECT",
       "properties": {
@@ -352,7 +352,7 @@
   },
   {
     "name": "act_mode_respond",
-    "description": "Provide a progress update or preamble to the user during ACT MODE execution. This tool allows you to communicate your thought process and planned actions without interrupting the execution flow. After displaying your message, execution automatically continues, allowing you to proceed with subsequent tool calls immediately. This tool is only available in ACT MODE. This tool may not be called immediately after a previous act_mode_respond call.\n\nIMPORTANT: Use this tool when it adds value to the user experience, but always follow it with an actual tool call - never call it twice in a row.\n\nUse this tool when:\n- After reading files and before making any edits - explain your analysis and what changes you plan to make\n- When starting a new phase of work (e.g., transitioning from backend to frontend, or from one feature to another)\n- During long sequences of operations to provide progress updates\n- When your approach or strategy changes mid-task\n- Before executing complex or potentially risky operations\n- To explain why you're choosing one approach over another\n\nDo NOT use this tool when you have completed all required actions and are ready to present the final output; in that case, use the attempt_completion tool instead.\n\nCRITICAL CONSTRAINT: You MUST NOT call this tool more than once in a row. After using act_mode_respond, your next assistant message MUST either call a different tool or perform additional work without using act_mode_respond again. If you attempt to call act_mode_respond consecutively, the tool call will fail with an explicit error.",
+    "description": "Send a brief ACT MODE preamble or progress update to the user. On success, the message is displayed, returns `[Message displayed.]`, and ends your current turn. Use it only when you intentionally want to pause and wait for the user's next reply. This tool is only available in ACT MODE and may not be called immediately after a previous act_mode_respond call.",
     "parameters": {
       "type": "OBJECT",
       "properties": {

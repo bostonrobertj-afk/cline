@@ -187,6 +187,20 @@ export function hasAssistantResponseContent(assistantTextOnly: string, finalized
 	return assistantTextOnly.trim().length > 0 || finalizedToolCallCount > 0
 }
 
+export async function consumeDeferredResponseToolUserContent(taskState: TaskState) {
+	const pendingResponseToolFollowup = taskState.consumePendingResponseToolFollowup()
+	if (pendingResponseToolFollowup?.route !== "normal_user_turn") {
+		return undefined
+	}
+
+	return await buildUserMessageContent(
+		pendingResponseToolFollowup.text,
+		pendingResponseToolFollowup.images,
+		pendingResponseToolFollowup.files,
+		pendingResponseToolFollowup.hookContext,
+	)
+}
+
 export class Task {
 	// Core task variables
 	readonly taskId: string
@@ -3662,14 +3676,8 @@ export class Task {
 
 				const completedResponseTool = this.taskState.consumeCompletedResponseTool()
 				if (completedResponseTool) {
-					const pendingResponseToolFollowup = this.taskState.consumePendingResponseToolFollowup()
-					if (pendingResponseToolFollowup?.route === "normal_user_turn") {
-						const deferredUserContent = await buildUserMessageContent(
-							pendingResponseToolFollowup.text,
-							pendingResponseToolFollowup.images,
-							pendingResponseToolFollowup.files,
-							pendingResponseToolFollowup.hookContext,
-						)
+					const deferredUserContent = await consumeDeferredResponseToolUserContent(this.taskState)
+					if (deferredUserContent) {
 						return await this.recursivelyMakeClineRequests(deferredUserContent)
 					}
 					return true

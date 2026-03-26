@@ -68,17 +68,6 @@ export class ActModeRespondHandler implements IToolHandler, IPartialBlockHandler
 
 		// Note: lastToolName is tracked centrally by ToolExecutor after tool execution
 
-		// Return success immediately to allow LLM to continue execution
-		// The key difference from generate_plan_output: no blocking for user input
-		// NOTE: We explicitly tell the model to use a different tool next to prevent narration loops
-		return responseToolRuntime.finalizeTool(
-			config,
-			this.name,
-			formatResponse.toolResult(
-				`[Message displayed. Now proceed with your next tool call - ` +
-					`it must be a different tool (read_file, replace_in_file, execute_command, etc.), ` +
-					`not act_mode_respond again.]`,
-			),
-		)
+		return responseToolRuntime.finalizeSuccess(config, this.name)
 	}
 }

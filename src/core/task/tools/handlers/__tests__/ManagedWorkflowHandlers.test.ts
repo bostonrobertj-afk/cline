@@ -11,6 +11,7 @@ import { resolvePlaceholderWorkflowManagedVariant } from "../../../bmad-agent-mo
 import { startOrResumeManagedWorkflowRun } from "../../../managed-workflows/ManagedWorkflowController"
 import type { ManagedWorkflowRunState } from "../../../managed-workflows/types"
 import { TaskState } from "../../../TaskState"
+import { RESPONSE_TOOL_SUCCESS_MESSAGE } from "../../response/types"
 import type { TaskConfig } from "../../types/TaskConfig"
 import { AttemptCompletionHandler } from "../AttemptCompletionHandler"
 import { CompleteWorkflowItemToolHandler } from "../CompleteWorkflowItemToolHandler"
@@ -153,7 +154,7 @@ describe("Managed workflow handlers", () => {
 		} as any)
 
 		expect(String(result)).to.not.contain("Managed workflow")
-		expect(String(result)).to.contain("[attempt_completion] Result: Done")
+		expect(String(result)).to.equal(RESPONSE_TOOL_SUCCESS_MESSAGE)
 		expect(config.taskState.consecutiveMistakeCount).to.equal(0)
 		expect(config.taskState.didAttemptCompletionEndTask).to.equal(true)
 		expect(config.taskState.responseToolTurnShouldEnd).to.equal(true)
@@ -183,7 +184,7 @@ describe("Managed workflow handlers", () => {
 			partial: false,
 		} as any)
 
-		expect(String(result)).to.contain("[attempt_completion] Result: Done")
+		expect(String(result)).to.equal(RESPONSE_TOOL_SUCCESS_MESSAGE)
 		expect(config.taskState.didAttemptCompletionEndTask).to.equal(true)
 		expect(config.taskState.responseToolTurnShouldEnd).to.equal(true)
 		expect(config.taskState.responseToolTurnCompletedBy).to.equal("attempt_completion")

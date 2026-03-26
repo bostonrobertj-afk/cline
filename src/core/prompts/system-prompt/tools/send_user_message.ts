@@ -20,7 +20,7 @@ const generic: ClineToolSpec = {
 	id,
 	name: "send_user_message",
 	description:
-		"Send a direct user-visible message when other response tools are not appropriate or available. Use this for ordinary communication such as acknowledgements, brief clarifications, short reactions, or conversational steering. This tool is available in both ACT MODE and PLAN MODE. Do not use it when the correct action is to complete the task with attempt_completion, ask a question with ask_followup_question, or present a plan with generate_plan_output.",
+		"Send a direct user-visible message when other response tools are not appropriate or available. On success, this tool displays the message to the user, returns `[Message displayed.]`, and ends your current turn. Any later user reply arrives on the following turn as normal human-authored input.",
 	parameters: [
 		{
 			name: "message",
@@ -37,7 +37,7 @@ const NATIVE_GPT_5: ClineToolSpec = {
 	id,
 	name: "send_user_message",
 	description:
-		"Send a direct user-visible message when other response tools are not appropriate or available. Use this for ordinary communication in either ACT MODE or PLAN MODE. Do not use it for final completion, follow-up questions, or formal plan presentation when a specialized response tool is the better fit.",
+		"Send a direct user-visible message when other response tools are not appropriate or available. On success, this tool displays the message to the user, returns `[Message displayed.]`, and ends your current turn. Any later user reply arrives on the following turn as normal human-authored input.",
 	parameters: [
 		{
 			name: "message",
