@@ -893,9 +893,13 @@ export function groupLowStakesTools(groupedMessages: (ClineMessage | ClineMessag
 
 		// Text - once a tool group is active, ignore additional text so it
 		// doesn't continue mutating the text row rendered above the group.
+		//
+		// If a response/tool flow emits a real assistant text message after a
+		// low-stakes tool group, we need to commit the existing group and render
+		// the text as its own row rather than dropping it.
 		if (messageType === "text") {
 			if (hasTools) {
-				continue
+				commitToolGroup()
 			}
 			flushPending()
 			result.push(message)
