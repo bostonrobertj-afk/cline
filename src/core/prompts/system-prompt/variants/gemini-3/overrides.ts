@@ -212,12 +212,12 @@ During Act Mode, focus on efficient execution:
 
 const GEMINI_3_UPDATING_TASK_PROGRESS_TEMPLATE = (_context: SystemPromptContext) => `UPDATING TASK PROGRESS
 
-Use the task_progress parameter as one concise Markdown checklist.
+Use \`task_progress\` only as a checklist parameter on the next tool call, not a standalone tool.
 
-- Create it when switching from PLAN MODE to ACT MODE.
+- Use \`task_progress\` to create a task list when switching out of PLAN MODE.
 - Keep items brief and milestone-based.
-- On updates, include the full current list with "- [ ]" and "- [x]".
-- Pass task_progress as its own tool parameter.
+- To create the list, pass a full Markdown checklist as the \`task_progress\` parameter.
+- Use \`__COMPLETE_NEXT_STEP__\` as the \`task_progress\` value to complete the next incomplete step.
 `
 
 export const gemini3ComponentOverrides: PromptVariant["componentOverrides"] = {

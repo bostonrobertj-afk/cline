@@ -125,30 +125,12 @@ You accomplish a given task iteratively, breaking it down into clear steps and w
 5. The user may provide feedback, which you can use to make improvements and try again. But DO NOT continue in pointless back and forth conversations, i.e. don't end your responses with questions or offers for further assistance.`
 const HERMES_TASK_PROGRESS_TEMPLATE = `UPDATING TASK PROGRESS
 
-Each tool supports an optional task_progress parameter for maintaining a Markdown checklist of your progress. Use it to show completed and remaining steps throughout a task.
+Use \`task_progress\` only as a checklist parameter on the next tool call, not a standalone tool.
 
-- Normally, skip task_progress during PLAN MODE until the plan is approved and you enter ACT MODE.
-- When switching from PLAN MODE to ACT MODE, you should create a comprehensive todo list for the task
-- Todo list updates should be done silently using the task_progress parameter - do not announce these updates to the user
-- Focus on creating actionable, meaningful steps rather than granular technical details
-- Use standard Markdown checkboxes: - [ ] (incomplete) and - [x] (complete).
-- Include the full checklist of meaningful milestones—not low-level technical steps.
-- Update the checklist whenever progress is made; rewrite it if scope or priorities change.
-- When adding the checklist for the first time, mark the current step as completed if it was just accomplished.
-- Short checklists are fine for simple tasks; keep longer ones concise and readable.
-- task_progress must be included as a parameter, not as a standalone tool call.
-
-Example:
-<execute_command>
-<command>npm install react</command>
-<requires_approval>false</requires_approval>
-<task_progress>    <- NOTE THAT task_progress IS ALWAYS A PARAMETER INSIDE THE TOOL CALL
-- [x] Set up project structure
-- [x] Install dependencies
-- [ ] Create components
-- [ ] Test application
-</task_progress>
-</execute_command>`
+- Use \`task_progress\` to create a task list when switching out of PLAN MODE.
+- Keep items brief and milestone-based.
+- To create the list, pass a full Markdown checklist as the \`task_progress\` parameter.
+- Use \`__COMPLETE_NEXT_STEP__\` as the \`task_progress\` value to complete the next incomplete step.`
 
 const HERMES_MCP_TEMPLATE = `MCP SERVERS
 

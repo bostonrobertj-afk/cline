@@ -59,10 +59,9 @@ Inspect the prepared review input and write findings.
 			expect(prompt).to.contain("# CURRENT WORKFLOW STEP")
 			expect(prompt).to.contain("You are currently on this step: Step 1: Gather Context")
 			expect(prompt).to.contain("Determine what to review from the user's prompt")
-			expect(prompt).to.contain("If you finish this step, include the full current checklist as `task_progress`")
-			expect(prompt).to.contain("Keep the same step labels in the same order.")
-			expect(prompt).to.contain("Change only this completed step from `- [ ]` to `- [x]`")
-			expect(prompt).to.contain("Do not resend the same unchanged all-unchecked checklist")
+			expect(prompt).to.contain("When you finish this step, include `task_progress` on your next tool call")
+			expect(prompt).to.contain("__COMPLETE_NEXT_STEP__")
+			expect(prompt).to.contain("I determine the active step from your latest `task_progress` update.")
 			expect(prompt).to.match(/^### Reminder:/m)
 			expect(prompt).to.contain("```text")
 			expect(prompt).to.match(/^- \[ \] Step 1: Gather Context/m)
@@ -166,7 +165,7 @@ Inspect the prepared review input and write findings.
 		const manager = new FocusChainManager(createDependencies(taskState))
 		const prompt = await manager.generateFocusChainInstructions()
 
-		expect(prompt).to.contain('Update the full "task_progress" checklist in your next tool call')
+		expect(prompt).to.contain('If you finish the current checklist step, include "task_progress" in your next tool call')
 		expect(prompt).to.not.contain("# CURRENT WORKFLOW STEP")
 	})
 
@@ -290,6 +289,65 @@ Determine what to review from the user's prompt before asking follow-up question
 			const written = await fs.readFile(focusChainFilePath, "utf8")
 			expect(written).to.contain("- [x] Step 1: Gather Context")
 			expect(written).to.contain("- [ ] Step 2: Review")
+		} finally {
+			sandbox.restore()
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("accepts the next-step sentinel and updates the checklist on disk", async () => {
+		const sandbox = sinon.createSandbox()
+		const taskId = `task-focus-chain-placeholder-${Date.now()}`
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "focus-chain-placeholder-sentinel-"))
+		try {
+			sandbox.stub(disk, "ensureTaskDirectoryExists").resolves(tempDir)
+			const taskState = new TaskState()
+			taskState.currentFocusChainChecklist = "- [x] Step 1: Gather Context\n- [ ] Step 2: Review"
+
+			const say = sinon.stub().resolves(undefined)
+			const manager = new FocusChainManager({
+				...createDependencies(taskState),
+				taskId,
+				say,
+			})
+
+			const result = await manager.updateFCListFromToolResponse("__COMPLETE_NEXT_STEP__")
+
+			expect(result.accepted).to.equal(true)
+			expect(taskState.currentFocusChainChecklist).to.equal("- [x] Step 1: Gather Context\n- [x] Step 2: Review")
+			sinon.assert.calledOnce(say)
+			sinon.assert.calledWith(say, "task_progress", "- [x] Step 1: Gather Context\n- [x] Step 2: Review")
+
+			const focusChainFilePath = getFocusChainFilePath(tempDir, taskId)
+			const written = await fs.readFile(focusChainFilePath, "utf8")
+			expect(written).to.contain("- [x] Step 1: Gather Context")
+			expect(written).to.contain("- [x] Step 2: Review")
+		} finally {
+			sandbox.restore()
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("rejects the next-step sentinel when no checklist exists yet", async () => {
+		const sandbox = sinon.createSandbox()
+		const taskId = `task-focus-chain-placeholder-${Date.now()}`
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "focus-chain-placeholder-no-checklist-"))
+		try {
+			sandbox.stub(disk, "ensureTaskDirectoryExists").resolves(tempDir)
+			const taskState = new TaskState()
+			const say = sinon.stub().resolves(undefined)
+			const manager = new FocusChainManager({
+				...createDependencies(taskState),
+				taskId,
+				say,
+			})
+
+			const result = await manager.updateFCListFromToolResponse("__COMPLETE_NEXT_STEP__")
+
+			expect(result.accepted).to.equal(false)
+			expect(result.feedback).to.contain("No active task list exists yet.")
+			expect(taskState.currentFocusChainChecklist).to.equal(null)
+			sinon.assert.notCalled(say)
 		} finally {
 			sandbox.restore()
 			await fs.rm(tempDir, { recursive: true, force: true })

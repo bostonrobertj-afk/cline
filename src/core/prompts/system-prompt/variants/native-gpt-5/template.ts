@@ -27,9 +27,11 @@ export const BASE = `{{${SystemPromptSection.AGENT_ROLE}}}
 const TASK_PROGRESS = `UPDATING TASK PROGRESS
 
 Use \`task_progress\` only as a checklist parameter on the next tool call, not a standalone tool.
-- Use when switching from Plan Mode to persist your task list
-- Keep items brief and milestone-level.
-- On updates, send the full current list using \`- [ ]\` and \`- [x]\`.`
+
+- Use \`task_progress\` to create a task list when switching out of PLAN MODE.
+- Keep items brief and milestone-based.
+- To create the list, pass a full Markdown checklist as the \`task_progress\` parameter.
+- Use \`__COMPLETE_NEXT_STEP__\` as the \`task_progress\` value to complete the next incomplete step.`
 
 const RULES = (_context: SystemPromptContext) => `RULES
 
@@ -44,6 +46,7 @@ const TOOL_USE = (_context: SystemPromptContext) => `TOOL USE
 Use these tools in one response when they are not dependent on one another; if using tools dependent on one another do so sequentially.
 - environment_details provides runtime context
 - Use list_files when you need directory structure
+- For native tool calls, treat the tool schema as the source of truth for canonical parameter names, required fields, and argument shape. Match the schema exactly.
 
 ${getResponseToolsSection(_context)}`
 

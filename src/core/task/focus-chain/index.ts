@@ -7,6 +7,7 @@ import {
 	getActivePlaceholderWorkflowStepDetails,
 } from "@/core/workflows/placeholder-workflow-step-details"
 import { telemetryService } from "@/services/telemetry"
+import { isFocusChainCompleteNextStepSentinel } from "@/shared/focus-chain-utils"
 import { Logger } from "@/shared/services/Logger"
 import { ClineSay } from "../../../shared/ExtensionMessage"
 import { Mode } from "../../../shared/storage/types"
@@ -18,6 +19,7 @@ import { TaskState } from "../TaskState"
 import { logFocusChainDiagnosticEvent, summarizeFocusChainText, summarizeFocusChainTextBlocks } from "./diagnostics"
 import {
 	buildFocusChainChecklistRejectionFeedback,
+	buildFocusChainMissingChecklistDirectiveFeedback,
 	createFocusChainMarkdownContent,
 	evaluateFocusChainChecklistUpdate,
 	extractFocusChainItemsFromText,
@@ -241,7 +243,7 @@ export class FocusChainManager {
 			const percentComplete = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0
 
 			const introUpdateRequired =
-				"### Reminder: Detailed instructions are automatically sent for the first incomplete task in your task list. Failure to maintain your task list can lead to old instructions persisting, and prevent you from seeing the details for the step you're currently on. To update your task list, include the full current checklist as task_progress on your next tool call. Keep the step labels and order, and change only completed items from - [ ] to - [x]."
+				"### Reminder: Detailed instructions are shown for the first incomplete checklist item. Keep `task_progress` moving so the active step and its details stay in sync."
 			const listCurrentProgress = `**Current Progress: ${completedItems}/${totalItems} items completed (${percentComplete}%)**`
 			const userHasUpdatedList =
 				"**CRITICAL INFORMATION:** The user has modified this todo list - review ALL changes carefully"
@@ -356,7 +358,7 @@ export class FocusChainManager {
 			})
 
 			return this.joinPromptSections(
-				"### Reminder: Detailed instructions are automatically sent for the first incomplete task in your task list. Failure to maintain your task list can lead to old instructions persisting, and prevent you from seeing the details for the step you're currently on. To update your task list, include the full current checklist as task_progress on your next tool call. Keep the step labels and order, and change only completed items from - [ ] to - [x].",
+				"### Reminder: Detailed instructions are shown for the first incomplete checklist item. Keep `task_progress` moving so the active step and its details stay in sync.",
 				listCurrentProgress,
 				this.renderChecklistForPrompt(currentChecklist),
 				userUpdatedWarning,
@@ -365,11 +367,10 @@ export class FocusChainManager {
 					`You are currently on this step: ${stepDetails.checklistLabel}`,
 					stepDetails.details.trim(),
 					"Focus on completing this step.",
-					"I track which step you're on based on your last `task_progress` update.",
-					"If you finish this step, include the full current checklist as `task_progress` on your next tool call.",
-					"Keep the same step labels in the same order. Change only this completed step from `- [ ]` to `- [x]`, and leave future steps unchecked.",
-					"Do not resend the same unchanged all-unchecked checklist after you finish this step.",
-					"Once you do, I'll give you the next step's details.",
+					"I determine the active step from your latest `task_progress` update.",
+					"When you finish this step, include `task_progress` on your next tool call so I can advance the checklist.",
+					'Use "__COMPLETE_NEXT_STEP__" if only this step changed.',
+					"Once the checklist advances, I'll give you the next step's details.",
 				].join("\n\n"),
 			)
 		} catch (error) {
@@ -565,12 +566,19 @@ export class FocusChainManager {
 				return { accepted: true }
 			}
 
-			if (taskProgress && taskProgress.trim()) {
+			if (taskProgress?.trim()) {
 				const trimmedTaskProgress = taskProgress.trim()
 				const currentChecklist = this.taskState.currentFocusChainChecklist ?? (await this.readFocusChainFromDisk())
 
 				if (!this.taskState.currentFocusChainChecklist && currentChecklist) {
 					this.taskState.currentFocusChainChecklist = currentChecklist
+				}
+
+				if (!currentChecklist && isFocusChainCompleteNextStepSentinel(trimmedTaskProgress)) {
+					return {
+						accepted: false,
+						feedback: buildFocusChainMissingChecklistDirectiveFeedback(),
+					}
 				}
 
 				if (currentChecklist) {

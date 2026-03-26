@@ -48,11 +48,13 @@ After receiving the tool result, briefly reflect on whether the result matches y
 const GPT5_1_TASK_PROGRESS = (_context: SystemPromptContext) => `UPDATING TASK PROGRESS
 
 Use \`task_progress\` only as a checklist parameter on the next tool call, not a standalone tool.
-- Create it when switching from PLAN MODE to ACT MODE.
-- Keep items brief and milestone-level.
-- On updates, send the full current list using \`- [ ]\` and \`- [x]\`.`
 
-const GPT5_1_ACT_VS_PLAN = (context: SystemPromptContext) => `ACT MODE V.S. PLAN MODE
+- Use \`task_progress\` to create a task list when switching out of PLAN MODE.
+- Keep items brief and milestone-based.
+- To create the list, pass a full Markdown checklist as the \`task_progress\` parameter.
+- Use \`__COMPLETE_NEXT_STEP__\` as the \`task_progress\` value to complete the next incomplete step.`
+
+const GPT5_1_ACT_VS_PLAN = (_context: SystemPromptContext) => `ACT MODE V.S. PLAN MODE
 
 Current mode is provided in environment_details.`
 

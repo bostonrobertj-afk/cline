@@ -39,14 +39,18 @@ describe("managed workflow task progress prompt", () => {
 })
 
 describe("generic task progress prompt", () => {
-	it("explains checklist-shape preservation and checkbox progression semantics", async () => {
+	it("teaches checklist creation and next-step completion semantics", async () => {
 		const progress = await getUpdatingTaskProgress(variant, {
 			...context,
 			managedWorkflowActive: false,
 		})
 
-		expect(progress).to.contain("On each update, include the full current checklist.")
-		expect(progress).to.contain("Keep the same checklist items in the same order; only checkbox states should change.")
-		expect(progress).to.contain('Mark completed items by changing only those lines from "- [ ]" to "- [x]".')
+		expect(progress).to.contain(
+			"Use `task_progress` only as a checklist parameter on the next tool call, not a standalone tool.",
+		)
+		expect(progress).to.contain("To create the list, pass a full Markdown checklist as the `task_progress` parameter.")
+		expect(progress).to.contain(
+			"Use `__COMPLETE_NEXT_STEP__` as the `task_progress` value to complete the next incomplete step.",
+		)
 	})
 })

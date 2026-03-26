@@ -1,4 +1,8 @@
-import { isFocusChainItem } from "@shared/focus-chain-utils"
+import {
+	FOCUS_CHAIN_COMPLETE_NEXT_STEP_SENTINEL,
+	isFocusChainCompleteNextStepSentinel,
+	isFocusChainItem,
+} from "@shared/focus-chain-utils"
 import * as fs from "fs/promises"
 import * as path from "path"
 import { ensureTaskDirectoryExists } from "../../storage/disk"
@@ -94,6 +98,26 @@ export function evaluateFocusChainChecklistUpdate(
 	existingChecklist: string,
 	incomingChecklist: string,
 ): FocusChainChecklistUpdateResult {
+	if (isFocusChainCompleteNextStepSentinel(incomingChecklist)) {
+		const existingItems = parseFocusChainChecklistItems(existingChecklist)
+		const nextIncompleteIndex = existingItems.findIndex((item) => !item.checked)
+
+		return {
+			accepted: true,
+			checklist:
+				existingItems.length === 0
+					? existingChecklist.trim()
+					: existingItems
+							.map((existingItem, index) =>
+								formatFocusChainChecklistItem(
+									index === nextIncompleteIndex || existingItem.checked,
+									existingItem.label,
+								),
+							)
+							.join("\n"),
+		}
+	}
+
 	const existingItems = parseFocusChainChecklistItems(existingChecklist)
 	const incomingItems = parseFocusChainChecklistItems(incomingChecklist)
 
@@ -136,6 +160,13 @@ export function buildFocusChainChecklistRejectionFeedback(existingChecklist: str
 	]
 		.filter((part) => part.length > 0)
 		.join("\n\n")
+}
+
+export function buildFocusChainMissingChecklistDirectiveFeedback(): string {
+	return [
+		"No active task list exists yet.",
+		`Send the full Markdown checklist in task_progress before using \`${FOCUS_CHAIN_COMPLETE_NEXT_STEP_SENTINEL}\`.`,
+	].join("\n\n")
 }
 
 /**

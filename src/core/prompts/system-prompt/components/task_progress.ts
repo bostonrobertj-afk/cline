@@ -5,37 +5,28 @@ const UPDATING_TASK_PROGRESS = `UPDATING TASK PROGRESS
 
 Use \`task_progress\` only as a checklist parameter on the next tool call, not a standalone tool.
 
-- Use to create a task list when switching out of PLAN MODE
+- Use \`task_progress\` to create a task list when switching out of PLAN MODE.
 - Keep items brief and milestone-based.
-- On each update, include the full current checklist.
-- Keep the same checklist items in the same order; only checkbox states should change.
-- Mark completed items by changing only those lines from "- [ ]" to "- [x]".
-- Use Markdown checkboxes: "- [ ]" and "- [x]".
-- Pass task_progress as its own tool parameter, not inside another field.`
+- To create the list, pass a full Markdown checklist as the \`task_progress\` parameter.
+- Use \`__COMPLETE_NEXT_STEP__\` as the \`task_progress\` value to complete the next incomplete step.`
 
 const UPDATING_TASK_PROGRESS_NATIVE_NEXT_GEN = `UPDATING TASK PROGRESS
 
 Use \`task_progress\` only as a checklist parameter on the next tool call, not a standalone tool.
 
-- Use to create a task list when switching out of PLAN MODE
+- Use \`task_progress\` to create a task list when switching out of PLAN MODE.
 - Keep items brief and milestone-based.
-- On each update, include the full current checklist.
-- Keep the same checklist items in the same order; only checkbox states should change.
-- Mark completed items by changing only those lines from "- [ ]" to "- [x]".
-- Use Markdown checkboxes: "- [ ]" and "- [x]".
-- Pass task_progress as its own tool parameter, not inside another field.`
+- To create the list, pass a full Markdown checklist as the \`task_progress\` parameter.
+- Use \`__COMPLETE_NEXT_STEP__\` as the \`task_progress\` value to complete the next incomplete step.`
 
 const UPDATING_TASK_PROGRESS_NATIVE_GPT5 = `UPDATING TASK PROGRESS
 
 Use \`task_progress\` only as a checklist parameter on the next tool call, not a standalone tool.
 
-- Use to create a task list when switching out of PLAN MODE
+- Use \`task_progress\` to create a task list when switching out of PLAN MODE.
 - Keep items brief and milestone-based.
-- On each update, include the full current checklist.
-- Keep the same checklist items in the same order; only checkbox states should change.
-- Mark completed items by changing only those lines from "- [ ]" to "- [x]".
-- Use Markdown checkboxes: "- [ ]" and "- [x]".
-- Pass task_progress as its own tool parameter, not inside another field.`
+- To create the list, pass a full Markdown checklist as the \`task_progress\` parameter.
+- Use \`__COMPLETE_NEXT_STEP__\` as the \`task_progress\` value to complete the next incomplete step.`
 
 export async function getUpdatingTaskProgress(variant: PromptVariant, context: SystemPromptContext): Promise<string | undefined> {
 	if (!context.focusChainSettings?.enabled) {

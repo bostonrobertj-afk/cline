@@ -3,6 +3,8 @@
  * Used by both extension and webview
  *  */
 
+export const FOCUS_CHAIN_COMPLETE_NEXT_STEP_SENTINEL = "__COMPLETE_NEXT_STEP__"
+
 /**
  * Checks if a trimmed line matches focus chain item patterns
  * @param line The trimmed line to check
@@ -40,4 +42,8 @@ export function parseFocusChainItem(line: string): { checked: boolean; text: str
 		return { checked, text }
 	}
 	return null
+}
+
+export function isFocusChainCompleteNextStepSentinel(value: string): boolean {
+	return value.trim() === FOCUS_CHAIN_COMPLETE_NEXT_STEP_SENTINEL
 }

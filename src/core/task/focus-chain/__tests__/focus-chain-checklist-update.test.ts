@@ -13,6 +13,15 @@ describe("focus chain checklist update protection", () => {
 		expect(result.checklist).to.equal("- [x] Step 1: Gather Context\n- [ ] Step 2: Review")
 	})
 
+	it("accepts the next-step sentinel and marks only the first incomplete item complete", () => {
+		const existing = "- [x] Step 1: Gather Context\n- [ ] Step 2: Review\n- [ ] Step 3: Ship"
+
+		const result = evaluateFocusChainChecklistUpdate(existing, "__COMPLETE_NEXT_STEP__")
+
+		expect(result.accepted).to.equal(true)
+		expect(result.checklist).to.equal("- [x] Step 1: Gather Context\n- [x] Step 2: Review\n- [ ] Step 3: Ship")
+	})
+
 	it("rejects reordered items", () => {
 		const existing = "- [ ] Step 1: Gather Context\n- [ ] Step 2: Review"
 		const incoming = "- [ ] Step 2: Review\n- [ ] Step 1: Gather Context"

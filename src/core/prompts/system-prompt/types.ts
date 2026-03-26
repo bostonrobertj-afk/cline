@@ -6,6 +6,7 @@ import { ApiProviderInfo } from "@/core/api"
 import type { McpHub } from "@/services/mcp/McpHub"
 import type { BrowserSettings } from "@/shared/BrowserSettings"
 import type { FocusChainSettings } from "@/shared/FocusChainSettings"
+import { FOCUS_CHAIN_COMPLETE_NEXT_STEP_SENTINEL } from "@/shared/focus-chain-utils"
 import { ModelFamily } from "@/shared/prompts"
 import type { SkillMetadata } from "@/shared/skills"
 import { ClineDefaultTool } from "@/shared/tools"
@@ -276,8 +277,7 @@ export interface VariantSchema {
 export const TASK_PROGRESS_PARAMETER = {
 	name: "task_progress",
 	required: false,
-	instruction:
-		"Full Markdown checklist as a top-level parameter on a tool call. Keep the same items in the same order, and mark completed items by changing only those checkboxes from `- [ ]` to `- [x]`. Not a standalone tool.",
+	instruction: `Use as a top-level parameter on the next tool call, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use \`${FOCUS_CHAIN_COMPLETE_NEXT_STEP_SENTINEL}\` to complete the next incomplete step.`,
 	usage: "Checklist here (optional)",
 	dependencies: [ClineDefaultTool.TODO],
 }
