@@ -58,23 +58,23 @@ describe("ResponseToolRuntime", () => {
 	it("registers post-turn thread display states for governed response tools", () => {
 		assert.equal(
 			ResponseToolRegistry.get(ClineDefaultTool.ATTEMPT)?.threadDisplayStateAfterTurnEnds,
-			ThreadDisplayStates.IDLE_OPEN,
+			ThreadDisplayStates.ACTIVE_USER,
 		)
 		assert.equal(
 			ResponseToolRegistry.get(ClineDefaultTool.SEND_USER_MESSAGE)?.threadDisplayStateAfterTurnEnds,
-			ThreadDisplayStates.IDLE_OPEN,
+			ThreadDisplayStates.ACTIVE_USER,
 		)
 		assert.equal(
 			ResponseToolRegistry.get(ClineDefaultTool.ASK)?.threadDisplayStateAfterTurnEnds,
-			ThreadDisplayStates.IDLE_OPEN,
+			ThreadDisplayStates.ACTIVE_USER,
 		)
 		assert.equal(
 			ResponseToolRegistry.get(ClineDefaultTool.PLAN_MODE)?.threadDisplayStateAfterTurnEnds,
-			ThreadDisplayStates.IDLE_OPEN,
+			ThreadDisplayStates.ACTIVE_USER,
 		)
 		assert.equal(
 			ResponseToolRegistry.get(ClineDefaultTool.ACT_MODE)?.threadDisplayStateAfterTurnEnds,
-			ThreadDisplayStates.IDLE_OPEN,
+			ThreadDisplayStates.ACTIVE_USER,
 		)
 	})
 
@@ -162,11 +162,11 @@ describe("ResponseToolRuntime", () => {
 		assert.equal(result, RESPONSE_TOOL_SUCCESS_MESSAGE)
 		assert.deepEqual(completed, {
 			toolName: ClineDefaultTool.SEND_USER_MESSAGE,
-			threadDisplayStateAfterTurnEnds: ThreadDisplayStates.IDLE_OPEN,
+			threadDisplayStateAfterTurnEnds: ThreadDisplayStates.ACTIVE_USER,
 		})
 	})
 
-	it("stores idle_open as the shared post-turn state for attempt_completion too", () => {
+	it("stores active_user as the shared post-turn state for attempt_completion too", () => {
 		const runtime = new ResponseToolRuntime()
 		const taskState = new TaskState()
 		const config = { taskState } as TaskConfig
@@ -176,7 +176,7 @@ describe("ResponseToolRuntime", () => {
 
 		assert.deepEqual(completed, {
 			toolName: ClineDefaultTool.ATTEMPT,
-			threadDisplayStateAfterTurnEnds: ThreadDisplayStates.IDLE_OPEN,
+			threadDisplayStateAfterTurnEnds: ThreadDisplayStates.ACTIVE_USER,
 		})
 	})
 })

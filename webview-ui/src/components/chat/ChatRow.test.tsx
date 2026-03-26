@@ -1,5 +1,25 @@
-import { describe, expect, it } from "vitest"
-import { getFollowupPresentation } from "./ChatRow"
+import type { ClineMessage } from "@shared/ExtensionMessage"
+import { render, screen } from "@testing-library/react"
+import { describe, expect, it, vi } from "vitest"
+import { ChatRowContent, getFollowupPresentation } from "./ChatRow"
+
+const { mockThreadDisplayState } = vi.hoisted(() => ({
+	mockThreadDisplayState: { value: "idle_open" as string | null },
+}))
+
+vi.mock("@/context/ExtensionStateContext", () => ({
+	useExtensionState: () => ({
+		backgroundEditEnabled: false,
+		mcpServers: [],
+		mcpMarketplaceCatalog: {},
+		currentTaskItem: {
+			threadDisplayState: mockThreadDisplayState.value,
+		},
+		onRelinquishControl: vi.fn(),
+		vscodeTerminalExecutionMode: "terminal",
+		clineMessages: [],
+	}),
+}))
 
 describe("ChatRow followup presentation", () => {
 	it("renders reopened followup messages as a passive thread label", () => {
@@ -22,5 +42,56 @@ describe("ChatRow followup presentation", () => {
 
 		expect(presentation.hasQuestion).to.equal(true)
 		expect(presentation.title).to.equal("Barry has a question:")
+	})
+
+	it("renders the reopened banner for idle_open followup rows", () => {
+		mockThreadDisplayState.value = "idle_open"
+
+		const message: ClineMessage = {
+			ts: Date.now(),
+			type: "ask",
+			ask: "followup",
+			text: JSON.stringify({ question: "What should I do next?" }),
+		}
+
+		render(
+			<ChatRowContent
+				inputValue=""
+				isExpanded={true}
+				isLast={false}
+				message={message}
+				onSetQuote={vi.fn()}
+				onToggleExpand={vi.fn()}
+			/>,
+		)
+
+		expect(screen.getByText("Conversation reopened.")).toBeInTheDocument()
+		expect(screen.getByText("Conversation reopened:")).toBeInTheDocument()
+	})
+
+	it("does not render the reopened banner for active_user followup rows", () => {
+		mockThreadDisplayState.value = "active_user"
+
+		const message: ClineMessage = {
+			ts: Date.now(),
+			type: "ask",
+			ask: "followup",
+			text: JSON.stringify({ question: "What should I do next?" }),
+		}
+
+		render(
+			<ChatRowContent
+				inputValue=""
+				isExpanded={true}
+				isLast={false}
+				message={message}
+				onSetQuote={vi.fn()}
+				onToggleExpand={vi.fn()}
+			/>,
+		)
+
+		expect(screen.queryByText("Conversation reopened.")).not.toBeInTheDocument()
+		expect(screen.getByText("Cline has a question:")).toBeInTheDocument()
+		expect(screen.getByText("What should I do next?")).toBeInTheDocument()
 	})
 })

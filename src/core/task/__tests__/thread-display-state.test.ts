@@ -35,6 +35,7 @@ describe("thread display state contract", () => {
 	it("round-trips the full passive/active thread display state contract", () => {
 		const states = [
 			ThreadDisplayStates.ACTIVE_RUN,
+			ThreadDisplayStates.ACTIVE_USER,
 			ThreadDisplayStates.AWAITING_USER_RESPONSE,
 			ThreadDisplayStates.COMPLETED,
 			ThreadDisplayStates.IDLE_OPEN,
@@ -57,9 +58,18 @@ describe("thread display state contract", () => {
 
 	it("keeps passive open distinct from real ask states", () => {
 		assert.equal(ThreadDisplayStates.IDLE_OPEN, "idle_open")
+		assert.notEqual(ThreadDisplayStates.IDLE_OPEN, ThreadDisplayStates.ACTIVE_USER)
 		assert.notEqual(ThreadDisplayStates.IDLE_OPEN, ThreadDisplayStates.AWAITING_USER_RESPONSE)
 		assert.notEqual(ThreadDisplayStates.IDLE_OPEN, ThreadDisplayStates.COMPLETED)
 		assert.notEqual(ThreadDisplayStates.IDLE_OPEN, ThreadDisplayStates.PAUSED)
+	})
+
+	it("keeps active_user distinct from passive open and structured asks", () => {
+		assert.equal(ThreadDisplayStates.ACTIVE_USER, "active_user")
+		assert.notEqual(ThreadDisplayStates.ACTIVE_USER, ThreadDisplayStates.IDLE_OPEN)
+		assert.notEqual(ThreadDisplayStates.ACTIVE_USER, ThreadDisplayStates.AWAITING_USER_RESPONSE)
+		assert.notEqual(ThreadDisplayStates.ACTIVE_USER, ThreadDisplayStates.COMPLETED)
+		assert.notEqual(ThreadDisplayStates.ACTIVE_USER, ThreadDisplayStates.PAUSED)
 	})
 
 	it("does not treat passive open as active execution", () => {

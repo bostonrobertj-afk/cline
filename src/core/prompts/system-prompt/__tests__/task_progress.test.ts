@@ -38,6 +38,22 @@ describe("managed workflow task progress prompt", () => {
 	})
 })
 
+describe("placeholder workflow task progress prompt", () => {
+	it("teaches checklist updates for placeholder workflows", async () => {
+		const progress = await getUpdatingTaskProgress(variant, {
+			...context,
+			managedWorkflowActive: false,
+			activeWorkflowSupportsPlaceholders: true,
+		})
+
+		expect(progress).to.contain("This is a placeholder workflow with a live checklist.")
+		expect(progress).to.contain("use `set_workflow_placeholders` on that step's tool call")
+		expect(progress).to.contain(
+			"Use `task_progress` only as a checklist parameter on the next tool call, not a standalone tool.",
+		)
+	})
+})
+
 describe("generic task progress prompt", () => {
 	it("teaches checklist creation and next-step completion semantics", async () => {
 		const progress = await getUpdatingTaskProgress(variant, {

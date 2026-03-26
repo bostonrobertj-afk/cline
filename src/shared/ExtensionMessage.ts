@@ -39,6 +39,7 @@ export const COMMAND_CANCEL_TOKEN = "__cline_command_cancel__"
 
 export const ThreadDisplayStates = {
 	ACTIVE_RUN: "active_run",
+	ACTIVE_USER: "active_user",
 	AWAITING_USER_RESPONSE: "awaiting_user_response",
 	COMPLETED: "completed",
 	IDLE_OPEN: "idle_open",

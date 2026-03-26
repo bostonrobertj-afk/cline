@@ -48,6 +48,11 @@ export async function askResponse(controller: Controller, request: AskResponseRe
 				return Empty.create()
 			}
 
+			if (threadDisplayState === "active_user") {
+				await controller.continueActiveTaskWithFeedback(request.text, request.images, request.files)
+				return Empty.create()
+			}
+
 			if (threadDisplayState === "idle_open" || threadDisplayState === "paused") {
 				await controller.resumePassiveTaskWithFeedback(request.text, request.images, request.files)
 				return Empty.create()

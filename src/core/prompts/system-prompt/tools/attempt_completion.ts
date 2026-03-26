@@ -8,7 +8,7 @@ const generic: ClineToolSpec = {
 	variant: ModelFamily.GENERIC,
 	id,
 	name: "attempt_completion",
-	description: `Once you can confirm that the task is complete, use this tool to present the final result of your work to the user. Optionally you may provide a CLI command to showcase the result of your work. On success, this tool displays your message to the user, returns \`[Message displayed.]\`, and ends your current turn. If the user responds afterward, that reply arrives on the following turn as normal human-authored input, which you can use to continue or revise the work.
+	description: `Once you can confirm that the task is complete, use this tool to present the final result of your work to the user. Optionally you may provide a CLI command to showcase the result of your work. On success, this tool displays your message to the user, returns \`[Message displayed.]\`, and ends your current turn. If the user responds afterward, that reply arrives on the following turn as normal human-authored input, which you can use to continue or revise the work. Example: result="Implemented the fix and verified it with tests."
 IMPORTANT NOTE: This tool CANNOT be used until you've confirmed from the user that any previous tool uses were successful. Failure to do so will result in code corruption and system failure. Before using this tool, you must ask yourself in <thinking></thinking> tags if you've confirmed from the user that any previous tool uses were successful. If not, then DO NOT use this tool.`,
 	parameters: [
 		{
@@ -41,7 +41,7 @@ const GPT_5: ClineToolSpec = {
 	variant: ModelFamily.GPT_5,
 	id,
 	name: "attempt_completion",
-	description: `Once you can confirm that the task is complete, use this tool to present the final result of your work to the user. Optionally you may provide a CLI command to showcase the result of your work. On success, this tool displays your message to the user, returns \`[Message displayed.]\`, and ends your current turn. If the user responds afterward, that reply arrives on the following turn as normal human-authored input, which you can use to continue or revise the work.
+	description: `Once you can confirm that the task is complete, use this tool to present the final result of your work to the user. Optionally you may provide a CLI command to showcase the result of your work. On success, this tool displays your message to the user, returns \`[Message displayed.]\`, and ends your current turn. If the user responds afterward, that reply arrives on the following turn as normal human-authored input, which you can use to continue or revise the work. Example: result="Implemented the fix and verified it with tests."
 IMPORTANT NOTE: This tool CANNOT be used until you've confirmed from the user that any previous tool uses were successful and all tasks have been completed in full. Failure to do so will result in code corruption and system failure. Before using this tool, you must ask yourself in <thinking></thinking> tags if you've confirmed from the user that any previous tool uses were successful and all goals defined by the user have been completed. If not, then DO NOT use this tool.`,
 	parameters: [
 		{
@@ -76,7 +76,7 @@ const NATIVE_NEXT_GEN: ClineToolSpec = {
 	id,
 	name: "attempt_completion",
 	description:
-		"Once you've completed the user's task, use this tool to present the final result to the user, including a brief and very short (1-2 paragraph) summary of the task and what was done to resolve it. On success, this tool displays your message to the user, returns `[Message displayed.]`, and ends your current turn. Any later user reply arrives on the following turn as normal human-authored input. You should only call this tool when you have completed all tasks in the task_progress list, and completed all changes that are necessary to satisfy the user's request. You should not provide the contents of the task_progress list in the result parameter, it must be included in the task_progress parameter.",
+		"Once you've completed the user's task, use this tool to present the final result to the user, including a brief and very short (1-2 paragraph) summary of the task and what was done to resolve it. On success, this tool displays your message to the user, returns `[Message displayed.]`, and ends your current turn. Any later user reply arrives on the following turn as normal human-authored input. Example: result=\"Implemented the fix and verified it with tests.\" You should only call this tool when you have completed all tasks in the task_progress list, and completed all changes that are necessary to satisfy the user's request. You should not provide the contents of the task_progress list in the result parameter, it must be included in the task_progress parameter.",
 	parameters: [
 		{
 			name: "result",

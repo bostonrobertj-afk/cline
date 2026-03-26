@@ -62,6 +62,39 @@ describe("controller/task/askResponse", () => {
 		sinon.assert.notCalled(controller.task.handleWebviewAskResponse)
 	})
 
+	it("routes messageResponse into normal next-turn continuation when the thread is active_user", async () => {
+		const controller = {
+			task: {
+				handleWebviewAskResponse: sinon.stub().resolves(),
+				getThreadDisplayState: sinon.stub().returns("active_user"),
+			},
+			isTaskActivelyRunning: sinon.stub().returns(false),
+			interruptTaskWithFeedback: sinon.stub().resolves(),
+			resumePassiveTaskWithFeedback: sinon.stub().resolves(),
+			continueActiveTaskWithFeedback: sinon.stub().resolves(),
+		}
+
+		await askResponse(
+			controller as unknown as Controller,
+			AskResponseRequest.create({
+				responseType: "messageResponse",
+				text: "continue as normal dialogue",
+				images: ["img-1"],
+				files: ["file-1"],
+			}),
+		)
+
+		sinon.assert.notCalled(controller.interruptTaskWithFeedback)
+		sinon.assert.notCalled(controller.resumePassiveTaskWithFeedback)
+		sinon.assert.calledOnceWithExactly(
+			controller.continueActiveTaskWithFeedback,
+			"continue as normal dialogue",
+			["img-1"],
+			["file-1"],
+		)
+		sinon.assert.notCalled(controller.task.handleWebviewAskResponse)
+	})
+
 	it("keeps normal ask response behavior when the task is not actively running", async () => {
 		const controller = {
 			task: {

@@ -28,6 +28,24 @@ describe("Controller passive thread routing", () => {
 		})
 	})
 
+	it("continues an active_user task as normal next-turn dialogue", async () => {
+		const task = {
+			continueTaskWithFeedback: sinon.stub().resolves(),
+		}
+		const controller = {
+			task,
+		}
+
+		await Controller.prototype.continueActiveTaskWithFeedback.call(
+			controller as unknown as Controller,
+			"continue this active dialogue",
+			["img-1"],
+			["file-1"],
+		)
+
+		sinon.assert.calledOnceWithExactly(task.continueTaskWithFeedback, "continue this active dialogue", ["img-1"], ["file-1"])
+	})
+
 	it("prefers fresher in-memory state when passively reopening the active task", async () => {
 		const apiConversationHistory = [{ role: "user", content: "fresh" }]
 		const clineMessages = [{ ts: 1, type: "say", say: "text", text: "fresh" }]

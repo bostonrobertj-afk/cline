@@ -16,6 +16,7 @@ export function useMessageHandlers(messages: ClineMessage[], chatState: ChatStat
 	const { backgroundCommandRunning, currentTaskItem } = useExtensionState()
 	const threadDisplayState = (currentTaskItem as { threadDisplayState?: string | null } | undefined)?.threadDisplayState
 	const isPassiveThreadOpenState = isPassiveThreadOpen(threadDisplayState)
+	const isActiveUserThreadState = threadDisplayState === "active_user"
 	const {
 		setInputValue,
 		activeQuote,
@@ -117,6 +118,18 @@ export function useMessageHandlers(messages: ClineMessage[], chatState: ChatStat
 						)
 						messageSent = true
 						sentAsInterruption = true
+					} else if (isActiveUserThreadState) {
+						// Active-user threads are the normal live next-turn handoff after a governed response tool.
+						// Send the message as the next human-authored turn rather than a passive reopen.
+						await TaskServiceClient.askResponse(
+							AskResponseRequest.create({
+								responseType: "messageResponse",
+								text: messageToSend,
+								images,
+								files,
+							}),
+						)
+						messageSent = true
 					}
 
 					const isTaskRunning =
@@ -330,6 +343,7 @@ export function useMessageHandlers(messages: ClineMessage[], chatState: ChatStat
 			handleSendMessage,
 			startNewTask,
 			chatState,
+			isActiveUserThreadState,
 			backgroundCommandRunning,
 			isPassiveThreadOpenState,
 			setSendingDisabled,

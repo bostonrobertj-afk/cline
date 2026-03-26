@@ -18,7 +18,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Full Markdown checklist as a top-level parameter on a tool call. Keep the same items in the same order, and mark completed items by changing only those checkboxes from `- [ ]` to `- [x]`. Not a standalone tool."
+            "description": "Use as a top-level parameter on the next tool call, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
           }
         },
         "required": [
@@ -70,7 +70,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Full Markdown checklist as a top-level parameter on a tool call. Keep the same items in the same order, and mark completed items by changing only those checkboxes from `- [ ]` to `- [x]`. Not a standalone tool."
+            "description": "Use as a top-level parameter on the next tool call, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
           }
         },
         "required": [
@@ -99,7 +99,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Full Markdown checklist as a top-level parameter on a tool call. Keep the same items in the same order, and mark completed items by changing only those checkboxes from `- [ ]` to `- [x]`. Not a standalone tool."
+            "description": "Use as a top-level parameter on the next tool call, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
           }
         },
         "required": [
@@ -129,7 +129,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Full Markdown checklist as a top-level parameter on a tool call. Keep the same items in the same order, and mark completed items by changing only those checkboxes from `- [ ]` to `- [x]`. Not a standalone tool."
+            "description": "Use as a top-level parameter on the next tool call, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
           }
         },
         "required": [
@@ -163,7 +163,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Full Markdown checklist as a top-level parameter on a tool call. Keep the same items in the same order, and mark completed items by changing only those checkboxes from `- [ ]` to `- [x]`. Not a standalone tool."
+            "description": "Use as a top-level parameter on the next tool call, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
           }
         },
         "required": [
@@ -193,7 +193,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Full Markdown checklist as a top-level parameter on a tool call. Keep the same items in the same order, and mark completed items by changing only those checkboxes from `- [ ]` to `- [x]`. Not a standalone tool."
+            "description": "Use as a top-level parameter on the next tool call, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
           }
         },
         "required": [
@@ -218,7 +218,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Full Markdown checklist as a top-level parameter on a tool call. Keep the same items in the same order, and mark completed items by changing only those checkboxes from `- [ ]` to `- [x]`. Not a standalone tool."
+            "description": "Use as a top-level parameter on the next tool call, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
           }
         },
         "required": [
@@ -280,7 +280,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Full Markdown checklist as a top-level parameter on a tool call. Keep the same items in the same order, and mark completed items by changing only those checkboxes from `- [ ]` to `- [x]`. Not a standalone tool."
+            "description": "Use as a top-level parameter on the next tool call, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
           }
         },
         "required": [
@@ -314,7 +314,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Full Markdown checklist as a top-level parameter on a tool call. Keep the same items in the same order, and mark completed items by changing only those checkboxes from `- [ ]` to `- [x]`. Not a standalone tool."
+            "description": "Use as a top-level parameter on the next tool call, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
           }
         },
         "required": [
@@ -343,7 +343,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Full Markdown checklist as a top-level parameter on a tool call. Keep the same items in the same order, and mark completed items by changing only those checkboxes from `- [ ]` to `- [x]`. Not a standalone tool."
+            "description": "Use as a top-level parameter on the next tool call, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
           }
         },
         "required": [
@@ -358,7 +358,7 @@
     "type": "function",
     "function": {
       "name": "attempt_completion",
-      "description": "Once you've completed the user's task, use this tool to present the final result to the user, including a brief and very short (1-2 paragraph) summary of the task and what was done to resolve it. On success, this tool displays your message to the user, returns `[Message displayed.]`, and ends your current turn. Any later user reply arrives on the following turn as normal human-authored input. You should only call this tool when you have completed all tasks in the task_progress list, and completed all changes that are necessary to satisfy the user's request. You should not provide the contents of the task_progress list in the result parameter, it must be included in the task_progress parameter.",
+      "description": "Once you've completed the user's task, use this tool to present the final result to the user, including a brief and very short (1-2 paragraph) summary of the task and what was done to resolve it. On success, this tool displays your message to the user, returns `[Message displayed.]`, and ends your current turn. Any later user reply arrives on the following turn as normal human-authored input. Example: result=\"Implemented the fix and verified it with tests.\" You should only call this tool when you have completed all tasks in the task_progress list, and completed all changes that are necessary to satisfy the user's request. You should not provide the contents of the task_progress list in the result parameter, it must be included in the task_progress parameter.",
       "strict": false,
       "parameters": {
         "type": "object",

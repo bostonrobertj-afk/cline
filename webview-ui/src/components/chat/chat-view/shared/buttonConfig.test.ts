@@ -1,6 +1,6 @@
 import type { ClineMessage } from "@shared/ExtensionMessage"
 import { describe, expect, it } from "vitest"
-import { BUTTON_CONFIGS, getButtonConfig, PASSIVE_THREAD_DISPLAY_STATE } from "./buttonConfig"
+import { BUTTON_CONFIGS, getButtonConfig, isPassiveThreadOpen, PASSIVE_THREAD_DISPLAY_STATE } from "./buttonConfig"
 
 describe("getButtonConfig", () => {
 	// Test default behavior
@@ -63,6 +63,22 @@ describe("getButtonConfig", () => {
 		expect(config).toEqual(BUTTON_CONFIGS.default)
 		expect(config.sendingDisabled).toBe(false)
 		expect(config.enableButtons).toBe(false)
+	})
+
+	it("keeps active_user threads out of passive-open treatment", () => {
+		const activeUserMessage: ClineMessage = {
+			type: "say",
+			say: "api_req_started",
+			ts: Date.now(),
+		}
+
+		expect(isPassiveThreadOpen("active_user")).toBe(false)
+
+		const config = getButtonConfig(activeUserMessage, "act", "active_user")
+
+		expect(config).toEqual(BUTTON_CONFIGS.api_req_active)
+		expect(config.sendingDisabled).toBe(false)
+		expect(config.enableButtons).toBe(true)
 	})
 
 	// Test error recovery states

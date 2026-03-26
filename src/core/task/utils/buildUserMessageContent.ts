@@ -18,7 +18,7 @@ export async function buildUserMessageContent(
 	if (text) {
 		content.push({
 			type: "text",
-			text: formatResponse.latestHumanInput("user_message", text),
+			text: formatResponse.normalNextTurnDialogue("user_message", text),
 		})
 	}
 

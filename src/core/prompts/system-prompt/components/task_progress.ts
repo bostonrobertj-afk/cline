@@ -28,6 +28,16 @@ Use \`task_progress\` only as a checklist parameter on the next tool call, not a
 - To create the list, pass a full Markdown checklist as the \`task_progress\` parameter.
 - Use \`__COMPLETE_NEXT_STEP__\` as the \`task_progress\` value to complete the next incomplete step.`
 
+const UPDATING_TASK_PROGRESS_PLACEHOLDER_WORKFLOW = `UPDATING TASK PROGRESS
+
+This is a placeholder workflow with a live checklist.
+
+- Use \`task_progress\` only as a checklist parameter on the next tool call, not a standalone tool.
+- Keep items brief and milestone-based.
+- When a step sets a placeholder value, use \`set_workflow_placeholders\` on that step's tool call.
+- To create or update the list, pass a full Markdown checklist as the \`task_progress\` parameter.
+- Use \`__COMPLETE_NEXT_STEP__\` as the \`task_progress\` value to complete the next incomplete step.`
+
 export async function getUpdatingTaskProgress(variant: PromptVariant, context: SystemPromptContext): Promise<string | undefined> {
 	if (!context.focusChainSettings?.enabled) {
 		return undefined
@@ -41,6 +51,10 @@ The current checklist was built for you by the user at the beginning of the conv
 - The checklist shows you tasks which you must complete, then mark as done using the complete_workflow_item tool.
 - The system automatically shows you extra details for the 1st incomplete task if any were provided by the user.
 - task_progress is rendered based on the user's provided steps and the steps you've marked as complete.`
+	}
+
+	if (context.activeWorkflowSupportsPlaceholders) {
+		return UPDATING_TASK_PROGRESS_PLACEHOLDER_WORKFLOW
 	}
 
 	// Check for component override first

@@ -84,6 +84,7 @@ function convertClineThreadDisplayStateToProtoEnum(
 
 	const mapping: Record<AppThreadDisplayState, ProtoThreadDisplayState> = {
 		active_run: ProtoThreadDisplayState.ACTIVE_RUN,
+		active_user: ProtoThreadDisplayState.ACTIVE_USER,
 		awaiting_user_response: ProtoThreadDisplayState.AWAITING_USER_RESPONSE,
 		completed: ProtoThreadDisplayState.COMPLETED,
 		idle_open: ProtoThreadDisplayState.IDLE_OPEN,
@@ -106,6 +107,7 @@ function convertProtoThreadDisplayStateToCline(threadDisplayState: ProtoThreadDi
 		AppThreadDisplayState
 	> = {
 		[ProtoThreadDisplayState.ACTIVE_RUN]: "active_run",
+		[ProtoThreadDisplayState.ACTIVE_USER]: "active_user",
 		[ProtoThreadDisplayState.AWAITING_USER_RESPONSE]: "awaiting_user_response",
 		[ProtoThreadDisplayState.COMPLETED]: "completed",
 		[ProtoThreadDisplayState.IDLE_OPEN]: "idle_open",

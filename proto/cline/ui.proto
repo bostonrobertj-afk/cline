@@ -22,6 +22,7 @@ enum ThreadDisplayState {
   COMPLETED = 3;
   IDLE_OPEN = 4;
   PAUSED = 5;
+  ACTIVE_USER = 6;
 }
 
 // Enum for ClineAsk types

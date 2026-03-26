@@ -40,7 +40,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Full Markdown checklist as a top-level tool parameter. Keep the same items/order and change only completed checkboxes to `[x]`."
+            "description": "Top-level tool parameter, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
           }
         },
         "required": [
@@ -73,7 +73,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Full Markdown checklist as a top-level tool parameter. Keep the same items/order and change only completed checkboxes to `[x]`."
+            "description": "Top-level tool parameter, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
           }
         },
         "required": [
@@ -100,7 +100,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Full Markdown checklist as a top-level tool parameter. Keep the same items/order and change only completed checkboxes to `[x]`."
+            "description": "Top-level tool parameter, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
           }
         },
         "required": [
@@ -133,7 +133,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Full Markdown checklist as a top-level tool parameter. Keep the same items/order and change only completed checkboxes to `[x]`."
+            "description": "Top-level tool parameter, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
           }
         },
         "required": [
@@ -163,7 +163,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Full Markdown checklist as a top-level tool parameter. Keep the same items/order and change only completed checkboxes to `[x]`."
+            "description": "Top-level tool parameter, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
           }
         },
         "required": [
@@ -188,7 +188,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Full Markdown checklist as a top-level tool parameter. Keep the same items/order and change only completed checkboxes to `[x]`."
+            "description": "Top-level tool parameter, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
           }
         },
         "required": [
@@ -250,7 +250,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Full Markdown checklist as a top-level tool parameter. Keep the same items/order and change only completed checkboxes to `[x]`."
+            "description": "Top-level tool parameter, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
           }
         },
         "required": [
@@ -280,7 +280,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Full Markdown checklist as a top-level tool parameter. Keep the same items/order and change only completed checkboxes to `[x]`."
+            "description": "Top-level tool parameter, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
           }
         },
         "required": [
@@ -310,7 +310,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Full Markdown checklist as a top-level tool parameter. Keep the same items/order and change only completed checkboxes to `[x]`."
+            "description": "Top-level tool parameter, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
           }
         },
         "required": [
@@ -356,7 +356,7 @@
           },
           "task_progress": {
             "type": "string",
-            "description": "Full Markdown checklist as a top-level tool parameter. Keep the same items/order and change only completed checkboxes to `[x]`."
+            "description": "Top-level tool parameter, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
           }
         },
         "required": [

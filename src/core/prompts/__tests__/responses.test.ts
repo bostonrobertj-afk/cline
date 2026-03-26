@@ -11,6 +11,15 @@ describe("formatResponse user input framing", () => {
 		expect(framed).to.contain("<task>\nReview this story\n</task>")
 	})
 
+	it("wraps normal next-turn dialogue separately from reopened-thread copy", () => {
+		const framed = formatResponse.normalNextTurnDialogue("user_message", "Continue the review")
+
+		expect(framed).to.contain("[NORMAL NEXT-TURN HUMAN INPUT]")
+		expect(framed).to.contain("current live turn")
+		expect(framed).to.contain("[LATEST HUMAN USER INPUT]")
+		expect(framed).to.contain("<user_message>\nContinue the review\n</user_message>")
+	})
+
 	it("renders reopened-thread copy without synthetic resume framing", () => {
 		const [taskResumptionMessage, userResponseMessage] = formatResponse.taskResumption(
 			"act",

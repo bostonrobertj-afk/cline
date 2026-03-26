@@ -363,13 +363,12 @@ describe("Prompt System Integration Tests", () => {
 				},
 				"gpt-3",
 				async ({ systemPrompt }) => {
-					expect(systemPrompt).to.include("Governed user-facing response tools behave differently")
+					expect(systemPrompt).to.include("Governed user-facing response flows share one contract")
 					expect(systemPrompt).to.include("returns `[Message displayed.]`, and ends your current turn")
 					expect(systemPrompt).to.include("The next turn does not begin until the human user responds.")
-					expect(systemPrompt).to.include(
+					expect(systemPrompt).to.not.include(
 						"Any human reply arrives on the following turn as normal human-authored input",
 					)
-					expect(systemPrompt).to.include("needs_more_exploration=true")
 					expect(systemPrompt).to.include("internal control flow")
 				},
 			)
@@ -397,6 +396,9 @@ describe("Prompt System Integration Tests", () => {
 					expect(byName.get("send_user_message")).to.include(
 						"returns `[Message displayed.]`, and ends your current turn",
 					)
+					expect(byName.get("attempt_completion")).to.include(
+						'Example: result="Implemented the fix and verified it with tests."',
+					)
 					expect(byName.get("ask_followup_question")).to.include("following turn as normal human-authored input")
 					expect(byName.get("generate_plan_output")).to.include(
 						"internal control flow rather than a governed user-facing response",
@@ -411,6 +413,7 @@ describe("Prompt System Integration Tests", () => {
 			const guidanceSnippet = "When a step sets a placeholder value, use `set_workflow_placeholders`."
 			const taskProgressSnippet =
 				"Use `task_progress` only as a checklist parameter on the next tool call, not a standalone tool."
+			const placeholderTaskProgressSnippet = "This is a placeholder workflow with a live checklist."
 
 			const cases = [
 				{
@@ -449,6 +452,7 @@ describe("Prompt System Integration Tests", () => {
 					async ({ systemPrompt }) => {
 						expect(systemPrompt).to.include(guidanceSnippet)
 						expect(systemPrompt).to.include(taskProgressSnippet)
+						expect(systemPrompt).to.include(placeholderTaskProgressSnippet)
 						expect(systemPrompt).to.not.include("managed workflow step")
 					},
 				)

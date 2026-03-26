@@ -176,7 +176,7 @@ export function shouldIncludePersistentPromptContext(taskState: Pick<TaskState, 
 }
 
 export function isActiveThreadDisplayState(threadDisplayState: ThreadDisplayState): boolean {
-	return threadDisplayState === ThreadDisplayStates.ACTIVE_RUN
+	return threadDisplayState === ThreadDisplayStates.ACTIVE_RUN || threadDisplayState === ThreadDisplayStates.ACTIVE_USER
 }
 
 export function isPassiveThreadDisplayState(threadDisplayState: ThreadDisplayState): boolean {
@@ -1852,6 +1852,44 @@ export class Task {
 		await this.messageStateHandler.overwriteApiConversationHistory(modifiedApiConversationHistory)
 		this.nextApiRequestIncludesHumanAuthoredInput = this.hasHumanAuthoredInput(newUserContent)
 		await this.initiateTaskLoop(newUserContent)
+	}
+
+	public async continueTaskWithFeedback(text?: string, images?: string[], files?: string[]): Promise<void> {
+		const hasPayload = !!(text || (images && images.length > 0) || (files && files.length > 0))
+		if (!hasPayload) {
+			return
+		}
+
+		await this.say("user_feedback", text, images, files)
+		await this.checkpointManager?.saveCheckpoint()
+
+		const userContent = await buildUserFeedbackContent(text, images, files)
+
+		const hooksEnabled = getHooksEnabledSafe(this.stateManager.getGlobalSettingsKey("hooksEnabled"))
+		if (hooksEnabled) {
+			const userPromptHookResult = await this.runUserPromptSubmitHook(userContent, "feedback")
+
+			if (this.taskState.abort) {
+				return
+			}
+
+			if (userPromptHookResult.cancel === true) {
+				await this.cancelTask()
+				return
+			}
+
+			if (userPromptHookResult.contextModification) {
+				userContent.push({
+					type: "text",
+					text: `<hook_context source="UserPromptSubmit">\n${userPromptHookResult.contextModification}\n</hook_context>`,
+				})
+			}
+		}
+
+		this.nextApiRequestIncludesHumanAuthoredInput = this.hasHumanAuthoredInput(userContent)
+		this.threadDisplayState = ThreadDisplayStates.ACTIVE_RUN
+		await this.postStateToWebview()
+		await this.initiateTaskLoop(userContent)
 	}
 
 	private async initiateTaskLoop(userContent: ClineContent[]): Promise<void> {

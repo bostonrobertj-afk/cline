@@ -19,7 +19,7 @@ export async function buildUserFeedbackContent(text?: string, images?: string[],
 	if (text) {
 		content.push({
 			type: "text",
-			text: formatResponse.latestHumanInput("feedback", text),
+			text: formatResponse.normalNextTurnDialogue("feedback", text),
 		})
 	}
 

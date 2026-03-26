@@ -1,8 +1,10 @@
 import { strict as assert } from "node:assert"
 import { describe, it } from "mocha"
+import sinon from "sinon"
+import { ThreadDisplayStates } from "@/shared/ExtensionMessage"
 import { ClineDefaultTool } from "@/shared/tools"
 import { formatResponse } from "../../prompts/responses"
-import { consumeDeferredResponseToolUserContent } from "../index"
+import { consumeDeferredResponseToolUserContent, Task } from "../index"
 import { TaskState } from "../TaskState"
 
 describe("response tool turn flow", () => {
@@ -20,7 +22,7 @@ describe("response tool turn flow", () => {
 		assert.deepEqual(result, [
 			{
 				type: "text",
-				text: formatResponse.latestHumanInput("user_message", "Please tighten the summary."),
+				text: formatResponse.normalNextTurnDialogue("user_message", "Please tighten the summary."),
 			},
 			{
 				type: "text",
@@ -43,7 +45,7 @@ describe("response tool turn flow", () => {
 		assert.deepEqual(result, [
 			{
 				type: "text",
-				text: formatResponse.latestHumanInput("user_message", "Use the stricter validation path."),
+				text: formatResponse.normalNextTurnDialogue("user_message", "Use the stricter validation path."),
 			},
 		])
 		assert.equal(taskState.pendingResponseToolFollowup, undefined)
@@ -61,5 +63,39 @@ describe("response tool turn flow", () => {
 
 		assert.equal(result, undefined)
 		assert.equal(taskState.pendingResponseToolFollowup, undefined)
+	})
+
+	it("continues active_user dialogue as a fresh normal turn", async () => {
+		const say = sinon.stub().resolves()
+		const saveCheckpoint = sinon.stub().resolves()
+		const runUserPromptSubmitHook = sinon.stub().resolves({})
+		const initiateTaskLoop = sinon.stub().resolves()
+		const hasHumanAuthoredInput = sinon.stub().returns(true)
+		const postStateToWebview = sinon.stub().resolves()
+		const taskState = new TaskState()
+		const fakeTask = {
+			say,
+			checkpointManager: {
+				saveCheckpoint,
+			},
+			runUserPromptSubmitHook,
+			taskState,
+			postStateToWebview,
+			stateManager: {
+				getGlobalSettingsKey: sinon.stub().callsFake((key: string) => key === "hooksEnabled"),
+			},
+			hasHumanAuthoredInput,
+			initiateTaskLoop,
+		}
+
+		await Task.prototype.continueTaskWithFeedback.call(fakeTask as unknown as Task, "resume as active user", [], [])
+
+		sinon.assert.calledOnceWithExactly(say, "user_feedback", "resume as active user", [], [])
+		sinon.assert.calledOnce(saveCheckpoint)
+		sinon.assert.calledOnceWithMatch(runUserPromptSubmitHook, sinon.match.array, "feedback")
+		sinon.assert.calledOnce(postStateToWebview)
+		sinon.assert.calledOnce(initiateTaskLoop)
+		assert.equal((fakeTask as any).threadDisplayState, ThreadDisplayStates.ACTIVE_RUN)
+		assert.equal(taskState.responseToolTurnShouldEnd, false)
 	})
 })

@@ -93,6 +93,13 @@ export const formatResponse = {
 			`</${tag}>`,
 		].join("\n"),
 
+	normalNextTurnDialogue: (tag: "task" | "feedback" | "user_message", text: string | undefined) =>
+		[
+			"[NORMAL NEXT-TURN HUMAN INPUT]",
+			"The tagged content below is the latest direct input from the human user for the current live turn.",
+			formatResponse.latestHumanInput(tag, text),
+		].join("\n"),
+
 	systemGeneratedContextNotice: () =>
 		[
 			"[SYSTEM-GENERATED CONTEXT]",
