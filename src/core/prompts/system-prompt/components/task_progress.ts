@@ -5,7 +5,7 @@ const UPDATING_TASK_PROGRESS = `UPDATING TASK PROGRESS
 
 Use \`task_progress\` only as a checklist parameter on the next tool call, not a standalone tool.
 
-- Create the checklist when switching from PLAN MODE to ACT MODE.
+- Use to create a task list when switching out of PLAN MODE
 - Keep items brief and milestone-based.
 - On each update, include the full current checklist.
 - Keep the same checklist items in the same order; only checkbox states should change.
@@ -17,7 +17,7 @@ const UPDATING_TASK_PROGRESS_NATIVE_NEXT_GEN = `UPDATING TASK PROGRESS
 
 Use \`task_progress\` only as a checklist parameter on the next tool call, not a standalone tool.
 
-- Create the checklist when switching from PLAN MODE to ACT MODE.
+- Use to create a task list when switching out of PLAN MODE
 - Keep items brief and milestone-based.
 - On each update, include the full current checklist.
 - Keep the same checklist items in the same order; only checkbox states should change.
@@ -29,7 +29,7 @@ const UPDATING_TASK_PROGRESS_NATIVE_GPT5 = `UPDATING TASK PROGRESS
 
 Use \`task_progress\` only as a checklist parameter on the next tool call, not a standalone tool.
 
-- Create the checklist when switching from PLAN MODE to ACT MODE.
+- Use to create a task list when switching out of PLAN MODE
 - Keep items brief and milestone-based.
 - On each update, include the full current checklist.
 - Keep the same checklist items in the same order; only checkbox states should change.

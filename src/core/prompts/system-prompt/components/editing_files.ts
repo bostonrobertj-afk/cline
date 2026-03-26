@@ -28,16 +28,14 @@ You have access to two tools for working with files: **write_to_file** and **rep
 
 ## When to Use
 
-- Initial file creation, such as when scaffolding a new project.  
-- Overwriting large boilerplate files where you want to replace the entire content at once.
-- When the complexity or number of changes would make replace_in_file unwieldy or error-prone.
-- When you need to completely restructure a file's content or change its fundamental organization.
+- Initial file creation
+- Rewriting most of an existing file at once
+- Significant file restructuring
 
 ## Important Considerations
 
 - Using write_to_file requires providing the file's complete final content.  
-- If you only need to make small changes to an existing file, consider using replace_in_file instead to avoid unnecessarily rewriting the entire file.
-- While write_to_file should not be your default choice, don't hesitate to use it when the situation truly calls for it.
+- If you useful for small, targeted edit to existing files
 
 # replace_in_file
 
@@ -47,24 +45,19 @@ You have access to two tools for working with files: **write_to_file** and **rep
 
 ## When to Use
 
-- Small, localized changes like updating a few lines, function implementations, changing variable names, modifying a section of text, etc.
+- Small, localized changes
 - Targeted improvements where only specific portions of the file's content needs to be altered.
 - Especially useful for long files where much of the file will remain unchanged.
 
 ## Advantages
 
-- More efficient for minor edits, since you don't need to supply the entire file content.  
-- Reduces the chance of errors that can occur when overwriting large files.
+- Low token consumption
+- Less risk of error
 
 # Choosing the Appropriate Tool
 
-- **Default to replace_in_file** for most changes. It's the safer, more precise option that minimizes potential issues.
-- **Use write_to_file** when:
-  - Creating new files
-  - The changes are so extensive that using replace_in_file would be more complex or risky
-  - You need to completely reorganize or restructure a file
-  - The file is relatively small and the changes affect most of its content
-  - You're generating boilerplate or template files
+- Default to replace_in_file for most changes.
+- Use write_to_file for extensive changes or new file generation
 
 {{AUTO_FORMATTING_SECTION}}
 
