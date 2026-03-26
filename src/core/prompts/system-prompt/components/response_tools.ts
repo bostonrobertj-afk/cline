@@ -7,10 +7,6 @@ function getActModeResponseTools(context: SystemPromptContext): string[] {
 		tools.splice(1, 0, "`ask_followup_question`")
 	}
 
-	if (context.enableNativeToolCalls) {
-		tools.splice(tools.length - 1, 0, "`act_mode_respond`")
-	}
-
 	return tools
 }
 
@@ -44,17 +40,10 @@ export function getResponseToolsSection(context: SystemPromptContext): string {
 		responseToolLines.push("- `ask_followup_question`: Use to ask a question + present options for user to select")
 	}
 
-	if (context.enableNativeToolCalls) {
-		responseToolLines.push("- `act_mode_respond`: prefer send_user_message over this tool.")
-	}
-
 	responseToolLines.push("- `generate_plan_output`: Use to present a structured plan")
 
 	return `RESPONSE TOOLS
 Use these tools to respond to the user. A reply reaches the human user only when you use the appropriate response tool.
-Governed user-facing response flows share one contract:
-- Success displays the message, returns \`[Message displayed.]\`, and ends your current turn.
-- The next turn does not begin until the human user responds.
 
 ${responseToolLines.join("\n")}
 
