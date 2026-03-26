@@ -27,6 +27,7 @@ import {
 import { Environment } from "../../../src/shared/config-types"
 import type { McpMarketplaceCatalog, McpServer, McpViewTab } from "../../../src/shared/mcp"
 import { McpServiceClient, ModelsServiceClient, StateServiceClient, UiServiceClient } from "../services/grpc-client"
+import { shouldPreservePreviousClineMessages } from "./extensionStateUtils"
 
 export interface ExtensionStateContextType extends ExtensionState {
 	didHydrateState: boolean
@@ -362,11 +363,24 @@ export const ExtensionStateContextProvider: React.FC<{
 							const incomingVersion = stateData.autoApprovalSettings?.version ?? 1
 							const currentVersion = prevState.autoApprovalSettings?.version ?? 1
 							const shouldUpdateAutoApproval = incomingVersion > currentVersion
-							// HACK: Preserve clineMessages if currentTaskItem is the same
-							if (stateData.currentTaskItem?.id === prevState.currentTaskItem?.id) {
-								stateData.clineMessages = stateData.clineMessages?.length
-									? stateData.clineMessages
-									: prevState.clineMessages
+
+							// Preserve previous messages only for the narrow case where the backend
+							// says the same task is still actively running but the new payload has
+							// not yet included the message list. This avoids reviving stale rows
+							// after reconnect when the thread is already user-ready.
+							if (
+								shouldPreservePreviousClineMessages({
+									previousClineMessages: prevState.clineMessages,
+									previousTaskItem: prevState.currentTaskItem as
+										| { id?: string; threadDisplayState?: string | null }
+										| undefined,
+									nextClineMessages: stateData.clineMessages,
+									nextTaskItem: stateData.currentTaskItem as
+										| { id?: string; threadDisplayState?: string | null }
+										| undefined,
+								})
+							) {
+								stateData.clineMessages = prevState.clineMessages
 							}
 
 							const newState = {

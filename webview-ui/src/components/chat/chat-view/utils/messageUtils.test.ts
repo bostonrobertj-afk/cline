@@ -1,6 +1,13 @@
 import type { ClineMessage } from "@shared/ExtensionMessage"
+import { ThreadDisplayStates } from "@shared/ExtensionMessage"
 import { describe, expect, it } from "vitest"
-import { filterVisibleMessages, groupLowStakesTools, isToolGroup } from "./messageUtils"
+import {
+	filterVisibleMessages,
+	groupLowStakesTools,
+	isToolGroup,
+	shouldAppendThinkingLoaderRow,
+	shouldShowThinkingLoaderRow,
+} from "./messageUtils"
 
 const createTextMessage = (ts: number, text: string): ClineMessage => ({
 	type: "say",
@@ -19,6 +26,49 @@ const createToolMessage = (ts: number, tool: string): ClineMessage => ({
 const createReasoningMessage = (ts: number, text: string): ClineMessage => ({
 	type: "say",
 	say: "reasoning",
+	text,
+	ts,
+})
+
+const createPartialReasoningMessage = (ts: number, text: string): ClineMessage => ({
+	type: "say",
+	say: "reasoning",
+	text,
+	partial: true,
+	ts,
+})
+
+const createApiReqStartedMessage = (
+	ts: number,
+	overrides: Partial<Pick<ClineMessage, "partial" | "text">> & { cost?: number | null; cancelReason?: string } = {},
+): ClineMessage => ({
+	type: "say",
+	say: "api_req_started",
+	text: JSON.stringify({
+		cost: overrides.cost,
+		cancelReason: overrides.cancelReason,
+	}),
+	partial: overrides.partial,
+	ts,
+})
+
+const createAskMessage = (ts: number, ask: NonNullable<ClineMessage["ask"]>): ClineMessage => ({
+	type: "ask",
+	ask,
+	text: "",
+	ts,
+})
+
+const createTaskMessage = (ts: number): ClineMessage => ({
+	type: "say",
+	say: "task",
+	text: "",
+	ts,
+})
+
+const createUserFeedbackMessage = (ts: number, say: "user_feedback" | "user_feedback_diff", text: string): ClineMessage => ({
+	type: "say",
+	say,
 	text,
 	ts,
 })
@@ -169,5 +219,56 @@ describe("filterVisibleMessages", () => {
 
 		expect(filtered).toHaveLength(1)
 		expect(filtered[0]).toMatchObject({ type: "say", say: "subagent", ts: 2 })
+	})
+})
+
+describe("shouldShowThinkingLoaderRow", () => {
+	it("does not show Thinking for a completed non-partial assistant tail", () => {
+		const messages: ClineMessage[] = [createTextMessage(1, "Completed response")]
+
+		expect(shouldShowThinkingLoaderRow(messages, 1)).toBe(false)
+	})
+
+	it("shows Thinking for an incomplete api_req_started before any visible content", () => {
+		const messages: ClineMessage[] = [createApiReqStartedMessage(1, { cost: null })]
+
+		expect(shouldShowThinkingLoaderRow(messages, 0)).toBe(true)
+	})
+
+	it("shows Thinking for the initial task row before any visible content", () => {
+		const messages: ClineMessage[] = [createTaskMessage(1)]
+
+		expect(shouldShowThinkingLoaderRow(messages, 0)).toBe(true)
+	})
+
+	it("appends a synthetic Thinking row before visible content", () => {
+		const messages: ClineMessage[] = [createApiReqStartedMessage(1, { cost: null })]
+
+		expect(shouldAppendThinkingLoaderRow(messages, 0, undefined, undefined)).toBe(true)
+	})
+
+	it("does not append a synthetic Thinking row when a partial visible row is already present", () => {
+		const messages: ClineMessage[] = [createPartialReasoningMessage(1, "Thinking through the next step")]
+
+		expect(shouldAppendThinkingLoaderRow(messages, 1, undefined, messages[0])).toBe(false)
+	})
+
+	it("does not show Thinking for active_user threads", () => {
+		const messages: ClineMessage[] = [createApiReqStartedMessage(1, { cost: null })]
+
+		expect(shouldShowThinkingLoaderRow(messages, 0, ThreadDisplayStates.ACTIVE_USER)).toBe(false)
+	})
+
+	it("shows Thinking for user_feedback follow-up states", () => {
+		const messages: ClineMessage[] = [createUserFeedbackMessage(1, "user_feedback", "User follow-up")]
+
+		expect(shouldShowThinkingLoaderRow(messages, 1)).toBe(true)
+		expect(shouldAppendThinkingLoaderRow(messages, 1, undefined, messages[0])).toBe(true)
+	})
+
+	it("does not show Thinking for ask states", () => {
+		const messages: ClineMessage[] = [createAskMessage(1, "followup")]
+
+		expect(shouldShowThinkingLoaderRow(messages, 0)).toBe(false)
 	})
 })

@@ -10,7 +10,9 @@ import type {
 	ClineSayBrowserAction,
 	ClineSaySubagentStatus,
 	ClineSayTool,
+	ThreadDisplayState,
 } from "@shared/ExtensionMessage"
+import { ThreadDisplayStates } from "@shared/ExtensionMessage"
 import { FileIcon, FolderOpenDotIcon, FolderOpenIcon, SearchIcon, ShapesIcon, WrenchIcon } from "lucide-react"
 
 /**
@@ -44,6 +46,93 @@ export function isLowStakesTool(message: ClineMessage): boolean {
  */
 export function isToolGroup(item: ClineMessage | ClineMessage[]): item is ClineMessage[] & { _isToolGroup: true } {
 	return Array.isArray(item) && (item as any)._isToolGroup === true
+}
+
+const USER_READY_THREAD_DISPLAY_STATES = new Set<ThreadDisplayState>([
+	ThreadDisplayStates.ACTIVE_USER,
+	ThreadDisplayStates.AWAITING_USER_RESPONSE,
+	ThreadDisplayStates.COMPLETED,
+	ThreadDisplayStates.IDLE_OPEN,
+	ThreadDisplayStates.PAUSED,
+])
+
+function parseApiReqStartedInfo(message: ClineMessage): { cost?: number | null; cancelReason?: string } | undefined {
+	try {
+		return JSON.parse(message.text || "{}") as { cost?: number | null; cancelReason?: string }
+	} catch {
+		return undefined
+	}
+}
+
+/**
+ * Determine whether the chat should show the "Thinking..." loader row.
+ *
+ * The loader should stay tied to concrete in-flight signals:
+ * - active backend request markers that have not completed yet
+ * - trailing partial assistant/reasoning/tool output
+ * - initial task startup before any visible rows have rendered
+ *
+ * It must not be driven by a completed visible row by itself, or by user-ready
+ * thread states such as `active_user` or passive reopen modes.
+ */
+export function shouldShowThinkingLoaderRow(
+	messages: ClineMessage[],
+	visibleGroupCount: number,
+	threadDisplayState?: string | null,
+): boolean {
+	if (threadDisplayState && USER_READY_THREAD_DISPLAY_STATES.has(threadDisplayState as ThreadDisplayState)) {
+		return false
+	}
+
+	const lastMessage = messages.at(-1)
+	if (!lastMessage) {
+		return visibleGroupCount === 0
+	}
+
+	if (lastMessage.type === "ask") {
+		return false
+	}
+
+	if (lastMessage.type === "say" && (lastMessage.say === "user_feedback" || lastMessage.say === "user_feedback_diff")) {
+		return true
+	}
+
+	if (lastMessage.type === "say" && lastMessage.say === "completion_result") {
+		return false
+	}
+
+	if (lastMessage.type === "say" && lastMessage.say === "api_req_started") {
+		const info = parseApiReqStartedInfo(lastMessage)
+		if (info?.cancelReason === "user_cancelled") {
+			return false
+		}
+		return info?.cost == null
+	}
+
+	if (lastMessage.partial === true) {
+		return true
+	}
+
+	return visibleGroupCount === 0 && (!lastMessage || lastMessage.say === "task")
+}
+
+/**
+ * Determine whether a synthetic Thinking row should be appended to the visible list.
+ *
+ * This stays separate from the waiting-state signal so we can avoid duplicating
+ * an already-visible partial assistant/reasoning/tool row.
+ */
+export function shouldAppendThinkingLoaderRow(
+	messages: ClineMessage[],
+	visibleGroupCount: number,
+	threadDisplayState: string | null | undefined,
+	lastVisibleMessage?: ClineMessage,
+): boolean {
+	if (!shouldShowThinkingLoaderRow(messages, visibleGroupCount, threadDisplayState)) {
+		return false
+	}
+
+	return lastVisibleMessage?.partial !== true
 }
 
 /**
