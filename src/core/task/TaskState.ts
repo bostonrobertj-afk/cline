@@ -2,6 +2,7 @@ import { Anthropic } from "@anthropic-ai/sdk"
 import { AssistantMessageContent } from "@core/assistant-message"
 import { ClineAskResponse } from "@shared/WebviewMessage"
 import type { ActivePlaceholderWorkflowSource } from "@/core/workflows/placeholder-workflow-step-details"
+import type { ThreadDisplayState } from "@/shared/ExtensionMessage"
 import type { ClineDefaultTool } from "@/shared/tools"
 import type { ManagedWorkflowRunState } from "./managed-workflows/types"
 import type {
@@ -56,6 +57,7 @@ export class TaskState {
 	activeResponseToolName?: ClineDefaultTool
 	responseToolTurnShouldEnd = false
 	responseToolTurnCompletedBy?: ClineDefaultTool
+	responseToolThreadDisplayStateAfterTurnEnds?: ThreadDisplayState
 	pendingResponseToolFollowup?: PendingResponseToolFollowup
 	responseToolFailureCount = 0
 	lastFailedResponseTool?: ClineDefaultTool
@@ -117,24 +119,33 @@ export class TaskState {
 	currentlySummarizing = false
 	lastAutoCompactTriggerIndex?: number
 
-	markResponseToolTurnComplete(toolName: ClineDefaultTool, behavior: ResponseToolTurnBehavior): void {
+	markResponseToolTurnComplete(
+		toolName: ClineDefaultTool,
+		behavior: ResponseToolTurnBehavior,
+		threadDisplayStateAfterTurnEnds?: ThreadDisplayState,
+	): void {
 		this.activeResponseToolName = undefined
 		this.responseToolTurnCompletedBy = toolName
 		this.responseToolTurnShouldEnd = behavior === "end_turn"
+		this.responseToolThreadDisplayStateAfterTurnEnds = threadDisplayStateAfterTurnEnds
 		this.didAttemptCompletionEndTask = toolName === "attempt_completion" && behavior === "end_turn"
 	}
 
-	consumeCompletedResponseTool(): ClineDefaultTool | undefined {
+	consumeCompletedResponseTool():
+		| { toolName: ClineDefaultTool; threadDisplayStateAfterTurnEnds?: ThreadDisplayState }
+		| undefined {
 		if (!this.responseToolTurnShouldEnd || !this.responseToolTurnCompletedBy) {
 			return undefined
 		}
 
 		const toolName = this.responseToolTurnCompletedBy
+		const threadDisplayStateAfterTurnEnds = this.responseToolThreadDisplayStateAfterTurnEnds
 		this.responseToolTurnCompletedBy = undefined
 		this.responseToolTurnShouldEnd = false
+		this.responseToolThreadDisplayStateAfterTurnEnds = undefined
 		this.didAttemptCompletionEndTask = false
 
-		return toolName
+		return { toolName, threadDisplayStateAfterTurnEnds }
 	}
 
 	setPendingResponseToolFollowup(followup: PendingResponseToolFollowup): void {
@@ -195,6 +206,7 @@ export class TaskState {
 		this.activeResponseToolName = undefined
 		this.responseToolTurnShouldEnd = false
 		this.responseToolTurnCompletedBy = undefined
+		this.responseToolThreadDisplayStateAfterTurnEnds = undefined
 		this.pendingResponseToolFollowup = undefined
 		this.clearResponseToolFailureState()
 		this.didAttemptCompletionEndTask = false

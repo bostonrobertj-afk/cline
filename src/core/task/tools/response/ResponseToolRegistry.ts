@@ -1,3 +1,4 @@
+import { ThreadDisplayStates } from "@shared/ExtensionMessage"
 import { ClineDefaultTool } from "@shared/tools"
 import type { ResponseToolMetadata } from "./types"
 
@@ -5,6 +6,7 @@ const RESPONSE_TOOL_METADATA: Record<ClineDefaultTool, ResponseToolMetadata | un
 	[ClineDefaultTool.ATTEMPT]: {
 		toolName: ClineDefaultTool.ATTEMPT,
 		defaultTurnBehavior: "end_turn",
+		threadDisplayStateAfterTurnEnds: ThreadDisplayStates.COMPLETED,
 		dismissCommandOutputAskBeforeBlockingAsk: true,
 		suppressCommandBlockingAsk: true,
 		partialMessage: {
@@ -15,6 +17,7 @@ const RESPONSE_TOOL_METADATA: Record<ClineDefaultTool, ResponseToolMetadata | un
 	[ClineDefaultTool.ASK]: {
 		toolName: ClineDefaultTool.ASK,
 		defaultTurnBehavior: "end_turn",
+		threadDisplayStateAfterTurnEnds: ThreadDisplayStates.AWAITING_USER_RESPONSE,
 		dismissCommandOutputAskBeforeBlockingAsk: true,
 		partialMessage: {
 			channel: "ask",
@@ -24,6 +27,7 @@ const RESPONSE_TOOL_METADATA: Record<ClineDefaultTool, ResponseToolMetadata | un
 	[ClineDefaultTool.SEND_USER_MESSAGE]: {
 		toolName: ClineDefaultTool.SEND_USER_MESSAGE,
 		defaultTurnBehavior: "end_turn",
+		threadDisplayStateAfterTurnEnds: ThreadDisplayStates.AWAITING_USER_RESPONSE,
 		partialMessage: {
 			channel: "say",
 			type: "text",
@@ -32,6 +36,7 @@ const RESPONSE_TOOL_METADATA: Record<ClineDefaultTool, ResponseToolMetadata | un
 	[ClineDefaultTool.PLAN_MODE]: {
 		toolName: ClineDefaultTool.PLAN_MODE,
 		defaultTurnBehavior: "end_turn",
+		threadDisplayStateAfterTurnEnds: ThreadDisplayStates.AWAITING_USER_RESPONSE,
 		dismissCommandOutputAskBeforeBlockingAsk: true,
 		partialMessage: {
 			channel: "ask",
@@ -41,6 +46,7 @@ const RESPONSE_TOOL_METADATA: Record<ClineDefaultTool, ResponseToolMetadata | un
 	[ClineDefaultTool.ACT_MODE]: {
 		toolName: ClineDefaultTool.ACT_MODE,
 		defaultTurnBehavior: "end_turn",
+		threadDisplayStateAfterTurnEnds: ThreadDisplayStates.AWAITING_USER_RESPONSE,
 		partialMessage: {
 			channel: "say",
 			type: "text",

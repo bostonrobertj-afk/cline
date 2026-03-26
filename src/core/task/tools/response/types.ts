@@ -1,4 +1,4 @@
-import type { ClineAsk, ClineSay } from "@shared/ExtensionMessage"
+import type { ClineAsk, ClineSay, ThreadDisplayState } from "@shared/ExtensionMessage"
 import type { ClineDefaultTool } from "@shared/tools"
 import type { ToolUse } from "@/core/assistant-message"
 import type { TaskConfig } from "../types/TaskConfig"
@@ -16,6 +16,7 @@ export type ResponseToolFailureCause =
 export interface ResponseToolMetadata {
 	toolName: ClineDefaultTool
 	defaultTurnBehavior: ResponseToolTurnBehavior
+	threadDisplayStateAfterTurnEnds?: ThreadDisplayState
 	dismissCommandOutputAskBeforeBlockingAsk?: boolean
 	suppressCommandBlockingAsk?: boolean
 	partialMessage:

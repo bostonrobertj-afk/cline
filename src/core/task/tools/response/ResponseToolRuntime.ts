@@ -164,8 +164,9 @@ export class ResponseToolRuntime {
 		result: ToolResponse,
 		overrideBehavior?: ResponseToolTurnBehavior,
 	): ToolResponse {
-		const turnBehavior = overrideBehavior ?? this.getTurnBehavior(toolName)
-		config.taskState.markResponseToolTurnComplete(toolName as any, turnBehavior)
+		const metadata = ResponseToolRegistry.get(toolName)
+		const turnBehavior = overrideBehavior ?? metadata?.defaultTurnBehavior ?? "continue"
+		config.taskState.markResponseToolTurnComplete(toolName as any, turnBehavior, metadata?.threadDisplayStateAfterTurnEnds)
 		config.taskState.activeResponseToolName = undefined
 		return result
 	}

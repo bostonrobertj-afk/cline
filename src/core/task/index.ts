@@ -3680,6 +3680,10 @@ export class Task {
 					if (deferredUserContent) {
 						return await this.recursivelyMakeClineRequests(deferredUserContent)
 					}
+					if (completedResponseTool.threadDisplayStateAfterTurnEnds && !this.taskState.abort) {
+						this.setThreadDisplayState(completedResponseTool.threadDisplayStateAfterTurnEnds)
+						await this.postStateToWebview()
+					}
 					return true
 				}
 
