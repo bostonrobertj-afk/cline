@@ -8,6 +8,11 @@ const CONTEXT_WINDOW_WARNING_THRESHOLD_PERCENT = 50
 const INLINE_FINAL_FILE_CONTENT_MAX_CHARS = 2000
 const PATCH_SUMMARY_MAX_CHARS = 1400
 
+interface SavedFileReferenceOptions {
+	autoFormattingApplied?: boolean
+	userEditsApplied?: boolean
+}
+
 function countLines(text: string): number {
 	if (!text) {
 		return 0
@@ -21,11 +26,53 @@ function countChangedRegions(patch: string): number {
 	return matches?.length ?? (patch.trim() ? 1 : 0)
 }
 
+function formatFinalFileStateBlock(args: {
+	relPath: string
+	finalContent: string
+	isNewFile: boolean
+	referenceFormat: "full_content" | "patch_summary" | "metadata_summary"
+	patchTruncated?: boolean
+	autoFormattingApplied?: boolean
+	userEditsApplied?: boolean
+}) {
+	const {
+		relPath,
+		finalContent,
+		isNewFile,
+		referenceFormat,
+		patchTruncated = false,
+		autoFormattingApplied = false,
+		userEditsApplied = false,
+	} = args
+
+	return (
+		`<final_file_state path="${relPath.toPosix()}">\n` +
+		`saved=true\n` +
+		`created_file=${isNewFile}\n` +
+		`chars=${finalContent.length}\n` +
+		`lines=${countLines(finalContent)}\n` +
+		`reference_format=${referenceFormat}\n` +
+		`exact_saved_content_matches_agent_output=${!autoFormattingApplied && !userEditsApplied}\n` +
+		`user_edits_applied=${userEditsApplied}\n` +
+		`auto_formatting_applied=${autoFormattingApplied}\n` +
+		`patch_truncated=${patchTruncated}\n` +
+		`additional_verification_read_required=${patchTruncated}\n` +
+		`</final_file_state>\n\n`
+	)
+}
+
+function formatVerificationGuidance(relPath: string, patchTruncated: boolean) {
+	return patchTruncated
+		? `The save succeeded, but the patch summary was truncated. Only use read_file on ${relPath.toPosix()} if you need the exact surrounding saved context before another edit.\n\n`
+		: `The save succeeded. No additional verification read is required unless you need broader file context for a follow-up edit.\n\n`
+}
+
 function formatSavedFileReference(
 	relPath: string,
 	previousContent: string | undefined,
 	finalContent: string | undefined,
 	isNewFile = false,
+	options: SavedFileReferenceOptions = {},
 ): string {
 	if (!finalContent) {
 		return ""
@@ -33,53 +80,87 @@ function formatSavedFileReference(
 
 	if (isNewFile && finalContent.length <= INLINE_FINAL_FILE_CONTENT_MAX_CHARS) {
 		return (
+			formatFinalFileStateBlock({
+				relPath,
+				finalContent,
+				isNewFile,
+				referenceFormat: "full_content",
+				autoFormattingApplied: options.autoFormattingApplied,
+				userEditsApplied: options.userEditsApplied,
+			}) +
 			`Here is the full, updated content of the file that was saved:\n\n` +
 			`<final_file_content path="${relPath.toPosix()}">\n${finalContent}\n</final_file_content>\n\n` +
-			`IMPORTANT: For any future changes to this file, use the final_file_content shown above as your reference. This content reflects the current state of the file, including any auto-formatting. Always base your SEARCH/REPLACE operations on this final version to ensure accuracy.\n\n`
+			`IMPORTANT: For any future changes to this file, use the final_file_content shown above as your reference. This content reflects the current state of the file, including any auto-formatting. Always base your SEARCH/REPLACE operations on this final version to ensure accuracy.\n\n` +
+			formatVerificationGuidance(relPath, false)
 		)
 	}
 
 	if (previousContent !== undefined) {
 		const prettyPatch = formatResponse.createPrettyPatch(relPath.toPosix(), previousContent, finalContent).trim()
 		const changedRegions = countChangedRegions(prettyPatch)
+		const patchTruncated = prettyPatch.length > PATCH_SUMMARY_MAX_CHARS
 
 		if (prettyPatch.length === 0) {
 			return (
+				formatFinalFileStateBlock({
+					relPath,
+					finalContent,
+					isNewFile,
+					referenceFormat: "patch_summary",
+					autoFormattingApplied: options.autoFormattingApplied,
+					userEditsApplied: options.userEditsApplied,
+				}) +
 				`<final_file_patch_summary path="${relPath.toPosix()}">\n` +
 				`chars=${finalContent.length}\n` +
 				`lines=${countLines(finalContent)}\n` +
 				`changed_regions=0\n` +
 				`No textual differences were detected between the previous baseline and the saved file.\n` +
 				`</final_file_patch_summary>\n\n` +
-				`If you need the exact full saved baseline later, use read_file on ${relPath.toPosix()} before making additional changes.\n\n`
+				formatVerificationGuidance(relPath, false)
 			)
 		}
 
-		const patchText =
-			prettyPatch.length <= PATCH_SUMMARY_MAX_CHARS
-				? prettyPatch
-				: `${prettyPatch.slice(0, PATCH_SUMMARY_MAX_CHARS).trimEnd()}\n...[patch truncated]`
+		const patchText = !patchTruncated
+			? prettyPatch
+			: `${prettyPatch.slice(0, PATCH_SUMMARY_MAX_CHARS).trimEnd()}\n...[patch truncated]`
 
 		return (
+			formatFinalFileStateBlock({
+				relPath,
+				finalContent,
+				isNewFile,
+				referenceFormat: "patch_summary",
+				patchTruncated,
+				autoFormattingApplied: options.autoFormattingApplied,
+				userEditsApplied: options.userEditsApplied,
+			}) +
 			`<final_file_patch_summary path="${relPath.toPosix()}">\n` +
 			`chars=${finalContent.length}\n` +
 			`lines=${countLines(finalContent)}\n` +
 			`changed_regions=${changedRegions}\n` +
-			`${prettyPatch.length > PATCH_SUMMARY_MAX_CHARS ? "patch_truncated=true\n" : ""}` +
+			`${patchTruncated ? "patch_truncated=true\n" : ""}` +
 			`${patchText}\n` +
 			`</final_file_patch_summary>\n\n` +
-			`If you need the exact full saved baseline later, use read_file on ${relPath.toPosix()} before making additional changes.\n\n`
+			formatVerificationGuidance(relPath, patchTruncated)
 		)
 	}
 
 	return (
+		formatFinalFileStateBlock({
+			relPath,
+			finalContent,
+			isNewFile,
+			referenceFormat: "metadata_summary",
+			autoFormattingApplied: options.autoFormattingApplied,
+			userEditsApplied: options.userEditsApplied,
+		}) +
 		`<final_file_summary path="${relPath.toPosix()}">\n` +
 		`saved=true\n` +
 		`created_file=${isNewFile}\n` +
 		`chars=${finalContent.length}\n` +
 		`lines=${countLines(finalContent)}\n` +
 		`</final_file_summary>\n\n` +
-		`If you need the latest saved baseline for future edits, use read_file on ${relPath.toPosix()} before making additional changes.\n\n`
+		formatVerificationGuidance(relPath, false)
 	)
 }
 
@@ -131,7 +212,8 @@ export const formatResponse = {
 		previousContent: string | undefined,
 		finalContent: string | undefined,
 		isNewFile = false,
-	) => formatSavedFileReference(relPath, previousContent, finalContent, isNewFile),
+		options: SavedFileReferenceOptions = {},
+	) => formatSavedFileReference(relPath, previousContent, finalContent, isNewFile, options),
 
 	clineIgnoreError: (path: string) =>
 		`Access to ${path} is blocked by the .clineignore file settings. You must try to continue in the task without using this file, or ask the user to update the .clineignore file.`,
@@ -358,7 +440,10 @@ Otherwise, if you have not completed the task and do not need additional informa
 			? `The user's editor also applied the following auto-formatting to your content:\n\n${autoFormattingEdits}\n\n(Note: Pay close attention to changes such as single quotes being converted to double quotes, semicolons being removed or added, long lines being broken into multiple lines, adjusting indentation style, adding/removing trailing commas, etc. This will help you ensure future SEARCH/REPLACE operations to this file are accurate.)\n\n`
 			: "") +
 		`The updated content, which includes both your original modifications and the additional edits, has been successfully saved to ${relPath.toPosix()}.\n\n` +
-		formatSavedFileReference(relPath, previousContent, finalContent, isNewFile) +
+		formatSavedFileReference(relPath, previousContent, finalContent, isNewFile, {
+			autoFormattingApplied: !!autoFormattingEdits,
+			userEditsApplied: true,
+		}) +
 		`Please note:\n` +
 		`1. You do not need to re-write the file with these changes, as they have already been applied.\n` +
 		`2. Proceed with the task using this updated file state as the new baseline.\n` +
@@ -377,7 +462,10 @@ Otherwise, if you have not completed the task and do not need additional informa
 		(autoFormattingEdits
 			? `Along with your edits, the user's editor applied the following auto-formatting to your content:\n\n${autoFormattingEdits}\n\n(Note: Pay close attention to changes such as single quotes being converted to double quotes, semicolons being removed or added, long lines being broken into multiple lines, adjusting indentation style, adding/removing trailing commas, etc. This will help you ensure future SEARCH/REPLACE operations to this file are accurate.)\n\n`
 			: "") +
-		formatSavedFileReference(relPath, previousContent, finalContent, isNewFile) +
+		formatSavedFileReference(relPath, previousContent, finalContent, isNewFile, {
+			autoFormattingApplied: !!autoFormattingEdits,
+			userEditsApplied: false,
+		}) +
 		`${newProblemsMessage}`,
 
 	diffError: (relPath: string, originalContent: string | undefined) =>

@@ -50,9 +50,13 @@ describe("formatResponse file save summaries", () => {
 		)
 
 		expect(response).to.not.contain("<final_file_content")
+		expect(response).to.contain("<final_file_state")
 		expect(response).to.contain("<final_file_patch_summary")
-		expect(response).to.contain("use read_file")
+		expect(response).to.contain("reference_format=patch_summary")
+		expect(response).to.contain("exact_saved_content_matches_agent_output=true")
+		expect(response).to.contain("additional_verification_read_required=false")
 		expect(response).to.contain("changed_regions=")
+		expect(response).to.contain("No additional verification read is required")
 	})
 
 	it("keeps final_file_content for tiny new files", () => {
@@ -66,6 +70,8 @@ describe("formatResponse file save summaries", () => {
 		)
 
 		expect(response).to.contain("<final_file_content")
+		expect(response).to.contain("<final_file_state")
+		expect(response).to.contain("reference_format=full_content")
 		expect(response).to.not.contain("<final_file_patch_summary")
 	})
 
@@ -81,8 +87,11 @@ describe("formatResponse file save summaries", () => {
 		)
 
 		expect(response).to.not.contain("<final_file_content")
+		expect(response).to.contain("<final_file_state")
 		expect(response).to.contain("<final_file_patch_summary")
-		expect(response).to.contain("use read_file")
+		expect(response).to.contain("patch_truncated=true")
+		expect(response).to.contain("additional_verification_read_required=true")
+		expect(response).to.contain("Only use read_file")
 	})
 
 	it("falls back to a metadata summary when previousContent is unavailable", () => {
@@ -96,8 +105,40 @@ describe("formatResponse file save summaries", () => {
 		)
 
 		expect(response).to.not.contain("<final_file_content")
+		expect(response).to.contain("<final_file_state")
 		expect(response).to.contain("<final_file_summary")
 		expect(response).to.contain("created_file=false")
-		expect(response).to.contain("use read_file")
+		expect(response).to.contain("reference_format=metadata_summary")
+		expect(response).to.contain("No additional verification read is required")
+	})
+
+	it("marks auto-formatting as changing the exact saved output", () => {
+		const response = formatResponse.fileEditWithoutUserChanges(
+			path.posix.join("src", "formatted.ts"),
+			"@@\n-const value = 1\n+const value = 1;\n",
+			"const value = 0\n",
+			"const value = 1\n",
+			false,
+			undefined,
+		)
+
+		expect(response).to.contain("auto_formatting_applied=true")
+		expect(response).to.contain("exact_saved_content_matches_agent_output=false")
+	})
+
+	it("marks user edits as changing the exact saved output", () => {
+		const response = formatResponse.fileEditWithUserChanges(
+			path.posix.join("src", "edited.ts"),
+			"@@\n-const value = 1\n+const value = 2\n",
+			undefined,
+			"const value = 1\n",
+			"const value = 2\n",
+			false,
+			undefined,
+		)
+
+		expect(response).to.contain("user_edits_applied=true")
+		expect(response).to.contain("exact_saved_content_matches_agent_output=false")
+		expect(response).to.contain("You do not need to re-write the file")
 	})
 })
