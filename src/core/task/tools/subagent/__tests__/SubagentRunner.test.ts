@@ -46,6 +46,11 @@ function initializeHostProvider() {
 }
 
 function createTaskConfig(nativeToolCallEnabled: boolean, promptRefreshFrequency = 5): TaskConfig {
+	const autoApprovalSettings = {
+		enableNotifications: false,
+		actions: { executeSafeCommands: false, executeAllCommands: false, useMcp: false },
+	}
+
 	return {
 		taskId: "task-1",
 		ulid: "ulid-1",
@@ -84,6 +89,9 @@ function createTaskConfig(nativeToolCallEnabled: boolean, promptRefreshFrequency
 					if (key === "promptRefreshFrequency") {
 						return promptRefreshFrequency
 					}
+					if (key === "autoApprovalSettings") {
+						return autoApprovalSettings
+					}
 					return undefined
 				},
 				getGlobalStateKey: (key: string) => (key === "nativeToolCallEnabled" ? nativeToolCallEnabled : undefined),
@@ -96,10 +104,7 @@ function createTaskConfig(nativeToolCallEnabled: boolean, promptRefreshFrequency
 		},
 		browserSettings: {},
 		focusChainSettings: {},
-		autoApprovalSettings: {
-			enableNotifications: false,
-			actions: { executeSafeCommands: false, executeAllCommands: false },
-		},
+		autoApprovalSettings,
 		autoApprover: { shouldAutoApproveTool: sinon.stub().returns([false, false]) },
 		callbacks: {
 			say: sinon.stub().resolves(undefined),
@@ -199,6 +204,79 @@ describe("SubagentRunner", () => {
 		assert.deepEqual(result, { response: "yesButtonClicked" })
 		sinon.assert.notCalled(parentAsk)
 		assert.equal(await subagentConfig.callbacks.shouldAutoApproveToolWithPath(ClineDefaultTool.FILE_READ, "foo.ts"), true)
+	})
+
+	it("omits mcpHub from subagent prompt context when MCP auto-approval is disabled", async () => {
+		const runner = new SubagentRunner(createTaskConfig(false))
+		const context = await (runner as any).buildPromptContext({
+			state: new TaskState(),
+			hostIde: "TestIde",
+			providerInfo: { providerId: "openai", model: { id: "gpt-5" }, mode: "act" },
+			availableSkills: [],
+			configuredSkillNames: undefined,
+			assignedSkillNames: [],
+			nativeToolCallsRequested: false,
+			shouldSendFullPromptAssembly: true,
+		})
+
+		assert.equal(context.mcpHub, undefined)
+	})
+
+	it("passes mcpHub into subagent prompt context when MCP auto-approval is enabled", async () => {
+		const config = createTaskConfig(false)
+		config.autoApprovalSettings.actions.useMcp = true
+		config.services.mcpHub = { getServers: () => [] } as any
+
+		const runner = new SubagentRunner(config)
+		const context = await (runner as any).buildPromptContext({
+			state: new TaskState(),
+			hostIde: "TestIde",
+			providerInfo: { providerId: "openai", model: { id: "gpt-5" }, mode: "act" },
+			availableSkills: [],
+			configuredSkillNames: undefined,
+			assignedSkillNames: [],
+			nativeToolCallsRequested: false,
+			shouldSendFullPromptAssembly: true,
+		})
+
+		assert.equal(context.mcpHub, config.services.mcpHub)
+	})
+
+	it("passes the constructed prompt context into subagent system-prompt assembly", async () => {
+		const config = createTaskConfig(false)
+		config.autoApprovalSettings.actions.useMcp = true
+		config.services.mcpHub = { getServers: () => [] } as any
+
+		const buildSystemPromptStub = sinon.stub(SubagentBuilder.prototype, "buildSystemPrompt").callsFake((prompt, context) => {
+			assert.equal(prompt, "system prompt")
+			assert.equal(context?.mcpHub, config.services.mcpHub)
+			return "system prompt"
+		})
+		sinon.stub(SubagentBuilder.prototype, "buildNativeTools").returns([] as any)
+		sinon.stub(SubagentBuilder.prototype, "getConfiguredSkills").returns(undefined)
+		sinon.stub(PromptRegistry.getInstance(), "get").resolves("system prompt")
+		sinon.stub(skills, "discoverSkills").resolves([])
+		sinon.stub(skills, "getAvailableSkills").returns([])
+
+		const createMessage = sinon.stub()
+		createMessage.onFirstCall().callsFake(async function* () {
+			yield {
+				type: "tool_calls",
+				tool_call: {
+					function: {
+						id: "toolu_subagent_complete_mcp_context",
+						name: ClineDefaultTool.ATTEMPT,
+						arguments: JSON.stringify({ result: "done" }),
+					},
+				},
+			}
+		})
+		stubApiHandler(createMessage)
+		initializeHostProvider()
+
+		const runner = new SubagentRunner(config)
+		await runner.run("Finish quickly", () => {})
+		assert.equal(buildSystemPromptStub.called, true)
 	})
 
 	it("emits native tool_use blocks with matching tool_result tool_use_id across turns", async () => {

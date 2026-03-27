@@ -1,5 +1,6 @@
 import { buildApiHandler } from "@core/api"
 import { PromptRegistry } from "@core/prompts/system-prompt"
+import { getSubagentIndxrExplorationGuidance } from "@core/prompts/system-prompt/components/mcp"
 import { ClineToolSet } from "@core/prompts/system-prompt/registry/ClineToolSet"
 import type { SystemPromptContext } from "@core/prompts/system-prompt/types"
 import { ClineDefaultTool } from "@shared/tools"
@@ -20,10 +21,10 @@ export const SUBAGENT_DEFAULT_ALLOWED_TOOLS: ClineDefaultTool[] = [
 	ClineDefaultTool.USE_SKILL,
 	ClineDefaultTool.ATTEMPT,
 ]
-
+const SUBAGENT_MCP_TOOLS: ClineDefaultTool[] = [ClineDefaultTool.MCP_USE, ClineDefaultTool.MCP_ACCESS, ClineDefaultTool.MCP_DOCS]
+// If a test fails due to changed verbiage in the lines following this one, update the test expectations. Do not change the prompt verbiage below without explicit approval from a human user.
 export const SUBAGENT_SYSTEM_SUFFIX = `\n\n# Subagent Execution Mode
 You are running as a research subagent. Your job is to explore the codebase and gather information to answer the question.
-Explore, read related files, trace through call chains, and build a complete picture before reporting back.
 You can read files, list directories, search for patterns, list code definitions, and run commands.
 Only use execute_command for readonly operations like ls, grep, git log, git diff, gh, etc.
 When it makes sense, be clever about chaining commands or in-command scripting in execute_command to quickly get relevant context - and using pipes / filters to help narrow results.
@@ -70,22 +71,49 @@ export class SubagentBuilder {
 		return this.agentConfig.skills
 	}
 
-	buildSystemPrompt(generatedSystemPrompt: string): string {
+	private isSubagentMcpExposureEnabled(): boolean {
+		const autoApprovalSettings = this.baseConfig.services.stateManager.getGlobalSettingsKey("autoApprovalSettings")
+		return autoApprovalSettings?.actions?.useMcp === true
+	}
+
+	isMcpExposureEnabled(): boolean {
+		return this.isSubagentMcpExposureEnabled()
+	}
+
+	buildSystemPrompt(generatedSystemPrompt: string, context?: SystemPromptContext): string {
 		const configuredSystemPrompt = this.agentConfig?.systemPrompt?.trim()
 		const systemPrompt = configuredSystemPrompt || generatedSystemPrompt
-		return `${systemPrompt}${this.buildAgentIdentitySystemPrefix()}${SUBAGENT_SYSTEM_SUFFIX}`
+		return `${systemPrompt}${this.buildAgentIdentitySystemPrefix()}${SUBAGENT_SYSTEM_SUFFIX}${this.buildConditionalMcpGuidance(context)}`
+	}
+
+	private buildConditionalMcpGuidance(context?: SystemPromptContext): string {
+		if (!context || !this.isSubagentMcpExposureEnabled()) {
+			return ""
+		}
+
+		const indxrGuidance = getSubagentIndxrExplorationGuidance(context)
+		if (!indxrGuidance) {
+			return ""
+		}
+
+		return `\n\n# Indxr-Aware Exploration\n${indxrGuidance}`
 	}
 
 	buildNativeTools(context: SystemPromptContext) {
 		const family = PromptRegistry.getInstance().getModelFamily(context)
 		const toolSets = ClineToolSet.getToolsForVariantWithFallback(family, this.allowedTools)
+		const mcpExposureEnabled = this.isSubagentMcpExposureEnabled()
 		const filteredToolSpecs = toolSets
 			.map((toolSet) => toolSet.config)
-			.filter(
-				(toolSpec) =>
-					this.allowedTools.includes(toolSpec.id) &&
-					(!toolSpec.contextRequirements || toolSpec.contextRequirements(context)),
-			)
+			.filter((toolSpec) => {
+				if (!this.allowedTools.includes(toolSpec.id)) {
+					return false
+				}
+				if (!mcpExposureEnabled && SUBAGENT_MCP_TOOLS.includes(toolSpec.id as ClineDefaultTool)) {
+					return false
+				}
+				return !toolSpec.contextRequirements || toolSpec.contextRequirements(context)
+			})
 
 		const converter = ClineToolSet.getNativeConverter(context.providerInfo.providerId, context.providerInfo.model.id)
 		return filteredToolSpecs.map((tool) => converter(tool, context))

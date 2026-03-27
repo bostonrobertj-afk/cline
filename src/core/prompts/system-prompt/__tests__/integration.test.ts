@@ -391,7 +391,7 @@ describe("Prompt System Integration Tests", () => {
 				"gpt-5.4-2026-03-05",
 				async ({ systemPrompt }) => {
 					expect(systemPrompt).to.include("MCP SERVERS")
-					expect(systemPrompt).to.include("Connected MCP servers: test-server")
+					expect(systemPrompt).to.include("## test-server (`test`)")
 					expect(systemPrompt).to.not.include("When Indxr is available, prefer it for code exploration")
 				},
 			)
@@ -409,9 +409,9 @@ describe("Prompt System Integration Tests", () => {
 				},
 				"gpt-5.4-2026-03-05",
 				async ({ systemPrompt, tools }) => {
-					expect(systemPrompt).to.include("Connected MCP servers: workspace-index")
+					expect(systemPrompt).to.include("## workspace-index (`indxr`)")
 					expect(systemPrompt).to.include(
-						"When Indxr is available, prefer it for code exploration, structural summaries, and targeted source discovery before using built-in `search_files`, `list_code_definition_names`, `read_file`, or `read_file_range`.",
+						"When Indxr is available, use its tools first for code exploration, symbol discovery, file understanding, dependency tracing, and targeted source reads. Prefer tools like `search_relevant`, `get_file_summary`, `lookup_symbol`, `explain_symbol`, `read_source`, `get_file_context`, `get_public_api`, `get_callers`, and `get_related_tests` before built-in `search_files`, `list_code_definition_names`, `read_file`, or `read_file_range` whenever feasible.",
 					)
 					expect(systemPrompt).to.include(
 						"Use built-in file tools when Indxr is unavailable, insufficient for the task, or when exact raw file contents, regex search, or line-based inspection are required.",
@@ -421,7 +421,7 @@ describe("Prompt System Integration Tests", () => {
 					const byName = new Map(nativeTools.map((tool) => [tool.name, tool.description]))
 
 					expect(byName.get("search_files")).to.equal(
-						"Regex-search raw files when Indxr is unavailable, insufficient, or when regex search is the better fit.",
+						"Use only for exact raw-text regex search when Indxr is unavailable, insufficient, or regex search is specifically required.",
 					)
 				},
 			)
@@ -439,7 +439,7 @@ describe("Prompt System Integration Tests", () => {
 				},
 				"gpt-5.4-2026-03-05",
 				async ({ systemPrompt, tools }) => {
-					expect(systemPrompt).to.include("Connected MCP servers: weak-read_source-server")
+					expect(systemPrompt).to.include("## weak-read_source-server (`generic`)")
 					expect(systemPrompt).to.not.include("When Indxr is available, prefer it for code exploration")
 
 					const nativeTools = (tools as any[]).map((tool) => (tool?.type === "function" ? tool.function : tool))
@@ -449,6 +449,19 @@ describe("Prompt System Integration Tests", () => {
 						"Request to perform a regex search across files in a specified directory, providing context-rich results.",
 					)
 				},
+			)
+		})
+
+		it("keeps dedicated subagent Indxr guidance separate from the main MCP prompt guidance", async () => {
+			const context: SystemPromptContext = {
+				...baseContext,
+				mcpHub: makeMcpHub([makeIndxrServer()]),
+			}
+
+			const result = await getSystemPrompt(context)
+			expect(result.systemPrompt).to.contain("When Indxr is available, use its tools first for code exploration")
+			expect(result.systemPrompt).to.not.contain(
+				"Prefer these Indxr tools for code exploration and structural discovery over built-in tools",
 			)
 		})
 

@@ -14,7 +14,19 @@ function createTaskConfig(mode: "act" | "plan", provider: string): TaskConfig {
 		ulid: "ulid-123",
 		services: {
 			stateManager: {
-				getGlobalSettingsKey: (key: string) => (key === "mode" ? mode : undefined),
+				getGlobalSettingsKey: (key: string) => {
+					if (key === "mode") {
+						return mode
+					}
+					if (key === "autoApprovalSettings") {
+						return {
+							actions: {
+								useMcp: false,
+							},
+						}
+					}
+					return undefined
+				},
 				getApiConfiguration: () => ({
 					actModeApiProvider: provider,
 					planModeApiProvider: provider,
@@ -162,5 +174,114 @@ describe("SubagentBuilder", () => {
 		assert.equal(getToolsStub.callCount, 1)
 		assert.equal(getConverterStub.callCount, 1)
 		assert.deepEqual(result, [{ converted: ClineDefaultTool.LIST_FILES }])
+	})
+
+	it("suppresses MCP native tools when subagent MCP auto-approval is disabled", () => {
+		sinon.stub(AgentConfigLoader, "getInstance").returns({
+			getCachedConfig: () => ({
+				name: "mcp-agent",
+				description: "mcp aware",
+				tools: [ClineDefaultTool.MCP_USE, ClineDefaultTool.MCP_DOCS],
+				systemPrompt: "prompt",
+			}),
+		} as unknown as AgentConfigLoader)
+		sinon.stub(api, "buildApiHandler").returns({ getModel: sinon.stub(), createMessage: sinon.stub() } as never)
+		sinon.stub(PromptRegistry.getInstance(), "getModelFamily").returns("test-family" as never)
+		sinon
+			.stub(ClineToolSet, "getToolsForVariantWithFallback")
+			.returns([
+				{ config: { id: ClineDefaultTool.MCP_USE, contextRequirements: () => true } },
+				{ config: { id: ClineDefaultTool.MCP_DOCS, contextRequirements: () => true } },
+			] as never)
+		const converter = sinon.stub().callsFake((tool: { id: string }) => ({ converted: tool.id }))
+		sinon.stub(ClineToolSet, "getNativeConverter").returns(converter as never)
+
+		const builder = new SubagentBuilder(createTaskConfig("act", "openai"), "mcp-agent")
+		const result = builder.buildNativeTools({
+			providerInfo: { providerId: "openai", model: { id: "m1" } },
+			mcpHub: {} as any,
+		} as never)
+
+		assert.deepEqual(result, [])
+		assert.equal(builder.isMcpExposureEnabled(), false)
+	})
+
+	it("includes MCP native tools when subagent MCP auto-approval is enabled", () => {
+		sinon.stub(AgentConfigLoader, "getInstance").returns({
+			getCachedConfig: () => ({
+				name: "mcp-agent",
+				description: "mcp aware",
+				tools: [ClineDefaultTool.MCP_USE, ClineDefaultTool.MCP_DOCS],
+				systemPrompt: "prompt",
+			}),
+		} as unknown as AgentConfigLoader)
+		sinon.stub(api, "buildApiHandler").returns({ getModel: sinon.stub(), createMessage: sinon.stub() } as never)
+		sinon.stub(PromptRegistry.getInstance(), "getModelFamily").returns("test-family" as never)
+		sinon
+			.stub(ClineToolSet, "getToolsForVariantWithFallback")
+			.returns([
+				{ config: { id: ClineDefaultTool.MCP_USE, contextRequirements: () => true } },
+				{ config: { id: ClineDefaultTool.MCP_DOCS, contextRequirements: () => true } },
+			] as never)
+		const converter = sinon.stub().callsFake((tool: { id: string }) => ({ converted: tool.id }))
+		sinon.stub(ClineToolSet, "getNativeConverter").returns(converter as never)
+
+		const taskConfig = createTaskConfig("act", "openai")
+		;(taskConfig.services.stateManager.getGlobalSettingsKey as any) = (key: string) => {
+			if (key === "mode") return "act"
+			if (key === "autoApprovalSettings") {
+				return { actions: { useMcp: true } }
+			}
+			return undefined
+		}
+
+		const builder = new SubagentBuilder(taskConfig, "mcp-agent")
+		const result = builder.buildNativeTools({
+			providerInfo: { providerId: "openai", model: { id: "m1" } },
+			mcpHub: {} as any,
+		} as never)
+
+		assert.deepEqual(result, [{ converted: ClineDefaultTool.MCP_USE }, { converted: ClineDefaultTool.MCP_DOCS }])
+		assert.equal(builder.isMcpExposureEnabled(), true)
+	})
+
+	it("appends subagent-specific Indxr guidance only when MCP exposure is enabled and Indxr is connected", () => {
+		sinon.stub(AgentConfigLoader, "getInstance").returns({
+			getCachedConfig: () => undefined,
+		} as unknown as AgentConfigLoader)
+		sinon.stub(api, "buildApiHandler").returns({ getModel: sinon.stub(), createMessage: sinon.stub() } as never)
+
+		const taskConfig = createTaskConfig("act", "openai")
+		;(taskConfig.services.stateManager.getGlobalSettingsKey as any) = (key: string) => {
+			if (key === "mode") return "act"
+			if (key === "autoApprovalSettings") {
+				return { actions: { useMcp: true } }
+			}
+			return undefined
+		}
+
+		const builder = new SubagentBuilder(taskConfig)
+		const prompt = builder.buildSystemPrompt("generated", {
+			mcpHub: {
+				getServers: () => [
+					{
+						name: "workspace-index",
+						status: "connected",
+						config: '{"command":"indxr"}',
+						tools: [
+							{
+								name: "search_relevant",
+								description: "Search relevant",
+								inputSchema: { type: "object", properties: {} },
+							},
+							{ name: "get_file_summary", description: "Summary", inputSchema: { type: "object", properties: {} } },
+						],
+					},
+				],
+			} as any,
+		} as never)
+
+		assert.match(prompt, /# Indxr-Aware Exploration/)
+		assert.match(prompt, /Prefer these Indxr tools for code exploration and structural discovery/)
 	})
 })

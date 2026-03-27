@@ -5,13 +5,16 @@ import { ModelFamily } from "@/shared/prompts"
 import { ClineDefaultTool } from "@/shared/tools"
 import {
 	getIndxrToolMatches,
+	getSubagentIndxrExplorationGuidance,
 	hasConnectedIndxrServer,
 	hasDistinctiveIndxrToolSignature,
 	isIndxrToolName,
+	SUBAGENT_INDXR_EXPLORATION_GUIDANCE,
 } from "../components/mcp"
 import type { ClineToolSpec } from "../spec"
 import { toolSpecFunctionDeclarations, toolSpecFunctionDefinition, toolSpecInputSchema } from "../spec"
 import { list_code_definition_names_variants } from "../tools/list_code_definition_names"
+import { read_file_variants } from "../tools/read_file"
 import { read_file_range_variants } from "../tools/read_file_range"
 import { search_files_variants } from "../tools/search_files"
 import { set_workflow_placeholders_variants } from "../tools/set_workflow_placeholders"
@@ -200,6 +203,11 @@ describe("Indxr MCP detection", () => {
 		expect(getIndxrToolMatches(server)).to.deep.equal(["get_token_estimate", "read_source"])
 		expect(hasDistinctiveIndxrToolSignature(server)).to.equal(true)
 	})
+
+	it("returns the dedicated subagent Indxr guidance only when a distinctive Indxr server is connected", () => {
+		expect(getSubagentIndxrExplorationGuidance(indxrContext)).to.equal(SUBAGENT_INDXR_EXPLORATION_GUIDANCE)
+		expect(getSubagentIndxrExplorationGuidance(mockContext)).to.equal("")
+	})
 })
 
 describe("Gemini and Anthropic parameter descriptions match", () => {
@@ -314,6 +322,7 @@ describe("native tool placeholder replacement", () => {
 
 		const searchTool = toolSpecFunctionDefinition(search_files_variants[1], context) as any
 		const defsTool = toolSpecFunctionDefinition(list_code_definition_names_variants[1], context) as any
+		const readTool = toolSpecFunctionDefinition(read_file_variants[1], context) as any
 		const rangeTool = toolSpecFunctionDefinition(read_file_range_variants[1], context) as any
 
 		expect(searchTool.function.description).to.equal(
@@ -322,6 +331,7 @@ describe("native tool placeholder replacement", () => {
 		expect(defsTool.function.description).to.equal(
 			"Request to list definition names (classes, functions, methods, etc.) used in source code files at the top level of the specified directory.",
 		)
+		expect(readTool.function.description).to.equal("Request to read the contents of a file at the specified path.")
 		expect(rangeTool.function.description).to.equal("Request to read only a specific 1-based line range from a text file.")
 	})
 
@@ -339,20 +349,24 @@ describe("native tool placeholder replacement", () => {
 
 		const searchTool = toolSpecFunctionDefinition(search_files_variants[1], context) as any
 		const defsTool = toolSpecFunctionDefinition(list_code_definition_names_variants[1], context) as any
+		const readTool = toolSpecFunctionDefinition(read_file_variants[1], context) as any
 		const rangeTool = toolSpecFunctionDefinition(read_file_range_variants[1], context) as any
 		const mcpTool = toolSpecFunctionDefinition(use_mcp_tool_variants[0], context) as any
 
 		expect(searchTool.function.description).to.equal(
-			"Regex-search raw files when Indxr is unavailable, insufficient, or when regex search is the better fit.",
+			"Use only for exact raw-text regex search when Indxr is unavailable, insufficient, or regex search is specifically required.",
 		)
 		expect(defsTool.function.description).to.equal(
-			"List top-level definitions in a directory when Indxr is unavailable, insufficient, or when a built-in definition pass is the better fit.",
+			"Use only when Indxr is unavailable or insufficient and you specifically need a built-in top-level definition pass.",
+		)
+		expect(readTool.function.description).to.equal(
+			"Use Indxr first for discovery, summaries, symbol lookup, dependency tracing, and targeted source reads. Use read_file only when exact full raw file contents are required or Indxr is insufficient.",
 		)
 		expect(rangeTool.function.description).to.equal(
-			"Read an exact 1-based line range after Indxr or other exploration tools have isolated a raw file region that needs direct inspection.",
+			"Use only when exact raw line-based inspection is required after Indxr has already narrowed the target, or when Indxr is insufficient.",
 		)
 		expect(mcpTool.function.description).to.equal(
-			"Use a connected MCP tool. When Indxr is available, prefer its exploration tools for code exploration, structural summaries, and targeted source discovery before built-in file exploration.",
+			"Use a connected MCP tool. When Indxr is available, default to its exploration tools first for code exploration, symbol lookup, file understanding, dependency tracing, and targeted source reads before any built-in exploration tool.",
 		)
 	})
 

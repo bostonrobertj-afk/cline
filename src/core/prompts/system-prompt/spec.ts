@@ -463,19 +463,23 @@ function getNativeToolDescription(tool: ClineToolSpec, context: SystemPromptCont
 			return "Activate a skill by exact name when the request matches an available skill."
 		case "use_mcp_tool":
 			return hasConnectedIndxrServer(context)
-				? "Use a connected MCP tool. When Indxr is available, prefer its exploration tools for code exploration, structural summaries, and targeted source discovery before built-in file exploration."
+				? "Use a connected MCP tool. When Indxr is available, default to its exploration tools first for code exploration, symbol lookup, file understanding, dependency tracing, and targeted source reads before any built-in exploration tool."
 				: firstSentence(resolved)
 		case "search_files":
 			return hasConnectedIndxrServer(context)
-				? "Regex-search raw files when Indxr is unavailable, insufficient, or when regex search is the better fit."
+				? "Use only for exact raw-text regex search when Indxr is unavailable, insufficient, or regex search is specifically required."
 				: firstSentence(resolved)
 		case "list_code_definition_names":
 			return hasConnectedIndxrServer(context)
-				? "List top-level definitions in a directory when Indxr is unavailable, insufficient, or when a built-in definition pass is the better fit."
+				? "Use only when Indxr is unavailable or insufficient and you specifically need a built-in top-level definition pass."
+				: firstSentence(resolved)
+		case "read_file":
+			return hasConnectedIndxrServer(context)
+				? "Use Indxr first for discovery, summaries, symbol lookup, dependency tracing, and targeted source reads. Use read_file only when exact full raw file contents are required or Indxr is insufficient."
 				: firstSentence(resolved)
 		case "read_file_range":
 			return hasConnectedIndxrServer(context)
-				? "Read an exact 1-based line range after Indxr or other exploration tools have isolated a raw file region that needs direct inspection."
+				? "Use only when exact raw line-based inspection is required after Indxr has already narrowed the target, or when Indxr is insufficient."
 				: firstSentence(resolved)
 		default:
 			return firstSentence(resolved)

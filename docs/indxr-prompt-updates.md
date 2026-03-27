@@ -1,0 +1,7 @@
+
+
+- in /Users/robertboston/Documents/Cline%20Extension/cline/src/core/prompts/system-prompt/tools/read_file.ts, update prompting to include language that strongly pushes the agent toward Indxr when the indxr mcp is connected (hasConnectedIndxrServer)
+- in /Users/robertboston/Documents/Cline%20Extension/cline/src/core/prompts/system-prompt/components/mcp.ts, update prompting to more overtly push agents to use indxr and include callout of Indxr tool use instead of read_file whenever feasible.
+- in /Users/robertboston/Documents/Cline%20Extension/cline/src/core/prompts/system-prompt/components/mcp.ts update prompting that returns for minimal gpt turns to include the same full mcp prompt string that regular turns use. Do not remove the separate minimal turn config- just replicate the full prompt string there so it stays easy to tune specifically for minimal gpt turns going forward.
+- In /Users/robertboston/Documents/Cline%20Extension/cline/src/core/prompts/system-prompt/components/rules.ts, update the minimal gpt prompt rules prompting to include a single-line reminder that strongly steers agents toward Indxr tools over native tools.
+- In /Users/robertboston/Documents/Cline%20Extension/cline/src/core/prompts/system-prompt/spec.ts, add an Indxr-aware compact/native override for read_file, and consider strengthening the existing compact/native Indxr strings for use_mcp_tool, search_files, list_code_definition_names, and read_file_range if you want stronger behavior on GPT-native paths.

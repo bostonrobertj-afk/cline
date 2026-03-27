@@ -8,10 +8,24 @@ const INDXR_ANCHOR_TOOL_SIGNATURES = new Set(["search_relevant", "get_file_summa
 const MIN_INDXR_SIGNATURE_MATCHES = 2
 
 export const INDXR_EXPLORATION_PREFERENCE_GUIDANCE =
-	"When Indxr is available, prefer it for code exploration, structural summaries, and targeted source discovery before using built-in `search_files`, `list_code_definition_names`, `read_file`, or `read_file_range`."
+	"When Indxr is available, use its tools first for code exploration, symbol discovery, file understanding, dependency tracing, and targeted source reads. Prefer tools like `search_relevant`, `get_file_summary`, `lookup_symbol`, `explain_symbol`, `read_source`, `get_file_context`, `get_public_api`, `get_callers`, and `get_related_tests` before built-in `search_files`, `list_code_definition_names`, `read_file`, or `read_file_range` whenever feasible."
 
 export const BUILTIN_FILE_TOOL_FALLBACK_GUIDANCE =
 	"Use built-in file tools when Indxr is unavailable, insufficient for the task, or when exact raw file contents, regex search, or line-based inspection are required."
+
+export const SUBAGENT_INDXR_EXPLORATION_GUIDANCE = `Prefer these Indxr tools for code exploration and structural discovery over built-in tools like \`search_files\`, \`list_code_definition_names\`, \`read_file\`, or \`read_file_range\`:
+
+Use:
+- \`search_relevant\` for broad code discovery
+- \`lookup_symbol\` or \`explain_symbol\` for symbol lookup/understanding
+- \`get_file_summary\` for first-pass file understanding
+- \`read_source\` for symbol-level or targeted source reads
+- \`get_file_context\` for dependency and surrounding-file context
+- \`get_public_api\` for interface-only understanding
+- \`get_callers\` and \`get_related_tests\` for usage and test tracing
+- \`get_token_estimate\` before large reads
+
+Fall back to built-in file tools when Indxr is insufficient or when exact raw file text, regex search, or direct line inspection is required.`
 
 /**
  * Checks if there are any enabled MCP servers in the context.
@@ -62,6 +76,10 @@ export function getIndxrExplorationGuidance(context: SystemPromptContext): strin
 		: ""
 }
 
+export function getSubagentIndxrExplorationGuidance(context: SystemPromptContext): string {
+	return hasConnectedIndxrServer(context) ? SUBAGENT_INDXR_EXPLORATION_GUIDANCE : ""
+}
+
 export function getCodeExplorationGuidance(context: SystemPromptContext, fallbackWhenIndxrUnavailable: string): string {
 	return hasConnectedIndxrServer(context)
 		? `${INDXR_EXPLORATION_PREFERENCE_GUIDANCE} ${BUILTIN_FILE_TOOL_FALLBACK_GUIDANCE}`
@@ -70,24 +88,29 @@ export function getCodeExplorationGuidance(context: SystemPromptContext, fallbac
 
 export function replacePromptPlaceholders(description: string, context: SystemPromptContext): string {
 	const searchFilesGuidance = hasConnectedIndxrServer(context)
-		? "Use this when Indxr is unavailable, insufficient for the task, or when regex search across raw files is the better fit."
+		? "Use this only when you need exact regex search across raw files or when Indxr is unavailable or insufficient."
 		: "Start here when you need to narrow candidate files or regions before using list_code_definition_names, read_file, or read_file_range."
 
 	const listCodeDefinitionsGuidance = hasConnectedIndxrServer(context)
-		? "Use this when Indxr is unavailable, insufficient for the task, or when a built-in directory-level definition pass is the better fit."
+		? "Use this only when Indxr is unavailable or insufficient and you specifically need a built-in directory-level definition pass."
 		: "Results include human-friendly 1-based line numbers so you can target a later read_file or read_file_range call instead of loading large files blindly."
 
+	const readFileGuidance = hasConnectedIndxrServer(context)
+		? "When Indxr is available, use its tools first for discovery, summaries, symbol lookup, dependency tracing, and targeted source reads. Use read_file only when you need the exact full raw contents of a file or when Indxr is insufficient."
+		: "Prefer using search_files and list_code_definition_names first to narrow the target, then use read_file for the first full pass on a file. For follow-up checks on a focused region, prefer read_file_range instead of rereading the entire file."
+
 	const readFileRangeGuidance = hasConnectedIndxrServer(context)
-		? "Use this after Indxr or other exploration tools have isolated a specific raw file region that must be inspected directly, or when you need a targeted refresher without replaying the entire file."
+		? "Use this only when you need exact raw line-based inspection after Indxr has already narrowed the target, or when Indxr is insufficient."
 		: "Use this after search_files or list_code_definition_names has already narrowed the problem to a focused region, or when you need a targeted refresher without replaying the entire file."
 
 	const useMcpToolGuidance = hasConnectedIndxrServer(context)
-		? ` When Indxr is available, prefer its MCP tools for code exploration, structural summaries, and targeted source discovery before using built-in \`search_files\`, \`list_code_definition_names\`, \`read_file\`, or \`read_file_range\`.`
+		? ` When Indxr is available, default to its MCP tools first for code exploration, symbol lookup, file understanding, dependency tracing, and targeted source reads before using built-in \`search_files\`, \`list_code_definition_names\`, \`read_file\`, or \`read_file_range\`. Use built-in file tools only when exact raw file contents, regex search, or direct line inspection are required.`
 		: ""
 
 	return description
 		.replace(/{{SEARCH_FILES_EXPLORATION_GUIDANCE}}/g, searchFilesGuidance)
 		.replace(/{{LIST_CODE_DEFINITION_NAMES_EXPLORATION_GUIDANCE}}/g, listCodeDefinitionsGuidance)
+		.replace(/{{READ_FILE_EXPLORATION_GUIDANCE}}/g, readFileGuidance)
 		.replace(/{{READ_FILE_RANGE_EXPLORATION_GUIDANCE}}/g, readFileRangeGuidance)
 		.replace(/{{USE_MCP_TOOL_EXPLORATION_GUIDANCE}}/g, useMcpToolGuidance)
 }
@@ -112,21 +135,19 @@ export async function getMcp(variant: PromptVariant, context: SystemPromptContex
 	}
 
 	if (context.useMinimalGptPrompt === true) {
-		const connectedServerNames = getConnectedMcpServers(context)
-			.map((server) => server.name)
-			.join(", ")
-
-		if (!connectedServerNames) {
+		const connectedServers = getConnectedMcpServers(context)
+		if (connectedServers.length === 0) {
 			return undefined
 		}
-
-		const indxrGuidance = hasConnectedIndxrServer(context) ? `\n\n${getIndxrExplorationGuidance(context)}` : ""
-
-		return `MCP SERVERS
-
-Connected MCP servers: ${connectedServerNames}
-
-Use MCP tools/resources only when needed. Full MCP details are omitted on this compact prompt turn.${indxrGuidance}`
+		const minimalTemplate = MCP_TEMPLATE_TEXT
+		return await getMcpServers(
+			connectedServers,
+			{
+				...variant,
+				componentOverrides: { ...variant.componentOverrides, [SystemPromptSection.MCP]: { template: minimalTemplate } },
+			},
+			context,
+		)
 	}
 
 	return await getMcpServers(servers, variant, context)

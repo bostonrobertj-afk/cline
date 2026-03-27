@@ -10,7 +10,7 @@ const generic: ClineToolSpec = {
 	id,
 	name: "read_file",
 	description:
-		"Request to read the contents of a file at the specified path. Prefer using search_files and list_code_definition_names first to narrow the target, then use read_file for the first full pass on a file. For follow-up checks on a focused region, prefer read_file_range instead of rereading the entire file. Automatically extracts raw text from PDF and DOCX files. Do NOT use this tool to list the contents of a directory.",
+		"Request to read the contents of a file at the specified path. {{READ_FILE_EXPLORATION_GUIDANCE}} Automatically extracts raw text from PDF and DOCX files. Do NOT use this tool to list the contents of a directory.",
 	parameters: [
 		{
 			name: "path",
@@ -27,7 +27,7 @@ const NATIVE_GPT_5: ClineToolSpec = {
 	id,
 	name: "read_file",
 	description:
-		"Request to read the contents of a file at the specified path. Prefer using search_files and list_code_definition_names first to narrow the target, then use read_file for the first full pass on a file. For follow-up checks on a focused region, prefer read_file_range instead of rereading the entire file. Automatically extracts raw text from PDF and DOCX files. Do NOT use this tool to list the contents of a directory.",
+		"Request to read the contents of a file at the specified path. {{READ_FILE_EXPLORATION_GUIDANCE}} Automatically extracts raw text from PDF and DOCX files. Do NOT use this tool to list the contents of a directory.",
 	parameters: [
 		{
 			name: "path",

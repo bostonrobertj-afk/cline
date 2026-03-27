@@ -511,7 +511,7 @@ export class SubagentRunner {
 					shouldSendFullPromptAssembly,
 				})
 				const generatedSystemPrompt = await promptRegistry.get(context)
-				const baseSystemPrompt = this.agent.buildSystemPrompt(generatedSystemPrompt)
+				const baseSystemPrompt = this.agent.buildSystemPrompt(generatedSystemPrompt, context)
 				const systemPrompt =
 					assignedSkillNames.length > 0 &&
 					!state.activeWorkflowId &&
@@ -909,6 +909,8 @@ export class SubagentRunner {
 			activeWorkflowReminder = await getBmadWorkflowReminder(this.baseConfig.cwd, params.state.activeWorkflowId)
 		}
 
+		const includeMcpHub = this.agent.isMcpExposureEnabled()
+
 		return {
 			providerInfo: params.providerInfo,
 			cwd: this.baseConfig.cwd,
@@ -921,6 +923,7 @@ export class SubagentRunner {
 			managedWorkflowActive: !!params.state.managedWorkflowRun,
 			focusChainSettings: this.baseConfig.focusChainSettings,
 			browserSettings: this.baseConfig.browserSettings,
+			mcpHub: includeMcpHub ? this.baseConfig.services.mcpHub : undefined,
 			yoloModeToggled: false,
 			enableNativeToolCalls: params.nativeToolCallsRequested,
 			enableParallelToolCalling: false,
