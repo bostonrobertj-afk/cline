@@ -34,7 +34,7 @@ describe("Controller.cancelTask", () => {
 		assert.equal(fakeController.cancelInProgress, false)
 	})
 
-	it("keeps the cancelled task visible by hydrating passive history when preserveThreadVisible is true", async () => {
+	it("keeps the cancelled task visible without reopening passive history when preserveThreadVisible is true", async () => {
 		const activeTask = {
 			taskId: "task-1",
 			taskState: {
@@ -49,8 +49,6 @@ describe("Controller.cancelTask", () => {
 			cancelInProgress: false,
 			task: activeTask,
 			updateBackgroundCommandState: sinon.stub(),
-			getTaskWithId: sinon.stub().resolves({ historyItem: { id: "task-1" } }),
-			openHistoricalTaskPassively: sinon.stub().resolves(),
 			clearTask: sinon.stub().resolves(),
 			postStateToWebview: sinon.stub().resolves(),
 		}
@@ -59,8 +57,7 @@ describe("Controller.cancelTask", () => {
 
 		sinon.assert.calledOnce(activeTask.abortTask)
 		sinon.assert.notCalled(fakeController.clearTask)
-		sinon.assert.calledOnceWithExactly(fakeController.openHistoricalTaskPassively, { id: "task-1" })
-		sinon.assert.notCalled(fakeController.postStateToWebview)
+		sinon.assert.calledOnce(fakeController.postStateToWebview)
 		assert.equal(fakeController.cancelInProgress, false)
 	})
 })

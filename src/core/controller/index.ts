@@ -521,13 +521,8 @@ export class Controller {
 			}
 
 			if (preserveThreadVisible) {
-				try {
-					await this.openHistoricalTaskPassively({ id: this.task.taskId } as HistoryItem)
-					return
-				} catch (error) {
-					// Task not in history yet (new task with no messages); continue with the neutral fallback below.
-					Logger.log(`[Controller.cancelTask] Failed to preserve visible thread: ${error}`)
-				}
+				await this.postStateToWebview()
+				return
 			}
 
 			// After an explicit cancel, leave the UI in a neutral state so the user can type

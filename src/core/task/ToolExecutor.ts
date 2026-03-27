@@ -26,6 +26,7 @@ import { applyPostToolTaskProgressUpdate, applyPreToolTaskProgressUpdate } from 
 import { MessageStateHandler } from "./message-state"
 import { TaskState } from "./TaskState"
 import { AutoApprove } from "./tools/autoApprove"
+import { ResponseToolRegistry } from "./tools/response/ResponseToolRegistry"
 import { ResponseToolRuntime } from "./tools/response/ResponseToolRuntime"
 import { IPartialBlockHandler, ToolExecutorCoordinator } from "./tools/ToolExecutorCoordinator"
 import { ToolValidator } from "./tools/ToolValidator"
@@ -41,6 +42,13 @@ export function canonicalizeAttemptCompletionParams(block: ToolUse): boolean {
 	}
 
 	return false
+}
+
+export type ToolExecutionOutcomeStatus = "streaming" | "executed" | "skipped" | "rejected" | "not_handled"
+
+export interface ToolExecutionOutcome {
+	status: ToolExecutionOutcomeStatus
+	emittedToolResult: boolean
 }
 
 export class ToolExecutor {
@@ -229,8 +237,8 @@ export class ToolExecutor {
 	/**
 	 * Main entry point for tool execution - called by Task class
 	 */
-	public async executeTool(block: ToolUse): Promise<void> {
-		await this.execute(block)
+	public async executeTool(block: ToolUse): Promise<ToolExecutionOutcome> {
+		return await this.execute(block)
 	}
 
 	/**
@@ -261,6 +269,9 @@ export class ToolExecutor {
 		// Create error response for the tool
 		const errorResponse = formatResponse.toolError(errorString)
 		this.pushToolResult(errorResponse, block)
+		if (block.isNativeToolCall && block.call_id && !this.taskState.nativeToolCallIdsExecuted.has(block.call_id)) {
+			this.taskState.nativeToolCallIdsSkipped.add(block.call_id)
+		}
 	}
 
 	/**
@@ -274,20 +285,50 @@ export class ToolExecutor {
 	 * @param content The tool response content to add
 	 * @param block The tool use block that generated this result
 	 */
-	private pushToolResult = (content: ToolResponse, block: ToolUse) => {
+	private pushToolResult = (
+		content: ToolResponse,
+		block: ToolUse,
+		target: "userMessageContent" | "completedResponseToolResultContent" = "userMessageContent",
+	) => {
+		const destination =
+			target === "completedResponseToolResultContent"
+				? this.taskState.completedResponseToolResultContent
+				: this.taskState.userMessageContent
 		// Use the ToolResultUtils to properly format and push the tool result
-		ToolResultUtils.pushToolResult(
+		const emittedResult = ToolResultUtils.pushToolResult(
 			content,
 			block,
-			this.taskState.userMessageContent,
+			destination,
 			(block: ToolUse) => ToolDisplayUtils.getToolDescription(block),
 			this.coordinator,
 			this.taskState.toolUseIdMap,
 		)
+		if (emittedResult && block.isNativeToolCall && block.call_id) {
+			this.taskState.nativeToolCallIdsWithResults.add(block.call_id)
+			this.taskState.nativeToolCallIdsBreakingPreviousResponseChain.delete(block.call_id)
+		}
 		// Mark that a tool has been used (only matters when parallel tool calling is disabled)
 		if (!this.isParallelToolCallingEnabled()) {
 			this.taskState.didAlreadyUseTool = true
 		}
+		return emittedResult
+	}
+
+	private markNativeToolCallBreaksPreviousResponseChain(block: ToolUse): void {
+		if (!block.isNativeToolCall || !block.call_id) {
+			return
+		}
+
+		this.taskState.nativeToolCallIdsBreakingPreviousResponseChain.add(block.call_id)
+	}
+
+	private shouldIsolateCompletedResponseToolContent(block: ToolUse): boolean {
+		const responseToolMetadata = ResponseToolRegistry.get(block.name)
+		return (
+			responseToolMetadata?.defaultTurnBehavior === "end_turn" &&
+			this.taskState.responseToolTurnShouldEnd &&
+			this.taskState.responseToolTurnCompletedBy === block.name
+		)
 	}
 
 	/**
@@ -329,12 +370,12 @@ export class ToolExecutor {
 	 * @param block The tool use block to execute
 	 * @returns true if the tool was handled (even if execution failed), false if not registered
 	 */
-	private async execute(block: ToolUse): Promise<boolean> {
+	private async execute(block: ToolUse): Promise<ToolExecutionOutcome> {
 		// Note: MCP tool name transformation happens earlier in ToolUseHandler.getPartialToolUsesAsContent()
 		// The toolUseIdMap is updated at the point of transformation in index.ts
 
 		if (!this.coordinator.has(block.name)) {
-			return false // Tool not handled by coordinator
+			return { status: "not_handled", emittedToolResult: false } // Tool not handled by coordinator
 		}
 		canonicalizeAttemptCompletionParams(block)
 
@@ -347,7 +388,11 @@ export class ToolExecutor {
 					? "Tool was interrupted and not executed due to user rejecting a previous tool."
 					: "Skipping tool due to user rejecting a previous tool."
 				this.createToolRejectionMessage(block, reason)
-				return true
+				if (block.isNativeToolCall && block.call_id) {
+					this.taskState.nativeToolCallIdsSkipped.add(block.call_id)
+				}
+				this.markNativeToolCallBreaksPreviousResponseChain(block)
+				return { status: "rejected", emittedToolResult: false }
 			}
 
 			if (
@@ -358,7 +403,11 @@ export class ToolExecutor {
 					? "Tool was interrupted because governed response tool failures already exhausted the current turn's retry budget."
 					: "Skipping tool because governed response tool failures already exhausted the current turn's retry budget."
 				this.createToolRejectionMessage(block, reason)
-				return true
+				if (block.isNativeToolCall && block.call_id) {
+					this.taskState.nativeToolCallIdsSkipped.add(block.call_id)
+				}
+				this.markNativeToolCallBreaksPreviousResponseChain(block)
+				return { status: "rejected", emittedToolResult: false }
 			}
 
 			if (this.taskState.responseToolTurnShouldEnd) {
@@ -366,7 +415,11 @@ export class ToolExecutor {
 					? "Tool was interrupted because a previous response tool already completed the current assistant turn."
 					: "Skipping tool because a previous response tool already completed the current assistant turn."
 				this.createToolRejectionMessage(block, reason)
-				return true
+				if (block.isNativeToolCall && block.call_id) {
+					this.taskState.nativeToolCallIdsSkipped.add(block.call_id)
+				}
+				this.markNativeToolCallBreaksPreviousResponseChain(block)
+				return { status: "rejected", emittedToolResult: false }
 			}
 
 			// Check if a tool has already been used in this message (only enforced when parallel tool calling is disabled)
@@ -375,7 +428,11 @@ export class ToolExecutor {
 					type: "text",
 					text: formatResponse.toolAlreadyUsed(block.name),
 				})
-				return true
+				if (block.isNativeToolCall && block.call_id) {
+					this.taskState.nativeToolCallIdsSkipped.add(block.call_id)
+				}
+				this.markNativeToolCallBreaksPreviousResponseChain(block)
+				return { status: "rejected", emittedToolResult: false }
 			}
 
 			// Logic for plan-mode tool call restrictions
@@ -392,7 +449,13 @@ export class ToolExecutor {
 				if (!block.partial) {
 					this.pushToolResult(formatResponse.toolError(errorMessage), block)
 				}
-				return true
+				if (block.isNativeToolCall && block.call_id) {
+					this.taskState.nativeToolCallIdsSkipped.add(block.call_id)
+				}
+				if (block.partial) {
+					this.markNativeToolCallBreaksPreviousResponseChain(block)
+				}
+				return { status: "rejected", emittedToolResult: !block.partial }
 			}
 
 			// Close browser for non-browser tools
@@ -403,15 +466,14 @@ export class ToolExecutor {
 			// Handle partial blocks
 			if (block.partial) {
 				await this.handlePartialBlock(block, config)
-				return true
+				return { status: "streaming", emittedToolResult: false }
 			}
 
 			// Handle complete blocks
-			await this.handleCompleteBlock(block, config)
-			return true
+			return await this.handleCompleteBlock(block, config)
 		} catch (error) {
 			await this.handleError(`executing ${block.name}`, error as Error, block)
-			return true
+			return { status: "executed", emittedToolResult: true }
 		}
 	}
 
@@ -588,10 +650,11 @@ export class ToolExecutor {
 	 * @param block The complete tool use block with all parameters
 	 * @param config The task configuration containing all necessary context
 	 */
-	private async handleCompleteBlock(block: ToolUse, config: any): Promise<void> {
+	private async handleCompleteBlock(block: ToolUse, config: any): Promise<ToolExecutionOutcome> {
 		// Check abort flag at the very start to prevent execution after cancellation
 		if (this.taskState.abort) {
-			return
+			this.markNativeToolCallBreaksPreviousResponseChain(block)
+			return { status: "skipped", emittedToolResult: false }
 		}
 
 		const hooksEnabled = getHooksEnabledSafe(this.stateManager.getGlobalSettingsKey("hooksEnabled"))
@@ -604,11 +667,13 @@ export class ToolExecutor {
 		let toolWasExecuted = false
 		const executionStartTime = Date.now()
 		let skipPostExecutionFocusChainUpdate = false
+		let emittedToolResult = false
 
 		try {
 			// Final abort check immediately before tool execution
 			if (this.taskState.abort) {
-				return
+				this.markNativeToolCallBreaksPreviousResponseChain(block)
+				return { status: "skipped", emittedToolResult: false }
 			}
 
 			const preToolTaskProgressUpdate = await applyPreToolTaskProgressUpdate({
@@ -619,8 +684,14 @@ export class ToolExecutor {
 			skipPostExecutionFocusChainUpdate = preToolTaskProgressUpdate.skipPostExecutionUpdate
 			if (preToolTaskProgressUpdate.skipToolExecution) {
 				toolResult = preToolTaskProgressUpdate.toolResult
-				this.pushToolResult(toolResult, block)
-				return
+				emittedToolResult = this.pushToolResult(toolResult, block)
+				if (block.isNativeToolCall && block.call_id) {
+					this.taskState.nativeToolCallIdsSkipped.add(block.call_id)
+				}
+				if (!emittedToolResult) {
+					this.markNativeToolCallBreaksPreviousResponseChain(block)
+				}
+				return { status: "skipped", emittedToolResult }
 			}
 
 			// Execute the actual tool
@@ -628,7 +699,16 @@ export class ToolExecutor {
 			toolResult = await this.coordinator.execute(config, block)
 			toolWasExecuted = true
 			await this.handleGovernedResponseToolFailureIfNeeded(config, block, toolResult)
-			this.pushToolResult(toolResult, block)
+			const shouldIsolateCompletedResponseToolResult = this.shouldIsolateCompletedResponseToolContent(block)
+			emittedToolResult = this.pushToolResult(
+				toolResult,
+				block,
+				shouldIsolateCompletedResponseToolResult ? "completedResponseToolResultContent" : "userMessageContent",
+			)
+			if (block.isNativeToolCall && block.call_id) {
+				this.taskState.nativeToolCallIdsExecuted.add(block.call_id)
+				this.taskState.nativeToolCallIdsSkipped.delete(block.call_id)
+			}
 			Logger.info(`[ToolExecutor ${config.taskId}] completed tool ${block.name} (call_id=${block.call_id ?? "none"})`)
 
 			// Track the last executed tool for consecutive call detection (used by act_mode_respond)
@@ -636,7 +716,7 @@ export class ToolExecutor {
 
 			// Check abort before running PostToolUse hook (success path)
 			if (this.taskState.abort) {
-				return
+				return { status: "executed", emittedToolResult }
 			}
 
 			// Run PostToolUse hook for successful tool execution
@@ -687,7 +767,7 @@ export class ToolExecutor {
 
 		// Early return if hook requested cancellation
 		if (shouldCancelAfterHook) {
-			return
+			return { status: "executed", emittedToolResult }
 		}
 
 		// Handle focus chain updates
@@ -698,11 +778,16 @@ export class ToolExecutor {
 			updateFCListFromToolResponse: this.updateFCListFromToolResponse,
 		})
 		if (postToolTaskProgressUpdate.feedback) {
-			this.taskState.userMessageContent.push({
+			const feedbackTarget = this.shouldIsolateCompletedResponseToolContent(block)
+				? this.taskState.completedResponseToolResultContent
+				: this.taskState.userMessageContent
+			feedbackTarget.push({
 				type: "text",
 				text: postToolTaskProgressUpdate.feedback,
 			})
 		}
+
+		return { status: "executed", emittedToolResult }
 	}
 
 	private async handleGovernedResponseToolFailureIfNeeded(

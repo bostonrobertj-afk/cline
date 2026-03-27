@@ -85,6 +85,14 @@ export interface ClineStorageMessage extends Anthropic.MessageParam {
 	 * Response ID associated with this message
 	 */
 	id?: string
+	/**
+	 * Explicit boundary marker for providers that support response chaining (for example
+	 * OpenAI Responses `previous_response_id`). When true, future requests must not
+	 * chain past this message because the provider-side lifecycle for the preceding turn
+	 * is intentionally incomplete or otherwise unsafe to continue.
+	 */
+	previousResponseIdChainBroken?: boolean
+	previousResponseIdChainBrokenReason?: string
 	role: ClineMessageRole
 	content: ClinePromptInputContent | ClineContent[]
 	/**

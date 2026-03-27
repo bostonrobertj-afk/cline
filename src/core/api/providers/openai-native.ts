@@ -221,7 +221,9 @@ export class OpenAiNativeHandler implements ApiHandler {
 			this.preconnectResponsesWebsocket()
 		}
 
-		const { input, previousResponseId } = convertToOpenAIResponsesInput(messages, { usePreviousResponseId })
+		const { input, previousResponseId, previousResponseIdChainBreakReason } = convertToOpenAIResponsesInput(messages, {
+			usePreviousResponseId,
+		})
 		const responseTools = this.mapResponseTools(tools)
 		this.abortController = new AbortController()
 
@@ -238,6 +240,16 @@ export class OpenAiNativeHandler implements ApiHandler {
 		const fallbackInput = previousResponseId
 			? convertToOpenAIResponsesInput(messages, { usePreviousResponseId: false }).input
 			: input
+
+		if (usePreviousResponseId && !previousResponseId && previousResponseIdChainBreakReason) {
+			this.logOpenAiWarn("Native disabling previous_response_id chaining for the next request", {
+				model: model.id,
+				reason: previousResponseIdChainBreakReason,
+				usingPreviousResponseId: false,
+				usingFullHistoryFallback: false,
+				inputItems: Array.isArray(input) ? input.length : undefined,
+			})
+		}
 
 		const fallbackParams = this.buildResponseCreateParams({
 			modelId: model.id,

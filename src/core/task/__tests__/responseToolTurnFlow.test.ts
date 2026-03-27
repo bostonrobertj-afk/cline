@@ -11,6 +11,7 @@ import {
 	consumePendingSteerUserContent,
 	handleCompletedResponseToolTurn,
 	persistCompletedResponseToolResultIfNeeded,
+	resolvePersistableNativeToolUseBlocks,
 	Task,
 } from "../index"
 import { TaskState } from "../TaskState"
@@ -80,6 +81,9 @@ describe("response tool turn flow", () => {
 		const initiateTaskLoop = sinon.stub().resolves()
 		const hasHumanAuthoredInput = sinon.stub().returns(true)
 		const postStateToWebview = sinon.stub().resolves()
+		const setThreadDisplayState = sinon.stub().callsFake((nextState: string) => {
+			;(fakeTask as any).threadDisplayState = nextState
+		})
 		const taskState = new TaskState()
 		const fakeTask = {
 			say,
@@ -94,6 +98,7 @@ describe("response tool turn flow", () => {
 			},
 			hasHumanAuthoredInput,
 			initiateTaskLoop,
+			setThreadDisplayState,
 		}
 
 		await Task.prototype.continueTaskWithFeedback.call(fakeTask as unknown as Task, "resume as active user", [], [])
@@ -183,7 +188,7 @@ describe("response tool turn flow", () => {
 
 	it("forces one more request instead of handing off to active_user when steer is queued after a response tool", async () => {
 		const taskState = new TaskState()
-		taskState.userMessageContent = [
+		taskState.completedResponseToolResultContent = [
 			{
 				type: "tool_result",
 				tool_use_id: "toolu_send_message",
@@ -245,7 +250,7 @@ describe("response tool turn flow", () => {
 
 	it("hands off to active_user immediately when no response-tool continuation content exists", async () => {
 		const taskState = new TaskState()
-		taskState.userMessageContent = [
+		taskState.completedResponseToolResultContent = [
 			{
 				type: "tool_result",
 				tool_use_id: "toolu_attempt_completion",
@@ -285,13 +290,21 @@ describe("response tool turn flow", () => {
 			ts: sinon.match.number,
 		} as any)
 		sinon.assert.notCalled(recursivelyMakeClineRequests)
-		sinon.assert.calledOnceWithExactly(setThreadDisplayState, ThreadDisplayStates.ACTIVE_USER)
+		sinon.assert.calledOnceWithMatch(
+			setThreadDisplayState,
+			ThreadDisplayStates.ACTIVE_USER,
+			"response_tool_turn_ended",
+			sinon.match({
+				completedResponseTool: ClineDefaultTool.ATTEMPT,
+				hasContinuationContent: false,
+			}),
+		)
 		sinon.assert.calledOnce(postStateToWebview)
 	})
 
 	it("persists a completed send_user_message tool result into API conversation history", async () => {
 		const taskState = new TaskState()
-		taskState.userMessageContent = [
+		taskState.completedResponseToolResultContent = [
 			{
 				type: "tool_result",
 				tool_use_id: "toolu_send_user_message",
@@ -319,12 +332,53 @@ describe("response tool turn flow", () => {
 			],
 			ts: sinon.match.number,
 		} as any)
-		assert.deepEqual(taskState.userMessageContent, [])
+		assert.deepEqual(taskState.completedResponseToolResultContent, [])
+	})
+
+	it("persists completed end-turn response-tool feedback alongside the isolated tool result", async () => {
+		const taskState = new TaskState()
+		taskState.completedResponseToolResultContent = [
+			{
+				type: "tool_result",
+				tool_use_id: "toolu_send_user_message",
+				content: "[Message displayed.]",
+			},
+			{
+				type: "text",
+				text: 'Do not include `task_progress` on a tool call until the active step\'s "Done Signal" is true.',
+			},
+		] as any
+		const messageStateHandler = {
+			addToApiConversationHistory: sinon.stub().resolves(),
+		}
+
+		const persisted = await persistCompletedResponseToolResultIfNeeded({
+			taskState,
+			messageStateHandler,
+		})
+
+		assert.equal(persisted, true)
+		sinon.assert.calledOnceWithExactly(messageStateHandler.addToApiConversationHistory, {
+			role: "user",
+			content: [
+				{
+					type: "tool_result",
+					tool_use_id: "toolu_send_user_message",
+					content: "[Message displayed.]",
+				},
+				{
+					type: "text",
+					text: 'Do not include `task_progress` on a tool call until the active step\'s "Done Signal" is true.',
+				},
+			],
+			ts: sinon.match.number,
+		} as any)
+		assert.deepEqual(taskState.completedResponseToolResultContent, [])
 	})
 
 	it("persists a completed attempt_completion tool result into API conversation history", async () => {
 		const taskState = new TaskState()
-		taskState.userMessageContent = [
+		taskState.completedResponseToolResultContent = [
 			{
 				type: "tool_result",
 				tool_use_id: "toolu_attempt_completion",
@@ -352,12 +406,12 @@ describe("response tool turn flow", () => {
 			],
 			ts: sinon.match.number,
 		} as any)
-		assert.deepEqual(taskState.userMessageContent, [])
+		assert.deepEqual(taskState.completedResponseToolResultContent, [])
 	})
 
 	it("does not persist the same completed response-tool result twice", async () => {
 		const taskState = new TaskState()
-		taskState.userMessageContent = [
+		taskState.completedResponseToolResultContent = [
 			{
 				type: "tool_result",
 				tool_use_id: "toolu_send_user_message",
@@ -380,6 +434,55 @@ describe("response tool turn flow", () => {
 		assert.equal(firstPersist, true)
 		assert.equal(secondPersist, false)
 		sinon.assert.calledOnce(messageStateHandler.addToApiConversationHistory)
+	})
+
+	it("drops skipped native tool calls from assistant history while preserving resolved calls", () => {
+		const taskState = new TaskState()
+		taskState.nativeToolCallIdsWithResults.add("call_keep")
+		taskState.nativeToolCallIdsSkipped.add("call_skip")
+
+		const result = resolvePersistableNativeToolUseBlocks(taskState, [
+			{
+				type: "tool_use",
+				id: "toolu_keep",
+				name: ClineDefaultTool.READ_FILE,
+				input: { path: "src/index.ts" },
+				call_id: "call_keep",
+			},
+			{
+				type: "tool_use",
+				id: "toolu_skip",
+				name: ClineDefaultTool.READ_FILE,
+				input: { path: "src/skip.ts" },
+				call_id: "call_skip",
+			},
+		] as any)
+
+		assert.deepEqual(
+			result.persistableToolUseBlocks.map((block) => block.call_id),
+			["call_keep"],
+		)
+		assert.deepEqual(result.droppedSkippedCallIds, ["call_skip"])
+		assert.deepEqual(result.unresolvedCallIds, [])
+	})
+
+	it("flags native tool calls without emitted outputs as unresolved before the next request", () => {
+		const taskState = new TaskState()
+		taskState.nativeToolCallIdsExecuted.add("call_missing_output")
+
+		const result = resolvePersistableNativeToolUseBlocks(taskState, [
+			{
+				type: "tool_use",
+				id: "toolu_missing_output",
+				name: ClineDefaultTool.READ_FILE,
+				input: { path: "src/index.ts" },
+				call_id: "call_missing_output",
+			},
+		] as any)
+
+		assert.deepEqual(result.persistableToolUseBlocks, [])
+		assert.deepEqual(result.droppedSkippedCallIds, [])
+		assert.deepEqual(result.unresolvedCallIds, ["call_missing_output"])
 	})
 
 	it("queues steer feedback without changing thread state", async () => {

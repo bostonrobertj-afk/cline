@@ -40,6 +40,17 @@ export async function askResponse(controller: Controller, request: AskResponseRe
 
 		if (responseType === "steerMessage") {
 			const threadDisplayState = controller.task.getThreadDisplayState?.()
+			Logger.info(
+				`askResponse routing ${JSON.stringify({
+					responseType,
+					threadDisplayState,
+					isTaskActivelyRunning: controller.isTaskActivelyRunning(),
+					route:
+						controller.isTaskActivelyRunning() || threadDisplayState === "active_run"
+							? "queueActiveTaskSteerFeedback"
+							: "degrade_to_messageResponse",
+				})}`,
+			)
 
 			if (controller.isTaskActivelyRunning() || threadDisplayState === "active_run") {
 				await controller.queueActiveTaskSteerFeedback(request.text, request.images, request.files)
@@ -53,8 +64,25 @@ export async function askResponse(controller: Controller, request: AskResponseRe
 
 		if (responseType === "messageResponse") {
 			const threadDisplayState = controller.task.getThreadDisplayState?.()
+			const isTaskActivelyRunning = controller.isTaskActivelyRunning()
+			let route = "handleWebviewAskResponse"
+			if (isTaskActivelyRunning || threadDisplayState === "active_run") {
+				route = "interruptTaskWithFeedback"
+			} else if (threadDisplayState === "active_user") {
+				route = "continueActiveTaskWithFeedback"
+			} else if (threadDisplayState === "idle_open" || threadDisplayState === "paused") {
+				route = "resumePassiveTaskWithFeedback"
+			}
+			Logger.info(
+				`askResponse routing ${JSON.stringify({
+					responseType,
+					threadDisplayState,
+					isTaskActivelyRunning,
+					route,
+				})}`,
+			)
 
-			if (controller.isTaskActivelyRunning()) {
+			if (isTaskActivelyRunning) {
 				await controller.interruptTaskWithFeedback(request.text, request.images, request.files)
 				return Empty.create()
 			}

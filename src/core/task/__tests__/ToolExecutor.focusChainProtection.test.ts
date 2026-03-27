@@ -191,4 +191,96 @@ describe("ToolExecutor focus chain protection", () => {
 			),
 		)
 	})
+
+	it("keeps post-tool task_progress feedback with isolated end-turn response-tool results", async () => {
+		const taskState = new TaskState()
+		taskState.markResponseToolTurnComplete(ClineDefaultTool.SEND_USER_MESSAGE, "end_turn")
+		const stateManager = {
+			getGlobalSettingsKey: sinon.stub().callsFake((key: string) => {
+				if (key === "focusChainSettings") {
+					return { enabled: true, remindClineInterval: 6 }
+				}
+				if (key === "mode") {
+					return "act"
+				}
+				if (key === "hooksEnabled") {
+					return false
+				}
+				if (key === "enableParallelToolCalling") {
+					return true
+				}
+				return false
+			}),
+			getApiConfiguration: sinon.stub().returns({ actModeApiProvider: "openai", planModeApiProvider: "openai" }),
+		} as any
+
+		const updateFCListFromToolResponse = sinon.stub().resolves({
+			accepted: false,
+			feedback: 'Do not include `task_progress` on a tool call until the active step\'s "Done Signal" is true.',
+		})
+
+		const executor = new ToolExecutor(
+			taskState,
+			{} as any,
+			{ getModel: sinon.stub().returns({ id: "gpt-5.4-mini" }) } as any,
+			{} as any,
+			{ closeBrowser: sinon.stub().resolves() } as any,
+			{} as any,
+			{} as any,
+			{} as any,
+			{} as any,
+			{} as any,
+			{} as any,
+			stateManager,
+			".",
+			"task-id",
+			"ulid",
+			"vscodeTerminal",
+			undefined,
+			false,
+			sinon.stub().resolves(undefined),
+			sinon.stub().resolves(undefined),
+			sinon.stub().resolves(undefined),
+			sinon.stub().resolves(undefined),
+			sinon.stub().resolves(undefined),
+			sinon.stub().resolves([false, "command executed"]),
+			sinon.stub().resolves(false),
+			sinon.stub().resolves(false),
+			updateFCListFromToolResponse,
+			sinon.stub().resolves(undefined),
+			sinon.stub().resolves(undefined),
+			sinon.stub().resolves(undefined),
+			sinon.stub().resolves(undefined),
+			sinon.stub().resolves(undefined),
+			sinon.stub().resolves(undefined),
+		)
+
+		;(executor as any).coordinator = {
+			execute: sinon.stub().resolves("[Message displayed.]"),
+			getHandler: sinon.stub().returns(undefined),
+		}
+
+		await (executor as any).handleCompleteBlock(
+			{
+				type: "tool_use",
+				name: ClineDefaultTool.SEND_USER_MESSAGE,
+				params: {
+					message: "Done",
+					task_progress: "__COMPLETE_NEXT_STEP__",
+				},
+				partial: false,
+			},
+			{ taskId: "task-id", callbacks: { cancelTask: sinon.stub() } },
+		)
+
+		assert.equal(taskState.userMessageContent.length, 0)
+		assert.equal(taskState.completedResponseToolResultContent.length, 2)
+		assert.equal((taskState.completedResponseToolResultContent[0] as any).type, "text")
+		assert.match(String((taskState.completedResponseToolResultContent[0] as any).text), /^\[send_user_message\] Result:\n/)
+		assert.equal((taskState.completedResponseToolResultContent[1] as any).type, "text")
+		assert.match(
+			String((taskState.completedResponseToolResultContent[1] as any).text),
+			/Do not include `task_progress` on a tool call until the active step's "Done Signal" is true\./,
+		)
+	})
 })

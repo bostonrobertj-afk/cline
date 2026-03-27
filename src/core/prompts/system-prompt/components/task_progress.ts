@@ -32,7 +32,8 @@ const UPDATING_TASK_PROGRESS_PLACEHOLDER_WORKFLOW = `UPDATING TASK PROGRESS
 
 The user has triggered a workflow with a prebuilt checklist.
 - Instructions are automatically sent for the first incomplete item on the checklist each turn.
-- Use \`task_progress\` with \`__COMPLETE_NEXT_STEP__\` as the value when ready to complete a step.`
+- Do not include \`task_progress\` on a tool call until the active step's "Done Signal" is true.
+- When the active step's "Done Signal" is true, use \`task_progress\` with \`__COMPLETE_NEXT_STEP__\` on the next relevant tool call, and use it only once in that assistant turn.`
 
 export async function getUpdatingTaskProgress(variant: PromptVariant, context: SystemPromptContext): Promise<string | undefined> {
 	if (!context.focusChainSettings?.enabled) {

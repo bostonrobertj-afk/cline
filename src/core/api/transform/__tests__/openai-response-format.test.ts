@@ -100,6 +100,51 @@ describe("convertToOpenAIResponsesInput", () => {
 		;(chained.input[0] as any).output.should.equal("Found 1 result")
 	})
 
+	it("should stop previous_response_id chaining at an explicit broken-chain assistant boundary", () => {
+		const messages: ClineStorageMessage[] = [
+			{
+				role: "assistant",
+				id: "resp_safe_older",
+				ts: Date.now(),
+				modelInfo: {
+					modelId: "gpt-5.4-mini-2026-03-17",
+					providerId: "openai-native",
+					mode: "act",
+				},
+				content: "older safe response",
+			},
+			{
+				role: "assistant",
+				id: "resp_broken_boundary",
+				ts: Date.now(),
+				modelInfo: {
+					modelId: "gpt-5.4-mini-2026-03-17",
+					providerId: "openai-native",
+					mode: "act",
+				},
+				previousResponseIdChainBroken: true,
+				previousResponseIdChainBrokenReason: "native_tool_call_missing_provider_output:call_skip_1",
+				content: "response containing an unsafe native tool turn",
+			},
+			{
+				role: "user",
+				content: "continue after unsafe turn",
+			},
+		]
+
+		const chained = convertToOpenAIResponsesInput(messages, { usePreviousResponseId: true })
+
+		;(chained.previousResponseId === undefined).should.be.true()
+		chained.previousResponseIdChainBreakReason?.should.equal("native_tool_call_missing_provider_output:call_skip_1")
+		chained.input.should.have.length(3)
+		;(chained.input[0] as any).type.should.equal("message")
+		;(chained.input[0] as any).role.should.equal("assistant")
+		;(chained.input[1] as any).type.should.equal("message")
+		;(chained.input[1] as any).role.should.equal("assistant")
+		;(chained.input[2] as any).type.should.equal("message")
+		;(chained.input[2] as any).role.should.equal("user")
+	})
+
 	it("should omit stored response item ids when rebuilding full context after a tool turn", () => {
 		const messages: ClineStorageMessage[] = [
 			{

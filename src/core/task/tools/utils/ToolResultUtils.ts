@@ -37,7 +37,7 @@ export class ToolResultUtils {
 		toolDescription: (block: ToolUse) => string,
 		coordinator?: ToolExecutorCoordinator,
 		toolUseIdMap?: Map<string, string>,
-	): void {
+	): boolean {
 		if (typeof content === "string") {
 			const resultText = content || "(tool did not return anything)"
 
@@ -58,26 +58,27 @@ export class ToolResultUtils {
 				userMessageContent.some((item) => item.type === "tool_result" && item.tool_use_id === toolUseId && item.content)
 			) {
 				Logger.warn(`ToolResultUtils: Tool result for tool_use_id ${toolUseId} already exists. Skipping duplicate.`)
-				return
+				return false
 			}
 
 			// Create ToolResultBlockParam with description and result
 			userMessageContent.push(
 				ToolResultUtils.createToolResultBlock(`${description} Result:\n${resultText}`, toolUseId, block.call_id),
 			)
-		} else {
-			// For complex content (arrays with text/image blocks), pass it through directly
-			// The content array should already be properly formatted with type, text, source, etc.
-			const toolUseId = ToolResultUtils.resolveToolResultId(block, toolUseIdMap) || "cline"
-
-			// If using backward-compatible "cline" ID and content is an array, spread it directly
-			// instead of wrapping it (which would cause JSON.stringify in createToolResultBlock)
-			if ((toolUseId === "cline" || !toolUseId) && Array.isArray(content)) {
-				userMessageContent.push(...content)
-			} else {
-				userMessageContent.push(ToolResultUtils.createToolResultBlock(content, toolUseId, block.call_id))
-			}
+			return true
 		}
+		// For complex content (arrays with text/image blocks), pass it through directly
+		// The content array should already be properly formatted with type, text, source, etc.
+		const toolUseId = ToolResultUtils.resolveToolResultId(block, toolUseIdMap) || "cline"
+
+		// If using backward-compatible "cline" ID and content is an array, spread it directly
+		// instead of wrapping it (which would cause JSON.stringify in createToolResultBlock)
+		if ((toolUseId === "cline" || !toolUseId) && Array.isArray(content)) {
+			userMessageContent.push(...content)
+		} else {
+			userMessageContent.push(ToolResultUtils.createToolResultBlock(content, toolUseId, block.call_id))
+		}
+		return true
 	}
 
 	private static createToolResultBlock(content: ToolResponse, id?: string, call_id?: string) {

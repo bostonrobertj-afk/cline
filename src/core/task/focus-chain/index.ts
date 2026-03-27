@@ -368,8 +368,8 @@ export class FocusChainManager {
 					stepDetails.details.trim(),
 					"Focus on completing this step.",
 					"I determine the active step from your latest `task_progress` update.",
-					"When you finish this step, include `task_progress` on your next tool call so I can advance the checklist.",
-					'Use "__COMPLETE_NEXT_STEP__" if only this step changed.',
+					'Do not include `task_progress` on a tool call until the active step\'s "Done Signal" is true.',
+					'When the active step\'s "Done Signal" is true, use `task_progress` with `__COMPLETE_NEXT_STEP__` on the next relevant tool call, and use it only once in that assistant turn.',
 					"Once the checklist advances, I'll give you the next step's details.",
 				].join("\n\n"),
 			)
@@ -581,6 +581,21 @@ export class FocusChainManager {
 					}
 				}
 
+				if (
+					this.taskState.activePlaceholderWorkflowSource &&
+					isFocusChainCompleteNextStepSentinel(trimmedTaskProgress) &&
+					this.taskState.completedNextStepUpdatesThisTurn > 0
+				) {
+					return {
+						accepted: false,
+						feedback: [
+							"Placeholder workflow progress already advanced once in this assistant turn.",
+							'Do not include `task_progress` on a tool call until the active step\'s "Done Signal" is true.',
+							'When the active step\'s "Done Signal" is true, use `__COMPLETE_NEXT_STEP__` only once on the next relevant tool call in that assistant turn.',
+						].join("\n\n"),
+					}
+				}
+
 				if (currentChecklist) {
 					const updateResult = evaluateFocusChainChecklistUpdate(currentChecklist, trimmedTaskProgress)
 					if (!updateResult.accepted) {
@@ -591,6 +606,9 @@ export class FocusChainManager {
 					}
 
 					const mergedChecklist = updateResult.checklist || trimmedTaskProgress
+					if (isFocusChainCompleteNextStepSentinel(trimmedTaskProgress)) {
+						this.taskState.completedNextStepUpdatesThisTurn += 1
+					}
 					const previousList = this.taskState.currentFocusChainChecklist
 					this.taskState.apiRequestsSinceLastTodoUpdate = 0
 					this.taskState.currentFocusChainChecklist = mergedChecklist
@@ -624,6 +642,9 @@ export class FocusChainManager {
 						Logger.log(`[Task ${this.taskId}] focus chain list: Sent fallback task_progress message to UI`)
 					}
 				} else {
+					if (isFocusChainCompleteNextStepSentinel(trimmedTaskProgress)) {
+						this.taskState.completedNextStepUpdatesThisTurn += 1
+					}
 					this.taskState.apiRequestsSinceLastTodoUpdate = 0
 					this.taskState.currentFocusChainChecklist = trimmedTaskProgress
 					Logger.debug(

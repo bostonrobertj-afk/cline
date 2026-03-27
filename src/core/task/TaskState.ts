@@ -43,9 +43,19 @@ export class TaskState {
 	currentStreamingContentIndex = 0
 	assistantMessageContent: AssistantMessageContent[] = []
 	userMessageContent: (Anthropic.TextBlockParam | Anthropic.ImageBlockParam | Anthropic.ToolResultBlockParam)[] = []
+	completedResponseToolResultContent: (
+		| Anthropic.TextBlockParam
+		| Anthropic.ImageBlockParam
+		| Anthropic.ToolResultBlockParam
+	)[] = []
 	userMessageContentReady = false
 	// Map of tool names to their tool_use_id for creating proper ToolResultBlockParam
 	toolUseIdMap: Map<string, string> = new Map()
+	nativeToolCallIdsSeen: Set<string> = new Set()
+	nativeToolCallIdsExecuted: Set<string> = new Set()
+	nativeToolCallIdsSkipped: Set<string> = new Set()
+	nativeToolCallIdsWithResults: Set<string> = new Set()
+	nativeToolCallIdsBreakingPreviousResponseChain: Set<string> = new Set()
 
 	// Presentation locks
 	presentAssistantMessageLocked = false
@@ -123,6 +133,7 @@ export class TaskState {
 	turnsSinceFullPromptRefresh = 0
 	currentFocusChainChecklist: string | null = null
 	todoListWasUpdatedByUser = false
+	completedNextStepUpdatesThisTurn = 0
 
 	// Task Abort / Cancellation
 	abort = false
@@ -183,6 +194,18 @@ export class TaskState {
 			: undefined
 	}
 
+	peekPendingResponseToolFollowup(): PendingResponseToolFollowup | undefined {
+		if (!this.pendingResponseToolFollowup) {
+			return undefined
+		}
+
+		return {
+			...this.pendingResponseToolFollowup,
+			images: this.pendingResponseToolFollowup.images?.length ? [...this.pendingResponseToolFollowup.images] : undefined,
+			files: this.pendingResponseToolFollowup.files?.length ? [...this.pendingResponseToolFollowup.files] : undefined,
+		}
+	}
+
 	consumePendingResponseToolFollowup(): PendingResponseToolFollowup | undefined {
 		if (!this.pendingResponseToolFollowup) {
 			return undefined
@@ -228,6 +251,14 @@ export class TaskState {
 		}))
 		this.pendingSteerFeedback = []
 		return queuedFeedback
+	}
+
+	clearNativeToolCallTracking(): void {
+		this.nativeToolCallIdsSeen.clear()
+		this.nativeToolCallIdsExecuted.clear()
+		this.nativeToolCallIdsSkipped.clear()
+		this.nativeToolCallIdsWithResults.clear()
+		this.nativeToolCallIdsBreakingPreviousResponseChain.clear()
 	}
 
 	setPartialResponseToolPreview(preview: PartialResponseToolPreview): void {

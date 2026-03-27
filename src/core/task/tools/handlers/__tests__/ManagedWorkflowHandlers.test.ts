@@ -56,6 +56,7 @@ function createConfig(overrides: Partial<TaskConfig> = {}): TaskConfig {
 		saveCheckpoint: sinon.stub().resolves(),
 		sayAndCreateMissingParamError: sinon.stub().resolves("missing"),
 		removeLastPartialMessageIfExistsWithType: sinon.stub().resolves(),
+		clearPartialResponseToolPreview: sinon.stub().resolves(false),
 		updateFCListFromToolResponse: sinon.stub().resolves(),
 		doesLatestTaskCompletionHaveNewChanges: sinon.stub().resolves(false),
 		executeCommandTool: sinon.stub().resolves([false, "ok"]),
@@ -581,7 +582,12 @@ describe("Managed workflow handlers", () => {
 				report_path: "docs/workflow-gating.md",
 			})
 			expect(String(result)).to.contain("Continue the current placeholder workflow step.")
-			expect(String(result)).to.contain("include `task_progress` on your next tool call so the checklist advances")
+			expect(String(result)).to.contain(
+				'Do not include `task_progress` on a tool call until the active step\'s "Done Signal" is true.',
+			)
+			expect(String(result)).to.contain(
+				'When the active step\'s "Done Signal" is true, use `task_progress` with `__COMPLETE_NEXT_STEP__` on the next relevant tool call, and use it only once in that assistant turn.',
+			)
 			expect(String(result)).to.contain("__COMPLETE_NEXT_STEP__")
 		} finally {
 			sandbox.restore()
@@ -643,7 +649,12 @@ describe("Managed workflow handlers", () => {
 		expect(String(result)).to.contain("No workflow placeholder values changed")
 		expect(String(result)).to.contain("Do not call set_workflow_placeholders again unless one of those values changes.")
 		expect(String(result)).to.contain("Continue the current placeholder workflow step.")
-		expect(String(result)).to.contain("include `task_progress` on your next tool call so the checklist advances")
+		expect(String(result)).to.contain(
+			'Do not include `task_progress` on a tool call until the active step\'s "Done Signal" is true.',
+		)
+		expect(String(result)).to.contain(
+			'When the active step\'s "Done Signal" is true, use `task_progress` with `__COMPLETE_NEXT_STEP__` on the next relevant tool call, and use it only once in that assistant turn.',
+		)
 		expect(String(result)).to.contain("__COMPLETE_NEXT_STEP__")
 		expect(String(result)).to.not.contain("complete_workflow_item")
 		expect((config.callbacks.updateFCListFromToolResponse as sinon.SinonStub).called).to.equal(false)

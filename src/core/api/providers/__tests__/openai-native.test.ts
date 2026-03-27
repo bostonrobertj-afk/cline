@@ -247,6 +247,86 @@ describe("OpenAiNativeHandler", () => {
 		createStub.callCount.should.equal(2)
 	})
 
+	it("should disable previous_response_id chaining when the latest assistant turn marked the chain as broken", async () => {
+		const handler = new OpenAiNativeHandler({
+			openAiNativeApiKey: "test-api-key",
+			apiModelId: "gpt-5.4-mini-2026-03-17",
+		})
+
+		const createStub = sinon.stub().resolves(
+			createAsyncIterable([
+				{
+					type: "response.completed",
+					response: {
+						id: "resp_after_chain_break",
+						usage: {
+							input_tokens: 10,
+							output_tokens: 5,
+						},
+					},
+				},
+			]),
+		)
+
+		const fakeClient = {
+			responses: {
+				create: createStub,
+			},
+		}
+		sinon.stub(handler as any, "ensureClient").returns(fakeClient as any)
+		sinon.stub(handler as any, "useWebsocketMode").returns(false)
+		const warnStub = sinon.stub(Logger, "warn")
+
+		const messages = [
+			{
+				role: "assistant",
+				content: "older safe response",
+				id: "resp_safe_older",
+				ts: Date.now(),
+				modelInfo: { providerId: "openai-native", modelId: "gpt-5.4-mini-2026-03-17", mode: "act" },
+			},
+			{
+				role: "assistant",
+				content: "unsafe skipped native tool turn",
+				id: "resp_broken_boundary",
+				ts: Date.now(),
+				modelInfo: { providerId: "openai-native", modelId: "gpt-5.4-mini-2026-03-17", mode: "act" },
+				previousResponseIdChainBroken: true,
+				previousResponseIdChainBrokenReason: "native_tool_call_missing_provider_output:call_skip_1",
+			},
+			{
+				role: "user",
+				content: "continue",
+			},
+		] as any
+
+		const tools = [
+			{
+				type: "function",
+				function: {
+					name: "read_file",
+					description: "Read a file",
+					parameters: { type: "object" },
+				},
+			},
+		] as any
+
+		for await (const _chunk of handler.createMessage("system", messages, tools)) {
+			// drain
+		}
+
+		const requestParams = createStub.firstCall.args[0]
+		;("previous_response_id" in requestParams).should.equal(false)
+		warnStub
+			.getCalls()
+			.some((call) => call.args[0].includes("[OpenAI] Native disabling previous_response_id chaining for the next request"))
+			.should.equal(true)
+		warnStub
+			.getCalls()
+			.some((call) => call.args[0].includes("native_tool_call_missing_provider_output:call_skip_1"))
+			.should.equal(true)
+	})
+
 	it("should include reasoning tokens in Responses API output usage totals", async () => {
 		const handler = new OpenAiNativeHandler({
 			openAiNativeApiKey: "test-api-key",

@@ -36,7 +36,7 @@ function getNextStepGuidance(isManagedWorkflow: boolean): string {
 		return "Continue the current workflow step or call complete_workflow_item if that step is finished."
 	}
 
-	return 'Continue the current placeholder workflow step. If that step is complete, include `task_progress` on your next tool call so the checklist advances. Use "__COMPLETE_NEXT_STEP__" if only the next incomplete step changed.'
+	return 'Continue the current placeholder workflow step. Do not include `task_progress` on a tool call until the active step\'s "Done Signal" is true. When the active step\'s "Done Signal" is true, use `task_progress` with `__COMPLETE_NEXT_STEP__` on the next relevant tool call, and use it only once in that assistant turn.'
 }
 
 export class SetWorkflowPlaceholdersToolHandler implements IToolHandler, IPartialBlockHandler {

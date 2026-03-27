@@ -59,7 +59,9 @@ Inspect the prepared review input and write findings.
 			expect(prompt).to.contain("# CURRENT WORKFLOW STEP")
 			expect(prompt).to.contain("You are currently on this step: Step 1: Gather Context")
 			expect(prompt).to.contain("Determine what to review from the user's prompt")
-			expect(prompt).to.contain("When you finish this step, include `task_progress` on your next tool call")
+			expect(prompt).to.contain(
+				'When the active step\'s "Done Signal" is true, use `task_progress` with `__COMPLETE_NEXT_STEP__` on the next relevant tool call, and use it only once in that assistant turn.',
+			)
 			expect(prompt).to.contain("__COMPLETE_NEXT_STEP__")
 			expect(prompt).to.contain("I determine the active step from your latest `task_progress` update.")
 			expect(prompt).to.match(/^### Reminder:/m)
@@ -322,6 +324,43 @@ Determine what to review from the user's prompt before asking follow-up question
 			const written = await fs.readFile(focusChainFilePath, "utf8")
 			expect(written).to.contain("- [x] Step 1: Gather Context")
 			expect(written).to.contain("- [x] Step 2: Review")
+		} finally {
+			sandbox.restore()
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("rejects a second next-step sentinel in the same assistant turn for placeholder workflows", async () => {
+		const sandbox = sinon.createSandbox()
+		const taskId = `task-focus-chain-placeholder-${Date.now()}`
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "focus-chain-placeholder-repeat-sentinel-"))
+		try {
+			sandbox.stub(disk, "ensureTaskDirectoryExists").resolves(tempDir)
+			const taskState = new TaskState()
+			taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "placeholder-inline",
+				contents: "placeholder workflow details",
+			}
+			taskState.currentFocusChainChecklist = "- [ ] Step 1: Gather Context\n- [ ] Step 2: Review"
+			taskState.completedNextStepUpdatesThisTurn = 1
+
+			const say = sinon.stub().resolves(undefined)
+			const manager = new FocusChainManager({
+				...createDependencies(taskState),
+				taskId,
+				say,
+			})
+
+			const result = await manager.updateFCListFromToolResponse("__COMPLETE_NEXT_STEP__")
+
+			expect(result.accepted).to.equal(false)
+			expect(result.feedback).to.contain("Placeholder workflow progress already advanced once in this assistant turn.")
+			expect(result.feedback).to.contain(
+				'Do not include `task_progress` on a tool call until the active step\'s "Done Signal" is true.',
+			)
+			expect(taskState.currentFocusChainChecklist).to.equal("- [ ] Step 1: Gather Context\n- [ ] Step 2: Review")
+			sinon.assert.notCalled(say)
 		} finally {
 			sandbox.restore()
 			await fs.rm(tempDir, { recursive: true, force: true })

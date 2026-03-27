@@ -95,6 +95,7 @@ import { telemetryService } from "@/services/telemetry"
 import { ClineClient } from "@/shared/cline"
 import {
 	ClineAssistantContent,
+	ClineAssistantToolUseBlock,
 	ClineContent,
 	ClineImageContentBlock,
 	ClineMessageModelInfo,
@@ -187,6 +188,57 @@ export function hasAssistantResponseContent(assistantTextOnly: string, finalized
 	return assistantTextOnly.trim().length > 0 || finalizedToolCallCount > 0
 }
 
+export function resolvePersistableNativeToolUseBlocks(
+	taskState: Pick<
+		TaskState,
+		| "nativeToolCallIdsExecuted"
+		| "nativeToolCallIdsSkipped"
+		| "nativeToolCallIdsWithResults"
+		| "nativeToolCallIdsBreakingPreviousResponseChain"
+	>,
+	toolUseBlocks: ClineAssistantToolUseBlock[],
+) {
+	const persistableToolUseBlocks: ClineAssistantToolUseBlock[] = []
+	const droppedSkippedCallIds: string[] = []
+	const unresolvedCallIds: string[] = []
+
+	for (const toolUseBlock of toolUseBlocks) {
+		const callId = toolUseBlock.call_id
+		if (!callId) {
+			persistableToolUseBlocks.push(toolUseBlock)
+			continue
+		}
+
+		if (taskState.nativeToolCallIdsWithResults.has(callId)) {
+			persistableToolUseBlocks.push(toolUseBlock)
+			continue
+		}
+
+		if (taskState.nativeToolCallIdsSkipped.has(callId)) {
+			droppedSkippedCallIds.push(callId)
+			continue
+		}
+
+		if (taskState.nativeToolCallIdsBreakingPreviousResponseChain.has(callId)) {
+			unresolvedCallIds.push(callId)
+			continue
+		}
+
+		if (taskState.nativeToolCallIdsExecuted.has(callId)) {
+			unresolvedCallIds.push(callId)
+			continue
+		}
+
+		unresolvedCallIds.push(callId)
+	}
+
+	return {
+		persistableToolUseBlocks,
+		droppedSkippedCallIds,
+		unresolvedCallIds,
+	}
+}
+
 export async function consumeDeferredResponseToolUserContent(taskState: TaskState) {
 	const pendingResponseToolFollowup = taskState.consumePendingResponseToolFollowup()
 	if (pendingResponseToolFollowup?.route !== "normal_user_turn") {
@@ -219,11 +271,11 @@ export async function persistCompletedResponseToolResultIfNeeded(params: {
 	taskState: TaskState
 	messageStateHandler: Pick<MessageStateHandler, "addToApiConversationHistory">
 }) {
-	if (params.taskState.userMessageContent.length === 0) {
+	if (params.taskState.completedResponseToolResultContent.length === 0) {
 		return false
 	}
 
-	const completedToolResultContent = cloneDeep(params.taskState.userMessageContent)
+	const completedToolResultContent = cloneDeep(params.taskState.completedResponseToolResultContent)
 
 	await params.messageStateHandler.addToApiConversationHistory({
 		role: "user",
@@ -233,7 +285,7 @@ export async function persistCompletedResponseToolResultIfNeeded(params: {
 
 	// Response-tool success content belongs to the just-finished turn.
 	// Clear it after persistence so any next-turn continuation starts fresh.
-	params.taskState.userMessageContent = []
+	params.taskState.completedResponseToolResultContent = []
 
 	return true
 }
@@ -355,7 +407,7 @@ export async function handleCompletedResponseToolTurn(params: {
 	abort: boolean
 	messageStateHandler: Pick<MessageStateHandler, "addToApiConversationHistory">
 	recursivelyMakeClineRequests: (userContent: ClineContent[]) => Promise<boolean>
-	setThreadDisplayState: (threadDisplayState: ThreadDisplayState) => void
+	setThreadDisplayState: (threadDisplayState: ThreadDisplayState, reason: string, details?: Record<string, unknown>) => void
 	postStateToWebview: () => Promise<void>
 }) {
 	await persistCompletedResponseToolResultIfNeeded({
@@ -369,7 +421,10 @@ export async function handleCompletedResponseToolTurn(params: {
 	}
 
 	if (params.completedResponseTool.threadDisplayStateAfterTurnEnds && !params.abort) {
-		params.setThreadDisplayState(params.completedResponseTool.threadDisplayStateAfterTurnEnds)
+		params.setThreadDisplayState(params.completedResponseTool.threadDisplayStateAfterTurnEnds, "response_tool_turn_ended", {
+			completedResponseTool: params.completedResponseTool.toolName,
+			hasContinuationContent: false,
+		})
 		await params.postStateToWebview()
 	}
 
@@ -435,8 +490,27 @@ export class Task {
 		return this.threadDisplayState
 	}
 
-	private setThreadDisplayState(threadDisplayState: ThreadDisplayState): void {
+	private setThreadDisplayState(
+		threadDisplayState: ThreadDisplayState,
+		reason: string,
+		details?: Record<string, unknown>,
+	): void {
+		const previousState = this.threadDisplayState
 		this.threadDisplayState = threadDisplayState
+		Logger.info(
+			`[Task ${this.taskId}] thread_display_state_transition ${JSON.stringify({
+				previousState,
+				nextState: threadDisplayState,
+				reason,
+				isStreaming: this.taskState.isStreaming,
+				isWaitingForFirstChunk: this.taskState.isWaitingForFirstChunk,
+				abort: this.taskState.abort,
+				responseToolTurnShouldEnd: this.taskState.responseToolTurnShouldEnd,
+				hasPendingResponseToolFollowup: !!this.taskState.peekPendingResponseToolFollowup(),
+				hasPendingSteerFeedback: this.taskState.hasPendingSteerFeedback(),
+				...(details ?? {}),
+			})}`,
+		)
 	}
 
 	private getThreadDisplayStateForAsk(type: ClineAsk): ThreadDisplayState {
@@ -866,7 +940,10 @@ export class Task {
 				// this.askResponseImages = undefined
 				askTs = Date.now()
 				this.taskState.lastMessageTs = askTs
-				this.setThreadDisplayState(threadDisplayState ?? this.getThreadDisplayStateForAsk(type))
+				this.setThreadDisplayState(threadDisplayState ?? this.getThreadDisplayStateForAsk(type), "ask_partial_started", {
+					askType: type,
+					partial: true,
+				})
 				await this.messageStateHandler.addToClineMessages({
 					ts: askTs,
 					type: "ask",
@@ -910,7 +987,10 @@ export class Task {
 				this.taskState.askResponseFiles = undefined
 				askTs = Date.now()
 				this.taskState.lastMessageTs = askTs
-				this.setThreadDisplayState(threadDisplayState ?? this.getThreadDisplayStateForAsk(type))
+				this.setThreadDisplayState(threadDisplayState ?? this.getThreadDisplayStateForAsk(type), "ask_completed", {
+					askType: type,
+					partial: false,
+				})
 				await this.messageStateHandler.addToClineMessages({
 					ts: askTs,
 					type: "ask",
@@ -929,7 +1009,10 @@ export class Task {
 			this.taskState.askResponseFiles = undefined
 			askTs = Date.now()
 			this.taskState.lastMessageTs = askTs
-			this.setThreadDisplayState(threadDisplayState ?? this.getThreadDisplayStateForAsk(type))
+			this.setThreadDisplayState(threadDisplayState ?? this.getThreadDisplayStateForAsk(type), "ask_started", {
+				askType: type,
+				partial: false,
+			})
 			await this.messageStateHandler.addToClineMessages({
 				ts: askTs,
 				type: "ask",
@@ -975,7 +1058,9 @@ export class Task {
 		// Restore the thread to active-run so post-approval/post-followup work doesn't
 		// remain visually or semantically stuck in the ask state.
 		if (!this.taskState.abort && type !== "completion_result") {
-			this.threadDisplayState = ThreadDisplayStates.ACTIVE_RUN
+			this.setThreadDisplayState(ThreadDisplayStates.ACTIVE_RUN, "ask_resolved", {
+				askType: type,
+			})
 			await this.postStateToWebview()
 		}
 
@@ -1614,7 +1699,7 @@ export class Task {
 		// if the extension process were killed, then on restart the clineMessages might not be empty, so we need to set it to [] when we create a new Cline client (otherwise webview would show stale messages from previous session)
 		this.messageStateHandler.setClineMessages([])
 		this.messageStateHandler.setApiConversationHistory([])
-		this.threadDisplayState = ThreadDisplayStates.ACTIVE_RUN
+		this.setThreadDisplayState(ThreadDisplayStates.ACTIVE_RUN, "task_started")
 
 		await this.postStateToWebview()
 
@@ -2062,7 +2147,11 @@ export class Task {
 		}
 
 		this.nextApiRequestIncludesHumanAuthoredInput = this.hasHumanAuthoredInput(userContent)
-		this.threadDisplayState = ThreadDisplayStates.ACTIVE_RUN
+		this.setThreadDisplayState(ThreadDisplayStates.ACTIVE_RUN, "continue_task_with_feedback", {
+			hasText: !!text,
+			imageCount: images?.length ?? 0,
+			fileCount: files?.length ?? 0,
+		})
 		await this.postStateToWebview()
 		await this.initiateTaskLoop(userContent)
 	}
@@ -2085,7 +2174,9 @@ export class Task {
 	private async initiateTaskLoop(userContent: ClineContent[]): Promise<void> {
 		let nextUserContent = userContent
 		let includeFileDetails = true
-		this.threadDisplayState = ThreadDisplayStates.ACTIVE_RUN
+		this.setThreadDisplayState(ThreadDisplayStates.ACTIVE_RUN, "initiate_task_loop", {
+			hasInitialUserContent: userContent.length > 0,
+		})
 		await this.postStateToWebview()
 		while (!this.taskState.abort) {
 			const didEndLoop = await this.recursivelyMakeClineRequests(nextUserContent, includeFileDetails)
@@ -2180,7 +2271,7 @@ export class Task {
 			// This must happen before canceling hooks so that hook catch blocks
 			// can properly detect the abort state
 			this.taskState.abort = true
-			this.threadDisplayState = ThreadDisplayStates.PAUSED
+			this.setThreadDisplayState(ThreadDisplayStates.PAUSED, "abort_requested")
 
 			// PHASE 3: Cancel any running hook execution
 			const activeHook = await this.getActiveHookExecution()
@@ -2303,7 +2394,7 @@ export class Task {
 
 			// Final state update to notify UI that abort is complete
 			try {
-				this.threadDisplayState = ThreadDisplayStates.IDLE_OPEN
+				this.setThreadDisplayState(ThreadDisplayStates.IDLE_OPEN, "abort_finalized")
 				await this.postStateToWebview()
 			} catch (error) {
 				Logger.error("Failed to post final state after abort", error)
@@ -2988,9 +3079,9 @@ export class Task {
 						this.initialCheckpointCommitPromise = undefined
 					}
 				}
-				await this.toolExecutor.executeTool(block)
+				const toolExecutionOutcome = await this.toolExecutor.executeTool(block)
 				Logger.info(
-					`[Task ${this.taskId}] presentAssistantMessage completed tool ${block.name} at index ${this.taskState.currentStreamingContentIndex + 1}/${this.taskState.assistantMessageContent.length}; userMessageContent blocks=${this.taskState.userMessageContent.length}`,
+					`[Task ${this.taskId}] presentAssistantMessage tool ${block.name} ${toolExecutionOutcome.status} at index ${this.taskState.currentStreamingContentIndex + 1}/${this.taskState.assistantMessageContent.length}; call_id=${block.call_id ?? "none"}; emittedToolResult=${String(toolExecutionOutcome.emittedToolResult)}; userMessageContent blocks=${this.taskState.userMessageContent.length}`,
 				)
 				if (block.call_id) {
 					Session.get().updateToolCall(block.call_id, block.name)
@@ -3046,6 +3137,7 @@ export class Task {
 		// assistant request/turn instead of leaking across later turns.
 		this.taskState.lastToolName = ""
 		this.taskState.clearResponseToolTurnState()
+		this.taskState.completedNextStepUpdatesThisTurn = 0
 
 		// Increment API request counter for focus chain list management
 		this.taskState.apiRequestCount++
@@ -3497,6 +3589,7 @@ export class Task {
 			await this.diffViewProvider.reset()
 			this.streamHandler.reset()
 			this.taskState.toolUseIdMap.clear()
+			this.taskState.clearNativeToolCallTracking()
 
 			const { toolUseHandler, reasonsHandler } = this.streamHandler.getHandlers()
 			const stream = this.attemptApiRequest(previousApiReqIndex) // yields only if the first chunk is successful, otherwise will allow the user to retry the request (most likely due to rate limit error, which gets thrown on the first chunk)
@@ -3792,6 +3885,7 @@ export class Task {
 			// (e.g., from Claude Code provider when the model returns native tool_use blocks).
 			const hasAccumulatedToolCalls = toolUseHandler.getAllFinalizedToolUses().length > 0
 			let assistantHasContent = hasAssistantResponseContent(assistantTextOnly, hasAccumulatedToolCalls ? 1 : 0)
+			const requestId = this.streamHandler.requestId
 			if (assistantHasContent) {
 				telemetryService.captureConversationTurnEvent(
 					this.ulid,
@@ -3802,67 +3896,6 @@ export class Task {
 					undefined,
 					this.useNativeToolCalls,
 				)
-
-				const { reasonsHandler } = this.streamHandler.getHandlers()
-				const redactedThinkingContent = reasonsHandler.getRedactedThinking()
-
-				const requestId = this.streamHandler.requestId
-
-				// Build content array with thinking blocks, text (if any), and tool use blocks
-				const assistantContent: Array<ClineAssistantContent> = [
-					// This is critical for maintaining the model's reasoning flow and conversation integrity.
-					// "When providing thinking blocks, the entire sequence of consecutive thinking blocks must match the outputs generated by the model during the original request; you cannot rearrange or modify the sequence of these blocks." The signature_delta is used to verify that the thinking was generated by Claude, and the thinking blocks will be ignored if it's incorrect or missing.
-					// https://docs.claude.com/en/docs/build-with-claude/extended-thinking#preserving-thinking-blocks
-					...redactedThinkingContent,
-				]
-				// Add thinking block from the reasoning handler if available
-				const thinkingBlock = reasonsHandler.getCurrentReasoning()
-				if (thinkingBlock) {
-					assistantContent.push({ ...thinkingBlock })
-				}
-
-				// Only add text block if there's actual text (not just tool XML)
-				const hasAssistantText = assistantTextOnly.trim().length > 0
-				if (hasAssistantText) {
-					assistantContent.push({
-						type: "text",
-						text: assistantTextOnly,
-						// reasoning_details only exists for cline/openrouter providers
-						reasoning_details: thinkingBlock?.summary as any[],
-						signature: assistantTextSignature,
-						call_id: assistantMessageId,
-					})
-				}
-
-				// Get finalized tool use blocks from the handler
-				const toolUseBlocks = toolUseHandler.getAllFinalizedToolUses(
-					// NOTE: If there is no assistant text but there is a thinking block, we attach the summary to the tool use blocks
-					// for providers that required reasoning traces included with assistant content.
-					hasAssistantText ? undefined : thinkingBlock?.summary,
-				)
-				// Append tool use blocks if any exist
-				if (toolUseBlocks.length > 0) {
-					assistantContent.push(...toolUseBlocks)
-				}
-
-				// Append the assistant's content to the API conversation history only if there's content
-				if (assistantContent.length > 0) {
-					await this.messageStateHandler.addToApiConversationHistory({
-						role: "assistant",
-						content: assistantContent,
-						modelInfo,
-						id: responseId || requestId,
-						metrics: {
-							tokens: {
-								prompt: taskMetrics.inputTokens,
-								completion: taskMetrics.outputTokens,
-								cached: (taskMetrics.cacheWriteTokens ?? 0) + (taskMetrics.cacheReadTokens ?? 0),
-							},
-							cost: taskMetrics.totalCost,
-						},
-						ts: Date.now(),
-					})
-				}
 			}
 
 			this.taskState.didCompleteReadingStream = true
@@ -3907,6 +3940,85 @@ export class Task {
 					`[Task ${this.taskId}] userMessageContentReady wait released; userMessageContent blocks=${this.taskState.userMessageContent.length}`,
 				)
 
+				const redactedThinkingContent = reasonsHandler.getRedactedThinking()
+				const assistantContent: Array<ClineAssistantContent> = [
+					// Preserve the original thinking block sequence for providers that require it.
+					...redactedThinkingContent,
+				]
+				const thinkingBlock = reasonsHandler.getCurrentReasoning()
+				if (thinkingBlock) {
+					assistantContent.push({ ...thinkingBlock })
+				}
+
+				const hasAssistantText = assistantTextOnly.trim().length > 0
+				if (hasAssistantText) {
+					assistantContent.push({
+						type: "text",
+						text: assistantTextOnly,
+						reasoning_details: thinkingBlock?.summary as any[],
+						signature: assistantTextSignature,
+						call_id: assistantMessageId,
+					})
+				}
+
+				const finalizedToolUseBlocks = toolUseHandler.getAllFinalizedToolUses(
+					hasAssistantText ? undefined : thinkingBlock?.summary,
+				)
+				const { persistableToolUseBlocks, droppedSkippedCallIds, unresolvedCallIds } =
+					resolvePersistableNativeToolUseBlocks(this.taskState, finalizedToolUseBlocks)
+
+				if (droppedSkippedCallIds.length > 0) {
+					Logger.warn(
+						`[Task ${this.taskId}] dropping ${droppedSkippedCallIds.length} native tool call(s) from assistant history because they were skipped/rejected before a tool result was emitted: ${droppedSkippedCallIds.join(", ")}`,
+					)
+				}
+
+				if (persistableToolUseBlocks.length > 0) {
+					assistantContent.push(...persistableToolUseBlocks)
+				}
+
+				const previousResponseIdChainBroken = this.taskState.nativeToolCallIdsBreakingPreviousResponseChain.size > 0
+				const previousResponseIdChainBrokenReason = previousResponseIdChainBroken
+					? `native_tool_call_missing_provider_output:${Array.from(
+							this.taskState.nativeToolCallIdsBreakingPreviousResponseChain,
+						).join(",")}`
+					: undefined
+
+				if (previousResponseIdChainBroken && previousResponseIdChainBrokenReason) {
+					Logger.warn(
+						`[Task ${this.taskId}] breaking previous_response_id chaining for this assistant turn because native tool call(s) finished without provider-balancing outputs: ${Array.from(
+							this.taskState.nativeToolCallIdsBreakingPreviousResponseChain,
+						).join(", ")}`,
+					)
+				}
+
+				if (assistantContent.length > 0) {
+					await this.messageStateHandler.addToApiConversationHistory({
+						role: "assistant",
+						content: assistantContent,
+						modelInfo,
+						id: responseId || requestId,
+						previousResponseIdChainBroken,
+						previousResponseIdChainBrokenReason,
+						metrics: {
+							tokens: {
+								prompt: taskMetrics.inputTokens,
+								completion: taskMetrics.outputTokens,
+								cached: (taskMetrics.cacheWriteTokens ?? 0) + (taskMetrics.cacheReadTokens ?? 0),
+							},
+							cost: taskMetrics.totalCost,
+						},
+						ts: Date.now(),
+					})
+				}
+
+				if (unresolvedCallIds.length > 0) {
+					const mismatchMessage = `Native tool-call bookkeeping mismatch prevented a follow-up request. Missing tool output for call_id(s): ${unresolvedCallIds.join(", ")}.`
+					Logger.error(`[Task ${this.taskId}] ${mismatchMessage}`)
+					await this.say("error", mismatchMessage)
+					return true
+				}
+
 				// Save checkpoint after all tools in this response have finished executing
 				await this.checkpointManager?.saveCheckpoint()
 
@@ -3921,6 +4033,26 @@ export class Task {
 						setThreadDisplayState: this.setThreadDisplayState.bind(this),
 						postStateToWebview: this.postStateToWebview.bind(this),
 					})
+				}
+
+				if (this.taskState.completedResponseToolResultContent.length > 0) {
+					await persistCompletedResponseToolResultIfNeeded({
+						taskState: this.taskState,
+						messageStateHandler: this.messageStateHandler,
+					})
+
+					const continuedUserContent = await consumeCompletedResponseToolContinuationUserContent(this.taskState)
+					if (continuedUserContent) {
+						Logger.warn(
+							`[Task ${this.taskId}] response-tool fallback continuation gate engaged after completed-result persistence`,
+						)
+						return await this.recursivelyMakeClineRequests(continuedUserContent)
+					}
+
+					Logger.warn(
+						`[Task ${this.taskId}] response-tool fallback stop engaged after completed-result persistence with no explicit continuation content`,
+					)
+					return true
 				}
 
 				// if the model did not tool use, then we need to tell it to either use a tool or attempt_completion
@@ -4265,6 +4397,11 @@ export class Task {
 		}
 
 		this.taskState.assistantMessageContent = [...textBlocks, ...toolBlocks]
+		for (const block of toolBlocks) {
+			if (!block.partial && block.call_id) {
+				this.taskState.nativeToolCallIdsSeen.add(block.call_id)
+			}
+		}
 		Logger.info(
 			`[Task ${this.taskId}] processNativeToolCalls scheduled ${toolBlocks.length} native tool call(s): ${toolBlocks
 				.map((block) => `${block.name}(call_id=${block.call_id ?? "none"}, partial=${String(block.partial)})`)

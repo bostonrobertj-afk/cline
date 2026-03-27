@@ -77,10 +77,12 @@ export function convertToOpenAIResponsesInput(
 ): {
 	input: ResponseInput
 	previousResponseId?: string
+	previousResponseIdChainBreakReason?: string
 } {
 	// Chain from the latest stored Responses API assistant message when available.
 	// When chaining, only send new items after that assistant turn.
 	let previousResponseId: string | undefined
+	let previousResponseIdChainBreakReason: string | undefined
 	let messages = _messages
 
 	if (options?.usePreviousResponseId) {
@@ -88,6 +90,10 @@ export function convertToOpenAIResponsesInput(
 
 		for (let i = _messages.length - 1; i >= 0; i--) {
 			const msg = _messages[i]
+			if (msg.previousResponseIdChainBroken) {
+				previousResponseIdChainBreakReason = msg.previousResponseIdChainBrokenReason || "stored_chain_break_boundary"
+				break
+			}
 			// Must be less than 24 hours old to be considered for chaining as the previous_response_id is only valid for 24 hours.
 			// Set to 23 hours to account for any potential delays in processing.
 			const isLessThan23HoursOld = msg.ts ? Date.now() - msg.ts < 23 * 60 * 60 * 1000 : false
@@ -296,7 +302,7 @@ export function convertToOpenAIResponsesInput(
 		}
 	}
 
-	return { input: allItems, previousResponseId }
+	return { input: allItems, previousResponseId, previousResponseIdChainBreakReason }
 }
 
 function convertToolResultContentToResponseOutput(content: unknown): string | Array<Record<string, unknown>> {
