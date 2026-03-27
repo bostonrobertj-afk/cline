@@ -1,5 +1,5 @@
 import type { ClineMessage } from "@shared/ExtensionMessage"
-import { ThreadDisplayStates } from "@shared/ExtensionMessage"
+import { AwaitingUserResponseSubtypes, ThreadDisplayStates } from "@shared/ExtensionMessage"
 import { describe, expect, it } from "vitest"
 import {
 	filterVisibleMessages,
@@ -257,6 +257,41 @@ describe("shouldShowThinkingLoaderRow", () => {
 		const messages: ClineMessage[] = [createApiReqStartedMessage(1, { cost: null })]
 
 		expect(shouldShowThinkingLoaderRow(messages, 0, ThreadDisplayStates.ACTIVE_USER)).toBe(false)
+	})
+
+	it("does not show Thinking for awaiting_user_response.user threads", () => {
+		const messages: ClineMessage[] = [createApiReqStartedMessage(1, { cost: null })]
+
+		expect(
+			shouldShowThinkingLoaderRow(
+				messages,
+				0,
+				ThreadDisplayStates.AWAITING_USER_RESPONSE,
+				AwaitingUserResponseSubtypes.USER,
+			),
+		).toBe(false)
+	})
+
+	it("still allows Thinking for awaiting_user_response.system when the last row is an in-flight API marker", () => {
+		const messages: ClineMessage[] = [createApiReqStartedMessage(1, { cost: null })]
+
+		expect(
+			shouldShowThinkingLoaderRow(
+				messages,
+				0,
+				ThreadDisplayStates.AWAITING_USER_RESPONSE,
+				AwaitingUserResponseSubtypes.SYSTEM,
+			),
+		).toBe(true)
+		expect(
+			shouldAppendThinkingLoaderRow(
+				messages,
+				0,
+				ThreadDisplayStates.AWAITING_USER_RESPONSE,
+				undefined,
+				AwaitingUserResponseSubtypes.SYSTEM,
+			),
+		).toBe(true)
 	})
 
 	it("shows Thinking for user_feedback follow-up states", () => {

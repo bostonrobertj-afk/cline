@@ -1,6 +1,12 @@
-import type { ClineMessage } from "@shared/ExtensionMessage"
+import { AwaitingUserResponseSubtypes, type ClineMessage } from "@shared/ExtensionMessage"
 import { describe, expect, it } from "vitest"
-import { BUTTON_CONFIGS, getButtonConfig, isPassiveThreadOpen, PASSIVE_THREAD_DISPLAY_STATE } from "./buttonConfig"
+import {
+	BUTTON_CONFIGS,
+	getButtonConfig,
+	getComposerSendingDisabled,
+	isPassiveThreadOpen,
+	PASSIVE_THREAD_DISPLAY_STATE,
+} from "./buttonConfig"
 
 describe("getButtonConfig", () => {
 	// Test default behavior
@@ -30,7 +36,6 @@ describe("getButtonConfig", () => {
 			ts: Date.now(),
 		}
 		const config = getButtonConfig(streamingMessage)
-		expect(config.sendingDisabled).toBe(false)
 		expect(config.primaryText).toBe("Steer")
 		expect(config.primaryAction).toBe("steer")
 		expect(config.secondaryText).toBe("Cancel")
@@ -46,7 +51,6 @@ describe("getButtonConfig", () => {
 		const config = getButtonConfig(passiveMessage, "act", PASSIVE_THREAD_DISPLAY_STATE)
 
 		expect(config).toEqual(BUTTON_CONFIGS.default)
-		expect(config.sendingDisabled).toBe(false)
 		expect(config.enableButtons).toBe(false)
 	})
 
@@ -61,7 +65,6 @@ describe("getButtonConfig", () => {
 		const config = getButtonConfig(pausedMessage, "act", "paused")
 
 		expect(config).toEqual(BUTTON_CONFIGS.default)
-		expect(config.sendingDisabled).toBe(false)
 		expect(config.enableButtons).toBe(false)
 	})
 
@@ -77,7 +80,6 @@ describe("getButtonConfig", () => {
 		const config = getButtonConfig(activeUserMessage, "act", "active_user")
 
 		expect(config).toEqual(BUTTON_CONFIGS.default)
-		expect(config.sendingDisabled).toBe(false)
 		expect(config.enableButtons).toBe(false)
 	})
 
@@ -255,7 +257,6 @@ describe("getButtonConfig", () => {
 			ts: Date.now(),
 		}
 		const config = getButtonConfig(apiReqMessage)
-		expect(config.sendingDisabled).toBe(false)
 		expect(config.primaryText).toBe("Steer")
 		expect(config.primaryAction).toBe("steer")
 		expect(config.secondaryText).toBe("Cancel")
@@ -272,5 +273,39 @@ describe("getButtonConfig", () => {
 		const configAct = getButtonConfig(message, "act")
 		const configPlan = getButtonConfig(message, "plan")
 		expect(configAct).toEqual(configPlan)
+	})
+})
+
+describe("getComposerSendingDisabled", () => {
+	it("returns true for active_run", () => {
+		expect(getComposerSendingDisabled("active_run")).toBe(true)
+	})
+
+	it("returns false for active_user", () => {
+		expect(getComposerSendingDisabled("active_user")).toBe(false)
+	})
+
+	it("returns false for idle_open", () => {
+		expect(getComposerSendingDisabled("idle_open")).toBe(false)
+	})
+
+	it("returns false for completed", () => {
+		expect(getComposerSendingDisabled("completed")).toBe(false)
+	})
+
+	it("returns false for paused", () => {
+		expect(getComposerSendingDisabled("paused")).toBe(false)
+	})
+
+	it("returns false for awaiting_user_response.user", () => {
+		expect(getComposerSendingDisabled("awaiting_user_response", AwaitingUserResponseSubtypes.USER)).toBe(false)
+	})
+
+	it("returns true for awaiting_user_response.system", () => {
+		expect(getComposerSendingDisabled("awaiting_user_response", AwaitingUserResponseSubtypes.SYSTEM)).toBe(true)
+	})
+
+	it("treats missing awaiting_user_response subtype as enabled", () => {
+		expect(getComposerSendingDisabled("awaiting_user_response", undefined)).toBe(false)
 	})
 })

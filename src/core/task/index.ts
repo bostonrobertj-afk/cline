@@ -58,6 +58,8 @@ import { McpHub } from "@services/mcp/McpHub"
 import { ApiConfiguration } from "@shared/api"
 import { findLastIndex } from "@shared/array"
 import {
+	AwaitingUserResponseSubtype,
+	AwaitingUserResponseSubtypes,
 	ClineApiReqCancelReason,
 	ClineApiReqInfo,
 	ClineAsk,
@@ -441,6 +443,7 @@ export class Task {
 
 	taskState: TaskState
 	private threadDisplayState: ThreadDisplayState = ThreadDisplayStates.IDLE_OPEN
+	private awaitingUserResponseSubtype: AwaitingUserResponseSubtype | undefined
 
 	// ONE mutex for ALL state modifications to prevent race conditions
 	private stateMutex = new Mutex()
@@ -490,17 +493,27 @@ export class Task {
 		return this.threadDisplayState
 	}
 
+	public getAwaitingUserResponseSubtype(): AwaitingUserResponseSubtype | undefined {
+		return this.awaitingUserResponseSubtype
+	}
+
 	private setThreadDisplayState(
 		threadDisplayState: ThreadDisplayState,
 		reason: string,
 		details?: Record<string, unknown>,
+		awaitingUserResponseSubtype?: AwaitingUserResponseSubtype,
 	): void {
 		const previousState = this.threadDisplayState
+		const previousAwaitingUserResponseSubtype = this.awaitingUserResponseSubtype
 		this.threadDisplayState = threadDisplayState
+		this.awaitingUserResponseSubtype =
+			threadDisplayState === ThreadDisplayStates.AWAITING_USER_RESPONSE ? awaitingUserResponseSubtype : undefined
 		Logger.info(
 			`[Task ${this.taskId}] thread_display_state_transition ${JSON.stringify({
 				previousState,
+				previousAwaitingUserResponseSubtype,
 				nextState: threadDisplayState,
+				awaitingUserResponseSubtype: this.awaitingUserResponseSubtype,
 				reason,
 				isStreaming: this.taskState.isStreaming,
 				isWaitingForFirstChunk: this.taskState.isWaitingForFirstChunk,
@@ -519,6 +532,20 @@ export class Task {
 		}
 
 		return ThreadDisplayStates.AWAITING_USER_RESPONSE
+	}
+
+	private getAwaitingUserResponseSubtypeForAsk(
+		type: ClineAsk,
+		partialLifecycle: "partial_started" | "finalized",
+		threadDisplayState: ThreadDisplayState,
+	): AwaitingUserResponseSubtype | undefined {
+		void type
+
+		if (threadDisplayState !== ThreadDisplayStates.AWAITING_USER_RESPONSE) {
+			return undefined
+		}
+
+		return partialLifecycle === "partial_started" ? AwaitingUserResponseSubtypes.SYSTEM : AwaitingUserResponseSubtypes.USER
 	}
 
 	// Core dependencies
@@ -940,15 +967,28 @@ export class Task {
 				// this.askResponseImages = undefined
 				askTs = Date.now()
 				this.taskState.lastMessageTs = askTs
-				this.setThreadDisplayState(threadDisplayState ?? this.getThreadDisplayStateForAsk(type), "ask_partial_started", {
-					askType: type,
-					partial: true,
-				})
+				const nextThreadDisplayState = threadDisplayState ?? this.getThreadDisplayStateForAsk(type)
+				const nextAwaitingSubtype = this.getAwaitingUserResponseSubtypeForAsk(
+					type,
+					"partial_started",
+					nextThreadDisplayState,
+				)
+
+				this.setThreadDisplayState(
+					nextThreadDisplayState,
+					"ask_partial_started",
+					{
+						askType: type,
+						partial: true,
+					},
+					nextAwaitingSubtype,
+				)
 				await this.messageStateHandler.addToClineMessages({
 					ts: askTs,
 					type: "ask",
 					ask: type,
 					threadDisplayState: this.threadDisplayState,
+					awaitingUserResponseSubtype: this.awaitingUserResponseSubtype,
 					text,
 					partial,
 				})
@@ -968,19 +1008,29 @@ export class Task {
 					In the webview we use the ts as the chatrow key for the virtuoso list. Since we would update this ts right at the end of streaming, it would cause the view to flicker. The key prop has to be stable otherwise react has trouble reconciling items between renders, causing unmounting and remounting of components (flickering).
 					The lesson here is if you see flickering when rendering lists, it's likely because the key prop is not stable.
 					So in this case we must make sure that the message ts is never altered after first setting it.
-					*/
+				*/
 				askTs = lastMessage.ts
 				this.taskState.lastMessageTs = askTs
 				// lastMessage.ts = askTs
+				const nextThreadDisplayState = threadDisplayState ?? this.getThreadDisplayStateForAsk(type)
+				const nextAwaitingSubtype = this.getAwaitingUserResponseSubtypeForAsk(type, "finalized", nextThreadDisplayState)
+
 				await this.messageStateHandler.updateClineMessage(lastMessageIndex, {
 					text,
 					partial: false,
+					threadDisplayState: nextThreadDisplayState,
+					awaitingUserResponseSubtype: nextAwaitingSubtype,
 				})
-				this.setThreadDisplayState(threadDisplayState ?? this.getThreadDisplayStateForAsk(type), "ask_completed", {
-					askType: type,
-					partial: false,
-					updatedPartial: true,
-				})
+				this.setThreadDisplayState(
+					nextThreadDisplayState,
+					"ask_completed",
+					{
+						askType: type,
+						partial: false,
+						updatedPartial: true,
+					},
+					nextAwaitingSubtype,
+				)
 				await this.postStateToWebview()
 				const protoMessage = convertClineMessageToProto(lastMessage)
 				await sendPartialMessageEvent(protoMessage)
@@ -992,15 +1042,24 @@ export class Task {
 				this.taskState.askResponseFiles = undefined
 				askTs = Date.now()
 				this.taskState.lastMessageTs = askTs
-				this.setThreadDisplayState(threadDisplayState ?? this.getThreadDisplayStateForAsk(type), "ask_completed", {
-					askType: type,
-					partial: false,
-				})
+				const nextThreadDisplayState = threadDisplayState ?? this.getThreadDisplayStateForAsk(type)
+				const nextAwaitingSubtype = this.getAwaitingUserResponseSubtypeForAsk(type, "finalized", nextThreadDisplayState)
+
+				this.setThreadDisplayState(
+					nextThreadDisplayState,
+					"ask_completed",
+					{
+						askType: type,
+						partial: false,
+					},
+					nextAwaitingSubtype,
+				)
 				await this.messageStateHandler.addToClineMessages({
 					ts: askTs,
 					type: "ask",
 					ask: type,
 					threadDisplayState: this.threadDisplayState,
+					awaitingUserResponseSubtype: this.awaitingUserResponseSubtype,
 					text,
 				})
 				await this.postStateToWebview()
@@ -1014,15 +1073,24 @@ export class Task {
 			this.taskState.askResponseFiles = undefined
 			askTs = Date.now()
 			this.taskState.lastMessageTs = askTs
-			this.setThreadDisplayState(threadDisplayState ?? this.getThreadDisplayStateForAsk(type), "ask_started", {
-				askType: type,
-				partial: false,
-			})
+			const nextThreadDisplayState = threadDisplayState ?? this.getThreadDisplayStateForAsk(type)
+			const nextAwaitingSubtype = this.getAwaitingUserResponseSubtypeForAsk(type, "finalized", nextThreadDisplayState)
+
+			this.setThreadDisplayState(
+				nextThreadDisplayState,
+				"ask_started",
+				{
+					askType: type,
+					partial: false,
+				},
+				nextAwaitingSubtype,
+			)
 			await this.messageStateHandler.addToClineMessages({
 				ts: askTs,
 				type: "ask",
 				ask: type,
 				threadDisplayState: this.threadDisplayState,
+				awaitingUserResponseSubtype: this.awaitingUserResponseSubtype,
 				text,
 			})
 			await this.postStateToWebview()
@@ -1236,6 +1304,7 @@ export class Task {
 				const newLastMessage = updatedMessages.at(-1)
 				if (
 					this.threadDisplayState === ThreadDisplayStates.AWAITING_USER_RESPONSE &&
+					this.awaitingUserResponseSubtype === AwaitingUserResponseSubtypes.SYSTEM &&
 					newLastMessage?.type !== "ask" &&
 					!this.taskState.abort
 				) {

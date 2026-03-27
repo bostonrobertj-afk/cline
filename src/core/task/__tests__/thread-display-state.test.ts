@@ -1,7 +1,8 @@
 import { strict as assert } from "node:assert"
 import type { ClineMessage } from "@shared/ExtensionMessage"
-import { ThreadDisplayStates } from "@shared/ExtensionMessage"
+import { AwaitingUserResponseSubtypes, ThreadDisplayStates } from "@shared/ExtensionMessage"
 import {
+	AwaitingUserResponseSubtype as ProtoAwaitingUserResponseSubtype,
 	ClineAsk as ProtoClineAsk,
 	ClineMessage as ProtoClineMessage,
 	ThreadDisplayState as ProtoThreadDisplayState,
@@ -53,6 +54,33 @@ describe("thread display state contract", () => {
 			const protoMessage = convertClineMessageToProto(message)
 			const roundTripped = convertProtoToClineMessage(protoMessage)
 			assert.equal(roundTripped.threadDisplayState, threadDisplayState)
+		}
+	})
+
+	it("round-trips awaiting_user_response subtype values on cline messages", () => {
+		const subtypes = [AwaitingUserResponseSubtypes.USER, AwaitingUserResponseSubtypes.SYSTEM] as const
+
+		for (const awaitingUserResponseSubtype of subtypes) {
+			const message: ClineMessage = {
+				ts: 789,
+				type: "ask",
+				ask: "tool",
+				threadDisplayState: ThreadDisplayStates.AWAITING_USER_RESPONSE,
+				awaitingUserResponseSubtype,
+			}
+
+			const protoMessage = convertClineMessageToProto(message)
+			assert.equal(protoMessage.threadDisplayState, ProtoThreadDisplayState.AWAITING_USER_RESPONSE)
+			assert.equal(
+				protoMessage.awaitingUserResponseSubtype,
+				awaitingUserResponseSubtype === AwaitingUserResponseSubtypes.USER
+					? ProtoAwaitingUserResponseSubtype.USER
+					: ProtoAwaitingUserResponseSubtype.SYSTEM,
+			)
+
+			const roundTripped = convertProtoToClineMessage(protoMessage)
+			assert.equal(roundTripped.threadDisplayState, ThreadDisplayStates.AWAITING_USER_RESPONSE)
+			assert.equal(roundTripped.awaitingUserResponseSubtype, awaitingUserResponseSubtype)
 		}
 	})
 

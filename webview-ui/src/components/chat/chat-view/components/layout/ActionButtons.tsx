@@ -36,7 +36,7 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
 	const { currentTaskItem } = useExtensionState()
 	const threadDisplayState = (currentTaskItem as { threadDisplayState?: string | null } | undefined)?.threadDisplayState
 	const isPassiveThreadOpenState = isPassiveThreadOpen(threadDisplayState)
-	const { inputValue, selectedImages, selectedFiles, setSendingDisabled } = chatState
+	const { inputValue, selectedImages, selectedFiles } = chatState
 	const [isProcessing, setIsProcessing] = useState(false)
 
 	// Memoize last messages to avoid unnecessary recalculations
@@ -47,16 +47,12 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
 
 	// Memoize button configuration to avoid recalculation on every render
 	const buttonConfig = useMemo(() => {
-		return lastMessage
-			? getButtonConfig(lastMessage, mode, threadDisplayState)
-			: { sendingDisabled: false, enableButtons: false }
+		return lastMessage ? getButtonConfig(lastMessage, mode, threadDisplayState) : { enableButtons: false }
 	}, [lastMessage, mode, threadDisplayState])
 
-	// Single effect to handle all configuration updates
 	useEffect(() => {
-		setSendingDisabled(buttonConfig.sendingDisabled)
 		setIsProcessing(false)
-	}, [buttonConfig, setSendingDisabled])
+	}, [buttonConfig])
 
 	// Clear input when transitioning from command_output to api_req
 	// This happens when user provides feedback during command execution

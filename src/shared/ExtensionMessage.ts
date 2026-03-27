@@ -48,6 +48,13 @@ export const ThreadDisplayStates = {
 
 export type ThreadDisplayState = (typeof ThreadDisplayStates)[keyof typeof ThreadDisplayStates]
 
+export const AwaitingUserResponseSubtypes = {
+	USER: "user",
+	SYSTEM: "system",
+} as const
+
+export type AwaitingUserResponseSubtype = (typeof AwaitingUserResponseSubtypes)[keyof typeof AwaitingUserResponseSubtypes]
+
 export interface ExtensionState {
 	isNewUser: boolean
 	welcomeViewCompleted: boolean
@@ -62,6 +69,7 @@ export interface ExtensionState {
 	clineMessages: ClineMessage[]
 	currentTaskItem?: HistoryItem
 	threadDisplayState?: ThreadDisplayState
+	awaitingUserResponseSubtype?: AwaitingUserResponseSubtype
 	currentFocusChainChecklist?: string | null
 	mcpMarketplaceEnabled?: boolean
 	mcpDisplayMode: McpDisplayMode
@@ -133,6 +141,7 @@ export interface ClineMessage {
 	ask?: ClineAsk
 	say?: ClineSay
 	threadDisplayState?: ThreadDisplayState
+	awaitingUserResponseSubtype?: AwaitingUserResponseSubtype
 	text?: string
 	reasoning?: string
 	images?: string[]

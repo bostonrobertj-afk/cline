@@ -32,13 +32,6 @@ export interface ChatState {
 	selectedFiles: string[]
 	setSelectedFiles: React.Dispatch<React.SetStateAction<string[]>>
 	sendingDisabled: boolean
-	setSendingDisabled: React.Dispatch<React.SetStateAction<boolean>>
-	enableButtons: boolean
-	setEnableButtons: React.Dispatch<React.SetStateAction<boolean>>
-	primaryButtonText: string | undefined
-	setPrimaryButtonText: React.Dispatch<React.SetStateAction<string | undefined>>
-	secondaryButtonText: string | undefined
-	setSecondaryButtonText: React.Dispatch<React.SetStateAction<string | undefined>>
 	expandedRows: Record<number, boolean>
 	setExpandedRows: React.Dispatch<React.SetStateAction<Record<number, boolean>>>
 
@@ -95,15 +88,6 @@ export interface ScrollBehavior {
 }
 
 /**
- * Button state interface
- */
-export interface ButtonState {
-	enableButtons: boolean
-	primaryButtonText: string | undefined
-	secondaryButtonText: string | undefined
-}
-
-/**
  * Input state interface
  */
 export interface InputState {
@@ -121,7 +105,6 @@ export interface TaskSectionProps {
 	task: ClineMessage
 	messages: ClineMessage[]
 	scrollBehavior: ScrollBehavior
-	buttonState: ButtonState
 	messageHandlers: MessageHandlers
 	chatState: ChatState
 	apiMetrics: {

@@ -15,10 +15,6 @@ export function useChatState(messages: ClineMessage[]): ChatState {
 	const [selectedFiles, setSelectedFiles] = useState<string[]>([])
 
 	// UI state
-	const [sendingDisabled, setSendingDisabled] = useState(false)
-	const [enableButtons, setEnableButtons] = useState<boolean>(false)
-	const [primaryButtonText, setPrimaryButtonText] = useState<string | undefined>("Approve")
-	const [secondaryButtonText, setSecondaryButtonText] = useState<string | undefined>("Reject")
 	const [expandedRows, setExpandedRows] = useState<Record<number, boolean>>({})
 
 	// Refs
@@ -65,14 +61,7 @@ export function useChatState(messages: ClineMessage[]): ChatState {
 		setSelectedImages,
 		selectedFiles,
 		setSelectedFiles,
-		sendingDisabled,
-		setSendingDisabled,
-		enableButtons,
-		setEnableButtons,
-		primaryButtonText,
-		setPrimaryButtonText,
-		secondaryButtonText,
-		setSecondaryButtonText,
+		sendingDisabled: false,
 		expandedRows,
 		setExpandedRows,
 

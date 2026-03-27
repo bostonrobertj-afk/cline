@@ -1,5 +1,4 @@
 import type { ClineMessage } from "@shared/ExtensionMessage"
-import type { HistoryItem } from "@shared/HistoryItem"
 import type React from "react"
 import { useCallback, useMemo } from "react"
 import { Virtuoso } from "react-virtuoso"
@@ -32,9 +31,7 @@ export const MessagesArea: React.FC<MessagesAreaProps> = ({
 	chatState,
 	messageHandlers,
 }) => {
-	const { clineMessages, currentTaskItem } = useExtensionState()
-	const threadDisplayState = (currentTaskItem as (HistoryItem & { threadDisplayState?: string | null }) | undefined)
-		?.threadDisplayState
+	const { clineMessages, threadDisplayState, awaitingUserResponseSubtype } = useExtensionState()
 	const isPassiveThreadOpenState = isPassiveThreadOpen(threadDisplayState)
 
 	const {
@@ -77,8 +74,14 @@ export const MessagesArea: React.FC<MessagesAreaProps> = ({
 	// Keep the loader tied to real assistant activity only. The helper uses raw
 	// message state and backend thread state rather than the shape of the visible row.
 	const showThinkingLoaderRow = useMemo(() => {
-		return shouldAppendThinkingLoaderRow(clineMessages, groupedMessages.length, threadDisplayState, lastVisibleMessage)
-	}, [clineMessages, groupedMessages.length, lastVisibleMessage, threadDisplayState])
+		return shouldAppendThinkingLoaderRow(
+			clineMessages,
+			groupedMessages.length,
+			threadDisplayState,
+			lastVisibleMessage,
+			awaitingUserResponseSubtype,
+		)
+	}, [awaitingUserResponseSubtype, clineMessages, groupedMessages.length, lastVisibleMessage, threadDisplayState])
 
 	const displayedGroupedMessages = useMemo<(ClineMessage | ClineMessage[])[]>(() => {
 		if (!showThinkingLoaderRow) {

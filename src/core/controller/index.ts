@@ -1138,6 +1138,7 @@ export class Controller {
 			backgroundCommandRunning: this.backgroundCommandRunning,
 			backgroundCommandTaskId: this.backgroundCommandTaskId,
 			threadDisplayState: this.task?.getThreadDisplayState(),
+			awaitingUserResponseSubtype: this.task?.getAwaitingUserResponseSubtype(),
 			// NEW: Add workspace information
 			workspaceRoots: this.workspaceManager?.getRoots() ?? [],
 			primaryRootIndex: this.workspaceManager?.getPrimaryIndex() ?? 0,

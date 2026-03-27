@@ -1,4 +1,4 @@
-import type { ClineMessage, ClineSayTool } from "@shared/ExtensionMessage"
+import type { AwaitingUserResponseSubtype, ClineMessage, ClineSayTool } from "@shared/ExtensionMessage"
 import type { Mode } from "@shared/storage/types"
 
 /**
@@ -18,7 +18,6 @@ export type ButtonActionType =
  * Button configuration for different message states
  */
 export interface ButtonConfig {
-	sendingDisabled: boolean
 	enableButtons: boolean
 	primaryText?: string
 	secondaryText?: string
@@ -36,6 +35,27 @@ export function isPassiveThreadOpen(threadDisplayState?: string | null): boolean
 	)
 }
 
+export function getComposerSendingDisabled(
+	threadDisplayState?: string | null,
+	awaitingUserResponseSubtype?: AwaitingUserResponseSubtype | null,
+): boolean {
+	switch (threadDisplayState) {
+		case "active_run":
+			return true
+		case "awaiting_user_response":
+			return awaitingUserResponseSubtype === "system"
+		case "active_user":
+		case "completed":
+		case "idle_open":
+		case "paused":
+		case undefined:
+		case null:
+			return false
+		default:
+			return false
+	}
+}
+
 /**
  * Centralized button state configurations based on task lifecycle
  * This is the single source of truth for both button display and actions
@@ -43,7 +63,6 @@ export function isPassiveThreadOpen(threadDisplayState?: string | null): boolean
 export const BUTTON_CONFIGS: Record<string, ButtonConfig> = {
 	// Error recovery states - user must take action
 	api_req_failed: {
-		sendingDisabled: true,
 		enableButtons: true,
 		primaryText: "Retry",
 		secondaryText: "Start New Task",
@@ -51,7 +70,6 @@ export const BUTTON_CONFIGS: Record<string, ButtonConfig> = {
 		secondaryAction: "new_task",
 	},
 	mistake_limit_reached: {
-		sendingDisabled: false,
 		enableButtons: true,
 		primaryText: "Proceed Anyways",
 		secondaryText: "Start New Task",
@@ -61,7 +79,6 @@ export const BUTTON_CONFIGS: Record<string, ButtonConfig> = {
 
 	// Tool approval states - most common during task execution
 	tool_approve: {
-		sendingDisabled: false,
 		enableButtons: true,
 		primaryText: "Approve",
 		secondaryText: "Reject",
@@ -69,7 +86,6 @@ export const BUTTON_CONFIGS: Record<string, ButtonConfig> = {
 		secondaryAction: "reject",
 	},
 	tool_save: {
-		sendingDisabled: false,
 		enableButtons: true,
 		primaryText: "Save",
 		secondaryText: "Reject",
@@ -79,7 +95,6 @@ export const BUTTON_CONFIGS: Record<string, ButtonConfig> = {
 
 	// Command execution states
 	command: {
-		sendingDisabled: false,
 		enableButtons: true,
 		primaryText: "Run Command",
 		secondaryText: "Reject",
@@ -87,7 +102,6 @@ export const BUTTON_CONFIGS: Record<string, ButtonConfig> = {
 		secondaryAction: "reject",
 	},
 	command_output: {
-		sendingDisabled: false,
 		enableButtons: true,
 		primaryText: "Proceed While Running",
 		secondaryText: undefined,
@@ -97,7 +111,6 @@ export const BUTTON_CONFIGS: Record<string, ButtonConfig> = {
 
 	// Browser and external tool states
 	browser_action_launch: {
-		sendingDisabled: false,
 		enableButtons: true,
 		primaryText: "Approve",
 		secondaryText: "Reject",
@@ -105,7 +118,6 @@ export const BUTTON_CONFIGS: Record<string, ButtonConfig> = {
 		secondaryAction: "reject",
 	},
 	use_mcp_server: {
-		sendingDisabled: false,
 		enableButtons: true,
 		primaryText: "Approve",
 		secondaryText: "Reject",
@@ -113,7 +125,6 @@ export const BUTTON_CONFIGS: Record<string, ButtonConfig> = {
 		secondaryAction: "reject",
 	},
 	use_subagents: {
-		sendingDisabled: false,
 		enableButtons: true,
 		primaryText: "Approve",
 		secondaryText: "Reject",
@@ -121,7 +132,6 @@ export const BUTTON_CONFIGS: Record<string, ButtonConfig> = {
 		secondaryAction: "reject",
 	},
 	followup: {
-		sendingDisabled: false,
 		enableButtons: false,
 		primaryText: undefined,
 		secondaryText: undefined,
@@ -129,7 +139,6 @@ export const BUTTON_CONFIGS: Record<string, ButtonConfig> = {
 		secondaryAction: undefined,
 	},
 	generate_plan_output: {
-		sendingDisabled: false,
 		enableButtons: false,
 		primaryText: undefined,
 		secondaryText: undefined,
@@ -139,7 +148,6 @@ export const BUTTON_CONFIGS: Record<string, ButtonConfig> = {
 
 	// Task lifecycle states
 	completion_result: {
-		sendingDisabled: false,
 		enableButtons: true,
 		primaryText: "Start New Task",
 		secondaryText: undefined,
@@ -147,7 +155,6 @@ export const BUTTON_CONFIGS: Record<string, ButtonConfig> = {
 		secondaryAction: undefined,
 	},
 	resume_task: {
-		sendingDisabled: false,
 		enableButtons: true,
 		primaryText: "Resume Task",
 		secondaryText: undefined,
@@ -155,7 +162,6 @@ export const BUTTON_CONFIGS: Record<string, ButtonConfig> = {
 		secondaryAction: undefined,
 	},
 	resume_completed_task: {
-		sendingDisabled: false,
 		enableButtons: true,
 		primaryText: "Start New Task",
 		secondaryText: undefined,
@@ -163,7 +169,6 @@ export const BUTTON_CONFIGS: Record<string, ButtonConfig> = {
 		secondaryAction: undefined,
 	},
 	new_task: {
-		sendingDisabled: false,
 		enableButtons: true,
 		primaryText: "Start New Task with Context",
 		secondaryText: undefined,
@@ -173,7 +178,6 @@ export const BUTTON_CONFIGS: Record<string, ButtonConfig> = {
 
 	// Utility states
 	condense: {
-		sendingDisabled: false,
 		enableButtons: true,
 		primaryText: "Condense Conversation",
 		secondaryText: undefined,
@@ -181,7 +185,6 @@ export const BUTTON_CONFIGS: Record<string, ButtonConfig> = {
 		secondaryAction: undefined,
 	},
 	report_bug: {
-		sendingDisabled: false,
 		enableButtons: true,
 		primaryText: "Report GitHub issue",
 		secondaryText: undefined,
@@ -191,7 +194,6 @@ export const BUTTON_CONFIGS: Record<string, ButtonConfig> = {
 
 	// Streaming/partial states - disable interaction during streaming
 	partial: {
-		sendingDisabled: false,
 		enableButtons: true,
 		primaryText: "Steer",
 		secondaryText: "Cancel",
@@ -201,7 +203,6 @@ export const BUTTON_CONFIGS: Record<string, ButtonConfig> = {
 
 	// Default states
 	default: {
-		sendingDisabled: false,
 		enableButtons: false,
 		primaryText: undefined,
 		secondaryText: undefined,
@@ -209,7 +210,6 @@ export const BUTTON_CONFIGS: Record<string, ButtonConfig> = {
 		secondaryAction: undefined,
 	},
 	api_req_active: {
-		sendingDisabled: false,
 		enableButtons: true,
 		primaryText: "Steer",
 		secondaryText: "Cancel",

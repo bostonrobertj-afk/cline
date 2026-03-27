@@ -5,12 +5,12 @@
 import { combineApiRequests } from "@shared/combineApiRequests"
 import { combineCommandSequences } from "@shared/combineCommandSequences"
 import type {
+	AwaitingUserResponseSubtype,
 	ClineAskUseSubagents,
 	ClineMessage,
 	ClineSayBrowserAction,
 	ClineSaySubagentStatus,
 	ClineSayTool,
-	ThreadDisplayState,
 } from "@shared/ExtensionMessage"
 import { ThreadDisplayStates } from "@shared/ExtensionMessage"
 import { FileIcon, FolderOpenDotIcon, FolderOpenIcon, SearchIcon, ShapesIcon, WrenchIcon } from "lucide-react"
@@ -48,13 +48,22 @@ export function isToolGroup(item: ClineMessage | ClineMessage[]): item is ClineM
 	return Array.isArray(item) && (item as any)._isToolGroup === true
 }
 
-const USER_READY_THREAD_DISPLAY_STATES = new Set<ThreadDisplayState>([
-	ThreadDisplayStates.ACTIVE_USER,
-	ThreadDisplayStates.AWAITING_USER_RESPONSE,
-	ThreadDisplayStates.COMPLETED,
-	ThreadDisplayStates.IDLE_OPEN,
-	ThreadDisplayStates.PAUSED,
-])
+function isUserReadyThreadDisplayState(
+	threadDisplayState?: string | null,
+	awaitingUserResponseSubtype?: AwaitingUserResponseSubtype | null,
+): boolean {
+	switch (threadDisplayState) {
+		case ThreadDisplayStates.ACTIVE_USER:
+		case ThreadDisplayStates.COMPLETED:
+		case ThreadDisplayStates.IDLE_OPEN:
+		case ThreadDisplayStates.PAUSED:
+			return true
+		case ThreadDisplayStates.AWAITING_USER_RESPONSE:
+			return awaitingUserResponseSubtype !== "system"
+		default:
+			return false
+	}
+}
 
 function parseApiReqStartedInfo(message: ClineMessage): { cost?: number | null; cancelReason?: string } | undefined {
 	try {
@@ -79,8 +88,9 @@ export function shouldShowThinkingLoaderRow(
 	messages: ClineMessage[],
 	visibleGroupCount: number,
 	threadDisplayState?: string | null,
+	awaitingUserResponseSubtype?: AwaitingUserResponseSubtype | null,
 ): boolean {
-	if (threadDisplayState && USER_READY_THREAD_DISPLAY_STATES.has(threadDisplayState as ThreadDisplayState)) {
+	if (isUserReadyThreadDisplayState(threadDisplayState, awaitingUserResponseSubtype)) {
 		return false
 	}
 
@@ -127,8 +137,9 @@ export function shouldAppendThinkingLoaderRow(
 	visibleGroupCount: number,
 	threadDisplayState: string | null | undefined,
 	lastVisibleMessage?: ClineMessage,
+	awaitingUserResponseSubtype?: AwaitingUserResponseSubtype | null,
 ): boolean {
-	if (!shouldShowThinkingLoaderRow(messages, visibleGroupCount, threadDisplayState)) {
+	if (!shouldShowThinkingLoaderRow(messages, visibleGroupCount, threadDisplayState, awaitingUserResponseSubtype)) {
 		return false
 	}
 

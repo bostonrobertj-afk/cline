@@ -1,4 +1,5 @@
 import {
+	AwaitingUserResponseSubtype as AppAwaitingUserResponseSubtype,
 	ClineAsk as AppClineAsk,
 	ClineMessage as AppClineMessage,
 	ClineSay as AppClineSay,
@@ -8,6 +9,7 @@ import {
 	ClineAsk,
 	ClineMessageType,
 	ClineSay,
+	AwaitingUserResponseSubtype as ProtoAwaitingUserResponseSubtype,
 	ClineMessage as ProtoClineMessage,
 	ThreadDisplayState as ProtoThreadDisplayState,
 } from "@shared/proto/cline/ui"
@@ -118,6 +120,52 @@ function convertProtoThreadDisplayStateToCline(threadDisplayState: ProtoThreadDi
 		threadDisplayState as Exclude<
 			ProtoThreadDisplayState,
 			ProtoThreadDisplayState.UNRECOGNIZED | ProtoThreadDisplayState.UNSPECIFIED
+		>
+	]
+}
+
+function convertAwaitingUserResponseSubtypeToProto(
+	subtype: AppAwaitingUserResponseSubtype | undefined,
+): ProtoAwaitingUserResponseSubtype | undefined {
+	if (!subtype) {
+		return undefined
+	}
+
+	const mapping: Record<AppAwaitingUserResponseSubtype, ProtoAwaitingUserResponseSubtype> = {
+		user: ProtoAwaitingUserResponseSubtype.USER,
+		system: ProtoAwaitingUserResponseSubtype.SYSTEM,
+	}
+
+	return mapping[subtype]
+}
+
+function convertProtoAwaitingUserResponseSubtypeToCline(
+	subtype: ProtoAwaitingUserResponseSubtype,
+): AppAwaitingUserResponseSubtype | undefined {
+	if (
+		subtype === ProtoAwaitingUserResponseSubtype.UNRECOGNIZED ||
+		subtype === ProtoAwaitingUserResponseSubtype.AWAITING_USER_RESPONSE_SUBTYPE_UNSPECIFIED
+	) {
+		return undefined
+	}
+
+	const mapping: Record<
+		Exclude<
+			ProtoAwaitingUserResponseSubtype,
+			| ProtoAwaitingUserResponseSubtype.UNRECOGNIZED
+			| ProtoAwaitingUserResponseSubtype.AWAITING_USER_RESPONSE_SUBTYPE_UNSPECIFIED
+		>,
+		AppAwaitingUserResponseSubtype
+	> = {
+		[ProtoAwaitingUserResponseSubtype.USER]: "user",
+		[ProtoAwaitingUserResponseSubtype.SYSTEM]: "system",
+	}
+
+	return mapping[
+		subtype as Exclude<
+			ProtoAwaitingUserResponseSubtype,
+			| ProtoAwaitingUserResponseSubtype.UNRECOGNIZED
+			| ProtoAwaitingUserResponseSubtype.AWAITING_USER_RESPONSE_SUBTYPE_UNSPECIFIED
 		>
 	]
 }
@@ -248,6 +296,9 @@ export function convertClineMessageToProto(message: AppClineMessage): ProtoCline
 		say: finalSayEnum,
 		threadDisplayState:
 			convertClineThreadDisplayStateToProtoEnum(message.threadDisplayState) ?? ProtoThreadDisplayState.UNSPECIFIED,
+		awaitingUserResponseSubtype:
+			convertAwaitingUserResponseSubtypeToProto(message.awaitingUserResponseSubtype) ??
+			ProtoAwaitingUserResponseSubtype.AWAITING_USER_RESPONSE_SUBTYPE_UNSPECIFIED,
 		text: message.text ?? "",
 		reasoning: message.reasoning ?? "",
 		images: message.images ?? [],
@@ -320,6 +371,14 @@ export function convertProtoToClineMessage(protoMessage: ProtoClineMessage): App
 		const threadDisplayState = convertProtoThreadDisplayStateToCline(protoMessage.threadDisplayState)
 		if (threadDisplayState !== undefined) {
 			message.threadDisplayState = threadDisplayState
+		}
+	}
+	if (protoMessage.awaitingUserResponseSubtype !== undefined) {
+		const awaitingUserResponseSubtype = convertProtoAwaitingUserResponseSubtypeToCline(
+			protoMessage.awaitingUserResponseSubtype,
+		)
+		if (awaitingUserResponseSubtype !== undefined) {
+			message.awaitingUserResponseSubtype = awaitingUserResponseSubtype
 		}
 	}
 	if (protoMessage.partial) {

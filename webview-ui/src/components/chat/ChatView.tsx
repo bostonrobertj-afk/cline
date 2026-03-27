@@ -29,6 +29,7 @@ import {
 	useScrollBehavior,
 	WelcomeSection,
 } from "./chat-view"
+import { BUTTON_CONFIGS, getButtonConfig, getComposerSendingDisabled } from "./chat-view/shared/buttonConfig"
 
 interface ChatViewProps {
 	isHidden: boolean
@@ -54,6 +55,8 @@ const ChatView = ({ isHidden, showAnnouncement, hideAnnouncement, showHistoryVie
 		currentFocusChainChecklist,
 		focusChainSettings,
 		hooksEnabled,
+		threadDisplayState,
+		awaitingUserResponseSubtype,
 	} = useExtensionState()
 	const isProdHostedApp = userInfo?.apiBaseUrl === "https://app.cline.bot"
 	const shouldShowQuickWins = isProdHostedApp && (!taskHistory || taskHistory.length < QUICK_WINS_HISTORY_THRESHOLD)
@@ -72,19 +75,33 @@ const ChatView = ({ isHidden, showAnnouncement, hideAnnouncement, showHistoryVie
 	const lastApiReqTotalTokens = useMemo(() => getLastApiReqTotalTokens(modifiedMessages) || undefined, [modifiedMessages])
 
 	// Use custom hooks for state management
-	const chatState = useChatState(messages)
+	const baseChatState = useChatState(messages)
+	const sendingDisabled = useMemo(
+		() => getComposerSendingDisabled(threadDisplayState, awaitingUserResponseSubtype),
+		[threadDisplayState, awaitingUserResponseSubtype],
+	)
+	const chatState = useMemo(
+		() => ({
+			...baseChatState,
+			sendingDisabled,
+		}),
+		[baseChatState, sendingDisabled],
+	)
 	const {
 		setInputValue,
 		selectedImages,
 		setSelectedImages,
 		selectedFiles,
 		setSelectedFiles,
-		sendingDisabled,
-		enableButtons,
 		expandedRows,
 		setExpandedRows,
 		textAreaRef,
 	} = chatState
+	const currentFooterConfig = useMemo(() => {
+		const lastMessage = messages.at(-1)
+		return lastMessage ? getButtonConfig(lastMessage, mode, threadDisplayState) : BUTTON_CONFIGS.default
+	}, [messages, mode, threadDisplayState])
+	const shouldSuppressComposerAutoFocus = Boolean(currentFooterConfig.primaryText || currentFooterConfig.secondaryText)
 
 	useEffect(() => {
 		const handleCopy = async (e: ClipboardEvent) => {
@@ -284,14 +301,14 @@ const ChatView = ({ isHidden, showAnnouncement, hideAnnouncement, showHistoryVie
 
 	useEffect(() => {
 		const timer = setTimeout(() => {
-			if (!isHidden && !sendingDisabled && !enableButtons) {
+			if (!isHidden && !sendingDisabled && !shouldSuppressComposerAutoFocus) {
 				textAreaRef.current?.focus()
 			}
 		}, 50)
 		return () => {
 			clearTimeout(timer)
 		}
-	}, [isHidden, sendingDisabled, enableButtons])
+	}, [isHidden, sendingDisabled, shouldSuppressComposerAutoFocus])
 
 	const visibleMessages = useMemo(() => {
 		return filterVisibleMessages(modifiedMessages)

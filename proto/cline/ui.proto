@@ -25,6 +25,12 @@ enum ThreadDisplayState {
   ACTIVE_USER = 6;
 }
 
+enum AwaitingUserResponseSubtype {
+  AWAITING_USER_RESPONSE_SUBTYPE_UNSPECIFIED = 0;
+  USER = 1;
+  SYSTEM = 2;
+}
+
 // Enum for ClineAsk types
 enum ClineAsk {
   FOLLOWUP = 0;
@@ -238,6 +244,7 @@ message ClineMessage {
   ClineApiReqInfo api_req_info = 22;
   ClineModelInfo model_info = 23;
   ThreadDisplayState thread_display_state = 24;
+  AwaitingUserResponseSubtype awaiting_user_response_subtype = 25;
 }
 
 message ShowWebviewEvent {

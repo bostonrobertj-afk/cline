@@ -12,6 +12,7 @@ const {
 	mockCondense,
 	mockReportBug,
 	mockThreadDisplayState,
+	mockAwaitingUserResponseSubtype,
 } = vi.hoisted(() => ({
 	mockAskResponse: vi.fn().mockResolvedValue(undefined),
 	mockNewTask: vi.fn(),
@@ -21,14 +22,14 @@ const {
 	mockCondense: vi.fn(),
 	mockReportBug: vi.fn(),
 	mockThreadDisplayState: { value: "active_user" as string | null },
+	mockAwaitingUserResponseSubtype: { value: undefined as "user" | "system" | undefined },
 }))
 
 vi.mock("@/context/ExtensionStateContext", () => ({
 	useExtensionState: () => ({
 		backgroundCommandRunning: false,
-		currentTaskItem: {
-			threadDisplayState: mockThreadDisplayState.value,
-		},
+		threadDisplayState: mockThreadDisplayState.value,
+		awaitingUserResponseSubtype: mockAwaitingUserResponseSubtype.value,
 	}),
 }))
 
@@ -61,13 +62,6 @@ function createChatState(): ChatState {
 		selectedFiles: [],
 		setSelectedFiles: vi.fn(),
 		sendingDisabled: false,
-		setSendingDisabled: vi.fn(),
-		enableButtons: false,
-		setEnableButtons: vi.fn(),
-		primaryButtonText: undefined,
-		setPrimaryButtonText: vi.fn(),
-		secondaryButtonText: undefined,
-		setSecondaryButtonText: vi.fn(),
 		expandedRows: {},
 		setExpandedRows: vi.fn(),
 		textAreaRef: { current: null },
@@ -84,6 +78,7 @@ function createChatState(): ChatState {
 describe("useMessageHandlers active_user routing", () => {
 	beforeEach(() => {
 		mockThreadDisplayState.value = "active_user"
+		mockAwaitingUserResponseSubtype.value = undefined
 		vi.clearAllMocks()
 	})
 
@@ -108,8 +103,6 @@ describe("useMessageHandlers active_user routing", () => {
 		const request = mockAskResponse.mock.calls[0]?.[0] as { responseType?: string; text?: string }
 		expect(request.responseType).toBe("messageResponse")
 		expect(request.text).toBe("Follow-up from the human")
-		expect(chatState.setSendingDisabled).toHaveBeenCalledWith(true)
-		expect(chatState.setEnableButtons).toHaveBeenCalledWith(false)
 		expect(chatState.setInputValue).toHaveBeenCalledWith("")
 	})
 
@@ -134,8 +127,6 @@ describe("useMessageHandlers active_user routing", () => {
 		const request = mockAskResponse.mock.calls[0]?.[0] as { responseType?: string; text?: string }
 		expect(request.responseType).toBe("messageResponse")
 		expect(request.text).toBe("Follow-up despite stale partial")
-		expect(chatState.setSendingDisabled).toHaveBeenCalledWith(true)
-		expect(chatState.setEnableButtons).toHaveBeenCalledWith(false)
 	})
 
 	it("treats stale tool asks in active_user as normal next-turn input", async () => {
@@ -163,8 +154,6 @@ describe("useMessageHandlers active_user routing", () => {
 		const request = mockAskResponse.mock.calls[0]?.[0] as { responseType?: string; text?: string }
 		expect(request.responseType).toBe("messageResponse")
 		expect(request.text).toBe("Human follow-up after handoff")
-		expect(chatState.setSendingDisabled).toHaveBeenCalledWith(true)
-		expect(chatState.setEnableButtons).toHaveBeenCalledWith(false)
 	})
 
 	it("treats stale followup asks in active_user as normal next-turn input", async () => {
@@ -192,8 +181,6 @@ describe("useMessageHandlers active_user routing", () => {
 		const request = mockAskResponse.mock.calls[0]?.[0] as { responseType?: string; text?: string }
 		expect(request.responseType).toBe("messageResponse")
 		expect(request.text).toBe("Human next turn still goes through")
-		expect(chatState.setSendingDisabled).toHaveBeenCalledWith(true)
-		expect(chatState.setEnableButtons).toHaveBeenCalledWith(false)
 	})
 
 	it("preserves ask-response routing while awaiting_user_response", async () => {
@@ -222,5 +209,32 @@ describe("useMessageHandlers active_user routing", () => {
 		const request = mockAskResponse.mock.calls[0]?.[0] as { responseType?: string; text?: string }
 		expect(request.responseType).toBe("messageResponse")
 		expect(request.text).toBe("Approval-thread response")
+	})
+
+	it("does not route composer sends while awaiting_user_response.system", async () => {
+		mockThreadDisplayState.value = "awaiting_user_response"
+		mockAwaitingUserResponseSubtype.value = "system"
+		const messages: ClineMessage[] = [
+			{
+				ts: Date.now(),
+				type: "ask",
+				ask: "tool",
+				text: JSON.stringify({ tool: "readFile" }),
+			},
+		]
+
+		const chatState = {
+			...createChatState(),
+			clineAsk: "tool" as const,
+			lastMessage: messages[0],
+		}
+		const { result } = renderHook(() => useMessageHandlers(messages, chatState))
+
+		await act(async () => {
+			await result.current.handleSendMessage("Blocked system wait state", [], [])
+		})
+
+		expect(mockAskResponse).not.toHaveBeenCalled()
+		expect(chatState.setInputValue).not.toHaveBeenCalled()
 	})
 })

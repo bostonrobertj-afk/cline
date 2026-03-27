@@ -13,23 +13,14 @@ import type { ChatState, MessageHandlers } from "../types/chatTypes"
  * Handles sending messages, button clicks, and task management
  */
 export function useMessageHandlers(messages: ClineMessage[], chatState: ChatState): MessageHandlers {
-	const { backgroundCommandRunning, currentTaskItem } = useExtensionState()
-	const threadDisplayState = (currentTaskItem as { threadDisplayState?: string | null } | undefined)?.threadDisplayState
+	const { backgroundCommandRunning, threadDisplayState, awaitingUserResponseSubtype } = useExtensionState()
 	const isPassiveThreadOpenState = isPassiveThreadOpen(threadDisplayState)
 	const isActiveRunThreadState = threadDisplayState === "active_run"
 	const isActiveUserThreadState = threadDisplayState === "active_user"
 	const isAwaitingUserResponseThreadState = threadDisplayState === "awaiting_user_response"
-	const {
-		setInputValue,
-		activeQuote,
-		setActiveQuote,
-		setSelectedImages,
-		setSelectedFiles,
-		setSendingDisabled,
-		setEnableButtons,
-		clineAsk,
-		lastMessage,
-	} = chatState
+	const isAwaitingUserResponseUserState = isAwaitingUserResponseThreadState && awaitingUserResponseSubtype !== "system"
+	const isAwaitingUserResponseSystemState = isAwaitingUserResponseThreadState && awaitingUserResponseSubtype === "system"
+	const { setInputValue, activeQuote, setActiveQuote, setSelectedImages, setSelectedFiles, clineAsk, lastMessage } = chatState
 	const cancelInFlightRef = useRef(false)
 
 	const sendSteerMessage = useCallback(async (text: string, images: string[], files: string[]) => {
@@ -125,7 +116,7 @@ export function useMessageHandlers(messages: ClineMessage[], chatState: ChatStat
 						await sendSteerMessage(messageToSend, images, files)
 						messageSent = true
 						sentAsInterruption = true
-					} else if (isAwaitingUserResponseThreadState && clineAsk) {
+					} else if (isAwaitingUserResponseUserState && clineAsk) {
 						// For resume_task and resume_completed_task, use yesButtonClicked to match Resume button behavior
 						// This ensures Enter key and Resume button work identically
 						if (clineAsk === "resume_task" || clineAsk === "resume_completed_task") {
@@ -172,7 +163,8 @@ export function useMessageHandlers(messages: ClineMessage[], chatState: ChatStat
 					const isTaskRunning =
 						!isActiveUserThreadState &&
 						!isPassiveThreadOpenState &&
-						!isAwaitingUserResponseThreadState &&
+						!isAwaitingUserResponseUserState &&
+						!isAwaitingUserResponseSystemState &&
 						lastMessageLooksStreaming
 
 					if (!messageSent && isTaskRunning) {
@@ -190,11 +182,6 @@ export function useMessageHandlers(messages: ClineMessage[], chatState: ChatStat
 					setSelectedImages([])
 					setSelectedFiles([])
 
-					if (!sentAsInterruption) {
-						setSendingDisabled(true)
-						setEnableButtons(false)
-					}
-
 					// Reset auto-scroll
 					if ("disableAutoScrollRef" in chatState) {
 						;(chatState as any).disableAutoScrollRef.current = false
@@ -209,14 +196,14 @@ export function useMessageHandlers(messages: ClineMessage[], chatState: ChatStat
 			isActiveRunThreadState,
 			isActiveUserThreadState,
 			isAwaitingUserResponseThreadState,
+			isAwaitingUserResponseUserState,
+			isAwaitingUserResponseSystemState,
 			isPassiveThreadOpenState,
 			sendSteerMessage,
 			setInputValue,
 			setActiveQuote,
-			setSendingDisabled,
 			setSelectedImages,
 			setSelectedFiles,
-			setEnableButtons,
 			chatState,
 		],
 	)
@@ -337,8 +324,6 @@ export function useMessageHandlers(messages: ClineMessage[], chatState: ChatStat
 						return
 					}
 					cancelInFlightRef.current = true
-					setSendingDisabled(true)
-					setEnableButtons(false)
 					try {
 						if (backgroundCommandRunning) {
 							await TaskServiceClient.cancelBackgroundCommand(EmptyRequest.create({})).catch((err) =>
@@ -348,9 +333,6 @@ export function useMessageHandlers(messages: ClineMessage[], chatState: ChatStat
 						await TaskServiceClient.cancelTask(EmptyRequest.create({}))
 					} finally {
 						cancelInFlightRef.current = false
-						// Clear any pending state that might interfere with resume
-						setSendingDisabled(false)
-						setEnableButtons(true)
 					}
 					break
 				}
@@ -386,8 +368,6 @@ export function useMessageHandlers(messages: ClineMessage[], chatState: ChatStat
 			isActiveUserThreadState,
 			backgroundCommandRunning,
 			isPassiveThreadOpenState,
-			setSendingDisabled,
-			setEnableButtons,
 		],
 	)
 
