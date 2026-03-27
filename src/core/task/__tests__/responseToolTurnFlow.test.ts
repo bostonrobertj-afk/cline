@@ -445,14 +445,14 @@ describe("response tool turn flow", () => {
 			{
 				type: "tool_use",
 				id: "toolu_keep",
-				name: ClineDefaultTool.READ_FILE,
+				name: ClineDefaultTool.FILE_READ,
 				input: { path: "src/index.ts" },
 				call_id: "call_keep",
 			},
 			{
 				type: "tool_use",
 				id: "toolu_skip",
-				name: ClineDefaultTool.READ_FILE,
+				name: ClineDefaultTool.FILE_READ,
 				input: { path: "src/skip.ts" },
 				call_id: "call_skip",
 			},
@@ -474,7 +474,7 @@ describe("response tool turn flow", () => {
 			{
 				type: "tool_use",
 				id: "toolu_missing_output",
-				name: ClineDefaultTool.READ_FILE,
+				name: ClineDefaultTool.FILE_READ,
 				input: { path: "src/index.ts" },
 				call_id: "call_missing_output",
 			},

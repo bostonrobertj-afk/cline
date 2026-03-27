@@ -73,8 +73,8 @@ function createExecutor() {
 
 	const coordinator = (executor as any).coordinator
 	sinon.stub(coordinator, "has").returns(true)
-	sinon.stub(coordinator, "getHandler").callsFake((toolName: string) => ({
-		getDescription: () => `[${toolName}]`,
+	sinon.stub(coordinator, "getHandler").callsFake((...args: unknown[]) => ({
+		getDescription: () => `[${String(args[0])}]`,
 	}))
 
 	return {
@@ -96,7 +96,7 @@ describe("ToolExecutor native tool parity", () => {
 
 		const outcome = await executor.executeTool({
 			type: "tool_use",
-			name: ClineDefaultTool.READ_FILE,
+			name: ClineDefaultTool.FILE_READ,
 			params: {
 				path: "src/index.ts",
 			},
@@ -120,7 +120,7 @@ describe("ToolExecutor native tool parity", () => {
 
 		const outcome = await executor.executeTool({
 			type: "tool_use",
-			name: ClineDefaultTool.READ_FILE,
+			name: ClineDefaultTool.FILE_READ,
 			params: {
 				path: "src/index.ts",
 			},
