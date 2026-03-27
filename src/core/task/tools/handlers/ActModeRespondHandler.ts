@@ -26,8 +26,8 @@ export class ActModeRespondHandler implements IToolHandler, IPartialBlockHandler
 
 		const message = uiHelpers.removeClosingTag(block, "response", response)
 
-		// Display partial message as "text" type to avoid blocking
-		await uiHelpers.say("text", message, undefined, undefined, true).catch(() => {})
+		// Display partial message as one coalesced preview row instead of appending duplicates.
+		await uiHelpers.upsertPartialResponseToolSayPreview(block, "text", message).catch(() => {})
 	}
 
 	async execute(config: TaskConfig, block: ToolUse): Promise<ToolResponse> {
@@ -64,6 +64,7 @@ export class ActModeRespondHandler implements IToolHandler, IPartialBlockHandler
 		// Display complete message to user using "text" type (non-blocking)
 		// This allows us to show the progress update and immediately continue
 		await responseToolRuntime.prepareForResponseDelivery(config, this.name)
+		await config.callbacks.clearPartialResponseToolPreview(block)
 		await config.callbacks.say("text", response, undefined, undefined, false)
 
 		// Note: lastToolName is tracked centrally by ToolExecutor after tool execution

@@ -49,7 +49,7 @@ export class AttemptCompletionHandler implements IToolHandler, IPartialBlockHand
 	async handlePartialBlock(block: ToolUse, uiHelpers: StronglyTypedUIHelpers): Promise<void> {
 		const result = uiHelpers.removeClosingTag(block, "result", block.params.result)
 		if (result) {
-			await uiHelpers.say("completion_result", result, undefined, undefined, block.partial)
+			await uiHelpers.upsertPartialResponseToolSayPreview(block, "completion_result", result)
 		}
 		// We will handle command in the final execution step
 	}
@@ -79,6 +79,7 @@ export class AttemptCompletionHandler implements IToolHandler, IPartialBlockHand
 			config.taskState.doubleCheckCompletionPending = true
 			// Remove the partial completion_result message that was shown during streaming
 			await config.callbacks.removeLastPartialMessageIfExistsWithType("say", "completion_result")
+			await config.callbacks.clearPartialResponseToolPreview(block, { removeMessage: true })
 
 			const taskPreview = getInitialTaskPreview(config)
 			const taskSection = taskPreview ? `\n\n<initial_task>\n${taskPreview}\n</initial_task>` : ""
@@ -153,6 +154,7 @@ export class AttemptCompletionHandler implements IToolHandler, IPartialBlockHand
 			config.messageState.setClineMessages(updatedMessages)
 			await config.messageState.saveClineMessagesAndUpdateHistory()
 		}
+		await config.callbacks.clearPartialResponseToolPreview(block)
 
 		const lastMessage = config.messageState.getClineMessages().at(-1)
 

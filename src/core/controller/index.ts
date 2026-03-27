@@ -580,6 +580,19 @@ export class Controller {
 		await this.task.continueTaskWithFeedback(text, images, files)
 	}
 
+	async queueActiveTaskSteerFeedback(text?: string, images?: string[], files?: string[]) {
+		if (!this.task) {
+			return
+		}
+
+		const hasPayload = !!(text || (images && images.length > 0) || (files && files.length > 0))
+		if (!hasPayload) {
+			return
+		}
+
+		await this.task.queueSteerFeedback(text, images, files)
+	}
+
 	async interruptTaskWithFeedback(text?: string, images?: string[], files?: string[]) {
 		if (this.cancelInProgress) {
 			Logger.log(`[Controller.interruptTaskWithFeedback] Task transition already in progress, ignoring duplicate request`)

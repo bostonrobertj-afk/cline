@@ -19,6 +19,8 @@ function createConfig(options?: { autoApproveCommand?: boolean }): {
 		saveCheckpoint: sinon.stub().resolves(),
 		sayAndCreateMissingParamError: sinon.stub().resolves("missing"),
 		removeLastPartialMessageIfExistsWithType: sinon.stub().resolves(),
+		upsertPartialResponseToolSayPreview: sinon.stub().resolves(true),
+		clearPartialResponseToolPreview: sinon.stub().resolves(false),
 		executeCommandTool: sinon.stub().resolves([false, "ok"]),
 		doesLatestTaskCompletionHaveNewChanges: sinon.stub().resolves(false),
 		updateFCListFromToolResponse: sinon.stub().resolves(),
@@ -117,6 +119,7 @@ describe("AttemptCompletionHandler post-completion follow-up", () => {
 		} as any)
 
 		assert.equal(result, RESPONSE_TOOL_SUCCESS_MESSAGE)
+		sinon.assert.calledOnce(callbacks.clearPartialResponseToolPreview)
 		sinon.assert.calledWithExactly(callbacks.say, "user_feedback", "one more change", undefined, undefined)
 		sinon.assert.calledOnce(callbacks.runUserPromptSubmitHook)
 		assert.equal(taskState.didAttemptCompletionEndTask, true)
@@ -152,5 +155,36 @@ describe("AttemptCompletionHandler post-completion follow-up", () => {
 		sinon.assert.calledWithExactly(callbacks.executeCommandTool, "echo hi", undefined, {
 			suppressBlockingAsk: true,
 		})
+	})
+
+	it("updates one completion preview row while the result is still streaming", async () => {
+		const handler = new AttemptCompletionHandler()
+		const uiHelpers = {
+			removeClosingTag: sinon.stub().returns("Almost there"),
+			upsertPartialResponseToolSayPreview: sinon.stub().resolves(true),
+		} as any
+
+		await handler.handlePartialBlock(
+			{
+				type: "tool_use",
+				name: ClineDefaultTool.ATTEMPT,
+				call_id: "call_attempt_completion",
+				params: {
+					result: "Almost there",
+				},
+				partial: true,
+			} as any,
+			uiHelpers,
+		)
+
+		sinon.assert.calledOnceWithExactly(
+			uiHelpers.upsertPartialResponseToolSayPreview,
+			sinon.match({
+				name: ClineDefaultTool.ATTEMPT,
+				call_id: "call_attempt_completion",
+			}),
+			"completion_result",
+			"Almost there",
+		)
 	})
 })

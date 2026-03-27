@@ -201,6 +201,181 @@ export async function consumeDeferredResponseToolUserContent(taskState: TaskStat
 	)
 }
 
+export async function consumePendingSteerUserContent(taskState: TaskState) {
+	const pendingSteerFeedback = taskState.consumePendingSteerFeedback()
+	if (pendingSteerFeedback.length === 0) {
+		return undefined
+	}
+
+	const queuedUserContent: ClineContent[] = []
+	for (const feedback of pendingSteerFeedback) {
+		queuedUserContent.push(...(await buildUserFeedbackContent(feedback.text, feedback.images, feedback.files)))
+	}
+
+	return queuedUserContent
+}
+
+export async function persistCompletedResponseToolResultIfNeeded(params: {
+	taskState: TaskState
+	messageStateHandler: Pick<MessageStateHandler, "addToApiConversationHistory">
+}) {
+	if (params.taskState.userMessageContent.length === 0) {
+		return false
+	}
+
+	const completedToolResultContent = cloneDeep(params.taskState.userMessageContent)
+
+	await params.messageStateHandler.addToApiConversationHistory({
+		role: "user",
+		content: completedToolResultContent,
+		ts: Date.now(),
+	})
+
+	// Response-tool success content belongs to the just-finished turn.
+	// Clear it after persistence so any next-turn continuation starts fresh.
+	params.taskState.userMessageContent = []
+
+	return true
+}
+
+export function getPartialResponseToolPreviewKey(block: Pick<ToolUse, "call_id" | "name">): string {
+	return block.call_id || `response-tool:${block.name}`
+}
+
+export async function upsertPartialResponseToolSayPreview(params: {
+	taskState: TaskState
+	messageStateHandler: Pick<MessageStateHandler, "getClineMessages" | "updateClineMessage">
+	say: (type: ClineSay, text?: string, images?: string[], files?: string[], partial?: boolean) => Promise<number | undefined>
+	block: Pick<ToolUse, "call_id" | "name">
+	sayType: ClineSay
+	text?: string
+}) {
+	if (!params.text) {
+		return false
+	}
+
+	const previewKey = getPartialResponseToolPreviewKey(params.block)
+	const fingerprint = `${params.sayType}:${params.text}`
+	const existingPreview = params.taskState.getPartialResponseToolPreview(previewKey)
+	if (existingPreview?.status === "streaming" && existingPreview.fingerprint === fingerprint) {
+		return false
+	}
+
+	if (existingPreview?.messageTs) {
+		const messageIndex = params.messageStateHandler
+			.getClineMessages()
+			.findIndex((message) => message.ts === existingPreview.messageTs)
+		if (messageIndex !== -1) {
+			await params.messageStateHandler.updateClineMessage(messageIndex, {
+				text: params.text,
+				partial: true,
+			})
+			params.taskState.setPartialResponseToolPreview({
+				...existingPreview,
+				fingerprint,
+				status: "streaming",
+			})
+			return true
+		}
+	}
+
+	const messageTs = await params.say(params.sayType, params.text, undefined, undefined, true)
+	params.taskState.setPartialResponseToolPreview({
+		key: previewKey,
+		toolName: params.block.name as ClineDefaultTool,
+		sayType: params.sayType,
+		fingerprint,
+		messageTs,
+		status: "streaming",
+	})
+	return true
+}
+
+export async function clearPartialResponseToolPreview(params: {
+	taskState: TaskState
+	messageStateHandler: Pick<MessageStateHandler, "getClineMessages" | "deleteClineMessage">
+	block: Pick<ToolUse, "call_id" | "name">
+	removeMessage?: boolean
+}) {
+	const previewKey = getPartialResponseToolPreviewKey(params.block)
+	const existingPreview = params.taskState.deletePartialResponseToolPreview(previewKey)
+	if (!existingPreview) {
+		return false
+	}
+
+	if (params.removeMessage && existingPreview.messageTs) {
+		const messageIndex = params.messageStateHandler
+			.getClineMessages()
+			.findIndex((message) => message.ts === existingPreview.messageTs)
+		if (messageIndex !== -1) {
+			await params.messageStateHandler.deleteClineMessage(messageIndex)
+		}
+	}
+
+	return true
+}
+
+export async function clearInterruptedPartialResponseToolPreviews(params: {
+	taskState: TaskState
+	messageStateHandler: Pick<MessageStateHandler, "getClineMessages" | "deleteClineMessage">
+}) {
+	const previews = params.taskState.getAllPartialResponseToolPreviews()
+	for (const preview of previews) {
+		await clearPartialResponseToolPreview({
+			taskState: params.taskState,
+			messageStateHandler: params.messageStateHandler,
+			block: {
+				call_id: preview.key.startsWith("response-tool:") ? undefined : preview.key,
+				name: preview.toolName,
+			},
+			removeMessage: true,
+		})
+	}
+}
+
+export async function appendQueuedSteerUserContentToRequest(taskState: TaskState, userContent: ClineContent[]) {
+	const queuedSteerUserContent = await consumePendingSteerUserContent(taskState)
+	if (!queuedSteerUserContent?.length) {
+		return userContent
+	}
+
+	return [...userContent, ...queuedSteerUserContent]
+}
+
+export async function consumeCompletedResponseToolContinuationUserContent(taskState: TaskState) {
+	const deferredUserContent = await consumeDeferredResponseToolUserContent(taskState)
+	const queuedSteerUserContent = await consumePendingSteerUserContent(taskState)
+	const continuedUserContent = [...(deferredUserContent ?? []), ...(queuedSteerUserContent ?? [])]
+	return continuedUserContent.length > 0 ? continuedUserContent : undefined
+}
+
+export async function handleCompletedResponseToolTurn(params: {
+	taskState: TaskState
+	completedResponseTool: { toolName: ClineDefaultTool; threadDisplayStateAfterTurnEnds?: ThreadDisplayState }
+	abort: boolean
+	messageStateHandler: Pick<MessageStateHandler, "addToApiConversationHistory">
+	recursivelyMakeClineRequests: (userContent: ClineContent[]) => Promise<boolean>
+	setThreadDisplayState: (threadDisplayState: ThreadDisplayState) => void
+	postStateToWebview: () => Promise<void>
+}) {
+	await persistCompletedResponseToolResultIfNeeded({
+		taskState: params.taskState,
+		messageStateHandler: params.messageStateHandler,
+	})
+
+	const continuedUserContent = await consumeCompletedResponseToolContinuationUserContent(params.taskState)
+	if (continuedUserContent) {
+		return await params.recursivelyMakeClineRequests(continuedUserContent)
+	}
+
+	if (params.completedResponseTool.threadDisplayStateAfterTurnEnds && !params.abort) {
+		params.setThreadDisplayState(params.completedResponseTool.threadDisplayStateAfterTurnEnds)
+		await params.postStateToWebview()
+	}
+
+	return true
+}
+
 export class Task {
 	// Core task variables
 	readonly taskId: string
@@ -1892,6 +2067,21 @@ export class Task {
 		await this.initiateTaskLoop(userContent)
 	}
 
+	public async queueSteerFeedback(text?: string, images?: string[], files?: string[]): Promise<void> {
+		const hasPayload = !!(text || (images && images.length > 0) || (files && files.length > 0))
+		if (!hasPayload) {
+			return
+		}
+
+		this.taskState.enqueueSteerFeedback({
+			text,
+			images,
+			files,
+		})
+
+		await this.say("user_feedback", text, images, files)
+	}
+
 	private async initiateTaskLoop(userContent: ClineContent[]): Promise<void> {
 		let nextUserContent = userContent
 		let includeFileDetails = true
@@ -3005,6 +3195,9 @@ export class Task {
 		const useReducedEnvironmentDetails = isGPT5ModelFamily(this.getCurrentProviderInfo().model.id)
 		let shouldCompact = false
 		const useAutoCondense = this.stateManager.getGlobalSettingsKey("useAutoCondense")
+
+		userContent = await appendQueuedSteerUserContentToRequest(this.taskState, userContent)
+
 		this.currentRequestHasHumanAuthoredInput = this.hasHumanAuthoredInput(userContent)
 		this.currentRequestShouldSendFullPromptAssembly = this.shouldSendFullPromptAssemblyForCurrentTurn(
 			this.currentRequestHasHumanAuthoredInput,
@@ -3229,6 +3422,11 @@ export class Task {
 				if (this.diffViewProvider.isEditing) {
 					await this.diffViewProvider.revertChanges() // closes diff view
 				}
+
+				await clearInterruptedPartialResponseToolPreviews({
+					taskState: this.taskState,
+					messageStateHandler: this.messageStateHandler,
+				})
 
 				// if last message is a partial we need to update and save it
 				const lastMessage = this.messageStateHandler.getClineMessages().at(-1)
@@ -3714,15 +3912,15 @@ export class Task {
 
 				const completedResponseTool = this.taskState.consumeCompletedResponseTool()
 				if (completedResponseTool) {
-					const deferredUserContent = await consumeDeferredResponseToolUserContent(this.taskState)
-					if (deferredUserContent) {
-						return await this.recursivelyMakeClineRequests(deferredUserContent)
-					}
-					if (completedResponseTool.threadDisplayStateAfterTurnEnds && !this.taskState.abort) {
-						this.setThreadDisplayState(completedResponseTool.threadDisplayStateAfterTurnEnds)
-						await this.postStateToWebview()
-					}
-					return true
+					return await handleCompletedResponseToolTurn({
+						taskState: this.taskState,
+						completedResponseTool,
+						abort: this.taskState.abort,
+						messageStateHandler: this.messageStateHandler,
+						recursivelyMakeClineRequests: this.recursivelyMakeClineRequests.bind(this),
+						setThreadDisplayState: this.setThreadDisplayState.bind(this),
+						postStateToWebview: this.postStateToWebview.bind(this),
+					})
 				}
 
 				// if the model did not tool use, then we need to tell it to either use a tool or attempt_completion

@@ -8,7 +8,7 @@ export type ButtonActionType =
 	| "approve" // Send yesButtonClicked
 	| "reject" // Send noButtonClicked
 	| "proceed" // Send messageResponse or yesButtonClicked
-	| "steer" // Send messageResponse while a task is actively running
+	| "steer" // Queue steer feedback while a task is actively running
 	| "new_task" // Start a new task
 	| "cancel" // Cancel streaming
 	| "utility" // Execute utility function (condense, report_bug)

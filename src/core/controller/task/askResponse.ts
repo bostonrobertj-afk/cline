@@ -30,9 +30,25 @@ export async function askResponse(controller: Controller, request: AskResponseRe
 			case "messageResponse":
 				responseType = "messageResponse"
 				break
+			case "steerMessage":
+				responseType = "steerMessage"
+				break
 			default:
 				Logger.warn(`askResponse: Unknown response type: ${request.responseType}`)
 				return Empty.create()
+		}
+
+		if (responseType === "steerMessage") {
+			const threadDisplayState = controller.task.getThreadDisplayState?.()
+
+			if (controller.isTaskActivelyRunning() || threadDisplayState === "active_run") {
+				await controller.queueActiveTaskSteerFeedback(request.text, request.images, request.files)
+				return Empty.create()
+			}
+
+			// If steer arrives after the task has already transitioned out of active execution,
+			// degrade gracefully into the normal message-response routing.
+			responseType = "messageResponse"
 		}
 
 		if (responseType === "messageResponse") {

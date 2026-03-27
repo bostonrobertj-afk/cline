@@ -13,6 +13,22 @@ import type {
 } from "./tools/response/types"
 import type { HookExecution } from "./types/HookExecution"
 
+export interface PendingSteerFeedback {
+	text?: string
+	images?: string[]
+	files?: string[]
+	ts: number
+}
+
+export interface PartialResponseToolPreview {
+	key: string
+	toolName: ClineDefaultTool
+	sayType: string
+	fingerprint: string
+	messageTs?: number
+	status: "streaming" | "completed" | "interrupted"
+}
+
 export class TaskState {
 	// Task-level timing
 	taskStartTimeMs = Date.now()
@@ -59,6 +75,8 @@ export class TaskState {
 	responseToolTurnCompletedBy?: ClineDefaultTool
 	responseToolThreadDisplayStateAfterTurnEnds?: ThreadDisplayState
 	pendingResponseToolFollowup?: PendingResponseToolFollowup
+	pendingSteerFeedback: PendingSteerFeedback[] = []
+	partialResponseToolPreviews: Map<string, PartialResponseToolPreview> = new Map()
 	responseToolFailureCount = 0
 	lastFailedResponseTool?: ClineDefaultTool
 	lastResponseToolFailureMessage?: string
@@ -175,6 +193,63 @@ export class TaskState {
 		return followup
 	}
 
+	enqueueSteerFeedback(feedback: Omit<PendingSteerFeedback, "ts"> & { ts?: number }): void {
+		const hasContent = !!(
+			(feedback.text && feedback.text.trim().length > 0) ||
+			(feedback.images && feedback.images.length > 0) ||
+			(feedback.files && feedback.files.length > 0)
+		)
+		if (!hasContent) {
+			return
+		}
+
+		this.pendingSteerFeedback.push({
+			text: feedback.text,
+			images: feedback.images?.length ? [...feedback.images] : undefined,
+			files: feedback.files?.length ? [...feedback.files] : undefined,
+			ts: feedback.ts ?? Date.now(),
+		})
+	}
+
+	hasPendingSteerFeedback(): boolean {
+		return this.pendingSteerFeedback.length > 0
+	}
+
+	consumePendingSteerFeedback(): PendingSteerFeedback[] {
+		if (this.pendingSteerFeedback.length === 0) {
+			return []
+		}
+
+		const queuedFeedback = this.pendingSteerFeedback.map((feedback) => ({
+			text: feedback.text,
+			images: feedback.images?.length ? [...feedback.images] : undefined,
+			files: feedback.files?.length ? [...feedback.files] : undefined,
+			ts: feedback.ts,
+		}))
+		this.pendingSteerFeedback = []
+		return queuedFeedback
+	}
+
+	setPartialResponseToolPreview(preview: PartialResponseToolPreview): void {
+		this.partialResponseToolPreviews.set(preview.key, preview)
+	}
+
+	getPartialResponseToolPreview(key: string): PartialResponseToolPreview | undefined {
+		return this.partialResponseToolPreviews.get(key)
+	}
+
+	deletePartialResponseToolPreview(key: string): PartialResponseToolPreview | undefined {
+		const existing = this.partialResponseToolPreviews.get(key)
+		if (existing) {
+			this.partialResponseToolPreviews.delete(key)
+		}
+		return existing
+	}
+
+	getAllPartialResponseToolPreviews(): PartialResponseToolPreview[] {
+		return [...this.partialResponseToolPreviews.values()]
+	}
+
 	recordResponseToolFailure(toolName: ClineDefaultTool, message: string, cause?: ResponseToolFailureCause): void {
 		this.responseToolFailureCount += 1
 		this.lastFailedResponseTool = toolName
@@ -208,6 +283,7 @@ export class TaskState {
 		this.responseToolTurnCompletedBy = undefined
 		this.responseToolThreadDisplayStateAfterTurnEnds = undefined
 		this.pendingResponseToolFollowup = undefined
+		this.partialResponseToolPreviews.clear()
 		this.clearResponseToolFailureState()
 		this.didAttemptCompletionEndTask = false
 	}

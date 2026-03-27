@@ -58,6 +58,8 @@ export const TASK_CALLBACKS_KEYS = [
 	"saveCheckpoint",
 	"sayAndCreateMissingParamError",
 	"removeLastPartialMessageIfExistsWithType",
+	"upsertPartialResponseToolSayPreview",
+	"clearPartialResponseToolPreview",
 	"executeCommandTool",
 	"doesLatestTaskCompletionHaveNewChanges",
 	"updateFCListFromToolResponse",

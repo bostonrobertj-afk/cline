@@ -12,6 +12,7 @@ function createConfig(mode: "act" | "plan" = "act") {
 	const callbacks = {
 		say: sinon.stub().resolves(undefined),
 		sayAndCreateMissingParamError: sinon.stub().resolves("missing"),
+		clearPartialResponseToolPreview: sinon.stub().resolves(false),
 	}
 
 	const config = {
@@ -42,6 +43,7 @@ describe("SendUserMessageHandler", () => {
 		})
 
 		assert.equal(result, RESPONSE_TOOL_SUCCESS_MESSAGE)
+		sinon.assert.calledOnce(callbacks.clearPartialResponseToolPreview)
 		sinon.assert.calledOnce(callbacks.say)
 		sinon.assert.calledWithExactly(callbacks.say, "text", "That is a good choice.", undefined, undefined, false)
 		assert.equal(taskState.responseToolTurnShouldEnd, true)
@@ -62,6 +64,7 @@ describe("SendUserMessageHandler", () => {
 		})
 
 		assert.equal(result, RESPONSE_TOOL_SUCCESS_MESSAGE)
+		sinon.assert.calledOnce(callbacks.clearPartialResponseToolPreview)
 		sinon.assert.calledOnce(callbacks.say)
 		sinon.assert.calledWithExactly(callbacks.say, "text", "I see the tradeoff here.", undefined, undefined, false)
 		assert.equal(taskState.responseToolTurnShouldEnd, true)
@@ -83,7 +86,39 @@ describe("SendUserMessageHandler", () => {
 		})
 
 		assert.equal(result, RESPONSE_TOOL_SUCCESS_MESSAGE)
+		sinon.assert.calledOnce(callbacks.clearPartialResponseToolPreview)
 		sinon.assert.calledOnce(callbacks.say)
+	})
+
+	it("coalesces partial updates into a preview row instead of appending new text rows", async () => {
+		const handler = new SendUserMessageHandler()
+		const uiHelpers = {
+			removeClosingTag: sinon.stub().returns("Streaming preview"),
+			upsertPartialResponseToolSayPreview: sinon.stub().resolves(true),
+		} as any
+
+		await handler.handlePartialBlock(
+			{
+				type: "tool_use",
+				name: ClineDefaultTool.SEND_USER_MESSAGE,
+				call_id: "call_send_user_message",
+				params: {
+					message: "Streaming preview",
+				},
+				partial: true,
+			} as any,
+			uiHelpers,
+		)
+
+		sinon.assert.calledOnceWithExactly(
+			uiHelpers.upsertPartialResponseToolSayPreview,
+			sinon.match({
+				name: ClineDefaultTool.SEND_USER_MESSAGE,
+				call_id: "call_send_user_message",
+			}),
+			"text",
+			"Streaming preview",
+		)
 	})
 
 	it("returns a missing-param error when message is absent", async () => {

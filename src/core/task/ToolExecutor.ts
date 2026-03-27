@@ -20,7 +20,7 @@ import { ContextManager } from "../context/context-management/ContextManager"
 import { formatResponse } from "../prompts/responses"
 import { StateManager } from "../storage/StateManager"
 import { WorkspaceRootManager } from "../workspace"
-import { ToolResponse } from "."
+import { clearPartialResponseToolPreview, ToolResponse, upsertPartialResponseToolSayPreview } from "."
 import type { FocusChainChecklistUpdateResult } from "./focus-chain/types"
 import { applyPostToolTaskProgressUpdate, applyPreToolTaskProgressUpdate } from "./focus-chain/updateFromToolResponse"
 import { MessageStateHandler } from "./message-state"
@@ -182,6 +182,22 @@ export class ToolExecutor {
 				updateFCListFromToolResponse: this.updateFCListFromToolResponse,
 				sayAndCreateMissingParamError: this.sayAndCreateMissingParamError,
 				removeLastPartialMessageIfExistsWithType: this.removeLastPartialMessageIfExistsWithType,
+				upsertPartialResponseToolSayPreview: (block, sayType, text) =>
+					upsertPartialResponseToolSayPreview({
+						taskState: this.taskState,
+						messageStateHandler: this.messageStateHandler,
+						say: this.say,
+						block,
+						sayType,
+						text,
+					}),
+				clearPartialResponseToolPreview: (block, options) =>
+					clearPartialResponseToolPreview({
+						taskState: this.taskState,
+						messageStateHandler: this.messageStateHandler,
+						block,
+						removeMessage: options?.removeMessage,
+					}),
 				shouldAutoApproveTool: this.shouldAutoApproveTool.bind(this),
 				shouldAutoApproveToolWithPath: this.shouldAutoApproveToolWithPath.bind(this),
 				applyLatestBrowserSettings: this.applyLatestBrowserSettings.bind(this),

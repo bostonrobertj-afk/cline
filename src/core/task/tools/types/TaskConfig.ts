@@ -17,6 +17,7 @@ import type { ClineDefaultTool } from "@shared/tools"
 import type { ClineAskResponse } from "@shared/WebviewMessage"
 import type { FocusChainChecklistUpdateResult } from "@/core/task/focus-chain/types"
 import { WorkspaceRootManager } from "@/core/workspace"
+import type { ToolUse } from "../../../assistant-message"
 import type { ContextManager } from "../../../context/context-management/ContextManager"
 import type { StateManager } from "../../../storage/StateManager"
 import type { MessageStateHandler } from "../../message-state"
@@ -104,6 +105,15 @@ export interface TaskCallbacks {
 	sayAndCreateMissingParamError: (toolName: ClineDefaultTool, paramName: string, relPath?: string) => Promise<any>
 
 	removeLastPartialMessageIfExistsWithType: (type: "ask" | "say", askOrSay: ClineAsk | ClineSay) => Promise<void>
+	upsertPartialResponseToolSayPreview: (
+		block: Pick<ToolUse, "call_id" | "name">,
+		sayType: ClineSay,
+		text?: string,
+	) => Promise<boolean>
+	clearPartialResponseToolPreview: (
+		block: Pick<ToolUse, "call_id" | "name">,
+		options?: { removeMessage?: boolean },
+	) => Promise<boolean>
 
 	executeCommandTool: (
 		command: string,

@@ -28,6 +28,15 @@ export interface StronglyTypedUIHelpers {
 	// Utility methods
 	removeClosingTag: (block: ToolUse, tag: ToolParamName, text?: string) => string
 	removeLastPartialMessageIfExistsWithType: (type: "ask" | "say", askOrSay: ClineAsk | ClineSay) => Promise<void>
+	upsertPartialResponseToolSayPreview: (
+		block: Pick<ToolUse, "call_id" | "name">,
+		sayType: ClineSay,
+		text?: string,
+	) => Promise<boolean>
+	clearPartialResponseToolPreview: (
+		block: Pick<ToolUse, "call_id" | "name">,
+		options?: { removeMessage?: boolean },
+	) => Promise<boolean>
 
 	// Approval methods
 	shouldAutoApproveTool: (toolName: ClineDefaultTool) => boolean | [boolean, boolean]
@@ -51,6 +60,8 @@ export function createUIHelpers(config: TaskConfig): StronglyTypedUIHelpers {
 		ask: config.callbacks.ask,
 		removeClosingTag: (block: ToolUse, tag: ToolParamName, text?: string) => removeClosingTag(block, tag, text),
 		removeLastPartialMessageIfExistsWithType: config.callbacks.removeLastPartialMessageIfExistsWithType,
+		upsertPartialResponseToolSayPreview: config.callbacks.upsertPartialResponseToolSayPreview,
+		clearPartialResponseToolPreview: config.callbacks.clearPartialResponseToolPreview,
 		shouldAutoApproveTool: (toolName: ClineDefaultTool) => config.autoApprover.shouldAutoApproveTool(toolName),
 		shouldAutoApproveToolWithPath: config.callbacks.shouldAutoApproveToolWithPath,
 		askApproval: async (messageType: ClineAsk, message: string): Promise<boolean> => {

@@ -16,7 +16,7 @@ export type GrpcCancel = {
 	request_id: string // ID of the request to cancel
 }
 
-export type ClineAskResponse = "yesButtonClicked" | "noButtonClicked" | "messageResponse"
+export type ClineAskResponse = "yesButtonClicked" | "noButtonClicked" | "messageResponse" | "steerMessage"
 
 export type ClineCheckpointRestore = "task" | "workspace" | "taskAndWorkspace"
 

@@ -19,7 +19,7 @@ export class SendUserMessageHandler implements IToolHandler, IPartialBlockHandle
 		const message = block.params.message
 		const partialMessage = uiHelpers.removeClosingTag(block, "message", message)
 
-		await uiHelpers.say("text", partialMessage, undefined, undefined, true).catch(() => {})
+		await uiHelpers.upsertPartialResponseToolSayPreview(block, "text", partialMessage).catch(() => {})
 	}
 
 	async execute(config: TaskConfig, block: ToolUse): Promise<ToolResponse> {
@@ -33,6 +33,7 @@ export class SendUserMessageHandler implements IToolHandler, IPartialBlockHandle
 		config.taskState.consecutiveMistakeCount = 0
 
 		await responseToolRuntime.prepareForResponseDelivery(config, this.name)
+		await config.callbacks.clearPartialResponseToolPreview(block)
 		await config.callbacks.say("text", message, undefined, undefined, false)
 
 		return responseToolRuntime.finalizeSuccess(config, this.name)

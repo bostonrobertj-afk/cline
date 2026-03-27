@@ -30,6 +30,17 @@ export function useMessageHandlers(messages: ClineMessage[], chatState: ChatStat
 	} = chatState
 	const cancelInFlightRef = useRef(false)
 
+	const sendSteerMessage = useCallback(async (text: string, images: string[], files: string[]) => {
+		await TaskServiceClient.askResponse(
+			AskResponseRequest.create({
+				responseType: "steerMessage",
+				text,
+				images,
+				files,
+			}),
+		)
+	}, [])
+
 	// Handle sending a message
 	const handleSendMessage = useCallback(
 		async (text: string, images: string[], files: string[]) => {
@@ -136,15 +147,8 @@ export function useMessageHandlers(messages: ClineMessage[], chatState: ChatStat
 						lastMessage.partial === true || (lastMessage.type === "say" && lastMessage.say === "api_req_started")
 
 					if (!messageSent && isTaskRunning) {
-						// Task is running - send message as interruption/feedback
-						await TaskServiceClient.askResponse(
-							AskResponseRequest.create({
-								responseType: "messageResponse",
-								text: messageToSend,
-								images,
-								files,
-							}),
-						)
+						// Task is running - queue the message as steer feedback for the next outbound request.
+						await sendSteerMessage(messageToSend, images, files)
 						messageSent = true
 						sentAsInterruption = true
 					}
@@ -173,7 +177,9 @@ export function useMessageHandlers(messages: ClineMessage[], chatState: ChatStat
 			messages.length,
 			clineAsk,
 			activeQuote,
+			isActiveUserThreadState,
 			isPassiveThreadOpenState,
+			sendSteerMessage,
 			setInputValue,
 			setActiveQuote,
 			setSendingDisabled,
@@ -275,7 +281,10 @@ export function useMessageHandlers(messages: ClineMessage[], chatState: ChatStat
 					break
 
 				case "steer":
-					await handleSendMessage(trimmedInput ?? "", images ?? [], files ?? [])
+					if (hasContent) {
+						await sendSteerMessage(trimmedInput ?? "", images ?? [], files ?? [])
+						clearInputState()
+					}
 					break
 
 				case "new_task":
