@@ -43,16 +43,12 @@ ${hasConnectedIndxrServer(context) ? `- ${getCodeExplorationGuidance(context, ""
 
 export async function getRulesSection(variant: PromptVariant, context: SystemPromptContext): Promise<string> {
 	if (context.useMinimalGptPrompt === true) {
-		const minimalIndxrReminder = hasConnectedIndxrServer(context)
-			? "- When Indxr is connected, use its MCP exploration tools before built-in `search_files`, `list_code_definition_names`, `read_file`, or `read_file_range` unless you specifically need regex search or exact raw file contents.\n"
-			: ""
-
 		return new TemplateEngine().resolve(
 			`RULES
 
 - Operate from \`{{CWD}}\`; pass explicit paths instead of assuming directory changes.
 - Verify important command/edit results before completion.
-${minimalIndxrReminder}- Use complete-line SEARCH blocks in \`replace_in_file\` and preserve marker syntax exactly.`,
+- Use complete-line SEARCH blocks in \`replace_in_file\` and preserve marker syntax exactly.`,
 			context,
 			{ CWD: context.cwd || process.cwd() },
 		)

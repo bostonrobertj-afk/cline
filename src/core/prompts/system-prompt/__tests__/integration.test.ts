@@ -379,7 +379,7 @@ describe("Prompt System Integration Tests", () => {
 			)
 		})
 
-		it("includes the MCP section for native GPT-5 OpenAI prompts when MCP servers are connected", async function () {
+		it("omits the textual MCP section for native GPT-5 OpenAI prompts when only generic MCP servers are connected", async function () {
 			await runPromptTest(
 				this,
 				{
@@ -390,9 +390,9 @@ describe("Prompt System Integration Tests", () => {
 				},
 				"gpt-5.4-2026-03-05",
 				async ({ systemPrompt }) => {
-					expect(systemPrompt).to.include("MCP SERVERS")
-					expect(systemPrompt).to.include("## test-server (`test`)")
-					expect(systemPrompt).to.not.include("When Indxr is available, prefer it for code exploration")
+					expect(systemPrompt).to.not.include("MCP SERVERS")
+					expect(systemPrompt).to.not.include("## test-server (`test`)")
+					expect(systemPrompt).to.not.include("Indxr-Aware Exploration")
 				},
 			)
 		})
@@ -409,13 +409,14 @@ describe("Prompt System Integration Tests", () => {
 				},
 				"gpt-5.4-2026-03-05",
 				async ({ systemPrompt, tools }) => {
-					expect(systemPrompt).to.include("## workspace-index (`indxr`)")
+					expect(systemPrompt).to.include("Indxr-Aware Exploration")
 					expect(systemPrompt).to.include(
-						"When Indxr is available, use its tools first for code exploration, symbol discovery, file understanding, dependency tracing, and targeted source reads. Prefer tools like `search_relevant`, `get_file_summary`, `lookup_symbol`, `explain_symbol`, `read_source`, `get_file_context`, `get_public_api`, `get_callers`, and `get_related_tests` before built-in `search_files`, `list_code_definition_names`, `read_file`, or `read_file_range` whenever feasible.",
+						"Use Indxr MCP's tools for code exploration, symbol discovery, file understanding, dependency tracing, and targeted source reads. Prefer tools like `search_relevant`, `get_file_summary`, `lookup_symbol`, `explain_symbol`, `read_source`, `get_file_context`, `get_public_api`, `get_callers`, and `get_related_tests` before built-in `search_files`, `list_code_definition_names`, `read_file`, or `read_file_range` whenever feasible.",
 					)
 					expect(systemPrompt).to.include(
 						"Use built-in file tools when Indxr is unavailable, insufficient for the task, or when exact raw file contents, regex search, or line-based inspection are required.",
 					)
+					expect(systemPrompt).to.not.include("## workspace-index (`indxr`)")
 
 					const nativeTools = (tools as any[]).map((tool) => (tool?.type === "function" ? tool.function : tool))
 					const byName = new Map(nativeTools.map((tool) => [tool.name, tool.description]))
@@ -439,8 +440,8 @@ describe("Prompt System Integration Tests", () => {
 				},
 				"gpt-5.4-2026-03-05",
 				async ({ systemPrompt, tools }) => {
-					expect(systemPrompt).to.include("## weak-read_source-server (`generic`)")
-					expect(systemPrompt).to.not.include("When Indxr is available, prefer it for code exploration")
+					expect(systemPrompt).to.not.include("## weak-read_source-server (`generic`)")
+					expect(systemPrompt).to.not.include("Indxr-Aware Exploration")
 
 					const nativeTools = (tools as any[]).map((tool) => (tool?.type === "function" ? tool.function : tool))
 					const byName = new Map(nativeTools.map((tool) => [tool.name, tool.description]))
@@ -459,7 +460,7 @@ describe("Prompt System Integration Tests", () => {
 			}
 
 			const result = await getSystemPrompt(context)
-			expect(result.systemPrompt).to.contain("When Indxr is available, use its tools first for code exploration")
+			expect(result.systemPrompt).to.contain("Use Indxr MCP's tools for code exploration")
 			expect(result.systemPrompt).to.not.contain(
 				"Prefer these Indxr tools for code exploration and structural discovery over built-in tools",
 			)
