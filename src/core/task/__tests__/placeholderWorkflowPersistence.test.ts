@@ -7,6 +7,7 @@ import path from "path"
 import sinon from "sinon"
 import { parseSlashCommands } from "../../slash-commands"
 import { StateManager } from "../../storage/StateManager"
+import { getCanonicalWorkflowConfigPath } from "../../workflows/workflow-placeholders"
 import { FocusChainManager } from "../focus-chain"
 import { Task, type ToolResponse } from "../index"
 import { TaskState } from "../TaskState"
@@ -88,7 +89,7 @@ Inspect the prepared review input and write findings.
 		try {
 			const workflowPath = path.join(tempDir, ".cline", "skills", "custom-review", "custom-review.md")
 			const manifestPath = path.join(tempDir, "_bmad", "_config", "skill-manifest.csv")
-			const configPath = path.join(tempDir, "_bmad", "bmm", "config.yaml")
+			const configPath = getCanonicalWorkflowConfigPath(tempDir)
 			await fs.mkdir(path.dirname(workflowPath), { recursive: true })
 			await fs.mkdir(path.dirname(manifestPath), { recursive: true })
 			await fs.mkdir(path.dirname(configPath), { recursive: true })
@@ -97,7 +98,7 @@ Inspect the prepared review input and write findings.
 				`# Local Flow
 
 ## Step 1: Gather Context
-Respond in {communication_language} from {config_source}.
+Respond in {communication_language} from {config_source}. Write artifacts to {output_folder}.
 `,
 				"utf8",
 			)
@@ -109,7 +110,11 @@ Respond in {communication_language} from {config_source}.
 				].join("\n"),
 				"utf8",
 			)
-			await fs.writeFile(configPath, 'communication_language: "English"\n', "utf8")
+			await fs.writeFile(
+				configPath,
+				['communication_language: "English"', 'output_folder: "{project-root}/workflow-output"'].join("\n"),
+				"utf8",
+			)
 
 			sandbox.stub(StateManager, "get").returns({
 				getRemoteConfigSettings: () => ({}),
@@ -156,7 +161,8 @@ Respond in {communication_language} from {config_source}.
 			expect(getMetadataStub.calledOnce).to.equal(true)
 			expect(fakeTask.taskState.activePlaceholderWorkflowStableValues).to.include({
 				communication_language: "English",
-				config_source: "_bmad/bmm/config.yaml",
+				config_source: ".cline/workflow-config.yaml",
+				output_folder: `${tempDir}/workflow-output`,
 			})
 
 			const prompt = await (Task.prototype as any).buildPlaceholderWorkflowActivationInstructions.call(fakeTask, {
@@ -165,11 +171,13 @@ Respond in {communication_language} from {config_source}.
 				workflowSource: fakeTask.taskState.activePlaceholderWorkflowSource!,
 			})
 
-			expect(prompt).to.contain("Respond in English from _bmad/bmm/config.yaml.")
+			expect(prompt).to.contain("Respond in English from .cline/workflow-config.yaml. Write artifacts to")
+			expect(prompt).to.contain(`${tempDir}/workflow-output`)
 			const [, savedMetadata] = saveMetadataStub.firstCall.args
 			expect(savedMetadata.activePlaceholderWorkflowStableValues).to.include({
 				communication_language: "English",
-				config_source: "_bmad/bmm/config.yaml",
+				config_source: ".cline/workflow-config.yaml",
+				output_folder: `${tempDir}/workflow-output`,
 			})
 		} finally {
 			sandbox.restore()
@@ -269,7 +277,10 @@ Inspect the prepared review input and write findings.
 			const getMetadataStub = sandbox.stub(disk, "getTaskMetadata").resolves({} as never)
 			const saveMetadataStub = sandbox.stub(disk, "saveTaskMetadata").resolves()
 
-			const fakeTask = createFakeTask("task-slash-placeholder")
+			const fakeTask = {
+				...createFakeTask("task-slash-placeholder"),
+				cwd: tempDir,
+			}
 			await (Task.prototype as any).applyPersistentSlashCommandAction.call(
 				fakeTask,
 				parseResult.persistentSlashCommandAction,
@@ -279,18 +290,24 @@ Inspect the prepared review input and write findings.
 			expect(fakeTask.refreshPlaceholderWorkflowChecklistProjection.calledOnceWith(true)).to.equal(true)
 			expect(fakeTask.taskState.activeAgentId).to.equal(undefined)
 			expect(fakeTask.taskState.activePlaceholderWorkflowId).to.equal("local-flow.md")
-			expect(fakeTask.taskState.activePlaceholderWorkflowSource).to.deep.equal({
+			expect(fakeTask.taskState.activePlaceholderWorkflowSource).to.include({
 				type: "local",
 				name: "local-flow.md",
 				path: workflowPath,
 			})
+			expect(fakeTask.taskState.activePlaceholderWorkflowSource?.configPath).to.be.a("string")
+			expect(fakeTask.taskState.activePlaceholderWorkflowSource?.configPath).to.contain(".cline")
+			expect(fakeTask.taskState.activePlaceholderWorkflowSource?.configPath).to.contain("workflow-config.yaml")
 
 			const [, savedMetadata] = saveMetadataStub.firstCall.args
-			expect(savedMetadata.activePlaceholderWorkflowSource).to.deep.equal({
+			expect(savedMetadata.activePlaceholderWorkflowSource).to.include({
 				type: "local",
 				name: "local-flow.md",
 				path: workflowPath,
 			})
+			expect(savedMetadata.activePlaceholderWorkflowSource.configPath).to.be.a("string")
+			expect(savedMetadata.activePlaceholderWorkflowSource.configPath).to.contain(".cline")
+			expect(savedMetadata.activePlaceholderWorkflowSource.configPath).to.contain("workflow-config.yaml")
 
 			sandbox.restore()
 			const restoreSandbox = sinon.createSandbox()

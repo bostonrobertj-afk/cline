@@ -6,6 +6,7 @@ import path from "path"
 import * as sinon from "sinon"
 import { StateManager } from "../../storage/StateManager"
 import * as bmadAgentMode from "../../task/bmad-agent-mode"
+import { getCanonicalWorkflowConfigPath } from "../../workflows/workflow-placeholders"
 import { formatMcpPromptResponse, McpPromptFetcher, parseSlashCommands } from "../index"
 
 describe("slash-commands", () => {
@@ -280,23 +281,13 @@ describe("slash-commands", () => {
 			})
 		})
 
-		it("includes configPath metadata for local BMAD skill workflows when it can be resolved", async () => {
+		it("includes the canonical workflow config path for local workflows", async () => {
 			const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "slash-local-config-"))
 			const workflowPath = path.join(tempDir, ".cline", "skills", "custom-review", "custom-review.md")
-			const manifestPath = path.join(tempDir, "_bmad", "_config", "skill-manifest.csv")
-			const configPath = path.join(tempDir, "_bmad", "bmm", "config.yaml")
+			const configPath = getCanonicalWorkflowConfigPath(tempDir)
 			await fs.mkdir(path.dirname(workflowPath), { recursive: true })
-			await fs.mkdir(path.dirname(manifestPath), { recursive: true })
 			await fs.mkdir(path.dirname(configPath), { recursive: true })
 			await fs.writeFile(workflowPath, "# Custom review\nUse {communication_language}.", "utf8")
-			await fs.writeFile(
-				manifestPath,
-				[
-					"canonicalId,name,description,module,path,install_to_bmad",
-					'"custom-review","custom-review","Custom review workflow","bmm","_bmad/bmm/workflows/custom-review/SKILL.md","true"',
-				].join("\n"),
-				"utf8",
-			)
 			await fs.writeFile(configPath, 'communication_language: "English"\n', "utf8")
 			sinon.stub(StateManager, "get").returns({
 				getRemoteConfigSettings: () => ({}),

@@ -9,7 +9,7 @@ const generic: ClineToolSpec = {
 	variant: ModelFamily.GENERIC,
 	name: "set_workflow_placeholders",
 	description:
-		'Persist placeholder values for the active placeholder workflow step. Example: {"story_path":"docs/story.md","project_context":"docs/project-context.md"}.',
+		'Persist dynamic placeholder values discovered during the active workflow. Use the wrapper shape {"values":{"story_path":"docs/story.md","project_context":"docs/project-context.md"}}. Do not use this for stable config-backed placeholders like output_folder; those come from .cline/workflow-config.yaml.',
 	contextRequirements: (context) =>
 		context.managedWorkflowActive === true || context.activeWorkflowSupportsPlaceholders === true,
 	parameters: [
@@ -17,7 +17,8 @@ const generic: ClineToolSpec = {
 			name: "values",
 			required: true,
 			type: "object",
-			instruction: "Object map of placeholder keys to string values. Not arrays of {name,value} or {key,value}.",
+			instruction:
+				'Object map of placeholder keys to string values. Call the tool as {"values": {...}}. Not arrays of {name,value} or {key,value}.',
 			additionalProperties: {
 				type: "string",
 			},

@@ -6,7 +6,7 @@ Add managed-workflow runtime support so placeholder values inside workflow and s
 
 This plan covers two classes of placeholders:
 
-- Stable runtime/config placeholders such as `{project-root}`, `{user_name}`, `{communication_language}`, `{output_folder}`, and `{date}`
+- Stable runtime/config placeholders such as `{project-root}`, `{user_name}`, `{communication_language}`, `{output_folder}`, and `{date}` loaded from `.cline/workflow-config.yaml`
 - Dynamic workflow-state placeholders such as `{{research_topic}}`, `{prd_file_path}`, `{validation_report_path}`, `{spec_file}`, and other values discovered or established while the workflow is running
 
 The target outcome is that the managed workflow reminder shown under `USER'S CUSTOM INSTRUCTIONS` contains real resolved values instead of raw placeholder tokens.
@@ -72,7 +72,7 @@ This change is required before any runtime resolution will work reliably.
 
 ### 3. Seed Stable Runtime and Config Placeholders at Workflow Start
 
-When a managed workflow run is created in `ManagedWorkflowController.ts`, build `stablePlaceholders` from runtime and config data already available to the task.
+When a managed workflow run is created in `ManagedWorkflowController.ts`, build `stablePlaceholders` from runtime data plus the canonical workspace config file at `.cline/workflow-config.yaml`.
 
 Initial supported values should include:
 
@@ -314,4 +314,3 @@ Verify that:
 - No placeholder text is stripped during extraction.
 - Managed workflow placeholder state persists across task metadata save and restore.
 - Existing workflows without placeholder usage do not regress.
-

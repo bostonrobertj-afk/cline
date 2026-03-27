@@ -5,6 +5,7 @@ import { describe, it } from "mocha"
 import os from "os"
 import path from "path"
 import sinon from "sinon"
+import { getCanonicalWorkflowConfigPath } from "@/core/workflows/workflow-placeholders"
 import { HostProvider } from "@/hosts/host-provider"
 import { setVscodeHostProviderMock } from "@/test/host-provider-test-utils"
 import { resolvePlaceholderWorkflowManagedVariant } from "../../../bmad-agent-mode"
@@ -820,6 +821,7 @@ describe("Managed workflow handlers", () => {
 
 			const handler = new UseSkillToolHandler()
 			const config = createConfig({
+				cwd: tempDir,
 				isSubagentExecution: false,
 				services: {
 					stateManager: {
@@ -845,18 +847,26 @@ describe("Managed workflow handlers", () => {
 			expect(String(result)).to.contain("Inspect the staged diff.")
 			expect(config.taskState.activeWorkflowId).to.equal(undefined)
 			expect(config.taskState.activePlaceholderWorkflowId).to.equal("local-review.md")
-			expect(config.taskState.activePlaceholderWorkflowSource).to.deep.equal({
+			expect(config.taskState.activePlaceholderWorkflowSource).to.include({
 				type: "local",
 				name: "local-review.md",
 				path: workflowPath,
 			})
+			expect(config.taskState.activePlaceholderWorkflowSource?.configPath).to.be.a("string")
+			expect(config.taskState.activePlaceholderWorkflowSource?.configPath).to.contain(".cline")
+			expect(config.taskState.activePlaceholderWorkflowSource?.configPath).to.contain("workflow-config.yaml")
 			expect(config.taskState.activeWorkflowJustStarted).to.equal(true)
 			expect(saveMetadataStub.calledOnce).to.equal(true)
-			expect(saveMetadataStub.firstCall.args[1].activePlaceholderWorkflowSource).to.deep.equal({
+			expect(saveMetadataStub.firstCall.args[1].activePlaceholderWorkflowSource).to.include({
 				type: "local",
 				name: "local-review.md",
 				path: workflowPath,
 			})
+			expect(saveMetadataStub.firstCall.args[1].activePlaceholderWorkflowSource.configPath).to.be.a("string")
+			expect(saveMetadataStub.firstCall.args[1].activePlaceholderWorkflowSource.configPath).to.contain(".cline")
+			expect(saveMetadataStub.firstCall.args[1].activePlaceholderWorkflowSource.configPath).to.contain(
+				"workflow-config.yaml",
+			)
 		} finally {
 			sandbox.restore()
 			if (tempDir) {
@@ -974,7 +984,7 @@ Inspect the prepared review input and write findings.`,
 		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "use-skill-local-stable-"))
 		const workflowPath = path.join(tempDir, ".cline", "skills", "custom-review", "custom-review.md")
 		const manifestPath = path.join(tempDir, "_bmad", "_config", "skill-manifest.csv")
-		const configPath = path.join(tempDir, "_bmad", "bmm", "config.yaml")
+		const configPath = getCanonicalWorkflowConfigPath(tempDir)
 		await fs.mkdir(path.dirname(workflowPath), { recursive: true })
 		await fs.mkdir(path.dirname(manifestPath), { recursive: true })
 		await fs.mkdir(path.dirname(configPath), { recursive: true })
@@ -1016,7 +1026,7 @@ Inspect the prepared review input and write findings.`,
 				partial: false,
 			} as any)
 
-			expect(String(result)).to.contain("Respond in English from _bmad/bmm/config.yaml.")
+			expect(String(result)).to.contain("Respond in English from .cline/workflow-config.yaml.")
 			expect(config.taskState.activePlaceholderWorkflowSource).to.deep.equal({
 				type: "local",
 				name: "custom-review.md",
@@ -1025,12 +1035,12 @@ Inspect the prepared review input and write findings.`,
 			})
 			expect(config.taskState.activePlaceholderWorkflowStableValues).to.include({
 				communication_language: "English",
-				config_source: "_bmad/bmm/config.yaml",
+				config_source: ".cline/workflow-config.yaml",
 			})
 			expect(saveMetadataStub.calledOnce).to.equal(true)
 			expect(saveMetadataStub.firstCall.args[1].activePlaceholderWorkflowStableValues).to.include({
 				communication_language: "English",
-				config_source: "_bmad/bmm/config.yaml",
+				config_source: ".cline/workflow-config.yaml",
 			})
 		} finally {
 			sandbox.restore()
@@ -1079,6 +1089,7 @@ Inspect the prepared review input and write findings.`,
 				type: "global",
 				name: "global-review.md",
 				path: workflowPath,
+				configPath: getCanonicalWorkflowConfigPath(process.cwd()),
 			})
 			expect(saveMetadataStub.calledOnce).to.equal(true)
 		} finally {
@@ -1094,7 +1105,7 @@ Inspect the prepared review input and write findings.`,
 			tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "use-skill-local-rendered-"))
 			const workflowPath = path.join(tempDir, ".cline", "skills", "custom-review", "custom-review.md")
 			const manifestPath = path.join(tempDir, "_bmad", "_config", "skill-manifest.csv")
-			const configPath = path.join(tempDir, "_bmad", "bmm", "config.yaml")
+			const configPath = getCanonicalWorkflowConfigPath(tempDir)
 			await fs.mkdir(path.dirname(workflowPath), { recursive: true })
 			await fs.mkdir(path.dirname(manifestPath), { recursive: true })
 			await fs.mkdir(path.dirname(configPath), { recursive: true })
@@ -1134,7 +1145,7 @@ Inspect the prepared review input and write findings.`,
 			}
 			config.taskState.activePlaceholderWorkflowStableValues = {
 				story_id: "1.0",
-				config_source: "_bmad/bmm/config.yaml",
+				config_source: ".cline/workflow-config.yaml",
 			}
 			config.taskState.activePlaceholderWorkflowValues = {
 				story_id: "1.2",
@@ -1154,7 +1165,7 @@ Inspect the prepared review input and write findings.`,
 			expect(String(result)).to.not.contain("{{story_id}}")
 			expect(config.taskState.activePlaceholderWorkflowStableValues).to.include({
 				story_id: "1.0",
-				config_source: "_bmad/bmm/config.yaml",
+				config_source: ".cline/workflow-config.yaml",
 			})
 			expect(config.taskState.activePlaceholderWorkflowValues).to.deep.equal({
 				story_id: "1.2",
@@ -1208,6 +1219,7 @@ Inspect the prepared review input and write findings.`,
 				type: "remote",
 				name: "remote-review",
 				contents: "# Remote review\nCheck the config.",
+				configPath: getCanonicalWorkflowConfigPath(process.cwd()),
 			})
 			expect(saveMetadataStub.calledOnce).to.equal(true)
 		} finally {

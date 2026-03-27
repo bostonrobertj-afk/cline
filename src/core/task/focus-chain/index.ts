@@ -6,6 +6,7 @@ import {
 	buildPlaceholderWorkflowChecklist,
 	getActivePlaceholderWorkflowStepDetails,
 } from "@/core/workflows/placeholder-workflow-step-details"
+import { findUnresolvedWorkflowPlaceholders } from "@/core/workflows/workflow-placeholders"
 import { telemetryService } from "@/services/telemetry"
 import { isFocusChainCompleteNextStepSentinel } from "@/shared/focus-chain-utils"
 import { Logger } from "@/shared/services/Logger"
@@ -349,12 +350,15 @@ export class FocusChainManager {
 			const userUpdatedWarning = this.taskState.todoListWasUpdatedByUser
 				? "**CRITICAL INFORMATION:** I updated this checklist manually. Review the current checklist carefully before you continue."
 				: ""
+			const unresolvedPlaceholders = findUnresolvedWorkflowPlaceholders(stepDetails.details)
 			logFocusChainDiagnosticEvent(this.taskId, "placeholder_step_prompt_resolution", {
 				entered: true,
 				resolved: true,
 				checklistLabel: stepDetails.checklistLabel,
 				hasActivePlaceholderWorkflowSource: !!this.taskState.activePlaceholderWorkflowSource,
 				currentChecklistItems: parseFocusChainListCounts(currentChecklist).totalItems,
+				unresolvedPlaceholderCount: unresolvedPlaceholders.length,
+				unresolvedPlaceholders: unresolvedPlaceholders.length > 0 ? unresolvedPlaceholders : undefined,
 			})
 
 			return this.joinPromptSections(

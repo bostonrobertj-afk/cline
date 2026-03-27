@@ -92,10 +92,12 @@ describe("ManagedWorkflowController", () => {
 				user_name: "Rob",
 				communication_language: "English",
 				output_folder: "/workspace/project/output",
+				story_id: "1.0",
 			},
 			dynamicPlaceholders: {
 				research_topic: "token resolution",
 				validation_report_path: "reports/validation.md",
+				story_id: "1.2",
 			},
 			phases: [
 				{
@@ -104,12 +106,12 @@ describe("ManagedWorkflowController", () => {
 					sourcePath: "phase-1.md",
 					sourceContent: "# Phase 1",
 					completed: false,
-					checkpointText: "Confirm {validation_report_path}",
+					checkpointText: "Confirm {validation_report_path} for {{story_id}} and keep {missing_report} visible",
 					items: [
 						{
 							id: "phase-1::item-1",
-							label: "Ask {user_name} about {{research_topic}}",
-							sourceText: "Ask {user_name} about {{research_topic}}",
+							label: "Ask {user_name} about {{research_topic}} in story {{story_id}}",
+							sourceText: "Ask {user_name} about {{research_topic}} in story {{story_id}}",
 							completed: false,
 							blocked: true,
 						},
@@ -125,9 +127,9 @@ describe("ManagedWorkflowController", () => {
 		const taskProgress = renderManagedWorkflowTaskProgress(run)
 
 		expect(prompt).to.contain("Current phase: Review Cline")
-		expect(prompt).to.contain("Current checkpoint: Confirm reports/validation.md")
+		expect(prompt).to.contain("Current checkpoint: Confirm reports/validation.md for 1.2 and keep {missing_report} visible")
 		expect(prompt).to.contain("Current phase checkpoint:")
-		expect(taskProgress).to.contain("Review Cline: Ask Rob about token resolution")
+		expect(taskProgress).to.contain("Review Cline: Ask Rob about token resolution in story 1.2")
 		expect(taskProgress).to.contain("(Checkpoint)")
 	})
 

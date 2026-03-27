@@ -7,7 +7,13 @@ import {
 import type { LoadedResolvedWorkflowContent } from "@core/workflows/resolution/loadResolvedWorkflowContent"
 import { loadResolvedWorkflowContent } from "@core/workflows/resolution/loadResolvedWorkflowContent"
 import type { ResolvedWorkflowEntry } from "@core/workflows/resolution/resolveAvailableWorkflows"
-import { buildWorkflowStablePlaceholders } from "@core/workflows/workflow-placeholders"
+import {
+	buildWorkflowStablePlaceholders,
+	findUnresolvedWorkflowPlaceholders,
+	getCanonicalWorkflowConfigPath,
+} from "@core/workflows/workflow-placeholders"
+import fs from "fs/promises"
+import { Logger } from "@/shared/services/Logger"
 import { startOrResumeManagedWorkflowRun } from "./managed-workflows/ManagedWorkflowController"
 import type { ManagedWorkflowRunState } from "./managed-workflows/types"
 import type { TaskState } from "./TaskState"
@@ -69,14 +75,36 @@ export async function activatePlaceholderWorkflowInTaskState(args: {
 		!isSameActivePlaceholderWorkflowSource(args.taskState.activePlaceholderWorkflowSource, workflowSource)
 	const stablePlaceholderValues = await buildWorkflowStablePlaceholders({
 		cwd: args.cwd,
-		configPath: workflowSource.configPath,
 	})
+	const canonicalConfigPath = getCanonicalWorkflowConfigPath(args.cwd)
+	const canonicalConfigFound = await fs
+		.access(canonicalConfigPath)
+		.then(() => true)
+		.catch(() => false)
 	const placeholderValues = workflowChanged ? undefined : args.taskState.activePlaceholderWorkflowValues
 	const renderedWorkflowContents = await getRenderedActivePlaceholderWorkflowSourceContents({
 		source: workflowSource,
 		stablePlaceholderValues,
 		placeholderValues,
 	})
+	const unresolvedPlaceholders = findUnresolvedWorkflowPlaceholders(renderedWorkflowContents)
+	Logger.info(
+		`[WorkflowActivation] placeholder_workflow_stable_config ${JSON.stringify({
+			workflowId: args.workflow.name,
+			workflowSourceType: workflowSource.type,
+			canonicalConfigPath,
+			canonicalConfigFound,
+			stablePlaceholderCount: Object.keys(stablePlaceholderValues).length,
+			stablePlaceholdersLoadedFromConfig: canonicalConfigFound && Object.keys(stablePlaceholderValues).length > 4,
+			hasOutputFolder: stablePlaceholderValues.output_folder !== undefined,
+			hasCommunicationLanguage: stablePlaceholderValues.communication_language !== undefined,
+			hasProjectName: stablePlaceholderValues.project_name !== undefined,
+			loadedStableKeysSample: ["output_folder", "communication_language", "project_name"].filter(
+				(key) => stablePlaceholderValues[key] !== undefined,
+			),
+			unresolvedPlaceholderCount: unresolvedPlaceholders.length,
+		})}`,
+	)
 
 	if (args.clearActiveWorkflowId) {
 		args.taskState.activeWorkflowId = undefined
@@ -119,6 +147,12 @@ export async function buildActivePlaceholderWorkflowActivationInstructions(taskS
 	const renderedWorkflowContents = await renderActivePlaceholderWorkflowReminder(taskState)
 	if (!renderedWorkflowContents || !taskState.activePlaceholderWorkflowSource) {
 		return undefined
+	}
+	const unresolvedPlaceholders = findUnresolvedWorkflowPlaceholders(renderedWorkflowContents)
+	if (unresolvedPlaceholders.length > 0) {
+		Logger.info(
+			`[WorkflowActivation] unresolved placeholders remain in activation instructions for ${taskState.activePlaceholderWorkflowSource.name}: ${unresolvedPlaceholders.join(", ")}`,
+		)
 	}
 
 	return `<explicit_instructions type="${taskState.activePlaceholderWorkflowSource.name}">\n${renderedWorkflowContents}\n</explicit_instructions>\n`

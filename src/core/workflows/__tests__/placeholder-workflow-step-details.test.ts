@@ -9,6 +9,7 @@ import {
 	buildPlaceholderWorkflowChecklist,
 	getActivePlaceholderWorkflowStepDetails,
 } from "../placeholder-workflow-step-details"
+import { getCanonicalWorkflowConfigPath } from "../workflow-placeholders"
 
 const SAMPLE_WORKFLOW = `# Review Workflow
 
@@ -61,6 +62,55 @@ describe("placeholder workflow step details", () => {
 		})
 
 		expect(checklist).to.equal("- [ ] Step 1: Gather Context\n- [ ] Step 2: Review")
+	})
+
+	it("resolves stable placeholders while preserving unresolved dynamic tokens in step details", async () => {
+		const workflow = `# Review Workflow
+
+## Step 1: Gather Context
+Write notes to {output_folder}/notes.md and keep {{story_id}} visible until it is set.
+`
+
+		const result = await getActivePlaceholderWorkflowStepDetails({
+			checklistMarkdown: "- [ ] Step 1: Gather Context",
+			source: {
+				type: "remote",
+				name: "remote-review",
+				contents: workflow,
+			},
+			stablePlaceholderValues: {
+				output_folder: "/workspace/output",
+			},
+		})
+
+		expect(result?.details).to.contain("/workspace/output/notes.md")
+		expect(result?.details).to.contain("{{story_id}}")
+	})
+
+	it("lets dynamic placeholder values override stable workflow values", async () => {
+		const workflow = `# Review Workflow
+
+## Step 1: Gather Context
+Review story {{story_id}} before continuing.
+`
+
+		const result = await getActivePlaceholderWorkflowStepDetails({
+			checklistMarkdown: "- [ ] Step 1: Gather Context",
+			source: {
+				type: "remote",
+				name: "remote-review",
+				contents: workflow,
+			},
+			stablePlaceholderValues: {
+				story_id: "1.0",
+			},
+			placeholderValues: {
+				story_id: "1.2",
+			},
+		})
+
+		expect(result?.details).to.contain("Review story 1.2 before continuing.")
+		expect(result?.details).to.not.contain("1.0")
 	})
 
 	it("builds checklist rows from ### Step N - Title headings without affecting detail extraction", async () => {
@@ -179,23 +229,13 @@ Inspect the prepared review input and write findings.
 		}
 	})
 
-	it("discovers configPath for local placeholder workflows from the BMAD skill manifest", async () => {
+	it("uses the canonical workflow config path for local placeholder workflows", async () => {
 		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "placeholder-workflow-config-discovery-"))
 		const workflowPath = path.join(tempDir, ".cline", "skills", "custom-review", "custom-review.md")
-		const manifestPath = path.join(tempDir, "_bmad", "_config", "skill-manifest.csv")
-		const configPath = path.join(tempDir, "_bmad", "bmm", "config.yaml")
+		const configPath = getCanonicalWorkflowConfigPath(tempDir)
 		await fs.mkdir(path.dirname(workflowPath), { recursive: true })
-		await fs.mkdir(path.dirname(manifestPath), { recursive: true })
 		await fs.mkdir(path.dirname(configPath), { recursive: true })
 		await fs.writeFile(workflowPath, SAMPLE_WORKFLOW, "utf8")
-		await fs.writeFile(
-			manifestPath,
-			[
-				"canonicalId,name,description,module,path,install_to_bmad",
-				'"custom-review","custom-review","Custom review workflow","bmm","_bmad/bmm/workflows/custom-review/SKILL.md","true"',
-			].join("\n"),
-			"utf8",
-		)
 		await fs.writeFile(configPath, 'communication_language: "English"\n', "utf8")
 
 		try {

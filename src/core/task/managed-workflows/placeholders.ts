@@ -1,4 +1,3 @@
-import path from "path"
 import {
 	buildWorkflowStablePlaceholders,
 	mergeWorkflowPlaceholderMaps,
@@ -31,12 +30,9 @@ export function getManagedWorkflowPlaceholderMap(
 
 export async function buildManagedWorkflowStablePlaceholders(
 	cwd: string,
-	moduleName: string,
+	_moduleName: string,
 ): Promise<ManagedWorkflowPlaceholderMap> {
-	return buildWorkflowStablePlaceholders({
-		cwd,
-		configPath: path.resolve(cwd, "_bmad", moduleName, "config.yaml"),
-	})
+	return buildWorkflowStablePlaceholders({ cwd })
 }
 
 export function updateManagedWorkflowDynamicPlaceholders(

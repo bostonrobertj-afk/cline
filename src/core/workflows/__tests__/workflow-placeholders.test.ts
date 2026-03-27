@@ -3,7 +3,7 @@ import fs from "fs/promises"
 import { describe, it } from "mocha"
 import os from "os"
 import path from "path"
-import { buildWorkflowStablePlaceholders } from "../workflow-placeholders"
+import { buildWorkflowStablePlaceholders, getCanonicalWorkflowConfigPath } from "../workflow-placeholders"
 
 describe("workflow placeholders", () => {
 	it("builds built-in stable placeholders even without a config file", async () => {
@@ -14,12 +14,12 @@ describe("workflow placeholders", () => {
 		expect(placeholders.project_root).to.equal(cwd)
 		expect(placeholders.cwd).to.equal(cwd)
 		expect(placeholders.date).to.match(/^\d{4}-\d{2}-\d{2}$/)
-		expect(placeholders.config_source).to.equal(undefined)
+		expect(placeholders.config_source).to.equal(".cline/workflow-config.yaml")
 	})
 
 	it("loads config values and resolves nested placeholders recursively", async () => {
 		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "workflow-placeholders-config-"))
-		const configPath = path.join(tempDir, "_bmad", "bmm", "config.yaml")
+		const configPath = getCanonicalWorkflowConfigPath(tempDir)
 		await fs.mkdir(path.dirname(configPath), { recursive: true })
 		await fs.writeFile(
 			configPath,
@@ -35,14 +35,13 @@ describe("workflow placeholders", () => {
 		try {
 			const placeholders = await buildWorkflowStablePlaceholders({
 				cwd: tempDir,
-				configPath,
 			})
 
 			expect(placeholders.communication_language).to.equal("English")
 			expect(placeholders.project_name).to.equal(`${tempDir}/app`)
 			expect(placeholders.nested_path).to.equal(`${tempDir}/app/stories`)
-			expect(placeholders.config_source).to.equal("_bmad/bmm/config.yaml")
-			expect(placeholders.config_ref).to.equal("_bmad/bmm/config.yaml")
+			expect(placeholders.config_source).to.equal(".cline/workflow-config.yaml")
+			expect(placeholders.config_ref).to.equal(".cline/workflow-config.yaml")
 		} finally {
 			await fs.rm(tempDir, { recursive: true, force: true })
 		}
@@ -50,14 +49,13 @@ describe("workflow placeholders", () => {
 
 	it("leaves unresolved placeholders unchanged when config values cannot be fully resolved", async () => {
 		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "workflow-placeholders-unresolved-"))
-		const configPath = path.join(tempDir, "_bmad", "bmm", "config.yaml")
+		const configPath = getCanonicalWorkflowConfigPath(tempDir)
 		await fs.mkdir(path.dirname(configPath), { recursive: true })
 		await fs.writeFile(configPath, ['known_value: "resolved"', 'report_path: "{missing_value}/report.md"'].join("\n"), "utf8")
 
 		try {
 			const placeholders = await buildWorkflowStablePlaceholders({
 				cwd: tempDir,
-				configPath,
 			})
 
 			expect(placeholders.known_value).to.equal("resolved")
