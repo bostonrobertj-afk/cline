@@ -76,9 +76,26 @@ describe("getButtonConfig", () => {
 
 		const config = getButtonConfig(activeUserMessage, "act", "active_user")
 
-		expect(config).toEqual(BUTTON_CONFIGS.api_req_active)
+		expect(config).toEqual(BUTTON_CONFIGS.default)
 		expect(config.sendingDisabled).toBe(false)
-		expect(config.enableButtons).toBe(true)
+		expect(config.enableButtons).toBe(false)
+	})
+
+	it("suppresses stale partial controls for active_user threads", () => {
+		const stalePartialMessage: ClineMessage = {
+			type: "say",
+			say: "api_req_started",
+			partial: true,
+			ts: Date.now(),
+		}
+
+		const config = getButtonConfig(stalePartialMessage, "act", "active_user")
+
+		expect(config).toEqual(BUTTON_CONFIGS.default)
+		expect(config.primaryAction).toBeUndefined()
+		expect(config.secondaryAction).toBeUndefined()
+		expect(config.primaryText).not.toBe("Steer")
+		expect(config.secondaryText).not.toBe("Cancel")
 	})
 
 	// Test error recovery states

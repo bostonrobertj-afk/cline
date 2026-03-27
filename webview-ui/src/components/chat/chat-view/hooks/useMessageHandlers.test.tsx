@@ -112,4 +112,29 @@ describe("useMessageHandlers active_user routing", () => {
 		expect(chatState.setEnableButtons).toHaveBeenCalledWith(false)
 		expect(chatState.setInputValue).toHaveBeenCalledWith("")
 	})
+
+	it("does not degrade active_user sends into steer routing when the last row still looks streaming", async () => {
+		const messages: ClineMessage[] = [
+			{
+				ts: Date.now(),
+				type: "say",
+				say: "api_req_started",
+				partial: true,
+			},
+		]
+
+		const chatState = createChatState()
+		const { result } = renderHook(() => useMessageHandlers(messages, chatState))
+
+		await act(async () => {
+			await result.current.handleSendMessage("Follow-up despite stale partial", [], [])
+		})
+
+		expect(mockAskResponse).toHaveBeenCalledTimes(1)
+		const request = mockAskResponse.mock.calls[0]?.[0] as { responseType?: string; text?: string }
+		expect(request.responseType).toBe("messageResponse")
+		expect(request.text).toBe("Follow-up despite stale partial")
+		expect(chatState.setSendingDisabled).toHaveBeenCalledWith(true)
+		expect(chatState.setEnableButtons).toHaveBeenCalledWith(false)
+	})
 })

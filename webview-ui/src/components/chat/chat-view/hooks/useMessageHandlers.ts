@@ -114,6 +114,8 @@ export function useMessageHandlers(messages: ClineMessage[], chatState: ChatStat
 				} else if (messages.length > 0) {
 					// No clineAsk set - check if the thread is passively open or if a task is actively running.
 					const lastMessage = messages[messages.length - 1]
+					const lastMessageLooksStreaming =
+						lastMessage?.partial === true || (lastMessage?.type === "say" && lastMessage.say === "api_req_started")
 
 					if (isPassiveThreadOpenState) {
 						// Passive-open threads are conversationally open without a pending ask.
@@ -132,6 +134,15 @@ export function useMessageHandlers(messages: ClineMessage[], chatState: ChatStat
 					} else if (isActiveUserThreadState) {
 						// Active-user threads are the normal live next-turn handoff after a governed response tool.
 						// Send the message as the next human-authored turn rather than a passive reopen.
+						if (lastMessageLooksStreaming) {
+							console.info("[useMessageHandlers] active_user routing overrides stale streaming row", {
+								threadDisplayState,
+								lastMessageType: lastMessage?.type,
+								lastMessageSay: lastMessage?.type === "say" ? lastMessage.say : undefined,
+								lastMessagePartial: lastMessage?.partial === true,
+								route: "messageResponse",
+							})
+						}
 						await TaskServiceClient.askResponse(
 							AskResponseRequest.create({
 								responseType: "messageResponse",
@@ -143,8 +154,7 @@ export function useMessageHandlers(messages: ClineMessage[], chatState: ChatStat
 						messageSent = true
 					}
 
-					const isTaskRunning =
-						lastMessage.partial === true || (lastMessage.type === "say" && lastMessage.say === "api_req_started")
+					const isTaskRunning = !isActiveUserThreadState && lastMessageLooksStreaming
 
 					if (!messageSent && isTaskRunning) {
 						// Task is running - queue the message as steer feedback for the next outbound request.

@@ -77,7 +77,7 @@ Proposed remediation:
 - Keep one canonical helper for tagged human input blocks, then have the normal-next-turn variant compose from raw content rather than from another pre-tagged wrapper.
 - Add prompt-format tests covering both helpers so the normal-next-turn variant cannot reintroduce nested human-input markers.
 
-## Tool Use Prompt Section is embedded at the tail-end of the previous prompt section
+## Tool Use Prompt Section is embedded at the tail-end of the previous prompt section- RESOLVED
 Example:
 System Instructions
 Agent Metadata

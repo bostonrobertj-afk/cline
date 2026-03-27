@@ -11,6 +11,7 @@ const getWorkflowPlaceholderToolGuidance = (context: SystemPromptContext) =>
  * Base template for GPT-5 variant with structured sections
  */
 export const BASE = `{{${SystemPromptSection.AGENT_ROLE}}}
+====
 {{${SystemPromptSection.TOOL_USE}}}
 ====
 {{${SystemPromptSection.TASK_PROGRESS}}}

@@ -237,8 +237,22 @@ export function getButtonConfig(
 		return BUTTON_CONFIGS.default
 	}
 
+	const isActiveUserThread = threadDisplayState === "active_user"
 	const isStreaming = message.partial === true
 	const isError = message?.ask ? errorTypes.includes(message.ask) : false
+	const isApiReqStartedSay = message.type === "say" && message.say === "api_req_started"
+
+	if (isActiveUserThread && message.type !== "ask") {
+		if (isStreaming || isApiReqStartedSay) {
+			console.info("[buttonConfig] active_user override suppressing stale running state", {
+				threadDisplayState,
+				messageType: message.type,
+				messageSay: message.type === "say" ? message.say : undefined,
+				partial: message.partial === true,
+			})
+		}
+		return BUTTON_CONFIGS.default
+	}
 
 	// Special case: command_output should show "Proceed While Running" button even while streaming
 	// This allows terminal output to stream while still showing the action button
