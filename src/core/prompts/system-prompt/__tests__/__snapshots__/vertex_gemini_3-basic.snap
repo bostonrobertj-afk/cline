@@ -8,15 +8,13 @@ When using tools, proceed directly with tool calls. Save explanations for the ap
 
 RESPONSE TOOLS
 Use these tools to respond to the user. A reply reaches the human user only when you use the appropriate response tool.
-Governed user-facing response flows share one contract:
-- Success displays the message, returns `[Message displayed.]`, and ends your current turn.
 
 - `attempt_completion`: Use once at the end of each workflow
 - `send_user_message`: Use by default to send messages to the user
 - `ask_followup_question`: Use to ask a question + present options for user to select
 - `generate_plan_output`: Use to present a structured plan
 
-In ACT MODE, respond using these: `attempt_completion`, `ask_followup_question`, `act_mode_respond` and `send_user_message`. In PLAN MODE, respond using these: `generate_plan_output`, `ask_followup_question` and `send_user_message`.
+In ACT MODE, respond using these: `attempt_completion`, `ask_followup_question` and `send_user_message`. In PLAN MODE, respond using these: `generate_plan_output`, `ask_followup_question` and `send_user_message`.
 
 ====
 
@@ -266,9 +264,7 @@ You accomplish a given task iteratively, breaking it down into clear steps and w
 
 USER'S CUSTOM INSTRUCTIONS
 
-The following additional instructions are provided by the user, and should be followed to the best of your ability without interfering with the TOOL USE guidelines.
-The instructions in this section are not the raw message from the user. They are custom instructions that the user has configured. The user intends for you to review and follow these instructions at all times.
-If this turn includes a new message directly from the user, it will be found under the [LATEST HUMAN INPUT] label. If you do not see [LATEST HUMAN INPUT] that means this turn's input is entirely system generated.
+General Instructions for This Repo:
 Prefer TypeScript
 
 Follow global rules

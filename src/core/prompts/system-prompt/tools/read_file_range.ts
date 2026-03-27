@@ -6,7 +6,7 @@ import { TASK_PROGRESS_PARAMETER } from "../types"
 const id = ClineDefaultTool.FILE_READ_RANGE
 
 const description =
-	"Request to read only a specific 1-based line range from a text file. Use this after search_files or list_code_definition_names has already narrowed the problem to a focused region, or when you need a targeted refresher without replaying the entire file."
+	"Request to read only a specific 1-based line range from a text file. {{READ_FILE_RANGE_EXPLORATION_GUIDANCE}}"
 
 const parameters: ClineToolSpec["parameters"] = [
 	{

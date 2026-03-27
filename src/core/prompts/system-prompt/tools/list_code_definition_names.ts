@@ -10,7 +10,7 @@ const generic: ClineToolSpec = {
 	id,
 	name: "list_code_definition_names",
 	description:
-		"Request to list definition names (classes, functions, methods, etc.) used in source code files at the top level of the specified directory. Results include human-friendly 1-based line numbers so you can target a later read_file or read_file_range call instead of loading large files blindly.",
+		"Request to list definition names (classes, functions, methods, etc.) used in source code files at the top level of the specified directory. {{LIST_CODE_DEFINITION_NAMES_EXPLORATION_GUIDANCE}}",
 	parameters: [
 		{
 			name: "path",
@@ -27,7 +27,7 @@ const NATIVE_GPT_5: ClineToolSpec = {
 	id,
 	name: "list_code_definition_names",
 	description:
-		"Request to list definition names (classes, functions, methods, etc.) used in source code files at the top level of the specified directory. Results include human-friendly 1-based line numbers so you can target a later read_file or read_file_range call instead of loading large files blindly.",
+		"Request to list definition names (classes, functions, methods, etc.) used in source code files at the top level of the specified directory. {{LIST_CODE_DEFINITION_NAMES_EXPLORATION_GUIDANCE}}",
 	parameters: [
 		{
 			name: "path",

@@ -1,11 +1,21 @@
 import { expect } from "chai"
 import { describe, it } from "mocha"
+import type { McpHub } from "@/services/mcp/McpHub"
 import { ModelFamily } from "@/shared/prompts"
 import { ClineDefaultTool } from "@/shared/tools"
+import {
+	getIndxrToolMatches,
+	hasConnectedIndxrServer,
+	hasDistinctiveIndxrToolSignature,
+	isIndxrToolName,
+} from "../components/mcp"
 import type { ClineToolSpec } from "../spec"
 import { toolSpecFunctionDeclarations, toolSpecFunctionDefinition, toolSpecInputSchema } from "../spec"
+import { list_code_definition_names_variants } from "../tools/list_code_definition_names"
 import { read_file_range_variants } from "../tools/read_file_range"
+import { search_files_variants } from "../tools/search_files"
 import { set_workflow_placeholders_variants } from "../tools/set_workflow_placeholders"
+import { use_mcp_tool_variants } from "../tools/use_mcp_tool"
 import type { SystemPromptContext } from "../types"
 
 const mockContext: SystemPromptContext = {
@@ -17,6 +27,26 @@ const mockContext: SystemPromptContext = {
 	providerInfo: { providerId: "test", model: { id: "test-model", info: { supportsPromptCache: false } }, mode: "act" },
 	enableNativeToolCalls: false,
 	isTesting: true,
+}
+
+const makeMcpHub = (servers: any[]): McpHub =>
+	({
+		getServers: () => servers,
+	}) as unknown as McpHub
+
+const indxrContext: SystemPromptContext = {
+	...mockContext,
+	mcpHub: makeMcpHub([
+		{
+			name: "workspace-index",
+			status: "connected",
+			config: '{"command":"indxr"}',
+			tools: [
+				{ name: "search_relevant", description: "Search relevant code", inputSchema: { type: "object", properties: {} } },
+				{ name: "get_file_summary", description: "Summarize file", inputSchema: { type: "object", properties: {} } },
+			],
+		},
+	]),
 }
 
 const makeTool = (overrides?: Partial<ClineToolSpec>): ClineToolSpec => ({
@@ -81,6 +111,94 @@ describe("toolSpecFunctionDeclarations (Gemini)", () => {
 
 		const param = result.parameters?.properties?.["empty"] as any
 		expect(param.description).to.be.undefined
+	})
+})
+
+describe("Indxr MCP detection", () => {
+	it("detects Indxr by connected tool signature", () => {
+		expect(isIndxrToolName("search_relevant")).to.equal(true)
+		expect(isIndxrToolName("get_file_summary")).to.equal(true)
+		expect(getIndxrToolMatches((indxrContext.mcpHub as McpHub).getServers()[0] as any)).to.deep.equal([
+			"search_relevant",
+			"get_file_summary",
+		])
+		expect(hasDistinctiveIndxrToolSignature((indxrContext.mcpHub as McpHub).getServers()[0] as any)).to.equal(true)
+		expect(hasConnectedIndxrServer(indxrContext)).to.equal(true)
+	})
+
+	it("does not treat a server name alone as Indxr availability", () => {
+		const context: SystemPromptContext = {
+			...mockContext,
+			mcpHub: makeMcpHub([
+				{
+					name: "indxr",
+					status: "connected",
+					config: '{"command":"indxr"}',
+					tools: [{ name: "plain_tool", description: "Not Indxr", inputSchema: { type: "object", properties: {} } }],
+				},
+			]),
+		}
+
+		expect(hasConnectedIndxrServer(context)).to.equal(false)
+	})
+
+	it("does not trigger on read_source alone", () => {
+		const context: SystemPromptContext = {
+			...mockContext,
+			mcpHub: makeMcpHub([
+				{
+					name: "generic-code-reader",
+					status: "connected",
+					config: '{"command":"generic"}',
+					tools: [{ name: "read_source", description: "Read source", inputSchema: { type: "object", properties: {} } }],
+				},
+			]),
+		}
+
+		const server = (context.mcpHub as McpHub).getServers()[0] as any
+		expect(getIndxrToolMatches(server)).to.deep.equal(["read_source"])
+		expect(hasDistinctiveIndxrToolSignature(server)).to.equal(false)
+		expect(hasConnectedIndxrServer(context)).to.equal(false)
+	})
+
+	it("does not trigger on a single anchor tool match", () => {
+		const context: SystemPromptContext = {
+			...mockContext,
+			mcpHub: makeMcpHub([
+				{
+					name: "searchish",
+					status: "connected",
+					config: '{"command":"search"}',
+					tools: [
+						{
+							name: "search_relevant",
+							description: "Search relevant",
+							inputSchema: { type: "object", properties: {} },
+						},
+					],
+				},
+			]),
+		}
+
+		const server = (context.mcpHub as McpHub).getServers()[0] as any
+		expect(getIndxrToolMatches(server)).to.deep.equal(["search_relevant"])
+		expect(hasDistinctiveIndxrToolSignature(server)).to.equal(false)
+		expect(hasConnectedIndxrServer(context)).to.equal(false)
+	})
+
+	it("triggers on an anchor tool plus an additional Indxr match", () => {
+		const server = {
+			name: "workspace-index",
+			status: "connected",
+			config: '{"command":"indxr"}',
+			tools: [
+				{ name: "get_token_estimate", description: "Token estimate", inputSchema: { type: "object", properties: {} } },
+				{ name: "read_source", description: "Read source", inputSchema: { type: "object", properties: {} } },
+			],
+		} as any
+
+		expect(getIndxrToolMatches(server)).to.deep.equal(["get_token_estimate", "read_source"])
+		expect(hasDistinctiveIndxrToolSignature(server)).to.equal(true)
 	})
 })
 
@@ -179,6 +297,62 @@ describe("native tool placeholder replacement", () => {
 		expect(openAI.function.parameters.properties.input.description).to.equal("Complete `apply_patch` command to execute.")
 		expect(openAI.function.parameters.properties.task_progress.description).to.equal(
 			"Top-level tool parameter, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step.",
+		)
+	})
+
+	it("keeps native compact exploration tool descriptions unchanged when Indxr is absent", () => {
+		const context: SystemPromptContext = {
+			...mockContext,
+			enableNativeToolCalls: true,
+			useMinimalGptPrompt: true,
+			providerInfo: {
+				providerId: "openai",
+				model: { id: "gpt-5.4-2026-03-05", info: { supportsPromptCache: false } },
+				mode: "act",
+			},
+		}
+
+		const searchTool = toolSpecFunctionDefinition(search_files_variants[1], context) as any
+		const defsTool = toolSpecFunctionDefinition(list_code_definition_names_variants[1], context) as any
+		const rangeTool = toolSpecFunctionDefinition(read_file_range_variants[1], context) as any
+
+		expect(searchTool.function.description).to.equal(
+			"Request to perform a regex search across files in a specified directory, providing context-rich results.",
+		)
+		expect(defsTool.function.description).to.equal(
+			"Request to list definition names (classes, functions, methods, etc.) used in source code files at the top level of the specified directory.",
+		)
+		expect(rangeTool.function.description).to.equal("Request to read only a specific 1-based line range from a text file.")
+	})
+
+	it("switches native compact exploration descriptions when Indxr is connected", () => {
+		const context: SystemPromptContext = {
+			...indxrContext,
+			enableNativeToolCalls: true,
+			useMinimalGptPrompt: true,
+			providerInfo: {
+				providerId: "openai",
+				model: { id: "gpt-5.4-2026-03-05", info: { supportsPromptCache: false } },
+				mode: "act",
+			},
+		}
+
+		const searchTool = toolSpecFunctionDefinition(search_files_variants[1], context) as any
+		const defsTool = toolSpecFunctionDefinition(list_code_definition_names_variants[1], context) as any
+		const rangeTool = toolSpecFunctionDefinition(read_file_range_variants[1], context) as any
+		const mcpTool = toolSpecFunctionDefinition(use_mcp_tool_variants[0], context) as any
+
+		expect(searchTool.function.description).to.equal(
+			"Regex-search raw files when Indxr is unavailable, insufficient, or when regex search is the better fit.",
+		)
+		expect(defsTool.function.description).to.equal(
+			"List top-level definitions in a directory when Indxr is unavailable, insufficient, or when a built-in definition pass is the better fit.",
+		)
+		expect(rangeTool.function.description).to.equal(
+			"Read an exact 1-based line range after Indxr or other exploration tools have isolated a raw file region that needs direct inspection.",
+		)
+		expect(mcpTool.function.description).to.equal(
+			"Use a connected MCP tool. When Indxr is available, prefer its exploration tools for code exploration, structural summaries, and targeted source discovery before built-in file exploration.",
 		)
 	})
 

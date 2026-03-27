@@ -1,7 +1,7 @@
 import { Logger } from "@/shared/services/Logger"
 import type { ClineDefaultTool } from "@/shared/tools"
 import { ClineToolSet } from "../registry/ClineToolSet"
-import { type ClineToolSpec, resolveInstruction } from "../spec"
+import { type ClineToolSpec, replacePromptPlaceholders, resolveInstruction } from "../spec"
 import { STANDARD_PLACEHOLDERS } from "../templates/placeholders"
 import { TemplateEngine } from "../templates/TemplateEngine"
 import type { ComponentRegistry, PromptVariant, SystemPromptContext } from "../types"
@@ -151,7 +151,7 @@ export class PromptBuilder {
 		const useCompactToolSpecs = context.useMinimalGptPrompt === true
 		const displayName = config.name || config.id
 		const title = `## ${displayName}`
-		const description = [`Description: ${config.description}`]
+		const description = [`Description: ${replacePromptPlaceholders(config.description, context)}`]
 
 		if (!config.parameters?.length) {
 			config.parameters = []

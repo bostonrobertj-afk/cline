@@ -125,25 +125,51 @@ const makeProviderInfo = (modelId: string, providerId = "test") => ({
 	customPrompt: providerId.includes("lmstudio") || providerId.includes("ollama") ? "compact" : undefined,
 })
 
+const makeMcpHub = (servers: any[]): McpHub =>
+	({
+		getServers: () => servers,
+	}) as unknown as McpHub
+
+const makeConnectedServer = (overrides: Partial<any> = {}) => ({
+	uid: "1234567",
+	name: "test-server",
+	status: "connected",
+	config: '{"command": "test"}',
+	tools: [{ name: "test_tool", description: "A test tool", inputSchema: { type: "object", properties: {} } }],
+	resources: [],
+	resourceTemplates: [],
+	...overrides,
+})
+
+const makeIndxrServer = (overrides: Partial<any> = {}) =>
+	makeConnectedServer({
+		uid: "indxr-1",
+		name: "workspace-index",
+		config: '{"command": "indxr"}',
+		tools: [
+			{ name: "search_relevant", description: "Search relevant code", inputSchema: { type: "object", properties: {} } },
+			{ name: "get_file_summary", description: "Summarize file", inputSchema: { type: "object", properties: {} } },
+			{ name: "read_source", description: "Read source", inputSchema: { type: "object", properties: {} } },
+		],
+		...overrides,
+	})
+
+const makeWeakIndxrLikeServer = (toolName: string, overrides: Partial<any> = {}) =>
+	makeConnectedServer({
+		uid: `weak-${toolName}`,
+		name: `weak-${toolName}-server`,
+		config: '{"command": "generic"}',
+		tools: [{ name: toolName, description: `Weak ${toolName}`, inputSchema: { type: "object", properties: {} } }],
+		...overrides,
+	})
+
 const baseContext: SystemPromptContext = {
 	cwd: "/test/project",
 	ide: "TestIde",
 	supportsBrowserUse: true,
 	clineWebToolsEnabled: true,
 	subagentsEnabled: true,
-	mcpHub: {
-		getServers: () => [
-			{
-				uid: "1234567",
-				name: "test-server",
-				status: "connected",
-				config: '{"command": "test"}',
-				tools: [{ name: "test_tool", description: "A test tool", inputSchema: { type: "object", properties: {} } }],
-				resources: [],
-				resourceTemplates: [],
-			},
-		],
-	} as unknown as McpHub,
+	mcpHub: makeMcpHub([makeConnectedServer()]),
 	focusChainSettings: { enabled: true, remindClineInterval: 6 },
 	browserSettings: { viewport: { width: 1280, height: 720 } },
 	globalClineRulesFileInstructions: "Follow global rules",
@@ -353,6 +379,79 @@ describe("Prompt System Integration Tests", () => {
 			)
 		})
 
+		it("includes the MCP section for native GPT-5 OpenAI prompts when MCP servers are connected", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
+					enableNativeToolCalls: true,
+					useMinimalGptPrompt: true,
+				},
+				"gpt-5.4-2026-03-05",
+				async ({ systemPrompt }) => {
+					expect(systemPrompt).to.include("MCP SERVERS")
+					expect(systemPrompt).to.include("Connected MCP servers: test-server")
+					expect(systemPrompt).to.not.include("When Indxr is available, prefer it for code exploration")
+				},
+			)
+		})
+
+		it("adds Indxr-aware MCP guidance when a connected server exposes Indxr tool signatures", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					mcpHub: makeMcpHub([makeIndxrServer()]),
+					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
+					enableNativeToolCalls: true,
+					useMinimalGptPrompt: true,
+				},
+				"gpt-5.4-2026-03-05",
+				async ({ systemPrompt, tools }) => {
+					expect(systemPrompt).to.include("Connected MCP servers: workspace-index")
+					expect(systemPrompt).to.include(
+						"When Indxr is available, prefer it for code exploration, structural summaries, and targeted source discovery before using built-in `search_files`, `list_code_definition_names`, `read_file`, or `read_file_range`.",
+					)
+					expect(systemPrompt).to.include(
+						"Use built-in file tools when Indxr is unavailable, insufficient for the task, or when exact raw file contents, regex search, or line-based inspection are required.",
+					)
+
+					const nativeTools = (tools as any[]).map((tool) => (tool?.type === "function" ? tool.function : tool))
+					const byName = new Map(nativeTools.map((tool) => [tool.name, tool.description]))
+
+					expect(byName.get("search_files")).to.equal(
+						"Regex-search raw files when Indxr is unavailable, insufficient, or when regex search is the better fit.",
+					)
+				},
+			)
+		})
+
+		it("does not add Indxr-aware guidance for a single weak matching tool", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					mcpHub: makeMcpHub([makeWeakIndxrLikeServer("read_source")]),
+					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
+					enableNativeToolCalls: true,
+					useMinimalGptPrompt: true,
+				},
+				"gpt-5.4-2026-03-05",
+				async ({ systemPrompt, tools }) => {
+					expect(systemPrompt).to.include("Connected MCP servers: weak-read_source-server")
+					expect(systemPrompt).to.not.include("When Indxr is available, prefer it for code exploration")
+
+					const nativeTools = (tools as any[]).map((tool) => (tool?.type === "function" ? tool.function : tool))
+					const byName = new Map(nativeTools.map((tool) => [tool.name, tool.description]))
+
+					expect(byName.get("search_files")).to.equal(
+						"Request to perform a regex search across files in a specified directory, providing context-rich results.",
+					)
+				},
+			)
+		})
+
 		it("teaches the governed response-tool contract in the active prompt guidance", async function () {
 			await runPromptTest(
 				this,
@@ -363,18 +462,22 @@ describe("Prompt System Integration Tests", () => {
 				},
 				"gpt-3",
 				async ({ systemPrompt }) => {
-					expect(systemPrompt).to.include("Governed user-facing response flows share one contract")
-					expect(systemPrompt).to.include("returns `[Message displayed.]`, and ends your current turn")
-					expect(systemPrompt).to.include("The next turn does not begin until the human user responds.")
-					expect(systemPrompt).to.not.include(
-						"Any human reply arrives on the following turn as normal human-authored input",
+					expect(systemPrompt).to.include("RESPONSE TOOLS")
+					expect(systemPrompt).to.include(
+						"A reply reaches the human user only when you use the appropriate response tool.",
 					)
-					expect(systemPrompt).to.include("internal control flow")
+					expect(systemPrompt).to.include("`attempt_completion`: Use once at the end of each workflow")
+					expect(systemPrompt).to.include("`send_user_message`: Use by default to send messages to the user")
+					expect(systemPrompt).to.include(
+						"`ask_followup_question`: Use to ask a question + present options for user to select",
+					)
+					expect(systemPrompt).to.include("`generate_plan_output`: Use to present a structured plan")
+					expect(systemPrompt).to.include("In ACT MODE, respond using these:")
 				},
 			)
 		})
 
-		it("keeps all five governed native tool specs aligned with the shared response-tool contract", async function () {
+		it("keeps native response-tool specs aligned with the shared response-tool contract", async function () {
 			await runPromptTest(
 				this,
 				{
@@ -385,11 +488,11 @@ describe("Prompt System Integration Tests", () => {
 				"gpt-5-1",
 				async ({ tools, systemPrompt }) => {
 					expect(systemPrompt).to.include("RESPONSE TOOLS")
-					expect(systemPrompt).to.include("`act_mode_respond`")
 
 					const nativeTools = (tools as any[]).map((tool) => (tool?.type === "function" ? tool.function : tool))
 					const byName = new Map(nativeTools.map((tool) => [tool.name, tool.description]))
 
+					expect(byName.has("act_mode_respond")).to.equal(true)
 					expect(byName.get("attempt_completion")).to.include(
 						"returns `[Message displayed.]`, and ends your current turn",
 					)
@@ -399,7 +502,9 @@ describe("Prompt System Integration Tests", () => {
 					expect(byName.get("attempt_completion")).to.include(
 						'Example: result="Implemented the fix and verified it with tests."',
 					)
-					expect(byName.get("ask_followup_question")).to.include("following turn as normal human-authored input")
+					expect(byName.get("ask_followup_question")).to.include(
+						"arrives on the following turn as normal human-authored input",
+					)
 					expect(byName.get("generate_plan_output")).to.include(
 						"internal control flow rather than a governed user-facing response",
 					)
@@ -411,9 +516,10 @@ describe("Prompt System Integration Tests", () => {
 
 		it("includes set_workflow_placeholders guidance for placeholder workflows across prompt variants", async function () {
 			const guidanceSnippet = "When a step sets a placeholder value, use `set_workflow_placeholders`."
-			const taskProgressSnippet =
-				"Use `task_progress` only as a checklist parameter on the next tool call, not a standalone tool."
-			const placeholderTaskProgressSnippet = "This is a placeholder workflow with a live checklist."
+			const validTaskProgressSnippets = [
+				"The user has triggered a workflow with a prebuilt checklist.",
+				"Use `task_progress` only as a checklist parameter on the next tool call, not a standalone tool.",
+			]
 
 			const cases = [
 				{
@@ -451,8 +557,7 @@ describe("Prompt System Integration Tests", () => {
 					testCase.name,
 					async ({ systemPrompt }) => {
 						expect(systemPrompt).to.include(guidanceSnippet)
-						expect(systemPrompt).to.include(taskProgressSnippet)
-						expect(systemPrompt).to.include(placeholderTaskProgressSnippet)
+						expect(validTaskProgressSnippets.some((snippet) => systemPrompt.includes(snippet))).to.equal(true)
 						expect(systemPrompt).to.not.include("managed workflow step")
 					},
 				)

@@ -10,6 +10,8 @@ export const BASE = `{{${SystemPromptSection.AGENT_ROLE}}}
 ====
 {{${SystemPromptSection.TASK_PROGRESS}}}
 ====
+{{${SystemPromptSection.MCP}}}
+====
 {{${SystemPromptSection.ACT_VS_PLAN}}}
 ====
 {{${SystemPromptSection.SKILLS}}}

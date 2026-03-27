@@ -46,10 +46,10 @@ describe("placeholder workflow task progress prompt", () => {
 			activeWorkflowSupportsPlaceholders: true,
 		})
 
-		expect(progress).to.contain("This is a placeholder workflow with a live checklist.")
-		expect(progress).to.contain("use `set_workflow_placeholders` on that step's tool call")
+		expect(progress).to.contain("The user has triggered a workflow with a prebuilt checklist.")
+		expect(progress).to.contain("Instructions are automatically sent for the first incomplete item on the checklist")
 		expect(progress).to.contain(
-			"Use `task_progress` only as a checklist parameter on the next tool call, not a standalone tool.",
+			"Use `task_progress` with `__COMPLETE_NEXT_STEP__` as the value when ready to complete a step.",
 		)
 	})
 })

@@ -4,6 +4,7 @@ import { ChatCompletionTool as OpenAITool } from "openai/resources/chat/completi
 import { FunctionTool as OpenAIResponseFunctionTool, Tool as OpenAIResponseTool } from "openai/resources/responses/responses"
 import { ModelFamily } from "@/shared/prompts"
 import type { ClineDefaultTool } from "@/shared/tools"
+import { hasConnectedIndxrServer, replacePromptPlaceholders as replaceMcpPromptPlaceholders } from "./components/mcp"
 import { MULTI_ROOT_HINT } from "./constants"
 import type { SystemPromptContext } from "./types"
 
@@ -171,7 +172,7 @@ export function toolSpecInputSchema(tool: ClineToolSpec, context: SystemPromptCo
 			// Build parameter schema
 			const paramSchema: any = {
 				type: paramType,
-				description: replacer(resolveInstruction(param.instruction, context), context),
+				description: replacePromptPlaceholders(resolveInstruction(param.instruction, context), context),
 			}
 
 			// Add items for array types
@@ -216,7 +217,7 @@ export function toolSpecInputSchema(tool: ClineToolSpec, context: SystemPromptCo
 	// Build the Tool object
 	const toolInputSchema: AnthropicTool = {
 		name: tool.name,
-		description: replacer(tool.description, context),
+		description: replacePromptPlaceholders(tool.description, context),
 		input_schema: {
 			type: "object",
 			properties,
@@ -271,7 +272,7 @@ export function toolSpecFunctionDeclarations(tool: ClineToolSpec, context: Syste
 			}
 
 			if (param.instruction) {
-				const desc = replacer(resolveInstruction(param.instruction, context), context)
+				const desc = replacePromptPlaceholders(resolveInstruction(param.instruction, context), context)
 				if (desc) {
 					paramSchema.description = desc
 				}
@@ -286,7 +287,7 @@ export function toolSpecFunctionDeclarations(tool: ClineToolSpec, context: Syste
 					}
 					paramSchema.properties[key] = {
 						type: GOOGLE_TOOL_PARAM_MAP[prop.type || "string"] || GoogleToolParamType.OBJECT,
-						description: replacer(resolveInstruction(param.instruction, context), context),
+						description: replacePromptPlaceholders(resolveInstruction(param.instruction, context), context),
 					}
 
 					// Handle enum values
@@ -302,7 +303,7 @@ export function toolSpecFunctionDeclarations(tool: ClineToolSpec, context: Syste
 
 	const googleTool: GoogleTool = {
 		name: tool.name,
-		description: replacer(tool.description, context),
+		description: replacePromptPlaceholders(tool.description, context),
 		parameters: {
 			type: GoogleToolParamType.OBJECT,
 			properties,
@@ -401,17 +402,20 @@ export function toOpenAIResponsesAPITool(openAITool: OpenAITool): OpenAIResponse
 /**
  * Replaces template placeholders in descriptions for native tool schemas.
  */
-function replacer(description: string, context: SystemPromptContext): string {
+export function replacePromptPlaceholders(description: string, context: SystemPromptContext): string {
 	const width = context.browserSettings?.viewport?.width || 900
 	const height = context.browserSettings?.viewport?.height || 600
 	const cwd = context.cwd || process.cwd()
 	const multiRootHint = context.isMultiRootEnabled ? MULTI_ROOT_HINT : ""
 
-	return description
-		.replace(/{{BROWSER_VIEWPORT_WIDTH}}/g, String(width))
-		.replace(/{{BROWSER_VIEWPORT_HEIGHT}}/g, String(height))
-		.replace(/{{CWD}}/g, cwd)
-		.replace(/{{MULTI_ROOT_HINT}}/g, multiRootHint)
+	return replaceMcpPromptPlaceholders(
+		description
+			.replace(/{{BROWSER_VIEWPORT_WIDTH}}/g, String(width))
+			.replace(/{{BROWSER_VIEWPORT_HEIGHT}}/g, String(height))
+			.replace(/{{CWD}}/g, cwd)
+			.replace(/{{MULTI_ROOT_HINT}}/g, multiRootHint),
+		context,
+	)
 }
 
 function shouldCompactNativeToolSchema(context: SystemPromptContext): boolean {
@@ -433,7 +437,7 @@ function firstSentence(value: string): string {
 }
 
 function getNativeToolDescription(tool: ClineToolSpec, context: SystemPromptContext): string {
-	const resolved = replacer(tool.description, context)
+	const resolved = replacePromptPlaceholders(tool.description, context)
 	if (!shouldCompactNativeToolSchema(context)) {
 		return resolved
 	}
@@ -457,6 +461,22 @@ function getNativeToolDescription(tool: ClineToolSpec, context: SystemPromptCont
 			return 'Persist placeholder values for the active placeholder workflow step. Example: {"story_path":"docs/story.md","project_context":"docs/project-context.md"}.'
 		case "use_skill":
 			return "Activate a skill by exact name when the request matches an available skill."
+		case "use_mcp_tool":
+			return hasConnectedIndxrServer(context)
+				? "Use a connected MCP tool. When Indxr is available, prefer its exploration tools for code exploration, structural summaries, and targeted source discovery before built-in file exploration."
+				: firstSentence(resolved)
+		case "search_files":
+			return hasConnectedIndxrServer(context)
+				? "Regex-search raw files when Indxr is unavailable, insufficient, or when regex search is the better fit."
+				: firstSentence(resolved)
+		case "list_code_definition_names":
+			return hasConnectedIndxrServer(context)
+				? "List top-level definitions in a directory when Indxr is unavailable, insufficient, or when a built-in definition pass is the better fit."
+				: firstSentence(resolved)
+		case "read_file_range":
+			return hasConnectedIndxrServer(context)
+				? "Read an exact 1-based line range after Indxr or other exploration tools have isolated a raw file region that needs direct inspection."
+				: firstSentence(resolved)
 		default:
 			return firstSentence(resolved)
 	}
@@ -467,7 +487,7 @@ function getNativeToolParameterDescription(
 	param: NonNullable<ClineToolSpec["parameters"]>[number],
 	context: SystemPromptContext,
 ): string {
-	const resolved = replacer(resolveInstruction(param.instruction, context), context)
+	const resolved = replacePromptPlaceholders(resolveInstruction(param.instruction, context), context)
 	if (!shouldCompactNativeToolSchema(context)) {
 		return resolved
 	}
