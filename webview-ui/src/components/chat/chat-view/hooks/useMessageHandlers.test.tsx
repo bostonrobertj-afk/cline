@@ -137,4 +137,90 @@ describe("useMessageHandlers active_user routing", () => {
 		expect(chatState.setSendingDisabled).toHaveBeenCalledWith(true)
 		expect(chatState.setEnableButtons).toHaveBeenCalledWith(false)
 	})
+
+	it("treats stale tool asks in active_user as normal next-turn input", async () => {
+		const messages: ClineMessage[] = [
+			{
+				ts: Date.now(),
+				type: "ask",
+				ask: "tool",
+				text: JSON.stringify({ tool: "readFile" }),
+			},
+		]
+
+		const chatState = {
+			...createChatState(),
+			clineAsk: "tool" as const,
+			lastMessage: messages[0],
+		}
+		const { result } = renderHook(() => useMessageHandlers(messages, chatState))
+
+		await act(async () => {
+			await result.current.handleSendMessage("Human follow-up after handoff", [], [])
+		})
+
+		expect(mockAskResponse).toHaveBeenCalledTimes(1)
+		const request = mockAskResponse.mock.calls[0]?.[0] as { responseType?: string; text?: string }
+		expect(request.responseType).toBe("messageResponse")
+		expect(request.text).toBe("Human follow-up after handoff")
+		expect(chatState.setSendingDisabled).toHaveBeenCalledWith(true)
+		expect(chatState.setEnableButtons).toHaveBeenCalledWith(false)
+	})
+
+	it("treats stale followup asks in active_user as normal next-turn input", async () => {
+		const messages: ClineMessage[] = [
+			{
+				ts: Date.now(),
+				type: "ask",
+				ask: "followup",
+				text: "stale question",
+			},
+		]
+
+		const chatState = {
+			...createChatState(),
+			clineAsk: "followup" as const,
+			lastMessage: messages[0],
+		}
+		const { result } = renderHook(() => useMessageHandlers(messages, chatState))
+
+		await act(async () => {
+			await result.current.handleSendMessage("Human next turn still goes through", [], [])
+		})
+
+		expect(mockAskResponse).toHaveBeenCalledTimes(1)
+		const request = mockAskResponse.mock.calls[0]?.[0] as { responseType?: string; text?: string }
+		expect(request.responseType).toBe("messageResponse")
+		expect(request.text).toBe("Human next turn still goes through")
+		expect(chatState.setSendingDisabled).toHaveBeenCalledWith(true)
+		expect(chatState.setEnableButtons).toHaveBeenCalledWith(false)
+	})
+
+	it("preserves ask-response routing while awaiting_user_response", async () => {
+		mockThreadDisplayState.value = "awaiting_user_response"
+		const messages: ClineMessage[] = [
+			{
+				ts: Date.now(),
+				type: "ask",
+				ask: "tool",
+				text: JSON.stringify({ tool: "readFile" }),
+			},
+		]
+
+		const chatState = {
+			...createChatState(),
+			clineAsk: "tool" as const,
+			lastMessage: messages[0],
+		}
+		const { result } = renderHook(() => useMessageHandlers(messages, chatState))
+
+		await act(async () => {
+			await result.current.handleSendMessage("Approval-thread response", [], [])
+		})
+
+		expect(mockAskResponse).toHaveBeenCalledTimes(1)
+		const request = mockAskResponse.mock.calls[0]?.[0] as { responseType?: string; text?: string }
+		expect(request.responseType).toBe("messageResponse")
+		expect(request.text).toBe("Approval-thread response")
+	})
 })

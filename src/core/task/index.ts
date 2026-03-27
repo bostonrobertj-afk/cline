@@ -976,7 +976,12 @@ export class Task {
 					text,
 					partial: false,
 				})
-				// await this.postStateToWebview()
+				this.setThreadDisplayState(threadDisplayState ?? this.getThreadDisplayStateForAsk(type), "ask_completed", {
+					askType: type,
+					partial: false,
+					updatedPartial: true,
+				})
+				await this.postStateToWebview()
 				const protoMessage = convertClineMessageToProto(lastMessage)
 				await sendPartialMessageEvent(protoMessage)
 			} else {
@@ -1223,8 +1228,21 @@ export class Task {
 		const clineMessages = this.messageStateHandler.getClineMessages()
 		const lastMessage = clineMessages.at(-1)
 		if (lastMessage?.partial && lastMessage.type === type && (lastMessage.ask === askOrSay || lastMessage.say === askOrSay)) {
-			this.messageStateHandler.setClineMessages(clineMessages.slice(0, -1))
+			const updatedMessages = clineMessages.slice(0, -1)
+			this.messageStateHandler.setClineMessages(updatedMessages)
 			await this.messageStateHandler.saveClineMessagesAndUpdateHistory()
+
+			if (type === "ask") {
+				const newLastMessage = updatedMessages.at(-1)
+				if (
+					this.threadDisplayState === ThreadDisplayStates.AWAITING_USER_RESPONSE &&
+					newLastMessage?.type !== "ask" &&
+					!this.taskState.abort
+				) {
+					this.setThreadDisplayState(ThreadDisplayStates.ACTIVE_RUN, "partial_ask_removed")
+					await this.postStateToWebview()
+				}
+			}
 		}
 	}
 

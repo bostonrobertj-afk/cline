@@ -132,6 +132,52 @@ describe("response tool turn flow", () => {
 		assert.equal(taskState.responseToolTurnShouldEnd, false)
 	})
 
+	it("continues active_user dialogue as a fresh normal turn even if stale ask metadata remains in prior messages", async () => {
+		const say = sinon.stub().resolves()
+		const saveCheckpoint = sinon.stub().resolves()
+		const runUserPromptSubmitHook = sinon.stub().resolves({})
+		const initiateTaskLoop = sinon.stub().resolves()
+		const hasHumanAuthoredInput = sinon.stub().returns(true)
+		const postStateToWebview = sinon.stub().resolves()
+		const setThreadDisplayState = sinon.stub().callsFake((nextState: string) => {
+			;(fakeTask as any).threadDisplayState = nextState
+		})
+		const taskState = new TaskState()
+		const fakeTask = {
+			say,
+			clineMessages: [
+				{
+					ts: Date.now(),
+					type: "ask",
+					ask: "tool",
+					text: JSON.stringify({ tool: "readFile" }),
+				},
+			],
+			checkpointManager: {
+				saveCheckpoint,
+			},
+			runUserPromptSubmitHook,
+			taskState,
+			postStateToWebview,
+			stateManager: {
+				getGlobalSettingsKey: sinon.stub().callsFake((key: string) => key === "hooksEnabled"),
+			},
+			hasHumanAuthoredInput,
+			initiateTaskLoop,
+			setThreadDisplayState,
+		}
+
+		await Task.prototype.continueTaskWithFeedback.call(fakeTask as unknown as Task, "resume despite stale ask row", [], [])
+
+		sinon.assert.calledOnceWithExactly(say, "user_feedback", "resume despite stale ask row", [], [])
+		sinon.assert.calledOnce(saveCheckpoint)
+		sinon.assert.calledOnceWithMatch(runUserPromptSubmitHook, sinon.match.array, "feedback")
+		sinon.assert.calledOnce(postStateToWebview)
+		sinon.assert.calledOnce(initiateTaskLoop)
+		assert.equal((fakeTask as any).threadDisplayState, ThreadDisplayStates.ACTIVE_RUN)
+		assert.equal(taskState.responseToolTurnShouldEnd, false)
+	})
+
 	it("consumes queued steer feedback in FIFO order as normal user content", async () => {
 		const taskState = new TaskState()
 		taskState.enqueueSteerFeedback({ text: "First steer message" })

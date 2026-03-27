@@ -98,6 +98,45 @@ describe("getButtonConfig", () => {
 		expect(config.secondaryText).not.toBe("Cancel")
 	})
 
+	it("suppresses stale tool ask controls for active_user threads", () => {
+		const staleToolAsk: ClineMessage = {
+			type: "ask",
+			ask: "tool",
+			text: JSON.stringify({ tool: "readFile" }),
+			ts: Date.now(),
+		}
+
+		const config = getButtonConfig(staleToolAsk, "act", "active_user")
+
+		expect(config).toEqual(BUTTON_CONFIGS.default)
+	})
+
+	it("suppresses stale followup ask controls for active_user threads", () => {
+		const staleFollowupAsk: ClineMessage = {
+			type: "ask",
+			ask: "followup",
+			text: "stale follow-up",
+			ts: Date.now(),
+		}
+
+		const config = getButtonConfig(staleFollowupAsk, "act", "active_user")
+
+		expect(config).toEqual(BUTTON_CONFIGS.default)
+	})
+
+	it("preserves ask controls for awaiting_user_response threads", () => {
+		const toolAsk: ClineMessage = {
+			type: "ask",
+			ask: "tool",
+			text: JSON.stringify({ tool: "readFile" }),
+			ts: Date.now(),
+		}
+
+		const config = getButtonConfig(toolAsk, "act", "awaiting_user_response")
+
+		expect(config).toEqual(BUTTON_CONFIGS.tool_approve)
+	})
+
 	// Test error recovery states
 	describe("Error Recovery States", () => {
 		const errorStates = ["api_req_failed", "mistake_limit_reached"]

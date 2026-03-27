@@ -16,7 +16,9 @@ export function useMessageHandlers(messages: ClineMessage[], chatState: ChatStat
 	const { backgroundCommandRunning, currentTaskItem } = useExtensionState()
 	const threadDisplayState = (currentTaskItem as { threadDisplayState?: string | null } | undefined)?.threadDisplayState
 	const isPassiveThreadOpenState = isPassiveThreadOpen(threadDisplayState)
+	const isActiveRunThreadState = threadDisplayState === "active_run"
 	const isActiveUserThreadState = threadDisplayState === "active_user"
+	const isAwaitingUserResponseThreadState = threadDisplayState === "awaiting_user_response"
 	const {
 		setInputValue,
 		activeQuote,
@@ -69,69 +71,22 @@ export function useMessageHandlers(messages: ClineMessage[], chatState: ChatStat
 						}),
 					)
 					messageSent = true
-				} else if (clineAsk) {
-					// For resume_task and resume_completed_task, use yesButtonClicked to match Resume button behavior
-					// This ensures Enter key and Resume button work identically
-					if (clineAsk === "resume_task" || clineAsk === "resume_completed_task") {
-						await TaskServiceClient.askResponse(
-							AskResponseRequest.create({
-								responseType: "yesButtonClicked",
-								text: messageToSend,
-								images,
-								files,
-							}),
-						)
-						messageSent = true
-					} else {
-						// All other ask types use messageResponse
-						switch (clineAsk) {
-							case "followup":
-							case "generate_plan_output":
-							case "tool":
-							case "browser_action_launch":
-							case "command":
-							case "command_output":
-							case "use_mcp_server":
-							case "use_subagents":
-							case "completion_result":
-							case "mistake_limit_reached":
-							case "api_req_failed":
-							case "new_task":
-							case "condense":
-							case "report_bug":
-								await TaskServiceClient.askResponse(
-									AskResponseRequest.create({
-										responseType: "messageResponse",
-										text: messageToSend,
-										images,
-										files,
-									}),
-								)
-								messageSent = true
-								break
-						}
-					}
 				} else if (messages.length > 0) {
-					// No clineAsk set - check if the thread is passively open or if a task is actively running.
 					const lastMessage = messages[messages.length - 1]
 					const lastMessageLooksStreaming =
 						lastMessage?.partial === true || (lastMessage?.type === "say" && lastMessage.say === "api_req_started")
 
-					if (isPassiveThreadOpenState) {
-						// Passive-open threads are conversationally open without a pending ask.
-						// Route the message through the controller's explicit passive-thread continuation path
-						// and keep the composer semantics aligned with interruption-style sends.
-						await TaskServiceClient.askResponse(
-							AskResponseRequest.create({
-								responseType: "messageResponse",
-								text: messageToSend,
-								images,
-								files,
-							}),
-						)
-						messageSent = true
-						sentAsInterruption = true
-					} else if (isActiveUserThreadState) {
+					if (clineAsk && (isActiveUserThreadState || isActiveRunThreadState || isPassiveThreadOpenState)) {
+						console.info("[useMessageHandlers] canonical thread state overrides clineAsk routing", {
+							threadDisplayState,
+							clineAsk,
+							lastMessageType: lastMessage?.type,
+							lastMessageAsk: lastMessage?.type === "ask" ? lastMessage.ask : undefined,
+							lastMessageSay: lastMessage?.type === "say" ? lastMessage.say : undefined,
+						})
+					}
+
+					if (isActiveUserThreadState) {
 						// Active-user threads are the normal live next-turn handoff after a governed response tool.
 						// Send the message as the next human-authored turn rather than a passive reopen.
 						if (lastMessageLooksStreaming) {
@@ -152,9 +107,73 @@ export function useMessageHandlers(messages: ClineMessage[], chatState: ChatStat
 							}),
 						)
 						messageSent = true
+					} else if (isPassiveThreadOpenState) {
+						// Passive-open threads are conversationally open without a pending ask.
+						// Route the message through the controller's explicit passive-thread continuation path
+						// and keep the composer semantics aligned with interruption-style sends.
+						await TaskServiceClient.askResponse(
+							AskResponseRequest.create({
+								responseType: "messageResponse",
+								text: messageToSend,
+								images,
+								files,
+							}),
+						)
+						messageSent = true
+						sentAsInterruption = true
+					} else if (isActiveRunThreadState) {
+						await sendSteerMessage(messageToSend, images, files)
+						messageSent = true
+						sentAsInterruption = true
+					} else if (isAwaitingUserResponseThreadState && clineAsk) {
+						// For resume_task and resume_completed_task, use yesButtonClicked to match Resume button behavior
+						// This ensures Enter key and Resume button work identically
+						if (clineAsk === "resume_task" || clineAsk === "resume_completed_task") {
+							await TaskServiceClient.askResponse(
+								AskResponseRequest.create({
+									responseType: "yesButtonClicked",
+									text: messageToSend,
+									images,
+									files,
+								}),
+							)
+							messageSent = true
+						} else {
+							// All other ask types use messageResponse
+							switch (clineAsk) {
+								case "followup":
+								case "generate_plan_output":
+								case "tool":
+								case "browser_action_launch":
+								case "command":
+								case "command_output":
+								case "use_mcp_server":
+								case "use_subagents":
+								case "completion_result":
+								case "mistake_limit_reached":
+								case "api_req_failed":
+								case "new_task":
+								case "condense":
+								case "report_bug":
+									await TaskServiceClient.askResponse(
+										AskResponseRequest.create({
+											responseType: "messageResponse",
+											text: messageToSend,
+											images,
+											files,
+										}),
+									)
+									messageSent = true
+									break
+							}
+						}
 					}
 
-					const isTaskRunning = !isActiveUserThreadState && lastMessageLooksStreaming
+					const isTaskRunning =
+						!isActiveUserThreadState &&
+						!isPassiveThreadOpenState &&
+						!isAwaitingUserResponseThreadState &&
+						lastMessageLooksStreaming
 
 					if (!messageSent && isTaskRunning) {
 						// Task is running - queue the message as steer feedback for the next outbound request.
@@ -187,7 +206,9 @@ export function useMessageHandlers(messages: ClineMessage[], chatState: ChatStat
 			messages.length,
 			clineAsk,
 			activeQuote,
+			isActiveRunThreadState,
 			isActiveUserThreadState,
+			isAwaitingUserResponseThreadState,
 			isPassiveThreadOpenState,
 			sendSteerMessage,
 			setInputValue,

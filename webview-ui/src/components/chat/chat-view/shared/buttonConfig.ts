@@ -242,11 +242,12 @@ export function getButtonConfig(
 	const isError = message?.ask ? errorTypes.includes(message.ask) : false
 	const isApiReqStartedSay = message.type === "say" && message.say === "api_req_started"
 
-	if (isActiveUserThread && message.type !== "ask") {
-		if (isStreaming || isApiReqStartedSay) {
+	if (isActiveUserThread) {
+		if (isStreaming || isApiReqStartedSay || message.type === "ask") {
 			console.info("[buttonConfig] active_user override suppressing stale running state", {
 				threadDisplayState,
 				messageType: message.type,
+				messageAsk: message.type === "ask" ? message.ask : undefined,
 				messageSay: message.type === "say" ? message.say : undefined,
 				partial: message.partial === true,
 			})
