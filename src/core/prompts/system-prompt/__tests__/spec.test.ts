@@ -370,13 +370,14 @@ describe("native tool placeholder replacement", () => {
 		const tool = makeTool({
 			name: "set_workflow_placeholders",
 			description:
-				'Persist placeholder values for the active placeholder workflow step. Example: {"story_path":"docs/story.md","project_context":"docs/project-context.md"}.',
+				'Persist dynamic placeholder values discovered during the active workflow. Use the wrapper shape {"values":{"story_path":"docs/story.md","project_context":"docs/project-context.md"}}. Do not use this for stable config-backed placeholders like output_folder; those come from .cline/workflow-config.yaml.',
 			parameters: [
 				{
 					name: "values",
 					required: true,
 					type: "object",
-					instruction: "Object map of placeholder keys to string values. Not arrays of {name,value} or {key,value}.",
+					instruction:
+						'Object map of placeholder keys to string values. Call the tool as {"values": {...}}. Not arrays of {name,value} or {key,value}.',
 					additionalProperties: { type: "string" },
 				},
 			],
@@ -385,10 +386,10 @@ describe("native tool placeholder replacement", () => {
 		const openAI = toolSpecFunctionDefinition(tool, context) as any
 
 		expect(openAI.function.parameters.properties.values.description).to.equal(
-			"Object map of placeholder keys to strings. Not arrays of {name,value} or {key,value}.",
+			'Object map of placeholder keys to strings. Call the tool as {"values": {...}}. Not arrays of {name,value} or {key,value}.',
 		)
 		expect(openAI.function.description).to.equal(
-			'Persist placeholder values for the active placeholder workflow step. Example: {"story_path":"docs/story.md","project_context":"docs/project-context.md"}.',
+			'Persist dynamic placeholder values discovered during the active workflow. Call as {"values":{"story_path":"docs/story.md","project_context":"docs/project-context.md"}}. Stable config-backed placeholders like output_folder come from .cline/workflow-config.yaml.',
 		)
 	})
 

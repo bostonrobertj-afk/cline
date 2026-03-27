@@ -300,14 +300,19 @@ Inspect the prepared review input and write findings.
 			expect(fakeTask.taskState.activePlaceholderWorkflowSource?.configPath).to.contain("workflow-config.yaml")
 
 			const [, savedMetadata] = saveMetadataStub.firstCall.args
-			expect(savedMetadata.activePlaceholderWorkflowSource).to.include({
+			const savedSource = savedMetadata.activePlaceholderWorkflowSource
+			expect(savedSource).to.exist
+			if (!savedSource) {
+				throw new Error("expected activePlaceholderWorkflowSource to be persisted")
+			}
+			expect(savedSource).to.include({
 				type: "local",
 				name: "local-flow.md",
 				path: workflowPath,
 			})
-			expect(savedMetadata.activePlaceholderWorkflowSource.configPath).to.be.a("string")
-			expect(savedMetadata.activePlaceholderWorkflowSource.configPath).to.contain(".cline")
-			expect(savedMetadata.activePlaceholderWorkflowSource.configPath).to.contain("workflow-config.yaml")
+			expect(savedSource.configPath).to.be.a("string")
+			expect(savedSource.configPath).to.contain(".cline")
+			expect(savedSource.configPath).to.contain("workflow-config.yaml")
 
 			sandbox.restore()
 			const restoreSandbox = sinon.createSandbox()

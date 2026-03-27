@@ -857,16 +857,19 @@ describe("Managed workflow handlers", () => {
 			expect(config.taskState.activePlaceholderWorkflowSource?.configPath).to.contain("workflow-config.yaml")
 			expect(config.taskState.activeWorkflowJustStarted).to.equal(true)
 			expect(saveMetadataStub.calledOnce).to.equal(true)
-			expect(saveMetadataStub.firstCall.args[1].activePlaceholderWorkflowSource).to.include({
+			const savedSource = saveMetadataStub.firstCall.args[1].activePlaceholderWorkflowSource
+			expect(savedSource).to.exist
+			if (!savedSource) {
+				throw new Error("expected activePlaceholderWorkflowSource to be persisted")
+			}
+			expect(savedSource).to.include({
 				type: "local",
 				name: "local-review.md",
 				path: workflowPath,
 			})
-			expect(saveMetadataStub.firstCall.args[1].activePlaceholderWorkflowSource.configPath).to.be.a("string")
-			expect(saveMetadataStub.firstCall.args[1].activePlaceholderWorkflowSource.configPath).to.contain(".cline")
-			expect(saveMetadataStub.firstCall.args[1].activePlaceholderWorkflowSource.configPath).to.contain(
-				"workflow-config.yaml",
-			)
+			expect(savedSource.configPath).to.be.a("string")
+			expect(savedSource.configPath).to.contain(".cline")
+			expect(savedSource.configPath).to.contain("workflow-config.yaml")
 		} finally {
 			sandbox.restore()
 			if (tempDir) {

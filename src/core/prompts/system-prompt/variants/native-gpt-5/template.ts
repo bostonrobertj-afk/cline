@@ -2,6 +2,11 @@ import { getResponseToolsSection } from "../../components/response_tools"
 import { SystemPromptSection } from "../../templates/placeholders"
 import type { SystemPromptContext } from "../../types"
 
+const getWorkflowPlaceholderToolGuidance = (context: SystemPromptContext) =>
+	context.managedWorkflowActive || context.activeWorkflowSupportsPlaceholders
+		? `- When a step sets a placeholder value, use \`set_workflow_placeholders\`.`
+		: ""
+
 /**
  * Base template for GPT-5 variant with structured sections
  */
@@ -50,7 +55,8 @@ Use these tools in one response when they are not dependent on one another; if u
 - Use list_files when you need directory structure
 - For native tool calls, treat the tool schema as the source of truth for canonical parameter names, required fields, and argument shape. Match the schema exactly.
 
-${getResponseToolsSection(_context)}`
+${getResponseToolsSection(_context)}
+${getWorkflowPlaceholderToolGuidance(_context)}`
 
 const OBJECTIVE = (context: SystemPromptContext) => `OBJECTIVE
 

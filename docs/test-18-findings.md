@@ -1,6 +1,6 @@
 # Findings
 
-## Agent Struggled with set_workflow_placeholders
+## Agent Struggled with set_workflow_placeholders - RESOLVED
 user: were you unable to identify the correct shape for set_workflow_placeholders in the provided tool schema?
 
 

@@ -458,7 +458,7 @@ function getNativeToolDescription(tool: ClineToolSpec, context: SystemPromptCont
 		case "send_user_message":
 			return "Send a direct user-visible message when specialized response tools are not the right fit."
 		case "set_workflow_placeholders":
-			return 'Persist placeholder values for the active placeholder workflow step. Example: {"story_path":"docs/story.md","project_context":"docs/project-context.md"}.'
+			return 'Persist dynamic placeholder values discovered during the active workflow. Call as {"values":{"story_path":"docs/story.md","project_context":"docs/project-context.md"}}. Stable config-backed placeholders like output_folder come from .cline/workflow-config.yaml.'
 		case "use_skill":
 			return "Activate a skill by exact name when the request matches an available skill."
 		case "use_mcp_tool":
@@ -497,7 +497,7 @@ function getNativeToolParameterDescription(
 	}
 
 	if (tool.name === "set_workflow_placeholders" && param.name === "values") {
-		return "Object map of placeholder keys to strings. Not arrays of {name,value} or {key,value}."
+		return 'Object map of placeholder keys to strings. Call the tool as {"values": {...}}. Not arrays of {name,value} or {key,value}.'
 	}
 
 	if (tool.name === "apply_patch" && param.name === "input") {

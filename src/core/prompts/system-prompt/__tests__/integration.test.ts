@@ -537,6 +537,13 @@ describe("Prompt System Integration Tests", () => {
 					},
 				},
 				{
+					name: "Native GPT-5",
+					context: {
+						providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
+						enableNativeToolCalls: true,
+					},
+				},
+				{
 					name: "Native Next Gen",
 					context: {
 						providerInfo: makeProviderInfo("claude-sonnet-4", "cline"),
