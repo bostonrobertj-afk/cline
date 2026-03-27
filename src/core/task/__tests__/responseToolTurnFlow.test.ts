@@ -41,6 +41,26 @@ describe("response tool turn flow", () => {
 		assert.equal(taskState.pendingResponseToolFollowup, undefined)
 	})
 
+	it("formats synthesized normal next-turn content without nesting latest-human-input markers", async () => {
+		const taskState = new TaskState()
+		taskState.setPendingResponseToolFollowup({
+			toolName: ClineDefaultTool.ASK,
+			route: "normal_user_turn",
+			text: "Continue the review",
+		})
+
+		const result = await consumeDeferredResponseToolUserContent(taskState)
+		const textBlock = result?.[0]
+
+		assert.ok(textBlock && textBlock.type === "text")
+		if (!textBlock || textBlock.type !== "text") {
+			throw new Error("expected synthesized normal next-turn user content")
+		}
+		assert.match(textBlock.text, /\[NORMAL NEXT-TURN HUMAN INPUT\]/)
+		assert.doesNotMatch(textBlock.text, /\[LATEST HUMAN USER INPUT\]/)
+		assert.match(textBlock.text, /<user_message>\nContinue the review\n<\/user_message>/)
+	})
+
 	it("converts ask_followup_question replies into normal next-turn user content", async () => {
 		const taskState = new TaskState()
 		taskState.setPendingResponseToolFollowup({

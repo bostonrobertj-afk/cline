@@ -16,8 +16,20 @@ describe("formatResponse user input framing", () => {
 
 		expect(framed).to.contain("[NORMAL NEXT-TURN HUMAN INPUT]")
 		expect(framed).to.contain("current live turn")
-		expect(framed).to.contain("[LATEST HUMAN USER INPUT]")
+		expect(framed).to.not.contain("[LATEST HUMAN USER INPUT]")
 		expect(framed).to.contain("<user_message>\nContinue the review\n</user_message>")
+	})
+
+	it("keeps latest-human-input and normal-next-turn wrappers as peers rather than nested blocks", () => {
+		const latest = formatResponse.latestHumanInput("user_message", "Continue the review")
+		const nextTurn = formatResponse.normalNextTurnDialogue("user_message", "Continue the review")
+
+		expect(latest).to.contain("[LATEST HUMAN USER INPUT]")
+		expect(latest).to.not.contain("[NORMAL NEXT-TURN HUMAN INPUT]")
+		expect(nextTurn).to.contain("[NORMAL NEXT-TURN HUMAN INPUT]")
+		expect(nextTurn).to.not.contain("[LATEST HUMAN USER INPUT]")
+		expect(latest).to.contain("<user_message>\nContinue the review\n</user_message>")
+		expect(nextTurn).to.contain("<user_message>\nContinue the review\n</user_message>")
 	})
 
 	it("renders reopened-thread copy without synthetic resume framing", () => {

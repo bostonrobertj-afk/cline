@@ -165,20 +165,21 @@ function formatSavedFileReference(
 }
 
 export const formatResponse = {
+	taggedHumanInputContent: (tag: "task" | "feedback" | "user_message", text: string | undefined) =>
+		[`<${tag}>`, text ?? "", `</${tag}>`].join("\n"),
+
 	latestHumanInput: (tag: "task" | "feedback" | "user_message", text: string | undefined) =>
 		[
 			"[LATEST HUMAN USER INPUT]",
 			"The tagged content below is the latest direct input from the human user for this turn.",
-			`<${tag}>`,
-			text ?? "",
-			`</${tag}>`,
+			formatResponse.taggedHumanInputContent(tag, text),
 		].join("\n"),
 
 	normalNextTurnDialogue: (tag: "task" | "feedback" | "user_message", text: string | undefined) =>
 		[
 			"[NORMAL NEXT-TURN HUMAN INPUT]",
 			"The tagged content below is the latest direct input from the human user for the current live turn.",
-			formatResponse.latestHumanInput(tag, text),
+			formatResponse.taggedHumanInputContent(tag, text),
 		].join("\n"),
 
 	systemGeneratedContextNotice: () =>
