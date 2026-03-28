@@ -423,7 +423,7 @@ export async function applyDeterministicPlaceholderProgression(args: {
 		noticesAdded = true
 
 		const nextChecklistResult = evaluateFocusChainChecklistUpdate(checklist, FOCUS_CHAIN_COMPLETE_NEXT_STEP_SENTINEL)
-		checklist = nextChecklistResult.checklist
+		checklist = nextChecklistResult.checklist ?? checklist
 	}
 
 	return {

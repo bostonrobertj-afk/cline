@@ -9,8 +9,10 @@ const RESPONSE_TOOL_LINES = {
 	generate_plan_output: "- `generate_plan_output`: Use to present a structured plan",
 } as const
 
-function getActModeResponseToolNames(context: SystemPromptContext): string[] {
-	const tools = ["attempt_completion"]
+type ResponseToolName = keyof typeof RESPONSE_TOOL_LINES
+
+function getActModeResponseToolNames(context: SystemPromptContext): ResponseToolName[] {
+	const tools: ResponseToolName[] = ["attempt_completion"]
 
 	if (context.yoloModeToggled !== true) {
 		tools.push("ask_followup_question")
@@ -20,8 +22,8 @@ function getActModeResponseToolNames(context: SystemPromptContext): string[] {
 	return tools
 }
 
-function getPlanModeResponseToolNames(context: SystemPromptContext): string[] {
-	const tools = ["generate_plan_output"]
+function getPlanModeResponseToolNames(context: SystemPromptContext): ResponseToolName[] {
+	const tools: ResponseToolName[] = ["generate_plan_output"]
 
 	if (context.yoloModeToggled !== true) {
 		tools.push("ask_followup_question")
@@ -31,7 +33,7 @@ function getPlanModeResponseToolNames(context: SystemPromptContext): string[] {
 	return tools
 }
 
-function formatResponseToolNames(toolNames: string[]): string[] {
+function formatResponseToolNames(toolNames: ResponseToolName[]): string[] {
 	return toolNames.map((toolName) => `\`${toolName}\``)
 }
 
@@ -57,10 +59,10 @@ export function getCurrentModeResponseToolsLine(context: SystemPromptContext): s
 	return `- Use ${joinToolNames(currentModeTools)} when responding to the user.`
 }
 
-function getVisibleResponseToolNames(context: SystemPromptContext): string[] {
+function getVisibleResponseToolNames(context: SystemPromptContext): ResponseToolName[] {
 	const currentModeToolNames =
 		context.providerInfo.mode === "plan" ? getPlanModeResponseToolNames(context) : getActModeResponseToolNames(context)
-	const orderedToolNames =
+	const orderedToolNames: ResponseToolName[] =
 		context.providerInfo.mode === "plan" ? currentModeToolNames : [...currentModeToolNames, "act_mode_respond"]
 
 	if (context.enableNativeToolCalls === true && context.visibleNativeToolNames) {

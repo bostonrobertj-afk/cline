@@ -57,7 +57,7 @@ describe("agent-feedback helpers", () => {
 					callbacks: {
 						say,
 					},
-				} as TaskConfig,
+				} as unknown as TaskConfig,
 				"send_user_message",
 				"Blocked on unstable behavior.",
 			),

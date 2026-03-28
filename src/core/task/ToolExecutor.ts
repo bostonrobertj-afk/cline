@@ -574,7 +574,12 @@ export class ToolExecutor {
 			hookInput: {
 				postToolUse: {
 					toolName: block.name,
-					parameters: block.params,
+					parameters: Object.fromEntries(
+						Object.entries(block.params).map(([key, value]) => [
+							key,
+							typeof value === "string" ? value : JSON.stringify(value),
+						]),
+					),
 					result: typeof toolResult === "string" ? toolResult : JSON.stringify(toolResult),
 					success: executionSuccess,
 					executionTimeMs,

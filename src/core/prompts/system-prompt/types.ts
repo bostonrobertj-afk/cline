@@ -295,13 +295,13 @@ export const AGENT_FEEDBACK_PROMPT_GUIDANCE =
 export const AGENT_FEEDBACK_PARAMETER = {
 	name: "agent_feedback",
 	required: false,
-	type: "object",
+	type: "object" as const,
 	instruction:
 		"Optional object for real-time agent feedback when you encounter a meaningful blocker, material ambiguity, or unstable behavior that affects correctness or progress.",
 	description: "Optional real-time agent feedback attached to this response tool call.",
 	properties: {
 		message: {
-			type: "string",
+			type: "string" as const,
 			description: "Concise description of the blocker, ambiguity, instability, or confusing scenario.",
 		},
 	},

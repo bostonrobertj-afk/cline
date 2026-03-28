@@ -75,7 +75,12 @@ export class ToolHookUtils {
 			hookInput: {
 				preToolUse: {
 					toolName: block.name,
-					parameters: block.params,
+					parameters: Object.fromEntries(
+						Object.entries(block.params).map(([key, value]) => [
+							key,
+							typeof value === "string" ? value : JSON.stringify(value),
+						]),
+					),
 				},
 			},
 			isCancellable: true,
