@@ -29,13 +29,13 @@ Use \`task_progress\` only as a checklist parameter on the next tool call, not a
 - Use \`__COMPLETE_NEXT_STEP__\` as the \`task_progress\` value to complete the next incomplete step.`
 
 export const PLACEHOLDER_WORKFLOW_DONE_SIGNAL_REMINDER =
-	'When the active step\'s "Done Signal" is true, use the next relevant `send_user_message` tool call to briefly tell the user what step you are completing, and include `task_progress` with `__COMPLETE_NEXT_STEP__`. Use it only once in that assistant turn.'
+	'When the active step\'s "Done Signal" is true, use `send_user_message` tool call to briefly tell the user what step you are completing, and include `task_progress` with `__COMPLETE_NEXT_STEP__`. Use it only once in that assistant turn.'
 
 const UPDATING_TASK_PROGRESS_PLACEHOLDER_WORKFLOW = `UPDATING TASK PROGRESS
 
 The user has triggered a workflow with a prebuilt checklist.
 - Instructions are automatically sent for the first incomplete item on the checklist each turn.
-- Do not include \`task_progress\` on a tool call until the active step's "Done Signal" is true.
+- DO inform the user when the Done Signal for the current step is true using send_user_message, and include \`task_progress\` as a parameter on that tool call to complete the step.
 - ${PLACEHOLDER_WORKFLOW_DONE_SIGNAL_REMINDER}`
 
 export async function getUpdatingTaskProgress(variant: PromptVariant, context: SystemPromptContext): Promise<string | undefined> {

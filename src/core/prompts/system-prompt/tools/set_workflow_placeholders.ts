@@ -9,7 +9,7 @@ const generic: ClineToolSpec = {
 	variant: ModelFamily.GENERIC,
 	name: "set_workflow_placeholders",
 	description:
-		'Persist dynamic placeholder values discovered during the active workflow. Use the wrapper shape {"values":{"story_path":"docs/story.md","project_context":"docs/project-context.md"}}. Do not use this for stable config-backed placeholders like output_folder; those come from .cline/workflow-config.yaml.',
+		'Persist dynamic placeholder values discovered during the active workflow. Use the wrapper shape {"values":{"story_path":"docs/story.md","methods":"Tree of Thought, Genre Mashup, Explain Reasoning, Feynman Technique, SCAMPER Method"}}. Do not use this for stable config-backed placeholders like output_folder; those come from .cline/workflow-config.yaml.',
 	contextRequirements: (context) =>
 		context.managedWorkflowActive === true || context.activeWorkflowSupportsPlaceholders === true,
 	parameters: [
