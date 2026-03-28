@@ -217,6 +217,7 @@ describe("SubagentRunner", () => {
 			assignedSkillNames: [],
 			nativeToolCallsRequested: false,
 			shouldSendFullPromptAssembly: true,
+			shouldUseContinuationPrompt: false,
 		})
 
 		assert.equal(context.mcpHub, undefined)
@@ -237,6 +238,7 @@ describe("SubagentRunner", () => {
 			assignedSkillNames: [],
 			nativeToolCallsRequested: false,
 			shouldSendFullPromptAssembly: true,
+			shouldUseContinuationPrompt: false,
 		})
 
 		assert.equal(context.mcpHub, config.services.mcpHub)
@@ -277,6 +279,38 @@ describe("SubagentRunner", () => {
 		const runner = new SubagentRunner(config)
 		await runner.run("Finish quickly", () => {})
 		assert.equal(buildSystemPromptStub.called, true)
+	})
+
+	it("marks suppressed internal subagent turns as continuation turns and forwards the current checklist", async () => {
+		const runner = new SubagentRunner(createTaskConfig(false))
+		const state = new TaskState()
+		state.currentFocusChainChecklist = "- [ ] Step 1\n- [ ] Step 2"
+		state.activePlaceholderWorkflowId = "review-edge-case-hunter"
+
+		const context = await (runner as any).buildPromptContext({
+			state,
+			hostIde: "test",
+			providerInfo: {
+				providerId: "anthropic",
+				model: { id: "anthropic/claude-sonnet-4.5", info: { contextWindow: 200_000 } },
+				mode: "act",
+				customPrompt: undefined,
+			},
+			availableSkills: [],
+			configuredSkillNames: undefined,
+			assignedSkillNames: [],
+			nativeToolCallsRequested: false,
+			shouldSendFullPromptAssembly: false,
+			shouldUseContinuationPrompt: true,
+		})
+
+		assert.equal(context.isContinuationTurn, true)
+		assert.equal(context.currentFocusChainChecklist, "- [ ] Step 1\n- [ ] Step 2")
+		assert.equal(context.activeWorkflowSupportsPlaceholders, true)
+		assert.equal(context.managedWorkflowActive, false)
+		assert.deepEqual(context.skills, [])
+		assert.equal(context.activeAgentId, undefined)
+		assert.equal(context.activeWorkflowReminder, undefined)
 	})
 
 	it("emits native tool_use blocks with matching tool_result tool_use_id across turns", async () => {
@@ -844,6 +878,67 @@ describe("SubagentRunner", () => {
 		assert.equal(createMessage.callCount, 1)
 	})
 
+	it("keeps managed-workflow subagent turns on the full-prompt path even on suppressed internal turns", async () => {
+		const createMessage = sinon.stub()
+		createMessage.onFirstCall().callsFake(async function* () {
+			yield {
+				type: "tool_calls",
+				tool_call: {
+					function: {
+						id: "toolu_subagent_managed_workflow_1",
+						name: ClineDefaultTool.LIST_FILES,
+						arguments: JSON.stringify({ path: ".", recursive: false }),
+					},
+				},
+			}
+		})
+		createMessage.onSecondCall().callsFake(async function* () {
+			yield {
+				type: "tool_calls",
+				tool_call: {
+					function: {
+						id: "toolu_subagent_managed_workflow_complete_1",
+						name: ClineDefaultTool.ATTEMPT,
+						arguments: JSON.stringify({ result: "done" }),
+					},
+				},
+			}
+		})
+
+		const promptRegistry = PromptRegistry.getInstance()
+		const promptGetStub = sinon.stub(promptRegistry, "get").callsFake(async (context) => {
+			promptRegistry.nativeTools = undefined
+			return context.isContinuationTurn === true ? "CONTINUATION TURN" : "system prompt"
+		})
+		sinon.stub(SubagentBuilder.prototype, "getConfiguredSkills").returns(undefined)
+		sinon.stub(skills, "discoverSkills").resolves([])
+		sinon.stub(skills, "getAvailableSkills").returns([
+			{
+				name: "bmad-review-edge-case-hunter",
+				description: "Edge case review",
+				path: "/skills/bmad-review-edge-case-hunter/SKILL.md",
+				source: "project",
+			},
+		])
+		stubApiHandler(createMessage)
+		initializeHostProvider()
+
+		const config = createTaskConfig(false)
+		config.cwd = process.cwd()
+		const runner = new SubagentRunner(config)
+		const result = await runner.run(`Skill: use_skill('bmad-review-edge-case-hunter')`, () => {})
+
+		assert.equal(result.status, "completed")
+		assert.equal(createMessage.callCount, 2)
+		assert.equal(promptGetStub.callCount, 2)
+		assert.equal(promptGetStub.firstCall.args[0].managedWorkflowActive, true)
+		assert.equal(promptGetStub.secondCall.args[0].managedWorkflowActive, true)
+		assert.equal(promptGetStub.firstCall.args[0].isContinuationTurn, false)
+		assert.equal(promptGetStub.secondCall.args[0].isContinuationTurn, false)
+		const secondSystemPrompt = createMessage.secondCall.args[0] as string
+		assert.doesNotMatch(secondSystemPrompt, /CONTINUATION TURN/)
+	})
+
 	it("auto-activates an explicitly assigned placeholder workflow before the first subagent turn", async () => {
 		const createMessage = sinon.stub().callsFake(async function* () {
 			yield {
@@ -926,10 +1021,10 @@ describe("SubagentRunner", () => {
 		})
 
 		const promptRegistry = PromptRegistry.getInstance()
-		sinon.stub(promptRegistry, "get").callsFake(async (context) => {
+		const promptGetStub = sinon.stub(promptRegistry, "get").callsFake(async (context) => {
 			assert.equal(context.activeWorkflowReminder, undefined)
 			promptRegistry.nativeTools = undefined
-			return "system prompt"
+			return context.isContinuationTurn === true ? "CONTINUATION TURN" : "system prompt"
 		})
 		sinon.stub(skills, "discoverSkills").resolves([])
 		sinon.stub(skills, "getAvailableSkills").returns([])
@@ -956,6 +1051,13 @@ Review the changed implementation for edge cases.`,
 
 		assert.equal(result.status, "completed")
 		assert.equal(createMessage.callCount, 2)
+		assert.equal(promptGetStub.callCount, 2)
+		assert.equal(promptGetStub.firstCall.args[0].isContinuationTurn, false)
+		assert.equal(promptGetStub.secondCall.args[0].isContinuationTurn, true)
+		assert.equal(
+			promptGetStub.secondCall.args[0].currentFocusChainChecklist,
+			"- [ ] Step 1: Gather Context\n- [ ] Step 2: Review",
+		)
 		const initialUser = createMessage.firstCall.args[1][0] as {
 			role: string
 			content: Array<{ type?: string; text?: string }>
@@ -978,6 +1080,8 @@ Review the changed implementation for edge cases.`,
 		assert.doesNotMatch(followUpTexts, /### Reminder:/)
 		assert.doesNotMatch(followUpTexts, /Current Progress: 0\/2 items completed/)
 		assert.doesNotMatch(followUpTexts, /# CURRENT WORKFLOW STEP/)
+		const secondSystemPrompt = createMessage.secondCall.args[0] as string
+		assert.match(secondSystemPrompt, /CONTINUATION TURN/)
 	})
 
 	it("reinjects focus-chain guidance on every internal turn when prompt refresh frequency is zero", async () => {
@@ -1008,9 +1112,9 @@ Review the changed implementation for edge cases.`,
 		})
 
 		const promptRegistry = PromptRegistry.getInstance()
-		sinon.stub(promptRegistry, "get").callsFake(async () => {
+		const promptGetStub = sinon.stub(promptRegistry, "get").callsFake(async (context) => {
 			promptRegistry.nativeTools = undefined
-			return "system prompt"
+			return context.isContinuationTurn === true ? "CONTINUATION TURN" : "system prompt"
 		})
 		sinon.stub(skills, "discoverSkills").resolves([])
 		sinon.stub(skills, "getAvailableSkills").returns([])
@@ -1037,6 +1141,9 @@ Review the changed implementation for edge cases.`,
 
 		assert.equal(result.status, "completed")
 		assert.equal(createMessage.callCount, 2)
+		assert.equal(promptGetStub.callCount, 2)
+		assert.equal(promptGetStub.firstCall.args[0].isContinuationTurn, false)
+		assert.equal(promptGetStub.secondCall.args[0].isContinuationTurn, false)
 
 		const secondConversation = createMessage.secondCall.args[1] as Array<{
 			role: string
@@ -1050,6 +1157,8 @@ Review the changed implementation for edge cases.`,
 		assert.match(followUpTexts, /### Reminder:/)
 		assert.match(followUpTexts, /Current Progress: 0\/2 items completed/)
 		assert.match(followUpTexts, /# CURRENT WORKFLOW STEP/)
+		const secondSystemPrompt = createMessage.secondCall.args[0] as string
+		assert.doesNotMatch(secondSystemPrompt, /CONTINUATION TURN/)
 	})
 
 	it("auto-binds the owning BMAD agent when an assigned placeholder workflow maps to a managed twin", async () => {
@@ -1586,6 +1695,7 @@ Review the changed implementation for edge cases.`,
 			assignedSkillNames: [],
 			nativeToolCallsRequested: false,
 			shouldSendFullPromptAssembly: true,
+			shouldUseContinuationPrompt: false,
 		})
 
 		assert.equal(context.activeAgentId, undefined)
@@ -1615,6 +1725,7 @@ Review the changed implementation for edge cases.`,
 			assignedSkillNames: [],
 			nativeToolCallsRequested: false,
 			shouldSendFullPromptAssembly: true,
+			shouldUseContinuationPrompt: false,
 		})
 
 		assert.equal(context.managedWorkflowActive, false)
@@ -1644,6 +1755,7 @@ Review the changed implementation for edge cases.`,
 			assignedSkillNames: [],
 			nativeToolCallsRequested: true,
 			shouldSendFullPromptAssembly: false,
+			shouldUseContinuationPrompt: false,
 		})
 
 		assert.deepEqual(context.skills, [])

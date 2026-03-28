@@ -20,6 +20,7 @@ import {
 	getNextTurnsSinceFullPromptRefresh,
 	normalizePromptRefreshFrequency,
 	shouldSendFullPromptAssembly,
+	shouldUseContinuationTurnPrompt,
 } from "@core/task/prompt-refresh"
 import { StreamResponseHandler } from "@core/task/StreamResponseHandler"
 import {
@@ -493,6 +494,11 @@ export class SubagentRunner {
 				state.apiRequestCount += 1
 				state.apiRequestsSinceLastTodoUpdate += 1
 				const shouldSendFullPromptAssembly = this.shouldSendFullPromptAssembly(state)
+				const shouldUseContinuationPrompt = shouldUseContinuationTurnPrompt({
+					hasHumanAuthoredInput: false,
+					shouldSendFullPromptAssembly,
+					managedWorkflowActive: !!state.managedWorkflowRun,
+				})
 				state.turnsSinceFullPromptRefresh = getNextTurnsSinceFullPromptRefresh({
 					didSendFullPromptAssembly: shouldSendFullPromptAssembly,
 					hasHumanAuthoredInput: false,
@@ -509,6 +515,7 @@ export class SubagentRunner {
 					assignedSkillNames,
 					nativeToolCallsRequested,
 					shouldSendFullPromptAssembly,
+					shouldUseContinuationPrompt,
 				})
 				const generatedSystemPrompt = await promptRegistry.get(context)
 				const baseSystemPrompt = this.agent.buildSystemPrompt(generatedSystemPrompt, context)
@@ -889,6 +896,7 @@ export class SubagentRunner {
 		assignedSkillNames: string[]
 		nativeToolCallsRequested: boolean
 		shouldSendFullPromptAssembly: boolean
+		shouldUseContinuationPrompt: boolean
 	}): Promise<SystemPromptContext> {
 		const skills = params.shouldSendFullPromptAssembly
 			? this.resolvePromptSkills(params.availableSkills, params.configuredSkillNames, params.assignedSkillNames)
@@ -921,6 +929,8 @@ export class SubagentRunner {
 			activeWorkflowReminder,
 			activeWorkflowSupportsPlaceholders: !!params.state.managedWorkflowRun || !!params.state.activePlaceholderWorkflowId,
 			managedWorkflowActive: !!params.state.managedWorkflowRun,
+			isContinuationTurn: params.shouldUseContinuationPrompt,
+			currentFocusChainChecklist: params.state.currentFocusChainChecklist,
 			focusChainSettings: this.baseConfig.focusChainSettings,
 			browserSettings: this.baseConfig.browserSettings,
 			mcpHub: includeMcpHub ? this.baseConfig.services.mcpHub : undefined,
