@@ -40,6 +40,7 @@ interface ClineToolSpecParameter {
 	 * For object types, this defines the properties
 	 */
 	properties?: Record<string, any>
+	requiredProperties?: string[]
 	/**
 	 * Additional JSON Schema fields to preserve from MCP tools
 	 */
@@ -90,6 +91,9 @@ export function toolSpecFunctionDefinition(tool: ClineToolSpec, context: SystemP
 			// Add properties for object types
 			if (paramType === "object" && param.properties) {
 				paramSchema.properties = param.properties
+				if (param.requiredProperties?.length) {
+					paramSchema.required = param.requiredProperties
+				}
 			}
 
 			// Preserve any additional JSON Schema fields from MCP tools
@@ -105,6 +109,7 @@ export function toolSpecFunctionDefinition(tool: ClineToolSpec, context: SystemP
 				"type",
 				"items",
 				"properties",
+				"requiredProperties",
 			])
 			for (const key in param) {
 				if (!reservedKeys.has(key) && param[key] !== undefined) {
@@ -183,6 +188,9 @@ export function toolSpecInputSchema(tool: ClineToolSpec, context: SystemPromptCo
 			// Add properties for object types
 			if (paramType === "object" && param.properties) {
 				paramSchema.properties = param.properties
+				if (param.requiredProperties?.length) {
+					paramSchema.required = param.requiredProperties
+				}
 			}
 
 			// Preserve any additional JSON Schema fields from MCP tools
@@ -198,6 +206,7 @@ export function toolSpecInputSchema(tool: ClineToolSpec, context: SystemPromptCo
 				"type",
 				"items",
 				"properties",
+				"requiredProperties",
 			])
 			for (const key in param) {
 				if (!reservedKeys.has(key) && param[key] !== undefined) {
@@ -294,6 +303,9 @@ export function toolSpecFunctionDeclarations(tool: ClineToolSpec, context: Syste
 					if (prop.enum) {
 						paramSchema.properties[key].enum = prop.enum
 					}
+				}
+				if (param.requiredProperties?.length) {
+					paramSchema.required = param.requiredProperties
 				}
 			}
 

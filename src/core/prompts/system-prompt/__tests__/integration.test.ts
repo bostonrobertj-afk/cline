@@ -26,6 +26,7 @@ import { ModelFamily } from "@/shared/prompts"
 import { isGPT5ModelFamily } from "@/utils/model-utils"
 import { getSystemPrompt, PromptRegistry } from "../index"
 import type { SystemPromptContext } from "../types"
+import { AGENT_FEEDBACK_PROMPT_GUIDANCE } from "../types"
 
 // ============================================================================
 // Configuration
@@ -145,6 +146,10 @@ function normalizePromptSnapshotSurface(content: string): string {
 
 		if (line === "## access_mcp_resource") {
 			inAccessMcpResourceToolSection = true
+			continue
+		}
+
+		if (line === AGENT_FEEDBACK_PROMPT_GUIDANCE) {
 			continue
 		}
 
@@ -499,6 +504,21 @@ describe("Prompt System Integration Tests", () => {
 			)
 		})
 
+		it("includes the shared agent_feedback guidance in continuation-turn prompts", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: { ...mockProviderInfo, mode: "act" },
+					isContinuationTurn: true,
+				},
+				"fast",
+				async ({ systemPrompt }) => {
+					expect(systemPrompt).to.include(AGENT_FEEDBACK_PROMPT_GUIDANCE)
+				},
+			)
+		})
+
 		it("generates an ACT-mode continuation prompt with Indxr and checklist", async function () {
 			await runPromptTest(
 				this,
@@ -780,6 +800,45 @@ describe("Prompt System Integration Tests", () => {
 					expect(systemPrompt).to.not.include("In ACT MODE, respond using these:")
 				},
 			)
+		})
+
+		it("includes the shared agent_feedback guidance in a normal tool-use prompt", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: makeProviderInfo("gpt-3", "openai"),
+					enableNativeToolCalls: false,
+				},
+				"gpt-3",
+				async ({ systemPrompt }) => {
+					expect(systemPrompt).to.include(AGENT_FEEDBACK_PROMPT_GUIDANCE)
+				},
+			)
+		})
+
+		it("includes the shared agent_feedback guidance in the GPT-5 tool-use prompt", async function () {
+			this.timeout(TEST_TIMEOUT)
+
+			const systemPrompt = await PromptRegistry.getInstance().get({
+				...baseContext,
+				providerInfo: makeProviderInfo("gpt-5", "openai"),
+				enableNativeToolCalls: false,
+			})
+
+			expect(systemPrompt).to.include(AGENT_FEEDBACK_PROMPT_GUIDANCE)
+		})
+
+		it("includes the shared agent_feedback guidance in the Hermes tool-use prompt", async function () {
+			this.timeout(TEST_TIMEOUT)
+
+			const systemPrompt = await PromptRegistry.getInstance().get({
+				...baseContext,
+				providerInfo: makeProviderInfo("hermes-4", "test"),
+				enableNativeToolCalls: false,
+			})
+
+			expect(systemPrompt).to.include(AGENT_FEEDBACK_PROMPT_GUIDANCE)
 		})
 
 		it("keeps native response-tool specs aligned with the shared response-tool contract", async function () {

@@ -288,3 +288,24 @@ export const TASK_PROGRESS_PARAMETER = {
 	dependencies: [ClineDefaultTool.TODO],
 	contextRequirements: (context: SystemPromptContext) => context.activeDeterministicPlaceholderWorkflowEnabled !== true,
 }
+
+export const AGENT_FEEDBACK_PROMPT_GUIDANCE =
+	"- If you hit a meaningful blocker, material ambiguity, or unstable behavior that affects correctness or progress, include `agent_feedback` on your response tool call with a concise description of the issue."
+
+export const AGENT_FEEDBACK_PARAMETER = {
+	name: "agent_feedback",
+	required: false,
+	type: "object",
+	instruction:
+		"Optional object for real-time agent feedback when you encounter a meaningful blocker, material ambiguity, or unstable behavior that affects correctness or progress.",
+	description: "Optional real-time agent feedback attached to this response tool call.",
+	properties: {
+		message: {
+			type: "string",
+			description: "Concise description of the blocker, ambiguity, instability, or confusing scenario.",
+		},
+	},
+	requiredProperties: ["message"],
+	additionalProperties: false,
+	usage: '{"message":"Concise description of the blocker or ambiguity."}',
+}

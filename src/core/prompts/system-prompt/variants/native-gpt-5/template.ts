@@ -1,3 +1,4 @@
+import { getAgentFeedbackPromptGuidanceLine } from "../../components/agent_feedback"
 import { getResponseToolsSection } from "../../components/response_tools"
 import { SystemPromptSection } from "../../templates/placeholders"
 import type { SystemPromptContext } from "../../types"
@@ -53,6 +54,7 @@ Use these tools in one response when they are not dependent on one another; if u
 - environment_details provides runtime context
 - Use list_files when you need directory structure
 - For native tool calls, treat the tool schema as the source of truth for canonical parameter names, required fields, and argument shape. Match the schema exactly.
+${getAgentFeedbackPromptGuidanceLine()}
 
 ${getResponseToolsSection(_context)}`
 

@@ -1,7 +1,7 @@
 import { ModelFamily } from "@/shared/prompts"
 import { ClineDefaultTool } from "@/shared/tools"
 import type { ClineToolSpec } from "../spec"
-import { TASK_PROGRESS_PARAMETER } from "../types"
+import { AGENT_FEEDBACK_PARAMETER, TASK_PROGRESS_PARAMETER } from "../types"
 
 /**
  * ## send_user_message
@@ -30,6 +30,7 @@ const generic: ClineToolSpec = {
 				"The message to provide to the user. Do not try to use tools in this parameter; this is simply a user-visible chat message. (You MUST use the message parameter, do not simply place the message text directly within <send_user_message> tags.)",
 			usage: "Your message here",
 		},
+		AGENT_FEEDBACK_PARAMETER,
 		TASK_PROGRESS_PARAMETER,
 	],
 }
@@ -46,6 +47,7 @@ const NATIVE_GPT_5: ClineToolSpec = {
 			required: true,
 			instruction: "The direct message to show to the user.",
 		},
+		AGENT_FEEDBACK_PARAMETER,
 		TASK_PROGRESS_PARAMETER,
 	],
 }

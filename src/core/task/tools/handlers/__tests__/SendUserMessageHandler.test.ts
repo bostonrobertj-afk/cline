@@ -1,6 +1,8 @@
 import { strict as assert } from "node:assert"
+import * as disk from "@core/storage/disk"
 import { afterEach, describe, it } from "mocha"
 import sinon from "sinon"
+import { Logger } from "@/shared/services/Logger"
 import { ClineDefaultTool } from "@/shared/tools"
 import { TaskState } from "../../../TaskState"
 import { RESPONSE_TOOL_SUCCESS_MESSAGE } from "../../response/types"
@@ -16,8 +18,12 @@ function createConfig(mode: "act" | "plan" = "act") {
 	}
 
 	const config = {
+		taskId: "task-1",
 		mode,
 		taskState,
+		messageState: {
+			getClineMessages: () => [],
+		},
 		callbacks,
 	} as unknown as TaskConfig
 
@@ -136,5 +142,41 @@ describe("SendUserMessageHandler", () => {
 		sinon.assert.notCalled(callbacks.say)
 		sinon.assert.calledOnce(callbacks.sayAndCreateMissingParamError)
 		sinon.assert.calledWithExactly(callbacks.sayAndCreateMissingParamError, ClineDefaultTool.SEND_USER_MESSAGE, "message")
+	})
+
+	it("emits an agent_feedback row after the user-visible text row", async () => {
+		sinon.stub(disk, "appendAgentFeedbackAuditEntry").resolves()
+		sinon.stub(Logger, "info")
+		const { config, callbacks } = createConfig("act")
+		const handler = new SendUserMessageHandler()
+
+		const result = await handler.execute(config, {
+			type: "tool_use",
+			name: ClineDefaultTool.SEND_USER_MESSAGE,
+			params: {
+				message: "Working through it.",
+				agent_feedback: {
+					message: "Blocked on unstable behavior.",
+				},
+			},
+			partial: false,
+		})
+
+		assert.equal(result, RESPONSE_TOOL_SUCCESS_MESSAGE)
+		assert.equal(callbacks.say.callCount, 2)
+		sinon.assert.calledWithExactly(callbacks.say.firstCall, "text", "Working through it.", undefined, undefined, false)
+		assert.equal(callbacks.say.secondCall.args[0], "agent_feedback")
+		assert.equal(callbacks.say.secondCall.args[2], undefined)
+		assert.equal(callbacks.say.secondCall.args[3], undefined)
+		assert.equal(callbacks.say.secondCall.args[4], false)
+
+		const payload = JSON.parse(callbacks.say.secondCall.args[1] as string)
+		assert.equal(payload.label, "Real-Time Agent Feedback")
+		assert.equal(payload.message, "Blocked on unstable behavior.")
+		assert.equal(payload.toolName, ClineDefaultTool.SEND_USER_MESSAGE)
+		assert.equal(payload.taskId, "task-1")
+		assert.equal(typeof payload.timestamp, "string")
+		assert.equal(typeof payload.turnIdentifier, "number")
+		assert.equal(typeof payload.apiCallIdentifier, "number")
 	})
 })

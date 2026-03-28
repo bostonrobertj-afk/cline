@@ -184,6 +184,7 @@ export type ClineSay =
 	| "api_req_finished"
 	| "text"
 	| "reasoning"
+	| "agent_feedback"
 	| "completion_result"
 	| "user_feedback"
 	| "user_feedback_diff"
@@ -345,6 +346,16 @@ export interface ClineAskUseMcpServer {
 export interface ClineAskUseSubagents {
 	subagentBatchId?: string
 	prompts: string[]
+}
+
+export interface ClineSayAgentFeedback {
+	label: "Real-Time Agent Feedback"
+	message: string
+	timestamp: string
+	toolName: string
+	taskId: string
+	turnIdentifier: number
+	apiCallIdentifier: number
 }
 
 export interface ClinePlanModeResponse {

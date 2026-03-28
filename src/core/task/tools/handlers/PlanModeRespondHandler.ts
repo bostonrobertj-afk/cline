@@ -6,6 +6,7 @@ import { ClinePlanModeResponse } from "@/shared/ExtensionMessage"
 import { Logger } from "@/shared/services/Logger"
 import { ClineDefaultTool } from "@/shared/tools"
 import type { ToolResponse } from "../../index"
+import { emitAgentFeedback, readAgentFeedbackMessage } from "../response/agent-feedback"
 import { ResponseToolRuntime } from "../response/ResponseToolRuntime"
 import type { IPartialBlockHandler, IToolHandler } from "../ToolExecutorCoordinator"
 import type { TaskConfig } from "../types/TaskConfig"
@@ -40,6 +41,12 @@ export class PlanModeRespondHandler implements IToolHandler, IPartialBlockHandle
 		const response: string | undefined = block.params.response
 		const optionsRaw: string | undefined = block.params.options
 		const needsMoreExploration: boolean = block.params.needs_more_exploration === "true"
+		const { invalid, message: agentFeedbackMessage } = readAgentFeedbackMessage(block.params as Record<string, unknown>)
+
+		if (invalid) {
+			config.taskState.consecutiveMistakeCount++
+			return await config.callbacks.sayAndCreateMissingParamError(this.name, "agent_feedback.message")
+		}
 
 		// Validate required parameters
 		if (!response) {
@@ -50,6 +57,11 @@ export class PlanModeRespondHandler implements IToolHandler, IPartialBlockHandle
 		config.taskState.consecutiveMistakeCount = 0
 
 		// The generate_plan_output tool tends to run into this issue where the model realizes mid-tool call that it should have called another tool before calling generate_plan_output. And it ends the generate_plan_output tool call with 'Proceeding to reading files...' which doesn't do anything because we restrict to 1 tool call per message. As an escape hatch for the model, we provide it the optionality to tack on a parameter at the end of its response `needs_more_exploration`, which will allow the loop to continue.
+		if (needsMoreExploration && agentFeedbackMessage !== undefined) {
+			return formatResponse.toolError(
+				"[agent_feedback is not allowed when generate_plan_output sets needs_more_exploration=true.]",
+			)
+		}
 		if (needsMoreExploration) {
 			return formatResponse.toolResult(
 				`[You have indicated that you need more exploration. Proceed with calling tools to continue the planning process.]`,
@@ -95,11 +107,12 @@ export class PlanModeRespondHandler implements IToolHandler, IPartialBlockHandle
 		config.taskState.isAwaitingPlanResponse = true
 
 		// Ask for user response
-		let {
-			text,
-			images,
-			files: planResponseFiles,
-		} = await responseToolRuntime.askForResponse(config, this.name, this.name, JSON.stringify(sharedMessage))
+		await responseToolRuntime.prepareForResponseDelivery(config, this.name)
+		const responsePromise = config.callbacks.ask(this.name, JSON.stringify(sharedMessage), false)
+		if (agentFeedbackMessage) {
+			await emitAgentFeedback(config, this.name, agentFeedbackMessage)
+		}
+		let { text, images, files: planResponseFiles } = await responsePromise
 
 		config.taskState.isAwaitingPlanResponse = false
 

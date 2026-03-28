@@ -94,4 +94,37 @@ describe("ChatRow followup presentation", () => {
 		expect(screen.getByText("Cline has a question:")).toBeInTheDocument()
 		expect(screen.getByText("What should I do next?")).toBeInTheDocument()
 	})
+
+	it("renders agent feedback rows", () => {
+		mockThreadDisplayState.value = "idle_open"
+
+		const message: ClineMessage = {
+			ts: Date.now(),
+			type: "say",
+			say: "agent_feedback",
+			text: JSON.stringify({
+				label: "Real-Time Agent Feedback",
+				message: "Blocked on unstable behavior.",
+				timestamp: "2026-03-28T12:00:00.000Z",
+				toolName: "send_user_message",
+				taskId: "task-1",
+				turnIdentifier: 1,
+				apiCallIdentifier: 1,
+			}),
+		}
+
+		render(
+			<ChatRowContent
+				inputValue=""
+				isExpanded={true}
+				isLast={false}
+				message={message}
+				onSetQuote={vi.fn()}
+				onToggleExpand={vi.fn()}
+			/>,
+		)
+
+		expect(screen.getByText("Real-Time Agent Feedback")).toBeInTheDocument()
+		expect(screen.getByText("Blocked on unstable behavior.")).toBeInTheDocument()
+	})
 })

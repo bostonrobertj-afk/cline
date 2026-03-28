@@ -12,6 +12,7 @@ import type { ToolResponse } from "../../index"
 import { listIncompleteManagedWorkflowItems } from "../../managed-workflows/ManagedWorkflowRenderer"
 import { showNotificationForApproval } from "../../utils"
 import { buildUserFeedbackContent } from "../../utils/buildUserFeedbackContent"
+import { emitAgentFeedback, readAgentFeedbackMessage } from "../response/agent-feedback"
 import { ResponseToolRuntime } from "../response/ResponseToolRuntime"
 import type { IPartialBlockHandler, IToolHandler } from "../ToolExecutorCoordinator"
 import type { TaskConfig } from "../types/TaskConfig"
@@ -57,6 +58,12 @@ export class AttemptCompletionHandler implements IToolHandler, IPartialBlockHand
 	async execute(config: TaskConfig, block: ToolUse): Promise<ToolResponse> {
 		const result: string | undefined = block.params.result
 		const command: string | undefined = block.params.command
+		const { invalid, message: agentFeedbackMessage } = readAgentFeedbackMessage(block.params as Record<string, unknown>)
+
+		if (invalid) {
+			config.taskState.consecutiveMistakeCount++
+			return await config.callbacks.sayAndCreateMissingParamError(this.name, "agent_feedback.message")
+		}
 
 		// Validate required parameters
 		if (!result) {
@@ -157,6 +164,13 @@ export class AttemptCompletionHandler implements IToolHandler, IPartialBlockHand
 		await config.callbacks.clearPartialResponseToolPreview(block)
 
 		const lastMessage = config.messageState.getClineMessages().at(-1)
+		let didEmitAgentFeedback = false
+		const emitAgentFeedbackOnce = async () => {
+			if (!didEmitAgentFeedback && agentFeedbackMessage) {
+				didEmitAgentFeedback = true
+				await emitAgentFeedback(config, this.name, agentFeedbackMessage)
+			}
+		}
 
 		if (command) {
 			if (lastMessage && lastMessage.ask !== "command") {
@@ -165,6 +179,7 @@ export class AttemptCompletionHandler implements IToolHandler, IPartialBlockHand
 				await config.callbacks.saveCheckpoint(true, completionMessageTs)
 				await addNewChangesFlagToLastCompletionResultMessage()
 				telemetryService.captureTaskCompleted(config.ulid, getTaskCompletionTelemetry(config))
+				await emitAgentFeedbackOnce()
 			} else {
 				// we already sent a command message, meaning the complete completion message has also been sent
 				await config.callbacks.saveCheckpoint(true)
@@ -188,10 +203,12 @@ export class AttemptCompletionHandler implements IToolHandler, IPartialBlockHand
 
 				const didApprove = await ToolResultUtils.askApprovalAndPushFeedback("command", command, config)
 				if (!didApprove) {
+					await emitAgentFeedbackOnce()
 					return formatResponse.toolDenied()
 				}
 			}
 
+			await emitAgentFeedbackOnce()
 			// Execute the command
 			const [userRejected, execCommandResult] = await config.callbacks.executeCommandTool(
 				command!,
@@ -209,6 +226,7 @@ export class AttemptCompletionHandler implements IToolHandler, IPartialBlockHand
 			await config.callbacks.saveCheckpoint(true, completionMessageTs)
 			await addNewChangesFlagToLastCompletionResultMessage()
 			telemetryService.captureTaskCompleted(config.ulid, getTaskCompletionTelemetry(config))
+			await emitAgentFeedbackOnce()
 		}
 
 		// Run TaskComplete hook BEFORE presenting the "Start New Task" button

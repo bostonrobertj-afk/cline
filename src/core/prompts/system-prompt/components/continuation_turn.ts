@@ -1,6 +1,7 @@
 import { FocusChainPrompts } from "@/core/task/focus-chain/prompts"
 import { MULTI_ROOT_HINT } from "../constants"
 import type { PromptVariant, SystemPromptContext } from "../types"
+import { getAgentFeedbackPromptGuidanceLine } from "./agent_feedback"
 import { getIndxrExplorationGuidance } from "./mcp"
 import { getCurrentModeResponseToolsLine } from "./response_tools"
 
@@ -36,6 +37,7 @@ export async function getContinuationTurnSection(
 		"- Before any tool call, check the native tool schema for that tool's exact name, required fields, and argument shape. Do not rely on memory or prior examples.",
 		`- Operate from ${context.cwd || process.cwd()}; use explicit paths.`,
 		getCurrentModeResponseToolsLine(context),
+		getAgentFeedbackPromptGuidanceLine(),
 		"- Ask the user only if required to unblock progress or reduce risk.",
 		"- Prefer completing the next concrete step instead of restating prior context.",
 	]

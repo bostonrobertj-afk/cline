@@ -1,3 +1,4 @@
+import { getAgentFeedbackPromptGuidanceLine } from "../../components/agent_feedback"
 import { getResponseToolsSection } from "../../components/response_tools"
 import { SystemPromptSection } from "../../templates/placeholders"
 import type { PromptVariant, SystemPromptContext } from "../../types"
@@ -11,7 +12,8 @@ You have access to a set of tools that are executed upon the user's approval.${c
 
 When using tools, proceed directly with tool calls. Save explanations for the appropriate response tool payload. Governed user-facing response tools display their content to the user, return \`[Message displayed.]\`, and end your current turn, so include the full user-visible message within the tool call itself rather than duplicating it outside.
 
-${getResponseToolsSection(context)}`
+${getResponseToolsSection(context)}
+${getAgentFeedbackPromptGuidanceLine()}`
 
 const GEMINI_3_OBJECTIVE_TEMPLATE = (context: SystemPromptContext) => `OBJECTIVE
 

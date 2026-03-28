@@ -1,6 +1,7 @@
 import { ModelFamily } from "@/shared/prompts"
 import { ClineDefaultTool } from "@/shared/tools"
 import type { ClineToolSpec } from "../spec"
+import { AGENT_FEEDBACK_PARAMETER } from "../types"
 
 /**
  * ## generate_plan_output
@@ -44,6 +45,7 @@ However, if while writing your response you realize you actually need to do more
 			usage: "true or false (optional, but you MUST set to true if in <response> you need to read files or use other exploration tools)",
 			type: "boolean",
 		},
+		AGENT_FEEDBACK_PARAMETER,
 		// Different than the vanilla TASK_PROGRESS_PARAMETER
 		{
 			name: "task_progress",
@@ -70,6 +72,7 @@ However, if while writing your response you realize you actually need to do more
 			required: true,
 			instruction: `The response to provide to the user.`,
 		},
+		AGENT_FEEDBACK_PARAMETER,
 		{
 			name: "task_progress",
 			required: false,
@@ -100,6 +103,7 @@ If it becomes apparent that additional exploration is required while the generat
 			usage: "true or false (optional, but you MUST set to true if in <response> you need to read files or use other exploration tools)",
 			type: "boolean",
 		},
+		AGENT_FEEDBACK_PARAMETER,
 		{
 			name: "task_progress",
 			required: false,

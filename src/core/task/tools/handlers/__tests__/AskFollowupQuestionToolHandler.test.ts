@@ -1,6 +1,8 @@
 import { strict as assert } from "node:assert"
+import * as disk from "@core/storage/disk"
 import { afterEach, describe, it } from "mocha"
 import sinon from "sinon"
+import { Logger } from "@/shared/services/Logger"
 import { ClineDefaultTool } from "@/shared/tools"
 import { TaskState } from "../../../TaskState"
 import { RESPONSE_TOOL_SUCCESS_MESSAGE } from "../../response/types"
@@ -161,5 +163,45 @@ describe("AskFollowupQuestionToolHandler", () => {
 			images: undefined,
 			files: undefined,
 		})
+	})
+
+	it("emits agent_feedback after creating the followup ask and before consuming the response", async () => {
+		sinon.stub(disk, "appendAgentFeedbackAuditEntry").resolves()
+		sinon.stub(Logger, "info")
+		const { config, callbacks } = createConfig()
+		let resolveAsk: ((value: { text?: string; images?: string[]; files?: string[] }) => void) | undefined
+		;(callbacks.ask as sinon.SinonStub).callsFake(
+			() =>
+				new Promise((resolve) => {
+					resolveAsk = resolve
+				}),
+		)
+
+		const handler = new AskFollowupQuestionToolHandler()
+		const execution = handler.execute(config, {
+			type: "tool_use",
+			name: "ask_followup_question",
+			params: {
+				question: "Proceed with the review summary?",
+				options: JSON.stringify(["Proceed", "Hold"]),
+				agent_feedback: {
+					message: "Blocked on unstable behavior.",
+				},
+			},
+			partial: false,
+		} as any)
+
+		await Promise.resolve()
+		await Promise.resolve()
+
+		sinon.assert.calledOnce(callbacks.ask)
+		sinon.assert.calledOnce(callbacks.say)
+		assert.equal(callbacks.say.firstCall.args[0], "agent_feedback")
+		assert.equal(callbacks.ask.firstCall.calledBefore(callbacks.say.firstCall), true)
+
+		resolveAsk?.({ text: "Proceed" })
+
+		const result = await execution
+		assert.equal(result, RESPONSE_TOOL_SUCCESS_MESSAGE)
 	})
 })

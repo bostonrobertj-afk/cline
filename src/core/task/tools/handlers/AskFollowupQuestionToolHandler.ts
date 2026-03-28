@@ -7,6 +7,7 @@ import { ToolUse } from "../../../assistant-message"
 import { formatResponse } from "../../../prompts/responses"
 import { ToolResponse } from "../.."
 import { getBmadAgentDisplayName } from "../../bmad-agent-mode"
+import { emitAgentFeedback, readAgentFeedbackMessage } from "../response/agent-feedback"
 import { ResponseToolRuntime } from "../response/ResponseToolRuntime"
 import type { IPartialBlockHandler, IToolHandler } from "../ToolExecutorCoordinator"
 import type { TaskConfig } from "../types/TaskConfig"
@@ -35,6 +36,12 @@ export class AskFollowupQuestionToolHandler implements IToolHandler, IPartialBlo
 	async execute(config: TaskConfig, block: ToolUse): Promise<ToolResponse> {
 		const question: string | undefined = block.params.question
 		const optionsRaw: string | undefined = block.params.options
+		const { invalid, message: agentFeedbackMessage } = readAgentFeedbackMessage(block.params as Record<string, unknown>)
+
+		if (invalid) {
+			config.taskState.consecutiveMistakeCount++
+			return await config.callbacks.sayAndCreateMissingParamError(this.name, "agent_feedback.message")
+		}
 
 		// Validate required parameter
 		if (!question) {
@@ -73,11 +80,12 @@ export class AskFollowupQuestionToolHandler implements IToolHandler, IPartialBlo
 		const options = parsePartialArrayString(optionsRaw || "[]")
 
 		// Ask the question
-		const {
-			text,
-			images,
-			files: followupFiles,
-		} = await responseToolRuntime.askForResponse(config, this.name, "followup", JSON.stringify(sharedMessage))
+		await responseToolRuntime.prepareForResponseDelivery(config, this.name)
+		const responsePromise = config.callbacks.ask("followup", JSON.stringify(sharedMessage), false)
+		if (agentFeedbackMessage) {
+			await emitAgentFeedback(config, this.name, agentFeedbackMessage)
+		}
+		const { text, images, files: followupFiles } = await responsePromise
 
 		// Check if options contains the text response
 		if (optionsRaw && text && options.includes(text)) {

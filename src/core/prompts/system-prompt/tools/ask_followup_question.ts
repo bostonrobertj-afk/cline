@@ -1,7 +1,7 @@
 import { ModelFamily } from "@/shared/prompts"
 import { ClineDefaultTool } from "@/shared/tools"
 import type { ClineToolSpec } from "../spec"
-import { TASK_PROGRESS_PARAMETER } from "../types"
+import { AGENT_FEEDBACK_PARAMETER, TASK_PROGRESS_PARAMETER } from "../types"
 
 const generic: ClineToolSpec = {
 	variant: ModelFamily.GENERIC,
@@ -25,6 +25,7 @@ const generic: ClineToolSpec = {
 				"An array of 2-5 options for the user to choose from. Each option should be a string describing a possible answer. You may not always need to provide options, but it may be helpful in many cases where it can save the user from having to type out a response manually. IMPORTANT: NEVER include an option to toggle to Act mode, as this would be something you need to direct the user to do manually themselves if needed.",
 			usage: 'Array of options here (optional), e.g. ["Option 1", "Option 2", "Option 3"]',
 		},
+		AGENT_FEEDBACK_PARAMETER,
 		TASK_PROGRESS_PARAMETER,
 	],
 }
@@ -48,6 +49,7 @@ const NATIVE_NEXT_GEN: ClineToolSpec = {
 			instruction:
 				'An array of 2-5 options (e.x: "["Option 1", "Option 2", "Option 3"]") for the user to choose from. Each option should be a string describing a possible answer to the single question. You may not always need to provide options, but it may be helpful in many cases where it can save the user from having to type out a response manually. IMPORTANT: NEVER include an option to toggle to Act mode, as this would be something you need to direct the user to do manually themselves if needed.',
 		},
+		AGENT_FEEDBACK_PARAMETER,
 		TASK_PROGRESS_PARAMETER,
 	],
 }

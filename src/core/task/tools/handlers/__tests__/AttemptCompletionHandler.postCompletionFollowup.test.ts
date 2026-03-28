@@ -1,6 +1,8 @@
 import { strict as assert } from "node:assert"
+import * as disk from "@core/storage/disk"
 import { afterEach, describe, it } from "mocha"
 import sinon from "sinon"
+import { Logger } from "@/shared/services/Logger"
 import { ClineDefaultTool } from "@/shared/tools"
 import { TaskState } from "../../../TaskState"
 import { RESPONSE_TOOL_SUCCESS_MESSAGE } from "../../response/types"
@@ -186,5 +188,31 @@ describe("AttemptCompletionHandler post-completion follow-up", () => {
 			"completion_result",
 			"Almost there",
 		)
+	})
+
+	it("emits agent_feedback after the completion_result row", async () => {
+		sinon.stub(disk, "appendAgentFeedbackAuditEntry").resolves()
+		sinon.stub(Logger, "info")
+		const { config, callbacks } = createConfig()
+		;(callbacks.ask as sinon.SinonStub).resolves({
+			response: "yesButtonClicked",
+		})
+
+		const handler = new AttemptCompletionHandler()
+		const result = await handler.execute(config, {
+			type: "tool_use",
+			name: "attempt_completion",
+			params: {
+				result: "done",
+				agent_feedback: {
+					message: "Blocked on unstable behavior.",
+				},
+			},
+			partial: false,
+		} as any)
+
+		assert.equal(result, RESPONSE_TOOL_SUCCESS_MESSAGE)
+		assert.equal(callbacks.say.firstCall.args[0], "completion_result")
+		assert.equal(callbacks.say.secondCall.args[0], "agent_feedback")
 	})
 })

@@ -16,6 +16,7 @@ import { McpMarketplaceCatalog } from "@/shared/mcp"
 import { Logger } from "@/shared/services/Logger"
 import { syncWorker } from "@/shared/services/worker/sync"
 import { reconstructTaskHistory } from "../commands/reconstructTaskHistory"
+import type { AgentFeedbackAuditEntry } from "../task/tools/response/agent-feedback"
 import { StateManager } from "./StateManager"
 
 /**
@@ -164,6 +165,17 @@ export async function ensureHooksDirectoryExists(): Promise<string> {
 		return path.join(os.homedir(), "Documents", "Cline", "Hooks") // in case creating a directory in documents fails for whatever reason (e.g. permissions) - this is fine because we will fail gracefully with a path that does not exist
 	}
 	return clineHooksDir
+}
+
+export async function ensureAuditsDirectoryExists(): Promise<string> {
+	const userDocumentsPath = await getDocumentsPath()
+	const clineAuditsDir = path.join(userDocumentsPath, "Cline", "Audits")
+	await fs.mkdir(clineAuditsDir, { recursive: true })
+	return clineAuditsDir
+}
+
+export async function getAgentFeedbackAuditFilePath(): Promise<string> {
+	return path.join(await ensureAuditsDirectoryExists(), "agent-feedback-audit.jsonl")
 }
 
 /**
@@ -335,6 +347,41 @@ export async function saveTaskMetadata(taskId: string, metadata: TaskMetadata) {
 	} catch (error) {
 		Logger.error("Failed to save task metadata:", error)
 	}
+}
+
+export function pruneAgentFeedbackAuditEntries(entries: AgentFeedbackAuditEntry[], now = new Date()) {
+	const cutoff = now.getTime() - 7 * 24 * 60 * 60 * 1000
+
+	return entries.filter((entry) => {
+		const timestamp = new Date(entry.timestamp).getTime()
+		return !Number.isNaN(timestamp) && timestamp >= cutoff
+	})
+}
+
+export async function appendAgentFeedbackAuditEntry(entry: AgentFeedbackAuditEntry) {
+	const filePath = await getAgentFeedbackAuditFilePath()
+	const entries: AgentFeedbackAuditEntry[] = []
+
+	if (await fileExistsAtPath(filePath)) {
+		const existingContents = await fs.readFile(filePath, "utf8")
+
+		for (const line of existingContents.split("\n")) {
+			if (!line.trim()) {
+				continue
+			}
+
+			try {
+				entries.push(JSON.parse(line) as AgentFeedbackAuditEntry)
+			} catch {
+				Logger.warn("[AgentFeedbackAudit] Dropping malformed line during prune.")
+			}
+		}
+	}
+
+	const prunedEntries = pruneAgentFeedbackAuditEntries(entries)
+	prunedEntries.push(entry)
+
+	await atomicWriteFile(filePath, `${prunedEntries.map((auditEntry) => JSON.stringify(auditEntry)).join("\n")}\n`)
 }
 
 export async function ensureStateDirectoryExists(): Promise<string> {

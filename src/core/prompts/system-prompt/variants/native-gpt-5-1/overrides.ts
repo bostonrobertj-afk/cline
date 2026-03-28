@@ -1,3 +1,4 @@
+import { getAgentFeedbackPromptGuidanceLine } from "../../components/agent_feedback"
 import { getCodeExplorationGuidance } from "../../components/mcp"
 import { getResponseToolsSection } from "../../components/response_tools"
 import { SystemPromptSection } from "../../templates/placeholders"
@@ -30,6 +31,7 @@ You have access to a set of tools that are executed upon the user's approval. Yo
 - Use list_files when you need directory structure beyond the current visible-file context.
 
 ${getResponseToolsSection(_context)}
+${getAgentFeedbackPromptGuidanceLine()}
 
 ## Tool-Calling Convention and Preambles
 

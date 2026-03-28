@@ -1,6 +1,9 @@
 import { strict as assert } from "node:assert"
+import { formatResponse } from "@core/prompts/responses"
+import * as disk from "@core/storage/disk"
 import { afterEach, describe, it } from "mocha"
 import sinon from "sinon"
+import { Logger } from "@/shared/services/Logger"
 import { ClineDefaultTool } from "@/shared/tools"
 import { TaskState } from "../../../TaskState"
 import { RESPONSE_TOOL_SUCCESS_MESSAGE } from "../../response/types"
@@ -120,5 +123,74 @@ describe("PlanModeRespondHandler", () => {
 			images: undefined,
 			files: undefined,
 		})
+	})
+
+	it("creates the plan ask before emitting agent_feedback", async () => {
+		sinon.stub(disk, "appendAgentFeedbackAuditEntry").resolves()
+		sinon.stub(Logger, "info")
+		const { config, callbacks } = createConfig()
+		let resolveAsk: ((value: { text?: string; images?: string[]; files?: string[] }) => void) | undefined
+		;(callbacks.ask as sinon.SinonStub).callsFake(
+			() =>
+				new Promise((resolve) => {
+					resolveAsk = resolve
+				}),
+		)
+
+		const handler = new PlanModeRespondHandler()
+		const execution = handler.execute(config, {
+			type: "tool_use",
+			name: ClineDefaultTool.PLAN_MODE,
+			params: {
+				response: "Here is the plan.",
+				options: JSON.stringify(["Proceed", "Revise"]),
+				agent_feedback: {
+					message: "Blocked on unstable behavior.",
+				},
+			},
+			partial: false,
+		} as any)
+
+		await Promise.resolve()
+		await Promise.resolve()
+
+		sinon.assert.calledOnce(callbacks.ask)
+		sinon.assert.calledOnce(callbacks.say)
+		assert.equal(callbacks.say.firstCall.args[0], "agent_feedback")
+		assert.equal(callbacks.ask.firstCall.calledBefore(callbacks.say.firstCall), true)
+
+		resolveAsk?.({ text: "Proceed" })
+
+		const result = await execution
+		assert.equal(result, RESPONSE_TOOL_SUCCESS_MESSAGE)
+	})
+
+	it("rejects agent_feedback when needs_more_exploration is true", async () => {
+		sinon.stub(disk, "appendAgentFeedbackAuditEntry").resolves()
+		sinon.stub(Logger, "info")
+		const { config, callbacks } = createConfig()
+		const handler = new PlanModeRespondHandler()
+
+		const result = await handler.execute(config, {
+			type: "tool_use",
+			name: ClineDefaultTool.PLAN_MODE,
+			params: {
+				response: "Here is the plan.",
+				needs_more_exploration: "true",
+				agent_feedback: {
+					message: "Blocked on unstable behavior.",
+				},
+			},
+			partial: false,
+		} as any)
+
+		assert.equal(
+			result,
+			formatResponse.toolError(
+				"[agent_feedback is not allowed when generate_plan_output sets needs_more_exploration=true.]",
+			),
+		)
+		sinon.assert.notCalled(callbacks.say)
+		sinon.assert.notCalled(callbacks.ask)
 	})
 })

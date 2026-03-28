@@ -1,6 +1,7 @@
 import type { ToolUse } from "@core/assistant-message"
 import { ClineDefaultTool } from "@shared/tools"
 import type { ToolResponse } from "../../index"
+import { emitAgentFeedback, readAgentFeedbackMessage } from "../response/agent-feedback"
 import { ResponseToolRuntime } from "../response/ResponseToolRuntime"
 import type { IPartialBlockHandler, IToolHandler } from "../ToolExecutorCoordinator"
 import type { TaskConfig } from "../types/TaskConfig"
@@ -24,6 +25,12 @@ export class SendUserMessageHandler implements IToolHandler, IPartialBlockHandle
 
 	async execute(config: TaskConfig, block: ToolUse): Promise<ToolResponse> {
 		const message: string | undefined = block.params.message
+		const { invalid, message: agentFeedbackMessage } = readAgentFeedbackMessage(block.params as Record<string, unknown>)
+
+		if (invalid) {
+			config.taskState.consecutiveMistakeCount++
+			return await config.callbacks.sayAndCreateMissingParamError(this.name, "agent_feedback.message")
+		}
 
 		if (!message) {
 			config.taskState.consecutiveMistakeCount++
@@ -35,6 +42,9 @@ export class SendUserMessageHandler implements IToolHandler, IPartialBlockHandle
 		await responseToolRuntime.prepareForResponseDelivery(config, this.name)
 		await config.callbacks.clearPartialResponseToolPreview(block)
 		await config.callbacks.say("text", message, undefined, undefined, false)
+		if (agentFeedbackMessage) {
+			await emitAgentFeedback(config, this.name, agentFeedbackMessage)
+		}
 
 		return responseToolRuntime.finalizeSuccess(config, this.name)
 	}

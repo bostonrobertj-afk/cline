@@ -5,6 +5,7 @@ import {
 	ClineAskUseMcpServer,
 	ClineMessage,
 	ClinePlanModeResponse,
+	ClineSayAgentFeedback,
 	ClineSayGenerateExplanation,
 	ClineSayTool,
 	COMPLETION_RESULT_CHANGES_FLAG,
@@ -948,6 +949,19 @@ export const ChatRowContent = memo(
 								{isReasoningStreaming && <FeatureTip />}
 							</div>
 						)
+					}
+					case "agent_feedback": {
+						try {
+							const agentFeedback = JSON.parse(message.text || "{}") as ClineSayAgentFeedback
+							return (
+								<div className="text-sm py-1">
+									<div className="font-semibold">Real-Time Agent Feedback</div>
+									<div>{agentFeedback.message}</div>
+								</div>
+							)
+						} catch {
+							return <MarkdownRow markdown={message.text} />
+						}
 					}
 					case "user_feedback":
 						return (
