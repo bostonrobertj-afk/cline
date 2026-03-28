@@ -3,15 +3,18 @@ import { MULTI_ROOT_HINT } from "../constants"
 import type { PromptVariant, SystemPromptContext } from "../types"
 import { hasConnectedIndxrServer, INDXR_EXPLORATION_PREFERENCE_GUIDANCE } from "./mcp"
 import { getCurrentModeResponseToolsLine } from "./response_tools"
-import { PLACEHOLDER_WORKFLOW_DONE_SIGNAL_REMINDER } from "./task_progress"
 
 function renderChecklistForPrompt(checklist: string): string {
 	return ["```text", checklist.trim(), "```"].join("\n")
 }
 
 function getFocusChainReminderLine(context: SystemPromptContext): string {
+	if (context.activeDeterministicPlaceholderWorkflowEnabled === true) {
+		return "- Once you correctly complete the current step, the next step's details will be shown automatically."
+	}
+
 	if (context.activeWorkflowSupportsPlaceholders && !context.managedWorkflowActive) {
-		return `- ${PLACEHOLDER_WORKFLOW_DONE_SIGNAL_REMINDER}`
+		return '- When the active step\'s "Done Signal" is true, use `send_user_message` tool call to briefly tell the user what step you are completing, and include `task_progress` with `__COMPLETE_NEXT_STEP__`. Use it only once in that assistant turn.'
 	}
 
 	return `- ${FocusChainPrompts.reminder.trim()}`

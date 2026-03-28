@@ -1,5 +1,6 @@
 import { formatResponse } from "@core/prompts/responses"
 import { ClineDefaultTool } from "@shared/tools"
+import type { DeterministicPlaceholderToolContext } from "./deterministicPlaceholderProgression"
 import type { FocusChainChecklistUpdateResult } from "./types"
 
 interface TaskProgressCarrier {
@@ -13,7 +14,10 @@ interface TaskProgressCarrier {
 interface TaskProgressUpdateOptions {
 	block: TaskProgressCarrier
 	focusChainEnabled: boolean
-	updateFCListFromToolResponse: (taskProgress: string | undefined) => Promise<FocusChainChecklistUpdateResult>
+	updateFCListFromToolResponse: (
+		taskProgress: string | undefined,
+		toolContext?: DeterministicPlaceholderToolContext,
+	) => Promise<FocusChainChecklistUpdateResult>
 }
 
 export interface PreToolTaskProgressUpdateResult {
@@ -54,15 +58,18 @@ export async function applyPreToolTaskProgressUpdate(
 }
 
 export async function applyPostToolTaskProgressUpdate(
-	options: TaskProgressUpdateOptions & { skipPostExecutionUpdate?: boolean },
+	options: TaskProgressUpdateOptions & {
+		skipPostExecutionUpdate?: boolean
+		toolContext?: DeterministicPlaceholderToolContext
+	},
 ): Promise<PostToolTaskProgressUpdateResult> {
-	const { block, focusChainEnabled, skipPostExecutionUpdate, updateFCListFromToolResponse } = options
+	const { block, focusChainEnabled, skipPostExecutionUpdate, toolContext, updateFCListFromToolResponse } = options
 
 	if (!focusChainEnabled || block.partial || skipPostExecutionUpdate) {
 		return {}
 	}
 
-	const focusChainUpdate = await updateFCListFromToolResponse(block.params?.task_progress)
+	const focusChainUpdate = await updateFCListFromToolResponse(block.params?.task_progress, toolContext)
 	return {
 		feedback: focusChainUpdate.feedback,
 	}

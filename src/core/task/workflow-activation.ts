@@ -49,6 +49,8 @@ export async function activateManagedWorkflowInTaskState(args: {
 	args.taskState.activePlaceholderWorkflowSource = undefined
 	args.taskState.activePlaceholderWorkflowStableValues = undefined
 	args.taskState.activePlaceholderWorkflowValues = undefined
+	args.taskState.activePlaceholderWorkflowDeterministicState = undefined
+	args.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices = []
 	args.taskState.activeWorkflowJustStarted = !resumed
 
 	return { run, resumed }
@@ -113,6 +115,10 @@ export async function activatePlaceholderWorkflowInTaskState(args: {
 	args.taskState.activePlaceholderWorkflowSource = workflowSource
 	args.taskState.activePlaceholderWorkflowStableValues = stablePlaceholderValues
 	args.taskState.activePlaceholderWorkflowValues = placeholderValues
+	if (workflowChanged) {
+		args.taskState.activePlaceholderWorkflowDeterministicState = undefined
+		args.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices = []
+	}
 	args.taskState.activeWorkflowJustStarted = true
 
 	return {

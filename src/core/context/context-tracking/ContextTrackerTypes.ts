@@ -1,4 +1,8 @@
 import type { ManagedWorkflowRunState } from "@/core/task/managed-workflows/types"
+import type {
+	ActivePlaceholderWorkflowDeterministicState,
+	AutoCompletedPlaceholderWorkflowStepNotice,
+} from "@/core/task/TaskState"
 import type { ActivePlaceholderWorkflowSource } from "@/core/workflows/placeholder-workflow-step-details"
 
 // Type definitions for FileContextTracker
@@ -40,5 +44,7 @@ export interface TaskMetadata {
 	activePlaceholderWorkflowSource?: ActivePlaceholderWorkflowSource
 	activePlaceholderWorkflowStableValues?: Record<string, string>
 	activePlaceholderWorkflowValues?: Record<string, string>
+	activePlaceholderWorkflowDeterministicState?: ActivePlaceholderWorkflowDeterministicState
+	pendingAutoCompletedPlaceholderWorkflowStepNotices?: AutoCompletedPlaceholderWorkflowStepNotice[]
 	managedWorkflowRun?: ManagedWorkflowRunState
 }

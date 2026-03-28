@@ -11,6 +11,7 @@ import { getCanonicalWorkflowConfigPath } from "../../workflows/workflow-placeho
 import { FocusChainManager } from "../focus-chain"
 import { Task, type ToolResponse } from "../index"
 import { TaskState } from "../TaskState"
+import { activateManagedWorkflowInTaskState } from "../workflow-activation"
 
 function createFocusChainManager(taskState: TaskState) {
 	return new FocusChainManager({
@@ -59,6 +60,21 @@ Inspect the prepared review input and write findings.
 				activePlaceholderWorkflowStableValues: {
 					communication_language: "English",
 				},
+				activePlaceholderWorkflowDeterministicState: {
+					codeReview: {
+						completedReviewLayers: {
+							adversarial_general: "subagent_report",
+						},
+					},
+				},
+				pendingAutoCompletedPlaceholderWorkflowStepNotices: [
+					{
+						workflowName: "code-review",
+						stepNumber: 4,
+						checklistLabel: "Step 4: Set Review Mode",
+						reason: "review_mode was derived deterministically from fresh review artifacts.",
+					},
+				],
 			}
 			sandbox.stub(disk, "getTaskMetadata").resolves(metadata as never)
 
@@ -69,6 +85,12 @@ Inspect the prepared review input and write findings.
 			expect(fakeTask.taskState.activePlaceholderWorkflowSource).to.deep.equal(metadata.activePlaceholderWorkflowSource)
 			expect(fakeTask.taskState.activePlaceholderWorkflowStableValues).to.deep.equal(
 				metadata.activePlaceholderWorkflowStableValues,
+			)
+			expect(fakeTask.taskState.activePlaceholderWorkflowDeterministicState).to.deep.equal(
+				metadata.activePlaceholderWorkflowDeterministicState,
+			)
+			expect(fakeTask.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal(
+				metadata.pendingAutoCompletedPlaceholderWorkflowStepNotices,
 			)
 
 			fakeTask.taskState.currentFocusChainChecklist = "- [ ] Step 1: Gather Context\n- [ ] Step 2: Review"
@@ -81,6 +103,83 @@ Inspect the prepared review input and write findings.
 		} finally {
 			sandbox.restore()
 		}
+	})
+
+	it("persists consumed auto-completed placeholder workflow notices as cleared after prompt generation", async () => {
+		const sandbox = sinon.createSandbox()
+		try {
+			const metadata = {
+				activePlaceholderWorkflowId: "code-review",
+				activePlaceholderWorkflowSource: {
+					type: "remote",
+					name: "code-review",
+					contents: `# Remote Review
+
+## Step 1: Gather Context
+Determine what to review from the user's prompt before asking follow-up questions.
+
+## Step 2: Review
+Inspect the prepared review input and write findings.
+`,
+				},
+				pendingAutoCompletedPlaceholderWorkflowStepNotices: [
+					{
+						workflowName: "code-review",
+						stepNumber: 4,
+						checklistLabel: "Step 4: Set Review Mode",
+						reason: "review_mode was derived deterministically from fresh review artifacts.",
+					},
+				],
+			}
+			sandbox.stub(disk, "getTaskMetadata").resolves(metadata as never)
+			const saveTaskMetadataStub = sandbox.stub(disk, "saveTaskMetadata").resolves()
+
+			const fakeTask = createFakeTask("task-consume-placeholder-notices")
+			await (Task.prototype as any).restoreBmadStateFromMetadata.call(fakeTask)
+
+			fakeTask.taskState.currentFocusChainChecklist = "- [ ] Step 1: Gather Context\n- [ ] Step 2: Review"
+
+			const manager = createFocusChainManager(fakeTask.taskState)
+			const prompt = await manager.generateFocusChainInstructions()
+
+			expect(prompt).to.contain("# AUTO-COMPLETED WORKFLOW STEPS")
+			expect(prompt).to.contain("Step 4: Set Review Mode")
+			expect(fakeTask.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+			expect(saveTaskMetadataStub.callCount).to.be.greaterThan(0)
+			const lastSavedMetadata = saveTaskMetadataStub.getCall(saveTaskMetadataStub.callCount - 1).args[1]
+			expect(lastSavedMetadata.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+		} finally {
+			sandbox.restore()
+		}
+	})
+
+	it("clears deterministic placeholder state and notices when activating a managed workflow", async () => {
+		const taskState = new TaskState()
+		taskState.activePlaceholderWorkflowId = "code-review"
+		taskState.activePlaceholderWorkflowDeterministicState = {
+			codeReview: {
+				completedReviewLayers: {
+					adversarial_general: "subagent_report",
+				},
+			},
+		}
+		taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices = [
+			{
+				workflowName: "code-review",
+				stepNumber: 4,
+				checklistLabel: "Step 4: Set Review Mode",
+				reason: "review_mode was derived deterministically from fresh review artifacts.",
+			},
+		]
+
+		await activateManagedWorkflowInTaskState({
+			cwd: process.cwd(),
+			taskState,
+			workflowId: "bmad-code-review",
+		})
+
+		expect(taskState.activePlaceholderWorkflowDeterministicState).to.equal(undefined)
+		expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
 	})
 
 	it("computes stable placeholder values from slash-command activation metadata and renders them in activation instructions", async () => {

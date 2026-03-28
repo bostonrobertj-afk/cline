@@ -31,6 +31,7 @@ IMPORTANT NOTE: This tool CANNOT be used until you've confirmed from the user th
 			instruction: "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool.",
 			usage: "Checklist here (required if you used task_progress in previous tool uses)",
 			dependencies: [ClineDefaultTool.TODO],
+			contextRequirements: (context) => context.activeDeterministicPlaceholderWorkflowEnabled !== true,
 			description:
 				"If you were using task_progress to update the task progress, you must include the completed list in the result as well.",
 		},
@@ -65,6 +66,7 @@ IMPORTANT NOTE: This tool CANNOT be used until you've confirmed from the user th
 				"A checklist showing task progress after this tool use is completed. (See 'Updating Task Progress' section for more details)",
 			usage: "Checklist here (required if you used task_progress in previous tool uses)",
 			dependencies: [ClineDefaultTool.TODO],
+			contextRequirements: (context) => context.activeDeterministicPlaceholderWorkflowEnabled !== true,
 			description:
 				"If you were using task_progress to update the task progress, you must include the completed list in the result as well.",
 		},
@@ -76,7 +78,7 @@ const NATIVE_NEXT_GEN: ClineToolSpec = {
 	id,
 	name: "attempt_completion",
 	description:
-		"Once you've completed the user's task, use this tool to present the final result to the user, including a brief and very short (1-2 paragraph) summary of the task and what was done to resolve it. On success, this tool displays your message to the user, returns `[Message displayed.]`, and ends your current turn. Any later user reply arrives on the following turn as normal human-authored input. Example: result=\"Implemented the fix and verified it with tests.\" You should only call this tool when you have completed all tasks in the task_progress list, and completed all changes that are necessary to satisfy the user's request. You should not provide the contents of the task_progress list in the result parameter, it must be included in the task_progress parameter.",
+		"Once you've completed the user's task, use this tool to present the final result to the user, including a brief and very short (1-2 paragraph) summary of the task and what was done to resolve it. On success, this tool displays your message to the user, returns `[Message displayed.]`, and ends your current turn. Any later user reply arrives on the following turn as normal human-authored input. Example: result=\"Implemented the fix and verified it with tests.\" You should only call this tool when you have completed all necessary work for the user's request.",
 	parameters: [
 		{
 			name: "result",
@@ -93,6 +95,7 @@ const NATIVE_NEXT_GEN: ClineToolSpec = {
 			name: "task_progress",
 			required: false,
 			dependencies: [ClineDefaultTool.TODO],
+			contextRequirements: (context) => context.activeDeterministicPlaceholderWorkflowEnabled !== true,
 			instruction:
 				"A checklist showing task progress with the latest status of each subtasks included previously, if any. If you are calling attempt completion, and all items in this list have been completed, they must be marked as completed in this response.",
 		},

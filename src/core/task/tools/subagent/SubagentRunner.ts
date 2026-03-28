@@ -13,6 +13,7 @@ import {
 	resolvePlaceholderWorkflowManagedVariant,
 } from "@core/task/bmad-agent-mode"
 import { FocusChainManager } from "@core/task/focus-chain"
+import { isDeterministicPlaceholderWorkflowSupported } from "@core/task/focus-chain/deterministicPlaceholderProgression"
 import { applyPostToolTaskProgressUpdate, applyPreToolTaskProgressUpdate } from "@core/task/focus-chain/updateFromToolResponse"
 import { getManagedWorkflowDefinition } from "@core/task/managed-workflows/ManagedWorkflowRegistry"
 import { buildManagedWorkflowPrompt } from "@core/task/managed-workflows/ManagedWorkflowRenderer"
@@ -942,6 +943,9 @@ export class SubagentRunner {
 			stablePlaceholderValues: params.state.activePlaceholderWorkflowStableValues,
 			placeholderValues: params.state.activePlaceholderWorkflowValues,
 		})
+		const activeDeterministicPlaceholderWorkflowEnabled = isDeterministicPlaceholderWorkflowSupported(
+			activePlaceholderWorkflowPromptContext.activePlaceholderWorkflowName,
+		)
 
 		return {
 			providerInfo: params.providerInfo,
@@ -953,6 +957,7 @@ export class SubagentRunner {
 			activeWorkflowReminder,
 			activeWorkflowSupportsPlaceholders: !!params.state.managedWorkflowRun || !!params.state.activePlaceholderWorkflowId,
 			...activePlaceholderWorkflowPromptContext,
+			activeDeterministicPlaceholderWorkflowEnabled,
 			managedWorkflowActive: !!params.state.managedWorkflowRun,
 			isContinuationTurn: params.shouldUseContinuationPrompt,
 			currentFocusChainChecklist: params.state.currentFocusChainChecklist,

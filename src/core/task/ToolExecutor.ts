@@ -775,6 +775,12 @@ export class ToolExecutor {
 			block,
 			focusChainEnabled: this.stateManager.getGlobalSettingsKey("focusChainSettings").enabled,
 			skipPostExecutionUpdate: skipPostExecutionFocusChainUpdate,
+			toolContext: {
+				toolName: block.name,
+				toolParams: (block.params as Record<string, unknown>) ?? undefined,
+				toolResult,
+				toolWasExecuted,
+			},
 			updateFCListFromToolResponse: this.updateFCListFromToolResponse,
 		})
 		if (postToolTaskProgressUpdate.feedback) {

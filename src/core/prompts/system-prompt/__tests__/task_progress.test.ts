@@ -39,20 +39,32 @@ describe("managed workflow task progress prompt", () => {
 })
 
 describe("placeholder workflow task progress prompt", () => {
+	it("teaches deterministic runtime auto-completion for supported placeholder workflows", async () => {
+		const progress = await getUpdatingTaskProgress(variant, {
+			...context,
+			managedWorkflowActive: false,
+			activeWorkflowSupportsPlaceholders: true,
+			activeDeterministicPlaceholderWorkflowEnabled: true,
+		})
+
+		expect(progress).to.equal(undefined)
+	})
+
 	it("teaches checklist updates for placeholder workflows", async () => {
 		const progress = await getUpdatingTaskProgress(variant, {
 			...context,
 			managedWorkflowActive: false,
 			activeWorkflowSupportsPlaceholders: true,
+			activeDeterministicPlaceholderWorkflowEnabled: false,
 		})
 
 		expect(progress).to.contain("The user has triggered a workflow with a prebuilt checklist.")
 		expect(progress).to.contain("Instructions are automatically sent for the first incomplete item on the checklist")
 		expect(progress).to.contain(
-			'Do not include `task_progress` on a tool call until the active step\'s "Done Signal" is true.',
+			"DO inform the user when the Done Signal for the current step is true using send_user_message, and include `task_progress` as a parameter on that tool call to complete the step.",
 		)
 		expect(progress).to.contain(
-			'When the active step\'s "Done Signal" is true, use `task_progress` with `__COMPLETE_NEXT_STEP__` on the next relevant tool call, and use it only once in that assistant turn.',
+			'When the active step\'s "Done Signal" is true, use `send_user_message` tool call to briefly tell the user what step you are completing, and include `task_progress` with `__COMPLETE_NEXT_STEP__`. Use it only once in that assistant turn.',
 		)
 	})
 })

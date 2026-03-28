@@ -26,7 +26,7 @@ function createDependencies(taskState: TaskState) {
 describe("FocusChainManager placeholder workflow prompting", () => {
 	it("injects current-step details for a placeholder workflow when they can be resolved", async () => {
 		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "focus-chain-placeholder-"))
-		const workflowPath = path.join(tempDir, "local-review.md")
+		const workflowPath = path.join(tempDir, "code-review.md")
 		await fs.writeFile(
 			workflowPath,
 			`# Review Workflow
@@ -42,10 +42,10 @@ Inspect the prepared review input and write findings.
 
 		try {
 			const taskState = new TaskState()
-			taskState.activePlaceholderWorkflowId = "local-review.md"
+			taskState.activePlaceholderWorkflowId = "code-review"
 			taskState.activePlaceholderWorkflowSource = {
 				type: "local",
-				name: "local-review.md",
+				name: "code-review",
 				path: workflowPath,
 			}
 			taskState.activePlaceholderWorkflowValues = {
@@ -60,16 +60,104 @@ Inspect the prepared review input and write findings.
 			expect(prompt).to.contain("You are currently on this step: Step 1: Gather Context")
 			expect(prompt).to.contain("Determine what to review from the user's prompt")
 			expect(prompt).to.contain(
-				'When the active step\'s "Done Signal" is true, use `task_progress` with `__COMPLETE_NEXT_STEP__` on the next relevant tool call, and use it only once in that assistant turn.',
+				"Once you correctly complete this step, the next step's details will be shown automatically.",
 			)
-			expect(prompt).to.contain("__COMPLETE_NEXT_STEP__")
-			expect(prompt).to.contain("I determine the active step from your latest `task_progress` update.")
+			expect(prompt).to.not.contain("task_progress")
+			expect(prompt).to.not.contain("__COMPLETE_NEXT_STEP__")
 			expect(prompt).to.match(/^### Reminder:/m)
 			expect(prompt).to.contain("```text")
 			expect(prompt).to.match(/^- \[ \] Step 1: Gather Context/m)
 			expect(prompt).to.match(/^# CURRENT WORKFLOW STEP/m)
 		} finally {
 			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("renders and consumes pending auto-completed placeholder workflow notices", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "focus-chain-placeholder-notices-"))
+		const workflowPath = path.join(tempDir, "code-review.md")
+		await fs.writeFile(
+			workflowPath,
+			`# Review Workflow
+
+## Step 1: Gather Context
+Determine what to review from the user's prompt before asking follow-up questions.
+`,
+			"utf8",
+		)
+
+		try {
+			const taskState = new TaskState()
+			taskState.activePlaceholderWorkflowId = "code-review"
+			taskState.activePlaceholderWorkflowSource = {
+				type: "local",
+				name: "code-review",
+				path: workflowPath,
+			}
+			taskState.currentFocusChainChecklist = "- [ ] Step 1: Gather Context"
+			taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.push({
+				workflowName: "code-review",
+				stepNumber: 1,
+				checklistLabel: "Step 1: Gather Context",
+				reason: "review_target and spec_file are both present.",
+			})
+
+			const manager = new FocusChainManager(createDependencies(taskState))
+			const prompt = await manager.generateFocusChainInstructions()
+
+			expect(prompt).to.contain("# AUTO-COMPLETED WORKFLOW STEPS")
+			expect(prompt).to.contain("- Step 1: Gather Context — review_target and spec_file are both present.")
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("shows auto-completed notices once and clears them from persisted placeholder metadata", async () => {
+		const sandbox = sinon.createSandbox()
+		try {
+			const taskState = new TaskState()
+			taskState.activePlaceholderWorkflowId = "code-review"
+			taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "code-review",
+				contents: `# Review Workflow
+
+## Step 1: Gather Context
+Determine what to review from the user's prompt before asking follow-up questions.
+
+## Step 2: Review
+Inspect the prepared review input and write findings.
+`,
+			}
+			taskState.currentFocusChainChecklist = "- [ ] Step 1: Gather Context\n- [ ] Step 2: Review"
+			taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices = [
+				{
+					workflowName: "code-review",
+					stepNumber: 4,
+					checklistLabel: "Step 4: Set Review Mode",
+					reason: "review_mode was derived deterministically from fresh review artifacts.",
+				},
+			]
+
+			sandbox.stub(disk, "getTaskMetadata").resolves({} as never)
+			const saveTaskMetadataStub = sandbox.stub(disk, "saveTaskMetadata").resolves()
+
+			const manager = new FocusChainManager(createDependencies(taskState))
+			const firstPrompt = await manager.generateFocusChainInstructions()
+
+			expect(firstPrompt).to.contain("# AUTO-COMPLETED WORKFLOW STEPS")
+			expect(firstPrompt).to.contain("No action was required from you for those steps.")
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+			const lastSavedMetadata = saveTaskMetadataStub.getCall(saveTaskMetadataStub.callCount - 1).args[1]
+			expect(lastSavedMetadata.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+
+			const secondPrompt = await manager.generateFocusChainInstructions()
+
+			expect(secondPrompt).to.not.contain("# AUTO-COMPLETED WORKFLOW STEPS")
+			expect(secondPrompt).to.not.contain("Step 4: Set Review Mode")
+		} finally {
+			sandbox.restore()
 		}
 	})
 

@@ -1,5 +1,6 @@
 import type { ToolUse } from "@core/assistant-message"
 import { formatResponse } from "@core/prompts/responses"
+import { getTaskMetadata, saveTaskMetadata } from "@core/storage/disk"
 import {
 	ClineAskUseSubagents,
 	ClineSaySubagentStatus,
@@ -51,6 +52,22 @@ function excerpt(text: string | undefined, maxChars = 1200): string {
 	}
 
 	return `${trimmed.slice(0, maxChars)}...`
+}
+
+function detectCodeReviewLayerFromPrompt(prompt: string): "adversarial_general" | "edge_case_hunter" | undefined {
+	if (prompt.includes("review-adversarial-general.md") || prompt.includes("bmad-review-adversarial-general")) {
+		return "adversarial_general"
+	}
+
+	if (prompt.includes("review-edge-case-hunter.md") || prompt.includes("bmad-review-edge-case-hunter")) {
+		return "edge_case_hunter"
+	}
+
+	return undefined
+}
+
+function isActiveCodeReviewPlaceholderWorkflow(config: TaskConfig): boolean {
+	return config.taskState.activePlaceholderWorkflowSource?.name === "code-review"
 }
 
 export class UseSubagentsToolHandler implements IFullyManagedTool {
@@ -296,6 +313,31 @@ export class UseSubagentsToolHandler implements IFullyManagedTool {
 			usageCost += result.value.stats.totalCost || 0
 		})
 
+		if (isActiveCodeReviewPlaceholderWorkflow(config)) {
+			if (!config.taskState.activePlaceholderWorkflowDeterministicState) {
+				config.taskState.activePlaceholderWorkflowDeterministicState = {}
+			}
+			if (!config.taskState.activePlaceholderWorkflowDeterministicState.codeReview) {
+				config.taskState.activePlaceholderWorkflowDeterministicState.codeReview = {
+					completedReviewLayers: {},
+				}
+			}
+
+			entries.forEach((entry) => {
+				if (entry.status !== "completed") {
+					return
+				}
+
+				const layer = detectCodeReviewLayerFromPrompt(entry.prompt)
+				if (!layer) {
+					return
+				}
+
+				config.taskState.activePlaceholderWorkflowDeterministicState!.codeReview!.completedReviewLayers[layer] =
+					"subagent_report"
+			})
+		}
+
 		const failures = entries.filter((entry) => entry.status === "failed").length
 		await queueStatusUpdate(failures > 0 ? "failed" : "completed", false)
 
@@ -314,6 +356,25 @@ export class UseSubagentsToolHandler implements IFullyManagedTool {
 		const maxContextUsagePercentage = entries.reduce((acc, entry) => Math.max(acc, entry.contextUsagePercentage || 0), 0)
 		const maxContextTokens = entries.reduce((acc, entry) => Math.max(acc, entry.contextTokens || 0), 0)
 		const contextWindow = entries.reduce((acc, entry) => Math.max(acc, entry.contextWindow || 0), 0)
+
+		if (!config.taskState.managedWorkflowRun) {
+			try {
+				const metadata = await getTaskMetadata(config.taskId)
+				metadata.activeWorkflowId = config.taskState.activeWorkflowId
+				metadata.activePlaceholderWorkflowId = config.taskState.activePlaceholderWorkflowId
+				metadata.activePlaceholderWorkflowSource = config.taskState.activePlaceholderWorkflowSource
+				metadata.activePlaceholderWorkflowStableValues = config.taskState.activePlaceholderWorkflowStableValues
+				metadata.activePlaceholderWorkflowValues = config.taskState.activePlaceholderWorkflowValues
+				metadata.activePlaceholderWorkflowDeterministicState =
+					config.taskState.activePlaceholderWorkflowDeterministicState
+				metadata.pendingAutoCompletedPlaceholderWorkflowStepNotices =
+					config.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices
+				metadata.managedWorkflowRun = config.taskState.managedWorkflowRun
+				await saveTaskMetadata(config.taskId, metadata)
+			} catch {
+				// Non-fatal: the in-memory managed workflow run remains canonical for the active task.
+			}
+		}
 
 		const summary = [
 			"Subagent results:",

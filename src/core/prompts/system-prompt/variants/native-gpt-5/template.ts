@@ -32,7 +32,10 @@ export const BASE = `{{${SystemPromptSection.AGENT_ROLE}}}
 ====
 {{${SystemPromptSection.USER_INSTRUCTIONS}}}`
 
-const TASK_PROGRESS = `UPDATING TASK PROGRESS
+const TASK_PROGRESS = (context: SystemPromptContext) =>
+	context.activeDeterministicPlaceholderWorkflowEnabled
+		? ""
+		: `UPDATING TASK PROGRESS
 
 Use \`task_progress\` only as a checklist parameter on the next tool call, not a standalone tool.
 

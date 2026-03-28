@@ -29,6 +29,25 @@ export interface PartialResponseToolPreview {
 	status: "streaming" | "completed" | "interrupted"
 }
 
+export type DeterministicPlaceholderWorkflowName = "code-review" | "dev-story"
+
+export interface AutoCompletedPlaceholderWorkflowStepNotice {
+	workflowName: DeterministicPlaceholderWorkflowName
+	stepNumber: number
+	checklistLabel: string
+	reason: string
+}
+
+export type CodeReviewLayerCompletionSource = "subagent_report" | "fallback_prompt"
+
+export interface CodeReviewDeterministicProgressState {
+	completedReviewLayers: Partial<Record<"adversarial_general" | "edge_case_hunter", CodeReviewLayerCompletionSource>>
+}
+
+export interface ActivePlaceholderWorkflowDeterministicState {
+	codeReview?: CodeReviewDeterministicProgressState
+}
+
 export class TaskState {
 	// Task-level timing
 	taskStartTimeMs = Date.now()
@@ -124,6 +143,8 @@ export class TaskState {
 	activePlaceholderWorkflowSource?: ActivePlaceholderWorkflowSource
 	activePlaceholderWorkflowStableValues?: Record<string, string>
 	activePlaceholderWorkflowValues?: Record<string, string>
+	activePlaceholderWorkflowDeterministicState?: ActivePlaceholderWorkflowDeterministicState
+	pendingAutoCompletedPlaceholderWorkflowStepNotices: AutoCompletedPlaceholderWorkflowStepNotice[] = []
 	activeWorkflowJustStarted = false
 	managedWorkflowRun?: ManagedWorkflowRunState
 

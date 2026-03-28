@@ -4,6 +4,7 @@ import { ClineSubagentUsageInfo } from "@shared/ExtensionMessage"
 import { ClineDefaultTool } from "@shared/tools"
 import { afterEach, describe, it } from "mocha"
 import sinon from "sinon"
+import * as disk from "../../../../storage/disk"
 import { TaskState } from "../../../TaskState"
 import { AgentConfigLoader } from "../../subagent/AgentConfigLoader"
 import { SubagentRunner } from "../../subagent/SubagentRunner"
@@ -20,6 +21,8 @@ function createConfig(options?: {
 	const taskState = new TaskState()
 	const askResponse = options?.taskAskResponse ?? "yesButtonClicked"
 	const subagentsEnabled = options?.subagentsEnabled ?? true
+	sinon.stub(disk, "getTaskMetadata").resolves({ files_in_context: [], model_usage: [], environment_history: [] })
+	sinon.stub(disk, "saveTaskMetadata").resolves()
 
 	const callbacks = {
 		say: sinon.stub().resolves(undefined),
@@ -433,6 +436,71 @@ describe("SubagentToolHandler", () => {
 		assert.ok((result as string).includes("Succeeded: 1"))
 		assert.ok((result as string).includes("Failed: 1"))
 		assert.ok((result as string).includes("boom"))
+	})
+
+	it("records completed code-review layer subagent reports in deterministic placeholder state", async () => {
+		const { config, taskState } = createConfig({ autoApproveSafe: true, autoApproveAll: true })
+		taskState.activePlaceholderWorkflowId = "code-review"
+		taskState.activePlaceholderWorkflowSource = {
+			type: "remote",
+			name: "code-review",
+			contents: "",
+		}
+
+		sinon
+			.stub(SubagentRunner.prototype, "run")
+			.onFirstCall()
+			.resolves({
+				status: "completed",
+				result: "adversarial done",
+				stats: {
+					toolCalls: 1,
+					inputTokens: 0,
+					outputTokens: 0,
+					cacheWriteTokens: 0,
+					cacheReadTokens: 0,
+					totalCost: 0,
+					contextTokens: 0,
+					contextWindow: 200000,
+					contextUsagePercentage: 0,
+				},
+			})
+			.onSecondCall()
+			.resolves({
+				status: "completed",
+				result: "edge-case done",
+				stats: {
+					toolCalls: 1,
+					inputTokens: 0,
+					outputTokens: 0,
+					cacheWriteTokens: 0,
+					cacheReadTokens: 0,
+					totalCost: 0,
+					contextTokens: 0,
+					contextWindow: 200000,
+					contextUsagePercentage: 0,
+				},
+			})
+
+		const handler = new UseSubagentsToolHandler()
+		await handler.execute(config, {
+			type: "tool_use",
+			name: ClineDefaultTool.USE_SUBAGENTS,
+			params: {
+				prompt_1: "run review-adversarial-general.md now",
+				prompt_2: "run review-edge-case-hunter.md now",
+			},
+			partial: false,
+		})
+
+		assert.equal(
+			taskState.activePlaceholderWorkflowDeterministicState?.codeReview?.completedReviewLayers.adversarial_general,
+			"subagent_report",
+		)
+		assert.equal(
+			taskState.activePlaceholderWorkflowDeterministicState?.codeReview?.completedReviewLayers.edge_case_hunter,
+			"subagent_report",
+		)
 	})
 
 	it("runs configured subagent tools using the prompt parameter", async () => {

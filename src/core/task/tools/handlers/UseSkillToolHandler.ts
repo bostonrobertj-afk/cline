@@ -263,6 +263,8 @@ IMPORTANT: The workflow is now loaded. Do NOT call use_skill again for this task
 			config.taskState.activePlaceholderWorkflowSource = undefined
 			config.taskState.activePlaceholderWorkflowStableValues = undefined
 			config.taskState.activePlaceholderWorkflowValues = undefined
+			config.taskState.activePlaceholderWorkflowDeterministicState = undefined
+			config.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices = []
 			config.taskState.activeWorkflowJustStarted = true
 
 			return `# Skill "${skillContent.name}" is now active

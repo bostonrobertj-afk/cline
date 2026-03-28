@@ -38,6 +38,7 @@ const NATIVE_GPT_5: ClineToolSpec = {
 			name: "task_progress",
 			required: false,
 			instruction: "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool.",
+			contextRequirements: (context) => context.activeDeterministicPlaceholderWorkflowEnabled !== true,
 		},
 	],
 }

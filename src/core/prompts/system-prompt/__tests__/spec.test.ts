@@ -13,13 +13,17 @@ import {
 } from "../components/mcp"
 import type { ClineToolSpec } from "../spec"
 import { toolSpecFunctionDeclarations, toolSpecFunctionDefinition, toolSpecInputSchema } from "../spec"
+import { act_mode_respond_variants } from "../tools/act_mode_respond"
+import { attempt_completion_variants } from "../tools/attempt_completion"
 import { build_review_diff_output_variants } from "../tools/build_review_diff_output"
+import { generate_plan_output_variants } from "../tools/generate_plan_output"
 import { list_code_definition_names_variants } from "../tools/list_code_definition_names"
 import { read_file_variants } from "../tools/read_file"
 import { read_file_range_variants } from "../tools/read_file_range"
 import { search_files_variants } from "../tools/search_files"
 import { set_workflow_placeholders_variants } from "../tools/set_workflow_placeholders"
 import { use_mcp_tool_variants } from "../tools/use_mcp_tool"
+import { write_to_file_variants } from "../tools/write_to_file"
 import type { SystemPromptContext } from "../types"
 
 const mockContext: SystemPromptContext = {
@@ -257,6 +261,30 @@ describe("workflow placeholder tool gating", () => {
 	it("keeps build_review_diff_output globally available without workflow gating", () => {
 		const tool = build_review_diff_output_variants[0]
 		expect(tool.contextRequirements).to.equal(undefined)
+	})
+
+	it("omits task_progress from supported deterministic placeholder workflow native schemas", () => {
+		const context: SystemPromptContext = {
+			...mockContext,
+			enableNativeToolCalls: true,
+			activeWorkflowSupportsPlaceholders: true,
+			activeDeterministicPlaceholderWorkflowEnabled: true,
+			providerInfo: {
+				providerId: "openai",
+				model: { id: "gpt-5.4-2026-03-05", info: { supportsPromptCache: false } },
+				mode: "act",
+			},
+		}
+
+		const writeToFile = toolSpecFunctionDefinition(write_to_file_variants[1], context) as any
+		const attemptCompletion = toolSpecFunctionDefinition(attempt_completion_variants[3], context) as any
+		const actModeRespond = toolSpecFunctionDefinition(act_mode_respond_variants[0], context) as any
+		const generatePlanOutput = toolSpecFunctionDefinition(generate_plan_output_variants[1], context) as any
+
+		expect(writeToFile.function.parameters.properties.task_progress).to.equal(undefined)
+		expect(attemptCompletion.function.parameters.properties.task_progress).to.equal(undefined)
+		expect(actModeRespond.function.parameters.properties.task_progress).to.equal(undefined)
+		expect(generatePlanOutput.function.parameters.properties.task_progress).to.equal(undefined)
 	})
 })
 

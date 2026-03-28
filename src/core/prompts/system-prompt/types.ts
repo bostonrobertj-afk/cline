@@ -108,6 +108,7 @@ export interface SystemPromptContext {
 	readonly activeWorkflowSupportsPlaceholders?: boolean
 	readonly activePlaceholderWorkflowName?: string
 	readonly activePlaceholderWorkflowStepNumber?: number
+	readonly activeDeterministicPlaceholderWorkflowEnabled?: boolean
 	readonly managedWorkflowActive?: boolean
 	readonly isContinuationTurn?: boolean
 	readonly isPromptRefreshTurn?: boolean
@@ -284,4 +285,5 @@ export const TASK_PROGRESS_PARAMETER = {
 	instruction: `Use as a top-level parameter on the next tool call, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use \`${FOCUS_CHAIN_COMPLETE_NEXT_STEP_SENTINEL}\` to complete the next incomplete step.`,
 	usage: "Checklist here (optional)",
 	dependencies: [ClineDefaultTool.TODO],
+	contextRequirements: (context: SystemPromptContext) => context.activeDeterministicPlaceholderWorkflowEnabled !== true,
 }

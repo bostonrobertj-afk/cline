@@ -52,6 +52,7 @@ However, if while writing your response you realize you actually need to do more
 				" A checklist showing task progress after this tool use is completed. (See 'Updating Task Progress' section for more details)",
 			usage: "Checklist here (If you have presented the user with concrete steps or requirements, you can optionally include a todo list outlining these steps.)",
 			dependencies: [ClineDefaultTool.TODO],
+			contextRequirements: (context) => context.activeDeterministicPlaceholderWorkflowEnabled !== true,
 		},
 	],
 }
@@ -73,6 +74,7 @@ However, if while writing your response you realize you actually need to do more
 			name: "task_progress",
 			required: false,
 			instruction: "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool.",
+			contextRequirements: (context) => context.activeDeterministicPlaceholderWorkflowEnabled !== true,
 		},
 	],
 }
@@ -105,6 +107,7 @@ If it becomes apparent that additional exploration is required while the generat
 				"A checklist showing task progress after this tool use is completed. If you are presenting a final implementation plan to the user with needs_more_exploration set to false, you should include a checklist of items to be completed during Act Mode when implementation is underway. (See 'Updating Task Progress' section for more details)",
 			usage: "Checklist here (If you have presented the user with concrete steps or requirements, you can optionally include a todo list outlining these steps.)",
 			dependencies: [ClineDefaultTool.TODO],
+			contextRequirements: (context) => context.activeDeterministicPlaceholderWorkflowEnabled !== true,
 		},
 	],
 }

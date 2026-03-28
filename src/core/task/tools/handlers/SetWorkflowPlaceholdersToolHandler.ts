@@ -2,6 +2,7 @@ import type { ToolUse } from "@core/assistant-message"
 import { getTaskMetadata, saveTaskMetadata } from "@core/storage/disk"
 import { applyManagedWorkflowDynamicPlaceholders } from "@core/task/managed-workflows/placeholders"
 import type { ManagedWorkflowRunState } from "@core/task/managed-workflows/types"
+import { isDeterministicPlaceholderWorkflowSupported } from "@/core/task/focus-chain/deterministicPlaceholderProgression"
 import { ClineDefaultTool } from "@/shared/tools"
 import type { ToolResponse } from "../../index"
 import type { IPartialBlockHandler, IToolHandler } from "../ToolExecutorCoordinator"
@@ -31,9 +32,13 @@ function getWorkflowPlaceholderValues(block: ToolUse): Record<string, unknown> |
 	return parseWorkflowPlaceholderValues((block.params as Record<string, unknown>).values)
 }
 
-function getNextStepGuidance(isManagedWorkflow: boolean): string {
+function getNextStepGuidance(isManagedWorkflow: boolean, activeDeterministicPlaceholderWorkflowEnabled: boolean): string {
 	if (isManagedWorkflow) {
 		return "Continue the current workflow step or call complete_workflow_item if that step is finished."
+	}
+
+	if (activeDeterministicPlaceholderWorkflowEnabled) {
+		return "Continue the current placeholder workflow step. Once you correctly complete the current step, the next step's details will be shown automatically."
 	}
 
 	return 'Continue the current placeholder workflow step. Do not include `task_progress` on a tool call until the active step\'s "Done Signal" is true. When the active step\'s "Done Signal" is true, use `task_progress` with `__COMPLETE_NEXT_STEP__` on the next relevant tool call, and use it only once in that assistant turn.'
@@ -133,7 +138,10 @@ export class SetWorkflowPlaceholdersToolHandler implements IToolHandler, IPartia
 			unchangedStableKeys = genericResult.unchangedStableKeys
 		}
 
-		const nextStepGuidance = getNextStepGuidance(!!currentRun)
+		const activeDeterministicPlaceholderWorkflowEnabled = isDeterministicPlaceholderWorkflowSupported(
+			config.taskState.activePlaceholderWorkflowSource?.name,
+		)
+		const nextStepGuidance = getNextStepGuidance(!!currentRun, activeDeterministicPlaceholderWorkflowEnabled)
 
 		if (changedKeys.length === 0) {
 			config.taskState.consecutiveMistakeCount = 0

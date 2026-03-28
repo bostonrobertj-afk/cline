@@ -38,6 +38,7 @@ import {
 	getTaskMetadata,
 	saveTaskMetadata,
 } from "@core/storage/disk"
+import { isDeterministicPlaceholderWorkflowSupported } from "@core/task/focus-chain/deterministicPlaceholderProgression"
 import { releaseTaskLock } from "@core/task/TaskLockUtils"
 import {
 	buildPlaceholderWorkflowChecklist,
@@ -1419,6 +1420,8 @@ export class Task {
 				this.taskState.activePlaceholderWorkflowSource = action.workflowSource
 				this.taskState.activePlaceholderWorkflowStableValues = undefined
 				this.taskState.activePlaceholderWorkflowValues = undefined
+				this.taskState.activePlaceholderWorkflowDeterministicState = undefined
+				this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices = []
 				this.taskState.activeWorkflowJustStarted = true
 			}
 			if (!activation || activation.workflowChanged || this.taskState.currentFocusChainChecklist == null) {
@@ -1447,6 +1450,8 @@ export class Task {
 				this.taskState.activePlaceholderWorkflowSource = undefined
 				this.taskState.activePlaceholderWorkflowStableValues = undefined
 				this.taskState.activePlaceholderWorkflowValues = undefined
+				this.taskState.activePlaceholderWorkflowDeterministicState = undefined
+				this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices = []
 				this.taskState.activeWorkflowJustStarted = false
 			} else if (hadManagedWorkflowRun) {
 				await this.refreshManagedWorkflowChecklistProjection()
@@ -1464,6 +1469,8 @@ export class Task {
 				this.taskState.activePlaceholderWorkflowSource = undefined
 				this.taskState.activePlaceholderWorkflowStableValues = undefined
 				this.taskState.activePlaceholderWorkflowValues = undefined
+				this.taskState.activePlaceholderWorkflowDeterministicState = undefined
+				this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices = []
 				this.taskState.activeWorkflowJustStarted = false
 			}
 			if (hadManagedWorkflowRun && !this.taskState.managedWorkflowRun) {
@@ -1481,6 +1488,9 @@ export class Task {
 			taskMetadata.activePlaceholderWorkflowSource = this.taskState.activePlaceholderWorkflowSource
 			taskMetadata.activePlaceholderWorkflowStableValues = this.taskState.activePlaceholderWorkflowStableValues
 			taskMetadata.activePlaceholderWorkflowValues = this.taskState.activePlaceholderWorkflowValues
+			taskMetadata.activePlaceholderWorkflowDeterministicState = this.taskState.activePlaceholderWorkflowDeterministicState
+			taskMetadata.pendingAutoCompletedPlaceholderWorkflowStepNotices =
+				this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices
 			taskMetadata.managedWorkflowRun = this.taskState.managedWorkflowRun
 			await saveTaskMetadata(this.taskId, taskMetadata)
 		} catch {
@@ -1625,6 +1635,9 @@ export class Task {
 			this.taskState.activePlaceholderWorkflowSource = metadata.activePlaceholderWorkflowSource
 			this.taskState.activePlaceholderWorkflowStableValues = metadata.activePlaceholderWorkflowStableValues
 			this.taskState.activePlaceholderWorkflowValues = metadata.activePlaceholderWorkflowValues
+			this.taskState.activePlaceholderWorkflowDeterministicState = metadata.activePlaceholderWorkflowDeterministicState
+			this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices =
+				metadata.pendingAutoCompletedPlaceholderWorkflowStepNotices ?? []
 			this.taskState.activeWorkflowJustStarted = false
 			this.taskState.managedWorkflowRun = metadata.managedWorkflowRun
 		} catch {
@@ -2800,6 +2813,9 @@ export class Task {
 			stablePlaceholderValues: this.taskState.activePlaceholderWorkflowStableValues,
 			placeholderValues: this.taskState.activePlaceholderWorkflowValues,
 		})
+		const activeDeterministicPlaceholderWorkflowEnabled = isDeterministicPlaceholderWorkflowSupported(
+			activePlaceholderWorkflowPromptContext.activePlaceholderWorkflowName,
+		)
 
 		const promptContext: SystemPromptContext = {
 			cwd: this.cwd,
@@ -2814,6 +2830,7 @@ export class Task {
 			activeWorkflowSupportsPlaceholders:
 				!!this.taskState.managedWorkflowRun || !!this.taskState.activePlaceholderWorkflowId,
 			...activePlaceholderWorkflowPromptContext,
+			activeDeterministicPlaceholderWorkflowEnabled,
 			managedWorkflowActive: !!this.taskState.managedWorkflowRun,
 			isContinuationTurn: shouldUseContinuationPrompt,
 			isPromptRefreshTurn: shouldSendFullPromptAssembly,

@@ -2,6 +2,7 @@ import { FocusChainSettings } from "@shared/FocusChainSettings"
 import * as chokidar from "chokidar"
 import * as fs from "fs/promises"
 import * as path from "path"
+import { getTaskMetadata, saveTaskMetadata } from "@/core/storage/disk"
 import {
 	buildPlaceholderWorkflowChecklist,
 	getActivePlaceholderWorkflowStepDetails,
@@ -17,6 +18,11 @@ import { ensureTaskDirectoryExists } from "../../storage/disk"
 import { StateManager } from "../../storage/StateManager"
 import { renderManagedWorkflowTaskProgress } from "../managed-workflows/ManagedWorkflowRenderer"
 import { TaskState } from "../TaskState"
+import {
+	applyDeterministicPlaceholderProgression,
+	type DeterministicPlaceholderToolContext,
+	isDeterministicPlaceholderWorkflowSupported,
+} from "./deterministicPlaceholderProgression"
 import { logFocusChainDiagnosticEvent, summarizeFocusChainText, summarizeFocusChainTextBlocks } from "./diagnostics"
 import {
 	buildFocusChainChecklistRejectionFeedback,
@@ -314,6 +320,26 @@ export class FocusChainManager {
 		return FocusChainPrompts.apiRequestCount.replace("{{apiRequestCount}}", this.taskState.apiRequestCount.toString())
 	}
 
+	private async consumeAutoCompletedPlaceholderWorkflowNoticesForPrompt(): Promise<string | undefined> {
+		if (this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.length === 0) {
+			return undefined
+		}
+
+		const section = [
+			"# AUTO-COMPLETED WORKFLOW STEPS",
+			"",
+			"The runtime auto-completed these workflow steps:",
+			...this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.map(
+				(notice) => `- ${notice.checklistLabel} — ${notice.reason}`,
+			),
+			"",
+			"No action was required from you for those steps.",
+		].join("\n")
+		this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices = []
+		await this.persistPlaceholderWorkflowMetadata()
+		return section
+	}
+
 	private async buildPlaceholderWorkflowStepPrompt(
 		currentChecklist: string,
 		listCurrentProgress: string,
@@ -350,6 +376,8 @@ export class FocusChainManager {
 			const userUpdatedWarning = this.taskState.todoListWasUpdatedByUser
 				? "**CRITICAL INFORMATION:** I updated this checklist manually. Review the current checklist carefully before you continue."
 				: ""
+			const deterministicWorkflowSupported = isDeterministicPlaceholderWorkflowSupported(stepDetails.sourceName)
+			const autoCompletedNoticeSection = await this.consumeAutoCompletedPlaceholderWorkflowNoticesForPrompt()
 			const unresolvedPlaceholders = findUnresolvedWorkflowPlaceholders(stepDetails.details)
 			logFocusChainDiagnosticEvent(this.taskId, "placeholder_step_prompt_resolution", {
 				entered: true,
@@ -360,22 +388,34 @@ export class FocusChainManager {
 				unresolvedPlaceholderCount: unresolvedPlaceholders.length,
 				unresolvedPlaceholders: unresolvedPlaceholders.length > 0 ? unresolvedPlaceholders : undefined,
 			})
+			const currentStepBody = deterministicWorkflowSupported
+				? [
+						"# CURRENT WORKFLOW STEP",
+						`You are currently on this step: ${stepDetails.checklistLabel}`,
+						stepDetails.details.trim(),
+						"Focus on correctly completing this step.",
+						"Once you correctly complete this step, the next step's details will be shown automatically.",
+					].join("\n\n")
+				: [
+						"# CURRENT WORKFLOW STEP",
+						`You are currently on this step: ${stepDetails.checklistLabel}`,
+						stepDetails.details.trim(),
+						"Focus on completing this step.",
+						"I determine the active step from your latest `task_progress` update.",
+						'Do not include `task_progress` on a tool call until the active step\'s "Done Signal" is true.',
+						'When the active step\'s "Done Signal" is true, use `task_progress` with `__COMPLETE_NEXT_STEP__` on the next relevant tool call, and use it only once in that assistant turn.',
+						"Once the checklist advances, I'll give you the next step's details.",
+					].join("\n\n")
 
 			return this.joinPromptSections(
-				"### Reminder: Detailed instructions are shown for the first incomplete checklist item. Keep `task_progress` moving so the active step and its details stay in sync.",
+				deterministicWorkflowSupported
+					? "### Reminder: Detailed instructions are shown for the first incomplete checklist item. Once you correctly complete the current step, the next step's details will be shown automatically."
+					: "### Reminder: Detailed instructions are shown for the first incomplete checklist item. Keep `task_progress` moving so the active step and its details stay in sync.",
 				listCurrentProgress,
 				this.renderChecklistForPrompt(currentChecklist),
 				userUpdatedWarning,
-				[
-					"# CURRENT WORKFLOW STEP",
-					`You are currently on this step: ${stepDetails.checklistLabel}`,
-					stepDetails.details.trim(),
-					"Focus on completing this step.",
-					"I determine the active step from your latest `task_progress` update.",
-					'Do not include `task_progress` on a tool call until the active step\'s "Done Signal" is true.',
-					'When the active step\'s "Done Signal" is true, use `task_progress` with `__COMPLETE_NEXT_STEP__` on the next relevant tool call, and use it only once in that assistant turn.',
-					"Once the checklist advances, I'll give you the next step's details.",
-				].join("\n\n"),
+				autoCompletedNoticeSection,
+				currentStepBody,
 			)
 		} catch (error) {
 			logFocusChainDiagnosticEvent(this.taskId, "placeholder_step_prompt_resolution", {
@@ -388,6 +428,28 @@ export class FocusChainManager {
 			})
 			Logger.warn(`[Task ${this.taskId}] Failed to resolve workflow step details`, error)
 			return undefined
+		}
+	}
+
+	private async persistPlaceholderWorkflowMetadata(): Promise<void> {
+		if (this.taskState.managedWorkflowRun) {
+			return
+		}
+
+		try {
+			const metadata = await getTaskMetadata(this.taskId)
+			metadata.activeWorkflowId = this.taskState.activeWorkflowId
+			metadata.activePlaceholderWorkflowId = this.taskState.activePlaceholderWorkflowId
+			metadata.activePlaceholderWorkflowSource = this.taskState.activePlaceholderWorkflowSource
+			metadata.activePlaceholderWorkflowStableValues = this.taskState.activePlaceholderWorkflowStableValues
+			metadata.activePlaceholderWorkflowValues = this.taskState.activePlaceholderWorkflowValues
+			metadata.activePlaceholderWorkflowDeterministicState = this.taskState.activePlaceholderWorkflowDeterministicState
+			metadata.pendingAutoCompletedPlaceholderWorkflowStepNotices =
+				this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices
+			metadata.managedWorkflowRun = this.taskState.managedWorkflowRun
+			await saveTaskMetadata(this.taskId, metadata)
+		} catch {
+			// Non-fatal: the in-memory managed workflow run remains canonical for the active task.
 		}
 	}
 
@@ -551,6 +613,37 @@ export class FocusChainManager {
 		}
 	}
 
+	private async applyDeterministicPlaceholderWorkflowProgressionIfNeeded(
+		currentChecklist: string,
+		toolContext?: DeterministicPlaceholderToolContext,
+	): Promise<string> {
+		if (!this.taskState.activePlaceholderWorkflowSource) {
+			return currentChecklist
+		}
+
+		if (!isDeterministicPlaceholderWorkflowSupported(this.taskState.activePlaceholderWorkflowSource.name)) {
+			return currentChecklist
+		}
+
+		const progressionResult = await applyDeterministicPlaceholderProgression({
+			taskState: this.taskState,
+			checklistMarkdown: currentChecklist,
+			toolContext,
+		})
+		if (progressionResult.checklist !== currentChecklist) {
+			this.taskState.currentFocusChainChecklist = progressionResult.checklist
+		}
+		if (
+			progressionResult.placeholderValuesChanged ||
+			progressionResult.deterministicStateChanged ||
+			progressionResult.noticesAdded
+		) {
+			await this.persistPlaceholderWorkflowMetadata()
+		}
+
+		return progressionResult.checklist
+	}
+
 	/**
 	 * Processes focus chain list updates from the AI model's task_progress parameter and persists them to disk.
 	 * Handles telemetry tracking for progress updates and falls back to reading existing files if no update provided.
@@ -559,7 +652,10 @@ export class FocusChainManager {
 	 * @requires this.taskState, this.say method, and telemetryService to be available
 	 * @returns Promise<void> - Updates taskState.currentFocusChainChecklist and sends UI messages
 	 */
-	public async updateFCListFromToolResponse(taskProgress: string | undefined): Promise<FocusChainChecklistUpdateResult> {
+	public async updateFCListFromToolResponse(
+		taskProgress: string | undefined,
+		toolContext?: DeterministicPlaceholderToolContext,
+	): Promise<FocusChainChecklistUpdateResult> {
 		try {
 			if (this.taskState.managedWorkflowRun) {
 				await this.refreshManagedWorkflowChecklistProjection()
@@ -569,6 +665,10 @@ export class FocusChainManager {
 				await this.refreshPlaceholderWorkflowChecklistProjection()
 				return { accepted: true }
 			}
+
+			let nextChecklist: string | undefined
+			let previousChecklist = this.taskState.currentFocusChainChecklist
+			let shouldWriteFocusChainToDisk = false
 
 			if (taskProgress?.trim()) {
 				const trimmedTaskProgress = taskProgress.trim()
@@ -609,91 +709,66 @@ export class FocusChainManager {
 						}
 					}
 
-					const mergedChecklist = updateResult.checklist || trimmedTaskProgress
+					nextChecklist = updateResult.checklist || trimmedTaskProgress
 					if (isFocusChainCompleteNextStepSentinel(trimmedTaskProgress)) {
 						this.taskState.completedNextStepUpdatesThisTurn += 1
 					}
-					const previousList = this.taskState.currentFocusChainChecklist
-					this.taskState.apiRequestsSinceLastTodoUpdate = 0
-					this.taskState.currentFocusChainChecklist = mergedChecklist
-					Logger.debug(
-						`[Task ${this.taskId}] focus chain list: LLM provided focus chain list update via task_progress parameter. Length ${previousList?.length || 0} > ${this.taskState.currentFocusChainChecklist.length}`,
-					)
-
-					// Parse focus chain list counts for telemetry
-					const { totalItems, completedItems } = parseFocusChainListCounts(mergedChecklist)
-
-					// Track first progress creation
-					if (!this.hasTrackedFirstProgress && totalItems > 0) {
-						telemetryService.captureFocusChainProgressFirst(this.taskId, totalItems)
-						this.hasTrackedFirstProgress = true
-					}
-					// Track progress updates (only if not the first, and has items)
-					else if (this.hasTrackedFirstProgress && totalItems > 0) {
-						telemetryService.captureFocusChainProgressUpdate(this.taskId, totalItems, completedItems)
-					}
-
-					// Write the model's update to the markdown file
-					try {
-						await this.writeFocusChainToDisk(mergedChecklist)
-
-						// Send the task_progress message to the UI immediately
-						await this.say("task_progress", mergedChecklist)
-					} catch (error) {
-						Logger.error(`[Task ${this.taskId}] focus chain list: Failed to write to markdown file:`, error)
-						// Fall back to creating a task_progress message directly if file write fails
-						await this.say("task_progress", mergedChecklist)
-						Logger.log(`[Task ${this.taskId}] focus chain list: Sent fallback task_progress message to UI`)
-					}
+					shouldWriteFocusChainToDisk = true
 				} else {
 					if (isFocusChainCompleteNextStepSentinel(trimmedTaskProgress)) {
 						this.taskState.completedNextStepUpdatesThisTurn += 1
 					}
-					this.taskState.apiRequestsSinceLastTodoUpdate = 0
-					this.taskState.currentFocusChainChecklist = trimmedTaskProgress
-					Logger.debug(
-						`[Task ${this.taskId}] focus chain list: LLM provided focus chain list update via task_progress parameter. Length 0 > ${this.taskState.currentFocusChainChecklist.length}`,
-					)
-
-					// Parse focus chain list counts for telemetry
-					const { totalItems, completedItems } = parseFocusChainListCounts(trimmedTaskProgress)
-
-					// Track first progress creation
-					if (!this.hasTrackedFirstProgress && totalItems > 0) {
-						telemetryService.captureFocusChainProgressFirst(this.taskId, totalItems)
-						this.hasTrackedFirstProgress = true
-					}
-					// Track progress updates (only if not the first, and has items)
-					else if (this.hasTrackedFirstProgress && totalItems > 0) {
-						telemetryService.captureFocusChainProgressUpdate(this.taskId, totalItems, completedItems)
-					}
-
-					// Write the model's update to the markdown file
-					try {
-						await this.writeFocusChainToDisk(trimmedTaskProgress)
-
-						// Send the task_progress message to the UI immediately
-						await this.say("task_progress", trimmedTaskProgress)
-					} catch (error) {
-						Logger.error(`[Task ${this.taskId}] focus chain list: Failed to write to markdown file:`, error)
-						// Fall back to creating a task_progress message directly if file write fails
-						await this.say("task_progress", trimmedTaskProgress)
-						Logger.log(`[Task ${this.taskId}] focus chain list: Sent fallback task_progress message to UI`)
-					}
+					nextChecklist = trimmedTaskProgress
+					shouldWriteFocusChainToDisk = true
 				}
 			} else {
 				// No model update provided, check if markdown file exists and load it
 				const markdownTodoList = await this.readFocusChainFromDisk()
 				if (markdownTodoList) {
-					const _previousList = this.taskState.currentFocusChainChecklist
-					this.taskState.currentFocusChainChecklist = markdownTodoList
-
-					// Create a task_progress message to display the focus chain list in the UI
-					await this.say("task_progress", markdownTodoList)
+					previousChecklist = this.taskState.currentFocusChainChecklist
+					nextChecklist = markdownTodoList
 				} else {
 					Logger.debug(`[Task ${this.taskId}] focus chain list: No valid task progress to update with`)
 				}
 			}
+
+			if (!nextChecklist) {
+				return { accepted: true }
+			}
+
+			const finalChecklist = await this.applyDeterministicPlaceholderWorkflowProgressionIfNeeded(nextChecklist, toolContext)
+			if (finalChecklist !== nextChecklist) {
+				shouldWriteFocusChainToDisk = true
+			}
+
+			this.taskState.apiRequestsSinceLastTodoUpdate = 0
+			this.taskState.currentFocusChainChecklist = finalChecklist
+			Logger.debug(
+				`[Task ${this.taskId}] focus chain list: LLM provided focus chain list update via task_progress parameter. Length ${previousChecklist?.length || 0} > ${this.taskState.currentFocusChainChecklist.length}`,
+			)
+
+			const { totalItems, completedItems } = parseFocusChainListCounts(finalChecklist)
+
+			if (!this.hasTrackedFirstProgress && totalItems > 0) {
+				telemetryService.captureFocusChainProgressFirst(this.taskId, totalItems)
+				this.hasTrackedFirstProgress = true
+			} else if (this.hasTrackedFirstProgress && totalItems > 0) {
+				telemetryService.captureFocusChainProgressUpdate(this.taskId, totalItems, completedItems)
+			}
+
+			if (shouldWriteFocusChainToDisk) {
+				try {
+					await this.writeFocusChainToDisk(finalChecklist)
+					await this.say("task_progress", finalChecklist)
+				} catch (error) {
+					Logger.error(`[Task ${this.taskId}] focus chain list: Failed to write to markdown file:`, error)
+					await this.say("task_progress", finalChecklist)
+					Logger.log(`[Task ${this.taskId}] focus chain list: Sent fallback task_progress message to UI`)
+				}
+			} else {
+				await this.say("task_progress", finalChecklist)
+			}
+
 			return { accepted: true }
 		} catch (error) {
 			Logger.error(`[Task ${this.taskId}] focus chain list: Error in updateFCListFromToolResponse:`, error)
