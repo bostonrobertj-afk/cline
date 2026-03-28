@@ -39,7 +39,10 @@ import {
 	saveTaskMetadata,
 } from "@core/storage/disk"
 import { releaseTaskLock } from "@core/task/TaskLockUtils"
-import { buildPlaceholderWorkflowChecklist } from "@core/workflows/placeholder-workflow-step-details"
+import {
+	buildPlaceholderWorkflowChecklist,
+	resolveActivePlaceholderWorkflowPromptContext,
+} from "@core/workflows/placeholder-workflow-step-details"
 import { createWorkflowSkillMetadata, resolveAvailableWorkflows } from "@core/workflows/resolution/resolveAvailableWorkflows"
 import { isMultiRootEnabled } from "@core/workspace/multi-root-utils"
 import { WorkspaceRootManager } from "@core/workspace/WorkspaceRootManager"
@@ -2791,6 +2794,13 @@ export class Task {
 			visible: visibleTabPaths.slice(0, cap),
 		}
 
+		const activePlaceholderWorkflowPromptContext = await resolveActivePlaceholderWorkflowPromptContext({
+			checklistMarkdown: this.taskState.currentFocusChainChecklist,
+			source: this.taskState.activePlaceholderWorkflowSource,
+			stablePlaceholderValues: this.taskState.activePlaceholderWorkflowStableValues,
+			placeholderValues: this.taskState.activePlaceholderWorkflowValues,
+		})
+
 		const promptContext: SystemPromptContext = {
 			cwd: this.cwd,
 			ide,
@@ -2803,6 +2813,7 @@ export class Task {
 			activeWorkflowReminder,
 			activeWorkflowSupportsPlaceholders:
 				!!this.taskState.managedWorkflowRun || !!this.taskState.activePlaceholderWorkflowId,
+			...activePlaceholderWorkflowPromptContext,
 			managedWorkflowActive: !!this.taskState.managedWorkflowRun,
 			isContinuationTurn: shouldUseContinuationPrompt,
 			isPromptRefreshTurn: shouldSendFullPromptAssembly,

@@ -180,6 +180,9 @@ const baseContext: SystemPromptContext = {
 	enableNativeToolCalls: false,
 }
 
+const getNativeToolNames = (tools: any[] | undefined): string[] =>
+	(tools ?? []).map((tool) => (tool?.type === "function" ? tool.function?.name : tool?.name)).filter(Boolean)
+
 const isNativeToolsFamily = (family: ModelFamily) =>
 	[ModelFamily.NATIVE_NEXT_GEN, ModelFamily.NATIVE_GPT_5, ModelFamily.NATIVE_GPT_5_1, ModelFamily.GEMINI_3].includes(family)
 
@@ -588,6 +591,8 @@ describe("Prompt System Integration Tests", () => {
 					const byName = new Map(nativeTools.map((tool) => [tool.name, tool.description]))
 
 					expect(byName.has("act_mode_respond")).to.equal(true)
+					expect(byName.has("attempt_completion")).to.equal(true)
+					expect(byName.has("generate_plan_output")).to.equal(false)
 					expect(byName.get("attempt_completion")).to.include(
 						"returns `[Message displayed.]`, and ends your current turn",
 					)
@@ -600,11 +605,30 @@ describe("Prompt System Integration Tests", () => {
 					expect(byName.get("ask_followup_question")).to.include(
 						"arrives on the following turn as normal human-authored input",
 					)
-					expect(byName.get("generate_plan_output")).to.include(
-						"internal control flow rather than a governed user-facing response",
-					)
 					expect(byName.get("act_mode_respond")).to.include("ends your current turn")
 					expect(byName.get("act_mode_respond")).to.include("wait for the user's next reply")
+				},
+			)
+		})
+
+		it("filters native response-tool specs for PLAN mode", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: { ...makeProviderInfo("gpt-5-1", "openai"), mode: "plan" },
+					enableNativeToolCalls: true,
+				},
+				"gpt-5-1",
+				async ({ tools }) => {
+					const nativeTools = (tools as any[]).map((tool) => (tool?.type === "function" ? tool.function : tool))
+					const byName = new Map(nativeTools.map((tool) => [tool.name, tool.description]))
+
+					expect(byName.has("generate_plan_output")).to.equal(true)
+					expect(byName.has("attempt_completion")).to.equal(false)
+					expect(byName.has("act_mode_respond")).to.equal(false)
+					expect(byName.has("ask_followup_question")).to.equal(true)
+					expect(byName.has("send_user_message")).to.equal(true)
 				},
 			)
 		})
@@ -664,6 +688,104 @@ describe("Prompt System Integration Tests", () => {
 					},
 				)
 			}
+		})
+
+		it("filters native tools for code-review step 3", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
+					enableNativeToolCalls: true,
+					useMinimalGptPrompt: true,
+					activeWorkflowSupportsPlaceholders: true,
+					managedWorkflowActive: false,
+					activePlaceholderWorkflowName: "code-review.md",
+					activePlaceholderWorkflowStepNumber: 3,
+					mcpHub: makeMcpHub([makeConnectedServer(), makeIndxrServer()]),
+				},
+				"gpt-5.4-2026-03-05",
+				async ({ tools }) => {
+					const nativeToolNames = getNativeToolNames(tools as any[])
+
+					expect(nativeToolNames).to.include.members([
+						"build_review_diff_output",
+						"execute_command",
+						"list_files",
+						"search_files",
+						"read_file",
+						"read_file_range",
+						"attempt_completion",
+					])
+					expect(nativeToolNames).to.not.include("apply_patch")
+					expect(nativeToolNames).to.not.include("set_workflow_placeholders")
+					expect(nativeToolNames).to.not.include("generate_plan_output")
+					expect(nativeToolNames.some((name) => name.includes("0mcp0") && name.includes("search_relevant"))).to.equal(
+						false,
+					)
+					expect(nativeToolNames.some((name) => name.includes("0mcp0") && name.includes("get_file_summary"))).to.equal(
+						false,
+					)
+					expect(nativeToolNames.some((name) => name.includes("0mcp0") && name.includes("read_source"))).to.equal(false)
+				},
+			)
+		})
+
+		it("filters native tools for a code-read placeholder step and retains only allowed prefixed Indxr tools", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
+					enableNativeToolCalls: true,
+					useMinimalGptPrompt: true,
+					activeWorkflowSupportsPlaceholders: true,
+					managedWorkflowActive: false,
+					activePlaceholderWorkflowName: "review-edge-case-hunter.md",
+					activePlaceholderWorkflowStepNumber: 2,
+					mcpHub: makeMcpHub([
+						makeConnectedServer(),
+						makeIndxrServer({
+							tools: [
+								{
+									name: "search_relevant",
+									description: "Search relevant code",
+									inputSchema: { type: "object", properties: {} },
+								},
+								{
+									name: "get_file_summary",
+									description: "Summarize file",
+									inputSchema: { type: "object", properties: {} },
+								},
+								{
+									name: "lookup_symbol",
+									description: "Lookup symbol",
+									inputSchema: { type: "object", properties: {} },
+								},
+								{
+									name: "get_callers",
+									description: "Get callers",
+									inputSchema: { type: "object", properties: {} },
+								},
+							],
+						}),
+					]),
+				},
+				"gpt-5.4-2026-03-05",
+				async ({ tools }) => {
+					const nativeToolNames = getNativeToolNames(tools as any[])
+
+					expect(nativeToolNames).to.include.members([
+						"indxr-10mcp0search_relevant",
+						"indxr-10mcp0get_file_summary",
+						"indxr-10mcp0lookup_symbol",
+						"indxr-10mcp0get_callers",
+					])
+					expect(nativeToolNames).to.not.include("12345670mcp0test_tool")
+					expect(nativeToolNames).to.not.include("build_review_diff_output")
+					expect(nativeToolNames).to.not.include("set_workflow_placeholders")
+				},
+			)
 		})
 
 		it("does not inline the verbose tool catalog for BMAD-active GPT-5.4 OpenAI turns", async function () {

@@ -291,6 +291,11 @@ describe("SubagentRunner", () => {
 		const state = new TaskState()
 		state.currentFocusChainChecklist = "- [ ] Step 1\n- [ ] Step 2"
 		state.activePlaceholderWorkflowId = "review-edge-case-hunter"
+		state.activePlaceholderWorkflowSource = {
+			type: "remote",
+			name: "review-edge-case-hunter.md",
+			contents: "# Flow\n\n## Step 1: Gather Context\nReview the diff.\n\n## Step 2: Review\nWrite findings.\n",
+		}
 
 		const context = await (runner as any).buildPromptContext({
 			state,
@@ -312,6 +317,8 @@ describe("SubagentRunner", () => {
 		assert.equal(context.isContinuationTurn, true)
 		assert.equal(context.currentFocusChainChecklist, "- [ ] Step 1\n- [ ] Step 2")
 		assert.equal(context.activeWorkflowSupportsPlaceholders, true)
+		assert.equal(context.activePlaceholderWorkflowName, "review-edge-case-hunter.md")
+		assert.equal(context.activePlaceholderWorkflowStepNumber, 1)
 		assert.equal(context.managedWorkflowActive, false)
 		assert.deepEqual(context.skills, [])
 		assert.equal(context.activeAgentId, undefined)

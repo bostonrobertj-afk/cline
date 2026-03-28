@@ -4,6 +4,7 @@ import { ModelFamily } from "@/shared/prompts"
 import { ClineDefaultTool } from "@/shared/tools"
 import { type ClineToolSpec, toolSpecFunctionDeclarations, toolSpecFunctionDefinition, toolSpecInputSchema } from "../spec"
 import { PromptVariant, SystemPromptContext } from "../types"
+import { filterContextualNativeToolSpecs } from "./contextualNativeToolFilter"
 
 export class ClineToolSet {
 	// A list of tools mapped by model group
@@ -183,7 +184,13 @@ export class ClineToolSet {
 		const mcpServers = context.mcpHub?.getServers()?.filter((s) => s.disabled !== true) || []
 		const mcpTools = mcpServers?.flatMap((server) => mcpToolToClineToolSpec(variant.family, server))
 
-		const enabledTools = [...toolConfigs, ...mcpTools].filter(
+		const contextuallyFilteredTools = filterContextualNativeToolSpecs({
+			context,
+			registeredTools: toolConfigs,
+			mcpTools,
+		})
+
+		const enabledTools = contextuallyFilteredTools.filter(
 			(tool) => typeof tool.description === "string" && tool.description.trim().length > 0,
 		)
 		const converter = ClineToolSet.getNativeConverter(context.providerInfo.providerId, context.providerInfo.model.id)

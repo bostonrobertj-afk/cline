@@ -364,35 +364,6 @@
   {
     "type": "function",
     "function": {
-      "name": "generate_plan_output",
-      "description": "Present a concrete plan when the task is in PLAN MODE.",
-      "strict": false,
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "response": {
-            "type": "string",
-            "description": "The response to provide to the user."
-          },
-          "needs_more_exploration": {
-            "type": "boolean",
-            "description": "Set to true if while formulating your response that you found you need to do more exploration with tools, for example reading files."
-          },
-          "task_progress": {
-            "type": "string",
-            "description": "Top-level tool parameter, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
-          }
-        },
-        "required": [
-          "response"
-        ],
-        "additionalProperties": false
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
       "name": "act_mode_respond",
       "description": "Send a brief ACT MODE preamble or progress update to the user.",
       "strict": false,

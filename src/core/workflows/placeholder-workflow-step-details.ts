@@ -28,6 +28,11 @@ export type ActivePlaceholderWorkflowStepDetails = {
 	sourceType: ActivePlaceholderWorkflowSource["type"]
 }
 
+export type ActivePlaceholderWorkflowPromptContext = {
+	activePlaceholderWorkflowName?: string
+	activePlaceholderWorkflowStepNumber?: number
+}
+
 type ParsedChecklistItem = {
 	label: string
 	stepNumber?: number
@@ -153,6 +158,37 @@ export async function getActivePlaceholderWorkflowStepDetails(args: {
 		details: matchingSection.details.trim(),
 		sourceName: args.source.name,
 		sourceType: args.source.type,
+	}
+}
+
+export async function resolveActivePlaceholderWorkflowPromptContext(args: {
+	checklistMarkdown?: string | null
+	source?: ActivePlaceholderWorkflowSource
+	stablePlaceholderValues?: Record<string, string>
+	placeholderValues?: Record<string, string>
+}): Promise<ActivePlaceholderWorkflowPromptContext> {
+	if (!args.checklistMarkdown) {
+		return {}
+	}
+
+	if (!args.source) {
+		return {}
+	}
+
+	const stepDetails = await getActivePlaceholderWorkflowStepDetails({
+		checklistMarkdown: args.checklistMarkdown,
+		source: args.source,
+		stablePlaceholderValues: args.stablePlaceholderValues,
+		placeholderValues: args.placeholderValues,
+	})
+
+	if (!stepDetails) {
+		return {}
+	}
+
+	return {
+		activePlaceholderWorkflowName: stepDetails.sourceName,
+		activePlaceholderWorkflowStepNumber: stepDetails.stepNumber,
 	}
 }
 

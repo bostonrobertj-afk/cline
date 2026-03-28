@@ -3,7 +3,27 @@ import { SystemPromptSection } from "../templates/placeholders"
 import { TemplateEngine } from "../templates/TemplateEngine"
 import type { PromptVariant, SystemPromptContext } from "../types"
 
-const INDXR_TOOL_SIGNATURES = new Set(["search_relevant", "get_file_summary", "read_source", "get_token_estimate"])
+const INDXR_TOOL_SIGNATURES = new Set([
+	"lookup_symbol",
+	"list_declarations",
+	"search_signatures",
+	"get_tree",
+	"get_imports",
+	"get_stats",
+	"get_file_summary",
+	"read_source",
+	"get_file_context",
+	"regenerate_index",
+	"get_token_estimate",
+	"search_relevant",
+	"get_diff_summary",
+	"batch_file_summaries",
+	"get_callers",
+	"get_public_api",
+	"explain_symbol",
+	"get_related_tests",
+	"get_dependency_graph",
+])
 const INDXR_ANCHOR_TOOL_SIGNATURES = new Set(["search_relevant", "get_file_summary", "get_token_estimate"])
 const MIN_INDXR_SIGNATURE_MATCHES = 2
 

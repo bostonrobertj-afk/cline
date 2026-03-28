@@ -327,30 +327,6 @@
     }
   },
   {
-    "name": "generate_plan_output",
-    "description": "Respond with a plan that outlines a solution to the user's request. This tool should ONLY be used when you have already explored the relevant files and are ready to present a concrete plan. Only use this tool after you have explored relevant files and collected sufficient context to create a detailed, accurate plan. This tool is only available in PLAN MODE, as indicated by the environment_details.\nIf you are presenting a plan or other user-facing planning response, success displays the message to the user, returns `[Message displayed.]`, and ends your current turn. Any later user reply arrives on the following turn as normal human-authored input.\nIf it becomes apparent that additional exploration is required while the generate_plan_output response is being generated, the optional needs_more_exploration parameter can be toggled to enable further research. That branch is internal control flow rather than a governed user-facing response, so it does not use the shared response-tool turn-ending contract.",
-    "parameters": {
-      "type": "OBJECT",
-      "properties": {
-        "response": {
-          "type": "STRING",
-          "description": "A chat message response to the user."
-        },
-        "needs_more_exploration": {
-          "type": "BOOLEAN",
-          "description": "needs_more_exploration can be set to true if it is determined that further exploration with read_file/search tools is necessary to formulate a complete plan. This determination can be reached during the response generation process, but should not be acknowledged until this parameter is set to true if required."
-        },
-        "task_progress": {
-          "type": "STRING",
-          "description": "A checklist showing task progress after this tool use is completed. If you are presenting a final implementation plan to the user with needs_more_exploration set to false, you should include a checklist of items to be completed during Act Mode when implementation is underway. (See 'Updating Task Progress' section for more details)"
-        }
-      },
-      "required": [
-        "response"
-      ]
-    }
-  },
-  {
     "name": "act_mode_respond",
     "description": "Send a brief ACT MODE preamble or progress update to the user. On success, the message is displayed, returns `[Message displayed.]`, and ends your current turn. Use it only when you intentionally want to pause and wait for the user's next reply. This tool is only available in ACT MODE and may not be called immediately after a previous act_mode_respond call.",
     "parameters": {

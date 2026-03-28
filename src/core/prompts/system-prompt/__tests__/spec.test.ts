@@ -122,12 +122,31 @@ describe("Indxr MCP detection", () => {
 	it("detects Indxr by connected tool signature", () => {
 		expect(isIndxrToolName("search_relevant")).to.equal(true)
 		expect(isIndxrToolName("get_file_summary")).to.equal(true)
+		expect(isIndxrToolName("lookup_symbol")).to.equal(true)
+		expect(isIndxrToolName("get_dependency_graph")).to.equal(true)
+		expect(isIndxrToolName("list_declarations")).to.equal(true)
 		expect(getIndxrToolMatches((indxrContext.mcpHub as McpHub).getServers()[0] as any)).to.deep.equal([
 			"search_relevant",
 			"get_file_summary",
 		])
 		expect(hasDistinctiveIndxrToolSignature((indxrContext.mcpHub as McpHub).getServers()[0] as any)).to.equal(true)
 		expect(hasConnectedIndxrServer(indxrContext)).to.equal(true)
+	})
+
+	it("matches extended Indxr tool names while keeping the distinctive signature rule", () => {
+		const server = {
+			name: "workspace-index",
+			status: "connected",
+			config: '{"command":"indxr"}',
+			tools: [
+				{ name: "lookup_symbol", description: "Lookup symbol", inputSchema: { type: "object", properties: {} } },
+				{ name: "get_callers", description: "Get callers", inputSchema: { type: "object", properties: {} } },
+				{ name: "search_relevant", description: "Search relevant", inputSchema: { type: "object", properties: {} } },
+			],
+		} as any
+
+		expect(getIndxrToolMatches(server)).to.include.members(["lookup_symbol", "get_callers", "search_relevant"])
+		expect(hasDistinctiveIndxrToolSignature(server)).to.equal(true)
 	})
 
 	it("does not treat a server name alone as Indxr availability", () => {

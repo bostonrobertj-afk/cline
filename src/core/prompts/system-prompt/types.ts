@@ -106,6 +106,8 @@ export interface SystemPromptContext {
 	readonly activeAgentRoleInstructions?: string
 	readonly activeWorkflowReminder?: string
 	readonly activeWorkflowSupportsPlaceholders?: boolean
+	readonly activePlaceholderWorkflowName?: string
+	readonly activePlaceholderWorkflowStepNumber?: number
 	readonly managedWorkflowActive?: boolean
 	readonly isContinuationTurn?: boolean
 	readonly isPromptRefreshTurn?: boolean

@@ -28,6 +28,7 @@ import {
 	activatePlaceholderWorkflowInTaskState,
 	buildActivePlaceholderWorkflowActivationInstructions,
 } from "@core/task/workflow-activation"
+import { resolveActivePlaceholderWorkflowPromptContext } from "@core/workflows/placeholder-workflow-step-details"
 import {
 	createWorkflowSkillMetadata,
 	findResolvedWorkflowByName,
@@ -933,6 +934,12 @@ export class SubagentRunner {
 		}
 
 		const includeMcpHub = this.agent.isMcpExposureEnabled()
+		const activePlaceholderWorkflowPromptContext = await resolveActivePlaceholderWorkflowPromptContext({
+			checklistMarkdown: params.state.currentFocusChainChecklist,
+			source: params.state.activePlaceholderWorkflowSource,
+			stablePlaceholderValues: params.state.activePlaceholderWorkflowStableValues,
+			placeholderValues: params.state.activePlaceholderWorkflowValues,
+		})
 
 		return {
 			providerInfo: params.providerInfo,
@@ -943,6 +950,7 @@ export class SubagentRunner {
 			activeAgentRoleInstructions,
 			activeWorkflowReminder,
 			activeWorkflowSupportsPlaceholders: !!params.state.managedWorkflowRun || !!params.state.activePlaceholderWorkflowId,
+			...activePlaceholderWorkflowPromptContext,
 			managedWorkflowActive: !!params.state.managedWorkflowRun,
 			isContinuationTurn: params.shouldUseContinuationPrompt,
 			currentFocusChainChecklist: params.state.currentFocusChainChecklist,

@@ -8,6 +8,7 @@ import {
 	buildActivePlaceholderWorkflowSource,
 	buildPlaceholderWorkflowChecklist,
 	getActivePlaceholderWorkflowStepDetails,
+	resolveActivePlaceholderWorkflowPromptContext,
 } from "../placeholder-workflow-step-details"
 import { getCanonicalWorkflowConfigPath } from "../workflow-placeholders"
 
@@ -36,6 +37,20 @@ describe("placeholder workflow step details", () => {
 		expect(result?.stepNumber).to.equal(1)
 		expect(result?.stepTitle).to.equal("Gather Context")
 		expect(result?.details).to.contain("Determine what to review from the user's prompt")
+	})
+
+	it("resolves prompt context from the active placeholder workflow step", async () => {
+		const result = await resolveActivePlaceholderWorkflowPromptContext({
+			checklistMarkdown: "- [ ] Step 1: Gather Context\n- [ ] Step 2: Review",
+			source: {
+				type: "remote",
+				name: "remote-review",
+				contents: SAMPLE_WORKFLOW,
+			},
+		})
+
+		expect(result.activePlaceholderWorkflowName).to.equal("remote-review")
+		expect(result.activePlaceholderWorkflowStepNumber).to.equal(1)
 	})
 
 	it("falls back to normalized title matching when the checklist item omits the step prefix", async () => {
@@ -154,6 +169,19 @@ Inspect the prepared review input and write findings.
 		})
 
 		expect(result).to.equal(undefined)
+	})
+
+	it("returns an empty prompt context when there are no incomplete checklist items", async () => {
+		const result = await resolveActivePlaceholderWorkflowPromptContext({
+			checklistMarkdown: "- [x] Step 1: Gather Context\n- [x] Step 2: Review",
+			source: {
+				type: "remote",
+				name: "remote-review",
+				contents: SAMPLE_WORKFLOW,
+			},
+		})
+
+		expect(result).to.deep.equal({})
 	})
 
 	it("returns undefined when no workflow heading matches the first incomplete checklist item", async () => {

@@ -407,31 +407,6 @@
   {
     "type": "function",
     "function": {
-      "name": "generate_plan_output",
-      "description": "Respond to the user's inquiry in an effort to plan a solution to the user's task. This tool should ONLY be used when you have already explored the relevant files and are ready to present a concrete plan. DO NOT use this tool to announce what files you're going to read - just read them first. This tool is only available in PLAN MODE. The environment_details will specify the current mode; if it is not PLAN_MODE then you should not use this tool.\nIf you are presenting a plan or other user-facing planning response, success displays the message to the user, returns `[Message displayed.]`, and ends your current turn. Any later user reply arrives on the following turn as normal human-authored input.\nHowever, if while writing your response you realize you actually need to do more exploration before providing a complete plan, you can add the optional needs_more_exploration parameter to indicate this. That branch is internal control flow rather than a governed user-facing response, so it does not use the shared response-tool turn-ending contract.",
-      "strict": false,
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "response": {
-            "type": "string",
-            "description": "The response to provide to the user."
-          },
-          "task_progress": {
-            "type": "string",
-            "description": "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool."
-          }
-        },
-        "required": [
-          "response"
-        ],
-        "additionalProperties": false
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
       "name": "load_mcp_documentation",
       "description": "Load documentation about creating MCP servers. This tool should be used when the user requests to create or install an MCP server (the user may ask you something along the lines of \"add a tool\" that does some function, in other words to create an MCP server that provides tools and resources that may connect to external APIs for example. You have the ability to create an MCP server and add it to a configuration file that will then expose the tools and resources for you to use with `use_mcp_tool` and `access_mcp_resource`). The documentation provides detailed information about the MCP server creation process, including setup instructions, best practices, and examples.",
       "strict": false,

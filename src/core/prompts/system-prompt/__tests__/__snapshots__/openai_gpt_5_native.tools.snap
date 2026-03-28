@@ -344,31 +344,6 @@
   {
     "type": "function",
     "function": {
-      "name": "generate_plan_output",
-      "description": "Present a concrete plan when the task is in PLAN MODE.",
-      "strict": false,
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "response": {
-            "type": "string",
-            "description": "The response to provide to the user."
-          },
-          "task_progress": {
-            "type": "string",
-            "description": "Top-level tool parameter, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
-          }
-        },
-        "required": [
-          "response"
-        ],
-        "additionalProperties": false
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
       "name": "load_mcp_documentation",
       "description": "Load documentation about creating MCP servers.",
       "strict": false,
