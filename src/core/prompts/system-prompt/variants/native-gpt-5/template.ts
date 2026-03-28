@@ -39,7 +39,7 @@ Use \`task_progress\` only as a checklist parameter on the next tool call, not a
 - Use \`task_progress\` to create a task list when switching out of PLAN MODE.
 - Keep items brief and milestone-based.
 - To create the list, pass a full Markdown checklist as the \`task_progress\` parameter.
-- Use \`__COMPLETE_NEXT_STEP__\` as the \`task_progress\` value to complete the next incomplete step.`
+- When you complete the next step, use the next relevant \`send_user_message\` tool call to briefly tell the user what you finished and include \`task_progress: "__COMPLETE_NEXT_STEP__"\` on that same tool call.`
 
 const RULES = (_context: SystemPromptContext) => `RULES
 

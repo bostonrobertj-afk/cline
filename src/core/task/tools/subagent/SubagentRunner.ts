@@ -707,6 +707,7 @@ export class SubagentRunner {
 						content: assistantContent,
 						modelInfo,
 						id: responseId || requestId,
+						ts: Date.now(),
 					})
 				}
 
@@ -730,6 +731,7 @@ export class SubagentRunner {
 								},
 							],
 							id: requestId,
+							ts: Date.now(),
 						})
 					}
 					conversation.push({
