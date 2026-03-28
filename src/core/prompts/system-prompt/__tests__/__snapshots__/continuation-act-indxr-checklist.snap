@@ -1,0 +1,17 @@
+CONTINUATION TURN
+
+Continue the current task from the latest tool results and conversation state.
+
+- Use the native tool schema as the source of truth for tool names, parameters, and required fields.
+- Operate from /test/project; use explicit paths.
+- Use `attempt_completion`, `ask_followup_question` and `send_user_message` when responding to the user.
+- Ask the user only if required to unblock progress or reduce risk.
+- Prefer completing the next concrete step instead of restating prior context.
+- Use Indxr MCP's tools for code exploration, symbol discovery, file understanding, dependency tracing, and targeted source reads. Prefer tools like `search_relevant`, `get_file_summary`, `lookup_symbol`, `explain_symbol`, `read_source`, `get_file_context`, `get_public_api`, `get_callers`, and `get_related_tests` before built-in `search_files`, `list_code_definition_names`, `read_file`, or `read_file_range` whenever feasible.
+
+CURRENT TASK LIST
+```text
+- Review diff
+- Update tests
+```
+- If you finish the current checklist step, include "task_progress" in your next tool call so the checklist advances.

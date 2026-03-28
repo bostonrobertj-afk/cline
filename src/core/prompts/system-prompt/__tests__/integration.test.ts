@@ -335,6 +335,85 @@ describe("Prompt System Integration Tests", () => {
 		})
 	})
 
+	describe("Continuation Turn Prompt", () => {
+		it("generates a basic ACT-mode continuation prompt", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: { ...mockProviderInfo, mode: "act" },
+					isContinuationTurn: true,
+				},
+				"fast",
+				async ({ systemPrompt }) => {
+					expect(systemPrompt).to.include("CONTINUATION TURN")
+					expect(systemPrompt).to.not.include("TOOL USE")
+					expect(systemPrompt).to.not.include("RULES")
+					expect(systemPrompt).to.not.include("CAPABILITIES")
+					expect(systemPrompt).to.include(
+						"- Use `attempt_completion`, `ask_followup_question` and `send_user_message` when responding to the user.",
+					)
+
+					await assertSnapshot("continuation-act-basic.snap", systemPrompt)
+				},
+			)
+		})
+
+		it("generates an ACT-mode continuation prompt with Indxr and checklist", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: { ...mockProviderInfo, mode: "act" },
+					mcpHub: makeMcpHub([makeIndxrServer()]),
+					isContinuationTurn: true,
+					currentFocusChainChecklist: "- Review diff\n- Update tests",
+					activeWorkflowSupportsPlaceholders: false,
+					managedWorkflowActive: false,
+				},
+				"fast",
+				async ({ systemPrompt }) => {
+					expect(systemPrompt).to.include("CONTINUATION TURN")
+					expect(systemPrompt).to.not.include("TOOL USE")
+					expect(systemPrompt).to.not.include("RULES")
+					expect(systemPrompt).to.not.include("CAPABILITIES")
+					expect(systemPrompt).to.include(
+						"- Use `attempt_completion`, `ask_followup_question` and `send_user_message` when responding to the user.",
+					)
+
+					await assertSnapshot("continuation-act-indxr-checklist.snap", systemPrompt)
+				},
+			)
+		})
+
+		it("generates a PLAN-mode continuation prompt with multi-root and placeholder workflow", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: { ...mockProviderInfo, mode: "plan" },
+					isContinuationTurn: true,
+					isMultiRootEnabled: true,
+					currentFocusChainChecklist: "- Inspect task state\n- Apply patch",
+					activeWorkflowSupportsPlaceholders: true,
+					managedWorkflowActive: false,
+				},
+				"fast",
+				async ({ systemPrompt }) => {
+					expect(systemPrompt).to.include("CONTINUATION TURN")
+					expect(systemPrompt).to.not.include("TOOL USE")
+					expect(systemPrompt).to.not.include("RULES")
+					expect(systemPrompt).to.not.include("CAPABILITIES")
+					expect(systemPrompt).to.include(
+						"- Use `generate_plan_output`, `ask_followup_question` and `send_user_message` when responding to the user.",
+					)
+
+					await assertSnapshot("continuation-plan-multiroot-placeholder.snap", systemPrompt)
+				},
+			)
+		})
+	})
+
 	describe("Context-Specific Features", () => {
 		const featureTests = [
 			{ name: "browser-specific content when browser is enabled", context: { supportsBrowserUse: true }, check: "browser" },

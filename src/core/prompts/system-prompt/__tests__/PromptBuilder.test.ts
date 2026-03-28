@@ -3,6 +3,7 @@ import type { McpHub } from "@/services/mcp/McpHub"
 import { ModelFamily } from "@/shared/prompts"
 import { Logger } from "@/shared/services/Logger"
 import { PromptBuilder } from "../registry/PromptBuilder"
+import { PromptRegistry } from "../registry/PromptRegistry"
 import { SystemPromptSection } from "../templates/placeholders"
 import type { ComponentRegistry, PromptVariant, SystemPromptContext } from "../types"
 import { createVariant } from "../variants/variant-builder"
@@ -202,6 +203,17 @@ describe("PromptBuilder", () => {
 				// Restore original Logger.warn
 				Logger.warn = originalWarn
 			}
+		})
+
+		it("bypasses full-template assembly for continuation turns", async () => {
+			const registry = PromptRegistry.getInstance()
+			const result = await registry.get({
+				...mockContext,
+				isContinuationTurn: true,
+			})
+
+			expect(result).to.include("CONTINUATION TURN")
+			expect(result).to.not.include("You are Cline.")
 		})
 	})
 

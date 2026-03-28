@@ -1,6 +1,6 @@
 export const DEFAULT_PROMPT_REFRESH_FREQUENCY = 5
 export const MIN_PROMPT_REFRESH_FREQUENCY = 0
-export const MAX_PROMPT_REFRESH_FREQUENCY = 10
+export const MAX_PROMPT_REFRESH_FREQUENCY = 20
 
 export function normalizePromptRefreshFrequency(value: number | undefined): number {
 	if (typeof value !== "number" || !Number.isFinite(value)) {
@@ -48,4 +48,16 @@ export function getNextTurnsSinceFullPromptRefresh(params: {
 	}
 
 	return params.turnsSinceFullPromptRefresh + 1
+}
+
+export function shouldUseContinuationTurnPrompt(params: {
+	hasHumanAuthoredInput: boolean
+	shouldSendFullPromptAssembly: boolean
+	managedWorkflowActive?: boolean
+}): boolean {
+	return (
+		params.hasHumanAuthoredInput === false &&
+		params.shouldSendFullPromptAssembly === false &&
+		params.managedWorkflowActive !== true
+	)
 }

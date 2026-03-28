@@ -1,6 +1,6 @@
 import type { SystemPromptContext } from "../types"
 
-function getActModeResponseTools(context: SystemPromptContext): string[] {
+export function getActModeResponseTools(context: SystemPromptContext): string[] {
 	const tools = ["`attempt_completion`", "`send_user_message`"]
 
 	if (context.yoloModeToggled !== true) {
@@ -10,7 +10,7 @@ function getActModeResponseTools(context: SystemPromptContext): string[] {
 	return tools
 }
 
-function getPlanModeResponseTools(context: SystemPromptContext): string[] {
+export function getPlanModeResponseTools(context: SystemPromptContext): string[] {
 	const tools = ["`generate_plan_output`", "`send_user_message`"]
 
 	if (context.yoloModeToggled !== true) {
@@ -20,12 +20,18 @@ function getPlanModeResponseTools(context: SystemPromptContext): string[] {
 	return tools
 }
 
-function joinToolNames(toolNames: string[]): string {
+export function joinToolNames(toolNames: string[]): string {
 	if (toolNames.length === 1) {
 		return toolNames[0]
 	}
 
 	return `${toolNames.slice(0, -1).join(", ")} and ${toolNames.at(-1)}`
+}
+
+export function getCurrentModeResponseToolsLine(context: SystemPromptContext): string {
+	const currentModeTools =
+		context.providerInfo.mode === "plan" ? getPlanModeResponseTools(context) : getActModeResponseTools(context)
+	return `- Use ${joinToolNames(currentModeTools)} when responding to the user.`
 }
 
 export function getResponseToolsSection(context: SystemPromptContext): string {

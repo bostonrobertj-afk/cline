@@ -107,7 +107,9 @@ export interface SystemPromptContext {
 	readonly activeWorkflowReminder?: string
 	readonly activeWorkflowSupportsPlaceholders?: boolean
 	readonly managedWorkflowActive?: boolean
+	readonly isContinuationTurn?: boolean
 	readonly isPromptRefreshTurn?: boolean
+	readonly currentFocusChainChecklist?: string | null
 	readonly useMinimalGptPrompt?: boolean
 	readonly skills?: SkillMetadata[]
 	readonly focusChainSettings?: FocusChainSettings

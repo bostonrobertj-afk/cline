@@ -306,9 +306,9 @@ const FeatureSettingsSection = ({ renderSectionHeader }: FeatureSettingsSectionP
 								</div>
 							))}
 							<SettingsSlider
-								description="0 = full prompt every eligible internal turn. 10 = full prompt every tenth eligible internal turn."
-								label="Prompt Refresh Frequency (0-10)"
-								max={10}
+								description="0 = full prompt every eligible internal turn. 20 = full prompt every twentieth eligible internal turn."
+								label="Prompt Refresh Frequency (0-20)"
+								max={20}
 								min={0}
 								onChange={handlePromptRefreshFrequencyChange}
 								step={1}

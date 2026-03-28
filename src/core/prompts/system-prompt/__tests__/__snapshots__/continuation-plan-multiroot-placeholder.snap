@@ -1,0 +1,17 @@
+CONTINUATION TURN
+
+Continue the current task from the latest tool results and conversation state.
+
+- Use the native tool schema as the source of truth for tool names, parameters, and required fields.
+- Operate from /test/project; use explicit paths.
+- Use `generate_plan_output`, `ask_followup_question` and `send_user_message` when responding to the user.
+- Ask the user only if required to unblock progress or reduce risk.
+- Prefer completing the next concrete step instead of restating prior context.
+- Use @workspace:path syntax (e.g., @frontend:src/index.ts) to specify a workspace.
+
+CURRENT TASK LIST
+```text
+- Inspect task state
+- Apply patch
+```
+- When the active step's "Done Signal" is true, use `task_progress` with `__COMPLETE_NEXT_STEP__` on the next relevant tool call, and use it only once in that assistant turn.

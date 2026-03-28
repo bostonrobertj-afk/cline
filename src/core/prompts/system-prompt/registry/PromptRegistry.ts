@@ -3,6 +3,7 @@ import { Logger } from "@/shared/services/Logger"
 import type { ClineTool } from "@/shared/tools"
 import { ClineToolSet } from ".."
 import { getSystemPromptComponents } from "../components"
+import { SystemPromptSection } from "../templates/placeholders"
 import { registerClineToolSets } from "../tools"
 import type { ComponentFunction, ComponentRegistry, PromptVariant, SystemPromptContext } from "../types"
 import { loadAllVariantConfigs } from "../variants"
@@ -88,6 +89,14 @@ export class PromptRegistry {
 
 		// Hacky way to get native tools for the current variant - it's bad and ugly
 		this.nativeTools = ClineToolSet.getNativeTools(variant, context)
+
+		if (context.isContinuationTurn) {
+			const continuationComponent = this.components[SystemPromptSection.CONTINUATION_TURN]
+			if (!continuationComponent) {
+				throw new Error("Continuation turn prompt component is not registered")
+			}
+			return (await continuationComponent(variant, context)) ?? ""
+		}
 
 		const builder = new PromptBuilder(variant, context, this.components)
 		return await builder.build()

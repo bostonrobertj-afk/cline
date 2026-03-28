@@ -133,6 +133,7 @@ import {
 	getNextTurnsSinceFullPromptRefresh,
 	normalizePromptRefreshFrequency,
 	shouldSendFullPromptAssembly,
+	shouldUseContinuationTurnPrompt,
 } from "./prompt-refresh"
 import { StreamChunkCoordinator } from "./StreamChunkCoordinator"
 import { StreamResponseHandler } from "./StreamResponseHandler"
@@ -2685,6 +2686,11 @@ export class Task {
 
 		const providerInfo = this.getCurrentProviderInfo()
 		const shouldSendFullPromptAssembly = this.currentRequestShouldSendFullPromptAssembly
+		const shouldUseContinuationPrompt = shouldUseContinuationTurnPrompt({
+			hasHumanAuthoredInput: this.currentRequestHasHumanAuthoredInput,
+			shouldSendFullPromptAssembly,
+			managedWorkflowActive: !!this.taskState.managedWorkflowRun,
+		})
 		const useMinimalGptPrompt = this.shouldUseMinimalGptPrompt(providerInfo)
 		const shouldIncludeDynamicPromptContext = shouldSendFullPromptAssembly
 		const shouldIncludeBmadPromptContext = shouldSendFullPromptAssembly
@@ -2798,7 +2804,9 @@ export class Task {
 			activeWorkflowSupportsPlaceholders:
 				!!this.taskState.managedWorkflowRun || !!this.taskState.activePlaceholderWorkflowId,
 			managedWorkflowActive: !!this.taskState.managedWorkflowRun,
+			isContinuationTurn: shouldUseContinuationPrompt,
 			isPromptRefreshTurn: shouldSendFullPromptAssembly,
+			currentFocusChainChecklist: this.taskState.currentFocusChainChecklist,
 			useMinimalGptPrompt,
 			skills: promptSkills,
 			focusChainSettings: this.stateManager.getGlobalSettingsKey("focusChainSettings"),

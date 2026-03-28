@@ -5,11 +5,18 @@ import {
 	getPromptRefreshInterval,
 	normalizePromptRefreshFrequency,
 	shouldSendFullPromptAssembly,
+	shouldUseContinuationTurnPrompt,
 } from "../prompt-refresh"
 
 describe("prompt refresh helpers", () => {
 	it("uses the documented default frequency when unset", () => {
 		expect(normalizePromptRefreshFrequency(undefined)).to.equal(DEFAULT_PROMPT_REFRESH_FREQUENCY)
+	})
+
+	it("clamps the configured frequency to the supported 0-20 range", () => {
+		expect(normalizePromptRefreshFrequency(-1)).to.equal(0)
+		expect(normalizePromptRefreshFrequency(20)).to.equal(20)
+		expect(normalizePromptRefreshFrequency(21)).to.equal(20)
 	})
 
 	it("treats zero as refreshing every eligible internal turn", () => {
@@ -73,5 +80,47 @@ describe("prompt refresh helpers", () => {
 				turnsSinceFullPromptRefresh: 2,
 			}),
 		).to.equal(3)
+	})
+})
+
+describe("shouldUseContinuationTurnPrompt", () => {
+	it("returns true for non-human turns without a full prompt refresh or managed workflow", () => {
+		expect(
+			shouldUseContinuationTurnPrompt({
+				hasHumanAuthoredInput: false,
+				shouldSendFullPromptAssembly: false,
+				managedWorkflowActive: false,
+			}),
+		).to.equal(true)
+	})
+
+	it("returns false when human-authored input is present", () => {
+		expect(
+			shouldUseContinuationTurnPrompt({
+				hasHumanAuthoredInput: true,
+				shouldSendFullPromptAssembly: false,
+				managedWorkflowActive: false,
+			}),
+		).to.equal(false)
+	})
+
+	it("returns false when a full prompt refresh is required", () => {
+		expect(
+			shouldUseContinuationTurnPrompt({
+				hasHumanAuthoredInput: false,
+				shouldSendFullPromptAssembly: true,
+				managedWorkflowActive: false,
+			}),
+		).to.equal(false)
+	})
+
+	it("returns false when a managed workflow is active", () => {
+		expect(
+			shouldUseContinuationTurnPrompt({
+				hasHumanAuthoredInput: false,
+				shouldSendFullPromptAssembly: false,
+				managedWorkflowActive: true,
+			}),
+		).to.equal(false)
 	})
 })

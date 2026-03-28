@@ -2,6 +2,7 @@ import { SystemPromptSection } from "../templates/placeholders"
 import { getActVsPlanModeSection } from "./act_vs_plan_mode"
 import { getAgentRoleSection } from "./agent_role"
 import { getCapabilitiesSection } from "./capabilities"
+import { getContinuationTurnSection } from "./continuation_turn"
 import { getEditingFilesSection } from "./editing_files"
 import { getFeedbackSection } from "./feedback"
 import { getMcp } from "./mcp"
@@ -21,6 +22,7 @@ import { getUserInstructions } from "./user_instructions"
 export function getSystemPromptComponents() {
 	return [
 		{ id: SystemPromptSection.AGENT_ROLE, fn: getAgentRoleSection },
+		{ id: SystemPromptSection.CONTINUATION_TURN, fn: getContinuationTurnSection },
 		{ id: SystemPromptSection.SYSTEM_INFO, fn: getSystemInfo },
 		{ id: SystemPromptSection.MCP, fn: getMcp },
 		{

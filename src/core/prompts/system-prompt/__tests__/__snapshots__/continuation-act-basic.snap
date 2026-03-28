@@ -1,0 +1,9 @@
+CONTINUATION TURN
+
+Continue the current task from the latest tool results and conversation state.
+
+- Use the native tool schema as the source of truth for tool names, parameters, and required fields.
+- Operate from /test/project; use explicit paths.
+- Use `attempt_completion`, `ask_followup_question` and `send_user_message` when responding to the user.
+- Ask the user only if required to unblock progress or reduce risk.
+- Prefer completing the next concrete step instead of restating prior context.
