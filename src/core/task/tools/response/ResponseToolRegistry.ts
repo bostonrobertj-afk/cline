@@ -77,6 +77,7 @@ const RESPONSE_TOOL_METADATA: Record<ClineDefaultTool, ResponseToolMetadata | un
 	[ClineDefaultTool.GENERATE_EXPLANATION]: undefined,
 	[ClineDefaultTool.USE_SKILL]: undefined,
 	[ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS]: undefined,
+	[ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT]: undefined,
 	[ClineDefaultTool.USE_SUBAGENTS]: undefined,
 }
 

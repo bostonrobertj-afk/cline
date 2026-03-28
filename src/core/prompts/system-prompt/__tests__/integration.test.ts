@@ -270,6 +270,7 @@ describe("Prompt System Integration Tests", () => {
 						})
 						expect(toolNames).to.not.include("focus_chain")
 						expect(JSON.stringify(tools)).to.not.include('"focus_chain"')
+						expect(toolNames).to.include("build_review_diff_output")
 						const snapshotName = `${providerId}_${family.replace(/[^a-zA-Z0-9]/g, "_")}.tools.snap`
 						await assertSnapshot(snapshotName, JSON.stringify(tools, null, 2))
 					})
@@ -295,6 +296,7 @@ describe("Prompt System Integration Tests", () => {
 									return tool?.name
 								})
 								expect(toolNames).to.not.include("focus_chain")
+								expect(toolNames).to.include("build_review_diff_output")
 							} else {
 								expect(tools).to.be.undefined
 							}

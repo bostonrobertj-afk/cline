@@ -76,6 +76,7 @@ export const config = createVariant(ModelFamily.GENERIC)
 		ClineDefaultTool.USE_SKILL,
 		ClineDefaultTool.COMPLETE_WORKFLOW_ITEM,
 		ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
+		ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT,
 		ClineDefaultTool.USE_SUBAGENTS,
 	)
 	.placeholders({

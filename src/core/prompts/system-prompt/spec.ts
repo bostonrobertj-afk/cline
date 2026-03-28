@@ -459,6 +459,8 @@ function getNativeToolDescription(tool: ClineToolSpec, context: SystemPromptCont
 			return "Send a direct user-visible message when specialized response tools are not the right fit."
 		case "set_workflow_placeholders":
 			return 'Persist dynamic placeholder values discovered during the active workflow. Call as {"values":{"story_path":"docs/story.md","project_context":"docs/project-context.md"}}. Stable config-backed placeholders like output_folder come from .cline/workflow-config.yaml.'
+		case "build_review_diff_output":
+			return "Build and atomically replace {diff_output} from an explicit Git-backed source. Use for code-review diff artifact construction, not for arbitrary file writes."
 		case "use_skill":
 			return "Activate a skill by exact name when the request matches an available skill."
 		case "use_mcp_tool":
@@ -502,6 +504,17 @@ function getNativeToolParameterDescription(
 
 	if (tool.name === "set_workflow_placeholders" && param.name === "values") {
 		return 'Object map of placeholder keys to strings. Call the tool as {"values": {...}}. Not arrays of {name,value} or {key,value}.'
+	}
+
+	if (tool.name === "build_review_diff_output") {
+		switch (param.name) {
+			case "source":
+				return 'Required source object. Supported shape: {"type":"commit","commit":"<ref>"} | {"type":"commit_range","base":"<ref>","head":"<ref>"} | {"type":"ref_diff","base":"<ref>","head":"<ref>"} | {"type":"worktree_head_scoped"}.'
+			case "scoped_paths":
+				return 'Optional repository-relative path array. Required for {"type":"worktree_head_scoped"}.'
+			case "context_lines":
+				return "Optional unified diff context line count. Defaults to 3."
+		}
 	}
 
 	if (tool.name === "apply_patch" && param.name === "input") {

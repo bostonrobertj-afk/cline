@@ -285,6 +285,19 @@ Usage:
 <load_mcp_documentation>
 </load_mcp_documentation>
 
+## build_review_diff_output
+Description: Build and replace the stable review diff artifact at {diff_output} from an explicit Git-backed source. Use this for code-review workflow Step 3 when the diff source is a supported commit, commit range, ref diff, or HEAD-scoped worktree diff. Do not use set_workflow_placeholders for diff_output; it is stable in .cline/workflow-config.yaml.
+Parameters:
+- source: (required) Required source object. Supported shape: {"type":"commit","commit":"<ref>"} | {"type":"commit_range","base":"<ref>","head":"<ref>"} | {"type":"ref_diff","base":"<ref>","head":"<ref>"} | {"type":"worktree_head_scoped"}.
+- scoped_paths: (optional) Optional array of repository-relative paths to scope the diff. Required for {"type":"worktree_head_scoped"}. Optional for the other source types.
+- context_lines: (optional) Optional unified diff context line count. Defaults to 3.
+Usage:
+<build_review_diff_output>
+<source></source>
+<scoped_paths></scoped_paths>
+<context_lines></context_lines>
+</build_review_diff_output>
+
 ## use_subagents
 Description: Run up to five focused in-process subagents in parallel. Each subagent gets its own prompt and returns a comprehensive research result with tool and token stats. Use this for broad exploration when reading many files would consume the main agent's context window. You do not need to launch multiple subagents every time; using one subagent is valid when it avoids unnecessary context usage for light discovery work.
 Parameters:

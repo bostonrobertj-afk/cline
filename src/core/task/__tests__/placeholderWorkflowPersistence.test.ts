@@ -112,7 +112,11 @@ Respond in {communication_language} from {config_source}. Write artifacts to {ou
 			)
 			await fs.writeFile(
 				configPath,
-				['communication_language: "English"', 'output_folder: "{project-root}/workflow-output"'].join("\n"),
+				[
+					'communication_language: "English"',
+					'output_folder: "{project-root}/workflow-output"',
+					'diff_output: "{output_folder}/review-input.diff"',
+				].join("\n"),
 				"utf8",
 			)
 
@@ -179,6 +183,87 @@ Respond in {communication_language} from {config_source}. Write artifacts to {ou
 				config_source: ".cline/workflow-config.yaml",
 				output_folder: `${tempDir}/workflow-output`,
 			})
+		} finally {
+			sandbox.restore()
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("renders migrated Step 3 guidance with build_review_diff_output and stable diff_output placeholder handling", async () => {
+		const sandbox = sinon.createSandbox()
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "placeholder-step-3-guidance-"))
+		try {
+			const workflowPath = path.join(tempDir, "code-review.md")
+			const configPath = getCanonicalWorkflowConfigPath(tempDir)
+			await fs.mkdir(path.dirname(configPath), { recursive: true })
+			await fs.writeFile(
+				workflowPath,
+				`# Code Review
+
+## Step 3: Construct & Persist Diff Output File
+Goal: Construct a diff output with detailed code changes from the most recent dev cycle
+
+When the requested diff source is inside the supported Git-backed contract, use the \`build_review_diff_output\` tool to build and replace {diff_output}.
+
+Supported tool-backed sources:
+- an explicit commit from the user or story
+- an explicit commit range from the user or story
+- an explicit branch diff or remote branch reference from the user or story
+- \`git diff HEAD -- <scoped-paths>\` for tracked scoped files with unstaged and/or staged changes
+
+Use raw \`git show\` / \`git diff\` construction only as fallback when:
+- the \`build_review_diff_output\` tool is unavailable
+- the tool errors
+- or the requested diff source is outside the tool's supported contract
+
+If no diff sources are available this step may be completed without persisting a new \`review-input.diff\` file.
+
+Done Signal: You've persisted a new \`review-input.diff\` file in {output_folder}
+`,
+				"utf8",
+			)
+			await fs.writeFile(
+				configPath,
+				[
+					'communication_language: "English"',
+					'output_folder: "{project-root}/workflow-output"',
+					'diff_output: "{output_folder}/review-input.diff"',
+				].join("\n"),
+				"utf8",
+			)
+
+			sandbox.stub(disk, "getTaskMetadata").resolves({} as never)
+			sandbox.stub(disk, "saveTaskMetadata").resolves()
+
+			const fakeTask = {
+				...createFakeTask("task-step-3-guidance"),
+				cwd: tempDir,
+			}
+			fakeTask.taskState.activePlaceholderWorkflowId = "code-review"
+			fakeTask.taskState.activePlaceholderWorkflowSource = {
+				type: "local",
+				name: "code-review",
+				path: workflowPath,
+				configPath,
+			}
+			fakeTask.taskState.activePlaceholderWorkflowStableValues = {
+				communication_language: "English",
+				config_source: ".cline/workflow-config.yaml",
+				output_folder: `${tempDir}/workflow-output`,
+				diff_output: `${tempDir}/workflow-output/review-input.diff`,
+			}
+
+			const prompt = await (Task.prototype as any).buildPlaceholderWorkflowActivationInstructions.call(fakeTask, {
+				type: "activate_placeholder_workflow",
+				workflowId: "code-review",
+				workflowSource: fakeTask.taskState.activePlaceholderWorkflowSource,
+			})
+
+			expect(prompt).to.contain("build_review_diff_output")
+			expect(prompt.includes("{diff_output}") || prompt.includes(`${tempDir}/workflow-output/review-input.diff`)).to.equal(
+				true,
+			)
+			expect(prompt).to.not.contain("Set `{diff_output}` to that artifact path using the `set_workflow_placeholders` tool")
 		} finally {
 			sandbox.restore()
 			await fs.rm(tempDir, { recursive: true, force: true })

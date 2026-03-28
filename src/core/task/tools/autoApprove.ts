@@ -51,6 +51,7 @@ export class AutoApprove {
 				case ClineDefaultTool.FILE_NEW:
 				case ClineDefaultTool.FILE_EDIT:
 				case ClineDefaultTool.APPLY_PATCH:
+				case ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT:
 				case ClineDefaultTool.BASH:
 				case ClineDefaultTool.USE_SUBAGENTS:
 					return [true, true]
@@ -75,6 +76,7 @@ export class AutoApprove {
 				case ClineDefaultTool.FILE_NEW:
 				case ClineDefaultTool.FILE_EDIT:
 				case ClineDefaultTool.APPLY_PATCH:
+				case ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT:
 				case ClineDefaultTool.BASH:
 				case ClineDefaultTool.USE_SUBAGENTS:
 					return [true, true]
@@ -101,6 +103,7 @@ export class AutoApprove {
 			case ClineDefaultTool.FILE_NEW:
 			case ClineDefaultTool.FILE_EDIT:
 			case ClineDefaultTool.APPLY_PATCH:
+			case ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT:
 				return [autoApprovalSettings.actions.editFiles, autoApprovalSettings.actions.editFilesExternally ?? false]
 			case ClineDefaultTool.BASH:
 				return [

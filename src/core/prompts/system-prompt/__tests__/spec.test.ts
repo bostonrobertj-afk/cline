@@ -13,6 +13,7 @@ import {
 } from "../components/mcp"
 import type { ClineToolSpec } from "../spec"
 import { toolSpecFunctionDeclarations, toolSpecFunctionDefinition, toolSpecInputSchema } from "../spec"
+import { build_review_diff_output_variants } from "../tools/build_review_diff_output"
 import { list_code_definition_names_variants } from "../tools/list_code_definition_names"
 import { read_file_variants } from "../tools/read_file"
 import { read_file_range_variants } from "../tools/read_file_range"
@@ -233,6 +234,11 @@ describe("workflow placeholder tool gating", () => {
 			}),
 		).to.equal(true)
 	})
+
+	it("keeps build_review_diff_output globally available without workflow gating", () => {
+		const tool = build_review_diff_output_variants[0]
+		expect(tool.contextRequirements).to.equal(undefined)
+	})
 })
 
 describe("native tool placeholder replacement", () => {
@@ -404,6 +410,34 @@ describe("native tool placeholder replacement", () => {
 		)
 		expect(openAI.function.description).to.equal(
 			'Persist dynamic placeholder values discovered during the active workflow. Call as {"values":{"story_path":"docs/story.md","project_context":"docs/project-context.md"}}. Stable config-backed placeholders like output_folder come from .cline/workflow-config.yaml.',
+		)
+	})
+
+	it("compacts native build_review_diff_output descriptions and parameter text", () => {
+		const context: SystemPromptContext = {
+			...mockContext,
+			enableNativeToolCalls: true,
+			useMinimalGptPrompt: true,
+			providerInfo: {
+				providerId: "openai",
+				model: { id: "gpt-5.4-2026-03-05", info: { supportsPromptCache: false } },
+				mode: "act",
+			},
+		}
+
+		const openAI = toolSpecFunctionDefinition(build_review_diff_output_variants[0], context) as any
+
+		expect(openAI.function.description).to.equal(
+			"Build and atomically replace {diff_output} from an explicit Git-backed source. Use for code-review diff artifact construction, not for arbitrary file writes.",
+		)
+		expect(openAI.function.parameters.properties.source.description).to.equal(
+			'Required source object. Supported shape: {"type":"commit","commit":"<ref>"} | {"type":"commit_range","base":"<ref>","head":"<ref>"} | {"type":"ref_diff","base":"<ref>","head":"<ref>"} | {"type":"worktree_head_scoped"}.',
+		)
+		expect(openAI.function.parameters.properties.scoped_paths.description).to.equal(
+			'Optional repository-relative path array. Required for {"type":"worktree_head_scoped"}.',
+		)
+		expect(openAI.function.parameters.properties.context_lines.description).to.equal(
+			"Optional unified diff context line count. Defaults to 3.",
 		)
 	})
 

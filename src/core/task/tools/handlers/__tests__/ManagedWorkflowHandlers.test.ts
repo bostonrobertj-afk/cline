@@ -4,7 +4,9 @@ import fs from "fs/promises"
 import { describe, it } from "mocha"
 import os from "os"
 import path from "path"
+import simpleGit from "simple-git"
 import sinon from "sinon"
+import { formatResponse } from "@/core/prompts/responses"
 import { getCanonicalWorkflowConfigPath } from "@/core/workflows/workflow-placeholders"
 import { HostProvider } from "@/hosts/host-provider"
 import { setVscodeHostProviderMock } from "@/test/host-provider-test-utils"
@@ -15,6 +17,7 @@ import { TaskState } from "../../../TaskState"
 import { RESPONSE_TOOL_SUCCESS_MESSAGE } from "../../response/types"
 import type { TaskConfig } from "../../types/TaskConfig"
 import { AttemptCompletionHandler } from "../AttemptCompletionHandler"
+import { BuildReviewDiffOutputToolHandler } from "../BuildReviewDiffOutputToolHandler"
 import { CompleteWorkflowItemToolHandler } from "../CompleteWorkflowItemToolHandler"
 import { SetWorkflowPlaceholdersToolHandler } from "../SetWorkflowPlaceholdersToolHandler"
 import { UseSkillToolHandler } from "../UseSkillToolHandler"
@@ -54,6 +57,7 @@ function createConfig(overrides: Partial<TaskConfig> = {}): TaskConfig {
 	const callbacks = {
 		say: sinon.stub().resolves(undefined),
 		ask: sinon.stub().resolves({ response: "yesButtonClicked" }),
+		shouldAutoApproveToolWithPath: sinon.stub().resolves(true),
 		saveCheckpoint: sinon.stub().resolves(),
 		sayAndCreateMissingParamError: sinon.stub().resolves("missing"),
 		removeLastPartialMessageIfExistsWithType: sinon.stub().resolves(),
@@ -95,7 +99,7 @@ function createConfig(overrides: Partial<TaskConfig> = {}): TaskConfig {
 		services: {
 			stateManager: {
 				getGlobalStateKey: () => undefined,
-				getGlobalSettingsKey: () => undefined,
+				getGlobalSettingsKey: (key: string) => (key === "hooksEnabled" ? false : undefined),
 				getWorkspaceStateKey: () => undefined,
 				getRemoteConfigSettings: () => ({}),
 				getApiConfiguration: () => ({ planModeApiProvider: "openai", actModeApiProvider: "openai" }),
@@ -105,6 +109,48 @@ function createConfig(overrides: Partial<TaskConfig> = {}): TaskConfig {
 		coordinator: { getHandler: sinon.stub() } as any,
 		...overrides,
 	} as TaskConfig
+}
+
+async function createReviewDiffRepo() {
+	const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), "build-review-diff-output-"))
+	const git = simpleGit(repoDir)
+	const workflowConfigPath = getCanonicalWorkflowConfigPath(repoDir)
+
+	await git.init()
+	await git.addConfig("user.name", "Test User")
+	await git.addConfig("user.email", "test@example.com")
+
+	await fs.mkdir(path.dirname(workflowConfigPath), { recursive: true })
+	await fs.writeFile(
+		workflowConfigPath,
+		[
+			"user_name: Rob",
+			"communication_language: English",
+			"document_output_language: English",
+			'output_folder: "{project-root}/_bmad-output"',
+			'diff_output: "{output_folder}/review-input.diff"',
+			"",
+		].join("\n"),
+	)
+
+	await fs.mkdir(path.join(repoDir, "src"), { recursive: true })
+	await fs.writeFile(path.join(repoDir, "src", "in-scope.ts"), "export const inScope = 1\n")
+	await git.add(".")
+	await git.commit("add in scope file")
+	const firstCommit = (await git.revparse(["HEAD"])).trim()
+
+	await fs.mkdir(path.join(repoDir, "docs"), { recursive: true })
+	await fs.writeFile(path.join(repoDir, "docs", "notes.md"), "# notes\n")
+	await git.add(".")
+	await git.commit("add out of scope notes")
+	const secondCommit = (await git.revparse(["HEAD"])).trim()
+
+	return {
+		repoDir,
+		firstCommit,
+		secondCommit,
+		diffOutputPath: path.join(repoDir, "_bmad-output", "review-input.diff"),
+	}
 }
 
 describe("Managed workflow handlers", () => {
@@ -1377,6 +1423,210 @@ Inspect the prepared review input and write findings.`,
 			expect(config.taskState.activeAgentId).to.equal("bmad-pm")
 		} finally {
 			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("builds and atomically replaces review-input.diff for a commit source", async () => {
+		const sandbox = sinon.createSandbox()
+		const { repoDir, firstCommit, diffOutputPath } = await createReviewDiffRepo()
+
+		try {
+			setVscodeHostProviderMock()
+			sandbox.stub(HostProvider.workspace, "getWorkspacePaths").resolves({ paths: [repoDir] } as any)
+
+			const handler = new BuildReviewDiffOutputToolHandler()
+			const config = createConfig({ cwd: repoDir })
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "build_review_diff_output",
+				params: {
+					source: { type: "commit", commit: firstCommit },
+				},
+				partial: false,
+			} as any)
+
+			const payload = JSON.parse(String(result))
+			expect(payload.persisted).to.equal(true)
+			expect(payload.diff_available).to.equal(true)
+			expect(path.isAbsolute(payload.artifact_path)).to.equal(true)
+
+			const artifact = await fs.readFile(diffOutputPath, "utf8")
+			expect(artifact).to.contain("# Review Diff Output")
+			expect(artifact).to.contain("## Source")
+			expect(artifact).to.contain("## Diff")
+			expect(artifact).to.contain("diff --git")
+		} finally {
+			sandbox.restore()
+			HostProvider.reset()
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("does not write a new artifact when no diff content is available", async () => {
+		const sandbox = sinon.createSandbox()
+		const { repoDir, firstCommit, secondCommit, diffOutputPath } = await createReviewDiffRepo()
+
+		try {
+			setVscodeHostProviderMock()
+			sandbox.stub(HostProvider.workspace, "getWorkspacePaths").resolves({ paths: [repoDir] } as any)
+
+			const handler = new BuildReviewDiffOutputToolHandler()
+			const config = createConfig({ cwd: repoDir })
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "build_review_diff_output",
+				params: {
+					source: { type: "commit_range", base: firstCommit, head: secondCommit },
+					scoped_paths: ["src/in-scope.ts"],
+				},
+				partial: false,
+			} as any)
+
+			const payload = JSON.parse(String(result))
+			expect(payload.persisted).to.equal(false)
+			expect(payload.diff_available).to.equal(false)
+			expect(
+				await fs
+					.access(diffOutputPath)
+					.then(() => true)
+					.catch(() => false),
+			).to.equal(false)
+		} finally {
+			sandbox.restore()
+			HostProvider.reset()
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("requires scoped_paths for worktree_head_scoped", async () => {
+		const handler = new BuildReviewDiffOutputToolHandler()
+		const config = createConfig()
+
+		const result = await handler.execute(config, {
+			type: "tool_use",
+			name: "build_review_diff_output",
+			params: {
+				source: { type: "worktree_head_scoped" },
+			},
+			partial: false,
+		} as any)
+
+		expect(result).to.equal(
+			'Error: scoped_paths is required and must contain at least one path when source.type is "worktree_head_scoped".',
+		)
+	})
+
+	it("respects manual approval when auto-approval does not apply", async () => {
+		const sandbox = sinon.createSandbox()
+		const { repoDir, firstCommit, diffOutputPath } = await createReviewDiffRepo()
+
+		try {
+			setVscodeHostProviderMock()
+			sandbox.stub(HostProvider.workspace, "getWorkspacePaths").resolves({ paths: [repoDir] } as any)
+
+			const handler = new BuildReviewDiffOutputToolHandler()
+			const config = createConfig({ cwd: repoDir, isSubagentExecution: false })
+			;(config.callbacks.shouldAutoApproveToolWithPath as sinon.SinonStub).resolves(false)
+			;(config.callbacks.ask as sinon.SinonStub).resolves({ response: "yesButtonClicked" })
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "build_review_diff_output",
+				params: {
+					source: { type: "commit", commit: firstCommit },
+				},
+				partial: false,
+			} as any)
+
+			const payload = JSON.parse(String(result))
+			expect(payload.persisted).to.equal(true)
+			expect(
+				await fs
+					.access(diffOutputPath)
+					.then(() => true)
+					.catch(() => false),
+			).to.equal(true)
+			expect((config.callbacks.ask as sinon.SinonStub).calledOnce).to.equal(true)
+			expect((config.callbacks.shouldAutoApproveToolWithPath as sinon.SinonStub).calledOnce).to.equal(true)
+		} finally {
+			sandbox.restore()
+			HostProvider.reset()
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("returns toolDenied when manual approval rejects the write", async () => {
+		const sandbox = sinon.createSandbox()
+		const { repoDir, firstCommit, diffOutputPath } = await createReviewDiffRepo()
+
+		try {
+			setVscodeHostProviderMock()
+			sandbox.stub(HostProvider.workspace, "getWorkspacePaths").resolves({ paths: [repoDir] } as any)
+
+			const handler = new BuildReviewDiffOutputToolHandler()
+			const config = createConfig({ cwd: repoDir, isSubagentExecution: false })
+			;(config.callbacks.shouldAutoApproveToolWithPath as sinon.SinonStub).resolves(false)
+			;(config.callbacks.ask as sinon.SinonStub).resolves({ response: "noButtonClicked" })
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "build_review_diff_output",
+				params: {
+					source: { type: "commit", commit: firstCommit },
+				},
+				partial: false,
+			} as any)
+
+			expect(result).to.equal(formatResponse.toolDenied())
+			expect(
+				await fs
+					.access(diffOutputPath)
+					.then(() => true)
+					.catch(() => false),
+			).to.equal(false)
+		} finally {
+			sandbox.restore()
+			HostProvider.reset()
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("keeps subagent execution auto-approved and local-only", async () => {
+		const sandbox = sinon.createSandbox()
+		const { repoDir, firstCommit, diffOutputPath } = await createReviewDiffRepo()
+
+		try {
+			setVscodeHostProviderMock()
+			sandbox.stub(HostProvider.workspace, "getWorkspacePaths").resolves({ paths: [repoDir] } as any)
+
+			const handler = new BuildReviewDiffOutputToolHandler()
+			const config = createConfig({ cwd: repoDir, isSubagentExecution: true })
+			;(config.callbacks.shouldAutoApproveToolWithPath as sinon.SinonStub).resolves(false)
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "build_review_diff_output",
+				params: {
+					source: { type: "commit", commit: firstCommit },
+				},
+				partial: false,
+			} as any)
+
+			const payload = JSON.parse(String(result))
+			expect(payload.persisted).to.equal(true)
+			expect(
+				await fs
+					.access(diffOutputPath)
+					.then(() => true)
+					.catch(() => false),
+			).to.equal(true)
+			expect((config.callbacks.ask as sinon.SinonStub).called).to.equal(false)
+		} finally {
+			sandbox.restore()
+			HostProvider.reset()
+			await fs.rm(repoDir, { recursive: true, force: true })
 		}
 	})
 })

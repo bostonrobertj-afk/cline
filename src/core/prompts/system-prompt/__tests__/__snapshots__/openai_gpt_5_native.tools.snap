@@ -383,6 +383,38 @@
   {
     "type": "function",
     "function": {
+      "name": "build_review_diff_output",
+      "description": "Build and atomically replace {diff_output} from an explicit Git-backed source. Use for code-review diff artifact construction, not for arbitrary file writes.",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "object",
+            "description": "Required source object. Supported shape: {\"type\":\"commit\",\"commit\":\"<ref>\"} | {\"type\":\"commit_range\",\"base\":\"<ref>\",\"head\":\"<ref>\"} | {\"type\":\"ref_diff\",\"base\":\"<ref>\",\"head\":\"<ref>\"} | {\"type\":\"worktree_head_scoped\"}."
+          },
+          "scoped_paths": {
+            "type": "array",
+            "description": "Optional repository-relative path array. Required for {\"type\":\"worktree_head_scoped\"}.",
+            "items": {
+              "type": "string"
+            }
+          },
+          "context_lines": {
+            "type": "integer",
+            "description": "Optional unified diff context line count. Defaults to 3."
+          }
+        },
+        "required": [
+          "source"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
       "name": "use_subagents",
       "description": "Run up to five focused in-process subagents in parallel.",
       "strict": false,
