@@ -78,7 +78,6 @@ export const ALWAYS_PRESERVED_NATIVE_TOOL_IDS = [
 	ClineDefaultTool.NEW_TASK,
 	ClineDefaultTool.BROWSER,
 	ClineDefaultTool.MCP_ACCESS,
-	ClineDefaultTool.MCP_DOCS,
 ] as const
 
 export const PLACEHOLDER_WORKFLOW_STEP_MATRIX: Record<string, Record<number, readonly PlaceholderToolBundle[]>> = {
