@@ -34,6 +34,7 @@ import {
 	resolveAvailableWorkflows,
 } from "@core/workflows/resolution/resolveAvailableWorkflows"
 import { ClineAssistantToolUseBlock, ClineStorageMessage, ClineTextContentBlock, ClineUserContent } from "@shared/messages"
+import type { ClineMessageModelInfo } from "@shared/messages/metrics"
 import { Logger } from "@shared/services/Logger"
 import type { SkillMetadata } from "@shared/skills"
 import { ClineDefaultTool, ClineTool } from "@shared/tools"
@@ -437,6 +438,11 @@ export class SubagentRunner {
 				mode,
 				customPrompt: this.baseConfig.services.stateManager.getGlobalSettingsKey("customPrompt"),
 			}
+			const modelInfo: ClineMessageModelInfo = {
+				providerId: providerInfo.providerId,
+				modelId: providerInfo.model.id,
+				mode: providerInfo.mode,
+			}
 			stats.contextWindow = providerInfo.model.info.contextWindow || 0
 			const nativeToolCallsRequested =
 				providerInfo.model.info.apiFormat === ApiFormat.OPENAI_RESPONSES ||
@@ -563,6 +569,7 @@ export class SubagentRunner {
 				let assistantText = ""
 				let assistantTextSignature: string | undefined
 				let requestId: string | undefined
+				let responseId: string | undefined
 
 				const stream = this.createMessageWithInitialChunkRetry(
 					api,
@@ -579,6 +586,9 @@ export class SubagentRunner {
 					switch (chunk.type) {
 						case "usage":
 							requestId = requestId ?? chunk.id
+							if (chunk.id) {
+								responseId = chunk.id
+							}
 							stats.inputTokens += chunk.inputTokens || 0
 							stats.outputTokens += chunk.outputTokens || 0
 							stats.cacheWriteTokens += chunk.cacheWriteTokens || 0
@@ -617,6 +627,10 @@ export class SubagentRunner {
 							)
 							break
 						case "reasoning":
+							requestId = requestId ?? chunk.id
+							break
+						case "response_id":
+							responseId = chunk.id
 							requestId = requestId ?? chunk.id
 							break
 					}
@@ -690,7 +704,8 @@ export class SubagentRunner {
 					conversation.push({
 						role: "assistant",
 						content: assistantContent,
-						id: requestId,
+						modelInfo,
+						id: responseId || requestId,
 					})
 				}
 

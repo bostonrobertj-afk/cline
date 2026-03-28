@@ -144,14 +144,19 @@ function createTaskConfig(nativeToolCallEnabled: boolean, promptRefreshFrequency
 	} as unknown as TaskConfig
 }
 
-function stubApiHandler(createMessage: sinon.SinonStub) {
+type StubApiOptions = {
+	modelId?: string
+	apiFormat?: ApiFormat
+}
+
+function stubApiHandler(createMessage: sinon.SinonStub, options?: StubApiOptions) {
 	sinon.stub(coreApi, "buildApiHandler").returns({
 		abort: sinon.stub(),
 		getModel: () => ({
-			id: "anthropic/claude-sonnet-4.5",
+			id: options?.modelId ?? "anthropic/claude-sonnet-4.5",
 			info: {
 				contextWindow: 200_000,
-				apiFormat: ApiFormat.ANTHROPIC_CHAT,
+				apiFormat: options?.apiFormat ?? ApiFormat.ANTHROPIC_CHAT,
 				supportsPromptCache: true,
 			},
 		}),
@@ -373,6 +378,152 @@ describe("SubagentRunner", () => {
 
 		assert.equal(result.status, "completed")
 		assert.equal(result.result, "done")
+		assert.equal(createMessage.callCount, 2)
+	})
+
+	it("stores openai-native responses subagent turns with provider metadata and the completed response id", async () => {
+		const createMessage = sinon.stub()
+		createMessage.onFirstCall().callsFake(async function* () {
+			yield {
+				type: "text",
+				id: "msg_subagent_native_text_1",
+				text: "Inspecting the workspace.",
+			}
+			yield {
+				type: "tool_calls",
+				id: "fc_subagent_native_1",
+				tool_call: {
+					function: {
+						id: "toolu_subagent_native_1",
+						name: ClineDefaultTool.LIST_FILES,
+						arguments: JSON.stringify({ path: ".", recursive: false }),
+					},
+				},
+			}
+			yield {
+				type: "usage",
+				id: "resp_subagent_native_1",
+				inputTokens: 10,
+				outputTokens: 5,
+			}
+		})
+		createMessage.onSecondCall().callsFake(async function* (_systemPrompt: string, conversation: any[]) {
+			const assistantMessage = conversation[1]
+			assert.equal(assistantMessage.role, "assistant")
+			assert.equal(assistantMessage.id, "resp_subagent_native_1")
+			assert.deepEqual(assistantMessage.modelInfo, {
+				providerId: "openai-native",
+				modelId: "gpt-5.4-mini-2026-03-17",
+				mode: "act",
+			})
+			yield {
+				type: "tool_calls",
+				tool_call: {
+					function: {
+						id: "toolu_subagent_native_complete_1",
+						name: ClineDefaultTool.ATTEMPT,
+						arguments: JSON.stringify({ result: "done" }),
+					},
+				},
+			}
+		})
+
+		const promptRegistry = PromptRegistry.getInstance()
+		sinon.stub(promptRegistry, "get").callsFake(async () => {
+			promptRegistry.nativeTools = undefined
+			return "system prompt"
+		})
+		sinon.stub(SubagentBuilder.prototype, "getConfiguredSkills").returns(undefined)
+		sinon.stub(skills, "discoverSkills").resolves([])
+		sinon.stub(skills, "getAvailableSkills").returns([])
+		stubApiHandler(createMessage, {
+			modelId: "gpt-5.4-mini-2026-03-17",
+			apiFormat: ApiFormat.OPENAI_RESPONSES,
+		})
+		initializeHostProvider()
+
+		const config = createTaskConfig(false)
+		config.services.stateManager.getApiConfiguration = () => ({
+			actModeApiProvider: "openai-native",
+			planModeApiProvider: "openai-native",
+		})
+
+		const runner = new SubagentRunner(config)
+		const result = await runner.run("Inspect the repo", () => {})
+
+		assert.equal(result.status, "completed")
+		assert.equal(createMessage.callCount, 2)
+	})
+
+	it("stores openai responses subagent turns with the explicit response_id anchor", async () => {
+		const createMessage = sinon.stub()
+		createMessage.onFirstCall().callsFake(async function* () {
+			yield {
+				type: "text",
+				id: "msg_subagent_openai_text_1",
+				text: "Searching for the right files.",
+			}
+			yield {
+				type: "tool_calls",
+				id: "fc_subagent_openai_1",
+				tool_call: {
+					function: {
+						id: "toolu_subagent_openai_1",
+						name: ClineDefaultTool.LIST_FILES,
+						arguments: JSON.stringify({ path: ".", recursive: false }),
+					},
+				},
+			}
+			yield {
+				type: "response_id",
+				id: "resp_subagent_openai_1",
+			}
+		})
+		createMessage.onSecondCall().callsFake(async function* (_systemPrompt: string, conversation: any[]) {
+			const assistantMessage = conversation[1]
+			assert.equal(assistantMessage.role, "assistant")
+			assert.equal(assistantMessage.id, "resp_subagent_openai_1")
+			assert.deepEqual(assistantMessage.modelInfo, {
+				providerId: "openai",
+				modelId: "gpt-5.4-mini-2026-03-17",
+				mode: "act",
+			})
+			yield {
+				type: "tool_calls",
+				tool_call: {
+					function: {
+						id: "toolu_subagent_openai_complete_1",
+						name: ClineDefaultTool.ATTEMPT,
+						arguments: JSON.stringify({ result: "done" }),
+					},
+				},
+			}
+		})
+
+		const promptRegistry = PromptRegistry.getInstance()
+		sinon.stub(promptRegistry, "get").callsFake(async () => {
+			promptRegistry.nativeTools = undefined
+			return "system prompt"
+		})
+		sinon.stub(SubagentBuilder.prototype, "getConfiguredSkills").returns(undefined)
+		sinon.stub(skills, "discoverSkills").resolves([])
+		sinon.stub(skills, "getAvailableSkills").returns([])
+		stubApiHandler(createMessage, {
+			modelId: "gpt-5.4-mini-2026-03-17",
+			apiFormat: ApiFormat.OPENAI_RESPONSES,
+		})
+		initializeHostProvider()
+
+		const config = createTaskConfig(false)
+		config.services.stateManager.getApiConfiguration = () => ({
+			actModeApiProvider: "openai",
+			planModeApiProvider: "openai",
+		})
+
+		const runner = new SubagentRunner(config)
+		const result = await runner.run("Inspect the repo", () => {})
+
+		assert.equal(result.status, "completed")
 		assert.equal(createMessage.callCount, 2)
 	})
 
