@@ -1,12 +1,7 @@
-import { getCodeExplorationGuidance, hasConnectedIndxrServer } from "../../components/mcp"
+import { getCodeExplorationGuidance } from "../../components/mcp"
 import { getResponseToolsSection } from "../../components/response_tools"
 import { SystemPromptSection } from "../../templates/placeholders"
 import type { PromptVariant, SystemPromptContext } from "../../types"
-
-const getWorkflowPlaceholderToolGuidance = (context: SystemPromptContext) =>
-	context.managedWorkflowActive || context.activeWorkflowSupportsPlaceholders
-		? `- When a step sets a placeholder value, use \`set_workflow_placeholders\`.`
-		: ""
 
 const GPT5_1_AGENT_ROLE = (_context: SystemPromptContext) =>
 	`You are Cline, a highly skilled software engineer with extensive knowledge in many programming languages, frameworks, design patterns, and best practices. You excel at problem-solving, writing clean and efficient code, and leveraging a wide range of tools to accomplish complex tasks. Your goal is to assist users by understanding their requests, breaking down tasks into manageable steps, and utilizing available tools effectively to deliver high-quality solutions. You communicate clearly and concisely, ensuring that users are informed and engaged via concise preambles throughout the process. You are adaptable and continuously learn from interactions to improve your performance over time. You are friendly, professional, and always focused on delivering value to the user. You speak in the first person when referring to yourself, and ask the user questions and refer to them as you would in a normal conversation. You always respond using tools. Whether these tools are used to read, edit, or communicate, they must be used as the only method of responding to the user.`
@@ -35,7 +30,6 @@ You have access to a set of tools that are executed upon the user's approval. Yo
 - Use list_files when you need directory structure beyond the current visible-file context.
 
 ${getResponseToolsSection(_context)}
-${getWorkflowPlaceholderToolGuidance(_context)}
 
 ## Tool-Calling Convention and Preambles
 
@@ -87,11 +81,10 @@ When working in a codebase:
 - Always reference the **relevant module/file path** and **domain concept** before proposing or making edits
 - Track context across files, modules, and feature boundaries to ensure changes are coherent
 - If task scope is ambiguous, existing architecture is unclear, or constraints are undefined, ${context.yoloModeToggled !== true ? "**ask clarifying questions** using ask_followup_question rather than making assumptions" : "state your assumptions clearly before proceeding"}
-- ${
-	hasConnectedIndxrServer(context)
-		? `${getCodeExplorationGuidance(context, "")}`
-		: "When in doubt about existing patterns, conventions, or dependencies, **investigate first** using search_files and list_code_definition_names before the first full read_file, then use read_file_range for focused follow-up checks whenever possible"
-}
+- ${getCodeExplorationGuidance(
+	context,
+	"When in doubt about existing patterns, conventions, or dependencies, **investigate first** using search_files and list_code_definition_names before the first full read_file, then use read_file_range for focused follow-up checks whenever possible",
+)}
 
 This ensures your work aligns with the existing codebase structure and avoids unintended side effects.
 

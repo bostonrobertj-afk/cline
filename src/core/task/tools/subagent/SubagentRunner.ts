@@ -116,6 +116,18 @@ interface SubagentContextState {
 	conversationHistoryDeletedRange?: [number, number]
 }
 
+function getVisibleNativeToolNames(nativeTools: ClineTool[] | undefined): string[] {
+	return (nativeTools ?? []).flatMap((tool) => {
+		if ("function" in tool && typeof tool.function?.name === "string") {
+			return [tool.function.name]
+		}
+		if ("name" in tool && typeof tool.name === "string") {
+			return [tool.name]
+		}
+		return []
+	})
+}
+
 function createEmptyRequestUsageState(): SubagentRequestUsageState {
 	return {
 		inputTokens: 0,
@@ -525,8 +537,13 @@ export class SubagentRunner {
 					shouldSendFullPromptAssembly,
 					shouldUseContinuationPrompt,
 				})
-				const generatedSystemPrompt = await promptRegistry.get(context)
-				const baseSystemPrompt = this.agent.buildSystemPrompt(generatedSystemPrompt, context)
+				const candidateNativeTools = this.agent.buildNativeTools(context)
+				const visibleNativeToolNames = getVisibleNativeToolNames(candidateNativeTools)
+				const promptContext = { ...context, visibleNativeToolNames }
+				const generatedSystemPrompt = await promptRegistry.get(promptContext)
+				const useNativeToolCalls = !!promptRegistry.nativeTools?.length
+				const nativeTools = useNativeToolCalls ? candidateNativeTools : undefined
+				const baseSystemPrompt = this.agent.buildSystemPrompt(generatedSystemPrompt, promptContext)
 				const systemPrompt =
 					assignedSkillNames.length > 0 &&
 					!state.activeWorkflowId &&
@@ -534,8 +551,6 @@ export class SubagentRunner {
 					!state.activePlaceholderWorkflowId
 						? `${baseSystemPrompt}${buildAssignedSkillDirective(assignedSkillNames)}`
 						: baseSystemPrompt
-				const useNativeToolCalls = !!promptRegistry.nativeTools?.length
-				const nativeTools = useNativeToolCalls ? this.agent.buildNativeTools(context) : undefined
 
 				if (useNativeToolCalls && (!nativeTools || nativeTools.length === 0)) {
 					const error = "Subagent tool requires native tool calling support."

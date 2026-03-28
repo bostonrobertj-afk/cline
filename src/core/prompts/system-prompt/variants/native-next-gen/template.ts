@@ -3,11 +3,6 @@ import { getResponseToolsSection } from "../../components/response_tools"
 import { SystemPromptSection } from "../../templates/placeholders"
 import type { SystemPromptContext } from "../../types"
 
-const getWorkflowPlaceholderToolGuidance = (context: SystemPromptContext) =>
-	context.managedWorkflowActive || context.activeWorkflowSupportsPlaceholders
-		? `- When a step sets a placeholder value, use \`set_workflow_placeholders\`.`
-		: ""
-
 /**
  * Base template for GPT-5 variant with structured sections
  */
@@ -76,8 +71,7 @@ const TOOL_USE = (context: SystemPromptContext) => `TOOL USE
 
 You have access to a set of tools that are executed upon the user's approval.${context.enableParallelToolCalling ? " You may use multiple tools in a single response when the operations are independent (e.g., reading several files, searching in parallel). For dependent operations where one result informs the next, use tools sequentially." : ""} You will receive the results of all tool uses in the user's response.
 
-${getResponseToolsSection(context)}
-${getWorkflowPlaceholderToolGuidance(context)}`
+${getResponseToolsSection(context)}`
 
 const ACT_VS_PLAN = (context: SystemPromptContext) => `ACT MODE V.S. PLAN MODE
 

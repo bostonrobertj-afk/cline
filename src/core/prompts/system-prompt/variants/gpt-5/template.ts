@@ -3,11 +3,6 @@ import { getResponseToolsSection } from "../../components/response_tools"
 import { SystemPromptSection } from "../../templates/placeholders"
 import type { SystemPromptContext } from "../../types"
 
-const getWorkflowPlaceholderToolGuidance = (context: SystemPromptContext) =>
-	context.managedWorkflowActive || context.activeWorkflowSupportsPlaceholders
-		? `- When a step sets a placeholder value, use \`set_workflow_placeholders\`.`
-		: ""
-
 /**
  * Base template for GPT-5 variant with structured sections
  */
@@ -58,7 +53,6 @@ You have access to a set of tools that are executed upon the user's approval. Yo
 - Use list_files when you need directory structure beyond the current visible-file context.
 
 ${getResponseToolsSection(context)}
-${getWorkflowPlaceholderToolGuidance(context)}
 
 {{TOOL_USE_FORMATTING_SECTION}}
 

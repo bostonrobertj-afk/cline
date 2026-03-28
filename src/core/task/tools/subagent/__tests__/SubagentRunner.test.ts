@@ -286,6 +286,48 @@ describe("SubagentRunner", () => {
 		assert.equal(buildSystemPromptStub.called, true)
 	})
 
+	it("passes visibleNativeToolNames into prompt registry assembly and subagent system-prompt assembly", async () => {
+		const config = createTaskConfig(false)
+		config.autoApprovalSettings.actions.useMcp = true
+		config.services.mcpHub = { getServers: () => [] } as any
+		const visibleNativeToolNames = ["indxr-10mcp0search_relevant", "search_files"]
+
+		const buildSystemPromptStub = sinon.stub(SubagentBuilder.prototype, "buildSystemPrompt").callsFake((prompt, context) => {
+			assert.equal(prompt, "system prompt")
+			assert.deepEqual(context?.visibleNativeToolNames, visibleNativeToolNames)
+			return "system prompt"
+		})
+		sinon.stub(SubagentBuilder.prototype, "buildNativeTools").returns(visibleNativeToolNames.map((name) => ({ name })) as any)
+		sinon.stub(SubagentBuilder.prototype, "getConfiguredSkills").returns(undefined)
+		const promptRegistryGetStub = sinon.stub(PromptRegistry.getInstance(), "get").callsFake(async (context) => {
+			assert.deepEqual(context.visibleNativeToolNames, visibleNativeToolNames)
+			return "system prompt"
+		})
+		sinon.stub(skills, "discoverSkills").resolves([])
+		sinon.stub(skills, "getAvailableSkills").returns([])
+
+		const createMessage = sinon.stub()
+		createMessage.onFirstCall().callsFake(async function* () {
+			yield {
+				type: "tool_calls",
+				tool_call: {
+					function: {
+						id: "toolu_subagent_complete_visible_native_tools",
+						name: ClineDefaultTool.ATTEMPT,
+						arguments: JSON.stringify({ result: "done" }),
+					},
+				},
+			}
+		})
+		stubApiHandler(createMessage)
+		initializeHostProvider()
+
+		const runner = new SubagentRunner(config)
+		await runner.run("Finish quickly", () => {})
+		assert.equal(promptRegistryGetStub.called, true)
+		assert.equal(buildSystemPromptStub.called, true)
+	})
+
 	it("marks suppressed internal subagent turns as continuation turns and forwards the current checklist", async () => {
 		const runner = new SubagentRunner(createTaskConfig(false))
 		const state = new TaskState()

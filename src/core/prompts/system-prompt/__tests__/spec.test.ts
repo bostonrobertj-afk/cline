@@ -4,6 +4,7 @@ import type { McpHub } from "@/services/mcp/McpHub"
 import { ModelFamily } from "@/shared/prompts"
 import { ClineDefaultTool } from "@/shared/tools"
 import {
+	getCodeExplorationGuidance,
 	getIndxrToolMatches,
 	getSubagentIndxrExplorationGuidance,
 	hasConnectedIndxrServer,
@@ -13,6 +14,7 @@ import {
 } from "../components/mcp"
 import type { ClineToolSpec } from "../spec"
 import { toolSpecFunctionDeclarations, toolSpecFunctionDefinition, toolSpecInputSchema } from "../spec"
+import { access_mcp_resource_variants } from "../tools/access_mcp_resource"
 import { act_mode_respond_variants } from "../tools/act_mode_respond"
 import { attempt_completion_variants } from "../tools/attempt_completion"
 import { build_review_diff_output_variants } from "../tools/build_review_diff_output"
@@ -21,6 +23,7 @@ import { list_code_definition_names_variants } from "../tools/list_code_definiti
 import { read_file_variants } from "../tools/read_file"
 import { read_file_range_variants } from "../tools/read_file_range"
 import { search_files_variants } from "../tools/search_files"
+import { send_user_message_variants } from "../tools/send_user_message"
 import { set_workflow_placeholders_variants } from "../tools/set_workflow_placeholders"
 import { use_mcp_tool_variants } from "../tools/use_mcp_tool"
 import { write_to_file_variants } from "../tools/write_to_file"
@@ -232,6 +235,33 @@ describe("Indxr MCP detection", () => {
 		expect(getSubagentIndxrExplorationGuidance(indxrContext)).to.equal(SUBAGENT_INDXR_EXPLORATION_GUIDANCE)
 		expect(getSubagentIndxrExplorationGuidance(mockContext)).to.equal("")
 	})
+
+	it("uses visible native Indxr tools when present and falls back when they are absent", () => {
+		const fallbackGuidance = "fallback guidance"
+		const nativeVisibleGuidance = getCodeExplorationGuidance(
+			{
+				...indxrContext,
+				enableNativeToolCalls: true,
+				visibleNativeToolNames: ["search_relevant"],
+			},
+			fallbackGuidance,
+		)
+		const nativeFallbackGuidance = getCodeExplorationGuidance(
+			{
+				...indxrContext,
+				enableNativeToolCalls: true,
+				visibleNativeToolNames: [],
+			},
+			fallbackGuidance,
+		)
+
+		expect(nativeVisibleGuidance).to.include("`search_relevant`").and.not.include("`get_file_summary`")
+		expect(nativeFallbackGuidance).to.equal(fallbackGuidance)
+		expect(() => {
+			const nonNativeGuidance = getCodeExplorationGuidance(indxrContext, fallbackGuidance)
+			expect(nonNativeGuidance).to.not.equal("")
+		}).to.not.throw()
+	})
 })
 
 describe("Gemini and Anthropic parameter descriptions match", () => {
@@ -285,6 +315,100 @@ describe("workflow placeholder tool gating", () => {
 		expect(attemptCompletion.function.parameters.properties.task_progress).to.equal(undefined)
 		expect(actModeRespond.function.parameters.properties.task_progress).to.equal(undefined)
 		expect(generatePlanOutput.function.parameters.properties.task_progress).to.equal(undefined)
+	})
+
+	it("includes task_progress in send_user_message native schemas for normal non-deterministic contexts", () => {
+		const context: SystemPromptContext = {
+			...mockContext,
+			enableNativeToolCalls: true,
+			providerInfo: {
+				providerId: "openai",
+				model: { id: "gpt-5.4-2026-03-05", info: { supportsPromptCache: false } },
+				mode: "act",
+			},
+		}
+
+		const sendUserMessage = toolSpecFunctionDefinition(
+			send_user_message_variants.find((tool) => tool.variant === ModelFamily.NATIVE_GPT_5)!,
+			context,
+		) as any
+
+		expect(sendUserMessage.function.parameters.properties.task_progress).to.not.equal(undefined)
+	})
+
+	it("omits task_progress from send_user_message native schemas for supported deterministic placeholder workflows", () => {
+		const context: SystemPromptContext = {
+			...mockContext,
+			enableNativeToolCalls: true,
+			activeWorkflowSupportsPlaceholders: true,
+			activeDeterministicPlaceholderWorkflowEnabled: true,
+			providerInfo: {
+				providerId: "openai",
+				model: { id: "gpt-5.4-2026-03-05", info: { supportsPromptCache: false } },
+				mode: "act",
+			},
+		}
+
+		const sendUserMessage = toolSpecFunctionDefinition(
+			send_user_message_variants.find((tool) => tool.variant === ModelFamily.NATIVE_GPT_5)!,
+			context,
+		) as any
+
+		expect(sendUserMessage.function.parameters.properties.task_progress).to.equal(undefined)
+	})
+
+	it("omits access_mcp_resource native schemas when connected servers expose no resources or resource templates", () => {
+		const context: SystemPromptContext = {
+			...mockContext,
+			enableNativeToolCalls: true,
+			mcpHub: makeMcpHub([
+				{
+					name: "empty-server",
+					status: "connected",
+					disabled: false,
+					resources: [],
+					resourceTemplates: [],
+				},
+			]),
+			providerInfo: {
+				providerId: "openai",
+				model: { id: "gpt-5.4-2026-03-05", info: { supportsPromptCache: false } },
+				mode: "act",
+			},
+		}
+
+		const accessMcpResource = access_mcp_resource_variants.find((tool) => tool.variant === ModelFamily.NATIVE_GPT_5)!
+		expect(() => toolSpecFunctionDefinition(accessMcpResource, context)).to.throw(
+			"Tool access_mcp_resource does not meet context requirements",
+		)
+	})
+
+	it("includes access_mcp_resource native schemas when a connected server exposes resources or resource templates", () => {
+		const context: SystemPromptContext = {
+			...mockContext,
+			enableNativeToolCalls: true,
+			mcpHub: makeMcpHub([
+				{
+					name: "resource-server",
+					status: "connected",
+					disabled: false,
+					resources: [],
+					resourceTemplates: [{ uriTemplate: "test://{id}", name: "template" }],
+				},
+			]),
+			providerInfo: {
+				providerId: "openai",
+				model: { id: "gpt-5.4-2026-03-05", info: { supportsPromptCache: false } },
+				mode: "act",
+			},
+		}
+
+		const accessMcpResource = toolSpecFunctionDefinition(
+			access_mcp_resource_variants.find((tool) => tool.variant === ModelFamily.NATIVE_GPT_5)!,
+			context,
+		) as any
+
+		expect(accessMcpResource.function.name).to.equal("access_mcp_resource")
 	})
 })
 

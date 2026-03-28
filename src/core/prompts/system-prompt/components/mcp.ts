@@ -1,4 +1,5 @@
 import type { McpServer } from "@/shared/mcp"
+import { CLINE_MCP_TOOL_IDENTIFIER } from "@/shared/mcp"
 import { SystemPromptSection } from "../templates/placeholders"
 import { TemplateEngine } from "../templates/TemplateEngine"
 import type { PromptVariant, SystemPromptContext } from "../types"
@@ -26,9 +27,6 @@ const INDXR_TOOL_SIGNATURES = new Set([
 ])
 const INDXR_ANCHOR_TOOL_SIGNATURES = new Set(["search_relevant", "get_file_summary", "get_token_estimate"])
 const MIN_INDXR_SIGNATURE_MATCHES = 2
-
-export const INDXR_EXPLORATION_PREFERENCE_GUIDANCE =
-	"Use Indxr MCP's tools for code exploration, symbol discovery, file understanding, dependency tracing, and targeted source reads. Prefer tools like `search_relevant`, `get_file_summary`, `lookup_symbol`, `explain_symbol`, `read_source`, `get_file_context`, `get_public_api`, `get_callers`, and `get_related_tests` before built-in `search_files`, `list_code_definition_names`, `read_file`, or `read_file_range` whenever feasible."
 
 export const BUILTIN_FILE_TOOL_FALLBACK_GUIDANCE =
 	"Use built-in file tools when Indxr is unavailable, insufficient for the task, or when exact raw file contents, regex search, or line-based inspection are required."
@@ -90,20 +88,94 @@ export function hasConnectedIndxrServer(context: SystemPromptContext): boolean {
 	return getConnectedIndxrServers(context).length > 0
 }
 
+export function normalizeVisibleNativeToolName(name: string): string {
+	const delimiterIndex = name.lastIndexOf(CLINE_MCP_TOOL_IDENTIFIER)
+	if (delimiterIndex === -1) {
+		return name
+	}
+
+	return name.slice(delimiterIndex + CLINE_MCP_TOOL_IDENTIFIER.length)
+}
+
+export function getVisibleNativeToolNames(context: SystemPromptContext): string[] {
+	return [...(context.visibleNativeToolNames ?? [])]
+}
+
+export function getVisibleIndxrToolNames(context: SystemPromptContext): string[] {
+	const visibleIndxrToolNames: string[] = []
+	const seen = new Set<string>()
+
+	for (const name of getVisibleNativeToolNames(context)) {
+		const normalizedName = normalizeVisibleNativeToolName(name)
+		if (!isIndxrToolName(normalizedName) || seen.has(normalizedName)) {
+			continue
+		}
+		seen.add(normalizedName)
+		visibleIndxrToolNames.push(normalizedName)
+	}
+
+	return visibleIndxrToolNames
+}
+
+export function hasConnectedMcpResources(context: SystemPromptContext): boolean {
+	return getConnectedMcpServers(context).some(
+		(server) => (server.resources?.length ?? 0) > 0 || (server.resourceTemplates?.length ?? 0) > 0,
+	)
+}
+
+function renderIndxrToolNames(toolNames: readonly string[]): string {
+	return toolNames.map((toolName) => `\`${toolName}\``).join(", ")
+}
+
+function renderIndxrExplorationPreferenceGuidance(toolNames: readonly string[]): string {
+	return `Use Indxr MCP's tools for code exploration, symbol discovery, file understanding, dependency tracing, and targeted source reads. Prefer exactly these visible Indxr tools: ${renderIndxrToolNames(toolNames)} before built-in \`search_files\`, \`list_code_definition_names\`, \`read_file\`, or \`read_file_range\` whenever feasible.`
+}
+
+function renderSubagentVisibleIndxrExplorationGuidance(toolNames: readonly string[]): string {
+	return `Prefer these visible Indxr tools for code exploration and structural discovery over built-in tools like \`search_files\`, \`list_code_definition_names\`, \`read_file\`, or \`read_file_range\`: ${renderIndxrToolNames(toolNames)}.\n\nFall back to built-in file tools when Indxr is insufficient or when exact raw file text, regex search, or direct line inspection is required.`
+}
+
 export function getIndxrExplorationGuidance(context: SystemPromptContext): string {
+	if (context.enableNativeToolCalls === true) {
+		const visibleIndxrToolNames = getVisibleIndxrToolNames(context)
+		if (visibleIndxrToolNames.length === 0) {
+			return ""
+		}
+
+		return `${renderIndxrExplorationPreferenceGuidance(visibleIndxrToolNames)} ${BUILTIN_FILE_TOOL_FALLBACK_GUIDANCE}`
+	}
+
 	return hasConnectedIndxrServer(context)
-		? `${INDXR_EXPLORATION_PREFERENCE_GUIDANCE}\n${BUILTIN_FILE_TOOL_FALLBACK_GUIDANCE}`
+		? `${renderIndxrExplorationPreferenceGuidance([
+				"search_relevant",
+				"get_file_summary",
+				"lookup_symbol",
+				"explain_symbol",
+				"read_source",
+				"get_file_context",
+				"get_public_api",
+				"get_callers",
+				"get_related_tests",
+			])} ${BUILTIN_FILE_TOOL_FALLBACK_GUIDANCE}`
 		: ""
 }
 
 export function getSubagentIndxrExplorationGuidance(context: SystemPromptContext): string {
+	if (context.enableNativeToolCalls === true) {
+		const visibleIndxrToolNames = getVisibleIndxrToolNames(context)
+		if (visibleIndxrToolNames.length === 0) {
+			return ""
+		}
+
+		return renderSubagentVisibleIndxrExplorationGuidance(visibleIndxrToolNames)
+	}
+
 	return hasConnectedIndxrServer(context) ? SUBAGENT_INDXR_EXPLORATION_GUIDANCE : ""
 }
 
 export function getCodeExplorationGuidance(context: SystemPromptContext, fallbackWhenIndxrUnavailable: string): string {
-	return hasConnectedIndxrServer(context)
-		? `${INDXR_EXPLORATION_PREFERENCE_GUIDANCE} ${BUILTIN_FILE_TOOL_FALLBACK_GUIDANCE}`
-		: fallbackWhenIndxrUnavailable
+	const indxrGuidance = getIndxrExplorationGuidance(context)
+	return indxrGuidance || fallbackWhenIndxrUnavailable
 }
 
 export function replacePromptPlaceholders(description: string, context: SystemPromptContext): string {
@@ -144,7 +216,8 @@ export async function getMcp(variant: PromptVariant, context: SystemPromptContex
 		return undefined
 	}
 
-	if (!hasConnectedIndxrServer(context)) {
+	const indxrGuidance = getIndxrExplorationGuidance(context)
+	if (!indxrGuidance) {
 		return undefined
 	}
 
@@ -169,11 +242,10 @@ export async function getMcp(variant: PromptVariant, context: SystemPromptContex
 
 async function getMcpServers(servers: McpServer[], variant: PromptVariant, context: SystemPromptContext): Promise<string> {
 	const template = variant.componentOverrides?.[SystemPromptSection.MCP]?.template || MCP_TEMPLATE_TEXT
+	const indxrGuidance = getIndxrExplorationGuidance(context)
 
 	return new TemplateEngine().resolve(template, context, {
-		INDXR_GUIDANCE: hasConnectedIndxrServer(context)
-			? `Indxr-Aware Exploration\n${getIndxrExplorationGuidance(context)}`
-			: "",
+		INDXR_GUIDANCE: indxrGuidance ? `Indxr-Aware Exploration\n${indxrGuidance}` : "",
 		MCP_SERVERS_LIST: "",
 	})
 }

@@ -245,7 +245,7 @@ describe("SubagentBuilder", () => {
 		assert.equal(builder.isMcpExposureEnabled(), true)
 	})
 
-	it("appends subagent-specific Indxr guidance only when MCP exposure is enabled and Indxr is connected", () => {
+	it("omits subagent-specific Indxr guidance when native tool visibility excludes Indxr tools", () => {
 		sinon.stub(AgentConfigLoader, "getInstance").returns({
 			getCachedConfig: () => undefined,
 		} as unknown as AgentConfigLoader)
@@ -262,6 +262,8 @@ describe("SubagentBuilder", () => {
 
 		const builder = new SubagentBuilder(taskConfig)
 		const prompt = builder.buildSystemPrompt("generated", {
+			enableNativeToolCalls: true,
+			visibleNativeToolNames: ["search_files", "read_file"],
 			mcpHub: {
 				getServers: () => [
 					{
@@ -281,7 +283,51 @@ describe("SubagentBuilder", () => {
 			} as any,
 		} as never)
 
+		assert.doesNotMatch(prompt, /# Indxr-Aware Exploration/)
+	})
+
+	it("mentions only the visible subset of Indxr tools in subagent-specific native guidance", () => {
+		sinon.stub(AgentConfigLoader, "getInstance").returns({
+			getCachedConfig: () => undefined,
+		} as unknown as AgentConfigLoader)
+		sinon.stub(api, "buildApiHandler").returns({ getModel: sinon.stub(), createMessage: sinon.stub() } as never)
+
+		const taskConfig = createTaskConfig("act", "openai")
+		;(taskConfig.services.stateManager.getGlobalSettingsKey as any) = (key: string) => {
+			if (key === "mode") return "act"
+			if (key === "autoApprovalSettings") {
+				return { actions: { useMcp: true } }
+			}
+			return undefined
+		}
+
+		const builder = new SubagentBuilder(taskConfig)
+		const prompt = builder.buildSystemPrompt("generated", {
+			enableNativeToolCalls: true,
+			visibleNativeToolNames: ["indxr-10mcp0search_relevant", "indxr-10mcp0get_file_summary", "search_files"],
+			mcpHub: {
+				getServers: () => [
+					{
+						name: "workspace-index",
+						status: "connected",
+						config: '{"command":"indxr"}',
+						tools: [
+							{
+								name: "search_relevant",
+								description: "Search relevant",
+								inputSchema: { type: "object", properties: {} },
+							},
+							{ name: "get_file_summary", description: "Summary", inputSchema: { type: "object", properties: {} } },
+							{ name: "lookup_symbol", description: "Lookup", inputSchema: { type: "object", properties: {} } },
+						],
+					},
+				],
+			} as any,
+		} as never)
+
 		assert.match(prompt, /# Indxr-Aware Exploration/)
-		assert.match(prompt, /Prefer these Indxr tools for code exploration and structural discovery/)
+		assert.match(prompt, /`search_relevant`/)
+		assert.match(prompt, /`get_file_summary`/)
+		assert.doesNotMatch(prompt, /`lookup_symbol`/)
 	})
 })

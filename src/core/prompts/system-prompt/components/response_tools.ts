@@ -1,23 +1,46 @@
 import type { SystemPromptContext } from "../types"
 
-export function getActModeResponseTools(context: SystemPromptContext): string[] {
-	const tools = ["`attempt_completion`", "`send_user_message`"]
+const RESPONSE_TOOL_LINES = {
+	attempt_completion: "- `attempt_completion`: Use once at the end of each workflow",
+	ask_followup_question: "- `ask_followup_question`: Use to ask a question + present options for user to select",
+	send_user_message: "- `send_user_message`: Use by default to send messages to the user",
+	act_mode_respond:
+		"- `act_mode_respond`: Use to send a brief ACT MODE progress update and intentionally wait for the user's next reply",
+	generate_plan_output: "- `generate_plan_output`: Use to present a structured plan",
+} as const
+
+function getActModeResponseToolNames(context: SystemPromptContext): string[] {
+	const tools = ["attempt_completion"]
 
 	if (context.yoloModeToggled !== true) {
-		tools.splice(1, 0, "`ask_followup_question`")
+		tools.push("ask_followup_question")
 	}
 
+	tools.push("send_user_message")
 	return tools
 }
 
-export function getPlanModeResponseTools(context: SystemPromptContext): string[] {
-	const tools = ["`generate_plan_output`", "`send_user_message`"]
+function getPlanModeResponseToolNames(context: SystemPromptContext): string[] {
+	const tools = ["generate_plan_output"]
 
 	if (context.yoloModeToggled !== true) {
-		tools.splice(1, 0, "`ask_followup_question`")
+		tools.push("ask_followup_question")
 	}
 
+	tools.push("send_user_message")
 	return tools
+}
+
+function formatResponseToolNames(toolNames: string[]): string[] {
+	return toolNames.map((toolName) => `\`${toolName}\``)
+}
+
+export function getActModeResponseTools(context: SystemPromptContext): string[] {
+	return formatResponseToolNames(getActModeResponseToolNames(context))
+}
+
+export function getPlanModeResponseTools(context: SystemPromptContext): string[] {
+	return formatResponseToolNames(getPlanModeResponseToolNames(context))
 }
 
 export function joinToolNames(toolNames: string[]): string {
@@ -34,24 +57,25 @@ export function getCurrentModeResponseToolsLine(context: SystemPromptContext): s
 	return `- Use ${joinToolNames(currentModeTools)} when responding to the user.`
 }
 
-export function getResponseToolsSection(context: SystemPromptContext): string {
-	const actModeResponseTools = joinToolNames(getActModeResponseTools(context))
-	const planModeResponseTools = joinToolNames(getPlanModeResponseTools(context))
-	const responseToolLines = [
-		"- `attempt_completion`: Use once at the end of each workflow",
-		"- `send_user_message`: Use by default to send messages to the user",
-	]
+function getVisibleResponseToolNames(context: SystemPromptContext): string[] {
+	const currentModeToolNames =
+		context.providerInfo.mode === "plan" ? getPlanModeResponseToolNames(context) : getActModeResponseToolNames(context)
+	const orderedToolNames =
+		context.providerInfo.mode === "plan" ? currentModeToolNames : [...currentModeToolNames, "act_mode_respond"]
 
-	if (context.yoloModeToggled !== true) {
-		responseToolLines.push("- `ask_followup_question`: Use to ask a question + present options for user to select")
+	if (context.enableNativeToolCalls === true && context.visibleNativeToolNames) {
+		const visibleToolNames = new Set(context.visibleNativeToolNames)
+		return orderedToolNames.filter((toolName) => visibleToolNames.has(toolName))
 	}
 
-	responseToolLines.push("- `generate_plan_output`: Use to present a structured plan")
+	return currentModeToolNames
+}
+
+export function getResponseToolsSection(context: SystemPromptContext): string {
+	const responseToolLines = getVisibleResponseToolNames(context).map((toolName) => RESPONSE_TOOL_LINES[toolName])
 
 	return `RESPONSE TOOLS
 Use these tools to respond to the user. A reply reaches the human user only when you use the appropriate response tool.
 
-${responseToolLines.join("\n")}
-
-In ACT MODE, respond using these: ${actModeResponseTools}. In PLAN MODE, respond using these: ${planModeResponseTools}.`
+${responseToolLines.join("\n")}`
 }

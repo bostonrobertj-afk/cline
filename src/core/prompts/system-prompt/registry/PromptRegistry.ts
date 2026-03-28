@@ -10,6 +10,18 @@ import { loadAllVariantConfigs } from "../variants"
 import { config as genericConfig } from "../variants/generic/config"
 import { PromptBuilder } from "./PromptBuilder"
 
+function getVisibleNativeToolNames(nativeTools: ClineTool[] | undefined): string[] {
+	return (nativeTools ?? []).flatMap((tool) => {
+		if ("function" in tool && typeof tool.function?.name === "string") {
+			return [tool.function.name]
+		}
+		if ("name" in tool && typeof tool.name === "string") {
+			return [tool.name]
+		}
+		return []
+	})
+}
+
 export class PromptRegistry {
 	private static instance: PromptRegistry
 	private variants: Map<string, PromptVariant> = new Map()
@@ -89,16 +101,21 @@ export class PromptRegistry {
 
 		// Hacky way to get native tools for the current variant - it's bad and ugly
 		this.nativeTools = ClineToolSet.getNativeTools(variant, context)
+		const visibleNativeToolNames =
+			context.visibleNativeToolNames !== undefined
+				? [...context.visibleNativeToolNames]
+				: getVisibleNativeToolNames(this.nativeTools)
+		const promptContext = { ...context, visibleNativeToolNames }
 
 		if (context.isContinuationTurn) {
 			const continuationComponent = this.components[SystemPromptSection.CONTINUATION_TURN]
 			if (!continuationComponent) {
 				throw new Error("Continuation turn prompt component is not registered")
 			}
-			return (await continuationComponent(variant, context)) ?? ""
+			return (await continuationComponent(variant, promptContext)) ?? ""
 		}
 
-		const builder = new PromptBuilder(variant, context, this.components)
+		const builder = new PromptBuilder(variant, promptContext, this.components)
 		return await builder.build()
 	}
 

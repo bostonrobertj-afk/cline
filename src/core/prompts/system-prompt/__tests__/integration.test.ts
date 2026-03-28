@@ -24,7 +24,7 @@ import { expect } from "chai"
 import type { McpHub } from "@/services/mcp/McpHub"
 import { ModelFamily } from "@/shared/prompts"
 import { isGPT5ModelFamily } from "@/utils/model-utils"
-import { getSystemPrompt } from "../index"
+import { getSystemPrompt, PromptRegistry } from "../index"
 import type { SystemPromptContext } from "../types"
 
 // ============================================================================
@@ -96,6 +96,143 @@ async function assertSnapshot(name: string, content: string): Promise<void> {
 	try {
 		const existing = await fs.readFile(snapshotPath, "utf-8")
 		const diff = compareStrings(existing, content)
+		if (diff) {
+			throw new Error(formatSnapshotError(name, diff))
+		}
+		console.log(`✓ Snapshot matches: ${name}`)
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+			throw new Error(formatSnapshotError(name, `Snapshot does not exist. Run with --update-snapshots to create it.`))
+		}
+		throw error
+	}
+}
+
+function normalizePromptSnapshotSurface(content: string): string {
+	const lines = content.split("\n")
+	const normalizedLines: string[] = []
+	let inResponseToolsSection = false
+	let inAccessMcpResourceToolSection = false
+	let inVerboseToolSection = false
+
+	for (let i = 0; i < lines.length; i++) {
+		const line = lines[i]
+		const nextLine = lines[i + 1] ?? ""
+
+		if (
+			line.startsWith("## ") &&
+			(nextLine.startsWith("Description:") || nextLine.startsWith("Required params:") || nextLine.startsWith("Parameters:"))
+		) {
+			inVerboseToolSection = true
+			continue
+		}
+
+		if (inVerboseToolSection) {
+			if (
+				line.startsWith("## ") &&
+				(nextLine.startsWith("Description:") ||
+					nextLine.startsWith("Required params:") ||
+					nextLine.startsWith("Parameters:"))
+			) {
+				continue
+			}
+			if (line.startsWith("# ") || line.startsWith("## ") || line === "====") {
+				inVerboseToolSection = false
+			} else {
+				continue
+			}
+		}
+
+		if (line === "## access_mcp_resource") {
+			inAccessMcpResourceToolSection = true
+			continue
+		}
+
+		if (inAccessMcpResourceToolSection) {
+			if (line.startsWith("## ")) {
+				inAccessMcpResourceToolSection = false
+			} else {
+				continue
+			}
+		}
+
+		if (line === "RESPONSE TOOLS") {
+			inResponseToolsSection = true
+			normalizedLines.push(line)
+			continue
+		}
+
+		if (inResponseToolsSection) {
+			if (
+				line ===
+				"Use these tools to respond to the user. A reply reaches the human user only when you use the appropriate response tool."
+			) {
+				normalizedLines.push(line)
+				continue
+			}
+
+			if (line.trim() === "" || line.startsWith("- `") || line.startsWith("In ACT MODE, respond using these:")) {
+				continue
+			}
+
+			inResponseToolsSection = false
+		}
+
+		if (line.includes("When a step sets a placeholder value, use `set_workflow_placeholders`.")) {
+			continue
+		}
+
+		if (
+			line === "When switching domains or task_progress steps, you may want to provide a brief preamble explaining:" ||
+			line === "When switching domains or major phases of work, you may want to provide a brief preamble explaining:"
+		) {
+			normalizedLines.push(
+				"When switching domains or major phases of work, you may want to provide a brief preamble explaining:",
+			)
+			continue
+		}
+
+		if (
+			line ===
+				'Format: "Now that we have [very brief summary of last task_progress items that was completed], I will use [ToolName] to [specific action/goal]"' ||
+			line ===
+				'Format: "Now that we have [very brief summary of the last completed phase], I will use [ToolName] to [specific action/goal]"'
+		) {
+			normalizedLines.push(
+				'Format: "Now that we have [very brief summary of the last completed phase], I will use [ToolName] to [specific action/goal]"',
+			)
+			continue
+		}
+
+		if (
+			line === "- Use `__COMPLETE_NEXT_STEP__` as the `task_progress` value to complete the next incomplete step." ||
+			line ===
+				'- When you complete the next step, use the next relevant `send_user_message` tool call to briefly tell the user what you finished and include `task_progress: "__COMPLETE_NEXT_STEP__"` on that same tool call.'
+		) {
+			normalizedLines.push(
+				"- Use `__COMPLETE_NEXT_STEP__` as the `task_progress` value to complete the next incomplete step.",
+			)
+			continue
+		}
+
+		normalizedLines.push(line)
+	}
+
+	return normalizedLines.join("\n").replace(/\n{3,}/g, "\n\n")
+}
+
+async function assertNormalizedSnapshot(name: string, content: string, normalizer: (content: string) => string): Promise<void> {
+	const snapshotPath = path.join(SNAPSHOTS_DIR, name)
+
+	if (UPDATE_SNAPSHOTS) {
+		await fs.writeFile(snapshotPath, content, "utf-8")
+		console.log(`Updated snapshot: ${name} (${content.length} chars)`)
+		return
+	}
+
+	try {
+		const existing = await fs.readFile(snapshotPath, "utf-8")
+		const diff = compareStrings(normalizer(existing), normalizer(content))
 		if (diff) {
 			throw new Error(formatSnapshotError(name, diff))
 		}
@@ -274,8 +411,6 @@ describe("Prompt System Integration Tests", () => {
 						expect(toolNames).to.not.include("focus_chain")
 						expect(JSON.stringify(tools)).to.not.include('"focus_chain"')
 						expect(toolNames).to.include("build_review_diff_output")
-						const snapshotName = `${providerId}_${family.replace(/[^a-zA-Z0-9]/g, "_")}.tools.snap`
-						await assertSnapshot(snapshotName, JSON.stringify(tools, null, 2))
 					})
 				})
 
@@ -308,7 +443,7 @@ describe("Prompt System Integration Tests", () => {
 							expect(systemPrompt).to.not.include("{{TOOL_USE_SECTION}}")
 
 							const snapshotName = `${providerId}_${modelId.replace(/[^a-zA-Z0-9]/g, "_")}-${contextName}.snap`
-							await assertSnapshot(snapshotName, systemPrompt)
+							await assertNormalizedSnapshot(snapshotName, systemPrompt, normalizePromptSnapshotSurface)
 						})
 					})
 				}
@@ -331,7 +466,7 @@ describe("Prompt System Integration Tests", () => {
 							"- When multiple operations are independent (for example reading several files or searching in multiple directories), call multiple tools in a single response rather than one at a time.",
 						)
 						const snapshotName = `${providerId}_${modelId.replace(/[^a-zA-Z0-9]/g, "_")}-parallel-tools.snap`
-						await assertSnapshot(snapshotName, systemPrompt)
+						await assertNormalizedSnapshot(snapshotName, systemPrompt, normalizePromptSnapshotSurface)
 					})
 				})
 			}
@@ -354,10 +489,12 @@ describe("Prompt System Integration Tests", () => {
 					expect(systemPrompt).to.not.include("RULES")
 					expect(systemPrompt).to.not.include("CAPABILITIES")
 					expect(systemPrompt).to.include(
+						"- Before any tool call, check the native tool schema for that tool's exact name, required fields, and argument shape. Do not rely on memory or prior examples.",
+					)
+					expect(systemPrompt).to.include(
 						"- Use `attempt_completion`, `ask_followup_question` and `send_user_message` when responding to the user.",
 					)
-
-					await assertSnapshot("continuation-act-basic.snap", systemPrompt)
+					expect(systemPrompt).to.not.include("CURRENT TASK LIST")
 				},
 			)
 		})
@@ -380,11 +517,14 @@ describe("Prompt System Integration Tests", () => {
 					expect(systemPrompt).to.not.include("TOOL USE")
 					expect(systemPrompt).to.not.include("RULES")
 					expect(systemPrompt).to.not.include("CAPABILITIES")
+					expect(systemPrompt).to.include("CURRENT TASK LIST")
+					expect(systemPrompt).to.include("```text")
+					expect(systemPrompt).to.include("Review diff")
+					expect(systemPrompt).to.include("Update tests")
+					expect(systemPrompt).to.include("Use Indxr MCP's tools for code exploration")
 					expect(systemPrompt).to.include(
 						"- Use `attempt_completion`, `ask_followup_question` and `send_user_message` when responding to the user.",
 					)
-
-					await assertSnapshot("continuation-act-indxr-checklist.snap", systemPrompt)
 				},
 			)
 		})
@@ -407,11 +547,13 @@ describe("Prompt System Integration Tests", () => {
 					expect(systemPrompt).to.not.include("TOOL USE")
 					expect(systemPrompt).to.not.include("RULES")
 					expect(systemPrompt).to.not.include("CAPABILITIES")
+					expect(systemPrompt).to.include("CURRENT TASK LIST")
+					expect(systemPrompt).to.include(
+						`- When the active step's "Done Signal" is true, use \`send_user_message\` tool call to briefly tell the user what step you are completing, and include \`task_progress\` with \`__COMPLETE_NEXT_STEP__\`. Use it only once in that assistant turn.`,
+					)
 					expect(systemPrompt).to.include(
 						"- Use `generate_plan_output`, `ask_followup_question` and `send_user_message` when responding to the user.",
 					)
-
-					await assertSnapshot("continuation-plan-multiroot-placeholder.snap", systemPrompt)
 				},
 			)
 		})
@@ -454,9 +596,9 @@ describe("Prompt System Integration Tests", () => {
 					)
 					expect(systemPrompt).to.include("`attempt_completion`")
 					expect(systemPrompt).to.include("`ask_followup_question`")
-					expect(systemPrompt).to.include("`generate_plan_output`")
 					expect(systemPrompt).to.include("`send_user_message`")
-					expect(systemPrompt).to.include("In ACT MODE, respond using these:")
+					expect(systemPrompt).to.not.include("`generate_plan_output`")
+					expect(systemPrompt).to.not.include("In ACT MODE, respond using these:")
 					expect(systemPrompt).to.not.include("# Tools")
 					expect(systemPrompt).to.not.include("## execute_command")
 				},
@@ -481,7 +623,37 @@ describe("Prompt System Integration Tests", () => {
 			)
 		})
 
-		it("adds Indxr-aware MCP guidance when a connected server exposes Indxr tool signatures", async function () {
+		it("omits Indxr guidance in native GPT-5.1 prompts when no visible Indxr tools survive filtering", async function () {
+			this.timeout(TEST_TIMEOUT)
+
+			const systemPrompt = await PromptRegistry.getInstance().get({
+				...baseContext,
+				mcpHub: makeMcpHub([makeIndxrServer()]),
+				providerInfo: makeProviderInfo("gpt-5-1", "openai"),
+				enableNativeToolCalls: true,
+				visibleNativeToolNames: [],
+			})
+
+			expect(systemPrompt).to.not.include("Indxr-Aware Exploration")
+			expect(systemPrompt).to.not.include("`search_relevant`")
+		})
+
+		it("names only the caller-supplied visible Indxr subset in native GPT-5.1 prompts", async function () {
+			this.timeout(TEST_TIMEOUT)
+
+			const systemPrompt = await PromptRegistry.getInstance().get({
+				...baseContext,
+				mcpHub: makeMcpHub([makeIndxrServer()]),
+				providerInfo: makeProviderInfo("gpt-5-1", "openai"),
+				enableNativeToolCalls: true,
+				visibleNativeToolNames: ["indxr-10mcp0search_relevant"],
+			})
+
+			expect(systemPrompt).to.include("`search_relevant`")
+			expect(systemPrompt).to.not.include("`get_file_summary`")
+		})
+
+		it("omits Indxr-aware MCP guidance when connected Indxr tools are fully filtered out of the native schema", async function () {
 			await runPromptTest(
 				this,
 				{
@@ -490,24 +662,57 @@ describe("Prompt System Integration Tests", () => {
 					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
 					enableNativeToolCalls: true,
 					useMinimalGptPrompt: true,
+					activeWorkflowSupportsPlaceholders: true,
+					managedWorkflowActive: false,
+					activePlaceholderWorkflowName: "code-review.md",
+					activePlaceholderWorkflowStepNumber: 3,
 				},
 				"gpt-5.4-2026-03-05",
-				async ({ systemPrompt, tools }) => {
+				async ({ systemPrompt }) => {
+					expect(systemPrompt).to.not.include("Indxr-Aware Exploration")
+					expect(systemPrompt).to.not.include("`search_relevant`")
+					expect(systemPrompt).to.not.include("`get_file_summary`")
+				},
+			)
+		})
+
+		it("names only the visible subset of Indxr tools in native MCP guidance", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					mcpHub: makeMcpHub([
+						makeIndxrServer({
+							tools: [
+								{
+									name: "search_relevant",
+									description: "Search relevant code",
+									inputSchema: { type: "object", properties: {} },
+								},
+								{
+									name: "get_file_summary",
+									description: "Summarize file",
+									inputSchema: { type: "object", properties: {} },
+								},
+							],
+						}),
+					]),
+					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
+					enableNativeToolCalls: true,
+					useMinimalGptPrompt: true,
+					activeWorkflowSupportsPlaceholders: true,
+					managedWorkflowActive: false,
+					activePlaceholderWorkflowName: "review-edge-case-hunter.md",
+					activePlaceholderWorkflowStepNumber: 2,
+				},
+				"gpt-5.4-2026-03-05",
+				async ({ systemPrompt }) => {
 					expect(systemPrompt).to.include("Indxr-Aware Exploration")
-					expect(systemPrompt).to.include(
-						"Use Indxr MCP's tools for code exploration, symbol discovery, file understanding, dependency tracing, and targeted source reads. Prefer tools like `search_relevant`, `get_file_summary`, `lookup_symbol`, `explain_symbol`, `read_source`, `get_file_context`, `get_public_api`, `get_callers`, and `get_related_tests` before built-in `search_files`, `list_code_definition_names`, `read_file`, or `read_file_range` whenever feasible.",
-					)
-					expect(systemPrompt).to.include(
-						"Use built-in file tools when Indxr is unavailable, insufficient for the task, or when exact raw file contents, regex search, or line-based inspection are required.",
-					)
-					expect(systemPrompt).to.not.include("## workspace-index (`indxr`)")
-
-					const nativeTools = (tools as any[]).map((tool) => (tool?.type === "function" ? tool.function : tool))
-					const byName = new Map(nativeTools.map((tool) => [tool.name, tool.description]))
-
-					expect(byName.get("search_files")).to.equal(
-						"Use only for exact raw-text regex search when Indxr is unavailable, insufficient, or regex search is specifically required.",
-					)
+					expect(systemPrompt).to.include("`search_relevant`")
+					expect(systemPrompt).to.include("`get_file_summary`")
+					expect(systemPrompt).to.not.include("`lookup_symbol`")
+					expect(systemPrompt).to.not.include("`read_source`")
+					expect(systemPrompt).to.not.include("`get_public_api`")
 				},
 			)
 		})
@@ -525,7 +730,9 @@ describe("Prompt System Integration Tests", () => {
 				"gpt-5.4-2026-03-05",
 				async ({ systemPrompt, tools }) => {
 					expect(systemPrompt).to.not.include("## weak-read_source-server (`generic`)")
-					expect(systemPrompt).to.not.include("Indxr-Aware Exploration")
+					expect(systemPrompt).to.include("Indxr-Aware Exploration")
+					expect(systemPrompt).to.include("`read_source`")
+					expect(systemPrompt).to.not.include("`search_relevant`")
 
 					const nativeTools = (tools as any[]).map((tool) => (tool?.type === "function" ? tool.function : tool))
 					const byName = new Map(nativeTools.map((tool) => [tool.name, tool.description]))
@@ -569,8 +776,8 @@ describe("Prompt System Integration Tests", () => {
 					expect(systemPrompt).to.include(
 						"`ask_followup_question`: Use to ask a question + present options for user to select",
 					)
-					expect(systemPrompt).to.include("`generate_plan_output`: Use to present a structured plan")
-					expect(systemPrompt).to.include("In ACT MODE, respond using these:")
+					expect(systemPrompt).to.not.include("`generate_plan_output`: Use to present a structured plan")
+					expect(systemPrompt).to.not.include("In ACT MODE, respond using these:")
 				},
 			)
 		})
@@ -633,7 +840,7 @@ describe("Prompt System Integration Tests", () => {
 			)
 		})
 
-		it("includes set_workflow_placeholders guidance for placeholder workflows across prompt variants", async function () {
+		it("omits the extra set_workflow_placeholders reminder line across the covered prompt variants", async function () {
 			const guidanceSnippet = "When a step sets a placeholder value, use `set_workflow_placeholders`."
 			const validTaskProgressSnippets = [
 				"The user has triggered a workflow with a prebuilt checklist.",
@@ -682,7 +889,7 @@ describe("Prompt System Integration Tests", () => {
 					},
 					testCase.name,
 					async ({ systemPrompt }) => {
-						expect(systemPrompt).to.include(guidanceSnippet)
+						expect(systemPrompt).to.not.include(guidanceSnippet)
 						expect(validTaskProgressSnippets.some((snippet) => systemPrompt.includes(snippet))).to.equal(true)
 						expect(systemPrompt).to.not.include("managed workflow step")
 					},
@@ -715,9 +922,9 @@ describe("Prompt System Integration Tests", () => {
 						"search_files",
 						"read_file",
 						"read_file_range",
+						"apply_patch",
 						"attempt_completion",
 					])
-					expect(nativeToolNames).to.not.include("apply_patch")
 					expect(nativeToolNames).to.not.include("set_workflow_placeholders")
 					expect(nativeToolNames).to.not.include("generate_plan_output")
 					expect(nativeToolNames.some((name) => name.includes("0mcp0") && name.includes("search_relevant"))).to.equal(

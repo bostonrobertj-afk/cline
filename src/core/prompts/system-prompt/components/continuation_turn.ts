@@ -1,7 +1,7 @@
 import { FocusChainPrompts } from "@/core/task/focus-chain/prompts"
 import { MULTI_ROOT_HINT } from "../constants"
 import type { PromptVariant, SystemPromptContext } from "../types"
-import { hasConnectedIndxrServer, INDXR_EXPLORATION_PREFERENCE_GUIDANCE } from "./mcp"
+import { getIndxrExplorationGuidance } from "./mcp"
 import { getCurrentModeResponseToolsLine } from "./response_tools"
 
 function renderChecklistForPrompt(checklist: string): string {
@@ -44,8 +44,9 @@ export async function getContinuationTurnSection(
 		lines.push(`- ${MULTI_ROOT_HINT.trim()}`)
 	}
 
-	if (hasConnectedIndxrServer(context)) {
-		lines.push(`- ${INDXR_EXPLORATION_PREFERENCE_GUIDANCE}`)
+	const indxrGuidance = getIndxrExplorationGuidance(context)
+	if (indxrGuidance) {
+		lines.push(`- ${indxrGuidance}`)
 	}
 
 	const checklist = context.currentFocusChainChecklist?.trim()

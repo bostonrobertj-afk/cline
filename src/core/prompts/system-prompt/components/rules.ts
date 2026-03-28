@@ -1,7 +1,7 @@
 import { SystemPromptSection } from "../templates/placeholders"
 import { TemplateEngine } from "../templates/TemplateEngine"
 import type { PromptVariant, SystemPromptContext } from "../types"
-import { getCodeExplorationGuidance, hasConnectedIndxrServer } from "./mcp"
+import { getCodeExplorationGuidance } from "./mcp"
 
 const BROWSER_RULES = `- The user may ask generic non-development tasks, such as "what\\'s the latest news" or "look up the weather in San Diego", in which case you might use the browser_action tool to complete the task if it makes sense to do so, rather than trying to create a website or using curl to answer the question. However, if an available MCP server tool or resource can be used instead, you should prefer to use it over browser_action.\n`
 
@@ -9,14 +9,17 @@ const BROWSER_WAIT_RULES = ` Then if you want to test your work, you might use b
 
 const CLI_RULES = `- After making code changes, consider running any available validation tools for the project (such as type checkers, linters, test suites, or build scripts) to catch errors, since you won't receive automatic diagnostics after edits.\n`
 
-const getRulesTemplateText = (context: SystemPromptContext) => `RULES
+const getRulesTemplateText = (context: SystemPromptContext) => {
+	const codeExplorationGuidance = getCodeExplorationGuidance(context, "")
+
+	return `RULES
 
 - Your current working directory is: {{CWD}}
 - You cannot \`cd\` into a different directory to complete a task. You are stuck operating from '{{CWD}}', so be sure to pass in the correct 'path' parameter when using tools that require a path.
 - Do not use the ~ character or $HOME to refer to the home directory.
 - Before using the execute_command tool, you must first think about the SYSTEM INFORMATION context provided to understand the user's environment and tailor your commands to ensure they are compatible with their system. You must also consider if the command you need to run should be executed in a specific directory outside of the current working directory '{{CWD}}', and if so prepend with \`cd\`'ing into that directory && then executing the command (as one command since you are stuck operating from '{{CWD}}'). For example, if you needed to run \`npm install\` in a project outside of '{{CWD}}', you would need to prepend with a \`cd\` i.e. pseudocode for this would be \`cd (path to project) && (command, in this case npm install)\`.
 - When using the search_files tool, craft your regex patterns carefully to balance specificity and flexibility. Based on the user's task you may use it to find code patterns, TODO comments, function definitions, or any text-based information across the project. The results include context, so analyze the surrounding code to better understand the matches. Leverage the search_files tool in combination with other tools for more comprehensive analysis. For example, use it to find specific code patterns, then use read_file to examine the full context of interesting matches before using replace_in_file to make informed changes.
-${hasConnectedIndxrServer(context) ? `- ${getCodeExplorationGuidance(context, "")}\n` : ""}- When creating a new project (such as an app, website, or any software project), organize all new files within a dedicated project directory unless the user specifies otherwise. Use appropriate file paths when creating files, as the write_to_file tool will automatically create any necessary directories. Structure the project logically, adhering to best practices for the specific type of project being created. Unless otherwise specified, new projects should be easily run without additional setup, for example most projects can be built in HTML, CSS, and JavaScript - which you can open in a browser.
+${codeExplorationGuidance ? `- ${codeExplorationGuidance}\n` : ""}- When creating a new project (such as an app, website, or any software project), organize all new files within a dedicated project directory unless the user specifies otherwise. Use appropriate file paths when creating files, as the write_to_file tool will automatically create any necessary directories. Structure the project logically, adhering to best practices for the specific type of project being created. Unless otherwise specified, new projects should be easily run without additional setup, for example most projects can be built in HTML, CSS, and JavaScript - which you can open in a browser.
 - Be sure to consider the type of project (e.g. Python, JavaScript, web application) when determining the appropriate structure and files to include. Also consider what files may be most relevant to accomplishing the task, for example looking at a project's manifest file would help you understand the project's dependencies, which you could incorporate into any code you write.
 - When making changes to code, always consider the context in which the code is being used. Ensure that your changes are compatible with the existing codebase and that they follow the project's coding standards and best practices.
 - When you want to modify a file, use the replace_in_file or write_to_file tool directly with the desired changes. You do not need to display the changes before using the tool.
@@ -40,6 +43,7 @@ ${hasConnectedIndxrServer(context) ? `- ${getCodeExplorationGuidance(context, ""
 - When using the replace_in_file tool, Do NOT add extra characters to the markers (e.g., ------- SEARCH> is INVALID). Do NOT forget to use the closing +++++++ REPLACE marker. Do NOT modify the marker format in any way. Malformed XML will cause complete tool failure and break the entire editing process.
 - It is critical you wait for the user's response after each tool use, in order to confirm the success of the tool use. For example, if asked to make a todo app, you would create a file, wait for the user's response it was created successfully, then create another file if needed, wait for the user's response it was created successfully, etc.{{BROWSER_WAIT_RULES}}
 - MCP operations should be used one at a time, similar to other tool usage. Wait for confirmation of success before proceeding with additional operations.`
+}
 
 export async function getRulesSection(variant: PromptVariant, context: SystemPromptContext): Promise<string> {
 	if (context.useMinimalGptPrompt === true) {

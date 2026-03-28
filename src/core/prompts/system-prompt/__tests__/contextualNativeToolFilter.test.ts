@@ -128,16 +128,15 @@ describe("filterContextualNativeToolSpecs", () => {
 			ClineDefaultTool.FILE_READ_RANGE,
 			ClineDefaultTool.BASH,
 			ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT,
+			ClineDefaultTool.APPLY_PATCH,
 			ClineDefaultTool.ASK,
 			ClineDefaultTool.SEND_USER_MESSAGE,
 			ClineDefaultTool.ATTEMPT,
 			ClineDefaultTool.BROWSER,
 			ClineDefaultTool.MCP_ACCESS,
-			ClineDefaultTool.MCP_DOCS,
 			ClineDefaultTool.NEW_TASK,
 		])
 		expect(keptIds).to.not.include(ClineDefaultTool.PLAN_MODE)
-		expect(keptIds).to.not.include(ClineDefaultTool.APPLY_PATCH)
 		expect(keptIds).to.not.include(ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS)
 		expect(keptIds).to.not.include(ClineDefaultTool.USE_SUBAGENTS)
 		expect(keptIds).to.not.include(ClineDefaultTool.WEB_SEARCH)
