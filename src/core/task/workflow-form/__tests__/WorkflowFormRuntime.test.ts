@@ -120,4 +120,28 @@ describe("WorkflowFormRuntime", () => {
 			})
 		}
 	})
+
+	it("reads the tool dictionary from the repo root even when process.cwd is not the repo", () => {
+		const originalCwd = process.cwd()
+
+		try {
+			process.chdir("/")
+			const runtimeWithDefaultReader = new WorkflowFormRuntime()
+			const session = runtimeWithDefaultReader.createSession({
+				resolverId: "code_review_step_3_diff_source",
+				triggerSource: "deterministic_workflow_progression",
+				owner: {
+					kind: "placeholder_workflow_step",
+					workflowName: "code-review.md",
+					stepNumber: 3,
+				},
+			})
+
+			const payload = runtimeWithDefaultReader.buildPayload(session)
+			expect(payload.title).to.equal("Prepare Diff Input")
+			expect(payload.toolDictionaryRelativePath).to.equal("docs/workflow-ui-surface/tool-dictionary.md")
+		} finally {
+			process.chdir(originalCwd)
+		}
+	})
 })

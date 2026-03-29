@@ -5,7 +5,7 @@ import {
 	type WorkflowFormSubmissionRequest,
 } from "@shared/proto/cline/task"
 import { randomUUID } from "crypto"
-import { readFileSync } from "fs"
+import { existsSync, readFileSync } from "fs"
 import path from "path"
 import type {
 	WorkflowFormResolverDefinition,
@@ -16,8 +16,23 @@ import type {
 } from "./types"
 import { workflowFormRegistry } from "./WorkflowFormRegistry"
 
+function resolveWorkflowFormAssetPath(relativePath: string): string {
+	const candidatePaths = [
+		path.resolve(__dirname, "..", "..", "..", "..", relativePath),
+		path.resolve(process.cwd(), relativePath),
+	]
+
+	for (const candidatePath of candidatePaths) {
+		if (existsSync(candidatePath)) {
+			return candidatePath
+		}
+	}
+
+	return candidatePaths[0]
+}
+
 function defaultReadToolDictionaryMarkdown(relativePath: string): string {
-	return readFileSync(path.resolve(process.cwd(), relativePath), "utf8")
+	return readFileSync(resolveWorkflowFormAssetPath(relativePath), "utf8")
 }
 
 function buildValuesFromSubmissions(fields: WorkflowFormFieldSubmission[]): WorkflowFormValues {
