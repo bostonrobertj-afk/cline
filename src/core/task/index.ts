@@ -1349,11 +1349,12 @@ export class Task {
 	): Promise<void> {
 		let checklist = this.taskState.currentFocusChainChecklist
 		if (!checklist && this.taskState.activePlaceholderWorkflowSource) {
-			checklist = await buildPlaceholderWorkflowChecklist({
-				source: this.taskState.activePlaceholderWorkflowSource,
-				stablePlaceholderValues: this.taskState.activePlaceholderWorkflowStableValues,
-				placeholderValues: this.taskState.activePlaceholderWorkflowValues,
-			})
+			checklist =
+				(await buildPlaceholderWorkflowChecklist({
+					source: this.taskState.activePlaceholderWorkflowSource,
+					stablePlaceholderValues: this.taskState.activePlaceholderWorkflowStableValues,
+					placeholderValues: this.taskState.activePlaceholderWorkflowValues,
+				})) ?? null
 			if (checklist) {
 				this.taskState.currentFocusChainChecklist = checklist
 			}
@@ -1471,37 +1472,44 @@ export class Task {
 				return
 			}
 
-			const outcome = this.pendingWorkflowFormOutcome
+			const resolvedOutcome = this.pendingWorkflowFormOutcome
 			this.pendingWorkflowFormOutcome = undefined
-			if (!outcome) {
+			if (!resolvedOutcome) {
 				continue
 			}
+			const outcome = resolvedOutcome as
+				| Extract<WorkflowFormRuntimeOutcome, { kind: "render_form" }>
+				| Extract<WorkflowFormRuntimeOutcome, { kind: "fallback_to_agent" }>
+				| Extract<WorkflowFormRuntimeOutcome, { kind: "invoke_tool" }>
 
-			if (outcome.kind === "render_form") {
-				continue
+			switch (outcome.kind) {
+				case "render_form":
+					continue
+				case "fallback_to_agent":
+					break
+				case "invoke_tool": {
+					const toolExecution = await this.executeWorkflowFormToolAndSync(outcome)
+					if (toolExecution.succeeded) {
+						const successPayload = this.workflowFormRuntime.buildSuccessPayload(
+							outcome.session,
+							"The Step 3 diff artifact is ready.",
+						)
+						await this.clearWorkflowFormSession()
+						await this.renderWorkflowFormMessage(successPayload)
+						break
+					}
+
+					this.taskState.activeWorkflowFormSession = {
+						...outcome.session,
+						phase: "retry_error",
+						lastError: toolExecution.errorMessage,
+					}
+					await this.persistWorkflowFormSession()
+					continue
+				}
 			}
 
-			if (outcome.kind === "fallback_to_agent") {
-				break
-			}
-
-			const toolExecution = await this.executeWorkflowFormToolAndSync(outcome)
-			if (toolExecution.succeeded) {
-				const successPayload = this.workflowFormRuntime.buildSuccessPayload(
-					outcome.session,
-					"The Step 3 diff artifact is ready.",
-				)
-				await this.clearWorkflowFormSession()
-				await this.renderWorkflowFormMessage(successPayload)
-				break
-			}
-
-			this.taskState.activeWorkflowFormSession = {
-				...outcome.session,
-				phase: "retry_error",
-				lastError: toolExecution.errorMessage,
-			}
-			await this.persistWorkflowFormSession()
+			break
 		}
 
 		this.setThreadDisplayState(ThreadDisplayStates.ACTIVE_RUN, "workflow_form_resolved", {

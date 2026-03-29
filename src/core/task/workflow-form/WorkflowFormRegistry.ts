@@ -18,9 +18,8 @@ function getStringValue(values: WorkflowFormValues, key: string): string | undef
 }
 
 function getStringArrayValue(values: WorkflowFormValues, key: string): string[] {
-	const rawValue = values[key]?.stringArrayValue ?? []
-	const normalized = Array.isArray(rawValue) ? rawValue : (rawValue.values ?? [])
-	return normalized.map((value) => value.trim()).filter(Boolean)
+	const normalized = values[key]?.stringArrayValue ?? []
+	return normalized.map((value: string) => value.trim()).filter(Boolean)
 }
 
 function getIntegerValue(values: WorkflowFormValues, key: string): number | undefined {
