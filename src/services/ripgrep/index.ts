@@ -65,7 +65,7 @@ async function execRipgrep(args: string[]): Promise<string> {
 		// cross-platform alternative to head, which is ripgrep author's recommendation for limiting output.
 		const rl = readline.createInterface({
 			input: rgProcess.stdout,
-			crlfDelay: Infinity, // treat \r\n as a single line break even if it's split across chunks. This ensures consistent behavior across different operating systems.
+			crlfDelay: Number.POSITIVE_INFINITY, // treat \r\n as a single line break even if it's split across chunks. This ensures consistent behavior across different operating systems.
 		})
 
 		let output = ""
@@ -161,7 +161,7 @@ export async function regexSearchFiles(
 const MAX_RIPGREP_MB = 0.25
 const MAX_BYTE_SIZE = MAX_RIPGREP_MB * 1024 * 1024 // 0./25MB in bytes
 
-function formatResults(results: SearchResult[], cwd: string): string {
+export function formatResults(results: SearchResult[], cwd: string): string {
 	const groupedResults: { [key: string]: SearchResult[] } = {}
 
 	let output = ""
@@ -200,17 +200,18 @@ function formatResults(results: SearchResult[], cwd: string): string {
 		for (let resultIndex = 0; resultIndex < fileResults.length; resultIndex++) {
 			const result = fileResults[resultIndex]
 			const allLines = [...result.beforeContext, result.match, ...result.afterContext]
+			const startingLineNumber = result.line - result.beforeContext.length
 
-			// Calculate bytes in all lines for this result
 			let resultBytes = 0
 			const resultLines: string[] = []
 
-			for (const line of allLines) {
+			for (let lineOffset = 0; lineOffset < allLines.length; lineOffset++) {
+				const line = allLines[lineOffset]
 				const trimmedLine = line?.trimEnd() ?? ""
-				const lineString = `│${trimmedLine}\n`
+				const lineNumber = startingLineNumber + lineOffset
+				const lineString = `│${lineNumber}│${trimmedLine}\n`
 				const lineBytes = Buffer.byteLength(lineString, "utf8")
 
-				// Check if adding this line would exceed the byte limit
 				if (byteSize + resultBytes + lineBytes >= MAX_BYTE_SIZE) {
 					wasLimitReached = true
 					break

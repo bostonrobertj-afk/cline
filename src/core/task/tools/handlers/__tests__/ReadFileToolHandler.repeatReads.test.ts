@@ -202,7 +202,24 @@ describe("ReadFileToolHandler repeat read behavior", () => {
 		assert.ok(!(result as string).includes(content))
 	})
 
-	it("does not store snapshot text for files above the size cap", async () => {
+	it("blocks full-file reads that exceed the bounded full-read limit", async () => {
+		const { config, taskState, validator } = createConfig()
+		const handler = new ReadFileToolHandler(validator)
+		const relPath = "too-large.ts"
+		const absolutePath = path.join(tmpDir, relPath)
+		const content = `${Array.from({ length: 301 }, (_, index) => `line ${index + 1}`).join("\n")}\n`
+		await fs.writeFile(absolutePath, content)
+
+		const result = await handler.execute(config, makeBlock(relPath))
+
+		assert.ok((result as string).includes("[Full file read blocked]"))
+		assert.ok((result as string).includes("300-line / 16384-byte full-read limit"))
+		assert.ok((result as string).includes("Use read_file_range with explicit 1-based start_line and end_line values"))
+		assert.ok(!(result as string).includes("line 301"))
+		assert.equal(taskState.fileReadCache.get(absolutePath.toLowerCase()), undefined)
+	})
+
+	it("blocks oversized full-file reads instead of caching them", async () => {
 		const { config, taskState, validator } = createConfig()
 		const handler = new ReadFileToolHandler(validator)
 		const relPath = "large-file.ts"
@@ -213,7 +230,8 @@ describe("ReadFileToolHandler repeat read behavior", () => {
 		const result = await handler.execute(config, makeBlock(relPath))
 		const cacheEntry = taskState.fileReadCache.get(absolutePath.toLowerCase())
 
-		assert.equal(result, content)
-		assert.equal(cacheEntry?.snapshotText, undefined)
+		assert.ok((result as string).includes("[Full file read blocked]"))
+		assert.ok((result as string).includes("300-line / 16384-byte full-read limit"))
+		assert.equal(cacheEntry, undefined)
 	})
 })

@@ -577,13 +577,13 @@ describe("native tool placeholder replacement", () => {
 			"Use only when Indxr is unavailable or insufficient and you specifically need a built-in top-level definition pass.",
 		)
 		expect(readTool.function.description).to.equal(
-			"Use Indxr first for discovery, summaries, symbol lookup, dependency tracing, and targeted source reads. Use read_file only when exact full raw file contents are required or Indxr is insufficient.",
+			"Use Indxr first for discovery, summaries, symbol lookup, dependency tracing, and targeted source reads. Use read_file only when exact full raw file contents are required for a file at or below 300 lines and 16384 bytes, or when Indxr is insufficient.",
 		)
 		expect(rangeTool.function.description).to.equal(
 			"Use only when exact raw line-based inspection is required after Indxr has already narrowed the target, or when Indxr is insufficient.",
 		)
 		expect(mcpTool.function.description).to.equal(
-			"Use a connected MCP tool. When Indxr is available, default to its exploration tools first for code exploration, symbol lookup, file understanding, dependency tracing, and targeted source reads before any built-in exploration tool.",
+			"Use a connected MCP tool. When Indxr is available, default to its exploration tools first for code exploration, symbol lookup, file understanding, dependency tracing, and targeted source reads. For large files, prefer symbol-targeted or explicit line-range source reads instead of full raw file reads.",
 		)
 	})
 

@@ -122,6 +122,7 @@ export class TaskState {
 			snapshotText?: string
 		}
 	> = new Map()
+	sourceReadWindowCache: Map<string, Array<{ startLine: number; endLine: number }>> = new Map()
 
 	// Error tracking
 	consecutiveMistakeCount = 0

@@ -9,6 +9,11 @@ import { showNotificationForApproval } from "../../utils"
 import type { IFullyManagedTool } from "../ToolExecutorCoordinator"
 import type { TaskConfig } from "../types/TaskConfig"
 import type { StronglyTypedUIHelpers } from "../types/UIHelpers"
+import {
+	evaluateFullSourceReadAllowance,
+	findTrackedSourceOverlap,
+	recordTrackedSourceWindow,
+} from "../utils/readFileContentUtils"
 import { ToolResultUtils } from "../utils/ToolResultUtils"
 
 export class UseMcpToolHandler implements IFullyManagedTool {
@@ -40,6 +45,59 @@ export class UseMcpToolHandler implements IFullyManagedTool {
 		} else {
 			await uiHelpers.removeLastPartialMessageIfExistsWithType("say", "use_mcp_server")
 			await uiHelpers.ask("use_mcp_server" as ClineAsk, partialMessage, block.partial).catch(() => {})
+		}
+	}
+
+	private hasExplicitReadSourceTarget(parsedArguments: Record<string, unknown> | undefined): boolean {
+		if (!parsedArguments) {
+			return false
+		}
+
+		const symbol = parsedArguments.symbol
+		const startLine = parsedArguments.start_line
+		const endLine = parsedArguments.end_line
+
+		return (
+			(typeof symbol === "string" && symbol.trim().length > 0) ||
+			((typeof startLine === "number" || typeof startLine === "string") &&
+				(typeof endLine === "number" || typeof endLine === "string"))
+		)
+	}
+
+	private normalizeReadSourcePayload(item: any):
+		| {
+				displayPath: string
+				source: string
+				startLine: number
+				endLine: number
+		  }
+		| undefined {
+		const resource = item?.resource
+		if (!resource || typeof resource !== "object") {
+			return undefined
+		}
+
+		const candidate = resource as Record<string, unknown>
+		const source = typeof candidate.source === "string" ? candidate.source : undefined
+		const rawStartLine = candidate.start_line
+		const rawEndLine = candidate.end_line
+		const startLine = typeof rawStartLine === "number" ? rawStartLine : Number(rawStartLine)
+		const endLine = typeof rawEndLine === "number" ? rawEndLine : Number(rawEndLine)
+		const displayPath =
+			(typeof candidate.path === "string" && candidate.path) ||
+			(typeof candidate.file_path === "string" && candidate.file_path) ||
+			(typeof candidate.uri === "string" && candidate.uri) ||
+			"(unknown path)"
+
+		if (!source || !Number.isFinite(startLine) || !Number.isFinite(endLine)) {
+			return undefined
+		}
+
+		return {
+			displayPath,
+			source,
+			startLine,
+			endLine,
 		}
 	}
 
@@ -128,18 +186,17 @@ export class UseMcpToolHandler implements IFullyManagedTool {
 					block.isNativeToolCall,
 				)
 				return formatResponse.toolDenied()
-			} else {
-				telemetryService.captureToolUsage(
-					config.ulid,
-					block.name,
-					config.api.getModel().id,
-					provider,
-					false,
-					true,
-					undefined,
-					block.isNativeToolCall,
-				)
 			}
+			telemetryService.captureToolUsage(
+				config.ulid,
+				block.name,
+				config.api.getModel().id,
+				provider,
+				false,
+				true,
+				undefined,
+				block.isNativeToolCall,
+			)
 		}
 
 		// Run PreToolUse hook after approval but before execution
@@ -188,7 +245,39 @@ export class UseMcpToolHandler implements IFullyManagedTool {
 							}
 							if (item.type === "resource") {
 								const { blob: _blob, ...rest } = item.resource
-								return JSON.stringify(rest, null, 2)
+								if (tool_name === "read_source") {
+									const normalized = this.normalizeReadSourcePayload(item)
+									if (!normalized) {
+										return JSON.stringify(rest)
+									}
+
+									const cacheKey = normalized.displayPath.toLowerCase()
+									const overlap = findTrackedSourceOverlap(
+										config.taskState.sourceReadWindowCache.get(cacheKey) ?? [],
+										normalized.startLine,
+										normalized.endLine,
+									)
+									if (overlap?.type === "contained") {
+										return `[MCP source already in context] '${normalized.displayPath}' lines ${normalized.startLine}-${normalized.endLine} are already covered by previously returned lines ${overlap.window.startLine}-${overlap.window.endLine} in this task. Reuse that earlier excerpt or request only novel lines.`
+									}
+
+									if (overlap?.type === "substantial") {
+										return `[MCP source overlap notice] '${normalized.displayPath}' lines ${normalized.startLine}-${normalized.endLine} substantially overlap previously returned lines ${overlap.window.startLine}-${overlap.window.endLine} in this task. Reissue read_source for only the novel subsection if you need more code.`
+									}
+
+									const allowance = evaluateFullSourceReadAllowance(normalized.source)
+									if (!this.hasExplicitReadSourceTarget(parsedArguments) && !allowance.allowed) {
+										return `[MCP full source read blocked] '${normalized.displayPath}' is ${allowance.totalLines} lines / ${allowance.totalBytes} bytes, which exceeds the 300-line / 16384-byte full-read limit. Reissue read_source with an explicit symbol or 1-based start_line/end_line range.`
+									}
+
+									recordTrackedSourceWindow(config.taskState.sourceReadWindowCache, cacheKey, {
+										startLine: normalized.startLine,
+										endLine: normalized.endLine,
+									})
+
+									return `[MCP source range ${normalized.startLine}-${normalized.endLine}] ${normalized.displayPath}\n${normalized.source}`
+								}
+								return JSON.stringify(rest)
 							}
 							return ""
 						})

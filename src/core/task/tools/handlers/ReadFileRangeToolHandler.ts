@@ -11,7 +11,7 @@ import type { IFullyManagedTool } from "../ToolExecutorCoordinator"
 import type { ToolValidator } from "../ToolValidator"
 import type { TaskConfig } from "../types/TaskConfig"
 import type { StronglyTypedUIHelpers } from "../types/UIHelpers"
-import { extractReadFileRange } from "../utils/readFileContentUtils"
+import { extractReadFileRange, findTrackedSourceOverlap, recordTrackedSourceWindow } from "../utils/readFileContentUtils"
 import { ToolResultUtils } from "../utils/ToolResultUtils"
 
 export class ReadFileRangeToolHandler implements IFullyManagedTool {
@@ -175,6 +175,21 @@ export class ReadFileRangeToolHandler implements IFullyManagedTool {
 		try {
 			const fileContent = await extractFileContent(absolutePath, supportsImages)
 			const range = extractReadFileRange(fileContent.text, startLine, endLine)
+			const cacheKey = absolutePath.toLowerCase()
+			const trackedWindows = config.taskState.sourceReadWindowCache.get(cacheKey) ?? []
+			const overlap = findTrackedSourceOverlap(trackedWindows, range.startLine, range.endLine)
+			if (overlap?.type === "contained") {
+				config.taskState.consecutiveMistakeCount = 0
+				return `[File range already in context] '${displayPath}' lines ${range.startLine}-${range.endLine} are already covered by previously returned lines ${overlap.window.startLine}-${overlap.window.endLine} in this task. Reuse that earlier excerpt or request only novel lines.`
+			}
+			if (overlap?.type === "substantial") {
+				config.taskState.consecutiveMistakeCount = 0
+				return `[File range overlap notice] '${displayPath}' lines ${range.startLine}-${range.endLine} substantially overlap previously returned lines ${overlap.window.startLine}-${overlap.window.endLine} in this task. Request only the novel subsection if you need more code.`
+			}
+			recordTrackedSourceWindow(config.taskState.sourceReadWindowCache, cacheKey, {
+				startLine: range.startLine,
+				endLine: range.endLine,
+			})
 			config.taskState.consecutiveMistakeCount = 0
 			await config.services.fileContextTracker.trackFileContext(relPath!, "read_tool")
 			if (fileContent.imageBlock) {

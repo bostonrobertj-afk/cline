@@ -12,11 +12,9 @@ RESPONSE TOOLS
 Use these tools to respond to the user. A reply reaches the human user only when you use the appropriate response tool.
 
 - `attempt_completion`: Use once at the end of each workflow
-- `send_user_message`: Use by default to send messages to the user
 - `ask_followup_question`: Use to ask a question + present options for user to select
-- `generate_plan_output`: Use to present a structured plan
-
-In ACT MODE, respond using these: `attempt_completion`, `ask_followup_question` and `send_user_message`. In PLAN MODE, respond using these: `generate_plan_output`, `ask_followup_question` and `send_user_message`.
+- `send_user_message`: Use by default to send messages to the user
+- If you hit a meaningful blocker, material ambiguity, or unstable behavior that affects correctness or progress, include `agent_feedback` on your response tool call with a concise description of the issue.
 
 ## TOOLS
 

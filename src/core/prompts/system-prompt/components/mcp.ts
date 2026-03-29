@@ -188,15 +188,15 @@ export function replacePromptPlaceholders(description: string, context: SystemPr
 		: "Results include human-friendly 1-based line numbers so you can target a later read_file or read_file_range call instead of loading large files blindly."
 
 	const readFileGuidance = hasConnectedIndxrServer(context)
-		? "When Indxr is available, use its tools first for discovery, summaries, symbol lookup, dependency tracing, and targeted source reads. Use read_file only when you need the exact full raw contents of a file or when Indxr is insufficient."
-		: "Prefer using search_files and list_code_definition_names first to narrow the target, then use read_file for the first full pass on a file. For follow-up checks on a focused region, prefer read_file_range instead of rereading the entire file."
+		? "When Indxr is available, use its tools first for discovery, summaries, symbol lookup, dependency tracing, and targeted source reads. Use read_file only when you need the exact full raw contents of a file that is at or below 300 lines and 16384 bytes, or when Indxr is insufficient."
+		: "Prefer using search_files and list_code_definition_names first to narrow the target, then use read_file_range for targeted inspection. Use read_file only when the file is at or below 300 lines and 16384 bytes and you truly need the exact full contents."
 
 	const readFileRangeGuidance = hasConnectedIndxrServer(context)
 		? "Use this only when you need exact raw line-based inspection after Indxr has already narrowed the target, or when Indxr is insufficient."
 		: "Use this after search_files or list_code_definition_names has already narrowed the problem to a focused region, or when you need a targeted refresher without replaying the entire file."
 
 	const useMcpToolGuidance = hasConnectedIndxrServer(context)
-		? ` When Indxr is available, default to its MCP tools first for code exploration, symbol lookup, file understanding, dependency tracing, and targeted source reads before using built-in \`search_files\`, \`list_code_definition_names\`, \`read_file\`, or \`read_file_range\`. Use built-in file tools only when exact raw file contents, regex search, or direct line inspection are required.`
+		? ` When Indxr is available, default to its MCP tools first for code exploration, symbol lookup, file understanding, dependency tracing, and targeted source reads before using built-in \`search_files\`, \`list_code_definition_names\`, \`read_file\`, or \`read_file_range\`. For large files, prefer symbol-targeted or explicit line-range reads instead of full raw source reads. Use built-in file tools only when exact raw file contents, regex search, or direct line inspection are required.`
 		: ""
 
 	return description

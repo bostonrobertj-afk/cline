@@ -131,6 +131,36 @@ describe("ReadFileRangeToolHandler", () => {
 		assert.ok(!(result as string).includes("one"))
 	})
 
+	it("returns a compact notice when the requested range is already fully in context", async () => {
+		const { config, taskState, validator } = createConfig()
+		const handler = new ReadFileRangeToolHandler(validator)
+		const relPath = "contained.ts"
+		const absolutePath = path.join(tmpDir, relPath)
+		await fs.writeFile(absolutePath, "one\ntwo\nthree\nfour\nfive\n")
+		taskState.sourceReadWindowCache.set(absolutePath.toLowerCase(), [{ startLine: 2, endLine: 4 }])
+
+		const result = await handler.execute(config, makeBlock({ path: relPath, start_line: "2", end_line: "3" }))
+
+		assert.ok((result as string).includes("[File range already in context]"))
+		assert.ok((result as string).includes("lines 2-3"))
+		assert.ok(!(result as string).includes("two\nthree"))
+	})
+
+	it("returns a compact notice for substantially overlapping ranges", async () => {
+		const { config, taskState, validator } = createConfig()
+		const handler = new ReadFileRangeToolHandler(validator)
+		const relPath = "overlap.ts"
+		const absolutePath = path.join(tmpDir, relPath)
+		await fs.writeFile(absolutePath, Array.from({ length: 20 }, (_, index) => `line ${index + 1}`).join("\n"))
+		taskState.sourceReadWindowCache.set(absolutePath.toLowerCase(), [{ startLine: 5, endLine: 14 }])
+
+		const result = await handler.execute(config, makeBlock({ path: relPath, start_line: "7", end_line: "15" }))
+
+		assert.ok((result as string).includes("[File range overlap notice]"))
+		assert.ok((result as string).includes("lines 7-15"))
+		assert.ok(!(result as string).includes("line 15"))
+	})
+
 	it("rejects invalid line ranges", async () => {
 		const { config, taskState, validator } = createConfig()
 		const handler = new ReadFileRangeToolHandler(validator)

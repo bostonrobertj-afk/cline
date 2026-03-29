@@ -477,7 +477,7 @@ function getNativeToolDescription(tool: ClineToolSpec, context: SystemPromptCont
 			return "Activate a skill by exact name when the request matches an available skill."
 		case "use_mcp_tool":
 			return hasConnectedIndxrServer(context)
-				? "Use a connected MCP tool. When Indxr is available, default to its exploration tools first for code exploration, symbol lookup, file understanding, dependency tracing, and targeted source reads before any built-in exploration tool."
+				? "Use a connected MCP tool. When Indxr is available, default to its exploration tools first for code exploration, symbol lookup, file understanding, dependency tracing, and targeted source reads. For large files, prefer symbol-targeted or explicit line-range source reads instead of full raw file reads."
 				: firstSentence(resolved)
 		case "search_files":
 			return hasConnectedIndxrServer(context)
@@ -489,7 +489,7 @@ function getNativeToolDescription(tool: ClineToolSpec, context: SystemPromptCont
 				: firstSentence(resolved)
 		case "read_file":
 			return hasConnectedIndxrServer(context)
-				? "Use Indxr first for discovery, summaries, symbol lookup, dependency tracing, and targeted source reads. Use read_file only when exact full raw file contents are required or Indxr is insufficient."
+				? "Use Indxr first for discovery, summaries, symbol lookup, dependency tracing, and targeted source reads. Use read_file only when exact full raw file contents are required for a file at or below 300 lines and 16384 bytes, or when Indxr is insufficient."
 				: firstSentence(resolved)
 		case "read_file_range":
 			return hasConnectedIndxrServer(context)

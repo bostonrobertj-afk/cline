@@ -9,11 +9,9 @@ RESPONSE TOOLS
 Use these tools to respond to the user. A reply reaches the human user only when you use the appropriate response tool.
 
 - `attempt_completion`: Use once at the end of each workflow
-- `send_user_message`: Use by default to send messages to the user
 - `ask_followup_question`: Use to ask a question + present options for user to select
-- `generate_plan_output`: Use to present a structured plan
-
-In ACT MODE, respond using these: `attempt_completion`, `ask_followup_question` and `send_user_message`. In PLAN MODE, respond using these: `generate_plan_output`, `ask_followup_question` and `send_user_message`.
+- `send_user_message`: Use by default to send messages to the user
+- If you hit a meaningful blocker, material ambiguity, or unstable behavior that affects correctness or progress, include `agent_feedback` on your response tool call with a concise description of the issue.
 
 # Tool Use Formatting
 
@@ -26,7 +24,7 @@ Description: Request to execute a CLI command on the system. Use this when you n
 Required params: command, requires_approval
 
 ## read_file
-Description: Request to read the contents of a file at the specified path. Prefer using search_files and list_code_definition_names first to narrow the target, then use read_file for the first full pass on a file. For follow-up checks on a focused region, prefer read_file_range instead of rereading the entire file. Automatically extracts raw text from PDF and DOCX files. Do NOT use this tool to list the contents of a directory.
+Description: Request to read the contents of a file at the specified path. Prefer using search_files and list_code_definition_names first to narrow the target, then use read_file_range for targeted inspection. Use read_file only when the file is at or below 300 lines and 16384 bytes and you truly need the exact full contents. Automatically extracts raw text from PDF and DOCX files. Do NOT use this tool to list the contents of a directory.
 Required params: path
 
 ## read_file_range
@@ -65,10 +63,6 @@ Required params: action
 Description: Request to use a tool provided by a connected MCP server. Each MCP server can provide multiple tools with different capabilities. Tools have defined input schemas that specify required and optional parameters.
 Required params: server_name, tool_name, arguments
 
-## access_mcp_resource
-Description: Request to access a resource provided by a connected MCP server. Resources represent data sources that can be used as context, such as files, API responses, or system information.
-Required params: server_name, uri
-
 ## ask_followup_question
 Description: Ask the user a concise question when clarification or a direct answer is needed. On success, this tool displays the question to the user, returns `[Message displayed.]`, and ends your current turn. The user's answer arrives on the following turn as normal human-authored input rather than same-turn tool output.
 Required params: question
@@ -87,10 +81,6 @@ Description: Respond to the user's inquiry in an effort to plan a solution to th
 If you are presenting a plan or other user-facing planning response, success displays the message to the user, returns `[Message displayed.]`, and ends your current turn. Any later user reply arrives on the following turn as normal human-authored input.
 However, if while writing your response you realize you actually need to do more exploration before providing a complete plan, you can add the optional needs_more_exploration parameter to indicate this. That branch is internal control flow rather than a governed user-facing response, so it does not use the shared response-tool turn-ending contract.
 Required params: response
-
-## load_mcp_documentation
-Description: Load documentation about creating MCP servers. This tool should be used when the user requests to create or install an MCP server (the user may ask you something along the lines of "add a tool" that does some function, in other words to create an MCP server that provides tools and resources that may connect to external APIs for example. You have the ability to create an MCP server and add it to a configuration file that will then expose the tools and resources for you to use with `use_mcp_tool` and `access_mcp_resource`). The documentation provides detailed information about the MCP server creation process, including setup instructions, best practices, and examples.
-Required params: none
 
 ## build_review_diff_output
 Description: Build and replace the stable review diff artifact at {diff_output} from an explicit Git-backed source. Use this for code-review workflow Step 3 when the diff source is a supported commit, commit range, ref diff, or HEAD-scoped worktree diff. Do not use set_workflow_placeholders for diff_output; it is stable in .cline/workflow-config.yaml.

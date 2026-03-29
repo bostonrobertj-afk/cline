@@ -13,7 +13,7 @@ import type { IFullyManagedTool } from "../ToolExecutorCoordinator"
 import type { ToolValidator } from "../ToolValidator"
 import type { TaskConfig } from "../types/TaskConfig"
 import type { StronglyTypedUIHelpers } from "../types/UIHelpers"
-import { buildReadFileDelta, createReadFileSnapshot } from "../utils/readFileContentUtils"
+import { buildReadFileDelta, createReadFileSnapshot, evaluateFullSourceReadAllowance } from "../utils/readFileContentUtils"
 import { ToolResultUtils } from "../utils/ToolResultUtils"
 
 export class ReadFileToolHandler implements IFullyManagedTool {
@@ -198,6 +198,14 @@ export class ReadFileToolHandler implements IFullyManagedTool {
 					return formatResponse.toolError(normalizedMessage)
 				}
 
+				if (!fileContent.imageBlock) {
+					const allowance = evaluateFullSourceReadAllowance(fileContent.text)
+					if (!allowance.allowed) {
+						config.taskState.consecutiveMistakeCount = 0
+						return `[Full file read blocked] '${displayPath}' is ${allowance.totalLines} lines / ${allowance.totalBytes} bytes, which exceeds the 300-line / 16384-byte full-read limit. Use read_file_range with explicit 1-based start_line and end_line values for the smallest relevant section.`
+					}
+				}
+
 				config.taskState.consecutiveMistakeCount = 0
 				await config.services.fileContextTracker.trackFileContext(relPath!, "read_tool")
 
@@ -243,6 +251,14 @@ export class ReadFileToolHandler implements IFullyManagedTool {
 				? errorMessage
 				: `Error reading file: ${errorMessage}`
 			return formatResponse.toolError(normalizedMessage)
+		}
+
+		if (!fileContent.imageBlock) {
+			const allowance = evaluateFullSourceReadAllowance(fileContent.text)
+			if (!allowance.allowed) {
+				config.taskState.consecutiveMistakeCount = 0
+				return `[Full file read blocked] '${displayPath}' is ${allowance.totalLines} lines / ${allowance.totalBytes} bytes, which exceeds the 300-line / 16384-byte full-read limit. Use read_file_range with explicit 1-based start_line and end_line values for the smallest relevant section.`
+			}
 		}
 
 		// Only reset mistake count after a successful read, so that repeated

@@ -38,9 +38,9 @@ interface OpenAiNativeHandlerOptions extends CommonApiHandlerOptions {
 	openAiNativeUseResponsesWebsocket?: boolean
 }
 
-const OPENAI_SERVER_SIDE_COMPACTION_MAX_THRESHOLD = 200_000
-const OPENAI_SERVER_SIDE_COMPACTION_MIN_THRESHOLD = 120_000
-const OPENAI_SERVER_SIDE_COMPACTION_RATIO = 0.7
+const OPENAI_SERVER_SIDE_COMPACTION_MAX_THRESHOLD = 120_000
+const OPENAI_SERVER_SIDE_COMPACTION_MIN_THRESHOLD = 80_000
+const OPENAI_SERVER_SIDE_COMPACTION_RATIO = 0.5
 
 export class OpenAiNativeHandler implements ApiHandler {
 	private options: OpenAiNativeHandlerOptions

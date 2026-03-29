@@ -32,7 +32,7 @@ describe("OpenAiNativeHandler", () => {
 
 		params.store.should.equal(true)
 		params.previous_response_id.should.equal("resp_123")
-		params.context_management.should.deepEqual([{ type: "compaction", compact_threshold: 200000 }])
+		params.context_management.should.deepEqual([{ type: "compaction", compact_threshold: 120000 }])
 	})
 
 	it("should add server-side compaction to native GPT-5 Responses requests with a scaled threshold", () => {
@@ -50,7 +50,7 @@ describe("OpenAiNativeHandler", () => {
 			store: true,
 		})
 
-		params.context_management.should.deepEqual([{ type: "compaction", compact_threshold: 200000 }])
+		params.context_management.should.deepEqual([{ type: "compaction", compact_threshold: 120000 }])
 	})
 
 	it("should honor configured reasoning summary for Responses requests", () => {
