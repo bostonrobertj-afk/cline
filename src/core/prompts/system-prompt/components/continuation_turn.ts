@@ -53,7 +53,11 @@ export async function getContinuationTurnSection(
 
 	const checklist = context.currentFocusChainChecklist?.trim()
 	if (checklist) {
-		lines.push("", "CURRENT TASK LIST", renderChecklistForPrompt(checklist), getFocusChainReminderLine(context))
+		if (!context.activePlaceholderWorkflowName) {
+			lines.push("", "CURRENT TASK LIST", renderChecklistForPrompt(checklist))
+		}
+
+		lines.push(getFocusChainReminderLine(context))
 	}
 
 	return lines.join("\n")

@@ -559,6 +559,8 @@ describe("Prompt System Integration Tests", () => {
 					isMultiRootEnabled: true,
 					currentFocusChainChecklist: "- Inspect task state\n- Apply patch",
 					activeWorkflowSupportsPlaceholders: true,
+					activePlaceholderWorkflowName: "code-review.md",
+					activePlaceholderWorkflowStepNumber: 1,
 					managedWorkflowActive: false,
 				},
 				"fast",
@@ -567,7 +569,9 @@ describe("Prompt System Integration Tests", () => {
 					expect(systemPrompt).to.not.include("TOOL USE")
 					expect(systemPrompt).to.not.include("RULES")
 					expect(systemPrompt).to.not.include("CAPABILITIES")
-					expect(systemPrompt).to.include("CURRENT TASK LIST")
+					expect(systemPrompt).to.not.include("CURRENT TASK LIST")
+					expect(systemPrompt).to.not.include("Inspect task state")
+					expect(systemPrompt).to.not.include("Apply patch")
 					expect(systemPrompt).to.include(
 						`- When the active step's "Done Signal" is true, use \`send_user_message\` tool call to briefly tell the user what step you are completing, and include \`task_progress\` with \`__COMPLETE_NEXT_STEP__\`. Use it only once in that assistant turn.`,
 					)
