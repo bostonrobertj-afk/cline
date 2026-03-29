@@ -23,6 +23,7 @@ describe("syncBundledBmadAssetsToWorkspace", () => {
 
 		await fs.mkdir(path.join(extensionDir, "_bmad", "_config"), { recursive: true })
 		await fs.mkdir(path.join(extensionDir, ".cline", "skills", "bmad-code-review"), { recursive: true })
+		await fs.mkdir(path.join(extensionDir, ".cline"), { recursive: true })
 		await fs.writeFile(
 			path.join(extensionDir, "_bmad", "_config", "managed-workflows.json"),
 			'{"version":"packaged"}',
@@ -33,13 +34,24 @@ describe("syncBundledBmadAssetsToWorkspace", () => {
 			"# packaged workflow\n",
 			"utf8",
 		)
+		await fs.writeFile(
+			path.join(extensionDir, ".cline", "workflow-config.yaml"),
+			'output_folder: "{project-root}/_bmad-output"\n',
+			"utf8",
+		)
 
 		await fs.mkdir(path.join(workspaceDir, "_bmad", "_config"), { recursive: true })
 		await fs.mkdir(path.join(workspaceDir, ".cline", "skills", "bmad-code-review"), { recursive: true })
+		await fs.mkdir(path.join(workspaceDir, ".cline"), { recursive: true })
 		await fs.writeFile(path.join(workspaceDir, "_bmad", "_config", "managed-workflows.json"), '{"version":"stale"}', "utf8")
 		await fs.writeFile(
 			path.join(workspaceDir, ".cline", "skills", "bmad-code-review", "workflow.md"),
 			"# stale workflow\n",
+			"utf8",
+		)
+		await fs.writeFile(
+			path.join(workspaceDir, ".cline", "workflow-config.yaml"),
+			'output_folder: "{project-root}/stale-output"\n',
 			"utf8",
 		)
 
@@ -51,6 +63,9 @@ describe("syncBundledBmadAssetsToWorkspace", () => {
 		expect(
 			await fs.readFile(path.join(workspaceDir, ".cline", "skills", "bmad-code-review", "workflow.md"), "utf8"),
 		).to.equal("# packaged workflow\n")
+		expect(await fs.readFile(path.join(workspaceDir, ".cline", "workflow-config.yaml"), "utf8")).to.equal(
+			'output_folder: "{project-root}/_bmad-output"\n',
+		)
 	})
 
 	it("does not create BMAD assets in unrelated workspaces", async () => {

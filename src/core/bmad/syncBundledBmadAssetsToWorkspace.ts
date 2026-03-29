@@ -3,7 +3,7 @@ import path from "path"
 import { Logger } from "@/shared/services/Logger"
 import { fileExistsAtPath } from "@/utils/fs"
 
-const BMAD_SOURCE_DIRECTORIES = ["_bmad", path.join(".cline", "skills")]
+const BMAD_SOURCE_PATHS = ["_bmad", path.join(".cline", "skills"), path.join(".cline", "workflow-config.yaml")]
 
 async function copyDirectoryContents(sourceDir: string, targetDir: string): Promise<void> {
 	await fs.mkdir(targetDir, { recursive: true })
@@ -25,6 +25,17 @@ async function copyDirectoryContents(sourceDir: string, targetDir: string): Prom
 	}
 }
 
+async function copyBundledAssetPath(sourcePath: string, targetPath: string): Promise<void> {
+	const stats = await fs.stat(sourcePath)
+	if (stats.isDirectory()) {
+		await copyDirectoryContents(sourcePath, targetPath)
+		return
+	}
+
+	await fs.mkdir(path.dirname(targetPath), { recursive: true })
+	await fs.copyFile(sourcePath, targetPath)
+}
+
 async function isBmadWorkspace(workspacePath: string): Promise<boolean> {
 	return (
 		(await fileExistsAtPath(path.join(workspacePath, "_bmad"))) ||
@@ -41,15 +52,15 @@ export async function syncBundledBmadAssetsToWorkspace(extensionPath: string, wo
 		return
 	}
 
-	for (const relativeDir of BMAD_SOURCE_DIRECTORIES) {
-		const sourceDir = path.join(extensionPath, relativeDir)
-		if (!(await fileExistsAtPath(sourceDir))) {
-			Logger.warn(`[BMAD Sync] Packaged asset directory missing, skipping: ${sourceDir}`)
+	for (const relativePath of BMAD_SOURCE_PATHS) {
+		const sourcePath = path.join(extensionPath, relativePath)
+		if (!(await fileExistsAtPath(sourcePath))) {
+			Logger.warn(`[BMAD Sync] Packaged asset path missing, skipping: ${sourcePath}`)
 			continue
 		}
 
-		const targetDir = path.join(workspacePath, relativeDir)
-		await copyDirectoryContents(sourceDir, targetDir)
-		Logger.log(`[BMAD Sync] Synchronized bundled assets from ${relativeDir} into workspace`)
+		const targetPath = path.join(workspacePath, relativePath)
+		await copyBundledAssetPath(sourcePath, targetPath)
+		Logger.log(`[BMAD Sync] Synchronized bundled assets from ${relativePath} into workspace`)
 	}
 }
