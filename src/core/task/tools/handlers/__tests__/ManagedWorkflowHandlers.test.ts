@@ -890,7 +890,10 @@ describe("Managed workflow handlers", () => {
 			} as any)
 
 			expect(String(result)).to.contain('# Workflow "local-review.md" is now active')
-			expect(String(result)).to.contain("Inspect the staged diff.")
+			expect(String(result)).to.contain(
+				"The workflow started successfully. Use the current checklist and current workflow step details to continue.",
+			)
+			expect(String(result)).to.not.contain("Inspect the staged diff.")
 			expect(config.taskState.activeWorkflowId).to.equal(undefined)
 			expect(config.taskState.activePlaceholderWorkflowId).to.equal("local-review.md")
 			expect(config.taskState.activePlaceholderWorkflowSource).to.include({
@@ -1075,7 +1078,10 @@ Inspect the prepared review input and write findings.`,
 				partial: false,
 			} as any)
 
-			expect(String(result)).to.contain("Respond in English from .cline/workflow-config.yaml.")
+			expect(String(result)).to.contain(
+				"The workflow started successfully. Use the current checklist and current workflow step details to continue.",
+			)
+			expect(String(result)).to.not.contain("Respond in English from .cline/workflow-config.yaml.")
 			expect(config.taskState.activePlaceholderWorkflowSource).to.deep.equal({
 				type: "local",
 				name: "custom-review.md",
@@ -1131,7 +1137,10 @@ Inspect the prepared review input and write findings.`,
 			} as any)
 
 			expect(String(result)).to.contain('# Workflow "global-review.md" is now active')
-			expect(String(result)).to.contain("Review the release notes.")
+			expect(String(result)).to.contain(
+				"The workflow started successfully. Use the current checklist and current workflow step details to continue.",
+			)
+			expect(String(result)).to.not.contain("Review the release notes.")
 			expect(config.taskState.activeWorkflowId).to.equal(undefined)
 			expect(config.taskState.activePlaceholderWorkflowId).to.equal("global-review.md")
 			expect(config.taskState.activePlaceholderWorkflowSource).to.deep.equal({
@@ -1210,7 +1219,10 @@ Inspect the prepared review input and write findings.`,
 				partial: false,
 			} as any)
 
-			expect(String(result)).to.contain("Review 1.2 before continuing.")
+			expect(String(result)).to.contain(
+				"The workflow started successfully. Use the current checklist and current workflow step details to continue.",
+			)
+			expect(String(result)).to.not.contain("Review 1.2 before continuing.")
 			expect(String(result)).to.not.contain("{{story_id}}")
 			expect(config.taskState.activePlaceholderWorkflowStableValues).to.include({
 				story_id: "1.0",
@@ -1261,7 +1273,10 @@ Inspect the prepared review input and write findings.`,
 			} as any)
 
 			expect(String(result)).to.contain('# Workflow "remote-review" is now active')
-			expect(String(result)).to.contain("Check the config.")
+			expect(String(result)).to.contain(
+				"The workflow started successfully. Use the current checklist and current workflow step details to continue.",
+			)
+			expect(String(result)).to.not.contain("Check the config.")
 			expect(config.taskState.activeWorkflowId).to.equal(undefined)
 			expect(config.taskState.activePlaceholderWorkflowId).to.equal("remote-review")
 			expect(config.taskState.activePlaceholderWorkflowSource).to.deep.equal({
@@ -1343,6 +1358,9 @@ Inspect the prepared review input and write findings.`,
 			} as any)
 
 			expect(String(result)).to.contain('# Workflow "code-review" is now active')
+			expect(String(result)).to.contain(
+				"The workflow started successfully. Use the current checklist and current workflow step details to continue.",
+			)
 			expect(config.taskState.activeAgentId).to.equal("bmad-dev")
 			expect(config.taskState.activeAgentSkillName).to.equal("bmad-dev")
 			expect(config.taskState.activeAgentInvokedSlashCommand).to.equal("code-review")

@@ -157,9 +157,8 @@ function collectTextValues(value: unknown): string[] {
 }
 
 describe("Task.loadContext placeholder workflow focus chain prompting", () => {
-	it("returns environment details and placeholder-workflow guidance as prompt injection blocks when full prompt assembly is required", async () => {
+	it("returns environment details and focus-chain workflow guidance as prompt injection blocks when full prompt assembly is required", async () => {
 		const fakeTask = createFakeTask(0)
-		fakeTask.buildPlaceholderWorkflowActivationInstructions.resolves("ACTIVATION: placeholder workflow just started")
 		const userContent = [
 			{
 				type: "tool_result",
@@ -182,10 +181,8 @@ describe("Task.loadContext placeholder workflow focus chain prompting", () => {
 		expect(userText).to.not.contain("ENVIRONMENT: reduced")
 		expect(userText).to.not.contain("### Reminder:")
 		expect(userText).to.not.contain("# CURRENT WORKFLOW STEP")
-		expect(userText).to.not.contain("ACTIVATION: placeholder workflow just started")
 
 		expect(promptInjectionText).to.contain("ENVIRONMENT: reduced")
-		expect(promptInjectionText).to.contain("ACTIVATION: placeholder workflow just started")
 		expect(promptInjectionText).to.contain("### Reminder:")
 		expect(promptInjectionText).to.contain("Current Progress: 0/2 items completed")
 		expect(promptInjectionText).to.contain("- [ ] Step 1: Determine Review Source")

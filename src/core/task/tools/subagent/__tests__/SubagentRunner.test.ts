@@ -1224,8 +1224,9 @@ describe("SubagentRunner", () => {
 		assert.doesNotMatch(initialTexts, /Edge case review instructions/)
 		assert.doesNotMatch(initialTexts, /# task_progress RECOMMENDED/)
 		const systemPrompt = createMessage.firstCall.args[0] as string
-		assert.match(systemPrompt, /<explicit_instructions type="review-edge-case-hunter">/)
-		assert.match(systemPrompt, /Edge case review instructions/)
+		assert.doesNotMatch(systemPrompt, /<explicit_instructions type="review-edge-case-hunter">/)
+		assert.doesNotMatch(systemPrompt, /Edge case review instructions/)
+		assert.doesNotMatch(systemPrompt, /Inspect the provided bundle\./)
 		assert.match(systemPrompt, /# task_progress RECOMMENDED/)
 	})
 
@@ -1304,9 +1305,11 @@ Review the changed implementation for edge cases.`,
 		assert.doesNotMatch(initialTexts, /# CURRENT WORKFLOW STEP/)
 
 		const firstSystemPrompt = createMessage.firstCall.args[0] as string
-		assert.match(firstSystemPrompt, /<explicit_instructions type="review-edge-case-hunter">/)
+		assert.doesNotMatch(firstSystemPrompt, /<explicit_instructions type="review-edge-case-hunter">/)
 		assert.match(firstSystemPrompt, /### Reminder:/)
 		assert.match(firstSystemPrompt, /# CURRENT WORKFLOW STEP/)
+		assert.match(firstSystemPrompt, /Inspect the provided bundle before running tools\./)
+		assert.doesNotMatch(firstSystemPrompt, /Review the changed implementation for edge cases\./)
 		assert.doesNotMatch(firstSystemPrompt, /CONTINUATION TURN/)
 
 		const secondConversation = createMessage.secondCall.args[1] as Array<{
@@ -1487,9 +1490,11 @@ Review the changed implementation for edge cases.`,
 		assert.doesNotMatch(initialTexts, /<explicit_instructions type="review-edge-case-hunter">/)
 
 		const firstSystemPrompt = createMessage.firstCall.args[0] as string
-		assert.match(firstSystemPrompt, /<explicit_instructions type="review-edge-case-hunter">/)
+		assert.doesNotMatch(firstSystemPrompt, /<explicit_instructions type="review-edge-case-hunter">/)
 		assert.match(firstSystemPrompt, /^### Reminder:/m)
 		assert.match(firstSystemPrompt, /# CURRENT WORKFLOW STEP/)
+		assert.match(firstSystemPrompt, /Inspect the provided bundle before running tools\./)
+		assert.doesNotMatch(firstSystemPrompt, /Review the changed implementation for edge cases\./)
 
 		const secondConversation = createMessage.secondCall.args[1] as Array<{
 			role: string

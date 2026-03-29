@@ -157,11 +157,7 @@ import { extractProviderDomainFromUrl, updateApiReqMsg } from "./utils"
 import { buildUserFeedbackContent } from "./utils/buildUserFeedbackContent"
 import { buildUserMessageContent } from "./utils/buildUserMessageContent"
 import { hasExplicitMentionSyntax, hasUserContentTag } from "./utils/userContentProcessing"
-import {
-	activateManagedWorkflowInTaskState,
-	activatePlaceholderWorkflowInTaskState,
-	buildActivePlaceholderWorkflowActivationInstructions,
-} from "./workflow-activation"
+import { activateManagedWorkflowInTaskState, activatePlaceholderWorkflowInTaskState } from "./workflow-activation"
 import type { WorkflowFormRuntimeOutcome, WorkflowFormSessionState } from "./workflow-form/types"
 
 export type ToolResponse = ClineToolResponseContent
@@ -1840,13 +1836,9 @@ export class Task {
 	}
 
 	private async buildPlaceholderWorkflowActivationInstructions(
-		action?: PersistentSlashCommandAction,
+		_action?: PersistentSlashCommandAction,
 	): Promise<string | undefined> {
-		if (action?.type !== "activate_placeholder_workflow" || !this.taskState.activePlaceholderWorkflowSource) {
-			return undefined
-		}
-
-		return await buildActivePlaceholderWorkflowActivationInstructions(this.taskState)
+		return undefined
 	}
 
 	private async buildPromptSkillScope(enabledSkills: SkillMetadata[]): Promise<SkillMetadata[]> {
@@ -4763,16 +4755,7 @@ export class Task {
 		this.currentRequestHasHumanAuthoredInput = requestHasHumanAuthoredInput
 		const shouldSendFullPromptAssembly = this.shouldSendFullPromptAssemblyForCurrentTurn(requestHasHumanAuthoredInput)
 		this.currentRequestShouldSendFullPromptAssembly = shouldSendFullPromptAssembly
-		const placeholderWorkflowActivationInstructions =
-			await this.buildPlaceholderWorkflowActivationInstructions(persistentSlashCommandAction)
-		const placeholderActivationInstructionsAppended =
-			shouldSendFullPromptAssembly && !!placeholderWorkflowActivationInstructions?.trim()
-		if (shouldSendFullPromptAssembly && placeholderWorkflowActivationInstructions?.trim()) {
-			promptInjectionBlocks.push({
-				type: "text",
-				text: placeholderWorkflowActivationInstructions,
-			})
-		}
+		const placeholderActivationInstructionsAppended = false
 
 		logFocusChainDiagnosticEvent(this.taskId, "load_context_snapshot", {
 			providerId: providerInfo.providerId,

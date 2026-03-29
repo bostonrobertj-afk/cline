@@ -316,8 +316,7 @@ Respond in {communication_language} from {config_source}. Write artifacts to {ou
 				workflowSource: fakeTask.taskState.activePlaceholderWorkflowSource!,
 			})
 
-			expect(prompt).to.contain("Respond in English from .cline/workflow-config.yaml. Write artifacts to")
-			expect(prompt).to.contain(`${tempDir}/workflow-output`)
+			expect(prompt).to.equal(undefined)
 			const [, savedMetadata] = saveMetadataStub.firstCall.args
 			expect(savedMetadata.activePlaceholderWorkflowStableValues).to.include({
 				communication_language: "English",
@@ -400,11 +399,7 @@ Done Signal: You've persisted a new \`review-input.diff\` file in {output_folder
 				workflowSource: fakeTask.taskState.activePlaceholderWorkflowSource,
 			})
 
-			expect(prompt).to.contain("build_review_diff_output")
-			expect(prompt.includes("{diff_output}") || prompt.includes(`${tempDir}/workflow-output/review-input.diff`)).to.equal(
-				true,
-			)
-			expect(prompt).to.not.contain("Set `{diff_output}` to that artifact path using the `set_workflow_placeholders` tool")
+			expect(prompt).to.equal(undefined)
 		} finally {
 			sandbox.restore()
 			await fs.rm(tempDir, { recursive: true, force: true })
@@ -585,9 +580,7 @@ Review {{story_id}} before asking follow-up questions.
 			workflowSource: fakeTask.taskState.activePlaceholderWorkflowSource!,
 		})
 
-		expect(prompt).to.contain('<explicit_instructions type="remote-review">')
-		expect(prompt).to.contain("Review 1.2 before asking follow-up questions.")
-		expect(prompt).to.not.contain("{{story_id}}")
+		expect(prompt).to.equal(undefined)
 	})
 
 	it("lets dynamic placeholder values override stable values in activation instructions", async () => {
@@ -616,7 +609,6 @@ Review {{story_id}} in {communication_language}.
 			workflowSource: fakeTask.taskState.activePlaceholderWorkflowSource!,
 		})
 
-		expect(prompt).to.contain("Review 1.2 in English.")
-		expect(prompt).to.not.contain("{{story_id}}")
+		expect(prompt).to.equal(undefined)
 	})
 })

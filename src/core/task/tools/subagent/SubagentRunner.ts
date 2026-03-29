@@ -24,11 +24,7 @@ import {
 	shouldUseContinuationTurnPrompt,
 } from "@core/task/prompt-refresh"
 import { StreamResponseHandler } from "@core/task/StreamResponseHandler"
-import {
-	activateManagedWorkflowInTaskState,
-	activatePlaceholderWorkflowInTaskState,
-	buildActivePlaceholderWorkflowActivationInstructions,
-} from "@core/task/workflow-activation"
+import { activateManagedWorkflowInTaskState, activatePlaceholderWorkflowInTaskState } from "@core/task/workflow-activation"
 import { resolveActivePlaceholderWorkflowPromptContext } from "@core/workflows/placeholder-workflow-step-details"
 import {
 	createWorkflowSkillMetadata,
@@ -1089,13 +1085,6 @@ export class SubagentRunner {
 		shouldSendFullPromptAssembly: boolean,
 	): Promise<ClineTextContentBlock[]> {
 		const additions: ClineTextContentBlock[] = []
-
-		if (shouldSendFullPromptAssembly && state.activeWorkflowJustStarted && state.activePlaceholderWorkflowSource) {
-			const activationInstructions = await buildActivePlaceholderWorkflowActivationInstructions(state)
-			if (activationInstructions?.trim()) {
-				additions.push(toTextContentBlock(activationInstructions))
-			}
-		}
 
 		const focusChainManager = this.getOrCreateSubagentFocusChainManager(state)
 		if (focusChainManager.shouldIncludeFocusChainInstructions()) {

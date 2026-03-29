@@ -206,10 +206,9 @@ export class UseSkillToolHandler implements IToolHandler, IPartialBlockHandler {
 
 				return `# Workflow "${resolvedWorkflow.name}" is now active
 
-${activation.renderedWorkflowContents}
+The workflow started successfully. Use the current checklist and current workflow step details to continue.${locationHint}
 
----
-IMPORTANT: The workflow is now loaded. Do NOT call use_skill again for this task unless a later step explicitly requires a different workflow.${locationHint}`
+IMPORTANT: The workflow is now loaded. Do NOT call use_skill again for this task unless a later step explicitly requires a different workflow.`
 			} catch (error) {
 				return `Error loading workflow "${skillName}": ${(error as Error)?.message}`
 			}
