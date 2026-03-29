@@ -604,10 +604,6 @@ export class Task {
 	}
 
 	private getThreadDisplayStateForAsk(type: ClineAsk): ThreadDisplayState {
-		if (type === "completion_result") {
-			return ThreadDisplayStates.COMPLETED
-		}
-
 		return ThreadDisplayStates.AWAITING_USER_RESPONSE
 	}
 

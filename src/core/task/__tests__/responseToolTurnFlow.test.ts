@@ -17,30 +17,6 @@ import {
 import { TaskState } from "../TaskState"
 
 describe("response tool turn flow", () => {
-	it("converts attempt_completion follow-up into normal next-turn user content", async () => {
-		const taskState = new TaskState()
-		taskState.setPendingResponseToolFollowup({
-			toolName: ClineDefaultTool.ATTEMPT,
-			route: "normal_user_turn",
-			text: "Please tighten the summary.",
-			hookContext: "post-completion feedback",
-		})
-
-		const result = await consumeDeferredResponseToolUserContent(taskState)
-
-		assert.deepEqual(result, [
-			{
-				type: "text",
-				text: formatResponse.normalNextTurnDialogue("user_message", "Please tighten the summary."),
-			},
-			{
-				type: "text",
-				text: '<hook_context source="UserPromptSubmit">\npost-completion feedback\n</hook_context>',
-			},
-		])
-		assert.equal(taskState.pendingResponseToolFollowup, undefined)
-	})
-
 	it("formats synthesized normal next-turn content without nesting latest-human-input markers", async () => {
 		const taskState = new TaskState()
 		taskState.setPendingResponseToolFollowup({

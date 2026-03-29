@@ -100,15 +100,8 @@ describe("AttemptCompletionHandler post-completion follow-up", () => {
 		sinon.restore()
 	})
 
-	it("stores post-completion user input as deferred normal user turn content", async () => {
+	it("finalizes attempt_completion without opening a post-completion ask", async () => {
 		const { config, callbacks, taskState } = createConfig()
-		;(callbacks.ask as sinon.SinonStub).resolves({
-			response: "messageResponse",
-			text: "one more change",
-		})
-		;(callbacks.runUserPromptSubmitHook as sinon.SinonStub).resolves({
-			contextModification: "hook context",
-		})
 
 		const handler = new AttemptCompletionHandler()
 		const result = await handler.execute(config, {
@@ -122,26 +115,17 @@ describe("AttemptCompletionHandler post-completion follow-up", () => {
 
 		assert.equal(result, RESPONSE_TOOL_SUCCESS_MESSAGE)
 		sinon.assert.calledOnce(callbacks.clearPartialResponseToolPreview)
-		sinon.assert.calledWithExactly(callbacks.say, "user_feedback", "one more change", undefined, undefined)
-		sinon.assert.calledOnce(callbacks.runUserPromptSubmitHook)
+		sinon.assert.calledOnceWithExactly(callbacks.say, "completion_result", "done", undefined, undefined, false)
+		sinon.assert.notCalled(callbacks.ask)
+		sinon.assert.notCalled(callbacks.runUserPromptSubmitHook)
+		assert.equal(taskState.pendingResponseToolFollowup, undefined)
 		assert.equal(taskState.didAttemptCompletionEndTask, true)
 		assert.equal(taskState.responseToolTurnShouldEnd, true)
 		assert.equal(taskState.responseToolTurnCompletedBy, ClineDefaultTool.ATTEMPT)
-		assert.deepEqual(taskState.pendingResponseToolFollowup, {
-			toolName: ClineDefaultTool.ATTEMPT,
-			route: "normal_user_turn",
-			text: "one more change",
-			images: undefined,
-			files: undefined,
-			hookContext: "hook context",
-		})
 	})
 
 	it("runs attempt_completion commands without opening blocking command_output asks", async () => {
 		const { config, callbacks } = createConfig({ autoApproveCommand: true })
-		;(callbacks.ask as sinon.SinonStub).resolves({
-			response: "yesButtonClicked",
-		})
 
 		const handler = new AttemptCompletionHandler()
 		await handler.execute(config, {
@@ -194,9 +178,6 @@ describe("AttemptCompletionHandler post-completion follow-up", () => {
 		sinon.stub(disk, "appendAgentFeedbackAuditEntry").resolves()
 		sinon.stub(Logger, "info")
 		const { config, callbacks } = createConfig()
-		;(callbacks.ask as sinon.SinonStub).resolves({
-			response: "yesButtonClicked",
-		})
 
 		const handler = new AttemptCompletionHandler()
 		const result = await handler.execute(config, {

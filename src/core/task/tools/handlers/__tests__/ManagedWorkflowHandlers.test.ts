@@ -208,8 +208,7 @@ describe("Managed workflow handlers", () => {
 		expect(config.taskState.responseToolTurnShouldEnd).to.equal(true)
 		expect(config.taskState.responseToolTurnCompletedBy).to.equal("attempt_completion")
 		expect((config.callbacks.say as sinon.SinonStub).calledWith("completion_result", "done")).to.equal(true)
-		expect((config.callbacks.ask as sinon.SinonStub).calledOnce).to.equal(true)
-		expect((config.callbacks.ask as sinon.SinonStub).calledWith("completion_result", "", false)).to.equal(true)
+		expect((config.callbacks.ask as sinon.SinonStub).notCalled).to.equal(true)
 	})
 
 	it("ends the task cleanly for managed workflow completion even when attempt_completion includes a command", async () => {
@@ -241,8 +240,7 @@ describe("Managed workflow handlers", () => {
 				suppressBlockingAsk: true,
 			}),
 		).to.equal(true)
-		expect((config.callbacks.ask as sinon.SinonStub).calledOnce).to.equal(true)
-		expect((config.callbacks.ask as sinon.SinonStub).calledWith("completion_result", "", false)).to.equal(true)
+		expect((config.callbacks.ask as sinon.SinonStub).notCalled).to.equal(true)
 	})
 
 	it("persists managed workflow item completion to task metadata", async () => {

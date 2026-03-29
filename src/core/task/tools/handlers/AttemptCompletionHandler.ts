@@ -11,7 +11,6 @@ import { ClineDefaultTool } from "@shared/tools"
 import type { ToolResponse } from "../../index"
 import { listIncompleteManagedWorkflowItems } from "../../managed-workflows/ManagedWorkflowRenderer"
 import { showNotificationForApproval } from "../../utils"
-import { buildUserFeedbackContent } from "../../utils/buildUserFeedbackContent"
 import { emitAgentFeedback, readAgentFeedbackMessage } from "../response/agent-feedback"
 import { ResponseToolRuntime } from "../response/ResponseToolRuntime"
 import type { IPartialBlockHandler, IToolHandler } from "../ToolExecutorCoordinator"
@@ -238,45 +237,6 @@ export class AttemptCompletionHandler implements IToolHandler, IPartialBlockHand
 			message: result,
 			waitingForUserInput: false,
 		})
-
-		const {
-			response,
-			text,
-			images,
-			files: completionFiles,
-		} = await responseToolRuntime.askForResponse(config, this.name, "completion_result", "")
-		if (response === "yesButtonClicked") {
-			return responseToolRuntime.finalizeSuccess(config, this.name)
-		}
-
-		const hasPostCompletionReply = !!(
-			(text && text.trim().length > 0) ||
-			(images && images.length > 0) ||
-			(completionFiles && completionFiles.length > 0)
-		)
-		if (hasPostCompletionReply) {
-			await config.callbacks.say("user_feedback", text ?? "", images, completionFiles)
-		}
-
-		// Run UserPromptSubmit hook when user provides post-completion feedback
-		if (hasPostCompletionReply) {
-			const userContentForHook = await buildUserFeedbackContent(text, images, completionFiles)
-
-			const hookResult = await config.callbacks.runUserPromptSubmitHook(userContentForHook, "feedback")
-
-			if (hookResult.cancel === true) {
-				return formatResponse.toolDenied()
-			}
-
-			responseToolRuntime.queueFollowup(config, {
-				toolName: this.name,
-				route: "normal_user_turn",
-				text,
-				images,
-				files: completionFiles,
-				hookContext: hookResult.contextModification,
-			})
-		}
 
 		return responseToolRuntime.finalizeSuccess(config, this.name)
 	}
