@@ -975,7 +975,7 @@ export class SubagentRunner {
 			placeholderValues: params.state.activePlaceholderWorkflowValues,
 		})
 		const activeDeterministicPlaceholderWorkflowEnabled = isDeterministicPlaceholderWorkflowSupported(
-			activePlaceholderWorkflowPromptContext.activePlaceholderWorkflowName,
+			params.state.activePlaceholderWorkflowSource?.name,
 		)
 
 		return {

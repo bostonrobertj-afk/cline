@@ -248,9 +248,13 @@ export class FocusChainManager {
 			// Parse the current list for counts/stats
 			const { totalItems, completedItems } = parseFocusChainListCounts(this.taskState.currentFocusChainChecklist)
 			const percentComplete = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0
+			const activeDeterministicPlaceholderWorkflowEnabled = isDeterministicPlaceholderWorkflowSupported(
+				this.taskState.activePlaceholderWorkflowSource?.name,
+			)
 
-			const introUpdateRequired =
-				"### Reminder: Detailed instructions are shown for the first incomplete checklist item. Keep `task_progress` moving so the active step and its details stay in sync."
+			const introUpdateRequired = activeDeterministicPlaceholderWorkflowEnabled
+				? "### Reminder: Detailed instructions are shown for the first incomplete checklist item. This turn could not resolve the current deterministic workflow step details, so do not advance the checklist manually. Continue the current step work and wait for the next step's details to be shown automatically."
+				: "### Reminder: Detailed instructions are shown for the first incomplete checklist item. Keep `task_progress` moving so the active step and its details stay in sync."
 			const listCurrentProgress = `**Current Progress: ${completedItems}/${totalItems} items completed (${percentComplete}%)**`
 			const userHasUpdatedList =
 				"**CRITICAL INFORMATION:** The user has modified this todo list - review ALL changes carefully"
@@ -270,7 +274,7 @@ export class FocusChainManager {
 					listCurrentProgress,
 					this.renderChecklistForPrompt(this.taskState.currentFocusChainChecklist),
 					userHasUpdatedList,
-					FocusChainPrompts.reminder,
+					activeDeterministicPlaceholderWorkflowEnabled ? undefined : FocusChainPrompts.reminder,
 				)
 
 				// If there are no user changes, proceed with reminders based on list progress
@@ -299,7 +303,7 @@ export class FocusChainManager {
 				introUpdateRequired,
 				listCurrentProgress,
 				this.renderChecklistForPrompt(this.taskState.currentFocusChainChecklist),
-				FocusChainPrompts.reminder,
+				activeDeterministicPlaceholderWorkflowEnabled ? undefined : FocusChainPrompts.reminder,
 				progressBasedMessageStub,
 			)
 		}

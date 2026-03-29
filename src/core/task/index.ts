@@ -183,6 +183,12 @@ export function shouldIncludePersistentPromptContext(taskState: Pick<TaskState, 
 	return !!taskState.activeAgentId || !!taskState.activeWorkflowId
 }
 
+export function isActiveDeterministicPlaceholderWorkflowEnabled(
+	taskState: Pick<TaskState, "activePlaceholderWorkflowSource">,
+): boolean {
+	return isDeterministicPlaceholderWorkflowSupported(taskState.activePlaceholderWorkflowSource?.name)
+}
+
 export function isActiveThreadDisplayState(threadDisplayState: ThreadDisplayState): boolean {
 	return threadDisplayState === ThreadDisplayStates.ACTIVE_RUN || threadDisplayState === ThreadDisplayStates.ACTIVE_USER
 }
@@ -2813,9 +2819,7 @@ export class Task {
 			stablePlaceholderValues: this.taskState.activePlaceholderWorkflowStableValues,
 			placeholderValues: this.taskState.activePlaceholderWorkflowValues,
 		})
-		const activeDeterministicPlaceholderWorkflowEnabled = isDeterministicPlaceholderWorkflowSupported(
-			activePlaceholderWorkflowPromptContext.activePlaceholderWorkflowName,
-		)
+		const activeDeterministicPlaceholderWorkflowEnabled = isActiveDeterministicPlaceholderWorkflowEnabled(this.taskState)
 
 		const promptContext: SystemPromptContext = {
 			cwd: this.cwd,

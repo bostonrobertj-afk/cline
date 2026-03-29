@@ -242,7 +242,7 @@ Inspect the prepared review input and write findings.
 		}
 	})
 
-	it("falls back to the generic reminder when step details cannot be resolved", async () => {
+	it("falls back to the generic reminder for non-deterministic workflows when step details cannot be resolved", async () => {
 		const taskState = new TaskState()
 		taskState.activePlaceholderWorkflowId = "remote-review"
 		taskState.activePlaceholderWorkflowSource = {
@@ -256,6 +256,25 @@ Inspect the prepared review input and write findings.
 		const prompt = await manager.generateFocusChainInstructions()
 
 		expect(prompt).to.contain('If you finish the current checklist step, include "task_progress" in your next tool call')
+		expect(prompt).to.not.contain("# CURRENT WORKFLOW STEP")
+	})
+
+	it("suppresses manual task_progress fallback text for deterministic workflows when step details cannot be resolved", async () => {
+		const taskState = new TaskState()
+		taskState.activePlaceholderWorkflowId = "code-review.md"
+		taskState.activePlaceholderWorkflowSource = {
+			type: "remote",
+			name: "code-review.md",
+			contents: "## Step 9: Ship It\nFinish the release.",
+		}
+		taskState.currentFocusChainChecklist = "- [ ] Step 1: Gather Context\n- [ ] Step 2: Review"
+
+		const manager = new FocusChainManager(createDependencies(taskState))
+		const prompt = await manager.generateFocusChainInstructions()
+
+		expect(prompt).to.contain("This turn could not resolve the current deterministic workflow step details")
+		expect(prompt).to.not.contain('If you finish the current checklist step, include "task_progress" in your next tool call')
+		expect(prompt).to.not.contain("Keep `task_progress` moving")
 		expect(prompt).to.not.contain("# CURRENT WORKFLOW STEP")
 	})
 

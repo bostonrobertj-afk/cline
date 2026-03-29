@@ -1,5 +1,5 @@
 import { expect } from "chai"
-import { shouldIncludePersistentPromptContext } from "../index"
+import { isActiveDeterministicPlaceholderWorkflowEnabled, shouldIncludePersistentPromptContext } from "../index"
 
 describe("shouldIncludePersistentPromptContext", () => {
 	it("returns false when no active BMAD agent or workflow is set", () => {
@@ -27,5 +27,35 @@ describe("shouldIncludePersistentPromptContext", () => {
 				activeWorkflowId: "bmad-quick-dev-new-preview",
 			}),
 		).to.equal(true)
+	})
+
+	it("returns true for supported deterministic placeholder workflows based on activePlaceholderWorkflowSource", () => {
+		expect(
+			isActiveDeterministicPlaceholderWorkflowEnabled({
+				activePlaceholderWorkflowSource: {
+					type: "remote",
+					name: "code-review.md",
+					contents: "# Review Workflow",
+				},
+			} as any),
+		).to.equal(true)
+	})
+
+	it("returns false when the active placeholder workflow source is missing or unsupported", () => {
+		expect(
+			isActiveDeterministicPlaceholderWorkflowEnabled({
+				activePlaceholderWorkflowSource: undefined,
+			} as any),
+		).to.equal(false)
+
+		expect(
+			isActiveDeterministicPlaceholderWorkflowEnabled({
+				activePlaceholderWorkflowSource: {
+					type: "remote",
+					name: "review-edge-case-hunter.md",
+					contents: "# Review Workflow",
+				},
+			} as any),
+		).to.equal(false)
 	})
 })
