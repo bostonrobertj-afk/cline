@@ -224,6 +224,43 @@ Inspect the prepared review input and write findings.
 		}
 	})
 
+	it("restores the placeholder checklist from disk before a resumed turn rebuilds it from source", async () => {
+		const fakeTask = createFakeTask("task-restore-placeholder-checklist")
+		fakeTask.taskState.activePlaceholderWorkflowId = "code-review.md"
+		fakeTask.taskState.activePlaceholderWorkflowSource = {
+			type: "remote",
+			name: "code-review.md",
+			contents: `# Code Review
+
+## Step 1: Determine Review Source
+Determine what to review from the user's prompt before asking follow-up questions.
+
+## Step 2: Construct & Persist Review Input File
+Persist review_input.md.
+`,
+		}
+		fakeTask.taskState.currentFocusChainChecklist = null
+
+		const restoredChecklist = [
+			"- [x] Step 1: Determine Review Source",
+			"- [x] Step 2: Construct & Persist Review Input File",
+			"- [ ] Step 3: (System-Owned) Diff Source Resolution And Diff Output Persistence",
+		].join("\n")
+
+		const restoreStub = sinon.stub().callsFake(async () => {
+			fakeTask.taskState.currentFocusChainChecklist = restoredChecklist
+			return restoredChecklist
+		})
+		;(fakeTask as any).FocusChainManager = {
+			restoreCurrentChecklistFromDisk: restoreStub,
+		}
+
+		await (Task.prototype as any).restorePlaceholderWorkflowChecklistFromDiskIfNeeded.call(fakeTask)
+
+		expect(restoreStub.calledOnce).to.equal(true)
+		expect(fakeTask.taskState.currentFocusChainChecklist).to.equal(restoredChecklist)
+	})
+
 	it("computes stable placeholder values from slash-command activation metadata and renders them in activation instructions", async () => {
 		const sandbox = sinon.createSandbox()
 		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "slash-placeholder-stable-"))

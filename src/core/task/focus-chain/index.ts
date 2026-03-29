@@ -511,6 +511,18 @@ export class FocusChainManager {
 		await this.postStateToWebview()
 	}
 
+	public async restoreCurrentChecklistFromDisk(): Promise<string | null> {
+		const markdownTodoList = await this.readFocusChainFromDisk()
+		if (!markdownTodoList) {
+			return null
+		}
+
+		this.taskState.currentFocusChainChecklist = markdownTodoList
+		this.taskState.todoListWasUpdatedByUser = false
+		this.taskState.apiRequestsSinceLastTodoUpdate = 0
+		return markdownTodoList
+	}
+
 	public async logPromptAssemblySnapshot(context: {
 		useCompactPrompt: boolean
 		includeDetailedEnvironmentDetails: boolean
@@ -666,8 +678,11 @@ export class FocusChainManager {
 				return { accepted: true }
 			}
 			if (!taskProgress && this.taskState.activePlaceholderWorkflowSource && !this.taskState.currentFocusChainChecklist) {
-				await this.refreshPlaceholderWorkflowChecklistProjection()
-				return { accepted: true }
+				const restoredChecklist = await this.restoreCurrentChecklistFromDisk()
+				if (!restoredChecklist) {
+					await this.refreshPlaceholderWorkflowChecklistProjection()
+					return { accepted: true }
+				}
 			}
 
 			let nextChecklist: string | undefined

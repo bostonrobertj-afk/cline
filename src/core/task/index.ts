@@ -1979,6 +1979,14 @@ export class Task {
 		}
 	}
 
+	private async restorePlaceholderWorkflowChecklistFromDiskIfNeeded(): Promise<void> {
+		if (!this.taskState.activePlaceholderWorkflowSource || this.taskState.currentFocusChainChecklist) {
+			return
+		}
+
+		await this.FocusChainManager?.restoreCurrentChecklistFromDisk()
+	}
+
 	private async refreshManagedWorkflowChecklistProjection(): Promise<void> {
 		if (!this.taskState.managedWorkflowRun) {
 			return
@@ -2323,6 +2331,7 @@ export class Task {
 		if (this.taskState.managedWorkflowRun) {
 			await this.refreshManagedWorkflowChecklistProjection()
 		}
+		await this.restorePlaceholderWorkflowChecklistFromDiskIfNeeded()
 
 		let response: ClineAskResponse
 		let text: string | undefined

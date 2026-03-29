@@ -478,6 +478,72 @@ Determine what to review from the user's prompt before asking follow-up question
 		}
 	})
 
+	it("restores a progressed placeholder checklist from disk instead of rebuilding it from source during no-task-progress updates", async () => {
+		const sandbox = sinon.createSandbox()
+		const taskId = `task-focus-chain-placeholder-restore-${Date.now()}`
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "focus-chain-placeholder-restore-"))
+		const workflowPath = path.join(tempDir, "code-review.md")
+		await fs.writeFile(
+			workflowPath,
+			`# Code Review
+
+## Step 1: Determine Review Source
+Determine what to review from the user's prompt before asking follow-up questions.
+
+## Step 2: Construct & Persist Review Input File
+Persist review_input.md.
+
+## Step 3: (System-Owned) Diff Source Resolution And Diff Output Persistence
+Resolve diff input through the system-owned form flow.
+`,
+			"utf8",
+		)
+
+		try {
+			sandbox.stub(disk, "ensureTaskDirectoryExists").resolves(tempDir)
+			const focusChainFilePath = getFocusChainFilePath(tempDir, taskId)
+			const progressedChecklist = [
+				"- [x] Step 1: Determine Review Source",
+				"- [x] Step 2: Construct & Persist Review Input File",
+				"- [ ] Step 3: (System-Owned) Diff Source Resolution And Diff Output Persistence",
+			].join("\n")
+			await fs.writeFile(
+				focusChainFilePath,
+				`# Focus Chain List for Task ${taskId}
+
+${progressedChecklist}
+`,
+				"utf8",
+			)
+
+			const taskState = new TaskState()
+			taskState.activePlaceholderWorkflowId = "code-review.md"
+			taskState.activePlaceholderWorkflowSource = {
+				type: "local",
+				name: "code-review.md",
+				path: workflowPath,
+			}
+
+			const say = sinon.stub().resolves(undefined)
+			const manager = new FocusChainManager({
+				...createDependencies(taskState),
+				taskId,
+				say,
+			})
+
+			const result = await manager.updateFCListFromToolResponse(undefined)
+
+			expect(result.accepted).to.equal(true)
+			expect(taskState.currentFocusChainChecklist).to.equal(progressedChecklist)
+			sinon.assert.calledWith(say, "task_progress", progressedChecklist)
+			const persistedChecklist = await fs.readFile(focusChainFilePath, "utf8")
+			expect(persistedChecklist).to.contain("- [x] Step 2: Construct & Persist Review Input File")
+		} finally {
+			sandbox.restore()
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
 	it("accepts same-shape updates and preserves the existing checklist labels", async () => {
 		const sandbox = sinon.createSandbox()
 		const taskId = `task-focus-chain-placeholder-${Date.now()}`
