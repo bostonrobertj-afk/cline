@@ -38,3 +38,14 @@ Need to move these out of input and into system instructions for primary agents:
     - focus chain block
     - focus chain "current step" block
 The only thing in "input" should be the user's message.
+
+Main task:
+environment_details
+auto-compact summarizeTask(...)
+placeholder-workflow activation instructions
+focus-chain block
+focus-chain current-step details block
+Subagents:
+workspace metadata block in the initial user message
+non-Responses placeholder-workflow activation
+non-Responses focus-chain/current-step guidance

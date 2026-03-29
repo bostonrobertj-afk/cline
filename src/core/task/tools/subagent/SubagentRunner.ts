@@ -530,9 +530,6 @@ export class SubagentRunner {
 					turnsSinceFullPromptRefresh: state.turnsSinceFullPromptRefresh,
 				})
 				const promptInjectionBlocks = await this.buildSubagentPromptInjectionBlocks(state, shouldSendFullPromptAssembly)
-				if (!responsesApiActive) {
-					this.appendSubagentPromptInjectionBlocksToConversation(conversation, promptInjectionBlocks)
-				}
 
 				const context = await this.buildPromptContext({
 					state,
@@ -564,9 +561,7 @@ export class SubagentRunner {
 					.join("\n\n")
 					.trim()
 				const effectiveSystemPrompt =
-					responsesApiActive && promptInjectionText.length > 0
-						? `${systemPrompt}\n\n${promptInjectionText}`
-						: systemPrompt
+					promptInjectionText.length > 0 ? `${systemPrompt}\n\n${promptInjectionText}` : systemPrompt
 
 				if (useNativeToolCalls && (!nativeTools || nativeTools.length === 0)) {
 					const error = "Subagent tool requires native tool calling support."
@@ -1113,27 +1108,6 @@ export class SubagentRunner {
 		}
 
 		return additions
-	}
-
-	private appendSubagentPromptInjectionBlocksToConversation(
-		conversation: ClineStorageMessage[],
-		additions: ClineTextContentBlock[],
-	): void {
-		if (additions.length === 0) {
-			return
-		}
-
-		const lastMessage = conversation[conversation.length - 1]
-		if (!lastMessage || lastMessage.role !== "user") {
-			conversation.push({
-				role: "user",
-				content: additions,
-			})
-			return
-		}
-
-		const content = ensureUserMessageContentArray(lastMessage)
-		content.push(...additions)
 	}
 
 	private mergePromptSkillEntries(skills: SkillMetadata[], workflows: SkillMetadata[]): SkillMetadata[] {

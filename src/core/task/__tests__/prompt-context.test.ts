@@ -1,5 +1,9 @@
 import { expect } from "chai"
-import { isActiveDeterministicPlaceholderWorkflowEnabled, shouldIncludePersistentPromptContext } from "../index"
+import {
+	appendPromptInjectionBlocksToSystemPrompt,
+	isActiveDeterministicPlaceholderWorkflowEnabled,
+	shouldIncludePersistentPromptContext,
+} from "../index"
 
 describe("shouldIncludePersistentPromptContext", () => {
 	it("returns false when no active BMAD agent or workflow is set", () => {
@@ -57,5 +61,20 @@ describe("shouldIncludePersistentPromptContext", () => {
 				},
 			} as any),
 		).to.equal(false)
+	})
+
+	it("appends runtime prompt injection blocks to the system prompt with blank-line separators", () => {
+		const result = appendPromptInjectionBlocksToSystemPrompt("BASE SYSTEM PROMPT", [
+			{ type: "text", text: "ENVIRONMENT: reduced" },
+			{ type: "text", text: "### Reminder:\nCurrent Progress: 0/2 items completed" },
+		] as any)
+
+		expect(result).to.equal(
+			"BASE SYSTEM PROMPT\n\nENVIRONMENT: reduced\n\n### Reminder:\nCurrent Progress: 0/2 items completed",
+		)
+	})
+
+	it("leaves the system prompt unchanged when there are no runtime prompt injection blocks", () => {
+		expect(appendPromptInjectionBlocksToSystemPrompt("BASE SYSTEM PROMPT", [])).to.equal("BASE SYSTEM PROMPT")
 	})
 })

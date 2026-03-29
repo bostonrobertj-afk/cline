@@ -379,9 +379,7 @@ export class OcaHandler implements ApiHandler {
 
 	async *createMessageResponsesApi(systemPrompt: string, messages: ClineStorageMessage[], tools?: OpenAITool[]): ApiStream {
 		const client = this.ensureOpenAIClient()
-		const inputMessages = convertToOpenAIResponsesInput(messages, { usePreviousResponseId: false }).input
-		// Convert messages to Responses API input format
-		const input: OpenAI.Responses.ResponseInputItem[] = [{ role: "system", content: systemPrompt }, ...inputMessages]
+		const input = convertToOpenAIResponsesInput(messages, { usePreviousResponseId: false }).input
 
 		// Convert ChatCompletion tools to Responses API format if provided
 		const responseTools = tools
@@ -409,6 +407,7 @@ export class OcaHandler implements ApiHandler {
 
 		const responsesParams: OpenAI.Responses.ResponseCreateParamsStreaming = {
 			model: this.options.ocaModelId || liteLlmDefaultModelId,
+			instructions: systemPrompt,
 			input,
 			stream: true,
 			tools: responseTools,

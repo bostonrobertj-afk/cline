@@ -157,8 +157,9 @@ function collectTextValues(value: unknown): string[] {
 }
 
 describe("Task.loadContext placeholder workflow focus chain prompting", () => {
-	it("appends placeholder workflow checklist and current-step guidance when full prompt assembly is required", async () => {
+	it("returns environment details and placeholder-workflow guidance as prompt injection blocks when full prompt assembly is required", async () => {
 		const fakeTask = createFakeTask(0)
+		fakeTask.buildPlaceholderWorkflowActivationInstructions.resolves("ACTIVATION: placeholder workflow just started")
 		const userContent = [
 			{
 				type: "tool_result",
@@ -167,7 +168,7 @@ describe("Task.loadContext placeholder workflow focus chain prompting", () => {
 			},
 		] as any
 
-		const [processedUserContent, environmentDetails] = await (Task.prototype as any).loadContext.call(
+		const [processedUserContent, promptInjectionBlocks] = await (Task.prototype as any).loadContext.call(
 			fakeTask,
 			userContent,
 			false,
@@ -175,19 +176,34 @@ describe("Task.loadContext placeholder workflow focus chain prompting", () => {
 			false,
 		)
 
-		const promptText = collectTextValues(processedUserContent).join("\n")
+		const userText = collectTextValues(processedUserContent).join("\n")
+		const promptInjectionText = collectTextValues(promptInjectionBlocks).join("\n")
 
-		expect(promptText).to.contain("### Reminder:")
-		expect(promptText).to.contain("Current Progress: 0/2 items completed")
-		expect(promptText).to.contain("- [ ] Step 1: Determine Review Source")
-		expect(promptText).to.contain("# CURRENT WORKFLOW STEP")
-		expect(promptText).to.contain("You are currently on this step: Step 1: Determine Review Source")
-		expect(environmentDetails).to.equal("ENVIRONMENT: reduced")
+		expect(userText).to.not.contain("ENVIRONMENT: reduced")
+		expect(userText).to.not.contain("### Reminder:")
+		expect(userText).to.not.contain("# CURRENT WORKFLOW STEP")
+		expect(userText).to.not.contain("ACTIVATION: placeholder workflow just started")
+
+		expect(promptInjectionText).to.contain("ENVIRONMENT: reduced")
+		expect(promptInjectionText).to.contain("ACTIVATION: placeholder workflow just started")
+		expect(promptInjectionText).to.contain("### Reminder:")
+		expect(promptInjectionText).to.contain("Current Progress: 0/2 items completed")
+		expect(promptInjectionText).to.contain("- [ ] Step 1: Determine Review Source")
+		expect(promptInjectionText).to.contain("# CURRENT WORKFLOW STEP")
+		expect(promptInjectionText).to.contain("You are currently on this step: Step 1: Determine Review Source")
 		expect(fakeTask.getEnvironmentDetails.calledOnceWith(false, false)).to.equal(true)
 	})
 
-	it("suppresses placeholder workflow checklist and current-step guidance on tool-only continuation turns before the refresh threshold", async () => {
+	it("returns placeholder-workflow continuation guidance as prompt injection blocks on tool-only continuation turns", async () => {
 		const fakeTask = createFakeTask()
+		fakeTask.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices = [
+			{
+				workflowName: "code-review.md",
+				stepNumber: 4,
+				checklistLabel: "Step 4: Set Review Mode",
+				reason: "review_mode was derived deterministically from fresh review artifacts.",
+			},
+		]
 		const userContent = [
 			{
 				type: "tool_result",
@@ -196,10 +212,25 @@ describe("Task.loadContext placeholder workflow focus chain prompting", () => {
 			},
 		] as any
 
-		const [processedUserContent] = await (Task.prototype as any).loadContext.call(fakeTask, userContent, false, false, false)
-		const promptText = collectTextValues(processedUserContent).join("\n")
+		const [processedUserContent, promptInjectionBlocks] = await (Task.prototype as any).loadContext.call(
+			fakeTask,
+			userContent,
+			false,
+			false,
+			false,
+		)
+		const userText = collectTextValues(processedUserContent).join("\n")
+		const promptInjectionText = collectTextValues(promptInjectionBlocks).join("\n")
 
-		expect(promptText).to.not.contain("TODO LIST UPDATE SUGGESTED")
-		expect(promptText).to.not.contain("# CURRENT WORKFLOW STEP")
+		expect(userText).to.not.contain("TODO LIST UPDATE SUGGESTED")
+		expect(userText).to.not.contain("# CURRENT WORKFLOW STEP")
+		expect(userText).to.not.contain("# AUTO-COMPLETED WORKFLOW STEPS")
+
+		expect(promptInjectionText).to.contain("### Reminder:")
+		expect(promptInjectionText).to.contain("Current Progress: 0/2 items completed")
+		expect(promptInjectionText).to.contain("# AUTO-COMPLETED WORKFLOW STEPS")
+		expect(promptInjectionText).to.contain("Step 4: Set Review Mode")
+		expect(promptInjectionText).to.contain("# CURRENT WORKFLOW STEP")
+		expect(promptInjectionText).to.contain("You are currently on this step: Step 1: Determine Review Source")
 	})
 })

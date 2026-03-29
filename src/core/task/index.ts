@@ -183,6 +183,18 @@ export function shouldIncludePersistentPromptContext(taskState: Pick<TaskState, 
 	return !!taskState.activeAgentId || !!taskState.activeWorkflowId
 }
 
+export function appendPromptInjectionBlocksToSystemPrompt(
+	systemPrompt: string,
+	promptInjectionBlocks: ClineTextContentBlock[],
+): string {
+	const promptInjectionText = promptInjectionBlocks
+		.map((block) => block.text)
+		.filter((text) => text.trim().length > 0)
+		.join("\n\n")
+
+	return promptInjectionText.length > 0 ? `${systemPrompt}\n\n${promptInjectionText}` : systemPrompt
+}
+
 export function isActiveDeterministicPlaceholderWorkflowEnabled(
 	taskState: Pick<TaskState, "activePlaceholderWorkflowSource">,
 ): boolean {
@@ -617,6 +629,7 @@ export class Task {
 	private nextApiRequestIncludesHumanAuthoredInput = false
 	private currentRequestHasHumanAuthoredInput = false
 	private currentRequestShouldSendFullPromptAssembly = true
+	private currentRequestPromptInjectionBlocks: ClineTextContentBlock[] = []
 
 	constructor(params: TaskParams) {
 		const {
@@ -2875,7 +2888,10 @@ export class Task {
 		}
 
 		const { systemPrompt, tools } = await getSystemPrompt(promptContext)
-		const effectiveSystemPrompt = systemPrompt
+		const effectiveSystemPrompt = appendPromptInjectionBlocksToSystemPrompt(
+			systemPrompt,
+			this.currentRequestPromptInjectionBlocks,
+		)
 		this.taskState.activeAgentJustActivated = false
 		this.taskState.activeWorkflowJustStarted = false
 		this.useNativeToolCalls = !!tools?.length
@@ -3477,18 +3493,18 @@ export class Task {
 		// NOW load context based on compaction decision
 		// This optimization avoids expensive context loading when using summarize_task
 		let parsedUserContent: ClineContent[]
-		let environmentDetails: string
+		let runtimePromptInjectionBlocks: ClineTextContentBlock[] = []
 		let clinerulesError: boolean
 
 		if (shouldCompact) {
 			// When compacting, skip full context loading (use summarize_task instead)
 			parsedUserContent = userContent
-			environmentDetails = ""
+			runtimePromptInjectionBlocks = []
 			clinerulesError = false
 			this.taskState.lastAutoCompactTriggerIndex = previousApiReqIndex
 		} else {
 			// When NOT compacting, load full context with mentions parsing and slash commands
-			;[parsedUserContent, environmentDetails, clinerulesError] = await this.loadContext(
+			;[parsedUserContent, runtimePromptInjectionBlocks, clinerulesError] = await this.loadContext(
 				userContent,
 				includeFileDetails,
 				useCompactPrompt,
@@ -3512,14 +3528,8 @@ export class Task {
 			this.nextApiRequestIncludesHumanAuthoredInput,
 		)
 
-		// add environment details as its own text block, separate from tool results
-		// do not add environment details to the message which we are compacting the context window
-		if (environmentDetails) {
-			userContent.push({ type: "text", text: environmentDetails })
-		}
-
 		if (shouldCompact) {
-			userContent.push({
+			runtimePromptInjectionBlocks.push({
 				type: "text",
 				text: summarizeTask(
 					this.stateManager.getGlobalSettingsKey("focusChainSettings"),
@@ -3528,6 +3538,8 @@ export class Task {
 				),
 			})
 		}
+
+		this.currentRequestPromptInjectionBlocks = runtimePromptInjectionBlocks
 
 		// getting verbose details is an expensive operation, it uses globby to top-down build file structure of project which for large projects can take a few seconds
 		// for the best UX we show a placeholder api_req_started message with a loading spinner as this happens
@@ -4300,7 +4312,7 @@ export class Task {
 		includeFileDetails = false,
 		useCompactPrompt = false,
 		includeDetailedEnvironmentDetails = true,
-	): Promise<[ClineContent[], string, boolean]> {
+	): Promise<[ClineContent[], ClineTextContentBlock[], boolean]> {
 		let needsClinerulesFileCheck = false
 		let persistentSlashCommandAction: PersistentSlashCommandAction | undefined
 
@@ -4408,6 +4420,13 @@ export class Task {
 			Promise.all(userContent.map(processContentBlock)),
 			this.getEnvironmentDetails(includeFileDetails, includeDetailedEnvironmentDetails),
 		])
+		const promptInjectionBlocks: ClineTextContentBlock[] = []
+		if (environmentDetails.trim().length > 0) {
+			promptInjectionBlocks.push({
+				type: "text",
+				text: environmentDetails,
+			})
+		}
 
 		// Check clinerulesData if needed
 		const clinerulesError = needsClinerulesFileCheck
@@ -4424,7 +4443,7 @@ export class Task {
 		const placeholderActivationInstructionsAppended =
 			shouldSendFullPromptAssembly && !!placeholderWorkflowActivationInstructions?.trim()
 		if (shouldSendFullPromptAssembly && placeholderWorkflowActivationInstructions?.trim()) {
-			processedUserContent.push({
+			promptInjectionBlocks.push({
 				type: "text",
 				text: placeholderWorkflowActivationInstructions,
 			})
@@ -4464,14 +4483,14 @@ export class Task {
 			focusChainManagerPresent: !!this.FocusChainManager,
 			useCompactPrompt,
 		})
-		if (shouldSendFullPromptAssembly && !useCompactPrompt && this.FocusChainManager?.shouldIncludeFocusChainInstructions()) {
+		if (!useCompactPrompt && this.FocusChainManager?.shouldIncludeFocusChainInstructions()) {
 			const focusChainInstructions = await this.FocusChainManager.generateFocusChainInstructions()
 			logFocusChainDiagnosticEvent(this.taskId, "focus_chain_generation", {
 				...summarizeFocusChainText(focusChainInstructions),
 				willAppend: !!focusChainInstructions.trim(),
 			})
 			if (focusChainInstructions.trim()) {
-				processedUserContent.push({
+				promptInjectionBlocks.push({
 					type: "text",
 					text: focusChainInstructions,
 				})
@@ -4482,11 +4501,11 @@ export class Task {
 		}
 
 		logFocusChainDiagnosticEvent(this.taskId, "load_context_final_summary", {
-			...summarizeFocusChainTextBlocks(processedUserContent),
+			...summarizeFocusChainTextBlocks([...processedUserContent, ...promptInjectionBlocks]),
 			placeholderActivationInstructionsAppended,
 		})
 
-		return [processedUserContent, environmentDetails, clinerulesError]
+		return [processedUserContent, promptInjectionBlocks, clinerulesError]
 	}
 
 	async processNativeToolCalls(assistantTextOnly: string, toolBlocks: ToolUse[]) {

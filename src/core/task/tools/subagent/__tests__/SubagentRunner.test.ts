@@ -1220,14 +1220,16 @@ describe("SubagentRunner", () => {
 			content: Array<{ type?: string; text?: string }>
 		}
 		const initialTexts = extractTextFromMessage(initialUser)
-		assert.match(initialTexts, /<explicit_instructions type="review-edge-case-hunter">/)
-		assert.match(initialTexts, /Edge case review instructions/)
-		assert.match(initialTexts, /# task_progress RECOMMENDED/)
+		assert.doesNotMatch(initialTexts, /<explicit_instructions type="review-edge-case-hunter">/)
+		assert.doesNotMatch(initialTexts, /Edge case review instructions/)
+		assert.doesNotMatch(initialTexts, /# task_progress RECOMMENDED/)
 		const systemPrompt = createMessage.firstCall.args[0] as string
-		assert.doesNotMatch(systemPrompt, /Assigned Workflow Activation/)
+		assert.match(systemPrompt, /<explicit_instructions type="review-edge-case-hunter">/)
+		assert.match(systemPrompt, /Edge case review instructions/)
+		assert.match(systemPrompt, /# task_progress RECOMMENDED/)
 	})
 
-	it("injects placeholder workflow activation only on the first subagent turn and suppresses repeated guidance before the refresh threshold", async () => {
+	it("keeps placeholder-workflow activation first-turn-only while relocating prompt injections into the system prompt for non-Responses subagents", async () => {
 		const createMessage = sinon.stub()
 		createMessage.onFirstCall().callsFake(async function* () {
 			yield {
@@ -1297,9 +1299,15 @@ Review the changed implementation for edge cases.`,
 			content: Array<{ type?: string; text?: string }>
 		}
 		const initialTexts = extractTextFromMessage(initialUser)
-		assert.match(initialTexts, /<explicit_instructions type="review-edge-case-hunter">/)
-		assert.match(initialTexts, /### Reminder:/)
-		assert.match(initialTexts, /# CURRENT WORKFLOW STEP/)
+		assert.doesNotMatch(initialTexts, /<explicit_instructions type="review-edge-case-hunter">/)
+		assert.doesNotMatch(initialTexts, /### Reminder:/)
+		assert.doesNotMatch(initialTexts, /# CURRENT WORKFLOW STEP/)
+
+		const firstSystemPrompt = createMessage.firstCall.args[0] as string
+		assert.match(firstSystemPrompt, /<explicit_instructions type="review-edge-case-hunter">/)
+		assert.match(firstSystemPrompt, /### Reminder:/)
+		assert.match(firstSystemPrompt, /# CURRENT WORKFLOW STEP/)
+		assert.doesNotMatch(firstSystemPrompt, /CONTINUATION TURN/)
 
 		const secondConversation = createMessage.secondCall.args[1] as Array<{
 			role: string
@@ -1311,14 +1319,18 @@ Review the changed implementation for edge cases.`,
 		}
 		const followUpTexts = extractTextFromMessage(followUpUser)
 		assert.doesNotMatch(followUpTexts, /<explicit_instructions type="review-edge-case-hunter">/)
-		assert.match(followUpTexts, /### Reminder:/)
-		assert.match(followUpTexts, /Current Progress: 0\/2 items completed/)
-		assert.match(followUpTexts, /# CURRENT WORKFLOW STEP/)
+		assert.doesNotMatch(followUpTexts, /### Reminder:/)
+		assert.doesNotMatch(followUpTexts, /Current Progress: 0\/2 items completed/)
+		assert.doesNotMatch(followUpTexts, /# CURRENT WORKFLOW STEP/)
 		const secondSystemPrompt = createMessage.secondCall.args[0] as string
 		assert.match(secondSystemPrompt, /CONTINUATION TURN/)
+		assert.match(secondSystemPrompt, /### Reminder:/)
+		assert.match(secondSystemPrompt, /Current Progress: 0\/2 items completed/)
+		assert.match(secondSystemPrompt, /# CURRENT WORKFLOW STEP/)
+		assert.doesNotMatch(secondSystemPrompt, /<explicit_instructions type="review-edge-case-hunter">/)
 	})
 
-	it("reinjects focus-chain guidance on every internal turn when prompt refresh frequency is zero for non-Responses subagents", async () => {
+	it("keeps focus-chain guidance in the system prompt on every internal turn when prompt refresh frequency is zero for non-Responses subagents", async () => {
 		const createMessage = sinon.stub()
 		createMessage.onFirstCall().callsFake(async function* () {
 			yield {
@@ -1388,10 +1400,13 @@ Review the changed implementation for edge cases.`,
 			content: Array<{ type?: string; text?: string }>
 		}
 		const followUpTexts = extractTextFromMessage(followUpUser)
-		assert.match(followUpTexts, /### Reminder:/)
-		assert.match(followUpTexts, /Current Progress: 0\/2 items completed/)
-		assert.match(followUpTexts, /# CURRENT WORKFLOW STEP/)
+		assert.doesNotMatch(followUpTexts, /### Reminder:/)
+		assert.doesNotMatch(followUpTexts, /Current Progress: 0\/2 items completed/)
+		assert.doesNotMatch(followUpTexts, /# CURRENT WORKFLOW STEP/)
 		const secondSystemPrompt = createMessage.secondCall.args[0] as string
+		assert.match(secondSystemPrompt, /### Reminder:/)
+		assert.match(secondSystemPrompt, /Current Progress: 0\/2 items completed/)
+		assert.match(secondSystemPrompt, /# CURRENT WORKFLOW STEP/)
 		assert.doesNotMatch(secondSystemPrompt, /CONTINUATION TURN/)
 	})
 
@@ -1915,9 +1930,13 @@ Review the changed implementation for edge cases.`,
 			const followUpUser = secondConversation[secondConversation.length - 1]
 			const followUpTexts = extractTextFromMessage(followUpUser)
 
-			assert.match(followUpTexts, /Current Progress: 1\/2 items completed/)
-			assert.match(followUpTexts, /You are currently on this step: Step 2: Review/)
+			assert.doesNotMatch(followUpTexts, /Current Progress: 1\/2 items completed/)
+			assert.doesNotMatch(followUpTexts, /You are currently on this step: Step 2: Review/)
 			assert.doesNotMatch(followUpTexts, /You are currently on this step: Step 1: Gather Context/)
+
+			assert.match(_systemPrompt, /Current Progress: 1\/2 items completed/)
+			assert.match(_systemPrompt, /You are currently on this step: Step 2: Review/)
+			assert.doesNotMatch(_systemPrompt, /You are currently on this step: Step 1: Gather Context/)
 
 			yield {
 				type: "tool_calls",
