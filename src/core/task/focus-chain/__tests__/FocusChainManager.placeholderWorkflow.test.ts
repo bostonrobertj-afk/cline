@@ -5,6 +5,7 @@ import os from "os"
 import path from "path"
 import sinon from "sinon"
 import * as disk from "../../../storage/disk"
+import { shouldInterceptWorkflowFormBeforeApiTurn } from "../../index"
 import { TaskState } from "../../TaskState"
 import { getFocusChainFilePath } from "../file-utils"
 import { FocusChainDependencies, FocusChainManager } from "../index"
@@ -276,6 +277,112 @@ Inspect the prepared review input and write findings.
 		expect(prompt).to.not.contain('If you finish the current checklist step, include "task_progress" in your next tool call')
 		expect(prompt).to.not.contain("Keep `task_progress` moving")
 		expect(prompt).to.not.contain("# CURRENT WORKFLOW STEP")
+	})
+
+	it("intercepts only code-review.md Step 3 when diff_output is not already satisfied", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "workflow-form-intercept-"))
+
+		try {
+			const diffOutputPath = path.join(tempDir, "workflow-output", "review-input.diff")
+			const taskState = new TaskState()
+			taskState.taskStartTimeMs = Date.now()
+			taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "code-review.md",
+				contents: `# Code Review
+
+## Step 1: Determine Review Source
+Done.
+
+## Step 2: Construct & Persist Review Input File
+Done.
+
+## Step 3: System-Owned Diff Source Resolution And Diff Output Persistence
+Fallback instructions live here.
+`,
+			}
+			taskState.activePlaceholderWorkflowStableValues = {
+				diff_output: diffOutputPath,
+			}
+			taskState.currentFocusChainChecklist = [
+				"- [x] Step 1: Determine Review Source",
+				"- [x] Step 2: Construct & Persist Review Input File",
+				"- [ ] Step 3: System-Owned Diff Source Resolution And Diff Output Persistence",
+			].join("\n")
+
+			expect(await shouldInterceptWorkflowFormBeforeApiTurn({ cwd: tempDir, taskState })).to.equal(true)
+
+			await fs.mkdir(path.dirname(diffOutputPath), { recursive: true })
+			await fs.writeFile(diffOutputPath, "diff --git a/file b/file", "utf8")
+			const timestamp = new Date(taskState.taskStartTimeMs + 1_000)
+			await fs.utimes(diffOutputPath, timestamp, timestamp)
+
+			expect(await shouldInterceptWorkflowFormBeforeApiTurn({ cwd: tempDir, taskState })).to.equal(false)
+
+			taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "dev-story.md",
+				contents: taskState.activePlaceholderWorkflowSource.contents,
+			}
+
+			expect(await shouldInterceptWorkflowFormBeforeApiTurn({ cwd: tempDir, taskState })).to.equal(false)
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("shows the fallback Step 3 instructions when the workflow-form path is not completed", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "focus-chain-placeholder-step3-fallback-"))
+		const workflowPath = path.join(tempDir, "code-review.md")
+		await fs.writeFile(
+			workflowPath,
+			`# Code Review
+
+## Step 1: Determine Review Source
+Done.
+
+## Step 2: Construct & Persist Review Input File
+Done.
+
+## Step 3: System-Owned Diff Source Resolution And Diff Output Persistence
+Goal: The primary path for this step is runtime-owned workflow-form resolution. The AI instructions below are fallback-only and apply only when the system-owned path was not completed.
+
+You are in the fallback path because the system-owned workflow-form path was not completed.
+
+Do not ask the human to restate or re-enter a diff source they already declined to provide in the form flow.
+
+First inspect available workflow context, story context, placeholders, and repo state to find a supported diff source.
+
+Use \`build_review_diff_output\` whenever a supported source is discovered.
+`,
+			"utf8",
+		)
+
+		try {
+			const taskState = new TaskState()
+			taskState.activePlaceholderWorkflowId = "code-review.md"
+			taskState.activePlaceholderWorkflowSource = {
+				type: "local",
+				name: "code-review.md",
+				path: workflowPath,
+			}
+			taskState.currentFocusChainChecklist = [
+				"- [x] Step 1: Determine Review Source",
+				"- [x] Step 2: Construct & Persist Review Input File",
+				"- [ ] Step 3: System-Owned Diff Source Resolution And Diff Output Persistence",
+			].join("\n")
+
+			const manager = new FocusChainManager(createDependencies(taskState))
+			const prompt = await manager.generateFocusChainInstructions()
+
+			expect(prompt).to.contain(
+				"You are in the fallback path because the system-owned workflow-form path was not completed.",
+			)
+			expect(prompt).to.contain("Do not ask the human to restate or re-enter a diff source")
+			expect(prompt).to.contain("build_review_diff_output")
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
 	})
 
 	it("seeds a placeholder checklist projection and writes the focus-chain markdown file", async () => {

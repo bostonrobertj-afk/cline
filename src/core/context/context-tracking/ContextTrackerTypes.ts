@@ -3,6 +3,7 @@ import type {
 	ActivePlaceholderWorkflowDeterministicState,
 	AutoCompletedPlaceholderWorkflowStepNotice,
 } from "@/core/task/TaskState"
+import type { WorkflowFormSessionState } from "@/core/task/workflow-form/types"
 import type { ActivePlaceholderWorkflowSource } from "@/core/workflows/placeholder-workflow-step-details"
 
 // Type definitions for FileContextTracker
@@ -45,6 +46,7 @@ export interface TaskMetadata {
 	activePlaceholderWorkflowStableValues?: Record<string, string>
 	activePlaceholderWorkflowValues?: Record<string, string>
 	activePlaceholderWorkflowDeterministicState?: ActivePlaceholderWorkflowDeterministicState
+	activeWorkflowFormSession?: WorkflowFormSessionState
 	pendingAutoCompletedPlaceholderWorkflowStepNotices?: AutoCompletedPlaceholderWorkflowStepNotice[]
 	managedWorkflowRun?: ManagedWorkflowRunState
 }

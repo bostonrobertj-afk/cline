@@ -1,12 +1,115 @@
 import type { ClineMessage } from "@shared/ExtensionMessage"
-import { EmptyRequest, StringRequest } from "@shared/proto/cline/common"
-import { AskResponseRequest, NewTaskRequest } from "@shared/proto/cline/task"
+import { EmptyRequest, StringArray, StringRequest } from "@shared/proto/cline/common"
+import { AskResponseRequest, NewTaskRequest, WorkflowFormAction, WorkflowFormSubmissionRequest } from "@shared/proto/cline/task"
 import { useCallback, useRef } from "react"
 import { useExtensionState } from "@/context/ExtensionStateContext"
 import { SlashServiceClient, TaskServiceClient } from "@/services/grpc-client"
 import type { ButtonActionType } from "../shared/buttonConfig"
 import { isPassiveThreadOpen } from "../shared/buttonConfig"
 import type { ChatState, MessageHandlers } from "../types/chatTypes"
+
+type WorkflowFormUiValue = number | string | string[] | undefined
+
+const WORKFLOW_FORM_STRING_FIELD_KEYS = ["source.type", "source.commit", "source.base", "source.head"] as const
+
+function normalizeWorkflowFormStringValue(value: WorkflowFormUiValue): string | undefined {
+	if (typeof value !== "string") {
+		return undefined
+	}
+
+	const trimmedValue = value.trim()
+	return trimmedValue.length > 0 ? trimmedValue : undefined
+}
+
+function normalizeWorkflowFormStringArrayValue(value: WorkflowFormUiValue): string[] | undefined {
+	const normalizedValues =
+		typeof value === "string"
+			? value
+					.split("\n")
+					.map((entry) => entry.trim())
+					.filter((entry) => entry.length > 0)
+			: Array.isArray(value)
+				? value.map((entry) => entry.trim()).filter((entry) => entry.length > 0)
+				: undefined
+
+	return normalizedValues && normalizedValues.length > 0 ? normalizedValues : undefined
+}
+
+function normalizeWorkflowFormIntegerValue(value: WorkflowFormUiValue): number | undefined {
+	if (typeof value === "number" && Number.isInteger(value)) {
+		return value
+	}
+
+	if (typeof value === "string" && value.trim().length > 0) {
+		const normalizedValue = value.trim()
+		if (!/^-?\d+$/.test(normalizedValue)) {
+			return undefined
+		}
+
+		const parsedValue = Number.parseInt(normalizedValue, 10)
+		return Number.isInteger(parsedValue) ? parsedValue : undefined
+	}
+
+	return undefined
+}
+
+export function buildWorkflowFormSubmissionRequest(
+	sessionId: string,
+	action: WorkflowFormAction,
+	values: Record<string, WorkflowFormUiValue> = {},
+): WorkflowFormSubmissionRequest {
+	const fields = []
+
+	for (const key of WORKFLOW_FORM_STRING_FIELD_KEYS) {
+		const normalizedValue = normalizeWorkflowFormStringValue(values[key])
+		if (!normalizedValue) {
+			continue
+		}
+
+		fields.push({
+			key,
+			value: {
+				stringValue: normalizedValue,
+			},
+		})
+	}
+
+	const scopedPaths = normalizeWorkflowFormStringArrayValue(values.scoped_paths)
+	if (scopedPaths) {
+		fields.push({
+			key: "scoped_paths",
+			value: {
+				stringArrayValue: StringArray.create({
+					values: scopedPaths,
+				}),
+			},
+		})
+	}
+
+	const contextLines = normalizeWorkflowFormIntegerValue(values.context_lines)
+	if (contextLines !== undefined) {
+		fields.push({
+			key: "context_lines",
+			value: {
+				integerValue: contextLines,
+			},
+		})
+	}
+
+	return WorkflowFormSubmissionRequest.create({
+		sessionId,
+		action,
+		fields,
+	})
+}
+
+export async function submitWorkflowForm(
+	sessionId: string,
+	action: WorkflowFormAction,
+	values: Record<string, WorkflowFormUiValue> = {},
+) {
+	await TaskServiceClient.submitWorkflowForm(buildWorkflowFormSubmissionRequest(sessionId, action, values))
+}
 
 /**
  * Custom hook for managing message handlers
@@ -22,6 +125,8 @@ export function useMessageHandlers(messages: ClineMessage[], chatState: ChatStat
 	const isAwaitingUserResponseSystemState = isAwaitingUserResponseThreadState && awaitingUserResponseSubtype === "system"
 	const { setInputValue, activeQuote, setActiveQuote, setSelectedImages, setSelectedFiles, clineAsk, lastMessage } = chatState
 	const cancelInFlightRef = useRef(false)
+	const isWorkflowFormAwaitingSystemState =
+		isAwaitingUserResponseThreadState && awaitingUserResponseSubtype === "system" && clineAsk === "workflow_form"
 
 	const sendSteerMessage = useCallback(async (text: string, images: string[], files: string[]) => {
 		await TaskServiceClient.askResponse(
@@ -39,6 +144,10 @@ export function useMessageHandlers(messages: ClineMessage[], chatState: ChatStat
 		async (text: string, images: string[], files: string[]) => {
 			let messageToSend = text.trim()
 			const hasContent = messageToSend || images.length > 0 || files.length > 0
+
+			if (isWorkflowFormAwaitingSystemState) {
+				return
+			}
 
 			// Prepend the active quote if it exists
 			if (activeQuote && hasContent) {
@@ -198,6 +307,7 @@ export function useMessageHandlers(messages: ClineMessage[], chatState: ChatStat
 			isAwaitingUserResponseThreadState,
 			isAwaitingUserResponseUserState,
 			isAwaitingUserResponseSystemState,
+			isWorkflowFormAwaitingSystemState,
 			isPassiveThreadOpenState,
 			sendSteerMessage,
 			setInputValue,

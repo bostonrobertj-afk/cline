@@ -187,4 +187,30 @@ describe("controller/task/askResponse", () => {
 		sinon.assert.notCalled(controller.queueActiveTaskSteerFeedback)
 		sinon.assert.calledOnceWithExactly(controller.continueActiveTaskWithFeedback, "deliver after run already ended", [], [])
 	})
+
+	it("does not accept workflow-form submissions through askResponse", async () => {
+		const controller = {
+			task: {
+				handleWebviewAskResponse: sinon.stub().resolves(),
+				getThreadDisplayState: sinon.stub().returns("awaiting_user_response"),
+			},
+			isTaskActivelyRunning: sinon.stub().returns(false),
+			interruptTaskWithFeedback: sinon.stub().resolves(),
+			queueActiveTaskSteerFeedback: sinon.stub().resolves(),
+			resumePassiveTaskWithFeedback: sinon.stub().resolves(),
+		}
+
+		await askResponse(
+			controller as unknown as Controller,
+			AskResponseRequest.create({
+				responseType: "workflow_form",
+				text: '{"sessionId":"wf-1"}',
+			}),
+		)
+
+		sinon.assert.notCalled(controller.interruptTaskWithFeedback)
+		sinon.assert.notCalled(controller.queueActiveTaskSteerFeedback)
+		sinon.assert.notCalled(controller.resumePassiveTaskWithFeedback)
+		sinon.assert.notCalled(controller.task.handleWebviewAskResponse)
+	})
 })

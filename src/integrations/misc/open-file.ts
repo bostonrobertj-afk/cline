@@ -29,11 +29,28 @@ export async function openImage(dataUri: string) {
 	}
 }
 
-export async function openFile(absolutePath: string, preserveFocus: boolean = false, preview: boolean = false) {
+export async function openFile(
+	absolutePath: string,
+	preserveFocus = false,
+	preview = false,
+	selection?: {
+		startLine: number
+		startCharacter: number
+		endLine: number
+		endCharacter: number
+	},
+) {
 	try {
 		await HostProvider.window.showTextDocument({
 			path: absolutePath,
-			options: { preserveFocus, preview },
+			options: {
+				preserveFocus,
+				preview,
+				selectionStartLine: selection?.startLine,
+				selectionStartCharacter: selection?.startCharacter,
+				selectionEndLine: selection?.endLine,
+				selectionEndCharacter: selection?.endCharacter,
+			},
 		})
 	} catch (_error) {
 		HostProvider.window.showMessage({

@@ -404,6 +404,8 @@
 		"verify-managed-workflow-assets": "node scripts/verify-managed-workflow-assets.mjs",
 		"package": "npm run generate-managed-workflows && npm run verify-managed-workflow-assets && npm run check-types && npm run build:webview && npm run lint && node esbuild.mjs --production",
 		"protos": "node scripts/build-proto.mjs",
+		"generate-workflow-ui-surface-docs": "npx tsx scripts/generate-workflow-ui-surface-docs.ts",
+		"verify-workflow-ui-surface-docs": "npx tsx scripts/verify-workflow-ui-surface-docs.ts",
 		"protos-python": "node scripts/build-python-proto.mjs",
 		"download-ripgrep": "node scripts/download-ripgrep.mjs",
 		"postprotos": "biome format src/shared/proto src/core/controller src/hosts/ webview-ui/src/services src/generated --write --no-errors-on-unmatched",

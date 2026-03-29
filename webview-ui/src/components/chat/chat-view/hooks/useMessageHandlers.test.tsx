@@ -1,4 +1,5 @@
 import type { ClineMessage } from "@shared/ExtensionMessage"
+import { WorkflowFormAction } from "@shared/proto/cline/task"
 import { act, renderHook } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import type { ChatState } from "../types/chatTypes"
@@ -6,6 +7,7 @@ import type { ChatState } from "../types/chatTypes"
 const {
 	mockAskResponse,
 	mockNewTask,
+	mockSubmitWorkflowForm,
 	mockClearTask,
 	mockCancelTask,
 	mockCancelBackgroundCommand,
@@ -16,6 +18,7 @@ const {
 } = vi.hoisted(() => ({
 	mockAskResponse: vi.fn().mockResolvedValue(undefined),
 	mockNewTask: vi.fn(),
+	mockSubmitWorkflowForm: vi.fn().mockResolvedValue(undefined),
 	mockClearTask: vi.fn(),
 	mockCancelTask: vi.fn(),
 	mockCancelBackgroundCommand: vi.fn(),
@@ -41,13 +44,14 @@ vi.mock("@/services/grpc-client", () => ({
 	TaskServiceClient: {
 		askResponse: mockAskResponse,
 		newTask: mockNewTask,
+		submitWorkflowForm: mockSubmitWorkflowForm,
 		clearTask: mockClearTask,
 		cancelTask: mockCancelTask,
 		cancelBackgroundCommand: mockCancelBackgroundCommand,
 	},
 }))
 
-import { useMessageHandlers } from "./useMessageHandlers"
+import { submitWorkflowForm, useMessageHandlers } from "./useMessageHandlers"
 
 function createChatState(): ChatState {
 	return {
@@ -235,6 +239,96 @@ describe("useMessageHandlers active_user routing", () => {
 		})
 
 		expect(mockAskResponse).not.toHaveBeenCalled()
+		expect(chatState.setInputValue).not.toHaveBeenCalled()
+	})
+
+	it("routes structured workflow form submissions through submitWorkflowForm", async () => {
+		await submitWorkflowForm("session-1", WorkflowFormAction.SUBMIT, {
+			"source.type": "commit_range",
+			"source.base": "main",
+			"source.head": "feature/review",
+			scoped_paths: "src/core/task/index.ts\nsrc/core/task/TaskState.ts",
+			context_lines: "5",
+		})
+
+		expect(mockSubmitWorkflowForm).toHaveBeenCalledTimes(1)
+		expect(mockSubmitWorkflowForm).toHaveBeenCalledWith(
+			expect.objectContaining({
+				sessionId: "session-1",
+				action: WorkflowFormAction.SUBMIT,
+				fields: [
+					{
+						key: "source.type",
+						value: {
+							stringValue: "commit_range",
+						},
+					},
+					{
+						key: "source.base",
+						value: {
+							stringValue: "main",
+						},
+					},
+					{
+						key: "source.head",
+						value: {
+							stringValue: "feature/review",
+						},
+					},
+					{
+						key: "scoped_paths",
+						value: {
+							stringArrayValue: {
+								values: ["src/core/task/index.ts", "src/core/task/TaskState.ts"],
+							},
+						},
+					},
+					{
+						key: "context_lines",
+						value: {
+							integerValue: 5,
+						},
+					},
+				],
+			}),
+		)
+	})
+
+	it("does not allow composer sends while a system-owned workflow form is awaiting input", async () => {
+		mockThreadDisplayState.value = "awaiting_user_response"
+		mockAwaitingUserResponseSubtype.value = "system"
+		const messages: ClineMessage[] = [
+			{
+				ts: Date.now(),
+				type: "ask",
+				ask: "workflow_form",
+				text: JSON.stringify({
+					sessionId: "session-1",
+					resolverId: "code_review_step_3_diff_source",
+					toolName: "build_review_diff_output",
+					title: "Prepare Diff Input",
+					prompt: "System-owned collection flow",
+					phase: "confirm",
+					toolDictionaryRelativePath: "docs/workflow-ui-surface/tool-dictionary.md",
+					toolDictionaryStartLine: 42,
+					options: ["Yes", "No"],
+				}),
+			},
+		]
+
+		const chatState = {
+			...createChatState(),
+			clineAsk: "workflow_form" as const,
+			lastMessage: messages[0],
+		}
+		const { result } = renderHook(() => useMessageHandlers(messages, chatState))
+
+		await act(async () => {
+			await result.current.handleSendMessage("Blocked system-owned form input", [], [])
+		})
+
+		expect(mockAskResponse).not.toHaveBeenCalled()
+		expect(mockSubmitWorkflowForm).not.toHaveBeenCalled()
 		expect(chatState.setInputValue).not.toHaveBeenCalled()
 	})
 })

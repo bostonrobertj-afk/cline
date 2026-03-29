@@ -12,6 +12,7 @@ import { FocusChainManager } from "../focus-chain"
 import { Task, type ToolResponse } from "../index"
 import { TaskState } from "../TaskState"
 import { activateManagedWorkflowInTaskState } from "../workflow-activation"
+import type { WorkflowFormSessionState } from "../workflow-form/types"
 
 function createFocusChainManager(taskState: TaskState) {
 	return new FocusChainManager({
@@ -180,6 +181,47 @@ Inspect the prepared review input and write findings.
 
 		expect(taskState.activePlaceholderWorkflowDeterministicState).to.equal(undefined)
 		expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+	})
+
+	it("persists and restores the active workflow-form session in task metadata", async () => {
+		const sandbox = sinon.createSandbox()
+		const session: WorkflowFormSessionState = {
+			sessionId: "wf-session-1",
+			resolverId: "code_review_step_3_diff_source",
+			triggerSource: "deterministic_workflow_progression",
+			owner: {
+				kind: "placeholder_workflow_step",
+				workflowName: "code-review.md",
+				stepNumber: 3,
+			},
+			phase: "collect",
+			values: {
+				"source.type": {
+					stringValue: "commit",
+				},
+			},
+			lastError: "Tool execution failed",
+		}
+
+		try {
+			sandbox.stub(disk, "getTaskMetadata").resolves({
+				activeWorkflowFormSession: session,
+			} as never)
+			const saveTaskMetadataStub = sandbox.stub(disk, "saveTaskMetadata").resolves()
+
+			const fakeTask = createFakeTask("task-workflow-form-metadata")
+			fakeTask.taskState.activeWorkflowFormSession = session
+
+			await (Task.prototype as any).persistWorkflowFormSession.call(fakeTask)
+			await (Task.prototype as any).restoreBmadStateFromMetadata.call(fakeTask)
+
+			expect(fakeTask.taskState.activeWorkflowFormSession).to.deep.equal(session)
+			expect(saveTaskMetadataStub.called).to.be.true
+			const lastSavedMetadata = saveTaskMetadataStub.getCall(saveTaskMetadataStub.callCount - 1).args[1]
+			expect(lastSavedMetadata.activeWorkflowFormSession).to.deep.equal(session)
+		} finally {
+			sandbox.restore()
+		}
 	})
 
 	it("computes stable placeholder values from slash-command activation metadata and renders them in activation instructions", async () => {

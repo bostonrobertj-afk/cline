@@ -8,9 +8,14 @@ import {
 	ClineSayAgentFeedback,
 	ClineSayGenerateExplanation,
 	ClineSayTool,
+	ClineWorkflowForm,
 	COMPLETION_RESULT_CHANGES_FLAG,
+	WorkflowFormFieldDefinition,
+	WorkflowFormFieldValuePayload,
 } from "@shared/ExtensionMessage"
 import { BooleanRequest, StringRequest } from "@shared/proto/cline/common"
+import { OpenFileRelativePathAtRangeRequest } from "@shared/proto/cline/file"
+import { WorkflowFormAction } from "@shared/proto/cline/task"
 import { Mode } from "@shared/storage/types"
 import deepEqual from "fast-deep-equal"
 import {
@@ -52,6 +57,7 @@ import { findMatchingResourceOrTemplate, getMcpServerDisplayName } from "@/utils
 import CodeAccordian, { cleanPathPrefix } from "../common/CodeAccordian"
 import { CommandOutputContent, CommandOutputRow } from "./CommandOutputRow"
 import { CompletionOutputRow } from "./CompletionOutputRow"
+import { submitWorkflowForm } from "./chat-view/hooks/useMessageHandlers"
 import { getActiveAssistantName } from "./chat-view/shared/assistantName"
 import { isPassiveThreadOpen } from "./chat-view/shared/buttonConfig"
 import { DiffEditRow } from "./DiffEditRow"
@@ -122,6 +128,34 @@ export const getFollowupPresentation = (messageText?: string, isPassiveThreadOpe
 		selected,
 		hasQuestion,
 		title: hasQuestion ? `${assistantName} has a question:` : "Conversation reopened:",
+	}
+}
+
+const createWorkflowFormInputValues = (values?: Record<string, WorkflowFormFieldValuePayload>) =>
+	Object.fromEntries(
+		Object.entries(values ?? {}).map(([key, value]) => [
+			key,
+			value.stringValue ?? value.integerValue?.toString() ?? value.stringArrayValue?.join("\n") ?? "",
+		]),
+	) as Record<string, string>
+
+const isWorkflowFormFieldRequiredValueValid = (field: WorkflowFormFieldDefinition, values: Record<string, string>) => {
+	const value = values[field.key]?.trim() ?? ""
+
+	if (!field.required) {
+		return true
+	}
+
+	switch (field.control) {
+		case "textarea":
+			return value
+				.split("\n")
+				.map((entry) => entry.trim())
+				.some((entry) => entry.length > 0)
+		case "number":
+			return /^-?\d+$/.test(value)
+		default:
+			return value.length > 0
 	}
 }
 
@@ -246,6 +280,31 @@ export const ChatRowContent = memo(
 				: undefined
 
 		const type = message.type === "ask" ? message.ask : message.say
+		const workflowForm = useMemo(() => {
+			if (message.ask !== "workflow_form" || !message.text) {
+				return undefined
+			}
+
+			try {
+				return JSON.parse(message.text) as ClineWorkflowForm
+			} catch (error) {
+				console.error("Failed to parse workflow form payload:", error)
+				return undefined
+			}
+		}, [message.ask, message.text])
+		const [workflowFormValues, setWorkflowFormValues] = useState<Record<string, string>>({})
+		const [workflowFormSubmissionPending, setWorkflowFormSubmissionPending] = useState(false)
+
+		useEffect(() => {
+			if (!workflowForm) {
+				setWorkflowFormValues({})
+				setWorkflowFormSubmissionPending(false)
+				return
+			}
+
+			setWorkflowFormValues(createWorkflowFormInputValues(workflowForm.values))
+			setWorkflowFormSubmissionPending(false)
+		}, [workflowForm])
 
 		const isCommandMessage = type === "command"
 		// Check if command has output to determine if it's actually executing
@@ -257,6 +316,11 @@ export const ChatRowContent = memo(
 		const isCommandCompleted = isCommandMessage && message.commandCompleted === true
 
 		const isMcpServerResponding = isLast && lastModifiedMessage?.say === "mcp_server_request_started"
+		const visibleWorkflowFormFields = workflowForm?.fields?.filter((field) => field.visible !== false) ?? []
+		const isWorkflowFormSubmitDisabled =
+			workflowForm?.phase === "collect" || workflowForm?.phase === "retry_error"
+				? visibleWorkflowFormFields.some((field) => !isWorkflowFormFieldRequiredValueValid(field, workflowFormValues))
+				: false
 
 		const handleToggle = useCallback(() => {
 			onToggleExpand(message.ts)
@@ -412,6 +476,49 @@ export const ChatRowContent = memo(
 			followupPresentation.hasQuestion,
 			followupPresentation.title,
 		])
+
+		const handleWorkflowFormFieldChange = useCallback((key: string, value: string) => {
+			setWorkflowFormValues((currentValues) => ({
+				...currentValues,
+				[key]: value,
+			}))
+		}, [])
+
+		const handleWorkflowFormAction = useCallback(
+			async (action: WorkflowFormAction, values?: Record<string, string>) => {
+				if (!workflowForm || workflowFormSubmissionPending) {
+					return
+				}
+
+				setWorkflowFormSubmissionPending(true)
+				try {
+					await submitWorkflowForm(workflowForm.sessionId, action, values)
+				} catch (error) {
+					console.error("Failed to submit workflow form:", error)
+					setWorkflowFormSubmissionPending(false)
+				}
+			},
+			[workflowForm, workflowFormSubmissionPending],
+		)
+
+		const handleWorkflowDictionaryOpen = useCallback(async () => {
+			if (!workflowForm) {
+				return
+			}
+
+			try {
+				await FileServiceClient.openFileRelativePathAtRange(
+					OpenFileRelativePathAtRangeRequest.create({
+						relativePath: workflowForm.toolDictionaryRelativePath,
+						startLine: workflowForm.toolDictionaryStartLine,
+						preview: false,
+						preserveFocus: false,
+					}),
+				)
+			} catch (error) {
+				console.error("Failed to open workflow form dictionary:", error)
+			}
+		}, [workflowForm])
 
 		const tool = useMemo(() => {
 			if (message.ask === "tool" || message.say === "tool") {
@@ -1337,6 +1444,159 @@ export const ChatRowContent = memo(
 									options={options}
 									selected={selected}
 								/>
+							</div>
+						)
+					}
+					case "workflow_form": {
+						if (!workflowForm) {
+							return <InvisibleSpacer />
+						}
+
+						return (
+							<div className="border border-editor-group-border rounded-xs bg-code/40 p-3">
+								<div className={HEADER_CLASSNAMES}>
+									<SettingsIcon className="size-2" />
+									<span className="font-bold">System-owned form:</span>
+								</div>
+								<div className="text-sm font-semibold">{workflowForm.title}</div>
+								<div className="pt-2">
+									<MarkdownRow
+										markdown={
+											workflowForm.phase === "success"
+												? workflowForm.successMessage || ""
+												: workflowForm.prompt
+										}
+									/>
+								</div>
+								{workflowForm.phase === "confirm" && (
+									<div className="pt-3">
+										<OptionsButtons
+											isActive={isLast && message.ask === "workflow_form" && !workflowFormSubmissionPending}
+											onSelect={(option) =>
+												handleWorkflowFormAction(
+													option === "Yes" ? WorkflowFormAction.SUBMIT : WorkflowFormAction.CANCEL,
+													option === "Yes" ? { confirm: "yes" } : undefined,
+												)
+											}
+											options={workflowForm.options ?? ["Yes", "No"]}
+										/>
+									</div>
+								)}
+								{(workflowForm.phase === "collect" || workflowForm.phase === "retry_error") && (
+									<div className="pt-3 space-y-3">
+										<button
+											className="text-xs underline underline-offset-2 text-link disabled:opacity-50"
+											disabled={workflowFormSubmissionPending}
+											onClick={() => {
+												void handleWorkflowDictionaryOpen()
+											}}
+											type="button">
+											About build_review_diff_output
+										</button>
+										{workflowForm.phase === "retry_error" && workflowForm.errorMessage && (
+											<div className="rounded-xs border border-error/50 bg-error/10 px-3 py-2 text-sm text-foreground">
+												{workflowForm.errorMessage}
+											</div>
+										)}
+										<div className="space-y-3">
+											{visibleWorkflowFormFields.map((field) => (
+												<label className="block" key={field.key}>
+													<div className="mb-1 text-xs font-semibold text-foreground">
+														{field.label}
+													</div>
+													<div className="mb-2 text-xs text-muted-foreground">{field.help}</div>
+													{field.control === "select" && (
+														<select
+															aria-label={field.label}
+															className="w-full rounded-xs border border-editor-group-border bg-background px-3 py-2 text-sm text-foreground"
+															disabled={workflowFormSubmissionPending}
+															onChange={(event) =>
+																handleWorkflowFormFieldChange(field.key, event.target.value)
+															}
+															value={workflowFormValues[field.key] ?? ""}>
+															<option value="">Select an option</option>
+															{field.options?.map((option) => (
+																<option key={option.value} value={option.value}>
+																	{option.label}
+																</option>
+															))}
+														</select>
+													)}
+													{field.control === "text" && (
+														<input
+															aria-label={field.label}
+															className="w-full rounded-xs border border-editor-group-border bg-background px-3 py-2 text-sm text-foreground"
+															disabled={workflowFormSubmissionPending}
+															onChange={(event) =>
+																handleWorkflowFormFieldChange(field.key, event.target.value)
+															}
+															placeholder={field.placeholder}
+															type="text"
+															value={workflowFormValues[field.key] ?? ""}
+														/>
+													)}
+													{field.control === "textarea" && (
+														<textarea
+															aria-label={field.label}
+															className="min-h-24 w-full rounded-xs border border-editor-group-border bg-background px-3 py-2 text-sm text-foreground"
+															disabled={workflowFormSubmissionPending}
+															onChange={(event) =>
+																handleWorkflowFormFieldChange(field.key, event.target.value)
+															}
+															placeholder={field.placeholder}
+															value={workflowFormValues[field.key] ?? ""}
+														/>
+													)}
+													{field.control === "number" && (
+														<input
+															aria-label={field.label}
+															className="w-full rounded-xs border border-editor-group-border bg-background px-3 py-2 text-sm text-foreground"
+															disabled={workflowFormSubmissionPending}
+															inputMode="numeric"
+															onChange={(event) =>
+																handleWorkflowFormFieldChange(field.key, event.target.value)
+															}
+															placeholder={field.placeholder}
+															type="text"
+															value={workflowFormValues[field.key] ?? ""}
+														/>
+													)}
+												</label>
+											))}
+										</div>
+										<div className="flex flex-wrap gap-2">
+											<button
+												className="rounded-xs border border-editor-group-border px-3 py-2 text-sm text-foreground disabled:opacity-50"
+												disabled={workflowFormSubmissionPending}
+												onClick={() => {
+													void handleWorkflowFormAction(WorkflowFormAction.CANCEL)
+												}}
+												type="button">
+												Cancel
+											</button>
+											{workflowForm.phase === "retry_error" && (
+												<button
+													className="rounded-xs border border-editor-group-border px-3 py-2 text-sm text-foreground disabled:opacity-50"
+													disabled={workflowFormSubmissionPending}
+													onClick={() => {
+														void handleWorkflowFormAction(WorkflowFormAction.RETRY)
+													}}
+													type="button">
+													Retry
+												</button>
+											)}
+											<button
+												className="rounded-xs bg-button-background px-3 py-2 text-sm text-primary-foreground disabled:opacity-50"
+												disabled={workflowFormSubmissionPending || isWorkflowFormSubmitDisabled}
+												onClick={() => {
+													void handleWorkflowFormAction(WorkflowFormAction.SUBMIT, workflowFormValues)
+												}}
+												type="button">
+												{workflowForm.submitLabel || "Submit"}
+											</button>
+										</div>
+									</div>
+								)}
 							</div>
 						)
 					}

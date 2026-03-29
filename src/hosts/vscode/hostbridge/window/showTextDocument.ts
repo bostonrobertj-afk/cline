@@ -35,6 +35,21 @@ export async function showTextDocument(request: ShowTextDocumentRequest): Promis
 	if (request.options?.viewColumn !== undefined) {
 		options.viewColumn = request.options.viewColumn
 	}
+	if (request.options?.selectionStartLine !== undefined) {
+		const start = new vscode.Position(
+			request.options.selectionStartLine - 1,
+			(request.options.selectionStartCharacter ?? 1) - 1,
+		)
+		const end =
+			request.options.selectionEndLine !== undefined
+				? new vscode.Position(
+						request.options.selectionEndLine - 1,
+						(request.options.selectionEndCharacter ?? request.options.selectionStartCharacter ?? 1) - 1,
+					)
+				: start
+
+		options.selection = new vscode.Range(start, end)
+	}
 
 	const editor = await vscode.window.showTextDocument(uri, options)
 

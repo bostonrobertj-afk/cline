@@ -188,6 +188,43 @@ Wait for review input to be prepared.`,
 		}
 	})
 
+	it("completes code-review step 3 when diff_output points to a fresh review-input.diff artifact", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-step3-success-"))
+
+		try {
+			const outputFolder = path.join(tempDir, "output")
+			const taskState = createTaskState({
+				workflowName: "code-review.md",
+				workflowContents: `## Step 3: System-Owned Diff Source Resolution And Diff Output Persistence
+Wait for the stable diff artifact to be prepared.`,
+				checklistMarkdown: "- [ ] Step 3: System-Owned Diff Source Resolution And Diff Output Persistence",
+				placeholderValues: {
+					output_folder: outputFolder,
+					diff_output: path.join(outputFolder, "review-input.diff"),
+				},
+			})
+			taskState.taskStartTimeMs = Date.now()
+
+			await writeFileWithMtime(
+				path.join(outputFolder, "review-input.diff"),
+				"diff --git a/file b/file",
+				taskState.taskStartTimeMs + 1_000,
+			)
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: taskState.currentFocusChainChecklist!,
+			})
+
+			expect(result.checklist).to.equal("- [x] Step 3: System-Owned Diff Source Resolution And Diff Output Persistence")
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
+				"diff_output points to a fresh review-input.diff artifact.",
+			)
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
 	it("does not complete code-review step 3 from fallback file existence alone when diff_output is missing", async () => {
 		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-step3-fallback-only-"))
 

@@ -28,11 +28,13 @@ export const OptionsButtons = ({
 	selected,
 	isActive,
 	inputValue,
+	onSelect,
 }: {
 	options?: string[]
 	selected?: string
 	isActive?: boolean
 	inputValue?: string
+	onSelect?: (option: string) => Promise<void> | void
 }) => {
 	if (!options?.length) {
 		return null
@@ -62,6 +64,10 @@ export const OptionsButtons = ({
 							return
 						}
 						try {
+							if (onSelect) {
+								await onSelect(option)
+								return
+							}
 							await TaskServiceClient.askResponse(
 								AskResponseRequest.create({
 									responseType: "messageResponse",

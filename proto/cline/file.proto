@@ -67,6 +67,9 @@ service FileService {
   // Open a file in editor by a relative path
   rpc openFileRelativePath(StringRequest) returns (Empty);
 
+  // Open a file in the editor by a relative path and reveal a target line/range
+  rpc openFileRelativePathAtRange(OpenFileRelativePathAtRangeRequest) returns (Empty);
+
   // Opens or creates a focus chain checklist markdown file for editing
   rpc openFocusChainFile(StringRequest) returns (Empty);
 
@@ -93,6 +96,17 @@ service FileService {
 
   // Deletes an existing skill directory
   rpc deleteSkillFile(DeleteSkillRequest) returns (SkillsToggles);
+}
+
+message OpenFileRelativePathAtRangeRequest {
+  Metadata metadata = 1;
+  string relative_path = 2;
+  int32 start_line = 3;
+  optional int32 start_character = 4;
+  optional int32 end_line = 5;
+  optional int32 end_character = 6;
+  optional bool preserve_focus = 7;
+  optional bool preview = 8;
 }
 
 // Response for refreshRules operation

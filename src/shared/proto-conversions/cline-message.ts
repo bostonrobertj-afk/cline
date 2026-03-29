@@ -39,6 +39,7 @@ function convertClineAskToProtoEnum(ask: AppClineAsk | undefined): ClineAsk | un
 		summarize_task: ClineAsk.SUMMARIZE_TASK,
 		report_bug: ClineAsk.REPORT_BUG,
 		use_subagents: ClineAsk.USE_SUBAGENTS,
+		workflow_form: ClineAsk.WORKFLOW_FORM,
 	}
 
 	const result = mapping[ask]
@@ -72,6 +73,7 @@ function convertProtoEnumToClineAsk(ask: ClineAsk): AppClineAsk | undefined {
 		[ClineAsk.SUMMARIZE_TASK]: "summarize_task",
 		[ClineAsk.REPORT_BUG]: "report_bug",
 		[ClineAsk.USE_SUBAGENTS]: "use_subagents",
+		[ClineAsk.WORKFLOW_FORM]: "workflow_form",
 	}
 
 	return mapping[ask]
@@ -216,6 +218,7 @@ function convertClineSayToProtoEnum(say: AppClineSay | undefined): ClineSay | un
 		use_subagents: ClineSay.USE_SUBAGENTS_SAY,
 		subagent_usage: ClineSay.SUBAGENT_USAGE,
 		generate_explanation: ClineSay.GENERATE_EXPLANATION,
+		workflow_form: ClineSay.WORKFLOW_FORM_SAY,
 	}
 
 	const result = mapping[say]
@@ -268,6 +271,7 @@ function convertProtoEnumToClineSay(say: ClineSay): AppClineSay | undefined {
 		[ClineSay.SUBAGENT_STATUS]: "subagent",
 		[ClineSay.USE_SUBAGENTS_SAY]: "use_subagents",
 		[ClineSay.SUBAGENT_USAGE]: "subagent_usage",
+		[ClineSay.WORKFLOW_FORM_SAY]: "workflow_form",
 	}
 
 	return mapping[say]

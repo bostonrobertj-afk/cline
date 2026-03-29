@@ -38,10 +38,17 @@ import {
 	getTaskMetadata,
 	saveTaskMetadata,
 } from "@core/storage/disk"
-import { isDeterministicPlaceholderWorkflowSupported } from "@core/task/focus-chain/deterministicPlaceholderProgression"
+import {
+	applyDeterministicPlaceholderProgression,
+	type DeterministicPlaceholderToolContext,
+	isDeterministicPlaceholderWorkflowSupported,
+} from "@core/task/focus-chain/deterministicPlaceholderProgression"
 import { releaseTaskLock } from "@core/task/TaskLockUtils"
+import { WorkflowFormRuntime } from "@core/task/workflow-form/WorkflowFormRuntime"
+import { getPlaceholderWorkflowValueMap } from "@core/workflows/placeholder-workflow-rendering"
 import {
 	buildPlaceholderWorkflowChecklist,
+	getActivePlaceholderWorkflowStepDetails,
 	resolveActivePlaceholderWorkflowPromptContext,
 } from "@core/workflows/placeholder-workflow-step-details"
 import { createWorkflowSkillMetadata, resolveAvailableWorkflows } from "@core/workflows/resolution/resolveAvailableWorkflows"
@@ -68,6 +75,7 @@ import {
 	ClineApiReqInfo,
 	ClineAsk,
 	ClineSay,
+	type ClineWorkflowForm,
 	ThreadDisplayState,
 	ThreadDisplayStates,
 } from "@shared/ExtensionMessage"
@@ -111,6 +119,7 @@ import {
 	ClineUserContent,
 } from "@/shared/messages"
 import { ApiFormat } from "@/shared/proto/cline/models"
+import { WorkflowFormSubmissionRequest } from "@/shared/proto/cline/task"
 import { ShowMessageType } from "@/shared/proto/index.host"
 import { Logger } from "@/shared/services/Logger"
 import { Session } from "@/shared/services/Session"
@@ -153,6 +162,7 @@ import {
 	activatePlaceholderWorkflowInTaskState,
 	buildActivePlaceholderWorkflowActivationInstructions,
 } from "./workflow-activation"
+import type { WorkflowFormRuntimeOutcome, WorkflowFormSessionState } from "./workflow-form/types"
 
 export type ToolResponse = ClineToolResponseContent
 
@@ -199,6 +209,54 @@ export function isActiveDeterministicPlaceholderWorkflowEnabled(
 	taskState: Pick<TaskState, "activePlaceholderWorkflowSource">,
 ): boolean {
 	return isDeterministicPlaceholderWorkflowSupported(taskState.activePlaceholderWorkflowSource?.name)
+}
+
+export async function shouldInterceptWorkflowFormBeforeApiTurn(args: {
+	cwd: string
+	taskState: Pick<
+		TaskState,
+		| "activePlaceholderWorkflowSource"
+		| "currentFocusChainChecklist"
+		| "activePlaceholderWorkflowStableValues"
+		| "activePlaceholderWorkflowValues"
+		| "taskStartTimeMs"
+	>
+}): Promise<boolean> {
+	if (args.taskState.activePlaceholderWorkflowSource?.name !== "code-review.md") {
+		return false
+	}
+
+	if (!args.taskState.currentFocusChainChecklist) {
+		return false
+	}
+
+	const activeStep = await getActivePlaceholderWorkflowStepDetails({
+		checklistMarkdown: args.taskState.currentFocusChainChecklist,
+		source: args.taskState.activePlaceholderWorkflowSource,
+		stablePlaceholderValues: args.taskState.activePlaceholderWorkflowStableValues,
+		placeholderValues: args.taskState.activePlaceholderWorkflowValues,
+	})
+	if (activeStep?.stepNumber !== 3) {
+		return false
+	}
+
+	const placeholders = getPlaceholderWorkflowValueMap(
+		args.taskState.activePlaceholderWorkflowStableValues,
+		args.taskState.activePlaceholderWorkflowValues,
+	)
+	const diffOutputPath = placeholders?.diff_output?.trim()
+	if (!diffOutputPath) {
+		return true
+	}
+
+	const resolvedDiffOutputPath = path.isAbsolute(diffOutputPath) ? diffOutputPath : path.resolve(args.cwd, diffOutputPath)
+
+	try {
+		const stats = await fs.stat(resolvedDiffOutputPath)
+		return !(stats.isFile() && stats.mtimeMs >= args.taskState.taskStartTimeMs)
+	} catch {
+		return true
+	}
 }
 
 export function isActiveThreadDisplayState(threadDisplayState: ThreadDisplayState): boolean {
@@ -562,10 +620,12 @@ export class Task {
 		partialLifecycle: "partial_started" | "finalized",
 		threadDisplayState: ThreadDisplayState,
 	): AwaitingUserResponseSubtype | undefined {
-		void type
-
 		if (threadDisplayState !== ThreadDisplayStates.AWAITING_USER_RESPONSE) {
 			return undefined
+		}
+
+		if (type === "workflow_form") {
+			return AwaitingUserResponseSubtypes.SYSTEM
 		}
 
 		return partialLifecycle === "partial_started" ? AwaitingUserResponseSubtypes.SYSTEM : AwaitingUserResponseSubtypes.USER
@@ -587,6 +647,8 @@ export class Task {
 	private clineIgnoreController: ClineIgnoreController
 	private commandPermissionController: CommandPermissionController
 	private toolExecutor: ToolExecutor
+	private workflowFormRuntime: WorkflowFormRuntime
+	private pendingWorkflowFormOutcome?: WorkflowFormRuntimeOutcome
 	/**
 	 * Whether the task is using native tool calls.
 	 * This is used to determine how we would format response.
@@ -689,6 +751,7 @@ export class Task {
 		this.browserSession = new BrowserSession(stateManager)
 		this.contextManager = new ContextManager()
 		this.streamHandler = new StreamResponseHandler()
+		this.workflowFormRuntime = new WorkflowFormRuntime()
 		this.cwd = cwd
 		this.stateManager = stateManager
 		this.workspaceManager = workspaceManager
@@ -1200,6 +1263,253 @@ export class Task {
 		this.taskState.askResponseFiles = files
 	}
 
+	async handleWorkflowFormSubmission(request: WorkflowFormSubmissionRequest) {
+		const activeSession = this.taskState.activeWorkflowFormSession
+		if (!activeSession) {
+			return
+		}
+
+		if (request.sessionId !== activeSession.sessionId) {
+			return
+		}
+
+		const outcome = this.workflowFormRuntime.handleSubmission(activeSession, request)
+
+		switch (outcome.kind) {
+			case "render_form":
+			case "invoke_tool":
+				this.taskState.activeWorkflowFormSession = outcome.session
+				await this.persistWorkflowFormSession()
+				break
+			case "fallback_to_agent":
+				await this.clearWorkflowFormSession()
+				break
+		}
+
+		this.pendingWorkflowFormOutcome = outcome
+	}
+
+	private async persistWorkflowFormSession() {
+		try {
+			const taskMetadata = await getTaskMetadata(this.taskId)
+			taskMetadata.activeWorkflowFormSession = this.taskState.activeWorkflowFormSession
+			await saveTaskMetadata(this.taskId, taskMetadata)
+		} catch {
+			// Non-fatal: prompt/runtime state should continue even if metadata persistence fails.
+		}
+	}
+
+	private async clearWorkflowFormSession() {
+		this.taskState.activeWorkflowFormSession = undefined
+		await this.persistWorkflowFormSession()
+	}
+
+	private async renderWorkflowFormMessage(payload: ClineWorkflowForm): Promise<void> {
+		const text = JSON.stringify(payload)
+		const nextThreadDisplayState = ThreadDisplayStates.AWAITING_USER_RESPONSE
+		const nextAwaitingSubtype = AwaitingUserResponseSubtypes.SYSTEM
+		const clineMessages = this.messageStateHandler.getClineMessages()
+		const lastMessage = clineMessages.at(-1)
+
+		this.setThreadDisplayState(
+			nextThreadDisplayState,
+			"workflow_form_render",
+			{
+				phase: payload.phase,
+				resolverId: payload.resolverId,
+			},
+			nextAwaitingSubtype,
+		)
+
+		if (lastMessage?.type === "ask" && lastMessage.ask === "workflow_form") {
+			await this.messageStateHandler.updateClineMessage(clineMessages.length - 1, {
+				text,
+				partial: false,
+				threadDisplayState: nextThreadDisplayState,
+				awaitingUserResponseSubtype: nextAwaitingSubtype,
+			})
+		} else {
+			const askTs = Date.now()
+			this.taskState.lastMessageTs = askTs
+			await this.messageStateHandler.addToClineMessages({
+				ts: askTs,
+				type: "ask",
+				ask: "workflow_form",
+				threadDisplayState: this.threadDisplayState,
+				awaitingUserResponseSubtype: this.awaitingUserResponseSubtype,
+				text,
+			})
+		}
+
+		await this.postStateToWebview()
+	}
+
+	private async syncDeterministicProgressionAfterWorkflowFormTool(
+		toolContext: DeterministicPlaceholderToolContext,
+	): Promise<void> {
+		let checklist = this.taskState.currentFocusChainChecklist
+		if (!checklist && this.taskState.activePlaceholderWorkflowSource) {
+			checklist = await buildPlaceholderWorkflowChecklist({
+				source: this.taskState.activePlaceholderWorkflowSource,
+				stablePlaceholderValues: this.taskState.activePlaceholderWorkflowStableValues,
+				placeholderValues: this.taskState.activePlaceholderWorkflowValues,
+			})
+			if (checklist) {
+				this.taskState.currentFocusChainChecklist = checklist
+			}
+		}
+
+		if (!checklist) {
+			return
+		}
+
+		if (this.FocusChainManager) {
+			await this.FocusChainManager.updateFCListFromToolResponse(checklist, toolContext)
+			return
+		}
+
+		const progressionResult = await applyDeterministicPlaceholderProgression({
+			taskState: this.taskState,
+			checklistMarkdown: checklist,
+			toolContext,
+		})
+
+		if (progressionResult.checklist !== checklist) {
+			this.taskState.currentFocusChainChecklist = progressionResult.checklist
+			await this.say("task_progress", progressionResult.checklist)
+			await this.postStateToWebview()
+		}
+	}
+
+	private getWorkflowFormToolErrorMessage(previousUserMessageContentLength: number): string {
+		const appendedContent = this.taskState.userMessageContent.slice(previousUserMessageContentLength)
+		const textContent = appendedContent
+			.map((item) => {
+				if (item.type === "text") {
+					return item.text
+				}
+				if (item.type === "tool_result" && typeof item.content === "string") {
+					return item.content
+				}
+				return undefined
+			})
+			.find((item): item is string => typeof item === "string" && item.trim().length > 0)
+
+		return textContent ?? "The workflow form could not build the Step 3 diff artifact. Review the input and try again."
+	}
+
+	private async executeWorkflowFormToolAndSync(outcome: Extract<WorkflowFormRuntimeOutcome, { kind: "invoke_tool" }>) {
+		const previousUserMessageContentLength = this.taskState.userMessageContent.length
+		const toolParams: Record<string, string> = {
+			source: JSON.stringify(outcome.toolInput.source),
+		}
+
+		if (Array.isArray(outcome.toolInput.scoped_paths)) {
+			toolParams.scoped_paths = JSON.stringify(outcome.toolInput.scoped_paths)
+		}
+		if (typeof outcome.toolInput.context_lines === "number") {
+			toolParams.context_lines = String(outcome.toolInput.context_lines)
+		}
+
+		await this.toolExecutor.executeTool({
+			type: "tool_use",
+			name: ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT,
+			params: toolParams as any,
+			partial: false,
+		})
+
+		await this.syncDeterministicProgressionAfterWorkflowFormTool({
+			toolName: outcome.toolName,
+			toolParams: outcome.toolInput,
+			toolResult: this.taskState.userMessageContent.at(-1),
+			toolWasExecuted: true,
+		})
+
+		const stillNeedsWorkflowForm = await shouldInterceptWorkflowFormBeforeApiTurn({
+			cwd: this.cwd,
+			taskState: this.taskState,
+		})
+
+		return {
+			succeeded: !stillNeedsWorkflowForm,
+			errorMessage: this.getWorkflowFormToolErrorMessage(previousUserMessageContentLength),
+		}
+	}
+
+	private async maybeResolveWorkflowFormBeforeApiTurn(): Promise<void> {
+		const shouldIntercept = await shouldInterceptWorkflowFormBeforeApiTurn({
+			cwd: this.cwd,
+			taskState: this.taskState,
+		})
+		if (!shouldIntercept) {
+			return
+		}
+
+		if (!this.taskState.activeWorkflowFormSession) {
+			this.taskState.activeWorkflowFormSession = this.workflowFormRuntime.createSession({
+				resolverId: "code_review_step_3_diff_source",
+				triggerSource: "deterministic_workflow_progression",
+				owner: {
+					kind: "placeholder_workflow_step",
+					workflowName: "code-review.md",
+					stepNumber: 3,
+				},
+			})
+			await this.persistWorkflowFormSession()
+		}
+
+		this.pendingWorkflowFormOutcome = undefined
+
+		while (this.taskState.activeWorkflowFormSession && !this.taskState.abort) {
+			const currentSession = this.taskState.activeWorkflowFormSession
+			await this.renderWorkflowFormMessage(this.workflowFormRuntime.buildPayload(currentSession))
+
+			await pWaitFor(() => this.pendingWorkflowFormOutcome !== undefined || this.taskState.abort, {
+				interval: 100,
+			})
+			if (this.taskState.abort) {
+				return
+			}
+
+			const outcome = this.pendingWorkflowFormOutcome
+			this.pendingWorkflowFormOutcome = undefined
+			if (!outcome) {
+				continue
+			}
+
+			if (outcome.kind === "render_form") {
+				continue
+			}
+
+			if (outcome.kind === "fallback_to_agent") {
+				break
+			}
+
+			const toolExecution = await this.executeWorkflowFormToolAndSync(outcome)
+			if (toolExecution.succeeded) {
+				const successPayload = this.workflowFormRuntime.buildSuccessPayload(
+					outcome.session,
+					"The Step 3 diff artifact is ready.",
+				)
+				await this.clearWorkflowFormSession()
+				await this.renderWorkflowFormMessage(successPayload)
+				break
+			}
+
+			this.taskState.activeWorkflowFormSession = {
+				...outcome.session,
+				phase: "retry_error",
+				lastError: toolExecution.errorMessage,
+			}
+			await this.persistWorkflowFormSession()
+		}
+
+		this.setThreadDisplayState(ThreadDisplayStates.ACTIVE_RUN, "workflow_form_resolved", {
+			sessionPresent: !!this.taskState.activeWorkflowFormSession,
+		})
+		await this.postStateToWebview()
+	}
+
 	async say(
 		type: ClineSay,
 		text?: string,
@@ -1440,6 +1750,7 @@ export class Task {
 				this.taskState.activePlaceholderWorkflowStableValues = undefined
 				this.taskState.activePlaceholderWorkflowValues = undefined
 				this.taskState.activePlaceholderWorkflowDeterministicState = undefined
+				this.taskState.activeWorkflowFormSession = undefined
 				this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices = []
 				this.taskState.activeWorkflowJustStarted = true
 			}
@@ -1470,6 +1781,7 @@ export class Task {
 				this.taskState.activePlaceholderWorkflowStableValues = undefined
 				this.taskState.activePlaceholderWorkflowValues = undefined
 				this.taskState.activePlaceholderWorkflowDeterministicState = undefined
+				this.taskState.activeWorkflowFormSession = undefined
 				this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices = []
 				this.taskState.activeWorkflowJustStarted = false
 			} else if (hadManagedWorkflowRun) {
@@ -1489,6 +1801,7 @@ export class Task {
 				this.taskState.activePlaceholderWorkflowStableValues = undefined
 				this.taskState.activePlaceholderWorkflowValues = undefined
 				this.taskState.activePlaceholderWorkflowDeterministicState = undefined
+				this.taskState.activeWorkflowFormSession = undefined
 				this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices = []
 				this.taskState.activeWorkflowJustStarted = false
 			}
@@ -1508,6 +1821,7 @@ export class Task {
 			taskMetadata.activePlaceholderWorkflowStableValues = this.taskState.activePlaceholderWorkflowStableValues
 			taskMetadata.activePlaceholderWorkflowValues = this.taskState.activePlaceholderWorkflowValues
 			taskMetadata.activePlaceholderWorkflowDeterministicState = this.taskState.activePlaceholderWorkflowDeterministicState
+			taskMetadata.activeWorkflowFormSession = this.taskState.activeWorkflowFormSession
 			taskMetadata.pendingAutoCompletedPlaceholderWorkflowStepNotices =
 				this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices
 			taskMetadata.managedWorkflowRun = this.taskState.managedWorkflowRun
@@ -1655,6 +1969,7 @@ export class Task {
 			this.taskState.activePlaceholderWorkflowStableValues = metadata.activePlaceholderWorkflowStableValues
 			this.taskState.activePlaceholderWorkflowValues = metadata.activePlaceholderWorkflowValues
 			this.taskState.activePlaceholderWorkflowDeterministicState = metadata.activePlaceholderWorkflowDeterministicState
+			this.taskState.activeWorkflowFormSession = metadata.activeWorkflowFormSession as WorkflowFormSessionState | undefined
 			this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices =
 				metadata.pendingAutoCompletedPlaceholderWorkflowStepNotices ?? []
 			this.taskState.activeWorkflowJustStarted = false
@@ -2825,6 +3140,8 @@ export class Task {
 			open: openTabPaths.slice(0, cap),
 			visible: visibleTabPaths.slice(0, cap),
 		}
+
+		await this.maybeResolveWorkflowFormBeforeApiTurn()
 
 		const activePlaceholderWorkflowPromptContext = await resolveActivePlaceholderWorkflowPromptContext({
 			checklistMarkdown: this.taskState.currentFocusChainChecklist,

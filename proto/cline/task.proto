@@ -32,6 +32,8 @@ service TaskService {
   rpc getTaskHistory(GetTaskHistoryRequest) returns (TaskHistoryArray);
   // Sends a response to a previous ask operation
   rpc askResponse(AskResponseRequest) returns (Empty);
+  // Sends a structured workflow-form submission to the active task/runtime
+  rpc submitWorkflowForm(WorkflowFormSubmissionRequest) returns (Empty);
   // Records task feedback (thumbs up/down)
   rpc taskFeedback(StringRequest) returns (Empty);
   // Shows task completion changes diff in a view
@@ -112,6 +114,33 @@ message AskResponseRequest {
   string text = 3;
   repeated string images = 4;
   repeated string files = 5;
+}
+
+enum WorkflowFormAction {
+  WORKFLOW_FORM_ACTION_UNSPECIFIED = 0;
+  SUBMIT = 1;
+  CANCEL = 2;
+  RETRY = 3;
+}
+
+message WorkflowFormFieldValue {
+  oneof kind {
+    string string_value = 1;
+    int32 integer_value = 2;
+    StringArray string_array_value = 3;
+  }
+}
+
+message WorkflowFormFieldSubmission {
+  string key = 1;
+  WorkflowFormFieldValue value = 2;
+}
+
+message WorkflowFormSubmissionRequest {
+  Metadata metadata = 1;
+  string session_id = 2;
+  WorkflowFormAction action = 3;
+  repeated WorkflowFormFieldSubmission fields = 4;
 }
 
 // Request for executing a quick win task

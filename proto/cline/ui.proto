@@ -51,6 +51,7 @@ enum ClineAsk {
   SUMMARIZE_TASK = 15;
   ACT_MODE_RESPOND = 16;
   USE_SUBAGENTS = 17;
+  WORKFLOW_FORM = 18;
 }
 
 // Enum for ClineSay types
@@ -93,6 +94,7 @@ enum ClineSay {
   SUBAGENT_STATUS = 35;
   USE_SUBAGENTS_SAY = 36;
   SUBAGENT_USAGE = 37;
+  WORKFLOW_FORM_SAY = 38;
 }
 
 // Enum for ClineSayTool tool types

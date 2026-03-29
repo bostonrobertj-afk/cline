@@ -1,9 +1,11 @@
 import type { ClineMessage } from "@shared/ExtensionMessage"
-import { render, screen } from "@testing-library/react"
-import { describe, expect, it, vi } from "vitest"
+import { fireEvent, render, screen } from "@testing-library/react"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 import { ChatRowContent, getFollowupPresentation } from "./ChatRow"
 
-const { mockThreadDisplayState } = vi.hoisted(() => ({
+const { mockOpenFileRelativePathAtRange, mockSubmitWorkflowForm, mockThreadDisplayState } = vi.hoisted(() => ({
+	mockOpenFileRelativePathAtRange: vi.fn().mockResolvedValue(undefined),
+	mockSubmitWorkflowForm: vi.fn().mockResolvedValue(undefined),
 	mockThreadDisplayState: { value: "idle_open" as string | null },
 }))
 
@@ -21,7 +23,60 @@ vi.mock("@/context/ExtensionStateContext", () => ({
 	}),
 }))
 
+vi.mock("@/services/grpc-client", () => ({
+	FileServiceClient: {
+		openFileRelativePathAtRange: mockOpenFileRelativePathAtRange,
+	},
+	TaskServiceClient: {
+		submitWorkflowForm: mockSubmitWorkflowForm,
+	},
+	UiServiceClient: {
+		openUrl: vi.fn(),
+		setTerminalExecutionMode: vi.fn(),
+	},
+}))
+
+function createWorkflowFormMessage(phase: "collect" | "confirm"): ClineMessage {
+	return {
+		ts: Date.now(),
+		type: "ask",
+		ask: "workflow_form",
+		text: JSON.stringify({
+			sessionId: "session-1",
+			resolverId: "code_review_step_3_diff_source",
+			toolName: "build_review_diff_output",
+			title: "Prepare Diff Input",
+			prompt: "The system can prepare the diff input directly.",
+			phase,
+			toolDictionaryRelativePath: "docs/workflow-ui-surface/tool-dictionary.md",
+			toolDictionaryStartLine: 42,
+			options: ["Yes", "No"],
+			fields:
+				phase === "collect"
+					? [
+							{
+								key: "source.type",
+								label: "Source type",
+								help: "Choose a diff source.",
+								control: "select",
+								required: true,
+								options: [
+									{ value: "commit", label: "Commit" },
+									{ value: "commit_range", label: "Commit range" },
+								],
+							},
+						]
+					: undefined,
+		}),
+	}
+}
+
 describe("ChatRow followup presentation", () => {
+	beforeEach(() => {
+		mockThreadDisplayState.value = "idle_open"
+		vi.clearAllMocks()
+	})
+
 	it("renders reopened followup messages as a passive thread label", () => {
 		const presentation = getFollowupPresentation(undefined, true)
 
@@ -126,5 +181,52 @@ describe("ChatRow followup presentation", () => {
 
 		expect(screen.getByText("Real-Time Agent Feedback")).toBeInTheDocument()
 		expect(screen.getByText("Blocked on unstable behavior.")).toBeInTheDocument()
+	})
+
+	it("renders workflow_form confirm rows as a system-owned form", () => {
+		const message = createWorkflowFormMessage("confirm")
+
+		render(
+			<ChatRowContent
+				inputValue=""
+				isExpanded={true}
+				isLast={true}
+				message={message}
+				onSetQuote={vi.fn()}
+				onToggleExpand={vi.fn()}
+			/>,
+		)
+
+		expect(screen.getByText("System-owned form:")).toBeInTheDocument()
+		expect(screen.getByText("Prepare Diff Input")).toBeInTheDocument()
+		expect(screen.getByRole("button", { name: "Yes" })).toBeInTheDocument()
+		expect(screen.getByRole("button", { name: "No" })).toBeInTheDocument()
+	})
+
+	it("opens the tool dictionary at the workflow form start line", () => {
+		const message = createWorkflowFormMessage("collect")
+
+		render(
+			<ChatRowContent
+				inputValue=""
+				isExpanded={true}
+				isLast={true}
+				message={message}
+				onSetQuote={vi.fn()}
+				onToggleExpand={vi.fn()}
+			/>,
+		)
+
+		fireEvent.click(screen.getByRole("button", { name: "About build_review_diff_output" }))
+
+		expect(mockOpenFileRelativePathAtRange).toHaveBeenCalledTimes(1)
+		expect(mockOpenFileRelativePathAtRange).toHaveBeenCalledWith(
+			expect.objectContaining({
+				relativePath: "docs/workflow-ui-surface/tool-dictionary.md",
+				startLine: 42,
+				preview: false,
+				preserveFocus: false,
+			}),
+		)
 	})
 })

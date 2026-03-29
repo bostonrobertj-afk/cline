@@ -1,6 +1,7 @@
 import { Anthropic } from "@anthropic-ai/sdk"
 import { AssistantMessageContent } from "@core/assistant-message"
 import { ClineAskResponse } from "@shared/WebviewMessage"
+import type { WorkflowFormSessionState } from "@/core/task/workflow-form/types"
 import type { ActivePlaceholderWorkflowSource } from "@/core/workflows/placeholder-workflow-step-details"
 import type { ThreadDisplayState } from "@/shared/ExtensionMessage"
 import type { ClineDefaultTool } from "@/shared/tools"
@@ -145,6 +146,7 @@ export class TaskState {
 	activePlaceholderWorkflowStableValues?: Record<string, string>
 	activePlaceholderWorkflowValues?: Record<string, string>
 	activePlaceholderWorkflowDeterministicState?: ActivePlaceholderWorkflowDeterministicState
+	activeWorkflowFormSession?: WorkflowFormSessionState
 	pendingAutoCompletedPlaceholderWorkflowStepNotices: AutoCompletedPlaceholderWorkflowStepNotice[] = []
 	activeWorkflowJustStarted = false
 	managedWorkflowRun?: ManagedWorkflowRunState

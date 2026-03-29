@@ -175,6 +175,7 @@ export type ClineAsk =
 	| "summarize_task"
 	| "report_bug"
 	| "use_subagents"
+	| "workflow_form"
 
 export type ClineSay =
 	| "task"
@@ -216,6 +217,7 @@ export type ClineSay =
 	| "use_subagents"
 	| "subagent_usage"
 	| "conditional_rules_applied"
+	| "workflow_form"
 
 export interface ClineSayTool {
 	tool:
@@ -372,6 +374,51 @@ export interface ClineAskQuestion {
 
 export interface ClineAskNewTask {
 	context: string
+}
+
+export type WorkflowFormPhase = "confirm" | "collect" | "retry_error" | "success"
+export type WorkflowFormFieldControl = "select" | "text" | "textarea" | "number"
+
+export interface WorkflowFormFieldOption {
+	value: string
+	label: string
+	description?: string
+}
+
+export interface WorkflowFormFieldValuePayload {
+	stringValue?: string
+	integerValue?: number
+	stringArrayValue?: string[]
+}
+
+export interface WorkflowFormFieldDefinition {
+	key: string
+	label: string
+	help: string
+	control: WorkflowFormFieldControl
+	required: boolean
+	placeholder?: string
+	options?: WorkflowFormFieldOption[]
+	visible?: boolean
+}
+
+export interface ClineWorkflowForm {
+	sessionId: string
+	resolverId: string
+	toolName: string
+	title: string
+	prompt: string
+	phase: WorkflowFormPhase
+	toolDictionaryRelativePath: string
+	toolDictionaryStartLine: number
+	options?: string[]
+	fields?: WorkflowFormFieldDefinition[]
+	values?: Record<string, WorkflowFormFieldValuePayload>
+	submitLabel?: string
+	cancelLabel?: string
+	retryLabel?: string
+	errorMessage?: string
+	successMessage?: string
 }
 
 export interface ClineApiReqInfo {
