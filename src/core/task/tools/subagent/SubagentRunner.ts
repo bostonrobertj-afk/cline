@@ -138,6 +138,10 @@ function createEmptyRequestUsageState(): SubagentRequestUsageState {
 	}
 }
 
+function usesResponsesApi(apiFormat: ApiFormat | undefined): boolean {
+	return apiFormat === ApiFormat.OPENAI_RESPONSES || apiFormat === ApiFormat.OPENAI_RESPONSES_WEBSOCKET_MODE
+}
+
 function serializeToolResult(result: unknown): string {
 	if (typeof result === "string") {
 		return result
@@ -461,6 +465,7 @@ export class SubagentRunner {
 			const nativeToolCallsRequested =
 				providerInfo.model.info.apiFormat === ApiFormat.OPENAI_RESPONSES ||
 				!!this.baseConfig.services.stateManager.getGlobalStateKey("nativeToolCallEnabled")
+			const responsesApiActive = usesResponsesApi(providerInfo.model.info.apiFormat)
 
 			const host = HostRegistryInfo.get()
 			const discoveredSkills = await discoverSkills(this.baseConfig.cwd)
@@ -524,7 +529,10 @@ export class SubagentRunner {
 					hasHumanAuthoredInput: false,
 					turnsSinceFullPromptRefresh: state.turnsSinceFullPromptRefresh,
 				})
-				await this.appendSubagentPromptInjections(conversation, state, shouldSendFullPromptAssembly)
+				const promptInjectionBlocks = await this.buildSubagentPromptInjectionBlocks(state, shouldSendFullPromptAssembly)
+				if (!responsesApiActive) {
+					this.appendSubagentPromptInjectionBlocksToConversation(conversation, promptInjectionBlocks)
+				}
 
 				const context = await this.buildPromptContext({
 					state,
@@ -551,6 +559,14 @@ export class SubagentRunner {
 					!state.activePlaceholderWorkflowId
 						? `${baseSystemPrompt}${buildAssignedSkillDirective(assignedSkillNames)}`
 						: baseSystemPrompt
+				const promptInjectionText = promptInjectionBlocks
+					.map((block) => block.text)
+					.join("\n\n")
+					.trim()
+				const effectiveSystemPrompt =
+					responsesApiActive && promptInjectionText.length > 0
+						? `${systemPrompt}\n\n${promptInjectionText}`
+						: systemPrompt
 
 				if (useNativeToolCalls && (!nativeTools || nativeTools.length === 0)) {
 					const error = "Subagent tool requires native tool calling support."
@@ -590,7 +606,7 @@ export class SubagentRunner {
 
 				const stream = this.createMessageWithInitialChunkRetry(
 					api,
-					systemPrompt,
+					effectiveSystemPrompt,
 					conversation,
 					nativeTools,
 					providerInfo.providerId,
@@ -1073,18 +1089,13 @@ export class SubagentRunner {
 		await focusChainManager.refreshPlaceholderWorkflowChecklistProjection(force)
 	}
 
-	private async appendSubagentPromptInjections(
-		conversation: ClineStorageMessage[],
+	private async buildSubagentPromptInjectionBlocks(
 		state: TaskState,
 		shouldSendFullPromptAssembly: boolean,
-	): Promise<void> {
-		if (!shouldSendFullPromptAssembly) {
-			return
-		}
-
+	): Promise<ClineTextContentBlock[]> {
 		const additions: ClineTextContentBlock[] = []
 
-		if (state.activeWorkflowJustStarted && state.activePlaceholderWorkflowSource) {
+		if (shouldSendFullPromptAssembly && state.activeWorkflowJustStarted && state.activePlaceholderWorkflowSource) {
 			const activationInstructions = await buildActivePlaceholderWorkflowActivationInstructions(state)
 			if (activationInstructions?.trim()) {
 				additions.push(toTextContentBlock(activationInstructions))
@@ -1101,6 +1112,13 @@ export class SubagentRunner {
 			}
 		}
 
+		return additions
+	}
+
+	private appendSubagentPromptInjectionBlocksToConversation(
+		conversation: ClineStorageMessage[],
+		additions: ClineTextContentBlock[],
+	): void {
 		if (additions.length === 0) {
 			return
 		}

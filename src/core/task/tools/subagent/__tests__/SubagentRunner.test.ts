@@ -1277,14 +1277,14 @@ Review the changed implementation for edge cases.`,
 		}
 		const followUpTexts = extractTextFromMessage(followUpUser)
 		assert.doesNotMatch(followUpTexts, /<explicit_instructions type="review-edge-case-hunter">/)
-		assert.doesNotMatch(followUpTexts, /### Reminder:/)
-		assert.doesNotMatch(followUpTexts, /Current Progress: 0\/2 items completed/)
-		assert.doesNotMatch(followUpTexts, /# CURRENT WORKFLOW STEP/)
+		assert.match(followUpTexts, /### Reminder:/)
+		assert.match(followUpTexts, /Current Progress: 0\/2 items completed/)
+		assert.match(followUpTexts, /# CURRENT WORKFLOW STEP/)
 		const secondSystemPrompt = createMessage.secondCall.args[0] as string
 		assert.match(secondSystemPrompt, /CONTINUATION TURN/)
 	})
 
-	it("reinjects focus-chain guidance on every internal turn when prompt refresh frequency is zero", async () => {
+	it("reinjects focus-chain guidance on every internal turn when prompt refresh frequency is zero for non-Responses subagents", async () => {
 		const createMessage = sinon.stub()
 		createMessage.onFirstCall().callsFake(async function* () {
 			yield {
@@ -1359,6 +1359,200 @@ Review the changed implementation for edge cases.`,
 		assert.match(followUpTexts, /# CURRENT WORKFLOW STEP/)
 		const secondSystemPrompt = createMessage.secondCall.args[0] as string
 		assert.doesNotMatch(secondSystemPrompt, /CONTINUATION TURN/)
+	})
+
+	it("moves placeholder workflow prompt injections into the system prompt for OpenAI Responses subagents", async () => {
+		const createMessage = sinon.stub()
+		createMessage.onFirstCall().callsFake(async function* () {
+			yield {
+				type: "tool_calls",
+				tool_call: {
+					function: {
+						id: "toolu_subagent_placeholder_refresh_responses_1",
+						name: ClineDefaultTool.LIST_FILES,
+						arguments: JSON.stringify({ path: ".", recursive: false }),
+					},
+				},
+			}
+		})
+		createMessage.onSecondCall().callsFake(async function* () {
+			yield {
+				type: "tool_calls",
+				tool_call: {
+					function: {
+						id: "toolu_subagent_placeholder_refresh_responses_complete_1",
+						name: ClineDefaultTool.ATTEMPT,
+						arguments: JSON.stringify({ result: "done" }),
+					},
+				},
+			}
+		})
+
+		const promptRegistry = PromptRegistry.getInstance()
+		sinon.stub(promptRegistry, "get").callsFake(async (context) => {
+			promptRegistry.nativeTools = undefined
+			return context.isContinuationTurn === true ? "CONTINUATION TURN" : "system prompt"
+		})
+		sinon.stub(skills, "discoverSkills").resolves([])
+		sinon.stub(skills, "getAvailableSkills").returns([])
+		;(workflowResolution.resolveAvailableWorkflows as sinon.SinonStub).resolves([
+			{
+				name: "review-edge-case-hunter",
+				source: "remote",
+				description: "Remote workflow: review-edge-case-hunter",
+				fileName: "review-edge-case-hunter",
+				contents: `# Edge case review instructions
+
+## Step 1: Gather Context
+Inspect the provided bundle before running tools.
+
+## Step 2: Review
+Review the changed implementation for edge cases.`,
+			},
+		])
+		stubApiHandler(createMessage, {
+			modelId: "gpt-5.4-mini-2026-03-17",
+			apiFormat: ApiFormat.OPENAI_RESPONSES,
+		})
+		initializeHostProvider()
+
+		const config = createTaskConfig(false, 0)
+		config.services.stateManager.getApiConfiguration = () => ({
+			actModeApiProvider: "openai-native",
+			planModeApiProvider: "openai-native",
+		})
+
+		const runner = new SubagentRunner(config)
+		const result = await runner.run(`Skill: use_skill('review-edge-case-hunter')`, () => {})
+
+		assert.equal(result.status, "completed")
+		assert.equal(createMessage.callCount, 2)
+
+		const initialUser = createMessage.firstCall.args[1][0] as {
+			role: string
+			content: Array<{ type?: string; text?: string }>
+		}
+		const initialTexts = extractTextFromMessage(initialUser)
+		assert.doesNotMatch(initialTexts, /^### Reminder:/m)
+		assert.doesNotMatch(initialTexts, /# CURRENT WORKFLOW STEP/)
+		assert.doesNotMatch(initialTexts, /<explicit_instructions type="review-edge-case-hunter">/)
+
+		const firstSystemPrompt = createMessage.firstCall.args[0] as string
+		assert.match(firstSystemPrompt, /<explicit_instructions type="review-edge-case-hunter">/)
+		assert.match(firstSystemPrompt, /^### Reminder:/m)
+		assert.match(firstSystemPrompt, /# CURRENT WORKFLOW STEP/)
+
+		const secondConversation = createMessage.secondCall.args[1] as Array<{
+			role: string
+			content: Array<{ type?: string; text?: string }>
+		}>
+		const followUpUser = secondConversation[secondConversation.length - 1] as {
+			role: string
+			content: Array<{ type?: string; text?: string }>
+		}
+		const followUpTexts = extractTextFromMessage(followUpUser)
+		assert.doesNotMatch(followUpTexts, /^### Reminder:/m)
+		assert.doesNotMatch(followUpTexts, /Current Progress: 0\/2 items completed/)
+		assert.doesNotMatch(followUpTexts, /# CURRENT WORKFLOW STEP/)
+		assert.doesNotMatch(followUpTexts, /<explicit_instructions type="review-edge-case-hunter">/)
+
+		const secondSystemPrompt = createMessage.secondCall.args[0] as string
+		assert.match(secondSystemPrompt, /^### Reminder:/m)
+		assert.match(secondSystemPrompt, /Current Progress: 0\/2 items completed/)
+		assert.match(secondSystemPrompt, /# CURRENT WORKFLOW STEP/)
+		assert.doesNotMatch(secondSystemPrompt, /<explicit_instructions type="review-edge-case-hunter">/)
+		assert.doesNotMatch(secondSystemPrompt, /CONTINUATION TURN/)
+	})
+
+	it("keeps continuation-turn placeholder workflow guidance out of local user content for OpenAI Responses subagents", async () => {
+		const createMessage = sinon.stub()
+		createMessage.onFirstCall().callsFake(async function* () {
+			yield {
+				type: "tool_calls",
+				tool_call: {
+					function: {
+						id: "toolu_subagent_placeholder_followup_responses_1",
+						name: ClineDefaultTool.LIST_FILES,
+						arguments: JSON.stringify({ path: ".", recursive: false }),
+					},
+				},
+			}
+		})
+		createMessage.onSecondCall().callsFake(async function* () {
+			yield {
+				type: "tool_calls",
+				tool_call: {
+					function: {
+						id: "toolu_subagent_placeholder_followup_responses_complete_1",
+						name: ClineDefaultTool.ATTEMPT,
+						arguments: JSON.stringify({ result: "done" }),
+					},
+				},
+			}
+		})
+
+		const promptRegistry = PromptRegistry.getInstance()
+		const promptGetStub = sinon.stub(promptRegistry, "get").callsFake(async (context) => {
+			assert.equal(context.activeWorkflowReminder, undefined)
+			promptRegistry.nativeTools = undefined
+			return context.isContinuationTurn === true ? "CONTINUATION TURN" : "system prompt"
+		})
+		sinon.stub(skills, "discoverSkills").resolves([])
+		sinon.stub(skills, "getAvailableSkills").returns([])
+		;(workflowResolution.resolveAvailableWorkflows as sinon.SinonStub).resolves([
+			{
+				name: "review-edge-case-hunter",
+				source: "remote",
+				description: "Remote workflow: review-edge-case-hunter",
+				fileName: "review-edge-case-hunter",
+				contents: `# Edge case review instructions
+
+## Step 1: Gather Context
+Inspect the provided bundle before running tools.
+
+## Step 2: Review
+Review the changed implementation for edge cases.`,
+			},
+		])
+		stubApiHandler(createMessage, {
+			modelId: "gpt-5.4-mini-2026-03-17",
+			apiFormat: ApiFormat.OPENAI_RESPONSES,
+		})
+		initializeHostProvider()
+
+		const config = createTaskConfig(false)
+		config.services.stateManager.getApiConfiguration = () => ({
+			actModeApiProvider: "openai-native",
+			planModeApiProvider: "openai-native",
+		})
+
+		const runner = new SubagentRunner(config)
+		const result = await runner.run(`Skill: use_skill('review-edge-case-hunter')`, () => {})
+
+		assert.equal(result.status, "completed")
+		assert.equal(createMessage.callCount, 2)
+		assert.equal(promptGetStub.secondCall.args[0].isContinuationTurn, true)
+
+		const secondConversation = createMessage.secondCall.args[1] as Array<{
+			role: string
+			content: Array<{ type?: string; text?: string }>
+		}>
+		const followUpUser = secondConversation[secondConversation.length - 1] as {
+			role: string
+			content: Array<{ type?: string; text?: string }>
+		}
+		const followUpTexts = extractTextFromMessage(followUpUser)
+		assert.doesNotMatch(followUpTexts, /^### Reminder:/m)
+		assert.doesNotMatch(followUpTexts, /Current Progress: 0\/2 items completed/)
+		assert.doesNotMatch(followUpTexts, /# CURRENT WORKFLOW STEP/)
+		assert.doesNotMatch(followUpTexts, /<explicit_instructions type="review-edge-case-hunter">/)
+
+		const secondSystemPrompt = createMessage.secondCall.args[0] as string
+		assert.match(secondSystemPrompt, /CONTINUATION TURN/)
+		assert.match(secondSystemPrompt, /^### Reminder:/m)
+		assert.match(secondSystemPrompt, /Current Progress: 0\/2 items completed/)
+		assert.match(secondSystemPrompt, /# CURRENT WORKFLOW STEP/)
+		assert.doesNotMatch(secondSystemPrompt, /<explicit_instructions type="review-edge-case-hunter">/)
 	})
 
 	it("auto-binds the owning BMAD agent when an assigned placeholder workflow maps to a managed twin", async () => {
