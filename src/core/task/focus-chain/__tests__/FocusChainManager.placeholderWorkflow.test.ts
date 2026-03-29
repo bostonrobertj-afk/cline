@@ -57,6 +57,7 @@ Inspect the prepared review input and write findings.
 			const manager = new FocusChainManager(createDependencies(taskState))
 			const prompt = await manager.generateFocusChainInstructions()
 
+			expect(prompt).to.contain("# CURRENT WORKFLOW STATUS")
 			expect(prompt).to.contain("# CURRENT WORKFLOW STEP")
 			expect(prompt).to.contain("You are currently on this step: Step 1: Gather Context")
 			expect(prompt).to.contain("Determine what to review from the user's prompt")
@@ -106,6 +107,7 @@ Determine what to review from the user's prompt before asking follow-up question
 			const manager = new FocusChainManager(createDependencies(taskState))
 			const prompt = await manager.generateFocusChainInstructions()
 
+			expect(prompt).to.contain("# CURRENT WORKFLOW STATUS")
 			expect(prompt).to.contain("# AUTO-COMPLETED WORKFLOW STEPS")
 			expect(prompt).to.contain("- Step 1: Gather Context — review_target and spec_file are both present.")
 			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])

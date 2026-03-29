@@ -237,7 +237,8 @@ export class FocusChainManager {
 		if (this.taskState.managedWorkflowRun) {
 			const currentChecklist = renderManagedWorkflowTaskProgress(this.taskState.managedWorkflowRun)
 			return this.joinPromptSections(
-				"# WORKFLOW PROGRESS IS BACKEND MANAGED",
+				"# CURRENT WORKFLOW STATUS",
+				"## WORKFLOW PROGRESS IS BACKEND MANAGED",
 				this.renderChecklistForPrompt(currentChecklist),
 				"Use the complete_workflow_item tool to mark the active workflow item complete.\nDo not create or rewrite task_progress manually.",
 			)
@@ -264,12 +265,13 @@ export class FocusChainManager {
 				listCurrentProgress,
 			)
 			if (placeholderWorkflowStepPrompt) {
-				return placeholderWorkflowStepPrompt
+				return this.joinPromptSections("# CURRENT WORKFLOW STATUS", placeholderWorkflowStepPrompt)
 			}
 
 			// If user has updated the list, inform the model (and provide latest copy)
 			if (this.taskState.todoListWasUpdatedByUser) {
 				return this.joinPromptSections(
+					"# CURRENT WORKFLOW STATUS",
 					introUpdateRequired,
 					listCurrentProgress,
 					this.renderChecklistForPrompt(this.taskState.currentFocusChainChecklist),
@@ -300,6 +302,7 @@ export class FocusChainManager {
 
 			// Return with progress-based stub
 			return this.joinPromptSections(
+				"# CURRENT WORKFLOW STATUS",
 				introUpdateRequired,
 				listCurrentProgress,
 				this.renderChecklistForPrompt(this.taskState.currentFocusChainChecklist),
@@ -330,7 +333,7 @@ export class FocusChainManager {
 		}
 
 		const section = [
-			"# AUTO-COMPLETED WORKFLOW STEPS",
+			"## AUTO-COMPLETED WORKFLOW STEPS",
 			"",
 			"The runtime auto-completed these workflow steps:",
 			...this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.map(
@@ -394,14 +397,14 @@ export class FocusChainManager {
 			})
 			const currentStepBody = deterministicWorkflowSupported
 				? [
-						"# CURRENT WORKFLOW STEP",
+						"### CURRENT WORKFLOW STEP",
 						`You are currently on this step: ${stepDetails.checklistLabel}`,
 						stepDetails.details.trim(),
 						"Focus on correctly completing this step.",
 						"Once you correctly complete this step, the next step's details will be shown automatically.",
 					].join("\n\n")
 				: [
-						"# CURRENT WORKFLOW STEP",
+						"### CURRENT WORKFLOW STEP",
 						`You are currently on this step: ${stepDetails.checklistLabel}`,
 						stepDetails.details.trim(),
 						"Focus on completing this step.",

@@ -183,6 +183,7 @@ describe("Task.loadContext placeholder workflow focus chain prompting", () => {
 		expect(userText).to.not.contain("# CURRENT WORKFLOW STEP")
 
 		expect(promptInjectionText).to.contain("ENVIRONMENT: reduced")
+		expect(promptInjectionText).to.contain("# CURRENT WORKFLOW STATUS")
 		expect(promptInjectionText).to.contain("### Reminder:")
 		expect(promptInjectionText).to.contain("Current Progress: 0/2 items completed")
 		expect(promptInjectionText).to.contain("- [ ] Step 1: Determine Review Source")
@@ -223,6 +224,7 @@ describe("Task.loadContext placeholder workflow focus chain prompting", () => {
 		expect(userText).to.not.contain("# CURRENT WORKFLOW STEP")
 		expect(userText).to.not.contain("# AUTO-COMPLETED WORKFLOW STEPS")
 
+		expect(promptInjectionText).to.contain("# CURRENT WORKFLOW STATUS")
 		expect(promptInjectionText).to.contain("### Reminder:")
 		expect(promptInjectionText).to.contain("Current Progress: 0/2 items completed")
 		expect(promptInjectionText).to.contain("# AUTO-COMPLETED WORKFLOW STEPS")
