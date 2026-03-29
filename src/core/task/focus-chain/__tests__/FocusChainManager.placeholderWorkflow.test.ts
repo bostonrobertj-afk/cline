@@ -42,10 +42,10 @@ Inspect the prepared review input and write findings.
 
 		try {
 			const taskState = new TaskState()
-			taskState.activePlaceholderWorkflowId = "code-review"
+			taskState.activePlaceholderWorkflowId = "code-review.md"
 			taskState.activePlaceholderWorkflowSource = {
 				type: "local",
-				name: "code-review",
+				name: "code-review.md",
 				path: workflowPath,
 			}
 			taskState.activePlaceholderWorkflowValues = {
@@ -88,15 +88,15 @@ Determine what to review from the user's prompt before asking follow-up question
 
 		try {
 			const taskState = new TaskState()
-			taskState.activePlaceholderWorkflowId = "code-review"
+			taskState.activePlaceholderWorkflowId = "code-review.md"
 			taskState.activePlaceholderWorkflowSource = {
 				type: "local",
-				name: "code-review",
+				name: "code-review.md",
 				path: workflowPath,
 			}
 			taskState.currentFocusChainChecklist = "- [ ] Step 1: Gather Context"
 			taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.push({
-				workflowName: "code-review",
+				workflowName: "code-review.md",
 				stepNumber: 1,
 				checklistLabel: "Step 1: Gather Context",
 				reason: "review_target and spec_file are both present.",
@@ -117,10 +117,10 @@ Determine what to review from the user's prompt before asking follow-up question
 		const sandbox = sinon.createSandbox()
 		try {
 			const taskState = new TaskState()
-			taskState.activePlaceholderWorkflowId = "code-review"
+			taskState.activePlaceholderWorkflowId = "code-review.md"
 			taskState.activePlaceholderWorkflowSource = {
 				type: "remote",
-				name: "code-review",
+				name: "code-review.md",
 				contents: `# Review Workflow
 
 ## Step 1: Gather Context
@@ -133,7 +133,7 @@ Inspect the prepared review input and write findings.
 			taskState.currentFocusChainChecklist = "- [ ] Step 1: Gather Context\n- [ ] Step 2: Review"
 			taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices = [
 				{
-					workflowName: "code-review",
+					workflowName: "code-review.md",
 					stepNumber: 4,
 					checklistLabel: "Step 4: Set Review Mode",
 					reason: "review_mode was derived deterministically from fresh review artifacts.",

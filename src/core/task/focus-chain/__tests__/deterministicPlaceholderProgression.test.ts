@@ -37,8 +37,10 @@ async function writeFileWithMtime(filePath: string, text: string, mtimeMs: numbe
 
 describe("deterministicPlaceholderProgression", () => {
 	it("supports only the prescribed deterministic placeholder workflows", () => {
-		expect(isDeterministicPlaceholderWorkflowSupported("code-review")).to.equal(true)
-		expect(isDeterministicPlaceholderWorkflowSupported("dev-story")).to.equal(true)
+		expect(isDeterministicPlaceholderWorkflowSupported("code-review.md")).to.equal(true)
+		expect(isDeterministicPlaceholderWorkflowSupported("dev-story.md")).to.equal(true)
+		expect(isDeterministicPlaceholderWorkflowSupported("code-review")).to.equal(false)
+		expect(isDeterministicPlaceholderWorkflowSupported("dev-story")).to.equal(false)
 		expect(isDeterministicPlaceholderWorkflowSupported("review-edge-case-hunter.md")).to.equal(false)
 	})
 
@@ -48,7 +50,7 @@ describe("deterministicPlaceholderProgression", () => {
 		try {
 			const outputFolder = path.join(tempDir, "output")
 			const taskState = createTaskState({
-				workflowName: "code-review",
+				workflowName: "code-review.md",
 				workflowContents: `## Step 4: Derive Review Mode
 Set review mode from the available review artifacts.`,
 				checklistMarkdown: "- [ ] Step 4: Derive Review Mode",
@@ -89,7 +91,7 @@ Set review mode from the available review artifacts.`,
 		try {
 			const outputFolder = path.join(tempDir, "output")
 			const taskState = createTaskState({
-				workflowName: "code-review",
+				workflowName: "code-review.md",
 				workflowContents: `## Step 4: Derive Review Mode
 Set review mode from the available review artifacts.`,
 				checklistMarkdown: "- [ ] Step 4: Derive Review Mode",
@@ -124,7 +126,7 @@ Set review mode from the available review artifacts.`,
 		try {
 			const outputFolder = path.join(tempDir, "output")
 			const taskState = createTaskState({
-				workflowName: "code-review",
+				workflowName: "code-review.md",
 				workflowContents: `## Step 4: Derive Review Mode
 Set review mode from the available review artifacts.`,
 				checklistMarkdown: "- [ ] Step 4: Derive Review Mode",
@@ -159,7 +161,7 @@ Set review mode from the available review artifacts.`,
 		try {
 			const outputFolder = path.join(tempDir, "output")
 			const taskState = createTaskState({
-				workflowName: "code-review",
+				workflowName: "code-review.md",
 				workflowContents: `## Step 2: Build Review Input
 Wait for review input to be prepared.`,
 				checklistMarkdown: "- [ ] Step 2: Build Review Input",
@@ -192,7 +194,7 @@ Wait for review input to be prepared.`,
 		try {
 			const outputFolder = path.join(tempDir, "output")
 			const taskState = createTaskState({
-				workflowName: "code-review",
+				workflowName: "code-review.md",
 				workflowContents: `## Step 3: Build Diff Output
 Wait for diff output to be prepared.`,
 				checklistMarkdown: "- [ ] Step 3: Build Diff Output",
@@ -225,7 +227,7 @@ Wait for diff output to be prepared.`,
 		try {
 			const outputFolder = path.join(tempDir, "output")
 			const taskState = createTaskState({
-				workflowName: "code-review",
+				workflowName: "code-review.md",
 				workflowContents: `## Step 4: Derive Review Mode
 Set review mode from the available review artifacts.`,
 				checklistMarkdown: "- [ ] Step 4: Derive Review Mode",
@@ -264,7 +266,7 @@ Set review mode from the available review artifacts.`,
 		try {
 			const specFilePath = path.join(tempDir, "spec.md")
 			const taskState = createTaskState({
-				workflowName: "code-review",
+				workflowName: "code-review.md",
 				workflowContents: `## Step 6: Finish Review
 Wait for the spec file to reach a terminal review status.`,
 				checklistMarkdown: "- [ ] Step 6: Finish Review",
@@ -293,7 +295,7 @@ Wait for the spec file to reach a terminal review status.`,
 		try {
 			const specFilePath = path.join(tempDir, "spec.md")
 			const taskState = createTaskState({
-				workflowName: "code-review",
+				workflowName: "code-review.md",
 				workflowContents: `## Step 6: Finish Review
 Wait for the spec file to reach a terminal review status.`,
 				checklistMarkdown: "- [ ] Step 6: Finish Review",
@@ -322,7 +324,7 @@ Wait for the spec file to reach a terminal review status.`,
 		try {
 			const storyPath = path.join(tempDir, "story.md")
 			const taskState = createTaskState({
-				workflowName: "dev-story",
+				workflowName: "dev-story.md",
 				workflowContents: `## Step 2: Finish Tasks
 Wait for every story task to be checked off.`,
 				checklistMarkdown: "- [ ] Step 2: Finish Tasks",
@@ -362,7 +364,7 @@ No changes needed.
 		try {
 			const storyPath = path.join(tempDir, "story.md")
 			const taskState = createTaskState({
-				workflowName: "dev-story",
+				workflowName: "dev-story.md",
 				workflowContents: `## Step 2: Finish Tasks
 Wait for every story task to be checked off.`,
 				checklistMarkdown: "- [ ] Step 2: Finish Tasks",
@@ -399,7 +401,7 @@ Wait for every story task to be checked off.`,
 		try {
 			const storyPath = path.join(tempDir, "story.md")
 			const taskState = createTaskState({
-				workflowName: "dev-story",
+				workflowName: "dev-story.md",
 				workflowContents: `## Step 2: Finish Tasks
 Wait for every story task to be checked off.`,
 				checklistMarkdown: "- [ ] Step 2: Finish Tasks",

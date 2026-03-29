@@ -67,7 +67,7 @@ function detectCodeReviewLayerFromPrompt(prompt: string): "adversarial_general" 
 }
 
 function isActiveCodeReviewPlaceholderWorkflow(config: TaskConfig): boolean {
-	return config.taskState.activePlaceholderWorkflowSource?.name === "code-review"
+	return config.taskState.activePlaceholderWorkflowSource?.name === "code-review.md"
 }
 
 export class UseSubagentsToolHandler implements IFullyManagedTool {

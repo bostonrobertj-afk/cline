@@ -15,6 +15,11 @@ The plan is intentionally prescriptive. The executing agent must follow it exact
 ## Execution Rules
 
 - Treat this action plan as the sole implementation authority for this feature.
+- Read each step in full before executing that step.
+- Execute only the current step.
+- After completing a step, update that step's leading `[ ]` checkbox to `[x]`.
+- After marking a completed step `[x]`, return to the action plan and read the next step in full before making any further changes.
+- Never execute a later step from memory or based on potentially stale context.
 - Do not widen scope.
 - Do not substitute a different architecture.
 - Do not move logic into unrelated modules.
@@ -1751,3 +1756,271 @@ If either fails:
 - then rerun both commands in the original order
 
 Do not update snapshots during this addendum. If any snapshot changes are suggested, stop and ask for input before proceeding.
+
+## Remediation Addendum 3: Canonical `.md` Placeholder Workflow Names
+
+This addendum fixes the regression where deterministic placeholder workflow support was implemented against bare workflow names (`code-review`, `dev-story`) instead of the canonical registered workflow names (`code-review.md`, `dev-story.md`).
+
+This addendum is grounded in:
+- [core-requirements.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/deterministic-workflow-progression/core-requirements.md)
+- [implementation-spec.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/deterministic-workflow-progression/implementation-spec.md)
+- [test-22-findings.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/test-22-findings.md)
+
+The executing agent must follow this addendum literally.
+
+## [x] Remediation Step 17: Update Production Code To Use Canonical `.md` Workflow Names
+
+### Allowed Files
+
+- `src/core/task/TaskState.ts`
+- `src/core/task/focus-chain/deterministicPlaceholderProgression.ts`
+- `src/core/task/tools/handlers/SubagentToolHandler.ts`
+
+### Exact Changes
+
+#### 17A. Update the deterministic workflow name type in `TaskState.ts`.
+
+At [TaskState.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/TaskState.ts#L32), replace:
+
+```ts
+export type DeterministicPlaceholderWorkflowName = "code-review" | "dev-story"
+```
+
+with:
+
+```ts
+export type DeterministicPlaceholderWorkflowName = "code-review.md" | "dev-story.md"
+```
+
+Do not introduce a helper type alias, normalization helper, or compatibility helper in this step.
+
+#### 17B. Update deterministic support checks and branching in `deterministicPlaceholderProgression.ts`.
+
+At [deterministicPlaceholderProgression.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/focus-chain/deterministicPlaceholderProgression.ts#L27-L30), replace:
+
+```ts
+export function isDeterministicPlaceholderWorkflowSupported(
+	workflowName?: string,
+): workflowName is DeterministicPlaceholderWorkflowName {
+	return workflowName === "code-review" || workflowName === "dev-story"
+}
+```
+
+with:
+
+```ts
+export function isDeterministicPlaceholderWorkflowSupported(
+	workflowName?: string,
+): workflowName is DeterministicPlaceholderWorkflowName {
+	return workflowName === "code-review.md" || workflowName === "dev-story.md"
+}
+```
+
+At [deterministicPlaceholderProgression.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/focus-chain/deterministicPlaceholderProgression.ts#L348), replace:
+
+```ts
+if (args.workflowName === "code-review") {
+```
+
+with:
+
+```ts
+if (args.workflowName === "code-review.md") {
+```
+
+Do not add any fallback handling for bare names in this file.
+
+#### 17C. Update code-review-specific subagent detection to use the canonical name.
+
+At [SubagentToolHandler.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/handlers/SubagentToolHandler.ts#L69-L70), replace:
+
+```ts
+function isActiveCodeReviewPlaceholderWorkflow(config: TaskConfig): boolean {
+	return config.taskState.activePlaceholderWorkflowSource?.name === "code-review"
+}
+```
+
+with:
+
+```ts
+function isActiveCodeReviewPlaceholderWorkflow(config: TaskConfig): boolean {
+	return config.taskState.activePlaceholderWorkflowSource?.name === "code-review.md"
+}
+```
+
+Do not modify any other production file in this step.
+
+### Pause Point 17
+
+Stop after Step 17 and report:
+- the exact new `DeterministicPlaceholderWorkflowName` union
+- the exact canonical strings now accepted by `isDeterministicPlaceholderWorkflowSupported(...)`
+- confirmation that no helper, normalization layer, or workflow-file change was introduced
+
+Do not proceed until this checkpoint is reviewed.
+
+## [x] Remediation Step 18: Update Regression Tests To The Canonical `.md` Contract
+
+### Allowed Files
+
+- `src/core/task/focus-chain/__tests__/deterministicPlaceholderProgression.test.ts`
+- `src/core/task/focus-chain/__tests__/FocusChainManager.placeholderWorkflow.test.ts`
+- `src/core/task/__tests__/placeholderWorkflowPersistence.test.ts`
+- `src/core/task/tools/handlers/__tests__/SubagentToolHandler.test.ts`
+
+### Exact Changes
+
+#### 18A. Update deterministic progression tests to assert canonical `.md` names.
+
+In [deterministicPlaceholderProgression.test.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/focus-chain/__tests__/deterministicPlaceholderProgression.test.ts#L38-L43):
+
+Replace:
+
+```ts
+expect(isDeterministicPlaceholderWorkflowSupported("code-review")).to.equal(true)
+expect(isDeterministicPlaceholderWorkflowSupported("dev-story")).to.equal(true)
+expect(isDeterministicPlaceholderWorkflowSupported("review-edge-case-hunter.md")).to.equal(false)
+```
+
+with:
+
+```ts
+expect(isDeterministicPlaceholderWorkflowSupported("code-review.md")).to.equal(true)
+expect(isDeterministicPlaceholderWorkflowSupported("dev-story.md")).to.equal(true)
+expect(isDeterministicPlaceholderWorkflowSupported("code-review")).to.equal(false)
+expect(isDeterministicPlaceholderWorkflowSupported("dev-story")).to.equal(false)
+expect(isDeterministicPlaceholderWorkflowSupported("review-edge-case-hunter.md")).to.equal(false)
+```
+
+Then update every `workflowName: "code-review"` in this file to `workflowName: "code-review.md"`.
+
+Then update every `workflowName: "dev-story"` in this file to `workflowName: "dev-story.md"`.
+
+Do not change the test titles in this file.
+
+#### 18B. Update focus-chain placeholder prompt tests to use canonical `.md` names.
+
+In [FocusChainManager.placeholderWorkflow.test.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/focus-chain/__tests__/FocusChainManager.placeholderWorkflow.test.ts):
+
+- At [FocusChainManager.placeholderWorkflow.test.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/focus-chain/__tests__/FocusChainManager.placeholderWorkflow.test.ts#L45), change:
+
+```ts
+taskState.activePlaceholderWorkflowId = "code-review"
+```
+
+to:
+
+```ts
+taskState.activePlaceholderWorkflowId = "code-review.md"
+```
+
+- At [FocusChainManager.placeholderWorkflow.test.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/focus-chain/__tests__/FocusChainManager.placeholderWorkflow.test.ts#L48), change:
+
+```ts
+name: "code-review",
+```
+
+to:
+
+```ts
+name: "code-review.md",
+```
+
+Apply that same canonical replacement to every remaining occurrence in this file for:
+- `activePlaceholderWorkflowId = "code-review"`
+- `name: "code-review"`
+- `workflowName: "code-review"`
+
+Every one of those values in this file must become `code-review.md`.
+
+Do not change:
+- the `workflowPath` file name `code-review.md`
+- any prompt assertions
+- any test titles
+
+#### 18C. Update placeholder persistence tests to use canonical `.md` names.
+
+In [placeholderWorkflowPersistence.test.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/__tests__/placeholderWorkflowPersistence.test.ts):
+
+Apply these canonical replacements everywhere they appear in this file:
+
+- `workflowName: "code-review"` -> `workflowName: "code-review.md"`
+- `activePlaceholderWorkflowId: "code-review"` -> `activePlaceholderWorkflowId: "code-review.md"`
+- `name: "code-review"` -> `name: "code-review.md"`
+- `workflowId: "code-review"` -> `workflowId: "code-review.md"`
+- `activeAgentInvokedSlashCommand` expectations that currently assert `"code-review"` -> `"code-review.md"`
+
+Do not change:
+- remote workflow contents
+- test titles
+- non-code-review values such as `remote-review`
+
+#### 18D. Update the subagent handler regression test to use the canonical code-review name.
+
+In [SubagentToolHandler.test.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/handlers/__tests__/SubagentToolHandler.test.ts#L441-L447):
+
+Replace:
+
+```ts
+taskState.activePlaceholderWorkflowId = "code-review"
+taskState.activePlaceholderWorkflowSource = {
+	type: "remote",
+	name: "code-review",
+	contents: "",
+}
+```
+
+with:
+
+```ts
+taskState.activePlaceholderWorkflowId = "code-review.md"
+taskState.activePlaceholderWorkflowSource = {
+	type: "remote",
+	name: "code-review.md",
+	contents: "",
+}
+```
+
+Do not change the test title or the stubbed subagent result payloads.
+
+### Pause Point 18
+
+Stop after Step 18 and report:
+- the exact new support expectations added for bare-name rejection in `deterministicPlaceholderProgression.test.ts`
+- confirmation that all code-review canonical test values now use `code-review.md`
+- confirmation that all dev-story canonical test values now use `dev-story.md`
+
+Do not proceed until this checkpoint is reviewed.
+
+## [x] Remediation Step 19: Validate Canonical `.md` Deterministic Workflow Support
+
+### Allowed Files
+
+- no source edits unless a validation failure directly identifies a defect in one of the files allowed by Steps 17-18
+
+### Exact Commands
+
+Run exactly these commands, in this order:
+
+1. `npm run test:unit -- --exit src/core/task/focus-chain/__tests__/deterministicPlaceholderProgression.test.ts`
+2. `npm run test:unit -- --exit src/core/task/focus-chain/__tests__/FocusChainManager.placeholderWorkflow.test.ts`
+3. `npm run test:unit -- --exit src/core/task/__tests__/placeholderWorkflowPersistence.test.ts`
+4. `npm run test:unit -- --exit src/core/task/tools/handlers/__tests__/SubagentToolHandler.test.ts`
+
+If all four pass, stop.
+
+If any command fails:
+- fix only the files already listed in Steps 17-18
+- rerun only the failing command until it passes
+- then rerun all four commands in the original order
+
+Do not update snapshots during this addendum. If any snapshot changes are suggested, stop and ask for input before proceeding.
+
+### Pause Point 19
+
+Stop after Step 19 and report:
+- the pass/fail result for each command in order
+- any files changed during validation repair, if any
+- confirmation that no snapshots were updated
+
+Do not proceed beyond this addendum.

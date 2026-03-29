@@ -69,7 +69,7 @@ Inspect the prepared review input and write findings.
 				},
 				pendingAutoCompletedPlaceholderWorkflowStepNotices: [
 					{
-						workflowName: "code-review",
+						workflowName: "code-review.md",
 						stepNumber: 4,
 						checklistLabel: "Step 4: Set Review Mode",
 						reason: "review_mode was derived deterministically from fresh review artifacts.",
@@ -109,10 +109,10 @@ Inspect the prepared review input and write findings.
 		const sandbox = sinon.createSandbox()
 		try {
 			const metadata = {
-				activePlaceholderWorkflowId: "code-review",
+				activePlaceholderWorkflowId: "code-review.md",
 				activePlaceholderWorkflowSource: {
 					type: "remote",
-					name: "code-review",
+					name: "code-review.md",
 					contents: `# Remote Review
 
 ## Step 1: Gather Context
@@ -124,7 +124,7 @@ Inspect the prepared review input and write findings.
 				},
 				pendingAutoCompletedPlaceholderWorkflowStepNotices: [
 					{
-						workflowName: "code-review",
+						workflowName: "code-review.md",
 						stepNumber: 4,
 						checklistLabel: "Step 4: Set Review Mode",
 						reason: "review_mode was derived deterministically from fresh review artifacts.",
@@ -155,7 +155,7 @@ Inspect the prepared review input and write findings.
 
 	it("clears deterministic placeholder state and notices when activating a managed workflow", async () => {
 		const taskState = new TaskState()
-		taskState.activePlaceholderWorkflowId = "code-review"
+		taskState.activePlaceholderWorkflowId = "code-review.md"
 		taskState.activePlaceholderWorkflowDeterministicState = {
 			codeReview: {
 				completedReviewLayers: {
@@ -165,7 +165,7 @@ Inspect the prepared review input and write findings.
 		}
 		taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices = [
 			{
-				workflowName: "code-review",
+				workflowName: "code-review.md",
 				stepNumber: 4,
 				checklistLabel: "Step 4: Set Review Mode",
 				reason: "review_mode was derived deterministically from fresh review artifacts.",
@@ -338,10 +338,10 @@ Done Signal: You've persisted a new \`review-input.diff\` file in {output_folder
 				...createFakeTask("task-step-3-guidance"),
 				cwd: tempDir,
 			}
-			fakeTask.taskState.activePlaceholderWorkflowId = "code-review"
+			fakeTask.taskState.activePlaceholderWorkflowId = "code-review.md"
 			fakeTask.taskState.activePlaceholderWorkflowSource = {
 				type: "local",
-				name: "code-review",
+				name: "code-review.md",
 				path: workflowPath,
 				configPath,
 			}
@@ -354,7 +354,7 @@ Done Signal: You've persisted a new \`review-input.diff\` file in {output_folder
 
 			const prompt = await (Task.prototype as any).buildPlaceholderWorkflowActivationInstructions.call(fakeTask, {
 				type: "activate_placeholder_workflow",
-				workflowId: "code-review",
+				workflowId: "code-review.md",
 				workflowSource: fakeTask.taskState.activePlaceholderWorkflowSource,
 			})
 
@@ -378,18 +378,18 @@ Done Signal: You've persisted a new \`review-input.diff\` file in {output_folder
 
 			await (Task.prototype as any).applyPersistentSlashCommandAction.call(fakeTask, {
 				type: "activate_placeholder_workflow",
-				workflowId: "code-review",
+				workflowId: "code-review.md",
 				workflowSource: {
 					type: "remote",
-					name: "code-review",
+					name: "code-review.md",
 					contents: "# Code review\nInspect the implementation.",
 				},
 			})
 
 			expect(fakeTask.taskState.activeAgentId).to.equal("bmad-dev")
 			expect(fakeTask.taskState.activeAgentSkillName).to.equal("bmad-dev")
-			expect(fakeTask.taskState.activeAgentInvokedSlashCommand).to.equal("code-review")
-			expect(fakeTask.taskState.activePlaceholderWorkflowId).to.equal("code-review")
+			expect(fakeTask.taskState.activeAgentInvokedSlashCommand).to.equal("code-review.md")
+			expect(fakeTask.taskState.activePlaceholderWorkflowId).to.equal("code-review.md")
 			expect(saveMetadataStub.calledOnce).to.equal(true)
 			const [, savedMetadata] = saveMetadataStub.firstCall.args
 			expect(savedMetadata.activeAgentId).to.equal("bmad-dev")
@@ -411,10 +411,10 @@ Done Signal: You've persisted a new \`review-input.diff\` file in {output_folder
 
 			await (Task.prototype as any).applyPersistentSlashCommandAction.call(fakeTask, {
 				type: "activate_placeholder_workflow",
-				workflowId: "code-review",
+				workflowId: "code-review.md",
 				workflowSource: {
 					type: "remote",
-					name: "code-review",
+					name: "code-review.md",
 					contents: "# Code review\nInspect the implementation.",
 				},
 			})

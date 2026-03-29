@@ -27,7 +27,7 @@ export interface DeterministicPlaceholderProgressionResult {
 export function isDeterministicPlaceholderWorkflowSupported(
 	workflowName?: string,
 ): workflowName is DeterministicPlaceholderWorkflowName {
-	return workflowName === "code-review" || workflowName === "dev-story"
+	return workflowName === "code-review.md" || workflowName === "dev-story.md"
 }
 
 type DeterministicStepEvaluationResult = {
@@ -345,7 +345,7 @@ async function evaluateDeterministicStep(args: {
 	workflowName: DeterministicPlaceholderWorkflowName
 	stepNumber: number
 }): Promise<DeterministicStepEvaluationResult> {
-	if (args.workflowName === "code-review") {
+	if (args.workflowName === "code-review.md") {
 		return evaluateCodeReviewStep({
 			taskState: args.taskState,
 			stepNumber: args.stepNumber,

@@ -440,10 +440,10 @@ describe("SubagentToolHandler", () => {
 
 	it("records completed code-review layer subagent reports in deterministic placeholder state", async () => {
 		const { config, taskState } = createConfig({ autoApproveSafe: true, autoApproveAll: true })
-		taskState.activePlaceholderWorkflowId = "code-review"
+		taskState.activePlaceholderWorkflowId = "code-review.md"
 		taskState.activePlaceholderWorkflowSource = {
 			type: "remote",
-			name: "code-review",
+			name: "code-review.md",
 			contents: "",
 		}
 

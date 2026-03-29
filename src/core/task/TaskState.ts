@@ -29,7 +29,7 @@ export interface PartialResponseToolPreview {
 	status: "streaming" | "completed" | "interrupted"
 }
 
-export type DeterministicPlaceholderWorkflowName = "code-review" | "dev-story"
+export type DeterministicPlaceholderWorkflowName = "code-review.md" | "dev-story.md"
 
 export interface AutoCompletedPlaceholderWorkflowStepNotice {
 	workflowName: DeterministicPlaceholderWorkflowName
