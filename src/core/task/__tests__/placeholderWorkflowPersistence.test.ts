@@ -205,7 +205,7 @@ Inspect the prepared review input and write findings.
 				workflowName: "code-review.md",
 				stepNumber: 3,
 			},
-			phase: "collect",
+			phase: "retry_error",
 			values: {
 				"source.type": {
 					stringValue: "commit",
@@ -691,7 +691,7 @@ Choose the review mode from the persisted diff output before continuing.
 					workflowName: "code-review.md",
 					stepNumber: 3,
 				},
-				phase: "collect",
+				phase: "collect_inputs",
 				values: {},
 			} as any
 
