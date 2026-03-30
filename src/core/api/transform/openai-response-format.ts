@@ -71,6 +71,43 @@ import { ClineStorageMessage } from "@/shared/messages/content"
  * @param messages - Array of ClineStorageMessage objects to be converted
  * @returns ResponseInput array containing the transformed messages with proper reasoning pairing
  */
+export function findLatestReusablePreviousResponseAnchor(
+	messages: ClineStorageMessage[],
+	options?: { previousResponseProviderIds?: string[] },
+): {
+	previousResponseId?: string
+	previousResponseIdChainBreakReason?: string
+	nextMessageIndex: number
+} {
+	const previousResponseProviderIds = new Set(options?.previousResponseProviderIds ?? ["openai-native"])
+
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const msg = messages[i]
+		if (msg.previousResponseIdChainBroken) {
+			return {
+				previousResponseIdChainBreakReason: msg.previousResponseIdChainBrokenReason || "stored_chain_break_boundary",
+				nextMessageIndex: 0,
+			}
+		}
+
+		const isMatchingAssistant =
+			msg.role === "assistant" &&
+			typeof msg.modelInfo?.providerId === "string" &&
+			previousResponseProviderIds.has(msg.modelInfo.providerId)
+
+		if (isMatchingAssistant && typeof msg.id === "string" && msg.id.length > 0) {
+			return {
+				previousResponseId: msg.id,
+				nextMessageIndex: i + 1,
+			}
+		}
+	}
+
+	return {
+		nextMessageIndex: 0,
+	}
+}
+
 export function convertToOpenAIResponsesInput(
 	_messages: ClineStorageMessage[],
 	options?: { usePreviousResponseId?: boolean; previousResponseProviderIds?: string[] },
@@ -86,27 +123,15 @@ export function convertToOpenAIResponsesInput(
 	let messages = _messages
 
 	if (options?.usePreviousResponseId) {
-		const previousResponseProviderIds = new Set(options.previousResponseProviderIds ?? ["openai-native"])
-
-		for (let i = _messages.length - 1; i >= 0; i--) {
-			const msg = _messages[i]
-			if (msg.previousResponseIdChainBroken) {
-				previousResponseIdChainBreakReason = msg.previousResponseIdChainBrokenReason || "stored_chain_break_boundary"
-				break
-			}
-			// Must be less than 24 hours old to be considered for chaining as the previous_response_id is only valid for 24 hours.
-			// Set to 23 hours to account for any potential delays in processing.
-			const isLessThan23HoursOld = msg.ts ? Date.now() - msg.ts < 23 * 60 * 60 * 1000 : false
-			const isMatchingAssistant =
-				msg.role === "assistant" &&
-				typeof msg.modelInfo?.providerId === "string" &&
-				previousResponseProviderIds.has(msg.modelInfo.providerId)
-
-			if (isMatchingAssistant && msg.id && isLessThan23HoursOld) {
-				previousResponseId = msg.id
-				messages = _messages.slice(i + 1)
-				break
-			}
+		// The helper chooses the latest reusable stored Responses anchor unless an explicit
+		// chain-break boundary blocks reuse.
+		const anchor = findLatestReusablePreviousResponseAnchor(_messages, {
+			previousResponseProviderIds: options.previousResponseProviderIds,
+		})
+		previousResponseId = anchor.previousResponseId
+		previousResponseIdChainBreakReason = anchor.previousResponseIdChainBreakReason
+		if (previousResponseId) {
+			messages = _messages.slice(anchor.nextMessageIndex)
 		}
 	}
 

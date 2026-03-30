@@ -59,7 +59,7 @@ describe("convertToOpenAIResponsesInput", () => {
 			{
 				role: "assistant",
 				id: "resp_456",
-				ts: Date.now(),
+				ts: Date.now() - 48 * 60 * 60 * 1000,
 				modelInfo: {
 					modelId: "gpt-5-codex",
 					providerId: "openai-codex",

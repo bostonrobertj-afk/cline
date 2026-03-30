@@ -346,6 +346,54 @@ describe("OpenAiHandler", () => {
 		createStub.callCount.should.equal(2)
 	})
 
+	it("should reuse aged stored previous_response_id anchors for openai responses", async () => {
+		const handler = new OpenAiHandler({
+			openAiApiKey: "test-api-key",
+			openAiModelId: "gpt-5.4-mini-2026-03-17",
+		})
+
+		const createStub = sinon.stub().resolves(
+			createAsyncIterable([
+				{
+					type: "response.completed",
+					response: {
+						id: "resp_test_logging_aged_anchor",
+						usage: {
+							input_tokens: 10,
+							output_tokens: 5,
+						},
+					},
+				},
+			]),
+		)
+		const fakeClient = {
+			responses: {
+				create: createStub,
+			},
+		}
+		sinon.stub(handler as any, "ensureClient").returns(fakeClient as any)
+
+		const messages = [
+			{
+				role: "assistant",
+				content: "prior",
+				id: "resp_prev_chain_aged",
+				ts: Date.now() - 48 * 60 * 60 * 1000,
+				modelInfo: { providerId: "openai" },
+			},
+			{
+				role: "user",
+				content: "continue",
+			},
+		] as any
+
+		for await (const _chunk of handler.createMessage("system", messages, [])) {
+			// drain
+		}
+
+		createStub.firstCall.args[0].previous_response_id.should.equal("resp_prev_chain_aged")
+	})
+
 	it("should include reasoning and cached tokens in Responses API usage chunks", async () => {
 		const handler = new OpenAiHandler({
 			openAiApiKey: "test-api-key",

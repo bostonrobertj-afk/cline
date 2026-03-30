@@ -1,5 +1,6 @@
 import { setTimeout as setTimeoutPromise } from "node:timers/promises"
 import { ApiHandler, ApiProviderInfo, buildApiHandler } from "@core/api"
+import { findLatestReusablePreviousResponseAnchor } from "@core/api/transform/openai-response-format"
 import { ApiStream } from "@core/api/transform/stream"
 import { AssistantMessageContent, parseAssistantMessageV2, ToolUse } from "@core/assistant-message"
 import { ContextManager } from "@core/context/context-management/ContextManager"
@@ -265,6 +266,62 @@ export function isPassiveThreadDisplayState(threadDisplayState: ThreadDisplaySta
 
 export function hasAssistantResponseContent(assistantTextOnly: string, finalizedToolCallCount: number): boolean {
 	return assistantTextOnly.trim().length > 0 || finalizedToolCallCount > 0
+}
+
+export function prepareApiConversationHistoryForResume(
+	existingApiConversationHistory: ClineStorageMessage[],
+	providerInfo: Pick<ApiProviderInfo, "providerId" | "model">,
+): {
+	resumeUsesStoredResponsesChain: boolean
+	apiConversationHistory: ClineStorageMessage[]
+	carryForwardUserContent: ClineContent[]
+} {
+	const canUseStoredResponsesChain =
+		(providerInfo.providerId === "openai" || providerInfo.providerId === "openai-native") &&
+		providerInfo.model.info.apiFormat === ApiFormat.OPENAI_RESPONSES
+
+	if (canUseStoredResponsesChain) {
+		const anchor = findLatestReusablePreviousResponseAnchor(existingApiConversationHistory, {
+			previousResponseProviderIds: [providerInfo.providerId],
+		})
+		if (anchor.previousResponseId) {
+			return {
+				resumeUsesStoredResponsesChain: true,
+				apiConversationHistory: existingApiConversationHistory,
+				carryForwardUserContent: [],
+			}
+		}
+	}
+
+	if (existingApiConversationHistory.length === 0) {
+		return {
+			resumeUsesStoredResponsesChain: false,
+			apiConversationHistory: [],
+			carryForwardUserContent: [],
+		}
+	}
+
+	const lastMessage = existingApiConversationHistory[existingApiConversationHistory.length - 1]
+	if (lastMessage.role === "assistant") {
+		return {
+			resumeUsesStoredResponsesChain: false,
+			apiConversationHistory: existingApiConversationHistory,
+			carryForwardUserContent: [],
+		}
+	}
+
+	if (lastMessage.role === "user") {
+		const existingUserContent: ClineContent[] = Array.isArray(lastMessage.content)
+			? lastMessage.content
+			: [{ type: "text", text: lastMessage.content }]
+		return {
+			resumeUsesStoredResponsesChain: false,
+			apiConversationHistory: existingApiConversationHistory.slice(0, -1),
+			carryForwardUserContent: [...existingUserContent],
+		}
+	}
+
+	throw new Error("Unexpected: Last message is not a user or assistant message")
 }
 
 export function resolvePersistableNativeToolUseBlocks(
@@ -2418,33 +2475,9 @@ export class Task {
 		// Use the already-loaded API conversation history from memory instead of reloading from disk
 		// This prevents issues where the file might be empty or stale after hook execution
 		const existingApiConversationHistory = this.messageStateHandler.getApiConversationHistory()
-
-		// Remove the last user message so we can update it with the resume message
-		let modifiedOldUserContent: ClineContent[] // either the last message if its user message, or the user message before the last (assistant) message
-		let modifiedApiConversationHistory: ClineStorageMessage[] // need to remove the last user message to replace with new modified user message
-		if (existingApiConversationHistory.length > 0) {
-			const lastMessage = existingApiConversationHistory[existingApiConversationHistory.length - 1]
-			if (lastMessage.role === "assistant") {
-				modifiedApiConversationHistory = [...existingApiConversationHistory]
-				modifiedOldUserContent = []
-			} else if (lastMessage.role === "user") {
-				const existingUserContent: ClineContent[] = Array.isArray(lastMessage.content)
-					? lastMessage.content
-					: [{ type: "text", text: lastMessage.content }]
-				modifiedApiConversationHistory = existingApiConversationHistory.slice(0, -1)
-				modifiedOldUserContent = [...existingUserContent]
-			} else {
-				throw new Error("Unexpected: Last message is not a user or assistant message")
-			}
-		} else {
-			// No API conversation history yet (e.g., cancelled during hook before first API request)
-			// Start fresh with empty history and no previous content
-			modifiedApiConversationHistory = []
-			modifiedOldUserContent = []
-		}
-
-		// Add previous content to newUserContent array
-		newUserContent.push(...modifiedOldUserContent)
+		const providerInfo = this.getCurrentProviderInfo()
+		const resumeConversationState = prepareApiConversationHistoryForResume(existingApiConversationHistory, providerInfo)
+		newUserContent.push(...resumeConversationState.carryForwardUserContent)
 
 		const agoText = (() => {
 			const timestamp = lastClineMessage?.ts ?? Date.now()
@@ -2552,7 +2585,9 @@ export class Task {
 			Logger.error("Failed to record environment metadata on resume:", error)
 		}
 
-		await this.messageStateHandler.overwriteApiConversationHistory(modifiedApiConversationHistory)
+		if (resumeConversationState.resumeUsesStoredResponsesChain === false) {
+			await this.messageStateHandler.overwriteApiConversationHistory(resumeConversationState.apiConversationHistory)
+		}
 		this.nextApiRequestIncludesHumanAuthoredInput = this.hasHumanAuthoredInput(newUserContent)
 		await this.initiateTaskLoop(newUserContent)
 	}

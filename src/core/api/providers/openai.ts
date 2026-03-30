@@ -17,6 +17,7 @@ import { calculateApiCostOpenAI } from "@/utils/cost"
 import { ApiHandler, CommonApiHandlerOptions } from "../index"
 import { withRetry } from "../retry"
 import { convertToOpenAiMessages } from "../transform/openai-format"
+import { findLatestReusablePreviousResponseAnchor } from "../transform/openai-response-format"
 import { convertToR1Format } from "../transform/r1-format"
 import { ApiStream } from "../transform/stream"
 import { ToolCallProcessor } from "../transform/tool-call-processor"
@@ -264,21 +265,12 @@ export class OpenAiHandler implements ApiHandler {
 
 		let previousResponseId: string | undefined
 		let inputMessages = messages
-
-		for (let i = messages.length - 1; i >= 0; i--) {
-			const message = messages[i] as any
-			const isRecentEnough = message?.ts ? Date.now() - message.ts < 23 * 60 * 60 * 1000 : false
-			const isOpenAiCompatibleAssistant =
-				message?.role === "assistant" &&
-				message?.modelInfo?.providerId === "openai" &&
-				typeof message?.id === "string" &&
-				message.id.length > 0
-
-			if (isOpenAiCompatibleAssistant && isRecentEnough) {
-				previousResponseId = message.id
-				inputMessages = messages.slice(i + 1)
-				break
-			}
+		const anchor = findLatestReusablePreviousResponseAnchor(messages, {
+			previousResponseProviderIds: ["openai"],
+		})
+		previousResponseId = anchor.previousResponseId
+		if (previousResponseId) {
+			inputMessages = messages.slice(anchor.nextMessageIndex)
 		}
 
 		let responseInput: any[] = buildResponsesInput(inputMessages, {
