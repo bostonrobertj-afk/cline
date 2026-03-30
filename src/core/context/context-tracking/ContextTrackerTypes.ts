@@ -48,6 +48,7 @@ export interface TaskMetadata {
 	activePlaceholderWorkflowDeterministicState?: ActivePlaceholderWorkflowDeterministicState
 	activePlaceholderWorkflowTaskWriteProofPaths?: string[]
 	activeWorkflowFormSession?: WorkflowFormSessionState
+	suppressedWorkflowFormResolverIds?: string[]
 	pendingAutoCompletedPlaceholderWorkflowStepNotices?: AutoCompletedPlaceholderWorkflowStepNotice[]
 	managedWorkflowRun?: ManagedWorkflowRunState
 }

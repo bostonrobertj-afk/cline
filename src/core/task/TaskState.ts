@@ -148,6 +148,7 @@ export class TaskState {
 	activePlaceholderWorkflowDeterministicState?: ActivePlaceholderWorkflowDeterministicState
 	activePlaceholderWorkflowTaskWriteProofPaths: string[] = []
 	activeWorkflowFormSession?: WorkflowFormSessionState
+	suppressedWorkflowFormResolverIds: string[] = []
 	pendingAutoCompletedPlaceholderWorkflowStepNotices: AutoCompletedPlaceholderWorkflowStepNotice[] = []
 	activeWorkflowJustStarted = false
 	managedWorkflowRun?: ManagedWorkflowRunState

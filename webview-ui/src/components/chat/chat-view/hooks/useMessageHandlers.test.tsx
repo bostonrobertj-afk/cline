@@ -294,6 +294,28 @@ describe("useMessageHandlers active_user routing", () => {
 		)
 	})
 
+	it("includes confirm submissions for workflow-form confirm screens", async () => {
+		await submitWorkflowForm("session-1", WorkflowFormAction.SUBMIT, {
+			confirm: "yes",
+		})
+
+		expect(mockSubmitWorkflowForm).toHaveBeenCalledTimes(1)
+		expect(mockSubmitWorkflowForm).toHaveBeenCalledWith(
+			expect.objectContaining({
+				sessionId: "session-1",
+				action: WorkflowFormAction.SUBMIT,
+				fields: [
+					{
+						key: "confirm",
+						value: {
+							stringValue: "yes",
+						},
+					},
+				],
+			}),
+		)
+	})
+
 	it("does not allow composer sends while a system-owned workflow form is awaiting input", async () => {
 		mockThreadDisplayState.value = "awaiting_user_response"
 		mockAwaitingUserResponseSubtype.value = "system"

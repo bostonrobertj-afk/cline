@@ -20,7 +20,10 @@ describe("WorkflowFormRuntime", () => {
 		const payload = runtime.buildPayload(session)
 
 		expect(payload.phase).to.equal("confirm")
-		expect(payload.title).to.equal("Prepare Diff Input")
+		expect(payload.title).to.equal("Review Diff Artifact")
+		expect(payload.prompt).to.equal(
+			"This workflow requires the following tool-produced artifact: `review-input.diff`.\n\nCan you provide the inputs required to produce `review-input.diff`?",
+		)
 		expect(payload.options).to.deep.equal(["Yes", "No"])
 	})
 
@@ -137,7 +140,7 @@ describe("WorkflowFormRuntime", () => {
 			})
 
 			const payload = runtimeWithDefaultReader.buildPayload(session)
-			expect(payload.title).to.equal("Prepare Diff Input")
+			expect(payload.title).to.equal("Review Diff Artifact")
 			expect(payload.toolDictionaryTitle).to.equal("Diff Source Reference")
 			expect(payload.toolDictionaryMarkdown).to.include("## build_review_diff_output")
 			expect(payload.toolDictionaryMarkdown).to.not.include("# Workflow UI Surface Tool Dictionary")

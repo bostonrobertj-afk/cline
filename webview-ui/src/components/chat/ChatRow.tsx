@@ -1458,22 +1458,8 @@ export const ChatRowContent = memo(
 										}
 									/>
 								</div>
-								{workflowForm.phase === "confirm" && (
+								{workflowForm.phase !== "success" && (
 									<div className="pt-3">
-										<OptionsButtons
-											isActive={isLast && message.ask === "workflow_form" && !workflowFormSubmissionPending}
-											onSelect={(option) =>
-												handleWorkflowFormAction(
-													option === "Yes" ? WorkflowFormAction.SUBMIT : WorkflowFormAction.CANCEL,
-													option === "Yes" ? { confirm: "yes" } : undefined,
-												)
-											}
-											options={workflowForm.options ?? ["Yes", "No"]}
-										/>
-									</div>
-								)}
-								{(workflowForm.phase === "collect" || workflowForm.phase === "retry_error") && (
-									<div className="pt-3 space-y-3">
 										<button
 											className="text-xs underline underline-offset-2 text-link disabled:opacity-50"
 											disabled={workflowFormSubmissionPending}
@@ -1481,7 +1467,7 @@ export const ChatRowContent = memo(
 												void handleWorkflowDictionaryOpen()
 											}}
 											type="button">
-											{`About ${workflowForm.toolDictionaryTitle}`}
+											Open inputs reference
 										</button>
 										<Dialog
 											onOpenChange={(open) => {
@@ -1500,6 +1486,24 @@ export const ChatRowContent = memo(
 												<MarkdownRow markdown={workflowForm.toolDictionaryMarkdown} />
 											</DialogContent>
 										</Dialog>
+									</div>
+								)}
+								{workflowForm.phase === "confirm" && (
+									<div className="pt-3">
+										<OptionsButtons
+											isActive={isLast && message.ask === "workflow_form" && !workflowFormSubmissionPending}
+											onSelect={(option) =>
+												handleWorkflowFormAction(
+													option === "Yes" ? WorkflowFormAction.SUBMIT : WorkflowFormAction.CANCEL,
+													option === "Yes" ? { confirm: "yes" } : undefined,
+												)
+											}
+											options={workflowForm.options ?? ["Yes", "No"]}
+										/>
+									</div>
+								)}
+								{(workflowForm.phase === "collect" || workflowForm.phase === "retry_error") && (
+									<div className="pt-3 space-y-3">
 										{workflowForm.phase === "retry_error" && workflowForm.errorMessage && (
 											<div className="rounded-xs border border-error/50 bg-error/10 px-3 py-2 text-sm text-foreground">
 												{workflowForm.errorMessage}

@@ -10,7 +10,7 @@ import type { ChatState, MessageHandlers } from "../types/chatTypes"
 
 type WorkflowFormUiValue = number | string | string[] | undefined
 
-const WORKFLOW_FORM_STRING_FIELD_KEYS = ["source.type", "source.commit", "source.base", "source.head"] as const
+const WORKFLOW_FORM_STRING_FIELD_KEYS = ["confirm", "source.type", "source.commit", "source.base", "source.head"] as const
 
 function normalizeWorkflowFormStringValue(value: WorkflowFormUiValue): string | undefined {
 	if (typeof value !== "string") {

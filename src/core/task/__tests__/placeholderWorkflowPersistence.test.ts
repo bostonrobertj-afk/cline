@@ -70,6 +70,7 @@ Inspect the prepared review input and write findings.
 					},
 				},
 				activePlaceholderWorkflowTaskWriteProofPaths: ["/tmp/review-input.md"],
+				suppressedWorkflowFormResolverIds: ["code_review_step_3_diff_source"],
 				pendingAutoCompletedPlaceholderWorkflowStepNotices: [
 					{
 						workflowName: "code-review.md",
@@ -95,6 +96,7 @@ Inspect the prepared review input and write findings.
 			expect(fakeTask.taskState.activePlaceholderWorkflowTaskWriteProofPaths).to.deep.equal(
 				metadata.activePlaceholderWorkflowTaskWriteProofPaths,
 			)
+			expect(fakeTask.taskState.suppressedWorkflowFormResolverIds).to.deep.equal(metadata.suppressedWorkflowFormResolverIds)
 			expect(fakeTask.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal(
 				metadata.pendingAutoCompletedPlaceholderWorkflowStepNotices,
 			)
@@ -170,6 +172,7 @@ Inspect the prepared review input and write findings.
 			},
 		}
 		taskState.activePlaceholderWorkflowTaskWriteProofPaths = ["/tmp/review-input.md"]
+		taskState.suppressedWorkflowFormResolverIds = ["code_review_step_3_diff_source"]
 		taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices = [
 			{
 				workflowName: "code-review.md",
@@ -187,6 +190,7 @@ Inspect the prepared review input and write findings.
 
 		expect(taskState.activePlaceholderWorkflowDeterministicState).to.equal(undefined)
 		expect(taskState.activePlaceholderWorkflowTaskWriteProofPaths).to.deep.equal([])
+		expect(taskState.suppressedWorkflowFormResolverIds).to.deep.equal([])
 		expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
 	})
 
@@ -213,19 +217,23 @@ Inspect the prepared review input and write findings.
 		try {
 			sandbox.stub(disk, "getTaskMetadata").resolves({
 				activeWorkflowFormSession: session,
+				suppressedWorkflowFormResolverIds: ["code_review_step_3_diff_source"],
 			} as never)
 			const saveTaskMetadataStub = sandbox.stub(disk, "saveTaskMetadata").resolves()
 
 			const fakeTask = createFakeTask("task-workflow-form-metadata")
 			fakeTask.taskState.activeWorkflowFormSession = session
+			fakeTask.taskState.suppressedWorkflowFormResolverIds = ["code_review_step_3_diff_source"]
 
 			await (Task.prototype as any).persistWorkflowFormSession.call(fakeTask)
 			await (Task.prototype as any).restoreBmadStateFromMetadata.call(fakeTask)
 
 			expect(fakeTask.taskState.activeWorkflowFormSession).to.deep.equal(session)
+			expect(fakeTask.taskState.suppressedWorkflowFormResolverIds).to.deep.equal(["code_review_step_3_diff_source"])
 			expect(saveTaskMetadataStub.called).to.be.true
 			const lastSavedMetadata = saveTaskMetadataStub.getCall(saveTaskMetadataStub.callCount - 1).args[1]
 			expect(lastSavedMetadata.activeWorkflowFormSession).to.deep.equal(session)
+			expect(lastSavedMetadata.suppressedWorkflowFormResolverIds).to.deep.equal(["code_review_step_3_diff_source"])
 		} finally {
 			sandbox.restore()
 		}

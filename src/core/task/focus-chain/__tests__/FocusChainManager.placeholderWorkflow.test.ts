@@ -321,6 +321,11 @@ Fallback instructions live here.
 
 			expect(await shouldInterceptWorkflowFormBeforeApiTurn({ cwd: tempDir, taskState })).to.equal(false)
 
+			taskState.activePlaceholderWorkflowTaskWriteProofPaths = []
+			taskState.suppressedWorkflowFormResolverIds = ["code_review_step_3_diff_source"]
+
+			expect(await shouldInterceptWorkflowFormBeforeApiTurn({ cwd: tempDir, taskState })).to.equal(false)
+
 			taskState.activePlaceholderWorkflowSource = {
 				type: "remote",
 				name: "dev-story.md",

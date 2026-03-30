@@ -46,8 +46,11 @@ function createWorkflowFormMessage(phase: "collect" | "confirm"): ClineMessage {
 			sessionId: "session-1",
 			resolverId: "code_review_step_3_diff_source",
 			toolName: "build_review_diff_output",
-			title: "Prepare Diff Input",
-			prompt: "The system can prepare the diff input directly.",
+			title: "Review Diff Artifact",
+			prompt:
+				phase === "confirm"
+					? "This workflow requires the following tool-produced artifact: `review-input.diff`.\n\nCan you provide the inputs required to produce `review-input.diff`?"
+					: "Select and provide the inputs needed to produce `review-input.diff`.",
 			phase,
 			toolDictionaryTitle: "Diff Source Reference",
 			toolDictionaryMarkdown: "## build_review_diff_output\n\nTool reference body.",
@@ -199,13 +202,14 @@ describe("ChatRow followup presentation", () => {
 		)
 
 		expect(screen.getByText("System-owned form:")).toBeInTheDocument()
-		expect(screen.getByText("Prepare Diff Input")).toBeInTheDocument()
+		expect(screen.getByText("Review Diff Artifact")).toBeInTheDocument()
+		expect(screen.getByRole("button", { name: "Open inputs reference" })).toBeInTheDocument()
 		expect(screen.getByRole("button", { name: "Yes" })).toBeInTheDocument()
 		expect(screen.getByRole("button", { name: "No" })).toBeInTheDocument()
 	})
 
-	it("opens the workflow dictionary in a read-only dialog", () => {
-		const message = createWorkflowFormMessage("collect")
+	it("opens the workflow dictionary in a read-only dialog", async () => {
+		const message = createWorkflowFormMessage("confirm")
 
 		render(
 			<ChatRowContent
@@ -218,9 +222,9 @@ describe("ChatRow followup presentation", () => {
 			/>,
 		)
 
-		fireEvent.click(screen.getByRole("button", { name: "About Diff Source Reference" }))
+		fireEvent.click(screen.getByRole("button", { name: "Open inputs reference" }))
 
-		expect(screen.getByText("Diff Source Reference")).toBeInTheDocument()
-		expect(screen.getByText("build_review_diff_output")).toBeInTheDocument()
+		expect(await screen.findByText("Diff Source Reference")).toBeInTheDocument()
+		expect(await screen.findByText("build_review_diff_output")).toBeInTheDocument()
 	})
 })

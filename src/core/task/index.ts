@@ -221,8 +221,10 @@ export async function shouldInterceptWorkflowFormBeforeApiTurn(args: {
 		| "activePlaceholderWorkflowStableValues"
 		| "activePlaceholderWorkflowValues"
 		| "activePlaceholderWorkflowTaskWriteProofPaths"
+		| "suppressedWorkflowFormResolverIds"
 	>
 }): Promise<boolean> {
+	const resolverId = "code_review_step_3_diff_source"
 	if (args.taskState.activePlaceholderWorkflowSource?.name !== "code-review.md") {
 		return false
 	}
@@ -238,6 +240,10 @@ export async function shouldInterceptWorkflowFormBeforeApiTurn(args: {
 		placeholderValues: args.taskState.activePlaceholderWorkflowValues,
 	})
 	if (activeStep?.stepNumber !== 3) {
+		return false
+	}
+
+	if (args.taskState.suppressedWorkflowFormResolverIds.includes(resolverId)) {
 		return false
 	}
 
@@ -1329,9 +1335,20 @@ export class Task {
 			case "render_form":
 			case "invoke_tool":
 				this.taskState.activeWorkflowFormSession = outcome.session
+				if (outcome.kind === "render_form") {
+					this.taskState.suppressedWorkflowFormResolverIds = this.taskState.suppressedWorkflowFormResolverIds.filter(
+						(id) => id !== outcome.session.resolverId,
+					)
+				}
 				await this.persistWorkflowFormSession()
 				break
 			case "fallback_to_agent":
+				if (!this.taskState.suppressedWorkflowFormResolverIds.includes(activeSession.resolverId)) {
+					this.taskState.suppressedWorkflowFormResolverIds = [
+						...this.taskState.suppressedWorkflowFormResolverIds,
+						activeSession.resolverId,
+					]
+				}
 				await this.clearWorkflowFormSession()
 				break
 		}
@@ -1343,6 +1360,7 @@ export class Task {
 		try {
 			const taskMetadata = await getTaskMetadata(this.taskId)
 			taskMetadata.activeWorkflowFormSession = this.taskState.activeWorkflowFormSession
+			taskMetadata.suppressedWorkflowFormResolverIds = this.taskState.suppressedWorkflowFormResolverIds
 			await saveTaskMetadata(this.taskId, taskMetadata)
 		} catch {
 			// Non-fatal: prompt/runtime state should continue even if metadata persistence fails.
@@ -1810,6 +1828,7 @@ export class Task {
 				this.taskState.activePlaceholderWorkflowDeterministicState = undefined
 				this.taskState.activePlaceholderWorkflowTaskWriteProofPaths = []
 				this.taskState.activeWorkflowFormSession = undefined
+				this.taskState.suppressedWorkflowFormResolverIds = []
 				this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices = []
 				this.taskState.activeWorkflowJustStarted = true
 			}
@@ -1842,6 +1861,7 @@ export class Task {
 				this.taskState.activePlaceholderWorkflowDeterministicState = undefined
 				this.taskState.activePlaceholderWorkflowTaskWriteProofPaths = []
 				this.taskState.activeWorkflowFormSession = undefined
+				this.taskState.suppressedWorkflowFormResolverIds = []
 				this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices = []
 				this.taskState.activeWorkflowJustStarted = false
 			} else if (hadManagedWorkflowRun) {
@@ -1863,6 +1883,7 @@ export class Task {
 				this.taskState.activePlaceholderWorkflowDeterministicState = undefined
 				this.taskState.activePlaceholderWorkflowTaskWriteProofPaths = []
 				this.taskState.activeWorkflowFormSession = undefined
+				this.taskState.suppressedWorkflowFormResolverIds = []
 				this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices = []
 				this.taskState.activeWorkflowJustStarted = false
 			}
@@ -1885,6 +1906,7 @@ export class Task {
 			taskMetadata.activePlaceholderWorkflowTaskWriteProofPaths =
 				this.taskState.activePlaceholderWorkflowTaskWriteProofPaths
 			taskMetadata.activeWorkflowFormSession = this.taskState.activeWorkflowFormSession
+			taskMetadata.suppressedWorkflowFormResolverIds = this.taskState.suppressedWorkflowFormResolverIds
 			taskMetadata.pendingAutoCompletedPlaceholderWorkflowStepNotices =
 				this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices
 			taskMetadata.managedWorkflowRun = this.taskState.managedWorkflowRun
@@ -2031,6 +2053,7 @@ export class Task {
 			this.taskState.activePlaceholderWorkflowTaskWriteProofPaths =
 				metadata.activePlaceholderWorkflowTaskWriteProofPaths ?? []
 			this.taskState.activeWorkflowFormSession = metadata.activeWorkflowFormSession as WorkflowFormSessionState | undefined
+			this.taskState.suppressedWorkflowFormResolverIds = metadata.suppressedWorkflowFormResolverIds ?? []
 			this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices =
 				metadata.pendingAutoCompletedPlaceholderWorkflowStepNotices ?? []
 			this.taskState.activeWorkflowJustStarted = false

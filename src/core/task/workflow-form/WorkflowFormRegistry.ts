@@ -133,7 +133,7 @@ function buildBasePayload(
 		sessionId: session.sessionId,
 		resolverId: session.resolverId,
 		toolName: "build_review_diff_output",
-		title: "Prepare Diff Input",
+		title: "Review Diff Artifact",
 		prompt: overrides.prompt,
 		phase: overrides.phase,
 		toolDictionaryTitle: WORKFLOW_FORM_RUNTIME_TOOL_REFERENCE_TITLE,
@@ -156,14 +156,14 @@ export const workflowFormRegistry: Record<"code_review_step_3_diff_source", Work
 		buildConfirmPayload(session) {
 			return buildBasePayload(session, {
 				phase: "confirm",
-				prompt: "If you already know the Git-backed diff source for workflow Step 3, the system can build the review diff artifact directly before the fallback AI path runs.",
+				prompt: "This workflow requires the following tool-produced artifact: `review-input.diff`.\n\nCan you provide the inputs required to produce `review-input.diff`?",
 				options: ["Yes", "No"],
 			})
 		},
 		buildCollectPayload(session) {
 			return buildBasePayload(session, {
 				phase: "collect",
-				prompt: "Provide the diff source details for build_review_diff_output so the system can create the Step 3 review diff artifact.",
+				prompt: "Select and provide the inputs needed to produce `review-input.diff`.",
 				fields: buildFieldDefinitions(session.values),
 				submitLabel: "Submit",
 				cancelLabel: "Cancel",
@@ -172,7 +172,7 @@ export const workflowFormRegistry: Record<"code_review_step_3_diff_source", Work
 		buildRetryPayload(session) {
 			return buildBasePayload(session, {
 				phase: "retry_error",
-				prompt: "The system could not build the review diff artifact. Update the diff source details or retry the request.",
+				prompt: "The system could not produce `review-input.diff`. Update the inputs or retry the request.",
 				fields: buildFieldDefinitions(session.values),
 				submitLabel: "Submit",
 				cancelLabel: "Cancel",
