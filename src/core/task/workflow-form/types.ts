@@ -12,13 +12,17 @@ export interface WorkflowFormSessionOwner {
 
 export type WorkflowFormValues = Record<string, WorkflowFormFieldValuePayload>
 export type WorkflowFormToolInput = Record<string, unknown>
+export type WorkflowFormSessionPhase = Extract<
+	WorkflowFormPhase,
+	"confirm" | "select_source" | "collect_inputs" | "retry_error" | "success"
+>
 
 export interface WorkflowFormSessionState {
 	sessionId: string
 	resolverId: WorkflowFormResolverId
 	triggerSource: WorkflowFormTriggerSource
 	owner: WorkflowFormSessionOwner
-	phase: WorkflowFormPhase
+	phase: WorkflowFormSessionPhase
 	values: WorkflowFormValues
 	lastError?: string
 }
@@ -27,7 +31,8 @@ export interface WorkflowFormResolverDefinition {
 	id: WorkflowFormResolverId
 	toolName: string
 	buildConfirmPayload(session: WorkflowFormSessionState): ClineWorkflowForm
-	buildCollectPayload(session: WorkflowFormSessionState): ClineWorkflowForm
+	buildSelectSourcePayload(session: WorkflowFormSessionState): ClineWorkflowForm
+	buildCollectInputsPayload(session: WorkflowFormSessionState): ClineWorkflowForm
 	buildRetryPayload(session: WorkflowFormSessionState): ClineWorkflowForm
 	translateSubmissionToToolUse(values: WorkflowFormValues): WorkflowFormToolInput
 }

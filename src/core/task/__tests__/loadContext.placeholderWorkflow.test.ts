@@ -113,6 +113,7 @@ Determine what to review from the user's prompt before asking follow-up question
 			.callsFake(async (_includeFileDetails: boolean, includeDetailedEnvironmentDetails: boolean) => {
 				return includeDetailedEnvironmentDetails ? "ENVIRONMENT: detailed" : "ENVIRONMENT: reduced"
 			}),
+		maybeResolveWorkflowFormBeforeApiTurn: sinon.stub().resolves(),
 		applyPersistentSlashCommandAction: sinon.stub().resolves(),
 		buildPlaceholderWorkflowActivationInstructions: sinon.stub().resolves(undefined),
 	}
@@ -231,5 +232,84 @@ describe("Task.loadContext placeholder workflow focus chain prompting", () => {
 		expect(promptInjectionText).to.contain("Step 4: Set Review Mode")
 		expect(promptInjectionText).to.contain("# CURRENT WORKFLOW STEP")
 		expect(promptInjectionText).to.contain("You are currently on this step: Step 1: Determine Review Source")
+	})
+
+	it("resolves a pending workflow form before generating focus-chain prompt injections", async () => {
+		const fakeTask = createFakeTask()
+		fakeTask.taskState.activePlaceholderWorkflowSource = {
+			type: "remote",
+			name: "code-review.md",
+			contents: `# Code Review
+
+## Step 1: Determine Review Source
+Done.
+
+## Step 2: Construct & Persist Review Input File
+Done.
+
+## Step 3: System-Owned Diff Source Resolution And Diff Output Persistence
+Goal: The primary path for this step is runtime-owned workflow-form resolution. The AI instructions below are fallback-only and apply only when the system-owned path was not completed.
+
+You are in the fallback path because the system-owned workflow-form path was not completed.
+
+Do not ask the human to restate or re-enter a diff source they already declined to provide in the form flow.
+
+Use \`build_review_diff_output\` whenever a supported source is discovered.
+
+## Step 4: Set Review Mode
+Choose the review mode from the persisted diff output before continuing.
+`,
+		}
+		fakeTask.taskState.currentFocusChainChecklist = [
+			"- [x] Step 1: Determine Review Source",
+			"- [x] Step 2: Construct & Persist Review Input File",
+			"- [ ] Step 3: System-Owned Diff Source Resolution And Diff Output Persistence",
+			"- [ ] Step 4: Set Review Mode",
+		].join("\n")
+
+		const callOrder: string[] = []
+		fakeTask.maybeResolveWorkflowFormBeforeApiTurn = sinon.stub().callsFake(async () => {
+			callOrder.push("maybeResolveWorkflowFormBeforeApiTurn")
+			fakeTask.taskState.currentFocusChainChecklist = [
+				"- [x] Step 1: Determine Review Source",
+				"- [x] Step 2: Construct & Persist Review Input File",
+				"- [x] Step 3: System-Owned Diff Source Resolution And Diff Output Persistence",
+				"- [ ] Step 4: Set Review Mode",
+			].join("\n")
+		})
+
+		const originalGenerateFocusChainInstructions = fakeTask.FocusChainManager.generateFocusChainInstructions.bind(
+			fakeTask.FocusChainManager,
+		)
+		sinon.stub(fakeTask.FocusChainManager, "generateFocusChainInstructions").callsFake(async () => {
+			callOrder.push("generateFocusChainInstructions")
+			expect(fakeTask.taskState.currentFocusChainChecklist).to.contain("- [x] Step 3")
+			expect(fakeTask.taskState.currentFocusChainChecklist).to.contain("- [ ] Step 4: Set Review Mode")
+			return await originalGenerateFocusChainInstructions()
+		})
+
+		const [, promptInjectionBlocks] = await (Task.prototype as any).loadContext.call(
+			fakeTask,
+			[
+				{
+					type: "tool_result",
+					tool_use_id: "tool-1",
+					content: [{ type: "text", text: "Diff output persisted." }],
+				},
+			] as any,
+			false,
+			false,
+			false,
+		)
+
+		const promptInjectionText = collectTextValues(promptInjectionBlocks).join("\n")
+		expect(fakeTask.maybeResolveWorkflowFormBeforeApiTurn.calledOnce).to.equal(true)
+		expect(callOrder.indexOf("maybeResolveWorkflowFormBeforeApiTurn")).to.be.lessThan(
+			callOrder.indexOf("generateFocusChainInstructions"),
+		)
+		expect(promptInjectionText).to.not.contain(
+			"You are in the fallback path because the system-owned workflow-form path was not completed.",
+		)
+		expect(promptInjectionText).to.contain("You are currently on this step: Step 4: Set Review Mode")
 	})
 })

@@ -376,7 +376,7 @@ export interface ClineAskNewTask {
 	context: string
 }
 
-export type WorkflowFormPhase = "confirm" | "collect" | "retry_error" | "success"
+export type WorkflowFormPhase = "confirm" | "select_source" | "collect_inputs" | "retry_error" | "success"
 export type WorkflowFormFieldControl = "select" | "text" | "textarea" | "number"
 
 export interface WorkflowFormFieldOption {

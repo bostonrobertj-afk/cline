@@ -239,6 +239,100 @@ Inspect the prepared review input and write findings.
 		}
 	})
 
+	it("keeps only one workflow-form ask message for the active session after retry_error followed by success", async () => {
+		const sessionId = "wf-session-step-3"
+		const basePayload = {
+			sessionId,
+			resolverId: "code_review_step_3_diff_source",
+			toolName: "build_review_diff_output",
+			title: "Review Diff Artifact",
+			prompt: "Provide the concrete inputs needed to produce `review-input.diff`.",
+			toolDictionaryTitle: "Diff Source Reference",
+			toolDictionaryMarkdown: "## build_review_diff_output\n\nTool reference body.",
+		}
+		const messages: Array<Record<string, unknown>> = [
+			{
+				ts: 1,
+				type: "ask",
+				ask: "workflow_form",
+				text: JSON.stringify({
+					...basePayload,
+					phase: "collect_inputs",
+					fields: [],
+					submitLabel: "Submit",
+					cancelLabel: "Cancel",
+				}),
+			},
+			{
+				ts: 2,
+				type: "say",
+				say: "tool",
+				text: JSON.stringify({ status: "first-attempt-started" }),
+			},
+			{
+				ts: 3,
+				type: "say",
+				say: "tool",
+				text: JSON.stringify({ status: "first-attempt-failed" }),
+			},
+		]
+		const messageStateHandler = {
+			getClineMessages: sinon.stub().callsFake(() => messages),
+			updateClineMessage: sinon.stub().callsFake(async (index: number, update: Record<string, unknown>) => {
+				Object.assign(messages[index], update)
+			}),
+			addToClineMessages: sinon.stub().callsFake(async (message: Record<string, unknown>) => {
+				messages.push(message)
+			}),
+		}
+		const fakeTask = {
+			taskState: new TaskState(),
+			threadDisplayState: undefined,
+			awaitingUserResponseSubtype: undefined,
+			messageStateHandler,
+			setThreadDisplayState: sinon.stub(),
+			postStateToWebview: sinon.stub().resolves(),
+		}
+
+		await (Task.prototype as any).renderWorkflowFormMessage.call(fakeTask, {
+			...basePayload,
+			phase: "retry_error",
+			prompt: "The system could not produce `review-input.diff`. Update the inputs or retry the request.",
+			fields: [],
+			submitLabel: "Submit",
+			cancelLabel: "Cancel",
+			retryLabel: "Start Over",
+			errorMessage: "The first tool attempt failed.",
+		})
+
+		messages.push({
+			ts: 4,
+			type: "say",
+			say: "tool",
+			text: JSON.stringify({ status: "second-attempt-succeeded" }),
+		})
+
+		await (Task.prototype as any).renderWorkflowFormMessage.call(fakeTask, {
+			...basePayload,
+			phase: "success",
+			prompt: "Provide the concrete inputs needed to produce `review-input.diff`.",
+			successMessage: "The workflow form completed successfully.",
+		})
+
+		const survivingMessages = messages.filter((message) => {
+			if (message.type !== "ask" || message.ask !== "workflow_form" || typeof message.text !== "string") {
+				return false
+			}
+
+			return JSON.parse(message.text).sessionId === sessionId
+		})
+
+		expect(survivingMessages).to.have.length(1)
+		expect(JSON.parse(String(survivingMessages[0].text)).phase).to.equal("success")
+		sinon.assert.calledTwice(messageStateHandler.updateClineMessage)
+		sinon.assert.notCalled(messageStateHandler.addToClineMessages)
+	})
+
 	it("restores the placeholder checklist from disk before a resumed turn rebuilds it from source", async () => {
 		const fakeTask = createFakeTask("task-restore-placeholder-checklist")
 		fakeTask.taskState.activePlaceholderWorkflowId = "code-review.md"
@@ -535,6 +629,126 @@ Done Signal: You've persisted a new \`review-input.diff\` file in {output_folder
 			expect(prompt).to.equal(undefined)
 		} finally {
 			sandbox.restore()
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("builds the first post-form prompt from the next active step after a successful Step 3 diff-output resolution", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "placeholder-step-3-post-form-prompt-"))
+		const workflowPath = path.join(tempDir, "code-review.md")
+		const diffOutputPath = path.join(tempDir, "workflow-output", "review-input.diff")
+
+		try {
+			await fs.writeFile(
+				workflowPath,
+				`# Code Review
+
+## Step 1: Determine Review Source
+Done.
+
+## Step 2: Construct & Persist Review Input File
+Done.
+
+## Step 3: System-Owned Diff Source Resolution And Diff Output Persistence
+Goal: The primary path for this step is runtime-owned workflow-form resolution. The AI instructions below are fallback-only and apply only when the system-owned path was not completed.
+
+You are in the fallback path because the system-owned workflow-form path was not completed.
+
+Do not ask the human to restate or re-enter a diff source they already declined to provide in the form flow.
+
+Use \`build_review_diff_output\` whenever a supported source is discovered.
+
+## Step 4: Set Review Mode
+Choose the review mode from the persisted diff output before continuing.
+`,
+				"utf8",
+			)
+			await fs.mkdir(path.dirname(diffOutputPath), { recursive: true })
+
+			const taskState = new TaskState()
+			taskState.activePlaceholderWorkflowId = "code-review.md"
+			taskState.activePlaceholderWorkflowSource = {
+				type: "local",
+				name: "code-review.md",
+				path: workflowPath,
+			}
+			taskState.currentFocusChainChecklist = [
+				"- [x] Step 1: Determine Review Source",
+				"- [x] Step 2: Construct & Persist Review Input File",
+				"- [ ] Step 3: System-Owned Diff Source Resolution And Diff Output Persistence",
+				"- [ ] Step 4: Set Review Mode",
+			].join("\n")
+			taskState.activePlaceholderWorkflowStableValues = {
+				output_folder: path.join(tempDir, "workflow-output"),
+			}
+
+			const createdSession = {
+				sessionId: "wf-session-step-3",
+				resolverId: "code_review_step_3_diff_source",
+				triggerSource: "deterministic_workflow_progression",
+				owner: {
+					kind: "placeholder_workflow_step",
+					workflowName: "code-review.md",
+					stepNumber: 3,
+				},
+				phase: "collect",
+				values: {},
+			} as any
+
+			let renderCount = 0
+			const fakeTask: any = {
+				cwd: tempDir,
+				taskState,
+				pendingWorkflowFormOutcome: undefined,
+				workflowFormRuntime: {
+					createSession: sinon.stub().returns(createdSession),
+					buildPayload: sinon.stub().callsFake((session: unknown) => ({ kind: "workflow_form", session })),
+					buildSuccessPayload: sinon.stub().returns({ kind: "workflow_form_success" }),
+				},
+				persistWorkflowFormSession: sinon.stub().resolves(),
+				renderWorkflowFormMessage: sinon.stub().callsFake(async () => {
+					renderCount += 1
+					if (renderCount === 1) {
+						fakeTask.pendingWorkflowFormOutcome = {
+							kind: "invoke_tool",
+							session: createdSession,
+						}
+					}
+				}),
+				executeWorkflowFormToolAndSync: sinon.stub().callsFake(async () => {
+					await fs.writeFile(diffOutputPath, "diff --git a/file.ts b/file.ts\n", "utf8")
+					taskState.activePlaceholderWorkflowValues = {
+						diff_output: diffOutputPath,
+					}
+					taskState.activePlaceholderWorkflowTaskWriteProofPaths = [diffOutputPath]
+					taskState.currentFocusChainChecklist = [
+						"- [x] Step 1: Determine Review Source",
+						"- [x] Step 2: Construct & Persist Review Input File",
+						"- [x] Step 3: System-Owned Diff Source Resolution And Diff Output Persistence",
+						"- [ ] Step 4: Set Review Mode",
+					].join("\n")
+					return { succeeded: true }
+				}),
+				clearWorkflowFormSession: sinon.stub().callsFake(async () => {
+					taskState.activeWorkflowFormSession = undefined
+				}),
+				setThreadDisplayState: sinon.stub(),
+				postStateToWebview: sinon.stub().resolves(),
+			}
+
+			await (Task.prototype as any).maybeResolveWorkflowFormBeforeApiTurn.call(fakeTask)
+
+			const manager = createFocusChainManager(taskState)
+			const prompt = await manager.generateFocusChainInstructions()
+
+			expect(prompt).to.not.contain(
+				"You are in the fallback path because the system-owned workflow-form path was not completed.",
+			)
+			expect(prompt).to.not.contain(
+				"You are currently on this step: Step 3: System-Owned Diff Source Resolution And Diff Output Persistence",
+			)
+			expect(prompt).to.contain("You are currently on this step: Step 4: Set Review Mode")
+		} finally {
 			await fs.rm(tempDir, { recursive: true, force: true })
 		}
 	})

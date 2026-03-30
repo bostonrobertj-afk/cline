@@ -318,10 +318,18 @@ export const ChatRowContent = memo(
 
 		const isMcpServerResponding = isLast && lastModifiedMessage?.say === "mcp_server_request_started"
 		const visibleWorkflowFormFields = workflowForm?.fields?.filter((field) => field.visible !== false) ?? []
+		const sourceSelectionWorkflowFormFields = visibleWorkflowFormFields.filter((field) => field.key === "source.type")
+		const concreteWorkflowFormFields = visibleWorkflowFormFields.filter((field) => field.key !== "source.type")
 		const isWorkflowFormSubmitDisabled =
-			workflowForm?.phase === "collect" || workflowForm?.phase === "retry_error"
-				? visibleWorkflowFormFields.some((field) => !isWorkflowFormFieldRequiredValueValid(field, workflowFormValues))
-				: false
+			workflowForm?.phase === "select_source"
+				? sourceSelectionWorkflowFormFields.some(
+						(field) => !isWorkflowFormFieldRequiredValueValid(field, workflowFormValues),
+					)
+				: workflowForm?.phase === "collect_inputs" || workflowForm?.phase === "retry_error"
+					? concreteWorkflowFormFields.some(
+							(field) => !isWorkflowFormFieldRequiredValueValid(field, workflowFormValues),
+						)
+					: false
 
 		const handleToggle = useCallback(() => {
 			onToggleExpand(message.ts)
@@ -1502,15 +1510,63 @@ export const ChatRowContent = memo(
 										/>
 									</div>
 								)}
-								{(workflowForm.phase === "collect" || workflowForm.phase === "retry_error") && (
+								{workflowForm.phase === "select_source" && (
 									<div className="pt-3 space-y-3">
-										{workflowForm.phase === "retry_error" && workflowForm.errorMessage && (
-											<div className="rounded-xs border border-error/50 bg-error/10 px-3 py-2 text-sm text-foreground">
-												{workflowForm.errorMessage}
-											</div>
-										)}
 										<div className="space-y-3">
-											{visibleWorkflowFormFields.map((field) => (
+											{sourceSelectionWorkflowFormFields.map((field) => (
+												<label className="block" key={field.key}>
+													<div className="mb-1 text-xs font-semibold text-foreground">
+														{field.label}
+													</div>
+													<div className="mb-2 text-xs text-muted-foreground">{field.help}</div>
+													{field.control === "select" && (
+														<select
+															aria-label={field.label}
+															className="w-full rounded-xs border border-editor-group-border bg-background px-3 py-2 text-sm text-foreground"
+															disabled={workflowFormSubmissionPending}
+															onChange={(event) =>
+																handleWorkflowFormFieldChange(field.key, event.target.value)
+															}
+															value={workflowFormValues[field.key] ?? ""}>
+															<option value="">Select an option</option>
+															{field.options?.map((option) => (
+																<option key={option.value} value={option.value}>
+																	{option.label}
+																</option>
+															))}
+														</select>
+													)}
+												</label>
+											))}
+										</div>
+										<div className="flex flex-wrap gap-2">
+											<button
+												className="rounded-xs border border-editor-group-border px-3 py-2 text-sm text-foreground disabled:opacity-50"
+												disabled={workflowFormSubmissionPending}
+												onClick={() => {
+													void handleWorkflowFormAction(WorkflowFormAction.CANCEL)
+												}}
+												type="button">
+												Cancel
+											</button>
+											<button
+												className="rounded-xs bg-button-background px-3 py-2 text-sm text-primary-foreground disabled:opacity-50"
+												disabled={workflowFormSubmissionPending || isWorkflowFormSubmitDisabled}
+												onClick={() => {
+													void handleWorkflowFormAction(WorkflowFormAction.SUBMIT, {
+														"source.type": workflowFormValues["source.type"] ?? "",
+													})
+												}}
+												type="button">
+												{workflowForm.submitLabel || "Next"}
+											</button>
+										</div>
+									</div>
+								)}
+								{workflowForm.phase === "collect_inputs" && (
+									<div className="pt-3 space-y-3">
+										<div className="space-y-3">
+											{concreteWorkflowFormFields.map((field) => (
 												<label className="block" key={field.key}>
 													<div className="mb-1 text-xs font-semibold text-foreground">
 														{field.label}
@@ -1585,25 +1641,134 @@ export const ChatRowContent = memo(
 												type="button">
 												Cancel
 											</button>
-											{workflowForm.phase === "retry_error" && (
-												<button
-													className="rounded-xs border border-editor-group-border px-3 py-2 text-sm text-foreground disabled:opacity-50"
-													disabled={workflowFormSubmissionPending}
-													onClick={() => {
-														void handleWorkflowFormAction(WorkflowFormAction.RETRY)
-													}}
-													type="button">
-													Retry
-												</button>
-											)}
 											<button
 												className="rounded-xs bg-button-background px-3 py-2 text-sm text-primary-foreground disabled:opacity-50"
 												disabled={workflowFormSubmissionPending || isWorkflowFormSubmitDisabled}
 												onClick={() => {
-													void handleWorkflowFormAction(WorkflowFormAction.SUBMIT, workflowFormValues)
+													void handleWorkflowFormAction(
+														WorkflowFormAction.SUBMIT,
+														Object.fromEntries(
+															concreteWorkflowFormFields.map((field) => [
+																field.key,
+																workflowFormValues[field.key] ?? "",
+															]),
+														),
+													)
 												}}
 												type="button">
-												{workflowForm.submitLabel || "Submit"}
+												Submit
+											</button>
+										</div>
+									</div>
+								)}
+								{workflowForm.phase === "retry_error" && (
+									<div className="pt-3 space-y-3">
+										{workflowForm.errorMessage && (
+											<div className="rounded-xs border border-error/50 bg-error/10 px-3 py-2 text-sm text-foreground">
+												{workflowForm.errorMessage}
+											</div>
+										)}
+										<div className="space-y-3">
+											{concreteWorkflowFormFields.map((field) => (
+												<label className="block" key={field.key}>
+													<div className="mb-1 text-xs font-semibold text-foreground">
+														{field.label}
+													</div>
+													<div className="mb-2 text-xs text-muted-foreground">{field.help}</div>
+													{field.control === "select" && (
+														<select
+															aria-label={field.label}
+															className="w-full rounded-xs border border-editor-group-border bg-background px-3 py-2 text-sm text-foreground"
+															disabled={workflowFormSubmissionPending}
+															onChange={(event) =>
+																handleWorkflowFormFieldChange(field.key, event.target.value)
+															}
+															value={workflowFormValues[field.key] ?? ""}>
+															<option value="">Select an option</option>
+															{field.options?.map((option) => (
+																<option key={option.value} value={option.value}>
+																	{option.label}
+																</option>
+															))}
+														</select>
+													)}
+													{field.control === "text" && (
+														<input
+															aria-label={field.label}
+															className="w-full rounded-xs border border-editor-group-border bg-background px-3 py-2 text-sm text-foreground"
+															disabled={workflowFormSubmissionPending}
+															onChange={(event) =>
+																handleWorkflowFormFieldChange(field.key, event.target.value)
+															}
+															placeholder={field.placeholder}
+															type="text"
+															value={workflowFormValues[field.key] ?? ""}
+														/>
+													)}
+													{field.control === "textarea" && (
+														<textarea
+															aria-label={field.label}
+															className="min-h-24 w-full rounded-xs border border-editor-group-border bg-background px-3 py-2 text-sm text-foreground"
+															disabled={workflowFormSubmissionPending}
+															onChange={(event) =>
+																handleWorkflowFormFieldChange(field.key, event.target.value)
+															}
+															placeholder={field.placeholder}
+															value={workflowFormValues[field.key] ?? ""}
+														/>
+													)}
+													{field.control === "number" && (
+														<input
+															aria-label={field.label}
+															className="w-full rounded-xs border border-editor-group-border bg-background px-3 py-2 text-sm text-foreground"
+															disabled={workflowFormSubmissionPending}
+															inputMode="numeric"
+															onChange={(event) =>
+																handleWorkflowFormFieldChange(field.key, event.target.value)
+															}
+															placeholder={field.placeholder}
+															type="text"
+															value={workflowFormValues[field.key] ?? ""}
+														/>
+													)}
+												</label>
+											))}
+										</div>
+										<div className="flex flex-wrap gap-2">
+											<button
+												className="rounded-xs border border-editor-group-border px-3 py-2 text-sm text-foreground disabled:opacity-50"
+												disabled={workflowFormSubmissionPending}
+												onClick={() => {
+													void handleWorkflowFormAction(WorkflowFormAction.CANCEL)
+												}}
+												type="button">
+												Cancel
+											</button>
+											<button
+												className="rounded-xs border border-editor-group-border px-3 py-2 text-sm text-foreground disabled:opacity-50"
+												disabled={workflowFormSubmissionPending}
+												onClick={() => {
+													void handleWorkflowFormAction(WorkflowFormAction.RETRY)
+												}}
+												type="button">
+												{workflowForm.retryLabel || "Start Over"}
+											</button>
+											<button
+												className="rounded-xs bg-button-background px-3 py-2 text-sm text-primary-foreground disabled:opacity-50"
+												disabled={workflowFormSubmissionPending || isWorkflowFormSubmitDisabled}
+												onClick={() => {
+													void handleWorkflowFormAction(
+														WorkflowFormAction.SUBMIT,
+														Object.fromEntries(
+															concreteWorkflowFormFields.map((field) => [
+																field.key,
+																workflowFormValues[field.key] ?? "",
+															]),
+														),
+													)
+												}}
+												type="button">
+												Submit
 											</button>
 										</div>
 									</div>

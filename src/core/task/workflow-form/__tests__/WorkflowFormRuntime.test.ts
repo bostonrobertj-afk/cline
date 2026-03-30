@@ -27,7 +27,7 @@ describe("WorkflowFormRuntime", () => {
 		expect(payload.options).to.deep.equal(["Yes", "No"])
 	})
 
-	it("transitions from confirm to collect when the submission confirms yes", () => {
+	it("transitions from confirm to select_source when the submission confirms yes", () => {
 		const session = runtime.createSession({
 			resolverId: "code_review_step_3_diff_source",
 			triggerSource: "deterministic_workflow_progression",
@@ -48,8 +48,43 @@ describe("WorkflowFormRuntime", () => {
 
 		expect(outcome.kind).to.equal("render_form")
 		if (outcome.kind === "render_form") {
-			expect(outcome.session.phase).to.equal("collect")
-			expect(outcome.payload.phase).to.equal("collect")
+			expect(outcome.session.phase).to.equal("select_source")
+			expect(outcome.payload.phase).to.equal("select_source")
+		}
+	})
+
+	it("transitions from select_source to collect_inputs without invoking the tool", () => {
+		const session = runtime.createSession({
+			resolverId: "code_review_step_3_diff_source",
+			triggerSource: "deterministic_workflow_progression",
+			owner: {
+				kind: "placeholder_workflow_step",
+				workflowName: "code-review.md",
+				stepNumber: 3,
+			},
+		})
+
+		const request = WorkflowFormSubmissionRequest.create({
+			sessionId: session.sessionId,
+			action: WorkflowFormAction.SUBMIT,
+			fields: [{ key: "source.type", value: { stringValue: "commit" } }],
+		})
+
+		const outcome = runtime.handleSubmission(
+			{
+				...session,
+				phase: "select_source",
+				values: {
+					confirm: { stringValue: "yes" },
+				},
+			},
+			request,
+		)
+
+		expect(outcome.kind).to.equal("render_form")
+		if (outcome.kind === "render_form") {
+			expect(outcome.session.phase).to.equal("collect_inputs")
+			expect(outcome.payload.phase).to.equal("collect_inputs")
 		}
 	})
 
@@ -103,7 +138,7 @@ describe("WorkflowFormRuntime", () => {
 		const outcome = runtime.handleSubmission(
 			{
 				...session,
-				phase: "collect",
+				phase: "collect_inputs",
 			},
 			request,
 		)
@@ -120,6 +155,137 @@ describe("WorkflowFormRuntime", () => {
 				scoped_paths: ["src/core/task/index.ts", "webview-ui/src/components/chat"],
 				context_lines: 5,
 			})
+		}
+	})
+
+	it("uses corrected retry_error values when submitting after a tool failure", () => {
+		const session = runtime.createSession({
+			resolverId: "code_review_step_3_diff_source",
+			triggerSource: "deterministic_workflow_progression",
+			owner: {
+				kind: "placeholder_workflow_step",
+				workflowName: "code-review.md",
+				stepNumber: 3,
+			},
+		})
+
+		const request = WorkflowFormSubmissionRequest.create({
+			sessionId: session.sessionId,
+			action: WorkflowFormAction.SUBMIT,
+			fields: [
+				{ key: "source.commit", value: { stringValue: "def5678" } },
+				{
+					key: "scoped_paths",
+					value: { stringArrayValue: { values: ["src/core/task/index.ts", " webview-ui/src/components/chat "] } },
+				},
+				{ key: "context_lines", value: { integerValue: 7 } },
+			],
+		})
+
+		const outcome = runtime.handleSubmission(
+			{
+				...session,
+				phase: "retry_error",
+				values: {
+					confirm: { stringValue: "yes" },
+					"source.type": { stringValue: "commit" },
+					"source.commit": { stringValue: "abc1234" },
+					scoped_paths: { stringArrayValue: ["src/old/path.ts"] },
+					context_lines: { integerValue: 3 },
+				},
+				lastError: "Failed to produce review-input.diff",
+			},
+			request,
+		)
+
+		expect(outcome.kind).to.equal("invoke_tool")
+		if (outcome.kind === "invoke_tool") {
+			expect(outcome.toolInput).to.deep.equal({
+				source: {
+					type: "commit",
+					commit: "def5678",
+				},
+				scoped_paths: ["src/core/task/index.ts", "webview-ui/src/components/chat"],
+				context_lines: 7,
+			})
+		}
+	})
+
+	it("resets retry_error back to select_source while preserving only confirm", () => {
+		const session = runtime.createSession({
+			resolverId: "code_review_step_3_diff_source",
+			triggerSource: "deterministic_workflow_progression",
+			owner: {
+				kind: "placeholder_workflow_step",
+				workflowName: "code-review.md",
+				stepNumber: 3,
+			},
+		})
+
+		const request = WorkflowFormSubmissionRequest.create({
+			sessionId: session.sessionId,
+			action: WorkflowFormAction.RETRY,
+		})
+
+		const outcome = runtime.handleSubmission(
+			{
+				...session,
+				phase: "retry_error",
+				values: {
+					confirm: { stringValue: "yes" },
+					"source.type": { stringValue: "commit_range" },
+					"source.base": { stringValue: "main" },
+					"source.head": { stringValue: "feature/review-form" },
+					scoped_paths: { stringArrayValue: ["src/core/task/index.ts"] },
+					context_lines: { integerValue: 5 },
+				},
+				lastError: "Failed to produce review-input.diff",
+			},
+			request,
+		)
+
+		expect(outcome.kind).to.equal("render_form")
+		if (outcome.kind === "render_form") {
+			expect(outcome.session.phase).to.equal("select_source")
+			expect(outcome.payload.phase).to.equal("select_source")
+			expect(outcome.session.values).to.deep.equal({
+				confirm: { stringValue: "yes" },
+			})
+		}
+	})
+
+	it("never produces a tool input from a select_source submission missing source.commit", () => {
+		const session = runtime.createSession({
+			resolverId: "code_review_step_3_diff_source",
+			triggerSource: "deterministic_workflow_progression",
+			owner: {
+				kind: "placeholder_workflow_step",
+				workflowName: "code-review.md",
+				stepNumber: 3,
+			},
+		})
+
+		const request = WorkflowFormSubmissionRequest.create({
+			sessionId: session.sessionId,
+			action: WorkflowFormAction.SUBMIT,
+			fields: [{ key: "source.type", value: { stringValue: "commit" } }],
+		})
+
+		const outcome = runtime.handleSubmission(
+			{
+				...session,
+				phase: "select_source",
+				values: {
+					confirm: { stringValue: "yes" },
+				},
+			},
+			request,
+		)
+
+		expect(outcome.kind).to.not.equal("invoke_tool")
+		if (outcome.kind === "render_form") {
+			expect(outcome.session.phase).to.equal("collect_inputs")
+			expect(outcome.session.values["source.commit"]).to.equal(undefined)
 		}
 	})
 

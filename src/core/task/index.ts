@@ -1377,7 +1377,6 @@ export class Task {
 		const nextThreadDisplayState = ThreadDisplayStates.AWAITING_USER_RESPONSE
 		const nextAwaitingSubtype = AwaitingUserResponseSubtypes.SYSTEM
 		const clineMessages = this.messageStateHandler.getClineMessages()
-		const lastMessage = clineMessages.at(-1)
 
 		this.setThreadDisplayState(
 			nextThreadDisplayState,
@@ -1389,8 +1388,24 @@ export class Task {
 			nextAwaitingSubtype,
 		)
 
-		if (lastMessage?.type === "ask" && lastMessage.ask === "workflow_form") {
-			await this.messageStateHandler.updateClineMessage(clineMessages.length - 1, {
+		let existingWorkflowFormMessageIndex = -1
+		for (let index = clineMessages.length - 1; index >= 0; index--) {
+			const message = clineMessages[index]
+			if (message.type !== "ask" || message.ask !== "workflow_form" || !message.text) {
+				continue
+			}
+
+			try {
+				const parsedPayload = JSON.parse(message.text) as Partial<ClineWorkflowForm>
+				if (parsedPayload.sessionId === payload.sessionId) {
+					existingWorkflowFormMessageIndex = index
+					break
+				}
+			} catch {}
+		}
+
+		if (existingWorkflowFormMessageIndex >= 0) {
+			await this.messageStateHandler.updateClineMessage(existingWorkflowFormMessageIndex, {
 				text,
 				partial: false,
 				threadDisplayState: nextThreadDisplayState,
@@ -3212,8 +3227,6 @@ export class Task {
 			visible: visibleTabPaths.slice(0, cap),
 		}
 
-		await this.maybeResolveWorkflowFormBeforeApiTurn()
-
 		const activePlaceholderWorkflowPromptContext = await resolveActivePlaceholderWorkflowPromptContext({
 			checklistMarkdown: this.taskState.currentFocusChainChecklist,
 			source: this.taskState.activePlaceholderWorkflowSource,
@@ -4799,6 +4812,9 @@ export class Task {
 
 			return block
 		}
+		// Workflow forms gate deterministic workflow steps and must resolve before prompt assembly begins.
+		await this.maybeResolveWorkflowFormBeforeApiTurn()
+
 		// Process all content and environment details in parallel.
 		// Mentions are now expanded only when the text contains explicit mention syntax.
 		// User-content tags remain as compatibility markers for slash-command processing and prompt extraction.

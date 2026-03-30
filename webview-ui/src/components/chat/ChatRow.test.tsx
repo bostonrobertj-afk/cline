@@ -1,4 +1,4 @@
-import type { ClineMessage } from "@shared/ExtensionMessage"
+import type { ClineMessage, WorkflowFormPhase } from "@shared/ExtensionMessage"
 import { fireEvent, render, screen } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { ChatRowContent, getFollowupPresentation } from "./ChatRow"
@@ -37,7 +37,47 @@ vi.mock("@/services/grpc-client", async (importOriginal) => {
 	}
 })
 
-function createWorkflowFormMessage(phase: "collect" | "confirm"): ClineMessage {
+function createWorkflowFormMessage(phase: WorkflowFormPhase): ClineMessage {
+	const sourceSelectionFields = [
+		{
+			key: "source.type",
+			label: "Source type",
+			help: "Choose a diff source.",
+			control: "select" as const,
+			required: true,
+			options: [
+				{ value: "commit", label: "Commit" },
+				{ value: "commit_range", label: "Commit range" },
+			],
+		},
+	]
+	const concreteCommitFields = [
+		{
+			key: "source.commit",
+			label: "Commit",
+			help: "Enter the commit SHA.",
+			control: "text" as const,
+			required: true,
+			placeholder: "abc1234",
+		},
+		{
+			key: "scoped_paths",
+			label: "Scoped paths",
+			help: "Optional path filter.",
+			control: "textarea" as const,
+			required: false,
+			placeholder: "src/core/task/index.ts",
+		},
+		{
+			key: "context_lines",
+			label: "Context lines",
+			help: "Optional context lines.",
+			control: "number" as const,
+			required: false,
+			placeholder: "3",
+		},
+	]
+
 	return {
 		ts: Date.now(),
 		type: "ask",
@@ -50,29 +90,52 @@ function createWorkflowFormMessage(phase: "collect" | "confirm"): ClineMessage {
 			prompt:
 				phase === "confirm"
 					? "This workflow requires the following tool-produced artifact: `review-input.diff`.\n\nCan you provide the inputs required to produce `review-input.diff`?"
-					: "Select and provide the inputs needed to produce `review-input.diff`.",
+					: phase === "select_source"
+						? "This workflow requires the tool-produced artifact `review-input.diff`.\n\nChoose which diff source you have so we can collect the right inputs."
+						: phase === "collect_inputs"
+							? "Provide the concrete inputs needed to produce `review-input.diff`."
+							: phase === "retry_error"
+								? "The system could not produce `review-input.diff`. Update the inputs or retry the request."
+								: "The workflow form completed successfully.",
 			phase,
 			toolDictionaryTitle: "Diff Source Reference",
 			toolDictionaryMarkdown: "## build_review_diff_output\n\nTool reference body.",
-			options: ["Yes", "No"],
+			options: phase === "confirm" ? ["Yes", "No"] : undefined,
 			fields:
-				phase === "collect"
-					? [
-							{
-								key: "source.type",
-								label: "Source type",
-								help: "Choose a diff source.",
-								control: "select",
-								required: true,
-								options: [
-									{ value: "commit", label: "Commit" },
-									{ value: "commit_range", label: "Commit range" },
-								],
-							},
-						]
+				phase === "select_source"
+					? sourceSelectionFields
+					: phase === "collect_inputs" || phase === "retry_error"
+						? concreteCommitFields
+						: undefined,
+			values:
+				phase === "collect_inputs" || phase === "retry_error"
+					? {
+							confirm: { stringValue: "yes" },
+							"source.type": { stringValue: "commit" },
+						}
 					: undefined,
+			submitLabel:
+				phase === "select_source" ? "Next" : phase === "collect_inputs" || phase === "retry_error" ? "Submit" : undefined,
+			cancelLabel:
+				phase === "select_source" || phase === "collect_inputs" || phase === "retry_error" ? "Cancel" : undefined,
+			retryLabel: phase === "retry_error" ? "Start Over" : undefined,
+			errorMessage: phase === "retry_error" ? "The system could not produce review-input.diff." : undefined,
+			successMessage: phase === "success" ? "The workflow form completed successfully." : undefined,
 		}),
 	}
+}
+
+function renderWorkflowFormRow(phase: WorkflowFormPhase) {
+	return render(
+		<ChatRowContent
+			inputValue=""
+			isExpanded={true}
+			isLast={true}
+			message={createWorkflowFormMessage(phase)}
+			onSetQuote={vi.fn()}
+			onToggleExpand={vi.fn()}
+		/>,
+	)
 }
 
 describe("ChatRow followup presentation", () => {
@@ -226,5 +289,68 @@ describe("ChatRow followup presentation", () => {
 
 		expect(await screen.findByText("Diff Source Reference")).toBeInTheDocument()
 		expect(await screen.findByText("build_review_diff_output")).toBeInTheDocument()
+	})
+
+	it("renders the select_source workflow form with Next and without Submit", () => {
+		renderWorkflowFormRow("select_source")
+
+		expect(screen.getByLabelText("Source type")).toBeInTheDocument()
+		expect(screen.getByRole("button", { name: "Next" })).toBeInTheDocument()
+		expect(screen.queryByRole("button", { name: "Submit" })).not.toBeInTheDocument()
+	})
+
+	it("renders the collect_inputs workflow form with concrete commit inputs and Submit", () => {
+		renderWorkflowFormRow("collect_inputs")
+
+		expect(screen.getByLabelText("Commit")).toBeInTheDocument()
+		expect(screen.getByLabelText("Scoped paths")).toBeInTheDocument()
+		expect(screen.getByLabelText("Context lines")).toBeInTheDocument()
+		expect(screen.getByRole("button", { name: "Submit" })).toBeInTheDocument()
+		expect(screen.queryByRole("button", { name: "Next" })).not.toBeInTheDocument()
+	})
+
+	it("renders the retry_error workflow form with the error banner, Start Over, and Submit", () => {
+		renderWorkflowFormRow("retry_error")
+
+		expect(screen.getByText("The system could not produce review-input.diff.")).toBeInTheDocument()
+		expect(screen.getByRole("button", { name: "Start Over" })).toBeInTheDocument()
+		expect(screen.getByRole("button", { name: "Submit" })).toBeInTheDocument()
+	})
+
+	it("keeps Next disabled in select_source until source.type is chosen", () => {
+		renderWorkflowFormRow("select_source")
+
+		const nextButton = screen.getByRole("button", { name: "Next" })
+		expect(nextButton).toBeDisabled()
+
+		fireEvent.change(screen.getByLabelText("Source type"), { target: { value: "commit" } })
+
+		expect(nextButton).not.toBeDisabled()
+	})
+
+	it("keeps Submit disabled in collect_inputs until required concrete fields are populated", () => {
+		renderWorkflowFormRow("collect_inputs")
+
+		const submitButton = screen.getByRole("button", { name: "Submit" })
+		expect(submitButton).toBeDisabled()
+
+		fireEvent.change(screen.getByLabelText("Commit"), { target: { value: "abc1234" } })
+
+		expect(submitButton).not.toBeDisabled()
+	})
+
+	it("keeps Submit available for corrected retry_error inputs and Start Over available to restart", () => {
+		renderWorkflowFormRow("retry_error")
+
+		const submitButton = screen.getByRole("button", { name: "Submit" })
+		const startOverButton = screen.getByRole("button", { name: "Start Over" })
+
+		expect(submitButton).toBeDisabled()
+		expect(startOverButton).not.toBeDisabled()
+
+		fireEvent.change(screen.getByLabelText("Commit"), { target: { value: "def5678" } })
+
+		expect(submitButton).not.toBeDisabled()
+		expect(startOverButton).not.toBeDisabled()
 	})
 })

@@ -54,13 +54,7 @@ function buildSourceTypeOptions(): WorkflowFormFieldOption[] {
 	]
 }
 
-function buildFieldDefinitions(values: WorkflowFormValues): WorkflowFormFieldDefinition[] {
-	const sourceType = getStringValue(values, SOURCE_TYPE_FIELD_KEY)
-	const showsCommitField = sourceType === "commit"
-	const showsBaseAndHeadFields = sourceType === "commit_range" || sourceType === "ref_diff"
-	const showsScopedPaths = Boolean(sourceType)
-	const worktreeScoped = sourceType === "worktree_head_scoped"
-
+function buildSourceSelectionFieldDefinitions(): WorkflowFormFieldDefinition[] {
 	return [
 		{
 			key: SOURCE_TYPE_FIELD_KEY,
@@ -71,6 +65,17 @@ function buildFieldDefinitions(values: WorkflowFormValues): WorkflowFormFieldDef
 			options: buildSourceTypeOptions(),
 			visible: true,
 		},
+	]
+}
+
+function buildConcreteInputFieldDefinitions(values: WorkflowFormValues): WorkflowFormFieldDefinition[] {
+	const sourceType = getStringValue(values, SOURCE_TYPE_FIELD_KEY)
+	const showsCommitField = sourceType === "commit"
+	const showsBaseAndHeadFields = sourceType === "commit_range" || sourceType === "ref_diff"
+	const showsScopedPaths = Boolean(sourceType)
+	const worktreeScoped = sourceType === "worktree_head_scoped"
+
+	return [
 		{
 			key: SOURCE_COMMIT_FIELD_KEY,
 			label: workflowFormSystemDictionary.commit.label,
@@ -160,11 +165,20 @@ export const workflowFormRegistry: Record<"code_review_step_3_diff_source", Work
 				options: ["Yes", "No"],
 			})
 		},
-		buildCollectPayload(session) {
+		buildSelectSourcePayload(session) {
 			return buildBasePayload(session, {
-				phase: "collect",
-				prompt: "Select and provide the inputs needed to produce `review-input.diff`.",
-				fields: buildFieldDefinitions(session.values),
+				phase: "select_source",
+				prompt: "This workflow requires the tool-produced artifact `review-input.diff`.\n\nChoose which diff source you have so we can collect the right inputs.",
+				fields: buildSourceSelectionFieldDefinitions(),
+				submitLabel: "Next",
+				cancelLabel: "Cancel",
+			})
+		},
+		buildCollectInputsPayload(session) {
+			return buildBasePayload(session, {
+				phase: "collect_inputs",
+				prompt: "Provide the concrete inputs needed to produce `review-input.diff`.",
+				fields: buildConcreteInputFieldDefinitions(session.values),
 				submitLabel: "Submit",
 				cancelLabel: "Cancel",
 			})
@@ -173,10 +187,10 @@ export const workflowFormRegistry: Record<"code_review_step_3_diff_source", Work
 			return buildBasePayload(session, {
 				phase: "retry_error",
 				prompt: "The system could not produce `review-input.diff`. Update the inputs or retry the request.",
-				fields: buildFieldDefinitions(session.values),
+				fields: buildConcreteInputFieldDefinitions(session.values),
 				submitLabel: "Submit",
 				cancelLabel: "Cancel",
-				retryLabel: "Retry",
+				retryLabel: "Start Over",
 				errorMessage: session.lastError,
 			})
 		},

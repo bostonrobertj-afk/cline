@@ -56,8 +56,10 @@ export class WorkflowFormRuntime {
 		switch (session.phase) {
 			case "confirm":
 				return resolver.buildConfirmPayload(session)
-			case "collect":
-				return resolver.buildCollectPayload(session)
+			case "select_source":
+				return resolver.buildSelectSourcePayload(session)
+			case "collect_inputs":
+				return resolver.buildCollectInputsPayload(session)
 			case "retry_error":
 				return resolver.buildRetryPayload(session)
 			case "success":
@@ -79,9 +81,9 @@ export class WorkflowFormRuntime {
 
 	buildSuccessPayload(session: WorkflowFormSessionState, successMessage: string): ClineWorkflowForm {
 		const resolver = this.getResolver(session.resolverId)
-		const basePayload = resolver.buildCollectPayload({
+		const basePayload = resolver.buildCollectInputsPayload({
 			...session,
-			phase: "success",
+			phase: "collect_inputs",
 		})
 
 		return {
@@ -119,7 +121,7 @@ export class WorkflowFormRuntime {
 			if (request.action === WorkflowFormAction.SUBMIT && confirmValue === "yes") {
 				const nextSession: WorkflowFormSessionState = {
 					...session,
-					phase: "collect",
+					phase: "select_source",
 					values: nextValues,
 					lastError: undefined,
 				}
@@ -127,7 +129,7 @@ export class WorkflowFormRuntime {
 				return {
 					kind: "render_form",
 					session: nextSession,
-					payload: resolver.buildCollectPayload(nextSession),
+					payload: resolver.buildSelectSourcePayload(nextSession),
 				}
 			}
 
@@ -140,13 +142,43 @@ export class WorkflowFormRuntime {
 			}
 		}
 
+		if (session.phase === "select_source" && request.action === WorkflowFormAction.SUBMIT) {
+			const sourceType = nextValues["source.type"]?.stringValue?.trim()
+			if (!sourceType) {
+				return {
+					kind: "render_form",
+					session: {
+						...session,
+						values: nextValues,
+					},
+					payload: resolver.buildSelectSourcePayload({
+						...session,
+						values: nextValues,
+					}),
+				}
+			}
+
+			const nextSession: WorkflowFormSessionState = {
+				...session,
+				phase: "collect_inputs",
+				values: nextValues,
+				lastError: undefined,
+			}
+
+			return {
+				kind: "render_form",
+				session: nextSession,
+				payload: resolver.buildCollectInputsPayload(nextSession),
+			}
+		}
+
 		if (
-			request.action === WorkflowFormAction.SUBMIT ||
-			(session.phase === "retry_error" && request.action === WorkflowFormAction.RETRY)
+			(session.phase === "collect_inputs" || session.phase === "retry_error") &&
+			request.action === WorkflowFormAction.SUBMIT
 		) {
 			const nextSession: WorkflowFormSessionState = {
 				...session,
-				phase: "collect",
+				phase: session.phase,
 				values: nextValues,
 				lastError: undefined,
 			}
@@ -156,6 +188,22 @@ export class WorkflowFormRuntime {
 				session: nextSession,
 				toolName: resolver.toolName,
 				toolInput: resolver.translateSubmissionToToolUse(nextValues),
+			}
+		}
+
+		if (session.phase === "retry_error" && request.action === WorkflowFormAction.RETRY) {
+			const confirmValue = session.values.confirm
+			const nextSession: WorkflowFormSessionState = {
+				...session,
+				phase: "select_source",
+				values: confirmValue ? { confirm: confirmValue } : {},
+				lastError: undefined,
+			}
+
+			return {
+				kind: "render_form",
+				session: nextSession,
+				payload: resolver.buildSelectSourcePayload(nextSession),
 			}
 		}
 
