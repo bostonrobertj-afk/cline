@@ -1,11 +1,10 @@
 import { WorkflowFormAction, WorkflowFormSubmissionRequest } from "@shared/proto/cline/task"
 import { expect } from "chai"
 import { describe, it } from "mocha"
-import { buildToolDictionaryMarkdown } from "@/core/task/workflow-form/dictionaries/buildToolDictionary"
 import { WorkflowFormRuntime } from "../WorkflowFormRuntime"
 
 describe("WorkflowFormRuntime", () => {
-	const runtime = new WorkflowFormRuntime(undefined, () => buildToolDictionaryMarkdown())
+	const runtime = new WorkflowFormRuntime()
 
 	it("creates a confirm payload for the Phase 1 workflow form session", () => {
 		const session = runtime.createSession({
@@ -121,7 +120,7 @@ describe("WorkflowFormRuntime", () => {
 		}
 	})
 
-	it("reads the tool dictionary from the repo root even when process.cwd is not the repo", () => {
+	it("builds the runtime dictionary payload in an install-like environment without docs path resolution", () => {
 		const originalCwd = process.cwd()
 
 		try {
@@ -139,7 +138,10 @@ describe("WorkflowFormRuntime", () => {
 
 			const payload = runtimeWithDefaultReader.buildPayload(session)
 			expect(payload.title).to.equal("Prepare Diff Input")
-			expect(payload.toolDictionaryRelativePath).to.equal("docs/workflow-ui-surface/tool-dictionary.md")
+			expect(payload.toolDictionaryTitle).to.equal("Diff Source Reference")
+			expect(payload.toolDictionaryMarkdown).to.include("## build_review_diff_output")
+			expect(payload.toolDictionaryMarkdown).to.not.include("# Workflow UI Surface Tool Dictionary")
+			expect(payload.toolDictionaryMarkdown).to.not.include("Generated from")
 		} finally {
 			process.chdir(originalCwd)
 		}

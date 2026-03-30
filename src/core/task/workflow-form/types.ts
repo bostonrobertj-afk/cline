@@ -26,11 +26,9 @@ export interface WorkflowFormSessionState {
 export interface WorkflowFormResolverDefinition {
 	id: WorkflowFormResolverId
 	toolName: string
-	toolDictionaryRelativePath: string
-	getToolDictionaryStartLine(markdown: string): number
-	buildConfirmPayload(session: WorkflowFormSessionState, toolDictionaryMarkdown: string): ClineWorkflowForm
-	buildCollectPayload(session: WorkflowFormSessionState, toolDictionaryMarkdown: string): ClineWorkflowForm
-	buildRetryPayload(session: WorkflowFormSessionState, toolDictionaryMarkdown: string): ClineWorkflowForm
+	buildConfirmPayload(session: WorkflowFormSessionState): ClineWorkflowForm
+	buildCollectPayload(session: WorkflowFormSessionState): ClineWorkflowForm
+	buildRetryPayload(session: WorkflowFormSessionState): ClineWorkflowForm
 	translateSubmissionToToolUse(values: WorkflowFormValues): WorkflowFormToolInput
 }
 

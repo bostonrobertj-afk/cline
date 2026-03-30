@@ -37,18 +37,9 @@ function getVariantReferenceLine(key: WorkflowFormSystemDictionaryKey): string {
 	return `- \`${key}\`: ${entry.label}. ${entry.medium}`
 }
 
-export const TOOL_DICTIONARY_TERM_KEYS = PHASE_1_SYSTEM_DICTIONARY_KEYS
-export const WORKFLOW_FORM_TOOL_DICTIONARY_HEADING = TOOL_HEADING
-
-export function buildToolDictionaryMarkdown(): string {
-	const tool = getBuildReviewDiffOutputSpec()
+function buildBuildReviewDiffOutputEntryLines(tool: ClineToolSpec): string[] {
 	const parameters = tool.parameters ?? []
-
 	const lines = [
-		"# Workflow UI Surface Tool Dictionary",
-		"",
-		"Generated from `src/core/task/workflow-form/dictionaries/buildToolDictionary.ts`.",
-		"",
 		TOOL_HEADING,
 		"",
 		`${workflowFormSystemDictionary.artifact.label}. ${workflowFormSystemDictionary.artifact.medium}`,
@@ -80,5 +71,26 @@ export function buildToolDictionaryMarkdown(): string {
 		lines.push(getVariantReferenceLine(key))
 	}
 
+	return lines
+}
+
+export const TOOL_DICTIONARY_TERM_KEYS = PHASE_1_SYSTEM_DICTIONARY_KEYS
+export const WORKFLOW_FORM_TOOL_DICTIONARY_HEADING = TOOL_HEADING
+export const WORKFLOW_FORM_RUNTIME_TOOL_REFERENCE_TITLE = "Diff Source Reference"
+
+export function buildToolDictionaryMarkdown(): string {
+	const tool = getBuildReviewDiffOutputSpec()
+	const lines = [
+		"# Workflow UI Surface Tool Dictionary",
+		"",
+		"Generated from `src/core/task/workflow-form/dictionaries/buildToolDictionary.ts`.",
+		"",
+		...buildBuildReviewDiffOutputEntryLines(tool),
+	]
+
 	return `${lines.join("\n").trimEnd()}\n`
+}
+
+export function buildRuntimeToolDictionaryMarkdown(): string {
+	return `${buildBuildReviewDiffOutputEntryLines(getBuildReviewDiffOutputSpec()).join("\n").trimEnd()}\n`
 }

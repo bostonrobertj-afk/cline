@@ -14,7 +14,6 @@ import {
 	WorkflowFormFieldValuePayload,
 } from "@shared/ExtensionMessage"
 import { BooleanRequest, StringRequest } from "@shared/proto/cline/common"
-import { OpenFileRelativePathAtRangeRequest } from "@shared/proto/cline/file"
 import { WorkflowFormAction } from "@shared/proto/cline/task"
 import { Mode } from "@shared/storage/types"
 import deepEqual from "fast-deep-equal"
@@ -50,6 +49,7 @@ import { WithCopyButton } from "@/components/common/CopyButton"
 import McpResponseDisplay from "@/components/mcp/chat-display/McpResponseDisplay"
 import McpResourceRow from "@/components/mcp/configuration/tabs/installed/server-row/McpResourceRow"
 import McpToolRow from "@/components/mcp/configuration/tabs/installed/server-row/McpToolRow"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useExtensionState } from "@/context/ExtensionStateContext"
 import { cn } from "@/lib/utils"
 import { FileServiceClient, UiServiceClient } from "@/services/grpc-client"
@@ -294,6 +294,7 @@ export const ChatRowContent = memo(
 		}, [message.ask, message.text])
 		const [workflowFormValues, setWorkflowFormValues] = useState<Record<string, string>>({})
 		const [workflowFormSubmissionPending, setWorkflowFormSubmissionPending] = useState(false)
+		const [isWorkflowDictionaryOpen, setIsWorkflowDictionaryOpen] = useState(false)
 
 		useEffect(() => {
 			if (!workflowForm) {
@@ -501,23 +502,12 @@ export const ChatRowContent = memo(
 			[workflowForm, workflowFormSubmissionPending],
 		)
 
-		const handleWorkflowDictionaryOpen = useCallback(async () => {
+		const handleWorkflowDictionaryOpen = useCallback(() => {
 			if (!workflowForm) {
 				return
 			}
 
-			try {
-				await FileServiceClient.openFileRelativePathAtRange(
-					OpenFileRelativePathAtRangeRequest.create({
-						relativePath: workflowForm.toolDictionaryRelativePath,
-						startLine: workflowForm.toolDictionaryStartLine,
-						preview: false,
-						preserveFocus: false,
-					}),
-				)
-			} catch (error) {
-				console.error("Failed to open workflow form dictionary:", error)
-			}
+			setIsWorkflowDictionaryOpen(true)
 		}, [workflowForm])
 
 		const tool = useMemo(() => {
@@ -1491,8 +1481,25 @@ export const ChatRowContent = memo(
 												void handleWorkflowDictionaryOpen()
 											}}
 											type="button">
-											About build_review_diff_output
+											{`About ${workflowForm.toolDictionaryTitle}`}
 										</button>
+										<Dialog
+											onOpenChange={(open) => {
+												if (!open) {
+													setIsWorkflowDictionaryOpen(false)
+												}
+											}}
+											open={isWorkflowDictionaryOpen}>
+											<DialogContent className="max-h-[80vh] overflow-y-auto">
+												<DialogHeader>
+													<DialogTitle>{workflowForm.toolDictionaryTitle}</DialogTitle>
+													<DialogDescription>
+														Read-only reference for the current workflow form tool.
+													</DialogDescription>
+												</DialogHeader>
+												<MarkdownRow markdown={workflowForm.toolDictionaryMarkdown} />
+											</DialogContent>
+										</Dialog>
 										{workflowForm.phase === "retry_error" && workflowForm.errorMessage && (
 											<div className="rounded-xs border border-error/50 bg-error/10 px-3 py-2 text-sm text-foreground">
 												{workflowForm.errorMessage}

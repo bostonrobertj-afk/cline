@@ -3,8 +3,7 @@ import { fireEvent, render, screen } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { ChatRowContent, getFollowupPresentation } from "./ChatRow"
 
-const { mockOpenFileRelativePathAtRange, mockSubmitWorkflowForm, mockThreadDisplayState } = vi.hoisted(() => ({
-	mockOpenFileRelativePathAtRange: vi.fn().mockResolvedValue(undefined),
+const { mockSubmitWorkflowForm, mockThreadDisplayState } = vi.hoisted(() => ({
 	mockSubmitWorkflowForm: vi.fn().mockResolvedValue(undefined),
 	mockThreadDisplayState: { value: "idle_open" as string | null },
 }))
@@ -23,18 +22,20 @@ vi.mock("@/context/ExtensionStateContext", () => ({
 	}),
 }))
 
-vi.mock("@/services/grpc-client", () => ({
-	FileServiceClient: {
-		openFileRelativePathAtRange: mockOpenFileRelativePathAtRange,
-	},
-	TaskServiceClient: {
-		submitWorkflowForm: mockSubmitWorkflowForm,
-	},
-	UiServiceClient: {
-		openUrl: vi.fn(),
-		setTerminalExecutionMode: vi.fn(),
-	},
-}))
+vi.mock("@/services/grpc-client", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("@/services/grpc-client")>()
+
+	return {
+		...actual,
+		TaskServiceClient: {
+			submitWorkflowForm: mockSubmitWorkflowForm,
+		},
+		UiServiceClient: {
+			openUrl: vi.fn(),
+			setTerminalExecutionMode: vi.fn(),
+		},
+	}
+})
 
 function createWorkflowFormMessage(phase: "collect" | "confirm"): ClineMessage {
 	return {
@@ -48,8 +49,8 @@ function createWorkflowFormMessage(phase: "collect" | "confirm"): ClineMessage {
 			title: "Prepare Diff Input",
 			prompt: "The system can prepare the diff input directly.",
 			phase,
-			toolDictionaryRelativePath: "docs/workflow-ui-surface/tool-dictionary.md",
-			toolDictionaryStartLine: 42,
+			toolDictionaryTitle: "Diff Source Reference",
+			toolDictionaryMarkdown: "## build_review_diff_output\n\nTool reference body.",
 			options: ["Yes", "No"],
 			fields:
 				phase === "collect"
@@ -203,7 +204,7 @@ describe("ChatRow followup presentation", () => {
 		expect(screen.getByRole("button", { name: "No" })).toBeInTheDocument()
 	})
 
-	it("opens the tool dictionary at the workflow form start line", () => {
+	it("opens the workflow dictionary in a read-only dialog", () => {
 		const message = createWorkflowFormMessage("collect")
 
 		render(
@@ -217,16 +218,9 @@ describe("ChatRow followup presentation", () => {
 			/>,
 		)
 
-		fireEvent.click(screen.getByRole("button", { name: "About build_review_diff_output" }))
+		fireEvent.click(screen.getByRole("button", { name: "About Diff Source Reference" }))
 
-		expect(mockOpenFileRelativePathAtRange).toHaveBeenCalledTimes(1)
-		expect(mockOpenFileRelativePathAtRange).toHaveBeenCalledWith(
-			expect.objectContaining({
-				relativePath: "docs/workflow-ui-surface/tool-dictionary.md",
-				startLine: 42,
-				preview: false,
-				preserveFocus: false,
-			}),
-		)
+		expect(screen.getByText("Diff Source Reference")).toBeInTheDocument()
+		expect(screen.getByText("build_review_diff_output")).toBeInTheDocument()
 	})
 })

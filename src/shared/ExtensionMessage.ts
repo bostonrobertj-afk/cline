@@ -409,8 +409,8 @@ export interface ClineWorkflowForm {
 	title: string
 	prompt: string
 	phase: WorkflowFormPhase
-	toolDictionaryRelativePath: string
-	toolDictionaryStartLine: number
+	toolDictionaryTitle: string
+	toolDictionaryMarkdown: string
 	options?: string[]
 	fields?: WorkflowFormFieldDefinition[]
 	values?: Record<string, WorkflowFormFieldValuePayload>

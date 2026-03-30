@@ -5,8 +5,6 @@ import {
 	type WorkflowFormSubmissionRequest,
 } from "@shared/proto/cline/task"
 import { randomUUID } from "crypto"
-import { existsSync, readFileSync } from "fs"
-import path from "path"
 import type {
 	WorkflowFormResolverDefinition,
 	WorkflowFormRuntimeCreateSessionOptions,
@@ -15,25 +13,6 @@ import type {
 	WorkflowFormValues,
 } from "./types"
 import { workflowFormRegistry } from "./WorkflowFormRegistry"
-
-function resolveWorkflowFormAssetPath(relativePath: string): string {
-	const candidatePaths = [
-		path.resolve(__dirname, "..", "..", "..", "..", relativePath),
-		path.resolve(process.cwd(), relativePath),
-	]
-
-	for (const candidatePath of candidatePaths) {
-		if (existsSync(candidatePath)) {
-			return candidatePath
-		}
-	}
-
-	return candidatePaths[0]
-}
-
-function defaultReadToolDictionaryMarkdown(relativePath: string): string {
-	return readFileSync(resolveWorkflowFormAssetPath(relativePath), "utf8")
-}
 
 function buildValuesFromSubmissions(fields: WorkflowFormFieldSubmission[]): WorkflowFormValues {
 	return fields.reduce<WorkflowFormValues>((accumulator, field) => {
@@ -58,10 +37,7 @@ function buildValuesFromSubmissions(fields: WorkflowFormFieldSubmission[]): Work
 }
 
 export class WorkflowFormRuntime {
-	constructor(
-		private readonly resolvers: Record<string, WorkflowFormResolverDefinition> = workflowFormRegistry,
-		private readonly readToolDictionaryMarkdown: (relativePath: string) => string = defaultReadToolDictionaryMarkdown,
-	) {}
+	constructor(private readonly resolvers: Record<string, WorkflowFormResolverDefinition> = workflowFormRegistry) {}
 
 	createSession(options: WorkflowFormRuntimeCreateSessionOptions): WorkflowFormSessionState {
 		return {
@@ -76,19 +52,18 @@ export class WorkflowFormRuntime {
 
 	buildPayload(session: WorkflowFormSessionState): ClineWorkflowForm {
 		const resolver = this.getResolver(session.resolverId)
-		const toolDictionaryMarkdown = this.readToolDictionaryMarkdown(resolver.toolDictionaryRelativePath)
 
 		switch (session.phase) {
 			case "confirm":
-				return resolver.buildConfirmPayload(session, toolDictionaryMarkdown)
+				return resolver.buildConfirmPayload(session)
 			case "collect":
-				return resolver.buildCollectPayload(session, toolDictionaryMarkdown)
+				return resolver.buildCollectPayload(session)
 			case "retry_error":
-				return resolver.buildRetryPayload(session, toolDictionaryMarkdown)
+				return resolver.buildRetryPayload(session)
 			case "success":
 				return this.buildSuccessPayload(session, "The workflow form completed successfully.")
 			default:
-				return resolver.buildConfirmPayload(session, toolDictionaryMarkdown)
+				return resolver.buildConfirmPayload(session)
 		}
 	}
 
@@ -99,22 +74,15 @@ export class WorkflowFormRuntime {
 			lastError: errorMessage,
 		}
 
-		return this.getResolver(retrySession.resolverId).buildRetryPayload(
-			retrySession,
-			this.readToolDictionaryMarkdown(this.getResolver(retrySession.resolverId).toolDictionaryRelativePath),
-		)
+		return this.getResolver(retrySession.resolverId).buildRetryPayload(retrySession)
 	}
 
 	buildSuccessPayload(session: WorkflowFormSessionState, successMessage: string): ClineWorkflowForm {
 		const resolver = this.getResolver(session.resolverId)
-		const toolDictionaryMarkdown = this.readToolDictionaryMarkdown(resolver.toolDictionaryRelativePath)
-		const basePayload = resolver.buildCollectPayload(
-			{
-				...session,
-				phase: "success",
-			},
-			toolDictionaryMarkdown,
-		)
+		const basePayload = resolver.buildCollectPayload({
+			...session,
+			phase: "success",
+		})
 
 		return {
 			...basePayload,
@@ -159,10 +127,7 @@ export class WorkflowFormRuntime {
 				return {
 					kind: "render_form",
 					session: nextSession,
-					payload: resolver.buildCollectPayload(
-						nextSession,
-						this.readToolDictionaryMarkdown(resolver.toolDictionaryRelativePath),
-					),
+					payload: resolver.buildCollectPayload(nextSession),
 				}
 			}
 

@@ -1,7 +1,8 @@
 import type { ClineWorkflowForm, WorkflowFormFieldDefinition, WorkflowFormFieldOption } from "@shared/ExtensionMessage"
 import {
+	buildRuntimeToolDictionaryMarkdown,
 	buildToolDictionaryMarkdown,
-	WORKFLOW_FORM_TOOL_DICTIONARY_HEADING,
+	WORKFLOW_FORM_RUNTIME_TOOL_REFERENCE_TITLE,
 } from "@/core/task/workflow-form/dictionaries/buildToolDictionary"
 import { workflowFormSystemDictionary } from "@/core/task/workflow-form/dictionaries/systemDictionary"
 import type { WorkflowFormResolverDefinition, WorkflowFormSessionState, WorkflowFormValues } from "./types"
@@ -12,6 +13,7 @@ const SOURCE_BASE_FIELD_KEY = "source.base"
 const SOURCE_HEAD_FIELD_KEY = "source.head"
 const SCOPED_PATHS_FIELD_KEY = "scoped_paths"
 const CONTEXT_LINES_FIELD_KEY = "context_lines"
+const RUNTIME_TOOL_DICTIONARY_MARKDOWN = buildRuntimeToolDictionaryMarkdown()
 
 function getStringValue(values: WorkflowFormValues, key: string): string | undefined {
 	return values[key]?.stringValue?.trim()
@@ -25,16 +27,6 @@ function getStringArrayValue(values: WorkflowFormValues, key: string): string[] 
 function getIntegerValue(values: WorkflowFormValues, key: string): number | undefined {
 	const value = values[key]?.integerValue
 	return Number.isInteger(value) ? value : undefined
-}
-
-function getDictionaryStartLine(markdown: string): number {
-	const lines = markdown.split("\n")
-	const lineIndex = lines.findIndex((line) => line === WORKFLOW_FORM_TOOL_DICTIONARY_HEADING)
-	if (lineIndex === -1) {
-		throw new Error(`Could not locate ${WORKFLOW_FORM_TOOL_DICTIONARY_HEADING} in the workflow form tool dictionary`)
-	}
-
-	return lineIndex + 1
 }
 
 function buildSourceTypeOptions(): WorkflowFormFieldOption[] {
@@ -129,7 +121,6 @@ function buildFieldDefinitions(values: WorkflowFormValues): WorkflowFormFieldDef
 
 function buildBasePayload(
 	session: WorkflowFormSessionState,
-	toolDictionaryMarkdown: string,
 	overrides: Pick<ClineWorkflowForm, "prompt" | "phase"> &
 		Partial<
 			Pick<
@@ -145,8 +136,8 @@ function buildBasePayload(
 		title: "Prepare Diff Input",
 		prompt: overrides.prompt,
 		phase: overrides.phase,
-		toolDictionaryRelativePath: "docs/workflow-ui-surface/tool-dictionary.md",
-		toolDictionaryStartLine: getDictionaryStartLine(toolDictionaryMarkdown),
+		toolDictionaryTitle: WORKFLOW_FORM_RUNTIME_TOOL_REFERENCE_TITLE,
+		toolDictionaryMarkdown: RUNTIME_TOOL_DICTIONARY_MARKDOWN,
 		options: overrides.options,
 		fields: overrides.fields,
 		values: session.values,
@@ -162,19 +153,15 @@ export const workflowFormRegistry: Record<"code_review_step_3_diff_source", Work
 	code_review_step_3_diff_source: {
 		id: "code_review_step_3_diff_source",
 		toolName: "build_review_diff_output",
-		toolDictionaryRelativePath: "docs/workflow-ui-surface/tool-dictionary.md",
-		getToolDictionaryStartLine(markdown: string): number {
-			return getDictionaryStartLine(markdown)
-		},
-		buildConfirmPayload(session, toolDictionaryMarkdown) {
-			return buildBasePayload(session, toolDictionaryMarkdown, {
+		buildConfirmPayload(session) {
+			return buildBasePayload(session, {
 				phase: "confirm",
 				prompt: "If you already know the Git-backed diff source for workflow Step 3, the system can build the review diff artifact directly before the fallback AI path runs.",
 				options: ["Yes", "No"],
 			})
 		},
-		buildCollectPayload(session, toolDictionaryMarkdown) {
-			return buildBasePayload(session, toolDictionaryMarkdown, {
+		buildCollectPayload(session) {
+			return buildBasePayload(session, {
 				phase: "collect",
 				prompt: "Provide the diff source details for build_review_diff_output so the system can create the Step 3 review diff artifact.",
 				fields: buildFieldDefinitions(session.values),
@@ -182,8 +169,8 @@ export const workflowFormRegistry: Record<"code_review_step_3_diff_source", Work
 				cancelLabel: "Cancel",
 			})
 		},
-		buildRetryPayload(session, toolDictionaryMarkdown) {
-			return buildBasePayload(session, toolDictionaryMarkdown, {
+		buildRetryPayload(session) {
+			return buildBasePayload(session, {
 				phase: "retry_error",
 				prompt: "The system could not build the review diff artifact. Update the diff source details or retry the request.",
 				fields: buildFieldDefinitions(session.values),
