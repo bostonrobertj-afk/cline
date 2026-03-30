@@ -69,7 +69,6 @@ Inspect the prepared review input and write findings.
 			expect(prompt).to.match(/^### Reminder:/m)
 			expect(prompt).to.contain("```text")
 			expect(prompt).to.match(/^- \[ \] Step 1: Gather Context/m)
-			expect(prompt).to.match(/^# CURRENT WORKFLOW STEP/m)
 		} finally {
 			await fs.rm(tempDir, { recursive: true, force: true })
 		}
@@ -139,7 +138,7 @@ Inspect the prepared review input and write findings.
 					workflowName: "code-review.md",
 					stepNumber: 4,
 					checklistLabel: "Step 4: Set Review Mode",
-					reason: "review_mode was derived deterministically from fresh review artifacts.",
+					reason: "review_mode was derived deterministically from current-task review artifacts.",
 				},
 			]
 
@@ -287,7 +286,6 @@ Inspect the prepared review input and write findings.
 		try {
 			const diffOutputPath = path.join(tempDir, "workflow-output", "review-input.diff")
 			const taskState = new TaskState()
-			taskState.taskStartTimeMs = Date.now()
 			taskState.activePlaceholderWorkflowSource = {
 				type: "remote",
 				name: "code-review.md",
@@ -316,8 +314,10 @@ Fallback instructions live here.
 
 			await fs.mkdir(path.dirname(diffOutputPath), { recursive: true })
 			await fs.writeFile(diffOutputPath, "diff --git a/file b/file", "utf8")
-			const timestamp = new Date(taskState.taskStartTimeMs + 1_000)
-			await fs.utimes(diffOutputPath, timestamp, timestamp)
+
+			expect(await shouldInterceptWorkflowFormBeforeApiTurn({ cwd: tempDir, taskState })).to.equal(true)
+
+			taskState.activePlaceholderWorkflowTaskWriteProofPaths = [diffOutputPath]
 
 			expect(await shouldInterceptWorkflowFormBeforeApiTurn({ cwd: tempDir, taskState })).to.equal(false)
 

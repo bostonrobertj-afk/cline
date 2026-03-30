@@ -451,6 +451,7 @@ export class FocusChainManager {
 			metadata.activePlaceholderWorkflowStableValues = this.taskState.activePlaceholderWorkflowStableValues
 			metadata.activePlaceholderWorkflowValues = this.taskState.activePlaceholderWorkflowValues
 			metadata.activePlaceholderWorkflowDeterministicState = this.taskState.activePlaceholderWorkflowDeterministicState
+			metadata.activePlaceholderWorkflowTaskWriteProofPaths = this.taskState.activePlaceholderWorkflowTaskWriteProofPaths
 			metadata.pendingAutoCompletedPlaceholderWorkflowStepNotices =
 				this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices
 			metadata.managedWorkflowRun = this.taskState.managedWorkflowRun

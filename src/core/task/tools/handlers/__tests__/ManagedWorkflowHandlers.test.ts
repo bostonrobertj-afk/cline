@@ -1501,6 +1501,7 @@ Inspect the prepared review input and write findings.`,
 			expect(payload.persisted).to.equal(true)
 			expect(payload.diff_available).to.equal(true)
 			expect(path.isAbsolute(payload.artifact_path)).to.equal(true)
+			expect(config.taskState.activePlaceholderWorkflowTaskWriteProofPaths).to.include(diffOutputPath)
 
 			const artifact = await fs.readFile(diffOutputPath, "utf8")
 			expect(artifact).to.contain("# Review Diff Output")
@@ -1544,6 +1545,7 @@ Inspect the prepared review input and write findings.`,
 					.then(() => true)
 					.catch(() => false),
 			).to.equal(false)
+			expect(config.taskState.activePlaceholderWorkflowTaskWriteProofPaths).to.deep.equal([])
 		} finally {
 			sandbox.restore()
 			HostProvider.reset()

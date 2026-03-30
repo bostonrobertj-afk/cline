@@ -44,6 +44,10 @@ import {
 	type DeterministicPlaceholderToolContext,
 	isDeterministicPlaceholderWorkflowSupported,
 } from "@core/task/focus-chain/deterministicPlaceholderProgression"
+import {
+	fileExistsForPlaceholderWorkflowWriteProof,
+	taskStateHasPlaceholderWorkflowWriteProof,
+} from "@core/task/focus-chain/placeholderWorkflowWriteProofs"
 import { releaseTaskLock } from "@core/task/TaskLockUtils"
 import { WorkflowFormRuntime } from "@core/task/workflow-form/WorkflowFormRuntime"
 import { getPlaceholderWorkflowValueMap } from "@core/workflows/placeholder-workflow-rendering"
@@ -216,7 +220,7 @@ export async function shouldInterceptWorkflowFormBeforeApiTurn(args: {
 		| "currentFocusChainChecklist"
 		| "activePlaceholderWorkflowStableValues"
 		| "activePlaceholderWorkflowValues"
-		| "taskStartTimeMs"
+		| "activePlaceholderWorkflowTaskWriteProofPaths"
 	>
 }): Promise<boolean> {
 	if (args.taskState.activePlaceholderWorkflowSource?.name !== "code-review.md") {
@@ -247,13 +251,10 @@ export async function shouldInterceptWorkflowFormBeforeApiTurn(args: {
 	}
 
 	const resolvedDiffOutputPath = path.isAbsolute(diffOutputPath) ? diffOutputPath : path.resolve(args.cwd, diffOutputPath)
-
-	try {
-		const stats = await fs.stat(resolvedDiffOutputPath)
-		return !(stats.isFile() && stats.mtimeMs >= args.taskState.taskStartTimeMs)
-	} catch {
-		return true
-	}
+	return !(
+		taskStateHasPlaceholderWorkflowWriteProof(args.taskState, resolvedDiffOutputPath) &&
+		(await fileExistsForPlaceholderWorkflowWriteProof(resolvedDiffOutputPath))
+	)
 }
 
 export function isActiveThreadDisplayState(threadDisplayState: ThreadDisplayState): boolean {
@@ -1807,6 +1808,7 @@ export class Task {
 				this.taskState.activePlaceholderWorkflowStableValues = undefined
 				this.taskState.activePlaceholderWorkflowValues = undefined
 				this.taskState.activePlaceholderWorkflowDeterministicState = undefined
+				this.taskState.activePlaceholderWorkflowTaskWriteProofPaths = []
 				this.taskState.activeWorkflowFormSession = undefined
 				this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices = []
 				this.taskState.activeWorkflowJustStarted = true
@@ -1838,6 +1840,7 @@ export class Task {
 				this.taskState.activePlaceholderWorkflowStableValues = undefined
 				this.taskState.activePlaceholderWorkflowValues = undefined
 				this.taskState.activePlaceholderWorkflowDeterministicState = undefined
+				this.taskState.activePlaceholderWorkflowTaskWriteProofPaths = []
 				this.taskState.activeWorkflowFormSession = undefined
 				this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices = []
 				this.taskState.activeWorkflowJustStarted = false
@@ -1858,6 +1861,7 @@ export class Task {
 				this.taskState.activePlaceholderWorkflowStableValues = undefined
 				this.taskState.activePlaceholderWorkflowValues = undefined
 				this.taskState.activePlaceholderWorkflowDeterministicState = undefined
+				this.taskState.activePlaceholderWorkflowTaskWriteProofPaths = []
 				this.taskState.activeWorkflowFormSession = undefined
 				this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices = []
 				this.taskState.activeWorkflowJustStarted = false
@@ -1878,6 +1882,8 @@ export class Task {
 			taskMetadata.activePlaceholderWorkflowStableValues = this.taskState.activePlaceholderWorkflowStableValues
 			taskMetadata.activePlaceholderWorkflowValues = this.taskState.activePlaceholderWorkflowValues
 			taskMetadata.activePlaceholderWorkflowDeterministicState = this.taskState.activePlaceholderWorkflowDeterministicState
+			taskMetadata.activePlaceholderWorkflowTaskWriteProofPaths =
+				this.taskState.activePlaceholderWorkflowTaskWriteProofPaths
 			taskMetadata.activeWorkflowFormSession = this.taskState.activeWorkflowFormSession
 			taskMetadata.pendingAutoCompletedPlaceholderWorkflowStepNotices =
 				this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices
@@ -2022,6 +2028,8 @@ export class Task {
 			this.taskState.activePlaceholderWorkflowStableValues = metadata.activePlaceholderWorkflowStableValues
 			this.taskState.activePlaceholderWorkflowValues = metadata.activePlaceholderWorkflowValues
 			this.taskState.activePlaceholderWorkflowDeterministicState = metadata.activePlaceholderWorkflowDeterministicState
+			this.taskState.activePlaceholderWorkflowTaskWriteProofPaths =
+				metadata.activePlaceholderWorkflowTaskWriteProofPaths ?? []
 			this.taskState.activeWorkflowFormSession = metadata.activeWorkflowFormSession as WorkflowFormSessionState | undefined
 			this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices =
 				metadata.pendingAutoCompletedPlaceholderWorkflowStepNotices ?? []

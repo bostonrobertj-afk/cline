@@ -28,6 +28,10 @@ function createTaskState(args: {
 	return taskState
 }
 
+function recordTaskWriteProof(taskState: TaskState, filePath: string): void {
+	taskState.activePlaceholderWorkflowTaskWriteProofPaths.push(path.resolve(filePath))
+}
+
 async function writeFileWithMtime(filePath: string, text: string, mtimeMs: number): Promise<void> {
 	await fs.mkdir(path.dirname(filePath), { recursive: true })
 	await fs.writeFile(filePath, text, "utf8")
@@ -65,13 +69,15 @@ Set review mode from the available review artifacts.`,
 			await writeFileWithMtime(
 				path.join(outputFolder, "review-input.md"),
 				"# review input",
-				taskState.taskStartTimeMs + 1_000,
+				taskState.taskStartTimeMs - 2_000,
 			)
 			await writeFileWithMtime(
 				path.join(outputFolder, "review-input.diff"),
 				"diff --git a/file b/file",
-				taskState.taskStartTimeMs + 2_000,
+				taskState.taskStartTimeMs - 1_000,
 			)
+			recordTaskWriteProof(taskState, path.join(outputFolder, "review-input.md"))
+			recordTaskWriteProof(taskState, path.join(outputFolder, "review-input.diff"))
 
 			const result = await applyDeterministicPlaceholderProgression({
 				taskState,
@@ -105,8 +111,9 @@ Set review mode from the available review artifacts.`,
 			await writeFileWithMtime(
 				path.join(outputFolder, "review-input.md"),
 				"# review input",
-				taskState.taskStartTimeMs + 1_000,
+				taskState.taskStartTimeMs - 1_000,
 			)
+			recordTaskWriteProof(taskState, path.join(outputFolder, "review-input.md"))
 
 			const result = await applyDeterministicPlaceholderProgression({
 				taskState,
@@ -140,8 +147,9 @@ Set review mode from the available review artifacts.`,
 			await writeFileWithMtime(
 				path.join(outputFolder, "review-input.diff"),
 				"diff --git a/file b/file",
-				taskState.taskStartTimeMs + 1_000,
+				taskState.taskStartTimeMs - 1_000,
 			)
+			recordTaskWriteProof(taskState, path.join(outputFolder, "review-input.diff"))
 
 			const result = await applyDeterministicPlaceholderProgression({
 				taskState,
@@ -214,8 +222,9 @@ Wait for review input to be prepared.`,
 			await writeFileWithMtime(
 				path.join(outputFolder, "review_input.md"),
 				"# review input",
-				taskState.taskStartTimeMs + 1_000,
+				taskState.taskStartTimeMs - 1_000,
 			)
+			recordTaskWriteProof(taskState, path.join(outputFolder, "review_input.md"))
 			process.chdir(foreignCwd)
 
 			const result = await applyDeterministicPlaceholderProgression({
@@ -225,7 +234,7 @@ Wait for review input to be prepared.`,
 
 			expect(result.checklist).to.equal("- [x] Step 2: Build Review Input")
 			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
-				"review_input points to a fresh review-input.md artifact.",
+				"review_input was written during this task and the artifact still exists.",
 			)
 		} finally {
 			process.chdir(originalCwd)
@@ -254,8 +263,9 @@ Wait for the stable diff artifact to be prepared.`,
 			await writeFileWithMtime(
 				path.join(outputFolder, "review-input.diff"),
 				"diff --git a/file b/file",
-				taskState.taskStartTimeMs + 1_000,
+				taskState.taskStartTimeMs - 1_000,
 			)
+			recordTaskWriteProof(taskState, path.join(outputFolder, "review-input.diff"))
 
 			const result = await applyDeterministicPlaceholderProgression({
 				taskState,
@@ -264,7 +274,7 @@ Wait for the stable diff artifact to be prepared.`,
 
 			expect(result.checklist).to.equal("- [x] Step 3: System-Owned Diff Source Resolution And Diff Output Persistence")
 			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
-				"diff_output points to a fresh review-input.diff artifact.",
+				"diff_output was written during this task and the artifact still exists.",
 			)
 		} finally {
 			await fs.rm(tempDir, { recursive: true, force: true })
@@ -297,8 +307,9 @@ Wait for the stable diff artifact to be prepared.`,
 			await writeFileWithMtime(
 				path.join(outputFolder, "review-input.diff"),
 				"diff --git a/file b/file",
-				taskState.taskStartTimeMs + 1_000,
+				taskState.taskStartTimeMs - 1_000,
 			)
+			recordTaskWriteProof(taskState, path.join(outputFolder, "review-input.diff"))
 			process.chdir(foreignCwd)
 
 			const result = await applyDeterministicPlaceholderProgression({
@@ -308,7 +319,7 @@ Wait for the stable diff artifact to be prepared.`,
 
 			expect(result.checklist).to.equal("- [x] Step 3: System-Owned Diff Source Resolution And Diff Output Persistence")
 			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
-				"diff_output points to a fresh review-input.diff artifact.",
+				"diff_output was written during this task and the artifact still exists.",
 			)
 		} finally {
 			process.chdir(originalCwd)
@@ -416,13 +427,15 @@ Set review mode from the available review artifacts.`,
 			await writeFileWithMtime(
 				path.join(outputFolder, "review_input.md"),
 				"# review input",
-				taskState.taskStartTimeMs + 1_000,
+				taskState.taskStartTimeMs - 2_000,
 			)
 			await writeFileWithMtime(
 				path.join(outputFolder, "review-input.diff"),
 				"diff --git a/file b/file",
-				taskState.taskStartTimeMs + 2_000,
+				taskState.taskStartTimeMs - 1_000,
 			)
+			recordTaskWriteProof(taskState, path.join(outputFolder, "review_input.md"))
+			recordTaskWriteProof(taskState, path.join(outputFolder, "review-input.diff"))
 			process.chdir(foreignCwd)
 
 			const result = await applyDeterministicPlaceholderProgression({
@@ -436,6 +449,82 @@ Set review mode from the available review artifacts.`,
 			process.chdir(originalCwd)
 			await fs.rm(tempDir, { recursive: true, force: true })
 			await fs.rm(foreignCwd, { recursive: true, force: true })
+		}
+	})
+
+	it("completes code-review step 5 when both fallback prompt files exist and were written during this task", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-step5-fallback-success-"))
+
+		try {
+			const outputFolder = path.join(tempDir, "output")
+			const adversarialPromptPath = path.join(outputFolder, "review-adversarial-general.md")
+			const edgeCasePromptPath = path.join(outputFolder, "review-edge-case-hunter.md")
+			const taskState = createTaskState({
+				workflowName: "code-review.md",
+				workflowContents: `## Step 5: Complete Review Layers
+Wait for every required review layer to finish.`,
+				checklistMarkdown: "- [ ] Step 5: Complete Review Layers",
+				placeholderValues: {
+					output_folder: outputFolder,
+				},
+			})
+			taskState.taskStartTimeMs = Date.now()
+
+			await writeFileWithMtime(adversarialPromptPath, "# adversarial", taskState.taskStartTimeMs - 2_000)
+			await writeFileWithMtime(edgeCasePromptPath, "# edge case", taskState.taskStartTimeMs - 1_000)
+			recordTaskWriteProof(taskState, adversarialPromptPath)
+			recordTaskWriteProof(taskState, edgeCasePromptPath)
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: taskState.currentFocusChainChecklist!,
+			})
+
+			expect(result.checklist).to.equal("- [x] Step 5: Complete Review Layers")
+			expect(taskState.activePlaceholderWorkflowDeterministicState?.codeReview?.completedReviewLayers).to.deep.equal({
+				adversarial_general: "fallback_prompt",
+				edge_case_hunter: "fallback_prompt",
+			})
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("does not complete code-review step 5 when fallback prompt files exist without current-task write proofs", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-step5-fallback-missing-proof-"))
+
+		try {
+			const outputFolder = path.join(tempDir, "output")
+			const taskState = createTaskState({
+				workflowName: "code-review.md",
+				workflowContents: `## Step 5: Complete Review Layers
+Wait for every required review layer to finish.`,
+				checklistMarkdown: "- [ ] Step 5: Complete Review Layers",
+				placeholderValues: {
+					output_folder: outputFolder,
+				},
+			})
+			taskState.taskStartTimeMs = Date.now()
+
+			await writeFileWithMtime(
+				path.join(outputFolder, "review-adversarial-general.md"),
+				"# adversarial",
+				taskState.taskStartTimeMs - 2_000,
+			)
+			await writeFileWithMtime(
+				path.join(outputFolder, "review-edge-case-hunter.md"),
+				"# edge case",
+				taskState.taskStartTimeMs - 1_000,
+			)
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: taskState.currentFocusChainChecklist!,
+			})
+
+			expect(result.checklist).to.equal("- [ ] Step 5: Complete Review Layers")
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
 		}
 	})
 
@@ -455,7 +544,8 @@ Wait for the spec file to reach a terminal review status.`,
 			})
 			taskState.taskStartTimeMs = Date.now()
 
-			await writeFileWithMtime(specFilePath, "Status: ready-for-dev\n", taskState.taskStartTimeMs + 1_000)
+			await writeFileWithMtime(specFilePath, "Status: ready-for-dev\n", taskState.taskStartTimeMs - 1_000)
+			recordTaskWriteProof(taskState, specFilePath)
 
 			const result = await applyDeterministicPlaceholderProgression({
 				taskState,

@@ -6,6 +6,7 @@ import { getReadablePath, isLocatedInWorkspace } from "@utils/path"
 import fs from "fs/promises"
 import path from "path"
 import simpleGit from "simple-git"
+import { recordAndPersistPlaceholderWorkflowWriteProof } from "@/core/task/focus-chain/placeholderWorkflowWriteProofs"
 import { ClineDefaultTool } from "@/shared/tools"
 import type { ToolResponse } from "../../index"
 import { showNotificationForApproval } from "../../utils"
@@ -411,6 +412,11 @@ export class BuildReviewDiffOutputToolHandler implements IToolHandler, IPartialB
 			}
 
 			await atomicReplaceTextFile(outputPath, artifactContent)
+			await recordAndPersistPlaceholderWorkflowWriteProof({
+				taskId: config.taskId,
+				taskState: config.taskState,
+				filePath: outputPath,
+			})
 			config.taskState.didEditFile = true
 			config.taskState.fileReadCache.delete(outputPath.toLowerCase())
 			config.taskState.consecutiveMistakeCount = 0

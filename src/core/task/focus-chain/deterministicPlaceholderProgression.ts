@@ -9,6 +9,10 @@ import {
 	TaskState,
 } from "../TaskState"
 import { evaluateFocusChainChecklistUpdate } from "./file-utils"
+import {
+	fileExistsForPlaceholderWorkflowWriteProof,
+	taskStateHasPlaceholderWorkflowWriteProof,
+} from "./placeholderWorkflowWriteProofs"
 
 export interface DeterministicPlaceholderToolContext {
 	toolName: string
@@ -57,15 +61,6 @@ function resolveArtifactPlaceholderPath(placeholders: Record<string, string>, pl
 	}
 
 	return path.resolve(workflowCwd, placeholderPath)
-}
-
-async function fileExistsAndIsFresh(filePath: string, taskStartTimeMs: number): Promise<boolean> {
-	try {
-		const stats = await fs.stat(filePath)
-		return stats.isFile() && stats.mtimeMs >= taskStartTimeMs
-	} catch {
-		return false
-	}
 }
 
 async function readFileIfExists(filePath: string): Promise<string | undefined> {
@@ -133,10 +128,10 @@ function cloneDeterministicState(taskState: TaskState): ActivePlaceholderWorkflo
 	}
 }
 
-async function resolveFreshPlaceholderArtifactPath(args: {
+async function resolveTaskWrittenPlaceholderArtifactPath(args: {
+	taskState: TaskState
 	placeholders: Record<string, string>
 	placeholderKey: "review_input" | "diff_output"
-	taskStartTimeMs: number
 }): Promise<string | undefined> {
 	const placeholderPath = args.placeholders[args.placeholderKey]?.trim()
 	if (!placeholderPath) {
@@ -144,7 +139,10 @@ async function resolveFreshPlaceholderArtifactPath(args: {
 	}
 
 	const resolvedPath = resolveArtifactPlaceholderPath(args.placeholders, placeholderPath)
-	return (await fileExistsAndIsFresh(resolvedPath, args.taskStartTimeMs)) ? resolvedPath : undefined
+	return taskStateHasPlaceholderWorkflowWriteProof(args.taskState, resolvedPath) &&
+		(await fileExistsForPlaceholderWorkflowWriteProof(resolvedPath))
+		? resolvedPath
+		: undefined
 }
 
 async function evaluateCodeReviewStep(args: {
@@ -167,10 +165,10 @@ async function evaluateCodeReviewStep(args: {
 			}
 		}
 		case 2: {
-			const reviewInputPath = await resolveFreshPlaceholderArtifactPath({
+			const reviewInputPath = await resolveTaskWrittenPlaceholderArtifactPath({
+				taskState: args.taskState,
 				placeholders,
 				placeholderKey: "review_input",
-				taskStartTimeMs: args.taskState.taskStartTimeMs,
 			})
 			if (!reviewInputPath) {
 				return { completed: false }
@@ -178,14 +176,14 @@ async function evaluateCodeReviewStep(args: {
 
 			return {
 				completed: true,
-				reason: "review_input points to a fresh review-input.md artifact.",
+				reason: "review_input was written during this task and the artifact still exists.",
 			}
 		}
 		case 3: {
-			const diffOutputPath = await resolveFreshPlaceholderArtifactPath({
+			const diffOutputPath = await resolveTaskWrittenPlaceholderArtifactPath({
+				taskState: args.taskState,
 				placeholders,
 				placeholderKey: "diff_output",
-				taskStartTimeMs: args.taskState.taskStartTimeMs,
 			})
 			if (!diffOutputPath) {
 				return { completed: false }
@@ -193,19 +191,19 @@ async function evaluateCodeReviewStep(args: {
 
 			return {
 				completed: true,
-				reason: "diff_output points to a fresh review-input.diff artifact.",
+				reason: "diff_output was written during this task and the artifact still exists.",
 			}
 		}
 		case 4: {
-			const reviewInputPath = await resolveFreshPlaceholderArtifactPath({
+			const reviewInputPath = await resolveTaskWrittenPlaceholderArtifactPath({
+				taskState: args.taskState,
 				placeholders,
 				placeholderKey: "review_input",
-				taskStartTimeMs: args.taskState.taskStartTimeMs,
 			})
-			const diffOutputPath = await resolveFreshPlaceholderArtifactPath({
+			const diffOutputPath = await resolveTaskWrittenPlaceholderArtifactPath({
+				taskState: args.taskState,
 				placeholders,
 				placeholderKey: "diff_output",
-				taskStartTimeMs: args.taskState.taskStartTimeMs,
 			})
 
 			const nextReviewMode =
@@ -225,7 +223,7 @@ async function evaluateCodeReviewStep(args: {
 
 			return {
 				completed: true,
-				reason: "review_mode was derived deterministically from fresh review artifacts.",
+				reason: "review_mode was derived deterministically from current-task review artifacts.",
 				placeholderValuesChanged,
 			}
 		}
@@ -240,7 +238,11 @@ async function evaluateCodeReviewStep(args: {
 				}
 
 				const fallbackPromptPath = getCodeReviewFallbackPromptPath(placeholders, layer)
-				if (!fallbackPromptPath || !(await fileExistsAndIsFresh(fallbackPromptPath, args.taskState.taskStartTimeMs))) {
+				if (
+					!fallbackPromptPath ||
+					!taskStateHasPlaceholderWorkflowWriteProof(args.taskState, fallbackPromptPath) ||
+					!(await fileExistsForPlaceholderWorkflowWriteProof(fallbackPromptPath))
+				) {
 					return { completed: false }
 				}
 
@@ -257,24 +259,32 @@ async function evaluateCodeReviewStep(args: {
 
 			return {
 				completed: true,
-				reason: "Every required review layer has a final report or a fresh fallback prompt artifact.",
+				reason: "Every required review layer has a final report or a current-task fallback prompt artifact.",
 				deterministicStateChanged,
 			}
 		}
 		case 6: {
 			const specFilePath = placeholders.spec_file?.trim()
-			if (!specFilePath || !(await fileExistsAndIsFresh(specFilePath, args.taskState.taskStartTimeMs))) {
+			if (!specFilePath) {
 				return { completed: false }
 			}
 
-			const specFileText = await readFileIfExists(specFilePath)
+			const resolvedSpecFilePath = resolveArtifactPlaceholderPath(placeholders, specFilePath)
+			if (
+				!taskStateHasPlaceholderWorkflowWriteProof(args.taskState, resolvedSpecFilePath) ||
+				!(await fileExistsForPlaceholderWorkflowWriteProof(resolvedSpecFilePath))
+			) {
+				return { completed: false }
+			}
+
+			const specFileText = await readFileIfExists(resolvedSpecFilePath)
 			if (!specFileText || !hasTopLevelStatusValue(specFileText, ["ready-for-dev", "complete"])) {
 				return { completed: false }
 			}
 
 			return {
 				completed: true,
-				reason: "spec_file was updated and now contains a terminal review status.",
+				reason: "spec_file was updated during this task and now contains a terminal review status.",
 			}
 		}
 		default:
@@ -335,7 +345,16 @@ async function evaluateDevStoryStep(args: {
 			}
 		}
 		case 3: {
-			if (!storyPath || !(await fileExistsAndIsFresh(storyPath, args.taskState.taskStartTimeMs))) {
+			if (!storyPath) {
+				return { completed: false }
+			}
+
+			try {
+				const stats = await fs.stat(storyPath)
+				if (!stats.isFile() || stats.mtimeMs < args.taskState.taskStartTimeMs) {
+					return { completed: false }
+				}
+			} catch {
 				return { completed: false }
 			}
 

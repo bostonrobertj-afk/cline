@@ -9,6 +9,7 @@ import { parseSlashCommands } from "../../slash-commands"
 import { StateManager } from "../../storage/StateManager"
 import { getCanonicalWorkflowConfigPath } from "../../workflows/workflow-placeholders"
 import { FocusChainManager } from "../focus-chain"
+import { getFocusChainFilePath } from "../focus-chain/file-utils"
 import { Task, type ToolResponse } from "../index"
 import { TaskState } from "../TaskState"
 import { activateManagedWorkflowInTaskState } from "../workflow-activation"
@@ -68,12 +69,13 @@ Inspect the prepared review input and write findings.
 						},
 					},
 				},
+				activePlaceholderWorkflowTaskWriteProofPaths: ["/tmp/review-input.md"],
 				pendingAutoCompletedPlaceholderWorkflowStepNotices: [
 					{
 						workflowName: "code-review.md",
 						stepNumber: 4,
 						checklistLabel: "Step 4: Set Review Mode",
-						reason: "review_mode was derived deterministically from fresh review artifacts.",
+						reason: "review_mode was derived deterministically from current-task review artifacts.",
 					},
 				],
 			}
@@ -89,6 +91,9 @@ Inspect the prepared review input and write findings.
 			)
 			expect(fakeTask.taskState.activePlaceholderWorkflowDeterministicState).to.deep.equal(
 				metadata.activePlaceholderWorkflowDeterministicState,
+			)
+			expect(fakeTask.taskState.activePlaceholderWorkflowTaskWriteProofPaths).to.deep.equal(
+				metadata.activePlaceholderWorkflowTaskWriteProofPaths,
 			)
 			expect(fakeTask.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal(
 				metadata.pendingAutoCompletedPlaceholderWorkflowStepNotices,
@@ -128,7 +133,7 @@ Inspect the prepared review input and write findings.
 						workflowName: "code-review.md",
 						stepNumber: 4,
 						checklistLabel: "Step 4: Set Review Mode",
-						reason: "review_mode was derived deterministically from fresh review artifacts.",
+						reason: "review_mode was derived deterministically from current-task review artifacts.",
 					},
 				],
 			}
@@ -164,12 +169,13 @@ Inspect the prepared review input and write findings.
 				},
 			},
 		}
+		taskState.activePlaceholderWorkflowTaskWriteProofPaths = ["/tmp/review-input.md"]
 		taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices = [
 			{
 				workflowName: "code-review.md",
 				stepNumber: 4,
 				checklistLabel: "Step 4: Set Review Mode",
-				reason: "review_mode was derived deterministically from fresh review artifacts.",
+				reason: "review_mode was derived deterministically from current-task review artifacts.",
 			},
 		]
 
@@ -180,6 +186,7 @@ Inspect the prepared review input and write findings.
 		})
 
 		expect(taskState.activePlaceholderWorkflowDeterministicState).to.equal(undefined)
+		expect(taskState.activePlaceholderWorkflowTaskWriteProofPaths).to.deep.equal([])
 		expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
 	})
 
@@ -259,6 +266,87 @@ Persist review_input.md.
 
 		expect(restoreStub.calledOnce).to.equal(true)
 		expect(fakeTask.taskState.currentFocusChainChecklist).to.equal(restoredChecklist)
+	})
+
+	it("advances Step 2 after placeholder resolution when review_input exists with a stale mtime but has a current-task write proof", async () => {
+		const sandbox = sinon.createSandbox()
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "placeholder-step2-write-proof-"))
+		const workflowPath = path.join(tempDir, "code-review.md")
+		const reviewInputPath = path.join(tempDir, "output", "review-input.md")
+		const taskId = "task-placeholder-persistence"
+
+		try {
+			await fs.writeFile(
+				workflowPath,
+				`# Code Review
+
+## Step 1: Determine Review Source
+Determine what to review from the user's prompt before asking follow-up questions.
+
+## Step 2: Construct & Persist Review Input File
+Persist review_input.md.
+
+## Step 3: System-Owned Diff Source Resolution And Diff Output Persistence
+Resolve diff input through the system-owned form flow.
+`,
+				"utf8",
+			)
+			await fs.mkdir(path.dirname(reviewInputPath), { recursive: true })
+			await fs.writeFile(reviewInputPath, "# review input\n", "utf8")
+
+			const taskState = new TaskState()
+			taskState.taskStartTimeMs = Date.now()
+			const staleTimestamp = new Date(taskState.taskStartTimeMs - 1_000)
+			await fs.utimes(reviewInputPath, staleTimestamp, staleTimestamp)
+			taskState.activePlaceholderWorkflowId = "code-review.md"
+			taskState.activePlaceholderWorkflowSource = {
+				type: "local",
+				name: "code-review.md",
+				path: workflowPath,
+			}
+			taskState.activePlaceholderWorkflowValues = {
+				review_input: reviewInputPath,
+			}
+			taskState.activePlaceholderWorkflowTaskWriteProofPaths = [reviewInputPath]
+			taskState.currentFocusChainChecklist = null
+
+			const step2Checklist = [
+				"- [x] Step 1: Determine Review Source",
+				"- [ ] Step 2: Construct & Persist Review Input File",
+				"- [ ] Step 3: System-Owned Diff Source Resolution And Diff Output Persistence",
+			].join("\n")
+			const focusChainFilePath = getFocusChainFilePath(tempDir, taskId)
+			await fs.writeFile(
+				focusChainFilePath,
+				`# Focus Chain List for Task ${taskId}
+
+${step2Checklist}
+`,
+				"utf8",
+			)
+
+			sandbox.stub(disk, "ensureTaskDirectoryExists").resolves(tempDir)
+			sandbox.stub(disk, "getTaskMetadata").resolves({} as never)
+			sandbox.stub(disk, "saveTaskMetadata").resolves()
+
+			const manager = createFocusChainManager(taskState)
+			const result = await manager.updateFCListFromToolResponse(undefined, {
+				toolName: "set_workflow_placeholders",
+				toolWasExecuted: true,
+			})
+
+			expect(result.accepted).to.equal(true)
+			expect(taskState.currentFocusChainChecklist).to.equal(
+				[
+					"- [x] Step 1: Determine Review Source",
+					"- [x] Step 2: Construct & Persist Review Input File",
+					"- [ ] Step 3: System-Owned Diff Source Resolution And Diff Output Persistence",
+				].join("\n"),
+			)
+		} finally {
+			sandbox.restore()
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
 	})
 
 	it("computes stable placeholder values from slash-command activation metadata and renders them in activation instructions", async () => {
