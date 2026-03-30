@@ -46,6 +46,19 @@ function getMergedPlaceholderValues(taskState: TaskState): Record<string, string
 	)
 }
 
+function resolveArtifactPlaceholderPath(placeholders: Record<string, string>, placeholderPath: string): string {
+	if (path.isAbsolute(placeholderPath)) {
+		return placeholderPath
+	}
+
+	const workflowCwd = placeholders.cwd?.trim() || placeholders.project_root?.trim() || placeholders["project-root"]?.trim()
+	if (!workflowCwd) {
+		return placeholderPath
+	}
+
+	return path.resolve(workflowCwd, placeholderPath)
+}
+
 async function fileExistsAndIsFresh(filePath: string, taskStartTimeMs: number): Promise<boolean> {
 	try {
 		const stats = await fs.stat(filePath)
@@ -130,7 +143,8 @@ async function resolveFreshPlaceholderArtifactPath(args: {
 		return undefined
 	}
 
-	return (await fileExistsAndIsFresh(placeholderPath, args.taskStartTimeMs)) ? placeholderPath : undefined
+	const resolvedPath = resolveArtifactPlaceholderPath(args.placeholders, placeholderPath)
+	return (await fileExistsAndIsFresh(resolvedPath, args.taskStartTimeMs)) ? resolvedPath : undefined
 }
 
 async function evaluateCodeReviewStep(args: {

@@ -672,6 +672,41 @@ describe("Managed workflow handlers", () => {
 		}
 	})
 
+	it("normalizes relative artifact placeholders to absolute paths for active non-managed workflows", async () => {
+		const sandbox = sinon.createSandbox()
+		const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), "placeholder-artifact-normalization-"))
+		try {
+			const handler = new SetWorkflowPlaceholdersToolHandler()
+			const config = createConfig({ cwd: repoDir, isSubagentExecution: false })
+			config.taskState.activePlaceholderWorkflowId = "code-review.md"
+
+			const metadata = { activeWorkflowId: "code-review.md" } as any
+			sandbox.stub(disk, "getTaskMetadata").resolves(metadata)
+			sandbox.stub(disk, "saveTaskMetadata").resolves()
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "set_workflow_placeholders",
+				params: {
+					values: {
+						review_input: "_bmad-output/review_input.md",
+						diff_output: "_bmad-output/review-input.diff",
+					},
+				},
+				partial: false,
+			} as any)
+
+			expect(String(result)).to.contain("Stored 2 workflow placeholders")
+			expect(config.taskState.activePlaceholderWorkflowValues).to.deep.equal({
+				review_input: path.join(repoDir, "_bmad-output", "review_input.md"),
+				diff_output: path.join(repoDir, "_bmad-output", "review-input.diff"),
+			})
+		} finally {
+			await fs.rm(repoDir, { recursive: true, force: true })
+			sandbox.restore()
+		}
+	})
+
 	it("uses placeholder-workflow-specific no-op guidance for active non-managed workflows", async () => {
 		const handler = new SetWorkflowPlaceholdersToolHandler()
 		const config = createConfig()

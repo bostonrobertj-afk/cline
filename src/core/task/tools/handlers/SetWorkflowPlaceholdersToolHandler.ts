@@ -2,12 +2,15 @@ import type { ToolUse } from "@core/assistant-message"
 import { getTaskMetadata, saveTaskMetadata } from "@core/storage/disk"
 import { applyManagedWorkflowDynamicPlaceholders } from "@core/task/managed-workflows/placeholders"
 import type { ManagedWorkflowRunState } from "@core/task/managed-workflows/types"
+import path from "path"
 import { isDeterministicPlaceholderWorkflowSupported } from "@/core/task/focus-chain/deterministicPlaceholderProgression"
 import { ClineDefaultTool } from "@/shared/tools"
 import type { ToolResponse } from "../../index"
 import type { IPartialBlockHandler, IToolHandler } from "../ToolExecutorCoordinator"
 import type { TaskConfig } from "../types/TaskConfig"
 import type { StronglyTypedUIHelpers } from "../types/UIHelpers"
+
+const ARTIFACT_PLACEHOLDER_KEYS = new Set(["review_input", "diff_output"])
 
 function parseWorkflowPlaceholderValues(values: unknown): Record<string, unknown> {
 	if (typeof values === "string") {
@@ -30,6 +33,44 @@ function parseWorkflowPlaceholderValues(values: unknown): Record<string, unknown
 
 function getWorkflowPlaceholderValues(block: ToolUse): Record<string, unknown> | undefined {
 	return parseWorkflowPlaceholderValues((block.params as Record<string, unknown>).values)
+}
+
+function normalizeArtifactPlaceholderPath(value: string, cwd: string): string {
+	const trimmedValue = value.trim()
+	if (!trimmedValue || path.isAbsolute(trimmedValue) || /\{[^}]+\}/.test(trimmedValue)) {
+		return trimmedValue
+	}
+
+	return path.resolve(cwd, trimmedValue)
+}
+
+function normalizeArtifactWorkflowPlaceholders(
+	dynamicPlaceholders: Record<string, string> | undefined,
+	cwd: string,
+	keysToNormalize: string[],
+): Record<string, string> | undefined {
+	if (!dynamicPlaceholders) {
+		return dynamicPlaceholders
+	}
+
+	let updatedPlaceholders: Record<string, string> | undefined
+
+	for (const key of keysToNormalize) {
+		const currentValue = dynamicPlaceholders[key]
+		if (!currentValue || !ARTIFACT_PLACEHOLDER_KEYS.has(key)) {
+			continue
+		}
+
+		const normalizedValue = normalizeArtifactPlaceholderPath(currentValue, cwd)
+		if (normalizedValue === currentValue) {
+			continue
+		}
+
+		updatedPlaceholders ??= { ...dynamicPlaceholders }
+		updatedPlaceholders[key] = normalizedValue
+	}
+
+	return updatedPlaceholders ?? dynamicPlaceholders
 }
 
 function getNextStepGuidance(isManagedWorkflow: boolean, activeDeterministicPlaceholderWorkflowEnabled: boolean): string {
@@ -113,6 +154,18 @@ export class SetWorkflowPlaceholdersToolHandler implements IToolHandler, IPartia
 
 		if (currentRun) {
 			const managedResult = applyManagedWorkflowDynamicPlaceholders(currentRun, values)
+			const normalizedDynamicPlaceholders = normalizeArtifactWorkflowPlaceholders(
+				managedResult.run.dynamicPlaceholders,
+				config.cwd,
+				managedResult.changedKeys,
+			)
+			if (normalizedDynamicPlaceholders !== managedResult.run.dynamicPlaceholders) {
+				managedResult.run = {
+					...managedResult.run,
+					dynamicPlaceholders: normalizedDynamicPlaceholders,
+					updatedAt: Date.now(),
+				}
+			}
 			config.taskState.managedWorkflowRun = managedResult.run
 			config.taskState.activeWorkflowId = config.taskState.managedWorkflowRun.workflowId
 			changedKeys = managedResult.changedKeys
@@ -131,7 +184,11 @@ export class SetWorkflowPlaceholdersToolHandler implements IToolHandler, IPartia
 				config.taskState.activePlaceholderWorkflowValues,
 				values,
 			)
-			config.taskState.activePlaceholderWorkflowValues = genericResult.run.dynamicPlaceholders
+			config.taskState.activePlaceholderWorkflowValues = normalizeArtifactWorkflowPlaceholders(
+				genericResult.run.dynamicPlaceholders,
+				config.cwd,
+				genericResult.changedKeys,
+			)
 			changedKeys = genericResult.changedKeys
 			unchangedKeys = genericResult.unchangedKeys
 			unchangedDynamicKeys = genericResult.unchangedDynamicKeys
