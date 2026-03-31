@@ -149,64 +149,65 @@ function findStoryDiffBlock(diffMarkdown: string, storyRelativePaths: string[]):
 	return undefined
 }
 
-function extractRecentStoryLines(storyDiffBlock: string) {
-	const lines = normalizeLines(storyDiffBlock)
-	const completedTasks: string[] = []
-	const completionNotes: string[] = []
-	let inHunk = false
-	let currentTopLevelSection: string | undefined
-	let currentNestedSection: string | undefined
-
+function buildMultiset(lines: string[]): Map<string, number> {
+	const counts = new Map<string, number>()
 	for (const line of lines) {
-		if (line.startsWith("@@")) {
-			inHunk = true
+		counts.set(line, (counts.get(line) ?? 0) + 1)
+	}
+	return counts
+}
+
+function takeLinesMatchingMultiset(linesInStoryOrder: string[], allowedCounts: Map<string, number>): string[] {
+	const matches: string[] = []
+	for (const line of linesInStoryOrder) {
+		const remaining = allowedCounts.get(line) ?? 0
+		if (remaining <= 0) {
 			continue
 		}
-
-		if (!inHunk || line.length === 0) {
-			continue
-		}
-
-		const marker = line[0]
-		if (![" ", "+", "-"].includes(marker)) {
-			continue
-		}
-
-		const content = line.slice(1)
-
-		if (/^##\s+Tasks \/ Subtasks\b/.test(content)) {
-			currentTopLevelSection = "tasks"
-			currentNestedSection = undefined
-		} else if (/^##\s+Dev Agent Record\b/.test(content)) {
-			currentTopLevelSection = "dev-agent-record"
-			currentNestedSection = undefined
-		} else if (/^##\s+/.test(content)) {
-			currentTopLevelSection = undefined
-			currentNestedSection = undefined
-		} else if (currentTopLevelSection === "dev-agent-record" && /^###\s+Completion Notes List\b/.test(content)) {
-			currentNestedSection = "completion-notes"
-		} else if (/^###\s+/.test(content)) {
-			currentNestedSection = undefined
-		}
-
-		if (marker !== "+") {
-			continue
-		}
-
-		if (currentTopLevelSection === "tasks" && /^\s*-\s*\[[xX]\]\s+/.test(content)) {
-			completedTasks.push(content)
-		}
-
-		if (
-			currentTopLevelSection === "dev-agent-record" &&
-			currentNestedSection === "completion-notes" &&
-			/^\s*-\s+/.test(content)
-		) {
-			completionNotes.push(content)
+		matches.push(line)
+		if (remaining === 1) {
+			allowedCounts.delete(line)
+		} else {
+			allowedCounts.set(line, remaining - 1)
 		}
 	}
+	return matches
+}
 
-	return { completedTasks, completionNotes }
+function extractRecentStoryLines(args: {
+	storyDiffBlock: string
+	tasksSection: SectionRange | undefined
+	completionNotesListSection: SectionRange | undefined
+}): {
+	completedTasks: string[]
+	completionNotes: string[]
+	unmatchedCompletedTaskCount: number
+	unmatchedCompletionNoteCount: number
+} {
+	const checkedTaskPattern = /^\s*-\s*\[[xX]\]\s+/
+	const bulletPattern = /^\s*-\s+/
+	const addedLines = normalizeLines(args.storyDiffBlock)
+		.filter((line) => line.startsWith("+") && !line.startsWith("+++"))
+		.map((line) => line.slice(1))
+	const addedCompletedTaskCandidates = addedLines.filter((line) => checkedTaskPattern.test(line))
+	const storyCompletedTaskLines = args.tasksSection?.lines.slice(1).filter((line) => checkedTaskPattern.test(line)) ?? []
+	const storyCompletionNoteLines =
+		args.completionNotesListSection?.lines.slice(1).filter((line) => bulletPattern.test(line)) ?? []
+	const storyCompletionNoteLineSet = new Set(storyCompletionNoteLines)
+	const addedCompletionNoteCandidates = addedLines.filter((line) => storyCompletionNoteLineSet.has(line))
+	const completedTaskMultiset = buildMultiset(addedCompletedTaskCandidates)
+	const completionNoteMultiset = buildMultiset(addedCompletionNoteCandidates)
+	const completedTasks = takeLinesMatchingMultiset(storyCompletedTaskLines, completedTaskMultiset)
+	const completionNotes = takeLinesMatchingMultiset(storyCompletionNoteLines, completionNoteMultiset)
+	const unmatchedCompletedTaskCount = Array.from(completedTaskMultiset.values()).reduce((sum, count) => sum + count, 0)
+	const unmatchedCompletionNoteCount = Array.from(completionNoteMultiset.values()).reduce((sum, count) => sum + count, 0)
+
+	return {
+		completedTasks,
+		completionNotes,
+		unmatchedCompletedTaskCount,
+		unmatchedCompletionNoteCount,
+	}
 }
 
 export function buildReviewInputExtraction(args: BuildReviewInputExtractionArgs): BuildReviewInputExtractionResult {
@@ -232,7 +233,18 @@ export function buildReviewInputExtraction(args: BuildReviewInputExtractionArgs)
 		return { kind: "no_recent_story_changes", recentStoryChangesDetected: false }
 	}
 
-	const { completedTasks, completionNotes } = extractRecentStoryLines(storyDiffBlock)
+	const { completedTasks, completionNotes, unmatchedCompletedTaskCount, unmatchedCompletionNoteCount } =
+		extractRecentStoryLines({
+			storyDiffBlock,
+			tasksSection,
+			completionNotesListSection,
+		})
+	if (unmatchedCompletedTaskCount > 0) {
+		return { kind: "no_recent_story_changes", recentStoryChangesDetected: false }
+	}
+	if (completionNotesListSection && unmatchedCompletionNoteCount > 0) {
+		return { kind: "no_recent_story_changes", recentStoryChangesDetected: false }
+	}
 	const latestReviewFindingsHasContent = hasNonWhitespaceBody(latestReviewFindingsSection)
 
 	const sections = [

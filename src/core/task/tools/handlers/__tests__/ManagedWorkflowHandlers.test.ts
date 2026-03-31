@@ -195,11 +195,13 @@ Status: review
 - Investigate prior QA feedback
 
 ## Tasks / Subtasks
+- [x] Added completed task
 - [ ] Existing incomplete task
 
 ## Dev Agent Record
 ### Completion Notes List
 - Existing completion note
+  - Added completion note
 `,
 	)
 

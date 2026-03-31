@@ -103,6 +103,8 @@ Exact edits:
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/buildReviewInputExtraction.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/buildReviewInputExtraction.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/ManagedWorkflowHandlers.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/ManagedWorkflowHandlers.test.ts`
 
 Exact edits:
 1. Add a new helper file at [buildReviewInputExtraction.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/handlers/buildReviewInputExtraction.ts) with these exact exported interfaces:
@@ -330,3 +332,97 @@ Completion criteria:
 - The only generated-file diffs outside the Step 1 explicit source files are the prompt snapshots under `src/core/prompts/system-prompt/__tests__/__snapshots__/`.
 - If either command reveals any additional required code or generated-file change outside the allowed files from prior steps, stop and ask for input instead of improvising.
 - Do not run `src/core/prompts/system-prompt/__tests__/integration.test.ts` in this tool-silo pass. Step-specific native-tool filtering and matrix alignment belong to the later deterministic-progression silo.
+
+## Remediation Step 6
+[x] Correct `buildReviewInputExtraction(...)` so diff-backed recent task and completion-note extraction derives section ownership from the parsed story file, not from heading lines that happen to appear inside the diff hunk.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/buildReviewInputExtraction.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/buildReviewInputExtraction.test.ts`
+
+Exact edits:
+1. In [buildReviewInputExtraction.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/handlers/buildReviewInputExtraction.ts#L152-L209), delete the current `extractRecentStoryLines(storyDiffBlock: string)` implementation that tracks `currentTopLevelSection` and `currentNestedSection` from diff-hunk heading lines.
+2. Replace it with three helpers in the same file, directly above `buildReviewInputExtraction(...)`:
+   - `buildMultiset(lines: string[]): Map<string, number>`
+   - `takeLinesMatchingMultiset(linesInStoryOrder: string[], allowedCounts: Map<string, number>): string[]`
+   - `extractRecentStoryLines(args: { storyDiffBlock: string; tasksSection: SectionRange | undefined; completionNotesListSection: SectionRange | undefined }): { completedTasks: string[]; completionNotes: string[]; unmatchedCompletedTaskCount: number; unmatchedCompletionNoteCount: number }`
+3. Implement `extractRecentStoryLines(...)` with this exact data flow:
+   - parse the story-file diff block into added lines only by scanning lines whose first character is `"+"`
+   - ignore diff metadata lines beginning with `"+++"`
+   - strip the leading `"+"` before any further matching
+   - derive `addedCompletedTaskCandidates` from those added lines using `/^\\s*-\\s*\\[[xX]\\]\\s+/`
+   - derive `storyCompletedTaskLines` from `tasksSection?.lines.slice(1)` using the same checked-checklist regex, preserving original story-file order
+   - derive `storyCompletionNoteLines` from `completionNotesListSection?.lines.slice(1)` using the same bullet regex, preserving original story-file order
+   - derive `addedCompletionNoteCandidates` only from added lines that exactly match entries in `storyCompletionNoteLines`, preserving diff order; do not treat generic added task bullets as completion-note candidates
+   - build multisets from the added candidate arrays
+   - return:
+     - `completedTasks = takeLinesMatchingMultiset(storyCompletedTaskLines, completedTaskMultiset)`
+     - `completionNotes = takeLinesMatchingMultiset(storyCompletionNoteLines, completionNoteMultiset)`
+4. `takeLinesMatchingMultiset(...)` must preserve story-file order and handle duplicate bullet text correctly by decrementing the count in the multiset each time a matching story line is emitted.
+5. Still in `extractRecentStoryLines(...)`, add deterministic-identification accounting:
+   - track `unmatchedCompletedTaskCount = sum(completedTaskMultiset.values())` after `takeLinesMatchingMultiset(...)` finishes
+   - track `unmatchedCompletionNoteCount = sum(completionNoteMultiset.values())` after `takeLinesMatchingMultiset(...)` finishes
+   - return those counts alongside `completedTasks` and `completionNotes`
+6. In [buildReviewInputExtraction.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/handlers/buildReviewInputExtraction.ts#L235), update the call site to pass:
+   - `storyDiffBlock`
+   - `tasksSection`
+   - `completionNotesListSection`
+7. After the `extractRecentStoryLines(...)` call, add this exact fallback decision rule:
+   - if `unmatchedCompletedTaskCount > 0`, return `{ kind: "no_recent_story_changes", recentStoryChangesDetected: false }`
+   - if `completionNotesListSection` exists and `unmatchedCompletionNoteCount > 0`, return `{ kind: "no_recent_story_changes", recentStoryChangesDetected: false }`
+   - otherwise preserve the existing success path
+8. This means fallback-note strings may only be emitted when deterministic matching completed successfully and the matched result set is genuinely empty.
+9. Do not change in this remediation step:
+   - malformed-story validation
+   - `no_recent_story_changes` behavior when the story diff block cannot be found
+   - output section ordering
+   - the exact diff/story mismatch reason string used by the handler
+10. In [buildReviewInputExtraction.test.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/handlers/__tests__/buildReviewInputExtraction.test.ts):
+   - keep the existing four tests
+   - add one new test immediately after `"builds normalized review-input markdown from a story file and matching story diff"`
+   - title it exactly: `"maps added checked tasks and completion notes from the story file even when the diff hunk omits section headings"`
+11. In that new test:
+   - use a story markdown fixture where:
+     - `## Tasks / Subtasks` contains at least one existing checked task before the newly added checked task
+     - `## Dev Agent Record -> ### Completion Notes List` contains at least one existing bullet before the newly added bullet
+   - use a diff artifact whose story-file hunk includes only the added checked task line and the added completion-note bullet plus nearby ordinary context lines, but does not include:
+     - `## Tasks / Subtasks`
+     - `## Dev Agent Record`
+     - `### Completion Notes List`
+   - assert `result.kind === "success"`
+   - assert the emitted markdown still contains exactly the newly added checked task line and the newly added completion-note bullet
+   - assert the emitted markdown does not include the existing preexisting checked task line or the existing preexisting completion-note bullet
+12. Add one additional test immediately after that new heading-omission test:
+   - title: `"returns no_recent_story_changes when added task or completion-note candidates cannot be matched back into the parsed story sections"`
+   - use a story markdown fixture whose `## Tasks / Subtasks` and `### Completion Notes List` do not contain the added candidate lines present in the diff
+   - use a diff artifact that still touches the story file and includes:
+     - one added checked task candidate line
+     - one added completion-note candidate line
+   - assert the result equals:
+     - `kind: "no_recent_story_changes"`
+     - `recentStoryChangesDetected: false`
+   - do not assert fallback-note text in this case, because the success artifact must not be produced when deterministic matching fails
+13. In [buildReviewInputExtraction.test.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/handlers/__tests__/buildReviewInputExtraction.test.ts), update the existing success fixtures so the story markdown represents the post-change file state:
+   - the story content used by `"builds normalized review-input markdown from a story file and matching story diff"` must already contain the added checked task line and the added completion-note bullet
+   - keep the diff artifact showing those same lines as additions
+   - keep the expected output unchanged
+14. In [ManagedWorkflowHandlers.test.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/handlers/__tests__/ManagedWorkflowHandlers.test.ts), update the `createReviewInputRepo()` helper so its success fixture story file also represents the post-change state:
+   - the story file written for the default `diffTouchesStory: true` case must already contain the added checked task line under `## Tasks / Subtasks`
+   - it must already contain the added completion-note bullet under `## Dev Agent Record -> ### Completion Notes List`
+   - keep the diff artifact showing those same lines as additions
+15. Do not change the no-go fixture path in `createReviewInputRepo({ diffTouchesStory: false })`; that case should continue proving the structured fallback result when the diff does not touch the story file.
+
+## Remediation Step 7
+[x] Re-run the focused tool verification after the extraction fix.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflow-ui-surface/phase-3/tool-action-plan.md`
+
+Exact commands:
+1. `npm run test:unit -- src/core/task/tools/handlers/__tests__/buildReviewInputExtraction.test.ts src/core/task/tools/handlers/__tests__/ManagedWorkflowHandlers.test.ts --exit`
+2. `npx tsc --noEmit`
+
+Completion criteria:
+- Both commands pass.
+- No files outside the Step 6 allowed files are modified, except this action-plan document’s checkbox updates.
+- If either command fails because of a seam outside the Step 6 allowed files, stop and report the failure without making any additional changes unless the failure is caused by an explicit mistake in this remediation section.

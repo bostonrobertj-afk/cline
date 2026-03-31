@@ -20,6 +20,26 @@ Status: review
 - Existing completion note
 `
 
+const successStoryMarkdown = `# Story 3.2: Review Input Artifact
+Status: review
+
+## Acceptance Criteria
+- AC 1
+- AC 2
+
+## Latest Review Findings
+- Fix the remediation issue
+
+## Tasks / Subtasks
+- [x] Added completed task
+- [ ] Existing incomplete task
+
+## Dev Agent Record
+### Completion Notes List
+- Existing completion note
+  - Added completion note
+`
+
 function createDiffArtifact(diffBody: string): string {
 	return `# Review Diff Output
 
@@ -33,7 +53,7 @@ ${diffBody}
 describe("buildReviewInputExtraction", () => {
 	it("builds normalized review-input markdown from a story file and matching story diff", () => {
 		const result = buildReviewInputExtraction({
-			storyMarkdown,
+			storyMarkdown: successStoryMarkdown,
 			storyAbsolutePath: "/repo/docs/story.md",
 			storyRelativePaths: ["docs/story.md"],
 			diffArtifactMarkdown: createDiffArtifact(`diff --git a/docs/story.md b/docs/story.md
@@ -72,6 +92,86 @@ This QA pass is reviewing work performed during a remediation cycle. Only the re
 
 ## Completion Notes
   - Added completion note`,
+		})
+	})
+
+	it("maps added checked tasks and completion notes from the story file even when the diff hunk omits section headings", () => {
+		const result = buildReviewInputExtraction({
+			storyMarkdown: `# Story 3.2: Review Input Artifact
+Status: review
+
+## Acceptance Criteria
+- AC 1
+
+## Latest Review Findings
+- Fix the remediation issue
+
+## Tasks / Subtasks
+- [x] Existing completed task
+- [x] Added completed task
+
+## Dev Agent Record
+### Completion Notes List
+- Existing completion note
+  - Added completion note
+`,
+			storyAbsolutePath: "/repo/docs/story.md",
+			storyRelativePaths: ["docs/story.md"],
+			diffArtifactMarkdown: createDiffArtifact(`diff --git a/docs/story.md b/docs/story.md
+index 1111111..2222222 100644
+--- a/docs/story.md
++++ b/docs/story.md
+@@ -8,4 +8,6 @@
+ - Fix the remediation issue
+ 
++- [x] Added completed task
++  - Added completion note
+  `),
+		})
+
+		expect(result.kind).to.equal("success")
+		if (result.kind === "success") {
+			expect(result.markdown).to.contain("- [x] Added completed task")
+			expect(result.markdown).to.contain("  - Added completion note")
+			expect(result.markdown).to.not.contain("- [x] Existing completed task")
+			expect(result.markdown).to.not.contain("- Existing completion note")
+		}
+	})
+
+	it("returns no_recent_story_changes when added task or completion-note candidates cannot be matched back into the parsed story sections", () => {
+		const result = buildReviewInputExtraction({
+			storyMarkdown: `# Story 3.2: Review Input Artifact
+Status: review
+
+## Acceptance Criteria
+- AC 1
+
+## Latest Review Findings
+- Fix the remediation issue
+
+## Tasks / Subtasks
+- [ ] Existing incomplete task
+
+## Dev Agent Record
+### Completion Notes List
+- Existing completion note
+`,
+			storyAbsolutePath: "/repo/docs/story.md",
+			storyRelativePaths: ["docs/story.md"],
+			diffArtifactMarkdown: createDiffArtifact(`diff --git a/docs/story.md b/docs/story.md
+index 1111111..2222222 100644
+--- a/docs/story.md
++++ b/docs/story.md
+@@ -8,4 +8,6 @@
+ - Fix the remediation issue
+ 
++- [x] Added completed task
++  - Added completion note`),
+		})
+
+		expect(result).to.deep.equal({
+			kind: "no_recent_story_changes",
+			recentStoryChangesDetected: false,
 		})
 	})
 

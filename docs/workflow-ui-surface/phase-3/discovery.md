@@ -66,7 +66,7 @@ collect the story file path
 auto-resolve diff_output
 invoke build_review_input
 surface the exact fallback/error message and return control to the fallback step when needed
-### Deterministic progression silo
+### Deterministic progression silo- done
 update the code-review.md deterministic evaluator for the new step order
 align the pre-form and post-form gates with the reauthored workflow
 update the step/tool-schema matrix for code-review.md
