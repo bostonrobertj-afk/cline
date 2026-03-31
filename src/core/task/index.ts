@@ -1503,6 +1503,8 @@ export class Task {
 			name: outcome.toolName,
 			params: outcome.toolParams as any,
 			partial: false,
+			isNativeToolCall: true,
+			call_id: `workflow_form_${outcome.session.sessionId}`,
 		})
 
 		await this.syncDeterministicProgressionAfterWorkflowFormTool({

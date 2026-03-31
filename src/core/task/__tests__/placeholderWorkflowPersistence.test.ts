@@ -1330,7 +1330,7 @@ Construct and persist review_input.md from the persisted diff output before cont
 		const fakeTask = {
 			taskState,
 			toolExecutor: {
-				executeTool: sinon.stub().callsFake(async () => {
+				executeTool: sinon.stub().callsFake(async (block: { call_id?: string; isNativeToolCall?: boolean }) => {
 					taskState.userMessageContent.push({
 						type: "text",
 						text: JSON.stringify({
@@ -1339,14 +1339,28 @@ Construct and persist review_input.md from the persisted diff output before cont
 							content: "Source: commit abc1234",
 						}),
 					})
+					if (block.isNativeToolCall && block.call_id) {
+						taskState.userMessageContent.push({
+							type: "tool_result",
+							tool_use_id: block.call_id,
+							content: JSON.stringify({
+								persisted: true,
+								diff_available: true,
+								artifact_path: "/tmp/review-input.diff",
+							}),
+						})
+						return
+					}
+
 					taskState.userMessageContent.push({
-						type: "tool_result",
-						tool_use_id: "call_native_123",
-						content: JSON.stringify({
-							persisted: true,
-							diff_available: true,
-							artifact_path: "/tmp/review-input.diff",
-						}),
+						type: "text",
+						text:
+							"[build_review_diff_output commit] Result:\n" +
+							JSON.stringify({
+								persisted: true,
+								diff_available: true,
+								artifact_path: "/tmp/review-input.diff",
+							}),
 					})
 				}),
 			},
@@ -1363,6 +1377,10 @@ Construct and persist review_input.md from the persisted diff output before cont
 			toolParams: { source: JSON.stringify({ type: "commit", commit: "abc1234" }) },
 		})
 
+		expect(fakeTask.toolExecutor.executeTool.firstCall.args[0]).to.include({
+			isNativeToolCall: true,
+			call_id: "workflow_form_wf-session-diff-success",
+		})
 		expect(result.succeeded).to.equal(true)
 	})
 
