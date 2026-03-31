@@ -297,18 +297,42 @@ async function evaluateReviewAdversarialGeneralStep(args: {
 	taskState: TaskState
 	stepNumber: number
 }): Promise<DeterministicStepEvaluationResult> {
+	const placeholders = getMergedPlaceholderValues(args.taskState)
+
 	switch (args.stepNumber) {
 		case 1: {
-			const dynamicPlaceholderValues = args.taskState.activePlaceholderWorkflowValues ?? {}
-			const reviewInput = dynamicPlaceholderValues.review_input?.trim()
-			const diffOutput = dynamicPlaceholderValues.diff_output?.trim()
-			if (!reviewInput && !diffOutput) {
+			const diffOutput = placeholders.diff_output?.trim()
+			if (!diffOutput) {
+				return { completed: false }
+			}
+
+			const resolvedDiffOutputPath = resolveArtifactPlaceholderPath(placeholders, diffOutput)
+			if (!(await fileExistsForPlaceholderWorkflowWriteProof(resolvedDiffOutputPath))) {
 				return { completed: false }
 			}
 
 			return {
 				completed: true,
-				reason: "review_input or diff_output is already available for this review pass.",
+				reason: "diff_output resolves to an existing file path.",
+			}
+		}
+		case 2: {
+			const findingsArtifactPath = resolveOutputFolderFile(placeholders, "adversarial-review-findings.md")
+			if (!findingsArtifactPath) {
+				return { completed: false }
+			}
+
+			const resolvedFindingsArtifactPath = resolveArtifactPlaceholderPath(placeholders, findingsArtifactPath)
+			if (
+				!taskStateHasPlaceholderWorkflowWriteProof(args.taskState, resolvedFindingsArtifactPath) ||
+				!(await fileExistsForPlaceholderWorkflowWriteProof(resolvedFindingsArtifactPath))
+			) {
+				return { completed: false }
+			}
+
+			return {
+				completed: true,
+				reason: "adversarial-review-findings.md was written during this task and the artifact still exists.",
 			}
 		}
 		default:

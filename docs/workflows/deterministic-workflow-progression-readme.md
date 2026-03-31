@@ -97,7 +97,8 @@ Current evaluator examples:
   - Step 4 derives `review_mode` from available artifacts
   - later steps inspect fallback prompt artifacts or spec-file status values
 - `review-adversarial-general.md`
-  - Step 1 completes when `review_input` or `diff_output` is already present
+  - Step 1 completes when `diff_output` resolves to an existing file path
+  - Step 2 completes when `adversarial-review-findings.md` was written during the current task and still exists
 - `dev-story.md`
   - steps inspect story-file existence, checklist completion, and top-level status values
 
@@ -138,7 +139,8 @@ This is especially important for steps whose completion is defined by:
 ## Examples
 - In `code-review.md`, if `review_input` was written during this task and the artifact still exists, Step 2 can complete without asking the model to re-confirm it.
 - In `code-review.md`, if both `review_input` and `diff_output` exist as current-task artifacts, Step 4 derives `review_mode = full` automatically.
-- In `review-adversarial-general.md`, if a workflow-start form already stored `review_input` or `diff_output`, Step 1 can complete immediately on the next deterministic pass.
+- In `review-adversarial-general.md`, if `diff_output` resolves to an existing file, Step 1 can complete immediately on the next deterministic pass.
+- In `review-adversarial-general.md`, if Step 2 writes `{output_folder}/adversarial-review-findings.md` during the current task and the artifact still exists, Step 2 can auto-complete.
 - In `dev-story.md`, if the story file’s `## Tasks / Subtasks` section has no unchecked items, the task-execution step can auto-complete.
 
 ## (Optional) Performance
