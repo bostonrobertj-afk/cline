@@ -176,11 +176,14 @@ function takeLinesMatchingMultiset(linesInStoryOrder: string[], allowedCounts: M
 
 function extractRecentStoryLines(args: {
 	storyDiffBlock: string
+	priorReviewFindingsSection: SectionRange | undefined
 	tasksSection: SectionRange | undefined
 	completionNotesListSection: SectionRange | undefined
 }): {
+	priorReviewFindings: string[]
 	completedTasks: string[]
 	completionNotes: string[]
+	unmatchedPriorReviewFindingCount: number
 	unmatchedCompletedTaskCount: number
 	unmatchedCompletionNoteCount: number
 } {
@@ -190,21 +193,33 @@ function extractRecentStoryLines(args: {
 		.filter((line) => line.startsWith("+") && !line.startsWith("+++"))
 		.map((line) => line.slice(1))
 	const addedCompletedTaskCandidates = addedLines.filter((line) => checkedTaskPattern.test(line))
+	const storyPriorReviewFindingLines =
+		args.priorReviewFindingsSection?.lines.slice(1).filter((line) => bulletPattern.test(line)) ?? []
 	const storyCompletedTaskLines = args.tasksSection?.lines.slice(1).filter((line) => checkedTaskPattern.test(line)) ?? []
 	const storyCompletionNoteLines =
 		args.completionNotesListSection?.lines.slice(1).filter((line) => bulletPattern.test(line)) ?? []
+	const storyPriorReviewFindingLineSet = new Set(storyPriorReviewFindingLines)
+	const addedPriorReviewFindingCandidates = addedLines.filter((line) => storyPriorReviewFindingLineSet.has(line))
 	const storyCompletionNoteLineSet = new Set(storyCompletionNoteLines)
 	const addedCompletionNoteCandidates = addedLines.filter((line) => storyCompletionNoteLineSet.has(line))
+	const priorReviewFindingMultiset = buildMultiset(addedPriorReviewFindingCandidates)
 	const completedTaskMultiset = buildMultiset(addedCompletedTaskCandidates)
 	const completionNoteMultiset = buildMultiset(addedCompletionNoteCandidates)
+	const priorReviewFindings = takeLinesMatchingMultiset(storyPriorReviewFindingLines, priorReviewFindingMultiset)
 	const completedTasks = takeLinesMatchingMultiset(storyCompletedTaskLines, completedTaskMultiset)
 	const completionNotes = takeLinesMatchingMultiset(storyCompletionNoteLines, completionNoteMultiset)
+	const unmatchedPriorReviewFindingCount = Array.from(priorReviewFindingMultiset.values()).reduce(
+		(sum, count) => sum + count,
+		0,
+	)
 	const unmatchedCompletedTaskCount = Array.from(completedTaskMultiset.values()).reduce((sum, count) => sum + count, 0)
 	const unmatchedCompletionNoteCount = Array.from(completionNoteMultiset.values()).reduce((sum, count) => sum + count, 0)
 
 	return {
+		priorReviewFindings,
 		completedTasks,
 		completionNotes,
+		unmatchedPriorReviewFindingCount,
 		unmatchedCompletedTaskCount,
 		unmatchedCompletionNoteCount,
 	}
@@ -219,7 +234,7 @@ export function buildReviewInputExtraction(args: BuildReviewInputExtractionArgs)
 		throw new Error(MALFORMED_STORY_ERROR)
 	}
 
-	const latestReviewFindingsSection = findTopLevelSection(storyLines, "## Latest Review Findings")
+	const priorReviewFindingsSection = findTopLevelSection(storyLines, "## Prior Review Findings")
 	const tasksSection = findTopLevelSection(storyLines, "## Tasks / Subtasks")
 	const devAgentRecordSection = findTopLevelSection(storyLines, "## Dev Agent Record")
 	const completionNotesListSection = findNestedSectionWithin(devAgentRecordSection, "### Completion Notes List")
@@ -233,23 +248,32 @@ export function buildReviewInputExtraction(args: BuildReviewInputExtractionArgs)
 		return { kind: "no_recent_story_changes", recentStoryChangesDetected: false }
 	}
 
-	const { completedTasks, completionNotes, unmatchedCompletedTaskCount, unmatchedCompletionNoteCount } =
-		extractRecentStoryLines({
-			storyDiffBlock,
-			tasksSection,
-			completionNotesListSection,
-		})
+	const {
+		priorReviewFindings,
+		completedTasks,
+		completionNotes,
+		unmatchedPriorReviewFindingCount,
+		unmatchedCompletedTaskCount,
+		unmatchedCompletionNoteCount,
+	} = extractRecentStoryLines({
+		storyDiffBlock,
+		priorReviewFindingsSection,
+		tasksSection,
+		completionNotesListSection,
+	})
 	if (unmatchedCompletedTaskCount > 0) {
+		return { kind: "no_recent_story_changes", recentStoryChangesDetected: false }
+	}
+	if (priorReviewFindingsSection && unmatchedPriorReviewFindingCount > 0) {
 		return { kind: "no_recent_story_changes", recentStoryChangesDetected: false }
 	}
 	if (completionNotesListSection && unmatchedCompletionNoteCount > 0) {
 		return { kind: "no_recent_story_changes", recentStoryChangesDetected: false }
 	}
-	const latestReviewFindingsHasContent = hasNonWhitespaceBody(latestReviewFindingsSection)
 
 	const sections = [
 		getSectionText(acceptanceCriteriaSection),
-		...(latestReviewFindingsHasContent && latestReviewFindingsSection ? [getSectionText(latestReviewFindingsSection)] : []),
+		...(priorReviewFindings.length > 0 ? [["## Prior Review Findings", priorReviewFindings.join("\n")].join("\n")] : []),
 		[
 			tasksSection?.lines[0] ?? "## Tasks / Subtasks",
 			completedTasks.length > 0 ? completedTasks.join("\n") : NO_RECENT_COMPLETED_TASKS,
@@ -264,7 +288,7 @@ export function buildReviewInputExtraction(args: BuildReviewInputExtractionArgs)
 			: []),
 	]
 
-	const headerLines = [storyTitleLine, statusLine, ...(latestReviewFindingsHasContent ? [REMEDIATION_CYCLE_NOTE] : [])]
+	const headerLines = [storyTitleLine, statusLine, ...(priorReviewFindings.length > 0 ? [REMEDIATION_CYCLE_NOTE] : [])]
 
 	return {
 		kind: "success",

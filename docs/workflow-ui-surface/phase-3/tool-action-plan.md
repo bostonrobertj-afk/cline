@@ -426,3 +426,77 @@ Completion criteria:
 - Both commands pass.
 - No files outside the Step 6 allowed files are modified, except this action-plan document’s checkbox updates.
 - If either command fails because of a seam outside the Step 6 allowed files, stop and report the failure without making any additional changes unless the failure is caused by an explicit mistake in this remediation section.
+
+## Remediation Step 8
+[x] Update the Phase 3 extraction contract and `buildReviewInputExtraction(...)` so the tool diff-filters `## Prior Review Findings` instead of full-copying `## Latest Review Findings`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflow-ui-surface/phase-3/discovery.md`
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflow-ui-surface/phase-3/requirements.md`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/buildReviewInputExtraction.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/buildReviewInputExtraction.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/ManagedWorkflowHandlers.test.ts`
+
+Exact edits:
+1. In [discovery.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/workflow-ui-surface/phase-3/discovery.md#L9-L31), replace the `# Latest Review Findings` subsection with `# Prior Review Findings` and update its bullets to say:
+   - the tool extracts only the newly added bullet content in `## Prior Review Findings`
+   - added content is identified through `review-input.diff`
+   - if any content is extracted from this section, the remediation-cycle note is added below `Status:`
+2. In the same file at [discovery.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/workflow-ui-surface/phase-3/discovery.md#L28-L40), update the expected output shape example so it shows `# Prior Review Findings:` instead of `# Latest Review Findings:`.
+3. In [requirements.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/workflow-ui-surface/phase-3/requirements.md#L206-L240), replace `### 4. Latest Review Findings` with `### 4. Prior Review Findings` and make these exact requirement changes:
+   - `The tool must extract only the newly added bullet content from ## Prior Review Findings when that section exists.`
+   - `This section must be diff-filtered using diff_output and must not be full-copied into review_input.md.`
+   - in `### 5. Remediation-cycle note`, replace `## Latest Review Findings` with `## Prior Review Findings`
+   - in `### 8. Output shape`, replace ``## Latest Review Findings`` with ``## Prior Review Findings`` and keep the rest of the output-order bullets unchanged
+4. In [buildReviewInputExtraction.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/handlers/buildReviewInputExtraction.ts#L27-L32), keep the existing malformed-story, no-recent-task, no-recent-completion-note, and remediation-note strings unchanged.
+5. In the same file at [buildReviewInputExtraction.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/handlers/buildReviewInputExtraction.ts#L177-L210), expand `extractRecentStoryLines(...)` so it takes `priorReviewFindingsSection: SectionRange | undefined` and returns:
+   - `priorReviewFindings: string[]`
+   - `unmatchedPriorReviewFindingCount: number`
+   alongside the existing task and completion-note fields
+6. Implement prior-review extraction inside `extractRecentStoryLines(...)` with this exact matching model:
+   - derive `storyPriorReviewFindingLines` from `priorReviewFindingsSection?.lines.slice(1)` using `/^\\s*-\\s+/`, preserving story-file order
+   - derive `addedPriorReviewFindingCandidates` from added diff lines that exactly match entries in `storyPriorReviewFindingLines`, preserving diff order
+   - build a multiset from `addedPriorReviewFindingCandidates`
+   - return `priorReviewFindings = takeLinesMatchingMultiset(storyPriorReviewFindingLines, priorReviewFindingMultiset)`
+   - return `unmatchedPriorReviewFindingCount = sum(priorReviewFindingMultiset.values())` after matching
+7. Still in [buildReviewInputExtraction.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/handlers/buildReviewInputExtraction.ts#L222-L271), replace `latestReviewFindingsSection = findTopLevelSection(..., "## Latest Review Findings")` with `priorReviewFindingsSection = findTopLevelSection(..., "## Prior Review Findings")`, pass that section into `extractRecentStoryLines(...)`, and add this exact fallback rule after the existing unmatched-task check:
+   - if `priorReviewFindingsSection` exists and `unmatchedPriorReviewFindingCount > 0`, return `{ kind: "no_recent_story_changes", recentStoryChangesDetected: false }`
+   - keep the existing unmatched-completion-note fallback rule after that
+8. In the same file’s success assembly:
+   - remove the full-copy `latestReviewFindingsSection` logic entirely
+   - include a `## Prior Review Findings` section only when `priorReviewFindings.length > 0`
+   - render only the matched diff-filtered bullet lines under that heading, preserving story-file order
+   - do not emit a fallback-note string when `priorReviewFindingsSection` exists but no new prior-review bullet was added
+   - keep `## Acceptance Criteria`, `## Tasks / Subtasks`, and `## Completion Notes` ordering unchanged
+   - trigger the remediation-cycle note only when `priorReviewFindings.length > 0`
+9. In [buildReviewInputExtraction.test.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/handlers/__tests__/buildReviewInputExtraction.test.ts#L5-L241), replace every `## Latest Review Findings` fixture heading with `## Prior Review Findings`, then make these exact test updates:
+   - in `"builds normalized review-input markdown from a story file and matching story diff"`, use post-change story markdown that already contains one added prior-review bullet, one added checked task, and one added completion-note bullet; keep the diff showing those same lines as additions; update the expected markdown to include only the added prior-review bullet under `## Prior Review Findings`
+   - in `"maps added checked tasks and completion notes from the story file even when the diff hunk omits section headings"`, also include one preexisting prior-review bullet and one newly added prior-review bullet in the story fixture, include only the newly added prior-review bullet in the diff hunk, and assert the emitted markdown contains the new prior-review bullet but not the preexisting one
+   - rename `"returns no_recent_story_changes when added task or completion-note candidates cannot be matched back into the parsed story sections"` to `"returns no_recent_story_changes when added prior-review, task, or completion-note candidates cannot be matched back into the parsed story sections"` and include one unmatched prior-review bullet candidate in the diff fixture
+   - in `"includes the no recent completed tasks note when the story diff has no added checked checklist lines"`, keep the prior-review section present but unchanged in the diff and assert the output does not include `## Prior Review Findings`
+10. In [ManagedWorkflowHandlers.test.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/handlers/__tests__/ManagedWorkflowHandlers.test.ts#L1804-L1824), update the build-review-input success fixture and assertion so the generated artifact contains `## Prior Review Findings` instead of `## Latest Review Findings`.
+11. In the same file’s `createReviewInputRepo()` helper near the existing story fixture at [ManagedWorkflowHandlers.test.ts:194](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/handlers/__tests__/ManagedWorkflowHandlers.test.ts#L194), replace the fixture section heading with `## Prior Review Findings` and ensure the default success story state plus matching diff artifact include:
+   - one newly added prior-review bullet in `## Prior Review Findings`
+   - one newly added checked task in `## Tasks / Subtasks`
+   - one newly added completion-note bullet in `## Dev Agent Record -> ### Completion Notes List`
+12. Do not change in this remediation step:
+   - malformed-story validation
+   - the structured `no_recent_story_changes` result shape
+   - stable placeholder resolution
+   - output artifact filename conventions
+   - workflow-form or deterministic-progression files
+
+## Remediation Step 9
+[x] Re-run the focused Phase 3 tool verification after the prior-review extraction update.
+
+Allowed files:
+- none
+
+Exact commands:
+1. `npm run test:unit -- src/core/task/tools/handlers/__tests__/buildReviewInputExtraction.test.ts src/core/task/tools/handlers/__tests__/ManagedWorkflowHandlers.test.ts --exit`
+2. `npx tsc --noEmit`
+
+Completion criteria:
+- Both commands pass.
+- No files outside the Remediation Step 8 allowed files are modified, except this action-plan document’s checkbox updates.
+- If either command fails because of a seam outside the Remediation Step 8 allowed files, stop and report the failure without making any additional changes unless the failure is caused by an explicit mistake in this remediation section.

@@ -191,8 +191,9 @@ Status: review
 - AC 1
 - AC 2
 
-## Latest Review Findings
+## Prior Review Findings
 - Investigate prior QA feedback
+- Added prior review finding
 
 ## Tasks / Subtasks
 - [x] Added completed task
@@ -228,8 +229,9 @@ index 1111111..2222222 100644
 --- a/${storyRelativePath}
 +++ b/${storyRelativePath}
 @@ -6,8 +6,10 @@ Status: review
- ## Latest Review Findings
+ ## Prior Review Findings
  - Investigate prior QA feedback
++- Added prior review finding
  
  ## Tasks / Subtasks
 +- [x] Added completed task
@@ -1819,7 +1821,7 @@ Inspect the prepared review input and write findings.`,
 			expect(artifact).to.contain("# Story 3.2: Review Input Artifact")
 			expect(artifact).to.contain("Status: review")
 			expect(artifact).to.contain("## Acceptance Criteria")
-			expect(artifact).to.contain("## Latest Review Findings")
+			expect(artifact).to.contain("## Prior Review Findings")
 			expect(artifact).to.contain("## Tasks / Subtasks")
 			expect(artifact).to.contain("## Completion Notes")
 		} finally {

@@ -9,7 +9,7 @@ Status: review
 - AC 1
 - AC 2
 
-## Latest Review Findings
+## Prior Review Findings
 - Fix the remediation issue
 
 ## Tasks / Subtasks
@@ -27,8 +27,9 @@ Status: review
 - AC 1
 - AC 2
 
-## Latest Review Findings
+## Prior Review Findings
 - Fix the remediation issue
+- Added prior review finding
 
 ## Tasks / Subtasks
 - [x] Added completed task
@@ -61,8 +62,9 @@ index 1111111..2222222 100644
 --- a/docs/story.md
 +++ b/docs/story.md
 @@ -6,8 +6,10 @@ Status: review
- ## Latest Review Findings
+ ## Prior Review Findings
  - Fix the remediation issue
++- Added prior review finding
  
  ## Tasks / Subtasks
 +- [x] Added completed task
@@ -84,8 +86,8 @@ This QA pass is reviewing work performed during a remediation cycle. Only the re
 - AC 1
 - AC 2
 
-## Latest Review Findings
-- Fix the remediation issue
+## Prior Review Findings
+- Added prior review finding
 
 ## Tasks / Subtasks
 - [x] Added completed task
@@ -103,8 +105,9 @@ Status: review
 ## Acceptance Criteria
 - AC 1
 
-## Latest Review Findings
-- Fix the remediation issue
+## Prior Review Findings
+- Existing prior review finding
+- Added prior review finding
 
 ## Tasks / Subtasks
 - [x] Existing completed task
@@ -122,7 +125,7 @@ index 1111111..2222222 100644
 --- a/docs/story.md
 +++ b/docs/story.md
 @@ -8,4 +8,6 @@
- - Fix the remediation issue
++- Added prior review finding
  
 +- [x] Added completed task
 +  - Added completion note
@@ -131,14 +134,16 @@ index 1111111..2222222 100644
 
 		expect(result.kind).to.equal("success")
 		if (result.kind === "success") {
+			expect(result.markdown).to.contain("- Added prior review finding")
 			expect(result.markdown).to.contain("- [x] Added completed task")
 			expect(result.markdown).to.contain("  - Added completion note")
+			expect(result.markdown).to.not.contain("- Existing prior review finding")
 			expect(result.markdown).to.not.contain("- [x] Existing completed task")
 			expect(result.markdown).to.not.contain("- Existing completion note")
 		}
 	})
 
-	it("returns no_recent_story_changes when added task or completion-note candidates cannot be matched back into the parsed story sections", () => {
+	it("returns no_recent_story_changes when added prior-review, task, or completion-note candidates cannot be matched back into the parsed story sections", () => {
 		const result = buildReviewInputExtraction({
 			storyMarkdown: `# Story 3.2: Review Input Artifact
 Status: review
@@ -146,7 +151,7 @@ Status: review
 ## Acceptance Criteria
 - AC 1
 
-## Latest Review Findings
+## Prior Review Findings
 - Fix the remediation issue
 
 ## Tasks / Subtasks
@@ -163,7 +168,7 @@ index 1111111..2222222 100644
 --- a/docs/story.md
 +++ b/docs/story.md
 @@ -8,4 +8,6 @@
- - Fix the remediation issue
++- Added prior review finding
  
 +- [x] Added completed task
 +  - Added completion note`),
@@ -205,7 +210,7 @@ index 1111111..2222222 100644
 --- a/docs/story.md
 +++ b/docs/story.md
 @@ -6,8 +6,10 @@ Status: review
- ## Latest Review Findings
+ ## Prior Review Findings
  - Fix the remediation issue
  
  ## Tasks / Subtasks
@@ -218,6 +223,7 @@ index 1111111..2222222 100644
 
 		expect(result.kind).to.equal("success")
 		if (result.kind === "success") {
+			expect(result.markdown).to.not.contain("## Prior Review Findings")
 			expect(result.markdown).to.include("No recent completed tasks were identified from the story-file diff.")
 		}
 	})

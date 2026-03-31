@@ -203,15 +203,15 @@ The tool must extract the full `## Acceptance Criteria` section.
 
 This section must not be diff-filtered.
 
-### 4. Latest Review Findings
+### 4. Prior Review Findings
 
-The tool must extract the full `## Latest Review Findings` section when it exists.
+The tool must extract only the newly added bullet content from `## Prior Review Findings` when that section exists.
 
-This section must not be diff-filtered.
+This section must be diff-filtered using `diff_output` and must not be full-copied into `review_input.md`.
 
 ### 5. Remediation-cycle note
 
-If any content is extracted from `## Latest Review Findings`, the tool must add this note directly below the status line:
+If any content is extracted from `## Prior Review Findings`, the tool must add this note directly below the status line:
 
 `This QA pass is reviewing work performed during a remediation cycle. Only the remediation tasks and subtasks are shown here. These tasks and subtasks may or may not satisfy all provided acceptance criteria. Do not treat failure to fully satisfy all acceptance criteria as a defect.`
 
@@ -235,7 +235,7 @@ The generated `review_input.md` must support this normalized top-level shape:
 - status line
 - remediation-cycle note when applicable
 - `## Acceptance Criteria`
-- `## Latest Review Findings` when present
+- `## Prior Review Findings` when present
 - `## Tasks / Subtasks`
 - `## Completion Notes` when deterministically derivable
 

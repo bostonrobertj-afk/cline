@@ -8,9 +8,10 @@
 - tool extracts the status line from the story file
 # Acceptance Criteria
 - Extracts all
-# Latest Review Findings
-- tool extracts all content in this section
-- If any content is extracted from this section, the tool must add a note below "status" that says:
+# Prior Review Findings
+- the tool extracts only the newly added bullet content in `## Prior Review Findings`
+- added content is identified through `review-input.diff`
+- if any content is extracted from this section, the tool must add a note below "status" that says:
     - This QA pass is reviewing work performed during a remediation cycle. Only the remediation tasks and subtasks are shown here. These tasks and subtasks may or may not satisfy all provided acceptance criteria. Do not treat failure to fully satisfy all acceptance criteria as a defect.
 # Tasks / Subtasks
 - User has to provide a story file path
@@ -33,7 +34,7 @@ status:
 
 # Acceptance Criteria:
 
-# Latest Review Findings:
+# Prior Review Findings:
 
 # Tasks / Subtasks:
 
