@@ -1477,10 +1477,9 @@ export class Task {
 	private getWorkflowFormToolResultText(previousUserMessageContentLength: number): string | undefined {
 		const appendedContent = this.taskState.userMessageContent.slice(previousUserMessageContentLength)
 		const appendedToolResult = appendedContent.find(
-			(item): item is { type: "tool_result"; content: string } =>
-				item.type === "tool_result" && typeof item.content === "string" && item.content.trim().length > 0,
+			(item) => item.type === "tool_result" && typeof item.content === "string" && item.content.trim().length > 0,
 		)
-		if (appendedToolResult) {
+		if (appendedToolResult?.type === "tool_result" && typeof appendedToolResult.content === "string") {
 			return appendedToolResult.content
 		}
 

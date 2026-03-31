@@ -982,7 +982,6 @@ Choose the review mode from the persisted diff output before continuing.
 					taskState.userMessageContent.push({
 						type: "tool_result",
 						tool_use_id: "call_native_123",
-						call_id: "call_native_123",
 						content: JSON.stringify({
 							persisted: true,
 							diff_available: true,
