@@ -89,6 +89,8 @@ This QA pass is reviewing work performed during a remediation cycle. Only the re
 ## Prior Review Findings
 - Added prior review finding
 
+## Latest Review Findings
+
 ## Tasks / Subtasks
 - [x] Added completed task
 
@@ -135,6 +137,7 @@ index 1111111..2222222 100644
 		expect(result.kind).to.equal("success")
 		if (result.kind === "success") {
 			expect(result.markdown).to.contain("- Added prior review finding")
+			expect(result.markdown).to.contain("## Latest Review Findings")
 			expect(result.markdown).to.contain("- [x] Added completed task")
 			expect(result.markdown).to.contain("  - Added completion note")
 			expect(result.markdown).to.not.contain("- Existing prior review finding")
@@ -223,6 +226,7 @@ index 1111111..2222222 100644
 
 		expect(result.kind).to.equal("success")
 		if (result.kind === "success") {
+			expect(result.markdown).to.contain("## Latest Review Findings")
 			expect(result.markdown).to.not.contain("## Prior Review Findings")
 			expect(result.markdown).to.include("No recent completed tasks were identified from the story-file diff.")
 		}

@@ -215,6 +215,12 @@ If any content is extracted from `## Prior Review Findings`, the tool must add t
 
 `This QA pass is reviewing work performed during a remediation cycle. Only the remediation tasks and subtasks are shown here. These tasks and subtasks may or may not satisfy all provided acceptance criteria. Do not treat failure to fully satisfy all acceptance criteria as a defect.`
 
+### 5a. Latest Review Findings Output Surface
+
+The generated review_input.md must always include an empty `## Latest Review Findings` section as the writable surface for the current review cycle.
+
+The tool must not copy existing `## Latest Review Findings` content from the source story into `review_input.md`.
+
 ### 6. Tasks / Subtasks
 
 The tool must extract only the tasks and subtasks corresponding to recent story-file changes identified through `diff_output`.
@@ -236,6 +242,7 @@ The generated `review_input.md` must support this normalized top-level shape:
 - remediation-cycle note when applicable
 - `## Acceptance Criteria`
 - `## Prior Review Findings` when present
+- `## Latest Review Findings`
 - `## Tasks / Subtasks`
 - `## Completion Notes` when deterministically derivable
 

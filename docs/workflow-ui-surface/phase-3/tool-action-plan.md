@@ -500,3 +500,64 @@ Completion criteria:
 - Both commands pass.
 - No files outside the Remediation Step 8 allowed files are modified, except this action-plan document’s checkbox updates.
 - If either command fails because of a seam outside the Remediation Step 8 allowed files, stop and report the failure without making any additional changes unless the failure is caused by an explicit mistake in this remediation section.
+
+## Remediation Step 10
+[x] Update the Phase 3 contract and `buildReviewInputExtraction(...)` so `review_input.md` always includes an empty `## Latest Review Findings` section as the writable surface for the current review cycle.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflow-ui-surface/phase-3/discovery.md`
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflow-ui-surface/phase-3/requirements.md`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/buildReviewInputExtraction.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/buildReviewInputExtraction.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/ManagedWorkflowHandlers.test.ts`
+
+Exact edits:
+1. In [discovery.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/workflow-ui-surface/phase-3/discovery.md#L9-L40), keep the existing `# Prior Review Findings` subsection unchanged, then add one new subsection immediately after it:
+   - heading: `# Latest Review Findings`
+   - bullets:
+     - `the tool writes an empty \`## Latest Review Findings\` section into \`review-input.md\` as the writable surface for the current review cycle`
+     - `the tool does not copy existing \`## Latest Review Findings\` content from the story file into \`review-input.md\``
+2. In the same file’s expected output shape example at [discovery.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/workflow-ui-surface/phase-3/discovery.md#L30-L40), insert `# Latest Review Findings:` immediately after `# Prior Review Findings:`.
+3. In [requirements.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/workflow-ui-surface/phase-3/requirements.md#L206-L240), keep `### 4. Prior Review Findings` and `### 5. Remediation-cycle note` unchanged, then insert a new subsection immediately after `### 5. Remediation-cycle note`:
+   - heading: `### 5a. Latest Review Findings Output Surface`
+   - exact requirement text:
+     - `The generated review_input.md must always include an empty \`## Latest Review Findings\` section as the writable surface for the current review cycle.`
+     - `The tool must not copy existing \`## Latest Review Findings\` content from the source story into \`review_input.md\`.`
+4. In the same file’s `### 8. Output shape` bullet list, insert ``## Latest Review Findings`` immediately after ``## Prior Review Findings`` and before ``## Tasks / Subtasks``.
+5. In [buildReviewInputExtraction.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/handlers/buildReviewInputExtraction.ts#L250-L282), keep all prior-review, task, completion-note, and fallback behavior unchanged, but change the success-section assembly so the output order becomes exactly:
+   - full `## Acceptance Criteria`
+   - diff-filtered `## Prior Review Findings` only when `priorReviewFindings.length > 0`
+   - empty `## Latest Review Findings`
+   - `## Tasks / Subtasks`
+   - `## Completion Notes` when applicable
+6. Implement the empty writable section in the same file by inserting exactly the string `"## Latest Review Findings"` into the `sections` array between the optional prior-review section and the tasks section.
+7. Do not add fallback-note text under `## Latest Review Findings`; the section must remain empty.
+8. Do not reintroduce any full-copy logic for source-story `## Latest Review Findings`.
+9. In [buildReviewInputExtraction.test.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/handlers/__tests__/buildReviewInputExtraction.test.ts):
+   - update the expected markdown in `"builds normalized review-input markdown from a story file and matching story diff"` so it now contains an empty `## Latest Review Findings` section between `## Prior Review Findings` and `## Tasks / Subtasks`
+   - in `"maps added checked tasks and completion notes from the story file even when the diff hunk omits section headings"`, assert the output contains `## Latest Review Findings`
+   - in `"includes the no recent completed tasks note when the story diff has no added checked checklist lines"`, also assert the output contains `## Latest Review Findings`
+10. In [ManagedWorkflowHandlers.test.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/handlers/__tests__/ManagedWorkflowHandlers.test.ts#L1818-L1824), add an assertion that the generated artifact contains `## Latest Review Findings`, while keeping the existing `## Prior Review Findings`, `## Tasks / Subtasks`, and `## Completion Notes` assertions unchanged.
+11. Do not change in this remediation step:
+   - prior-review diff filtering
+   - remediation-note trigger behavior
+   - tasks/completion-note extraction
+   - malformed-story validation
+   - `no_recent_story_changes` behavior
+   - stable placeholder resolution
+   - workflow-form or deterministic-progression files
+
+## Remediation Step 11
+[x] Re-run the focused Phase 3 tool verification after adding the empty latest-review output surface.
+
+Allowed files:
+- none
+
+Exact commands:
+1. `npm run test:unit -- src/core/task/tools/handlers/__tests__/buildReviewInputExtraction.test.ts src/core/task/tools/handlers/__tests__/ManagedWorkflowHandlers.test.ts --exit`
+2. `npx tsc --noEmit`
+
+Completion criteria:
+- Both commands pass.
+- No files outside the Remediation Step 10 allowed files are modified, except this action-plan document’s checkbox updates.
+- If either command fails because of a seam outside the Remediation Step 10 allowed files, stop and report the failure without making any additional changes unless the failure is caused by an explicit mistake in this remediation section.

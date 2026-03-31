@@ -1822,6 +1822,7 @@ Inspect the prepared review input and write findings.`,
 			expect(artifact).to.contain("Status: review")
 			expect(artifact).to.contain("## Acceptance Criteria")
 			expect(artifact).to.contain("## Prior Review Findings")
+			expect(artifact).to.contain("## Latest Review Findings")
 			expect(artifact).to.contain("## Tasks / Subtasks")
 			expect(artifact).to.contain("## Completion Notes")
 		} finally {

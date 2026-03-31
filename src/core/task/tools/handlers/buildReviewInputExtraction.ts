@@ -274,6 +274,7 @@ export function buildReviewInputExtraction(args: BuildReviewInputExtractionArgs)
 	const sections = [
 		getSectionText(acceptanceCriteriaSection),
 		...(priorReviewFindings.length > 0 ? [["## Prior Review Findings", priorReviewFindings.join("\n")].join("\n")] : []),
+		"## Latest Review Findings",
 		[
 			tasksSection?.lines[0] ?? "## Tasks / Subtasks",
 			completedTasks.length > 0 ? completedTasks.join("\n") : NO_RECENT_COMPLETED_TASKS,

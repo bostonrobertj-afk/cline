@@ -13,6 +13,9 @@
 - added content is identified through `review-input.diff`
 - if any content is extracted from this section, the tool must add a note below "status" that says:
     - This QA pass is reviewing work performed during a remediation cycle. Only the remediation tasks and subtasks are shown here. These tasks and subtasks may or may not satisfy all provided acceptance criteria. Do not treat failure to fully satisfy all acceptance criteria as a defect.
+# Latest Review Findings
+- the tool writes an empty `## Latest Review Findings` section into `review-input.md` as the writable surface for the current review cycle
+- the tool does not copy existing `## Latest Review Findings` content from the story file into `review-input.md`
 # Tasks / Subtasks
 - User has to provide a story file path
 - tool requires that the diff output file already be available to identify tasks completed in the last dev cycle
@@ -35,6 +38,8 @@ status:
 # Acceptance Criteria:
 
 # Prior Review Findings:
+
+# Latest Review Findings:
 
 # Tasks / Subtasks:
 
