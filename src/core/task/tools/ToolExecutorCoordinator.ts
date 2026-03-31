@@ -9,6 +9,7 @@ import { AskFollowupQuestionToolHandler } from "./handlers/AskFollowupQuestionTo
 import { AttemptCompletionHandler } from "./handlers/AttemptCompletionHandler"
 import { BrowserToolHandler } from "./handlers/BrowserToolHandler"
 import { BuildReviewDiffOutputToolHandler } from "./handlers/BuildReviewDiffOutputToolHandler"
+import { BuildReviewInputToolHandler } from "./handlers/BuildReviewInputToolHandler"
 import { CompleteWorkflowItemToolHandler } from "./handlers/CompleteWorkflowItemToolHandler"
 import { CondenseHandler } from "./handlers/CondenseHandler"
 import { ExecuteCommandToolHandler } from "./handlers/ExecuteCommandToolHandler"
@@ -115,6 +116,7 @@ export class ToolExecutorCoordinator {
 		[ClineDefaultTool.USE_SKILL]: (_v: ToolValidator) => new UseSkillToolHandler(),
 		[ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS]: (_v: ToolValidator) => new SetWorkflowPlaceholdersToolHandler(),
 		[ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT]: (_v: ToolValidator) => new BuildReviewDiffOutputToolHandler(),
+		[ClineDefaultTool.BUILD_REVIEW_INPUT]: (_v: ToolValidator) => new BuildReviewInputToolHandler(),
 		[ClineDefaultTool.USE_SUBAGENTS]: (_v: ToolValidator) => new UseSubagentsToolHandler(),
 	}
 

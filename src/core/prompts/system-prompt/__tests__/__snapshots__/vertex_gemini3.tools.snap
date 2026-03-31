@@ -380,6 +380,22 @@
     }
   },
   {
+    "name": "build_review_input",
+    "description": "Build and replace the stable review-input artifact at {review_input} from a story file plus the workflow-owned diff artifact at {diff_output}. The human must only provide story_path.",
+    "parameters": {
+      "type": "OBJECT",
+      "properties": {
+        "story_path": {
+          "type": "STRING",
+          "description": "Required path to the story markdown file that is being reviewed."
+        }
+      },
+      "required": [
+        "story_path"
+      ]
+    }
+  },
+  {
     "name": "use_subagents",
     "description": "Run up to five focused in-process subagents in parallel. Each subagent gets its own prompt and returns a comprehensive research result with tool and token stats. Use this for broad exploration when reading many files would consume the main agent's context window. You do not need to launch multiple subagents every time; using one subagent is valid when it avoids unnecessary context usage for light discovery work.",
     "parameters": {

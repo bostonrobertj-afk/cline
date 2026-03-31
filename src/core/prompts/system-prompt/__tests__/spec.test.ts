@@ -19,6 +19,7 @@ import { act_mode_respond_variants } from "../tools/act_mode_respond"
 import { ask_followup_question_variants } from "../tools/ask_followup_question"
 import { attempt_completion_variants } from "../tools/attempt_completion"
 import { build_review_diff_output_variants } from "../tools/build_review_diff_output"
+import { build_review_input_variants } from "../tools/build_review_input"
 import { generate_plan_output_variants } from "../tools/generate_plan_output"
 import { list_code_definition_names_variants } from "../tools/list_code_definition_names"
 import { read_file_variants } from "../tools/read_file"
@@ -291,6 +292,11 @@ describe("workflow placeholder tool gating", () => {
 
 	it("keeps build_review_diff_output globally available without workflow gating", () => {
 		const tool = build_review_diff_output_variants[0]
+		expect(tool.contextRequirements).to.equal(undefined)
+	})
+
+	it("keeps build_review_input globally available without workflow gating", () => {
+		const tool = build_review_input_variants[0]
 		expect(tool.contextRequirements).to.equal(undefined)
 	})
 
@@ -658,6 +664,29 @@ describe("native tool placeholder replacement", () => {
 		expect(openAI.function.parameters.properties.context_lines.description).to.equal(
 			"Optional unified diff context line count. Defaults to 3.",
 		)
+	})
+
+	it("compacts native build_review_input descriptions and parameter text", () => {
+		const context: SystemPromptContext = {
+			...mockContext,
+			enableNativeToolCalls: true,
+			useMinimalGptPrompt: true,
+			providerInfo: {
+				providerId: "openai",
+				model: { id: "gpt-5.4-2026-03-05", info: { supportsPromptCache: false } },
+				mode: "act",
+			},
+		}
+
+		const openAI = toolSpecFunctionDefinition(build_review_input_variants[0], context) as any
+
+		expect(openAI.function.description).to.equal(
+			"Build review-input.md from a story file and the stable {diff_output} artifact. The only human-supplied parameter is story_path.",
+		)
+		expect(openAI.function.parameters.properties.story_path.description).to.equal(
+			"Path to the story markdown file that is being reviewed.",
+		)
+		expect(Object.keys(openAI.function.parameters.properties)).to.deep.equal(["story_path"])
 	})
 
 	it("preserves integer types for read_file_range line parameters", () => {

@@ -18,6 +18,7 @@ import { RESPONSE_TOOL_SUCCESS_MESSAGE } from "../../response/types"
 import type { TaskConfig } from "../../types/TaskConfig"
 import { AttemptCompletionHandler } from "../AttemptCompletionHandler"
 import { BuildReviewDiffOutputToolHandler } from "../BuildReviewDiffOutputToolHandler"
+import { BuildReviewInputToolHandler } from "../BuildReviewInputToolHandler"
 import { CompleteWorkflowItemToolHandler } from "../CompleteWorkflowItemToolHandler"
 import { SetWorkflowPlaceholdersToolHandler } from "../SetWorkflowPlaceholdersToolHandler"
 import { UseSkillToolHandler } from "../UseSkillToolHandler"
@@ -150,6 +151,108 @@ async function createReviewDiffRepo() {
 		firstCommit,
 		secondCommit,
 		diffOutputPath: path.join(repoDir, "_bmad-output", "review-input.diff"),
+	}
+}
+
+async function createReviewInputRepo(options?: { diffTouchesStory?: boolean }) {
+	const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), "build-review-input-"))
+	const git = simpleGit(repoDir)
+	const workflowConfigPath = getCanonicalWorkflowConfigPath(repoDir)
+	const diffTouchesStory = options?.diffTouchesStory ?? true
+	const storyRelativePath = "docs/story.md"
+	const storyPath = path.join(repoDir, storyRelativePath)
+	const diffOutputPath = path.join(repoDir, "_bmad-output", "review-input.diff")
+	const reviewInputPath = path.join(repoDir, "_bmad-output", "review-input.md")
+
+	await git.init()
+	await git.addConfig("user.name", "Test User")
+	await git.addConfig("user.email", "test@example.com")
+
+	await fs.mkdir(path.dirname(workflowConfigPath), { recursive: true })
+	await fs.writeFile(
+		workflowConfigPath,
+		[
+			"user_name: Rob",
+			"communication_language: English",
+			"document_output_language: English",
+			'output_folder: "{project-root}/_bmad-output"',
+			'diff_output: "{output_folder}/review-input.diff"',
+			"",
+		].join("\n"),
+	)
+
+	await fs.mkdir(path.dirname(storyPath), { recursive: true })
+	await fs.writeFile(
+		storyPath,
+		`# Story 3.2: Review Input Artifact
+Status: review
+
+## Acceptance Criteria
+- AC 1
+- AC 2
+
+## Latest Review Findings
+- Investigate prior QA feedback
+
+## Tasks / Subtasks
+- [ ] Existing incomplete task
+
+## Dev Agent Record
+### Completion Notes List
+- Existing completion note
+`,
+	)
+
+	await fs.mkdir(path.join(repoDir, "src"), { recursive: true })
+	await fs.writeFile(path.join(repoDir, "src", "other.ts"), "export const other = 1\n")
+	await fs.mkdir(path.dirname(diffOutputPath), { recursive: true })
+	await fs.writeFile(
+		diffOutputPath,
+		`# Review Diff Output
+
+## Source
+- Type: commit
+- Commit: \`abc123\`
+- Parent: \`def456\`
+- Commit message: \`test\`
+- Command: \`git show abc123\`
+
+## Diff
+\`\`\`diff
+${
+	diffTouchesStory
+		? `diff --git a/${storyRelativePath} b/${storyRelativePath}
+index 1111111..2222222 100644
+--- a/${storyRelativePath}
++++ b/${storyRelativePath}
+@@ -6,8 +6,10 @@ Status: review
+ ## Latest Review Findings
+ - Investigate prior QA feedback
+ 
+ ## Tasks / Subtasks
++- [x] Added completed task
+ - [ ] Existing incomplete task
+ 
+ ## Dev Agent Record
+ ### Completion Notes List
++  - Added completion note`
+		: `diff --git a/src/other.ts b/src/other.ts
+index 1111111..2222222 100644
+--- a/src/other.ts
++++ b/src/other.ts
+@@ -1 +1 @@
+-export const other = 1
++export const other = 2`
+}
+\`\`\`
+`,
+	)
+
+	return {
+		repoDir,
+		storyPath,
+		diffOutputPath,
+		reviewInputPath,
 	}
 }
 
@@ -1676,6 +1779,126 @@ Inspect the prepared review input and write findings.`,
 					.catch(() => false),
 			).to.equal(true)
 			expect((config.callbacks.ask as sinon.SinonStub).called).to.equal(false)
+		} finally {
+			sandbox.restore()
+			HostProvider.reset()
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("builds and atomically replaces review-input.md from a story file and matching stable diff artifact", async () => {
+		const sandbox = sinon.createSandbox()
+		const { repoDir, storyPath, reviewInputPath } = await createReviewInputRepo()
+
+		try {
+			setVscodeHostProviderMock()
+			sandbox.stub(HostProvider.workspace, "getWorkspacePaths").resolves({ paths: [repoDir] } as any)
+
+			const handler = new BuildReviewInputToolHandler()
+			const config = createConfig({ cwd: repoDir })
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "build_review_input",
+				params: {
+					story_path: storyPath,
+				},
+				partial: false,
+			} as any)
+
+			const payload = JSON.parse(String(result))
+			expect(payload.persisted).to.equal(true)
+			expect(payload.review_input_available).to.equal(true)
+			expect(payload.recent_story_changes_detected).to.equal(true)
+			expect(path.isAbsolute(payload.artifact_path)).to.equal(true)
+			expect(config.taskState.activePlaceholderWorkflowTaskWriteProofPaths).to.include(reviewInputPath)
+
+			const artifact = await fs.readFile(reviewInputPath, "utf8")
+			expect(artifact).to.contain("# Story 3.2: Review Input Artifact")
+			expect(artifact).to.contain("Status: review")
+			expect(artifact).to.contain("## Acceptance Criteria")
+			expect(artifact).to.contain("## Latest Review Findings")
+			expect(artifact).to.contain("## Tasks / Subtasks")
+			expect(artifact).to.contain("## Completion Notes")
+		} finally {
+			sandbox.restore()
+			HostProvider.reset()
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("returns the structured no-go result when diff_output does not identify recent changes to the story file", async () => {
+		const sandbox = sinon.createSandbox()
+		const { repoDir, storyPath, reviewInputPath } = await createReviewInputRepo({ diffTouchesStory: false })
+
+		try {
+			setVscodeHostProviderMock()
+			sandbox.stub(HostProvider.workspace, "getWorkspacePaths").resolves({ paths: [repoDir] } as any)
+
+			const handler = new BuildReviewInputToolHandler()
+			const config = createConfig({ cwd: repoDir })
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "build_review_input",
+				params: {
+					story_path: storyPath,
+				},
+				partial: false,
+			} as any)
+
+			const payload = JSON.parse(String(result))
+			expect(payload.persisted).to.equal(false)
+			expect(payload.review_input_available).to.equal(false)
+			expect(payload.recent_story_changes_detected).to.equal(false)
+			expect(payload.reason).to.equal("diff_output does not identify recent changes to the story file.")
+			expect(
+				await fs
+					.access(reviewInputPath)
+					.then(() => true)
+					.catch(() => false),
+			).to.equal(false)
+			expect(config.taskState.activePlaceholderWorkflowTaskWriteProofPaths).to.deep.equal([])
+		} finally {
+			sandbox.restore()
+			HostProvider.reset()
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("hard-errors when the provided story file lacks deterministic story structure", async () => {
+		const sandbox = sinon.createSandbox()
+		const { repoDir, storyPath } = await createReviewInputRepo()
+
+		try {
+			setVscodeHostProviderMock()
+			sandbox.stub(HostProvider.workspace, "getWorkspacePaths").resolves({ paths: [repoDir] } as any)
+			await fs.writeFile(
+				storyPath,
+				`# Not A Story
+
+## Tasks / Subtasks
+- [x] Missing deterministic structure
+`,
+			)
+
+			const handler = new BuildReviewInputToolHandler()
+			const config = createConfig({ cwd: repoDir })
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "build_review_input",
+				params: {
+					story_path: storyPath,
+				},
+				partial: false,
+			} as any)
+
+			expect(result).to.equal(
+				formatResponse.toolError(
+					"The provided story file does not contain the required story structure for deterministic review-input generation.",
+				),
+			)
 		} finally {
 			sandbox.restore()
 			HostProvider.reset()

@@ -473,6 +473,8 @@ function getNativeToolDescription(tool: ClineToolSpec, context: SystemPromptCont
 			return 'Persist dynamic placeholder values discovered during the active workflow. Call as {"values":{"story_path":"docs/story.md","project_context":"docs/project-context.md"}}. Stable config-backed placeholders like output_folder come from .cline/workflow-config.yaml.'
 		case "build_review_diff_output":
 			return "Build and atomically replace {diff_output} from an explicit Git-backed source. Use for code-review diff artifact construction, not for arbitrary file writes."
+		case "build_review_input":
+			return "Build review-input.md from a story file and the stable {diff_output} artifact. The only human-supplied parameter is story_path."
 		case "use_skill":
 			return "Activate a skill by exact name when the request matches an available skill."
 		case "use_mcp_tool":
@@ -527,6 +529,10 @@ function getNativeToolParameterDescription(
 			case "context_lines":
 				return "Optional unified diff context line count. Defaults to 3."
 		}
+	}
+
+	if (tool.name === "build_review_input" && param.name === "story_path") {
+		return "Path to the story markdown file that is being reviewed."
 	}
 
 	if (tool.name === "apply_patch" && param.name === "input") {

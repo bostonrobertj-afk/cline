@@ -78,6 +78,10 @@ Required params: response
 Description: Build and replace the stable review diff artifact at {diff_output} from an explicit Git-backed source. Use this for code-review workflow Step 3 when the diff source is a supported commit, commit range, ref diff, or HEAD-scoped worktree diff. Do not use set_workflow_placeholders for diff_output; it is stable in .cline/workflow-config.yaml.
 Required params: source
 
+## build_review_input
+Description: Build review-input.md from a story file and the stable {diff_output} artifact. The only human-supplied parameter is story_path.
+Required params: story_path
+
 ## use_subagents
 Description: Run up to five focused in-process subagents in parallel. Each subagent gets its own prompt and returns a comprehensive research result with tool and token stats. Use this for broad exploration when reading many files would consume the main agent's context window. You do not need to launch multiple subagents every time; using one subagent is valid when it avoids unnecessary context usage for light discovery work.
 Required params: prompt_1

@@ -416,6 +416,7 @@ describe("Prompt System Integration Tests", () => {
 						expect(toolNames).to.not.include("focus_chain")
 						expect(JSON.stringify(tools)).to.not.include('"focus_chain"')
 						expect(toolNames).to.include("build_review_diff_output")
+						expect(toolNames).to.include("build_review_input")
 					})
 				})
 
@@ -440,6 +441,7 @@ describe("Prompt System Integration Tests", () => {
 								})
 								expect(toolNames).to.not.include("focus_chain")
 								expect(toolNames).to.include("build_review_diff_output")
+								expect(toolNames).to.include("build_review_input")
 							} else {
 								expect(tools).to.be.undefined
 							}

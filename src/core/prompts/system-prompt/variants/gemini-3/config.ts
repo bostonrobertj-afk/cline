@@ -69,6 +69,7 @@ export const config = createVariant(ModelFamily.GEMINI_3)
 		ClineDefaultTool.COMPLETE_WORKFLOW_ITEM,
 		ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
 		ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT,
+		ClineDefaultTool.BUILD_REVIEW_INPUT,
 		ClineDefaultTool.USE_SUBAGENTS,
 	)
 	.placeholders({

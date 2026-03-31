@@ -261,6 +261,15 @@ Usage:
 <context_lines></context_lines>
 </build_review_diff_output>
 
+## build_review_input
+Description: Build and replace the stable review-input artifact at {review_input} from a story file plus the workflow-owned diff artifact at {diff_output}. The human must only provide story_path.
+Parameters:
+- story_path: (required) Required path to the story markdown file that is being reviewed.
+Usage:
+<build_review_input>
+<story_path></story_path>
+</build_review_input>
+
 ## use_subagents
 Description: Run up to five focused in-process subagents in parallel. Each subagent gets its own prompt and returns a comprehensive research result with tool and token stats. Use this for broad exploration when reading many files would consume the main agent's context window. You do not need to launch multiple subagents every time; using one subagent is valid when it avoids unnecessary context usage for light discovery work.
 Parameters:

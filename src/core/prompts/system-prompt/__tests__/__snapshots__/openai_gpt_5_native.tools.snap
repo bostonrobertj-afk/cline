@@ -390,6 +390,27 @@
   {
     "type": "function",
     "function": {
+      "name": "build_review_input",
+      "description": "Build review-input.md from a story file and the stable {diff_output} artifact. The only human-supplied parameter is story_path.",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "story_path": {
+            "type": "string",
+            "description": "Path to the story markdown file that is being reviewed."
+          }
+        },
+        "required": [
+          "story_path"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
       "name": "use_subagents",
       "description": "Run up to five focused in-process subagents in parallel.",
       "strict": false,

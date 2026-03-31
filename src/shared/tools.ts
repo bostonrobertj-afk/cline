@@ -37,6 +37,7 @@ export enum ClineDefaultTool {
 	COMPLETE_WORKFLOW_ITEM = "complete_workflow_item",
 	SET_WORKFLOW_PLACEHOLDERS = "set_workflow_placeholders",
 	BUILD_REVIEW_DIFF_OUTPUT = "build_review_diff_output",
+	BUILD_REVIEW_INPUT = "build_review_input",
 	USE_SUBAGENTS = "use_subagents",
 }
 
