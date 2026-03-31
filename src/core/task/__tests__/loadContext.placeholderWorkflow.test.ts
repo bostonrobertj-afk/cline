@@ -111,12 +111,12 @@ function createFakeTask(promptRefreshFrequency = 5) {
 ## Step 1: Determine Review Source
 Determine what to review from the user's prompt before asking follow-up questions.
 
-## Step 2: Construct & Persist Review Input Files
+## Step 2: System-Owned Diff Source Resolution And Diff Output Persistence
 `,
 	}
 	taskState.currentFocusChainChecklist = [
 		"- [ ] Step 1: Determine Review Source",
-		"- [ ] Step 2: Construct & Persist Review Input Files",
+		"- [ ] Step 2: System-Owned Diff Source Resolution And Diff Output Persistence",
 	].join("\n")
 
 	const task: LoadContextTaskHarness = {
@@ -270,10 +270,7 @@ describe("Task.loadContext placeholder workflow focus chain prompting", () => {
 ## Step 1: Determine Review Source
 Done.
 
-## Step 2: Construct & Persist Review Input File
-Done.
-
-## Step 3: System-Owned Diff Source Resolution And Diff Output Persistence
+## Step 2: System-Owned Diff Source Resolution And Diff Output Persistence
 Goal: The primary path for this step is runtime-owned workflow-form resolution. The AI instructions below are fallback-only and apply only when the system-owned path was not completed.
 
 You are in the fallback path because the system-owned workflow-form path was not completed.
@@ -282,14 +279,17 @@ Do not ask the human to restate or re-enter a diff source they already declined 
 
 Use \`build_review_diff_output\` whenever a supported source is discovered.
 
+## Step 3: Construct & Persist Review Input File
+Construct and persist review-input.md from the persisted diff output before continuing.
+
 ## Step 4: Set Review Mode
 Choose the review mode from the persisted diff output before continuing.
 `,
 		}
 		fakeTask.taskState.currentFocusChainChecklist = [
 			"- [x] Step 1: Determine Review Source",
-			"- [x] Step 2: Construct & Persist Review Input File",
-			"- [ ] Step 3: System-Owned Diff Source Resolution And Diff Output Persistence",
+			"- [ ] Step 2: System-Owned Diff Source Resolution And Diff Output Persistence",
+			"- [ ] Step 3: Construct & Persist Review Input File",
 			"- [ ] Step 4: Set Review Mode",
 		].join("\n")
 
@@ -301,8 +301,8 @@ Choose the review mode from the persisted diff output before continuing.
 			callOrder.push("maybeResolveWorkflowFormBeforeApiTurn")
 			fakeTask.taskState.currentFocusChainChecklist = [
 				"- [x] Step 1: Determine Review Source",
-				"- [x] Step 2: Construct & Persist Review Input File",
-				"- [x] Step 3: System-Owned Diff Source Resolution And Diff Output Persistence",
+				"- [x] Step 2: System-Owned Diff Source Resolution And Diff Output Persistence",
+				"- [ ] Step 3: Construct & Persist Review Input File",
 				"- [ ] Step 4: Set Review Mode",
 			].join("\n")
 		})
@@ -311,7 +311,12 @@ Choose the review mode from the persisted diff output before continuing.
 		const originalGenerateFocusChainInstructions = focusChainManager.generateFocusChainInstructions.bind(focusChainManager)
 		sinon.stub(focusChainManager, "generateFocusChainInstructions").callsFake(async () => {
 			callOrder.push("generateFocusChainInstructions")
-			expect(fakeTask.taskState.currentFocusChainChecklist).to.contain("- [x] Step 3")
+			expect(fakeTask.taskState.currentFocusChainChecklist).to.contain(
+				"- [x] Step 2: System-Owned Diff Source Resolution And Diff Output Persistence",
+			)
+			expect(fakeTask.taskState.currentFocusChainChecklist).to.contain(
+				"- [ ] Step 3: Construct & Persist Review Input File",
+			)
 			expect(fakeTask.taskState.currentFocusChainChecklist).to.contain("- [ ] Step 4: Set Review Mode")
 			return await originalGenerateFocusChainInstructions()
 		})
@@ -341,6 +346,6 @@ Choose the review mode from the persisted diff output before continuing.
 		expect(promptInjectionText).to.not.contain(
 			"You are in the fallback path because the system-owned workflow-form path was not completed.",
 		)
-		expect(promptInjectionText).to.contain("You are currently on this step: Step 4: Set Review Mode")
+		expect(promptInjectionText).to.contain("You are currently on this step: Step 3: Construct & Persist Review Input File")
 	})
 })

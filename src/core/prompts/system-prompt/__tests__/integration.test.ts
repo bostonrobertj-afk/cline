@@ -679,7 +679,7 @@ describe("Prompt System Integration Tests", () => {
 			expect(systemPrompt).to.not.include("`get_file_summary`")
 		})
 
-		it("omits Indxr-aware MCP guidance when connected Indxr tools are fully filtered out of the native schema", async function () {
+		it("omits Indxr-aware MCP guidance for code-review step 3 when connected Indxr tools are fully filtered out of the native schema", async function () {
 			await runPromptTest(
 				this,
 				{
@@ -962,7 +962,7 @@ describe("Prompt System Integration Tests", () => {
 			}
 		})
 
-		it("filters native tools for code-review step 3", async function () {
+		it("filters native tools for code-review step 2", async function () {
 			await runPromptTest(
 				this,
 				{
@@ -973,8 +973,29 @@ describe("Prompt System Integration Tests", () => {
 					activeWorkflowSupportsPlaceholders: true,
 					managedWorkflowActive: false,
 					activePlaceholderWorkflowName: "code-review.md",
-					activePlaceholderWorkflowStepNumber: 3,
-					mcpHub: makeMcpHub([makeConnectedServer(), makeIndxrServer()]),
+					activePlaceholderWorkflowStepNumber: 2,
+					mcpHub: makeMcpHub([
+						makeConnectedServer(),
+						makeIndxrServer({
+							tools: [
+								{
+									name: "search_relevant",
+									description: "Search relevant code",
+									inputSchema: { type: "object", properties: {} },
+								},
+								{
+									name: "get_file_summary",
+									description: "Summarize file",
+									inputSchema: { type: "object", properties: {} },
+								},
+								{
+									name: "lookup_symbol",
+									description: "Lookup symbol",
+									inputSchema: { type: "object", properties: {} },
+								},
+							],
+						}),
+					]),
 				},
 				"gpt-5.4-2026-03-05",
 				async ({ tools }) => {
@@ -992,13 +1013,67 @@ describe("Prompt System Integration Tests", () => {
 					])
 					expect(nativeToolNames).to.not.include("set_workflow_placeholders")
 					expect(nativeToolNames).to.not.include("generate_plan_output")
-					expect(nativeToolNames.some((name) => name.includes("0mcp0") && name.includes("search_relevant"))).to.equal(
-						false,
-					)
-					expect(nativeToolNames.some((name) => name.includes("0mcp0") && name.includes("get_file_summary"))).to.equal(
-						false,
-					)
-					expect(nativeToolNames.some((name) => name.includes("0mcp0") && name.includes("read_source"))).to.equal(false)
+					expect(nativeToolNames.some((name) => name.includes("search_relevant"))).to.equal(true)
+					expect(nativeToolNames.some((name) => name.includes("get_file_summary"))).to.equal(true)
+					expect(nativeToolNames.some((name) => name.includes("lookup_symbol"))).to.equal(true)
+				},
+			)
+		})
+
+		it("filters native tools for code-review step 3", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
+					enableNativeToolCalls: true,
+					useMinimalGptPrompt: true,
+					activeWorkflowSupportsPlaceholders: true,
+					managedWorkflowActive: false,
+					activePlaceholderWorkflowName: "code-review.md",
+					activePlaceholderWorkflowStepNumber: 3,
+					mcpHub: makeMcpHub([
+						makeConnectedServer(),
+						makeIndxrServer({
+							tools: [
+								{
+									name: "search_relevant",
+									description: "Search relevant code",
+									inputSchema: { type: "object", properties: {} },
+								},
+								{
+									name: "get_file_summary",
+									description: "Summarize file",
+									inputSchema: { type: "object", properties: {} },
+								},
+								{
+									name: "lookup_symbol",
+									description: "Lookup symbol",
+									inputSchema: { type: "object", properties: {} },
+								},
+							],
+						}),
+					]),
+				},
+				"gpt-5.4-2026-03-05",
+				async ({ tools }) => {
+					const nativeToolNames = getNativeToolNames(tools as any[])
+
+					expect(nativeToolNames).to.include.members([
+						"set_workflow_placeholders",
+						"list_files",
+						"search_files",
+						"read_file",
+						"read_file_range",
+						"apply_patch",
+						"attempt_completion",
+					])
+					expect(nativeToolNames).to.not.include("build_review_diff_output")
+					expect(nativeToolNames).to.not.include("build_review_input")
+					expect(nativeToolNames).to.not.include("execute_command")
+					expect(nativeToolNames.some((name) => name.includes("search_relevant"))).to.equal(false)
+					expect(nativeToolNames.some((name) => name.includes("get_file_summary"))).to.equal(false)
+					expect(nativeToolNames.some((name) => name.includes("lookup_symbol"))).to.equal(false)
 				},
 			)
 		})

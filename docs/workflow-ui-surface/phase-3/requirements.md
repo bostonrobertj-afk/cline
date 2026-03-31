@@ -297,13 +297,13 @@ System-known artifact paths must remain runtime-owned.
 
 ### 1. Step completion alignment
 
-Once `build_review_input` succeeds and the workflow's Step 2 done signal is satisfied, deterministic progression must remain responsible for:
+Once `build_review_input` succeeds and the workflow's Step 3 done signal is satisfied, deterministic progression must remain responsible for:
 
 - detecting step completion
 - advancing the checklist
 - exposing the next workflow step
 
-Phase 3 must not create a separate post-Step-2 progression system.
+Phase 3 must not create a separate post-Step-3 progression system.
 
 ### 2. Deterministic gate ownership
 

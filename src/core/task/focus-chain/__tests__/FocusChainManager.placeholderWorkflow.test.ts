@@ -280,11 +280,12 @@ Inspect the prepared review input and write findings.
 		expect(prompt).to.not.contain("# CURRENT WORKFLOW STEP")
 	})
 
-	it("intercepts only code-review.md Step 3 when diff_output is not already satisfied", async () => {
+	it("intercepts code-review step 2 until diff_output is satisfied and step 3 until review_input is satisfied", async () => {
 		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "workflow-form-intercept-"))
 
 		try {
 			const diffOutputPath = path.join(tempDir, "workflow-output", "review-input.diff")
+			const reviewInputPath = path.join(tempDir, "workflow-output", "review-input.md")
 			const taskState = new TaskState()
 			taskState.activePlaceholderWorkflowSource = {
 				type: "remote",
@@ -294,11 +295,11 @@ Inspect the prepared review input and write findings.
 ## Step 1: Determine Review Source
 Done.
 
-## Step 2: Construct & Persist Review Input File
-Done.
+## Step 2: System-Owned Diff Source Resolution And Diff Output Persistence
+Fallback instructions for diff resolution live here.
 
-## Step 3: System-Owned Diff Source Resolution And Diff Output Persistence
-Fallback instructions live here.
+## Step 3: Construct & Persist Review Input File
+Fallback instructions for review input live here.
 `,
 			}
 			taskState.activePlaceholderWorkflowStableValues = {
@@ -306,8 +307,8 @@ Fallback instructions live here.
 			}
 			taskState.currentFocusChainChecklist = [
 				"- [x] Step 1: Determine Review Source",
-				"- [x] Step 2: Construct & Persist Review Input File",
-				"- [ ] Step 3: System-Owned Diff Source Resolution And Diff Output Persistence",
+				"- [ ] Step 2: System-Owned Diff Source Resolution And Diff Output Persistence",
+				"- [ ] Step 3: Construct & Persist Review Input File",
 			].join("\n")
 
 			expect(await shouldInterceptWorkflowFormBeforeApiTurn({ cwd: tempDir, taskState })).to.equal(true)
@@ -326,24 +327,29 @@ Fallback instructions live here.
 
 			expect(await shouldInterceptWorkflowFormBeforeApiTurn({ cwd: tempDir, taskState })).to.equal(false)
 
-			taskState.activePlaceholderWorkflowSource = {
-				type: "remote",
-				name: "dev-story.md",
-				contents: taskState.activePlaceholderWorkflowSource.contents,
-			}
-
-			expect(await shouldInterceptWorkflowFormBeforeApiTurn({ cwd: tempDir, taskState })).to.equal(false)
-
-			taskState.activePlaceholderWorkflowSource = {
-				type: "remote",
-				name: "code-review.md",
-				contents: taskState.activePlaceholderWorkflowSource.contents,
+			taskState.suppressedWorkflowFormResolverIds = []
+			taskState.activePlaceholderWorkflowTaskWriteProofPaths = []
+			taskState.activePlaceholderWorkflowStableValues = {
+				review_input: reviewInputPath,
 			}
 			taskState.currentFocusChainChecklist = [
 				"- [x] Step 1: Determine Review Source",
-				"- [ ] Step 2: Construct & Persist Review Input File",
-				"- [ ] Step 3: System-Owned Diff Source Resolution And Diff Output Persistence",
+				"- [x] Step 2: System-Owned Diff Source Resolution And Diff Output Persistence",
+				"- [ ] Step 3: Construct & Persist Review Input File",
 			].join("\n")
+
+			expect(await shouldInterceptWorkflowFormBeforeApiTurn({ cwd: tempDir, taskState })).to.equal(true)
+
+			await fs.writeFile(reviewInputPath, "# review input", "utf8")
+
+			expect(await shouldInterceptWorkflowFormBeforeApiTurn({ cwd: tempDir, taskState })).to.equal(true)
+
+			taskState.activePlaceholderWorkflowTaskWriteProofPaths = [reviewInputPath]
+
+			expect(await shouldInterceptWorkflowFormBeforeApiTurn({ cwd: tempDir, taskState })).to.equal(false)
+
+			taskState.activePlaceholderWorkflowTaskWriteProofPaths = []
+			taskState.suppressedWorkflowFormResolverIds = ["code_review_step_3_review_input"]
 
 			expect(await shouldInterceptWorkflowFormBeforeApiTurn({ cwd: tempDir, taskState })).to.equal(false)
 		} finally {

@@ -519,16 +519,16 @@ Set review mode from the available review artifacts.`,
 		}
 	})
 
-	it("does not complete code-review step 2 from fallback file existence alone when review_input is missing", async () => {
+	it("does not complete code-review step 2 from fallback file existence alone when diff_output is missing", async () => {
 		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-step2-fallback-only-"))
 
 		try {
 			const outputFolder = path.join(tempDir, "output")
 			const taskState = createTaskState({
 				workflowName: "code-review.md",
-				workflowContents: `## Step 2: Build Review Input
-Wait for review input to be prepared.`,
-				checklistMarkdown: "- [ ] Step 2: Build Review Input",
+				workflowContents: `## Step 2: System-Owned Diff Source Resolution And Diff Output Persistence
+Wait for the stable diff artifact to be prepared.`,
+				checklistMarkdown: "- [ ] Step 2: System-Owned Diff Source Resolution And Diff Output Persistence",
 				placeholderValues: {
 					output_folder: outputFolder,
 				},
@@ -536,8 +536,8 @@ Wait for review input to be prepared.`,
 			taskState.taskStartTimeMs = Date.now()
 
 			await writeFileWithMtime(
-				path.join(outputFolder, "review-input.md"),
-				"# review input",
+				path.join(outputFolder, "review-input.diff"),
+				"diff --git a/file b/file",
 				taskState.taskStartTimeMs + 1_000,
 			)
 
@@ -546,13 +546,13 @@ Wait for review input to be prepared.`,
 				checklistMarkdown: getChecklistMarkdown(taskState),
 			})
 
-			expect(result.checklist).to.equal("- [ ] Step 2: Build Review Input")
+			expect(result.checklist).to.equal("- [ ] Step 2: System-Owned Diff Source Resolution And Diff Output Persistence")
 		} finally {
 			await fs.rm(tempDir, { recursive: true, force: true })
 		}
 	})
 
-	it("completes code-review step 2 when review_input is stored as a relative path resolved from workflow cwd", async () => {
+	it("completes code-review step 2 when diff_output is stored as a relative path resolved from workflow cwd", async () => {
 		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-step2-relative-"))
 		const foreignCwd = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-step2-foreign-cwd-"))
 		const originalCwd = process.cwd()
@@ -561,94 +561,9 @@ Wait for review input to be prepared.`,
 			const outputFolder = path.join(tempDir, "output")
 			const taskState = createTaskState({
 				workflowName: "code-review.md",
-				workflowContents: `## Step 2: Build Review Input
-Wait for review input to be prepared.`,
-				checklistMarkdown: "- [ ] Step 2: Build Review Input",
-				stablePlaceholderValues: {
-					cwd: tempDir,
-					project_root: tempDir,
-				},
-				placeholderValues: {
-					output_folder: outputFolder,
-					review_input: path.join("output", "review_input.md"),
-				},
-			})
-			taskState.taskStartTimeMs = Date.now()
-
-			await writeFileWithMtime(
-				path.join(outputFolder, "review_input.md"),
-				"# review input",
-				taskState.taskStartTimeMs - 1_000,
-			)
-			recordTaskWriteProof(taskState, path.join(outputFolder, "review_input.md"))
-			process.chdir(foreignCwd)
-
-			const result = await applyDeterministicPlaceholderProgression({
-				taskState,
-				checklistMarkdown: getChecklistMarkdown(taskState),
-			})
-
-			expect(result.checklist).to.equal("- [x] Step 2: Build Review Input")
-			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
-				"review_input was written during this task and the artifact still exists.",
-			)
-		} finally {
-			process.chdir(originalCwd)
-			await fs.rm(tempDir, { recursive: true, force: true })
-			await fs.rm(foreignCwd, { recursive: true, force: true })
-		}
-	})
-
-	it("completes code-review step 3 when diff_output points to a fresh review-input.diff artifact", async () => {
-		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-step3-success-"))
-
-		try {
-			const outputFolder = path.join(tempDir, "output")
-			const taskState = createTaskState({
-				workflowName: "code-review.md",
-				workflowContents: `## Step 3: System-Owned Diff Source Resolution And Diff Output Persistence
+				workflowContents: `## Step 2: System-Owned Diff Source Resolution And Diff Output Persistence
 Wait for the stable diff artifact to be prepared.`,
-				checklistMarkdown: "- [ ] Step 3: System-Owned Diff Source Resolution And Diff Output Persistence",
-				placeholderValues: {
-					output_folder: outputFolder,
-					diff_output: path.join(outputFolder, "review-input.diff"),
-				},
-			})
-			taskState.taskStartTimeMs = Date.now()
-
-			await writeFileWithMtime(
-				path.join(outputFolder, "review-input.diff"),
-				"diff --git a/file b/file",
-				taskState.taskStartTimeMs - 1_000,
-			)
-			recordTaskWriteProof(taskState, path.join(outputFolder, "review-input.diff"))
-
-			const result = await applyDeterministicPlaceholderProgression({
-				taskState,
-				checklistMarkdown: getChecklistMarkdown(taskState),
-			})
-
-			expect(result.checklist).to.equal("- [x] Step 3: System-Owned Diff Source Resolution And Diff Output Persistence")
-			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
-				"diff_output was written during this task and the artifact still exists.",
-			)
-		} finally {
-			await fs.rm(tempDir, { recursive: true, force: true })
-		}
-	})
-
-	it("completes code-review step 3 when diff_output is stored as a relative path resolved from workflow cwd", async () => {
-		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-step3-relative-"))
-		const foreignCwd = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-step3-foreign-cwd-"))
-		const originalCwd = process.cwd()
-
-		try {
-			const outputFolder = path.join(tempDir, "output")
-			const taskState = createTaskState({
-				workflowName: "code-review.md",
-				workflowContents: `## Step 3: System-Owned Diff Source Resolution And Diff Output Persistence
-Wait for the stable diff artifact to be prepared.`,
-				checklistMarkdown: "- [ ] Step 3: System-Owned Diff Source Resolution And Diff Output Persistence",
+				checklistMarkdown: "- [ ] Step 2: System-Owned Diff Source Resolution And Diff Output Persistence",
 				stablePlaceholderValues: {
 					cwd: tempDir,
 					project_root: tempDir,
@@ -673,7 +588,7 @@ Wait for the stable diff artifact to be prepared.`,
 				checklistMarkdown: getChecklistMarkdown(taskState),
 			})
 
-			expect(result.checklist).to.equal("- [x] Step 3: System-Owned Diff Source Resolution And Diff Output Persistence")
+			expect(result.checklist).to.equal("- [x] Step 2: System-Owned Diff Source Resolution And Diff Output Persistence")
 			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
 				"diff_output was written during this task and the artifact still exists.",
 			)
@@ -684,16 +599,101 @@ Wait for the stable diff artifact to be prepared.`,
 		}
 	})
 
-	it("does not complete code-review step 3 from fallback file existence alone when diff_output is missing", async () => {
+	it("completes code-review step 3 when review_input points to a fresh review-input.md artifact", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-step3-success-"))
+
+		try {
+			const outputFolder = path.join(tempDir, "output")
+			const taskState = createTaskState({
+				workflowName: "code-review.md",
+				workflowContents: `## Step 3: Construct & Persist Review Input File
+Wait for review input to be prepared.`,
+				checklistMarkdown: "- [ ] Step 3: Construct & Persist Review Input File",
+				placeholderValues: {
+					output_folder: outputFolder,
+					review_input: path.join(outputFolder, "review-input.md"),
+				},
+			})
+			taskState.taskStartTimeMs = Date.now()
+
+			await writeFileWithMtime(
+				path.join(outputFolder, "review-input.md"),
+				"# review input",
+				taskState.taskStartTimeMs - 1_000,
+			)
+			recordTaskWriteProof(taskState, path.join(outputFolder, "review-input.md"))
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+			})
+
+			expect(result.checklist).to.equal("- [x] Step 3: Construct & Persist Review Input File")
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
+				"review_input was written during this task and the artifact still exists.",
+			)
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("completes code-review step 3 when review_input is stored as a relative path resolved from workflow cwd", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-step3-relative-"))
+		const foreignCwd = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-step3-foreign-cwd-"))
+		const originalCwd = process.cwd()
+
+		try {
+			const outputFolder = path.join(tempDir, "output")
+			const taskState = createTaskState({
+				workflowName: "code-review.md",
+				workflowContents: `## Step 3: Construct & Persist Review Input File
+Wait for review input to be prepared.`,
+				checklistMarkdown: "- [ ] Step 3: Construct & Persist Review Input File",
+				stablePlaceholderValues: {
+					cwd: tempDir,
+					project_root: tempDir,
+				},
+				placeholderValues: {
+					output_folder: outputFolder,
+					review_input: path.join("output", "review-input.md"),
+				},
+			})
+			taskState.taskStartTimeMs = Date.now()
+
+			await writeFileWithMtime(
+				path.join(outputFolder, "review-input.md"),
+				"# review input",
+				taskState.taskStartTimeMs - 1_000,
+			)
+			recordTaskWriteProof(taskState, path.join(outputFolder, "review-input.md"))
+			process.chdir(foreignCwd)
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+			})
+
+			expect(result.checklist).to.equal("- [x] Step 3: Construct & Persist Review Input File")
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
+				"review_input was written during this task and the artifact still exists.",
+			)
+		} finally {
+			process.chdir(originalCwd)
+			await fs.rm(tempDir, { recursive: true, force: true })
+			await fs.rm(foreignCwd, { recursive: true, force: true })
+		}
+	})
+
+	it("does not complete code-review step 3 from fallback file existence alone when review_input is missing", async () => {
 		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-step3-fallback-only-"))
 
 		try {
 			const outputFolder = path.join(tempDir, "output")
 			const taskState = createTaskState({
 				workflowName: "code-review.md",
-				workflowContents: `## Step 3: Build Diff Output
-Wait for diff output to be prepared.`,
-				checklistMarkdown: "- [ ] Step 3: Build Diff Output",
+				workflowContents: `## Step 3: Construct & Persist Review Input File
+Wait for review input to be prepared.`,
+				checklistMarkdown: "- [ ] Step 3: Construct & Persist Review Input File",
 				placeholderValues: {
 					output_folder: outputFolder,
 				},
@@ -701,8 +701,8 @@ Wait for diff output to be prepared.`,
 			taskState.taskStartTimeMs = Date.now()
 
 			await writeFileWithMtime(
-				path.join(outputFolder, "review-input.diff"),
-				"diff --git a/file b/file",
+				path.join(outputFolder, "review-input.md"),
+				"# review input",
 				taskState.taskStartTimeMs + 1_000,
 			)
 
@@ -711,7 +711,7 @@ Wait for diff output to be prepared.`,
 				checklistMarkdown: getChecklistMarkdown(taskState),
 			})
 
-			expect(result.checklist).to.equal("- [ ] Step 3: Build Diff Output")
+			expect(result.checklist).to.equal("- [ ] Step 3: Construct & Persist Review Input File")
 		} finally {
 			await fs.rm(tempDir, { recursive: true, force: true })
 		}

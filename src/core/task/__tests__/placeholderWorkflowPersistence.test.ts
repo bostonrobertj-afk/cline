@@ -441,9 +441,9 @@ Persist review_input.md.
 		expect(fakeTask.taskState.currentFocusChainChecklist).to.equal(restoredChecklist)
 	})
 
-	it("advances Step 2 after placeholder resolution when review_input exists with a stale mtime but has a current-task write proof", async () => {
+	it("advances Step 3 after placeholder resolution when review_input exists with a stale mtime but has a current-task write proof", async () => {
 		const sandbox = sinon.createSandbox()
-		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "placeholder-step2-write-proof-"))
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "placeholder-step3-write-proof-"))
 		const workflowPath = path.join(tempDir, "code-review.md")
 		const reviewInputPath = path.join(tempDir, "output", "review-input.md")
 		const taskId = "task-placeholder-persistence"
@@ -456,11 +456,11 @@ Persist review_input.md.
 ## Step 1: Determine Review Source
 Determine what to review from the user's prompt before asking follow-up questions.
 
-## Step 2: Construct & Persist Review Input File
-Persist review_input.md.
-
-## Step 3: System-Owned Diff Source Resolution And Diff Output Persistence
+## Step 2: System-Owned Diff Source Resolution And Diff Output Persistence
 Resolve diff input through the system-owned form flow.
+
+## Step 3: Construct & Persist Review Input File
+Persist review-input.md.
 `,
 				"utf8",
 			)
@@ -483,17 +483,17 @@ Resolve diff input through the system-owned form flow.
 			taskState.activePlaceholderWorkflowTaskWriteProofPaths = [reviewInputPath]
 			taskState.currentFocusChainChecklist = null
 
-			const step2Checklist = [
+			const step3Checklist = [
 				"- [x] Step 1: Determine Review Source",
-				"- [ ] Step 2: Construct & Persist Review Input File",
-				"- [ ] Step 3: System-Owned Diff Source Resolution And Diff Output Persistence",
+				"- [x] Step 2: System-Owned Diff Source Resolution And Diff Output Persistence",
+				"- [ ] Step 3: Construct & Persist Review Input File",
 			].join("\n")
 			const focusChainFilePath = getFocusChainFilePath(tempDir, taskId)
 			await fs.writeFile(
 				focusChainFilePath,
 				`# Focus Chain List for Task ${taskId}
 
-${step2Checklist}
+${step3Checklist}
 `,
 				"utf8",
 			)
@@ -512,8 +512,8 @@ ${step2Checklist}
 			expect(taskState.currentFocusChainChecklist).to.equal(
 				[
 					"- [x] Step 1: Determine Review Source",
-					"- [x] Step 2: Construct & Persist Review Input File",
-					"- [ ] Step 3: System-Owned Diff Source Resolution And Diff Output Persistence",
+					"- [x] Step 2: System-Owned Diff Source Resolution And Diff Output Persistence",
+					"- [x] Step 3: Construct & Persist Review Input File",
 				].join("\n"),
 			)
 		} finally {

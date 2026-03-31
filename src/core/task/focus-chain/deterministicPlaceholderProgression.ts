@@ -171,21 +171,6 @@ async function evaluateCodeReviewStep(args: {
 			}
 		}
 		case 2: {
-			const reviewInputPath = await resolveTaskWrittenPlaceholderArtifactPath({
-				taskState: args.taskState,
-				placeholders,
-				placeholderKey: "review_input",
-			})
-			if (!reviewInputPath) {
-				return { completed: false }
-			}
-
-			return {
-				completed: true,
-				reason: "review_input was written during this task and the artifact still exists.",
-			}
-		}
-		case 3: {
 			const diffOutputPath = await resolveTaskWrittenPlaceholderArtifactPath({
 				taskState: args.taskState,
 				placeholders,
@@ -198,6 +183,21 @@ async function evaluateCodeReviewStep(args: {
 			return {
 				completed: true,
 				reason: "diff_output was written during this task and the artifact still exists.",
+			}
+		}
+		case 3: {
+			const reviewInputPath = await resolveTaskWrittenPlaceholderArtifactPath({
+				taskState: args.taskState,
+				placeholders,
+				placeholderKey: "review_input",
+			})
+			if (!reviewInputPath) {
+				return { completed: false }
+			}
+
+			return {
+				completed: true,
+				reason: "review_input was written during this task and the artifact still exists.",
 			}
 		}
 		case 4: {
