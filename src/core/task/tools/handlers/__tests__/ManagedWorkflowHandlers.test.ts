@@ -154,7 +154,7 @@ async function createReviewDiffRepo() {
 }
 
 describe("Managed workflow handlers", () => {
-	it("blocks attempt_completion while a managed workflow still has incomplete items", async () => {
+	it("allows attempt_completion to succeed even while a managed workflow still has incomplete items", async () => {
 		const handler = new AttemptCompletionHandler()
 		const config = createConfig()
 		config.taskState.managedWorkflowRun = createManagedWorkflowRun()
@@ -168,8 +168,10 @@ describe("Managed workflow handlers", () => {
 			partial: false,
 		} as any)
 
-		expect(String(result)).to.contain('Managed workflow "bmad-code-review" is still in progress')
-		expect(config.taskState.consecutiveMistakeCount).to.equal(1)
+		expect(String(result)).to.equal(RESPONSE_TOOL_SUCCESS_MESSAGE)
+		expect((config.callbacks.say as sinon.SinonStub).calledWith("completion_result", "done")).to.equal(true)
+		expect((config.callbacks.ask as sinon.SinonStub).notCalled).to.equal(true)
+		expect(config.taskState.consecutiveMistakeCount).to.equal(0)
 	})
 
 	it("allows attempt_completion once all required managed workflow items are complete", async () => {
@@ -204,7 +206,6 @@ describe("Managed workflow handlers", () => {
 		expect(String(result)).to.not.contain("Managed workflow")
 		expect(String(result)).to.equal(RESPONSE_TOOL_SUCCESS_MESSAGE)
 		expect(config.taskState.consecutiveMistakeCount).to.equal(0)
-		expect(config.taskState.didAttemptCompletionEndTask).to.equal(true)
 		expect(config.taskState.responseToolTurnShouldEnd).to.equal(true)
 		expect(config.taskState.responseToolTurnCompletedBy).to.equal("attempt_completion")
 		expect((config.callbacks.say as sinon.SinonStub).calledWith("completion_result", "done")).to.equal(true)
@@ -232,7 +233,6 @@ describe("Managed workflow handlers", () => {
 		} as any)
 
 		expect(String(result)).to.equal(RESPONSE_TOOL_SUCCESS_MESSAGE)
-		expect(config.taskState.didAttemptCompletionEndTask).to.equal(true)
 		expect(config.taskState.responseToolTurnShouldEnd).to.equal(true)
 		expect(config.taskState.responseToolTurnCompletedBy).to.equal("attempt_completion")
 		expect(

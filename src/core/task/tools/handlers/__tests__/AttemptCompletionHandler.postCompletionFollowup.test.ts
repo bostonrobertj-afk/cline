@@ -1,5 +1,6 @@
 import { strict as assert } from "node:assert"
 import * as disk from "@core/storage/disk"
+import * as notifications from "@integrations/notifications"
 import { afterEach, describe, it } from "mocha"
 import sinon from "sinon"
 import { Logger } from "@/shared/services/Logger"
@@ -119,9 +120,29 @@ describe("AttemptCompletionHandler post-completion follow-up", () => {
 		sinon.assert.notCalled(callbacks.ask)
 		sinon.assert.notCalled(callbacks.runUserPromptSubmitHook)
 		assert.equal(taskState.pendingResponseToolFollowup, undefined)
-		assert.equal(taskState.didAttemptCompletionEndTask, true)
 		assert.equal(taskState.responseToolTurnShouldEnd, true)
 		assert.equal(taskState.responseToolTurnCompletedBy, ClineDefaultTool.ATTEMPT)
+	})
+
+	it("does not show task-complete system notifications", async () => {
+		const { config, callbacks } = createConfig()
+		config.autoApprovalSettings.enableNotifications = true
+		const showSystemNotification = sinon.stub(notifications, "showSystemNotification")
+
+		const handler = new AttemptCompletionHandler()
+		const result = await handler.execute(config, {
+			type: "tool_use",
+			name: "attempt_completion",
+			params: {
+				result: "done",
+			},
+			partial: false,
+		} as any)
+
+		assert.equal(result, RESPONSE_TOOL_SUCCESS_MESSAGE)
+		sinon.assert.calledOnceWithExactly(callbacks.say, "completion_result", "done", undefined, undefined, false)
+		sinon.assert.notCalled(callbacks.ask)
+		sinon.assert.notCalled(showSystemNotification)
 	})
 
 	it("runs attempt_completion commands without opening blocking command_output asks", async () => {

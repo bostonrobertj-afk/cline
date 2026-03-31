@@ -165,7 +165,6 @@ export class TaskState {
 	abort = false
 	didFinishAbortingStream = false
 	abandoned = false
-	didAttemptCompletionEndTask = false
 
 	// Hook execution tracking for cancellation
 	activeHookExecution?: HookExecution
@@ -183,7 +182,6 @@ export class TaskState {
 		this.responseToolTurnCompletedBy = toolName
 		this.responseToolTurnShouldEnd = behavior === "end_turn"
 		this.responseToolThreadDisplayStateAfterTurnEnds = threadDisplayStateAfterTurnEnds
-		this.didAttemptCompletionEndTask = toolName === "attempt_completion" && behavior === "end_turn"
 	}
 
 	consumeCompletedResponseTool():
@@ -198,7 +196,6 @@ export class TaskState {
 		this.responseToolTurnCompletedBy = undefined
 		this.responseToolTurnShouldEnd = false
 		this.responseToolThreadDisplayStateAfterTurnEnds = undefined
-		this.didAttemptCompletionEndTask = false
 
 		return { toolName, threadDisplayStateAfterTurnEnds }
 	}
@@ -342,6 +339,5 @@ export class TaskState {
 		this.pendingResponseToolFollowup = undefined
 		this.partialResponseToolPreviews.clear()
 		this.clearResponseToolFailureState()
-		this.didAttemptCompletionEndTask = false
 	}
 }

@@ -1,40 +1,18 @@
 import type { ToolUse } from "@core/assistant-message"
-import { getHookModelContext } from "@core/hooks/hook-model-context"
-import { getHooksEnabledSafe } from "@core/hooks/hooks-utils"
 import { formatResponse } from "@core/prompts/responses"
-import { showSystemNotification } from "@integrations/notifications"
-import { telemetryService } from "@services/telemetry"
 import { findLastIndex } from "@shared/array"
 import { COMPLETION_RESULT_CHANGES_FLAG } from "@shared/ExtensionMessage"
-import { Logger } from "@shared/services/Logger"
 import { ClineDefaultTool } from "@shared/tools"
 import type { ToolResponse } from "../../index"
-import { listIncompleteManagedWorkflowItems } from "../../managed-workflows/ManagedWorkflowRenderer"
 import { showNotificationForApproval } from "../../utils"
 import { emitAgentFeedback, readAgentFeedbackMessage } from "../response/agent-feedback"
 import { ResponseToolRuntime } from "../response/ResponseToolRuntime"
 import type { IPartialBlockHandler, IToolHandler } from "../ToolExecutorCoordinator"
 import type { TaskConfig } from "../types/TaskConfig"
 import type { StronglyTypedUIHelpers } from "../types/UIHelpers"
-import { getTaskCompletionTelemetry } from "../utils"
 import { ToolResultUtils } from "../utils/ToolResultUtils"
 
-const TASK_PREVIEW_MAX_CHARS = 8000
 const responseToolRuntime = new ResponseToolRuntime()
-
-function getInitialTaskPreview(config: TaskConfig): string | undefined {
-	const firstTaskMessage = config.messageState
-		.getClineMessages()
-		.find((message) => message.say === "task")
-		?.text?.trim()
-	if (!firstTaskMessage) {
-		return undefined
-	}
-	if (firstTaskMessage.length <= TASK_PREVIEW_MAX_CHARS) {
-		return firstTaskMessage
-	}
-	return `${firstTaskMessage.slice(0, TASK_PREVIEW_MAX_CHARS)}\n...[truncated]`
-}
 
 export class AttemptCompletionHandler implements IToolHandler, IPartialBlockHandler {
 	readonly name = ClineDefaultTool.ATTEMPT
@@ -70,40 +48,7 @@ export class AttemptCompletionHandler implements IToolHandler, IPartialBlockHand
 			return await config.callbacks.sayAndCreateMissingParamError(this.name, "result")
 		}
 
-		if (config.taskState.managedWorkflowRun && !config.taskState.managedWorkflowRun.allRequiredComplete) {
-			config.taskState.consecutiveMistakeCount++
-			const remainingItems = listIncompleteManagedWorkflowItems(config.taskState.managedWorkflowRun)
-			return formatResponse.toolError(
-				`Managed workflow "${config.taskState.managedWorkflowRun.workflowId}" is still in progress. Remaining items:\n- ${remainingItems.join("\n- ")}`,
-			)
-		}
-
 		config.taskState.consecutiveMistakeCount = 0
-
-		// Double-check completion: reject attempt_completion calls that haven't been re-verified
-		if (config.doubleCheckCompletionEnabled && !config.taskState.doubleCheckCompletionPending) {
-			config.taskState.doubleCheckCompletionPending = true
-			// Remove the partial completion_result message that was shown during streaming
-			await config.callbacks.removeLastPartialMessageIfExistsWithType("say", "completion_result")
-			await config.callbacks.clearPartialResponseToolPreview(block, { removeMessage: true })
-
-			const taskPreview = getInitialTaskPreview(config)
-			const taskSection = taskPreview ? `\n\n<initial_task>\n${taskPreview}\n</initial_task>` : ""
-
-			return formatResponse.toolError(
-				"Before completing, re-verify your work against the original task requirements. Check that:\n" +
-					"1. All requested changes have been made\n" +
-					"2. No steps were skipped or partially completed\n" +
-					"3. Edge cases and error handling are addressed\n" +
-					"4. The solution matches what was asked for, not just what was convenient\n" +
-					"5. Output files contain exactly what was specified--no extra columns, fields, debug output, or commentary\n" +
-					"6. If the task specifies numerical thresholds or accuracy targets, verify your result meets the criteria. If close but not passing, iterate rather than declaring completion" +
-					taskSection +
-					"\n\nIf everything checks out, call attempt_completion again with your final result.",
-			)
-		}
-		// Reset so the next attempt_completion pair triggers double-check again
-		config.taskState.doubleCheckCompletionPending = false
 
 		// Run PreToolUse hook before execution
 		try {
@@ -115,14 +60,6 @@ export class AttemptCompletionHandler implements IToolHandler, IPartialBlockHand
 				return formatResponse.toolDenied()
 			}
 			throw error
-		}
-
-		// Show notification if enabled
-		if (config.autoApprovalSettings.enableNotifications) {
-			showSystemNotification({
-				subtitle: "Task Completed",
-				message: result.replace(/\n/g, " "),
-			})
 		}
 
 		const addNewChangesFlagToLastCompletionResultMessage = async () => {
@@ -177,7 +114,6 @@ export class AttemptCompletionHandler implements IToolHandler, IPartialBlockHand
 				const completionMessageTs = await config.callbacks.say("completion_result", result, undefined, undefined, false)
 				await config.callbacks.saveCheckpoint(true, completionMessageTs)
 				await addNewChangesFlagToLastCompletionResultMessage()
-				telemetryService.captureTaskCompleted(config.ulid, getTaskCompletionTelemetry(config))
 				await emitAgentFeedbackOnce()
 			} else {
 				// we already sent a command message, meaning the complete completion message has also been sent
@@ -224,100 +160,9 @@ export class AttemptCompletionHandler implements IToolHandler, IPartialBlockHand
 			const completionMessageTs = await config.callbacks.say("completion_result", result, undefined, undefined, false)
 			await config.callbacks.saveCheckpoint(true, completionMessageTs)
 			await addNewChangesFlagToLastCompletionResultMessage()
-			telemetryService.captureTaskCompleted(config.ulid, getTaskCompletionTelemetry(config))
 			await emitAgentFeedbackOnce()
 		}
 
-		// Run TaskComplete hook BEFORE presenting the "Start New Task" button
-		// At this point we know: task is complete, checkpoint saved, result shown to user
-		await this.runTaskCompleteHook(config, block)
-		await this.runNotificationHook(config, {
-			event: "task_complete",
-			source: "attempt_completion",
-			message: result,
-			waitingForUserInput: false,
-		})
-
 		return responseToolRuntime.finalizeSuccess(config, this.name)
-	}
-
-	/**
-	 * Runs the TaskComplete hook after user confirms task completion.
-	 * This is a non-cancellable, observation-only hook similar to TaskCancel.
-	 * Errors are logged but do not affect task completion.
-	 */
-	private async runTaskCompleteHook(config: TaskConfig, block: ToolUse): Promise<void> {
-		const hooksEnabled = getHooksEnabledSafe(config.services.stateManager.getGlobalSettingsKey("hooksEnabled"))
-		if (!hooksEnabled) {
-			return
-		}
-
-		try {
-			const { executeHook } = await import("@core/hooks/hook-executor")
-
-			await executeHook({
-				hookName: "TaskComplete",
-				hookInput: {
-					taskComplete: {
-						taskMetadata: {
-							taskId: config.taskId,
-							ulid: config.ulid,
-							result: block.params.result || "",
-							command: block.params.command || "",
-						},
-					},
-				},
-				isCancellable: false, // Non-cancellable - task is already complete
-				say: config.callbacks.say,
-				setActiveHookExecution: undefined, // Explicitly undefined for non-cancellable hooks
-				clearActiveHookExecution: undefined, // Explicitly undefined for non-cancellable hooks
-				messageStateHandler: config.messageState,
-				taskId: config.taskId,
-				hooksEnabled,
-				model: getHookModelContext(config.api, config.services.stateManager),
-			})
-		} catch (error) {
-			// TaskComplete hook failed - non-fatal, just log
-			Logger.error("[TaskComplete Hook] Failed (non-fatal):", error)
-		}
-	}
-
-	private async runNotificationHook(
-		config: TaskConfig,
-		notification: {
-			event: string
-			source: string
-			message: string
-			waitingForUserInput: boolean
-		},
-	): Promise<void> {
-		const hooksEnabled = getHooksEnabledSafe(config.services.stateManager.getGlobalSettingsKey("hooksEnabled"))
-		if (!hooksEnabled) {
-			return
-		}
-
-		try {
-			const { executeHook } = await import("@core/hooks/hook-executor")
-
-			await executeHook({
-				hookName: "Notification",
-				hookInput: {
-					notification: {
-						...notification,
-						message: notification.message.slice(0, TASK_PREVIEW_MAX_CHARS),
-					},
-				},
-				isCancellable: false,
-				say: async () => undefined,
-				setActiveHookExecution: undefined,
-				clearActiveHookExecution: undefined,
-				messageStateHandler: config.messageState,
-				taskId: config.taskId,
-				hooksEnabled,
-				model: getHookModelContext(config.api, config.services.stateManager),
-			})
-		} catch (error) {
-			Logger.error("[Notification Hook] Failed (non-fatal):", error)
-		}
 	}
 }
