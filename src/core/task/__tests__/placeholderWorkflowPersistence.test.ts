@@ -1312,7 +1312,7 @@ Construct and persist review_input.md from the persisted diff output before cont
 		expect(result.succeeded).to.equal(true)
 	})
 
-	it("prefers appended tool_result content over preceding tool text when evaluating workflow-form tool success", async () => {
+	it("prefers appended decorated tool_result JSON over preceding tool text when evaluating workflow-form tool success", async () => {
 		const session: WorkflowFormSessionState = {
 			sessionId: "wf-session-diff-success",
 			resolverId: "code_review_step_3_diff_source",
@@ -1343,11 +1343,13 @@ Construct and persist review_input.md from the persisted diff output before cont
 						taskState.userMessageContent.push({
 							type: "tool_result",
 							tool_use_id: block.call_id,
-							content: JSON.stringify({
-								persisted: true,
-								diff_available: true,
-								artifact_path: "/tmp/review-input.diff",
-							}),
+							content:
+								"[build_review_diff_output commit] Result:\n" +
+								JSON.stringify({
+									persisted: true,
+									diff_available: true,
+									artifact_path: "/tmp/review-input.diff",
+								}),
 						})
 						return
 					}
@@ -1435,7 +1437,7 @@ Construct and persist review_input.md from the persisted diff output before cont
 		)
 	})
 
-	it("treats a non-persisted Phase 1 diff result as workflow-form failure", async () => {
+	it("treats a decorated non-persisted Phase 1 diff result as workflow-form failure", async () => {
 		const session: WorkflowFormSessionState = {
 			sessionId: "wf-session-diff-failure",
 			resolverId: "code_review_step_3_diff_source",
@@ -1453,7 +1455,22 @@ Construct and persist review_input.md from the persisted diff output before cont
 		const fakeTask = {
 			taskState,
 			toolExecutor: {
-				executeTool: sinon.stub().callsFake(async () => {
+				executeTool: sinon.stub().callsFake(async (block: { call_id?: string; isNativeToolCall?: boolean }) => {
+					if (block.isNativeToolCall && block.call_id) {
+						taskState.userMessageContent.push({
+							type: "tool_result",
+							tool_use_id: block.call_id,
+							content:
+								"[build_review_diff_output commit] Result:\n" +
+								JSON.stringify({
+									persisted: false,
+									diff_available: false,
+									reason: "No Git-backed diff content was available for the requested source and scope.",
+								}),
+						})
+						return
+					}
+
 					taskState.userMessageContent.push({
 						type: "text",
 						text: JSON.stringify({

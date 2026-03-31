@@ -1475,16 +1475,40 @@ export class Task {
 	}
 
 	private getWorkflowFormToolResultText(previousUserMessageContentLength: number): string | undefined {
+		const normalizeWorkflowFormToolText = (text: string | undefined): string | undefined => {
+			const trimmedText = text?.trim()
+			if (!trimmedText) {
+				return undefined
+			}
+
+			const decoratedResultSeparator = " Result:\n"
+			const separatorIndex = trimmedText.indexOf(decoratedResultSeparator)
+			if (separatorIndex > 0 && trimmedText.startsWith("[")) {
+				const candidate = trimmedText.slice(separatorIndex + decoratedResultSeparator.length).trim()
+				if (candidate.startsWith("{") || candidate.startsWith("[")) {
+					try {
+						JSON.parse(candidate)
+						return candidate
+					} catch {
+						// Preserve the original text when the suffix is not valid JSON.
+					}
+				}
+			}
+
+			return trimmedText
+		}
+
 		const appendedContent = this.taskState.userMessageContent.slice(previousUserMessageContentLength)
 		const appendedToolResult = appendedContent.find(
 			(item) => item.type === "tool_result" && typeof item.content === "string" && item.content.trim().length > 0,
 		)
 		if (appendedToolResult?.type === "tool_result" && typeof appendedToolResult.content === "string") {
-			return appendedToolResult.content
+			return normalizeWorkflowFormToolText(appendedToolResult.content)
 		}
 
 		return appendedContent
 			.map((item) => (item.type === "text" ? item.text : undefined))
+			.map((item) => normalizeWorkflowFormToolText(item))
 			.find((item): item is string => typeof item === "string" && item.trim().length > 0)
 	}
 
