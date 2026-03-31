@@ -40,7 +40,7 @@ Primary inputs:
   - pending deterministic state
   - placeholder-workflow write-proof paths
 - the current checklist markdown
-- optional `toolContext`
+- optional `toolContext`, which can carry current-turn tool execution facts that drive workflow-specific deterministic gates
 
 Runtime dependencies used by evaluators:
 
@@ -96,11 +96,14 @@ Current evaluator examples:
   - Steps 2 and 3 require task-written artifacts with surviving write proofs
   - Step 4 derives `review_mode` from available artifacts
   - later steps inspect fallback prompt artifacts or spec-file status values
+  - Step 7 completes when a successful current-turn attempt_completion delivers the final QA findings report
 - `review-adversarial-general.md`
   - Step 1 completes when `diff_output` resolves to an existing file path
   - Step 2 completes when `adversarial-review-findings.md` was written during the current task and still exists
+  - Step 3 completes when a successful current-turn attempt_completion delivers the final findings
 - `dev-story.md`
   - steps inspect story-file existence, checklist completion, and top-level status values
+  - Step 4 completes when a successful current-turn attempt_completion delivers the final closeout report
 
 ## Failure Modes
 - The active workflow is unsupported, so deterministic progression is skipped.
@@ -132,6 +135,7 @@ This is especially important for steps whose completion is defined by:
 - Extend [isDeterministicPlaceholderWorkflowSupported(...)](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/focus-chain/deterministicPlaceholderProgression.ts) and the workflow-specific evaluator dispatch together.
 - Keep workflow-specific logic explicit and hardcoded; do not quietly infer behavior from free-form workflow prose.
 - Use current-task write proofs for generated artifacts whenever completion depends on task-local writes.
+- Use toolContext-based gates only when a workflow step explicitly treats a successful current-turn tool execution as its machine-checkable done signal.
 - Return a concrete completion reason for every deterministic auto-completion.
 - Keep placeholder mutations narrow and intentional.
 - Add or update focused unit tests in [deterministicPlaceholderProgression.test.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/focus-chain/__tests__/deterministicPlaceholderProgression.test.ts) for every new evaluator branch.
@@ -142,6 +146,9 @@ This is especially important for steps whose completion is defined by:
 - In `review-adversarial-general.md`, if `diff_output` resolves to an existing file, Step 1 can complete immediately on the next deterministic pass.
 - In `review-adversarial-general.md`, if Step 2 writes `{output_folder}/adversarial-review-findings.md` during the current task and the artifact still exists, Step 2 can auto-complete.
 - In `dev-story.md`, if the story file’s `## Tasks / Subtasks` section has no unchecked items, the task-execution step can auto-complete.
+- In `code-review.md`, Step 7 can auto-complete when the current turn successfully executes attempt_completion for the final QA findings report.
+- In `review-adversarial-general.md`, Step 3 can auto-complete when the current turn successfully executes attempt_completion to deliver the adversarial findings.
+- In `dev-story.md`, Step 4 can auto-complete when the current turn successfully executes attempt_completion for the final closeout report.
 
 ## (Optional) Performance
 The capability is lightweight for unsupported workflows and early-exit cases.

@@ -1,5 +1,4 @@
 import { strict as assert } from "node:assert"
-import { formatResponse } from "@core/prompts/responses"
 import { ClineDefaultTool } from "@shared/tools"
 import { describe, it } from "mocha"
 import sinon from "sinon"
@@ -94,7 +93,7 @@ describe("ToolExecutor focus chain protection", () => {
 		assert.match(String(feedbackBlock.text), /Current checklist:/)
 	})
 
-	it("rejects attempt_completion in the same turn when task_progress would replace an existing checklist", async () => {
+	it("routes attempt_completion task_progress through the post-tool focus-chain path after execution", async () => {
 		const taskState = new TaskState()
 		const stateManager = {
 			getGlobalSettingsKey: sinon.stub().callsFake((key: string) => {
@@ -115,10 +114,7 @@ describe("ToolExecutor focus chain protection", () => {
 			getApiConfiguration: sinon.stub().returns({ actModeApiProvider: "openai", planModeApiProvider: "openai" }),
 		} as any
 
-		const updateFCListFromToolResponse = sinon.stub().onFirstCall().resolves({
-			accepted: false,
-			feedback: "A task list already exists.\n\nCurrent checklist:\n\n- [ ] Step 1: Gather Context",
-		})
+		const updateFCListFromToolResponse = sinon.stub().resolves({ accepted: true })
 
 		const executor = new ToolExecutor(
 			taskState,
@@ -156,8 +152,7 @@ describe("ToolExecutor focus chain protection", () => {
 			sinon.stub().resolves(undefined),
 		)
 
-		const executeStub = sinon.stub().resolves("should not run")
-		const pushToolResultSpy = sinon.spy(executor as any, "pushToolResult")
+		const executeStub = sinon.stub().resolves("[attempt_completion] Result:\nDone")
 		;(executor as any).coordinator = {
 			execute: executeStub,
 			getHandler: sinon.stub().returns(undefined),
@@ -176,20 +171,11 @@ describe("ToolExecutor focus chain protection", () => {
 		await (executor as any).handleCompleteBlock(block, { taskId: "task-id", callbacks: { cancelTask: sinon.stub() } })
 
 		assert.equal(updateFCListFromToolResponse.calledOnce, true)
-		assert.equal(executeStub.called, false)
-		assert.equal(pushToolResultSpy.calledOnce, true)
-		assert.match(String(pushToolResultSpy.firstCall.args[0]), /A task list already exists\./)
-		assert.equal(taskState.userMessageContent.length, 1)
-		assert.equal((taskState.userMessageContent[0] as any).type, "text")
-		assert.match(String((taskState.userMessageContent[0] as any).text), /^\[attempt_completion\] Result:\n/)
-		assert.match(
-			String((taskState.userMessageContent[0] as any).text),
-			new RegExp(
-				formatResponse
-					.toolError("A task list already exists.\n\nCurrent checklist:\n\n- [ ] Step 1: Gather Context")
-					.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
-			),
-		)
+		assert.equal(executeStub.calledOnce, true)
+		assert.equal(updateFCListFromToolResponse.firstCall.args[0], "- [ ] Something else")
+		assert.ok(updateFCListFromToolResponse.firstCall.args[1])
+		assert.equal(updateFCListFromToolResponse.firstCall.args[1].toolName, "attempt_completion")
+		assert.equal(updateFCListFromToolResponse.firstCall.args[1].toolWasExecuted, true)
 	})
 
 	it("keeps post-tool task_progress feedback with isolated end-turn response-tool results", async () => {

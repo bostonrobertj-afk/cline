@@ -110,6 +110,10 @@ function resolveOutputFolderFile(placeholders: Record<string, string>, fileName:
 	return path.join(outputFolder, fileName)
 }
 
+function didSuccessfulAttemptCompletionOccur(toolContext?: DeterministicPlaceholderToolContext): boolean {
+	return toolContext?.toolName === "attempt_completion" && toolContext.toolWasExecuted === true
+}
+
 function getCodeReviewFallbackPromptPath(
 	placeholders: Record<string, string>,
 	layer: "adversarial_general" | "edge_case_hunter",
@@ -150,6 +154,7 @@ async function resolveTaskWrittenPlaceholderArtifactPath(args: {
 async function evaluateCodeReviewStep(args: {
 	taskState: TaskState
 	stepNumber: number
+	toolContext?: DeterministicPlaceholderToolContext
 }): Promise<DeterministicStepEvaluationResult> {
 	const placeholders = getMergedPlaceholderValues(args.taskState)
 
@@ -288,6 +293,16 @@ async function evaluateCodeReviewStep(args: {
 				reason: "spec_file was updated during this task and now contains a terminal review status.",
 			}
 		}
+		case 7: {
+			if (!didSuccessfulAttemptCompletionOccur(args.toolContext)) {
+				return { completed: false }
+			}
+
+			return {
+				completed: true,
+				reason: "attempt_completion was executed successfully for the final QA findings report.",
+			}
+		}
 		default:
 			return { completed: false }
 	}
@@ -296,6 +311,7 @@ async function evaluateCodeReviewStep(args: {
 async function evaluateReviewAdversarialGeneralStep(args: {
 	taskState: TaskState
 	stepNumber: number
+	toolContext?: DeterministicPlaceholderToolContext
 }): Promise<DeterministicStepEvaluationResult> {
 	const placeholders = getMergedPlaceholderValues(args.taskState)
 
@@ -335,6 +351,16 @@ async function evaluateReviewAdversarialGeneralStep(args: {
 				reason: "adversarial-review-findings.md was written during this task and the artifact still exists.",
 			}
 		}
+		case 3: {
+			if (!didSuccessfulAttemptCompletionOccur(args.toolContext)) {
+				return { completed: false }
+			}
+
+			return {
+				completed: true,
+				reason: "attempt_completion was executed successfully to deliver adversarial findings.",
+			}
+		}
 		default:
 			return { completed: false }
 	}
@@ -343,6 +369,7 @@ async function evaluateReviewAdversarialGeneralStep(args: {
 async function evaluateDevStoryStep(args: {
 	taskState: TaskState
 	stepNumber: number
+	toolContext?: DeterministicPlaceholderToolContext
 }): Promise<DeterministicStepEvaluationResult> {
 	const placeholders = getMergedPlaceholderValues(args.taskState)
 	const storyPath = placeholders.story_path?.trim()
@@ -416,6 +443,16 @@ async function evaluateDevStoryStep(args: {
 				reason: "The story file was updated and now contains Status: review.",
 			}
 		}
+		case 4: {
+			if (!didSuccessfulAttemptCompletionOccur(args.toolContext)) {
+				return { completed: false }
+			}
+
+			return {
+				completed: true,
+				reason: "attempt_completion was executed successfully for the final closeout report.",
+			}
+		}
 		default:
 			return { completed: false }
 	}
@@ -425,11 +462,13 @@ async function evaluateDeterministicStep(args: {
 	taskState: TaskState
 	workflowName: DeterministicPlaceholderWorkflowName
 	stepNumber: number
+	toolContext?: DeterministicPlaceholderToolContext
 }): Promise<DeterministicStepEvaluationResult> {
 	if (args.workflowName === "code-review.md") {
 		return evaluateCodeReviewStep({
 			taskState: args.taskState,
 			stepNumber: args.stepNumber,
+			toolContext: args.toolContext,
 		})
 	}
 
@@ -437,12 +476,14 @@ async function evaluateDeterministicStep(args: {
 		return evaluateDevStoryStep({
 			taskState: args.taskState,
 			stepNumber: args.stepNumber,
+			toolContext: args.toolContext,
 		})
 	}
 
 	return evaluateReviewAdversarialGeneralStep({
 		taskState: args.taskState,
 		stepNumber: args.stepNumber,
+		toolContext: args.toolContext,
 	})
 }
 
@@ -495,6 +536,7 @@ export async function applyDeterministicPlaceholderProgression(args: {
 			taskState: args.taskState,
 			workflowName: stepDetails.sourceName,
 			stepNumber: stepDetails.stepNumber,
+			toolContext: args.toolContext,
 		})
 		if (!evaluation.completed || !evaluation.reason) {
 			break

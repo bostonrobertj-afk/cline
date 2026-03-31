@@ -1,5 +1,3 @@
-import { formatResponse } from "@core/prompts/responses"
-import { ClineDefaultTool } from "@shared/tools"
 import type { DeterministicPlaceholderToolContext } from "./deterministicPlaceholderProgression"
 import type { FocusChainChecklistUpdateResult } from "./types"
 
@@ -31,29 +29,11 @@ export interface PostToolTaskProgressUpdateResult {
 }
 
 export async function applyPreToolTaskProgressUpdate(
-	options: TaskProgressUpdateOptions,
+	_options: TaskProgressUpdateOptions,
 ): Promise<PreToolTaskProgressUpdateResult> {
-	const { block, focusChainEnabled, updateFCListFromToolResponse } = options
-
-	if (!focusChainEnabled || block.partial || block.name !== ClineDefaultTool.ATTEMPT) {
-		return {
-			skipToolExecution: false,
-			skipPostExecutionUpdate: false,
-		}
-	}
-
-	const focusChainUpdate = await updateFCListFromToolResponse(block.params?.task_progress)
-	if (focusChainUpdate.feedback) {
-		return {
-			skipToolExecution: true,
-			skipPostExecutionUpdate: true,
-			toolResult: formatResponse.toolError(focusChainUpdate.feedback),
-		}
-	}
-
 	return {
 		skipToolExecution: false,
-		skipPostExecutionUpdate: true,
+		skipPostExecutionUpdate: false,
 	}
 }
 

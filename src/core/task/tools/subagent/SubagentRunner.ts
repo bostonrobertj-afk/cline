@@ -14,7 +14,10 @@ import {
 	resolvePlaceholderWorkflowManagedVariant,
 } from "@core/task/bmad-agent-mode"
 import { FocusChainManager } from "@core/task/focus-chain"
-import { isDeterministicPlaceholderWorkflowSupported } from "@core/task/focus-chain/deterministicPlaceholderProgression"
+import {
+	type DeterministicPlaceholderToolContext,
+	isDeterministicPlaceholderWorkflowSupported,
+} from "@core/task/focus-chain/deterministicPlaceholderProgression"
 import { applyPostToolTaskProgressUpdate, applyPreToolTaskProgressUpdate } from "@core/task/focus-chain/updateFromToolResponse"
 import { getManagedWorkflowDefinition } from "@core/task/managed-workflows/ManagedWorkflowRegistry"
 import { buildManagedWorkflowPrompt } from "@core/task/managed-workflows/ManagedWorkflowRenderer"
@@ -813,6 +816,19 @@ export class SubagentRunner {
 							continue
 						}
 
+						await applyPostToolTaskProgressUpdate({
+							block: toolCallBlock,
+							focusChainEnabled,
+							skipPostExecutionUpdate: preToolTaskProgressUpdate.skipPostExecutionUpdate,
+							toolContext: {
+								toolName,
+								toolParams: (toolCallParams as Record<string, unknown>) ?? undefined,
+								toolResult: completionResult,
+								toolWasExecuted: true,
+							},
+							updateFCListFromToolResponse: subagentConfig.callbacks.updateFCListFromToolResponse,
+						})
+
 						stats.toolCalls += 1
 						onProgress({ stats: { ...stats } })
 						onProgress({ status: "completed", result: completionResult, stats: { ...stats } })
@@ -910,8 +926,10 @@ export class SubagentRunner {
 				...baseCallbacks,
 				say: async () => undefined,
 				ask: async () => ({ response: "yesButtonClicked" as const }),
-				updateFCListFromToolResponse: async (taskProgress: string | undefined) =>
-					focusChainManager.updateFCListFromToolResponse(taskProgress),
+				updateFCListFromToolResponse: async (
+					taskProgress: string | undefined,
+					toolContext?: DeterministicPlaceholderToolContext,
+				) => focusChainManager.updateFCListFromToolResponse(taskProgress, toolContext),
 				sayAndCreateMissingParamError: async (_toolName, paramName) =>
 					formatResponse.toolError(formatResponse.missingToolParameterError(paramName)),
 				removeLastPartialMessageIfExistsWithType: async () => undefined,

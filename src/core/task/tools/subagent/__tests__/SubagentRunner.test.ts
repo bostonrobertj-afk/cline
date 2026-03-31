@@ -1900,6 +1900,8 @@ Inspect reachable edge cases in the changed code.`,
 			config.taskState.activePlaceholderWorkflowValues = {
 				diff_output: path.join(tempDir, "review-input.diff"),
 			}
+			await fs.mkdir(path.dirname(config.taskState.activePlaceholderWorkflowValues!.diff_output), { recursive: true })
+			await fs.writeFile(config.taskState.activePlaceholderWorkflowValues!.diff_output, "diff --git a/file b/file", "utf8")
 
 			const runner = new SubagentRunner(config)
 			const state = new TaskState()
@@ -1939,7 +1941,7 @@ Return the findings to the user.`,
 					workflowName: "review-adversarial-general.md",
 					stepNumber: 1,
 					checklistLabel: "Step 1: Receive content and determine review scope",
-					reason: "review_input or diff_output is already available for this review pass.",
+					reason: "diff_output resolves to an existing file path.",
 				},
 			])
 		} finally {
@@ -2075,6 +2077,71 @@ Review the changed implementation for edge cases.`,
 			const subagentContent = await fs.readFile(subagentFilePath, "utf8")
 			assert.match(subagentContent, /- \[x\] Step 1: Gather Context/)
 			assert.match(subagentContent, /- \[ \] Step 2: Review/)
+		} finally {
+			sandbox.restore()
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("auto-completes a subagent final workflow step when attempt_completion succeeds", async () => {
+		const sandbox = sinon.createSandbox()
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "subagent-focus-chain-attempt-complete-"))
+		const createMessage = sinon.stub()
+		createMessage.onFirstCall().callsFake(async function* () {
+			yield {
+				type: "tool_calls",
+				tool_call: {
+					function: {
+						id: "toolu_subagent_attempt_completion_1",
+						name: ClineDefaultTool.ATTEMPT,
+						arguments: JSON.stringify({ result: "done" }),
+					},
+				},
+			}
+		})
+
+		try {
+			sandbox.stub(disk, "ensureTaskDirectoryExists").resolves(tempDir)
+			const promptRegistry = PromptRegistry.getInstance()
+			sinon.stub(promptRegistry, "get").callsFake(async () => {
+				promptRegistry.nativeTools = undefined
+				return "system prompt"
+			})
+			sinon.stub(skills, "discoverSkills").resolves([])
+			sinon.stub(skills, "getAvailableSkills").returns([])
+			;(workflowResolution.resolveAvailableWorkflows as sinon.SinonStub).resolves([
+				{
+					name: "review-adversarial-general.md",
+					source: "remote",
+					description: "Remote workflow: review-adversarial-general.md",
+					fileName: "review-adversarial-general.md",
+					contents: `# BMAD Review: Adversarial General
+
+## Step 3: Present findings
+Deliver findings using attempt_completion.`,
+				},
+			])
+			stubApiHandler(createMessage)
+			initializeHostProvider()
+
+			const config = createTaskConfig(false)
+			config.focusChainSettings = {
+				enabled: true,
+				remindClineInterval: 6,
+			} as any
+
+			const runner = new SubagentRunner(config)
+			const result = await runner.run("Skill: use_skill('review-adversarial-general.md')", () => {})
+
+			assert.equal(result.status, "completed")
+
+			const subagentFocusChainStorageKey = (runner as any).subagentFocusChainStorageKey as string
+			const subagentFilePath = getFocusChainFilePath(tempDir, config.taskId, {
+				key: subagentFocusChainStorageKey,
+				scope: "subagent",
+			})
+			const subagentContent = await fs.readFile(subagentFilePath, "utf8")
+			assert.match(subagentContent, /- \[x\] Step 3: Present findings/)
 		} finally {
 			sandbox.restore()
 			await fs.rm(tempDir, { recursive: true, force: true })

@@ -331,6 +331,54 @@ Persist the review findings artifact.`,
 		}
 	})
 
+	it("completes review-adversarial-general step 3 from successful attempt_completion tool context", async () => {
+		const taskState = createTaskState({
+			workflowName: "review-adversarial-general.md",
+			workflowContents: `## Step 3: Present findings
+Deliver findings using attempt_completion.`,
+			checklistMarkdown: "- [ ] Step 3: Present findings",
+		})
+
+		const result = await applyDeterministicPlaceholderProgression({
+			taskState,
+			checklistMarkdown: getChecklistMarkdown(taskState),
+			toolContext: {
+				toolName: "attempt_completion",
+				toolParams: { result: "Done" },
+				toolResult: "[attempt_completion] Result:\nDone",
+				toolWasExecuted: true,
+			},
+		})
+
+		expect(result.checklist).to.equal("- [x] Step 3: Present findings")
+		expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
+			"attempt_completion was executed successfully to deliver adversarial findings.",
+		)
+	})
+
+	it("does not complete review-adversarial-general step 3 when attempt_completion was not executed", async () => {
+		const taskState = createTaskState({
+			workflowName: "review-adversarial-general.md",
+			workflowContents: `## Step 3: Present findings
+Deliver findings using attempt_completion.`,
+			checklistMarkdown: "- [ ] Step 3: Present findings",
+		})
+
+		const result = await applyDeterministicPlaceholderProgression({
+			taskState,
+			checklistMarkdown: getChecklistMarkdown(taskState),
+			toolContext: {
+				toolName: "attempt_completion",
+				toolParams: { result: "Done" },
+				toolResult: "[attempt_completion] Result:\nDone",
+				toolWasExecuted: false,
+			},
+		})
+
+		expect(result.checklist).to.equal("- [ ] Step 3: Present findings")
+		expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+	})
+
 	it("completes code-review step 1 when spec_file is already available without review_target", async () => {
 		const taskState = createTaskState({
 			workflowName: "code-review.md",
@@ -895,6 +943,31 @@ Wait for the spec file to reach a terminal review status.`,
 		}
 	})
 
+	it("completes code-review step 7 from successful attempt_completion tool context", async () => {
+		const taskState = createTaskState({
+			workflowName: "code-review.md",
+			workflowContents: `## Step 7: Present QA Findings to the Human User
+Deliver the final QA findings using attempt_completion.`,
+			checklistMarkdown: "- [ ] Step 7: Present QA Findings to the Human User",
+		})
+
+		const result = await applyDeterministicPlaceholderProgression({
+			taskState,
+			checklistMarkdown: getChecklistMarkdown(taskState),
+			toolContext: {
+				toolName: "attempt_completion",
+				toolParams: { result: "Done" },
+				toolResult: "[attempt_completion] Result:\nDone",
+				toolWasExecuted: true,
+			},
+		})
+
+		expect(result.checklist).to.equal("- [x] Step 7: Present QA Findings to the Human User")
+		expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
+			"attempt_completion was executed successfully for the final QA findings report.",
+		)
+	})
+
 	it("completes dev-story step 2 when the Tasks / Subtasks section has only checked items", async () => {
 		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-dev-story-checked-"))
 
@@ -1009,6 +1082,31 @@ Wait for every story task to be checked off.`,
 		} finally {
 			await fs.rm(tempDir, { recursive: true, force: true })
 		}
+	})
+
+	it("completes dev-story step 4 from successful attempt_completion tool context", async () => {
+		const taskState = createTaskState({
+			workflowName: "dev-story.md",
+			workflowContents: `## Step 4: Closeout
+Provide the final closeout report using attempt_completion.`,
+			checklistMarkdown: "- [ ] Step 4: Closeout",
+		})
+
+		const result = await applyDeterministicPlaceholderProgression({
+			taskState,
+			checklistMarkdown: getChecklistMarkdown(taskState),
+			toolContext: {
+				toolName: "attempt_completion",
+				toolParams: { result: "Done" },
+				toolResult: "[attempt_completion] Result:\nDone",
+				toolWasExecuted: true,
+			},
+		})
+
+		expect(result.checklist).to.equal("- [x] Step 4: Closeout")
+		expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
+			"attempt_completion was executed successfully for the final closeout report.",
+		)
 	})
 
 	it("leaves unsupported placeholder workflows unchanged and adds no notices", async () => {

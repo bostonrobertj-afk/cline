@@ -1,0 +1,28 @@
+{
+	"files_in_context": [],
+	"model_usage": [],
+	"environment_history": [],
+	"activePlaceholderWorkflowId": "review-adversarial-general.md",
+	"activePlaceholderWorkflowSource": {
+		"type": "remote",
+		"name": "review-adversarial-general.md",
+		"contents": "# BMAD Review: Adversarial General\n\n## Step 3: Present findings\nDeliver findings using attempt_completion.",
+		"configPath": "/tmp/.cline/workflow-config.yaml"
+	},
+	"activePlaceholderWorkflowStableValues": {
+		"project-root": "/tmp",
+		"project_root": "/tmp",
+		"cwd": "/tmp",
+		"date": "2026-03-31",
+		"config_source": ".cline/workflow-config.yaml"
+	},
+	"activePlaceholderWorkflowTaskWriteProofPaths": [],
+	"pendingAutoCompletedPlaceholderWorkflowStepNotices": [
+		{
+			"workflowName": "review-adversarial-general.md",
+			"stepNumber": 3,
+			"checklistLabel": "Step 3: Present findings",
+			"reason": "attempt_completion was executed successfully to deliver adversarial findings."
+		}
+	]
+}
