@@ -32,6 +32,14 @@ function recordTaskWriteProof(taskState: TaskState, filePath: string): void {
 	taskState.activePlaceholderWorkflowTaskWriteProofPaths.push(path.resolve(filePath))
 }
 
+function getChecklistMarkdown(taskState: TaskState): string {
+	const checklistMarkdown = taskState.currentFocusChainChecklist
+	if (!checklistMarkdown) {
+		throw new Error("Expected currentFocusChainChecklist to be set for this test")
+	}
+	return checklistMarkdown
+}
+
 async function writeFileWithMtime(filePath: string, text: string, mtimeMs: number): Promise<void> {
 	await fs.mkdir(path.dirname(filePath), { recursive: true })
 	await fs.writeFile(filePath, text, "utf8")
@@ -43,9 +51,76 @@ describe("deterministicPlaceholderProgression", () => {
 	it("supports only the prescribed deterministic placeholder workflows", () => {
 		expect(isDeterministicPlaceholderWorkflowSupported("code-review.md")).to.equal(true)
 		expect(isDeterministicPlaceholderWorkflowSupported("dev-story.md")).to.equal(true)
+		expect(isDeterministicPlaceholderWorkflowSupported("review-adversarial-general.md")).to.equal(true)
 		expect(isDeterministicPlaceholderWorkflowSupported("code-review")).to.equal(false)
 		expect(isDeterministicPlaceholderWorkflowSupported("dev-story")).to.equal(false)
 		expect(isDeterministicPlaceholderWorkflowSupported("review-edge-case-hunter.md")).to.equal(false)
+	})
+
+	it("completes review-adversarial-general step 1 when diff_output is already available", async () => {
+		const taskState = createTaskState({
+			workflowName: "review-adversarial-general.md",
+			workflowContents: `## Step 1: Receive content and determine review scope
+Use {diff_output} when it is already available.
+
+## Step 2: Perform adversarial analysis
+Review the provided material.`,
+			checklistMarkdown:
+				"- [ ] Step 1: Receive content and determine review scope\n- [ ] Step 2: Perform adversarial analysis",
+			placeholderValues: {
+				diff_output: "/tmp/review-input.diff",
+			},
+		})
+
+		const result = await applyDeterministicPlaceholderProgression({
+			taskState,
+			checklistMarkdown: getChecklistMarkdown(taskState),
+		})
+
+		expect(result.checklist).to.equal(
+			"- [x] Step 1: Receive content and determine review scope\n- [ ] Step 2: Perform adversarial analysis",
+		)
+		expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
+			"review_input or diff_output is already available for this review pass.",
+		)
+	})
+
+	it("does not complete review-adversarial-general step 1 when neither review_input nor diff_output is available", async () => {
+		const taskState = createTaskState({
+			workflowName: "review-adversarial-general.md",
+			workflowContents: `## Step 1: Receive content and determine review scope
+Wait for the review input to be provided.`,
+			checklistMarkdown: "- [ ] Step 1: Receive content and determine review scope",
+		})
+
+		const result = await applyDeterministicPlaceholderProgression({
+			taskState,
+			checklistMarkdown: getChecklistMarkdown(taskState),
+		})
+
+		expect(result.checklist).to.equal("- [ ] Step 1: Receive content and determine review scope")
+		expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+	})
+
+	it("does not complete review-adversarial-general step 1 from stable diff_output alone", async () => {
+		const taskState = createTaskState({
+			workflowName: "review-adversarial-general.md",
+			workflowContents: `## Step 1: Receive content and determine review scope
+Use {diff_output} when it is already available.
+`,
+			checklistMarkdown: "- [ ] Step 1: Receive content and determine review scope",
+			stablePlaceholderValues: {
+				diff_output: "/tmp/review-input.diff",
+			},
+		})
+
+		const result = await applyDeterministicPlaceholderProgression({
+			taskState,
+			checklistMarkdown: getChecklistMarkdown(taskState),
+		})
+
+		expect(result.checklist).to.equal("- [ ] Step 1: Receive content and determine review scope")
+		expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
 	})
 
 	it("derives review_mode=full when fresh review input and diff artifacts exist", async () => {
@@ -81,7 +156,7 @@ Set review mode from the available review artifacts.`,
 
 			const result = await applyDeterministicPlaceholderProgression({
 				taskState,
-				checklistMarkdown: taskState.currentFocusChainChecklist!,
+				checklistMarkdown: getChecklistMarkdown(taskState),
 			})
 
 			expect(result.checklist).to.equal("- [x] Step 4: Derive Review Mode")
@@ -117,7 +192,7 @@ Set review mode from the available review artifacts.`,
 
 			const result = await applyDeterministicPlaceholderProgression({
 				taskState,
-				checklistMarkdown: taskState.currentFocusChainChecklist!,
+				checklistMarkdown: getChecklistMarkdown(taskState),
 			})
 
 			expect(result.checklist).to.equal("- [x] Step 4: Derive Review Mode")
@@ -153,7 +228,7 @@ Set review mode from the available review artifacts.`,
 
 			const result = await applyDeterministicPlaceholderProgression({
 				taskState,
-				checklistMarkdown: taskState.currentFocusChainChecklist!,
+				checklistMarkdown: getChecklistMarkdown(taskState),
 			})
 
 			expect(result.checklist).to.equal("- [x] Step 4: Derive Review Mode")
@@ -187,7 +262,7 @@ Wait for review input to be prepared.`,
 
 			const result = await applyDeterministicPlaceholderProgression({
 				taskState,
-				checklistMarkdown: taskState.currentFocusChainChecklist!,
+				checklistMarkdown: getChecklistMarkdown(taskState),
 			})
 
 			expect(result.checklist).to.equal("- [ ] Step 2: Build Review Input")
@@ -229,7 +304,7 @@ Wait for review input to be prepared.`,
 
 			const result = await applyDeterministicPlaceholderProgression({
 				taskState,
-				checklistMarkdown: taskState.currentFocusChainChecklist!,
+				checklistMarkdown: getChecklistMarkdown(taskState),
 			})
 
 			expect(result.checklist).to.equal("- [x] Step 2: Build Review Input")
@@ -269,7 +344,7 @@ Wait for the stable diff artifact to be prepared.`,
 
 			const result = await applyDeterministicPlaceholderProgression({
 				taskState,
-				checklistMarkdown: taskState.currentFocusChainChecklist!,
+				checklistMarkdown: getChecklistMarkdown(taskState),
 			})
 
 			expect(result.checklist).to.equal("- [x] Step 3: System-Owned Diff Source Resolution And Diff Output Persistence")
@@ -314,7 +389,7 @@ Wait for the stable diff artifact to be prepared.`,
 
 			const result = await applyDeterministicPlaceholderProgression({
 				taskState,
-				checklistMarkdown: taskState.currentFocusChainChecklist!,
+				checklistMarkdown: getChecklistMarkdown(taskState),
 			})
 
 			expect(result.checklist).to.equal("- [x] Step 3: System-Owned Diff Source Resolution And Diff Output Persistence")
@@ -352,7 +427,7 @@ Wait for diff output to be prepared.`,
 
 			const result = await applyDeterministicPlaceholderProgression({
 				taskState,
-				checklistMarkdown: taskState.currentFocusChainChecklist!,
+				checklistMarkdown: getChecklistMarkdown(taskState),
 			})
 
 			expect(result.checklist).to.equal("- [ ] Step 3: Build Diff Output")
@@ -390,7 +465,7 @@ Set review mode from the available review artifacts.`,
 
 			const result = await applyDeterministicPlaceholderProgression({
 				taskState,
-				checklistMarkdown: taskState.currentFocusChainChecklist!,
+				checklistMarkdown: getChecklistMarkdown(taskState),
 			})
 
 			expect(result.checklist).to.equal("- [ ] Step 4: Derive Review Mode")
@@ -440,7 +515,7 @@ Set review mode from the available review artifacts.`,
 
 			const result = await applyDeterministicPlaceholderProgression({
 				taskState,
-				checklistMarkdown: taskState.currentFocusChainChecklist!,
+				checklistMarkdown: getChecklistMarkdown(taskState),
 			})
 
 			expect(result.checklist).to.equal("- [x] Step 4: Derive Review Mode")
@@ -477,7 +552,7 @@ Wait for every required review layer to finish.`,
 
 			const result = await applyDeterministicPlaceholderProgression({
 				taskState,
-				checklistMarkdown: taskState.currentFocusChainChecklist!,
+				checklistMarkdown: getChecklistMarkdown(taskState),
 			})
 
 			expect(result.checklist).to.equal("- [x] Step 5: Complete Review Layers")
@@ -519,7 +594,7 @@ Wait for every required review layer to finish.`,
 
 			const result = await applyDeterministicPlaceholderProgression({
 				taskState,
-				checklistMarkdown: taskState.currentFocusChainChecklist!,
+				checklistMarkdown: getChecklistMarkdown(taskState),
 			})
 
 			expect(result.checklist).to.equal("- [ ] Step 5: Complete Review Layers")
@@ -549,7 +624,7 @@ Wait for the spec file to reach a terminal review status.`,
 
 			const result = await applyDeterministicPlaceholderProgression({
 				taskState,
-				checklistMarkdown: taskState.currentFocusChainChecklist!,
+				checklistMarkdown: getChecklistMarkdown(taskState),
 			})
 
 			expect(result.checklist).to.equal("- [x] Step 6: Finish Review")
@@ -578,7 +653,7 @@ Wait for the spec file to reach a terminal review status.`,
 
 			const result = await applyDeterministicPlaceholderProgression({
 				taskState,
-				checklistMarkdown: taskState.currentFocusChainChecklist!,
+				checklistMarkdown: getChecklistMarkdown(taskState),
 			})
 
 			expect(result.checklist).to.equal("- [ ] Step 6: Finish Review")
@@ -618,7 +693,7 @@ No changes needed.
 
 			const result = await applyDeterministicPlaceholderProgression({
 				taskState,
-				checklistMarkdown: taskState.currentFocusChainChecklist!,
+				checklistMarkdown: getChecklistMarkdown(taskState),
 			})
 
 			expect(result.checklist).to.equal("- [x] Step 2: Finish Tasks")
@@ -655,7 +730,7 @@ Wait for every story task to be checked off.`,
 
 			const result = await applyDeterministicPlaceholderProgression({
 				taskState,
-				checklistMarkdown: taskState.currentFocusChainChecklist!,
+				checklistMarkdown: getChecklistMarkdown(taskState),
 			})
 
 			expect(result.checklist).to.equal("- [ ] Step 2: Finish Tasks")
@@ -694,7 +769,7 @@ Wait for every story task to be checked off.`,
 
 			const result = await applyDeterministicPlaceholderProgression({
 				taskState,
-				checklistMarkdown: taskState.currentFocusChainChecklist!,
+				checklistMarkdown: getChecklistMarkdown(taskState),
 			})
 
 			expect(result.checklist).to.equal("- [x] Step 2: Finish Tasks")
@@ -713,7 +788,7 @@ Inspect the edge cases.`,
 
 		const result = await applyDeterministicPlaceholderProgression({
 			taskState,
-			checklistMarkdown: taskState.currentFocusChainChecklist!,
+			checklistMarkdown: getChecklistMarkdown(taskState),
 		})
 
 		expect(result.checklist).to.equal("- [ ] Step 1: Review")

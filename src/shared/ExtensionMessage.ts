@@ -397,26 +397,41 @@ export interface WorkflowFormFieldDefinition {
 	help: string
 	control: WorkflowFormFieldControl
 	required: boolean
+	oneOfGroupId?: string
 	placeholder?: string
 	options?: WorkflowFormFieldOption[]
 	visible?: boolean
 }
 
-export interface ClineWorkflowForm {
-	sessionId: string
-	resolverId: string
-	toolName: string
-	title: string
+export type WorkflowFormRenderablePhase = Extract<
+	WorkflowFormPhase,
+	"confirm" | "select_source" | "collect_inputs" | "retry_error"
+>
+
+export interface WorkflowFormPageDefinition {
 	prompt: string
-	phase: WorkflowFormPhase
-	toolDictionaryTitle: string
-	toolDictionaryMarkdown: string
 	options?: string[]
 	fields?: WorkflowFormFieldDefinition[]
-	values?: Record<string, WorkflowFormFieldValuePayload>
 	submitLabel?: string
 	cancelLabel?: string
 	retryLabel?: string
+}
+
+export interface WorkflowFormDefinition {
+	toolName: string
+	title: string
+	toolDictionaryTitle: string
+	toolDictionaryMarkdown: string
+	pages: Partial<Record<WorkflowFormRenderablePhase, WorkflowFormPageDefinition>>
+	successMessage: string
+}
+
+export interface ClineWorkflowForm {
+	sessionId: string
+	resolverId: string
+	phase: WorkflowFormPhase
+	definition: WorkflowFormDefinition
+	values?: Record<string, WorkflowFormFieldValuePayload>
 	errorMessage?: string
 	successMessage?: string
 }

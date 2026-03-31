@@ -80,6 +80,22 @@ export function findUnresolvedWorkflowPlaceholders(text: string | undefined): st
 	return Array.from(unresolved)
 }
 
+export function extractWorkflowPlaceholderKeys(text: string | undefined): string[] {
+	if (!isNonEmptyString(text)) {
+		return []
+	}
+
+	const keys = new Set<string>()
+	for (const match of text.matchAll(WORKFLOW_PLACEHOLDER_TOKEN_REGEX)) {
+		const key = String(match[1] ?? match[2] ?? "").trim()
+		if (key.length > 0) {
+			keys.add(key)
+		}
+	}
+
+	return Array.from(keys)
+}
+
 function toConfigSource(cwd: string, configPath?: string): string | undefined {
 	if (!configPath) {
 		return undefined

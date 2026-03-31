@@ -119,6 +119,10 @@ async function zipDistribution() {
 	const output = fs.createWriteStream(zipPath)
 	const startTime = Date.now()
 	const archive = archiver("zip", { zlib: { level: 6 } })
+	const outputClosed = new Promise((resolve, reject) => {
+		output.on("close", resolve)
+		output.on("error", reject)
+	})
 
 	output.on("close", () => {
 		const endTime = Date.now()
@@ -154,6 +158,7 @@ async function zipDistribution() {
 
 	console.log("Zipping package...")
 	await archive.finalize()
+	await outputClosed
 	return zipPath
 }
 

@@ -1,0 +1,126 @@
+import path from "path"
+import type { PersistentSlashCommandAction } from "@/core/slash-commands"
+import { getPlaceholderWorkflowValueMap } from "@/core/workflows/placeholder-workflow-rendering"
+import { getActivePlaceholderWorkflowStepDetails } from "@/core/workflows/placeholder-workflow-step-details"
+import {
+	fileExistsForPlaceholderWorkflowWriteProof,
+	taskStateHasPlaceholderWorkflowWriteProof,
+} from "../focus-chain/placeholderWorkflowWriteProofs"
+import type { TaskState } from "../TaskState"
+import type { WorkflowFormSessionContext, WorkflowFormSessionOwner, WorkflowFormTriggerSource } from "./types"
+import {
+	CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID,
+	PLACEHOLDER_WORKFLOW_START_SET_WORKFLOW_PLACEHOLDERS_RESOLVER_ID,
+} from "./WorkflowFormRegistry"
+import { parseWorkflowStartRequirements } from "./workflowStartRequirements"
+
+export interface WorkflowFormWorkflowStepTriggerDefinition {
+	workflowName: string
+	stepNumber: number
+	resolverId: string
+	shouldIntercept(args: {
+		cwd: string
+		taskState: Pick<
+			TaskState,
+			| "activePlaceholderWorkflowStableValues"
+			| "activePlaceholderWorkflowValues"
+			| "activePlaceholderWorkflowTaskWriteProofPaths"
+		>
+	}): Promise<boolean>
+}
+
+export interface WorkflowFormStartCandidate {
+	resolverId: string
+	triggerSource: WorkflowFormTriggerSource
+	owner: WorkflowFormSessionOwner
+	initialPhase: "collect_inputs"
+	context: WorkflowFormSessionContext
+	activeStep: {
+		stepNumber: number
+		stepTitle: string
+	}
+}
+
+export async function resolveWorkflowFormSlashCommandStartCandidate(args: {
+	cwd: string
+	taskState: Pick<
+		TaskState,
+		| "activePlaceholderWorkflowSource"
+		| "currentFocusChainChecklist"
+		| "activePlaceholderWorkflowStableValues"
+		| "activePlaceholderWorkflowValues"
+	>
+	currentTurnSlashCommandAction?: PersistentSlashCommandAction
+}): Promise<WorkflowFormStartCandidate | undefined> {
+	if (args.currentTurnSlashCommandAction?.type !== "activate_placeholder_workflow") {
+		return undefined
+	}
+
+	if (!args.taskState.activePlaceholderWorkflowSource || !args.taskState.currentFocusChainChecklist) {
+		return undefined
+	}
+
+	const activeStep = await getActivePlaceholderWorkflowStepDetails({
+		checklistMarkdown: args.taskState.currentFocusChainChecklist,
+		source: args.taskState.activePlaceholderWorkflowSource,
+		stablePlaceholderValues: args.taskState.activePlaceholderWorkflowStableValues,
+		placeholderValues: args.taskState.activePlaceholderWorkflowValues,
+	})
+	if (activeStep?.stepNumber !== 1) {
+		return undefined
+	}
+
+	const parsedRequirements = parseWorkflowStartRequirements(activeStep.rawDetails)
+	if (!parsedRequirements) {
+		return undefined
+	}
+
+	return {
+		resolverId: PLACEHOLDER_WORKFLOW_START_SET_WORKFLOW_PLACEHOLDERS_RESOLVER_ID,
+		triggerSource: "slash_command",
+		owner: {
+			kind: "slash_command",
+			workflowName: args.taskState.activePlaceholderWorkflowSource.name,
+			stepNumber: 1,
+		},
+		initialPhase: "collect_inputs",
+		context: {
+			workflowName: args.taskState.activePlaceholderWorkflowSource.name,
+			workflowStartRequirements: parsedRequirements,
+		},
+		activeStep: {
+			stepNumber: 1,
+			stepTitle: activeStep.stepTitle,
+		},
+	}
+}
+
+export const workflowFormWorkflowStepTriggerRegistry: WorkflowFormWorkflowStepTriggerDefinition[] = [
+	{
+		workflowName: "code-review.md",
+		stepNumber: 3,
+		resolverId: CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID,
+		async shouldIntercept({ cwd, taskState }) {
+			const placeholders = getPlaceholderWorkflowValueMap(
+				taskState.activePlaceholderWorkflowStableValues,
+				taskState.activePlaceholderWorkflowValues,
+			)
+			const diffOutputPath = placeholders?.diff_output?.trim()
+			if (!diffOutputPath) {
+				return true
+			}
+
+			const resolvedDiffOutputPath = path.isAbsolute(diffOutputPath) ? diffOutputPath : path.resolve(cwd, diffOutputPath)
+			return !(
+				taskStateHasPlaceholderWorkflowWriteProof(taskState, resolvedDiffOutputPath) &&
+				(await fileExistsForPlaceholderWorkflowWriteProof(resolvedDiffOutputPath))
+			)
+		},
+	},
+]
+
+export function getWorkflowFormWorkflowStepTriggerDefinition(workflowName: string, stepNumber: number) {
+	return workflowFormWorkflowStepTriggerRegistry.find(
+		(trigger) => trigger.workflowName === workflowName && trigger.stepNumber === stepNumber,
+	)
+}

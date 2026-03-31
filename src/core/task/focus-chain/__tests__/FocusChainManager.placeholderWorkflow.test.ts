@@ -333,9 +333,38 @@ Fallback instructions live here.
 			}
 
 			expect(await shouldInterceptWorkflowFormBeforeApiTurn({ cwd: tempDir, taskState })).to.equal(false)
+
+			taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "code-review.md",
+				contents: taskState.activePlaceholderWorkflowSource.contents,
+			}
+			taskState.currentFocusChainChecklist = [
+				"- [x] Step 1: Determine Review Source",
+				"- [ ] Step 2: Construct & Persist Review Input File",
+				"- [ ] Step 3: System-Owned Diff Source Resolution And Diff Output Persistence",
+			].join("\n")
+
+			expect(await shouldInterceptWorkflowFormBeforeApiTurn({ cwd: tempDir, taskState })).to.equal(false)
 		} finally {
 			await fs.rm(tempDir, { recursive: true, force: true })
 		}
+	})
+
+	it("does not request the Phase 1 workflow form for review-adversarial-general step 1 on ordinary continuation turns", async () => {
+		const taskState = new TaskState()
+		taskState.activePlaceholderWorkflowSource = {
+			type: "remote",
+			name: "review-adversarial-general.md",
+			contents: `# Adversarial Review
+
+## Step 1: Receive content and determine review scope
+Use {review_input} or {diff_output} when they are available.
+`,
+		}
+		taskState.currentFocusChainChecklist = "- [ ] Step 1: Receive content and determine review scope"
+
+		expect(await shouldInterceptWorkflowFormBeforeApiTurn({ cwd: process.cwd(), taskState })).to.equal(false)
 	})
 
 	it("shows the fallback Step 3 instructions when the workflow-form path is not completed", async () => {

@@ -5,6 +5,7 @@ import {
 	type WorkflowFormSubmissionRequest,
 } from "@shared/proto/cline/task"
 import { randomUUID } from "crypto"
+import { buildWorkflowFormPayload } from "./buildWorkflowFormPayload"
 import type {
 	WorkflowFormResolverDefinition,
 	WorkflowFormRuntimeCreateSessionOptions,
@@ -13,6 +14,51 @@ import type {
 	WorkflowFormValues,
 } from "./types"
 import { workflowFormRegistry } from "./WorkflowFormRegistry"
+
+function hasWorkflowFormValue(value: WorkflowFormFieldValuePayload | undefined): boolean {
+	if (!value) {
+		return false
+	}
+
+	if (typeof value.stringValue === "string" && value.stringValue.trim().length > 0) {
+		return true
+	}
+
+	if (typeof value.integerValue === "number") {
+		return true
+	}
+
+	return Array.isArray(value.stringArrayValue) && value.stringArrayValue.some((entry) => entry.trim().length > 0)
+}
+
+function getCurrentPageFields(session: WorkflowFormSessionState, resolver: WorkflowFormResolverDefinition) {
+	const definition = resolver.buildDefinition(session)
+	const page = session.phase === "success" ? undefined : definition.pages[session.phase]
+	return page?.fields ?? []
+}
+
+function areRequiredWorkflowFormFieldsSatisfied(
+	values: WorkflowFormValues,
+	fields: Array<{ key: string; required: boolean }>,
+): boolean {
+	return fields.filter((field) => field.required).every((field) => hasWorkflowFormValue(values[field.key]))
+}
+
+function areOneOfWorkflowFormGroupsSatisfied(
+	values: WorkflowFormValues,
+	fields: Array<{ key: string; oneOfGroupId?: string }>,
+): boolean {
+	const groupedKeys = fields.reduce<Record<string, string[]>>((acc, field) => {
+		if (!field.oneOfGroupId) {
+			return acc
+		}
+		acc[field.oneOfGroupId] ??= []
+		acc[field.oneOfGroupId].push(field.key)
+		return acc
+	}, {})
+
+	return Object.values(groupedKeys).every((groupKeys) => groupKeys.some((key) => hasWorkflowFormValue(values[key])))
+}
 
 function buildValuesFromSubmissions(fields: WorkflowFormFieldSubmission[]): WorkflowFormValues {
 	return fields.reduce<WorkflowFormValues>((accumulator, field) => {
@@ -45,28 +91,18 @@ export class WorkflowFormRuntime {
 			resolverId: options.resolverId,
 			triggerSource: options.triggerSource,
 			owner: options.owner,
-			phase: "confirm",
+			phase: options.initialPhase ?? "confirm",
+			initialPhase: options.initialPhase ?? "confirm",
 			values: {},
+			context: options.context,
 		}
 	}
 
 	buildPayload(session: WorkflowFormSessionState): ClineWorkflowForm {
 		const resolver = this.getResolver(session.resolverId)
+		const definition = resolver.buildDefinition(session)
 
-		switch (session.phase) {
-			case "confirm":
-				return resolver.buildConfirmPayload(session)
-			case "select_source":
-				return resolver.buildSelectSourcePayload(session)
-			case "collect_inputs":
-				return resolver.buildCollectInputsPayload(session)
-			case "retry_error":
-				return resolver.buildRetryPayload(session)
-			case "success":
-				return this.buildSuccessPayload(session, "The workflow form completed successfully.")
-			default:
-				return resolver.buildConfirmPayload(session)
-		}
+		return buildWorkflowFormPayload({ session, definition })
 	}
 
 	buildRetryPayload(session: WorkflowFormSessionState, errorMessage: string): ClineWorkflowForm {
@@ -75,28 +111,26 @@ export class WorkflowFormRuntime {
 			phase: "retry_error",
 			lastError: errorMessage,
 		}
+		const resolver = this.getResolver(retrySession.resolverId)
+		const definition = resolver.buildDefinition(retrySession)
 
-		return this.getResolver(retrySession.resolverId).buildRetryPayload(retrySession)
+		return buildWorkflowFormPayload({
+			session: retrySession,
+			definition,
+			errorMessage,
+		})
 	}
 
 	buildSuccessPayload(session: WorkflowFormSessionState, successMessage: string): ClineWorkflowForm {
 		const resolver = this.getResolver(session.resolverId)
-		const basePayload = resolver.buildCollectInputsPayload({
-			...session,
-			phase: "collect_inputs",
-		})
+		const successSession = { ...session, phase: "success" as const }
+		const definition = resolver.buildDefinition(successSession)
 
-		return {
-			...basePayload,
-			phase: "success",
-			fields: undefined,
-			options: undefined,
-			submitLabel: undefined,
-			cancelLabel: undefined,
-			retryLabel: undefined,
-			errorMessage: undefined,
+		return buildWorkflowFormPayload({
+			session: successSession,
+			definition,
 			successMessage,
-		}
+		})
 	}
 
 	handleSubmission(session: WorkflowFormSessionState, request: WorkflowFormSubmissionRequest): WorkflowFormRuntimeOutcome {
@@ -129,7 +163,7 @@ export class WorkflowFormRuntime {
 				return {
 					kind: "render_form",
 					session: nextSession,
-					payload: resolver.buildSelectSourcePayload(nextSession),
+					payload: this.buildPayload(nextSession),
 				}
 			}
 
@@ -151,7 +185,7 @@ export class WorkflowFormRuntime {
 						...session,
 						values: nextValues,
 					},
-					payload: resolver.buildSelectSourcePayload({
+					payload: this.buildPayload({
 						...session,
 						values: nextValues,
 					}),
@@ -168,7 +202,7 @@ export class WorkflowFormRuntime {
 			return {
 				kind: "render_form",
 				session: nextSession,
-				payload: resolver.buildCollectInputsPayload(nextSession),
+				payload: this.buildPayload(nextSession),
 			}
 		}
 
@@ -176,6 +210,40 @@ export class WorkflowFormRuntime {
 			(session.phase === "collect_inputs" || session.phase === "retry_error") &&
 			request.action === WorkflowFormAction.SUBMIT
 		) {
+			const fields = getCurrentPageFields(session, resolver)
+			if (!areRequiredWorkflowFormFieldsSatisfied(nextValues, fields)) {
+				const nextSession: WorkflowFormSessionState = {
+					...session,
+					phase: "retry_error",
+					values: nextValues,
+					lastError: "required fields are missing input",
+				}
+
+				return {
+					kind: "render_form",
+					session: nextSession,
+					payload: this.buildRetryPayload(nextSession, "required fields are missing input"),
+				}
+			}
+
+			if (!areOneOfWorkflowFormGroupsSatisfied(nextValues, fields)) {
+				const nextSession: WorkflowFormSessionState = {
+					...session,
+					phase: "retry_error",
+					values: nextValues,
+					lastError: "One-of fields require at least one field be completed prior to submitting",
+				}
+
+				return {
+					kind: "render_form",
+					session: nextSession,
+					payload: this.buildRetryPayload(
+						nextSession,
+						"One-of fields require at least one field be completed prior to submitting",
+					),
+				}
+			}
+
 			const nextSession: WorkflowFormSessionState = {
 				...session,
 				phase: session.phase,
@@ -186,12 +254,31 @@ export class WorkflowFormRuntime {
 			return {
 				kind: "invoke_tool",
 				session: nextSession,
-				toolName: resolver.toolName,
-				toolInput: resolver.translateSubmissionToToolUse(nextValues),
+				...resolver.buildToolExecutionRequest(nextSession, nextValues),
 			}
 		}
 
 		if (session.phase === "retry_error" && request.action === WorkflowFormAction.RETRY) {
+			const restartPhase = session.initialPhase === "collect_inputs" ? "collect_inputs" : "select_source"
+			if (restartPhase === "collect_inputs") {
+				const pageFields = getCurrentPageFields(session, resolver)
+				const placeholderFieldKeys = pageFields.map((field) => field.key)
+				const nextSession: WorkflowFormSessionState = {
+					...session,
+					phase: "collect_inputs",
+					values: Object.fromEntries(
+						Object.entries(session.values).filter(([key]) => placeholderFieldKeys.includes(key)),
+					),
+					lastError: undefined,
+				}
+
+				return {
+					kind: "render_form",
+					session: nextSession,
+					payload: this.buildPayload(nextSession),
+				}
+			}
+
 			const confirmValue = session.values.confirm
 			const nextSession: WorkflowFormSessionState = {
 				...session,
@@ -203,7 +290,7 @@ export class WorkflowFormRuntime {
 			return {
 				kind: "render_form",
 				session: nextSession,
-				payload: resolver.buildSelectSourcePayload(nextSession),
+				payload: this.buildPayload(nextSession),
 			}
 		}
 

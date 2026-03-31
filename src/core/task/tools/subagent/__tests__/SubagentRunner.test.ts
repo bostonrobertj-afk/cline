@@ -22,6 +22,49 @@ import { TaskState } from "../../../TaskState"
 import { SubagentBuilder } from "../SubagentBuilder"
 import { SubagentRunner } from "../SubagentRunner"
 
+type PromptContextArgs = {
+	state: TaskState
+	hostIde: string
+	providerInfo: { providerId: string; model: { id: string }; mode: string }
+	availableSkills: unknown[]
+	configuredSkillNames: string[] | undefined
+	assignedSkillNames: string[]
+	nativeToolCallsRequested: boolean
+	shouldSendFullPromptAssembly: boolean
+	shouldUseContinuationPrompt: boolean
+}
+
+type PromptContextResult = {
+	mcpHub?: unknown
+	managedWorkflowActive?: boolean
+	activeWorkflowReminder?: string
+	activeWorkflowSupportsPlaceholders?: boolean
+	skills?: Array<{ name: string }>
+}
+
+const createSubagentTaskConfig = Reflect.get(SubagentRunner.prototype, "createSubagentTaskConfig") as (
+	this: SubagentRunner,
+	state: TaskState,
+) => TaskConfig
+const buildPromptContext = Reflect.get(SubagentRunner.prototype, "buildPromptContext") as (
+	this: SubagentRunner,
+	args: PromptContextArgs,
+) => Promise<PromptContextResult>
+const autoActivateAssignedWorkflow = Reflect.get(SubagentRunner.prototype, "autoActivateAssignedWorkflow") as (
+	this: SubagentRunner,
+	state: TaskState,
+	assignedSkillNames: string[],
+	availableWorkflows: unknown[],
+) => Promise<void>
+const inheritSharedParentPlaceholdersToActivatedWorkflow = Reflect.get(
+	SubagentRunner.prototype,
+	"inheritSharedParentPlaceholdersToActivatedWorkflow",
+) as (this: SubagentRunner, state: TaskState) => Promise<void>
+
+function getSubagentFocusChainStorageKey(runner: SubagentRunner): string {
+	return Reflect.get(runner, "subagentFocusChainStorageKey") as string
+}
+
 function initializeHostProvider() {
 	HostProvider.reset()
 	HostProvider.initialize(
@@ -1720,6 +1763,69 @@ Review the changed implementation for edge cases.`,
 		assert.deepEqual(state.activePlaceholderWorkflowValues, { review_focus: "security" })
 	})
 
+	it("inherits only shared referenced parent placeholders into an activated subagent workflow", async () => {
+		const config = createTaskConfig(false)
+		config.taskState.activePlaceholderWorkflowId = "code-review.md"
+		config.taskState.activePlaceholderWorkflowSource = {
+			type: "remote",
+			name: "code-review.md",
+			contents: "# Code Review",
+		}
+		config.taskState.activePlaceholderWorkflowStableValues = { project_root: "/tmp/project" }
+		config.taskState.activePlaceholderWorkflowValues = {
+			diff_output: "/tmp/project/review-input.diff",
+			review_input: "/tmp/project/review-input.md",
+			review_mode: "full",
+		}
+
+		const runner = new SubagentRunner(config)
+		const state = new TaskState()
+		state.activePlaceholderWorkflowSource = {
+			type: "remote",
+			name: "review-adversarial-general.md",
+			contents: `# Review
+
+## Step 1: Receive content and determine review scope
+Use {diff_output} when it is available.
+
+## Step 2: Perform adversarial analysis
+Inspect only the provided diff.`,
+		}
+
+		await (runner as any).inheritSharedParentPlaceholdersToActivatedWorkflow(state)
+
+		assert.deepEqual(state.activePlaceholderWorkflowValues, {
+			diff_output: "/tmp/project/review-input.diff",
+		})
+	})
+
+	it("does not overwrite child placeholder values that are already resolved", async () => {
+		const config = createTaskConfig(false)
+		config.taskState.activePlaceholderWorkflowValues = {
+			diff_output: "/tmp/project/parent-review-input.diff",
+		}
+
+		const runner = new SubagentRunner(config)
+		const state = new TaskState()
+		state.activePlaceholderWorkflowSource = {
+			type: "remote",
+			name: "review-adversarial-general.md",
+			contents: `# Review
+
+## Step 1: Receive content and determine review scope
+Use {diff_output} when it is available.`,
+		}
+		state.activePlaceholderWorkflowValues = {
+			diff_output: "/tmp/project/child-review-input.diff",
+		}
+
+		await (runner as any).inheritSharedParentPlaceholdersToActivatedWorkflow(state)
+
+		assert.deepEqual(state.activePlaceholderWorkflowValues, {
+			diff_output: "/tmp/project/child-review-input.diff",
+		})
+	})
+
 	it("seeds a placeholder checklist from step headings when auto-activating a subagent workflow", async () => {
 		const sandbox = sinon.createSandbox()
 		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "subagent-focus-chain-seed-"))
@@ -1770,6 +1876,72 @@ Inspect reachable edge cases in the changed code.`,
 			const subagentContent = await fs.readFile(subagentFilePath, "utf8")
 			assert.match(subagentContent, /Step 1: Gather Context/)
 			assert.match(subagentContent, /Step 2: Review/)
+		} finally {
+			sandbox.restore()
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("advances review-adversarial-general.md before the first subagent turn when inherited diff_output already satisfies step 1", async () => {
+		const sandbox = sinon.createSandbox()
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "subagent-review-adversarial-initial-deterministic-"))
+
+		try {
+			sandbox.stub(disk, "ensureTaskDirectoryExists").resolves(tempDir)
+
+			const config = createTaskConfig(false)
+			config.taskState.activePlaceholderWorkflowId = "code-review.md"
+			config.taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "code-review.md",
+				contents: "# Code Review",
+			}
+			config.taskState.activePlaceholderWorkflowStableValues = { project_root: tempDir }
+			config.taskState.activePlaceholderWorkflowValues = {
+				diff_output: path.join(tempDir, "review-input.diff"),
+			}
+
+			const runner = new SubagentRunner(config)
+			const state = new TaskState()
+
+			await (runner as any).autoActivateAssignedWorkflow(
+				state,
+				["review-adversarial-general.md"],
+				[
+					{
+						name: "review-adversarial-general.md",
+						source: "remote",
+						description: "Remote workflow: review-adversarial-general.md",
+						fileName: "review-adversarial-general.md",
+						contents: `# BMAD Review: Adversarial General
+
+## Step 1: Receive content and determine review scope
+Use {diff_output} when it is already available.
+
+## Step 2: Perform adversarial analysis
+Review the provided material only.
+
+## Step 3: Present findings
+Return the findings to the user.`,
+					},
+				],
+			)
+
+			assert.deepEqual(state.activePlaceholderWorkflowValues, {
+				diff_output: path.join(tempDir, "review-input.diff"),
+			})
+			assert.equal(
+				state.currentFocusChainChecklist,
+				"- [x] Step 1: Receive content and determine review scope\n- [ ] Step 2: Perform adversarial analysis\n- [ ] Step 3: Present findings",
+			)
+			assert.deepEqual(state.pendingAutoCompletedPlaceholderWorkflowStepNotices, [
+				{
+					workflowName: "review-adversarial-general.md",
+					stepNumber: 1,
+					checklistLabel: "Step 1: Receive content and determine review scope",
+					reason: "review_input or diff_output is already available for this review pass.",
+				},
+			])
 		} finally {
 			sandbox.restore()
 			await fs.rm(tempDir, { recursive: true, force: true })

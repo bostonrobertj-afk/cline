@@ -3,7 +3,11 @@ import fs from "fs/promises"
 import { describe, it } from "mocha"
 import os from "os"
 import path from "path"
-import { buildWorkflowStablePlaceholders, getCanonicalWorkflowConfigPath } from "../workflow-placeholders"
+import {
+	buildWorkflowStablePlaceholders,
+	extractWorkflowPlaceholderKeys,
+	getCanonicalWorkflowConfigPath,
+} from "../workflow-placeholders"
 
 describe("workflow placeholders", () => {
 	it("builds built-in stable placeholders even without a config file", async () => {
@@ -63,5 +67,18 @@ describe("workflow placeholders", () => {
 		} finally {
 			await fs.rm(tempDir, { recursive: true, force: true })
 		}
+	})
+
+	it("extracts unique normalized placeholder keys from single-curly and double-curly tokens", () => {
+		expect(
+			extractWorkflowPlaceholderKeys(
+				"Review {diff_output}, compare {{ review_input }}, keep {diff_output}, and ignore plain text.",
+			),
+		).to.deep.equal(["diff_output", "review_input"])
+	})
+
+	it("returns an empty array when there are no placeholder tokens", () => {
+		expect(extractWorkflowPlaceholderKeys(undefined)).to.deep.equal([])
+		expect(extractWorkflowPlaceholderKeys("No placeholders here.")).to.deep.equal([])
 	})
 })

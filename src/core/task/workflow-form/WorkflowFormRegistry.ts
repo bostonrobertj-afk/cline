@@ -1,11 +1,16 @@
-import type { ClineWorkflowForm, WorkflowFormFieldDefinition, WorkflowFormFieldOption } from "@shared/ExtensionMessage"
+import type { WorkflowFormDefinition, WorkflowFormFieldDefinition, WorkflowFormFieldOption } from "@shared/ExtensionMessage"
+import { formatResponse } from "@/core/prompts/responses"
 import {
-	buildRuntimeToolDictionaryMarkdown,
-	buildToolDictionaryMarkdown,
-	WORKFLOW_FORM_RUNTIME_TOOL_REFERENCE_TITLE,
+	buildReviewDiffOutputToolDictionaryConfig,
+	buildRuntimeToolDictionaryMarkdownFromConfig,
 } from "@/core/task/workflow-form/dictionaries/buildToolDictionary"
 import { workflowFormSystemDictionary } from "@/core/task/workflow-form/dictionaries/systemDictionary"
-import type { WorkflowFormResolverDefinition, WorkflowFormSessionState, WorkflowFormValues } from "./types"
+import { ClineDefaultTool } from "@/shared/tools"
+import type { WorkflowFormResolverDefinition, WorkflowFormResolverId, WorkflowFormValues } from "./types"
+
+export const CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID = "code_review_step_3_diff_source"
+export const PLACEHOLDER_WORKFLOW_START_SET_WORKFLOW_PLACEHOLDERS_RESOLVER_ID =
+	"placeholder_workflow_start_set_workflow_placeholders"
 
 const SOURCE_TYPE_FIELD_KEY = "source.type"
 const SOURCE_COMMIT_FIELD_KEY = "source.commit"
@@ -13,7 +18,6 @@ const SOURCE_BASE_FIELD_KEY = "source.base"
 const SOURCE_HEAD_FIELD_KEY = "source.head"
 const SCOPED_PATHS_FIELD_KEY = "scoped_paths"
 const CONTEXT_LINES_FIELD_KEY = "context_lines"
-const RUNTIME_TOOL_DICTIONARY_MARKDOWN = buildRuntimeToolDictionaryMarkdown()
 
 function getStringValue(values: WorkflowFormValues, key: string): string | undefined {
 	return values[key]?.stringValue?.trim()
@@ -124,77 +128,147 @@ function buildConcreteInputFieldDefinitions(values: WorkflowFormValues): Workflo
 	]
 }
 
-function buildBasePayload(
-	session: WorkflowFormSessionState,
-	overrides: Pick<ClineWorkflowForm, "prompt" | "phase"> &
-		Partial<
-			Pick<
-				ClineWorkflowForm,
-				"options" | "fields" | "submitLabel" | "cancelLabel" | "retryLabel" | "errorMessage" | "successMessage"
-			>
-		>,
-): ClineWorkflowForm {
-	return {
-		sessionId: session.sessionId,
-		resolverId: session.resolverId,
-		toolName: "build_review_diff_output",
-		title: "Review Diff Artifact",
-		prompt: overrides.prompt,
-		phase: overrides.phase,
-		toolDictionaryTitle: WORKFLOW_FORM_RUNTIME_TOOL_REFERENCE_TITLE,
-		toolDictionaryMarkdown: RUNTIME_TOOL_DICTIONARY_MARKDOWN,
-		options: overrides.options,
-		fields: overrides.fields,
-		values: session.values,
-		submitLabel: overrides.submitLabel,
-		cancelLabel: overrides.cancelLabel,
-		retryLabel: overrides.retryLabel,
-		errorMessage: overrides.errorMessage,
-		successMessage: overrides.successMessage,
+const WORKFLOW_START_TOOL_DICTIONARY_CONFIG = {
+	toolName: ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
+	heading: "## set_workflow_placeholders",
+	runtimeTitle: "Workflow Placeholder Reference",
+	overviewLines: ["Persist dynamic placeholder values for the active workflow before the first AI turn begins."],
+	parameterDescriptions: {
+		values: "Workflow placeholder key/value map. Submit only the placeholders the human actually supplied.",
+	},
+	termKeys: [],
+}
+
+interface WorkflowStartFormOverride {
+	title: string
+	prompt: string
+	labels: Record<string, string>
+	help: Record<string, string>
+}
+
+const workflowStartFormOverrides: Record<string, WorkflowStartFormOverride> = {
+	"review-adversarial-general.md": {
+		title: "Adversarial Review Inputs",
+		prompt: "Provide the review material needed to begin this workflow. Supply at least one review target. If you also have a supporting spec or story file, include it as `spec_file`.",
+		labels: {
+			review_input: "Review Input File",
+			diff_output: "Review Diff File",
+			spec_file: "Spec or Story File",
+		},
+		help: {
+			review_input: "Path to an existing review-input markdown file for this review.",
+			diff_output: "Path to an existing review-input diff file for this review.",
+			spec_file: "Optional path to a story, spec, or requirements file that defines expected behavior.",
+		},
+	},
+}
+
+function humanizeWorkflowPlaceholderKey(key: string): string {
+	return key
+		.split("_")
+		.filter(Boolean)
+		.map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`)
+		.join(" ")
+}
+
+function buildWorkflowStartPlaceholderFieldDefinitions(args: {
+	requiredFieldKeys: string[]
+	optionalFieldKeys: string[]
+	oneOfRequirement?: { id: string; fieldKeys: string[] }
+	override?: WorkflowStartFormOverride
+}): WorkflowFormFieldDefinition[] {
+	const orderedKeys = [...args.requiredFieldKeys, ...args.optionalFieldKeys, ...(args.oneOfRequirement?.fieldKeys ?? [])]
+	const requiredFieldKeySet = new Set(args.requiredFieldKeys)
+	const oneOfFieldKeySet = new Set(args.oneOfRequirement?.fieldKeys ?? [])
+
+	return orderedKeys.reduce<WorkflowFormFieldDefinition[]>((fields, key) => {
+		if (fields.some((field) => field.key === key)) {
+			return fields
+		}
+
+		fields.push({
+			key,
+			label: args.override?.labels[key] ?? humanizeWorkflowPlaceholderKey(key),
+			help: args.override?.help[key] ?? humanizeWorkflowPlaceholderKey(key),
+			control: "text",
+			required: requiredFieldKeySet.has(key),
+			oneOfGroupId: oneOfFieldKeySet.has(key) ? args.oneOfRequirement?.id : undefined,
+			placeholder: "/absolute/path/to/file-or-artifact",
+			visible: true,
+		})
+
+		return fields
+	}, [])
+}
+
+function parseWorkflowFormJsonToolResult(text?: string): Record<string, unknown> | undefined {
+	if (!text) {
+		return undefined
+	}
+
+	try {
+		const parsed = JSON.parse(text)
+		return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : undefined
+	} catch {
+		return undefined
 	}
 }
 
-export const workflowFormRegistry: Record<"code_review_step_3_diff_source", WorkflowFormResolverDefinition> = {
-	code_review_step_3_diff_source: {
-		id: "code_review_step_3_diff_source",
-		toolName: "build_review_diff_output",
-		buildConfirmPayload(session) {
-			return buildBasePayload(session, {
-				phase: "confirm",
-				prompt: "This workflow requires the following tool-produced artifact: `review-input.diff`.\n\nCan you provide the inputs required to produce `review-input.diff`?",
-				options: ["Yes", "No"],
-			})
+function isWorkflowFormFailureText(text?: string): boolean {
+	const trimmed = text?.trim()
+	if (!trimmed) {
+		return true
+	}
+
+	return (
+		trimmed === formatResponse.toolDenied() ||
+		trimmed.startsWith("The tool execution failed with the following error:") ||
+		trimmed.startsWith("Error:")
+	)
+}
+
+export const workflowFormRegistry: Record<string, WorkflowFormResolverDefinition> = {
+	[CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID]: {
+		id: CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID,
+		toolName: ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT,
+		buildDefinition(session): WorkflowFormDefinition {
+			return {
+				toolName: ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT,
+				title: "Review Diff Artifact",
+				toolDictionaryTitle: "Diff Source Reference",
+				toolDictionaryMarkdown: buildRuntimeToolDictionaryMarkdownFromConfig(buildReviewDiffOutputToolDictionaryConfig),
+				pages: {
+					confirm: {
+						prompt: "This workflow requires the following tool-produced artifact: `review-input.diff`.\n\nCan you provide the inputs required to produce `review-input.diff`?",
+						options: ["Yes", "No"],
+					},
+					select_source: {
+						prompt: "This workflow requires the tool-produced artifact `review-input.diff`.\n\nChoose which diff source you have so we can collect the right inputs.",
+						fields: buildSourceSelectionFieldDefinitions(),
+						submitLabel: "Next",
+						cancelLabel: "Cancel",
+					},
+					collect_inputs: {
+						prompt: "Provide the concrete inputs needed to produce `review-input.diff`.",
+						fields: buildConcreteInputFieldDefinitions(session.values),
+						submitLabel: "Submit",
+						cancelLabel: "Cancel",
+					},
+					retry_error: {
+						prompt: "The system could not produce `review-input.diff`. Update the inputs or retry the request.",
+						fields: buildConcreteInputFieldDefinitions(session.values),
+						submitLabel: "Submit",
+						cancelLabel: "Cancel",
+						retryLabel: "Start Over",
+					},
+				},
+				successMessage: "The Step 3 diff artifact is ready.",
+			}
 		},
-		buildSelectSourcePayload(session) {
-			return buildBasePayload(session, {
-				phase: "select_source",
-				prompt: "This workflow requires the tool-produced artifact `review-input.diff`.\n\nChoose which diff source you have so we can collect the right inputs.",
-				fields: buildSourceSelectionFieldDefinitions(),
-				submitLabel: "Next",
-				cancelLabel: "Cancel",
-			})
+		buildToolExecutionFailureFallbackMessage() {
+			return "The workflow form could not build the Step 3 diff artifact. Review the input and try again."
 		},
-		buildCollectInputsPayload(session) {
-			return buildBasePayload(session, {
-				phase: "collect_inputs",
-				prompt: "Provide the concrete inputs needed to produce `review-input.diff`.",
-				fields: buildConcreteInputFieldDefinitions(session.values),
-				submitLabel: "Submit",
-				cancelLabel: "Cancel",
-			})
-		},
-		buildRetryPayload(session) {
-			return buildBasePayload(session, {
-				phase: "retry_error",
-				prompt: "The system could not produce `review-input.diff`. Update the inputs or retry the request.",
-				fields: buildConcreteInputFieldDefinitions(session.values),
-				submitLabel: "Submit",
-				cancelLabel: "Cancel",
-				retryLabel: "Start Over",
-				errorMessage: session.lastError,
-			})
-		},
-		translateSubmissionToToolUse(values) {
+		buildToolExecutionRequest(_session, values) {
 			const sourceType = getStringValue(values, SOURCE_TYPE_FIELD_KEY)
 			const scopedPaths = getStringArrayValue(values, SCOPED_PATHS_FIELD_KEY)
 			const contextLines = getIntegerValue(values, CONTEXT_LINES_FIELD_KEY)
@@ -247,15 +321,128 @@ export const workflowFormRegistry: Record<"code_review_step_3_diff_source", Work
 				toolInput.context_lines = contextLines
 			}
 
-			return toolInput
+			const toolParams: Record<string, string> = {
+				source: JSON.stringify(toolInput.source),
+			}
+
+			if (toolInput.scoped_paths !== undefined) {
+				toolParams.scoped_paths = JSON.stringify(toolInput.scoped_paths)
+			}
+
+			if (toolInput.context_lines !== undefined) {
+				toolParams.context_lines = String(toolInput.context_lines)
+			}
+
+			return {
+				toolName: ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT,
+				toolInput,
+				toolParams,
+			}
+		},
+		evaluateToolExecutionResult(session, args) {
+			const parsed = parseWorkflowFormJsonToolResult(args.toolResultText)
+			if (parsed?.persisted === true && parsed?.diff_available === true) {
+				return { succeeded: true }
+			}
+
+			if (typeof parsed?.reason === "string") {
+				return { succeeded: false, errorMessage: parsed.reason }
+			}
+
+			if (isWorkflowFormFailureText(args.toolResultText)) {
+				return {
+					succeeded: false,
+					errorMessage: args.toolResultText?.trim() ?? this.buildToolExecutionFailureFallbackMessage(session),
+				}
+			}
+
+			return {
+				succeeded: false,
+				errorMessage: this.buildToolExecutionFailureFallbackMessage(session),
+			}
+		},
+	},
+	[PLACEHOLDER_WORKFLOW_START_SET_WORKFLOW_PLACEHOLDERS_RESOLVER_ID]: {
+		id: PLACEHOLDER_WORKFLOW_START_SET_WORKFLOW_PLACEHOLDERS_RESOLVER_ID,
+		toolName: ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
+		buildDefinition(session): WorkflowFormDefinition {
+			const workflowName = session.context?.workflowName
+			const workflowStartRequirements = session.context?.workflowStartRequirements
+			if (!workflowName || !workflowStartRequirements) {
+				throw new Error("Workflow start form definition requires workflowName and workflowStartRequirements.")
+			}
+
+			const override = workflowStartFormOverrides[workflowName]
+			const fields = buildWorkflowStartPlaceholderFieldDefinitions({
+				requiredFieldKeys: workflowStartRequirements.requiredFieldKeys,
+				optionalFieldKeys: workflowStartRequirements.optionalFieldKeys,
+				oneOfRequirement: workflowStartRequirements.oneOfRequirement,
+				override,
+			})
+			const prompt =
+				override?.prompt ?? "Provide any Step 1 workflow inputs you already have before the first AI turn begins."
+
+			return {
+				toolName: ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
+				title: override?.title ?? "Workflow Start Inputs",
+				toolDictionaryTitle: "Workflow Placeholder Reference",
+				toolDictionaryMarkdown: buildRuntimeToolDictionaryMarkdownFromConfig(WORKFLOW_START_TOOL_DICTIONARY_CONFIG),
+				pages: {
+					collect_inputs: {
+						prompt,
+						fields,
+						submitLabel: "Submit",
+						cancelLabel: "Cancel",
+					},
+					retry_error: {
+						prompt,
+						fields,
+						submitLabel: "Submit",
+						cancelLabel: "Cancel",
+						retryLabel: "Start Over",
+					},
+				},
+				successMessage: "Workflow start inputs were stored.",
+			}
+		},
+		buildToolExecutionFailureFallbackMessage() {
+			return "The workflow form could not store the workflow start inputs. Review the values and try again."
+		},
+		buildToolExecutionRequest(session, values) {
+			const fields = this.buildDefinition(session).pages.collect_inputs?.fields ?? []
+			const filteredValues = fields.reduce<Record<string, string>>((acc, field) => {
+				const value = values[field.key]?.stringValue?.trim()
+				if (value) {
+					acc[field.key] = value
+				}
+
+				return acc
+			}, {})
+
+			return {
+				toolName: ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
+				toolInput: { values: filteredValues },
+				toolParams: { values: JSON.stringify(filteredValues) },
+			}
+		},
+		evaluateToolExecutionResult(session, args) {
+			if (isWorkflowFormFailureText(args.toolResultText)) {
+				return {
+					succeeded: false,
+					errorMessage: args.toolResultText?.trim() ?? this.buildToolExecutionFailureFallbackMessage(session),
+				}
+			}
+
+			return { succeeded: true }
 		},
 	},
 }
 
-export function getWorkflowFormResolverDefinition() {
-	return workflowFormRegistry.code_review_step_3_diff_source
-}
+export function getWorkflowFormResolverDefinition(resolverId: WorkflowFormResolverId): WorkflowFormResolverDefinition {
+	const resolver = workflowFormRegistry[resolverId]
+	if (!resolver) {
+		throw new Error(`Unknown workflow form resolver: ${resolverId}`)
+	}
 
-export function getDefaultWorkflowFormToolDictionaryMarkdown() {
-	return buildToolDictionaryMarkdown()
+	return resolver
 }

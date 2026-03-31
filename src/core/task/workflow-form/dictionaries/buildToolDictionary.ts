@@ -1,35 +1,31 @@
+import { ClineToolSet } from "@/core/prompts/system-prompt/registry/ClineToolSet"
 import type { ClineToolSpec } from "@/core/prompts/system-prompt/spec"
-import { build_review_diff_output_variants } from "@/core/prompts/system-prompt/tools/build_review_diff_output"
+import { registerClineToolSets } from "@/core/prompts/system-prompt/tools/init"
+import { ModelFamily } from "@/shared/prompts"
+import { ClineDefaultTool } from "@/shared/tools"
 import {
 	PHASE_1_SYSTEM_DICTIONARY_KEYS,
 	type WorkflowFormSystemDictionaryKey,
 	workflowFormSystemDictionary,
 } from "./systemDictionary"
 
-const TOOL_HEADING = "## build_review_diff_output"
-
-function getBuildReviewDiffOutputSpec(): ClineToolSpec {
-	const tool = build_review_diff_output_variants.find((candidate) => candidate.name === "build_review_diff_output")
-	if (!tool) {
-		throw new Error("build_review_diff_output schema is not available")
-	}
-
-	return tool
+export interface WorkflowFormToolDictionaryConfig {
+	toolName: ClineDefaultTool
+	heading: string
+	runtimeTitle: string
+	overviewLines: string[]
+	parameterDescriptions: Record<string, string>
+	termKeys?: readonly WorkflowFormSystemDictionaryKey[]
 }
 
-function getParameterDescription(parameterName: string): string {
-	const dictionary = workflowFormSystemDictionary
-
-	switch (parameterName) {
-		case "source":
-			return `${dictionary.source.label}. ${dictionary.source.medium} Supported variants: \`commit\`, \`commit_range\`, \`ref_diff\`, and \`worktree_head_scoped\`.`
-		case "scoped_paths":
-			return `${dictionary.scoped_paths.label}. ${dictionary.scoped_paths.medium} Required when the source is \`worktree_head_scoped\`.`
-		case "context_lines":
-			return `${dictionary.context_lines.label}. ${dictionary.context_lines.medium} Defaults to 3 when omitted.`
-		default:
-			return "No dictionary description is available for this parameter."
+export function resolveWorkflowFormToolSpec(toolName: ClineDefaultTool): ClineToolSpec {
+	registerClineToolSets()
+	const tool = ClineToolSet.getToolByNameWithFallback(toolName, ModelFamily.GENERIC)
+	if (!tool) {
+		throw new Error(`Unknown workflow-form tool spec: ${toolName}`)
 	}
+
+	return tool.config
 }
 
 function getVariantReferenceLine(key: WorkflowFormSystemDictionaryKey): string {
@@ -37,11 +33,42 @@ function getVariantReferenceLine(key: WorkflowFormSystemDictionaryKey): string {
 	return `- \`${key}\`: ${entry.label}. ${entry.medium}`
 }
 
-function buildBuildReviewDiffOutputEntryLines(tool: ClineToolSpec): string[] {
+function buildToolDictionaryEntryLines(config: WorkflowFormToolDictionaryConfig, tool: ClineToolSpec): string[] {
 	const parameters = tool.parameters ?? []
 	const lines = [
-		TOOL_HEADING,
+		config.heading,
 		"",
+		...config.overviewLines,
+		...(config.overviewLines.length > 0 ? [""] : []),
+		"### Parameters",
+		"",
+	]
+
+	for (const parameter of parameters) {
+		const parameterType = parameter.type ?? "string"
+		const requiredStatus = parameter.required ? "required" : "optional"
+		lines.push(
+			`- \`${parameter.name}\` (${requiredStatus}, ${parameterType}): ${config.parameterDescriptions[parameter.name] ?? "No dictionary description is available for this parameter."}`,
+		)
+	}
+
+	lines.push("")
+	lines.push("### Term Reference")
+	lines.push("")
+
+	for (const key of config.termKeys ?? PHASE_1_SYSTEM_DICTIONARY_KEYS) {
+		lines.push(getVariantReferenceLine(key))
+	}
+
+	return lines
+}
+
+export const TOOL_DICTIONARY_TERM_KEYS = PHASE_1_SYSTEM_DICTIONARY_KEYS
+export const buildReviewDiffOutputToolDictionaryConfig: WorkflowFormToolDictionaryConfig = {
+	toolName: ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT,
+	heading: "## build_review_diff_output",
+	runtimeTitle: "Diff Source Reference",
+	overviewLines: [
 		`${workflowFormSystemDictionary.artifact.label}. ${workflowFormSystemDictionary.artifact.medium}`,
 		"",
 		`${workflowFormSystemDictionary.source.label}. ${workflowFormSystemDictionary.source.medium}`,
@@ -52,45 +79,38 @@ function buildBuildReviewDiffOutputEntryLines(tool: ClineToolSpec): string[] {
 		getVariantReferenceLine("commit_range"),
 		getVariantReferenceLine("ref_diff"),
 		getVariantReferenceLine("worktree_head_scoped"),
-		"",
-		"### Parameters",
-		"",
-	]
-
-	for (const parameter of parameters) {
-		const parameterType = parameter.type ?? "string"
-		const requiredStatus = parameter.required ? "required" : "optional"
-		lines.push(`- \`${parameter.name}\` (${requiredStatus}, ${parameterType}): ${getParameterDescription(parameter.name)}`)
-	}
-
-	lines.push("")
-	lines.push("### Term Reference")
-	lines.push("")
-
-	for (const key of TOOL_DICTIONARY_TERM_KEYS) {
-		lines.push(getVariantReferenceLine(key))
-	}
-
-	return lines
+	],
+	parameterDescriptions: {
+		source: `${workflowFormSystemDictionary.source.label}. ${workflowFormSystemDictionary.source.medium} Supported variants: \`commit\`, \`commit_range\`, \`ref_diff\`, and \`worktree_head_scoped\`.`,
+		scoped_paths: `${workflowFormSystemDictionary.scoped_paths.label}. ${workflowFormSystemDictionary.scoped_paths.medium} Required when the source is \`worktree_head_scoped\`.`,
+		context_lines: `${workflowFormSystemDictionary.context_lines.label}. ${workflowFormSystemDictionary.context_lines.medium} Defaults to 3 when omitted.`,
+	},
+	termKeys: TOOL_DICTIONARY_TERM_KEYS,
 }
+export const WORKFLOW_FORM_TOOL_DICTIONARY_HEADING = buildReviewDiffOutputToolDictionaryConfig.heading
+export const WORKFLOW_FORM_RUNTIME_TOOL_REFERENCE_TITLE = buildReviewDiffOutputToolDictionaryConfig.runtimeTitle
 
-export const TOOL_DICTIONARY_TERM_KEYS = PHASE_1_SYSTEM_DICTIONARY_KEYS
-export const WORKFLOW_FORM_TOOL_DICTIONARY_HEADING = TOOL_HEADING
-export const WORKFLOW_FORM_RUNTIME_TOOL_REFERENCE_TITLE = "Diff Source Reference"
-
-export function buildToolDictionaryMarkdown(): string {
-	const tool = getBuildReviewDiffOutputSpec()
+export function buildToolDictionaryMarkdownFromConfig(config: WorkflowFormToolDictionaryConfig): string {
+	const tool = resolveWorkflowFormToolSpec(config.toolName)
 	const lines = [
 		"# Workflow UI Surface Tool Dictionary",
 		"",
 		"Generated from `src/core/task/workflow-form/dictionaries/buildToolDictionary.ts`.",
 		"",
-		...buildBuildReviewDiffOutputEntryLines(tool),
+		...buildToolDictionaryEntryLines(config, tool),
 	]
 
 	return `${lines.join("\n").trimEnd()}\n`
 }
 
+export function buildRuntimeToolDictionaryMarkdownFromConfig(config: WorkflowFormToolDictionaryConfig): string {
+	return `${buildToolDictionaryEntryLines(config, resolveWorkflowFormToolSpec(config.toolName)).join("\n").trimEnd()}\n`
+}
+
+export function buildToolDictionaryMarkdown(): string {
+	return buildToolDictionaryMarkdownFromConfig(buildReviewDiffOutputToolDictionaryConfig)
+}
+
 export function buildRuntimeToolDictionaryMarkdown(): string {
-	return `${buildBuildReviewDiffOutputEntryLines(getBuildReviewDiffOutputSpec()).join("\n").trimEnd()}\n`
+	return buildRuntimeToolDictionaryMarkdownFromConfig(buildReviewDiffOutputToolDictionaryConfig)
 }

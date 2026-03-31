@@ -1,3 +1,4 @@
+import fs from "node:fs/promises"
 import * as path from "node:path"
 import { setTimeout as delay } from "node:timers/promises"
 import type { ApiHandler, buildApiHandler } from "@core/api"
@@ -25,12 +26,14 @@ import {
 } from "@core/task/prompt-refresh"
 import { StreamResponseHandler } from "@core/task/StreamResponseHandler"
 import { activateManagedWorkflowInTaskState, activatePlaceholderWorkflowInTaskState } from "@core/task/workflow-activation"
+import { getPlaceholderWorkflowValueMap } from "@core/workflows/placeholder-workflow-rendering"
 import { resolveActivePlaceholderWorkflowPromptContext } from "@core/workflows/placeholder-workflow-step-details"
 import {
 	createWorkflowSkillMetadata,
 	findResolvedWorkflowByName,
 	resolveAvailableWorkflows,
 } from "@core/workflows/resolution/resolveAvailableWorkflows"
+import { extractWorkflowPlaceholderKeys } from "@core/workflows/workflow-placeholders"
 import { ClineAssistantToolUseBlock, ClineStorageMessage, ClineTextContentBlock, ClineUserContent } from "@shared/messages"
 import type { ClineMessageModelInfo } from "@shared/messages/metrics"
 import { Logger } from "@shared/services/Logger"
@@ -1068,7 +1071,77 @@ export class SubagentRunner {
 			workflow: resolvedWorkflow,
 			clearActiveWorkflowId: true,
 		})
+		await this.inheritSharedParentPlaceholdersToActivatedWorkflow(state)
 		await this.seedPlaceholderChecklistIfNeeded(state, true)
+		await this.applyInitialDeterministicPlaceholderProgressionIfNeeded(state)
+	}
+
+	private async inheritSharedParentPlaceholdersToActivatedWorkflow(state: TaskState): Promise<void> {
+		const childSource = state.activePlaceholderWorkflowSource
+		if (!childSource) {
+			return
+		}
+
+		const parentPlaceholders = getPlaceholderWorkflowValueMap(
+			this.baseConfig.taskState.activePlaceholderWorkflowStableValues,
+			this.baseConfig.taskState.activePlaceholderWorkflowValues,
+		)
+		if (!parentPlaceholders) {
+			return
+		}
+
+		const childSourceContents =
+			childSource.type === "remote"
+				? childSource.contents
+				: await fs.readFile(childSource.path, "utf8").catch(() => undefined)
+		if (!childSourceContents) {
+			return
+		}
+
+		const referencedKeys = extractWorkflowPlaceholderKeys(childSourceContents)
+		if (referencedKeys.length === 0) {
+			return
+		}
+
+		const childResolvedPlaceholders =
+			getPlaceholderWorkflowValueMap(state.activePlaceholderWorkflowStableValues, state.activePlaceholderWorkflowValues) ??
+			{}
+
+		const inheritedValues: Record<string, string> = {}
+		for (const key of referencedKeys) {
+			if (childResolvedPlaceholders[key] !== undefined) {
+				continue
+			}
+
+			const parentValue = parentPlaceholders[key]
+			if (parentValue === undefined) {
+				continue
+			}
+
+			inheritedValues[key] = parentValue
+		}
+
+		if (Object.keys(inheritedValues).length === 0) {
+			return
+		}
+
+		state.activePlaceholderWorkflowValues = {
+			...(state.activePlaceholderWorkflowValues ?? {}),
+			...inheritedValues,
+		}
+	}
+
+	private async applyInitialDeterministicPlaceholderProgressionIfNeeded(state: TaskState): Promise<void> {
+		if (!state.activePlaceholderWorkflowSource || !state.currentFocusChainChecklist) {
+			return
+		}
+
+		if (!isDeterministicPlaceholderWorkflowSupported(state.activePlaceholderWorkflowSource.name)) {
+			return
+		}
+
+		const focusChainManager = this.getOrCreateSubagentFocusChainManager(state)
+		await focusChainManager.updateFCListFromToolResponse(undefined)
 	}
 
 	private async seedPlaceholderChecklistIfNeeded(state: TaskState, force = false): Promise<void> {

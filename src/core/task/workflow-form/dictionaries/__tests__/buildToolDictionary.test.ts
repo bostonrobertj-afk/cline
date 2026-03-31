@@ -1,8 +1,11 @@
 import { expect } from "chai"
 import { describe, it } from "mocha"
+import { ClineDefaultTool } from "@/shared/tools"
 import {
 	buildRuntimeToolDictionaryMarkdown,
+	buildRuntimeToolDictionaryMarkdownFromConfig,
 	buildToolDictionaryMarkdown,
+	buildToolDictionaryMarkdownFromConfig,
 	TOOL_DICTIONARY_TERM_KEYS,
 	WORKFLOW_FORM_TOOL_DICTIONARY_HEADING,
 } from "../buildToolDictionary"
@@ -30,6 +33,27 @@ describe("buildToolDictionaryMarkdown", () => {
 			expect(workflowFormSystemDictionary[key]).to.not.equal(undefined)
 			expect(markdown).to.include(`\`${key}\``)
 		}
+	})
+
+	it("renders any configured tool by looking up its schema through the shared tool registry", () => {
+		const config = {
+			toolName: ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
+			heading: "## set_workflow_placeholders",
+			runtimeTitle: "Workflow Placeholder Reference",
+			overviewLines: ["Persist workflow placeholder values."],
+			parameterDescriptions: {
+				values: "Workflow placeholder key/value map.",
+			},
+			termKeys: [],
+		}
+
+		const markdown = buildToolDictionaryMarkdownFromConfig(config)
+		const runtimeMarkdown = buildRuntimeToolDictionaryMarkdownFromConfig(config)
+
+		expect(markdown).to.include("## set_workflow_placeholders")
+		expect(markdown).to.include("- `values` (required, object): Workflow placeholder key/value map.")
+		expect(runtimeMarkdown).to.include("## set_workflow_placeholders")
+		expect(runtimeMarkdown).to.not.include("# Workflow UI Surface Tool Dictionary")
 	})
 })
 

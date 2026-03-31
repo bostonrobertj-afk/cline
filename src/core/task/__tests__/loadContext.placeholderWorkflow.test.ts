@@ -1,3 +1,4 @@
+import type { ClineContent, ClineTextContentBlock } from "@shared/messages/content"
 import { expect } from "chai"
 import { describe, it } from "mocha"
 import proxyquire from "proxyquire"
@@ -16,6 +17,44 @@ const { Task } = proxyquireNoPreserveCache("../index", {
 		}),
 	},
 })
+
+type LoadContextTaskHarness = {
+	ulid: string
+	cwd: string
+	taskState: TaskState
+	controller: { stateManager: ReturnType<typeof createStateManager> }
+	stateManager: ReturnType<typeof createStateManager>
+	mcpHub: { getPrompt: sinon.SinonStub }
+	urlContentFetcher: object
+	fileContextTracker: object
+	workspaceManager: undefined
+	clineIgnoreController: { filterPaths: (paths: string[]) => string[] }
+	terminalManager: {
+		getTerminals: () => unknown[]
+		getUnretrievedOutput: () => undefined
+	}
+	FocusChainManager: FocusChainManager
+	getCurrentProviderInfo: () => {
+		model: { id: string }
+		providerId: string
+		mode: string
+	}
+	getEnvironmentDetails: sinon.SinonStub<[boolean, boolean], Promise<string>>
+	maybeResolveWorkflowFormBeforeApiTurn: sinon.SinonStub
+	applyPersistentSlashCommandAction: sinon.SinonStub
+	buildPlaceholderWorkflowActivationInstructions: sinon.SinonStub
+	hasHumanAuthoredInput: typeof Task.prototype.hasHumanAuthoredInput
+	getPromptRefreshFrequency: typeof Task.prototype.getPromptRefreshFrequency
+	shouldSendFullPromptAssemblyForCurrentTurn: typeof Task.prototype.shouldSendFullPromptAssemblyForCurrentTurn
+}
+
+const loadContext = Reflect.get(Task.prototype, "loadContext") as (
+	this: LoadContextTaskHarness,
+	userContent: ClineContent[],
+	includeFileDetails?: boolean,
+	useCompactPrompt?: boolean,
+	includeDetailedEnvironmentDetails?: boolean,
+) => Promise<[ClineContent[], ClineTextContentBlock[], boolean]>
 
 function createStateManager(promptRefreshFrequency = 5) {
 	return {
@@ -79,7 +118,7 @@ Determine what to review from the user's prompt before asking follow-up question
 		"- [ ] Step 2: Construct & Persist Review Input Files",
 	].join("\n")
 
-	const task: any = {
+	const task: LoadContextTaskHarness = {
 		ulid: "test-ulid",
 		cwd: process.cwd(),
 		taskState,
@@ -119,9 +158,9 @@ Determine what to review from the user's prompt before asking follow-up question
 	}
 
 	task.FocusChainManager = createFocusChainManager(taskState, promptRefreshFrequency)
-	task.hasHumanAuthoredInput = Task.prototype["hasHumanAuthoredInput"]
-	task.getPromptRefreshFrequency = Task.prototype["getPromptRefreshFrequency"]
-	task.shouldSendFullPromptAssemblyForCurrentTurn = Task.prototype["shouldSendFullPromptAssemblyForCurrentTurn"]
+	task.hasHumanAuthoredInput = Task.prototype.hasHumanAuthoredInput
+	task.getPromptRefreshFrequency = Task.prototype.getPromptRefreshFrequency
+	task.shouldSendFullPromptAssemblyForCurrentTurn = Task.prototype.shouldSendFullPromptAssemblyForCurrentTurn
 	return task
 }
 
@@ -160,21 +199,15 @@ function collectTextValues(value: unknown): string[] {
 describe("Task.loadContext placeholder workflow focus chain prompting", () => {
 	it("returns environment details and focus-chain workflow guidance as prompt injection blocks when full prompt assembly is required", async () => {
 		const fakeTask = createFakeTask(0)
-		const userContent = [
+		const userContent: ClineContent[] = [
 			{
 				type: "tool_result",
 				tool_use_id: "tool-1",
 				content: [{ type: "text", text: "Review input available." }],
 			},
-		] as any
+		]
 
-		const [processedUserContent, promptInjectionBlocks] = await (Task.prototype as any).loadContext.call(
-			fakeTask,
-			userContent,
-			false,
-			false,
-			false,
-		)
+		const [processedUserContent, promptInjectionBlocks] = await loadContext.call(fakeTask, userContent, false, false, false)
 
 		const userText = collectTextValues(processedUserContent).join("\n")
 		const promptInjectionText = collectTextValues(promptInjectionBlocks).join("\n")
@@ -203,21 +236,15 @@ describe("Task.loadContext placeholder workflow focus chain prompting", () => {
 				reason: "review_mode was derived deterministically from fresh review artifacts.",
 			},
 		]
-		const userContent = [
+		const userContent: ClineContent[] = [
 			{
 				type: "tool_result",
 				tool_use_id: "tool-1",
 				content: [{ type: "text", text: "Review input available." }],
 			},
-		] as any
+		]
 
-		const [processedUserContent, promptInjectionBlocks] = await (Task.prototype as any).loadContext.call(
-			fakeTask,
-			userContent,
-			false,
-			false,
-			false,
-		)
+		const [processedUserContent, promptInjectionBlocks] = await loadContext.call(fakeTask, userContent, false, false, false)
 		const userText = collectTextValues(processedUserContent).join("\n")
 		const promptInjectionText = collectTextValues(promptInjectionBlocks).join("\n")
 
@@ -268,6 +295,9 @@ Choose the review mode from the persisted diff output before continuing.
 		].join("\n")
 
 		const callOrder: string[] = []
+		fakeTask.applyPersistentSlashCommandAction = sinon.stub().callsFake(async () => {
+			callOrder.push("applyPersistentSlashCommandAction")
+		})
 		fakeTask.maybeResolveWorkflowFormBeforeApiTurn = sinon.stub().callsFake(async () => {
 			callOrder.push("maybeResolveWorkflowFormBeforeApiTurn")
 			fakeTask.taskState.currentFocusChainChecklist = [
@@ -288,7 +318,7 @@ Choose the review mode from the persisted diff output before continuing.
 			return await originalGenerateFocusChainInstructions()
 		})
 
-		const [, promptInjectionBlocks] = await (Task.prototype as any).loadContext.call(
+		const [, promptInjectionBlocks] = await loadContext.call(
 			fakeTask,
 			[
 				{
@@ -296,7 +326,7 @@ Choose the review mode from the persisted diff output before continuing.
 					tool_use_id: "tool-1",
 					content: [{ type: "text", text: "Diff output persisted." }],
 				},
-			] as any,
+			],
 			false,
 			false,
 			false,
@@ -304,6 +334,9 @@ Choose the review mode from the persisted diff output before continuing.
 
 		const promptInjectionText = collectTextValues(promptInjectionBlocks).join("\n")
 		expect(fakeTask.maybeResolveWorkflowFormBeforeApiTurn.calledOnce).to.equal(true)
+		expect(callOrder.indexOf("applyPersistentSlashCommandAction")).to.be.lessThan(
+			callOrder.indexOf("maybeResolveWorkflowFormBeforeApiTurn"),
+		)
 		expect(callOrder.indexOf("maybeResolveWorkflowFormBeforeApiTurn")).to.be.lessThan(
 			callOrder.indexOf("generateFocusChainInstructions"),
 		)

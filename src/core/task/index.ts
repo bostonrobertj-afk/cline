@@ -44,13 +44,13 @@ import {
 	type DeterministicPlaceholderToolContext,
 	isDeterministicPlaceholderWorkflowSupported,
 } from "@core/task/focus-chain/deterministicPlaceholderProgression"
-import {
-	fileExistsForPlaceholderWorkflowWriteProof,
-	taskStateHasPlaceholderWorkflowWriteProof,
-} from "@core/task/focus-chain/placeholderWorkflowWriteProofs"
 import { releaseTaskLock } from "@core/task/TaskLockUtils"
+import { getWorkflowFormResolverDefinition } from "@core/task/workflow-form/WorkflowFormRegistry"
 import { WorkflowFormRuntime } from "@core/task/workflow-form/WorkflowFormRuntime"
-import { getPlaceholderWorkflowValueMap } from "@core/workflows/placeholder-workflow-rendering"
+import {
+	getWorkflowFormWorkflowStepTriggerDefinition,
+	resolveWorkflowFormSlashCommandStartCandidate,
+} from "@core/task/workflow-form/WorkflowFormTriggerRegistry"
 import {
 	buildPlaceholderWorkflowChecklist,
 	getActivePlaceholderWorkflowStepDetails,
@@ -212,6 +212,50 @@ export function isActiveDeterministicPlaceholderWorkflowEnabled(
 	return isDeterministicPlaceholderWorkflowSupported(taskState.activePlaceholderWorkflowSource?.name)
 }
 
+export async function resolveWorkflowFormInterceptionCandidate(args: {
+	cwd: string
+	taskState: Pick<
+		TaskState,
+		| "activePlaceholderWorkflowSource"
+		| "currentFocusChainChecklist"
+		| "activePlaceholderWorkflowStableValues"
+		| "activePlaceholderWorkflowValues"
+		| "activePlaceholderWorkflowTaskWriteProofPaths"
+		| "suppressedWorkflowFormResolverIds"
+	>
+}) {
+	if (!args.taskState.activePlaceholderWorkflowSource) {
+		return undefined
+	}
+
+	if (!args.taskState.currentFocusChainChecklist) {
+		return undefined
+	}
+
+	const activeStep = await getActivePlaceholderWorkflowStepDetails({
+		checklistMarkdown: args.taskState.currentFocusChainChecklist,
+		source: args.taskState.activePlaceholderWorkflowSource,
+		stablePlaceholderValues: args.taskState.activePlaceholderWorkflowStableValues,
+		placeholderValues: args.taskState.activePlaceholderWorkflowValues,
+	})
+	if (!activeStep?.stepNumber) {
+		return undefined
+	}
+
+	const activeWorkflowName = args.taskState.activePlaceholderWorkflowSource.name
+	const trigger = getWorkflowFormWorkflowStepTriggerDefinition(activeWorkflowName, activeStep.stepNumber)
+	if (!trigger) {
+		return undefined
+	}
+
+	if (args.taskState.suppressedWorkflowFormResolverIds.includes(trigger.resolverId)) {
+		return undefined
+	}
+
+	const shouldIntercept = await trigger.shouldIntercept({ cwd: args.cwd, taskState: args.taskState })
+	return shouldIntercept ? { trigger, activeStep } : undefined
+}
+
 export async function shouldInterceptWorkflowFormBeforeApiTurn(args: {
 	cwd: string
 	taskState: Pick<
@@ -224,43 +268,8 @@ export async function shouldInterceptWorkflowFormBeforeApiTurn(args: {
 		| "suppressedWorkflowFormResolverIds"
 	>
 }): Promise<boolean> {
-	const resolverId = "code_review_step_3_diff_source"
-	if (args.taskState.activePlaceholderWorkflowSource?.name !== "code-review.md") {
-		return false
-	}
-
-	if (!args.taskState.currentFocusChainChecklist) {
-		return false
-	}
-
-	const activeStep = await getActivePlaceholderWorkflowStepDetails({
-		checklistMarkdown: args.taskState.currentFocusChainChecklist,
-		source: args.taskState.activePlaceholderWorkflowSource,
-		stablePlaceholderValues: args.taskState.activePlaceholderWorkflowStableValues,
-		placeholderValues: args.taskState.activePlaceholderWorkflowValues,
-	})
-	if (activeStep?.stepNumber !== 3) {
-		return false
-	}
-
-	if (args.taskState.suppressedWorkflowFormResolverIds.includes(resolverId)) {
-		return false
-	}
-
-	const placeholders = getPlaceholderWorkflowValueMap(
-		args.taskState.activePlaceholderWorkflowStableValues,
-		args.taskState.activePlaceholderWorkflowValues,
-	)
-	const diffOutputPath = placeholders?.diff_output?.trim()
-	if (!diffOutputPath) {
-		return true
-	}
-
-	const resolvedDiffOutputPath = path.isAbsolute(diffOutputPath) ? diffOutputPath : path.resolve(args.cwd, diffOutputPath)
-	return !(
-		taskStateHasPlaceholderWorkflowWriteProof(args.taskState, resolvedDiffOutputPath) &&
-		(await fileExistsForPlaceholderWorkflowWriteProof(resolvedDiffOutputPath))
-	)
+	const candidate = await resolveWorkflowFormInterceptionCandidate(args)
+	return candidate !== undefined
 }
 
 export function isActiveThreadDisplayState(threadDisplayState: ThreadDisplayState): boolean {
@@ -1465,9 +1474,9 @@ export class Task {
 		}
 	}
 
-	private getWorkflowFormToolErrorMessage(previousUserMessageContentLength: number): string {
+	private getWorkflowFormToolResultText(previousUserMessageContentLength: number): string | undefined {
 		const appendedContent = this.taskState.userMessageContent.slice(previousUserMessageContentLength)
-		const textContent = appendedContent
+		return appendedContent
 			.map((item) => {
 				if (item.type === "text") {
 					return item.text
@@ -1478,27 +1487,22 @@ export class Task {
 				return undefined
 			})
 			.find((item): item is string => typeof item === "string" && item.trim().length > 0)
+	}
 
-		return textContent ?? "The workflow form could not build the Step 3 diff artifact. Review the input and try again."
+	private getWorkflowFormToolErrorMessage(session: WorkflowFormSessionState, previousUserMessageContentLength: number): string {
+		const textContent = this.getWorkflowFormToolResultText(previousUserMessageContentLength)
+		return (
+			textContent ?? getWorkflowFormResolverDefinition(session.resolverId).buildToolExecutionFailureFallbackMessage(session)
+		)
 	}
 
 	private async executeWorkflowFormToolAndSync(outcome: Extract<WorkflowFormRuntimeOutcome, { kind: "invoke_tool" }>) {
 		const previousUserMessageContentLength = this.taskState.userMessageContent.length
-		const toolParams: Record<string, string> = {
-			source: JSON.stringify(outcome.toolInput.source),
-		}
-
-		if (Array.isArray(outcome.toolInput.scoped_paths)) {
-			toolParams.scoped_paths = JSON.stringify(outcome.toolInput.scoped_paths)
-		}
-		if (typeof outcome.toolInput.context_lines === "number") {
-			toolParams.context_lines = String(outcome.toolInput.context_lines)
-		}
 
 		await this.toolExecutor.executeTool({
 			type: "tool_use",
-			name: ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT,
-			params: toolParams as any,
+			name: outcome.toolName,
+			params: outcome.toolParams as any,
 			partial: false,
 		})
 
@@ -1508,38 +1512,58 @@ export class Task {
 			toolResult: this.taskState.userMessageContent.at(-1),
 			toolWasExecuted: true,
 		})
-
-		const stillNeedsWorkflowForm = await shouldInterceptWorkflowFormBeforeApiTurn({
-			cwd: this.cwd,
-			taskState: this.taskState,
-		})
+		const resolver = getWorkflowFormResolverDefinition(outcome.session.resolverId)
+		const toolResultText = this.getWorkflowFormToolResultText(previousUserMessageContentLength)
+		const evaluation = resolver.evaluateToolExecutionResult(outcome.session, { toolResultText })
 
 		return {
-			succeeded: !stillNeedsWorkflowForm,
-			errorMessage: this.getWorkflowFormToolErrorMessage(previousUserMessageContentLength),
+			succeeded: evaluation.succeeded,
+			errorMessage:
+				evaluation.errorMessage ??
+				this.getWorkflowFormToolErrorMessage(outcome.session, previousUserMessageContentLength),
 		}
 	}
 
-	private async maybeResolveWorkflowFormBeforeApiTurn(): Promise<void> {
-		const shouldIntercept = await shouldInterceptWorkflowFormBeforeApiTurn({
-			cwd: this.cwd,
-			taskState: this.taskState,
-		})
-		if (!shouldIntercept) {
-			return
-		}
-
+	private async maybeResolveWorkflowFormBeforeApiTurn(
+		currentTurnSlashCommandAction?: PersistentSlashCommandAction,
+	): Promise<void> {
 		if (!this.taskState.activeWorkflowFormSession) {
-			this.taskState.activeWorkflowFormSession = this.workflowFormRuntime.createSession({
-				resolverId: "code_review_step_3_diff_source",
-				triggerSource: "deterministic_workflow_progression",
-				owner: {
-					kind: "placeholder_workflow_step",
-					workflowName: "code-review.md",
-					stepNumber: 3,
-				},
+			const slashStartCandidate = await resolveWorkflowFormSlashCommandStartCandidate({
+				cwd: this.cwd,
+				taskState: this.taskState,
+				currentTurnSlashCommandAction,
 			})
-			await this.persistWorkflowFormSession()
+			if (slashStartCandidate) {
+				this.taskState.activeWorkflowFormSession = this.workflowFormRuntime.createSession({
+					resolverId: slashStartCandidate.resolverId,
+					triggerSource: slashStartCandidate.triggerSource,
+					owner: slashStartCandidate.owner,
+					initialPhase: slashStartCandidate.initialPhase,
+					context: slashStartCandidate.context,
+				})
+				await this.persistWorkflowFormSession()
+			} else {
+				const candidate = await resolveWorkflowFormInterceptionCandidate({
+					cwd: this.cwd,
+					taskState: this.taskState,
+				})
+				if (candidate === undefined) {
+					return
+				}
+
+				this.taskState.activeWorkflowFormSession = this.workflowFormRuntime.createSession({
+					resolverId: candidate.trigger.resolverId,
+					triggerSource: "deterministic_workflow_progression",
+					owner: {
+						kind: "placeholder_workflow_step",
+						workflowName: this.taskState.activePlaceholderWorkflowSource!.name,
+						stepNumber: candidate.activeStep.stepNumber,
+					},
+					initialPhase: "confirm",
+					context: undefined,
+				})
+				await this.persistWorkflowFormSession()
+			}
 		}
 
 		this.pendingWorkflowFormOutcome = undefined
@@ -1573,9 +1597,11 @@ export class Task {
 				case "invoke_tool": {
 					const toolExecution = await this.executeWorkflowFormToolAndSync(outcome)
 					if (toolExecution.succeeded) {
+						const resolver = getWorkflowFormResolverDefinition(outcome.session.resolverId)
+						const definition = resolver.buildDefinition(outcome.session)
 						const successPayload = this.workflowFormRuntime.buildSuccessPayload(
 							outcome.session,
-							"The Step 3 diff artifact is ready.",
+							definition.successMessage,
 						)
 						await this.clearWorkflowFormSession()
 						await this.renderWorkflowFormMessage(successPayload)
@@ -4812,9 +4838,6 @@ export class Task {
 
 			return block
 		}
-		// Workflow forms gate deterministic workflow steps and must resolve before prompt assembly begins.
-		await this.maybeResolveWorkflowFormBeforeApiTurn()
-
 		// Process all content and environment details in parallel.
 		// Mentions are now expanded only when the text contains explicit mention syntax.
 		// User-content tags remain as compatibility markers for slash-command processing and prompt extraction.
@@ -4838,6 +4861,7 @@ export class Task {
 			: false
 
 		await this.applyPersistentSlashCommandAction(persistentSlashCommandAction)
+		await this.maybeResolveWorkflowFormBeforeApiTurn(persistentSlashCommandAction)
 		const requestHasHumanAuthoredInput = this.hasHumanAuthoredInput(processedUserContent)
 		this.currentRequestHasHumanAuthoredInput = requestHasHumanAuthoredInput
 		const shouldSendFullPromptAssembly = this.shouldSendFullPromptAssemblyForCurrentTurn(requestHasHumanAuthoredInput)

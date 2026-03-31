@@ -24,6 +24,7 @@ export type ActivePlaceholderWorkflowStepDetails = {
 	stepTitle: string
 	stepHeading: string
 	details: string
+	rawDetails: string
 	sourceName: string
 	sourceType: ActivePlaceholderWorkflowSource["type"]
 }
@@ -137,16 +138,16 @@ export async function getActivePlaceholderWorkflowStepDetails(args: {
 		return undefined
 	}
 
-	let matchingSection: ParsedWorkflowStepSection | undefined
-	if (checklistItem.stepNumber !== undefined) {
-		matchingSection = workflowSections.find((section) => section.stepNumber === checklistItem.stepNumber)
-	}
-
-	if (!matchingSection && checklistItem.normalizedTitle) {
-		matchingSection = workflowSections.find((section) => section.normalizedTitle === checklistItem.normalizedTitle)
-	}
+	const matchingSection = findMatchingWorkflowStepSection(checklistItem, workflowSections)
 
 	if (!matchingSection || !matchingSection.details.trim()) {
+		return undefined
+	}
+
+	const rawWorkflowContents = await getPlaceholderWorkflowSourceContents(args.source)
+	const rawWorkflowSections = parseWorkflowStepSections(rawWorkflowContents)
+	const rawMatchingSection = findMatchingWorkflowStepSection(checklistItem, rawWorkflowSections)
+	if (!rawMatchingSection) {
 		return undefined
 	}
 
@@ -156,6 +157,7 @@ export async function getActivePlaceholderWorkflowStepDetails(args: {
 		stepTitle: matchingSection.stepTitle || checklistItem.stepTitle || checklistItem.label,
 		stepHeading: matchingSection.heading,
 		details: matchingSection.details.trim(),
+		rawDetails: rawMatchingSection.details.trim(),
 		sourceName: args.source.name,
 		sourceType: args.source.type,
 	}
@@ -312,6 +314,22 @@ function parseWorkflowStepSections(
 	}
 
 	return options.includeEmptySections ? sections : sections.filter((section) => section.details.length > 0)
+}
+
+function findMatchingWorkflowStepSection(
+	checklistItem: ParsedChecklistItem,
+	workflowSections: ParsedWorkflowStepSection[],
+): ParsedWorkflowStepSection | undefined {
+	let matchingSection: ParsedWorkflowStepSection | undefined
+	if (checklistItem.stepNumber !== undefined) {
+		matchingSection = workflowSections.find((section) => section.stepNumber === checklistItem.stepNumber)
+	}
+
+	if (!matchingSection && checklistItem.normalizedTitle) {
+		matchingSection = workflowSections.find((section) => section.normalizedTitle === checklistItem.normalizedTitle)
+	}
+
+	return matchingSection
 }
 
 function finalizeWorkflowStepSection(section: {

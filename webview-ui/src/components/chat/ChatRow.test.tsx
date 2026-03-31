@@ -37,7 +37,7 @@ vi.mock("@/services/grpc-client", async (importOriginal) => {
 	}
 })
 
-function createWorkflowFormMessage(phase: WorkflowFormPhase): ClineMessage {
+function createWorkflowFormMessage(phase: WorkflowFormPhase, overrides?: Partial<Record<string, unknown>>): ClineMessage {
 	const sourceSelectionFields = [
 		{
 			key: "source.type",
@@ -49,6 +49,7 @@ function createWorkflowFormMessage(phase: WorkflowFormPhase): ClineMessage {
 				{ value: "commit", label: "Commit" },
 				{ value: "commit_range", label: "Commit range" },
 			],
+			visible: true,
 		},
 	]
 	const concreteCommitFields = [
@@ -59,6 +60,7 @@ function createWorkflowFormMessage(phase: WorkflowFormPhase): ClineMessage {
 			control: "text" as const,
 			required: true,
 			placeholder: "abc1234",
+			visible: true,
 		},
 		{
 			key: "scoped_paths",
@@ -67,6 +69,7 @@ function createWorkflowFormMessage(phase: WorkflowFormPhase): ClineMessage {
 			control: "textarea" as const,
 			required: false,
 			placeholder: "src/core/task/index.ts",
+			visible: true,
 		},
 		{
 			key: "context_lines",
@@ -75,8 +78,41 @@ function createWorkflowFormMessage(phase: WorkflowFormPhase): ClineMessage {
 			control: "number" as const,
 			required: false,
 			placeholder: "3",
+			visible: true,
 		},
 	]
+	const definition = {
+		toolName: "build_review_diff_output",
+		title: "Review Diff Artifact",
+		toolDictionaryTitle: "Diff Source Reference",
+		toolDictionaryMarkdown: "## build_review_diff_output\n\nTool reference body.",
+		pages: {
+			confirm: {
+				prompt: "This workflow requires the following tool-produced artifact: `review-input.diff`.\n\nCan you provide the inputs required to produce `review-input.diff`?",
+				options: ["Yes", "No"],
+			},
+			select_source: {
+				prompt: "This workflow requires the tool-produced artifact `review-input.diff`.\n\nChoose which diff source you have so we can collect the right inputs.",
+				fields: sourceSelectionFields,
+				submitLabel: "Next",
+				cancelLabel: "Cancel",
+			},
+			collect_inputs: {
+				prompt: "Provide the concrete inputs needed to produce `review-input.diff`.",
+				fields: concreteCommitFields,
+				submitLabel: "Submit",
+				cancelLabel: "Cancel",
+			},
+			retry_error: {
+				prompt: "The system could not produce `review-input.diff`. Update the inputs or retry the request.",
+				fields: concreteCommitFields,
+				submitLabel: "Submit",
+				cancelLabel: "Cancel",
+				retryLabel: "Start Over",
+			},
+		},
+		successMessage: "The workflow form completed successfully.",
+	}
 
 	return {
 		ts: Date.now(),
@@ -85,28 +121,8 @@ function createWorkflowFormMessage(phase: WorkflowFormPhase): ClineMessage {
 		text: JSON.stringify({
 			sessionId: "session-1",
 			resolverId: "code_review_step_3_diff_source",
-			toolName: "build_review_diff_output",
-			title: "Review Diff Artifact",
-			prompt:
-				phase === "confirm"
-					? "This workflow requires the following tool-produced artifact: `review-input.diff`.\n\nCan you provide the inputs required to produce `review-input.diff`?"
-					: phase === "select_source"
-						? "This workflow requires the tool-produced artifact `review-input.diff`.\n\nChoose which diff source you have so we can collect the right inputs."
-						: phase === "collect_inputs"
-							? "Provide the concrete inputs needed to produce `review-input.diff`."
-							: phase === "retry_error"
-								? "The system could not produce `review-input.diff`. Update the inputs or retry the request."
-								: "The workflow form completed successfully.",
 			phase,
-			toolDictionaryTitle: "Diff Source Reference",
-			toolDictionaryMarkdown: "## build_review_diff_output\n\nTool reference body.",
-			options: phase === "confirm" ? ["Yes", "No"] : undefined,
-			fields:
-				phase === "select_source"
-					? sourceSelectionFields
-					: phase === "collect_inputs" || phase === "retry_error"
-						? concreteCommitFields
-						: undefined,
+			definition,
 			values:
 				phase === "collect_inputs" || phase === "retry_error"
 					? {
@@ -114,24 +130,20 @@ function createWorkflowFormMessage(phase: WorkflowFormPhase): ClineMessage {
 							"source.type": { stringValue: "commit" },
 						}
 					: undefined,
-			submitLabel:
-				phase === "select_source" ? "Next" : phase === "collect_inputs" || phase === "retry_error" ? "Submit" : undefined,
-			cancelLabel:
-				phase === "select_source" || phase === "collect_inputs" || phase === "retry_error" ? "Cancel" : undefined,
-			retryLabel: phase === "retry_error" ? "Start Over" : undefined,
 			errorMessage: phase === "retry_error" ? "The system could not produce review-input.diff." : undefined,
 			successMessage: phase === "success" ? "The workflow form completed successfully." : undefined,
+			...overrides,
 		}),
 	}
 }
 
-function renderWorkflowFormRow(phase: WorkflowFormPhase) {
+function renderWorkflowFormRow(phase: WorkflowFormPhase, overrides?: Partial<Record<string, unknown>>) {
 	return render(
 		<ChatRowContent
 			inputValue=""
 			isExpanded={true}
 			isLast={true}
-			message={createWorkflowFormMessage(phase)}
+			message={createWorkflowFormMessage(phase, overrides)}
 			onSetQuote={vi.fn()}
 			onToggleExpand={vi.fn()}
 		/>,
@@ -251,18 +263,7 @@ describe("ChatRow followup presentation", () => {
 	})
 
 	it("renders workflow_form confirm rows as a system-owned form", () => {
-		const message = createWorkflowFormMessage("confirm")
-
-		render(
-			<ChatRowContent
-				inputValue=""
-				isExpanded={true}
-				isLast={true}
-				message={message}
-				onSetQuote={vi.fn()}
-				onToggleExpand={vi.fn()}
-			/>,
-		)
+		renderWorkflowFormRow("confirm")
 
 		expect(screen.getByText("System-owned form:")).toBeInTheDocument()
 		expect(screen.getByText("Review Diff Artifact")).toBeInTheDocument()
@@ -271,19 +272,33 @@ describe("ChatRow followup presentation", () => {
 		expect(screen.getByRole("button", { name: "No" })).toBeInTheDocument()
 	})
 
-	it("opens the workflow dictionary in a read-only dialog", async () => {
-		const message = createWorkflowFormMessage("confirm")
+	it("renders workflow-form title and prompt from the canonical definition", () => {
+		renderWorkflowFormRow("collect_inputs", {
+			definition: {
+				toolName: "set_workflow_placeholders",
+				title: "Workflow Start Inputs",
+				toolDictionaryTitle: "Workflow Placeholder Reference",
+				toolDictionaryMarkdown: "## set_workflow_placeholders",
+				pages: {
+					collect_inputs: {
+						prompt: "Provide any Step 1 workflow inputs you already have before the first AI turn begins.",
+						fields: [],
+						submitLabel: "Submit",
+						cancelLabel: "Cancel",
+					},
+				},
+				successMessage: "Workflow start inputs were stored.",
+			},
+		})
 
-		render(
-			<ChatRowContent
-				inputValue=""
-				isExpanded={true}
-				isLast={true}
-				message={message}
-				onSetQuote={vi.fn()}
-				onToggleExpand={vi.fn()}
-			/>,
-		)
+		expect(screen.getByText("Workflow Start Inputs")).toBeInTheDocument()
+		expect(
+			screen.getByText("Provide any Step 1 workflow inputs you already have before the first AI turn begins."),
+		).toBeInTheDocument()
+	})
+
+	it("opens the workflow dictionary in a read-only dialog", async () => {
+		renderWorkflowFormRow("confirm")
 
 		fireEvent.click(screen.getByRole("button", { name: "Open inputs reference" }))
 
@@ -352,5 +367,148 @@ describe("ChatRow followup presentation", () => {
 
 		expect(submitButton).not.toBeDisabled()
 		expect(startOverButton).not.toBeDisabled()
+	})
+
+	it("shows a red asterisk on required workflow-start fields", () => {
+		renderWorkflowFormRow("collect_inputs", {
+			resolverId: "placeholder_workflow_start_set_workflow_placeholders",
+			definition: {
+				toolName: "set_workflow_placeholders",
+				title: "Workflow Start Inputs",
+				toolDictionaryTitle: "Workflow Placeholder Reference",
+				toolDictionaryMarkdown: "## set_workflow_placeholders",
+				pages: {
+					collect_inputs: {
+						prompt: "Provide any Step 1 workflow inputs you already have before the first AI turn begins.",
+						fields: [
+							{
+								key: "review_input",
+								label: "Review Input File",
+								help: "Path to the review input file.",
+								control: "text",
+								required: true,
+								visible: true,
+							},
+						],
+						submitLabel: "Submit",
+						cancelLabel: "Cancel",
+					},
+				},
+				successMessage: "Workflow start inputs were stored.",
+			},
+			values: {},
+		})
+
+		expect(screen.getByText("*")).toBeInTheDocument()
+	})
+
+	it("renders the workflow-start one-of group with OR separators", () => {
+		renderWorkflowFormRow("collect_inputs", {
+			resolverId: "placeholder_workflow_start_set_workflow_placeholders",
+			definition: {
+				toolName: "set_workflow_placeholders",
+				title: "Workflow Start Inputs",
+				toolDictionaryTitle: "Workflow Placeholder Reference",
+				toolDictionaryMarkdown: "## set_workflow_placeholders",
+				pages: {
+					collect_inputs: {
+						prompt: "Provide any Step 1 workflow inputs you already have before the first AI turn begins.",
+						fields: [
+							{
+								key: "review_input",
+								label: "Review Input File",
+								help: "Path to the review input file.",
+								control: "text",
+								required: true,
+								visible: true,
+							},
+							{
+								key: "diff_output",
+								label: "Review Diff File",
+								help: "Path to the review diff file.",
+								control: "text",
+								required: false,
+								oneOfGroupId: "workflow_start_one_of",
+								visible: true,
+							},
+							{
+								key: "spec_file",
+								label: "Spec or Story File",
+								help: "Path to the supporting spec or story file.",
+								control: "text",
+								required: false,
+								oneOfGroupId: "workflow_start_one_of",
+								visible: true,
+							},
+						],
+						submitLabel: "Submit",
+						cancelLabel: "Cancel",
+					},
+				},
+				successMessage: "Workflow start inputs were stored.",
+			},
+			values: {},
+		})
+
+		expect(screen.getByText("Provide one of the following")).toBeInTheDocument()
+		expect(screen.getByText("OR")).toBeInTheDocument()
+	})
+
+	it("keeps Submit disabled until required fields and the one-of group are satisfied", () => {
+		renderWorkflowFormRow("collect_inputs", {
+			resolverId: "placeholder_workflow_start_set_workflow_placeholders",
+			definition: {
+				toolName: "set_workflow_placeholders",
+				title: "Workflow Start Inputs",
+				toolDictionaryTitle: "Workflow Placeholder Reference",
+				toolDictionaryMarkdown: "## set_workflow_placeholders",
+				pages: {
+					collect_inputs: {
+						prompt: "Provide any Step 1 workflow inputs you already have before the first AI turn begins.",
+						fields: [
+							{
+								key: "review_input",
+								label: "Review Input File",
+								help: "Path to the review input file.",
+								control: "text",
+								required: true,
+								visible: true,
+							},
+							{
+								key: "diff_output",
+								label: "Review Diff File",
+								help: "Path to the review diff file.",
+								control: "text",
+								required: false,
+								oneOfGroupId: "workflow_start_one_of",
+								visible: true,
+							},
+							{
+								key: "spec_file",
+								label: "Spec or Story File",
+								help: "Path to the supporting spec or story file.",
+								control: "text",
+								required: false,
+								oneOfGroupId: "workflow_start_one_of",
+								visible: true,
+							},
+						],
+						submitLabel: "Submit",
+						cancelLabel: "Cancel",
+					},
+				},
+				successMessage: "Workflow start inputs were stored.",
+			},
+			values: {},
+		})
+
+		const submitButton = screen.getByRole("button", { name: "Submit" })
+		expect(submitButton).toBeDisabled()
+
+		fireEvent.change(screen.getByLabelText("Review Input File"), { target: { value: "docs/review.md" } })
+		expect(submitButton).toBeDisabled()
+
+		fireEvent.change(screen.getByLabelText("Spec or Story File"), { target: { value: "docs/spec.md" } })
+		expect(submitButton).not.toBeDisabled()
 	})
 })

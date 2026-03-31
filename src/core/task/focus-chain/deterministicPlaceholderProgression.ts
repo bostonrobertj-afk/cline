@@ -31,7 +31,9 @@ export interface DeterministicPlaceholderProgressionResult {
 export function isDeterministicPlaceholderWorkflowSupported(
 	workflowName?: string,
 ): workflowName is DeterministicPlaceholderWorkflowName {
-	return workflowName === "code-review.md" || workflowName === "dev-story.md"
+	return (
+		workflowName === "code-review.md" || workflowName === "dev-story.md" || workflowName === "review-adversarial-general.md"
+	)
 }
 
 type DeterministicStepEvaluationResult = {
@@ -292,6 +294,29 @@ async function evaluateCodeReviewStep(args: {
 	}
 }
 
+async function evaluateReviewAdversarialGeneralStep(args: {
+	taskState: TaskState
+	stepNumber: number
+}): Promise<DeterministicStepEvaluationResult> {
+	switch (args.stepNumber) {
+		case 1: {
+			const dynamicPlaceholderValues = args.taskState.activePlaceholderWorkflowValues ?? {}
+			const reviewInput = dynamicPlaceholderValues.review_input?.trim()
+			const diffOutput = dynamicPlaceholderValues.diff_output?.trim()
+			if (!reviewInput && !diffOutput) {
+				return { completed: false }
+			}
+
+			return {
+				completed: true,
+				reason: "review_input or diff_output is already available for this review pass.",
+			}
+		}
+		default:
+			return { completed: false }
+	}
+}
+
 async function evaluateDevStoryStep(args: {
 	taskState: TaskState
 	stepNumber: number
@@ -385,7 +410,14 @@ async function evaluateDeterministicStep(args: {
 		})
 	}
 
-	return evaluateDevStoryStep({
+	if (args.workflowName === "dev-story.md") {
+		return evaluateDevStoryStep({
+			taskState: args.taskState,
+			stepNumber: args.stepNumber,
+		})
+	}
+
+	return evaluateReviewAdversarialGeneralStep({
 		taskState: args.taskState,
 		stepNumber: args.stepNumber,
 	})

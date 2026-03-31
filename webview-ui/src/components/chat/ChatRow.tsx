@@ -317,18 +317,46 @@ export const ChatRowContent = memo(
 		const isCommandCompleted = isCommandMessage && message.commandCompleted === true
 
 		const isMcpServerResponding = isLast && lastModifiedMessage?.say === "mcp_server_request_started"
-		const visibleWorkflowFormFields = workflowForm?.fields?.filter((field) => field.visible !== false) ?? []
+		const workflowFormPage =
+			workflowForm?.phase === "success" ? undefined : workflowForm?.definition.pages[workflowForm.phase]
+		const visibleWorkflowFormFields = workflowFormPage?.fields?.filter((field) => field.visible !== false) ?? []
+		const workflowFormOptions = workflowFormPage?.options ?? []
 		const sourceSelectionWorkflowFormFields = visibleWorkflowFormFields.filter((field) => field.key === "source.type")
 		const concreteWorkflowFormFields = visibleWorkflowFormFields.filter((field) => field.key !== "source.type")
+		const hasWorkflowFormFieldValue = (value: string | undefined) => {
+			if (typeof value !== "string") {
+				return false
+			}
+
+			return value.trim().length > 0
+		}
+
+		const groupedWorkflowFormFields = concreteWorkflowFormFields.reduce<Record<string, WorkflowFormFieldDefinition[]>>(
+			(acc, field) => {
+				if (!field.oneOfGroupId) {
+					return acc
+				}
+
+				acc[field.oneOfGroupId] ??= []
+				acc[field.oneOfGroupId].push(field)
+				return acc
+			},
+			{},
+		)
+		const ungroupedWorkflowFormFields = concreteWorkflowFormFields.filter((field) => !field.oneOfGroupId)
+		const areRequiredWorkflowFormFieldsSatisfied = concreteWorkflowFormFields
+			.filter((field) => field.required)
+			.every((field) => isWorkflowFormFieldRequiredValueValid(field, workflowFormValues))
+		const areOneOfWorkflowFormGroupsSatisfied = Object.values(groupedWorkflowFormFields).every((groupFields) =>
+			groupFields.some((field) => hasWorkflowFormFieldValue(workflowFormValues[field.key])),
+		)
 		const isWorkflowFormSubmitDisabled =
 			workflowForm?.phase === "select_source"
 				? sourceSelectionWorkflowFormFields.some(
 						(field) => !isWorkflowFormFieldRequiredValueValid(field, workflowFormValues),
 					)
 				: workflowForm?.phase === "collect_inputs" || workflowForm?.phase === "retry_error"
-					? concreteWorkflowFormFields.some(
-							(field) => !isWorkflowFormFieldRequiredValueValid(field, workflowFormValues),
-						)
+					? !areRequiredWorkflowFormFieldsSatisfied || !areOneOfWorkflowFormGroupsSatisfied
 					: false
 
 		const handleToggle = useCallback(() => {
@@ -517,6 +545,67 @@ export const ChatRowContent = memo(
 
 			setIsWorkflowDictionaryOpen(true)
 		}, [workflowForm])
+
+		const renderWorkflowFormField = useCallback(
+			(field: WorkflowFormFieldDefinition) => (
+				<label className="block" key={field.key}>
+					<div className="mb-1 text-xs font-semibold text-foreground">
+						{field.label}
+						{field.required && <span className="text-red-500">*</span>}
+					</div>
+					<div className="mb-2 text-xs text-muted-foreground">{field.help}</div>
+					{field.control === "select" && (
+						<select
+							aria-label={field.label}
+							className="w-full rounded-xs border border-editor-group-border bg-background px-3 py-2 text-sm text-foreground"
+							disabled={workflowFormSubmissionPending}
+							onChange={(event) => handleWorkflowFormFieldChange(field.key, event.target.value)}
+							value={workflowFormValues[field.key] ?? ""}>
+							<option value="">Select an option</option>
+							{field.options?.map((option) => (
+								<option key={option.value} value={option.value}>
+									{option.label}
+								</option>
+							))}
+						</select>
+					)}
+					{field.control === "text" && (
+						<input
+							aria-label={field.label}
+							className="w-full rounded-xs border border-editor-group-border bg-background px-3 py-2 text-sm text-foreground"
+							disabled={workflowFormSubmissionPending}
+							onChange={(event) => handleWorkflowFormFieldChange(field.key, event.target.value)}
+							placeholder={field.placeholder}
+							type="text"
+							value={workflowFormValues[field.key] ?? ""}
+						/>
+					)}
+					{field.control === "textarea" && (
+						<textarea
+							aria-label={field.label}
+							className="min-h-24 w-full rounded-xs border border-editor-group-border bg-background px-3 py-2 text-sm text-foreground"
+							disabled={workflowFormSubmissionPending}
+							onChange={(event) => handleWorkflowFormFieldChange(field.key, event.target.value)}
+							placeholder={field.placeholder}
+							value={workflowFormValues[field.key] ?? ""}
+						/>
+					)}
+					{field.control === "number" && (
+						<input
+							aria-label={field.label}
+							className="w-full rounded-xs border border-editor-group-border bg-background px-3 py-2 text-sm text-foreground"
+							disabled={workflowFormSubmissionPending}
+							inputMode="numeric"
+							onChange={(event) => handleWorkflowFormFieldChange(field.key, event.target.value)}
+							placeholder={field.placeholder}
+							type="text"
+							value={workflowFormValues[field.key] ?? ""}
+						/>
+					)}
+				</label>
+			),
+			[handleWorkflowFormFieldChange, workflowFormSubmissionPending, workflowFormValues],
+		)
 
 		const tool = useMemo(() => {
 			if (message.ask === "tool" || message.say === "tool") {
@@ -1456,13 +1545,13 @@ export const ChatRowContent = memo(
 									<SettingsIcon className="size-2" />
 									<span className="font-bold">System-owned form:</span>
 								</div>
-								<div className="text-sm font-semibold">{workflowForm.title}</div>
+								<div className="text-sm font-semibold">{workflowForm.definition.title}</div>
 								<div className="pt-2">
 									<MarkdownRow
 										markdown={
 											workflowForm.phase === "success"
 												? workflowForm.successMessage || ""
-												: workflowForm.prompt
+												: (workflowFormPage?.prompt ?? "")
 										}
 									/>
 								</div>
@@ -1486,12 +1575,12 @@ export const ChatRowContent = memo(
 											open={isWorkflowDictionaryOpen}>
 											<DialogContent className="max-h-[80vh] overflow-y-auto">
 												<DialogHeader>
-													<DialogTitle>{workflowForm.toolDictionaryTitle}</DialogTitle>
+													<DialogTitle>{workflowForm.definition.toolDictionaryTitle}</DialogTitle>
 													<DialogDescription>
 														Read-only reference for the current workflow form tool.
 													</DialogDescription>
 												</DialogHeader>
-												<MarkdownRow markdown={workflowForm.toolDictionaryMarkdown} />
+												<MarkdownRow markdown={workflowForm.definition.toolDictionaryMarkdown} />
 											</DialogContent>
 										</Dialog>
 									</div>
@@ -1506,38 +1595,14 @@ export const ChatRowContent = memo(
 													option === "Yes" ? { confirm: "yes" } : undefined,
 												)
 											}
-											options={workflowForm.options ?? ["Yes", "No"]}
+											options={workflowFormOptions.length > 0 ? workflowFormOptions : ["Yes", "No"]}
 										/>
 									</div>
 								)}
 								{workflowForm.phase === "select_source" && (
 									<div className="pt-3 space-y-3">
 										<div className="space-y-3">
-											{sourceSelectionWorkflowFormFields.map((field) => (
-												<label className="block" key={field.key}>
-													<div className="mb-1 text-xs font-semibold text-foreground">
-														{field.label}
-													</div>
-													<div className="mb-2 text-xs text-muted-foreground">{field.help}</div>
-													{field.control === "select" && (
-														<select
-															aria-label={field.label}
-															className="w-full rounded-xs border border-editor-group-border bg-background px-3 py-2 text-sm text-foreground"
-															disabled={workflowFormSubmissionPending}
-															onChange={(event) =>
-																handleWorkflowFormFieldChange(field.key, event.target.value)
-															}
-															value={workflowFormValues[field.key] ?? ""}>
-															<option value="">Select an option</option>
-															{field.options?.map((option) => (
-																<option key={option.value} value={option.value}>
-																	{option.label}
-																</option>
-															))}
-														</select>
-													)}
-												</label>
-											))}
+											{sourceSelectionWorkflowFormFields.map((field) => renderWorkflowFormField(field))}
 										</div>
 										<div className="flex flex-wrap gap-2">
 											<button
@@ -1547,7 +1612,7 @@ export const ChatRowContent = memo(
 													void handleWorkflowFormAction(WorkflowFormAction.CANCEL)
 												}}
 												type="button">
-												Cancel
+												{workflowFormPage?.cancelLabel || "Cancel"}
 											</button>
 											<button
 												className="rounded-xs bg-button-background px-3 py-2 text-sm text-primary-foreground disabled:opacity-50"
@@ -1558,7 +1623,7 @@ export const ChatRowContent = memo(
 													})
 												}}
 												type="button">
-												{workflowForm.submitLabel || "Next"}
+												{workflowFormPage?.submitLabel || "Next"}
 											</button>
 										</div>
 									</div>
@@ -1566,69 +1631,23 @@ export const ChatRowContent = memo(
 								{workflowForm.phase === "collect_inputs" && (
 									<div className="pt-3 space-y-3">
 										<div className="space-y-3">
-											{concreteWorkflowFormFields.map((field) => (
-												<label className="block" key={field.key}>
-													<div className="mb-1 text-xs font-semibold text-foreground">
-														{field.label}
+											{ungroupedWorkflowFormFields.map((field) => renderWorkflowFormField(field))}
+											{Object.entries(groupedWorkflowFormFields).map(([groupId, groupFields]) => (
+												<div className="space-y-3" key={groupId}>
+													<div className="text-xs text-muted-foreground">
+														Provide one of the following
 													</div>
-													<div className="mb-2 text-xs text-muted-foreground">{field.help}</div>
-													{field.control === "select" && (
-														<select
-															aria-label={field.label}
-															className="w-full rounded-xs border border-editor-group-border bg-background px-3 py-2 text-sm text-foreground"
-															disabled={workflowFormSubmissionPending}
-															onChange={(event) =>
-																handleWorkflowFormFieldChange(field.key, event.target.value)
-															}
-															value={workflowFormValues[field.key] ?? ""}>
-															<option value="">Select an option</option>
-															{field.options?.map((option) => (
-																<option key={option.value} value={option.value}>
-																	{option.label}
-																</option>
-															))}
-														</select>
-													)}
-													{field.control === "text" && (
-														<input
-															aria-label={field.label}
-															className="w-full rounded-xs border border-editor-group-border bg-background px-3 py-2 text-sm text-foreground"
-															disabled={workflowFormSubmissionPending}
-															onChange={(event) =>
-																handleWorkflowFormFieldChange(field.key, event.target.value)
-															}
-															placeholder={field.placeholder}
-															type="text"
-															value={workflowFormValues[field.key] ?? ""}
-														/>
-													)}
-													{field.control === "textarea" && (
-														<textarea
-															aria-label={field.label}
-															className="min-h-24 w-full rounded-xs border border-editor-group-border bg-background px-3 py-2 text-sm text-foreground"
-															disabled={workflowFormSubmissionPending}
-															onChange={(event) =>
-																handleWorkflowFormFieldChange(field.key, event.target.value)
-															}
-															placeholder={field.placeholder}
-															value={workflowFormValues[field.key] ?? ""}
-														/>
-													)}
-													{field.control === "number" && (
-														<input
-															aria-label={field.label}
-															className="w-full rounded-xs border border-editor-group-border bg-background px-3 py-2 text-sm text-foreground"
-															disabled={workflowFormSubmissionPending}
-															inputMode="numeric"
-															onChange={(event) =>
-																handleWorkflowFormFieldChange(field.key, event.target.value)
-															}
-															placeholder={field.placeholder}
-															type="text"
-															value={workflowFormValues[field.key] ?? ""}
-														/>
-													)}
-												</label>
+													{groupFields.map((field, index) => (
+														<div className="space-y-3" key={field.key}>
+															{renderWorkflowFormField(field)}
+															{index < groupFields.length - 1 && (
+																<div className="text-xs font-semibold text-muted-foreground">
+																	OR
+																</div>
+															)}
+														</div>
+													))}
+												</div>
 											))}
 										</div>
 										<div className="flex flex-wrap gap-2">
@@ -1639,7 +1658,7 @@ export const ChatRowContent = memo(
 													void handleWorkflowFormAction(WorkflowFormAction.CANCEL)
 												}}
 												type="button">
-												Cancel
+												{workflowFormPage?.cancelLabel || "Cancel"}
 											</button>
 											<button
 												className="rounded-xs bg-button-background px-3 py-2 text-sm text-primary-foreground disabled:opacity-50"
@@ -1656,7 +1675,7 @@ export const ChatRowContent = memo(
 													)
 												}}
 												type="button">
-												Submit
+												{workflowFormPage?.submitLabel || "Submit"}
 											</button>
 										</div>
 									</div>
@@ -1669,69 +1688,23 @@ export const ChatRowContent = memo(
 											</div>
 										)}
 										<div className="space-y-3">
-											{concreteWorkflowFormFields.map((field) => (
-												<label className="block" key={field.key}>
-													<div className="mb-1 text-xs font-semibold text-foreground">
-														{field.label}
+											{ungroupedWorkflowFormFields.map((field) => renderWorkflowFormField(field))}
+											{Object.entries(groupedWorkflowFormFields).map(([groupId, groupFields]) => (
+												<div className="space-y-3" key={groupId}>
+													<div className="text-xs text-muted-foreground">
+														Provide one of the following
 													</div>
-													<div className="mb-2 text-xs text-muted-foreground">{field.help}</div>
-													{field.control === "select" && (
-														<select
-															aria-label={field.label}
-															className="w-full rounded-xs border border-editor-group-border bg-background px-3 py-2 text-sm text-foreground"
-															disabled={workflowFormSubmissionPending}
-															onChange={(event) =>
-																handleWorkflowFormFieldChange(field.key, event.target.value)
-															}
-															value={workflowFormValues[field.key] ?? ""}>
-															<option value="">Select an option</option>
-															{field.options?.map((option) => (
-																<option key={option.value} value={option.value}>
-																	{option.label}
-																</option>
-															))}
-														</select>
-													)}
-													{field.control === "text" && (
-														<input
-															aria-label={field.label}
-															className="w-full rounded-xs border border-editor-group-border bg-background px-3 py-2 text-sm text-foreground"
-															disabled={workflowFormSubmissionPending}
-															onChange={(event) =>
-																handleWorkflowFormFieldChange(field.key, event.target.value)
-															}
-															placeholder={field.placeholder}
-															type="text"
-															value={workflowFormValues[field.key] ?? ""}
-														/>
-													)}
-													{field.control === "textarea" && (
-														<textarea
-															aria-label={field.label}
-															className="min-h-24 w-full rounded-xs border border-editor-group-border bg-background px-3 py-2 text-sm text-foreground"
-															disabled={workflowFormSubmissionPending}
-															onChange={(event) =>
-																handleWorkflowFormFieldChange(field.key, event.target.value)
-															}
-															placeholder={field.placeholder}
-															value={workflowFormValues[field.key] ?? ""}
-														/>
-													)}
-													{field.control === "number" && (
-														<input
-															aria-label={field.label}
-															className="w-full rounded-xs border border-editor-group-border bg-background px-3 py-2 text-sm text-foreground"
-															disabled={workflowFormSubmissionPending}
-															inputMode="numeric"
-															onChange={(event) =>
-																handleWorkflowFormFieldChange(field.key, event.target.value)
-															}
-															placeholder={field.placeholder}
-															type="text"
-															value={workflowFormValues[field.key] ?? ""}
-														/>
-													)}
-												</label>
+													{groupFields.map((field, index) => (
+														<div className="space-y-3" key={field.key}>
+															{renderWorkflowFormField(field)}
+															{index < groupFields.length - 1 && (
+																<div className="text-xs font-semibold text-muted-foreground">
+																	OR
+																</div>
+															)}
+														</div>
+													))}
+												</div>
 											))}
 										</div>
 										<div className="flex flex-wrap gap-2">
@@ -1742,7 +1715,7 @@ export const ChatRowContent = memo(
 													void handleWorkflowFormAction(WorkflowFormAction.CANCEL)
 												}}
 												type="button">
-												Cancel
+												{workflowFormPage?.cancelLabel || "Cancel"}
 											</button>
 											<button
 												className="rounded-xs border border-editor-group-border px-3 py-2 text-sm text-foreground disabled:opacity-50"
@@ -1751,7 +1724,7 @@ export const ChatRowContent = memo(
 													void handleWorkflowFormAction(WorkflowFormAction.RETRY)
 												}}
 												type="button">
-												{workflowForm.retryLabel || "Start Over"}
+												{workflowFormPage?.retryLabel || "Start Over"}
 											</button>
 											<button
 												className="rounded-xs bg-button-background px-3 py-2 text-sm text-primary-foreground disabled:opacity-50"
@@ -1768,7 +1741,7 @@ export const ChatRowContent = memo(
 													)
 												}}
 												type="button">
-												Submit
+												{workflowFormPage?.submitLabel || "Submit"}
 											</button>
 										</div>
 									</div>
