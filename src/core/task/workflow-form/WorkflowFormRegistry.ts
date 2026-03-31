@@ -2,6 +2,7 @@ import type { WorkflowFormDefinition, WorkflowFormFieldDefinition, WorkflowFormF
 import { formatResponse } from "@/core/prompts/responses"
 import {
 	buildReviewDiffOutputToolDictionaryConfig,
+	buildReviewInputToolDictionaryConfig,
 	buildRuntimeToolDictionaryMarkdownFromConfig,
 } from "@/core/task/workflow-form/dictionaries/buildToolDictionary"
 import {
@@ -15,13 +16,17 @@ import {
 	parseWorkflowFormRawValue,
 	resolveWorkflowFormOneOfVariant,
 	resolveWorkflowFormSchema,
+	resolveWorkflowFormToolSpec,
 	type WorkflowFormFieldSchemaBinding,
 } from "./schema"
 import type { WorkflowFormResolverDefinition, WorkflowFormResolverId, WorkflowFormValues } from "./types"
 
 export const CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID = "code_review_step_3_diff_source"
+export const CODE_REVIEW_STEP_3_REVIEW_INPUT_RESOLVER_ID = "code_review_step_3_review_input"
 export const PLACEHOLDER_WORKFLOW_START_SET_WORKFLOW_PLACEHOLDERS_RESOLVER_ID =
 	"placeholder_workflow_start_set_workflow_placeholders"
+const CODE_REVIEW_STEP_3_REVIEW_INPUT_DIFF_MISMATCH_MESSAGE =
+	"diff_output does not identify recent changes to the story file. Proceeding with AI generation of review_input.md using the fallback Step 3 instructions."
 
 const SOURCE_TYPE_FIELD_KEY = "source.type"
 const SOURCE_COMMIT_FIELD_KEY = "source.commit"
@@ -205,6 +210,27 @@ function buildConcreteInputFieldDefinitions(values: WorkflowFormValues): Workflo
 	return fields
 }
 
+function buildSchemaDerivedPublicToolFieldDefinitions(args: {
+	toolName: ClineDefaultTool
+	labelOverrides?: Record<string, string>
+	helpOverrides?: Record<string, string>
+	placeholderOverrides?: Record<string, string>
+}): WorkflowFormFieldDefinition[] {
+	const tool = resolveWorkflowFormToolSpec(args.toolName)
+	return (tool.parameters ?? []).map((parameter) =>
+		buildSchemaBackedField({
+			toolName: args.toolName,
+			binding: { parameterName: parameter.name },
+			key: parameter.name,
+			label: args.labelOverrides?.[parameter.name] ?? humanizeWorkflowPlaceholderKey(parameter.name),
+			help: args.helpOverrides?.[parameter.name] ?? parameter.description ?? humanizeWorkflowPlaceholderKey(parameter.name),
+			required: parameter.required ?? false,
+			placeholder: args.placeholderOverrides?.[parameter.name],
+			visible: true,
+		}),
+	)
+}
+
 const WORKFLOW_START_TOOL_DICTIONARY_CONFIG = {
 	toolName: ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
 	heading: "## set_workflow_placeholders",
@@ -342,11 +368,11 @@ export const workflowFormRegistry: Record<string, WorkflowFormResolverDefinition
 						retryLabel: "Start Over",
 					},
 				},
-				successMessage: "The Step 3 diff artifact is ready.",
+				successMessage: "The Step 2 diff artifact is ready.",
 			}
 		},
 		buildToolExecutionFailureFallbackMessage() {
-			return "The workflow form could not build the Step 3 diff artifact. Review the input and try again."
+			return "The workflow form could not build the Step 2 diff artifact. Review the input and try again."
 		},
 		buildToolExecutionRequest(session, values) {
 			const fields = getCurrentCollectFields({ ...session, values }, this.buildDefinition)
@@ -425,6 +451,116 @@ export const workflowFormRegistry: Record<string, WorkflowFormResolverDefinition
 			return {
 				succeeded: false,
 				errorMessage: this.buildToolExecutionFailureFallbackMessage(session),
+			}
+		},
+	},
+	[CODE_REVIEW_STEP_3_REVIEW_INPUT_RESOLVER_ID]: {
+		id: CODE_REVIEW_STEP_3_REVIEW_INPUT_RESOLVER_ID,
+		toolName: ClineDefaultTool.BUILD_REVIEW_INPUT,
+		buildDefinition(): WorkflowFormDefinition {
+			return {
+				toolName: ClineDefaultTool.BUILD_REVIEW_INPUT,
+				title: "Review Input Artifact",
+				toolDictionaryTitle: "Review Input Reference",
+				toolDictionaryMarkdown: buildRuntimeToolDictionaryMarkdownFromConfig(buildReviewInputToolDictionaryConfig),
+				pages: {
+					confirm: {
+						prompt: "This workflow requires the following tool-produced artifact: `review-input.md`.\n\nCan you provide the story file path required to produce `review-input.md`?",
+						options: ["Yes", "No"],
+					},
+					collect_inputs: {
+						prompt: "Provide the story file path needed to produce `review-input.md`. The workflow-owned `review-input.diff` artifact will be supplied automatically.",
+						fields: buildSchemaDerivedPublicToolFieldDefinitions({
+							toolName: ClineDefaultTool.BUILD_REVIEW_INPUT,
+							labelOverrides: { story_path: "Story File Path" },
+							helpOverrides: {
+								story_path:
+									"Path to the story markdown file being reviewed. The workflow-owned `review-input.diff` artifact will be supplied automatically.",
+							},
+							placeholderOverrides: { story_path: "/absolute/path/to/story.md" },
+						}),
+						submitLabel: "Submit",
+						cancelLabel: "Cancel",
+					},
+					retry_error: {
+						prompt: "The system could not produce `review-input.md`. Update the story file path or retry the request.",
+						fields: buildSchemaDerivedPublicToolFieldDefinitions({
+							toolName: ClineDefaultTool.BUILD_REVIEW_INPUT,
+							labelOverrides: { story_path: "Story File Path" },
+							helpOverrides: {
+								story_path:
+									"Path to the story markdown file being reviewed. The workflow-owned `review-input.diff` artifact will be supplied automatically.",
+							},
+							placeholderOverrides: { story_path: "/absolute/path/to/story.md" },
+						}),
+						submitLabel: "Submit",
+						cancelLabel: "Cancel",
+						retryLabel: "Start Over",
+					},
+				},
+				successMessage: "The Step 3 review-input artifact is ready.",
+			}
+		},
+		buildToolExecutionFailureFallbackMessage() {
+			return "The workflow form could not build the Step 3 review-input artifact. The workflow will return to the Step 3 fallback instructions."
+		},
+		buildToolExecutionRequest(_session, values) {
+			const fields = buildSchemaDerivedPublicToolFieldDefinitions({
+				toolName: ClineDefaultTool.BUILD_REVIEW_INPUT,
+				labelOverrides: { story_path: "Story File Path" },
+				helpOverrides: {
+					story_path:
+						"Path to the story markdown file being reviewed. The workflow-owned `review-input.diff` artifact will be supplied automatically.",
+				},
+				placeholderOverrides: { story_path: "/absolute/path/to/story.md" },
+			})
+			const filteredValues = fields.reduce<Record<string, string>>((acc, field) => {
+				const value = getParsedFieldValue(fields, values, field.key)
+				if (typeof value === "string") {
+					acc[field.key] = value
+				}
+
+				return acc
+			}, {})
+
+			if (typeof filteredValues.story_path !== "string" || filteredValues.story_path.length === 0) {
+				throw new Error(
+					"Workflow form could not derive a valid build_review_input request from the schema-derived fields.",
+				)
+			}
+
+			return {
+				toolName: ClineDefaultTool.BUILD_REVIEW_INPUT,
+				toolInput: filteredValues,
+				toolParams: filteredValues,
+			}
+		},
+		evaluateToolExecutionResult(session, args) {
+			const parsed = parseWorkflowFormJsonToolResult(args.toolResultText)
+			if (parsed?.persisted === true && parsed?.review_input_available === true) {
+				return { succeeded: true }
+			}
+
+			if (parsed?.reason === "diff_output does not identify recent changes to the story file.") {
+				return {
+					succeeded: false,
+					errorMessage: CODE_REVIEW_STEP_3_REVIEW_INPUT_DIFF_MISMATCH_MESSAGE,
+					fallbackToAgent: true,
+				}
+			}
+
+			if (isWorkflowFormFailureText(args.toolResultText)) {
+				return {
+					succeeded: false,
+					errorMessage: args.toolResultText?.trim() ?? this.buildToolExecutionFailureFallbackMessage(session),
+					fallbackToAgent: true,
+				}
+			}
+
+			return {
+				succeeded: false,
+				errorMessage: this.buildToolExecutionFailureFallbackMessage(session),
+				fallbackToAgent: true,
 			}
 		},
 	},

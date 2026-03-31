@@ -75,6 +75,23 @@ export const buildReviewDiffOutputToolDictionaryConfig: WorkflowFormToolDictiona
 	},
 	termKeys: TOOL_DICTIONARY_TERM_KEYS,
 }
+export const buildReviewInputToolDictionaryConfig: WorkflowFormToolDictionaryConfig = {
+	toolName: ClineDefaultTool.BUILD_REVIEW_INPUT,
+	heading: "## build_review_input",
+	runtimeTitle: "Review Input Reference",
+	overviewLines: [
+		"Review Input Artifact. Build and replace the stable review-input artifact at {review_input}.",
+		"",
+		"Story File Path. The human must provide only the story markdown file path for the current review cycle.",
+		"",
+		"Workflow-owned Diff Artifact. The stable diff artifact at {diff_output} is resolved automatically and is not recollected from the human.",
+	],
+	parameterDescriptions: {
+		story_path:
+			"Required story markdown file path. The workflow-owned diff artifact at {diff_output} is resolved automatically.",
+	},
+	termKeys: [],
+}
 export const WORKFLOW_FORM_TOOL_DICTIONARY_HEADING = buildReviewDiffOutputToolDictionaryConfig.heading
 export const WORKFLOW_FORM_RUNTIME_TOOL_REFERENCE_TITLE = buildReviewDiffOutputToolDictionaryConfig.runtimeTitle
 

@@ -21,9 +21,9 @@ Phase 3 delivers one new deterministic workflow-form use case:
 - target artifact: `review_input.md`
 - invoked tool: `build_review_input`
 - human-provided input: story file path
-- system-provided supporting input: the stable `diff_output` artifact path
+- system-provided supporting input: the stable `diff_output` artifact path resolved internally by `build_review_input`
 
-Phase 3 is limited to story-file-backed review-input generation. If the active review source is not a story file, the workflow must fall back to the existing AI/manual Step 2 behavior.
+Phase 3 is limited to story-file-backed review-input generation. If the active review source is not a story file, the workflow must fall back to the existing AI/manual Step 3 behavior.
 
 ## Core Requirement
 
@@ -31,10 +31,9 @@ The system must support a workflow-form-driven path that:
 
 - asks whether the user has a story file path to provide
 - collects the story file path when the user does have one
-- automatically resolves the stable `diff_output` artifact path without asking the user for it
 - invokes `build_review_input` through the existing tool execution path
 - produces a normalized `review_input.md` artifact for downstream review workflows
-- falls back to the existing Step 2 AI/manual path when deterministic extraction cannot be completed
+- falls back to the existing Step 3 AI/manual path when deterministic extraction cannot be completed
 
 The capability must continue to keep raw human form inputs out of model-visible conversational context.
 
@@ -62,7 +61,7 @@ Only the normal tool result, artifact writes, placeholder effects, and workflow-
 
 ### 3. Step instructions remain valid fallback guidance
 
-The `code-review.md` Step 2 instructions must remain sufficient fallback instructions for the AI agent when:
+The `code-review.md` Step 3 instructions must remain sufficient fallback instructions for the AI agent when:
 
 - the user does not provide a story file path
 - the form is cancelled
@@ -91,13 +90,13 @@ The deterministic `build_review_input` path applies only when the human provides
 If the human does not have a story file path to provide:
 
 - the workflow form path must stop
-- the workflow must return control to the fallback Step 2 AI/manual instructions
+- the workflow must return control to the fallback Step 3 AI/manual instructions
 
 ### 3. Non-story fallback
 
 If the review source is a spec document, PRD, action plan, or any other non-story source, Phase 3 must not attempt to force deterministic story extraction rules onto that file.
 
-The workflow must return control to the fallback AI/manual Step 2 path instead.
+The workflow must return control to the fallback AI/manual Step 3 path instead.
 
 ## Silo Ownership Map
 
@@ -127,7 +126,6 @@ This silo owns:
 
 - the Phase 3 workflow-form resolver/use case
 - story-file-path collection
-- automatic stable `diff_output` path resolution for the form-backed use case
 - workflow-form success/retry/fallback UX
 - invocation of `build_review_input` through the existing tool path
 
@@ -251,25 +249,25 @@ Phase 3 must not use fallback notes as a substitute for the required diff-backed
 
 If `diff_output` does not identify recent changes to the story file, the workflow UI must surface this exact message:
 
-`diff_output does not identify recent changes to the story file. Proceeding with AI generation of review_input.md using the fallback Step 2 instructions.`
+`diff_output does not identify recent changes to the story file. Proceeding with AI generation of review_input.md using the fallback Step 3 instructions.`
 
-After surfacing that message, the workflow must fall back to the AI/manual Step 2 path.
+After surfacing that message, the workflow must fall back to the AI/manual Step 3 path.
 
 ### 2. No silent guessing
 
 If the tool cannot deterministically identify recent-cycle tasks or completion notes from the diff, the system must not guess.
 
-If that failure is caused by `diff_output` not identifying recent story-file changes, the workflow must surface the required diff/story mismatch message and fall back to the AI/manual Step 2 path.
+If that failure is caused by `diff_output` not identifying recent story-file changes, the workflow must surface the required diff/story mismatch message and fall back to the AI/manual Step 3 path.
 
 Phase 3 must not silently fabricate latest-cycle scope.
 
 ### 3. Form cancellation
 
-If the user cancels or declines the form path, the workflow must return to the fallback Step 2 AI/manual path.
+If the user cancels or declines the form path, the workflow must return to the fallback Step 3 AI/manual path.
 
 ### 4. Tool failure
 
-If `build_review_input` errors, the workflow must preserve the active workflow and fall back to the Step 2 AI/manual path rather than abandoning the review workflow.
+If `build_review_input` errors, the workflow must preserve the active workflow and fall back to the Step 3 AI/manual path rather than abandoning the review workflow.
 
 ## Workflow-Form Silo Requirements
 
@@ -287,7 +285,7 @@ It must not introduce:
 
 The form must begin by asking whether the user has a story file path to provide.
 
-If the user answers no, the system-owned path must stop and the workflow must continue through the fallback Step 2 instructions.
+If the user answers no, the system-owned path must stop and the workflow must continue through the fallback Step 3 instructions.
 
 ### 3. Minimal human input surface
 
@@ -344,5 +342,3 @@ Phase 3 is delivered in three implementation phases:
 1. Build the `build_review_input` tool.
 2. Build the workflow-form use case that invokes `build_review_input`.
 3. Update deterministic workflow progression as needed to align with the reauthored workflow step structure.
-
-

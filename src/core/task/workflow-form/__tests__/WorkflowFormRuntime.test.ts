@@ -118,8 +118,69 @@ describe("WorkflowFormRuntime", () => {
 		},
 	}
 
+	const confirmToCollectFormResolver: WorkflowFormResolverDefinition = {
+		id: "confirm_to_collect_form",
+		toolName: ClineDefaultTool.BUILD_REVIEW_INPUT,
+		buildDefinition: (): WorkflowFormDefinition => ({
+			toolName: ClineDefaultTool.BUILD_REVIEW_INPUT,
+			title: "Confirm To Collect Form",
+			toolDictionaryTitle: "Review Input Reference",
+			toolDictionaryMarkdown: "## build_review_input",
+			pages: {
+				confirm: {
+					prompt: "Confirm the review-input form.",
+					options: ["Yes", "No"],
+				},
+				collect_inputs: {
+					prompt: "Collect the story path.",
+					fields: [
+						{
+							key: "story_path",
+							label: "Story File Path",
+							help: "Path to the story markdown file being reviewed.",
+							control: "text",
+							valueSchema: { type: "string" },
+							required: true,
+							visible: true,
+						},
+					],
+				},
+				retry_error: {
+					prompt: "Retry the review-input form.",
+					fields: [
+						{
+							key: "story_path",
+							label: "Story File Path",
+							help: "Path to the story markdown file being reviewed.",
+							control: "text",
+							valueSchema: { type: "string" },
+							required: true,
+							visible: true,
+						},
+					],
+				},
+			},
+			successMessage: "success",
+		}),
+		buildToolExecutionFailureFallbackMessage: () => "error",
+		evaluateToolExecutionResult: () => ({ succeeded: true }),
+		buildToolExecutionRequest: (_session: WorkflowFormSessionState, values: WorkflowFormValues) => ({
+			toolName: ClineDefaultTool.BUILD_REVIEW_INPUT,
+			toolInput: {
+				story_path: values.story_path?.rawValue ?? "",
+			},
+			toolParams: {
+				story_path: values.story_path?.rawValue ?? "",
+			},
+		}),
+	}
+
 	function createCustomRuntime() {
 		return new WorkflowFormRuntime({ generic_form: sessionAwareCustomResolver })
+	}
+
+	function createConfirmToCollectRuntime() {
+		return new WorkflowFormRuntime({ confirm_to_collect_form: confirmToCollectFormResolver })
 	}
 
 	it("creates a confirm payload for the Phase 1 workflow form session", () => {
@@ -129,7 +190,7 @@ describe("WorkflowFormRuntime", () => {
 			owner: {
 				kind: "placeholder_workflow_step",
 				workflowName: "code-review.md",
-				stepNumber: 3,
+				stepNumber: 2,
 			},
 		})
 
@@ -165,14 +226,14 @@ describe("WorkflowFormRuntime", () => {
 		expect(session.context).to.deep.equal(context)
 	})
 
-	it("transitions from confirm to select_source when the submission confirms yes", () => {
+	it("transitions from confirm to select_source when the Phase 1 resolver submission confirms yes", () => {
 		const session = runtime.createSession({
 			resolverId: "code_review_step_3_diff_source",
 			triggerSource: "deterministic_workflow_progression",
 			owner: {
 				kind: "placeholder_workflow_step",
 				workflowName: "code-review.md",
-				stepNumber: 3,
+				stepNumber: 2,
 			},
 		})
 
@@ -191,6 +252,32 @@ describe("WorkflowFormRuntime", () => {
 		}
 	})
 
+	it("transitions from confirm to collect_inputs when the resolver has no select_source page", () => {
+		const customRuntime = createConfirmToCollectRuntime()
+		const session = customRuntime.createSession({
+			resolverId: "confirm_to_collect_form",
+			triggerSource: "deterministic_workflow_progression",
+			owner: {
+				kind: "placeholder_workflow_step",
+			},
+		})
+
+		const outcome = customRuntime.handleSubmission(
+			session,
+			WorkflowFormSubmissionRequest.create({
+				sessionId: session.sessionId,
+				action: WorkflowFormAction.SUBMIT,
+				fields: [{ key: "confirm", value: { rawValue: "yes" } }],
+			}),
+		)
+
+		expect(outcome.kind).to.equal("render_form")
+		if (outcome.kind === "render_form") {
+			expect(outcome.session.phase).to.equal("collect_inputs")
+			expect(outcome.payload.phase).to.equal("collect_inputs")
+		}
+	})
+
 	it("transitions from select_source to collect_inputs without invoking the tool", () => {
 		const session = runtime.createSession({
 			resolverId: "code_review_step_3_diff_source",
@@ -198,7 +285,7 @@ describe("WorkflowFormRuntime", () => {
 			owner: {
 				kind: "placeholder_workflow_step",
 				workflowName: "code-review.md",
-				stepNumber: 3,
+				stepNumber: 2,
 			},
 		})
 
@@ -233,7 +320,7 @@ describe("WorkflowFormRuntime", () => {
 			owner: {
 				kind: "placeholder_workflow_step",
 				workflowName: "code-review.md",
-				stepNumber: 3,
+				stepNumber: 2,
 			},
 		})
 
@@ -254,7 +341,7 @@ describe("WorkflowFormRuntime", () => {
 			owner: {
 				kind: "placeholder_workflow_step",
 				workflowName: "code-review.md",
-				stepNumber: 3,
+				stepNumber: 2,
 			},
 		})
 
@@ -485,7 +572,7 @@ describe("WorkflowFormRuntime", () => {
 			owner: {
 				kind: "placeholder_workflow_step",
 				workflowName: "code-review.md",
-				stepNumber: 3,
+				stepNumber: 2,
 			},
 		})
 
@@ -522,7 +609,7 @@ describe("WorkflowFormRuntime", () => {
 			owner: {
 				kind: "placeholder_workflow_step",
 				workflowName: "code-review.md",
-				stepNumber: 3,
+				stepNumber: 2,
 			},
 		})
 
@@ -572,7 +659,7 @@ describe("WorkflowFormRuntime", () => {
 			owner: {
 				kind: "placeholder_workflow_step",
 				workflowName: "code-review.md",
-				stepNumber: 3,
+				stepNumber: 2,
 			},
 		})
 
@@ -660,7 +747,7 @@ describe("WorkflowFormRuntime", () => {
 			owner: {
 				kind: "placeholder_workflow_step",
 				workflowName: "code-review.md",
-				stepNumber: 3,
+				stepNumber: 2,
 			},
 		})
 
@@ -700,7 +787,7 @@ describe("WorkflowFormRuntime", () => {
 				owner: {
 					kind: "placeholder_workflow_step",
 					workflowName: "code-review.md",
-					stepNumber: 3,
+					stepNumber: 2,
 				},
 			})
 

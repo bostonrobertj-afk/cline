@@ -24,11 +24,11 @@ Locked decisions for this pass:
 
 - The existing Phase 1 diff workflow form stays on the legacy resolver id `code_review_step_3_diff_source`, but its trigger ownership and user-facing step references must align to the live Step 2 diff workflow state.
 - The new Phase 3 resolver id is `code_review_step_3_review_input`.
-- The only human-submitted field for the Phase 3 form is `story_path`.
+- The public `build_review_input` tool schema currently exposes exactly one human-provided parameter, `story_path`, so schema-derived field discovery for the Phase 3 form must yield exactly one collected field without hand-authoring a custom field list.
 - The Phase 3 form must not ask for `diff_output`; it is resolved automatically from workflow placeholders/tool behavior.
 - The exact workflow-form UI fallback message for the diff/story mismatch case is:
   - `diff_output does not identify recent changes to the story file. Proceeding with AI generation of review_input.md using the fallback Step 3 instructions.`
-- After any post-tool Phase 3 failure, the workflow form must render the failure once in the workflow UI, suppress the resolver for the current active workflow step, clear the active form session, and return control to the manual Step 3 workflow instructions.
+- After any post-tool Phase 3 failure, the workflow form must render a terminal non-interactive workflow-form notice once in the workflow UI, suppress the resolver for the current active workflow step, clear the active form session, and return control to the manual Step 3 workflow instructions.
 - This pass must not modify:
   - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/**`
   - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/focus-chain/**`
@@ -36,7 +36,7 @@ Locked decisions for this pass:
   - `/Users/robertboston/Documents/Cline/Workflows/**`
 
 ## Step 1
-[ ] Generalize the workflow-form runtime so confirm pages can advance directly to `collect_inputs` when no `select_source` page exists, and extend the post-tool evaluation contract to carry a fallback-to-agent signal.
+[x] Generalize the workflow-form runtime so confirm pages can advance directly to `collect_inputs` when no `select_source` page exists, and extend the post-tool evaluation contract to carry a fallback-to-agent signal.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/types.ts`
@@ -74,7 +74,7 @@ Exact edits:
      - assert `outcome.payload.phase === "collect_inputs"`
 
 ## Step 2
-[ ] Add the Phase 3 review-input tool dictionary config and resolver, and align the existing Phase 1 resolver text to the reauthored Step 2/Step 3 workflow state.
+[x] Add the Phase 3 review-input tool dictionary config and resolver, and align the existing Phase 1 resolver text to the reauthored Step 2/Step 3 workflow state.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/dictionaries/buildToolDictionary.ts`
@@ -103,32 +103,41 @@ Exact edits:
    - `termKeys: []`
 2. In [WorkflowFormRegistry.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/WorkflowFormRegistry.ts#L22-L31), add:
    - `export const CODE_REVIEW_STEP_3_REVIEW_INPUT_RESOLVER_ID = "code_review_step_3_review_input"`
-   - `const STORY_PATH_FIELD_KEY = "story_path"`
    - `const CODE_REVIEW_STEP_3_REVIEW_INPUT_DIFF_MISMATCH_MESSAGE = "diff_output does not identify recent changes to the story file. Proceeding with AI generation of review_input.md using the fallback Step 3 instructions."`
-3. In the same file, import `buildReviewInputToolDictionaryConfig` next to `buildReviewDiffOutputToolDictionaryConfig`.
+3. In the same file, import:
+   - `buildReviewInputToolDictionaryConfig` next to `buildReviewDiffOutputToolDictionaryConfig`
+   - `resolveWorkflowFormToolSpec` from `./schema`
 4. Still in [WorkflowFormRegistry.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/WorkflowFormRegistry.ts#L45-L206), add one helper function immediately after `buildConcreteInputFieldDefinitions(...)`:
 
 ```ts
-function buildReviewInputFieldDefinitions(): WorkflowFormFieldDefinition[] {
-	return [
+function buildSchemaDerivedPublicToolFieldDefinitions(args: {
+	toolName: ClineDefaultTool
+	labelOverrides?: Record<string, string>
+	helpOverrides?: Record<string, string>
+	placeholderOverrides?: Record<string, string>
+}): WorkflowFormFieldDefinition[] {
+	const tool = resolveWorkflowFormToolSpec(args.toolName)
+	return (tool.parameters ?? []).map((parameter) =>
 		buildSchemaBackedField({
-			toolName: ClineDefaultTool.BUILD_REVIEW_INPUT,
-			binding: { parameterName: "story_path" },
-			key: STORY_PATH_FIELD_KEY,
-			label: "Story File Path",
-			help: "Path to the story markdown file being reviewed. The workflow-owned `review-input.diff` artifact will be supplied automatically.",
-			required: true,
-			placeholder: "/absolute/path/to/story.md",
+			toolName: args.toolName,
+			binding: { parameterName: parameter.name },
+			key: parameter.name,
+			label: args.labelOverrides?.[parameter.name] ?? humanizeWorkflowPlaceholderKey(parameter.name),
+			help: args.helpOverrides?.[parameter.name] ?? parameter.description ?? humanizeWorkflowPlaceholderKey(parameter.name),
+			required: parameter.required ?? false,
+			placeholder: args.placeholderOverrides?.[parameter.name],
 			visible: true,
 		}),
-	]
+	)
 }
 ```
 
-5. In the existing Phase 1 resolver entry at [WorkflowFormRegistry.ts:310-429](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/WorkflowFormRegistry.ts#L310), leave the resolver id unchanged, but update only its step-numbered strings:
+5. The new helper must not filter or suppress any tool parameters on its own. For `build_review_input`, it must yield exactly one field because the live tool schema currently exposes exactly one public parameter: `story_path`.
+6. Do not read `parameter.instruction` inside this helper. Live tool specs allow `instruction` to be either a string or a context-bound function, so the helper must use only `helpOverrides`, `parameter.description`, and the existing humanized-key fallback when deriving display help text.
+7. In the existing Phase 1 resolver entry at [WorkflowFormRegistry.ts:310-429](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/WorkflowFormRegistry.ts#L310), leave the resolver id unchanged, but update only its step-numbered strings:
    - `successMessage` from `The Step 3 diff artifact is ready.` to `The Step 2 diff artifact is ready.`
    - `buildToolExecutionFailureFallbackMessage()` from `The workflow form could not build the Step 3 diff artifact. Review the input and try again.` to `The workflow form could not build the Step 2 diff artifact. Review the input and try again.`
-6. Still in [WorkflowFormRegistry.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/WorkflowFormRegistry.ts#L430-L431), insert a new resolver entry immediately before the workflow-start resolver with these exact behaviors:
+8. Still in [WorkflowFormRegistry.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/WorkflowFormRegistry.ts#L430-L431), insert a new resolver entry immediately before the workflow-start resolver with these exact behaviors:
    - `id: CODE_REVIEW_STEP_3_REVIEW_INPUT_RESOLVER_ID`
    - `toolName: ClineDefaultTool.BUILD_REVIEW_INPUT`
    - `buildDefinition(session)` returns:
@@ -139,9 +148,9 @@ function buildReviewInputFieldDefinitions(): WorkflowFormFieldDefinition[] {
      - `pages.confirm.options = ["Yes", "No"]`
      - no `pages.select_source`
      - `pages.collect_inputs.prompt = "Provide the story file path needed to produce `review-input.md`. The workflow-owned `review-input.diff` artifact will be supplied automatically."`
-     - `pages.collect_inputs.fields = buildReviewInputFieldDefinitions()`
+     - `pages.collect_inputs.fields = buildSchemaDerivedPublicToolFieldDefinitions({ toolName: ClineDefaultTool.BUILD_REVIEW_INPUT, labelOverrides: { story_path: "Story File Path" }, helpOverrides: { story_path: "Path to the story markdown file being reviewed. The workflow-owned `review-input.diff` artifact will be supplied automatically." }, placeholderOverrides: { story_path: "/absolute/path/to/story.md" } })`
      - `pages.retry_error.prompt = "The system could not produce `review-input.md`. Update the story file path or retry the request."`
-     - `pages.retry_error.fields = buildReviewInputFieldDefinitions()`
+     - `pages.retry_error.fields = buildSchemaDerivedPublicToolFieldDefinitions({ toolName: ClineDefaultTool.BUILD_REVIEW_INPUT, labelOverrides: { story_path: "Story File Path" }, helpOverrides: { story_path: "Path to the story markdown file being reviewed. The workflow-owned `review-input.diff` artifact will be supplied automatically." }, placeholderOverrides: { story_path: "/absolute/path/to/story.md" } })`
      - `pages.collect_inputs.submitLabel = "Submit"`
      - `pages.collect_inputs.cancelLabel = "Cancel"`
      - `pages.retry_error.submitLabel = "Submit"`
@@ -151,16 +160,19 @@ function buildReviewInputFieldDefinitions(): WorkflowFormFieldDefinition[] {
    - `buildToolExecutionFailureFallbackMessage()` returns exactly:
      - `The workflow form could not build the Step 3 review-input artifact. The workflow will return to the Step 3 fallback instructions.`
    - `buildToolExecutionRequest(session, values)`:
-     - uses `buildReviewInputFieldDefinitions()`
-     - parses `story_path` with `getParsedFieldValue(...)`
-     - throws if the parsed value is not a string
+     - uses `buildSchemaDerivedPublicToolFieldDefinitions({ toolName: ClineDefaultTool.BUILD_REVIEW_INPUT, labelOverrides: { story_path: "Story File Path" }, helpOverrides: { story_path: "Path to the story markdown file being reviewed. The workflow-owned `review-input.diff` artifact will be supplied automatically." }, placeholderOverrides: { story_path: "/absolute/path/to/story.md" } })`
+     - reduces the schema-derived field list into `filteredValues` by:
+       - calling `getParsedFieldValue(fields, values, field.key)` for each field
+       - keeping only parsed values where `typeof value === "string"`
+       - storing them under `field.key`
+     - throws `new Error("Workflow form could not derive a valid build_review_input request from the schema-derived fields.")` unless `filteredValues.story_path` is a non-empty string
      - returns:
 
 ```ts
 {
 	toolName: ClineDefaultTool.BUILD_REVIEW_INPUT,
-	toolInput: { story_path: storyPath },
-	toolParams: { story_path: storyPath },
+	toolInput: filteredValues,
+	toolParams: filteredValues,
 }
 ```
 
@@ -196,7 +208,7 @@ function buildReviewInputFieldDefinitions(): WorkflowFormFieldDefinition[] {
 }
 ```
 
-7. In [WorkflowFormRegistry.test.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRegistry.test.ts):
+9. In [WorkflowFormRegistry.test.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRegistry.test.ts):
    - import `CODE_REVIEW_STEP_3_REVIEW_INPUT_RESOLVER_ID`
    - update all existing Phase 1 `owner.stepNumber` test fixtures from `3` to `2`
    - update the first test description to say `"returns the code-review diff resolver metadata by id"`
@@ -205,6 +217,12 @@ function buildReviewInputFieldDefinitions(): WorkflowFormFieldDefinition[] {
      - `"returns the code-review step 3 review-input resolver metadata by id"`
      - assert resolver id equals `code_review_step_3_review_input`
      - assert toolName equals `build_review_input`
+   - add one new test immediately after the new resolver metadata test:
+     - `"derives the Phase 3 review-input form field list from the build_review_input tool schema"`
+     - build a Step 3 session for the new resolver in `phase: "collect_inputs"`
+     - assert the rendered field keys equal exactly `["story_path"]`
+     - assert the field `valueSchema.type === "string"`
+     - assert the field `required === true`
    - add one new test after the Phase 1 serialization tests:
      - `"serializes the Phase 3 review-input resolver into tool params"`
      - build a session with `owner.stepNumber = 3`
@@ -227,7 +245,7 @@ function buildReviewInputFieldDefinitions(): WorkflowFormFieldDefinition[] {
      - assert `fallbackToAgent === true`
 
 ## Step 3
-[ ] Move the existing diff workflow-form trigger to Step 2 and add the new Phase 3 review-input trigger at Step 3, both using current-task write-proof gating against the correct stable artifact placeholder.
+[x] Move the existing diff workflow-form trigger to Step 2 and add the new Phase 3 review-input trigger at Step 3, both using current-task write-proof gating against the correct stable artifact placeholder.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormTriggerRegistry.ts`
@@ -302,7 +320,7 @@ async function shouldInterceptUntilCurrentTaskArtifactExists(args: {
      - assert the result is `true`
 
 ## Step 4
-[ ] Update task integration so the Phase 3 resolver can render the exact fallback/error message once, suppress itself, clear the session, and return control to the manual Step 3 workflow path after post-tool failures.
+[x] Update task integration so the Phase 3 resolver can render the exact fallback/error message once as a terminal workflow-form notice, suppress itself, clear the session, and return control to the manual Step 3 workflow path after post-tool failures.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
@@ -312,20 +330,20 @@ Exact edits:
 1. In [index.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/index.ts#L1498-L1524), make `executeWorkflowFormToolAndSync(...)` return `fallbackToAgent` alongside `succeeded` and `errorMessage` by forwarding `evaluation.fallbackToAgent ?? false`.
 2. In the same file at [index.ts:1596-1616](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/index.ts#L1596), keep the success path unchanged, keep the ordinary retry path unchanged, and insert this exact new branch before the current retry-state persistence:
    - when `toolExecution.succeeded === false` and `toolExecution.fallbackToAgent === true`:
-     - build `retrySession = { ...outcome.session, phase: "retry_error", lastError: toolExecution.errorMessage }`
-     - build `retryPayload = this.workflowFormRuntime.buildRetryPayload(retrySession, toolExecution.errorMessage)`
-     - `await this.renderWorkflowFormMessage(retryPayload)`
+     - build `fallbackNoticePayload = this.workflowFormRuntime.buildSuccessPayload(outcome.session, toolExecution.errorMessage)`
+     - `await this.renderWorkflowFormMessage(fallbackNoticePayload)`
      - if `outcome.session.resolverId` is not already present in `this.taskState.suppressedWorkflowFormResolverIds`, append it
      - `await this.clearWorkflowFormSession()`
      - `break`
 3. Do not call `persistWorkflowFormSession()` separately in that fallback branch; `clearWorkflowFormSession()` must remain the persistence point after the suppression list is updated.
-4. In [placeholderWorkflowPersistence.test.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/__tests__/placeholderWorkflowPersistence.test.ts), update all existing Phase 1 diff-form active-step fixtures to match the live workflow:
+4. Do not use `buildRetryPayload(...)` in the fallback-to-agent branch. The rendered fallback notice must be terminal and non-interactive, so it must use the existing `success` phase transport rather than `retry_error`.
+5. In [placeholderWorkflowPersistence.test.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/__tests__/placeholderWorkflowPersistence.test.ts), update all existing Phase 1 diff-form active-step fixtures to match the live workflow:
    - any created or restored Phase 1 diff-form session owner that currently uses `stepNumber: 3` must use `stepNumber: 2`
    - any checklist fixture where the diff form is the active step must now label that step as Step 2, not Step 3
    - any workflow markdown fixture where the diff form fallback guidance is the active step must reflect the live ordering:
      - Step 2 = diff source resolution / `review-input.diff`
      - Step 3 = construct `review_input.md`
-5. Still in [placeholderWorkflowPersistence.test.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/__tests__/placeholderWorkflowPersistence.test.ts), add one new integration-style test immediately after the existing successful diff-form progression test:
+6. Still in [placeholderWorkflowPersistence.test.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/__tests__/placeholderWorkflowPersistence.test.ts), add one new integration-style test immediately after the existing successful diff-form progression test:
    - `"opens the Phase 3 review-input workflow form after Step 2 is complete and Step 3 is active"`
    - use a temp workflow markdown fixture whose Step 2 is already complete and whose Step 3 contains the manual `review_input.md` fallback instructions
    - set the checklist to Step 3 active
@@ -336,8 +354,8 @@ Exact edits:
      - `owner.stepNumber = 3`
      - `initialPhase: "confirm"`
    - assert `maybeResolveWorkflowFormBeforeApiTurn.call(fakeTask)` creates that exact session via `workflowFormRuntime.createSession(...)`
-6. Add one new post-tool fallback test:
-   - `"renders the exact Phase 3 diff/story mismatch message once, suppresses the resolver, and returns control to manual Step 3"`
+7. Add one new post-tool fallback test:
+   - `"renders the exact Phase 3 diff/story mismatch message once as a terminal workflow-form notice, suppresses the resolver, and returns control to manual Step 3"`
    - session:
      - `resolverId: "code_review_step_3_review_input"`
      - `owner.stepNumber = 3`
@@ -357,12 +375,13 @@ Exact edits:
    - fake `renderWorkflowFormMessage` should record both payloads
    - call `executeWorkflowFormToolAndSync` through `maybeResolveWorkflowFormBeforeApiTurn` so the suppression/clear path is exercised
    - assert:
-     - the second rendered payload has `phase === "retry_error"`
-     - the second rendered payload `errorMessage` equals `diff_output does not identify recent changes to the story file. Proceeding with AI generation of review_input.md using the fallback Step 3 instructions.`
+     - the second rendered payload has `phase === "success"`
+     - the second rendered payload `successMessage` equals `diff_output does not identify recent changes to the story file. Proceeding with AI generation of review_input.md using the fallback Step 3 instructions.`
      - `taskState.suppressedWorkflowFormResolverIds` contains `code_review_step_3_review_input`
      - `taskState.activeWorkflowFormSession === undefined`
-7. Add one new post-tool hard-error fallback test:
-   - `"falls back after build_review_input tool errors and preserves the tool error in the workflow UI"`
+   - when wiring `fakeTask.executeWorkflowFormToolAndSync` in this test, assign it as `sinon.stub().callsFake(async (outcome: unknown) => executeWorkflowFormToolAndSync.call(fakeTask, outcome))` so the fake task continues to satisfy the declared `SinonStub` type in this test harness
+8. Add one new post-tool hard-error fallback test:
+   - `"falls back after build_review_input tool errors and preserves the tool error in a terminal workflow-form notice"`
    - same session shape as the previous test
    - fake `toolExecutor.executeTool(...)` appends one `text` block equal to:
 
@@ -373,11 +392,13 @@ The provided story file does not contain the required story structure for determ
 </error>
 ```
 
-   - assert the rendered retry payload error message is that exact multi-line tool error
+   - assert the rendered terminal payload has `phase === "success"`
+   - assert the rendered terminal payload `successMessage` is that exact multi-line tool error
    - assert suppression and session clearing behave the same as the diff/story mismatch test
+   - when wiring `fakeTask.executeWorkflowFormToolAndSync` in this test, assign it as `sinon.stub().callsFake(async (outcome: unknown) => executeWorkflowFormToolAndSync.call(fakeTask, outcome))` so this fake task also satisfies the declared `SinonStub` type in the shared test harness
 
 ## Step 5
-[ ] Run the focused workflow-form silo verification.
+[x] Run the focused workflow-form silo verification.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflow-ui-surface/phase-3/workflow-form-action-plan.md`

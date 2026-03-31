@@ -1520,6 +1520,7 @@ export class Task {
 			errorMessage:
 				evaluation.errorMessage ??
 				this.getWorkflowFormToolErrorMessage(outcome.session, previousUserMessageContentLength),
+			fallbackToAgent: evaluation.fallbackToAgent ?? false,
 		}
 	}
 
@@ -1604,6 +1605,22 @@ export class Task {
 						)
 						await this.clearWorkflowFormSession()
 						await this.renderWorkflowFormMessage(successPayload)
+						break
+					}
+
+					if (toolExecution.fallbackToAgent === true) {
+						const fallbackNoticePayload = this.workflowFormRuntime.buildSuccessPayload(
+							outcome.session,
+							toolExecution.errorMessage,
+						)
+						await this.renderWorkflowFormMessage(fallbackNoticePayload)
+						if (!this.taskState.suppressedWorkflowFormResolverIds.includes(outcome.session.resolverId)) {
+							this.taskState.suppressedWorkflowFormResolverIds = [
+								...this.taskState.suppressedWorkflowFormResolverIds,
+								outcome.session.resolverId,
+							]
+						}
+						await this.clearWorkflowFormSession()
 						break
 					}
 

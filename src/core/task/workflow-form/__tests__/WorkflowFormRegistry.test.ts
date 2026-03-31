@@ -2,16 +2,46 @@ import { expect } from "chai"
 import { describe, it } from "mocha"
 import {
 	CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID,
+	CODE_REVIEW_STEP_3_REVIEW_INPUT_RESOLVER_ID,
 	getWorkflowFormResolverDefinition,
 	PLACEHOLDER_WORKFLOW_START_SET_WORKFLOW_PLACEHOLDERS_RESOLVER_ID,
 } from "../WorkflowFormRegistry"
 
 describe("WorkflowFormRegistry", () => {
-	it("returns the code-review step 3 resolver metadata by id", () => {
+	it("returns the code-review diff resolver metadata by id", () => {
 		const resolver = getWorkflowFormResolverDefinition(CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID)
 
 		expect(resolver.id).to.equal("code_review_step_3_diff_source")
 		expect(resolver.toolName).to.equal("build_review_diff_output")
+	})
+
+	it("returns the code-review step 3 review-input resolver metadata by id", () => {
+		const resolver = getWorkflowFormResolverDefinition(CODE_REVIEW_STEP_3_REVIEW_INPUT_RESOLVER_ID)
+
+		expect(resolver.id).to.equal("code_review_step_3_review_input")
+		expect(resolver.toolName).to.equal("build_review_input")
+	})
+
+	it("derives the Phase 3 review-input form field list from the build_review_input tool schema", () => {
+		const resolver = getWorkflowFormResolverDefinition(CODE_REVIEW_STEP_3_REVIEW_INPUT_RESOLVER_ID)
+		const definition = resolver.buildDefinition({
+			sessionId: "session-phase-3-fields",
+			resolverId: resolver.id,
+			triggerSource: "deterministic_workflow_progression",
+			owner: {
+				kind: "placeholder_workflow_step",
+				workflowName: "code-review.md",
+				stepNumber: 3,
+			},
+			phase: "collect_inputs",
+			initialPhase: "confirm",
+			values: {},
+		})
+		const fields = definition.pages.collect_inputs?.fields ?? []
+
+		expect(fields.map((field) => field.key)).to.deep.equal(["story_path"])
+		expect(fields[0]?.valueSchema.type).to.equal("string")
+		expect(fields[0]?.required).to.equal(true)
 	})
 
 	it("serializes the Phase 1 review-diff resolver into tool params", () => {
@@ -24,7 +54,7 @@ describe("WorkflowFormRegistry", () => {
 				owner: {
 					kind: "placeholder_workflow_step",
 					workflowName: "code-review.md",
-					stepNumber: 3,
+					stepNumber: 2,
 				},
 				phase: "collect_inputs",
 				initialPhase: "confirm",
@@ -59,7 +89,7 @@ describe("WorkflowFormRegistry", () => {
 			owner: {
 				kind: "placeholder_workflow_step",
 				workflowName: "code-review.md",
-				stepNumber: 3,
+				stepNumber: 2,
 			},
 			phase: "select_source",
 			initialPhase: "confirm",
@@ -84,7 +114,7 @@ describe("WorkflowFormRegistry", () => {
 			owner: {
 				kind: "placeholder_workflow_step",
 				workflowName: "code-review.md",
-				stepNumber: 3,
+				stepNumber: 2,
 			},
 			phase: "collect_inputs",
 			initialPhase: "confirm",
@@ -108,7 +138,7 @@ describe("WorkflowFormRegistry", () => {
 			owner: {
 				kind: "placeholder_workflow_step",
 				workflowName: "code-review.md",
-				stepNumber: 3,
+				stepNumber: 2,
 			},
 			phase: "collect_inputs",
 			initialPhase: "confirm",
@@ -133,7 +163,7 @@ describe("WorkflowFormRegistry", () => {
 				owner: {
 					kind: "placeholder_workflow_step",
 					workflowName: "code-review.md",
-					stepNumber: 3,
+					stepNumber: 2,
 				},
 				phase: "collect_inputs",
 				initialPhase: "confirm",
@@ -149,6 +179,35 @@ describe("WorkflowFormRegistry", () => {
 		expect(outcome.toolParams.source).to.equal(JSON.stringify({ type: "commit", commit: "abc1234" }))
 	})
 
+	it("serializes the Phase 3 review-input resolver into tool params", () => {
+		const resolver = getWorkflowFormResolverDefinition(CODE_REVIEW_STEP_3_REVIEW_INPUT_RESOLVER_ID)
+		const outcome = resolver.buildToolExecutionRequest(
+			{
+				sessionId: "session-phase-3-serialize",
+				resolverId: resolver.id,
+				triggerSource: "deterministic_workflow_progression",
+				owner: {
+					kind: "placeholder_workflow_step",
+					workflowName: "code-review.md",
+					stepNumber: 3,
+				},
+				phase: "collect_inputs",
+				initialPhase: "confirm",
+				values: {},
+			},
+			{
+				story_path: { rawValue: "docs/story.md" },
+			},
+		)
+
+		expect(outcome.toolInput).to.deep.equal({
+			story_path: "docs/story.md",
+		})
+		expect(outcome.toolParams).to.deep.equal({
+			story_path: "docs/story.md",
+		})
+	})
+
 	it("treats persisted diff-output tool results as success", () => {
 		const resolver = getWorkflowFormResolverDefinition(CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID)
 		const result = resolver.evaluateToolExecutionResult(
@@ -159,7 +218,7 @@ describe("WorkflowFormRegistry", () => {
 				owner: {
 					kind: "placeholder_workflow_step",
 					workflowName: "code-review.md",
-					stepNumber: 3,
+					stepNumber: 2,
 				},
 				phase: "collect_inputs",
 				initialPhase: "confirm",
@@ -177,6 +236,34 @@ describe("WorkflowFormRegistry", () => {
 		expect(result).to.deep.equal({ succeeded: true })
 	})
 
+	it("treats persisted review-input tool results as success", () => {
+		const resolver = getWorkflowFormResolverDefinition(CODE_REVIEW_STEP_3_REVIEW_INPUT_RESOLVER_ID)
+		const result = resolver.evaluateToolExecutionResult(
+			{
+				sessionId: "session-phase-3-success",
+				resolverId: resolver.id,
+				triggerSource: "deterministic_workflow_progression",
+				owner: {
+					kind: "placeholder_workflow_step",
+					workflowName: "code-review.md",
+					stepNumber: 3,
+				},
+				phase: "collect_inputs",
+				initialPhase: "confirm",
+				values: {},
+			},
+			{
+				toolResultText: JSON.stringify({
+					persisted: true,
+					review_input_available: true,
+					artifact_path: "/tmp/review-input.md",
+				}),
+			},
+		)
+
+		expect(result).to.deep.equal({ succeeded: true })
+	})
+
 	it("treats non-persisted diff-output tool results as failure", () => {
 		const resolver = getWorkflowFormResolverDefinition(CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID)
 		const result = resolver.evaluateToolExecutionResult(
@@ -187,7 +274,7 @@ describe("WorkflowFormRegistry", () => {
 				owner: {
 					kind: "placeholder_workflow_step",
 					workflowName: "code-review.md",
-					stepNumber: 3,
+					stepNumber: 2,
 				},
 				phase: "collect_inputs",
 				initialPhase: "confirm",
@@ -206,6 +293,64 @@ describe("WorkflowFormRegistry", () => {
 			succeeded: false,
 			errorMessage: "No Git-backed diff content was available for the requested source and scope.",
 		})
+	})
+
+	it("treats the diff/story mismatch result as a fallback-to-agent failure", () => {
+		const resolver = getWorkflowFormResolverDefinition(CODE_REVIEW_STEP_3_REVIEW_INPUT_RESOLVER_ID)
+		const result = resolver.evaluateToolExecutionResult(
+			{
+				sessionId: "session-phase-3-mismatch",
+				resolverId: resolver.id,
+				triggerSource: "deterministic_workflow_progression",
+				owner: {
+					kind: "placeholder_workflow_step",
+					workflowName: "code-review.md",
+					stepNumber: 3,
+				},
+				phase: "collect_inputs",
+				initialPhase: "confirm",
+				values: {},
+			},
+			{
+				toolResultText: JSON.stringify({
+					persisted: false,
+					review_input_available: false,
+					recent_story_changes_detected: false,
+					reason: "diff_output does not identify recent changes to the story file.",
+				}),
+			},
+		)
+
+		expect(result.succeeded).to.equal(false)
+		expect(result.errorMessage).to.equal(
+			"diff_output does not identify recent changes to the story file. Proceeding with AI generation of review_input.md using the fallback Step 3 instructions.",
+		)
+		expect(result.fallbackToAgent).to.equal(true)
+	})
+
+	it("treats workflow-form tool errors for review-input as fallback-to-agent failures", () => {
+		const resolver = getWorkflowFormResolverDefinition(CODE_REVIEW_STEP_3_REVIEW_INPUT_RESOLVER_ID)
+		const result = resolver.evaluateToolExecutionResult(
+			{
+				sessionId: "session-phase-3-tool-error",
+				resolverId: resolver.id,
+				triggerSource: "deterministic_workflow_progression",
+				owner: {
+					kind: "placeholder_workflow_step",
+					workflowName: "code-review.md",
+					stepNumber: 3,
+				},
+				phase: "collect_inputs",
+				initialPhase: "confirm",
+				values: {},
+			},
+			{
+				toolResultText:
+					"The tool execution failed with the following error:\n<error>\nThe provided story file does not contain the required story structure for deterministic review-input generation.\n</error>",
+			},
+		)
+
+		expect(result.fallbackToAgent).to.equal(true)
 	})
 
 	it("builds workflow-start definitions from normalized requirements", () => {
@@ -383,7 +528,7 @@ describe("WorkflowFormRegistry", () => {
 			owner: {
 				kind: "placeholder_workflow_step",
 				workflowName: "code-review.md",
-				stepNumber: 3,
+				stepNumber: 2,
 			},
 			phase: "collect_inputs",
 			initialPhase: "confirm",

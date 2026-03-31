@@ -10,6 +10,7 @@ import type { TaskState } from "../TaskState"
 import type { WorkflowFormSessionContext, WorkflowFormSessionOwner, WorkflowFormTriggerSource } from "./types"
 import {
 	CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID,
+	CODE_REVIEW_STEP_3_REVIEW_INPUT_RESOLVER_ID,
 	PLACEHOLDER_WORKFLOW_START_SET_WORKFLOW_PLACEHOLDERS_RESOLVER_ID,
 } from "./WorkflowFormRegistry"
 import { parseWorkflowStartRequirements } from "./workflowStartRequirements"
@@ -95,26 +96,47 @@ export async function resolveWorkflowFormSlashCommandStartCandidate(args: {
 	}
 }
 
+async function shouldInterceptUntilCurrentTaskArtifactExists(args: {
+	cwd: string
+	taskState: Pick<
+		TaskState,
+		| "activePlaceholderWorkflowStableValues"
+		| "activePlaceholderWorkflowValues"
+		| "activePlaceholderWorkflowTaskWriteProofPaths"
+	>
+	placeholderKey: "diff_output" | "review_input"
+}): Promise<boolean> {
+	const placeholders = getPlaceholderWorkflowValueMap(
+		args.taskState.activePlaceholderWorkflowStableValues,
+		args.taskState.activePlaceholderWorkflowValues,
+	)
+	const artifactPath = placeholders?.[args.placeholderKey]?.trim()
+	if (!artifactPath) {
+		return true
+	}
+
+	const resolvedArtifactPath = path.isAbsolute(artifactPath) ? artifactPath : path.resolve(args.cwd, artifactPath)
+	return !(
+		taskStateHasPlaceholderWorkflowWriteProof(args.taskState, resolvedArtifactPath) &&
+		(await fileExistsForPlaceholderWorkflowWriteProof(resolvedArtifactPath))
+	)
+}
+
 export const workflowFormWorkflowStepTriggerRegistry: WorkflowFormWorkflowStepTriggerDefinition[] = [
 	{
 		workflowName: "code-review.md",
-		stepNumber: 3,
+		stepNumber: 2,
 		resolverId: CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID,
 		async shouldIntercept({ cwd, taskState }) {
-			const placeholders = getPlaceholderWorkflowValueMap(
-				taskState.activePlaceholderWorkflowStableValues,
-				taskState.activePlaceholderWorkflowValues,
-			)
-			const diffOutputPath = placeholders?.diff_output?.trim()
-			if (!diffOutputPath) {
-				return true
-			}
-
-			const resolvedDiffOutputPath = path.isAbsolute(diffOutputPath) ? diffOutputPath : path.resolve(cwd, diffOutputPath)
-			return !(
-				taskStateHasPlaceholderWorkflowWriteProof(taskState, resolvedDiffOutputPath) &&
-				(await fileExistsForPlaceholderWorkflowWriteProof(resolvedDiffOutputPath))
-			)
+			return shouldInterceptUntilCurrentTaskArtifactExists({ cwd, taskState, placeholderKey: "diff_output" })
+		},
+	},
+	{
+		workflowName: "code-review.md",
+		stepNumber: 3,
+		resolverId: CODE_REVIEW_STEP_3_REVIEW_INPUT_RESOLVER_ID,
+		async shouldIntercept({ cwd, taskState }) {
+			return shouldInterceptUntilCurrentTaskArtifactExists({ cwd, taskState, placeholderKey: "review_input" })
 		},
 	},
 ]

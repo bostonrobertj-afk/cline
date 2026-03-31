@@ -130,9 +130,19 @@ export class WorkflowFormRuntime {
 		if (session.phase === "confirm") {
 			const confirmValue = nextValues.confirm?.rawValue?.trim().toLowerCase()
 			if (request.action === WorkflowFormAction.SUBMIT && confirmValue === "yes") {
+				const definition = resolver.buildDefinition(session)
+				const nextPhase = definition.pages.select_source
+					? "select_source"
+					: definition.pages.collect_inputs
+						? "collect_inputs"
+						: undefined
+				if (!nextPhase) {
+					throw new Error("Workflow form confirm phase requires a select_source or collect_inputs page.")
+				}
+
 				const nextSession: WorkflowFormSessionState = {
 					...session,
-					phase: "select_source",
+					phase: nextPhase,
 					values: nextValues,
 					lastError: undefined,
 				}

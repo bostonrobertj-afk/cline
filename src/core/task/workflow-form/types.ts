@@ -26,6 +26,7 @@ export interface WorkflowFormToolExecutionRequest {
 export interface WorkflowFormToolExecutionEvaluation {
 	succeeded: boolean
 	errorMessage?: string
+	fallbackToAgent?: boolean
 }
 export type WorkflowFormSessionPhase = Extract<
 	WorkflowFormPhase,

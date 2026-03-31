@@ -39,19 +39,15 @@ export class BuildReviewInputToolHandler implements IToolHandler, IPartialBlockH
 	readonly name = ClineDefaultTool.BUILD_REVIEW_INPUT
 
 	getDescription(block: ToolUse): string {
-		const storyPath =
-			typeof (block.params as Record<string, unknown>).story_path === "string"
-				? (block.params as Record<string, unknown>).story_path.trim()
-				: ""
+		const params = block.params as Record<string, unknown>
+		const storyPath = typeof params.story_path === "string" ? params.story_path.trim() : ""
 		const basename = storyPath ? path.basename(storyPath) : "unknown"
 		return `[build_review_input ${basename}]`
 	}
 
 	async handlePartialBlock(block: ToolUse, uiHelpers: StronglyTypedUIHelpers): Promise<void> {
-		const storyPath =
-			typeof (block.params as Record<string, unknown>).story_path === "string"
-				? (block.params as Record<string, unknown>).story_path.trim()
-				: ""
+		const params = block.params as Record<string, unknown>
+		const storyPath = typeof params.story_path === "string" ? params.story_path.trim() : ""
 
 		await uiHelpers.say(
 			"tool",

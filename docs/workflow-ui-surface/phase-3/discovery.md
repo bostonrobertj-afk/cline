@@ -54,13 +54,13 @@ Build this out in three phases:
 - update deterministic workflow progression (if needed) to align with the new workflow step structure
 
 ## Required Action Plans
-### Tool silo
+### Tool silo - done
 build build_review_input
 story-file extraction
 diff-assisted filtering for tasks and completion notes
 review_input.md generation
 tool result contract
-### Workflow-form silo
+### Workflow-form silo - done
 add the Phase 3 form use case
 collect the story file path
 auto-resolve diff_output

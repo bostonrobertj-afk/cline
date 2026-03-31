@@ -1,6 +1,12 @@
 import { expect } from "chai"
+import fs from "fs/promises"
 import { describe, it } from "mocha"
-import { resolveWorkflowFormSlashCommandStartCandidate } from "../WorkflowFormTriggerRegistry"
+import os from "os"
+import path from "path"
+import {
+	getWorkflowFormWorkflowStepTriggerDefinition,
+	resolveWorkflowFormSlashCommandStartCandidate,
+} from "../WorkflowFormTriggerRegistry"
 import { parseWorkflowStartRequirements } from "../workflowStartRequirements"
 
 describe("WorkflowFormTriggerRegistry", () => {
@@ -168,5 +174,53 @@ One of: {one}, {two}, {three}, {four}, {five}, {six}
 				fieldKeys: ["one", "two", "three", "four", "five"],
 			},
 		})
+	})
+
+	it("maps code-review step 2 to the diff workflow-form resolver", () => {
+		expect(getWorkflowFormWorkflowStepTriggerDefinition("code-review.md", 2)?.resolverId).to.equal(
+			"code_review_step_3_diff_source",
+		)
+	})
+
+	it("maps code-review step 3 to the review-input workflow-form resolver", () => {
+		expect(getWorkflowFormWorkflowStepTriggerDefinition("code-review.md", 3)?.resolverId).to.equal(
+			"code_review_step_3_review_input",
+		)
+	})
+
+	it("does not intercept code-review step 3 when review_input has a current-task write proof and exists on disk", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "workflow-form-trigger-"))
+		const reviewInputPath = path.join(tempDir, "review-input.md")
+		await fs.writeFile(reviewInputPath, "# review input\n", "utf8")
+
+		const trigger = getWorkflowFormWorkflowStepTriggerDefinition("code-review.md", 3)
+		const shouldIntercept = await trigger?.shouldIntercept({
+			cwd: tempDir,
+			taskState: {
+				activePlaceholderWorkflowStableValues: { review_input: reviewInputPath },
+				activePlaceholderWorkflowValues: {},
+				activePlaceholderWorkflowTaskWriteProofPaths: [reviewInputPath],
+			},
+		})
+
+		expect(shouldIntercept).to.equal(false)
+	})
+
+	it("intercepts code-review step 3 when review_input is missing a current-task write proof", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "workflow-form-trigger-"))
+		const reviewInputPath = path.join(tempDir, "review-input.md")
+		await fs.writeFile(reviewInputPath, "# review input\n", "utf8")
+
+		const trigger = getWorkflowFormWorkflowStepTriggerDefinition("code-review.md", 3)
+		const shouldIntercept = await trigger?.shouldIntercept({
+			cwd: tempDir,
+			taskState: {
+				activePlaceholderWorkflowStableValues: { review_input: reviewInputPath },
+				activePlaceholderWorkflowValues: {},
+				activePlaceholderWorkflowTaskWriteProofPaths: [],
+			},
+		})
+
+		expect(shouldIntercept).to.equal(true)
 	})
 })

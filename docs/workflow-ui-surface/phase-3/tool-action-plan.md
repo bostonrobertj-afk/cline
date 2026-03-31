@@ -181,6 +181,7 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/BuildReviewInputToolHandler.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/ToolExecutorCoordinator.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/autoApprove.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/response/ResponseToolRegistry.ts`
 
 Exact edits:
 1. Add a new file at [BuildReviewInputToolHandler.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/handlers/BuildReviewInputToolHandler.ts) by mirroring the approval/write-proof structure of [BuildReviewDiffOutputToolHandler.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/handlers/BuildReviewDiffOutputToolHandler.ts#L1-L416) with these exact differences:
@@ -189,8 +190,14 @@ Exact edits:
    - the handler class name must be `BuildReviewInputToolHandler`
    - `readonly name = ClineDefaultTool.BUILD_REVIEW_INPUT`
    - copy the local `atomicReplaceTextFile(...)` helper into this file unchanged from the diff handler
-2. In the new handler, implement `getDescription(block)` so it returns `[build_review_input <basename>]`, where `<basename>` is `path.basename(storyPath)` when `story_path` is a non-empty string, otherwise `unknown`.
-3. Implement `handlePartialBlock(...)` so it emits exactly:
+2. In the new handler, implement `getDescription(block)` so it:
+   - first assigns `const params = block.params as Record<string, unknown>`
+   - then derives `storyPath` only from `params.story_path`
+   - returns `[build_review_input <basename>]`, where `<basename>` is `path.basename(storyPath)` when `story_path` is a non-empty string, otherwise `unknown`
+3. Implement `handlePartialBlock(...)` so it:
+   - first assigns `const params = block.params as Record<string, unknown>`
+   - then derives `storyPath` only from `params.story_path`
+   - emits exactly:
    - `tool: "buildReviewInput"`
    - `storyPathProvided: true|false`
    using the same `uiHelpers.say("tool", JSON.stringify(...), ..., true)` pattern used by the diff handler.
@@ -260,6 +267,10 @@ formatResponse.toolResult(
    - import `BuildReviewInputToolHandler`
    - register `ClineDefaultTool.BUILD_REVIEW_INPUT` immediately after `BUILD_REVIEW_DIFF_OUTPUT`
 15. In [autoApprove.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/autoApprove.ts#L35-L111), add `ClineDefaultTool.BUILD_REVIEW_INPUT` everywhere `ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT` is treated as an edit-file tool.
+16. In [ResponseToolRegistry.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/response/ResponseToolRegistry.ts#L5-L78), add:
+   - `[ClineDefaultTool.BUILD_REVIEW_INPUT]: undefined`
+   - place it immediately after `[ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT]: undefined`
+   - do not give `build_review_input` response-tool behavior; this entry exists only to keep the `Record<ClineDefaultTool, ...>` exhaustive after the new tool id was added
 
 ## Step 4
 [x] Add focused tool-handler tests covering the new success path, the structured diff/story no-go path, and the malformed-story hard-error path.
@@ -312,9 +323,10 @@ Allowed files:
 
 Exact commands:
 1. `npm run test:unit -- src/core/prompts/system-prompt/__tests__/spec.test.ts src/core/task/tools/handlers/__tests__/buildReviewInputExtraction.test.ts src/core/task/tools/handlers/__tests__/ManagedWorkflowHandlers.test.ts --exit`
-2. `npm run test:unit -- src/core/prompts/system-prompt/__tests__/integration.test.ts --exit`
+2. `npx tsc --noEmit`
 
 Completion criteria:
 - Both commands pass.
 - The only generated-file diffs outside the Step 1 explicit source files are the prompt snapshots under `src/core/prompts/system-prompt/__tests__/__snapshots__/`.
 - If either command reveals any additional required code or generated-file change outside the allowed files from prior steps, stop and ask for input instead of improvising.
+- Do not run `src/core/prompts/system-prompt/__tests__/integration.test.ts` in this tool-silo pass. Step-specific native-tool filtering and matrix alignment belong to the later deterministic-progression silo.
