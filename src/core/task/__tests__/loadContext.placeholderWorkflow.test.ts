@@ -2,6 +2,7 @@ import type { ClineContent, ClineTextContentBlock } from "@shared/messages/conte
 import { expect } from "chai"
 import { describe, it } from "mocha"
 import proxyquire from "proxyquire"
+import type { SinonStub } from "sinon"
 import sinon from "sinon"
 import { FocusChainManager } from "../focus-chain"
 import { TaskState } from "../TaskState"
@@ -33,13 +34,13 @@ type LoadContextTaskHarness = {
 		getTerminals: () => unknown[]
 		getUnretrievedOutput: () => undefined
 	}
-	FocusChainManager: FocusChainManager
+	FocusChainManager?: FocusChainManager
 	getCurrentProviderInfo: () => {
 		model: { id: string }
 		providerId: string
 		mode: string
 	}
-	getEnvironmentDetails: sinon.SinonStub<[boolean, boolean], Promise<string>>
+	getEnvironmentDetails: SinonStub
 	maybeResolveWorkflowFormBeforeApiTurn: sinon.SinonStub
 	applyPersistentSlashCommandAction: sinon.SinonStub
 	buildPlaceholderWorkflowActivationInstructions: sinon.SinonStub
@@ -147,20 +148,18 @@ Determine what to review from the user's prompt before asking follow-up question
 			providerId: "openai-native",
 			mode: "act",
 		}),
-		getEnvironmentDetails: sinon
-			.stub()
-			.callsFake(async (_includeFileDetails: boolean, includeDetailedEnvironmentDetails: boolean) => {
-				return includeDetailedEnvironmentDetails ? "ENVIRONMENT: detailed" : "ENVIRONMENT: reduced"
-			}),
+		getEnvironmentDetails: sinon.stub().callsFake(async (_includeFileDetails, includeDetailedEnvironmentDetails) => {
+			return includeDetailedEnvironmentDetails ? "ENVIRONMENT: detailed" : "ENVIRONMENT: reduced"
+		}),
 		maybeResolveWorkflowFormBeforeApiTurn: sinon.stub().resolves(),
 		applyPersistentSlashCommandAction: sinon.stub().resolves(),
 		buildPlaceholderWorkflowActivationInstructions: sinon.stub().resolves(undefined),
+		hasHumanAuthoredInput: Task.prototype.hasHumanAuthoredInput,
+		getPromptRefreshFrequency: Task.prototype.getPromptRefreshFrequency,
+		shouldSendFullPromptAssemblyForCurrentTurn: Task.prototype.shouldSendFullPromptAssemblyForCurrentTurn,
 	}
 
 	task.FocusChainManager = createFocusChainManager(taskState, promptRefreshFrequency)
-	task.hasHumanAuthoredInput = Task.prototype.hasHumanAuthoredInput
-	task.getPromptRefreshFrequency = Task.prototype.getPromptRefreshFrequency
-	task.shouldSendFullPromptAssemblyForCurrentTurn = Task.prototype.shouldSendFullPromptAssemblyForCurrentTurn
 	return task
 }
 
@@ -308,10 +307,9 @@ Choose the review mode from the persisted diff output before continuing.
 			].join("\n")
 		})
 
-		const originalGenerateFocusChainInstructions = fakeTask.FocusChainManager.generateFocusChainInstructions.bind(
-			fakeTask.FocusChainManager,
-		)
-		sinon.stub(fakeTask.FocusChainManager, "generateFocusChainInstructions").callsFake(async () => {
+		const focusChainManager = fakeTask.FocusChainManager!
+		const originalGenerateFocusChainInstructions = focusChainManager.generateFocusChainInstructions.bind(focusChainManager)
+		sinon.stub(focusChainManager, "generateFocusChainInstructions").callsFake(async () => {
 			callOrder.push("generateFocusChainInstructions")
 			expect(fakeTask.taskState.currentFocusChainChecklist).to.contain("- [x] Step 3")
 			expect(fakeTask.taskState.currentFocusChainChecklist).to.contain("- [ ] Step 4: Set Review Mode")

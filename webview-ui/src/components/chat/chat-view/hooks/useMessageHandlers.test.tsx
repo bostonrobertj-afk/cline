@@ -294,6 +294,35 @@ describe("useMessageHandlers active_user routing", () => {
 		)
 	})
 
+	it("includes generic workflow-start placeholder fields in workflow form submissions", async () => {
+		await submitWorkflowForm("session-1", WorkflowFormAction.SUBMIT, {
+			story_path: "docs/stories/story-123.md",
+			project_context: "docs/project-context.md",
+		})
+
+		expect(mockSubmitWorkflowForm).toHaveBeenCalledTimes(1)
+		expect(mockSubmitWorkflowForm).toHaveBeenCalledWith(
+			expect.objectContaining({
+				sessionId: "session-1",
+				action: WorkflowFormAction.SUBMIT,
+				fields: [
+					{
+						key: "story_path",
+						value: {
+							stringValue: "docs/stories/story-123.md",
+						},
+					},
+					{
+						key: "project_context",
+						value: {
+							stringValue: "docs/project-context.md",
+						},
+					},
+				],
+			}),
+		)
+	})
+
 	it("includes confirm submissions for workflow-form confirm screens", async () => {
 		await submitWorkflowForm("session-1", WorkflowFormAction.SUBMIT, {
 			confirm: "yes",

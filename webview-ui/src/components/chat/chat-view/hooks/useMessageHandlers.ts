@@ -10,8 +10,6 @@ import type { ChatState, MessageHandlers } from "../types/chatTypes"
 
 type WorkflowFormUiValue = number | string | string[] | undefined
 
-const WORKFLOW_FORM_STRING_FIELD_KEYS = ["confirm", "source.type", "source.commit", "source.base", "source.head"] as const
-
 function normalizeWorkflowFormStringValue(value: WorkflowFormUiValue): string | undefined {
 	if (typeof value !== "string") {
 		return undefined
@@ -60,8 +58,36 @@ export function buildWorkflowFormSubmissionRequest(
 ): WorkflowFormSubmissionRequest {
 	const fields = []
 
-	for (const key of WORKFLOW_FORM_STRING_FIELD_KEYS) {
-		const normalizedValue = normalizeWorkflowFormStringValue(values[key])
+	for (const [key, rawValue] of Object.entries(values)) {
+		if (key === "scoped_paths") {
+			const scopedPaths = normalizeWorkflowFormStringArrayValue(rawValue)
+			if (scopedPaths) {
+				fields.push({
+					key,
+					value: {
+						stringArrayValue: StringArray.create({
+							values: scopedPaths,
+						}),
+					},
+				})
+			}
+			continue
+		}
+
+		if (key === "context_lines") {
+			const contextLines = normalizeWorkflowFormIntegerValue(rawValue)
+			if (contextLines !== undefined) {
+				fields.push({
+					key,
+					value: {
+						integerValue: contextLines,
+					},
+				})
+			}
+			continue
+		}
+
+		const normalizedValue = normalizeWorkflowFormStringValue(rawValue)
 		if (!normalizedValue) {
 			continue
 		}
@@ -70,28 +96,6 @@ export function buildWorkflowFormSubmissionRequest(
 			key,
 			value: {
 				stringValue: normalizedValue,
-			},
-		})
-	}
-
-	const scopedPaths = normalizeWorkflowFormStringArrayValue(values.scoped_paths)
-	if (scopedPaths) {
-		fields.push({
-			key: "scoped_paths",
-			value: {
-				stringArrayValue: StringArray.create({
-					values: scopedPaths,
-				}),
-			},
-		})
-	}
-
-	const contextLines = normalizeWorkflowFormIntegerValue(values.context_lines)
-	if (contextLines !== undefined) {
-		fields.push({
-			key: "context_lines",
-			value: {
-				integerValue: contextLines,
 			},
 		})
 	}

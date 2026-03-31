@@ -97,7 +97,7 @@ describe("WorkflowFormRuntime", () => {
 		buildToolExecutionFailureFallbackMessage: () => "error",
 		evaluateToolExecutionResult: () => ({ succeeded: true }),
 		buildToolExecutionRequest: (session: WorkflowFormSessionState, values: WorkflowFormValues) => {
-			const fields = sessionAwareCustomResolver.buildDefinition(session).pages.collect_inputs.fields ?? []
+			const fields = sessionAwareCustomResolver.buildDefinition(session).pages.collect_inputs?.fields ?? []
 			const filteredValues = fields.reduce<Record<string, string>>((acc, field) => {
 				const value = values[field.key]?.stringValue
 				if (value) {

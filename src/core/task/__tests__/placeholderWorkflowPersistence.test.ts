@@ -1,5 +1,6 @@
 import * as disk from "@core/storage/disk"
 import type { ClineWorkflowForm } from "@shared/ExtensionMessage"
+import { ClineDefaultTool } from "@shared/tools"
 import { expect } from "chai"
 import fs from "fs/promises"
 import { describe, it } from "mocha"
@@ -14,7 +15,7 @@ import { getFocusChainFilePath } from "../focus-chain/file-utils"
 import { Task, type ToolResponse } from "../index"
 import { TaskState } from "../TaskState"
 import { activateManagedWorkflowInTaskState } from "../workflow-activation"
-import type { WorkflowFormSessionState } from "../workflow-form/types"
+import type { WorkflowFormRuntimeOutcome, WorkflowFormSessionState } from "../workflow-form/types"
 
 function createFocusChainManager(taskState: TaskState) {
 	return new FocusChainManager({
@@ -44,6 +45,22 @@ function createFakeTask(taskId: string) {
 
 type TaskMethod<Args extends unknown[], Result> = (this: Record<string, unknown>, ...args: Args) => Result
 type FakeTaskBase = ReturnType<typeof createFakeTask> & Record<string, unknown>
+type FakeWorkflowFormTask = {
+	cwd: string
+	taskState: TaskState
+	pendingWorkflowFormOutcome?: WorkflowFormRuntimeOutcome
+	workflowFormRuntime: {
+		createSession: sinon.SinonStub
+		buildPayload: sinon.SinonStub
+		buildSuccessPayload?: sinon.SinonStub
+	}
+	persistWorkflowFormSession?: sinon.SinonStub
+	renderWorkflowFormMessage: sinon.SinonStub
+	executeWorkflowFormToolAndSync?: sinon.SinonStub
+	clearWorkflowFormSession?: sinon.SinonStub
+	setThreadDisplayState: sinon.SinonStub
+	postStateToWebview: sinon.SinonStub
+}
 
 const restoreBmadStateFromMetadata = Reflect.get(Task.prototype, "restoreBmadStateFromMetadata") as TaskMethod<[], Promise<void>>
 const persistWorkflowFormSession = Reflect.get(Task.prototype, "persistWorkflowFormSession") as TaskMethod<[], Promise<void>>
@@ -737,7 +754,7 @@ Choose the review mode from the persisted diff output before continuing.
 				output_folder: path.join(tempDir, "workflow-output"),
 			}
 
-			const createdSession = {
+			const createdSession: WorkflowFormSessionState = {
 				sessionId: "wf-session-step-3",
 				resolverId: "code_review_step_3_diff_source",
 				triggerSource: "deterministic_workflow_progression",
@@ -752,7 +769,7 @@ Choose the review mode from the persisted diff output before continuing.
 			}
 
 			let renderCount = 0
-			const fakeTask = {
+			const fakeTask: FakeWorkflowFormTask = {
 				cwd: tempDir,
 				taskState,
 				pendingWorkflowFormOutcome: undefined,
@@ -768,7 +785,7 @@ Choose the review mode from the persisted diff output before continuing.
 						fakeTask.pendingWorkflowFormOutcome = {
 							kind: "invoke_tool",
 							session: createdSession,
-							toolName: "build_review_diff_output",
+							toolName: ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT,
 							toolInput: {
 								source: {
 									type: "commit",
@@ -858,7 +875,7 @@ Choose the review mode from the persisted diff output before continuing.
 		const taskState = new TaskState()
 		taskState.activeWorkflowFormSession = session
 
-		const fakeTask = {
+		const fakeTask: FakeWorkflowFormTask = {
 			cwd: process.cwd(),
 			taskState,
 			pendingWorkflowFormOutcome: undefined,
