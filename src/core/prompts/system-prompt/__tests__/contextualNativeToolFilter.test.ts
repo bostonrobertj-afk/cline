@@ -88,7 +88,7 @@ describe("filterContextualNativeToolSpecs", () => {
 		expect(keptIds).to.not.include(ClineDefaultTool.ACT_MODE)
 	})
 
-	it("applies code-review step 3 row and removes dynamic MCP tools when no Indxr bundles are allowed", () => {
+	it("applies code-review step 3 row and keeps the configured Indxr bundles", () => {
 		const registeredTools = [
 			makeRegisteredTool(ClineDefaultTool.LIST_FILES),
 			makeRegisteredTool(ClineDefaultTool.SEARCH),
@@ -116,7 +116,12 @@ describe("filterContextualNativeToolSpecs", () => {
 				activePlaceholderWorkflowStepNumber: 3,
 			}),
 			registeredTools,
-			mcpTools: [makeMcpTool("indxr-10mcp0search_relevant"), makeMcpTool("12345670mcp0test_tool")],
+			mcpTools: [
+				makeMcpTool("indxr-10mcp0search_relevant"),
+				makeMcpTool("indxr-10mcp0get_file_summary"),
+				makeMcpTool("indxr-10mcp0lookup_symbol"),
+				makeMcpTool("12345670mcp0test_tool"),
+			],
 		})
 
 		const keptIds = result.map((tool) => tool.id)
@@ -129,6 +134,7 @@ describe("filterContextualNativeToolSpecs", () => {
 			ClineDefaultTool.BASH,
 			ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT,
 			ClineDefaultTool.APPLY_PATCH,
+			ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
 			ClineDefaultTool.ASK,
 			ClineDefaultTool.SEND_USER_MESSAGE,
 			ClineDefaultTool.ATTEMPT,
@@ -137,10 +143,11 @@ describe("filterContextualNativeToolSpecs", () => {
 			ClineDefaultTool.NEW_TASK,
 		])
 		expect(keptIds).to.not.include(ClineDefaultTool.PLAN_MODE)
-		expect(keptIds).to.not.include(ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS)
 		expect(keptIds).to.not.include(ClineDefaultTool.USE_SUBAGENTS)
 		expect(keptIds).to.not.include(ClineDefaultTool.WEB_SEARCH)
-		expect(keptNames).to.not.include("indxr-10mcp0search_relevant")
+		expect(keptNames).to.include("indxr-10mcp0search_relevant")
+		expect(keptNames).to.include("indxr-10mcp0get_file_summary")
+		expect(keptNames).to.include("indxr-10mcp0lookup_symbol")
 		expect(keptNames).to.not.include("12345670mcp0test_tool")
 	})
 
