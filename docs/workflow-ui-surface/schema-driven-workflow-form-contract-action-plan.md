@@ -42,7 +42,7 @@ Locked decisions for this pass:
 - Future workflow-form use cases must verify that the invoked tool's schema is sufficiently machine-readable for the required staged UX and upgrade that tool schema if it is not.
 
 ## Step 1
-[ ] Replace the hard-coded typed workflow-form submission envelope with a schema-agnostic raw-value contract, and expose resolved field schema in the shared workflow-form payload.
+[x] Replace the hard-coded typed workflow-form submission envelope with a schema-agnostic raw-value contract, and expose resolved field schema in the shared workflow-form payload.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/proto/cline/task.proto`
@@ -97,7 +97,7 @@ export interface WorkflowFormJsonSchema {
 9. Do not manually edit those generated files.
 
 ## Step 2
-[ ] Add the shared workflow-form schema-resolution and raw-value parsing helpers, and make tool-spec lookup canonical outside the dictionary builder.
+[x] Add the shared workflow-form schema-resolution and raw-value parsing helpers, and make tool-spec lookup canonical outside the dictionary builder.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/schema.ts`
@@ -153,7 +153,7 @@ Exact edits:
    - `"returns undefined for invalid integer raw values"`
 
 ## Step 3
-[ ] Upgrade the `build_review_diff_output` tool schema so use case 1 branch selection and final-screen field typing are machine-readable, then refactor the Phase 1 resolver to derive those definitions from schema instead of hard-coded mappings.
+[x] Upgrade the `build_review_diff_output` tool schema so use case 1 branch selection and final-screen field typing are machine-readable, then refactor the Phase 1 resolver to derive those definitions from schema instead of hard-coded mappings.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/tools/build_review_diff_output.ts`
@@ -264,7 +264,7 @@ That test must build a `collect_inputs` definition for `source.type = "commit"` 
    - `context_lines.valueSchema.type === "integer"`
 
 ## Step 4
-[ ] Refactor the workflow-form runtime and resolver payload assembly to consume the new raw-value contract and schema-derived field definitions, including workflow-start forms.
+[x] Refactor the workflow-form runtime and resolver payload assembly to consume the new raw-value contract and schema-derived field definitions, including workflow-start forms.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRegistry.ts`
@@ -306,7 +306,7 @@ Exact edits:
    - `toolParams` does not include `context_lines`
 
 ## Step 5
-[ ] Replace the webview's field-name-based workflow-form submission mapping with a generic schema-driven submit path, and make the workflow-form row read/write raw values from the runtime definition.
+[x] Replace the webview's field-name-based workflow-form submission mapping with a generic schema-driven submit path, and make the workflow-form row read/write raw values from the runtime definition.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/webview-ui/src/components/chat/chat-view/hooks/useMessageHandlers.ts`
@@ -379,7 +379,7 @@ export async function submitWorkflowForm(
    and asserts those exact strings appear in the rendered inputs.
 
 ## Step 6
-[ ] Run the focused verification suite and stop if any failure requires edits outside the prescribed files above.
+[x] Run the focused verification suite and stop if any failure requires edits outside the prescribed files above.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflow-ui-surface/schema-driven-workflow-form-contract-action-plan.md`
@@ -400,3 +400,88 @@ cd webview-ui && npx vitest run src/components/chat/chat-view/hooks/useMessageHa
 
 4. Run `npm run check-types`.
 5. If any command fails because the implementation needs a file change not explicitly listed in the relevant prior step, stop and ask for input instead of broadening the fix.
+
+## Remediation Step 7
+[x] Remove the remaining hard-coded Phase 1 source-variant mapping by deriving branch-specific `source` fields and `source` payload assembly directly from `build_review_diff_output.source.oneOf`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/schema.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRegistry.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/schema.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRegistry.test.ts`
+
+Exact edits:
+1. In [schema.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/schema.ts#L117-L197), add one new export immediately above `parseWorkflowFormRawValue(...)`:
+
+```ts
+export function resolveWorkflowFormOneOfVariant(
+	schema: WorkflowFormJsonSchema,
+	discriminatorProperty: string,
+	discriminatorValue: string | undefined,
+): WorkflowFormJsonSchema | undefined
+```
+
+2. Implement `resolveWorkflowFormOneOfVariant(...)` with these exact rules:
+   - if `discriminatorValue` is falsy, return `undefined`
+   - iterate `schema.oneOf ?? []`
+   - for each variant, read `variant.properties?.[discriminatorProperty]`
+   - return the first variant whose discriminator property has `const === discriminatorValue`
+   - otherwise return `undefined`
+3. In [schema.test.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/__tests__/schema.test.ts#L1-L53), import `resolveWorkflowFormOneOfVariant`.
+4. In that same file, add one new test named `"resolves build_review_diff_output source variants from oneOf by discriminator"` that:
+   - resolves the `source` schema from `build_review_diff_output`
+   - resolves the `"commit_range"` variant through `resolveWorkflowFormOneOfVariant(sourceSchema, "type", "commit_range")`
+   - asserts the returned variant exists
+   - asserts `variant.properties?.type?.const === "commit_range"`
+   - asserts `variant.properties?.base?.type === "string"`
+   - asserts `variant.properties?.head?.type === "string"`
+5. In [WorkflowFormRegistry.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/WorkflowFormRegistry.ts#L76-L87), delete `getSourceBranchPropertyKeys(sourceType)` entirely.
+6. In that same file, add these exact helpers immediately below `getSelectedSourceType(values)`:
+   - `resolveSelectedSourceVariantSchema(sourceType)` which:
+     - resolves the `source` schema through `resolveWorkflowFormSchema(ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT, { parameterName: "source" })`
+     - returns `resolveWorkflowFormOneOfVariant(sourceSchema, "type", sourceType)`
+   - `getSelectedSourceVariantPropertyKeys(sourceType)` which:
+     - resolves the selected source variant
+     - returns `Object.keys(variant.properties ?? {}).filter((key) => key !== "type")`
+7. Update the imports in [WorkflowFormRegistry.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/WorkflowFormRegistry.ts#L12-L18) to include `resolveWorkflowFormOneOfVariant`.
+8. Replace the `for` loop in `buildConcreteInputFieldDefinitions(values)` at [WorkflowFormRegistry.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/WorkflowFormRegistry.ts#L128-L173) so it iterates `getSelectedSourceVariantPropertyKeys(sourceType)`.
+9. Keep the current Phase 1 UX behavior unchanged while doing so:
+   - `source.commit` keeps the existing commit dictionary label/help/placeholder and remains required
+   - `source.base` keeps the existing base dictionary label/help/placeholder and remains required
+   - `source.head` keeps the existing head dictionary label/help/placeholder and remains required
+   - `scoped_paths` and `context_lines` remain controlled exactly as they are today in this remediation step
+10. In [WorkflowFormRegistry.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/WorkflowFormRegistry.ts#L351-L432), replace the hard-coded `switch (sourceType)` block with schema-driven assembly:
+    - resolve the selected source variant schema once from `source.oneOf`
+    - if no variant is found, throw `Error(\`Unsupported workflow form source type: ${sourceType ?? "undefined"}\`)`
+    - create `const source: Record<string, unknown> = { type: sourceType }`
+    - iterate `getSelectedSourceVariantPropertyKeys(sourceType)`
+    - for each property key, read the parsed value from the current collect-input fields
+    - if the parsed value is a string, assign it onto `source[propertyKey]`
+    - set `toolInput.source = source`
+    - keep the existing `scoped_paths` and `context_lines` addition rules unchanged
+11. Do not change the tool name, staged pages, prompt copy, workflow-start resolver, or the existing `scoped_paths` / `context_lines` conditional behavior in this step.
+12. In [WorkflowFormRegistry.test.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRegistry.test.ts#L53-L100), keep the existing source-selection and value-schema tests unchanged.
+13. In that same file, add one new test immediately after `"attaches schema-derived value types to Phase 1 concrete input fields"` named `"derives Phase 1 branch-specific source fields from the selected source variant schema"` that:
+    - builds a `collect_inputs` definition with `values["source.type"] = { rawValue: "commit_range" }`
+    - asserts the field keys include `source.base`
+    - asserts the field keys include `source.head`
+    - asserts the field keys do not include `source.commit`
+14. In that same file, add one new test immediately after the new commit-range field-discovery test named `"assembles the Phase 1 source payload from the selected source variant schema"` that:
+    - calls `buildToolExecutionRequest(...)` with `source.type = "commit"` and `source.commit = "abc1234"`
+    - asserts `outcome.toolInput.source` exactly equals `{ type: "commit", commit: "abc1234" }`
+    - asserts `outcome.toolParams.source` equals `JSON.stringify({ type: "commit", commit: "abc1234" })`
+
+## Remediation Step 8
+[x] Run the focused remediation verification suite and stop if any failure requires edits outside the prescribed files above.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflow-ui-surface/schema-driven-workflow-form-contract-action-plan.md`
+
+Exact verification:
+1. Run:
+
+```bash
+npm run test:unit -- src/core/task/workflow-form/__tests__/schema.test.ts src/core/task/workflow-form/__tests__/WorkflowFormRegistry.test.ts --exit
+```
+
+2. If that command fails because the implementation needs a file change not explicitly listed in Remediation Step 7, stop and ask for input instead of broadening scope.

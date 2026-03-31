@@ -31,11 +31,11 @@ describe("WorkflowFormRegistry", () => {
 				values: {},
 			},
 			{
-				"source.type": { stringValue: "commit_range" },
-				"source.base": { stringValue: "main" },
-				"source.head": { stringValue: "feature/review-form" },
-				scoped_paths: { stringArrayValue: ["src/core/task/index.ts", "webview-ui/src/components/chat"] },
-				context_lines: { integerValue: 5 },
+				"source.type": { rawValue: "commit_range" },
+				"source.base": { rawValue: "main" },
+				"source.head": { rawValue: "feature/review-form" },
+				scoped_paths: { rawValue: "src/core/task/index.ts\nwebview-ui/src/components/chat" },
+				context_lines: { rawValue: "5" },
 			},
 		)
 
@@ -48,6 +48,105 @@ describe("WorkflowFormRegistry", () => {
 			scoped_paths: JSON.stringify(["src/core/task/index.ts", "webview-ui/src/components/chat"]),
 			context_lines: "5",
 		})
+	})
+
+	it("derives Phase 1 source-selection options from the build_review_diff_output schema", () => {
+		const resolver = getWorkflowFormResolverDefinition(CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID)
+		const definition = resolver.buildDefinition({
+			sessionId: "session-1",
+			resolverId: resolver.id,
+			triggerSource: "deterministic_workflow_progression",
+			owner: {
+				kind: "placeholder_workflow_step",
+				workflowName: "code-review.md",
+				stepNumber: 3,
+			},
+			phase: "select_source",
+			initialPhase: "confirm",
+			values: {},
+		})
+		const sourceTypeField = definition.pages.select_source?.fields?.find((field) => field.key === "source.type")
+
+		expect(sourceTypeField?.options?.map((option) => option.value)).to.deep.equal([
+			"commit",
+			"commit_range",
+			"ref_diff",
+			"worktree_head_scoped",
+		])
+	})
+
+	it("attaches schema-derived value types to Phase 1 concrete input fields", () => {
+		const resolver = getWorkflowFormResolverDefinition(CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID)
+		const definition = resolver.buildDefinition({
+			sessionId: "session-1",
+			resolverId: resolver.id,
+			triggerSource: "deterministic_workflow_progression",
+			owner: {
+				kind: "placeholder_workflow_step",
+				workflowName: "code-review.md",
+				stepNumber: 3,
+			},
+			phase: "collect_inputs",
+			initialPhase: "confirm",
+			values: {
+				"source.type": { rawValue: "commit" },
+			},
+		})
+		const fields = definition.pages.collect_inputs?.fields ?? []
+
+		expect(fields.find((field) => field.key === "source.commit")?.valueSchema.type).to.equal("string")
+		expect(fields.find((field) => field.key === "scoped_paths")?.valueSchema.type).to.equal("array")
+		expect(fields.find((field) => field.key === "context_lines")?.valueSchema.type).to.equal("integer")
+	})
+
+	it("derives Phase 1 branch-specific source fields from the selected source variant schema", () => {
+		const resolver = getWorkflowFormResolverDefinition(CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID)
+		const definition = resolver.buildDefinition({
+			sessionId: "session-1",
+			resolverId: resolver.id,
+			triggerSource: "deterministic_workflow_progression",
+			owner: {
+				kind: "placeholder_workflow_step",
+				workflowName: "code-review.md",
+				stepNumber: 3,
+			},
+			phase: "collect_inputs",
+			initialPhase: "confirm",
+			values: {
+				"source.type": { rawValue: "commit_range" },
+			},
+		})
+		const fieldKeys = (definition.pages.collect_inputs?.fields ?? []).map((field) => field.key)
+
+		expect(fieldKeys).to.include("source.base")
+		expect(fieldKeys).to.include("source.head")
+		expect(fieldKeys).to.not.include("source.commit")
+	})
+
+	it("assembles the Phase 1 source payload from the selected source variant schema", () => {
+		const resolver = getWorkflowFormResolverDefinition(CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID)
+		const outcome = resolver.buildToolExecutionRequest(
+			{
+				sessionId: "session-1",
+				resolverId: resolver.id,
+				triggerSource: "deterministic_workflow_progression",
+				owner: {
+					kind: "placeholder_workflow_step",
+					workflowName: "code-review.md",
+					stepNumber: 3,
+				},
+				phase: "collect_inputs",
+				initialPhase: "confirm",
+				values: {},
+			},
+			{
+				"source.type": { rawValue: "commit" },
+				"source.commit": { rawValue: "abc1234" },
+			},
+		)
+
+		expect(outcome.toolInput.source).to.deep.equal({ type: "commit", commit: "abc1234" })
+		expect(outcome.toolParams.source).to.equal(JSON.stringify({ type: "commit", commit: "abc1234" }))
 	})
 
 	it("treats persisted diff-output tool results as success", () => {
@@ -148,6 +247,7 @@ describe("WorkflowFormRegistry", () => {
 				help: field.help,
 				required: field.required,
 				oneOfGroupId: field.oneOfGroupId,
+				valueSchemaType: field.valueSchema.type,
 			})),
 		).to.deep.equal([
 			{
@@ -156,6 +256,7 @@ describe("WorkflowFormRegistry", () => {
 				help: "Optional path to a story, spec, or requirements file that defines expected behavior.",
 				required: true,
 				oneOfGroupId: "workflow_start_one_of",
+				valueSchemaType: "string",
 			},
 			{
 				key: "review_input",
@@ -163,6 +264,7 @@ describe("WorkflowFormRegistry", () => {
 				help: "Path to an existing review-input markdown file for this review.",
 				required: true,
 				oneOfGroupId: "workflow_start_one_of",
+				valueSchemaType: "string",
 			},
 			{
 				key: "diff_output",
@@ -170,6 +272,7 @@ describe("WorkflowFormRegistry", () => {
 				help: "Path to an existing review-input diff file for this review.",
 				required: false,
 				oneOfGroupId: "workflow_start_one_of",
+				valueSchemaType: "string",
 			},
 		])
 	})
@@ -202,9 +305,9 @@ describe("WorkflowFormRegistry", () => {
 				},
 			},
 			{
-				review_input: { stringValue: " /tmp/review.md " },
-				diff_output: { stringValue: "   " },
-				spec_file: { stringValue: "/tmp/spec.md" },
+				review_input: { rawValue: " /tmp/review.md " },
+				diff_output: { rawValue: "   " },
+				spec_file: { rawValue: "/tmp/spec.md" },
 			},
 		)
 

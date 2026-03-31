@@ -1,5 +1,5 @@
-import type { ClineMessage } from "@shared/ExtensionMessage"
-import { EmptyRequest, StringArray, StringRequest } from "@shared/proto/cline/common"
+import type { ClineMessage, ClineWorkflowForm } from "@shared/ExtensionMessage"
+import { EmptyRequest, StringRequest } from "@shared/proto/cline/common"
 import { AskResponseRequest, NewTaskRequest, WorkflowFormAction, WorkflowFormSubmissionRequest } from "@shared/proto/cline/task"
 import { useCallback, useRef } from "react"
 import { useExtensionState } from "@/context/ExtensionStateContext"
@@ -8,111 +8,53 @@ import type { ButtonActionType } from "../shared/buttonConfig"
 import { isPassiveThreadOpen } from "../shared/buttonConfig"
 import type { ChatState, MessageHandlers } from "../types/chatTypes"
 
-type WorkflowFormUiValue = number | string | string[] | undefined
-
-function normalizeWorkflowFormStringValue(value: WorkflowFormUiValue): string | undefined {
-	if (typeof value !== "string") {
-		return undefined
-	}
-
-	const trimmedValue = value.trim()
-	return trimmedValue.length > 0 ? trimmedValue : undefined
-}
-
-function normalizeWorkflowFormStringArrayValue(value: WorkflowFormUiValue): string[] | undefined {
-	const normalizedValues =
-		typeof value === "string"
-			? value
-					.split("\n")
-					.map((entry) => entry.trim())
-					.filter((entry) => entry.length > 0)
-			: Array.isArray(value)
-				? value.map((entry) => entry.trim()).filter((entry) => entry.length > 0)
-				: undefined
-
-	return normalizedValues && normalizedValues.length > 0 ? normalizedValues : undefined
-}
-
-function normalizeWorkflowFormIntegerValue(value: WorkflowFormUiValue): number | undefined {
-	if (typeof value === "number" && Number.isInteger(value)) {
-		return value
-	}
-
-	if (typeof value === "string" && value.trim().length > 0) {
-		const normalizedValue = value.trim()
-		if (!/^-?\d+$/.test(normalizedValue)) {
-			return undefined
-		}
-
-		const parsedValue = Number.parseInt(normalizedValue, 10)
-		return Number.isInteger(parsedValue) ? parsedValue : undefined
-	}
-
-	return undefined
-}
-
 export function buildWorkflowFormSubmissionRequest(
-	sessionId: string,
+	workflowForm: ClineWorkflowForm,
 	action: WorkflowFormAction,
-	values: Record<string, WorkflowFormUiValue> = {},
+	values: Record<string, string> = {},
 ): WorkflowFormSubmissionRequest {
 	const fields = []
 
-	for (const [key, rawValue] of Object.entries(values)) {
-		if (key === "scoped_paths") {
-			const scopedPaths = normalizeWorkflowFormStringArrayValue(rawValue)
-			if (scopedPaths) {
-				fields.push({
-					key,
-					value: {
-						stringArrayValue: StringArray.create({
-							values: scopedPaths,
-						}),
-					},
-				})
+	if (workflowForm.phase === "confirm") {
+		const confirm = values.confirm?.trim()
+		if (confirm) {
+			fields.push({
+				key: "confirm",
+				value: {
+					rawValue: confirm,
+				},
+			})
+		}
+	} else if (workflowForm.phase !== "success") {
+		const page = workflowForm.definition.pages[workflowForm.phase]
+		for (const field of page?.fields ?? []) {
+			const rawValue = values[field.key]?.trim()
+			if (!rawValue) {
+				continue
 			}
-			continue
-		}
 
-		if (key === "context_lines") {
-			const contextLines = normalizeWorkflowFormIntegerValue(rawValue)
-			if (contextLines !== undefined) {
-				fields.push({
-					key,
-					value: {
-						integerValue: contextLines,
-					},
-				})
-			}
-			continue
+			fields.push({
+				key: field.key,
+				value: {
+					rawValue,
+				},
+			})
 		}
-
-		const normalizedValue = normalizeWorkflowFormStringValue(rawValue)
-		if (!normalizedValue) {
-			continue
-		}
-
-		fields.push({
-			key,
-			value: {
-				stringValue: normalizedValue,
-			},
-		})
 	}
 
 	return WorkflowFormSubmissionRequest.create({
-		sessionId,
+		sessionId: workflowForm.sessionId,
 		action,
 		fields,
 	})
 }
 
 export async function submitWorkflowForm(
-	sessionId: string,
+	workflowForm: ClineWorkflowForm,
 	action: WorkflowFormAction,
-	values: Record<string, WorkflowFormUiValue> = {},
+	values: Record<string, string> = {},
 ) {
-	await TaskServiceClient.submitWorkflowForm(buildWorkflowFormSubmissionRequest(sessionId, action, values))
+	await TaskServiceClient.submitWorkflowForm(buildWorkflowFormSubmissionRequest(workflowForm, action, values))
 }
 
 /**

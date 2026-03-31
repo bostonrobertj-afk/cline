@@ -1,4 +1,9 @@
-import type { ClineMessage } from "@shared/ExtensionMessage"
+import type {
+	ClineMessage,
+	ClineWorkflowForm,
+	WorkflowFormFieldDefinition,
+	WorkflowFormJsonSchema,
+} from "@shared/ExtensionMessage"
 import { WorkflowFormAction } from "@shared/proto/cline/task"
 import { act, renderHook } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
@@ -52,6 +57,72 @@ vi.mock("@/services/grpc-client", () => ({
 }))
 
 import { submitWorkflowForm, useMessageHandlers } from "./useMessageHandlers"
+
+function createField(args: {
+	key: string
+	label: string
+	control: WorkflowFormFieldDefinition["control"]
+	valueSchema: WorkflowFormJsonSchema
+	required?: boolean
+}): WorkflowFormFieldDefinition {
+	return {
+		key: args.key,
+		label: args.label,
+		help: args.label,
+		control: args.control,
+		valueSchema: args.valueSchema,
+		required: args.required ?? false,
+		visible: true,
+		options: args.valueSchema.enum?.map((value) => ({ value, label: value })),
+	}
+}
+
+function createWorkflowForm(args: {
+	phase: ClineWorkflowForm["phase"]
+	fields?: WorkflowFormFieldDefinition[]
+}): ClineWorkflowForm {
+	const fields = args.fields ?? []
+
+	return {
+		sessionId: "session-1",
+		resolverId: "code_review_step_3_diff_source",
+		toolName: "build_review_diff_output",
+		phase: args.phase,
+		definition: {
+			toolName: "build_review_diff_output",
+			title: "Workflow Form",
+			toolDictionaryTitle: "Reference",
+			toolDictionaryMarkdown: "## build_review_diff_output",
+			pages: {
+				confirm: {
+					prompt: "Confirm",
+					options: ["Yes", "No"],
+				},
+				select_source: {
+					prompt: "Select source",
+					fields,
+					submitLabel: "Next",
+					cancelLabel: "Cancel",
+				},
+				collect_inputs: {
+					prompt: "Collect inputs",
+					fields,
+					submitLabel: "Submit",
+					cancelLabel: "Cancel",
+				},
+				retry_error: {
+					prompt: "Retry",
+					fields,
+					submitLabel: "Submit",
+					cancelLabel: "Cancel",
+					retryLabel: "Start Over",
+				},
+			},
+			successMessage: "Done",
+		},
+		values: {},
+	}
+}
 
 function createChatState(): ChatState {
 	return {
@@ -243,7 +314,44 @@ describe("useMessageHandlers active_user routing", () => {
 	})
 
 	it("routes structured workflow form submissions through submitWorkflowForm", async () => {
-		await submitWorkflowForm("session-1", WorkflowFormAction.SUBMIT, {
+		const workflowForm = createWorkflowForm({
+			phase: "collect_inputs",
+			fields: [
+				createField({
+					key: "source.type",
+					label: "Source type",
+					control: "select",
+					valueSchema: { type: "string", enum: ["commit", "commit_range"] },
+					required: true,
+				}),
+				createField({
+					key: "source.base",
+					label: "Base",
+					control: "text",
+					valueSchema: { type: "string" },
+				}),
+				createField({
+					key: "source.head",
+					label: "Head",
+					control: "text",
+					valueSchema: { type: "string" },
+				}),
+				createField({
+					key: "scoped_paths",
+					label: "Scoped paths",
+					control: "textarea",
+					valueSchema: { type: "array", items: { type: "string" } },
+				}),
+				createField({
+					key: "context_lines",
+					label: "Context lines",
+					control: "number",
+					valueSchema: { type: "integer" },
+				}),
+			],
+		})
+
+		await submitWorkflowForm(workflowForm, WorkflowFormAction.SUBMIT, {
 			"source.type": "commit_range",
 			"source.base": "main",
 			"source.head": "feature/review",
@@ -260,33 +368,31 @@ describe("useMessageHandlers active_user routing", () => {
 					{
 						key: "source.type",
 						value: {
-							stringValue: "commit_range",
+							rawValue: "commit_range",
 						},
 					},
 					{
 						key: "source.base",
 						value: {
-							stringValue: "main",
+							rawValue: "main",
 						},
 					},
 					{
 						key: "source.head",
 						value: {
-							stringValue: "feature/review",
+							rawValue: "feature/review",
 						},
 					},
 					{
 						key: "scoped_paths",
 						value: {
-							stringArrayValue: {
-								values: ["src/core/task/index.ts", "src/core/task/TaskState.ts"],
-							},
+							rawValue: "src/core/task/index.ts\nsrc/core/task/TaskState.ts",
 						},
 					},
 					{
 						key: "context_lines",
 						value: {
-							integerValue: 5,
+							rawValue: "5",
 						},
 					},
 				],
@@ -295,7 +401,25 @@ describe("useMessageHandlers active_user routing", () => {
 	})
 
 	it("includes generic workflow-start placeholder fields in workflow form submissions", async () => {
-		await submitWorkflowForm("session-1", WorkflowFormAction.SUBMIT, {
+		const workflowForm = createWorkflowForm({
+			phase: "collect_inputs",
+			fields: [
+				createField({
+					key: "story_path",
+					label: "Story path",
+					control: "text",
+					valueSchema: { type: "string" },
+				}),
+				createField({
+					key: "project_context",
+					label: "Project context",
+					control: "text",
+					valueSchema: { type: "string" },
+				}),
+			],
+		})
+
+		await submitWorkflowForm(workflowForm, WorkflowFormAction.SUBMIT, {
 			story_path: "docs/stories/story-123.md",
 			project_context: "docs/project-context.md",
 		})
@@ -309,13 +433,13 @@ describe("useMessageHandlers active_user routing", () => {
 					{
 						key: "story_path",
 						value: {
-							stringValue: "docs/stories/story-123.md",
+							rawValue: "docs/stories/story-123.md",
 						},
 					},
 					{
 						key: "project_context",
 						value: {
-							stringValue: "docs/project-context.md",
+							rawValue: "docs/project-context.md",
 						},
 					},
 				],
@@ -324,7 +448,9 @@ describe("useMessageHandlers active_user routing", () => {
 	})
 
 	it("includes confirm submissions for workflow-form confirm screens", async () => {
-		await submitWorkflowForm("session-1", WorkflowFormAction.SUBMIT, {
+		const workflowForm = createWorkflowForm({ phase: "confirm" })
+
+		await submitWorkflowForm(workflowForm, WorkflowFormAction.SUBMIT, {
 			confirm: "yes",
 		})
 
@@ -337,10 +463,68 @@ describe("useMessageHandlers active_user routing", () => {
 					{
 						key: "confirm",
 						value: {
-							stringValue: "yes",
+							rawValue: "yes",
 						},
 					},
 				],
+			}),
+		)
+	})
+
+	it("submits workflow-form fields generically without field-name transport mapping", async () => {
+		const workflowForm = createWorkflowForm({
+			phase: "collect_inputs",
+			fields: [
+				createField({
+					key: "source.type",
+					label: "Source type",
+					control: "select",
+					valueSchema: { type: "string", enum: ["commit", "commit_range"] },
+				}),
+				createField({
+					key: "review_input",
+					label: "Review input",
+					control: "text",
+					valueSchema: { type: "string" },
+				}),
+				createField({
+					key: "context_lines",
+					label: "Context lines",
+					control: "number",
+					valueSchema: { type: "integer" },
+				}),
+			],
+		})
+
+		await submitWorkflowForm(workflowForm, WorkflowFormAction.SUBMIT, {
+			"source.type": "commit",
+			review_input: "docs/review.md",
+			context_lines: "7",
+		})
+
+		expect(mockSubmitWorkflowForm).toHaveBeenCalledWith(
+			expect.objectContaining({
+				sessionId: "session-1",
+				action: WorkflowFormAction.SUBMIT,
+				fields: [
+					{ key: "source.type", value: { rawValue: "commit" } },
+					{ key: "review_input", value: { rawValue: "docs/review.md" } },
+					{ key: "context_lines", value: { rawValue: "7" } },
+				],
+			}),
+		)
+	})
+
+	it("submits confirm answers without depending on field definitions", async () => {
+		const workflowForm = createWorkflowForm({ phase: "confirm" })
+
+		await submitWorkflowForm(workflowForm, WorkflowFormAction.SUBMIT, { confirm: "yes" })
+
+		expect(mockSubmitWorkflowForm).toHaveBeenCalledWith(
+			expect.objectContaining({
+				sessionId: "session-1",
+				action: WorkflowFormAction.SUBMIT,
+				fields: [{ key: "confirm", value: { rawValue: "yes" } }],
 			}),
 		)
 	})

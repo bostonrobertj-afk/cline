@@ -17,6 +17,51 @@ const generic: ClineToolSpec = {
 			type: "object",
 			instruction:
 				'Required source object. Supported shape: {"type":"commit","commit":"<ref>"} | {"type":"commit_range","base":"<ref>","head":"<ref>"} | {"type":"ref_diff","base":"<ref>","head":"<ref>"} | {"type":"worktree_head_scoped"}.',
+			properties: {
+				type: {
+					type: "string",
+					enum: ["commit", "commit_range", "ref_diff", "worktree_head_scoped"],
+				},
+				commit: { type: "string" },
+				base: { type: "string" },
+				head: { type: "string" },
+			},
+			requiredProperties: ["type"],
+			oneOf: [
+				{
+					type: "object",
+					properties: {
+						type: { type: "string", const: "commit" },
+						commit: { type: "string" },
+					},
+					required: ["type", "commit"],
+				},
+				{
+					type: "object",
+					properties: {
+						type: { type: "string", const: "commit_range" },
+						base: { type: "string" },
+						head: { type: "string" },
+					},
+					required: ["type", "base", "head"],
+				},
+				{
+					type: "object",
+					properties: {
+						type: { type: "string", const: "ref_diff" },
+						base: { type: "string" },
+						head: { type: "string" },
+					},
+					required: ["type", "base", "head"],
+				},
+				{
+					type: "object",
+					properties: {
+						type: { type: "string", const: "worktree_head_scoped" },
+					},
+					required: ["type"],
+				},
+			],
 		},
 		{
 			name: "scoped_paths",

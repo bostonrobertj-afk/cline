@@ -1,4 +1,4 @@
-import type { ClineWorkflowForm, WorkflowFormFieldValuePayload } from "@shared/ExtensionMessage"
+import type { ClineWorkflowForm, WorkflowFormFieldDefinition, WorkflowFormFieldValuePayload } from "@shared/ExtensionMessage"
 import {
 	WorkflowFormAction,
 	type WorkflowFormFieldSubmission,
@@ -6,6 +6,7 @@ import {
 } from "@shared/proto/cline/task"
 import { randomUUID } from "crypto"
 import { buildWorkflowFormPayload } from "./buildWorkflowFormPayload"
+import { parseWorkflowFormRawValue } from "./schema"
 import type {
 	WorkflowFormResolverDefinition,
 	WorkflowFormRuntimeCreateSessionOptions,
@@ -15,20 +16,8 @@ import type {
 } from "./types"
 import { workflowFormRegistry } from "./WorkflowFormRegistry"
 
-function hasWorkflowFormValue(value: WorkflowFormFieldValuePayload | undefined): boolean {
-	if (!value) {
-		return false
-	}
-
-	if (typeof value.stringValue === "string" && value.stringValue.trim().length > 0) {
-		return true
-	}
-
-	if (typeof value.integerValue === "number") {
-		return true
-	}
-
-	return Array.isArray(value.stringArrayValue) && value.stringArrayValue.some((entry) => entry.trim().length > 0)
+function hasWorkflowFormValue(field: WorkflowFormFieldDefinition, value: WorkflowFormFieldValuePayload | undefined): boolean {
+	return parseWorkflowFormRawValue(value?.rawValue, field.valueSchema) !== undefined
 }
 
 function getCurrentPageFields(session: WorkflowFormSessionState, resolver: WorkflowFormResolverDefinition) {
@@ -37,17 +26,11 @@ function getCurrentPageFields(session: WorkflowFormSessionState, resolver: Workf
 	return page?.fields ?? []
 }
 
-function areRequiredWorkflowFormFieldsSatisfied(
-	values: WorkflowFormValues,
-	fields: Array<{ key: string; required: boolean }>,
-): boolean {
-	return fields.filter((field) => field.required).every((field) => hasWorkflowFormValue(values[field.key]))
+function areRequiredWorkflowFormFieldsSatisfied(values: WorkflowFormValues, fields: WorkflowFormFieldDefinition[]): boolean {
+	return fields.filter((field) => field.required).every((field) => hasWorkflowFormValue(field, values[field.key]))
 }
 
-function areOneOfWorkflowFormGroupsSatisfied(
-	values: WorkflowFormValues,
-	fields: Array<{ key: string; oneOfGroupId?: string }>,
-): boolean {
+function areOneOfWorkflowFormGroupsSatisfied(values: WorkflowFormValues, fields: WorkflowFormFieldDefinition[]): boolean {
 	const groupedKeys = fields.reduce<Record<string, string[]>>((acc, field) => {
 		if (!field.oneOfGroupId) {
 			return acc
@@ -57,7 +40,12 @@ function areOneOfWorkflowFormGroupsSatisfied(
 		return acc
 	}, {})
 
-	return Object.values(groupedKeys).every((groupKeys) => groupKeys.some((key) => hasWorkflowFormValue(values[key])))
+	return Object.values(groupedKeys).every((groupKeys) =>
+		groupKeys.some((key) => {
+			const field = fields.find((entry) => entry.key === key)
+			return field ? hasWorkflowFormValue(field, values[key]) : false
+		}),
+	)
 }
 
 function buildValuesFromSubmissions(fields: WorkflowFormFieldSubmission[]): WorkflowFormValues {
@@ -66,18 +54,7 @@ function buildValuesFromSubmissions(fields: WorkflowFormFieldSubmission[]): Work
 			return accumulator
 		}
 
-		const normalizedValue: WorkflowFormFieldValuePayload = {}
-		if (field.value.stringValue !== undefined) {
-			normalizedValue.stringValue = field.value.stringValue
-		}
-		if (field.value.integerValue !== undefined) {
-			normalizedValue.integerValue = field.value.integerValue
-		}
-		if (field.value.stringArrayValue?.values !== undefined) {
-			normalizedValue.stringArrayValue = field.value.stringArrayValue.values
-		}
-
-		accumulator[field.key] = normalizedValue
+		accumulator[field.key] = { rawValue: field.value.rawValue }
 		return accumulator
 	}, {})
 }
@@ -151,7 +128,7 @@ export class WorkflowFormRuntime {
 		}
 
 		if (session.phase === "confirm") {
-			const confirmValue = nextValues.confirm?.stringValue?.trim().toLowerCase()
+			const confirmValue = nextValues.confirm?.rawValue?.trim().toLowerCase()
 			if (request.action === WorkflowFormAction.SUBMIT && confirmValue === "yes") {
 				const nextSession: WorkflowFormSessionState = {
 					...session,
@@ -177,7 +154,7 @@ export class WorkflowFormRuntime {
 		}
 
 		if (session.phase === "select_source" && request.action === WorkflowFormAction.SUBMIT) {
-			const sourceType = nextValues["source.type"]?.stringValue?.trim()
+			const sourceType = nextValues["source.type"]?.rawValue?.trim()
 			if (!sourceType) {
 				return {
 					kind: "render_form",

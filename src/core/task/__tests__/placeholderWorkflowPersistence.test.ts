@@ -265,7 +265,7 @@ Inspect the prepared review input and write findings.
 			initialPhase: "confirm",
 			values: {
 				"source.type": {
-					stringValue: "commit",
+					rawValue: "commit",
 				},
 			},
 			lastError: "Tool execution failed",
@@ -913,7 +913,7 @@ Choose the review mode from the persisted diff output before continuing.
 			phase: "collect_inputs",
 			initialPhase: "collect_inputs",
 			values: {
-				review_input: { stringValue: "docs/review.md" },
+				review_input: { rawValue: "docs/review.md" },
 			},
 			context: {
 				workflowName: "review-adversarial-general.md",

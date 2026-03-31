@@ -4,8 +4,19 @@ import {
 	buildReviewDiffOutputToolDictionaryConfig,
 	buildRuntimeToolDictionaryMarkdownFromConfig,
 } from "@/core/task/workflow-form/dictionaries/buildToolDictionary"
-import { workflowFormSystemDictionary } from "@/core/task/workflow-form/dictionaries/systemDictionary"
+import {
+	type WorkflowFormSystemDictionaryKey,
+	workflowFormSystemDictionary,
+} from "@/core/task/workflow-form/dictionaries/systemDictionary"
 import { ClineDefaultTool } from "@/shared/tools"
+import {
+	deriveWorkflowFormControl,
+	deriveWorkflowFormOptions,
+	parseWorkflowFormRawValue,
+	resolveWorkflowFormOneOfVariant,
+	resolveWorkflowFormSchema,
+	type WorkflowFormFieldSchemaBinding,
+} from "./schema"
 import type { WorkflowFormResolverDefinition, WorkflowFormResolverId, WorkflowFormValues } from "./types"
 
 export const CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID = "code_review_step_3_diff_source"
@@ -19,113 +30,179 @@ const SOURCE_HEAD_FIELD_KEY = "source.head"
 const SCOPED_PATHS_FIELD_KEY = "scoped_paths"
 const CONTEXT_LINES_FIELD_KEY = "context_lines"
 
-function getStringValue(values: WorkflowFormValues, key: string): string | undefined {
-	return values[key]?.stringValue?.trim()
+function getParsedFieldValue(fields: WorkflowFormFieldDefinition[], values: WorkflowFormValues, key: string): unknown {
+	const field = fields.find((entry) => entry.key === key)
+	return field ? parseWorkflowFormRawValue(values[key]?.rawValue, field.valueSchema) : undefined
 }
 
-function getStringArrayValue(values: WorkflowFormValues, key: string): string[] {
-	const normalized = values[key]?.stringArrayValue ?? []
-	return normalized.map((value: string) => value.trim()).filter(Boolean)
+function getCurrentCollectFields(
+	session: Parameters<WorkflowFormResolverDefinition["buildDefinition"]>[0],
+	buildDefinition: WorkflowFormResolverDefinition["buildDefinition"],
+): WorkflowFormFieldDefinition[] {
+	return buildDefinition(session).pages.collect_inputs?.fields ?? []
 }
 
-function getIntegerValue(values: WorkflowFormValues, key: string): number | undefined {
-	const value = values[key]?.integerValue
-	return Number.isInteger(value) ? value : undefined
+function buildSchemaBackedField(args: {
+	toolName: ClineDefaultTool
+	binding: WorkflowFormFieldSchemaBinding
+	key: string
+	label: string
+	help: string
+	required: boolean
+	placeholder?: string
+	visible?: boolean
+	oneOfGroupId?: string
+	options?: WorkflowFormFieldOption[]
+}): WorkflowFormFieldDefinition {
+	const valueSchema = resolveWorkflowFormSchema(args.toolName, args.binding)
+
+	return {
+		key: args.key,
+		label: args.label,
+		help: args.help,
+		control: deriveWorkflowFormControl(valueSchema),
+		valueSchema,
+		required: args.required,
+		oneOfGroupId: args.oneOfGroupId,
+		placeholder: args.placeholder,
+		options: args.options ?? deriveWorkflowFormOptions(valueSchema),
+		visible: args.visible,
+	}
 }
 
-function buildSourceTypeOptions(): WorkflowFormFieldOption[] {
-	return [
-		{
-			value: "commit",
-			label: workflowFormSystemDictionary.commit.label,
-			description: workflowFormSystemDictionary.commit.medium,
-		},
-		{
-			value: "commit_range",
-			label: workflowFormSystemDictionary.commit_range.label,
-			description: workflowFormSystemDictionary.commit_range.medium,
-		},
-		{
-			value: "ref_diff",
-			label: workflowFormSystemDictionary.ref_diff.label,
-			description: workflowFormSystemDictionary.ref_diff.medium,
-		},
-		{
-			value: "worktree_head_scoped",
-			label: workflowFormSystemDictionary.worktree_head_scoped.label,
-			description: workflowFormSystemDictionary.worktree_head_scoped.medium,
-		},
-	]
+function getSelectedSourceType(values: WorkflowFormValues): string | undefined {
+	return values[SOURCE_TYPE_FIELD_KEY]?.rawValue?.trim()
+}
+
+function resolveSelectedSourceVariantSchema(sourceType: string | undefined) {
+	const sourceSchema = resolveWorkflowFormSchema(ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT, {
+		parameterName: "source",
+	})
+	return resolveWorkflowFormOneOfVariant(sourceSchema, "type", sourceType)
+}
+
+function getSelectedSourceVariantPropertyKeys(sourceType: string | undefined): string[] {
+	const variant = resolveSelectedSourceVariantSchema(sourceType)
+	return Object.keys(variant?.properties ?? {}).filter((key) => key !== "type")
 }
 
 function buildSourceSelectionFieldDefinitions(): WorkflowFormFieldDefinition[] {
+	const options =
+		deriveWorkflowFormOptions(
+			resolveWorkflowFormSchema(ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT, {
+				parameterName: "source",
+				propertyPath: ["type"],
+			}),
+		)?.map((option) => {
+			if (Object.hasOwn(workflowFormSystemDictionary, option.value)) {
+				const entry = workflowFormSystemDictionary[option.value as WorkflowFormSystemDictionaryKey]
+				return {
+					value: option.value,
+					label: entry.label,
+					description: entry.medium,
+				}
+			}
+
+			return option
+		}) ?? []
+
 	return [
-		{
+		buildSchemaBackedField({
+			toolName: ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT,
+			binding: { parameterName: "source", propertyPath: ["type"] },
 			key: SOURCE_TYPE_FIELD_KEY,
 			label: workflowFormSystemDictionary.source.label,
 			help: workflowFormSystemDictionary.source.medium,
-			control: "select",
 			required: true,
-			options: buildSourceTypeOptions(),
+			options,
 			visible: true,
-		},
+		}),
 	]
 }
 
 function buildConcreteInputFieldDefinitions(values: WorkflowFormValues): WorkflowFormFieldDefinition[] {
-	const sourceType = getStringValue(values, SOURCE_TYPE_FIELD_KEY)
-	const showsCommitField = sourceType === "commit"
-	const showsBaseAndHeadFields = sourceType === "commit_range" || sourceType === "ref_diff"
-	const showsScopedPaths = Boolean(sourceType)
+	const sourceType = getSelectedSourceType(values)
 	const worktreeScoped = sourceType === "worktree_head_scoped"
+	const fields: WorkflowFormFieldDefinition[] = []
 
-	return [
-		{
-			key: SOURCE_COMMIT_FIELD_KEY,
-			label: workflowFormSystemDictionary.commit.label,
-			help: workflowFormSystemDictionary.commit.medium,
-			control: "text",
-			required: showsCommitField,
-			placeholder: "abc1234",
-			visible: showsCommitField,
-		},
-		{
-			key: SOURCE_BASE_FIELD_KEY,
-			label: workflowFormSystemDictionary.base.label,
-			help: workflowFormSystemDictionary.base.medium,
-			control: "text",
-			required: showsBaseAndHeadFields,
-			placeholder: "main",
-			visible: showsBaseAndHeadFields,
-		},
-		{
-			key: SOURCE_HEAD_FIELD_KEY,
-			label: workflowFormSystemDictionary.head.label,
-			help: workflowFormSystemDictionary.head.medium,
-			control: "text",
-			required: showsBaseAndHeadFields,
-			placeholder: "HEAD",
-			visible: showsBaseAndHeadFields,
-		},
-		{
-			key: SCOPED_PATHS_FIELD_KEY,
-			label: workflowFormSystemDictionary.scoped_paths.label,
-			help: workflowFormSystemDictionary.scoped_paths.medium,
-			control: "textarea",
-			required: worktreeScoped,
-			placeholder: "src/core/task/index.ts",
-			visible: showsScopedPaths,
-		},
-		{
-			key: CONTEXT_LINES_FIELD_KEY,
-			label: workflowFormSystemDictionary.context_lines.label,
-			help: workflowFormSystemDictionary.context_lines.medium,
-			control: "number",
-			required: false,
-			placeholder: "3",
-			visible: Boolean(sourceType) && !worktreeScoped,
-		},
-	]
+	for (const propertyKey of getSelectedSourceVariantPropertyKeys(sourceType)) {
+		if (propertyKey === "commit") {
+			fields.push(
+				buildSchemaBackedField({
+					toolName: ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT,
+					binding: { parameterName: "source", propertyPath: ["commit"] },
+					key: SOURCE_COMMIT_FIELD_KEY,
+					label: workflowFormSystemDictionary.commit.label,
+					help: workflowFormSystemDictionary.commit.medium,
+					required: true,
+					placeholder: "abc1234",
+					visible: true,
+				}),
+			)
+			continue
+		}
+
+		if (propertyKey === "base") {
+			fields.push(
+				buildSchemaBackedField({
+					toolName: ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT,
+					binding: { parameterName: "source", propertyPath: ["base"] },
+					key: SOURCE_BASE_FIELD_KEY,
+					label: workflowFormSystemDictionary.base.label,
+					help: workflowFormSystemDictionary.base.medium,
+					required: true,
+					placeholder: "main",
+					visible: true,
+				}),
+			)
+			continue
+		}
+
+		fields.push(
+			buildSchemaBackedField({
+				toolName: ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT,
+				binding: { parameterName: "source", propertyPath: ["head"] },
+				key: SOURCE_HEAD_FIELD_KEY,
+				label: workflowFormSystemDictionary.head.label,
+				help: workflowFormSystemDictionary.head.medium,
+				required: true,
+				placeholder: "HEAD",
+				visible: true,
+			}),
+		)
+	}
+
+	if (sourceType) {
+		fields.push(
+			buildSchemaBackedField({
+				toolName: ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT,
+				binding: { parameterName: "scoped_paths" },
+				key: SCOPED_PATHS_FIELD_KEY,
+				label: workflowFormSystemDictionary.scoped_paths.label,
+				help: workflowFormSystemDictionary.scoped_paths.medium,
+				required: worktreeScoped,
+				placeholder: "src/core/task/index.ts",
+				visible: true,
+			}),
+		)
+	}
+
+	if (sourceType && !worktreeScoped) {
+		fields.push(
+			buildSchemaBackedField({
+				toolName: ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT,
+				binding: { parameterName: "context_lines" },
+				key: CONTEXT_LINES_FIELD_KEY,
+				label: workflowFormSystemDictionary.context_lines.label,
+				help: workflowFormSystemDictionary.context_lines.medium,
+				required: false,
+				placeholder: "3",
+				visible: true,
+			}),
+		)
+	}
+
+	return fields
 }
 
 const WORKFLOW_START_TOOL_DICTIONARY_CONFIG = {
@@ -186,16 +263,19 @@ function buildWorkflowStartPlaceholderFieldDefinitions(args: {
 			return fields
 		}
 
-		fields.push({
-			key,
-			label: args.override?.labels[key] ?? humanizeWorkflowPlaceholderKey(key),
-			help: args.override?.help[key] ?? humanizeWorkflowPlaceholderKey(key),
-			control: "text",
-			required: requiredFieldKeySet.has(key),
-			oneOfGroupId: oneOfFieldKeySet.has(key) ? args.oneOfRequirement?.id : undefined,
-			placeholder: "/absolute/path/to/file-or-artifact",
-			visible: true,
-		})
+		fields.push(
+			buildSchemaBackedField({
+				toolName: ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
+				binding: { parameterName: "values", useAdditionalProperties: true },
+				key,
+				label: args.override?.labels[key] ?? humanizeWorkflowPlaceholderKey(key),
+				help: args.override?.help[key] ?? humanizeWorkflowPlaceholderKey(key),
+				required: requiredFieldKeySet.has(key),
+				oneOfGroupId: oneOfFieldKeySet.has(key) ? args.oneOfRequirement?.id : undefined,
+				placeholder: "/absolute/path/to/file-or-artifact",
+				visible: true,
+			}),
+		)
 
 		return fields
 	}, [])
@@ -268,52 +348,38 @@ export const workflowFormRegistry: Record<string, WorkflowFormResolverDefinition
 		buildToolExecutionFailureFallbackMessage() {
 			return "The workflow form could not build the Step 3 diff artifact. Review the input and try again."
 		},
-		buildToolExecutionRequest(_session, values) {
-			const sourceType = getStringValue(values, SOURCE_TYPE_FIELD_KEY)
-			const scopedPaths = getStringArrayValue(values, SCOPED_PATHS_FIELD_KEY)
-			const contextLines = getIntegerValue(values, CONTEXT_LINES_FIELD_KEY)
-			let toolInput: Record<string, unknown>
+		buildToolExecutionRequest(session, values) {
+			const fields = getCurrentCollectFields({ ...session, values }, this.buildDefinition)
+			const sourceType = parseWorkflowFormRawValue(
+				values[SOURCE_TYPE_FIELD_KEY]?.rawValue,
+				resolveWorkflowFormSchema(ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT, {
+					parameterName: "source",
+					propertyPath: ["type"],
+				}),
+			)
+			const scopedPathsValue = getParsedFieldValue(fields, values, SCOPED_PATHS_FIELD_KEY)
+			const contextLinesValue = getParsedFieldValue(fields, values, CONTEXT_LINES_FIELD_KEY)
+			const scopedPaths = Array.isArray(scopedPathsValue) ? scopedPathsValue : []
+			const contextLines = typeof contextLinesValue === "number" ? contextLinesValue : undefined
+			const selectedSourceType = typeof sourceType === "string" ? sourceType : undefined
+			const selectedSourceVariant = resolveSelectedSourceVariantSchema(selectedSourceType)
+			if (!selectedSourceVariant) {
+				throw new Error(`Unsupported workflow form source type: ${selectedSourceType ?? "undefined"}`)
+			}
+			const source: Record<string, unknown> = { type: selectedSourceType }
+			for (const propertyKey of getSelectedSourceVariantPropertyKeys(selectedSourceType)) {
+				const parsedValue = getParsedFieldValue(fields, values, `source.${propertyKey}`)
+				if (typeof parsedValue === "string") {
+					source[propertyKey] = parsedValue
+				}
+			}
+			const toolInput: Record<string, unknown> = { source }
 
-			switch (sourceType) {
-				case "commit":
-					toolInput = {
-						source: {
-							type: "commit",
-							commit: getStringValue(values, SOURCE_COMMIT_FIELD_KEY) ?? "",
-						},
-					}
-					break
-				case "commit_range":
-					toolInput = {
-						source: {
-							type: "commit_range",
-							base: getStringValue(values, SOURCE_BASE_FIELD_KEY) ?? "",
-							head: getStringValue(values, SOURCE_HEAD_FIELD_KEY) ?? "",
-						},
-					}
-					break
-				case "ref_diff":
-					toolInput = {
-						source: {
-							type: "ref_diff",
-							base: getStringValue(values, SOURCE_BASE_FIELD_KEY) ?? "",
-							head: getStringValue(values, SOURCE_HEAD_FIELD_KEY) ?? "",
-						},
-					}
-					break
-				case "worktree_head_scoped":
-					toolInput = {
-						source: {
-							type: "worktree_head_scoped",
-						},
-						scoped_paths: scopedPaths,
-					}
-					break
-				default:
-					throw new Error(`Unsupported workflow form source type: ${sourceType ?? "undefined"}`)
+			if (selectedSourceType === "worktree_head_scoped") {
+				toolInput.scoped_paths = scopedPaths
 			}
 
-			if (sourceType !== "worktree_head_scoped" && scopedPaths.length > 0) {
+			if (selectedSourceType !== "worktree_head_scoped" && scopedPaths.length > 0) {
 				toolInput.scoped_paths = scopedPaths
 			}
 
@@ -409,10 +475,10 @@ export const workflowFormRegistry: Record<string, WorkflowFormResolverDefinition
 			return "The workflow form could not store the workflow start inputs. Review the values and try again."
 		},
 		buildToolExecutionRequest(session, values) {
-			const fields = this.buildDefinition(session).pages.collect_inputs?.fields ?? []
+			const fields = getCurrentCollectFields({ ...session, values }, this.buildDefinition)
 			const filteredValues = fields.reduce<Record<string, string>>((acc, field) => {
-				const value = values[field.key]?.stringValue?.trim()
-				if (value) {
+				const value = getParsedFieldValue(fields, values, field.key)
+				if (typeof value === "string") {
 					acc[field.key] = value
 				}
 

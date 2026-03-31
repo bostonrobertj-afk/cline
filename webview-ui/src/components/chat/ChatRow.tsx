@@ -132,12 +132,7 @@ export const getFollowupPresentation = (messageText?: string, isPassiveThreadOpe
 }
 
 const createWorkflowFormInputValues = (values?: Record<string, WorkflowFormFieldValuePayload>) =>
-	Object.fromEntries(
-		Object.entries(values ?? {}).map(([key, value]) => [
-			key,
-			value.stringValue ?? value.integerValue?.toString() ?? value.stringArrayValue?.join("\n") ?? "",
-		]),
-	) as Record<string, string>
+	Object.fromEntries(Object.entries(values ?? {}).map(([key, value]) => [key, value.rawValue ?? ""])) as Record<string, string>
 
 const isWorkflowFormFieldRequiredValueValid = (field: WorkflowFormFieldDefinition, values: Record<string, string>) => {
 	const value = values[field.key]?.trim() ?? ""
@@ -146,17 +141,15 @@ const isWorkflowFormFieldRequiredValueValid = (field: WorkflowFormFieldDefinitio
 		return true
 	}
 
-	switch (field.control) {
-		case "textarea":
-			return value
-				.split("\n")
-				.map((entry) => entry.trim())
-				.some((entry) => entry.length > 0)
-		case "number":
-			return /^-?\d+$/.test(value)
-		default:
-			return value.length > 0
+	if (field.valueSchema.type === "integer" && field.control === "number") {
+		return /^-?\d+$/.test(value)
 	}
+
+	if ((field.valueSchema.type === "array" || field.valueSchema.type === "object") && field.control === "textarea") {
+		return value.length > 0
+	}
+
+	return value.length > 0
 }
 
 const ChatRow = memo(
@@ -529,7 +522,7 @@ export const ChatRowContent = memo(
 
 				setWorkflowFormSubmissionPending(true)
 				try {
-					await submitWorkflowForm(workflowForm.sessionId, action, values)
+					await submitWorkflowForm(workflowForm, action, values)
 				} catch (error) {
 					console.error("Failed to submit workflow form:", error)
 					setWorkflowFormSubmissionPending(false)

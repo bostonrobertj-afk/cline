@@ -58,6 +58,7 @@ describe("WorkflowFormRuntime", () => {
 				label: key,
 				help: key,
 				control: "text",
+				valueSchema: { type: "string" },
 				required: requiredFieldKeys.has(key),
 				oneOfGroupId: oneOfFieldKeys.has(key) ? requirements.oneOfRequirement?.id : undefined,
 				visible: true,
@@ -99,7 +100,7 @@ describe("WorkflowFormRuntime", () => {
 		buildToolExecutionRequest: (session: WorkflowFormSessionState, values: WorkflowFormValues) => {
 			const fields = sessionAwareCustomResolver.buildDefinition(session).pages.collect_inputs?.fields ?? []
 			const filteredValues = fields.reduce<Record<string, string>>((acc, field) => {
-				const value = values[field.key]?.stringValue
+				const value = values[field.key]?.rawValue
 				if (value) {
 					acc[field.key] = value
 				}
@@ -178,7 +179,7 @@ describe("WorkflowFormRuntime", () => {
 		const request = WorkflowFormSubmissionRequest.create({
 			sessionId: session.sessionId,
 			action: WorkflowFormAction.SUBMIT,
-			fields: [{ key: "confirm", value: { stringValue: "yes" } }],
+			fields: [{ key: "confirm", value: { rawValue: "yes" } }],
 		})
 
 		const outcome = runtime.handleSubmission(session, request)
@@ -204,7 +205,7 @@ describe("WorkflowFormRuntime", () => {
 		const request = WorkflowFormSubmissionRequest.create({
 			sessionId: session.sessionId,
 			action: WorkflowFormAction.SUBMIT,
-			fields: [{ key: "source.type", value: { stringValue: "commit" } }],
+			fields: [{ key: "source.type", value: { rawValue: "commit" } }],
 		})
 
 		const outcome = runtime.handleSubmission(
@@ -212,7 +213,7 @@ describe("WorkflowFormRuntime", () => {
 				...session,
 				phase: "select_source",
 				values: {
-					confirm: { stringValue: "yes" },
+					confirm: { rawValue: "yes" },
 				},
 			},
 			request,
@@ -261,14 +262,11 @@ describe("WorkflowFormRuntime", () => {
 			sessionId: session.sessionId,
 			action: WorkflowFormAction.SUBMIT,
 			fields: [
-				{ key: "source.type", value: { stringValue: "commit_range" } },
-				{ key: "source.base", value: { stringValue: "main" } },
-				{ key: "source.head", value: { stringValue: "feature/review-form" } },
-				{
-					key: "scoped_paths",
-					value: { stringArrayValue: { values: ["src/core/task/index.ts", " webview-ui/src/components/chat "] } },
-				},
-				{ key: "context_lines", value: { integerValue: 5 } },
+				{ key: "source.type", value: { rawValue: "commit_range" } },
+				{ key: "source.base", value: { rawValue: "main" } },
+				{ key: "source.head", value: { rawValue: "feature/review-form" } },
+				{ key: "scoped_paths", value: { rawValue: "src/core/task/index.ts\n webview-ui/src/components/chat " } },
+				{ key: "context_lines", value: { rawValue: "5" } },
 			],
 		})
 
@@ -324,7 +322,7 @@ describe("WorkflowFormRuntime", () => {
 			WorkflowFormSubmissionRequest.create({
 				sessionId: session.sessionId,
 				action: WorkflowFormAction.SUBMIT,
-				fields: [{ key: "review_input", value: { stringValue: "docs/review.md" } }],
+				fields: [{ key: "review_input", value: { rawValue: "docs/review.md" } }],
 			}),
 		)
 
@@ -360,9 +358,9 @@ describe("WorkflowFormRuntime", () => {
 				sessionId: session.sessionId,
 				action: WorkflowFormAction.SUBMIT,
 				fields: [
-					{ key: "review_input", value: { stringValue: "docs/review.md" } },
-					{ key: "spec_file", value: { stringValue: "docs/spec.md" } },
-					{ key: "ignored", value: { stringValue: "drop-me" } },
+					{ key: "review_input", value: { rawValue: "docs/review.md" } },
+					{ key: "spec_file", value: { rawValue: "docs/spec.md" } },
+					{ key: "ignored", value: { rawValue: "drop-me" } },
 				],
 			}),
 		)
@@ -434,7 +432,7 @@ describe("WorkflowFormRuntime", () => {
 			WorkflowFormSubmissionRequest.create({
 				sessionId: session.sessionId,
 				action: WorkflowFormAction.SUBMIT,
-				fields: [{ key: "review_input", value: { stringValue: "docs/review.md" } }],
+				fields: [{ key: "review_input", value: { rawValue: "docs/review.md" } }],
 			}),
 		)
 
@@ -471,13 +469,50 @@ describe("WorkflowFormRuntime", () => {
 				sessionId: session.sessionId,
 				action: WorkflowFormAction.SUBMIT,
 				fields: [
-					{ key: "review_input", value: { stringValue: "docs/review.md" } },
-					{ key: "spec_file", value: { stringValue: "docs/spec.md" } },
+					{ key: "review_input", value: { rawValue: "docs/review.md" } },
+					{ key: "spec_file", value: { rawValue: "docs/spec.md" } },
 				],
 			}),
 		)
 
 		expect(outcome.kind).to.equal("invoke_tool")
+	})
+
+	it("drops schema-invalid optional collect_inputs values while still invoking the tool", () => {
+		const session = runtime.createSession({
+			resolverId: "code_review_step_3_diff_source",
+			triggerSource: "deterministic_workflow_progression",
+			owner: {
+				kind: "placeholder_workflow_step",
+				workflowName: "code-review.md",
+				stepNumber: 3,
+			},
+		})
+
+		const outcome = runtime.handleSubmission(
+			{
+				...session,
+				phase: "collect_inputs",
+				values: {
+					confirm: { rawValue: "yes" },
+					"source.type": { rawValue: "commit" },
+				},
+			},
+			WorkflowFormSubmissionRequest.create({
+				sessionId: session.sessionId,
+				action: WorkflowFormAction.SUBMIT,
+				fields: [
+					{ key: "source.commit", value: { rawValue: "abc1234" } },
+					{ key: "context_lines", value: { rawValue: "not-a-number" } },
+				],
+			}),
+		)
+
+		expect(outcome.kind).to.equal("invoke_tool")
+		if (outcome.kind === "invoke_tool") {
+			expect(outcome.toolInput).to.not.have.property("context_lines")
+			expect(outcome.toolParams).to.not.have.property("context_lines")
+		}
 	})
 
 	it("uses corrected retry_error values when submitting after a tool failure", () => {
@@ -495,12 +530,9 @@ describe("WorkflowFormRuntime", () => {
 			sessionId: session.sessionId,
 			action: WorkflowFormAction.SUBMIT,
 			fields: [
-				{ key: "source.commit", value: { stringValue: "def5678" } },
-				{
-					key: "scoped_paths",
-					value: { stringArrayValue: { values: ["src/core/task/index.ts", " webview-ui/src/components/chat "] } },
-				},
-				{ key: "context_lines", value: { integerValue: 7 } },
+				{ key: "source.commit", value: { rawValue: "def5678" } },
+				{ key: "scoped_paths", value: { rawValue: "src/core/task/index.ts\n webview-ui/src/components/chat " } },
+				{ key: "context_lines", value: { rawValue: "7" } },
 			],
 		})
 
@@ -509,11 +541,11 @@ describe("WorkflowFormRuntime", () => {
 				...session,
 				phase: "retry_error",
 				values: {
-					confirm: { stringValue: "yes" },
-					"source.type": { stringValue: "commit" },
-					"source.commit": { stringValue: "abc1234" },
-					scoped_paths: { stringArrayValue: ["src/old/path.ts"] },
-					context_lines: { integerValue: 3 },
+					confirm: { rawValue: "yes" },
+					"source.type": { rawValue: "commit" },
+					"source.commit": { rawValue: "abc1234" },
+					scoped_paths: { rawValue: "src/old/path.ts" },
+					context_lines: { rawValue: "3" },
 				},
 				lastError: "Failed to produce review-input.diff",
 			},
@@ -554,12 +586,12 @@ describe("WorkflowFormRuntime", () => {
 				...session,
 				phase: "retry_error",
 				values: {
-					confirm: { stringValue: "yes" },
-					"source.type": { stringValue: "commit_range" },
-					"source.base": { stringValue: "main" },
-					"source.head": { stringValue: "feature/review-form" },
-					scoped_paths: { stringArrayValue: ["src/core/task/index.ts"] },
-					context_lines: { integerValue: 5 },
+					confirm: { rawValue: "yes" },
+					"source.type": { rawValue: "commit_range" },
+					"source.base": { rawValue: "main" },
+					"source.head": { rawValue: "feature/review-form" },
+					scoped_paths: { rawValue: "src/core/task/index.ts" },
+					context_lines: { rawValue: "5" },
 				},
 				lastError: "Failed to produce review-input.diff",
 			},
@@ -571,7 +603,7 @@ describe("WorkflowFormRuntime", () => {
 			expect(outcome.session.phase).to.equal("select_source")
 			expect(outcome.payload.phase).to.equal("select_source")
 			expect(outcome.session.values).to.deep.equal({
-				confirm: { stringValue: "yes" },
+				confirm: { rawValue: "yes" },
 			})
 		}
 	})
@@ -598,9 +630,9 @@ describe("WorkflowFormRuntime", () => {
 				...session,
 				phase: "retry_error",
 				values: {
-					review_input: { stringValue: "docs/review.md" },
-					spec_file: { stringValue: "docs/spec.md" },
-					ignored: { stringValue: "drop-me" },
+					review_input: { rawValue: "docs/review.md" },
+					spec_file: { rawValue: "docs/spec.md" },
+					ignored: { rawValue: "drop-me" },
 				},
 				lastError: "Failed to store start inputs",
 			},
@@ -615,8 +647,8 @@ describe("WorkflowFormRuntime", () => {
 			expect(outcome.session.phase).to.equal("collect_inputs")
 			expect(outcome.payload.phase).to.equal("collect_inputs")
 			expect(outcome.session.values).to.deep.equal({
-				review_input: { stringValue: "docs/review.md" },
-				spec_file: { stringValue: "docs/spec.md" },
+				review_input: { rawValue: "docs/review.md" },
+				spec_file: { rawValue: "docs/spec.md" },
 			})
 		}
 	})
@@ -635,7 +667,7 @@ describe("WorkflowFormRuntime", () => {
 		const request = WorkflowFormSubmissionRequest.create({
 			sessionId: session.sessionId,
 			action: WorkflowFormAction.SUBMIT,
-			fields: [{ key: "source.type", value: { stringValue: "commit" } }],
+			fields: [{ key: "source.type", value: { rawValue: "commit" } }],
 		})
 
 		const outcome = runtime.handleSubmission(
@@ -643,7 +675,7 @@ describe("WorkflowFormRuntime", () => {
 				...session,
 				phase: "select_source",
 				values: {
-					confirm: { stringValue: "yes" },
+					confirm: { rawValue: "yes" },
 				},
 			},
 			request,

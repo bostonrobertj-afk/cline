@@ -1,8 +1,6 @@
-import { ClineToolSet } from "@/core/prompts/system-prompt/registry/ClineToolSet"
 import type { ClineToolSpec } from "@/core/prompts/system-prompt/spec"
-import { registerClineToolSets } from "@/core/prompts/system-prompt/tools/init"
-import { ModelFamily } from "@/shared/prompts"
 import { ClineDefaultTool } from "@/shared/tools"
+import { resolveWorkflowFormToolSpec } from "../schema"
 import {
 	PHASE_1_SYSTEM_DICTIONARY_KEYS,
 	type WorkflowFormSystemDictionaryKey,
@@ -16,16 +14,6 @@ export interface WorkflowFormToolDictionaryConfig {
 	overviewLines: string[]
 	parameterDescriptions: Record<string, string>
 	termKeys?: readonly WorkflowFormSystemDictionaryKey[]
-}
-
-export function resolveWorkflowFormToolSpec(toolName: ClineDefaultTool): ClineToolSpec {
-	registerClineToolSets()
-	const tool = ClineToolSet.getToolByNameWithFallback(toolName, ModelFamily.GENERIC)
-	if (!tool) {
-		throw new Error(`Unknown workflow-form tool spec: ${toolName}`)
-	}
-
-	return tool.config
 }
 
 function getVariantReferenceLine(key: WorkflowFormSystemDictionaryKey): string {

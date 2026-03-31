@@ -385,10 +385,21 @@ export interface WorkflowFormFieldOption {
 	description?: string
 }
 
+export type WorkflowFormJsonSchemaType = "string" | "integer" | "boolean" | "array" | "object"
+
+export interface WorkflowFormJsonSchema {
+	type: WorkflowFormJsonSchemaType
+	enum?: string[]
+	const?: string | number | boolean
+	items?: WorkflowFormJsonSchema
+	properties?: Record<string, WorkflowFormJsonSchema>
+	required?: string[]
+	additionalProperties?: WorkflowFormJsonSchema
+	oneOf?: WorkflowFormJsonSchema[]
+}
+
 export interface WorkflowFormFieldValuePayload {
-	stringValue?: string
-	integerValue?: number
-	stringArrayValue?: string[]
+	rawValue?: string
 }
 
 export interface WorkflowFormFieldDefinition {
@@ -396,6 +407,7 @@ export interface WorkflowFormFieldDefinition {
 	label: string
 	help: string
 	control: WorkflowFormFieldControl
+	valueSchema: WorkflowFormJsonSchema
 	required: boolean
 	oneOfGroupId?: string
 	placeholder?: string

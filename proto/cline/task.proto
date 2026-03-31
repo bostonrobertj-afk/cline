@@ -124,11 +124,7 @@ enum WorkflowFormAction {
 }
 
 message WorkflowFormFieldValue {
-  oneof kind {
-    string string_value = 1;
-    int32 integer_value = 2;
-    StringArray string_array_value = 3;
-  }
+  string raw_value = 1;
 }
 
 message WorkflowFormFieldSubmission {

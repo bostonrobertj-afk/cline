@@ -294,6 +294,14 @@ describe("workflow placeholder tool gating", () => {
 		expect(tool.contextRequirements).to.equal(undefined)
 	})
 
+	it("encodes build_review_diff_output source variants as machine-readable schema", () => {
+		const tool = build_review_diff_output_variants[0]
+		const source = tool.parameters?.find((parameter) => parameter.name === "source")
+
+		expect(source?.properties?.type?.enum).to.deep.equal(["commit", "commit_range", "ref_diff", "worktree_head_scoped"])
+		expect(source?.oneOf).to.have.length(4)
+	})
+
 	it("omits task_progress from supported deterministic placeholder workflow native schemas", () => {
 		const context: SystemPromptContext = {
 			...mockContext,

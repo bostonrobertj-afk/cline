@@ -44,6 +44,7 @@ function createWorkflowFormMessage(phase: WorkflowFormPhase, overrides?: Partial
 			label: "Source type",
 			help: "Choose a diff source.",
 			control: "select" as const,
+			valueSchema: { type: "string" as const, enum: ["commit", "commit_range"] },
 			required: true,
 			options: [
 				{ value: "commit", label: "Commit" },
@@ -58,6 +59,7 @@ function createWorkflowFormMessage(phase: WorkflowFormPhase, overrides?: Partial
 			label: "Commit",
 			help: "Enter the commit SHA.",
 			control: "text" as const,
+			valueSchema: { type: "string" as const },
 			required: true,
 			placeholder: "abc1234",
 			visible: true,
@@ -67,6 +69,7 @@ function createWorkflowFormMessage(phase: WorkflowFormPhase, overrides?: Partial
 			label: "Scoped paths",
 			help: "Optional path filter.",
 			control: "textarea" as const,
+			valueSchema: { type: "array" as const, items: { type: "string" as const } },
 			required: false,
 			placeholder: "src/core/task/index.ts",
 			visible: true,
@@ -76,6 +79,7 @@ function createWorkflowFormMessage(phase: WorkflowFormPhase, overrides?: Partial
 			label: "Context lines",
 			help: "Optional context lines.",
 			control: "number" as const,
+			valueSchema: { type: "integer" as const },
 			required: false,
 			placeholder: "3",
 			visible: true,
@@ -126,8 +130,8 @@ function createWorkflowFormMessage(phase: WorkflowFormPhase, overrides?: Partial
 			values:
 				phase === "collect_inputs" || phase === "retry_error"
 					? {
-							confirm: { stringValue: "yes" },
-							"source.type": { stringValue: "commit" },
+							confirm: { rawValue: "yes" },
+							"source.type": { rawValue: "commit" },
 						}
 					: undefined,
 			errorMessage: phase === "retry_error" ? "The system could not produce review-input.diff." : undefined,
@@ -386,6 +390,7 @@ describe("ChatRow followup presentation", () => {
 								label: "Review Input File",
 								help: "Path to the review input file.",
 								control: "text",
+								valueSchema: { type: "string" },
 								required: true,
 								visible: true,
 							},
@@ -419,6 +424,7 @@ describe("ChatRow followup presentation", () => {
 								label: "Review Input File",
 								help: "Path to the review input file.",
 								control: "text",
+								valueSchema: { type: "string" },
 								required: true,
 								visible: true,
 							},
@@ -427,6 +433,7 @@ describe("ChatRow followup presentation", () => {
 								label: "Review Diff File",
 								help: "Path to the review diff file.",
 								control: "text",
+								valueSchema: { type: "string" },
 								required: false,
 								oneOfGroupId: "workflow_start_one_of",
 								visible: true,
@@ -436,6 +443,7 @@ describe("ChatRow followup presentation", () => {
 								label: "Spec or Story File",
 								help: "Path to the supporting spec or story file.",
 								control: "text",
+								valueSchema: { type: "string" },
 								required: false,
 								oneOfGroupId: "workflow_start_one_of",
 								visible: true,
@@ -471,6 +479,7 @@ describe("ChatRow followup presentation", () => {
 								label: "Review Input File",
 								help: "Path to the review input file.",
 								control: "text",
+								valueSchema: { type: "string" },
 								required: true,
 								visible: true,
 							},
@@ -479,6 +488,7 @@ describe("ChatRow followup presentation", () => {
 								label: "Review Diff File",
 								help: "Path to the review diff file.",
 								control: "text",
+								valueSchema: { type: "string" },
 								required: false,
 								oneOfGroupId: "workflow_start_one_of",
 								visible: true,
@@ -488,6 +498,7 @@ describe("ChatRow followup presentation", () => {
 								label: "Spec or Story File",
 								help: "Path to the supporting spec or story file.",
 								control: "text",
+								valueSchema: { type: "string" },
 								required: false,
 								oneOfGroupId: "workflow_start_one_of",
 								visible: true,
@@ -510,5 +521,19 @@ describe("ChatRow followup presentation", () => {
 
 		fireEvent.change(screen.getByLabelText("Spec or Story File"), { target: { value: "docs/spec.md" } })
 		expect(submitButton).not.toBeDisabled()
+	})
+
+	it("prefills workflow_form inputs from raw values", () => {
+		renderWorkflowFormRow("collect_inputs", {
+			values: {
+				confirm: { rawValue: "yes" },
+				"source.type": { rawValue: "commit" },
+				"source.commit": { rawValue: "abc1234" },
+				context_lines: { rawValue: "7" },
+			},
+		})
+
+		expect(screen.getByDisplayValue("abc1234")).toBeInTheDocument()
+		expect(screen.getByDisplayValue("7")).toBeInTheDocument()
 	})
 })
