@@ -123,6 +123,31 @@ Use {diff_output} when it is already available.
 		expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
 	})
 
+	it("completes code-review step 1 when spec_file is already available without review_target", async () => {
+		const taskState = createTaskState({
+			workflowName: "code-review.md",
+			workflowContents: `## Step 1: Determine Review Source
+Resolve the review source placeholders.
+
+## Step 2: Construct & Persist Review Input File
+Build the review input artifact.`,
+			checklistMarkdown: "- [ ] Step 1: Determine Review Source\n- [ ] Step 2: Construct & Persist Review Input File",
+			placeholderValues: {
+				spec_file: "/tmp/spec.md",
+			},
+		})
+
+		const result = await applyDeterministicPlaceholderProgression({
+			taskState,
+			checklistMarkdown: getChecklistMarkdown(taskState),
+		})
+
+		expect(result.checklist).to.equal(
+			"- [x] Step 1: Determine Review Source\n- [ ] Step 2: Construct & Persist Review Input File",
+		)
+		expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal("spec_file is present.")
+	})
+
 	it("derives review_mode=full when fresh review input and diff artifacts exist", async () => {
 		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-step4-full-"))
 

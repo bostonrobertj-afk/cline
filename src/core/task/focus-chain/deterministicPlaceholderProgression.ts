@@ -155,15 +155,14 @@ async function evaluateCodeReviewStep(args: {
 
 	switch (args.stepNumber) {
 		case 1: {
-			const reviewTarget = placeholders.review_target?.trim()
 			const specFile = placeholders.spec_file?.trim()
-			if (!reviewTarget || !specFile) {
+			if (!specFile) {
 				return { completed: false }
 			}
 
 			return {
 				completed: true,
-				reason: "review_target and spec_file are both present.",
+				reason: "spec_file is present.",
 			}
 		}
 		case 2: {
