@@ -952,6 +952,61 @@ Choose the review mode from the persisted diff output before continuing.
 		expect(result.succeeded).to.equal(true)
 	})
 
+	it("prefers appended tool_result content over preceding tool text when evaluating workflow-form tool success", async () => {
+		const session: WorkflowFormSessionState = {
+			sessionId: "wf-session-diff-success",
+			resolverId: "code_review_step_3_diff_source",
+			triggerSource: "deterministic_workflow_progression",
+			owner: {
+				kind: "placeholder_workflow_step",
+				workflowName: "code-review.md",
+				stepNumber: 3,
+			},
+			phase: "collect_inputs",
+			initialPhase: "confirm",
+			values: {},
+		}
+		const taskState = new TaskState()
+		const fakeTask = {
+			taskState,
+			toolExecutor: {
+				executeTool: sinon.stub().callsFake(async () => {
+					taskState.userMessageContent.push({
+						type: "text",
+						text: JSON.stringify({
+							tool: "buildReviewDiffOutput",
+							path: "_bmad-output/review-input.diff",
+							content: "Source: commit abc1234",
+						}),
+					})
+					taskState.userMessageContent.push({
+						type: "tool_result",
+						tool_use_id: "call_native_123",
+						call_id: "call_native_123",
+						content: JSON.stringify({
+							persisted: true,
+							diff_available: true,
+							artifact_path: "/tmp/review-input.diff",
+						}),
+					})
+				}),
+			},
+			syncDeterministicProgressionAfterWorkflowFormTool: sinon.stub().resolves(),
+			getWorkflowFormToolResultText: getWorkflowFormToolResultText,
+			getWorkflowFormToolErrorMessage: getWorkflowFormToolErrorMessage,
+		}
+
+		const result = await executeWorkflowFormToolAndSync.call(fakeTask, {
+			kind: "invoke_tool",
+			session,
+			toolName: "build_review_diff_output",
+			toolInput: { source: { type: "commit", commit: "abc1234" } },
+			toolParams: { source: JSON.stringify({ type: "commit", commit: "abc1234" }) },
+		})
+
+		expect(result.succeeded).to.equal(true)
+	})
+
 	it("keeps the workflow-start form in failure state when set_workflow_placeholders returns the empty-values error", async () => {
 		const session: WorkflowFormSessionState = {
 			sessionId: "wf-session-start-failure",
