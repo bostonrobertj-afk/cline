@@ -1274,6 +1274,7 @@ You are in the fallback path because the system-owned workflow-form path was not
 				initialPhase: "confirm",
 				values: {},
 			}
+			const sayStub = sinon.stub().resolves(undefined)
 
 			const fakeTask: FakeWorkflowFormTask = {
 				cwd: tempDir,
@@ -1296,15 +1297,15 @@ You are in the fallback path because the system-owned workflow-form path was not
 						session: createdSession,
 					}
 				}),
-				say: sinon.stub().resolves(undefined),
+				say: sayStub,
 				setThreadDisplayState: sinon.stub(),
 				postStateToWebview: sinon.stub().resolves(),
 			}
 
 			await maybeResolveWorkflowFormBeforeApiTurn.call(fakeTask)
 
-			sinon.assert.calledOnceWithExactly(fakeTask.say, "command_output", "")
-			sinon.assert.callOrder(fakeTask.say, fakeTask.renderWorkflowFormMessage)
+			sinon.assert.calledOnceWithExactly(sayStub, "command_output", "")
+			sinon.assert.callOrder(sayStub, fakeTask.renderWorkflowFormMessage)
 		} finally {
 			await fs.rm(tempDir, { recursive: true, force: true })
 		}
@@ -1723,7 +1724,7 @@ Build the review input before continuing.
 					fakeTask.pendingWorkflowFormOutcome = {
 						kind: "invoke_tool",
 						session: workflowStartSession,
-						toolName: "set_workflow_placeholders",
+						toolName: ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
 						toolInput: { values: { review_input: "docs/review.md" } },
 						toolParams: { values: JSON.stringify({ review_input: "docs/review.md" }) },
 					}
@@ -1893,7 +1894,7 @@ Build the diff output before continuing.
 					fakeTask.pendingWorkflowFormOutcome = {
 						kind: "invoke_tool",
 						session: workflowStartSession,
-						toolName: "set_workflow_placeholders",
+						toolName: ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
 						toolInput: { values: { review_input: "docs/review.md" } },
 						toolParams: { values: JSON.stringify({ review_input: "docs/review.md" }) },
 					}
