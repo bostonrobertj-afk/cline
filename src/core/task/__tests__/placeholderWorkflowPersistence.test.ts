@@ -202,7 +202,9 @@ Inspect the prepared review input and write findings.
 			} as never)
 			const saveTaskMetadataStub = sandbox.stub(disk, "saveTaskMetadata").resolves()
 
-			const fakeTask = createFakeTask("task-clear-compaction-marker")
+			const fakeTask = createFakeTask("task-clear-compaction-marker") as FakeTaskBase & {
+				persistLastPromptedPlaceholderWorkflowChecklistLabel: () => Promise<void>
+			}
 			Object.setPrototypeOf(fakeTask, Task.prototype)
 			fakeTask.persistLastPromptedPlaceholderWorkflowChecklistLabel =
 				persistLastPromptedPlaceholderWorkflowChecklistLabel.bind(fakeTask)

@@ -136,6 +136,13 @@ const advancedFeatures: FeatureToggle[] = [
 		stateKey: "hooksEnabled",
 		settingKey: "hooksEnabled",
 	},
+	{
+		id: "multi-root",
+		label: "Multi-Root Workspace",
+		description: "Allow Cline to address files across multiple workspace folders when they are open.",
+		stateKey: "multiRootEnabled",
+		settingKey: "multiRootEnabled",
+	},
 ]
 
 const FeatureRow = memo(
@@ -205,6 +212,7 @@ const FeatureSettingsSection = ({ renderSectionHeader }: FeatureSettingsSectionP
 		subagentsEnabled,
 		clineWebToolsEnabled,
 		worktreesEnabled,
+		multiRootSetting,
 		focusChainSettings,
 		promptRefreshFrequency,
 		remoteConfigSettings,
@@ -238,6 +246,7 @@ const FeatureSettingsSection = ({ renderSectionHeader }: FeatureSettingsSectionP
 		subagentsEnabled,
 		clineWebToolsEnabled: clineWebToolsEnabled?.user,
 		worktreesEnabled: worktreesEnabled?.user,
+		multiRootEnabled: multiRootSetting?.user,
 		enableParallelToolCalling,
 		backgroundEditEnabled,
 		doubleCheckCompletionEnabled,

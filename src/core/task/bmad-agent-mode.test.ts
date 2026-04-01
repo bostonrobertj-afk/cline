@@ -110,7 +110,8 @@ You must fully embody this test BMAD skill wrapper.
 		expect(instructions).to.include("<installed_bmad_skill_activation")
 		expect(instructions).to.include("<installed_bmad_skill_instructions")
 		expect(instructions).to.be.a("string")
-		expect(instructions.trim().length).to.be.greaterThan(0)
+		expect(instructions).to.not.equal(undefined)
+		expect(instructions!.trim().length).to.be.greaterThan(0)
 	})
 
 	it("uses a compact activation wrapper when the installed BMAD skill loads a persona document", async () => {
@@ -126,7 +127,8 @@ You must fully embody this test BMAD skill wrapper.
 		expect(instructions).to.not.include("<installed_bmad_skill_wrapper")
 		expect(instructions).to.not.include("<installed_bmad_skill_instructions")
 		expect(instructions).to.be.a("string")
-		expect(instructions.trim().length).to.be.greaterThan(0)
+		expect(instructions).to.not.equal(undefined)
+		expect(instructions!.trim().length).to.be.greaterThan(0)
 	})
 
 	it("marks follow-up reminder turns as still active while distinguishing them from initial activation", async () => {

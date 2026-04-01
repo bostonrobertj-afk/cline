@@ -81,7 +81,7 @@ const GLOBAL_STATE_FIELDS = {
 	mcpDisplayMode: { default: DEFAULT_MCP_DISPLAY_MODE as McpDisplayMode },
 	workspaceRoots: { default: undefined as WorkspaceRoot[] | undefined },
 	primaryRootIndex: { default: 0 as number },
-	multiRootEnabled: { default: true as boolean },
+	multiRootEnabled: { default: false as boolean },
 	lastDismissedInfoBannerVersion: { default: 0 as number },
 	lastDismissedModelBannerVersion: { default: 0 as number },
 	lastDismissedCliBannerVersion: { default: 0 as number },
