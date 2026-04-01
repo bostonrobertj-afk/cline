@@ -29,6 +29,7 @@ It also influences post-tool guidance indirectly, because handlers such as [SetW
 - It does not execute tools, create artifacts, or write files on its own.
 - It does not replace the normal focus-chain checklist machinery; it only feeds into it.
 - It does not decide whether a workflow document is well-authored in general.
+- It does not own workflow teardown or workflow-end automation; those run afterward through `workflowCompletionRunner`.
 
 ## Inputs
 Primary inputs:
@@ -72,7 +73,7 @@ Side effects may also include:
   - `review-adversarial-general.md`
 - A step is auto-completed only when its evaluator returns both `completed: true` and a concrete reason.
 - Checklist advancement still happens through the standard focus-chain update path; this capability does not mutate checklist markdown ad hoc.
-- Artifact-backed completion checks rely on current-task write proofs, not just file existence.
+- Some artifact-backed completion checks rely on current-task write proofs, while others intentionally use plain file existence or file-stat checks depending on the workflow step.
 - Unsupported workflows and unresolved steps are left unchanged.
 
 ## Core Logic
@@ -93,17 +94,18 @@ Current evaluator examples:
 
 - `code-review.md`
   - Step 1 checks placeholder presence
-  - Steps 2 and 3 require task-written artifacts with surviving write proofs
+  - Step 2 requires task-written `diff_output` with a surviving write proof
+  - Step 3 requires task-written `review_input` with a surviving write proof
   - Step 4 derives `review_mode` from available artifacts
   - later steps inspect fallback prompt artifacts or spec-file status values
-  - Step 7 completes when a successful current-turn attempt_completion delivers the final QA findings report
+  - Step 7 completes when the current turn successfully executes `attempt_completion`
 - `review-adversarial-general.md`
   - Step 1 completes when `diff_output` resolves to an existing file path
   - Step 2 completes when `adversarial-review-findings.md` was written during the current task and still exists
-  - Step 3 completes when a successful current-turn attempt_completion delivers the final findings
+  - Step 3 completes when the current turn successfully executes `attempt_completion`
 - `dev-story.md`
   - steps inspect story-file existence, checklist completion, and top-level status values
-  - Step 4 completes when a successful current-turn attempt_completion delivers the final closeout report
+  - Step 4 completes when the current turn successfully executes `attempt_completion`
 
 ## Failure Modes
 - The active workflow is unsupported, so deterministic progression is skipped.
@@ -112,7 +114,7 @@ Current evaluator examples:
 - Expected artifacts were not written during the current task, so write-proof checks fail.
 - Referenced files cannot be read or stat-ed.
 - Expected file content markers such as top-level `Status:` values are missing or non-terminal.
-- A derived placeholder value would not actually change state, so no meaningful progression occurs for that branch.
+- A derived placeholder value may already match the needed value; in that case the step can still auto-complete, but no placeholder-value mutation is recorded.
 
 ## Usage
 Use this capability when a placeholder workflow step should advance based on repo-verifiable state rather than another assistant turn.
@@ -122,6 +124,7 @@ In normal runtime flow:
 - a tool response updates or rechecks checklist state
 - deterministic progression runs
 - the checklist may auto-advance
+- if the checklist just became fully complete, workflow-end handling may run immediately afterward
 - focus-chain prompting then shows the next real active step
 
 This is especially important for steps whose completion is defined by:
@@ -141,14 +144,15 @@ This is especially important for steps whose completion is defined by:
 - Add or update focused unit tests in [deterministicPlaceholderProgression.test.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/focus-chain/__tests__/deterministicPlaceholderProgression.test.ts) for every new evaluator branch.
 
 ## Examples
-- In `code-review.md`, if `review_input` was written during this task and the artifact still exists, Step 2 can complete without asking the model to re-confirm it.
+- In `code-review.md`, if `diff_output` was written during this task and the artifact still exists, Step 2 can complete without asking the model to re-confirm it.
+- In `code-review.md`, if `review_input` was written during this task and the artifact still exists, Step 3 can complete without asking the model to re-confirm it.
 - In `code-review.md`, if both `review_input` and `diff_output` exist as current-task artifacts, Step 4 derives `review_mode = full` automatically.
 - In `review-adversarial-general.md`, if `diff_output` resolves to an existing file, Step 1 can complete immediately on the next deterministic pass.
 - In `review-adversarial-general.md`, if Step 2 writes `{output_folder}/adversarial-review-findings.md` during the current task and the artifact still exists, Step 2 can auto-complete.
 - In `dev-story.md`, if the story file’s `## Tasks / Subtasks` section has no unchecked items, the task-execution step can auto-complete.
-- In `code-review.md`, Step 7 can auto-complete when the current turn successfully executes attempt_completion for the final QA findings report.
-- In `review-adversarial-general.md`, Step 3 can auto-complete when the current turn successfully executes attempt_completion to deliver the adversarial findings.
-- In `dev-story.md`, Step 4 can auto-complete when the current turn successfully executes attempt_completion for the final closeout report.
+- In `code-review.md`, Step 7 can auto-complete when the current turn successfully executes `attempt_completion`.
+- In `review-adversarial-general.md`, Step 3 can auto-complete when the current turn successfully executes `attempt_completion`.
+- In `dev-story.md`, Step 4 can auto-complete when the current turn successfully executes `attempt_completion`.
 
 ## (Optional) Performance
 The capability is lightweight for unsupported workflows and early-exit cases.
@@ -169,5 +173,6 @@ In practice, you observe it through:
 - checklist changes emitted through normal `task_progress` flow
 - persisted placeholder-workflow metadata when placeholder values or deterministic state change
 - pending auto-completed step notices
+- workflow-end handoff into `workflowCompletionRunner` when deterministic progression fully completes the active placeholder workflow
 - focus-chain behavior that immediately starts showing the next step instead of repeating the previous one
 - the unit test suite covering supported progression branches
