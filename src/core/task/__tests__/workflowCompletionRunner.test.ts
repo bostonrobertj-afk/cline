@@ -6,11 +6,14 @@ import sinon from "sinon"
 import { workflowCompletionHandlerRegistry } from "../workflowCompletionHandler"
 import { type WorkflowCompletionRunnerResult, workflowCompletionRunner } from "../workflowCompletionRunner"
 
+const originalRegistryEntries = { ...workflowCompletionHandlerRegistry }
+
 describe("workflowCompletionRunner", () => {
 	beforeEach(() => {
 		for (const key of Object.keys(workflowCompletionHandlerRegistry)) {
 			delete workflowCompletionHandlerRegistry[key]
 		}
+		Object.assign(workflowCompletionHandlerRegistry, originalRegistryEntries)
 	})
 
 	it("returns no_completion when no placeholder workflow is active", async () => {
@@ -67,15 +70,12 @@ describe("workflowCompletionRunner", () => {
 	})
 
 	it("returns completed with tool_completed and shouldTeardown=true when a configured workflow mapping succeeds", async () => {
-		workflowCompletionHandlerRegistry["example-workflow.md"] = {
-			toolName: ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE,
-		}
 		const invokeInternalTool = sinon.stub().resolves(true)
 
 		const result: WorkflowCompletionRunnerResult = await workflowCompletionRunner({
 			previousChecklist: "- [ ] Step 1",
 			currentChecklist: "- [x] Step 1",
-			activePlaceholderWorkflowId: "example-workflow.md",
+			activePlaceholderWorkflowId: "code-review.md",
 			noticeCountBefore: 0,
 			noticeCountAfter: 0,
 			invokeInternalTool,
@@ -83,7 +83,7 @@ describe("workflowCompletionRunner", () => {
 
 		assert.deepStrictEqual(result, {
 			kind: "completed",
-			completedWorkflowId: "example-workflow.md",
+			completedWorkflowId: "code-review.md",
 			handlerResult: "tool_completed",
 			shouldTeardown: true,
 		})
@@ -91,15 +91,12 @@ describe("workflowCompletionRunner", () => {
 	})
 
 	it("returns completed with tool_failed and shouldTeardown=false when a configured workflow mapping reports failure", async () => {
-		workflowCompletionHandlerRegistry["example-workflow.md"] = {
-			toolName: ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE,
-		}
 		const invokeInternalTool = sinon.stub().resolves(false)
 
 		const result: WorkflowCompletionRunnerResult = await workflowCompletionRunner({
 			previousChecklist: "- [ ] Step 1",
 			currentChecklist: "- [x] Step 1",
-			activePlaceholderWorkflowId: "example-workflow.md",
+			activePlaceholderWorkflowId: "code-review.md",
 			noticeCountBefore: 0,
 			noticeCountAfter: 0,
 			invokeInternalTool,
@@ -107,7 +104,7 @@ describe("workflowCompletionRunner", () => {
 
 		assert.deepStrictEqual(result, {
 			kind: "completed",
-			completedWorkflowId: "example-workflow.md",
+			completedWorkflowId: "code-review.md",
 			handlerResult: "tool_failed",
 			shouldTeardown: false,
 		})

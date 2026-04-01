@@ -1,4 +1,4 @@
-import type { ClineDefaultTool } from "@shared/tools"
+import { ClineDefaultTool } from "@shared/tools"
 
 export type WorkflowCompletionHandlerResult = "no_op" | "tool_completed" | "tool_failed"
 
@@ -6,7 +6,11 @@ export interface WorkflowCompletionHandlerRegistryEntry {
 	toolName: ClineDefaultTool
 }
 
-export const workflowCompletionHandlerRegistry: Record<string, WorkflowCompletionHandlerRegistryEntry> = {}
+export const workflowCompletionHandlerRegistry: Record<string, WorkflowCompletionHandlerRegistryEntry> = {
+	"code-review.md": {
+		toolName: ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE,
+	},
+}
 
 export interface WorkflowCompletionHandlerArgs {
 	completedWorkflowId: string

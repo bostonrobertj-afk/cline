@@ -38,29 +38,57 @@ The deployed generic capability consists of four parts:
 
 ## Current Deployment Status
 
-The **generic infrastructure is deployed**.
-
-The live base handler registry is still empty in:
+The generic infrastructure is deployed, and the first workflow-specific production mapping is now configured in:
 
 - [workflowCompletionHandler.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflowCompletionHandler.ts)
+
+The live mapping is:
+
+- `code-review.md` -> `code_review_spec_update`
 
 That means:
 
 - workflow completion detection and teardown are live
 - optional workflow-end automation dispatch infrastructure is live
-- no workflow-specific production mapping has been configured yet
+- the `code-review.md` placeholder workflow now runs `code_review_spec_update` at workflow completion through `workflowCompletionHandler`
+- workflows without a configured registry entry still resolve to `no_op`
 
-So today, when a supported placeholder workflow completes:
-
-- `workflowCompletionRunner` still runs
-- `workflowCompletionHandler` currently returns `no_op`
-- `Task` proceeds with placeholder-workflow teardown
-
-The first planned workflow-specific mapping is documented separately in:
+The workflow-specific requirements for this first mapping remain documented in:
 
 - [code-review-completion.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/workflow-automation/workflow-end-automation/code-review-completion.md)
 
-That mapping is **documented but not yet wired into production code**.
+## Code Review Configuration
+
+The currently configured workflow-specific completion behavior is:
+
+- completed workflow id: `code-review.md`
+- mapped internal runtime tool: `code_review_spec_update`
+
+That live mapping is defined in:
+
+- [workflowCompletionHandler.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflowCompletionHandler.ts)
+
+At runtime, the code-review completion path works like this:
+
+1. `workflowCompletionRunner(...)` detects that `code-review.md` just completed.
+2. `workflowCompletionHandler(...)` looks up `code-review.md` in `workflowCompletionHandlerRegistry`.
+3. The handler invokes `code_review_spec_update` through `ToolExecutor.executeInternalToolSilently(...)`.
+4. If the tool succeeds, the handler returns `tool_completed`.
+5. If the tool returns a failure result or throws, the handler returns `tool_failed`.
+6. `Task` tears down placeholder-workflow state only when the runner result still allows teardown.
+
+For this mapping, `workflowCompletionHandler` does not take over any of the tool's responsibilities. `code_review_spec_update` continues to own:
+
+- placeholder resolution for `{review_input}` and `{spec_file}`
+- approval and file-write behavior
+- spec-file mutation
+- `review_input.md` clearing
+- write-proof recording for `{spec_file}`
+
+The important failure rule for code review remains:
+
+- if `code_review_spec_update` fails, `workflowCompletionHandler` returns `tool_failed`
+- `workflowCompletionRunner` preserves the placeholder-workflow state instead of tearing it down
 
 ## Runtime Flow
 

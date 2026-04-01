@@ -9,15 +9,22 @@ import {
 	workflowCompletionHandlerRegistry,
 } from "../workflowCompletionHandler"
 
+const originalRegistryEntries = { ...workflowCompletionHandlerRegistry }
+
 describe("workflowCompletionHandler", () => {
 	beforeEach(() => {
 		for (const key of Object.keys(workflowCompletionHandlerRegistry)) {
 			delete workflowCompletionHandlerRegistry[key]
 		}
+		Object.assign(workflowCompletionHandlerRegistry, originalRegistryEntries)
 	})
 
-	it("ships with no workflow mappings configured in the base build", () => {
-		assert.deepEqual(Object.keys(workflowCompletionHandlerRegistry), [])
+	it("ships with code-review.md mapped to code_review_spec_update in production", () => {
+		assert.deepEqual(workflowCompletionHandlerRegistry, {
+			"code-review.md": {
+				toolName: ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE,
+			},
+		})
 	})
 
 	it("returns no_op and does not invoke any tool when the completed workflow has no configured mapping", async () => {
@@ -33,13 +40,10 @@ describe("workflowCompletionHandler", () => {
 	})
 
 	it("returns tool_completed when a configured workflow mapping invokes an internal tool successfully", async () => {
-		workflowCompletionHandlerRegistry["example-workflow.md"] = {
-			toolName: ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE,
-		}
 		const invokeInternalTool = sinon.stub().resolves(true)
 
 		const result: WorkflowCompletionHandlerResult = await workflowCompletionHandler({
-			completedWorkflowId: "example-workflow.md",
+			completedWorkflowId: "code-review.md",
 			invokeInternalTool,
 		})
 
@@ -48,13 +52,10 @@ describe("workflowCompletionHandler", () => {
 	})
 
 	it("returns tool_failed when a configured workflow mapping invokes an internal tool that reports failure", async () => {
-		workflowCompletionHandlerRegistry["example-workflow.md"] = {
-			toolName: ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE,
-		}
 		const invokeInternalTool = sinon.stub().resolves(false)
 
 		const result: WorkflowCompletionHandlerResult = await workflowCompletionHandler({
-			completedWorkflowId: "example-workflow.md",
+			completedWorkflowId: "code-review.md",
 			invokeInternalTool,
 		})
 
