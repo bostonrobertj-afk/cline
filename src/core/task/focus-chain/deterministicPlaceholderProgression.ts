@@ -32,7 +32,10 @@ export function isDeterministicPlaceholderWorkflowSupported(
 	workflowName?: string,
 ): workflowName is DeterministicPlaceholderWorkflowName {
 	return (
-		workflowName === "code-review.md" || workflowName === "dev-story.md" || workflowName === "review-adversarial-general.md"
+		workflowName === "code-review.md" ||
+		workflowName === "dev-story.md" ||
+		workflowName === "review-adversarial-general.md" ||
+		workflowName === "blind-review.md"
 	)
 }
 
@@ -366,6 +369,64 @@ async function evaluateReviewAdversarialGeneralStep(args: {
 	}
 }
 
+async function evaluateBlindReviewStep(args: {
+	taskState: TaskState
+	stepNumber: number
+	toolContext?: DeterministicPlaceholderToolContext
+}): Promise<DeterministicStepEvaluationResult> {
+	const placeholders = getMergedPlaceholderValues(args.taskState)
+
+	switch (args.stepNumber) {
+		case 1: {
+			const diffOutput = placeholders.diff_output?.trim()
+			if (!diffOutput) {
+				return { completed: false }
+			}
+
+			const resolvedDiffOutputPath = resolveArtifactPlaceholderPath(placeholders, diffOutput)
+			if (!(await fileExistsForPlaceholderWorkflowWriteProof(resolvedDiffOutputPath))) {
+				return { completed: false }
+			}
+
+			return {
+				completed: true,
+				reason: "diff_output resolves to an existing file path.",
+			}
+		}
+		case 2: {
+			const findingsArtifactPath = resolveOutputFolderFile(placeholders, "adversarial-review-findings.md")
+			if (!findingsArtifactPath) {
+				return { completed: false }
+			}
+
+			const resolvedFindingsArtifactPath = resolveArtifactPlaceholderPath(placeholders, findingsArtifactPath)
+			if (
+				!taskStateHasPlaceholderWorkflowWriteProof(args.taskState, resolvedFindingsArtifactPath) ||
+				!(await fileExistsForPlaceholderWorkflowWriteProof(resolvedFindingsArtifactPath))
+			) {
+				return { completed: false }
+			}
+
+			return {
+				completed: true,
+				reason: "adversarial-review-findings.md was written during this task and the artifact still exists.",
+			}
+		}
+		case 3: {
+			if (!didSuccessfulAttemptCompletionOccur(args.toolContext)) {
+				return { completed: false }
+			}
+
+			return {
+				completed: true,
+				reason: "attempt_completion was executed successfully to deliver blind-review findings.",
+			}
+		}
+		default:
+			return { completed: false }
+	}
+}
+
 async function evaluateDevStoryStep(args: {
 	taskState: TaskState
 	stepNumber: number
@@ -480,11 +541,23 @@ async function evaluateDeterministicStep(args: {
 		})
 	}
 
-	return evaluateReviewAdversarialGeneralStep({
-		taskState: args.taskState,
-		stepNumber: args.stepNumber,
-		toolContext: args.toolContext,
-	})
+	if (args.workflowName === "review-adversarial-general.md") {
+		return evaluateReviewAdversarialGeneralStep({
+			taskState: args.taskState,
+			stepNumber: args.stepNumber,
+			toolContext: args.toolContext,
+		})
+	}
+
+	if (args.workflowName === "blind-review.md") {
+		return evaluateBlindReviewStep({
+			taskState: args.taskState,
+			stepNumber: args.stepNumber,
+			toolContext: args.toolContext,
+		})
+	}
+
+	return { completed: false }
 }
 
 export async function applyDeterministicPlaceholderProgression(args: {

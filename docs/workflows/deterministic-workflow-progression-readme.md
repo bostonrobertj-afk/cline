@@ -71,6 +71,7 @@ Side effects may also include:
   - `code-review.md`
   - `dev-story.md`
   - `review-adversarial-general.md`
+  - `blind-review.md`
 - A step is auto-completed only when its evaluator returns both `completed: true` and a concrete reason.
 - Checklist advancement still happens through the standard focus-chain update path; this capability does not mutate checklist markdown ad hoc.
 - Some artifact-backed completion checks rely on current-task write proofs, while others intentionally use plain file existence or file-stat checks depending on the workflow step.
@@ -100,6 +101,10 @@ Current evaluator examples:
   - later steps inspect fallback prompt artifacts or spec-file status values
   - Step 7 completes when the current turn successfully executes `attempt_completion`
 - `review-adversarial-general.md`
+  - Step 1 completes when `diff_output` resolves to an existing file path
+  - Step 2 completes when `adversarial-review-findings.md` was written during the current task and still exists
+  - Step 3 completes when the current turn successfully executes `attempt_completion`
+- `blind-review.md`
   - Step 1 completes when `diff_output` resolves to an existing file path
   - Step 2 completes when `adversarial-review-findings.md` was written during the current task and still exists
   - Step 3 completes when the current turn successfully executes `attempt_completion`
@@ -149,6 +154,9 @@ This is especially important for steps whose completion is defined by:
 - In `code-review.md`, if both `review_input` and `diff_output` exist as current-task artifacts, Step 4 derives `review_mode = full` automatically.
 - In `review-adversarial-general.md`, if `diff_output` resolves to an existing file, Step 1 can complete immediately on the next deterministic pass.
 - In `review-adversarial-general.md`, if Step 2 writes `{output_folder}/adversarial-review-findings.md` during the current task and the artifact still exists, Step 2 can auto-complete.
+- In `blind-review.md`, if `diff_output` resolves to an existing file, Step 1 can complete immediately on the next deterministic pass.
+- In `blind-review.md`, if Step 2 writes `{output_folder}/adversarial-review-findings.md` during the current task and the artifact still exists, Step 2 can auto-complete.
+- In `blind-review.md`, Step 3 can auto-complete when the current turn successfully executes `attempt_completion`.
 - In `dev-story.md`, if the story file’s `## Tasks / Subtasks` section has no unchecked items, the task-execution step can auto-complete.
 - In `code-review.md`, Step 7 can auto-complete when the current turn successfully executes `attempt_completion`.
 - In `review-adversarial-general.md`, Step 3 can auto-complete when the current turn successfully executes `attempt_completion`.

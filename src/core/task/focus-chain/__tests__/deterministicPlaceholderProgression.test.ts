@@ -52,6 +52,7 @@ describe("deterministicPlaceholderProgression", () => {
 		expect(isDeterministicPlaceholderWorkflowSupported("code-review.md")).to.equal(true)
 		expect(isDeterministicPlaceholderWorkflowSupported("dev-story.md")).to.equal(true)
 		expect(isDeterministicPlaceholderWorkflowSupported("review-adversarial-general.md")).to.equal(true)
+		expect(isDeterministicPlaceholderWorkflowSupported("blind-review.md")).to.equal(true)
 		expect(isDeterministicPlaceholderWorkflowSupported("code-review")).to.equal(false)
 		expect(isDeterministicPlaceholderWorkflowSupported("dev-story")).to.equal(false)
 		expect(isDeterministicPlaceholderWorkflowSupported("review-edge-case-hunter.md")).to.equal(false)
@@ -359,6 +360,328 @@ Deliver findings using attempt_completion.`,
 	it("does not complete review-adversarial-general step 3 when attempt_completion was not executed", async () => {
 		const taskState = createTaskState({
 			workflowName: "review-adversarial-general.md",
+			workflowContents: `## Step 3: Present findings
+Deliver findings using attempt_completion.`,
+			checklistMarkdown: "- [ ] Step 3: Present findings",
+		})
+
+		const result = await applyDeterministicPlaceholderProgression({
+			taskState,
+			checklistMarkdown: getChecklistMarkdown(taskState),
+			toolContext: {
+				toolName: "attempt_completion",
+				toolParams: { result: "Done" },
+				toolResult: "[attempt_completion] Result:\nDone",
+				toolWasExecuted: false,
+			},
+		})
+
+		expect(result.checklist).to.equal("- [ ] Step 3: Present findings")
+		expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+	})
+
+	it("completes blind-review step 1 when diff_output resolves to an existing file", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-adversarial-step1-file-"))
+
+		try {
+			const diffOutputPath = path.join(tempDir, "review-input.diff")
+			const taskState = createTaskState({
+				workflowName: "blind-review.md",
+				workflowContents: `## Step 1: Receive content and determine review scope
+Use {diff_output} when it is already available.
+
+## Step 2: Perform adversarial analysis
+Review the provided material.`,
+				checklistMarkdown:
+					"- [ ] Step 1: Receive content and determine review scope\n- [ ] Step 2: Perform adversarial analysis",
+				placeholderValues: {
+					diff_output: diffOutputPath,
+				},
+			})
+
+			await writeFileWithMtime(diffOutputPath, "diff --git a/file b/file", Date.now())
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+			})
+
+			expect(result.checklist).to.equal(
+				"- [x] Step 1: Receive content and determine review scope\n- [ ] Step 2: Perform adversarial analysis",
+			)
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
+				"diff_output resolves to an existing file path.",
+			)
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("does not complete blind-review step 1 when only review_input exists", async () => {
+		const taskState = createTaskState({
+			workflowName: "blind-review.md",
+			workflowContents: `## Step 1: Receive content and determine review scope
+Wait for the diff output to be provided.`,
+			checklistMarkdown: "- [ ] Step 1: Receive content and determine review scope",
+			placeholderValues: {
+				review_input: "/tmp/review-input.md",
+			},
+		})
+
+		const result = await applyDeterministicPlaceholderProgression({
+			taskState,
+			checklistMarkdown: getChecklistMarkdown(taskState),
+		})
+
+		expect(result.checklist).to.equal("- [ ] Step 1: Receive content and determine review scope")
+		expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+	})
+
+	it("does not complete blind-review step 1 when diff_output is missing", async () => {
+		const taskState = createTaskState({
+			workflowName: "blind-review.md",
+			workflowContents: `## Step 1: Receive content and determine review scope
+Wait for the diff output to be provided.`,
+			checklistMarkdown: "- [ ] Step 1: Receive content and determine review scope",
+		})
+
+		const result = await applyDeterministicPlaceholderProgression({
+			taskState,
+			checklistMarkdown: getChecklistMarkdown(taskState),
+		})
+
+		expect(result.checklist).to.equal("- [ ] Step 1: Receive content and determine review scope")
+		expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+	})
+
+	it("does not complete blind-review step 1 when diff_output points to a missing file", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-adversarial-step1-missing-"))
+
+		try {
+			const taskState = createTaskState({
+				workflowName: "blind-review.md",
+				workflowContents: `## Step 1: Receive content and determine review scope
+Wait for the diff output to be provided.`,
+				checklistMarkdown: "- [ ] Step 1: Receive content and determine review scope",
+				placeholderValues: {
+					diff_output: path.join(tempDir, "missing.diff"),
+				},
+			})
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+			})
+
+			expect(result.checklist).to.equal("- [ ] Step 1: Receive content and determine review scope")
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("completes blind-review step 1 from stable relative diff_output when resolution succeeds", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-adversarial-step1-relative-"))
+		const foreignCwd = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-adversarial-step1-foreign-cwd-"))
+		const originalCwd = process.cwd()
+
+		try {
+			const outputFolder = path.join(tempDir, "output")
+			const diffOutputPath = path.join(outputFolder, "review-input.diff")
+			const taskState = createTaskState({
+				workflowName: "blind-review.md",
+				workflowContents: `## Step 1: Receive content and determine review scope
+Use {diff_output} when it is already available.
+`,
+				checklistMarkdown: "- [ ] Step 1: Receive content and determine review scope",
+				stablePlaceholderValues: {
+					cwd: tempDir,
+					project_root: tempDir,
+					diff_output: path.join("output", "review-input.diff"),
+				},
+			})
+
+			await writeFileWithMtime(diffOutputPath, "diff --git a/file b/file", Date.now())
+			process.chdir(foreignCwd)
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+			})
+
+			expect(result.checklist).to.equal("- [x] Step 1: Receive content and determine review scope")
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
+				"diff_output resolves to an existing file path.",
+			)
+		} finally {
+			process.chdir(originalCwd)
+			await fs.rm(tempDir, { recursive: true, force: true })
+			await fs.rm(foreignCwd, { recursive: true, force: true })
+		}
+	})
+
+	it("completes blind-review step 2 when the findings artifact exists with a current-task write proof", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-adversarial-step2-file-"))
+
+		try {
+			const outputFolder = path.join(tempDir, "output")
+			const findingsPath = path.join(outputFolder, "adversarial-review-findings.md")
+			const taskState = createTaskState({
+				workflowName: "blind-review.md",
+				workflowContents: `## Step 2: Perform adversarial analysis
+Persist the review findings artifact.
+
+## Step 3: Present findings
+Deliver the findings.`,
+				checklistMarkdown: "- [ ] Step 2: Perform adversarial analysis\n- [ ] Step 3: Present findings",
+				placeholderValues: {
+					output_folder: outputFolder,
+				},
+			})
+
+			await writeFileWithMtime(findingsPath, "# Findings\n", Date.now())
+			recordTaskWriteProof(taskState, findingsPath)
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+			})
+
+			expect(result.checklist).to.equal("- [x] Step 2: Perform adversarial analysis\n- [ ] Step 3: Present findings")
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
+				"adversarial-review-findings.md was written during this task and the artifact still exists.",
+			)
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("does not complete blind-review step 2 when the findings artifact exists without a write proof", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-adversarial-step2-missing-proof-"))
+
+		try {
+			const outputFolder = path.join(tempDir, "output")
+			const findingsPath = path.join(outputFolder, "adversarial-review-findings.md")
+			const taskState = createTaskState({
+				workflowName: "blind-review.md",
+				workflowContents: `## Step 2: Perform adversarial analysis
+Persist the review findings artifact.`,
+				checklistMarkdown: "- [ ] Step 2: Perform adversarial analysis",
+				placeholderValues: {
+					output_folder: outputFolder,
+				},
+			})
+
+			await writeFileWithMtime(findingsPath, "# Findings\n", Date.now())
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+			})
+
+			expect(result.checklist).to.equal("- [ ] Step 2: Perform adversarial analysis")
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("does not complete blind-review step 2 when the findings artifact is missing", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-adversarial-step2-missing-file-"))
+
+		try {
+			const taskState = createTaskState({
+				workflowName: "blind-review.md",
+				workflowContents: `## Step 2: Perform adversarial analysis
+Persist the review findings artifact.`,
+				checklistMarkdown: "- [ ] Step 2: Perform adversarial analysis",
+				placeholderValues: {
+					output_folder: path.join(tempDir, "output"),
+				},
+			})
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+			})
+
+			expect(result.checklist).to.equal("- [ ] Step 2: Perform adversarial analysis")
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("completes blind-review step 2 when output_folder is relative and resolves from workflow cwd", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-adversarial-step2-relative-"))
+		const foreignCwd = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-adversarial-step2-foreign-cwd-"))
+		const originalCwd = process.cwd()
+
+		try {
+			const outputFolder = path.join(tempDir, "output")
+			const findingsPath = path.join(outputFolder, "adversarial-review-findings.md")
+			const taskState = createTaskState({
+				workflowName: "blind-review.md",
+				workflowContents: `## Step 2: Perform adversarial analysis
+Persist the review findings artifact.`,
+				checklistMarkdown: "- [ ] Step 2: Perform adversarial analysis",
+				stablePlaceholderValues: {
+					cwd: tempDir,
+					project_root: tempDir,
+				},
+				placeholderValues: {
+					output_folder: "output",
+				},
+			})
+
+			await writeFileWithMtime(findingsPath, "# Findings\n", Date.now())
+			recordTaskWriteProof(taskState, findingsPath)
+			process.chdir(foreignCwd)
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+			})
+
+			expect(result.checklist).to.equal("- [x] Step 2: Perform adversarial analysis")
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
+				"adversarial-review-findings.md was written during this task and the artifact still exists.",
+			)
+		} finally {
+			process.chdir(originalCwd)
+			await fs.rm(tempDir, { recursive: true, force: true })
+			await fs.rm(foreignCwd, { recursive: true, force: true })
+		}
+	})
+
+	it("completes blind-review step 3 from successful attempt_completion tool context", async () => {
+		const taskState = createTaskState({
+			workflowName: "blind-review.md",
+			workflowContents: `## Step 3: Present findings
+Deliver findings using attempt_completion.`,
+			checklistMarkdown: "- [ ] Step 3: Present findings",
+		})
+
+		const result = await applyDeterministicPlaceholderProgression({
+			taskState,
+			checklistMarkdown: getChecklistMarkdown(taskState),
+			toolContext: {
+				toolName: "attempt_completion",
+				toolParams: { result: "Done" },
+				toolResult: "[attempt_completion] Result:\nDone",
+				toolWasExecuted: true,
+			},
+		})
+
+		expect(result.checklist).to.equal("- [x] Step 3: Present findings")
+		expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
+			"attempt_completion was executed successfully to deliver blind-review findings.",
+		)
+	})
+
+	it("does not complete blind-review step 3 when attempt_completion was not executed", async () => {
+		const taskState = createTaskState({
+			workflowName: "blind-review.md",
 			workflowContents: `## Step 3: Present findings
 Deliver findings using attempt_completion.`,
 			checklistMarkdown: "- [ ] Step 3: Present findings",
