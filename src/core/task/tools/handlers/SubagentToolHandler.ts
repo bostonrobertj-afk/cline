@@ -54,9 +54,9 @@ function excerpt(text: string | undefined, maxChars = 1200): string {
 	return `${trimmed.slice(0, maxChars)}...`
 }
 
-function detectCodeReviewLayerFromPrompt(prompt: string): "adversarial_general" | "edge_case_hunter" | undefined {
-	if (prompt.includes("review-adversarial-general.md") || prompt.includes("bmad-review-adversarial-general")) {
-		return "adversarial_general"
+function detectCodeReviewLayerFromPrompt(prompt: string): "blind_review" | "edge_case_hunter" | undefined {
+	if (prompt.includes("blind-review.md")) {
+		return "blind_review"
 	}
 
 	if (prompt.includes("review-edge-case-hunter.md") || prompt.includes("bmad-review-edge-case-hunter")) {

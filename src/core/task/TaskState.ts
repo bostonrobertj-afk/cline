@@ -46,7 +46,7 @@ export interface AutoCompletedPlaceholderWorkflowStepNotice {
 export type CodeReviewLayerCompletionSource = "subagent_report" | "fallback_prompt"
 
 export interface CodeReviewDeterministicProgressState {
-	completedReviewLayers: Partial<Record<"adversarial_general" | "edge_case_hunter", CodeReviewLayerCompletionSource>>
+	completedReviewLayers: Partial<Record<"blind_review" | "edge_case_hunter", CodeReviewLayerCompletionSource>>
 }
 
 export interface ActivePlaceholderWorkflowDeterministicState {

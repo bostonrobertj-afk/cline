@@ -1136,7 +1136,7 @@ Set review mode from the available review artifacts.`,
 
 		try {
 			const outputFolder = path.join(tempDir, "output")
-			const adversarialPromptPath = path.join(outputFolder, "review-adversarial-general.md")
+			const blindReviewPromptPath = path.join(outputFolder, "blind-review.md")
 			const edgeCasePromptPath = path.join(outputFolder, "review-edge-case-hunter.md")
 			const taskState = createTaskState({
 				workflowName: "code-review.md",
@@ -1149,9 +1149,9 @@ Wait for every required review layer to finish.`,
 			})
 			taskState.taskStartTimeMs = Date.now()
 
-			await writeFileWithMtime(adversarialPromptPath, "# adversarial", taskState.taskStartTimeMs - 2_000)
+			await writeFileWithMtime(blindReviewPromptPath, "# adversarial", taskState.taskStartTimeMs - 2_000)
 			await writeFileWithMtime(edgeCasePromptPath, "# edge case", taskState.taskStartTimeMs - 1_000)
-			recordTaskWriteProof(taskState, adversarialPromptPath)
+			recordTaskWriteProof(taskState, blindReviewPromptPath)
 			recordTaskWriteProof(taskState, edgeCasePromptPath)
 
 			const result = await applyDeterministicPlaceholderProgression({
@@ -1161,7 +1161,7 @@ Wait for every required review layer to finish.`,
 
 			expect(result.checklist).to.equal("- [x] Step 5: Complete Review Layers")
 			expect(taskState.activePlaceholderWorkflowDeterministicState?.codeReview?.completedReviewLayers).to.deep.equal({
-				adversarial_general: "fallback_prompt",
+				blind_review: "fallback_prompt",
 				edge_case_hunter: "fallback_prompt",
 			})
 		} finally {
@@ -1186,7 +1186,7 @@ Wait for every required review layer to finish.`,
 			taskState.taskStartTimeMs = Date.now()
 
 			await writeFileWithMtime(
-				path.join(outputFolder, "review-adversarial-general.md"),
+				path.join(outputFolder, "blind-review.md"),
 				"# adversarial",
 				taskState.taskStartTimeMs - 2_000,
 			)

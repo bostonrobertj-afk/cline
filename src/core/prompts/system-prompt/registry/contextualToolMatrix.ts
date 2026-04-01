@@ -29,7 +29,7 @@ export const PLACEHOLDER_BUILTIN_BUNDLE_TOOLS = {
 		ClineDefaultTool.FILE_READ,
 		ClineDefaultTool.FILE_READ_RANGE,
 	],
-	DOC_WRITE: [ClineDefaultTool.APPLY_PATCH],
+	DOC_WRITE: [ClineDefaultTool.APPLY_PATCH, ClineDefaultTool.FILE_NEW],
 	LOCAL_EXEC: [ClineDefaultTool.BASH],
 	PLACEHOLDER_WRITE: [ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS],
 	WORKFLOW_ROUTE: [ClineDefaultTool.USE_SKILL],
@@ -343,6 +343,11 @@ export const PLACEHOLDER_WORKFLOW_STEP_MATRIX: Record<string, Record<number, rea
 	"review-adversarial-general.md": {
 		1: ["DOC_READ"],
 		2: ["DOC_READ", "CODE_READ", "INDXR_DISCOVERY", "INDXR_SOURCE_READ", "INDXR_SYMBOL_GRAPH"],
+		3: [],
+	},
+	"blind-review.md": {
+		1: ["DOC_READ", "PLACEHOLDER_WRITE"],
+		2: ["DOC_READ", "CODE_READ", "INDXR_DISCOVERY", "INDXR_SOURCE_READ", "INDXR_SYMBOL_GRAPH", "DOC_WRITE"],
 		3: [],
 	},
 	"review-edge-case-hunter.md": {

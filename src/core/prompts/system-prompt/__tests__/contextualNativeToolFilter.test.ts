@@ -97,6 +97,7 @@ describe("filterContextualNativeToolSpecs", () => {
 			makeRegisteredTool(ClineDefaultTool.BASH),
 			makeRegisteredTool(ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT),
 			makeRegisteredTool(ClineDefaultTool.APPLY_PATCH),
+			makeRegisteredTool(ClineDefaultTool.FILE_NEW),
 			makeRegisteredTool(ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS),
 			makeRegisteredTool(ClineDefaultTool.USE_SUBAGENTS),
 			makeRegisteredTool(ClineDefaultTool.WEB_SEARCH),
@@ -134,6 +135,7 @@ describe("filterContextualNativeToolSpecs", () => {
 			ClineDefaultTool.BASH,
 			ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT,
 			ClineDefaultTool.APPLY_PATCH,
+			ClineDefaultTool.FILE_NEW,
 			ClineDefaultTool.ASK,
 			ClineDefaultTool.SEND_USER_MESSAGE,
 			ClineDefaultTool.ATTEMPT,
@@ -262,6 +264,71 @@ describe("filterContextualNativeToolSpecs", () => {
 		expect(keptIds).to.not.include(ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT)
 		expect(keptIds).to.not.include(ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS)
 		expect(keptIds).to.not.include(ClineDefaultTool.WEB_SEARCH)
+		expect(keptNames).to.not.include("12345670mcp0test_tool")
+	})
+
+	it("applies blind-review step 2 row and keeps write_to_file plus the allowed Indxr tools", () => {
+		const registeredTools = [
+			makeRegisteredTool(ClineDefaultTool.LIST_FILES),
+			makeRegisteredTool(ClineDefaultTool.SEARCH),
+			makeRegisteredTool(ClineDefaultTool.LIST_CODE_DEF),
+			makeRegisteredTool(ClineDefaultTool.FILE_READ),
+			makeRegisteredTool(ClineDefaultTool.FILE_READ_RANGE),
+			makeRegisteredTool(ClineDefaultTool.APPLY_PATCH),
+			makeRegisteredTool(ClineDefaultTool.FILE_NEW),
+			makeRegisteredTool(ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS),
+			makeRegisteredTool(ClineDefaultTool.BASH),
+			makeRegisteredTool(ClineDefaultTool.WEB_SEARCH),
+			makeRegisteredTool(ClineDefaultTool.ASK),
+			makeRegisteredTool(ClineDefaultTool.SEND_USER_MESSAGE),
+			makeRegisteredTool(ClineDefaultTool.ATTEMPT),
+			makeRegisteredTool(ClineDefaultTool.PLAN_MODE),
+			makeRegisteredTool(ClineDefaultTool.BROWSER),
+			makeRegisteredTool(ClineDefaultTool.MCP_ACCESS),
+			makeRegisteredTool(ClineDefaultTool.MCP_DOCS),
+			makeRegisteredTool(ClineDefaultTool.NEW_TASK),
+		]
+
+		const result = filterContextualNativeToolSpecs({
+			context: makeContext({
+				activePlaceholderWorkflowName: "blind-review.md",
+				activePlaceholderWorkflowStepNumber: 2,
+			}),
+			registeredTools,
+			mcpTools: [
+				makeMcpTool("indxr-10mcp0search_relevant"),
+				makeMcpTool("indxr-10mcp0get_file_summary"),
+				makeMcpTool("indxr-10mcp0lookup_symbol"),
+				makeMcpTool("12345670mcp0test_tool"),
+			],
+		})
+
+		const keptIds = result.map((tool) => tool.id)
+		const keptNames = result.map((tool) => tool.name)
+		expect(keptIds).to.include.members([
+			ClineDefaultTool.LIST_FILES,
+			ClineDefaultTool.SEARCH,
+			ClineDefaultTool.LIST_CODE_DEF,
+			ClineDefaultTool.FILE_READ,
+			ClineDefaultTool.FILE_READ_RANGE,
+			ClineDefaultTool.APPLY_PATCH,
+			ClineDefaultTool.FILE_NEW,
+			ClineDefaultTool.ASK,
+			ClineDefaultTool.SEND_USER_MESSAGE,
+			ClineDefaultTool.ATTEMPT,
+			ClineDefaultTool.BROWSER,
+			ClineDefaultTool.MCP_ACCESS,
+			ClineDefaultTool.NEW_TASK,
+		])
+		expect(keptIds).to.not.include(ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS)
+		expect(keptIds).to.not.include(ClineDefaultTool.BASH)
+		expect(keptIds).to.not.include(ClineDefaultTool.WEB_SEARCH)
+		expect(keptIds).to.not.include(ClineDefaultTool.PLAN_MODE)
+		expect(keptNames).to.include.members([
+			"indxr-10mcp0search_relevant",
+			"indxr-10mcp0get_file_summary",
+			"indxr-10mcp0lookup_symbol",
+		])
 		expect(keptNames).to.not.include("12345670mcp0test_tool")
 	})
 })

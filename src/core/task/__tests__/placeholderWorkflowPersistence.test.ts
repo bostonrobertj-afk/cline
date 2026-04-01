@@ -126,7 +126,7 @@ Inspect the prepared review input and write findings.
 				activePlaceholderWorkflowDeterministicState: {
 					codeReview: {
 						completedReviewLayers: {
-							adversarial_general: "subagent_report",
+							blind_review: "subagent_report",
 						},
 					},
 				},
@@ -228,7 +228,7 @@ Inspect the prepared review input and write findings.
 		taskState.activePlaceholderWorkflowDeterministicState = {
 			codeReview: {
 				completedReviewLayers: {
-					adversarial_general: "subagent_report",
+					blind_review: "subagent_report",
 				},
 			},
 		}
@@ -576,7 +576,7 @@ ${step3Checklist}
 			fakeTask.taskState.activePlaceholderWorkflowDeterministicState = {
 				codeReview: {
 					completedReviewLayers: {
-						adversarial_general: "subagent_report",
+						blind_review: "subagent_report",
 					},
 				},
 			}
@@ -690,7 +690,7 @@ ${step3Checklist}
 			fakeTask.taskState.activePlaceholderWorkflowDeterministicState = {
 				codeReview: {
 					completedReviewLayers: {
-						adversarial_general: "subagent_report",
+						blind_review: "subagent_report",
 					},
 				},
 			}
@@ -736,7 +736,7 @@ ${step3Checklist}
 			expect(fakeTask.taskState.activePlaceholderWorkflowDeterministicState).to.deep.equal({
 				codeReview: {
 					completedReviewLayers: {
-						adversarial_general: "subagent_report",
+						blind_review: "subagent_report",
 					},
 				},
 			})

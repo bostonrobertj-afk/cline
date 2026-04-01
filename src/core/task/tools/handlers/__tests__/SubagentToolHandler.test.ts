@@ -487,14 +487,14 @@ describe("SubagentToolHandler", () => {
 			type: "tool_use",
 			name: ClineDefaultTool.USE_SUBAGENTS,
 			params: {
-				prompt_1: "run review-adversarial-general.md now",
+				prompt_1: "run blind-review.md now",
 				prompt_2: "run review-edge-case-hunter.md now",
 			},
 			partial: false,
 		})
 
 		assert.equal(
-			taskState.activePlaceholderWorkflowDeterministicState?.codeReview?.completedReviewLayers.adversarial_general,
+			taskState.activePlaceholderWorkflowDeterministicState?.codeReview?.completedReviewLayers.blind_review,
 			"subagent_report",
 		)
 		assert.equal(

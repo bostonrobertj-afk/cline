@@ -119,9 +119,9 @@ function didSuccessfulAttemptCompletionOccur(toolContext?: DeterministicPlacehol
 
 function getCodeReviewFallbackPromptPath(
 	placeholders: Record<string, string>,
-	layer: "adversarial_general" | "edge_case_hunter",
+	layer: "blind_review" | "edge_case_hunter",
 ): string | undefined {
-	const fileName = layer === "adversarial_general" ? "review-adversarial-general.md" : "review-edge-case-hunter.md"
+	const fileName = layer === "blind_review" ? "blind-review.md" : "review-edge-case-hunter.md"
 	return resolveOutputFolderFile(placeholders, fileName)
 }
 
@@ -241,7 +241,7 @@ async function evaluateCodeReviewStep(args: {
 			const completedReviewLayers = nextDeterministicState.codeReview?.completedReviewLayers ?? {}
 			let deterministicStateChanged = false
 
-			for (const layer of ["adversarial_general", "edge_case_hunter"] as const) {
+			for (const layer of ["blind_review", "edge_case_hunter"] as const) {
 				if (completedReviewLayers[layer]) {
 					continue
 				}
