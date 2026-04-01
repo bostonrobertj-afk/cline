@@ -19,6 +19,7 @@ import type { TaskConfig } from "../../types/TaskConfig"
 import { AttemptCompletionHandler } from "../AttemptCompletionHandler"
 import { BuildReviewDiffOutputToolHandler } from "../BuildReviewDiffOutputToolHandler"
 import { BuildReviewInputToolHandler } from "../BuildReviewInputToolHandler"
+import { CodeReviewSpecUpdateToolHandler } from "../CodeReviewSpecUpdateToolHandler"
 import { CompleteWorkflowItemToolHandler } from "../CompleteWorkflowItemToolHandler"
 import { SetWorkflowPlaceholdersToolHandler } from "../SetWorkflowPlaceholdersToolHandler"
 import { UseSkillToolHandler } from "../UseSkillToolHandler"
@@ -258,6 +259,71 @@ index 1111111..2222222 100644
 		diffOutputPath,
 		reviewInputPath,
 	}
+}
+
+async function createCodeReviewSpecUpdateRepo() {
+	const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), "code-review-spec-update-"))
+	const specFilePath = path.join(repoDir, "docs", "story.md")
+	const reviewInputPath = path.join(repoDir, "_bmad-output", "review-input.md")
+
+	await fs.mkdir(path.dirname(specFilePath), { recursive: true })
+	await fs.mkdir(path.dirname(reviewInputPath), { recursive: true })
+
+	await fs.writeFile(
+		specFilePath,
+		`# Story 3.2: Review Input Artifact
+Status: review
+
+## Latest Review Findings
+- Previous review finding
+
+## Tasks / Subtasks
+- [ ] Existing story task
+- [ ] Carry-forward remediation task
+`,
+	)
+
+	await fs.writeFile(
+		reviewInputPath,
+		`# Story 3.2: Review Input Artifact
+Status: ready-for-dev
+
+## Latest Review Findings
+- Review finding one
+- Review finding two
+
+## Tasks / Subtasks
+- [ ] Carry-forward remediation task
+- [ ] New remediation task
+`,
+	)
+
+	return {
+		repoDir,
+		specFilePath,
+		reviewInputPath,
+	}
+}
+
+function getTopLevelSectionBody(markdown: string, heading: string): string {
+	const lines = markdown.replace(/\r\n/g, "\n").split("\n")
+	const start = lines.findIndex((line) => line === heading)
+	if (start === -1) {
+		return ""
+	}
+
+	let end = lines.length
+	for (let i = start + 1; i < lines.length; i++) {
+		if (/^##\s+/.test(lines[i])) {
+			end = i
+			break
+		}
+	}
+
+	return lines
+		.slice(start + 1, end)
+		.join("\n")
+		.trim()
 }
 
 describe("Managed workflow handlers", () => {
@@ -1904,6 +1970,211 @@ Inspect the prepared review input and write findings.`,
 					"The provided story file does not contain the required story structure for deterministic review-input generation.",
 				),
 			)
+		} finally {
+			sandbox.restore()
+			HostProvider.reset()
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("updates spec_file from merged workflow placeholders, clears review_input.md, and records write proof for spec_file", async () => {
+		const sandbox = sinon.createSandbox()
+		const { repoDir, specFilePath, reviewInputPath } = await createCodeReviewSpecUpdateRepo()
+
+		try {
+			setVscodeHostProviderMock()
+			sandbox.stub(HostProvider.workspace, "getWorkspacePaths").resolves({ paths: [repoDir] } as any)
+
+			const handler = new CodeReviewSpecUpdateToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowStableValues = {
+				review_input: reviewInputPath,
+				cwd: repoDir,
+				project_root: repoDir,
+				"project-root": repoDir,
+			}
+			config.taskState.activePlaceholderWorkflowValues = {
+				spec_file: specFilePath,
+			}
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "code_review_spec_update",
+				params: {
+					spec_file: "ignored.md",
+				},
+				partial: false,
+			} as any)
+
+			const payload = JSON.parse(String(result))
+			expect(payload).to.deep.equal({
+				persisted: true,
+				spec_file_updated: true,
+				review_input_cleared: true,
+				spec_file_path: specFilePath,
+				review_input_path: reviewInputPath,
+			})
+
+			const specFileMarkdown = await fs.readFile(specFilePath, "utf8")
+			expect(specFileMarkdown).to.contain("Status: ready-for-dev")
+			expect(getTopLevelSectionBody(specFileMarkdown, "## Latest Review Findings")).to.equal(
+				"- Review finding one\n- Review finding two",
+			)
+			expect(specFileMarkdown.match(/- \[ \] New remediation task/g)?.length ?? 0).to.equal(1)
+			expect(await fs.readFile(reviewInputPath, "utf8")).to.equal("")
+			expect(config.taskState.activePlaceholderWorkflowTaskWriteProofPaths).to.include(specFilePath)
+			expect(config.taskState.activePlaceholderWorkflowTaskWriteProofPaths).to.not.include(reviewInputPath)
+		} finally {
+			sandbox.restore()
+			HostProvider.reset()
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("requires review_input from merged placeholder state", async () => {
+		const handler = new CodeReviewSpecUpdateToolHandler()
+		const { repoDir, specFilePath } = await createCodeReviewSpecUpdateRepo()
+
+		try {
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowStableValues = {
+				cwd: repoDir,
+				project_root: repoDir,
+				"project-root": repoDir,
+			}
+			config.taskState.activePlaceholderWorkflowValues = {
+				spec_file: specFilePath,
+			}
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "code_review_spec_update",
+				params: {},
+				partial: false,
+			} as any)
+
+			expect(result).to.equal(
+				formatResponse.toolError(
+					"Could not resolve workflow placeholder 'review_input' from the active placeholder workflow state.",
+				),
+			)
+		} finally {
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("requires spec_file from merged placeholder state", async () => {
+		const handler = new CodeReviewSpecUpdateToolHandler()
+		const { repoDir, reviewInputPath } = await createCodeReviewSpecUpdateRepo()
+
+		try {
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowStableValues = {
+				review_input: reviewInputPath,
+				cwd: repoDir,
+				project_root: repoDir,
+				"project-root": repoDir,
+			}
+			config.taskState.activePlaceholderWorkflowValues = {}
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "code_review_spec_update",
+				params: {},
+				partial: false,
+			} as any)
+
+			expect(result).to.equal(
+				formatResponse.toolError(
+					"Could not resolve workflow placeholder 'spec_file' from the active placeholder workflow state.",
+				),
+			)
+		} finally {
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("requires approval when either mutated path is not auto-approved", async () => {
+		const sandbox = sinon.createSandbox()
+		const { repoDir, specFilePath, reviewInputPath } = await createCodeReviewSpecUpdateRepo()
+
+		try {
+			setVscodeHostProviderMock()
+			sandbox.stub(HostProvider.workspace, "getWorkspacePaths").resolves({ paths: [repoDir] } as any)
+
+			const handler = new CodeReviewSpecUpdateToolHandler()
+			const config = createConfig({ cwd: repoDir, isSubagentExecution: false })
+			config.taskState.activePlaceholderWorkflowStableValues = {
+				review_input: reviewInputPath,
+				cwd: repoDir,
+				project_root: repoDir,
+				"project-root": repoDir,
+			}
+			config.taskState.activePlaceholderWorkflowValues = {
+				spec_file: specFilePath,
+			}
+			;(config.callbacks.shouldAutoApproveToolWithPath as sinon.SinonStub).callsFake(
+				async (_toolName: string, filePath: string) => filePath === specFilePath,
+			)
+
+			await handler.execute(config, {
+				type: "tool_use",
+				name: "code_review_spec_update",
+				params: {},
+				partial: false,
+			} as any)
+
+			expect((config.callbacks.ask as sinon.SinonStub).calledOnce).to.equal(true)
+		} finally {
+			sandbox.restore()
+			HostProvider.reset()
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("does not persist either file when merge evaluation fails", async () => {
+		const sandbox = sinon.createSandbox()
+		const { repoDir, specFilePath, reviewInputPath } = await createCodeReviewSpecUpdateRepo()
+
+		try {
+			setVscodeHostProviderMock()
+			sandbox.stub(HostProvider.workspace, "getWorkspacePaths").resolves({ paths: [repoDir] } as any)
+
+			const malformedReviewInputMarkdown = `# Story 3.2: Review Input Artifact
+Status: ready-for-dev
+
+## Tasks / Subtasks
+- [ ] New remediation task
+`
+			await fs.writeFile(reviewInputPath, malformedReviewInputMarkdown, "utf8")
+
+			const originalSpecFileMarkdown = await fs.readFile(specFilePath, "utf8")
+			const originalReviewInputMarkdown = await fs.readFile(reviewInputPath, "utf8")
+
+			const handler = new CodeReviewSpecUpdateToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowStableValues = {
+				review_input: reviewInputPath,
+				cwd: repoDir,
+				project_root: repoDir,
+				"project-root": repoDir,
+			}
+			config.taskState.activePlaceholderWorkflowValues = {
+				spec_file: specFilePath,
+			}
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "code_review_spec_update",
+				params: {},
+				partial: false,
+			} as any)
+
+			expect(result).to.equal(
+				formatResponse.toolError("review_input.md does not contain the required ## Latest Review Findings section."),
+			)
+			expect(await fs.readFile(specFilePath, "utf8")).to.equal(originalSpecFileMarkdown)
+			expect(await fs.readFile(reviewInputPath, "utf8")).to.equal(originalReviewInputMarkdown)
 		} finally {
 			sandbox.restore()
 			HostProvider.reset()

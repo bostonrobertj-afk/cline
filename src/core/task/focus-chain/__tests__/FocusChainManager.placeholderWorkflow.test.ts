@@ -853,4 +853,60 @@ Inspect the prepared review input and write findings.
 		expect(prompt).to.contain("Use the complete_workflow_item tool")
 		expect(prompt).to.not.contain("# CURRENT WORKFLOW STEP")
 	})
+
+	it("clears the placeholder workflow checklist projection, resets counters, deletes the focus-chain file, and refreshes the webview", async () => {
+		const sandbox = sinon.createSandbox()
+		const taskId = `task-focus-chain-clear-${Date.now()}`
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "focus-chain-placeholder-clear-"))
+		const workflowPath = path.join(tempDir, "local-review.md")
+		await fs.writeFile(workflowPath, "# Review Workflow\n\n## Step 1: Gather Context\nDo the work.\n", "utf8")
+
+		try {
+			sandbox.stub(disk, "ensureTaskDirectoryExists").resolves(tempDir)
+
+			const taskState = new TaskState()
+			taskState.activePlaceholderWorkflowId = "local-review.md"
+			taskState.activePlaceholderWorkflowSource = {
+				type: "local",
+				name: "local-review.md",
+				path: workflowPath,
+			}
+			taskState.currentFocusChainChecklist = "- [ ] Step 1: Gather Context"
+			taskState.todoListWasUpdatedByUser = true
+			taskState.apiRequestsSinceLastTodoUpdate = 3
+
+			const dependencies = {
+				...createDependencies(taskState),
+				taskId,
+			}
+			const manager = new FocusChainManager(dependencies)
+			const todoFilePath = getFocusChainFilePath(tempDir, taskId)
+			await fs.writeFile(
+				todoFilePath,
+				`# Focus Chain List for Task ${taskId}
+
+- [ ] Step 1: Gather Context
+`,
+				"utf8",
+			)
+
+			await manager.clearPlaceholderWorkflowChecklistProjection()
+
+			expect(taskState.currentFocusChainChecklist).to.equal(null)
+			expect(taskState.todoListWasUpdatedByUser).to.equal(false)
+			expect(taskState.apiRequestsSinceLastTodoUpdate).to.equal(0)
+
+			let accessError: unknown
+			try {
+				await fs.access(todoFilePath)
+			} catch (error) {
+				accessError = error
+			}
+			expect(accessError).to.be.instanceOf(Error)
+			sinon.assert.calledOnce(dependencies.postStateToWebview)
+		} finally {
+			sandbox.restore()
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
 })

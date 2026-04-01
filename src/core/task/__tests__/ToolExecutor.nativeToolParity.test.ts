@@ -2,6 +2,7 @@ import { strict as assert } from "node:assert"
 import { afterEach, describe, it } from "mocha"
 import sinon from "sinon"
 import { ClineDefaultTool } from "@/shared/tools"
+import { formatResponse } from "../../prompts/responses"
 import { TaskState } from "../TaskState"
 import { ToolExecutor } from "../ToolExecutor"
 
@@ -137,5 +138,40 @@ describe("ToolExecutor native tool parity", () => {
 		assert.equal(taskState.nativeToolCallIdsWithResults.has("call_read_file"), true)
 		assert.equal(taskState.nativeToolCallIdsSkipped.has("call_read_file"), false)
 		assert.equal(taskState.nativeToolCallIdsBreakingPreviousResponseChain.has("call_read_file"), false)
+	})
+
+	it("returns true when executeInternalToolSilently receives a non-failure tool result", async () => {
+		const { executor, taskState, executeStub } = createExecutor()
+		executeStub.resolves("ok")
+
+		const result = await executor.executeInternalToolSilently(ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE)
+
+		assert.equal(result, true)
+		assert.equal(executeStub.calledOnce, true)
+		assert.deepEqual(executeStub.firstCall.args[1], {
+			type: "tool_use",
+			name: ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE,
+			params: {},
+			partial: false,
+		})
+		assert.deepEqual(taskState.userMessageContent, [])
+	})
+
+	it("returns false when executeInternalToolSilently receives a formatted tool error result", async () => {
+		const { executor, executeStub } = createExecutor()
+		executeStub.resolves(formatResponse.toolError("boom"))
+
+		const result = await executor.executeInternalToolSilently(ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE)
+
+		assert.equal(result, false)
+	})
+
+	it("returns false when executeInternalToolSilently catches a coordinator throw", async () => {
+		const { executor, executeStub } = createExecutor()
+		executeStub.rejects(new Error("boom"))
+
+		const result = await executor.executeInternalToolSilently(ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE)
+
+		assert.equal(result, false)
 	})
 })

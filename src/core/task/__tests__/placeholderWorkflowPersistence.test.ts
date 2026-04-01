@@ -16,6 +16,7 @@ import { Task, type ToolResponse } from "../index"
 import { TaskState } from "../TaskState"
 import { activateManagedWorkflowInTaskState } from "../workflow-activation"
 import type { WorkflowFormRuntimeOutcome, WorkflowFormSessionState } from "../workflow-form/types"
+import { workflowCompletionHandlerRegistry } from "../workflowCompletionHandler"
 
 function createFocusChainManager(taskState: TaskState) {
 	return new FocusChainManager({
@@ -39,6 +40,7 @@ function createFakeTask(taskId: string) {
 		refreshManagedWorkflowChecklistProjection: sinon.stub().resolves(),
 		refreshPlaceholderWorkflowChecklistProjection: sinon.stub().resolves(),
 		clearManagedWorkflowChecklistProjection: sinon.stub().resolves(),
+		postStateToWebview: sinon.stub().resolves(),
 		say: sinon.stub().resolves(undefined as unknown as ToolResponse),
 	}
 }
@@ -97,6 +99,14 @@ const getWorkflowFormToolErrorMessage = Reflect.get(Task.prototype, "getWorkflow
 	[WorkflowFormSessionState, number],
 	string | undefined
 >
+const updatePlaceholderWorkflowProgressAndMaybeRunCompletion = Reflect.get(
+	Task.prototype,
+	"updatePlaceholderWorkflowProgressAndMaybeRunCompletion",
+) as TaskMethod<[string | undefined, unknown?], Promise<{ accepted: boolean; feedback?: string }>>
+const clearPlaceholderWorkflowChecklistProjection = Reflect.get(
+	Task.prototype,
+	"clearPlaceholderWorkflowChecklistProjection",
+) as TaskMethod<[], Promise<void>>
 
 describe("placeholder workflow persistence", () => {
 	it("restores activePlaceholderWorkflowSource from metadata and resumes step-specific prompting", async () => {
@@ -519,6 +529,252 @@ ${step3Checklist}
 		} finally {
 			sandbox.restore()
 			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("tears down placeholder workflow state and persists cleared metadata when workflow completion finishes with no configured automation", async () => {
+		const sandbox = sinon.createSandbox()
+		try {
+			sandbox.stub(disk, "getTaskMetadata").resolves({} as never)
+			const saveTaskMetadataStub = sandbox.stub(disk, "saveTaskMetadata").resolves()
+
+			const fakeTask = createFakeTask("task-complete-placeholder-no-automation") as FakeTaskBase & {
+				FocusChainManager?: {
+					updateFCListFromToolResponse: sinon.SinonStub
+					clearPlaceholderWorkflowChecklistProjection: sinon.SinonStub
+				}
+				toolExecutor?: {
+					executeInternalToolSilently: sinon.SinonStub
+				}
+				pendingWorkflowFormOutcome?: WorkflowFormRuntimeOutcome
+			}
+			Object.setPrototypeOf(fakeTask, Task.prototype)
+
+			const updateFCListFromToolResponse = sinon.stub().callsFake(async () => {
+				fakeTask.taskState.currentFocusChainChecklist = "- [x] Step 1: Gather Context"
+				fakeTask.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.push({
+					workflowName: "code-review.md",
+					stepNumber: 1,
+					checklistLabel: "Step 1: Gather Context",
+					reason: "completed automatically",
+				})
+				return { accepted: true }
+			})
+			const clearProjectionStub = sinon.stub().resolves()
+			const executeInternalToolSilently = sinon.stub().resolves(true)
+
+			fakeTask.FocusChainManager = {
+				updateFCListFromToolResponse,
+				clearPlaceholderWorkflowChecklistProjection: clearProjectionStub,
+			}
+			fakeTask.toolExecutor = {
+				executeInternalToolSilently,
+			}
+
+			fakeTask.taskState.activePlaceholderWorkflowId = "unmapped-workflow.md"
+			fakeTask.taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "unmapped-workflow.md",
+				contents: "# Workflow\n\n## Step 1: Gather Context\nDo the work.\n",
+			}
+			fakeTask.taskState.activePlaceholderWorkflowValues = { review_mode: "full" }
+			fakeTask.taskState.activePlaceholderWorkflowStableValues = { communication_language: "English" }
+			fakeTask.taskState.activePlaceholderWorkflowDeterministicState = {
+				codeReview: {
+					completedReviewLayers: {
+						adversarial_general: "subagent_report",
+					},
+				},
+			}
+			fakeTask.taskState.activePlaceholderWorkflowTaskWriteProofPaths = ["/tmp/review-input.md"]
+			fakeTask.taskState.activeWorkflowFormSession = {
+				sessionId: "wf-session-1",
+				resolverId: "code_review_step_3_diff_source",
+				triggerSource: "deterministic_workflow_progression",
+				owner: {
+					kind: "placeholder_workflow_step",
+					workflowName: "unmapped-workflow.md",
+					stepNumber: 1,
+				},
+				phase: "confirm",
+				initialPhase: "confirm",
+				values: {},
+			}
+			fakeTask.taskState.suppressedWorkflowFormResolverIds = ["code_review_step_3_diff_source"]
+			fakeTask.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices = []
+			fakeTask.taskState.activeWorkflowJustStarted = true
+			fakeTask.taskState.currentFocusChainChecklist = "- [ ] Step 1: Gather Context"
+			fakeTask.pendingWorkflowFormOutcome = {
+				kind: "fallback_to_agent",
+				session: fakeTask.taskState.activeWorkflowFormSession!,
+			}
+
+			await updatePlaceholderWorkflowProgressAndMaybeRunCompletion.call(fakeTask, "__COMPLETE_NEXT_STEP__")
+
+			expect(fakeTask.taskState.activePlaceholderWorkflowId).to.equal(undefined)
+			expect(fakeTask.taskState.activePlaceholderWorkflowSource).to.equal(undefined)
+			expect(fakeTask.taskState.activePlaceholderWorkflowValues).to.equal(undefined)
+			expect(fakeTask.taskState.activePlaceholderWorkflowStableValues).to.equal(undefined)
+			expect(fakeTask.taskState.activePlaceholderWorkflowDeterministicState).to.equal(undefined)
+			expect(fakeTask.taskState.activePlaceholderWorkflowTaskWriteProofPaths).to.deep.equal([])
+			expect(fakeTask.taskState.activeWorkflowFormSession).to.equal(undefined)
+			expect(fakeTask.taskState.suppressedWorkflowFormResolverIds).to.deep.equal([])
+			expect(fakeTask.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+			expect(fakeTask.taskState.activeWorkflowJustStarted).to.equal(false)
+			expect(fakeTask.pendingWorkflowFormOutcome).to.equal(undefined)
+			sinon.assert.notCalled(fakeTask.toolExecutor.executeInternalToolSilently)
+			sinon.assert.calledOnce(fakeTask.FocusChainManager.clearPlaceholderWorkflowChecklistProjection)
+			expect(saveTaskMetadataStub.callCount).to.equal(1)
+
+			const lastSavedMetadata = saveTaskMetadataStub.getCall(saveTaskMetadataStub.callCount - 1).args[1]
+			expect(lastSavedMetadata.activePlaceholderWorkflowId).to.equal(undefined)
+			expect(lastSavedMetadata.activePlaceholderWorkflowSource).to.equal(undefined)
+			expect(lastSavedMetadata.activePlaceholderWorkflowStableValues).to.equal(undefined)
+			expect(lastSavedMetadata.activePlaceholderWorkflowValues).to.equal(undefined)
+			expect(lastSavedMetadata.activePlaceholderWorkflowDeterministicState).to.equal(undefined)
+			expect(lastSavedMetadata.activePlaceholderWorkflowTaskWriteProofPaths).to.deep.equal([])
+			expect(lastSavedMetadata.activeWorkflowFormSession).to.equal(undefined)
+			expect(lastSavedMetadata.suppressedWorkflowFormResolverIds).to.deep.equal([])
+			expect(lastSavedMetadata.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+		} finally {
+			sandbox.restore()
+		}
+	})
+
+	it("preserves placeholder workflow state when workflow completion automation reports tool_failed", async () => {
+		const sandbox = sinon.createSandbox()
+		workflowCompletionHandlerRegistry["example-workflow.md"] = {
+			toolName: ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE,
+		}
+
+		try {
+			sandbox.stub(disk, "getTaskMetadata").resolves({} as never)
+			const saveTaskMetadataStub = sandbox.stub(disk, "saveTaskMetadata").resolves()
+
+			const fakeTask = createFakeTask("task-complete-placeholder-tool-failed") as FakeTaskBase & {
+				FocusChainManager?: {
+					updateFCListFromToolResponse: sinon.SinonStub
+					clearPlaceholderWorkflowChecklistProjection: sinon.SinonStub
+				}
+				toolExecutor?: {
+					executeInternalToolSilently: sinon.SinonStub
+				}
+				pendingWorkflowFormOutcome?: WorkflowFormRuntimeOutcome
+			}
+			Object.setPrototypeOf(fakeTask, Task.prototype)
+
+			const updateFCListFromToolResponse = sinon.stub().callsFake(async () => {
+				fakeTask.taskState.currentFocusChainChecklist = "- [x] Step 1: Gather Context"
+				fakeTask.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.push({
+					workflowName: "code-review.md",
+					stepNumber: 1,
+					checklistLabel: "Step 1: Gather Context",
+					reason: "completed automatically",
+				})
+				return { accepted: true }
+			})
+			const clearProjectionStub = sinon.stub().resolves()
+			const executeInternalToolSilently = sinon.stub().resolves(false)
+
+			fakeTask.FocusChainManager = {
+				updateFCListFromToolResponse,
+				clearPlaceholderWorkflowChecklistProjection: clearProjectionStub,
+			}
+			fakeTask.toolExecutor = {
+				executeInternalToolSilently,
+			}
+
+			fakeTask.taskState.activePlaceholderWorkflowId = "example-workflow.md"
+			fakeTask.taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "example-workflow.md",
+				contents: "# Workflow\n\n## Step 1: Gather Context\nDo the work.\n",
+			}
+			fakeTask.taskState.activePlaceholderWorkflowValues = { review_mode: "full" }
+			fakeTask.taskState.activePlaceholderWorkflowStableValues = { communication_language: "English" }
+			fakeTask.taskState.activePlaceholderWorkflowDeterministicState = {
+				codeReview: {
+					completedReviewLayers: {
+						adversarial_general: "subagent_report",
+					},
+				},
+			}
+			fakeTask.taskState.activePlaceholderWorkflowTaskWriteProofPaths = ["/tmp/review-input.md"]
+			fakeTask.taskState.activeWorkflowFormSession = {
+				sessionId: "wf-session-2",
+				resolverId: "code_review_step_3_diff_source",
+				triggerSource: "deterministic_workflow_progression",
+				owner: {
+					kind: "placeholder_workflow_step",
+					workflowName: "code-review.md",
+					stepNumber: 1,
+				},
+				phase: "confirm",
+				initialPhase: "confirm",
+				values: {},
+			}
+			fakeTask.taskState.suppressedWorkflowFormResolverIds = ["code_review_step_3_diff_source"]
+			fakeTask.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices = []
+			fakeTask.taskState.activeWorkflowJustStarted = true
+			fakeTask.taskState.currentFocusChainChecklist = "- [ ] Step 1: Gather Context"
+			fakeTask.pendingWorkflowFormOutcome = {
+				kind: "fallback_to_agent",
+				session: fakeTask.taskState.activeWorkflowFormSession!,
+			}
+
+			await updatePlaceholderWorkflowProgressAndMaybeRunCompletion.call(fakeTask, "__COMPLETE_NEXT_STEP__")
+
+			expect(fakeTask.taskState.activePlaceholderWorkflowId).to.equal("example-workflow.md")
+			expect(fakeTask.taskState.activePlaceholderWorkflowSource).to.deep.equal({
+				type: "remote",
+				name: "example-workflow.md",
+				contents: "# Workflow\n\n## Step 1: Gather Context\nDo the work.\n",
+			})
+			expect(fakeTask.taskState.activePlaceholderWorkflowValues).to.deep.equal({ review_mode: "full" })
+			expect(fakeTask.taskState.activePlaceholderWorkflowStableValues).to.deep.equal({
+				communication_language: "English",
+			})
+			expect(fakeTask.taskState.activePlaceholderWorkflowDeterministicState).to.deep.equal({
+				codeReview: {
+					completedReviewLayers: {
+						adversarial_general: "subagent_report",
+					},
+				},
+			})
+			expect(fakeTask.taskState.activePlaceholderWorkflowTaskWriteProofPaths).to.deep.equal(["/tmp/review-input.md"])
+			expect(fakeTask.taskState.activeWorkflowFormSession).to.deep.equal({
+				sessionId: "wf-session-2",
+				resolverId: "code_review_step_3_diff_source",
+				triggerSource: "deterministic_workflow_progression",
+				owner: {
+					kind: "placeholder_workflow_step",
+					workflowName: "code-review.md",
+					stepNumber: 1,
+				},
+				phase: "confirm",
+				initialPhase: "confirm",
+				values: {},
+			})
+			expect(fakeTask.taskState.suppressedWorkflowFormResolverIds).to.deep.equal(["code_review_step_3_diff_source"])
+			expect(fakeTask.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([
+				{
+					workflowName: "code-review.md",
+					stepNumber: 1,
+					checklistLabel: "Step 1: Gather Context",
+					reason: "completed automatically",
+				},
+			])
+			expect(fakeTask.taskState.activeWorkflowJustStarted).to.equal(true)
+			expect(fakeTask.pendingWorkflowFormOutcome).to.deep.equal({
+				kind: "fallback_to_agent",
+				session: fakeTask.taskState.activeWorkflowFormSession!,
+			})
+			sinon.assert.calledOnce(fakeTask.toolExecutor.executeInternalToolSilently)
+			sinon.assert.notCalled(fakeTask.FocusChainManager.clearPlaceholderWorkflowChecklistProjection)
+			sinon.assert.notCalled(saveTaskMetadataStub)
+		} finally {
+			delete workflowCompletionHandlerRegistry["example-workflow.md"]
+			sandbox.restore()
 		}
 	})
 

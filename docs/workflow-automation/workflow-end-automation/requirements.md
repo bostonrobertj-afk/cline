@@ -1,0 +1,73 @@
+
+# Workflow Completion Requirements (workflowCompletionRunner)
+- Runs only when the focus chain checklist transitioned from having an incomplete step to having no incomplete steps during the deterministic progression pass
+- immediately performs a direct call + await to workflowCompletionHandler and provides:
+    - completedWorkflowId, derived from activePlaceholderWorkflowId
+- Does not perform its additional duties until workflowCompletionHandler returns
+- If workflowCompletionHandler returns `no_op` or `tool_completed`, it clears workflow-active runtime state
+- If workflowCompletionHandler returns `tool_failed`, it does not clear workflow-active runtime state
+- Owns placeholder-workflow completion teardown. There is no separate existing placeholder-workflow teardown capability that should perform this work instead.
+- Clears workflow-active runtime state:
+    - activePlaceholderWorkflowId
+    - activePlaceholderWorkflowSource
+    - activePlaceholderWorkflowValues
+    - activePlaceholderWorkflowStableValues
+    - activePlaceholderWorkflowDeterministicState
+    - activePlaceholderWorkflowTaskWriteProofPaths
+    - activeWorkflowFormSession
+    - suppressedWorkflowFormResolverIds
+    - pendingAutoCompletedPlaceholderWorkflowStepNotices
+    - activeWorkflowJustStarted
+    - pending workflow-form outcome if one exists in Task runtime state
+- Clears the placeholder-workflow focus-chain projection after successful completion handling:
+    - currentFocusChainChecklist
+    - todoListWasUpdatedByUser reset state
+    - apiRequestsSinceLastTodoUpdate reset state
+    - persisted focus-chain markdown file on disk
+- Persists the cleared placeholder-workflow metadata after teardown so resumed tasks do not restore a completed workflow as still active
+- Refreshes UI/runtime state after teardown so the cleared workflow state is reflected immediately
+- Does not own task-ending responsibilities:
+    - it does not end the conversation thread
+    - it does not change thread display state as a task-complete behavior
+    - it does not own response-tool turn termination
+    - it does not own task-completion telemetry, hooks, checkpoints, or other task-complete side effects
+- Does not clear non-placeholder-workflow state that is outside workflow completion scope:
+    - activeAgentId / activeAgentSkillName / activeAgentInvokedSlashCommand
+    - activeWorkflowId
+    - managedWorkflowRun
+
+
+
+# Helper Requirements (workflowCompletionHandler)
+- Receives completedWorkflowId from workflowCompletionRunner
+- Owns only workflow-end automation dispatch. It does not own workflow teardown, focus-chain cleanup, metadata clearing, or task-ending behavior.
+- The base build of workflowCompletionHandler must include the full configuration seam for workflow-end automation dispatch, but it must ship with no workflow-specific mappings configured yet.
+- The base build must be ready for later workflow-specific configuration to be added without redesigning the handler contract.
+- The base build must not include any workflow-specific dispatch behavior unless that behavior is documented and implemented in a separate workflow-specific pass.
+- Resolves whether the completed workflow has configured workflow-end automation
+- If the completed workflow has no configured workflow-end automation, it returns `no_op`
+- If the completed workflow has configured workflow-end automation, it directly invokes the mapped internal tool with direct call + await
+- The workflow-to-tool mapping is configuration owned by workflowCompletionHandler
+- The mapped tool must be an internal runtime tool, not an AI-exposed tool-surface capability
+- workflowCompletionHandler does not resolve workflow placeholders on behalf of the mapped tool. The mapped tool continues to own any placeholder resolution it requires from active workflow state.
+- workflowCompletionHandler does not own tool approval behavior. The mapped tool continues to own its normal approval and file-write behavior.
+- workflowCompletionHandler does not persist new workflow-completion metadata or state fields of its own
+- workflowCompletionHandler does not modify:
+    - activePlaceholderWorkflowId
+    - activePlaceholderWorkflowSource
+    - activePlaceholderWorkflowValues
+    - activePlaceholderWorkflowStableValues
+    - activePlaceholderWorkflowDeterministicState
+    - activePlaceholderWorkflowTaskWriteProofPaths
+    - activeWorkflowFormSession
+    - suppressedWorkflowFormResolverIds
+    - pendingAutoCompletedPlaceholderWorkflowStepNotices
+    - currentFocusChainChecklist
+- Returns only after the mapped tool invocation finishes
+- Returns one of:
+    - `no_op`
+    - `tool_completed`
+    - `tool_failed`
+- `tool_completed` means the mapped tool invocation completed successfully
+- `tool_failed` means the mapped tool invocation failed or returned a failure result
+- it does nothing else. It simply receives an indicator that a workflow ended, checks if it has a config for that workflow, and invokes a tool if it does. If it doesn't have a config, it does nothing. 

@@ -241,6 +241,24 @@ export class ToolExecutor {
 		return await this.execute(block)
 	}
 
+	public async executeInternalToolSilently(toolName: ClineDefaultTool): Promise<boolean> {
+		const config = this.asToolConfig()
+		const block: ToolUse = {
+			type: "tool_use",
+			name: toolName,
+			params: {},
+			partial: false,
+		}
+
+		try {
+			const result = await this.coordinator.execute(config, block)
+			return this.responseToolRuntime.classifyFailureResult(result) === undefined
+		} catch (error) {
+			Logger.error(`[ToolExecutor ${this.taskId}] failed silent internal tool ${toolName}`, error)
+			return false
+		}
+	}
+
 	/**
 	 * Updates the browser settings
 	 */

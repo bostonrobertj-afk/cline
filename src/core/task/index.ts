@@ -44,6 +44,7 @@ import {
 	type DeterministicPlaceholderToolContext,
 	isDeterministicPlaceholderWorkflowSupported,
 } from "@core/task/focus-chain/deterministicPlaceholderProgression"
+import type { FocusChainChecklistUpdateResult } from "@core/task/focus-chain/types"
 import { releaseTaskLock } from "@core/task/TaskLockUtils"
 import { getWorkflowFormResolverDefinition } from "@core/task/workflow-form/WorkflowFormRegistry"
 import { WorkflowFormRuntime } from "@core/task/workflow-form/WorkflowFormRuntime"
@@ -164,6 +165,7 @@ import { buildUserMessageContent } from "./utils/buildUserMessageContent"
 import { hasExplicitMentionSyntax, hasUserContentTag } from "./utils/userContentProcessing"
 import { activateManagedWorkflowInTaskState, activatePlaceholderWorkflowInTaskState } from "./workflow-activation"
 import type { WorkflowFormRuntimeOutcome, WorkflowFormSessionState } from "./workflow-form/types"
+import { workflowCompletionRunner } from "./workflowCompletionRunner"
 
 export type ToolResponse = ClineToolResponseContent
 
@@ -1060,8 +1062,7 @@ export class Task {
 			this.executeCommandTool.bind(this),
 			this.cancelBackgroundCommand.bind(this),
 			() => this.checkpointManager?.doesLatestTaskCompletionHaveNewChanges() ?? Promise.resolve(false),
-			this.FocusChainManager?.updateFCListFromToolResponse.bind(this.FocusChainManager) ||
-				(async () => ({ accepted: true })),
+			this.updatePlaceholderWorkflowProgressAndMaybeRunCompletion.bind(this),
 			this.switchToActModeCallback.bind(this),
 			this.cancelTask,
 			// Atomic hook state helpers for ToolExecutor
@@ -1457,10 +1458,11 @@ export class Task {
 		}
 
 		if (this.FocusChainManager) {
-			await this.FocusChainManager.updateFCListFromToolResponse(checklist, toolContext)
+			await this.updatePlaceholderWorkflowProgressAndMaybeRunCompletion(checklist, toolContext)
 			return
 		}
 
+		const noticeCountBefore = this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.length
 		const progressionResult = await applyDeterministicPlaceholderProgression({
 			taskState: this.taskState,
 			checklistMarkdown: checklist,
@@ -1471,6 +1473,93 @@ export class Task {
 			this.taskState.currentFocusChainChecklist = progressionResult.checklist
 			await this.say("task_progress", progressionResult.checklist)
 			await this.postStateToWebview()
+		}
+
+		await this.maybeFinalizeCompletedPlaceholderWorkflow(checklist, noticeCountBefore)
+	}
+
+	private async updatePlaceholderWorkflowProgressAndMaybeRunCompletion(
+		taskProgress: string | undefined,
+		toolContext?: DeterministicPlaceholderToolContext,
+	): Promise<FocusChainChecklistUpdateResult> {
+		const previousChecklist = this.taskState.currentFocusChainChecklist
+		const noticeCountBefore = this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.length
+
+		if (!this.FocusChainManager) {
+			return { accepted: true }
+		}
+
+		const result = await this.FocusChainManager.updateFCListFromToolResponse(taskProgress, toolContext)
+		if (result.accepted !== true) {
+			return result
+		}
+
+		await this.maybeFinalizeCompletedPlaceholderWorkflow(previousChecklist, noticeCountBefore)
+		return result
+	}
+
+	private async maybeFinalizeCompletedPlaceholderWorkflow(
+		previousChecklist: string | null | undefined,
+		noticeCountBefore: number,
+	): Promise<void> {
+		if (!this.toolExecutor) {
+			return
+		}
+
+		const result = await workflowCompletionRunner({
+			previousChecklist,
+			currentChecklist: this.taskState.currentFocusChainChecklist,
+			activePlaceholderWorkflowId: this.taskState.activePlaceholderWorkflowId,
+			noticeCountBefore,
+			noticeCountAfter: this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.length,
+			invokeInternalTool: this.toolExecutor.executeInternalToolSilently.bind(this.toolExecutor),
+		})
+		if (result.kind === "no_completion") {
+			return
+		}
+		if (result.shouldTeardown === false) {
+			return
+		}
+
+		await this.teardownCompletedPlaceholderWorkflow()
+	}
+
+	private async teardownCompletedPlaceholderWorkflow(): Promise<void> {
+		this.taskState.activePlaceholderWorkflowId = undefined
+		this.taskState.activePlaceholderWorkflowSource = undefined
+		this.taskState.activePlaceholderWorkflowValues = undefined
+		this.taskState.activePlaceholderWorkflowStableValues = undefined
+		this.taskState.activePlaceholderWorkflowDeterministicState = undefined
+		this.taskState.activePlaceholderWorkflowTaskWriteProofPaths = []
+		this.taskState.activeWorkflowFormSession = undefined
+		this.taskState.suppressedWorkflowFormResolverIds = []
+		this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices = []
+		this.taskState.activeWorkflowJustStarted = false
+		this.pendingWorkflowFormOutcome = undefined
+
+		await this.clearPlaceholderWorkflowChecklistProjection()
+		await this.persistClearedPlaceholderWorkflowMetadata()
+	}
+
+	private async persistClearedPlaceholderWorkflowMetadata(): Promise<void> {
+		try {
+			const taskMetadata = await getTaskMetadata(this.taskId)
+			taskMetadata.activeWorkflowId = this.taskState.activeWorkflowId
+			taskMetadata.activePlaceholderWorkflowId = this.taskState.activePlaceholderWorkflowId
+			taskMetadata.activePlaceholderWorkflowSource = this.taskState.activePlaceholderWorkflowSource
+			taskMetadata.activePlaceholderWorkflowStableValues = this.taskState.activePlaceholderWorkflowStableValues
+			taskMetadata.activePlaceholderWorkflowValues = this.taskState.activePlaceholderWorkflowValues
+			taskMetadata.activePlaceholderWorkflowDeterministicState = this.taskState.activePlaceholderWorkflowDeterministicState
+			taskMetadata.activePlaceholderWorkflowTaskWriteProofPaths =
+				this.taskState.activePlaceholderWorkflowTaskWriteProofPaths
+			taskMetadata.activeWorkflowFormSession = this.taskState.activeWorkflowFormSession
+			taskMetadata.suppressedWorkflowFormResolverIds = this.taskState.suppressedWorkflowFormResolverIds
+			taskMetadata.pendingAutoCompletedPlaceholderWorkflowStepNotices =
+				this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices
+			taskMetadata.managedWorkflowRun = this.taskState.managedWorkflowRun
+			await saveTaskMetadata(this.taskId, taskMetadata)
+		} catch {
+			// Non-fatal: prompt/runtime state should continue even if metadata persistence fails.
 		}
 	}
 
@@ -2202,6 +2291,18 @@ export class Task {
 	private async clearManagedWorkflowChecklistProjection(): Promise<void> {
 		if (this.FocusChainManager) {
 			await this.FocusChainManager.clearManagedWorkflowChecklistProjection()
+			return
+		}
+
+		this.taskState.currentFocusChainChecklist = null
+		this.taskState.todoListWasUpdatedByUser = false
+		this.taskState.apiRequestsSinceLastTodoUpdate = 0
+		await this.postStateToWebview()
+	}
+
+	private async clearPlaceholderWorkflowChecklistProjection(): Promise<void> {
+		if (this.FocusChainManager) {
+			await this.FocusChainManager.clearPlaceholderWorkflowChecklistProjection()
 			return
 		}
 

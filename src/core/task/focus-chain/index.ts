@@ -587,6 +587,21 @@ export class FocusChainManager {
 		await this.postStateToWebview()
 	}
 
+	public async clearPlaceholderWorkflowChecklistProjection(): Promise<void> {
+		this.taskState.currentFocusChainChecklist = null
+		this.taskState.todoListWasUpdatedByUser = false
+		this.taskState.apiRequestsSinceLastTodoUpdate = 0
+
+		try {
+			const todoFilePath = await this.resolveFocusChainFilePath()
+			await fs.unlink(todoFilePath)
+		} catch {
+			// Missing focus chain file is fine when clearing projection state.
+		}
+
+		await this.postStateToWebview()
+	}
+
 	/**
 	 * Reads the focus chain list from the task's markdown file on disk and extracts the checklist content.
 	 * Returns the raw focus chain list string if found, or null if the file doesn't exist or contains no valid todos.

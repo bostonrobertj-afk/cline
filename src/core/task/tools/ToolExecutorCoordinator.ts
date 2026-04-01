@@ -10,6 +10,7 @@ import { AttemptCompletionHandler } from "./handlers/AttemptCompletionHandler"
 import { BrowserToolHandler } from "./handlers/BrowserToolHandler"
 import { BuildReviewDiffOutputToolHandler } from "./handlers/BuildReviewDiffOutputToolHandler"
 import { BuildReviewInputToolHandler } from "./handlers/BuildReviewInputToolHandler"
+import { CodeReviewSpecUpdateToolHandler } from "./handlers/CodeReviewSpecUpdateToolHandler"
 import { CompleteWorkflowItemToolHandler } from "./handlers/CompleteWorkflowItemToolHandler"
 import { CondenseHandler } from "./handlers/CondenseHandler"
 import { ExecuteCommandToolHandler } from "./handlers/ExecuteCommandToolHandler"
@@ -117,6 +118,7 @@ export class ToolExecutorCoordinator {
 		[ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS]: (_v: ToolValidator) => new SetWorkflowPlaceholdersToolHandler(),
 		[ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT]: (_v: ToolValidator) => new BuildReviewDiffOutputToolHandler(),
 		[ClineDefaultTool.BUILD_REVIEW_INPUT]: (_v: ToolValidator) => new BuildReviewInputToolHandler(),
+		[ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE]: (_v: ToolValidator) => new CodeReviewSpecUpdateToolHandler(),
 		[ClineDefaultTool.USE_SUBAGENTS]: (_v: ToolValidator) => new UseSubagentsToolHandler(),
 	}
 
