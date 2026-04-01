@@ -1,6 +1,7 @@
 import { expect } from "chai"
 import { describe, it } from "mocha"
 import type { McpHub } from "@/services/mcp/McpHub"
+import type { McpServer } from "@/shared/mcp"
 import { ModelFamily } from "@/shared/prompts"
 import { ClineDefaultTool } from "@/shared/tools"
 import {
@@ -31,6 +32,23 @@ import { use_mcp_tool_variants } from "../tools/use_mcp_tool"
 import { write_to_file_variants } from "../tools/write_to_file"
 import type { SystemPromptContext } from "../types"
 
+type JsonSchemaProperty = {
+	description?: string
+	type?: string
+	properties?: Record<string, JsonSchemaProperty>
+	required?: string[]
+	enum?: string[]
+	oneOf?: unknown[]
+}
+
+type OpenAIFunctionParameters = {
+	properties?: Record<string, JsonSchemaProperty>
+}
+
+type AnthropicInputSchema = {
+	properties?: Record<string, JsonSchemaProperty>
+}
+
 const mockContext: SystemPromptContext = {
 	cwd: "/test/project",
 	ide: "TestIde",
@@ -42,10 +60,27 @@ const mockContext: SystemPromptContext = {
 	isTesting: true,
 }
 
-const makeMcpHub = (servers: any[]): McpHub =>
+const makeMcpHub = (servers: McpServer[]): McpHub =>
 	({
 		getServers: () => servers,
 	}) as unknown as McpHub
+
+const getOpenAIProperties = (tool: ReturnType<typeof toolSpecFunctionDefinition>): Record<string, JsonSchemaProperty> =>
+	(tool.function.parameters as unknown as OpenAIFunctionParameters).properties ?? {}
+
+const getAnthropicProperties = (tool: ReturnType<typeof toolSpecInputSchema>): Record<string, JsonSchemaProperty> =>
+	(tool.input_schema as unknown as AnthropicInputSchema).properties ?? {}
+
+const getGeminiProperties = (tool: ReturnType<typeof toolSpecFunctionDeclarations>): Record<string, JsonSchemaProperty> =>
+	(tool.parameters?.properties as Record<string, JsonSchemaProperty> | undefined) ?? {}
+
+const getVariantTool = (tools: readonly ClineToolSpec[], variant: ModelFamily): ClineToolSpec => {
+	const tool = tools.find((candidate) => candidate.variant === variant)
+	if (!tool) {
+		throw new Error(`Missing tool variant for ${variant}`)
+	}
+	return tool
+}
 
 const indxrContext: SystemPromptContext = {
 	...mockContext,
@@ -86,7 +121,7 @@ describe("toolSpecFunctionDeclarations (Gemini)", () => {
 	it("includes parameter descriptions from instruction field", () => {
 		const result = toolSpecFunctionDeclarations(makeTool(), mockContext)
 
-		const pathParam = result.parameters?.properties?.["path"] as any
+		const pathParam = getGeminiProperties(result).path
 		expect(pathParam).to.exist
 		expect(pathParam.description).to.be.a("string")
 		expect(pathParam.description).to.include("path of the file to read")
@@ -95,9 +130,9 @@ describe("toolSpecFunctionDeclarations (Gemini)", () => {
 	it("includes descriptions for all parameters", () => {
 		const result = toolSpecFunctionDeclarations(makeTool(), mockContext)
 
-		const props = result.parameters?.properties as any
-		expect(props["path"].description).to.be.a("string").and.not.be.empty
-		expect(props["optional_param"].description).to.be.a("string").and.not.be.empty
+		const props = getGeminiProperties(result)
+		expect(props.path?.description).to.be.a("string").and.not.be.empty
+		expect(props.optional_param?.description).to.be.a("string").and.not.be.empty
 	})
 
 	it("handles function-type instructions", () => {
@@ -112,7 +147,7 @@ describe("toolSpecFunctionDeclarations (Gemini)", () => {
 		})
 		const result = toolSpecFunctionDeclarations(tool, mockContext)
 
-		const param = result.parameters?.properties?.["dynamic"] as any
+		const param = getGeminiProperties(result).dynamic
 		expect(param.description).to.equal("Dynamic value: /test/project")
 	})
 
@@ -122,23 +157,22 @@ describe("toolSpecFunctionDeclarations (Gemini)", () => {
 		})
 		const result = toolSpecFunctionDeclarations(tool, mockContext)
 
-		const param = result.parameters?.properties?.["empty"] as any
+		const param = getGeminiProperties(result).empty
 		expect(param.description).to.be.undefined
 	})
 })
 
 describe("Indxr MCP detection", () => {
 	it("detects Indxr by connected tool signature", () => {
+		const connectedServer = (indxrContext.mcpHub as McpHub).getServers()[0] as McpServer
+
 		expect(isIndxrToolName("search_relevant")).to.equal(true)
 		expect(isIndxrToolName("get_file_summary")).to.equal(true)
 		expect(isIndxrToolName("lookup_symbol")).to.equal(true)
 		expect(isIndxrToolName("get_dependency_graph")).to.equal(true)
 		expect(isIndxrToolName("list_declarations")).to.equal(true)
-		expect(getIndxrToolMatches((indxrContext.mcpHub as McpHub).getServers()[0] as any)).to.deep.equal([
-			"search_relevant",
-			"get_file_summary",
-		])
-		expect(hasDistinctiveIndxrToolSignature((indxrContext.mcpHub as McpHub).getServers()[0] as any)).to.equal(true)
+		expect(getIndxrToolMatches(connectedServer)).to.deep.equal(["search_relevant", "get_file_summary"])
+		expect(hasDistinctiveIndxrToolSignature(connectedServer)).to.equal(true)
 		expect(hasConnectedIndxrServer(indxrContext)).to.equal(true)
 	})
 
@@ -152,7 +186,7 @@ describe("Indxr MCP detection", () => {
 				{ name: "get_callers", description: "Get callers", inputSchema: { type: "object", properties: {} } },
 				{ name: "search_relevant", description: "Search relevant", inputSchema: { type: "object", properties: {} } },
 			],
-		} as any
+		} satisfies McpServer
 
 		expect(getIndxrToolMatches(server)).to.include.members(["lookup_symbol", "get_callers", "search_relevant"])
 		expect(hasDistinctiveIndxrToolSignature(server)).to.equal(true)
@@ -187,7 +221,7 @@ describe("Indxr MCP detection", () => {
 			]),
 		}
 
-		const server = (context.mcpHub as McpHub).getServers()[0] as any
+		const server = (context.mcpHub as McpHub).getServers()[0] as McpServer
 		expect(getIndxrToolMatches(server)).to.deep.equal(["read_source"])
 		expect(hasDistinctiveIndxrToolSignature(server)).to.equal(false)
 		expect(hasConnectedIndxrServer(context)).to.equal(false)
@@ -212,7 +246,7 @@ describe("Indxr MCP detection", () => {
 			]),
 		}
 
-		const server = (context.mcpHub as McpHub).getServers()[0] as any
+		const server = (context.mcpHub as McpHub).getServers()[0] as McpServer
 		expect(getIndxrToolMatches(server)).to.deep.equal(["search_relevant"])
 		expect(hasDistinctiveIndxrToolSignature(server)).to.equal(false)
 		expect(hasConnectedIndxrServer(context)).to.equal(false)
@@ -227,7 +261,7 @@ describe("Indxr MCP detection", () => {
 				{ name: "get_token_estimate", description: "Token estimate", inputSchema: { type: "object", properties: {} } },
 				{ name: "read_source", description: "Read source", inputSchema: { type: "object", properties: {} } },
 			],
-		} as any
+		} satisfies McpServer
 
 		expect(getIndxrToolMatches(server)).to.deep.equal(["get_token_estimate", "read_source"])
 		expect(hasDistinctiveIndxrToolSignature(server)).to.equal(true)
@@ -272,8 +306,8 @@ describe("Gemini and Anthropic parameter descriptions match", () => {
 		const gemini = toolSpecFunctionDeclarations(tool, mockContext)
 		const anthropic = toolSpecInputSchema(tool, mockContext)
 
-		const geminiDesc = (gemini.parameters?.properties?.["path"] as any)?.description
-		const anthropicDesc = (anthropic.input_schema as any).properties["path"]?.description
+		const geminiDesc = getGeminiProperties(gemini).path?.description
+		const anthropicDesc = getAnthropicProperties(anthropic).path?.description
 
 		expect(geminiDesc).to.equal(anthropicDesc)
 	})
@@ -321,15 +355,15 @@ describe("workflow placeholder tool gating", () => {
 			},
 		}
 
-		const writeToFile = toolSpecFunctionDefinition(write_to_file_variants[1], context) as any
-		const attemptCompletion = toolSpecFunctionDefinition(attempt_completion_variants[3], context) as any
-		const actModeRespond = toolSpecFunctionDefinition(act_mode_respond_variants[0], context) as any
-		const generatePlanOutput = toolSpecFunctionDefinition(generate_plan_output_variants[1], context) as any
+		const writeToFile = toolSpecFunctionDefinition(write_to_file_variants[1], context)
+		const attemptCompletion = toolSpecFunctionDefinition(attempt_completion_variants[3], context)
+		const actModeRespond = toolSpecFunctionDefinition(act_mode_respond_variants[0], context)
+		const generatePlanOutput = toolSpecFunctionDefinition(generate_plan_output_variants[1], context)
 
-		expect(writeToFile.function.parameters.properties.task_progress).to.equal(undefined)
-		expect(attemptCompletion.function.parameters.properties.task_progress).to.equal(undefined)
-		expect(actModeRespond.function.parameters.properties.task_progress).to.equal(undefined)
-		expect(generatePlanOutput.function.parameters.properties.task_progress).to.equal(undefined)
+		expect(getOpenAIProperties(writeToFile).task_progress).to.equal(undefined)
+		expect(getOpenAIProperties(attemptCompletion).task_progress).to.equal(undefined)
+		expect(getOpenAIProperties(actModeRespond).task_progress).to.equal(undefined)
+		expect(getOpenAIProperties(generatePlanOutput).task_progress).to.equal(undefined)
 	})
 
 	it("includes task_progress in send_user_message native schemas for normal non-deterministic contexts", () => {
@@ -344,11 +378,11 @@ describe("workflow placeholder tool gating", () => {
 		}
 
 		const sendUserMessage = toolSpecFunctionDefinition(
-			send_user_message_variants.find((tool) => tool.variant === ModelFamily.NATIVE_GPT_5)!,
+			getVariantTool(send_user_message_variants, ModelFamily.NATIVE_GPT_5),
 			context,
-		) as any
+		)
 
-		expect(sendUserMessage.function.parameters.properties.task_progress).to.not.equal(undefined)
+		expect(getOpenAIProperties(sendUserMessage).task_progress).to.not.equal(undefined)
 	})
 
 	it("exposes agent_feedback on the four supported response tool schemas", () => {
@@ -363,29 +397,17 @@ describe("workflow placeholder tool gating", () => {
 		}
 
 		const tools = [
-			toolSpecFunctionDefinition(
-				send_user_message_variants.find((tool) => tool.variant === ModelFamily.NATIVE_GPT_5)!,
-				context,
-			) as any,
-			toolSpecFunctionDefinition(
-				ask_followup_question_variants.find((tool) => tool.variant === ModelFamily.NATIVE_GPT_5)!,
-				context,
-			) as any,
-			toolSpecFunctionDefinition(
-				attempt_completion_variants.find((tool) => tool.variant === ModelFamily.NATIVE_GPT_5)!,
-				context,
-			) as any,
-			toolSpecFunctionDefinition(
-				generate_plan_output_variants.find((tool) => tool.variant === ModelFamily.NATIVE_GPT_5)!,
-				context,
-			) as any,
+			toolSpecFunctionDefinition(getVariantTool(send_user_message_variants, ModelFamily.NATIVE_GPT_5), context),
+			toolSpecFunctionDefinition(getVariantTool(ask_followup_question_variants, ModelFamily.NATIVE_GPT_5), context),
+			toolSpecFunctionDefinition(getVariantTool(attempt_completion_variants, ModelFamily.NATIVE_GPT_5), context),
+			toolSpecFunctionDefinition(getVariantTool(generate_plan_output_variants, ModelFamily.NATIVE_GPT_5), context),
 		]
 
 		for (const tool of tools) {
-			const agentFeedback = tool.function.parameters.properties.agent_feedback
+			const agentFeedback = getOpenAIProperties(tool).agent_feedback
 			expect(agentFeedback).to.exist
 			expect(agentFeedback.type).to.equal("object")
-			expect(agentFeedback.properties.message).to.exist
+			expect(agentFeedback.properties?.message).to.exist
 			expect(agentFeedback.required).to.include("message")
 		}
 	})
@@ -404,11 +426,11 @@ describe("workflow placeholder tool gating", () => {
 		}
 
 		const sendUserMessage = toolSpecFunctionDefinition(
-			send_user_message_variants.find((tool) => tool.variant === ModelFamily.NATIVE_GPT_5)!,
+			getVariantTool(send_user_message_variants, ModelFamily.NATIVE_GPT_5),
 			context,
-		) as any
+		)
 
-		expect(sendUserMessage.function.parameters.properties.task_progress).to.equal(undefined)
+		expect(getOpenAIProperties(sendUserMessage).task_progress).to.equal(undefined)
 	})
 
 	it("omits access_mcp_resource native schemas when connected servers expose no resources or resource templates", () => {
@@ -431,7 +453,7 @@ describe("workflow placeholder tool gating", () => {
 			},
 		}
 
-		const accessMcpResource = access_mcp_resource_variants.find((tool) => tool.variant === ModelFamily.NATIVE_GPT_5)!
+		const accessMcpResource = getVariantTool(access_mcp_resource_variants, ModelFamily.NATIVE_GPT_5)
 		expect(() => toolSpecFunctionDefinition(accessMcpResource, context)).to.throw(
 			"Tool access_mcp_resource does not meet context requirements",
 		)
@@ -458,9 +480,9 @@ describe("workflow placeholder tool gating", () => {
 		}
 
 		const accessMcpResource = toolSpecFunctionDefinition(
-			access_mcp_resource_variants.find((tool) => tool.variant === ModelFamily.NATIVE_GPT_5)!,
+			getVariantTool(access_mcp_resource_variants, ModelFamily.NATIVE_GPT_5),
 			context,
-		) as any
+		)
 
 		expect(accessMcpResource.function.name).to.equal("access_mcp_resource")
 	})
@@ -486,9 +508,9 @@ describe("native tool placeholder replacement", () => {
 		const anthropic = toolSpecInputSchema(tool, context)
 		const gemini = toolSpecFunctionDeclarations(tool, context)
 
-		const openAIDesc = ((openAI as any).function.parameters.properties.path as any).description as string
-		const anthropicDesc = ((anthropic as any).input_schema.properties.path as any).description as string
-		const geminiDesc = (gemini.parameters?.properties?.["path"] as any)?.description as string
+		const openAIDesc = getOpenAIProperties(openAI).path?.description as string
+		const anthropicDesc = getAnthropicProperties(anthropic).path?.description as string
+		const geminiDesc = getGeminiProperties(gemini).path?.description as string
 
 		for (const desc of [openAIDesc, anthropicDesc, geminiDesc]) {
 			expect(desc).to.include("/test/project")
@@ -528,13 +550,14 @@ describe("native tool placeholder replacement", () => {
 			],
 		})
 
-		const openAI = toolSpecFunctionDefinition(tool, context) as any
+		const openAI = toolSpecFunctionDefinition(tool, context)
+		const openAIProperties = getOpenAIProperties(openAI)
 
 		expect(openAI.function.description).to.equal(
 			"Apply a V4A patch by passing the complete `apply_patch` command in `input` with `*** Begin Patch` and `*** End Patch`.",
 		)
-		expect(openAI.function.parameters.properties.input.description).to.equal("Complete `apply_patch` command to execute.")
-		expect(openAI.function.parameters.properties.task_progress.description).to.equal(
+		expect(openAIProperties.input?.description).to.equal("Complete `apply_patch` command to execute.")
+		expect(openAIProperties.task_progress?.description).to.equal(
 			"Top-level tool parameter, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step.",
 		)
 	})
@@ -551,10 +574,10 @@ describe("native tool placeholder replacement", () => {
 			},
 		}
 
-		const searchTool = toolSpecFunctionDefinition(search_files_variants[1], context) as any
-		const defsTool = toolSpecFunctionDefinition(list_code_definition_names_variants[1], context) as any
-		const readTool = toolSpecFunctionDefinition(read_file_variants[1], context) as any
-		const rangeTool = toolSpecFunctionDefinition(read_file_range_variants[1], context) as any
+		const searchTool = toolSpecFunctionDefinition(search_files_variants[1], context)
+		const defsTool = toolSpecFunctionDefinition(list_code_definition_names_variants[1], context)
+		const readTool = toolSpecFunctionDefinition(read_file_variants[1], context)
+		const rangeTool = toolSpecFunctionDefinition(read_file_range_variants[1], context)
 
 		expect(searchTool.function.description).to.equal(
 			"Request to perform a regex search across files in a specified directory, providing context-rich results.",
@@ -571,6 +594,7 @@ describe("native tool placeholder replacement", () => {
 			...indxrContext,
 			enableNativeToolCalls: true,
 			useMinimalGptPrompt: true,
+			visibleNativeToolNames: ["search_relevant", "get_file_summary", "lookup_symbol"],
 			providerInfo: {
 				providerId: "openai",
 				model: { id: "gpt-5.4-2026-03-05", info: { supportsPromptCache: false } },
@@ -578,11 +602,11 @@ describe("native tool placeholder replacement", () => {
 			},
 		}
 
-		const searchTool = toolSpecFunctionDefinition(search_files_variants[1], context) as any
-		const defsTool = toolSpecFunctionDefinition(list_code_definition_names_variants[1], context) as any
-		const readTool = toolSpecFunctionDefinition(read_file_variants[1], context) as any
-		const rangeTool = toolSpecFunctionDefinition(read_file_range_variants[1], context) as any
-		const mcpTool = toolSpecFunctionDefinition(use_mcp_tool_variants[0], context) as any
+		const searchTool = toolSpecFunctionDefinition(search_files_variants[1], context)
+		const defsTool = toolSpecFunctionDefinition(list_code_definition_names_variants[1], context)
+		const readTool = toolSpecFunctionDefinition(read_file_variants[1], context)
+		const rangeTool = toolSpecFunctionDefinition(read_file_range_variants[1], context)
+		const mcpTool = toolSpecFunctionDefinition(use_mcp_tool_variants[0], context)
 
 		expect(searchTool.function.description).to.equal(
 			"Use only for exact raw-text regex search when Indxr is unavailable, insufficient, or regex search is specifically required.",
@@ -591,13 +615,13 @@ describe("native tool placeholder replacement", () => {
 			"Use only when Indxr is unavailable or insufficient and you specifically need a built-in top-level definition pass.",
 		)
 		expect(readTool.function.description).to.equal(
-			"Use Indxr first for discovery, summaries, symbol lookup, dependency tracing, and targeted source reads. Use read_file only when exact full raw file contents are required for a file at or below 300 lines and 16384 bytes, or when Indxr is insufficient.",
+			"Use Indxr first for discovery, summaries, symbol lookup, dependency tracing, and targeted source reads. Once the task is narrowed to one concrete file, use read_file when exact full raw file contents are required for a file at or below 800 lines and 65536 bytes, or when Indxr is insufficient.",
 		)
 		expect(rangeTool.function.description).to.equal(
-			"Use only when exact raw line-based inspection is required after Indxr has already narrowed the target, or when Indxr is insufficient.",
+			"Use only when exact raw line-based inspection is required after Indxr has already narrowed the target, when the file exceeds the full-read limit, or when Indxr is insufficient.",
 		)
 		expect(mcpTool.function.description).to.equal(
-			"Use a connected MCP tool. When Indxr is available, default to its exploration tools first for code exploration, symbol lookup, file understanding, dependency tracing, and targeted source reads. For large files, prefer symbol-targeted or explicit line-range source reads instead of full raw file reads.",
+			"Use a connected MCP tool. When Indxr is available, default to its exploration tools first for code exploration, symbol lookup, file understanding, dependency tracing, and targeted source reads. After you have narrowed the task to one concrete file, prefer one full raw read only when the file is at or below 800 lines and 65536 bytes; otherwise prefer symbol-targeted or explicit line-range source reads.",
 		)
 	})
 
@@ -628,9 +652,10 @@ describe("native tool placeholder replacement", () => {
 			],
 		})
 
-		const openAI = toolSpecFunctionDefinition(tool, context) as any
+		const openAI = toolSpecFunctionDefinition(tool, context)
+		const openAIProperties = getOpenAIProperties(openAI)
 
-		expect(openAI.function.parameters.properties.values.description).to.equal(
+		expect(openAIProperties.values?.description).to.equal(
 			'Object map of placeholder keys to strings. Call the tool as {"values": {...}}. Not arrays of {name,value} or {key,value}.',
 		)
 		expect(openAI.function.description).to.equal(
@@ -650,20 +675,19 @@ describe("native tool placeholder replacement", () => {
 			},
 		}
 
-		const openAI = toolSpecFunctionDefinition(build_review_diff_output_variants[0], context) as any
+		const openAI = toolSpecFunctionDefinition(build_review_diff_output_variants[0], context)
+		const openAIProperties = getOpenAIProperties(openAI)
 
 		expect(openAI.function.description).to.equal(
 			"Build and atomically replace {diff_output} from an explicit Git-backed source. Use for code-review diff artifact construction, not for arbitrary file writes.",
 		)
-		expect(openAI.function.parameters.properties.source.description).to.equal(
+		expect(openAIProperties.source?.description).to.equal(
 			'Required source object. Supported shape: {"type":"commit","commit":"<ref>"} | {"type":"commit_range","base":"<ref>","head":"<ref>"} | {"type":"ref_diff","base":"<ref>","head":"<ref>"} | {"type":"worktree_head_scoped"}.',
 		)
-		expect(openAI.function.parameters.properties.scoped_paths.description).to.equal(
+		expect(openAIProperties.scoped_paths?.description).to.equal(
 			'Optional repository-relative path array. Required for {"type":"worktree_head_scoped"}.',
 		)
-		expect(openAI.function.parameters.properties.context_lines.description).to.equal(
-			"Optional unified diff context line count. Defaults to 3.",
-		)
+		expect(openAIProperties.context_lines?.description).to.equal("Optional unified diff context line count. Defaults to 3.")
 	})
 
 	it("compacts native build_review_input descriptions and parameter text", () => {
@@ -678,29 +702,28 @@ describe("native tool placeholder replacement", () => {
 			},
 		}
 
-		const openAI = toolSpecFunctionDefinition(build_review_input_variants[0], context) as any
+		const openAI = toolSpecFunctionDefinition(build_review_input_variants[0], context)
+		const openAIProperties = getOpenAIProperties(openAI)
 
 		expect(openAI.function.description).to.equal(
 			"Build review-input.md from a story file and the stable {diff_output} artifact. The only human-supplied parameter is story_path.",
 		)
-		expect(openAI.function.parameters.properties.story_path.description).to.equal(
-			"Path to the story markdown file that is being reviewed.",
-		)
-		expect(Object.keys(openAI.function.parameters.properties)).to.deep.equal(["story_path"])
+		expect(openAIProperties.story_path?.description).to.equal("Path to the story markdown file that is being reviewed.")
+		expect(Object.keys(openAIProperties)).to.deep.equal(["story_path"])
 	})
 
 	it("preserves integer types for read_file_range line parameters", () => {
 		const tool = read_file_range_variants[0]
 
-		const openAI = toolSpecFunctionDefinition(tool, mockContext) as any
-		const anthropic = toolSpecInputSchema(tool, mockContext) as any
-		const gemini = toolSpecFunctionDeclarations(tool, mockContext) as any
+		const openAI = toolSpecFunctionDefinition(tool, mockContext)
+		const anthropic = toolSpecInputSchema(tool, mockContext)
+		const gemini = toolSpecFunctionDeclarations(tool, mockContext)
 
-		expect(openAI.function.parameters.properties.start_line.type).to.equal("integer")
-		expect(openAI.function.parameters.properties.end_line.type).to.equal("integer")
-		expect(anthropic.input_schema.properties.start_line.type).to.equal("integer")
-		expect(anthropic.input_schema.properties.end_line.type).to.equal("integer")
-		expect(gemini.parameters.properties.start_line.type).to.equal("NUMBER")
-		expect(gemini.parameters.properties.end_line.type).to.equal("NUMBER")
+		expect(getOpenAIProperties(openAI).start_line?.type).to.equal("integer")
+		expect(getOpenAIProperties(openAI).end_line?.type).to.equal("integer")
+		expect(getAnthropicProperties(anthropic).start_line?.type).to.equal("integer")
+		expect(getAnthropicProperties(anthropic).end_line?.type).to.equal("integer")
+		expect(getGeminiProperties(gemini).start_line?.type).to.equal("NUMBER")
+		expect(getGeminiProperties(gemini).end_line?.type).to.equal("NUMBER")
 	})
 })

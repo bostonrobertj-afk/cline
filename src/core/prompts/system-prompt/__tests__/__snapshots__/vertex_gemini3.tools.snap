@@ -22,7 +22,7 @@
   },
   {
     "name": "read_file",
-    "description": "Request to read the contents of a file at the specified path. Prefer using search_files and list_code_definition_names first to narrow the target, then use read_file for the first full pass on a file. For follow-up checks on a focused region, prefer read_file_range instead of rereading the entire file. Automatically extracts raw text from PDF and DOCX files. Do NOT use this tool to list the contents of a directory.",
+    "description": "Request to read the contents of a file at the specified path. Prefer using search_files and list_code_definition_names first to narrow the target, then use read_file_range for targeted inspection. Once you have narrowed the work to one concrete file, prefer a single read_file call when that file is at or below 800 lines and 65536 bytes and you need the full raw contents, rather than stitching together many nearby range reads. Automatically extracts raw text from PDF and DOCX files. Do NOT use this tool to list the contents of a directory.",
     "parameters": {
       "type": "OBJECT",
       "properties": {
@@ -222,31 +222,6 @@
     }
   },
   {
-    "name": "access_mcp_resource",
-    "description": "Request to access a resource provided by a connected MCP server. Resources represent data sources that can be used as context, such as files, API responses, or system information.",
-    "parameters": {
-      "type": "OBJECT",
-      "properties": {
-        "server_name": {
-          "type": "STRING",
-          "description": "The name of the MCP server providing the resource"
-        },
-        "uri": {
-          "type": "STRING",
-          "description": "The URI identifying the specific resource to access"
-        },
-        "task_progress": {
-          "type": "STRING",
-          "description": "Use as a top-level parameter on the next tool call, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
-        }
-      },
-      "required": [
-        "server_name",
-        "uri"
-      ]
-    }
-  },
-  {
     "name": "ask_followup_question",
     "description": "Ask the user a concise question when clarification or a direct answer is needed. On success, this tool displays the question to the user, returns `[Message displayed.]`, and ends your current turn. The user's answer arrives on the following turn as normal human-authored input rather than same-turn tool output.",
     "parameters": {
@@ -259,6 +234,19 @@
         "options": {
           "type": "STRING",
           "description": "An array of 2-5 options for the user to choose from. Each option should be a string describing a possible answer. You may not always need to provide options, but it may be helpful in many cases where it can save the user from having to type out a response manually. IMPORTANT: NEVER include an option to toggle to Act mode, as this would be something you need to direct the user to do manually themselves if needed."
+        },
+        "agent_feedback": {
+          "type": "OBJECT",
+          "description": "Optional object for real-time agent feedback when you encounter a meaningful blocker, material ambiguity, or unstable behavior that affects correctness or progress.",
+          "properties": {
+            "message": {
+              "type": "STRING",
+              "description": "Optional object for real-time agent feedback when you encounter a meaningful blocker, material ambiguity, or unstable behavior that affects correctness or progress."
+            }
+          },
+          "required": [
+            "message"
+          ]
         },
         "task_progress": {
           "type": "STRING",
@@ -284,6 +272,19 @@
           "type": "STRING",
           "description": "A CLI command to execute to show a live demo of the result to the user. For example, use `open index.html` to display a created html website, or `open localhost:3000` to display a locally running development server. But DO NOT use commands like `echo` or `cat` that merely print text. This command should be valid for the current operating system. Ensure the command is properly formatted and does not contain any harmful instructions"
         },
+        "agent_feedback": {
+          "type": "OBJECT",
+          "description": "Optional object for real-time agent feedback when you encounter a meaningful blocker, material ambiguity, or unstable behavior that affects correctness or progress.",
+          "properties": {
+            "message": {
+              "type": "STRING",
+              "description": "Optional object for real-time agent feedback when you encounter a meaningful blocker, material ambiguity, or unstable behavior that affects correctness or progress."
+            }
+          },
+          "required": [
+            "message"
+          ]
+        },
         "task_progress": {
           "type": "STRING",
           "description": "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool."
@@ -303,6 +304,23 @@
         "message": {
           "type": "STRING",
           "description": "The direct message to show to the user."
+        },
+        "agent_feedback": {
+          "type": "OBJECT",
+          "description": "Optional object for real-time agent feedback when you encounter a meaningful blocker, material ambiguity, or unstable behavior that affects correctness or progress.",
+          "properties": {
+            "message": {
+              "type": "STRING",
+              "description": "Optional object for real-time agent feedback when you encounter a meaningful blocker, material ambiguity, or unstable behavior that affects correctness or progress."
+            }
+          },
+          "required": [
+            "message"
+          ]
+        },
+        "task_progress": {
+          "type": "STRING",
+          "description": "Use as a top-level parameter on the next tool call, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
         }
       },
       "required": [
@@ -347,15 +365,6 @@
     }
   },
   {
-    "name": "load_mcp_documentation",
-    "description": "Load documentation about creating MCP servers. This tool should be used when the user requests to create or install an MCP server (the user may ask you something along the lines of \"add a tool\" that does some function, in other words to create an MCP server that provides tools and resources that may connect to external APIs for example. You have the ability to create an MCP server and add it to a configuration file that will then expose the tools and resources for you to use with `use_mcp_tool` and `access_mcp_resource`). The documentation provides detailed information about the MCP server creation process, including setup instructions, best practices, and examples.",
-    "parameters": {
-      "type": "OBJECT",
-      "properties": {},
-      "required": []
-    }
-  },
-  {
     "name": "build_review_diff_output",
     "description": "Build and replace the stable review diff artifact at {diff_output} from an explicit Git-backed source. Use this for code-review workflow Step 3 when the diff source is a supported commit, commit range, ref diff, or HEAD-scoped worktree diff. Do not use set_workflow_placeholders for diff_output; it is stable in .cline/workflow-config.yaml.",
     "parameters": {
@@ -363,7 +372,34 @@
       "properties": {
         "source": {
           "type": "OBJECT",
-          "description": "Required source object. Supported shape: {\"type\":\"commit\",\"commit\":\"<ref>\"} | {\"type\":\"commit_range\",\"base\":\"<ref>\",\"head\":\"<ref>\"} | {\"type\":\"ref_diff\",\"base\":\"<ref>\",\"head\":\"<ref>\"} | {\"type\":\"worktree_head_scoped\"}."
+          "description": "Required source object. Supported shape: {\"type\":\"commit\",\"commit\":\"<ref>\"} | {\"type\":\"commit_range\",\"base\":\"<ref>\",\"head\":\"<ref>\"} | {\"type\":\"ref_diff\",\"base\":\"<ref>\",\"head\":\"<ref>\"} | {\"type\":\"worktree_head_scoped\"}.",
+          "properties": {
+            "type": {
+              "type": "STRING",
+              "description": "Required source object. Supported shape: {\"type\":\"commit\",\"commit\":\"<ref>\"} | {\"type\":\"commit_range\",\"base\":\"<ref>\",\"head\":\"<ref>\"} | {\"type\":\"ref_diff\",\"base\":\"<ref>\",\"head\":\"<ref>\"} | {\"type\":\"worktree_head_scoped\"}.",
+              "enum": [
+                "commit",
+                "commit_range",
+                "ref_diff",
+                "worktree_head_scoped"
+              ]
+            },
+            "commit": {
+              "type": "STRING",
+              "description": "Required source object. Supported shape: {\"type\":\"commit\",\"commit\":\"<ref>\"} | {\"type\":\"commit_range\",\"base\":\"<ref>\",\"head\":\"<ref>\"} | {\"type\":\"ref_diff\",\"base\":\"<ref>\",\"head\":\"<ref>\"} | {\"type\":\"worktree_head_scoped\"}."
+            },
+            "base": {
+              "type": "STRING",
+              "description": "Required source object. Supported shape: {\"type\":\"commit\",\"commit\":\"<ref>\"} | {\"type\":\"commit_range\",\"base\":\"<ref>\",\"head\":\"<ref>\"} | {\"type\":\"ref_diff\",\"base\":\"<ref>\",\"head\":\"<ref>\"} | {\"type\":\"worktree_head_scoped\"}."
+            },
+            "head": {
+              "type": "STRING",
+              "description": "Required source object. Supported shape: {\"type\":\"commit\",\"commit\":\"<ref>\"} | {\"type\":\"commit_range\",\"base\":\"<ref>\",\"head\":\"<ref>\"} | {\"type\":\"ref_diff\",\"base\":\"<ref>\",\"head\":\"<ref>\"} | {\"type\":\"worktree_head_scoped\"}."
+            }
+          },
+          "required": [
+            "type"
+          ]
         },
         "scoped_paths": {
           "type": "STRING",

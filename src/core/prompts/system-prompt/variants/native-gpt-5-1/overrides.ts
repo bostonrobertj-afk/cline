@@ -17,7 +17,7 @@ const GPT5_1_RULES = (_context: SystemPromptContext) => `RULES
 - When performing regex searches, try to craft search patterns that will not return an excessive amount of results.
 - ${getCodeExplorationGuidance(
 	_context,
-	"For code exploration, prefer search_files first, then list_code_definition_names, then read_file_range or symbol-targeted MCP reads for the smallest relevant section. Use read_file only when the target file is at or below 300 lines and 16384 bytes. Avoid repeating overlapping reads when a narrower range is enough.",
+	"For code exploration, prefer search_files first, then list_code_definition_names, then take one read_file pass for a single target file when it is at or below 800 lines and 65536 bytes and you need the full editing context; otherwise use read_file_range or symbol-targeted MCP reads for the smallest relevant section. Avoid repeating overlapping reads or stitching together many adjacent range reads when one allowed full read would be clearer.",
 )}
 - MCP operations should be used one at a time, similar to other tool usage. Wait for confirmation of success before proceeding with additional operations.
 - Before calling a tool, use the available runtime context and ensure required parameters are present or can be reasonably inferred.

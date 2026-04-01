@@ -6,6 +6,7 @@ import { ClineDefaultTool } from "@shared/tools"
 import * as pathUtils from "@utils/path"
 import { afterEach, beforeEach, describe, it } from "mocha"
 import sinon from "sinon"
+import type { ClineIgnoreController } from "@/core/ignore/ClineIgnoreController"
 import { TaskState } from "../../../TaskState"
 import { ToolValidator } from "../../ToolValidator"
 import type { TaskConfig } from "../../types/TaskConfig"
@@ -93,7 +94,11 @@ function createConfig() {
 		coordinator: { getHandler: sinon.stub() },
 	} as unknown as TaskConfig
 
-	return { config, taskState, validator: new ToolValidator({ validateAccess: () => true } as any) }
+	return {
+		config,
+		taskState,
+		validator: new ToolValidator({ validateAccess: () => true } as unknown as ClineIgnoreController),
+	}
 }
 
 function makeBlock(relPath: string) {
@@ -207,16 +212,31 @@ describe("ReadFileToolHandler repeat read behavior", () => {
 		const handler = new ReadFileToolHandler(validator)
 		const relPath = "too-large.ts"
 		const absolutePath = path.join(tmpDir, relPath)
-		const content = `${Array.from({ length: 301 }, (_, index) => `line ${index + 1}`).join("\n")}\n`
+		const content = `${Array.from({ length: 801 }, (_, index) => `line ${index + 1}`).join("\n")}\n`
 		await fs.writeFile(absolutePath, content)
 
 		const result = await handler.execute(config, makeBlock(relPath))
 
 		assert.ok((result as string).includes("[Full file read blocked]"))
-		assert.ok((result as string).includes("300-line / 16384-byte full-read limit"))
+		assert.ok((result as string).includes("800-line / 65536-byte full-read limit"))
 		assert.ok((result as string).includes("Use read_file_range with explicit 1-based start_line and end_line values"))
-		assert.ok(!(result as string).includes("line 301"))
+		assert.ok(!(result as string).includes("line 801"))
 		assert.equal(taskState.fileReadCache.get(absolutePath.toLowerCase()), undefined)
+	})
+
+	it("allows full-file reads at the 800-line threshold", async () => {
+		const { config, taskState, validator } = createConfig()
+		const handler = new ReadFileToolHandler(validator)
+		const relPath = "max-lines.ts"
+		const absolutePath = path.join(tmpDir, relPath)
+		const content = Array.from({ length: 800 }, (_, index) => `line ${index + 1}`).join("\n")
+		await fs.writeFile(absolutePath, content)
+
+		const result = await handler.execute(config, makeBlock(relPath))
+
+		assert.ok((result as string).includes("line 800"))
+		assert.ok(!(result as string).includes("[Full file read blocked]"))
+		assert.ok(taskState.fileReadCache.get(absolutePath.toLowerCase()) !== undefined)
 	})
 
 	it("blocks oversized full-file reads instead of caching them", async () => {
@@ -224,14 +244,29 @@ describe("ReadFileToolHandler repeat read behavior", () => {
 		const handler = new ReadFileToolHandler(validator)
 		const relPath = "large-file.ts"
 		const absolutePath = path.join(tmpDir, relPath)
-		const content = "a".repeat(200_000)
+		const content = "a".repeat(65_537)
 		await fs.writeFile(absolutePath, content)
 
 		const result = await handler.execute(config, makeBlock(relPath))
 		const cacheEntry = taskState.fileReadCache.get(absolutePath.toLowerCase())
 
 		assert.ok((result as string).includes("[Full file read blocked]"))
-		assert.ok((result as string).includes("300-line / 16384-byte full-read limit"))
+		assert.ok((result as string).includes("800-line / 65536-byte full-read limit"))
 		assert.equal(cacheEntry, undefined)
+	})
+
+	it("allows full-file reads at the 65536-byte threshold", async () => {
+		const { config, taskState, validator } = createConfig()
+		const handler = new ReadFileToolHandler(validator)
+		const relPath = "max-bytes.ts"
+		const absolutePath = path.join(tmpDir, relPath)
+		const content = "a".repeat(65_536)
+		await fs.writeFile(absolutePath, content)
+
+		const result = await handler.execute(config, makeBlock(relPath))
+
+		assert.equal((result as string).length, 65_536)
+		assert.ok(!(result as string).includes("[Full file read blocked]"))
+		assert.ok(taskState.fileReadCache.get(absolutePath.toLowerCase()) !== undefined)
 	})
 })

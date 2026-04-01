@@ -2,32 +2,6 @@
   {
     "type": "function",
     "function": {
-      "name": "execute_command",
-      "description": "Run a shell command in the current workspace.",
-      "strict": false,
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "command": {
-            "type": "string",
-            "description": "The CLI command to execute."
-          },
-          "requires_approval": {
-            "type": "boolean",
-            "description": "Set true for impactful or risky commands; false for safe non-destructive commands."
-          }
-        },
-        "required": [
-          "command",
-          "requires_approval"
-        ],
-        "additionalProperties": false
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
       "name": "read_file",
       "description": "Request to read the contents of a file at the specified path.",
       "strict": false,
@@ -155,36 +129,11 @@
         "properties": {
           "path": {
             "type": "string",
-            "description": "The path of the directory to list contents for (relative to the current working directory /test/project)"
+            "description": "The path of the directory to list contents for."
           },
           "recursive": {
             "type": "boolean",
             "description": "Whether to list files recursively."
-          },
-          "task_progress": {
-            "type": "string",
-            "description": "Top-level tool parameter, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
-          }
-        },
-        "required": [
-          "path"
-        ],
-        "additionalProperties": false
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "list_code_definition_names",
-      "description": "Request to list definition names (classes, functions, methods, etc.) used in source code files at the top level of the specified directory.",
-      "strict": false,
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "path": {
-            "type": "string",
-            "description": "The path of a directory (not a file) relative to the current working directory /test/project."
           },
           "task_progress": {
             "type": "string",
@@ -242,11 +191,11 @@
         "properties": {
           "question": {
             "type": "string",
-            "description": "The question to ask the user."
+            "description": "The single question to ask the user."
           },
           "options": {
             "type": "string",
-            "description": "An array of 2-5 options for the user to choose from."
+            "description": "An array of 2-5 options (e.x: \"[\"Option 1\", \"Option 2\", \"Option 3\"]\") for the user to choose from."
           },
           "agent_feedback": {
             "type": "object",
@@ -268,7 +217,8 @@
           }
         },
         "required": [
-          "question"
+          "question",
+          "options"
         ],
         "additionalProperties": false
       }
@@ -285,11 +235,11 @@
         "properties": {
           "result": {
             "type": "string",
-            "description": "The result of the tool use."
+            "description": "A clear, brief and very short (1-2 paragraph) summary of the final result of the task."
           },
           "command": {
             "type": "string",
-            "description": "A CLI command to execute to show a live demo of the result to the user."
+            "description": "An actionable terminal command that is non-verbose that allows user to review the result of your work."
           },
           "agent_feedback": {
             "type": "object",
@@ -359,242 +309,23 @@
   {
     "type": "function",
     "function": {
-      "name": "new_task",
-      "description": "Request to create a new task with preloaded context covering the conversation with the user up to this point and key information for continuing with the new task.",
+      "name": "set_workflow_placeholders",
+      "description": "Persist dynamic placeholder values discovered during the active workflow. Call as {\"values\":{\"story_path\":\"docs/story.md\",\"project_context\":\"docs/project-context.md\"}}. Stable config-backed placeholders like output_folder come from .cline/workflow-config.yaml.",
       "strict": false,
       "parameters": {
         "type": "object",
         "properties": {
-          "context": {
-            "type": "string",
-            "description": "The context to preload the new task with."
-          }
-        },
-        "required": [
-          "context"
-        ],
-        "additionalProperties": false
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "act_mode_respond",
-      "description": "Send a brief ACT MODE preamble or progress update to the user.",
-      "strict": false,
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "response": {
-            "type": "string",
-            "description": "The message to provide to the user."
-          },
-          "task_progress": {
-            "type": "string",
-            "description": "Top-level tool parameter, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
-          }
-        },
-        "required": [
-          "response"
-        ],
-        "additionalProperties": false
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "build_review_diff_output",
-      "description": "Build and atomically replace {diff_output} from an explicit Git-backed source. Use for code-review diff artifact construction, not for arbitrary file writes.",
-      "strict": false,
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "source": {
+          "values": {
             "type": "object",
-            "description": "Required source object. Supported shape: {\"type\":\"commit\",\"commit\":\"<ref>\"} | {\"type\":\"commit_range\",\"base\":\"<ref>\",\"head\":\"<ref>\"} | {\"type\":\"ref_diff\",\"base\":\"<ref>\",\"head\":\"<ref>\"} | {\"type\":\"worktree_head_scoped\"}.",
-            "properties": {
-              "type": {
-                "type": "string",
-                "enum": [
-                  "commit",
-                  "commit_range",
-                  "ref_diff",
-                  "worktree_head_scoped"
-                ]
-              },
-              "commit": {
-                "type": "string"
-              },
-              "base": {
-                "type": "string"
-              },
-              "head": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "type"
-            ],
-            "oneOf": [
-              {
-                "type": "object",
-                "properties": {
-                  "type": {
-                    "type": "string",
-                    "const": "commit"
-                  },
-                  "commit": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "type",
-                  "commit"
-                ]
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "type": {
-                    "type": "string",
-                    "const": "commit_range"
-                  },
-                  "base": {
-                    "type": "string"
-                  },
-                  "head": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "type",
-                  "base",
-                  "head"
-                ]
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "type": {
-                    "type": "string",
-                    "const": "ref_diff"
-                  },
-                  "base": {
-                    "type": "string"
-                  },
-                  "head": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "type",
-                  "base",
-                  "head"
-                ]
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "type": {
-                    "type": "string",
-                    "const": "worktree_head_scoped"
-                  }
-                },
-                "required": [
-                  "type"
-                ]
-              }
-            ]
-          },
-          "scoped_paths": {
-            "type": "array",
-            "description": "Optional repository-relative path array. Required for {\"type\":\"worktree_head_scoped\"}.",
-            "items": {
+            "description": "Object map of placeholder keys to strings. Call the tool as {\"values\": {...}}. Not arrays of {name,value} or {key,value}.",
+            "additionalProperties": {
               "type": "string"
             }
-          },
-          "context_lines": {
-            "type": "integer",
-            "description": "Optional unified diff context line count. Defaults to 3."
           }
         },
         "required": [
-          "source"
+          "values"
         ],
-        "additionalProperties": false
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "build_review_input",
-      "description": "Build review-input.md from a story file and the stable {diff_output} artifact. The only human-supplied parameter is story_path.",
-      "strict": false,
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "story_path": {
-            "type": "string",
-            "description": "Path to the story markdown file that is being reviewed."
-          }
-        },
-        "required": [
-          "story_path"
-        ],
-        "additionalProperties": false
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "use_subagents",
-      "description": "Run up to five focused in-process subagents in parallel.",
-      "strict": false,
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "prompt_1": {
-            "type": "string",
-            "description": "First subagent prompt."
-          },
-          "prompt_2": {
-            "type": "string",
-            "description": "Optional second subagent prompt."
-          },
-          "prompt_3": {
-            "type": "string",
-            "description": "Optional third subagent prompt."
-          },
-          "prompt_4": {
-            "type": "string",
-            "description": "Optional fourth subagent prompt."
-          },
-          "prompt_5": {
-            "type": "string",
-            "description": "Optional fifth subagent prompt."
-          }
-        },
-        "required": [
-          "prompt_1"
-        ],
-        "additionalProperties": false
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "12345670mcp0test_tool",
-      "description": "test-server: A test tool",
-      "strict": false,
-      "parameters": {
-        "type": "object",
-        "properties": {},
-        "required": [],
         "additionalProperties": false
       }
     }

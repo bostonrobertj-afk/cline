@@ -29,7 +29,7 @@
     "type": "function",
     "function": {
       "name": "read_file",
-      "description": "Request to read the contents of a file at the specified path.",
+      "description": "Use Indxr first for discovery, summaries, symbol lookup, dependency tracing, and targeted source reads. Once the task is narrowed to one concrete file, use read_file when exact full raw file contents are required for a file at or below 800 lines and 65536 bytes, or when Indxr is insufficient.",
       "strict": false,
       "parameters": {
         "type": "object",
@@ -54,7 +54,7 @@
     "type": "function",
     "function": {
       "name": "read_file_range",
-      "description": "Request to read only a specific 1-based line range from a text file.",
+      "description": "Use only when exact raw line-based inspection is required after Indxr has already narrowed the target, when the file exceeds the full-read limit, or when Indxr is insufficient.",
       "strict": false,
       "parameters": {
         "type": "object",
@@ -114,7 +114,7 @@
     "type": "function",
     "function": {
       "name": "search_files",
-      "description": "Request to perform a regex search across files in a specified directory, providing context-rich results.",
+      "description": "Use only for exact raw-text regex search when Indxr is unavailable, insufficient, or regex search is specifically required.",
       "strict": false,
       "parameters": {
         "type": "object",
@@ -160,31 +160,6 @@
           "recursive": {
             "type": "boolean",
             "description": "Whether to list files recursively."
-          },
-          "task_progress": {
-            "type": "string",
-            "description": "Top-level tool parameter, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
-          }
-        },
-        "required": [
-          "path"
-        ],
-        "additionalProperties": false
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "list_code_definition_names",
-      "description": "Request to list definition names (classes, functions, methods, etc.) used in source code files at the top level of the specified directory.",
-      "strict": false,
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "path": {
-            "type": "string",
-            "description": "The path of a directory (not a file) relative to the current working directory /test/project."
           },
           "task_progress": {
             "type": "string",
@@ -530,20 +505,13 @@
   {
     "type": "function",
     "function": {
-      "name": "build_review_input",
-      "description": "Build review-input.md from a story file and the stable {diff_output} artifact. The only human-supplied parameter is story_path.",
+      "name": "indxr-10mcp0search_relevant",
+      "description": "workspace-index: Search relevant code",
       "strict": false,
       "parameters": {
         "type": "object",
-        "properties": {
-          "story_path": {
-            "type": "string",
-            "description": "Path to the story markdown file that is being reviewed."
-          }
-        },
-        "required": [
-          "story_path"
-        ],
+        "properties": {},
+        "required": [],
         "additionalProperties": false
       }
     }
@@ -551,36 +519,13 @@
   {
     "type": "function",
     "function": {
-      "name": "use_subagents",
-      "description": "Run up to five focused in-process subagents in parallel.",
+      "name": "indxr-10mcp0get_file_summary",
+      "description": "workspace-index: Summarize file",
       "strict": false,
       "parameters": {
         "type": "object",
-        "properties": {
-          "prompt_1": {
-            "type": "string",
-            "description": "First subagent prompt."
-          },
-          "prompt_2": {
-            "type": "string",
-            "description": "Optional second subagent prompt."
-          },
-          "prompt_3": {
-            "type": "string",
-            "description": "Optional third subagent prompt."
-          },
-          "prompt_4": {
-            "type": "string",
-            "description": "Optional fourth subagent prompt."
-          },
-          "prompt_5": {
-            "type": "string",
-            "description": "Optional fifth subagent prompt."
-          }
-        },
-        "required": [
-          "prompt_1"
-        ],
+        "properties": {},
+        "required": [],
         "additionalProperties": false
       }
     }
@@ -588,8 +533,8 @@
   {
     "type": "function",
     "function": {
-      "name": "12345670mcp0test_tool",
-      "description": "test-server: A test tool",
+      "name": "indxr-10mcp0lookup_symbol",
+      "description": "workspace-index: Lookup symbol",
       "strict": false,
       "parameters": {
         "type": "object",

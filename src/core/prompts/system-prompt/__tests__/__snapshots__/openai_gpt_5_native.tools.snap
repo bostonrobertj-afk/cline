@@ -234,36 +234,6 @@
   {
     "type": "function",
     "function": {
-      "name": "access_mcp_resource",
-      "description": "Request to access a resource provided by a connected MCP server.",
-      "strict": false,
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "server_name": {
-            "type": "string",
-            "description": "The name of the MCP server providing the resource"
-          },
-          "uri": {
-            "type": "string",
-            "description": "The URI identifying the specific resource to access"
-          },
-          "task_progress": {
-            "type": "string",
-            "description": "Top-level tool parameter, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
-          }
-        },
-        "required": [
-          "server_name",
-          "uri"
-        ],
-        "additionalProperties": false
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
       "name": "ask_followup_question",
       "description": "Ask the user one concise follow-up question when required input cannot be inferred.",
       "strict": false,
@@ -277,6 +247,20 @@
           "options": {
             "type": "string",
             "description": "An array of 2-5 options (e.x: \"[\"Option 1\", \"Option 2\", \"Option 3\"]\") for the user to choose from."
+          },
+          "agent_feedback": {
+            "type": "object",
+            "description": "Optional object for real-time agent feedback when you encounter a meaningful blocker, material ambiguity, or unstable behavior that affects correctness or progress.",
+            "properties": {
+              "message": {
+                "type": "string",
+                "description": "Concise description of the blocker, ambiguity, instability, or confusing scenario."
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "additionalProperties": false
           },
           "task_progress": {
             "type": "string",
@@ -308,6 +292,20 @@
             "type": "string",
             "description": "An actionable terminal command that is non-verbose that allows user to review the result of your work."
           },
+          "agent_feedback": {
+            "type": "object",
+            "description": "Optional object for real-time agent feedback when you encounter a meaningful blocker, material ambiguity, or unstable behavior that affects correctness or progress.",
+            "properties": {
+              "message": {
+                "type": "string",
+                "description": "Concise description of the blocker, ambiguity, instability, or confusing scenario."
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "additionalProperties": false
+          },
           "task_progress": {
             "type": "string",
             "description": "Top-level tool parameter, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
@@ -332,25 +330,29 @@
           "message": {
             "type": "string",
             "description": "The direct message to show to the user."
+          },
+          "agent_feedback": {
+            "type": "object",
+            "description": "Optional object for real-time agent feedback when you encounter a meaningful blocker, material ambiguity, or unstable behavior that affects correctness or progress.",
+            "properties": {
+              "message": {
+                "type": "string",
+                "description": "Concise description of the blocker, ambiguity, instability, or confusing scenario."
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "additionalProperties": false
+          },
+          "task_progress": {
+            "type": "string",
+            "description": "Top-level tool parameter, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
           }
         },
         "required": [
           "message"
         ],
-        "additionalProperties": false
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "load_mcp_documentation",
-      "description": "Load documentation about creating MCP servers.",
-      "strict": false,
-      "parameters": {
-        "type": "object",
-        "properties": {},
-        "required": [],
         "additionalProperties": false
       }
     }
@@ -366,7 +368,100 @@
         "properties": {
           "source": {
             "type": "object",
-            "description": "Required source object. Supported shape: {\"type\":\"commit\",\"commit\":\"<ref>\"} | {\"type\":\"commit_range\",\"base\":\"<ref>\",\"head\":\"<ref>\"} | {\"type\":\"ref_diff\",\"base\":\"<ref>\",\"head\":\"<ref>\"} | {\"type\":\"worktree_head_scoped\"}."
+            "description": "Required source object. Supported shape: {\"type\":\"commit\",\"commit\":\"<ref>\"} | {\"type\":\"commit_range\",\"base\":\"<ref>\",\"head\":\"<ref>\"} | {\"type\":\"ref_diff\",\"base\":\"<ref>\",\"head\":\"<ref>\"} | {\"type\":\"worktree_head_scoped\"}.",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "commit",
+                  "commit_range",
+                  "ref_diff",
+                  "worktree_head_scoped"
+                ]
+              },
+              "commit": {
+                "type": "string"
+              },
+              "base": {
+                "type": "string"
+              },
+              "head": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "commit"
+                  },
+                  "commit": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "commit"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "commit_range"
+                  },
+                  "base": {
+                    "type": "string"
+                  },
+                  "head": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "base",
+                  "head"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "ref_diff"
+                  },
+                  "base": {
+                    "type": "string"
+                  },
+                  "head": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "base",
+                  "head"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "worktree_head_scoped"
+                  }
+                },
+                "required": [
+                  "type"
+                ]
+              }
+            ]
           },
           "scoped_paths": {
             "type": "array",

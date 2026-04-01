@@ -1,4 +1,5 @@
 import { strict as assert } from "node:assert"
+import type { McpToolCallResponse } from "@shared/mcp"
 import { ClineDefaultTool } from "@shared/tools"
 import { describe, it } from "mocha"
 import sinon from "sinon"
@@ -6,7 +7,7 @@ import { TaskState } from "../../../TaskState"
 import type { TaskConfig } from "../../types/TaskConfig"
 import { UseMcpToolHandler } from "../UseMcpToolHandler"
 
-function createConfig(toolResult: { content: any[]; isError?: boolean }) {
+function createConfig(toolResult: McpToolCallResponse) {
 	const taskState = new TaskState()
 	const callbacks = {
 		say: sinon.stub().resolves(undefined),
@@ -114,8 +115,8 @@ describe("UseMcpToolHandler", () => {
 					resource: {
 						path: "src/large.ts",
 						start_line: 1,
-						end_line: 301,
-						source: `${Array.from({ length: 301 }, (_, index) => `line ${index + 1}`).join("\n")}\n`,
+						end_line: 801,
+						source: `${Array.from({ length: 801 }, (_, index) => `line ${index + 1}`).join("\n")}\n`,
 					},
 				},
 			],
@@ -125,8 +126,32 @@ describe("UseMcpToolHandler", () => {
 		const result = await handler.execute(config, makeBlock("read_source", JSON.stringify({ path: "src/large.ts" })))
 
 		assert.ok((result as string).includes("[MCP full source read blocked]"))
+		assert.ok((result as string).includes("800-line / 65536-byte full-read limit"))
 		assert.ok((result as string).includes("explicit symbol or 1-based start_line/end_line range"))
-		assert.ok(!(result as string).includes("line 301"))
+		assert.ok(!(result as string).includes("line 801"))
+	})
+
+	it("allows non-targeted read_source payloads at the 800-line threshold", async () => {
+		const { config } = createConfig({
+			content: [
+				{
+					type: "resource",
+					resource: {
+						path: "src/allowed.ts",
+						start_line: 1,
+						end_line: 800,
+						source: Array.from({ length: 800 }, (_, index) => `line ${index + 1}`).join("\n"),
+					},
+				},
+			],
+		})
+		const handler = new UseMcpToolHandler()
+
+		const result = await handler.execute(config, makeBlock("read_source", JSON.stringify({ path: "src/allowed.ts" })))
+
+		assert.ok((result as string).includes("[MCP source range 1-800] src/allowed.ts"))
+		assert.ok((result as string).includes("line 800"))
+		assert.ok(!(result as string).includes("[MCP full source read blocked]"))
 	})
 
 	it("normalizes targeted read_source payloads with line metadata", async () => {

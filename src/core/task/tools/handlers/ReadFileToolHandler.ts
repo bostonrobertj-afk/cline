@@ -54,7 +54,7 @@ export class ReadFileToolHandler implements IFullyManagedTool {
 	}
 
 	async execute(config: TaskConfig, block: ToolUse): Promise<ToolResponse> {
-		const relPath: string | undefined = block.params.path
+		const relPath = block.params.path
 
 		// Extract provider information for telemetry
 		const apiConfig = config.services.stateManager.getApiConfiguration()
@@ -63,24 +63,24 @@ export class ReadFileToolHandler implements IFullyManagedTool {
 
 		// Validate required parameters
 		const pathValidation = this.validator.assertRequiredParams(block, "path")
-		if (!pathValidation.ok) {
+		if (!pathValidation.ok || relPath === undefined) {
 			config.taskState.consecutiveMistakeCount++
 			return await config.callbacks.sayAndCreateMissingParamError(this.name, "path")
 		}
 
 		// Check clineignore access
-		const accessValidation = this.validator.checkClineIgnorePath(relPath!)
+		const accessValidation = this.validator.checkClineIgnorePath(relPath)
 		if (!accessValidation.ok) {
 			if (!config.isSubagentExecution) {
 				await config.callbacks.say("clineignore_error", relPath)
 			}
-			return formatResponse.toolError(formatResponse.clineIgnoreError(relPath!))
+			return formatResponse.toolError(formatResponse.clineIgnoreError(relPath))
 		}
 
 		// Resolve the absolute path based on multi-workspace configuration
-		const pathResult = resolveWorkspacePath(config, relPath!, "ReadFileToolHandler.execute")
+		const pathResult = resolveWorkspacePath(config, relPath, "ReadFileToolHandler.execute")
 		const { absolutePath, displayPath } =
-			typeof pathResult === "string" ? { absolutePath: pathResult, displayPath: relPath! } : pathResult
+			typeof pathResult === "string" ? { absolutePath: pathResult, displayPath: relPath } : pathResult
 
 		// Determine workspace context for telemetry
 		const fallbackAbsolutePath = path.resolve(config.cwd, relPath ?? "")
@@ -96,7 +96,7 @@ export class ReadFileToolHandler implements IFullyManagedTool {
 			tool: "readFile",
 			path: getReadablePath(config.cwd, displayPath),
 			content: absolutePath,
-			operationIsLocatedInWorkspace: await isLocatedInWorkspace(relPath!),
+			operationIsLocatedInWorkspace: await isLocatedInWorkspace(relPath),
 		} satisfies ClineSayTool
 
 		const completeMessage = JSON.stringify(sharedMessageProps)
@@ -202,12 +202,12 @@ export class ReadFileToolHandler implements IFullyManagedTool {
 					const allowance = evaluateFullSourceReadAllowance(fileContent.text)
 					if (!allowance.allowed) {
 						config.taskState.consecutiveMistakeCount = 0
-						return `[Full file read blocked] '${displayPath}' is ${allowance.totalLines} lines / ${allowance.totalBytes} bytes, which exceeds the 300-line / 16384-byte full-read limit. Use read_file_range with explicit 1-based start_line and end_line values for the smallest relevant section.`
+						return `[Full file read blocked] '${displayPath}' is ${allowance.totalLines} lines / ${allowance.totalBytes} bytes, which exceeds the 800-line / 65536-byte full-read limit. Use read_file_range with explicit 1-based start_line and end_line values for the smallest relevant section.`
 					}
 				}
 
 				config.taskState.consecutiveMistakeCount = 0
-				await config.services.fileContextTracker.trackFileContext(relPath!, "read_tool")
+				await config.services.fileContextTracker.trackFileContext(relPath, "read_tool")
 
 				if (fileContent.imageBlock) {
 					config.taskState.userMessageContent.push(fileContent.imageBlock)
@@ -257,7 +257,7 @@ export class ReadFileToolHandler implements IFullyManagedTool {
 			const allowance = evaluateFullSourceReadAllowance(fileContent.text)
 			if (!allowance.allowed) {
 				config.taskState.consecutiveMistakeCount = 0
-				return `[Full file read blocked] '${displayPath}' is ${allowance.totalLines} lines / ${allowance.totalBytes} bytes, which exceeds the 300-line / 16384-byte full-read limit. Use read_file_range with explicit 1-based start_line and end_line values for the smallest relevant section.`
+				return `[Full file read blocked] '${displayPath}' is ${allowance.totalLines} lines / ${allowance.totalBytes} bytes, which exceeds the 800-line / 65536-byte full-read limit. Use read_file_range with explicit 1-based start_line and end_line values for the smallest relevant section.`
 			}
 		}
 
@@ -266,7 +266,7 @@ export class ReadFileToolHandler implements IFullyManagedTool {
 		config.taskState.consecutiveMistakeCount = 0
 
 		// Track file read operation
-		await config.services.fileContextTracker.trackFileContext(relPath!, "read_tool")
+		await config.services.fileContextTracker.trackFileContext(relPath, "read_tool")
 
 		// Cache metadata for deduplication (no content stored — saves memory)
 		let mtime = 0

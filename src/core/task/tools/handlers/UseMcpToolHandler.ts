@@ -1,6 +1,8 @@
 import type { ToolUse } from "@core/assistant-message"
 import { formatResponse } from "@core/prompts/responses"
+import type { McpConnection } from "@services/mcp/types"
 import { ClineAsk, ClineAskUseMcpServer } from "@shared/ExtensionMessage"
+import type { McpToolCallResponse } from "@shared/mcp"
 import { telemetryService } from "@/services/telemetry"
 import { truncateContent } from "@/shared/content-limits"
 import { ClineDefaultTool } from "@/shared/tools"
@@ -41,7 +43,7 @@ export class UseMcpToolHandler implements IFullyManagedTool {
 
 		if (shouldAutoApprove) {
 			await uiHelpers.removeLastPartialMessageIfExistsWithType("ask", "use_mcp_server")
-			await uiHelpers.say("use_mcp_server" as any, partialMessage, undefined, undefined, block.partial)
+			await uiHelpers.say("use_mcp_server", partialMessage, undefined, undefined, block.partial)
 		} else {
 			await uiHelpers.removeLastPartialMessageIfExistsWithType("say", "use_mcp_server")
 			await uiHelpers.ask("use_mcp_server" as ClineAsk, partialMessage, block.partial).catch(() => {})
@@ -64,7 +66,7 @@ export class UseMcpToolHandler implements IFullyManagedTool {
 		)
 	}
 
-	private normalizeReadSourcePayload(item: any):
+	private normalizeReadSourcePayload(item: McpToolCallResponse["content"][number]):
 		| {
 				displayPath: string
 				source: string
@@ -145,8 +147,8 @@ export class UseMcpToolHandler implements IFullyManagedTool {
 		} satisfies ClineAskUseMcpServer)
 
 		const isToolAutoApproved = config.services.mcpHub.connections
-			?.find((conn: any) => conn.server.name === server_name)
-			?.server.tools?.find((tool: any) => tool.name === tool_name)?.autoApprove
+			?.find((conn: McpConnection) => conn.server.name === server_name)
+			?.server.tools?.find((tool) => tool.name === tool_name)?.autoApprove
 
 		if (config.callbacks.shouldAutoApproveTool(block.name) || isToolAutoApproved) {
 			// Auto-approval flow
@@ -233,13 +235,16 @@ export class UseMcpToolHandler implements IFullyManagedTool {
 			// Process tool result
 			const toolResultImages =
 				toolResult?.content
-					.filter((item: any) => item.type === "image")
-					.map((item: any) => `data:${item.mimeType};base64,${item.data}`) || []
+					.filter(
+						(item): item is Extract<McpToolCallResponse["content"][number], { type: "image" }> =>
+							item.type === "image",
+					)
+					.map((item) => `data:${item.mimeType};base64,${item.data}`) || []
 
 			let toolResultText =
 				(toolResult?.isError ? "Error:\n" : "") +
 					toolResult?.content
-						.map((item: any) => {
+						.map((item) => {
 							if (item.type === "text") {
 								return item.text
 							}
@@ -267,7 +272,7 @@ export class UseMcpToolHandler implements IFullyManagedTool {
 
 									const allowance = evaluateFullSourceReadAllowance(normalized.source)
 									if (!this.hasExplicitReadSourceTarget(parsedArguments) && !allowance.allowed) {
-										return `[MCP full source read blocked] '${normalized.displayPath}' is ${allowance.totalLines} lines / ${allowance.totalBytes} bytes, which exceeds the 300-line / 16384-byte full-read limit. Reissue read_source with an explicit symbol or 1-based start_line/end_line range.`
+										return `[MCP full source read blocked] '${normalized.displayPath}' is ${allowance.totalLines} lines / ${allowance.totalBytes} bytes, which exceeds the 800-line / 65536-byte full-read limit. Reissue read_source with an explicit symbol or 1-based start_line/end_line range.`
 									}
 
 									recordTrackedSourceWindow(config.taskState.sourceReadWindowCache, cacheKey, {
@@ -285,7 +290,7 @@ export class UseMcpToolHandler implements IFullyManagedTool {
 						.join("\n\n") || "(No response)"
 
 			// webview extracts images from the text response to display in the UI
-			const toolResultToDisplay = toolResultText + toolResultImages?.map((image: any) => `\n\n${image}`).join("")
+			const toolResultToDisplay = toolResultText + toolResultImages.map((image) => `\n\n${image}`).join("")
 			await config.callbacks.say("mcp_server_response", toolResultToDisplay)
 
 			// Handle model image support

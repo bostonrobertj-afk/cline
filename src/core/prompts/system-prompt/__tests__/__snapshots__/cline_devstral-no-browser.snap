@@ -44,7 +44,7 @@ Usage:
 </execute_command>
 
 ## read_file
-Description: Request to read the contents of a file at the specified path. Prefer using search_files and list_code_definition_names first to narrow the target, then use read_file_range for targeted inspection. Use read_file only when the file is at or below 300 lines and 16384 bytes and you truly need the exact full contents. Automatically extracts raw text from PDF and DOCX files. Do NOT use this tool to list the contents of a directory.
+Description: Request to read the contents of a file at the specified path. Prefer using search_files and list_code_definition_names first to narrow the target, then use read_file_range for targeted inspection. Use read_file only when the file is at or below 800 lines and 65536 bytes and you truly need the exact full contents. Automatically extracts raw text from PDF and DOCX files. Do NOT use this tool to list the contents of a directory.
 Parameters:
 - path: (required) The path of the file to read (relative to the current working directory /test/project)
 - task_progress: (optional) Use as a top-level parameter on the next tool call, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step.

@@ -99,7 +99,8 @@ Current evaluator examples:
   - Step 2 requires task-written `diff_output` with a surviving write proof
   - Step 3 requires task-written `review_input` with a surviving write proof
   - Step 4 derives `review_mode` from available artifacts
-  - later steps inspect fallback prompt artifacts or spec-file status values
+  - Step 5 requires every required review layer to have either an already-recorded completion source or a current-task fallback prompt artifact
+  - Step 6 requires a task-written `spec_file` that now carries a terminal review status
   - Step 7 completes when the current turn successfully executes `attempt_completion`
 - `review-adversarial-general.md`
   - Step 1 completes when `diff_output` resolves to an existing file path
@@ -123,6 +124,7 @@ Current evaluator examples:
 - Required placeholders are absent or blank.
 - Expected artifacts were not written during the current task, so write-proof checks fail.
 - Referenced files cannot be read or stat-ed.
+- A multi-artifact gate cannot be proven because one required path is missing, blank, or points to a missing file.
 - Expected file content markers such as top-level `Status:` values are missing or non-terminal.
 - A derived placeholder value may already match the needed value; in that case the step can still auto-complete, but no placeholder-value mutation is recorded.
 
@@ -167,6 +169,8 @@ This is especially important for steps whose completion is defined by:
 - In `review-edge-case-hunter.md`, if `review_input` and `diff_output` both resolve to existing files, Step 1 can complete immediately on the next deterministic pass.
 - In `review-edge-case-hunter.md`, if Step 2 writes `{output_folder}/edge-case-review-findings.md` during the current task and the artifact still exists, Step 2 can auto-complete.
 - In `review-edge-case-hunter.md`, Step 3 can auto-complete when the current turn successfully executes `attempt_completion`.
+- In `code-review.md`, if every required review layer already has a current-task fallback prompt artifact, Step 5 can auto-complete without another model confirmation turn.
+- In `code-review.md`, if `spec_file` was updated during this task and now contains a terminal review status, Step 6 can auto-complete.
 - In `dev-story.md`, if the story file’s `## Tasks / Subtasks` section has no unchecked items, the task-execution step can auto-complete.
 - In `code-review.md`, Step 7 can auto-complete when the current turn successfully executes `attempt_completion`.
 - In `review-adversarial-general.md`, Step 3 can auto-complete when the current turn successfully executes `attempt_completion`.

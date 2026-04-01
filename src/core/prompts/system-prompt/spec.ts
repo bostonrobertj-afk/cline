@@ -4,7 +4,7 @@ import { ChatCompletionTool as OpenAITool } from "openai/resources/chat/completi
 import { FunctionTool as OpenAIResponseFunctionTool, Tool as OpenAIResponseTool } from "openai/resources/responses/responses"
 import { ModelFamily } from "@/shared/prompts"
 import type { ClineDefaultTool } from "@/shared/tools"
-import { hasConnectedIndxrServer, replacePromptPlaceholders as replaceMcpPromptPlaceholders } from "./components/mcp"
+import { hasUsableIndxrExplorationContext, replacePromptPlaceholders as replaceMcpPromptPlaceholders } from "./components/mcp"
 import { MULTI_ROOT_HINT } from "./constants"
 import type { SystemPromptContext } from "./types"
 
@@ -17,6 +17,8 @@ export interface ClineToolSpec {
 	contextRequirements?: (context: SystemPromptContext) => boolean
 	parameters?: Array<ClineToolSpecParameter>
 }
+
+type ToolSchemaObject = Record<string, unknown>
 
 interface ClineToolSpecParameter {
 	name: string
@@ -35,16 +37,16 @@ interface ClineToolSpecParameter {
 	/**
 	 * For array types, this defines the schema of array items
 	 */
-	items?: any
+	items?: ToolSchemaObject
 	/**
 	 * For object types, this defines the properties
 	 */
-	properties?: Record<string, any>
+	properties?: Record<string, ToolSchemaObject>
 	requiredProperties?: string[]
 	/**
 	 * Additional JSON Schema fields to preserve from MCP tools
 	 */
-	[key: string]: any
+	[key: string]: unknown
 }
 
 /**
@@ -58,7 +60,7 @@ export function toolSpecFunctionDefinition(tool: ClineToolSpec, context: SystemP
 	}
 
 	// Build the properties object for parameters
-	const properties: Record<string, any> = {}
+	const properties: Record<string, ToolSchemaObject> = {}
 	const required: string[] = []
 
 	if (tool.parameters) {
@@ -78,7 +80,7 @@ export function toolSpecFunctionDefinition(tool: ClineToolSpec, context: SystemP
 			const paramType: string = param.type || "string"
 
 			// Build parameter schema
-			const paramSchema: any = {
+			const paramSchema: ToolSchemaObject = {
 				type: paramType,
 				description: getNativeToolParameterDescription(tool, param, context),
 			}
@@ -155,7 +157,7 @@ export function toolSpecInputSchema(tool: ClineToolSpec, context: SystemPromptCo
 	}
 
 	// Build the properties object for parameters
-	const properties: Record<string, any> = {}
+	const properties: Record<string, ToolSchemaObject> = {}
 	const required: string[] = []
 
 	if (tool.parameters) {
@@ -175,7 +177,7 @@ export function toolSpecInputSchema(tool: ClineToolSpec, context: SystemPromptCo
 			const paramType: string = param.type || "string"
 
 			// Build parameter schema
-			const paramSchema: any = {
+			const paramSchema: ToolSchemaObject = {
 				type: paramType,
 				description: replacePromptPlaceholders(resolveInstruction(param.instruction, context), context),
 			}
@@ -257,7 +259,7 @@ export function toolSpecFunctionDeclarations(tool: ClineToolSpec, context: Syste
 	}
 
 	// Build the parameters object for parameters
-	const properties: Record<string, any> = {}
+	const properties: Record<string, ToolSchemaObject> = {}
 	const required: string[] = []
 
 	if (tool.parameters) {
@@ -276,7 +278,7 @@ export function toolSpecFunctionDeclarations(tool: ClineToolSpec, context: Syste
 				required.push(param.name)
 			}
 
-			const paramSchema: any = {
+			const paramSchema: ToolSchemaObject = {
 				type: GOOGLE_TOOL_PARAM_MAP[param.type || "string"] || GoogleToolParamType.OBJECT,
 			}
 
@@ -288,22 +290,25 @@ export function toolSpecFunctionDeclarations(tool: ClineToolSpec, context: Syste
 			}
 
 			if (param.properties) {
-				paramSchema.properties = {}
-				for (const [key, prop] of Object.entries<any>(param.properties)) {
+				const nestedProperties: Record<string, ToolSchemaObject> = {}
+				for (const [key, prop] of Object.entries(param.properties)) {
 					// Skip $schema property
 					if (key === "$schema") {
 						continue
 					}
-					paramSchema.properties[key] = {
-						type: GOOGLE_TOOL_PARAM_MAP[prop.type || "string"] || GoogleToolParamType.OBJECT,
+					const propType = typeof prop.type === "string" ? prop.type : "string"
+					const nestedProperty: ToolSchemaObject = {
+						type: GOOGLE_TOOL_PARAM_MAP[propType] || GoogleToolParamType.OBJECT,
 						description: replacePromptPlaceholders(resolveInstruction(param.instruction, context), context),
 					}
 
 					// Handle enum values
-					if (prop.enum) {
-						paramSchema.properties[key].enum = prop.enum
+					if (Array.isArray(prop.enum)) {
+						nestedProperty.enum = prop.enum
 					}
+					nestedProperties[key] = nestedProperty
 				}
+				paramSchema.properties = nestedProperties
 				if (param.requiredProperties?.length) {
 					paramSchema.required = param.requiredProperties
 				}
@@ -478,24 +483,24 @@ function getNativeToolDescription(tool: ClineToolSpec, context: SystemPromptCont
 		case "use_skill":
 			return "Activate a skill by exact name when the request matches an available skill."
 		case "use_mcp_tool":
-			return hasConnectedIndxrServer(context)
-				? "Use a connected MCP tool. When Indxr is available, default to its exploration tools first for code exploration, symbol lookup, file understanding, dependency tracing, and targeted source reads. For large files, prefer symbol-targeted or explicit line-range source reads instead of full raw file reads."
+			return hasUsableIndxrExplorationContext(context)
+				? "Use a connected MCP tool. When Indxr is available, default to its exploration tools first for code exploration, symbol lookup, file understanding, dependency tracing, and targeted source reads. After you have narrowed the task to one concrete file, prefer one full raw read only when the file is at or below 800 lines and 65536 bytes; otherwise prefer symbol-targeted or explicit line-range source reads."
 				: firstSentence(resolved)
 		case "search_files":
-			return hasConnectedIndxrServer(context)
+			return hasUsableIndxrExplorationContext(context)
 				? "Use only for exact raw-text regex search when Indxr is unavailable, insufficient, or regex search is specifically required."
 				: firstSentence(resolved)
 		case "list_code_definition_names":
-			return hasConnectedIndxrServer(context)
+			return hasUsableIndxrExplorationContext(context)
 				? "Use only when Indxr is unavailable or insufficient and you specifically need a built-in top-level definition pass."
 				: firstSentence(resolved)
 		case "read_file":
-			return hasConnectedIndxrServer(context)
-				? "Use Indxr first for discovery, summaries, symbol lookup, dependency tracing, and targeted source reads. Use read_file only when exact full raw file contents are required for a file at or below 300 lines and 16384 bytes, or when Indxr is insufficient."
+			return hasUsableIndxrExplorationContext(context)
+				? "Use Indxr first for discovery, summaries, symbol lookup, dependency tracing, and targeted source reads. Once the task is narrowed to one concrete file, use read_file when exact full raw file contents are required for a file at or below 800 lines and 65536 bytes, or when Indxr is insufficient."
 				: firstSentence(resolved)
 		case "read_file_range":
-			return hasConnectedIndxrServer(context)
-				? "Use only when exact raw line-based inspection is required after Indxr has already narrowed the target, or when Indxr is insufficient."
+			return hasUsableIndxrExplorationContext(context)
+				? "Use only when exact raw line-based inspection is required after Indxr has already narrowed the target, when the file exceeds the full-read limit, or when Indxr is insufficient."
 				: firstSentence(resolved)
 		default:
 			return firstSentence(resolved)

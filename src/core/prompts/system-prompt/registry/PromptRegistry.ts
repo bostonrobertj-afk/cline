@@ -99,13 +99,16 @@ export class PromptRegistry {
 	async get(context: SystemPromptContext): Promise<string> {
 		const variant = this.getVariant(context)
 
-		// Hacky way to get native tools for the current variant - it's bad and ugly
-		this.nativeTools = ClineToolSet.getNativeTools(variant, context)
+		// Build native tools once to discover the visible tool names, then rebuild with
+		// those names injected so context-sensitive descriptions can reflect the same
+		// filtered native-tool surface the prompt body sees.
+		const initialNativeTools = ClineToolSet.getNativeTools(variant, context)
 		const visibleNativeToolNames =
 			context.visibleNativeToolNames !== undefined
 				? [...context.visibleNativeToolNames]
-				: getVisibleNativeToolNames(this.nativeTools)
+				: getVisibleNativeToolNames(initialNativeTools)
 		const promptContext = { ...context, visibleNativeToolNames }
+		this.nativeTools = ClineToolSet.getNativeTools(variant, promptContext)
 
 		if (context.isContinuationTurn) {
 			const continuationComponent = this.components[SystemPromptSection.CONTINUATION_TURN]

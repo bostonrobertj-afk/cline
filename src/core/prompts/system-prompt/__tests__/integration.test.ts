@@ -22,7 +22,9 @@ import * as fs from "node:fs/promises"
 import * as path from "node:path"
 import { expect } from "chai"
 import type { McpHub } from "@/services/mcp/McpHub"
+import type { McpServer } from "@/shared/mcp"
 import { ModelFamily } from "@/shared/prompts"
+import type { ClineTool } from "@/shared/tools"
 import { isGPT5ModelFamily } from "@/utils/model-utils"
 import { getSystemPrompt, PromptRegistry } from "../index"
 import type { SystemPromptContext } from "../types"
@@ -267,12 +269,17 @@ const makeProviderInfo = (modelId: string, providerId = "test") => ({
 	customPrompt: providerId.includes("lmstudio") || providerId.includes("ollama") ? "compact" : undefined,
 })
 
-const makeMcpHub = (servers: any[]): McpHub =>
+type NativeToolEntry = {
+	name?: string
+	description?: string
+}
+
+const makeMcpHub = (servers: McpServer[]): McpHub =>
 	({
 		getServers: () => servers,
 	}) as unknown as McpHub
 
-const makeConnectedServer = (overrides: Partial<any> = {}) => ({
+const makeConnectedServer = (overrides: Partial<McpServer> = {}): McpServer => ({
 	uid: "1234567",
 	name: "test-server",
 	status: "connected",
@@ -283,7 +290,7 @@ const makeConnectedServer = (overrides: Partial<any> = {}) => ({
 	...overrides,
 })
 
-const makeIndxrServer = (overrides: Partial<any> = {}) =>
+const makeIndxrServer = (overrides: Partial<McpServer> = {}) =>
 	makeConnectedServer({
 		uid: "indxr-1",
 		name: "workspace-index",
@@ -296,7 +303,7 @@ const makeIndxrServer = (overrides: Partial<any> = {}) =>
 		...overrides,
 	})
 
-const makeWeakIndxrLikeServer = (toolName: string, overrides: Partial<any> = {}) =>
+const makeWeakIndxrLikeServer = (toolName: string, overrides: Partial<McpServer> = {}) =>
 	makeConnectedServer({
 		uid: `weak-${toolName}`,
 		name: `weak-${toolName}-server`,
@@ -322,8 +329,34 @@ const baseContext: SystemPromptContext = {
 	enableNativeToolCalls: false,
 }
 
-const getNativeToolNames = (tools: any[] | undefined): string[] =>
-	(tools ?? []).map((tool) => (tool?.type === "function" ? tool.function?.name : tool?.name)).filter(Boolean)
+const getNativeToolEntry = (tool: ClineTool): NativeToolEntry => {
+	if ("type" in tool && tool.type === "function") {
+		return {
+			name: tool.function?.name,
+			description: tool.function?.description,
+		}
+	}
+
+	if ("name" in tool && typeof tool.name === "string") {
+		return {
+			name: tool.name,
+			description: "description" in tool && typeof tool.description === "string" ? tool.description : undefined,
+		}
+	}
+
+	return {}
+}
+
+const getNativeToolEntries = (tools: ClineTool[] | undefined): NativeToolEntry[] => (tools ?? []).map(getNativeToolEntry)
+
+const getNativeToolNames = (tools: ClineTool[] | undefined): string[] =>
+	getNativeToolEntries(tools).flatMap((tool) => (tool.name ? [tool.name] : []))
+
+const getNativeFunctionTool = (tools: ClineTool[] | undefined, name: string) =>
+	getNativeToolEntries(tools).find((tool) => tool.name === name)
+
+const getNativeFunctionDescription = (tools: ClineTool[] | undefined, name: string): string =>
+	getNativeFunctionTool(tools, name)?.description ?? ""
 
 const isNativeToolsFamily = (family: ModelFamily) =>
 	[ModelFamily.NATIVE_NEXT_GEN, ModelFamily.NATIVE_GPT_5, ModelFamily.NATIVE_GPT_5_1, ModelFamily.GEMINI_3].includes(family)
@@ -407,16 +440,13 @@ describe("Prompt System Integration Tests", () => {
 						}
 
 						expect(tools).to.be.an("array").that.is.not.empty
-						const toolNames = (tools as any[]).map((tool) => {
-							if (tool?.type === "function") {
-								return tool.function?.name
-							}
-							return tool?.name
-						})
+						const toolNames = getNativeToolNames(tools)
 						expect(toolNames).to.not.include("focus_chain")
 						expect(JSON.stringify(tools)).to.not.include('"focus_chain"')
 						expect(toolNames).to.include("build_review_diff_output")
 						expect(toolNames).to.include("build_review_input")
+						const snapshotName = `${providerId}_${family.replace(/[^a-zA-Z0-9]/g, "_")}.tools.snap`
+						await assertSnapshot(snapshotName, JSON.stringify(tools, null, 2))
 					})
 				})
 
@@ -433,12 +463,7 @@ describe("Prompt System Integration Tests", () => {
 						await runPromptTest(this, context, modelId, async ({ systemPrompt, tools }) => {
 							if (enableNativeToolCalls) {
 								expect(tools).to.be.an("array").that.is.not.empty
-								const toolNames = (tools as any[]).map((tool) => {
-									if (tool?.type === "function") {
-										return tool.function?.name
-									}
-									return tool?.name
-								})
+								const toolNames = getNativeToolNames(tools)
 								expect(toolNames).to.not.include("focus_chain")
 								expect(toolNames).to.include("build_review_diff_output")
 								expect(toolNames).to.include("build_review_input")
@@ -760,7 +785,7 @@ describe("Prompt System Integration Tests", () => {
 					expect(systemPrompt).to.include("`read_source`")
 					expect(systemPrompt).to.not.include("`search_relevant`")
 
-					const nativeTools = (tools as any[]).map((tool) => (tool?.type === "function" ? tool.function : tool))
+					const nativeTools = getNativeToolEntries(tools)
 					const byName = new Map(nativeTools.map((tool) => [tool.name, tool.description]))
 
 					expect(byName.get("search_files")).to.equal(
@@ -859,7 +884,7 @@ describe("Prompt System Integration Tests", () => {
 				async ({ tools, systemPrompt }) => {
 					expect(systemPrompt).to.include("RESPONSE TOOLS")
 
-					const nativeTools = (tools as any[]).map((tool) => (tool?.type === "function" ? tool.function : tool))
+					const nativeTools = getNativeToolEntries(tools)
 					const byName = new Map(nativeTools.map((tool) => [tool.name, tool.description]))
 
 					expect(byName.has("act_mode_respond")).to.equal(true)
@@ -893,7 +918,7 @@ describe("Prompt System Integration Tests", () => {
 				},
 				"gpt-5-1",
 				async ({ tools }) => {
-					const nativeTools = (tools as any[]).map((tool) => (tool?.type === "function" ? tool.function : tool))
+					const nativeTools = getNativeToolEntries(tools)
 					const byName = new Map(nativeTools.map((tool) => [tool.name, tool.description]))
 
 					expect(byName.has("generate_plan_output")).to.equal(true)
@@ -999,7 +1024,7 @@ describe("Prompt System Integration Tests", () => {
 				},
 				"gpt-5.4-2026-03-05",
 				async ({ tools }) => {
-					const nativeToolNames = getNativeToolNames(tools as any[])
+					const nativeToolNames = getNativeToolNames(tools)
 
 					expect(nativeToolNames).to.include.members([
 						"build_review_diff_output",
@@ -1057,7 +1082,7 @@ describe("Prompt System Integration Tests", () => {
 				},
 				"gpt-5.4-2026-03-05",
 				async ({ tools }) => {
-					const nativeToolNames = getNativeToolNames(tools as any[])
+					const nativeToolNames = getNativeToolNames(tools)
 
 					expect(nativeToolNames).to.include.members([
 						"set_workflow_placeholders",
@@ -1077,6 +1102,91 @@ describe("Prompt System Integration Tests", () => {
 				},
 			)
 		})
+
+		for (const { modelId, stepNumber, snapshotName } of [
+			{
+				modelId: "gpt-5-codex",
+				stepNumber: 2,
+				snapshotName: "openai_gpt_5_native_code_review_step_2.tools.snap",
+			},
+			{
+				modelId: "gpt-5-1",
+				stepNumber: 2,
+				snapshotName: "openai_gpt_5_1_native_code_review_step_2.tools.snap",
+			},
+			{
+				modelId: "gpt-5-codex",
+				stepNumber: 3,
+				snapshotName: "openai_gpt_5_native_code_review_step_3.tools.snap",
+			},
+			{
+				modelId: "gpt-5-1",
+				stepNumber: 3,
+				snapshotName: "openai_gpt_5_1_native_code_review_step_3.tools.snap",
+			},
+		]) {
+			it(`preserves the native bounded-read tool descriptions for code-review step ${stepNumber} on ${modelId}`, async function () {
+				await runPromptTest(
+					this,
+					{
+						...baseContext,
+						providerInfo: makeProviderInfo(modelId, "openai"),
+						enableNativeToolCalls: true,
+						useMinimalGptPrompt: true,
+						activeWorkflowSupportsPlaceholders: true,
+						managedWorkflowActive: false,
+						activePlaceholderWorkflowName: "code-review.md",
+						activePlaceholderWorkflowStepNumber: stepNumber,
+						mcpHub: makeMcpHub([
+							makeConnectedServer(),
+							makeIndxrServer({
+								tools: [
+									{
+										name: "search_relevant",
+										description: "Search relevant code",
+										inputSchema: { type: "object", properties: {} },
+									},
+									{
+										name: "get_file_summary",
+										description: "Summarize file",
+										inputSchema: { type: "object", properties: {} },
+									},
+									{
+										name: "lookup_symbol",
+										description: "Lookup symbol",
+										inputSchema: { type: "object", properties: {} },
+									},
+								],
+							}),
+						]),
+					},
+					modelId,
+					async ({ tools }) => {
+						const nativeTools = tools
+						const nativeToolNames = getNativeToolNames(nativeTools)
+						const readFileDescription = getNativeFunctionDescription(nativeTools, "read_file")
+						const readFileRangeDescription = getNativeFunctionDescription(nativeTools, "read_file_range")
+
+						if (stepNumber === 2) {
+							expect(nativeToolNames.some((name) => name.includes("search_relevant"))).to.equal(true)
+							expect(readFileDescription).to.include("800 lines and 65536 bytes")
+							expect(readFileDescription).to.include("Use Indxr first for discovery")
+							expect(readFileDescription).to.include("Once the task is narrowed to one concrete file")
+							expect(readFileRangeDescription).to.include("when the file exceeds the full-read limit")
+							expect(readFileRangeDescription).to.include("after Indxr has already narrowed the target")
+						} else {
+							expect(nativeToolNames.some((name) => name.includes("search_relevant"))).to.equal(false)
+							expect(readFileDescription).to.equal("Request to read the contents of a file at the specified path.")
+							expect(readFileRangeDescription).to.equal(
+								"Request to read only a specific 1-based line range from a text file.",
+							)
+						}
+
+						await assertSnapshot(snapshotName, JSON.stringify(nativeTools, null, 2))
+					},
+				)
+			})
+		}
 
 		it("filters native tools for a code-read placeholder step and retains only allowed prefixed Indxr tools", async function () {
 			await runPromptTest(
@@ -1120,7 +1230,7 @@ describe("Prompt System Integration Tests", () => {
 				},
 				"gpt-5.4-2026-03-05",
 				async ({ tools }) => {
-					const nativeToolNames = getNativeToolNames(tools as any[])
+					const nativeToolNames = getNativeToolNames(tools)
 
 					expect(nativeToolNames).to.include.members([
 						"indxr-10mcp0search_relevant",

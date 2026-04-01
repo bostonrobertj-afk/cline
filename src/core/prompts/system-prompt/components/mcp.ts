@@ -88,6 +88,14 @@ export function hasConnectedIndxrServer(context: SystemPromptContext): boolean {
 	return getConnectedIndxrServers(context).length > 0
 }
 
+export function hasUsableIndxrExplorationContext(context: SystemPromptContext): boolean {
+	if (context.enableNativeToolCalls === true) {
+		return hasConnectedIndxrServer(context) && getVisibleIndxrToolNames(context).length > 0
+	}
+
+	return hasConnectedIndxrServer(context)
+}
+
 export function normalizeVisibleNativeToolName(name: string): string {
 	const delimiterIndex = name.lastIndexOf(CLINE_MCP_TOOL_IDENTIFIER)
 	if (delimiterIndex === -1) {
@@ -179,24 +187,26 @@ export function getCodeExplorationGuidance(context: SystemPromptContext, fallbac
 }
 
 export function replacePromptPlaceholders(description: string, context: SystemPromptContext): string {
-	const searchFilesGuidance = hasConnectedIndxrServer(context)
+	const hasUsableIndxr = hasUsableIndxrExplorationContext(context)
+
+	const searchFilesGuidance = hasUsableIndxr
 		? "Use this only when you need exact regex search across raw files or when Indxr is unavailable or insufficient."
 		: "Start here when you need to narrow candidate files or regions before using list_code_definition_names, read_file, or read_file_range."
 
-	const listCodeDefinitionsGuidance = hasConnectedIndxrServer(context)
+	const listCodeDefinitionsGuidance = hasUsableIndxr
 		? "Use this only when Indxr is unavailable or insufficient and you specifically need a built-in directory-level definition pass."
 		: "Results include human-friendly 1-based line numbers so you can target a later read_file or read_file_range call instead of loading large files blindly."
 
-	const readFileGuidance = hasConnectedIndxrServer(context)
-		? "When Indxr is available, use its tools first for discovery, summaries, symbol lookup, dependency tracing, and targeted source reads. Use read_file only when you need the exact full raw contents of a file that is at or below 300 lines and 16384 bytes, or when Indxr is insufficient."
-		: "Prefer using search_files and list_code_definition_names first to narrow the target, then use read_file_range for targeted inspection. Use read_file only when the file is at or below 300 lines and 16384 bytes and you truly need the exact full contents."
+	const readFileGuidance = hasUsableIndxr
+		? "When Indxr is available, use its tools first for discovery, summaries, symbol lookup, dependency tracing, and targeted source reads. Once you have narrowed the work to one concrete file, prefer a single read_file call when that file is at or below 800 lines and 65536 bytes and you need the full raw contents for editing; otherwise keep using targeted source reads or read_file_range."
+		: "Prefer using search_files and list_code_definition_names first to narrow the target, then use read_file_range for targeted inspection. Once you have narrowed the work to one concrete file, prefer a single read_file call when that file is at or below 800 lines and 65536 bytes and you need the full raw contents, rather than stitching together many nearby range reads."
 
-	const readFileRangeGuidance = hasConnectedIndxrServer(context)
-		? "Use this only when you need exact raw line-based inspection after Indxr has already narrowed the target, or when Indxr is insufficient."
-		: "Use this after search_files or list_code_definition_names has already narrowed the problem to a focused region, or when you need a targeted refresher without replaying the entire file."
+	const readFileRangeGuidance = hasUsableIndxr
+		? "Use this when you need exact raw line-based inspection after Indxr has already narrowed the target, when the file exceeds the full-read limit, or when Indxr is insufficient."
+		: "Use this after search_files or list_code_definition_names has narrowed the problem to a focused region, when the file exceeds the full-read limit, or when you need a targeted refresher without replaying the entire file."
 
-	const useMcpToolGuidance = hasConnectedIndxrServer(context)
-		? ` When Indxr is available, default to its MCP tools first for code exploration, symbol lookup, file understanding, dependency tracing, and targeted source reads before using built-in \`search_files\`, \`list_code_definition_names\`, \`read_file\`, or \`read_file_range\`. For large files, prefer symbol-targeted or explicit line-range reads instead of full raw source reads. Use built-in file tools only when exact raw file contents, regex search, or direct line inspection are required.`
+	const useMcpToolGuidance = hasUsableIndxr
+		? ` When Indxr is available, default to its MCP tools first for code exploration, symbol lookup, file understanding, dependency tracing, and targeted source reads before using built-in \`search_files\`, \`list_code_definition_names\`, \`read_file\`, or \`read_file_range\`. After you have narrowed the task to one concrete file, prefer one full raw read only when the file is at or below 800 lines and 65536 bytes; otherwise prefer symbol-targeted or explicit line-range reads. Use built-in file tools only when exact raw file contents, regex search, or direct line inspection are required.`
 		: ""
 
 	return description
@@ -240,7 +250,7 @@ export async function getMcp(variant: PromptVariant, context: SystemPromptContex
 	return await getMcpServers(servers, variant, context)
 }
 
-async function getMcpServers(servers: McpServer[], variant: PromptVariant, context: SystemPromptContext): Promise<string> {
+async function getMcpServers(_servers: McpServer[], variant: PromptVariant, context: SystemPromptContext): Promise<string> {
 	const template = variant.componentOverrides?.[SystemPromptSection.MCP]?.template || MCP_TEMPLATE_TEXT
 	const indxrGuidance = getIndxrExplorationGuidance(context)
 

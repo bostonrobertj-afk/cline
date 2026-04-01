@@ -16,6 +16,20 @@
             "type": "string",
             "description": "An array of 2-5 options (e.x: \"[\"Option 1\", \"Option 2\", \"Option 3\"]\") for the user to choose from. Each option should be a string describing a possible answer to the single question. You may not always need to provide options, but it may be helpful in many cases where it can save the user from having to type out a response manually. IMPORTANT: NEVER include an option to toggle to Act mode, as this would be something you need to direct the user to do manually themselves if needed."
           },
+          "agent_feedback": {
+            "type": "object",
+            "description": "Optional object for real-time agent feedback when you encounter a meaningful blocker, material ambiguity, or unstable behavior that affects correctness or progress.",
+            "properties": {
+              "message": {
+                "type": "string",
+                "description": "Concise description of the blocker, ambiguity, instability, or confusing scenario."
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "additionalProperties": false
+          },
           "task_progress": {
             "type": "string",
             "description": "Use as a top-level parameter on the next tool call, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
@@ -59,7 +73,7 @@
     "type": "function",
     "function": {
       "name": "read_file",
-      "description": "Request to read the contents of a file at the specified path. Prefer using search_files and list_code_definition_names first to narrow the target, then use read_file for the first full pass on a file. For follow-up checks on a focused region, prefer read_file_range instead of rereading the entire file. Automatically extracts raw text from PDF and DOCX files. Do NOT use this tool to list the contents of a directory.",
+      "description": "Request to read the contents of a file at the specified path. Prefer using search_files and list_code_definition_names first to narrow the target, then use read_file_range for targeted inspection. Once you have narrowed the work to one concrete file, prefer a single read_file call when that file is at or below 800 lines and 65536 bytes and you need the full raw contents, rather than stitching together many nearby range reads. Automatically extracts raw text from PDF and DOCX files. Do NOT use this tool to list the contents of a directory.",
       "strict": false,
       "parameters": {
         "type": "object",
@@ -327,38 +341,8 @@
   {
     "type": "function",
     "function": {
-      "name": "access_mcp_resource",
-      "description": "Request to access a resource provided by a connected MCP server. Resources represent data sources that can be used as context, such as files, API responses, or system information. You must only use this tool if you have been informed of the MCP server and the resource you are trying to access.",
-      "strict": false,
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "server_name": {
-            "type": "string",
-            "description": "The name of the MCP server providing the resource"
-          },
-          "uri": {
-            "type": "string",
-            "description": "The URI identifying the specific resource to access"
-          },
-          "task_progress": {
-            "type": "string",
-            "description": "Use as a top-level parameter on the next tool call, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
-          }
-        },
-        "required": [
-          "server_name",
-          "uri"
-        ],
-        "additionalProperties": false
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
       "name": "attempt_completion",
-      "description": "Once you've completed the user's task, use this tool to present the final result to the user, including a brief and very short (1-2 paragraph) summary of the task and what was done to resolve it. On success, this tool displays your message to the user, returns `[Message displayed.]`, and ends your current turn. Any later user reply arrives on the following turn as normal human-authored input. Example: result=\"Implemented the fix and verified it with tests.\" You should only call this tool when you have completed all tasks in the task_progress list, and completed all changes that are necessary to satisfy the user's request. You should not provide the contents of the task_progress list in the result parameter, it must be included in the task_progress parameter.",
+      "description": "Once you've completed the user's task, use this tool to present the final result to the user, including a brief and very short (1-2 paragraph) summary of the task and what was done to resolve it. On success, this tool displays your message to the user, returns `[Message displayed.]`, and ends your current turn. Any later user reply arrives on the following turn as normal human-authored input. Example: result=\"Implemented the fix and verified it with tests.\" You should only call this tool when you have completed all necessary work for the user's request.",
       "strict": false,
       "parameters": {
         "type": "object",
@@ -370,6 +354,20 @@
           "command": {
             "type": "string",
             "description": "An actionable terminal command that is non-verbose that allows user to review the result of your work. For example, use `start localhost:3000` to start a locally running development server. Commands like `echo` or `cat` that merely print text or open a file are not allowed. Ensure the command is properly formatted for user's OS and does not contain any harmful instructions"
+          },
+          "agent_feedback": {
+            "type": "object",
+            "description": "Optional object for real-time agent feedback when you encounter a meaningful blocker, material ambiguity, or unstable behavior that affects correctness or progress.",
+            "properties": {
+              "message": {
+                "type": "string",
+                "description": "Concise description of the blocker, ambiguity, instability, or confusing scenario."
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "additionalProperties": false
           },
           "task_progress": {
             "type": "string",
@@ -395,25 +393,29 @@
           "message": {
             "type": "string",
             "description": "The direct message to show to the user."
+          },
+          "agent_feedback": {
+            "type": "object",
+            "description": "Optional object for real-time agent feedback when you encounter a meaningful blocker, material ambiguity, or unstable behavior that affects correctness or progress.",
+            "properties": {
+              "message": {
+                "type": "string",
+                "description": "Concise description of the blocker, ambiguity, instability, or confusing scenario."
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "additionalProperties": false
+          },
+          "task_progress": {
+            "type": "string",
+            "description": "Use as a top-level parameter on the next tool call, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
           }
         },
         "required": [
           "message"
         ],
-        "additionalProperties": false
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "load_mcp_documentation",
-      "description": "Load documentation about creating MCP servers. This tool should be used when the user requests to create or install an MCP server (the user may ask you something along the lines of \"add a tool\" that does some function, in other words to create an MCP server that provides tools and resources that may connect to external APIs for example. You have the ability to create an MCP server and add it to a configuration file that will then expose the tools and resources for you to use with `use_mcp_tool` and `access_mcp_resource`). The documentation provides detailed information about the MCP server creation process, including setup instructions, best practices, and examples.",
-      "strict": false,
-      "parameters": {
-        "type": "object",
-        "properties": {},
-        "required": [],
         "additionalProperties": false
       }
     }
@@ -429,7 +431,100 @@
         "properties": {
           "source": {
             "type": "object",
-            "description": "Required source object. Supported shape: {\"type\":\"commit\",\"commit\":\"<ref>\"} | {\"type\":\"commit_range\",\"base\":\"<ref>\",\"head\":\"<ref>\"} | {\"type\":\"ref_diff\",\"base\":\"<ref>\",\"head\":\"<ref>\"} | {\"type\":\"worktree_head_scoped\"}."
+            "description": "Required source object. Supported shape: {\"type\":\"commit\",\"commit\":\"<ref>\"} | {\"type\":\"commit_range\",\"base\":\"<ref>\",\"head\":\"<ref>\"} | {\"type\":\"ref_diff\",\"base\":\"<ref>\",\"head\":\"<ref>\"} | {\"type\":\"worktree_head_scoped\"}.",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "commit",
+                  "commit_range",
+                  "ref_diff",
+                  "worktree_head_scoped"
+                ]
+              },
+              "commit": {
+                "type": "string"
+              },
+              "base": {
+                "type": "string"
+              },
+              "head": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "commit"
+                  },
+                  "commit": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "commit"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "commit_range"
+                  },
+                  "base": {
+                    "type": "string"
+                  },
+                  "head": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "base",
+                  "head"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "ref_diff"
+                  },
+                  "base": {
+                    "type": "string"
+                  },
+                  "head": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "base",
+                  "head"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "worktree_head_scoped"
+                  }
+                },
+                "required": [
+                  "type"
+                ]
+              }
+            ]
           },
           "scoped_paths": {
             "type": "array",

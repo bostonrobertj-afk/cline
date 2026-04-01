@@ -24,11 +24,11 @@ Description: Request to execute a CLI command on the system. Use this when you n
 Required params: command, requires_approval
 
 ## read_file
-Description: Request to read the contents of a file at the specified path. Prefer using search_files and list_code_definition_names first to narrow the target, then use read_file_range for targeted inspection. Use read_file only when the file is at or below 300 lines and 16384 bytes and you truly need the exact full contents. Automatically extracts raw text from PDF and DOCX files. Do NOT use this tool to list the contents of a directory.
+Description: Request to read the contents of a file at the specified path. Prefer using search_files and list_code_definition_names first to narrow the target, then use read_file_range for targeted inspection. Use read_file only when the file is at or below 800 lines and 65536 bytes and you truly need the exact full contents. Automatically extracts raw text from PDF and DOCX files. Do NOT use this tool to list the contents of a directory.
 Required params: path
 
 ## read_file_range
-Description: Request to read only a specific 1-based line range from a text file. Use this after search_files or list_code_definition_names has already narrowed the problem to a focused region, or when you need a targeted refresher without replaying the entire file.
+Description: Request to read only a specific 1-based line range from a text file. Use this after search_files or list_code_definition_names has narrowed the problem to a focused region, when the file exceeds the full-read limit, or when you need a targeted refresher without replaying the entire file.
 Required params: path, start_line, end_line
 
 ## write_to_file
