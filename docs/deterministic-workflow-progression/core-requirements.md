@@ -288,14 +288,12 @@ Important design note:
 ### Step 6: Triage
 
 Deterministic signal:
-- `{spec_file}` is fresh for the current task run
-- `{spec_file}` contains a top-level `Status:` field set to:
+- `{review_input}` is fresh for the current task run
+- `{review_input}` contains a top-level `Status:` field set to:
   - `ready-for-dev`
   - or `complete`
 
-This is intentionally document-type-agnostic so the same resolver can work for:
-- story files
-- generic spec docs
+This step uses the triaged review artifact rather than the source story/spec document.
 
 ### Step 7: Present QA Findings to the Human User
 

@@ -1549,24 +1549,24 @@ Wait for every required review layer to finish.`,
 		}
 	})
 
-	it("completes code-review step 6 for a fresh spec_file with Status: ready-for-dev", async () => {
+	it("completes code-review step 6 for a fresh review_input with Status: ready-for-dev", async () => {
 		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-step6-fresh-"))
 
 		try {
-			const specFilePath = path.join(tempDir, "spec.md")
+			const reviewInputPath = path.join(tempDir, "review-input.md")
 			const taskState = createTaskState({
 				workflowName: "code-review.md",
 				workflowContents: `## Step 6: Finish Review
-Wait for the spec file to reach a terminal review status.`,
+Wait for the review input artifact to reach a terminal review status.`,
 				checklistMarkdown: "- [ ] Step 6: Finish Review",
 				placeholderValues: {
-					spec_file: specFilePath,
+					review_input: reviewInputPath,
 				},
 			})
 			taskState.taskStartTimeMs = Date.now()
 
-			await writeFileWithMtime(specFilePath, "Status: ready-for-dev\n", taskState.taskStartTimeMs - 1_000)
-			recordTaskWriteProof(taskState, specFilePath)
+			await writeFileWithMtime(reviewInputPath, "Status: ready-for-dev\n", taskState.taskStartTimeMs - 1_000)
+			recordTaskWriteProof(taskState, reviewInputPath)
 
 			const result = await applyDeterministicPlaceholderProgression({
 				taskState,
@@ -1579,23 +1579,23 @@ Wait for the spec file to reach a terminal review status.`,
 		}
 	})
 
-	it("does not complete code-review step 6 for a stale spec_file", async () => {
+	it("does not complete code-review step 6 for a stale review_input", async () => {
 		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-step6-stale-"))
 
 		try {
-			const specFilePath = path.join(tempDir, "spec.md")
+			const reviewInputPath = path.join(tempDir, "review-input.md")
 			const taskState = createTaskState({
 				workflowName: "code-review.md",
 				workflowContents: `## Step 6: Finish Review
-Wait for the spec file to reach a terminal review status.`,
+Wait for the review input artifact to reach a terminal review status.`,
 				checklistMarkdown: "- [ ] Step 6: Finish Review",
 				placeholderValues: {
-					spec_file: specFilePath,
+					review_input: reviewInputPath,
 				},
 			})
 			taskState.taskStartTimeMs = Date.now()
 
-			await writeFileWithMtime(specFilePath, "Status: ready-for-dev\n", taskState.taskStartTimeMs - 1_000)
+			await writeFileWithMtime(reviewInputPath, "Status: ready-for-dev\n", taskState.taskStartTimeMs - 1_000)
 
 			const result = await applyDeterministicPlaceholderProgression({
 				taskState,

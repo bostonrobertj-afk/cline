@@ -1,5 +1,6 @@
 import { expect } from "chai"
 import { describe, it } from "mocha"
+import type { ChatCompletionFunctionTool } from "openai/resources/chat/completions"
 import type { McpHub } from "@/services/mcp/McpHub"
 import type { McpServer } from "@/shared/mcp"
 import { ModelFamily } from "@/shared/prompts"
@@ -65,8 +66,16 @@ const makeMcpHub = (servers: McpServer[]): McpHub =>
 		getServers: () => servers,
 	}) as unknown as McpHub
 
+const getOpenAIFunctionTool = (tool: ReturnType<typeof toolSpecFunctionDefinition>): ChatCompletionFunctionTool["function"] => {
+	if (tool.type !== "function") {
+		throw new Error("Expected OpenAI function tool")
+	}
+
+	return tool.function
+}
+
 const getOpenAIProperties = (tool: ReturnType<typeof toolSpecFunctionDefinition>): Record<string, JsonSchemaProperty> =>
-	(tool.function.parameters as unknown as OpenAIFunctionParameters).properties ?? {}
+	(getOpenAIFunctionTool(tool).parameters as unknown as OpenAIFunctionParameters).properties ?? {}
 
 const getAnthropicProperties = (tool: ReturnType<typeof toolSpecInputSchema>): Record<string, JsonSchemaProperty> =>
 	(tool.input_schema as unknown as AnthropicInputSchema).properties ?? {}
@@ -441,6 +450,7 @@ describe("workflow placeholder tool gating", () => {
 				{
 					name: "empty-server",
 					status: "connected",
+					config: '{"command":"empty"}',
 					disabled: false,
 					resources: [],
 					resourceTemplates: [],
@@ -467,6 +477,7 @@ describe("workflow placeholder tool gating", () => {
 				{
 					name: "resource-server",
 					status: "connected",
+					config: '{"command":"resource"}',
 					disabled: false,
 					resources: [],
 					resourceTemplates: [{ uriTemplate: "test://{id}", name: "template" }],
@@ -484,7 +495,7 @@ describe("workflow placeholder tool gating", () => {
 			context,
 		)
 
-		expect(accessMcpResource.function.name).to.equal("access_mcp_resource")
+		expect(getOpenAIFunctionTool(accessMcpResource).name).to.equal("access_mcp_resource")
 	})
 })
 
@@ -553,7 +564,7 @@ describe("native tool placeholder replacement", () => {
 		const openAI = toolSpecFunctionDefinition(tool, context)
 		const openAIProperties = getOpenAIProperties(openAI)
 
-		expect(openAI.function.description).to.equal(
+		expect(getOpenAIFunctionTool(openAI).description).to.equal(
 			"Apply a V4A patch by passing the complete `apply_patch` command in `input` with `*** Begin Patch` and `*** End Patch`.",
 		)
 		expect(openAIProperties.input?.description).to.equal("Complete `apply_patch` command to execute.")
@@ -579,14 +590,18 @@ describe("native tool placeholder replacement", () => {
 		const readTool = toolSpecFunctionDefinition(read_file_variants[1], context)
 		const rangeTool = toolSpecFunctionDefinition(read_file_range_variants[1], context)
 
-		expect(searchTool.function.description).to.equal(
+		expect(getOpenAIFunctionTool(searchTool).description).to.equal(
 			"Request to perform a regex search across files in a specified directory, providing context-rich results.",
 		)
-		expect(defsTool.function.description).to.equal(
+		expect(getOpenAIFunctionTool(defsTool).description).to.equal(
 			"Request to list definition names (classes, functions, methods, etc.) used in source code files at the top level of the specified directory.",
 		)
-		expect(readTool.function.description).to.equal("Request to read the contents of a file at the specified path.")
-		expect(rangeTool.function.description).to.equal("Request to read only a specific 1-based line range from a text file.")
+		expect(getOpenAIFunctionTool(readTool).description).to.equal(
+			"Request to read the contents of a file at the specified path.",
+		)
+		expect(getOpenAIFunctionTool(rangeTool).description).to.equal(
+			"Request to read only a specific 1-based line range from a text file.",
+		)
 	})
 
 	it("switches native compact exploration descriptions when Indxr is connected", () => {
@@ -608,19 +623,19 @@ describe("native tool placeholder replacement", () => {
 		const rangeTool = toolSpecFunctionDefinition(read_file_range_variants[1], context)
 		const mcpTool = toolSpecFunctionDefinition(use_mcp_tool_variants[0], context)
 
-		expect(searchTool.function.description).to.equal(
+		expect(getOpenAIFunctionTool(searchTool).description).to.equal(
 			"Use only for exact raw-text regex search when Indxr is unavailable, insufficient, or regex search is specifically required.",
 		)
-		expect(defsTool.function.description).to.equal(
+		expect(getOpenAIFunctionTool(defsTool).description).to.equal(
 			"Use only when Indxr is unavailable or insufficient and you specifically need a built-in top-level definition pass.",
 		)
-		expect(readTool.function.description).to.equal(
+		expect(getOpenAIFunctionTool(readTool).description).to.equal(
 			"Use Indxr first for discovery, summaries, symbol lookup, dependency tracing, and targeted source reads. Once the task is narrowed to one concrete file, use read_file when exact full raw file contents are required for a file at or below 800 lines and 65536 bytes, or when Indxr is insufficient.",
 		)
-		expect(rangeTool.function.description).to.equal(
+		expect(getOpenAIFunctionTool(rangeTool).description).to.equal(
 			"Use only when exact raw line-based inspection is required after Indxr has already narrowed the target, when the file exceeds the full-read limit, or when Indxr is insufficient.",
 		)
-		expect(mcpTool.function.description).to.equal(
+		expect(getOpenAIFunctionTool(mcpTool).description).to.equal(
 			"Use a connected MCP tool. When Indxr is available, default to its exploration tools first for code exploration, symbol lookup, file understanding, dependency tracing, and targeted source reads. After you have narrowed the task to one concrete file, prefer one full raw read only when the file is at or below 800 lines and 65536 bytes; otherwise prefer symbol-targeted or explicit line-range source reads.",
 		)
 	})
@@ -658,7 +673,7 @@ describe("native tool placeholder replacement", () => {
 		expect(openAIProperties.values?.description).to.equal(
 			'Object map of placeholder keys to strings. Call the tool as {"values": {...}}. Not arrays of {name,value} or {key,value}.',
 		)
-		expect(openAI.function.description).to.equal(
+		expect(getOpenAIFunctionTool(openAI).description).to.equal(
 			'Persist dynamic placeholder values discovered during the active workflow. Call as {"values":{"story_path":"docs/story.md","project_context":"docs/project-context.md"}}. Stable config-backed placeholders like output_folder come from .cline/workflow-config.yaml.',
 		)
 	})
@@ -678,7 +693,7 @@ describe("native tool placeholder replacement", () => {
 		const openAI = toolSpecFunctionDefinition(build_review_diff_output_variants[0], context)
 		const openAIProperties = getOpenAIProperties(openAI)
 
-		expect(openAI.function.description).to.equal(
+		expect(getOpenAIFunctionTool(openAI).description).to.equal(
 			"Build and atomically replace {diff_output} from an explicit Git-backed source. Use for code-review diff artifact construction, not for arbitrary file writes.",
 		)
 		expect(openAIProperties.source?.description).to.equal(
@@ -705,7 +720,7 @@ describe("native tool placeholder replacement", () => {
 		const openAI = toolSpecFunctionDefinition(build_review_input_variants[0], context)
 		const openAIProperties = getOpenAIProperties(openAI)
 
-		expect(openAI.function.description).to.equal(
+		expect(getOpenAIFunctionTool(openAI).description).to.equal(
 			"Build review-input.md from a story file and the stable {diff_output} artifact. The only human-supplied parameter is story_path.",
 		)
 		expect(openAIProperties.story_path?.description).to.equal("Path to the story markdown file that is being reviewed.")

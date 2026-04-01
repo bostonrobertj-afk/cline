@@ -274,27 +274,27 @@ async function evaluateCodeReviewStep(args: {
 			}
 		}
 		case 6: {
-			const specFilePath = placeholders.spec_file?.trim()
-			if (!specFilePath) {
+			const reviewInputPath = placeholders.review_input?.trim()
+			if (!reviewInputPath) {
 				return { completed: false }
 			}
 
-			const resolvedSpecFilePath = resolveArtifactPlaceholderPath(placeholders, specFilePath)
+			const resolvedReviewInputPath = resolveArtifactPlaceholderPath(placeholders, reviewInputPath)
 			if (
-				!taskStateHasPlaceholderWorkflowWriteProof(args.taskState, resolvedSpecFilePath) ||
-				!(await fileExistsForPlaceholderWorkflowWriteProof(resolvedSpecFilePath))
+				!taskStateHasPlaceholderWorkflowWriteProof(args.taskState, resolvedReviewInputPath) ||
+				!(await fileExistsForPlaceholderWorkflowWriteProof(resolvedReviewInputPath))
 			) {
 				return { completed: false }
 			}
 
-			const specFileText = await readFileIfExists(resolvedSpecFilePath)
-			if (!specFileText || !hasTopLevelStatusValue(specFileText, ["ready-for-dev", "complete"])) {
+			const reviewInputText = await readFileIfExists(resolvedReviewInputPath)
+			if (!reviewInputText || !hasTopLevelStatusValue(reviewInputText, ["ready-for-dev", "complete"])) {
 				return { completed: false }
 			}
 
 			return {
 				completed: true,
-				reason: "spec_file was updated during this task and now contains a terminal review status.",
+				reason: "review_input was updated during this task and now contains a terminal review status.",
 			}
 		}
 		case 7: {

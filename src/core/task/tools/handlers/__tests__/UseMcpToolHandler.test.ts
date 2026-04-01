@@ -7,6 +7,29 @@ import { TaskState } from "../../../TaskState"
 import type { TaskConfig } from "../../types/TaskConfig"
 import { UseMcpToolHandler } from "../UseMcpToolHandler"
 
+type ReadSourceResource = {
+	uri: string
+	path: string
+	start_line: number
+	end_line: number
+	source: string
+	mimeType?: string
+	text?: string
+	blob?: string
+	language?: string
+}
+
+const makeResourceItem = (resource: Record<string, unknown>) => ({
+	type: "resource" as const,
+	resource: resource as unknown as McpToolCallResponse["content"][number] extends infer T
+		? T extends { type: "resource"; resource: infer R }
+			? R
+			: never
+		: never,
+})
+
+const makeReadSourceResource = (resource: ReadSourceResource) => makeResourceItem(resource)
+
 function createConfig(toolResult: McpToolCallResponse) {
 	const taskState = new TaskState()
 	const callbacks = {
@@ -110,15 +133,13 @@ describe("UseMcpToolHandler", () => {
 	it("blocks oversized non-targeted read_source payloads", async () => {
 		const { config } = createConfig({
 			content: [
-				{
-					type: "resource",
-					resource: {
-						path: "src/large.ts",
-						start_line: 1,
-						end_line: 801,
-						source: `${Array.from({ length: 801 }, (_, index) => `line ${index + 1}`).join("\n")}\n`,
-					},
-				},
+				makeReadSourceResource({
+					uri: "file://src/large.ts",
+					path: "src/large.ts",
+					start_line: 1,
+					end_line: 801,
+					source: `${Array.from({ length: 801 }, (_, index) => `line ${index + 1}`).join("\n")}\n`,
+				}),
 			],
 		})
 		const handler = new UseMcpToolHandler()
@@ -134,15 +155,13 @@ describe("UseMcpToolHandler", () => {
 	it("allows non-targeted read_source payloads at the 800-line threshold", async () => {
 		const { config } = createConfig({
 			content: [
-				{
-					type: "resource",
-					resource: {
-						path: "src/allowed.ts",
-						start_line: 1,
-						end_line: 800,
-						source: Array.from({ length: 800 }, (_, index) => `line ${index + 1}`).join("\n"),
-					},
-				},
+				makeReadSourceResource({
+					uri: "file://src/allowed.ts",
+					path: "src/allowed.ts",
+					start_line: 1,
+					end_line: 800,
+					source: Array.from({ length: 800 }, (_, index) => `line ${index + 1}`).join("\n"),
+				}),
 			],
 		})
 		const handler = new UseMcpToolHandler()
@@ -157,15 +176,13 @@ describe("UseMcpToolHandler", () => {
 	it("normalizes targeted read_source payloads with line metadata", async () => {
 		const { config } = createConfig({
 			content: [
-				{
-					type: "resource",
-					resource: {
-						path: "src/example.ts",
-						start_line: 10,
-						end_line: 12,
-						source: "ten\neleven\ntwelve",
-					},
-				},
+				makeReadSourceResource({
+					uri: "file://src/example.ts",
+					path: "src/example.ts",
+					start_line: 10,
+					end_line: 12,
+					source: "ten\neleven\ntwelve",
+				}),
 			],
 		})
 		const handler = new UseMcpToolHandler()
@@ -182,15 +199,13 @@ describe("UseMcpToolHandler", () => {
 	it("returns a compact overlap notice for substantially overlapping targeted read_source payloads", async () => {
 		const { config, taskState } = createConfig({
 			content: [
-				{
-					type: "resource",
-					resource: {
-						path: "src/example.ts",
-						start_line: 12,
-						end_line: 21,
-						source: "twelve\nthirteen\nfourteen\nfifteen\nsixteen\nseventeen\neighteen\nnineteen\ntwenty\ntwenty-one",
-					},
-				},
+				makeReadSourceResource({
+					uri: "file://src/example.ts",
+					path: "src/example.ts",
+					start_line: 12,
+					end_line: 21,
+					source: "twelve\nthirteen\nfourteen\nfifteen\nsixteen\nseventeen\neighteen\nnineteen\ntwenty\ntwenty-one",
+				}),
 			],
 		})
 		taskState.sourceReadWindowCache.set("src/example.ts", [{ startLine: 10, endLine: 20 }])
@@ -208,13 +223,11 @@ describe("UseMcpToolHandler", () => {
 	it("serializes generic MCP resource payloads without pretty-print indentation", async () => {
 		const { config } = createConfig({
 			content: [
-				{
-					type: "resource",
-					resource: {
-						path: "src/example.ts",
-						language: "typescript",
-					},
-				},
+				makeResourceItem({
+					uri: "file://src/example.ts",
+					path: "src/example.ts",
+					language: "typescript",
+				}),
 			],
 		})
 		const handler = new UseMcpToolHandler()

@@ -392,16 +392,16 @@ Reason string:
 ### Step 6
 
 Completion condition:
-- `{spec_file}` exists
-- `{spec_file}` is fresh for the current task run
-- `{spec_file}` contains a top-level `Status:` field set to:
+- `{review_input}` exists
+- `{review_input}` is fresh for the current task run
+- `{review_input}` contains a top-level `Status:` field set to:
   - `ready-for-dev`
   - or `complete`
 
 No runtime side effect required.
 
 Reason string:
-- `{spec_file}` was updated and now contains a terminal review status.
+- `{review_input}` was updated and now contains a terminal review status.
 
 ### Step 7
 

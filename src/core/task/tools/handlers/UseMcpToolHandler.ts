@@ -74,7 +74,11 @@ export class UseMcpToolHandler implements IFullyManagedTool {
 				endLine: number
 		  }
 		| undefined {
-		const resource = item?.resource
+		if (item.type !== "resource") {
+			return undefined
+		}
+
+		const resource = item.resource
 		if (!resource || typeof resource !== "object") {
 			return undefined
 		}
