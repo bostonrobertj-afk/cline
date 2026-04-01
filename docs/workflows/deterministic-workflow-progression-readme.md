@@ -132,6 +132,8 @@ In normal runtime flow:
 - if the checklist just became fully complete, workflow-end handling may run immediately afterward
 - focus-chain prompting then shows the next real active step
 
+When deterministic progression is reached from pre-turn workflow-form resolution, focus-chain prompting and AI invocation begin only after the pre-turn system-owned decision loop has no further eligible work.
+
 This is especially important for steps whose completion is defined by:
 
 - an artifact being written in the current task

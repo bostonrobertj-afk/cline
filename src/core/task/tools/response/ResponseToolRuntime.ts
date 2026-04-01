@@ -2,6 +2,7 @@ import type { ToolUse } from "@core/assistant-message"
 import type { CommandExecutionOptions } from "@integrations/terminal"
 import { ClineDefaultTool } from "@/shared/tools"
 import type { ToolResponse } from "../.."
+import { dismissTrailingCommandOutputAskIfPresent } from "../../utils/dismissTrailingCommandOutputAsk"
 import type { TaskConfig } from "../types/TaskConfig"
 import type { StronglyTypedUIHelpers } from "../types/UIHelpers"
 import { ResponseToolRegistry } from "./ResponseToolRegistry"
@@ -72,9 +73,12 @@ export class ResponseToolRuntime {
 			return
 		}
 
-		if (config.messageState.getClineMessages().at(-1)?.ask === "command_output") {
-			await config.callbacks.say("command_output", "")
-		}
+		await dismissTrailingCommandOutputAskIfPresent({
+			getClineMessages: () => config.messageState.getClineMessages(),
+			dismissCommandOutputAsk: async () => {
+				await config.callbacks.say("command_output", "")
+			},
+		})
 	}
 
 	async askForResponse(

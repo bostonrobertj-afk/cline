@@ -1,0 +1,143 @@
+
+
+# Intended start-turn flow:
+- If there is an unresolved workflow-form session, resume it first.
+- Otherwise, if a placeholder workflow was activated by slash command on this turn, evaluate the workflow-start form path.
+- Otherwise, check whether the currently active workflow step has a form-backed system-owned path.
+- If a form runs, execute it and then run deterministic progression.
+- If that resolution changed the active workflow step or created another eligible system-owned form, restart the decision loop instead of letting the AI run.
+- Only hand control to the AI when there is no unresolved form session and no newly eligible system-owned form for the now-current step.
+
+# Requirements
+
+## Scope
+- These requirements cover the regression demonstrated in [test-33-findings.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/prod-testing/test-33-findings.md): system-owned workflow forms appear to succeed in UI, but the runtime still allows AI turns and fallback prompting before the system-owned workflow chain has fully settled.
+- These requirements apply to the live `code-review.md` runtime flow as authored in `/Users/robertboston/Documents/Cline/Workflows/code-review.md`, where Steps 1 through 4 are system-owned and Step 4 is deterministically derivable from current-task artifacts.
+- These requirements are grounded in the live runtime implementation in:
+  - `src/core/task/index.ts`
+  - `src/core/task/workflow-form/WorkflowFormTriggerRegistry.ts`
+  - `src/core/task/workflow-form/WorkflowFormRuntime.ts`
+  - `src/core/task/focus-chain/deterministicPlaceholderProgression.ts`
+  - `src/core/task/workflowCompletionRunner.ts`
+- Where docs and code disagree, the remediation requirements must follow the live runtime contract needed to make the shipped `code-review.md` flow behave correctly. Existing stale docs should be updated later, but doc drift must not be allowed to weaken runtime requirements.
+
+## Core Runtime Contract
+- The pre-turn workflow-form gate must behave as a decision loop, not as a single-pass interception check.
+- The runtime must not invoke the AI while system-owned workflow work remains unresolved for the current turn.
+- A successful system-owned form resolution must return control to runtime-owned progression first, not directly to prompt assembly.
+- The runtime must continue re-evaluating workflow state after each successful system-owned form/tool resolution until one of these conditions is true:
+  - there is no unresolved workflow-form session
+  - there is no newly eligible workflow-start form for the current turn
+  - there is no newly eligible step-triggered system-owned form for the now-current active step
+  - deterministic progression can no longer auto-complete additional steps
+  - the current system-owned form path explicitly fell back to agent/manual handling
+- Only after those conditions are satisfied may prompt assembly and AI invocation begin.
+
+## Pre-Turn Decision Order
+- If an unresolved workflow-form session is already persisted in task state, that session must be resumed before any new workflow-form candidate discovery occurs.
+- If no unresolved session exists, and the current turn includes slash-command activation of a placeholder workflow, the runtime must evaluate the workflow-start form path.
+- The workflow-start form path must remain limited to the slash-command activation turn or persisted-session resume. It must not be rediscovered on ordinary later turns merely because a workflow is active.
+- If no workflow-start form candidate exists, the runtime must evaluate the currently active workflow step for any registered form-backed system-owned path.
+- After any successful form-driven tool execution, the runtime must immediately run deterministic progression before deciding whether the pre-turn loop is complete.
+- If deterministic progression changes the active step, newly resolves placeholders, or newly makes another system-owned form eligible, the runtime must restart the decision loop from the top.
+
+## Prompt Assembly Gating
+- `loadContext()` must not generate prompt-injection blocks, focus-chain diagnostics, `CURRENT WORKFLOW STATUS`, or `CURRENT WORKFLOW STEP` text until the pre-turn decision loop has fully settled for the current turn.
+- The first API request after one or more system-owned workflow-form resolutions must be assembled from the updated task state produced by:
+  - form-driven tool execution
+  - placeholder mutations
+  - deterministic checklist advancement
+  - deterministic placeholder derivation
+  - workflow completion handling and teardown when applicable
+- The runtime must not rely on a later user turn to "catch up" prompt state after successful system-owned form resolution.
+- Fallback-only workflow prose must not be shown to the AI for a step that was successfully completed by the system-owned path earlier in the same continuation turn.
+- If a form explicitly falls back to agent/manual handling, only then may fallback instructions for that step appear in the next AI-visible prompt.
+
+## Deterministic Progression Requirements
+- After each successful workflow-form tool execution, deterministic progression must run immediately through the existing progression machinery rather than through a special-case path.
+- Deterministic progression must retain its documented ability to advance one step at a time and continue looping while more steps are machine-provable from runtime state.
+- The pre-turn workflow-form loop must observe the post-progression state, not the pre-form state, when deciding whether to continue gating the AI.
+- For the live `code-review.md` flow, the runtime must support the effective chain:
+  - Step 1 workflow-start form success
+  - Step 2 diff artifact form success
+  - Step 3 review-input form success or explicit fallback
+  - Step 4 deterministic `review_mode` derivation
+  - AI entry at Step 5 only if no earlier system-owned step remains unresolved
+- Step 4 deterministic derivation must continue to be owned by `deterministicPlaceholderProgression.ts`; the remediation must not introduce a second Step 4 progression path in the workflow-form runtime.
+- The remediation must preserve current-task write-proof semantics for artifact-backed deterministic gates. A pre-turn loop fix must not weaken the requirement that `diff_output` and `review_input` resolve through current-task write proofs where the existing evaluator requires them.
+
+## Workflow-Start Form Requirements
+- Workflow-start forms must continue to be triggered only from the slash-command-started placeholder-workflow path, not from generic workflow activity.
+- Successful workflow-start form submission must continue to execute `set_workflow_placeholders` through the normal tool path.
+- Deterministic progression must still evaluate Step 1 immediately after `set_workflow_placeholders` completes.
+- If the workflow-start form succeeds but Step 1 remains unresolved after deterministic progression, the runtime may hand control to the AI on Step 1 fallback instructions. It must not falsely treat that state as system-owned completion.
+- A persisted unresolved workflow-start session must resume correctly on reopen/reload without requiring a new slash-command action.
+
+## Step-Triggered Form Requirements
+- Step-triggered forms must remain owned by the active-step + trigger-registry contract.
+- The runtime must not open a step-triggered form for any step other than the currently active checklist step after deterministic progression has settled.
+- Successful completion of one step-triggered form must allow the runtime to discover the next now-active eligible form in the same pre-turn cycle.
+- A step-triggered form that explicitly falls back to the agent must suppress only that resolver as currently intended. It must not suppress later distinct resolvers that belong to downstream steps.
+- Successful completion of a resolver must not leave stale suppression state that blocks a downstream form for a newly active step.
+
+## Failure And Fallback Requirements
+- Workflow-form success must be determined from the invoked tool result and resolver evaluation contract, not from the accidental absence of another currently visible form candidate.
+- The runtime must not render workflow-form success copy for a form whose tool execution failed or whose deterministic done signal was not actually satisfied.
+- An explicit fallback-to-agent outcome must terminate the pre-turn decision loop and allow the AI to enter on the fallback instructions for the still-unresolved active step.
+- A fallback outcome for one step must not cause the runtime to skip necessary cleanup:
+  - the active session must be cleared
+  - resolver suppression must be persisted
+  - the next prompt must reflect fallback ownership accurately
+- A successful form outcome must not be treated as a fallback simply because another step becomes active afterward.
+
+## Ask-State And Thread-State Integrity
+- The pre-turn workflow-form loop must not supersede, ignore, or corrupt another unresolved ask in a way that throws `Current ask promise was ignored`.
+- If a trailing `command_output` ask exists when a system-owned workflow form must render, the runtime must explicitly dismiss that special ask before rendering the workflow form.
+- The `command_output` dismissal behavior used by workflow-form gating must match the existing response-tool precedent rather than introducing a second competing interaction policy.
+- The preferred implementation is a shared helper used by both:
+  - response-tool blocking-ask delivery
+  - workflow-form pre-turn rendering
+- The remediation must not solve this issue by broadly suppressing `command_output` for normal command execution or by redesigning general ask-state concurrency.
+- The user-visible behavior must no longer produce `Error while asking for command output` as a side effect of workflow-form interception.
+- System-owned workflow forms must continue to use `awaiting_user_response` with `system` subtype so existing composer disabling and UI routing semantics remain correct while the form is awaiting input.
+- Form re-renders, success states, and fallback notices must continue to update the correct session message rather than leaving stale duplicate cards for the same session.
+
+## Persistence And Resume Requirements
+- Every session mutation in the pre-turn loop must continue to persist:
+  - `activeWorkflowFormSession`
+  - `suppressedWorkflowFormResolverIds`
+- The remediation must preserve existing resume behavior for unresolved workflow-form sessions after task reopen.
+- If the workflow is fully completed and teardown occurs, placeholder-workflow metadata, active form session state, suppression state, and pending workflow-form outcomes must all still be cleared together.
+- If workflow-completion automation reports `tool_failed`, the runtime must continue preserving placeholder workflow state rather than tearing it down prematurely.
+- A multi-form pre-turn chain must not leave behind stale persisted session state from an earlier form in the same turn after that session has been successfully cleared.
+
+## Workflow Completion And Teardown Requirements
+- If the chained pre-turn form + deterministic progression loop fully completes a placeholder workflow before any AI turn is needed, the existing `workflowCompletionRunner` path must still run.
+- Workflow-end automation for `code-review.md` must continue to execute through `workflowCompletionRunner` and `workflowCompletionHandler` exactly once when the workflow first transitions from incomplete to complete.
+- If workflow-end automation succeeds or is a no-op, teardown must occur before prompt assembly so the AI does not receive stale workflow-state instructions for a workflow that has already ended.
+- If workflow-end automation reports `tool_failed`, teardown must not occur, and the task must retain enough workflow state for recovery or further user-directed handling.
+- A pre-turn loop fix must not trigger duplicate workflow-end automation invocations for the same completion event.
+
+## User-Visible Behavioral Requirements
+- In the `code-review.md` flow, the user-visible thread may show multiple system-owned form successes in sequence within the same overall continuation cycle, but the AI must not receive intermediate fallback prompts for Steps 1 through 4 while that chain is still settling.
+- After successful Step 2 and Step 3 form completions, the next AI-visible step for the live `code-review.md` flow must be Step 5 unless an explicit fallback occurred earlier in the chain.
+- The runtime must not ask the user to re-enter already-collected system-owned inputs merely because the workflow advanced to a later step in the same turn.
+- The runtime must not ask the AI to restate or manually resolve inputs that were already collected and accepted through a successful system-owned form path in the same turn.
+
+## Documentation Alignment Requirements
+- Any remediation implementation must leave behind documentation that matches the live runtime flow for `code-review.md`.
+- At minimum, canonical docs must no longer imply that the delivered `code-review.md` form support is limited to the stale Phase 1/Phase 2 inventory when the live runtime now includes:
+  - workflow-start form support
+  - Step 2 diff form support
+  - Step 3 review-input form support
+- Documentation updates must not weaken the stronger runtime requirement that successful system-owned form resolution keeps the AI out until the chain settles.
+
+## Regression Coverage Requirements
+- Regression coverage must prove that a successful workflow-start form can be followed in the same pre-turn cycle by downstream system-owned handling without allowing an intermediate AI turn.
+- Regression coverage must prove that a successful Step 2 form followed by successful Step 3 form and Step 4 deterministic derivation results in AI entry at Step 5, not Step 2 or Step 3 fallback.
+- Regression coverage must prove that if a step-triggered form falls back explicitly, the AI enters on that step's fallback instructions and the pre-turn loop does not keep chaining downstream forms.
+- Regression coverage must prove that a persisted unresolved session is resumed before new candidate discovery.
+- Regression coverage must prove that slash-command start-form discovery does not occur on ordinary later turns without a new slash-command action.
+- Regression coverage must prove that a trailing `command_output` ask is dismissed before workflow-form rendering begins when the pre-turn loop needs to open a system-owned form.
+- Regression coverage must prove that the pre-turn loop does not produce `command_output` ask corruption or ignored-ask errors when commands and forms occur in the same overall task flow.
+- Regression coverage must prove that workflow completion automation still runs exactly once when the pre-turn loop fully completes a workflow and that teardown behavior remains correct for both `tool_completed`/`no_op` and `tool_failed` outcomes.

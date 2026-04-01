@@ -348,4 +348,107 @@ Choose the review mode from the persisted diff output before continuing.
 		)
 		expect(promptInjectionText).to.contain("You are currently on this step: Step 3: Construct & Persist Review Input File")
 	})
+
+	it("builds the first AI prompt from the fully settled code-review system-owned chain", async () => {
+		const fakeTask = createFakeTask()
+		fakeTask.taskState.activePlaceholderWorkflowSource = {
+			type: "remote",
+			name: "code-review.md",
+			contents: `# Code Review
+
+## Step 1: Determine Review Source
+Determine what to review from the user's prompt before asking follow-up questions.
+
+## Step 2: System-Owned Diff Source Resolution And Diff Output Persistence
+You are in the fallback path because the system-owned workflow-form path was not completed.
+
+Use \`build_review_diff_output\` whenever a supported source is discovered.
+
+## Step 3: Construct & Persist Review Input File
+Construct and persist review-input.md from the persisted diff output before continuing.
+
+## Step 4: Set Review Mode
+Choose the review mode from the persisted diff output before continuing.
+
+## Step 5: Use Subagents for Specialized Reviews, then Collect Findings
+Use the settled {review_mode} review mode with {review_input} and collect findings before responding.
+`,
+		}
+		fakeTask.taskState.currentFocusChainChecklist = [
+			"- [x] Step 1: Determine Review Source",
+			"- [ ] Step 2: System-Owned Diff Source Resolution And Diff Output Persistence",
+			"- [ ] Step 3: Construct & Persist Review Input File",
+			"- [ ] Step 4: Set Review Mode",
+			"- [ ] Step 5: Use Subagents for Specialized Reviews, then Collect Findings",
+		].join("\n")
+
+		const callOrder: string[] = []
+		fakeTask.applyPersistentSlashCommandAction = sinon.stub().callsFake(async () => {
+			callOrder.push("applyPersistentSlashCommandAction")
+		})
+		fakeTask.maybeResolveWorkflowFormBeforeApiTurn = sinon.stub().callsFake(async () => {
+			callOrder.push("maybeResolveWorkflowFormBeforeApiTurn")
+			fakeTask.taskState.currentFocusChainChecklist = [
+				"- [x] Step 1: Determine Review Source",
+				"- [x] Step 2: System-Owned Diff Source Resolution And Diff Output Persistence",
+				"- [x] Step 3: Construct & Persist Review Input File",
+				"- [x] Step 4: Set Review Mode",
+				"- [ ] Step 5: Use Subagents for Specialized Reviews, then Collect Findings",
+			].join("\n")
+			fakeTask.taskState.activePlaceholderWorkflowStableValues = {
+				output_folder: "workflow-output",
+			}
+			fakeTask.taskState.activePlaceholderWorkflowValues = {
+				diff_output: "workflow-output/review-input.diff",
+				review_input: "workflow-output/review-input.md",
+				review_mode: "full",
+			}
+		})
+
+		const focusChainManager = fakeTask.FocusChainManager!
+		const originalGenerateFocusChainInstructions = focusChainManager.generateFocusChainInstructions.bind(focusChainManager)
+		sinon.stub(focusChainManager, "generateFocusChainInstructions").callsFake(async () => {
+			callOrder.push("generateFocusChainInstructions")
+			expect(fakeTask.taskState.currentFocusChainChecklist).to.contain("- [x] Step 4: Set Review Mode")
+			expect(fakeTask.taskState.currentFocusChainChecklist).to.contain(
+				"- [ ] Step 5: Use Subagents for Specialized Reviews, then Collect Findings",
+			)
+			expect(fakeTask.taskState.activePlaceholderWorkflowValues).to.deep.equal({
+				diff_output: "workflow-output/review-input.diff",
+				review_input: "workflow-output/review-input.md",
+				review_mode: "full",
+			})
+			return await originalGenerateFocusChainInstructions()
+		})
+
+		const [, promptInjectionBlocks] = await loadContext.call(
+			fakeTask,
+			[
+				{
+					type: "tool_result",
+					tool_use_id: "tool-1",
+					content: [{ type: "text", text: "Workflow chain settled before AI entry." }],
+				},
+			],
+			false,
+			false,
+			false,
+		)
+
+		const promptInjectionText = collectTextValues(promptInjectionBlocks).join("\n")
+		expect(fakeTask.maybeResolveWorkflowFormBeforeApiTurn.calledOnce).to.equal(true)
+		expect(callOrder.indexOf("maybeResolveWorkflowFormBeforeApiTurn")).to.be.lessThan(
+			callOrder.indexOf("generateFocusChainInstructions"),
+		)
+		expect(promptInjectionText).to.not.contain(
+			"You are in the fallback path because the system-owned workflow-form path was not completed.",
+		)
+		expect(promptInjectionText).to.not.contain("You are currently on this step: Step 1:")
+		expect(promptInjectionText).to.not.contain("You are currently on this step: Step 2:")
+		expect(promptInjectionText).to.not.contain("You are currently on this step: Step 3:")
+		expect(promptInjectionText).to.not.contain("You are currently on this step: Step 4:")
+		expect(promptInjectionText).to.contain(
+			"You are currently on this step: Step 5: Use Subagents for Specialized Reviews, then Collect Findings",
+		)
+	})
 })

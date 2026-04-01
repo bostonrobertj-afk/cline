@@ -38,6 +38,30 @@ describe("ResponseToolRuntime", () => {
 		assert.equal(taskState.activeResponseToolName, ClineDefaultTool.ATTEMPT)
 	})
 
+	it("does not dismiss command_output when the trailing message is not a command_output ask", async () => {
+		const runtime = new ResponseToolRuntime()
+		const taskState = new TaskState()
+		const callbacks = {
+			say: sinon.stub().resolves(undefined),
+			ask: sinon.stub().resolves({ response: "yesButtonClicked" }),
+		}
+
+		const config = {
+			taskState,
+			messageState: {
+				getClineMessages: () => [{ ask: "followup" }],
+			},
+			callbacks,
+		} as unknown as TaskConfig
+
+		const result = await runtime.askForResponse(config, ClineDefaultTool.ATTEMPT, "completion_result", "")
+
+		assert.equal(result.response, "yesButtonClicked")
+		sinon.assert.notCalled(callbacks.say)
+		sinon.assert.calledWithExactly(callbacks.ask, "completion_result", "", false)
+		assert.equal(taskState.activeResponseToolName, ClineDefaultTool.ATTEMPT)
+	})
+
 	it("returns command execution options that suppress only blocking asks", () => {
 		const runtime = new ResponseToolRuntime()
 

@@ -95,13 +95,9 @@ Primary inputs:
 
 Current delivered use cases:
 
-- Phase 1:
-  - `code-review.md` Step 3
-  - tool: `build_review_diff_output`
-- Phase 2:
-  - workflow-start forms for slash-command-started placeholder workflows
-  - first delivered example: `review-adversarial-general.md`
-  - tool: `set_workflow_placeholders`
+- workflow-start forms for slash-command-started placeholder workflows
+- `code-review.md` Step 2 diff artifact form using `build_review_diff_output`
+- `code-review.md` Step 3 review-input form using `build_review_input`
 
 ## Outputs
 
@@ -140,8 +136,9 @@ Current delivered use cases:
 8. If the submission is valid, the resolver builds the canonical tool input and tool params.
 9. The task runtime executes the tool through the normal tool path.
 10. The resolver evaluates the tool result and returns success or failure.
-11. On success, the session is cleared and normal workflow progression resumes.
-12. On failure, the session remains active in `retry_error` and the user can retry or fall back.
+11. On success, the session is cleared and control returns to runtime-owned workflow progression first.
+12. After a successful form resolution, the runtime may immediately re-enter deterministic progression and open another eligible system-owned form before any AI turn begins.
+13. On failure, the session remains active in `retry_error` and the user can retry or fall back.
 
 Important implementation note:
 
@@ -163,25 +160,16 @@ Important implementation note:
 
 ## Usage
 
-Typical Phase 1 path:
-
-1. Deterministic workflow progression reaches `code-review.md` Step 3.
-2. The runtime pauses normal agent execution and opens the Step 3 form.
-3. The user confirms they can provide diff inputs.
-4. The user selects a supported diff source.
-5. The form renders the concrete inputs for that source.
-6. The user submits.
-7. The runtime invokes `build_review_diff_output`.
-8. If the tool produces the expected artifact/result, deterministic progression advances to the next workflow step.
-
-Typical Phase 2 path:
+Typical live `code-review.md` path:
 
 1. A placeholder workflow is activated via slash command.
-2. Before the first API turn, the runtime inspects the active Step 1 requirements.
-3. If unresolved placeholders require human input, the start form is shown.
-4. The user provides values.
-5. The runtime invokes `set_workflow_placeholders`.
-6. Deterministic progression evaluates Step 1 immediately after the tool executes.
+2. Before the first API turn, the runtime inspects the active Step 1 requirements and may open the workflow-start form.
+3. The runtime invokes `set_workflow_placeholders` when the start form succeeds.
+4. Deterministic progression re-evaluates the now-current checklist state immediately after that tool runs.
+5. If Step 2 is now active and still unresolved, the runtime opens the Step 2 diff artifact form and invokes `build_review_diff_output` on success.
+6. Deterministic progression runs again and may advance directly into the Step 3 review-input form, which invokes `build_review_input` on success.
+7. Deterministic progression then derives Step 4 `review_mode` when the current-task artifacts prove it.
+8. The AI enters at Step 5 only after the pre-turn system-owned decision loop has no further eligible workflow-start or step-triggered form work to perform.
 
 ## Extension Guidelines
 

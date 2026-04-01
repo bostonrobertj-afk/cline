@@ -46,6 +46,7 @@ import {
 } from "@core/task/focus-chain/deterministicPlaceholderProgression"
 import type { FocusChainChecklistUpdateResult } from "@core/task/focus-chain/types"
 import { releaseTaskLock } from "@core/task/TaskLockUtils"
+import { dismissTrailingCommandOutputAskIfPresent } from "@core/task/utils/dismissTrailingCommandOutputAsk"
 import { getWorkflowFormResolverDefinition } from "@core/task/workflow-form/WorkflowFormRegistry"
 import { WorkflowFormRuntime } from "@core/task/workflow-form/WorkflowFormRuntime"
 import {
@@ -1642,111 +1643,134 @@ export class Task {
 	private async maybeResolveWorkflowFormBeforeApiTurn(
 		currentTurnSlashCommandAction?: PersistentSlashCommandAction,
 	): Promise<void> {
-		if (!this.taskState.activeWorkflowFormSession) {
-			const slashStartCandidate = await resolveWorkflowFormSlashCommandStartCandidate({
-				cwd: this.cwd,
-				taskState: this.taskState,
-				currentTurnSlashCommandAction,
-			})
-			if (slashStartCandidate) {
-				this.taskState.activeWorkflowFormSession = this.workflowFormRuntime.createSession({
-					resolverId: slashStartCandidate.resolverId,
-					triggerSource: slashStartCandidate.triggerSource,
-					owner: slashStartCandidate.owner,
-					initialPhase: slashStartCandidate.initialPhase,
-					context: slashStartCandidate.context,
+		let startFormHandledForCurrentTurn = this.taskState.activeWorkflowFormSession?.owner.kind === "slash_command"
+
+		while (!this.taskState.abort) {
+			if (!this.taskState.activeWorkflowFormSession) {
+				let slashStartCandidate
+				if (!startFormHandledForCurrentTurn) {
+					slashStartCandidate = await resolveWorkflowFormSlashCommandStartCandidate({
+						cwd: this.cwd,
+						taskState: this.taskState,
+						currentTurnSlashCommandAction,
+					})
+				}
+
+				if (slashStartCandidate) {
+					this.taskState.activeWorkflowFormSession = this.workflowFormRuntime.createSession({
+						resolverId: slashStartCandidate.resolverId,
+						triggerSource: slashStartCandidate.triggerSource,
+						owner: slashStartCandidate.owner,
+						initialPhase: slashStartCandidate.initialPhase,
+						context: slashStartCandidate.context,
+					})
+					await this.persistWorkflowFormSession()
+					startFormHandledForCurrentTurn = true
+				} else {
+					const candidate = await resolveWorkflowFormInterceptionCandidate({
+						cwd: this.cwd,
+						taskState: this.taskState,
+					})
+					if (candidate === undefined) {
+						break
+					}
+
+					this.taskState.activeWorkflowFormSession = this.workflowFormRuntime.createSession({
+						resolverId: candidate.trigger.resolverId,
+						triggerSource: "deterministic_workflow_progression",
+						owner: {
+							kind: "placeholder_workflow_step",
+							workflowName: this.taskState.activePlaceholderWorkflowSource!.name,
+							stepNumber: candidate.activeStep.stepNumber,
+						},
+						initialPhase: "confirm",
+						context: undefined,
+					})
+					await this.persistWorkflowFormSession()
+				}
+			}
+
+			this.pendingWorkflowFormOutcome = undefined
+			let restartDecisionLoop = false
+
+			while (this.taskState.activeWorkflowFormSession && !this.taskState.abort) {
+				const currentSession = this.taskState.activeWorkflowFormSession
+				await dismissTrailingCommandOutputAskIfPresent({
+					getClineMessages: () => this.messageStateHandler.getClineMessages(),
+					dismissCommandOutputAsk: async () => {
+						await this.say("command_output", "")
+					},
 				})
-				await this.persistWorkflowFormSession()
-			} else {
-				const candidate = await resolveWorkflowFormInterceptionCandidate({
-					cwd: this.cwd,
-					taskState: this.taskState,
+				await this.renderWorkflowFormMessage(this.workflowFormRuntime.buildPayload(currentSession))
+
+				await pWaitFor(() => this.pendingWorkflowFormOutcome !== undefined || this.taskState.abort, {
+					interval: 100,
 				})
-				if (candidate === undefined) {
+				if (this.taskState.abort) {
 					return
 				}
 
-				this.taskState.activeWorkflowFormSession = this.workflowFormRuntime.createSession({
-					resolverId: candidate.trigger.resolverId,
-					triggerSource: "deterministic_workflow_progression",
-					owner: {
-						kind: "placeholder_workflow_step",
-						workflowName: this.taskState.activePlaceholderWorkflowSource!.name,
-						stepNumber: candidate.activeStep.stepNumber,
-					},
-					initialPhase: "confirm",
-					context: undefined,
-				})
-				await this.persistWorkflowFormSession()
-			}
-		}
-
-		this.pendingWorkflowFormOutcome = undefined
-
-		while (this.taskState.activeWorkflowFormSession && !this.taskState.abort) {
-			const currentSession = this.taskState.activeWorkflowFormSession
-			await this.renderWorkflowFormMessage(this.workflowFormRuntime.buildPayload(currentSession))
-
-			await pWaitFor(() => this.pendingWorkflowFormOutcome !== undefined || this.taskState.abort, {
-				interval: 100,
-			})
-			if (this.taskState.abort) {
-				return
-			}
-
-			const resolvedOutcome = this.pendingWorkflowFormOutcome
-			this.pendingWorkflowFormOutcome = undefined
-			if (!resolvedOutcome) {
-				continue
-			}
-			const outcome = resolvedOutcome as
-				| Extract<WorkflowFormRuntimeOutcome, { kind: "render_form" }>
-				| Extract<WorkflowFormRuntimeOutcome, { kind: "fallback_to_agent" }>
-				| Extract<WorkflowFormRuntimeOutcome, { kind: "invoke_tool" }>
-
-			switch (outcome.kind) {
-				case "render_form":
-					continue
-				case "fallback_to_agent":
-					break
-				case "invoke_tool": {
-					const toolExecution = await this.executeWorkflowFormToolAndSync(outcome)
-					if (toolExecution.succeeded) {
-						const resolver = getWorkflowFormResolverDefinition(outcome.session.resolverId)
-						const definition = resolver.buildDefinition(outcome.session)
-						const successPayload = this.workflowFormRuntime.buildSuccessPayload(
-							outcome.session,
-							definition.successMessage,
-						)
-						await this.clearWorkflowFormSession()
-						await this.renderWorkflowFormMessage(successPayload)
-						break
-					}
-
-					if (toolExecution.fallbackToAgent === true) {
-						const fallbackNoticePayload = this.workflowFormRuntime.buildSuccessPayload(
-							outcome.session,
-							toolExecution.errorMessage,
-						)
-						await this.renderWorkflowFormMessage(fallbackNoticePayload)
-						if (!this.taskState.suppressedWorkflowFormResolverIds.includes(outcome.session.resolverId)) {
-							this.taskState.suppressedWorkflowFormResolverIds = [
-								...this.taskState.suppressedWorkflowFormResolverIds,
-								outcome.session.resolverId,
-							]
-						}
-						await this.clearWorkflowFormSession()
-						break
-					}
-
-					this.taskState.activeWorkflowFormSession = {
-						...outcome.session,
-						phase: "retry_error",
-						lastError: toolExecution.errorMessage,
-					}
-					await this.persistWorkflowFormSession()
+				const resolvedOutcome = this.pendingWorkflowFormOutcome
+				this.pendingWorkflowFormOutcome = undefined
+				if (!resolvedOutcome) {
 					continue
 				}
+				const outcome = resolvedOutcome as
+					| Extract<WorkflowFormRuntimeOutcome, { kind: "render_form" }>
+					| Extract<WorkflowFormRuntimeOutcome, { kind: "fallback_to_agent" }>
+					| Extract<WorkflowFormRuntimeOutcome, { kind: "invoke_tool" }>
+
+				switch (outcome.kind) {
+					case "render_form":
+						continue
+					case "fallback_to_agent":
+						break
+					case "invoke_tool": {
+						const toolExecution = await this.executeWorkflowFormToolAndSync(outcome)
+						if (toolExecution.succeeded) {
+							const resolver = getWorkflowFormResolverDefinition(outcome.session.resolverId)
+							const definition = resolver.buildDefinition(outcome.session)
+							const successPayload = this.workflowFormRuntime.buildSuccessPayload(
+								outcome.session,
+								definition.successMessage,
+							)
+							await this.clearWorkflowFormSession()
+							await this.renderWorkflowFormMessage(successPayload)
+							restartDecisionLoop = true
+							break
+						}
+
+						if (toolExecution.fallbackToAgent === true) {
+							const fallbackNoticePayload = this.workflowFormRuntime.buildSuccessPayload(
+								outcome.session,
+								toolExecution.errorMessage,
+							)
+							await this.renderWorkflowFormMessage(fallbackNoticePayload)
+							if (!this.taskState.suppressedWorkflowFormResolverIds.includes(outcome.session.resolverId)) {
+								this.taskState.suppressedWorkflowFormResolverIds = [
+									...this.taskState.suppressedWorkflowFormResolverIds,
+									outcome.session.resolverId,
+								]
+							}
+							await this.clearWorkflowFormSession()
+							break
+						}
+
+						this.taskState.activeWorkflowFormSession = {
+							...outcome.session,
+							phase: "retry_error",
+							lastError: toolExecution.errorMessage,
+						}
+						await this.persistWorkflowFormSession()
+						continue
+					}
+				}
+
+				break
+			}
+
+			if (restartDecisionLoop) {
+				continue
 			}
 
 			break
