@@ -4,7 +4,7 @@ import { getHooksEnabledSafe } from "@core/hooks/hooks-utils"
 import { executePreCompactHookWithCleanup, HookCancellationError } from "@core/hooks/precompact-executor"
 import { continuationPrompt } from "@core/prompts/contextManagement"
 import { formatResponse } from "@core/prompts/responses"
-import { ensureTaskDirectoryExists } from "@core/storage/disk"
+import { ensureTaskDirectoryExists, getTaskMetadata, saveTaskMetadata } from "@core/storage/disk"
 import { StateManager } from "@core/storage/StateManager"
 import { resolveWorkspacePath } from "@core/workspace"
 import { extractFileContent } from "@integrations/misc/extract-file-content"
@@ -230,6 +230,16 @@ export class SummarizeTaskHandler implements IToolHandler, IPartialBlockHandler 
 				config.taskState.conversationHistoryDeletedRange,
 				keepStrategy,
 			)
+			if (config.taskState.lastPromptedPlaceholderWorkflowChecklistLabel !== undefined) {
+				config.taskState.lastPromptedPlaceholderWorkflowChecklistLabel = undefined
+				try {
+					const metadata = await getTaskMetadata(config.taskId)
+					metadata.lastPromptedPlaceholderWorkflowChecklistLabel = undefined
+					await saveTaskMetadata(config.taskId, metadata)
+				} catch {
+					// Non-fatal: the in-memory marker remains canonical for the active turn.
+				}
+			}
 			await config.messageState.saveClineMessagesAndUpdateHistory()
 			await config.services.contextManager.triggerApplyStandardContextTruncationNoticeChange(
 				Date.now(),

@@ -384,6 +384,70 @@ describe("OpenAiNativeHandler", () => {
 		usageChunk.outputTokens.should.equal(100)
 	})
 
+	it("emits context_compacted when a Responses compaction output item completes", async () => {
+		const handler = new OpenAiNativeHandler({
+			openAiNativeApiKey: "test-api-key",
+			apiModelId: "gpt-5.4-mini-2026-03-17",
+		})
+
+		const fakeClient = {
+			responses: {
+				create: sinon.stub().resolves(
+					createAsyncIterable([
+						{
+							type: "response.output_item.done",
+							item: {
+								type: "compaction",
+								id: "cmp_test_123",
+								encrypted_content: "encrypted",
+							},
+						},
+						{
+							type: "response.completed",
+							response: {
+								id: "resp_compaction_done",
+								usage: {
+									input_tokens: 10,
+									input_tokens_details: {
+										cached_tokens: 0,
+									},
+									output_tokens: 5,
+									output_tokens_details: {
+										reasoning_tokens: 0,
+									},
+									total_tokens: 15,
+								},
+							},
+						},
+					]),
+				),
+			},
+		}
+		sinon.stub(handler as any, "ensureClient").returns(fakeClient as any)
+		sinon.stub(handler as any, "useWebsocketMode").returns(false)
+
+		const tools = [
+			{
+				type: "function",
+				function: {
+					name: "read_file",
+					description: "Read a file",
+					parameters: { type: "object" },
+				},
+			},
+		] as any
+
+		const chunks: any[] = []
+		for await (const chunk of handler.createMessage("system", [{ role: "user", content: "hi" }] as any, tools)) {
+			chunks.push(chunk)
+		}
+
+		chunks.some((chunk) => chunk.type === "context_compacted").should.equal(true)
+		const contextCompactedChunk = chunks.find((chunk) => chunk.type === "context_compacted")
+		contextCompactedChunk.should.not.equal(undefined)
+		contextCompactedChunk.id.should.equal("cmp_test_123")
+	})
+
 	it("should avoid duplicating Responses function call arguments when delta and done events both arrive", async () => {
 		const handler = new OpenAiNativeHandler({
 			openAiNativeApiKey: "test-api-key",

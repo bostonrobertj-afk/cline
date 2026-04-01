@@ -1,3 +1,4 @@
+import * as disk from "@core/storage/disk"
 import type { ClineContent, ClineTextContentBlock } from "@shared/messages/content"
 import { expect } from "chai"
 import { describe, it } from "mocha"
@@ -20,6 +21,7 @@ const { Task } = proxyquireNoPreserveCache("../index", {
 })
 
 type LoadContextTaskHarness = {
+	taskId: string
 	ulid: string
 	cwd: string
 	taskState: TaskState
@@ -44,6 +46,7 @@ type LoadContextTaskHarness = {
 	maybeResolveWorkflowFormBeforeApiTurn: sinon.SinonStub
 	applyPersistentSlashCommandAction: sinon.SinonStub
 	buildPlaceholderWorkflowActivationInstructions: sinon.SinonStub
+	persistLastPromptedPlaceholderWorkflowChecklistLabel: () => Promise<void>
 	hasHumanAuthoredInput: typeof Task.prototype.hasHumanAuthoredInput
 	getPromptRefreshFrequency: typeof Task.prototype.getPromptRefreshFrequency
 	shouldSendFullPromptAssemblyForCurrentTurn: typeof Task.prototype.shouldSendFullPromptAssemblyForCurrentTurn
@@ -112,6 +115,9 @@ function createFakeTask(promptRefreshFrequency = 5) {
 Determine what to review from the user's prompt before asking follow-up questions.
 
 ## Step 2: System-Owned Diff Source Resolution And Diff Output Persistence
+You are in the fallback path because the system-owned workflow-form path was not completed.
+
+Use \`build_review_diff_output\` whenever a supported source is discovered.
 `,
 	}
 	taskState.currentFocusChainChecklist = [
@@ -120,6 +126,7 @@ Determine what to review from the user's prompt before asking follow-up question
 	].join("\n")
 
 	const task: LoadContextTaskHarness = {
+		taskId: "task-load-context-placeholder",
 		ulid: "test-ulid",
 		cwd: process.cwd(),
 		taskState,
@@ -154,6 +161,7 @@ Determine what to review from the user's prompt before asking follow-up question
 		maybeResolveWorkflowFormBeforeApiTurn: sinon.stub().resolves(),
 		applyPersistentSlashCommandAction: sinon.stub().resolves(),
 		buildPlaceholderWorkflowActivationInstructions: sinon.stub().resolves(undefined),
+		persistLastPromptedPlaceholderWorkflowChecklistLabel: sinon.stub().resolves(),
 		hasHumanAuthoredInput: Task.prototype.hasHumanAuthoredInput,
 		getPromptRefreshFrequency: Task.prototype.getPromptRefreshFrequency,
 		shouldSendFullPromptAssemblyForCurrentTurn: Task.prototype.shouldSendFullPromptAssemblyForCurrentTurn,
@@ -195,6 +203,17 @@ function collectTextValues(value: unknown): string[] {
 	return result
 }
 
+function expectCurrentStepBlock(text: string, checklistLabel: string) {
+	expect(text).to.contain("# CURRENT WORKFLOW STEP")
+	expect(text).to.contain(checklistLabel)
+}
+
+function expectWorkflowStatusBlock(text: string) {
+	expect(text).to.contain("# CURRENT WORKFLOW STATUS")
+	expect(text).to.match(/### Reminder:/m)
+	expect(text).to.contain("Current Progress:")
+}
+
 describe("Task.loadContext placeholder workflow focus chain prompting", () => {
 	it("returns environment details and focus-chain workflow guidance as prompt injection blocks when full prompt assembly is required", async () => {
 		const fakeTask = createFakeTask(0)
@@ -213,15 +232,12 @@ describe("Task.loadContext placeholder workflow focus chain prompting", () => {
 
 		expect(userText).to.not.contain("ENVIRONMENT: reduced")
 		expect(userText).to.not.contain("### Reminder:")
-		expect(userText).to.not.contain("# CURRENT WORKFLOW STEP")
+		expectCurrentStepBlock(userText, "Step 1: Determine Review Source")
 
 		expect(promptInjectionText).to.contain("ENVIRONMENT: reduced")
-		expect(promptInjectionText).to.contain("# CURRENT WORKFLOW STATUS")
-		expect(promptInjectionText).to.contain("### Reminder:")
-		expect(promptInjectionText).to.contain("Current Progress: 0/2 items completed")
+		expectWorkflowStatusBlock(promptInjectionText)
 		expect(promptInjectionText).to.contain("- [ ] Step 1: Determine Review Source")
-		expect(promptInjectionText).to.contain("# CURRENT WORKFLOW STEP")
-		expect(promptInjectionText).to.contain("You are currently on this step: Step 1: Determine Review Source")
+		expect(promptInjectionText).to.not.contain("# CURRENT WORKFLOW STEP")
 		expect(fakeTask.getEnvironmentDetails.calledOnceWith(false, false)).to.equal(true)
 	})
 
@@ -248,16 +264,124 @@ describe("Task.loadContext placeholder workflow focus chain prompting", () => {
 		const promptInjectionText = collectTextValues(promptInjectionBlocks).join("\n")
 
 		expect(userText).to.not.contain("TODO LIST UPDATE SUGGESTED")
-		expect(userText).to.not.contain("# CURRENT WORKFLOW STEP")
+		expectCurrentStepBlock(userText, "Step 1: Determine Review Source")
 		expect(userText).to.not.contain("# AUTO-COMPLETED WORKFLOW STEPS")
 
-		expect(promptInjectionText).to.contain("# CURRENT WORKFLOW STATUS")
-		expect(promptInjectionText).to.contain("### Reminder:")
-		expect(promptInjectionText).to.contain("Current Progress: 0/2 items completed")
+		expectWorkflowStatusBlock(promptInjectionText)
 		expect(promptInjectionText).to.contain("# AUTO-COMPLETED WORKFLOW STEPS")
 		expect(promptInjectionText).to.contain("Step 4: Set Review Mode")
-		expect(promptInjectionText).to.contain("# CURRENT WORKFLOW STEP")
-		expect(promptInjectionText).to.contain("You are currently on this step: Step 1: Determine Review Source")
+		expect(promptInjectionText).to.not.contain("# CURRENT WORKFLOW STEP")
+	})
+
+	it("does not re-inject current-step details into input when the active checklist label was already prompted", async () => {
+		const fakeTask = createFakeTask()
+		fakeTask.taskState.lastPromptedPlaceholderWorkflowChecklistLabel = "Step 1: Determine Review Source"
+		const userContent: ClineContent[] = [
+			{
+				type: "tool_result",
+				tool_use_id: "tool-1",
+				content: [{ type: "text", text: "Review input available." }],
+			},
+		]
+
+		const [processedUserContent, promptInjectionBlocks] = await loadContext.call(fakeTask, userContent, false, false, false)
+		const userText = collectTextValues(processedUserContent).join("\n")
+		const promptInjectionText = collectTextValues(promptInjectionBlocks).join("\n")
+
+		expect(userText).to.not.contain("# CURRENT WORKFLOW STEP")
+		expect(promptInjectionText).to.not.contain("# CURRENT WORKFLOW STEP")
+		expectWorkflowStatusBlock(promptInjectionText)
+	})
+
+	it("injects the next step into input when the checklist advances to a new active label", async () => {
+		const fakeTask = createFakeTask()
+		fakeTask.taskState.lastPromptedPlaceholderWorkflowChecklistLabel = "Step 1: Determine Review Source"
+		fakeTask.taskState.currentFocusChainChecklist = [
+			"- [x] Step 1: Determine Review Source",
+			"- [ ] Step 2: System-Owned Diff Source Resolution And Diff Output Persistence",
+		].join("\n")
+
+		const userContent: ClineContent[] = [
+			{
+				type: "tool_result",
+				tool_use_id: "tool-1",
+				content: [{ type: "text", text: "Review input available." }],
+			},
+		]
+
+		const [processedUserContent, promptInjectionBlocks] = await loadContext.call(fakeTask, userContent, false, false, false)
+		const userText = collectTextValues(processedUserContent).join("\n")
+		const promptInjectionText = collectTextValues(promptInjectionBlocks).join("\n")
+
+		expectCurrentStepBlock(userText, "Step 2: System-Owned Diff Source Resolution And Diff Output Persistence")
+		expect(promptInjectionText).to.not.contain("# CURRENT WORKFLOW STEP")
+	})
+
+	it("does not inject current-step details on compact turns", async () => {
+		const fakeTask = createFakeTask()
+		const userContent: ClineContent[] = [
+			{
+				type: "tool_result",
+				tool_use_id: "tool-1",
+				content: [{ type: "text", text: "Review input available." }],
+			},
+		]
+
+		const [processedUserContent, promptInjectionBlocks] = await loadContext.call(fakeTask, userContent, false, true, false)
+		const userText = collectTextValues(processedUserContent).join("\n")
+		const promptInjectionText = collectTextValues(promptInjectionBlocks).join("\n")
+
+		expect(userText).to.not.contain("# CURRENT WORKFLOW STEP")
+		expect(promptInjectionText).to.not.contain("# CURRENT WORKFLOW STEP")
+	})
+
+	it("persists the last prompted placeholder workflow checklist label when loadContext injects a new active step", async () => {
+		const sandbox = sinon.createSandbox()
+		try {
+			sandbox.stub(disk, "getTaskMetadata").resolves({
+				files_in_context: [],
+				model_usage: [],
+				environment_history: [],
+			} as never)
+			const saveTaskMetadataStub = sandbox.stub(disk, "saveTaskMetadata").resolves()
+
+			const fakeTask = createFakeTask()
+			Object.setPrototypeOf(fakeTask, Task.prototype)
+			fakeTask.persistLastPromptedPlaceholderWorkflowChecklistLabel = Reflect.get(
+				Task.prototype,
+				"persistLastPromptedPlaceholderWorkflowChecklistLabel",
+			).bind(fakeTask)
+			fakeTask.taskState.lastPromptedPlaceholderWorkflowChecklistLabel = "Step 1: Determine Review Source"
+			fakeTask.taskState.currentFocusChainChecklist = [
+				"- [x] Step 1: Determine Review Source",
+				"- [ ] Step 2: System-Owned Diff Source Resolution And Diff Output Persistence",
+			].join("\n")
+
+			const [processedUserContent] = await loadContext.call(
+				fakeTask,
+				[
+					{
+						type: "tool_result",
+						tool_use_id: "tool-1",
+						content: [{ type: "text", text: "Review input available." }],
+					},
+				],
+				false,
+				false,
+				false,
+			)
+
+			const userText = collectTextValues(processedUserContent).join("\n")
+			expectCurrentStepBlock(userText, "Step 2: System-Owned Diff Source Resolution And Diff Output Persistence")
+			expect(saveTaskMetadataStub.called).to.equal(true)
+			const savedLabels = saveTaskMetadataStub
+				.getCalls()
+				.map((call) => call.args[1].lastPromptedPlaceholderWorkflowChecklistLabel)
+				.filter((value) => value !== undefined)
+			expect(savedLabels).to.include("Step 2: System-Owned Diff Source Resolution And Diff Output Persistence")
+		} finally {
+			sandbox.restore()
+		}
 	})
 
 	it("resolves a pending workflow form before generating focus-chain prompt injections", async () => {
@@ -321,7 +445,7 @@ Choose the review mode from the persisted diff output before continuing.
 			return await originalGenerateFocusChainInstructions()
 		})
 
-		const [, promptInjectionBlocks] = await loadContext.call(
+		const [processedUserContent, promptInjectionBlocks] = await loadContext.call(
 			fakeTask,
 			[
 				{
@@ -335,6 +459,7 @@ Choose the review mode from the persisted diff output before continuing.
 			false,
 		)
 
+		const userText = collectTextValues(processedUserContent).join("\n")
 		const promptInjectionText = collectTextValues(promptInjectionBlocks).join("\n")
 		expect(fakeTask.maybeResolveWorkflowFormBeforeApiTurn.calledOnce).to.equal(true)
 		expect(callOrder.indexOf("applyPersistentSlashCommandAction")).to.be.lessThan(
@@ -346,7 +471,7 @@ Choose the review mode from the persisted diff output before continuing.
 		expect(promptInjectionText).to.not.contain(
 			"You are in the fallback path because the system-owned workflow-form path was not completed.",
 		)
-		expect(promptInjectionText).to.contain("You are currently on this step: Step 3: Construct & Persist Review Input File")
+		expectCurrentStepBlock(userText, "Step 3: Construct & Persist Review Input File")
 	})
 
 	it("builds the first AI prompt from the fully settled code-review system-owned chain", async () => {
@@ -421,7 +546,7 @@ Use the settled {review_mode} review mode with {review_input} and collect findin
 			return await originalGenerateFocusChainInstructions()
 		})
 
-		const [, promptInjectionBlocks] = await loadContext.call(
+		const [processedUserContent, promptInjectionBlocks] = await loadContext.call(
 			fakeTask,
 			[
 				{
@@ -435,6 +560,7 @@ Use the settled {review_mode} review mode with {review_input} and collect findin
 			false,
 		)
 
+		const userText = collectTextValues(processedUserContent).join("\n")
 		const promptInjectionText = collectTextValues(promptInjectionBlocks).join("\n")
 		expect(fakeTask.maybeResolveWorkflowFormBeforeApiTurn.calledOnce).to.equal(true)
 		expect(callOrder.indexOf("maybeResolveWorkflowFormBeforeApiTurn")).to.be.lessThan(
@@ -447,8 +573,6 @@ Use the settled {review_mode} review mode with {review_input} and collect findin
 		expect(promptInjectionText).to.not.contain("You are currently on this step: Step 2:")
 		expect(promptInjectionText).to.not.contain("You are currently on this step: Step 3:")
 		expect(promptInjectionText).to.not.contain("You are currently on this step: Step 4:")
-		expect(promptInjectionText).to.contain(
-			"You are currently on this step: Step 5: Use Subagents for Specialized Reviews, then Collect Findings",
-		)
+		expectCurrentStepBlock(userText, "Step 5: Use Subagents for Specialized Reviews, then Collect Findings")
 	})
 })

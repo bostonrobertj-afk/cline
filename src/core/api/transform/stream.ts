@@ -3,6 +3,7 @@ export type ApiStreamChunk =
 	| ApiStreamTextChunk
 	| ApiStreamThinkingChunk
 	| ApiStreamUsageChunk
+	| ApiStreamContextCompactedChunk
 	| ApiStreamToolCallsChunk
 	| ApiStreamResponseIdChunk
 
@@ -33,6 +34,11 @@ export interface ApiStreamUsageChunk {
 	/**
 	 * The response ID associated with this response
 	 */
+	id?: string
+}
+
+export interface ApiStreamContextCompactedChunk {
+	type: "context_compacted"
 	id?: string
 }
 

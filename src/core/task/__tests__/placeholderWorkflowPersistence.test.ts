@@ -44,6 +44,14 @@ function createFakeTask(taskId: string) {
 	}
 }
 
+function expectWorkflowStatusOnlyPrompt(prompt: string, checklistLabel: string) {
+	expect(prompt).to.not.contain("# CURRENT WORKFLOW STEP")
+	expect(prompt).to.not.contain("You are currently on this step:")
+	expect(prompt).to.contain("# CURRENT WORKFLOW STATUS")
+	expect(prompt).to.contain("Current Progress:")
+	expect(prompt).to.contain(checklistLabel)
+}
+
 type TaskMethod<Args extends unknown[], Result> = (this: Record<string, unknown>, ...args: Args) => Result
 type FakeTaskBase = ReturnType<typeof createFakeTask> & Record<string, unknown>
 type FakeWorkflowFormTask = {
@@ -69,6 +77,10 @@ type FakeWorkflowFormTask = {
 
 const restoreBmadStateFromMetadata = Reflect.get(Task.prototype, "restoreBmadStateFromMetadata") as TaskMethod<[], Promise<void>>
 const persistWorkflowFormSession = Reflect.get(Task.prototype, "persistWorkflowFormSession") as TaskMethod<[], Promise<void>>
+const clearLastPromptedPlaceholderWorkflowChecklistLabelForContextCompaction = Reflect.get(
+	Task.prototype,
+	"clearLastPromptedPlaceholderWorkflowChecklistLabelForContextCompaction",
+) as TaskMethod<[], Promise<void>>
 const renderWorkflowFormMessage = Reflect.get(Task.prototype, "renderWorkflowFormMessage") as TaskMethod<
 	[ClineWorkflowForm],
 	Promise<void>
@@ -89,6 +101,10 @@ const maybeResolveWorkflowFormBeforeApiTurn = Reflect.get(Task.prototype, "maybe
 	[unknown?],
 	Promise<void>
 >
+const persistLastPromptedPlaceholderWorkflowChecklistLabel = Reflect.get(
+	Task.prototype,
+	"persistLastPromptedPlaceholderWorkflowChecklistLabel",
+) as TaskMethod<[], Promise<void>>
 const clearWorkflowFormSession = Reflect.get(Task.prototype, "clearWorkflowFormSession") as TaskMethod<[], Promise<void>>
 const executeWorkflowFormToolAndSync = Reflect.get(Task.prototype, "executeWorkflowFormToolAndSync") as TaskMethod<
 	[unknown],
@@ -135,6 +151,7 @@ Inspect the prepared review input and write findings.
 					},
 				},
 				activePlaceholderWorkflowTaskWriteProofPaths: ["/tmp/review-input.md"],
+				lastPromptedPlaceholderWorkflowChecklistLabel: "Step 1: Gather Context",
 				suppressedWorkflowFormResolverIds: ["code_review_step_3_diff_source"],
 				pendingAutoCompletedPlaceholderWorkflowStepNotices: [
 					{
@@ -161,6 +178,7 @@ Inspect the prepared review input and write findings.
 			expect(fakeTask.taskState.activePlaceholderWorkflowTaskWriteProofPaths).to.deep.equal(
 				metadata.activePlaceholderWorkflowTaskWriteProofPaths,
 			)
+			expect(fakeTask.taskState.lastPromptedPlaceholderWorkflowChecklistLabel).to.equal("Step 1: Gather Context")
 			expect(fakeTask.taskState.suppressedWorkflowFormResolverIds).to.deep.equal(metadata.suppressedWorkflowFormResolverIds)
 			expect(fakeTask.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal(
 				metadata.pendingAutoCompletedPlaceholderWorkflowStepNotices,
@@ -170,9 +188,32 @@ Inspect the prepared review input and write findings.
 			const manager = createFocusChainManager(fakeTask.taskState)
 			const prompt = await manager.generateFocusChainInstructions()
 
-			expect(prompt).to.contain("# CURRENT WORKFLOW STEP")
-			expect(prompt).to.contain("You are currently on this step: Step 1: Gather Context")
-			expect(prompt).to.contain("Determine what to review from the user's prompt")
+			expectWorkflowStatusOnlyPrompt(prompt, "Step 1: Gather Context")
+		} finally {
+			sandbox.restore()
+		}
+	})
+
+	it("clears and persists the last prompted checklist label when context compaction invalidates current-step history", async () => {
+		const sandbox = sinon.createSandbox()
+		try {
+			sandbox.stub(disk, "getTaskMetadata").resolves({
+				lastPromptedPlaceholderWorkflowChecklistLabel: "Step 1: Gather Context",
+			} as never)
+			const saveTaskMetadataStub = sandbox.stub(disk, "saveTaskMetadata").resolves()
+
+			const fakeTask = createFakeTask("task-clear-compaction-marker")
+			Object.setPrototypeOf(fakeTask, Task.prototype)
+			fakeTask.persistLastPromptedPlaceholderWorkflowChecklistLabel =
+				persistLastPromptedPlaceholderWorkflowChecklistLabel.bind(fakeTask)
+			fakeTask.taskState.lastPromptedPlaceholderWorkflowChecklistLabel = "Step 1: Gather Context"
+
+			await clearLastPromptedPlaceholderWorkflowChecklistLabelForContextCompaction.call(fakeTask)
+
+			expect(fakeTask.taskState.lastPromptedPlaceholderWorkflowChecklistLabel).to.equal(undefined)
+			expect(saveTaskMetadataStub.callCount).to.equal(1)
+			const lastSavedMetadata = saveTaskMetadataStub.getCall(saveTaskMetadataStub.callCount - 1).args[1]
+			expect(lastSavedMetadata.lastPromptedPlaceholderWorkflowChecklistLabel).to.equal(undefined)
 		} finally {
 			sandbox.restore()
 		}
@@ -619,6 +660,7 @@ ${step3Checklist}
 			expect(fakeTask.taskState.activePlaceholderWorkflowStableValues).to.equal(undefined)
 			expect(fakeTask.taskState.activePlaceholderWorkflowDeterministicState).to.equal(undefined)
 			expect(fakeTask.taskState.activePlaceholderWorkflowTaskWriteProofPaths).to.deep.equal([])
+			expect(fakeTask.taskState.lastPromptedPlaceholderWorkflowChecklistLabel).to.equal(undefined)
 			expect(fakeTask.taskState.activeWorkflowFormSession).to.equal(undefined)
 			expect(fakeTask.taskState.suppressedWorkflowFormResolverIds).to.deep.equal([])
 			expect(fakeTask.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
@@ -635,6 +677,7 @@ ${step3Checklist}
 			expect(lastSavedMetadata.activePlaceholderWorkflowValues).to.equal(undefined)
 			expect(lastSavedMetadata.activePlaceholderWorkflowDeterministicState).to.equal(undefined)
 			expect(lastSavedMetadata.activePlaceholderWorkflowTaskWriteProofPaths).to.deep.equal([])
+			expect(lastSavedMetadata.lastPromptedPlaceholderWorkflowChecklistLabel).to.equal(undefined)
 			expect(lastSavedMetadata.activeWorkflowFormSession).to.equal(undefined)
 			expect(lastSavedMetadata.suppressedWorkflowFormResolverIds).to.deep.equal([])
 			expect(lastSavedMetadata.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
@@ -2253,9 +2296,7 @@ Inspect the prepared review input and write findings.
 				const manager = createFocusChainManager(reloadedTask.taskState)
 				const prompt = await manager.generateFocusChainInstructions()
 
-				expect(prompt).to.contain("# CURRENT WORKFLOW STEP")
-				expect(prompt).to.contain("You are currently on this step: Step 1: Gather Context")
-				expect(prompt).to.contain("Determine what to review from the user's prompt")
+				expectWorkflowStatusOnlyPrompt(prompt, "Step 1: Gather Context")
 			} finally {
 				restoreSandbox.restore()
 			}

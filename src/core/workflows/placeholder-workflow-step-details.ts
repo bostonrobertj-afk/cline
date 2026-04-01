@@ -163,6 +163,10 @@ export async function getActivePlaceholderWorkflowStepDetails(args: {
 	}
 }
 
+export function getActivePlaceholderWorkflowChecklistLabel(checklistMarkdown: string): string | undefined {
+	return getFirstIncompleteChecklistItem(checklistMarkdown)?.label
+}
+
 export async function resolveActivePlaceholderWorkflowPromptContext(args: {
 	checklistMarkdown?: string | null
 	source?: ActivePlaceholderWorkflowSource

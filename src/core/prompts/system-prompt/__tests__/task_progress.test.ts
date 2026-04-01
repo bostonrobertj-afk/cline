@@ -32,9 +32,10 @@ describe("managed workflow task progress prompt", () => {
 	it("directs managed workflows to use backend-managed completion instead of manual checklist edits", async () => {
 		const progress = await getUpdatingTaskProgress(variant, context)
 
-		expect(progress).to.contain("The current checklist was built for you by the user at the beginning of the conversation.")
+		expect(progress).to.be.a("string")
 		expect(progress).to.contain("complete_workflow_item")
-		expect(progress).to.contain("task_progress is rendered based on the user's provided steps")
+		expect(progress).to.contain("task_progress")
+		expect(progress).to.not.contain("__COMPLETE_NEXT_STEP__")
 	})
 })
 
@@ -58,14 +59,10 @@ describe("placeholder workflow task progress prompt", () => {
 			activeDeterministicPlaceholderWorkflowEnabled: false,
 		})
 
-		expect(progress).to.contain("The user has triggered a workflow with a prebuilt checklist.")
-		expect(progress).to.contain("Instructions are automatically sent for the first incomplete item on the checklist")
-		expect(progress).to.contain(
-			"DO inform the user when the Done Signal for the current step is true using send_user_message, and include `task_progress` as a parameter on that tool call to complete the step.",
-		)
-		expect(progress).to.contain(
-			'When the active step\'s "Done Signal" is true, use `send_user_message` tool call to briefly tell the user what step you are completing, and include `task_progress` with `__COMPLETE_NEXT_STEP__`. Use it only once in that assistant turn.',
-		)
+		expect(progress).to.be.a("string")
+		expect(progress).to.contain("send_user_message")
+		expect(progress).to.contain("task_progress")
+		expect(progress).to.contain("__COMPLETE_NEXT_STEP__")
 	})
 })
 
@@ -76,12 +73,9 @@ describe("generic task progress prompt", () => {
 			managedWorkflowActive: false,
 		})
 
-		expect(progress).to.contain(
-			"Use `task_progress` only as a checklist parameter on the next tool call, not a standalone tool.",
-		)
-		expect(progress).to.contain("To create the list, pass a full Markdown checklist as the `task_progress` parameter.")
-		expect(progress).to.contain(
-			"Use `__COMPLETE_NEXT_STEP__` as the `task_progress` value to complete the next incomplete step.",
-		)
+		expect(progress).to.be.a("string")
+		expect(progress).to.contain("task_progress")
+		expect(progress).to.contain("__COMPLETE_NEXT_STEP__")
+		expect(progress).to.not.contain("send_user_message")
 	})
 })

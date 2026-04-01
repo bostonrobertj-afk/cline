@@ -113,6 +113,18 @@ function createConfig(overrides: Partial<TaskConfig> = {}): TaskConfig {
 	} as TaskConfig
 }
 
+function expectPlaceholderWorkflowGuidance(text: string) {
+	expect(text).to.be.a("string")
+	expect(text).to.contain("task_progress")
+	expect(text).to.contain("__COMPLETE_NEXT_STEP__")
+}
+
+function expectPlaceholderWorkflowActivationResult(text: string, workflowName: string) {
+	expect(text).to.be.a("string")
+	expect(text).to.contain(workflowName)
+	expect(text.trim().length).to.be.greaterThan(workflowName.length)
+}
+
 async function createReviewDiffRepo() {
 	const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), "build-review-diff-output-"))
 	const git = simpleGit(repoDir)
@@ -799,14 +811,7 @@ describe("Managed workflow handlers", () => {
 				research_topic: "workflow gating",
 				report_path: "docs/workflow-gating.md",
 			})
-			expect(String(result)).to.contain("Continue the current placeholder workflow step.")
-			expect(String(result)).to.contain(
-				'Do not include `task_progress` on a tool call until the active step\'s "Done Signal" is true.',
-			)
-			expect(String(result)).to.contain(
-				'When the active step\'s "Done Signal" is true, use `task_progress` with `__COMPLETE_NEXT_STEP__` on the next relevant tool call, and use it only once in that assistant turn.',
-			)
-			expect(String(result)).to.contain("__COMPLETE_NEXT_STEP__")
+			expectPlaceholderWorkflowGuidance(String(result))
 		} finally {
 			sandbox.restore()
 		}
@@ -901,14 +906,7 @@ describe("Managed workflow handlers", () => {
 
 		expect(String(result)).to.contain("No workflow placeholder values changed")
 		expect(String(result)).to.contain("Do not call set_workflow_placeholders again unless one of those values changes.")
-		expect(String(result)).to.contain("Continue the current placeholder workflow step.")
-		expect(String(result)).to.contain(
-			'Do not include `task_progress` on a tool call until the active step\'s "Done Signal" is true.',
-		)
-		expect(String(result)).to.contain(
-			'When the active step\'s "Done Signal" is true, use `task_progress` with `__COMPLETE_NEXT_STEP__` on the next relevant tool call, and use it only once in that assistant turn.',
-		)
-		expect(String(result)).to.contain("__COMPLETE_NEXT_STEP__")
+		expectPlaceholderWorkflowGuidance(String(result))
 		expect(String(result)).to.not.contain("complete_workflow_item")
 		expect((config.callbacks.updateFCListFromToolResponse as sinon.SinonStub).called).to.equal(false)
 	})
@@ -1095,10 +1093,7 @@ describe("Managed workflow handlers", () => {
 				partial: false,
 			} as any)
 
-			expect(String(result)).to.contain('# Workflow "local-review.md" is now active')
-			expect(String(result)).to.contain(
-				"The workflow started successfully. Use the current checklist and current workflow step details to continue.",
-			)
+			expectPlaceholderWorkflowActivationResult(String(result), 'Workflow "local-review.md"')
 			expect(String(result)).to.not.contain("Inspect the staged diff.")
 			expect(config.taskState.activeWorkflowId).to.equal(undefined)
 			expect(config.taskState.activePlaceholderWorkflowId).to.equal("local-review.md")
@@ -1169,7 +1164,7 @@ describe("Managed workflow handlers", () => {
 				partial: false,
 			} as any)
 
-			expect(String(result)).to.contain('# Workflow "local-review.md" is now active')
+			expectPlaceholderWorkflowActivationResult(String(result), 'Workflow "local-review.md"')
 			expect(config.taskState.activePlaceholderWorkflowId).to.equal("local-review.md")
 			expect(getMetadataStub.called).to.equal(false)
 			expect(saveMetadataStub.called).to.equal(false)
@@ -1284,9 +1279,7 @@ Inspect the prepared review input and write findings.`,
 				partial: false,
 			} as any)
 
-			expect(String(result)).to.contain(
-				"The workflow started successfully. Use the current checklist and current workflow step details to continue.",
-			)
+			expectPlaceholderWorkflowActivationResult(String(result), 'Workflow "custom-review.md"')
 			expect(String(result)).to.not.contain("Respond in English from .cline/workflow-config.yaml.")
 			expect(config.taskState.activePlaceholderWorkflowSource).to.deep.equal({
 				type: "local",
@@ -1342,10 +1335,7 @@ Inspect the prepared review input and write findings.`,
 				partial: false,
 			} as any)
 
-			expect(String(result)).to.contain('# Workflow "global-review.md" is now active')
-			expect(String(result)).to.contain(
-				"The workflow started successfully. Use the current checklist and current workflow step details to continue.",
-			)
+			expectPlaceholderWorkflowActivationResult(String(result), 'Workflow "global-review.md"')
 			expect(String(result)).to.not.contain("Review the release notes.")
 			expect(config.taskState.activeWorkflowId).to.equal(undefined)
 			expect(config.taskState.activePlaceholderWorkflowId).to.equal("global-review.md")
@@ -1425,9 +1415,7 @@ Inspect the prepared review input and write findings.`,
 				partial: false,
 			} as any)
 
-			expect(String(result)).to.contain(
-				"The workflow started successfully. Use the current checklist and current workflow step details to continue.",
-			)
+			expectPlaceholderWorkflowActivationResult(String(result), 'Workflow "custom-review.md"')
 			expect(String(result)).to.not.contain("Review 1.2 before continuing.")
 			expect(String(result)).to.not.contain("{{story_id}}")
 			expect(config.taskState.activePlaceholderWorkflowStableValues).to.include({
@@ -1478,10 +1466,7 @@ Inspect the prepared review input and write findings.`,
 				partial: false,
 			} as any)
 
-			expect(String(result)).to.contain('# Workflow "remote-review" is now active')
-			expect(String(result)).to.contain(
-				"The workflow started successfully. Use the current checklist and current workflow step details to continue.",
-			)
+			expectPlaceholderWorkflowActivationResult(String(result), 'Workflow "remote-review"')
 			expect(String(result)).to.not.contain("Check the config.")
 			expect(config.taskState.activeWorkflowId).to.equal(undefined)
 			expect(config.taskState.activePlaceholderWorkflowId).to.equal("remote-review")

@@ -1532,6 +1532,7 @@ export class Task {
 		this.taskState.activePlaceholderWorkflowStableValues = undefined
 		this.taskState.activePlaceholderWorkflowDeterministicState = undefined
 		this.taskState.activePlaceholderWorkflowTaskWriteProofPaths = []
+		this.taskState.lastPromptedPlaceholderWorkflowChecklistLabel = undefined
 		this.taskState.activeWorkflowFormSession = undefined
 		this.taskState.suppressedWorkflowFormResolverIds = []
 		this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices = []
@@ -1553,6 +1554,8 @@ export class Task {
 			taskMetadata.activePlaceholderWorkflowDeterministicState = this.taskState.activePlaceholderWorkflowDeterministicState
 			taskMetadata.activePlaceholderWorkflowTaskWriteProofPaths =
 				this.taskState.activePlaceholderWorkflowTaskWriteProofPaths
+			taskMetadata.lastPromptedPlaceholderWorkflowChecklistLabel =
+				this.taskState.lastPromptedPlaceholderWorkflowChecklistLabel
 			taskMetadata.activeWorkflowFormSession = this.taskState.activeWorkflowFormSession
 			taskMetadata.suppressedWorkflowFormResolverIds = this.taskState.suppressedWorkflowFormResolverIds
 			taskMetadata.pendingAutoCompletedPlaceholderWorkflowStepNotices =
@@ -2023,6 +2026,7 @@ export class Task {
 				this.taskState.activePlaceholderWorkflowValues = undefined
 				this.taskState.activePlaceholderWorkflowDeterministicState = undefined
 				this.taskState.activePlaceholderWorkflowTaskWriteProofPaths = []
+				this.taskState.lastPromptedPlaceholderWorkflowChecklistLabel = undefined
 				this.taskState.activeWorkflowFormSession = undefined
 				this.taskState.suppressedWorkflowFormResolverIds = []
 				this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices = []
@@ -2056,6 +2060,7 @@ export class Task {
 				this.taskState.activePlaceholderWorkflowValues = undefined
 				this.taskState.activePlaceholderWorkflowDeterministicState = undefined
 				this.taskState.activePlaceholderWorkflowTaskWriteProofPaths = []
+				this.taskState.lastPromptedPlaceholderWorkflowChecklistLabel = undefined
 				this.taskState.activeWorkflowFormSession = undefined
 				this.taskState.suppressedWorkflowFormResolverIds = []
 				this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices = []
@@ -2078,6 +2083,7 @@ export class Task {
 				this.taskState.activePlaceholderWorkflowValues = undefined
 				this.taskState.activePlaceholderWorkflowDeterministicState = undefined
 				this.taskState.activePlaceholderWorkflowTaskWriteProofPaths = []
+				this.taskState.lastPromptedPlaceholderWorkflowChecklistLabel = undefined
 				this.taskState.activeWorkflowFormSession = undefined
 				this.taskState.suppressedWorkflowFormResolverIds = []
 				this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices = []
@@ -2101,6 +2107,8 @@ export class Task {
 			taskMetadata.activePlaceholderWorkflowDeterministicState = this.taskState.activePlaceholderWorkflowDeterministicState
 			taskMetadata.activePlaceholderWorkflowTaskWriteProofPaths =
 				this.taskState.activePlaceholderWorkflowTaskWriteProofPaths
+			taskMetadata.lastPromptedPlaceholderWorkflowChecklistLabel =
+				this.taskState.lastPromptedPlaceholderWorkflowChecklistLabel
 			taskMetadata.activeWorkflowFormSession = this.taskState.activeWorkflowFormSession
 			taskMetadata.suppressedWorkflowFormResolverIds = this.taskState.suppressedWorkflowFormResolverIds
 			taskMetadata.pendingAutoCompletedPlaceholderWorkflowStepNotices =
@@ -2248,6 +2256,7 @@ export class Task {
 			this.taskState.activePlaceholderWorkflowDeterministicState = metadata.activePlaceholderWorkflowDeterministicState
 			this.taskState.activePlaceholderWorkflowTaskWriteProofPaths =
 				metadata.activePlaceholderWorkflowTaskWriteProofPaths ?? []
+			this.taskState.lastPromptedPlaceholderWorkflowChecklistLabel = metadata.lastPromptedPlaceholderWorkflowChecklistLabel
 			this.taskState.activeWorkflowFormSession = metadata.activeWorkflowFormSession as WorkflowFormSessionState | undefined
 			this.taskState.suppressedWorkflowFormResolverIds = metadata.suppressedWorkflowFormResolverIds ?? []
 			this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices =
@@ -2265,6 +2274,25 @@ export class Task {
 		}
 
 		await this.FocusChainManager?.restoreCurrentChecklistFromDisk()
+	}
+
+	private async persistLastPromptedPlaceholderWorkflowChecklistLabel(): Promise<void> {
+		try {
+			const metadata = await getTaskMetadata(this.taskId)
+			metadata.lastPromptedPlaceholderWorkflowChecklistLabel = this.taskState.lastPromptedPlaceholderWorkflowChecklistLabel
+			await saveTaskMetadata(this.taskId, metadata)
+		} catch {
+			// Non-fatal: the in-memory current-step marker remains canonical for the active turn.
+		}
+	}
+
+	private async clearLastPromptedPlaceholderWorkflowChecklistLabelForContextCompaction(): Promise<void> {
+		if (this.taskState.lastPromptedPlaceholderWorkflowChecklistLabel === undefined) {
+			return
+		}
+
+		this.taskState.lastPromptedPlaceholderWorkflowChecklistLabel = undefined
+		await this.persistLastPromptedPlaceholderWorkflowChecklistLabel()
 	}
 
 	private async refreshManagedWorkflowChecklistProjection(): Promise<void> {
@@ -3294,6 +3322,7 @@ export class Task {
 		)
 
 		this.taskState.conversationHistoryDeletedRange = newDeletedRange
+		await this.clearLastPromptedPlaceholderWorkflowChecklistLabelForContextCompaction()
 
 		await this.messageStateHandler.saveClineMessagesAndUpdateHistory()
 		await this.contextManager.triggerApplyStandardContextTruncationNoticeChange(
@@ -3505,6 +3534,7 @@ export class Task {
 
 		if (contextManagementMetadata.updatedConversationHistoryDeletedRange) {
 			this.taskState.conversationHistoryDeletedRange = contextManagementMetadata.conversationHistoryDeletedRange
+			await this.clearLastPromptedPlaceholderWorkflowChecklistLabelForContextCompaction()
 			await this.messageStateHandler.saveClineMessagesAndUpdateHistory()
 			// saves task history item which we use to keep track of conversation history deleted range
 		}
@@ -4047,6 +4077,7 @@ export class Task {
 					const safeEnd = Math.min(end + 2, apiHistory.length - 1)
 					if (end + 2 <= safeEnd) {
 						this.taskState.conversationHistoryDeletedRange = [start, end + 2]
+						await this.clearLastPromptedPlaceholderWorkflowChecklistLabelForContextCompaction()
 						await this.messageStateHandler.saveClineMessagesAndUpdateHistory()
 					}
 				}
@@ -4466,6 +4497,10 @@ export class Task {
 						}
 						case "response_id": {
 							responseId = chunk.id
+							break
+						}
+						case "context_compacted": {
+							await this.clearLastPromptedPlaceholderWorkflowChecklistLabelForContextCompaction()
 							break
 						}
 					}
@@ -5033,6 +5068,19 @@ export class Task {
 		this.currentRequestHasHumanAuthoredInput = requestHasHumanAuthoredInput
 		const shouldSendFullPromptAssembly = this.shouldSendFullPromptAssemblyForCurrentTurn(requestHasHumanAuthoredInput)
 		this.currentRequestShouldSendFullPromptAssembly = shouldSendFullPromptAssembly
+		if (!useCompactPrompt) {
+			const previousPromptedChecklistLabel = this.taskState.lastPromptedPlaceholderWorkflowChecklistLabel
+			const currentStepInputPrompt = await this.FocusChainManager?.consumeCurrentPlaceholderWorkflowStepPromptForInput()
+			if (currentStepInputPrompt?.trim()) {
+				processedUserContent.push({
+					type: "text",
+					text: currentStepInputPrompt,
+				})
+			}
+			if (this.taskState.lastPromptedPlaceholderWorkflowChecklistLabel !== previousPromptedChecklistLabel) {
+				await this.persistLastPromptedPlaceholderWorkflowChecklistLabel()
+			}
+		}
 		const placeholderActivationInstructionsAppended = false
 
 		logFocusChainDiagnosticEvent(this.taskId, "load_context_snapshot", {

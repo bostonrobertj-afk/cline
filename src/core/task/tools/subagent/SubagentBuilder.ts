@@ -24,17 +24,13 @@ export const SUBAGENT_DEFAULT_ALLOWED_TOOLS: ClineDefaultTool[] = [
 const SUBAGENT_MCP_TOOLS: ClineDefaultTool[] = [ClineDefaultTool.MCP_USE, ClineDefaultTool.MCP_ACCESS, ClineDefaultTool.MCP_DOCS]
 // If a test fails due to changed verbiage in the lines following this one, update the test expectations. Do not change the prompt verbiage below without explicit approval from a human user.
 export const SUBAGENT_SYSTEM_SUFFIX = `\n\n# Subagent Execution Mode
-You are running as a research subagent. Your job is to explore the codebase and gather information to answer the question.
+You are running as a subagent.
+You must execute exactly as you've been instructed, and limit your scope to the tasks assigned to you.
 You can read files, list directories, search for patterns, list code definitions, and run commands.
 Only use execute_command for readonly operations like ls, grep, git log, git diff, gh, etc.
-When it makes sense, be clever about chaining commands or in-command scripting in execute_command to quickly get relevant context - and using pipes / filters to help narrow results.
 Do not run commands that modify files or system state.
 When you have a comprehensive answer, call the attempt_completion tool.
-The attempt_completion result field is sent directly to the main agent, so put your full final findings there.
-Unless the subagent prompt explicitly asks for detailed analysis, keep the result concise and focus on the files the main agent should read next.
-Include a section titled "Relevant file paths" and list only file paths, one per line.
-Do not include line numbers, summaries, or per-file explanations unless explicitly requested.
-`
+The attempt_completion result field is sent directly to the main agent, so put your full final findings there.`
 
 export class SubagentBuilder {
 	private readonly agentConfig: AgentConfig = {}

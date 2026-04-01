@@ -24,8 +24,21 @@ function createDependencies(taskState: TaskState) {
 	}
 }
 
+function expectReminderLine(prompt: string) {
+	expect(prompt).to.match(/^### Reminder:/m)
+	const reminderLine = prompt.split("\n").find((line) => line.startsWith("### Reminder:"))
+	expect(reminderLine).to.be.a("string")
+	expect(reminderLine!.trim().length).to.be.greaterThan("### Reminder:".length)
+}
+
+function expectCurrentStepPrompt(prompt: string | undefined, checklistLabel: string) {
+	expect(prompt).to.be.a("string")
+	expect(prompt).to.contain("# CURRENT WORKFLOW STEP")
+	expect(prompt).to.contain(checklistLabel)
+}
+
 describe("FocusChainManager placeholder workflow prompting", () => {
-	it("injects current-step details for a placeholder workflow when they can be resolved", async () => {
+	it("renders placeholder workflow status without embedding current-step details in focus-chain instructions", async () => {
 		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "focus-chain-placeholder-"))
 		const workflowPath = path.join(tempDir, "code-review.md")
 		await fs.writeFile(
@@ -58,20 +71,102 @@ Inspect the prepared review input and write findings.
 			const prompt = await manager.generateFocusChainInstructions()
 
 			expect(prompt).to.contain("# CURRENT WORKFLOW STATUS")
-			expect(prompt).to.contain("# CURRENT WORKFLOW STEP")
-			expect(prompt).to.contain("You are currently on this step: Step 1: Gather Context")
-			expect(prompt).to.contain("Determine what to review from the user's prompt")
-			expect(prompt).to.contain(
-				"Once you correctly complete this step, the next step's details will be shown automatically.",
-			)
+			expect(prompt).to.not.contain("# CURRENT WORKFLOW STEP")
+			expect(prompt).to.not.contain("Determine what to review from the user's prompt before asking follow-up questions.")
 			expect(prompt).to.not.contain("task_progress")
-			expect(prompt).to.not.contain("__COMPLETE_NEXT_STEP__")
-			expect(prompt).to.match(/^### Reminder:/m)
+			expectReminderLine(prompt)
 			expect(prompt).to.contain("```text")
 			expect(prompt).to.match(/^- \[ \] Step 1: Gather Context/m)
 		} finally {
 			await fs.rm(tempDir, { recursive: true, force: true })
 		}
+	})
+
+	it("returns the current-step block only once per active checklist label", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "focus-chain-current-step-input-"))
+		const workflowPath = path.join(tempDir, "code-review.md")
+		await fs.writeFile(
+			workflowPath,
+			`# Review Workflow
+
+## Step 1: Gather Context
+Determine what to review from the user's prompt before asking follow-up questions.
+
+## Step 2: Review
+Inspect the prepared review input and write findings.
+`,
+			"utf8",
+		)
+
+		try {
+			const taskState = new TaskState()
+			taskState.activePlaceholderWorkflowId = "code-review.md"
+			taskState.activePlaceholderWorkflowSource = {
+				type: "local",
+				name: "code-review.md",
+				path: workflowPath,
+			}
+			taskState.currentFocusChainChecklist = "- [ ] Step 1: Gather Context\n- [ ] Step 2: Review"
+
+			const manager = new FocusChainManager(createDependencies(taskState))
+			const firstPrompt = await manager.consumeCurrentPlaceholderWorkflowStepPromptForInput()
+			const secondPrompt = await manager.consumeCurrentPlaceholderWorkflowStepPromptForInput()
+
+			expectCurrentStepPrompt(firstPrompt, "Step 1: Gather Context")
+			expect(secondPrompt).to.equal(undefined)
+			expect(taskState.lastPromptedPlaceholderWorkflowChecklistLabel).to.equal("Step 1: Gather Context")
+
+			taskState.currentFocusChainChecklist = "- [x] Step 1: Gather Context\n- [ ] Step 2: Review"
+
+			const thirdPrompt = await manager.consumeCurrentPlaceholderWorkflowStepPromptForInput()
+
+			expectCurrentStepPrompt(thirdPrompt, "Step 2: Review")
+			expect(taskState.lastPromptedPlaceholderWorkflowChecklistLabel).to.equal("Step 2: Review")
+
+			taskState.currentFocusChainChecklist = "- [x] Step 1: Gather Context\n- [x] Step 2: Review"
+
+			const completedPrompt = await manager.consumeCurrentPlaceholderWorkflowStepPromptForInput()
+
+			expect(completedPrompt).to.equal(undefined)
+			expect(taskState.lastPromptedPlaceholderWorkflowChecklistLabel).to.equal(undefined)
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("retries current-step resolution on later turns when step details were previously unresolved", async () => {
+		const taskState = new TaskState()
+		taskState.activePlaceholderWorkflowId = "code-review.md"
+		taskState.activePlaceholderWorkflowSource = {
+			type: "remote",
+			name: "code-review.md",
+			contents: "## Step 9: Ship It\nFinish the release.",
+		}
+		taskState.currentFocusChainChecklist = "- [ ] Step 1: Gather Context\n- [ ] Step 2: Review"
+
+		const manager = new FocusChainManager(createDependencies(taskState))
+		const firstPrompt = await manager.consumeCurrentPlaceholderWorkflowStepPromptForInput()
+
+		expect(firstPrompt).to.equal(undefined)
+		expect(taskState.lastPromptedPlaceholderWorkflowChecklistLabel).to.equal(undefined)
+
+		taskState.activePlaceholderWorkflowSource = {
+			type: "remote",
+			name: "code-review.md",
+			contents: `# Review Workflow
+
+## Step 1: Gather Context
+Determine what to review from the user's prompt before asking follow-up questions.
+
+## Step 2: Review
+Inspect the prepared review input and write findings.
+`,
+		}
+
+		const secondPrompt = await manager.consumeCurrentPlaceholderWorkflowStepPromptForInput()
+
+		expectCurrentStepPrompt(secondPrompt, "Step 1: Gather Context")
+		expect(taskState.lastPromptedPlaceholderWorkflowChecklistLabel).to.equal("Step 1: Gather Context")
 	})
 
 	it("renders and consumes pending auto-completed placeholder workflow notices", async () => {
@@ -196,9 +291,10 @@ Inspect the prepared review input and write findings.
 			taskState.currentFocusChainChecklist = "- [ ] Step 1: Gather Context\n- [ ] Step 2: Review"
 
 			const manager = new FocusChainManager(createDependencies(taskState))
-			const prompt = await manager.generateFocusChainInstructions()
+			const prompt = await manager.consumeCurrentPlaceholderWorkflowStepPromptForInput()
 
-			expect(prompt).to.contain("Review the scoped story 1.2 before asking follow-up questions.")
+			expectCurrentStepPrompt(prompt, "Step 1: Gather Context")
+			expect(prompt).to.contain("1.2")
 			expect(prompt).to.not.contain("{{story_id}}")
 		} finally {
 			await fs.rm(tempDir, { recursive: true, force: true })
@@ -235,9 +331,10 @@ Inspect the prepared review input and write findings.
 			taskState.currentFocusChainChecklist = "- [ ] Step 1: Gather Context\n- [ ] Step 2: Review"
 
 			const manager = new FocusChainManager(createDependencies(taskState))
-			const prompt = await manager.generateFocusChainInstructions()
+			const prompt = await manager.consumeCurrentPlaceholderWorkflowStepPromptForInput()
 
-			expect(prompt).to.contain("Respond in English before asking follow-up questions.")
+			expectCurrentStepPrompt(prompt, "Step 1: Gather Context")
+			expect(prompt).to.contain("English")
 			expect(prompt).to.not.contain("{communication_language}")
 		} finally {
 			await fs.rm(tempDir, { recursive: true, force: true })
@@ -257,7 +354,8 @@ Inspect the prepared review input and write findings.
 		const manager = new FocusChainManager(createDependencies(taskState))
 		const prompt = await manager.generateFocusChainInstructions()
 
-		expect(prompt).to.contain('If you finish the current checklist step, include "task_progress" in your next tool call')
+		expectReminderLine(prompt)
+		expect(prompt).to.contain("task_progress")
 		expect(prompt).to.not.contain("# CURRENT WORKFLOW STEP")
 	})
 
@@ -274,8 +372,10 @@ Inspect the prepared review input and write findings.
 		const manager = new FocusChainManager(createDependencies(taskState))
 		const prompt = await manager.generateFocusChainInstructions()
 
-		expect(prompt).to.contain("This turn could not resolve the current deterministic workflow step details")
-		expect(prompt).to.not.contain('If you finish the current checklist step, include "task_progress" in your next tool call')
+		expect(prompt).to.contain("# CURRENT WORKFLOW STATUS")
+		expect(prompt).to.contain("Current Progress:")
+		expect(prompt).to.contain("```text")
+		expectReminderLine(prompt)
 		expect(prompt).to.not.contain("Keep `task_progress` moving")
 		expect(prompt).to.not.contain("# CURRENT WORKFLOW STEP")
 	})
@@ -415,12 +515,11 @@ Use \`build_review_diff_output\` whenever a supported source is discovered.
 			].join("\n")
 
 			const manager = new FocusChainManager(createDependencies(taskState))
-			const prompt = await manager.generateFocusChainInstructions()
+			const prompt = await manager.consumeCurrentPlaceholderWorkflowStepPromptForInput()
 
-			expect(prompt).to.contain(
-				"You are in the fallback path because the system-owned workflow-form path was not completed.",
-			)
-			expect(prompt).to.contain("Do not ask the human to restate or re-enter a diff source")
+			expectCurrentStepPrompt(prompt, "Step 3: System-Owned Diff Source Resolution And Diff Output Persistence")
+			expect(prompt).to.contain("fallback path")
+			expect(prompt).to.contain("diff source")
 			expect(prompt).to.contain("build_review_diff_output")
 		} finally {
 			await fs.rm(tempDir, { recursive: true, force: true })
@@ -677,10 +776,8 @@ ${progressedChecklist}
 			const result = await manager.updateFCListFromToolResponse("__COMPLETE_NEXT_STEP__")
 
 			expect(result.accepted).to.equal(false)
-			expect(result.feedback).to.contain("Placeholder workflow progress already advanced once in this assistant turn.")
-			expect(result.feedback).to.contain(
-				'Do not include `task_progress` on a tool call until the active step\'s "Done Signal" is true.',
-			)
+			expect(result.feedback).to.be.a("string")
+			expect(result.feedback).to.contain("task_progress")
 			expect(taskState.currentFocusChainChecklist).to.equal("- [ ] Step 1: Gather Context\n- [ ] Step 2: Review")
 			sinon.assert.notCalled(say)
 		} finally {

@@ -112,6 +112,8 @@ export class UseSkillToolHandler implements IToolHandler, IPartialBlockHandler {
 					metadata.activePlaceholderWorkflowSource = config.taskState.activePlaceholderWorkflowSource
 					metadata.activePlaceholderWorkflowStableValues = config.taskState.activePlaceholderWorkflowStableValues
 					metadata.activePlaceholderWorkflowValues = config.taskState.activePlaceholderWorkflowValues
+					metadata.lastPromptedPlaceholderWorkflowChecklistLabel =
+						config.taskState.lastPromptedPlaceholderWorkflowChecklistLabel
 					metadata.managedWorkflowRun = config.taskState.managedWorkflowRun
 					await saveTaskMetadata(config.taskId, metadata)
 				} catch {
@@ -168,6 +170,8 @@ export class UseSkillToolHandler implements IToolHandler, IPartialBlockHandler {
 						metadata.activePlaceholderWorkflowSource = config.taskState.activePlaceholderWorkflowSource
 						metadata.activePlaceholderWorkflowStableValues = config.taskState.activePlaceholderWorkflowStableValues
 						metadata.activePlaceholderWorkflowValues = config.taskState.activePlaceholderWorkflowValues
+						metadata.lastPromptedPlaceholderWorkflowChecklistLabel =
+							config.taskState.lastPromptedPlaceholderWorkflowChecklistLabel
 						metadata.managedWorkflowRun = config.taskState.managedWorkflowRun
 						await saveTaskMetadata(config.taskId, metadata)
 					} catch {
@@ -263,6 +267,7 @@ IMPORTANT: The workflow is now loaded. Do NOT call use_skill again for this task
 			config.taskState.activePlaceholderWorkflowStableValues = undefined
 			config.taskState.activePlaceholderWorkflowValues = undefined
 			config.taskState.activePlaceholderWorkflowDeterministicState = undefined
+			config.taskState.lastPromptedPlaceholderWorkflowChecklistLabel = undefined
 			config.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices = []
 			config.taskState.activeWorkflowJustStarted = true
 

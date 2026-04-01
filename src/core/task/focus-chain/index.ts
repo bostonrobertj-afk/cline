@@ -5,6 +5,7 @@ import * as path from "path"
 import { getTaskMetadata, saveTaskMetadata } from "@/core/storage/disk"
 import {
 	buildPlaceholderWorkflowChecklist,
+	getActivePlaceholderWorkflowChecklistLabel,
 	getActivePlaceholderWorkflowStepDetails,
 } from "@/core/workflows/placeholder-workflow-step-details"
 import { findUnresolvedWorkflowPlaceholders } from "@/core/workflows/workflow-placeholders"
@@ -253,26 +254,22 @@ export class FocusChainManager {
 				this.taskState.activePlaceholderWorkflowSource?.name,
 			)
 
-			const introUpdateRequired = activeDeterministicPlaceholderWorkflowEnabled
-				? "### Reminder: Detailed instructions are shown for the first incomplete checklist item. This turn could not resolve the current deterministic workflow step details, so do not advance the checklist manually. Continue the current step work and wait for the next step's details to be shown automatically."
-				: "### Reminder: Detailed instructions are shown for the first incomplete checklist item. Keep `task_progress` moving so the active step and its details stay in sync."
 			const listCurrentProgress = `**Current Progress: ${completedItems}/${totalItems} items completed (${percentComplete}%)**`
 			const userHasUpdatedList =
 				"**CRITICAL INFORMATION:** The user has modified this todo list - review ALL changes carefully"
 
-			const placeholderWorkflowStepPrompt = await this.buildPlaceholderWorkflowStepPrompt(
+			const placeholderWorkflowStatusPrompt = await this.buildPlaceholderWorkflowStatusPrompt(
 				this.taskState.currentFocusChainChecklist,
 				listCurrentProgress,
 			)
-			if (placeholderWorkflowStepPrompt) {
-				return this.joinPromptSections("# CURRENT WORKFLOW STATUS", placeholderWorkflowStepPrompt)
+			if (placeholderWorkflowStatusPrompt) {
+				return this.joinPromptSections("# CURRENT WORKFLOW STATUS", placeholderWorkflowStatusPrompt)
 			}
 
 			// If user has updated the list, inform the model (and provide latest copy)
 			if (this.taskState.todoListWasUpdatedByUser) {
 				return this.joinPromptSections(
 					"# CURRENT WORKFLOW STATUS",
-					introUpdateRequired,
 					listCurrentProgress,
 					this.renderChecklistForPrompt(this.taskState.currentFocusChainChecklist),
 					userHasUpdatedList,
@@ -303,7 +300,6 @@ export class FocusChainManager {
 			// Return with progress-based stub
 			return this.joinPromptSections(
 				"# CURRENT WORKFLOW STATUS",
-				introUpdateRequired,
 				listCurrentProgress,
 				this.renderChecklistForPrompt(this.taskState.currentFocusChainChecklist),
 				activeDeterministicPlaceholderWorkflowEnabled ? undefined : FocusChainPrompts.reminder,
@@ -347,7 +343,7 @@ export class FocusChainManager {
 		return section
 	}
 
-	private async buildPlaceholderWorkflowStepPrompt(
+	private async buildPlaceholderWorkflowStatusPrompt(
 		currentChecklist: string,
 		listCurrentProgress: string,
 	): Promise<string | undefined> {
@@ -359,6 +355,47 @@ export class FocusChainManager {
 				hasActivePlaceholderWorkflowSource: false,
 				currentChecklistItems: parseFocusChainListCounts(currentChecklist).totalItems,
 			})
+			return undefined
+		}
+
+		const userUpdatedWarning = this.taskState.todoListWasUpdatedByUser
+			? "**CRITICAL INFORMATION:** I updated this checklist manually. Review the current checklist carefully before you continue."
+			: ""
+		const deterministicWorkflowSupported = isDeterministicPlaceholderWorkflowSupported(
+			this.taskState.activePlaceholderWorkflowSource.name,
+		)
+		const autoCompletedNoticeSection = await this.consumeAutoCompletedPlaceholderWorkflowNoticesForPrompt()
+
+		return this.joinPromptSections(
+			deterministicWorkflowSupported
+				? "### Reminder: Detailed instructions for the current step are available in conversation history. Further Instructions will be provided once you complete the current step's requirements."
+				: "### Reminder: Detailed instructions for the current step are available in conversatoin history.. Keep `task_progress` moving so the active step and its details stay in sync.",
+			listCurrentProgress,
+			this.renderChecklistForPrompt(currentChecklist),
+			userUpdatedWarning,
+			autoCompletedNoticeSection,
+		)
+	}
+
+	public async consumeCurrentPlaceholderWorkflowStepPromptForInput(): Promise<string | undefined> {
+		if (this.taskState.managedWorkflowRun) {
+			this.taskState.lastPromptedPlaceholderWorkflowChecklistLabel = undefined
+			return undefined
+		}
+
+		const currentChecklist = this.taskState.currentFocusChainChecklist
+		if (!this.taskState.activePlaceholderWorkflowSource || !currentChecklist) {
+			this.taskState.lastPromptedPlaceholderWorkflowChecklistLabel = undefined
+			return undefined
+		}
+
+		const activeChecklistLabel = getActivePlaceholderWorkflowChecklistLabel(currentChecklist)
+		if (!activeChecklistLabel) {
+			this.taskState.lastPromptedPlaceholderWorkflowChecklistLabel = undefined
+			return undefined
+		}
+
+		if (this.taskState.lastPromptedPlaceholderWorkflowChecklistLabel === activeChecklistLabel) {
 			return undefined
 		}
 
@@ -380,11 +417,6 @@ export class FocusChainManager {
 				return undefined
 			}
 
-			const userUpdatedWarning = this.taskState.todoListWasUpdatedByUser
-				? "**CRITICAL INFORMATION:** I updated this checklist manually. Review the current checklist carefully before you continue."
-				: ""
-			const deterministicWorkflowSupported = isDeterministicPlaceholderWorkflowSupported(stepDetails.sourceName)
-			const autoCompletedNoticeSection = await this.consumeAutoCompletedPlaceholderWorkflowNoticesForPrompt()
 			const unresolvedPlaceholders = findUnresolvedWorkflowPlaceholders(stepDetails.details)
 			logFocusChainDiagnosticEvent(this.taskId, "placeholder_step_prompt_resolution", {
 				entered: true,
@@ -395,35 +427,28 @@ export class FocusChainManager {
 				unresolvedPlaceholderCount: unresolvedPlaceholders.length,
 				unresolvedPlaceholders: unresolvedPlaceholders.length > 0 ? unresolvedPlaceholders : undefined,
 			})
-			const currentStepBody = deterministicWorkflowSupported
-				? [
-						"### CURRENT WORKFLOW STEP",
-						`You are currently on this step: ${stepDetails.checklistLabel}`,
-						stepDetails.details.trim(),
-						"Focus on correctly completing this step.",
-						"Once you correctly complete this step, the next step's details will be shown automatically.",
-					].join("\n\n")
-				: [
-						"### CURRENT WORKFLOW STEP",
-						`You are currently on this step: ${stepDetails.checklistLabel}`,
-						stepDetails.details.trim(),
-						"Focus on completing this step.",
-						"I determine the active step from your latest `task_progress` update.",
-						'Do not include `task_progress` on a tool call until the active step\'s "Done Signal" is true.',
-						'When the active step\'s "Done Signal" is true, use `task_progress` with `__COMPLETE_NEXT_STEP__` on the next relevant tool call, and use it only once in that assistant turn.',
-						"Once the checklist advances, I'll give you the next step's details.",
-					].join("\n\n")
+			this.taskState.lastPromptedPlaceholderWorkflowChecklistLabel = activeChecklistLabel
 
-			return this.joinPromptSections(
-				deterministicWorkflowSupported
-					? "### Reminder: Detailed instructions are shown for the first incomplete checklist item. Once you correctly complete the current step, the next step's details will be shown automatically."
-					: "### Reminder: Detailed instructions are shown for the first incomplete checklist item. Keep `task_progress` moving so the active step and its details stay in sync.",
-				listCurrentProgress,
-				this.renderChecklistForPrompt(currentChecklist),
-				userUpdatedWarning,
-				autoCompletedNoticeSection,
-				currentStepBody,
-			)
+			if (isDeterministicPlaceholderWorkflowSupported(stepDetails.sourceName)) {
+				return [
+					"### CURRENT WORKFLOW STEP",
+					`You are currently on this step: ${stepDetails.checklistLabel}`,
+					stepDetails.details.trim(),
+					"Focus on correctly completing this step.",
+					"Once you correctly complete this step, the next step's details will be shown automatically.",
+				].join("\n\n")
+			}
+
+			return [
+				"### CURRENT WORKFLOW STEP",
+				`You are currently on this step: ${stepDetails.checklistLabel}`,
+				stepDetails.details.trim(),
+				"Focus on completing this step.",
+				"I determine the active step from your latest `task_progress` update.",
+				'Do not include `task_progress` on a tool call until the active step\'s "Done Signal" is true.',
+				'When the active step\'s "Done Signal" is true, use `task_progress` with `__COMPLETE_NEXT_STEP__` on the next relevant tool call, and use it only once in that assistant turn.',
+				"Once the checklist advances, I'll give you the next step's details.",
+			].join("\n\n")
 		} catch (error) {
 			logFocusChainDiagnosticEvent(this.taskId, "placeholder_step_prompt_resolution", {
 				entered: true,
@@ -731,9 +756,9 @@ export class FocusChainManager {
 					return {
 						accepted: false,
 						feedback: [
-							"Placeholder workflow progress already advanced once in this assistant turn.",
+							"Workflow progress already advanced once in this assistant turn.",
 							'Do not include `task_progress` on a tool call until the active step\'s "Done Signal" is true.',
-							'When the active step\'s "Done Signal" is true, use `__COMPLETE_NEXT_STEP__` only once on the next relevant tool call in that assistant turn.',
+							'When the active step\'s "Done Signal" is true, use `__COMPLETE_NEXT_STEP__` only once on the next relevant tool call in that turn.',
 						].join("\n\n"),
 					}
 				}
@@ -823,8 +848,8 @@ export class FocusChainManager {
 	public shouldIncludeFocusChainInstructions(): boolean {
 		// Always include when in Plan mode
 		const inPlanMode = this.stateManager.getGlobalSettingsKey("mode") === "plan"
-		// Always include when a placeholder workflow is active so the checklist and current-step details
-		// remain present on every turn after activation.
+		// Always include when a placeholder workflow is active so checklist guidance remains
+		// present on every turn while the workflow is active.
 		const placeholderWorkflowActive = !!this.taskState.activePlaceholderWorkflowSource
 		// Always include when switching from Plan > Act
 		const justSwitchedFromPlanMode = this.taskState.didRespondToPlanAskBySwitchingMode

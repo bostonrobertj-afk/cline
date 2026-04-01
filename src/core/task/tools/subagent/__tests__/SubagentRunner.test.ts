@@ -1345,14 +1345,15 @@ Review the changed implementation for edge cases.`,
 		const initialTexts = extractTextFromMessage(initialUser)
 		assert.doesNotMatch(initialTexts, /<explicit_instructions type="review-edge-case-hunter">/)
 		assert.doesNotMatch(initialTexts, /### Reminder:/)
-		assert.doesNotMatch(initialTexts, /# CURRENT WORKFLOW STEP/)
+		assert.match(initialTexts, /# CURRENT WORKFLOW STEP/)
+		assert.match(initialTexts, /Step 1: Gather Context/)
+		assert.doesNotMatch(initialTexts, /Step 2: Review/)
 
 		const firstSystemPrompt = createMessage.firstCall.args[0] as string
 		assert.doesNotMatch(firstSystemPrompt, /<explicit_instructions type="review-edge-case-hunter">/)
 		assert.match(firstSystemPrompt, /### Reminder:/)
-		assert.match(firstSystemPrompt, /# CURRENT WORKFLOW STEP/)
-		assert.match(firstSystemPrompt, /Inspect the provided bundle before running tools\./)
-		assert.doesNotMatch(firstSystemPrompt, /Review the changed implementation for edge cases\./)
+		assert.match(firstSystemPrompt, /# CURRENT WORKFLOW STATUS/)
+		assert.doesNotMatch(firstSystemPrompt, /# CURRENT WORKFLOW STEP/)
 		assert.doesNotMatch(firstSystemPrompt, /CONTINUATION TURN/)
 
 		const secondConversation = createMessage.secondCall.args[1] as Array<{
@@ -1366,13 +1367,14 @@ Review the changed implementation for edge cases.`,
 		const followUpTexts = extractTextFromMessage(followUpUser)
 		assert.doesNotMatch(followUpTexts, /<explicit_instructions type="review-edge-case-hunter">/)
 		assert.doesNotMatch(followUpTexts, /### Reminder:/)
-		assert.doesNotMatch(followUpTexts, /Current Progress: 0\/2 items completed/)
+		assert.doesNotMatch(followUpTexts, /Current Progress:/)
 		assert.doesNotMatch(followUpTexts, /# CURRENT WORKFLOW STEP/)
 		const secondSystemPrompt = createMessage.secondCall.args[0] as string
 		assert.match(secondSystemPrompt, /CONTINUATION TURN/)
 		assert.match(secondSystemPrompt, /### Reminder:/)
-		assert.match(secondSystemPrompt, /Current Progress: 0\/2 items completed/)
-		assert.match(secondSystemPrompt, /# CURRENT WORKFLOW STEP/)
+		assert.match(secondSystemPrompt, /# CURRENT WORKFLOW STATUS/)
+		assert.match(secondSystemPrompt, /Current Progress:/)
+		assert.doesNotMatch(secondSystemPrompt, /# CURRENT WORKFLOW STEP/)
 		assert.doesNotMatch(secondSystemPrompt, /<explicit_instructions type="review-edge-case-hunter">/)
 	})
 
@@ -1452,8 +1454,96 @@ Review the changed implementation for edge cases.`,
 		const secondSystemPrompt = createMessage.secondCall.args[0] as string
 		assert.match(secondSystemPrompt, /### Reminder:/)
 		assert.match(secondSystemPrompt, /Current Progress: 0\/2 items completed/)
-		assert.match(secondSystemPrompt, /# CURRENT WORKFLOW STEP/)
 		assert.doesNotMatch(secondSystemPrompt, /CONTINUATION TURN/)
+	})
+
+	it("re-injects the active current-step block on the next non-Responses subagent turn after local compaction clears the marker", async () => {
+		const createMessage = sinon.stub()
+		createMessage.onFirstCall().callsFake(async function* () {
+			yield {
+				type: "usage",
+				inputTokens: 11,
+				outputTokens: 7,
+				cacheWriteTokens: 0,
+				cacheReadTokens: 0,
+			}
+			yield {
+				type: "tool_calls",
+				tool_call: {
+					function: {
+						id: "toolu_subagent_placeholder_reinject_local_1",
+						name: ClineDefaultTool.LIST_FILES,
+						arguments: JSON.stringify({ path: ".", recursive: false }),
+					},
+				},
+			}
+		})
+		createMessage.onSecondCall().callsFake(async function* () {
+			yield {
+				type: "tool_calls",
+				tool_call: {
+					function: {
+						id: "toolu_subagent_placeholder_reinject_local_complete_1",
+						name: ClineDefaultTool.ATTEMPT,
+						arguments: JSON.stringify({ result: "done" }),
+					},
+				},
+			}
+		})
+
+		const promptRegistry = PromptRegistry.getInstance()
+		sinon.stub(promptRegistry, "get").callsFake(async (context) => {
+			promptRegistry.nativeTools = undefined
+			return context.isContinuationTurn === true ? "CONTINUATION TURN" : "system prompt"
+		})
+		sinon.stub(skills, "discoverSkills").resolves([])
+		sinon.stub(skills, "getAvailableSkills").returns([])
+		;(workflowResolution.resolveAvailableWorkflows as sinon.SinonStub).resolves([
+			{
+				name: "review-edge-case-hunter",
+				source: "remote",
+				description: "Remote workflow: review-edge-case-hunter",
+				fileName: "review-edge-case-hunter",
+				contents: `# Edge case review instructions
+
+## Step 1: Gather Context
+Inspect the provided bundle before running tools.
+
+## Step 2: Review
+Review the changed implementation for edge cases.`,
+			},
+		])
+		stubApiHandler(createMessage)
+		initializeHostProvider()
+
+		const config = createTaskConfig(false)
+		const runner = new SubagentRunner(config)
+		sinon.stub(runner as any, "shouldCompactBeforeNextRequest").returns(true)
+		sinon.stub(runner as any, "compactConversationForContextWindow").returns({
+			didCompact: true,
+			conversationHistoryDeletedRange: [2, 3],
+		})
+
+		const result = await runner.run(`Skill: use_skill('review-edge-case-hunter')`, () => {})
+
+		assert.equal(result.status, "completed")
+		assert.equal(createMessage.callCount, 2)
+
+		const secondConversation = createMessage.secondCall.args[1] as Array<{
+			role: string
+			content: Array<{ type?: string; text?: string }>
+		}>
+		const secondTurnUserTexts = secondConversation
+			.filter((message) => message.role === "user")
+			.map((message) => extractTextFromMessage(message))
+		assert.equal(
+			secondTurnUserTexts.some((text) => /# CURRENT WORKFLOW STEP/.test(text)),
+			true,
+		)
+		assert.equal(
+			secondTurnUserTexts.some((text) => /Step 1: Gather Context/.test(text)),
+			true,
+		)
 	})
 
 	it("moves placeholder workflow prompt injections into the system prompt for OpenAI Responses subagents", async () => {
@@ -1529,15 +1619,16 @@ Review the changed implementation for edge cases.`,
 		}
 		const initialTexts = extractTextFromMessage(initialUser)
 		assert.doesNotMatch(initialTexts, /^### Reminder:/m)
-		assert.doesNotMatch(initialTexts, /# CURRENT WORKFLOW STEP/)
+		assert.match(initialTexts, /# CURRENT WORKFLOW STEP/)
+		assert.match(initialTexts, /Step 1: Gather Context/)
+		assert.doesNotMatch(initialTexts, /Step 2: Review/)
 		assert.doesNotMatch(initialTexts, /<explicit_instructions type="review-edge-case-hunter">/)
 
 		const firstSystemPrompt = createMessage.firstCall.args[0] as string
 		assert.doesNotMatch(firstSystemPrompt, /<explicit_instructions type="review-edge-case-hunter">/)
 		assert.match(firstSystemPrompt, /^### Reminder:/m)
-		assert.match(firstSystemPrompt, /# CURRENT WORKFLOW STEP/)
-		assert.match(firstSystemPrompt, /Inspect the provided bundle before running tools\./)
-		assert.doesNotMatch(firstSystemPrompt, /Review the changed implementation for edge cases\./)
+		assert.match(firstSystemPrompt, /# CURRENT WORKFLOW STATUS/)
+		assert.doesNotMatch(firstSystemPrompt, /# CURRENT WORKFLOW STEP/)
 
 		const secondConversation = createMessage.secondCall.args[1] as Array<{
 			role: string
@@ -1549,14 +1640,15 @@ Review the changed implementation for edge cases.`,
 		}
 		const followUpTexts = extractTextFromMessage(followUpUser)
 		assert.doesNotMatch(followUpTexts, /^### Reminder:/m)
-		assert.doesNotMatch(followUpTexts, /Current Progress: 0\/2 items completed/)
+		assert.doesNotMatch(followUpTexts, /Current Progress:/)
 		assert.doesNotMatch(followUpTexts, /# CURRENT WORKFLOW STEP/)
 		assert.doesNotMatch(followUpTexts, /<explicit_instructions type="review-edge-case-hunter">/)
 
 		const secondSystemPrompt = createMessage.secondCall.args[0] as string
 		assert.match(secondSystemPrompt, /^### Reminder:/m)
-		assert.match(secondSystemPrompt, /Current Progress: 0\/2 items completed/)
-		assert.match(secondSystemPrompt, /# CURRENT WORKFLOW STEP/)
+		assert.match(secondSystemPrompt, /# CURRENT WORKFLOW STATUS/)
+		assert.match(secondSystemPrompt, /Current Progress:/)
+		assert.doesNotMatch(secondSystemPrompt, /# CURRENT WORKFLOW STEP/)
 		assert.doesNotMatch(secondSystemPrompt, /<explicit_instructions type="review-edge-case-hunter">/)
 		assert.doesNotMatch(secondSystemPrompt, /CONTINUATION TURN/)
 	})
@@ -1648,8 +1740,92 @@ Review the changed implementation for edge cases.`,
 		assert.match(secondSystemPrompt, /CONTINUATION TURN/)
 		assert.match(secondSystemPrompt, /^### Reminder:/m)
 		assert.match(secondSystemPrompt, /Current Progress: 0\/2 items completed/)
-		assert.match(secondSystemPrompt, /# CURRENT WORKFLOW STEP/)
 		assert.doesNotMatch(secondSystemPrompt, /<explicit_instructions type="review-edge-case-hunter">/)
+	})
+
+	it("re-injects the active current-step block on the next OpenAI Responses subagent turn after a context_compacted stream chunk", async () => {
+		const createMessage = sinon.stub()
+		createMessage.onFirstCall().callsFake(async function* () {
+			yield {
+				type: "context_compacted",
+				id: "cmp_subagent_1",
+			}
+			yield {
+				type: "tool_calls",
+				tool_call: {
+					function: {
+						id: "toolu_subagent_placeholder_reinject_responses_1",
+						name: ClineDefaultTool.LIST_FILES,
+						arguments: JSON.stringify({ path: ".", recursive: false }),
+					},
+				},
+			}
+		})
+		createMessage.onSecondCall().callsFake(async function* () {
+			yield {
+				type: "tool_calls",
+				tool_call: {
+					function: {
+						id: "toolu_subagent_placeholder_reinject_responses_complete_1",
+						name: ClineDefaultTool.ATTEMPT,
+						arguments: JSON.stringify({ result: "done" }),
+					},
+				},
+			}
+		})
+
+		const promptRegistry = PromptRegistry.getInstance()
+		sinon.stub(promptRegistry, "get").callsFake(async (context) => {
+			assert.equal(context.activeWorkflowReminder, undefined)
+			promptRegistry.nativeTools = undefined
+			return context.isContinuationTurn === true ? "CONTINUATION TURN" : "system prompt"
+		})
+		sinon.stub(skills, "discoverSkills").resolves([])
+		sinon.stub(skills, "getAvailableSkills").returns([])
+		;(workflowResolution.resolveAvailableWorkflows as sinon.SinonStub).resolves([
+			{
+				name: "review-edge-case-hunter",
+				source: "remote",
+				description: "Remote workflow: review-edge-case-hunter",
+				fileName: "review-edge-case-hunter",
+				contents: `# Edge case review instructions
+
+## Step 1: Gather Context
+Inspect the provided bundle before running tools.
+
+## Step 2: Review
+Review the changed implementation for edge cases.`,
+			},
+		])
+		stubApiHandler(createMessage, {
+			modelId: "gpt-5.4-mini-2026-03-17",
+			apiFormat: ApiFormat.OPENAI_RESPONSES,
+		})
+		initializeHostProvider()
+
+		const config = createTaskConfig(false)
+		config.services.stateManager.getApiConfiguration = () => ({
+			actModeApiProvider: "openai-native",
+			planModeApiProvider: "openai-native",
+		})
+
+		const runner = new SubagentRunner(config)
+		const result = await runner.run(`Skill: use_skill('review-edge-case-hunter')`, () => {})
+
+		assert.equal(result.status, "completed")
+		assert.equal(createMessage.callCount, 2)
+
+		const secondConversation = createMessage.secondCall.args[1] as Array<{
+			role: string
+			content: Array<{ type?: string; text?: string }>
+		}>
+		const followUpUser = secondConversation[secondConversation.length - 1] as {
+			role: string
+			content: Array<{ type?: string; text?: string }>
+		}
+		const followUpTexts = extractTextFromMessage(followUpUser)
+		assert.match(followUpTexts, /# CURRENT WORKFLOW STEP/)
+		assert.match(followUpTexts, /Step 1: Gather Context/)
 	})
 
 	it("auto-binds the owning BMAD agent when an assigned placeholder workflow maps to a managed twin", async () => {
@@ -2175,12 +2351,13 @@ Deliver findings using attempt_completion.`,
 			const followUpTexts = extractTextFromMessage(followUpUser)
 
 			assert.doesNotMatch(followUpTexts, /Current Progress: 1\/2 items completed/)
-			assert.doesNotMatch(followUpTexts, /You are currently on this step: Step 2: Review/)
-			assert.doesNotMatch(followUpTexts, /You are currently on this step: Step 1: Gather Context/)
+			assert.match(followUpTexts, /# CURRENT WORKFLOW STEP/)
+			assert.match(followUpTexts, /Step 2: Review/)
+			assert.doesNotMatch(followUpTexts, /Step 1: Gather Context/)
 
-			assert.match(_systemPrompt, /Current Progress: 1\/2 items completed/)
-			assert.match(_systemPrompt, /You are currently on this step: Step 2: Review/)
-			assert.doesNotMatch(_systemPrompt, /You are currently on this step: Step 1: Gather Context/)
+			assert.match(_systemPrompt, /# CURRENT WORKFLOW STATUS/)
+			assert.match(_systemPrompt, /Current Progress:/)
+			assert.doesNotMatch(_systemPrompt, /You are currently on this step:/)
 
 			yield {
 				type: "tool_calls",

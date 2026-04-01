@@ -51,6 +51,7 @@ export async function activateManagedWorkflowInTaskState(args: {
 	args.taskState.activePlaceholderWorkflowValues = undefined
 	args.taskState.activePlaceholderWorkflowDeterministicState = undefined
 	args.taskState.activePlaceholderWorkflowTaskWriteProofPaths = []
+	args.taskState.lastPromptedPlaceholderWorkflowChecklistLabel = undefined
 	args.taskState.suppressedWorkflowFormResolverIds = []
 	args.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices = []
 	args.taskState.activeWorkflowJustStarted = !resumed
@@ -120,6 +121,7 @@ export async function activatePlaceholderWorkflowInTaskState(args: {
 	if (workflowChanged) {
 		args.taskState.activePlaceholderWorkflowDeterministicState = undefined
 		args.taskState.activePlaceholderWorkflowTaskWriteProofPaths = []
+		args.taskState.lastPromptedPlaceholderWorkflowChecklistLabel = undefined
 		args.taskState.suppressedWorkflowFormResolverIds = []
 		args.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices = []
 	}

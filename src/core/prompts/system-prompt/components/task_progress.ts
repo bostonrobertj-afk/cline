@@ -31,7 +31,7 @@ Use \`task_progress\` only as a checklist parameter on the next tool call, not a
 const UPDATING_TASK_PROGRESS_PLACEHOLDER_WORKFLOW = `UPDATING TASK PROGRESS
 
 The user has triggered a workflow with a prebuilt checklist.
-- Instructions are automatically sent for the first incomplete item on the checklist each turn.
+- Detailed instructions are automatically sent when a checklist item first becomes the active step.
 - DO inform the user when the Done Signal for the current step is true using send_user_message, and include \`task_progress\` as a parameter on that tool call to complete the step.
 - When the active step's "Done Signal" is true, use \`send_user_message\` tool call to briefly tell the user what step you are completing, and include \`task_progress\` with \`__COMPLETE_NEXT_STEP__\`. Use it only once in that assistant turn.`
 

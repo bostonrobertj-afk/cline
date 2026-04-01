@@ -495,25 +495,28 @@ export class SubagentRunner {
 				return { status: "failed", error, stats }
 			}
 
+			const initialUserContent: ClineUserContent[] = [
+				{
+					type: "text",
+					text: prompt,
+				} as ClineTextContentBlock,
+				// Server-side task loop checks require workspace metadata to be present in the
+				// initial user message of subagent runs.
+				...(workspaceMetadataEnvironmentBlock
+					? [
+							{
+								type: "text",
+								text: workspaceMetadataEnvironmentBlock,
+							} as ClineTextContentBlock,
+						]
+					: []),
+			]
+			await this.maybeAppendCurrentStepInputPrompt(state, initialUserContent)
+
 			const conversation: ClineStorageMessage[] = [
 				{
 					role: "user",
-					content: [
-						{
-							type: "text",
-							text: prompt,
-						} as ClineTextContentBlock,
-						// Server-side task loop checks require workspace metadata to be present in the
-						// initial user message of subagent runs.
-						...(workspaceMetadataEnvironmentBlock
-							? [
-									{
-										type: "text",
-										text: workspaceMetadataEnvironmentBlock,
-									} as ClineTextContentBlock,
-								]
-							: []),
-					],
+					content: initialUserContent,
 				},
 			]
 
@@ -585,6 +588,7 @@ export class SubagentRunner {
 					)
 					contextState.conversationHistoryDeletedRange = compactResult.conversationHistoryDeletedRange
 					if (compactResult.didCompact) {
+						this.clearSubagentCurrentStepPromptMarkerForContextCompaction(state)
 						Logger.warn("[SubagentRunner] Proactively compacted context before next subagent request.")
 					}
 					// Prevent repeated compaction attempts off the same token sample.
@@ -610,6 +614,7 @@ export class SubagentRunner {
 					providerInfo.model.id,
 					contextManager,
 					contextState,
+					state,
 				)
 
 				for await (const chunk of stream) {
@@ -662,6 +667,9 @@ export class SubagentRunner {
 						case "response_id":
 							responseId = chunk.id
 							requestId = requestId ?? chunk.id
+							break
+						case "context_compacted":
+							this.clearSubagentCurrentStepPromptMarkerForContextCompaction(state)
 							break
 					}
 
@@ -881,6 +889,8 @@ export class SubagentRunner {
 						})
 					}
 				}
+
+				await this.maybeAppendCurrentStepInputPrompt(state, toolResultBlocks)
 
 				conversation.push({
 					role: "user",
@@ -1171,6 +1181,25 @@ export class SubagentRunner {
 		await focusChainManager.refreshPlaceholderWorkflowChecklistProjection(force)
 	}
 
+	private async maybeAppendCurrentStepInputPrompt(state: TaskState, content: ClineUserContent[]): Promise<void> {
+		const prompt =
+			await this.getOrCreateSubagentFocusChainManager(state).consumeCurrentPlaceholderWorkflowStepPromptForInput()
+		if (prompt?.trim()) {
+			content.push({
+				type: "text",
+				text: prompt,
+			})
+		}
+	}
+
+	private clearSubagentCurrentStepPromptMarkerForContextCompaction(state: TaskState): void {
+		if (state.lastPromptedPlaceholderWorkflowChecklistLabel === undefined) {
+			return
+		}
+
+		state.lastPromptedPlaceholderWorkflowChecklistLabel = undefined
+	}
+
 	private async buildSubagentPromptInjectionBlocks(
 		state: TaskState,
 		shouldSendFullPromptAssembly: boolean,
@@ -1338,6 +1367,7 @@ export class SubagentRunner {
 		modelId: string,
 		contextManager: ContextManager,
 		contextState: SubagentContextState,
+		state: TaskState,
 	) {
 		for (let attempt = 1; attempt <= MAX_INITIAL_STREAM_ATTEMPTS; attempt += 1) {
 			const truncatedConversation = contextManager
@@ -1362,6 +1392,9 @@ export class SubagentRunner {
 						contextState.conversationHistoryDeletedRange,
 					)
 					contextState.conversationHistoryDeletedRange = compactResult.conversationHistoryDeletedRange
+					if (compactResult.didCompact) {
+						this.clearSubagentCurrentStepPromptMarkerForContextCompaction(state)
+					}
 					if (!compactResult.didCompact || this.shouldAbort() || attempt >= MAX_INITIAL_STREAM_ATTEMPTS) {
 						throw error
 					}

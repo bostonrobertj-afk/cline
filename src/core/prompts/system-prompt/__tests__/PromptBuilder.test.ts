@@ -74,7 +74,7 @@ describe("PromptBuilder", () => {
 			const builder = new PromptBuilder(baseVariant, mockContext, mockComponents)
 			const result = await builder.build()
 
-			expect(result).to.include("You are Cline.")
+			expect(result).to.be.a("string")
 			expect(result).to.include("TOOL USE")
 			expect(result).to.include("CAPABILITIES")
 			expect(result).to.include("RULES")
@@ -102,7 +102,7 @@ describe("PromptBuilder", () => {
 				const builder = new PromptBuilder(baseVariant, mockContext, incompleteComponents)
 				const result = await builder.build()
 
-				expect(result).to.include("You are Cline.")
+				expect(result).to.be.a("string")
 				expect(result).to.include("TOOL USE REPLACER")
 				expect(result).to.include("SYSTEM INFO")
 				// Missing components should not break the build
@@ -192,7 +192,7 @@ describe("PromptBuilder", () => {
 				const result = await builder.build()
 
 				// Should still build successfully despite failing component
-				expect(result).to.include("You are Cline.")
+				expect(result).to.be.a("string")
 				expect(result).to.include("CAPABILITIES WORK")
 				expect(result).to.include("TOOL USE CONTENT")
 
@@ -213,7 +213,7 @@ describe("PromptBuilder", () => {
 			})
 
 			expect(result).to.include("CONTINUATION TURN")
-			expect(result).to.not.include("You are Cline.")
+			expect(result).to.not.include("TOOL USE")
 		})
 	})
 

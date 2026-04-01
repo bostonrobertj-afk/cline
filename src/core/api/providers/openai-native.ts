@@ -803,6 +803,12 @@ export class OpenAiNativeHandler implements ApiHandler {
 						reasoning: "",
 					}
 				}
+				if (item.type === "compaction") {
+					yield {
+						type: "context_compacted",
+						id: item.id,
+					}
+				}
 			}
 			if (chunk.type === "response.reasoning_summary_part.added") {
 				yield {
