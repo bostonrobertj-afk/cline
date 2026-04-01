@@ -35,7 +35,8 @@ export function isDeterministicPlaceholderWorkflowSupported(
 		workflowName === "code-review.md" ||
 		workflowName === "dev-story.md" ||
 		workflowName === "review-adversarial-general.md" ||
-		workflowName === "blind-review.md"
+		workflowName === "blind-review.md" ||
+		workflowName === "review-edge-case-hunter.md"
 	)
 }
 
@@ -427,6 +428,69 @@ async function evaluateBlindReviewStep(args: {
 	}
 }
 
+async function evaluateEdgeCaseHunterStep(args: {
+	taskState: TaskState
+	stepNumber: number
+	toolContext?: DeterministicPlaceholderToolContext
+}): Promise<DeterministicStepEvaluationResult> {
+	const placeholders = getMergedPlaceholderValues(args.taskState)
+
+	switch (args.stepNumber) {
+		case 1: {
+			const reviewInput = placeholders.review_input?.trim()
+			const diffOutput = placeholders.diff_output?.trim()
+			if (!reviewInput || !diffOutput) {
+				return { completed: false }
+			}
+
+			const resolvedReviewInputPath = resolveArtifactPlaceholderPath(placeholders, reviewInput)
+			const resolvedDiffOutputPath = resolveArtifactPlaceholderPath(placeholders, diffOutput)
+			if (
+				!(await fileExistsForPlaceholderWorkflowWriteProof(resolvedReviewInputPath)) ||
+				!(await fileExistsForPlaceholderWorkflowWriteProof(resolvedDiffOutputPath))
+			) {
+				return { completed: false }
+			}
+
+			return {
+				completed: true,
+				reason: "review_input and diff_output resolve to existing file paths.",
+			}
+		}
+		case 2: {
+			const findingsArtifactPath = resolveOutputFolderFile(placeholders, "edge-case-review-findings.md")
+			if (!findingsArtifactPath) {
+				return { completed: false }
+			}
+
+			const resolvedFindingsArtifactPath = resolveArtifactPlaceholderPath(placeholders, findingsArtifactPath)
+			if (
+				!taskStateHasPlaceholderWorkflowWriteProof(args.taskState, resolvedFindingsArtifactPath) ||
+				!(await fileExistsForPlaceholderWorkflowWriteProof(resolvedFindingsArtifactPath))
+			) {
+				return { completed: false }
+			}
+
+			return {
+				completed: true,
+				reason: "edge-case-review-findings.md was written during this task and the artifact still exists.",
+			}
+		}
+		case 3: {
+			if (!didSuccessfulAttemptCompletionOccur(args.toolContext)) {
+				return { completed: false }
+			}
+
+			return {
+				completed: true,
+				reason: "attempt_completion was executed successfully to deliver edge-case findings.",
+			}
+		}
+		default:
+			return { completed: false }
+	}
+}
+
 async function evaluateDevStoryStep(args: {
 	taskState: TaskState
 	stepNumber: number
@@ -551,6 +615,14 @@ async function evaluateDeterministicStep(args: {
 
 	if (args.workflowName === "blind-review.md") {
 		return evaluateBlindReviewStep({
+			taskState: args.taskState,
+			stepNumber: args.stepNumber,
+			toolContext: args.toolContext,
+		})
+	}
+
+	if (args.workflowName === "review-edge-case-hunter.md") {
+		return evaluateEdgeCaseHunterStep({
 			taskState: args.taskState,
 			stepNumber: args.stepNumber,
 			toolContext: args.toolContext,

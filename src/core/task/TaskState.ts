@@ -35,6 +35,7 @@ export type DeterministicPlaceholderWorkflowName =
 	| "dev-story.md"
 	| "review-adversarial-general.md"
 	| "blind-review.md"
+	| "review-edge-case-hunter.md"
 
 export interface AutoCompletedPlaceholderWorkflowStepNotice {
 	workflowName: DeterministicPlaceholderWorkflowName

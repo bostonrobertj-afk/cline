@@ -55,7 +55,7 @@ describe("deterministicPlaceholderProgression", () => {
 		expect(isDeterministicPlaceholderWorkflowSupported("blind-review.md")).to.equal(true)
 		expect(isDeterministicPlaceholderWorkflowSupported("code-review")).to.equal(false)
 		expect(isDeterministicPlaceholderWorkflowSupported("dev-story")).to.equal(false)
-		expect(isDeterministicPlaceholderWorkflowSupported("review-edge-case-hunter.md")).to.equal(false)
+		expect(isDeterministicPlaceholderWorkflowSupported("review-edge-case-hunter.md")).to.equal(true)
 	})
 
 	it("completes review-adversarial-general step 1 when diff_output resolves to an existing file", async () => {
@@ -699,6 +699,348 @@ Deliver findings using attempt_completion.`,
 		})
 
 		expect(result.checklist).to.equal("- [ ] Step 3: Present findings")
+		expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+	})
+
+	it("completes review-edge-case-hunter step 1 when review_input and diff_output both resolve to existing files", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-edge-case-step1-file-"))
+
+		try {
+			const reviewInputPath = path.join(tempDir, "review-input.md")
+			const diffOutputPath = path.join(tempDir, "review-input.diff")
+			const taskState = createTaskState({
+				workflowName: "review-edge-case-hunter.md",
+				workflowContents: `## Step 1: Receive Content (may auto-advance)
+Required: {review_input}, {diff_output}
+
+## Step 2: Exhaustive Path Analysis
+Review the provided material.`,
+				checklistMarkdown: "- [ ] Step 1: Receive Content (may auto-advance)\n- [ ] Step 2: Exhaustive Path Analysis",
+				placeholderValues: {
+					review_input: reviewInputPath,
+					diff_output: diffOutputPath,
+				},
+			})
+
+			await writeFileWithMtime(reviewInputPath, "# Review Input\n", Date.now())
+			await writeFileWithMtime(diffOutputPath, "diff --git a/file b/file", Date.now())
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+			})
+
+			expect(result.checklist).to.equal(
+				"- [x] Step 1: Receive Content (may auto-advance)\n- [ ] Step 2: Exhaustive Path Analysis",
+			)
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
+				"review_input and diff_output resolve to existing file paths.",
+			)
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("does not complete review-edge-case-hunter step 1 when review_input is missing", async () => {
+		const tempDir = await fs.mkdtemp(
+			path.join(os.tmpdir(), "deterministic-placeholder-edge-case-step1-missing-review-input-"),
+		)
+
+		try {
+			const diffOutputPath = path.join(tempDir, "review-input.diff")
+			const taskState = createTaskState({
+				workflowName: "review-edge-case-hunter.md",
+				workflowContents: `## Step 1: Receive Content (may auto-advance)
+Required: {review_input}, {diff_output}
+
+## Step 2: Exhaustive Path Analysis
+Review the provided material.`,
+				checklistMarkdown: "- [ ] Step 1: Receive Content (may auto-advance)",
+				placeholderValues: {
+					diff_output: diffOutputPath,
+				},
+			})
+
+			await writeFileWithMtime(diffOutputPath, "diff --git a/file b/file", Date.now())
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+			})
+
+			expect(result.checklist).to.equal("- [ ] Step 1: Receive Content (may auto-advance)")
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("does not complete review-edge-case-hunter step 1 when diff_output is missing", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-edge-case-step1-missing-diff-output-"))
+
+		try {
+			const reviewInputPath = path.join(tempDir, "review-input.md")
+			const taskState = createTaskState({
+				workflowName: "review-edge-case-hunter.md",
+				workflowContents: `## Step 1: Receive Content (may auto-advance)
+Required: {review_input}, {diff_output}
+
+## Step 2: Exhaustive Path Analysis
+Review the provided material.`,
+				checklistMarkdown: "- [ ] Step 1: Receive Content (may auto-advance)",
+				placeholderValues: {
+					review_input: reviewInputPath,
+				},
+			})
+
+			await writeFileWithMtime(reviewInputPath, "# Review Input\n", Date.now())
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+			})
+
+			expect(result.checklist).to.equal("- [ ] Step 1: Receive Content (may auto-advance)")
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("does not complete review-edge-case-hunter step 1 when review_input points to a missing file", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-edge-case-step1-missing-file-"))
+
+		try {
+			const reviewInputPath = path.join(tempDir, "missing-review-input.md")
+			const diffOutputPath = path.join(tempDir, "review-input.diff")
+			const taskState = createTaskState({
+				workflowName: "review-edge-case-hunter.md",
+				workflowContents: `## Step 1: Receive Content (may auto-advance)
+Required: {review_input}, {diff_output}
+
+## Step 2: Exhaustive Path Analysis
+Review the provided material.`,
+				checklistMarkdown: "- [ ] Step 1: Receive Content (may auto-advance)",
+				placeholderValues: {
+					review_input: reviewInputPath,
+					diff_output: diffOutputPath,
+				},
+			})
+
+			await writeFileWithMtime(diffOutputPath, "diff --git a/file b/file", Date.now())
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+			})
+
+			expect(result.checklist).to.equal("- [ ] Step 1: Receive Content (may auto-advance)")
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("completes review-edge-case-hunter step 1 from stable relative review_input and diff_output when resolution succeeds", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-edge-case-step1-relative-"))
+		const foreignCwd = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-edge-case-step1-foreign-cwd-"))
+		const originalCwd = process.cwd()
+
+		try {
+			const outputFolder = path.join(tempDir, "output")
+			const reviewInputPath = path.join(outputFolder, "review-input.md")
+			const diffOutputPath = path.join(outputFolder, "review-input.diff")
+			const taskState = createTaskState({
+				workflowName: "review-edge-case-hunter.md",
+				workflowContents: `## Step 1: Receive Content (may auto-advance)
+Required: {review_input}, {diff_output}
+
+## Step 2: Exhaustive Path Analysis
+Review the provided material.`,
+				checklistMarkdown: "- [ ] Step 1: Receive Content (may auto-advance)",
+				stablePlaceholderValues: {
+					cwd: tempDir,
+					project_root: tempDir,
+				},
+				placeholderValues: {
+					review_input: path.join("output", "review-input.md"),
+					diff_output: path.join("output", "review-input.diff"),
+				},
+			})
+
+			await writeFileWithMtime(reviewInputPath, "# Review Input\n", Date.now())
+			await writeFileWithMtime(diffOutputPath, "diff --git a/file b/file", Date.now())
+			process.chdir(foreignCwd)
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+			})
+
+			expect(result.checklist).to.equal("- [x] Step 1: Receive Content (may auto-advance)")
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
+				"review_input and diff_output resolve to existing file paths.",
+			)
+		} finally {
+			process.chdir(originalCwd)
+			await fs.rm(tempDir, { recursive: true, force: true })
+			await fs.rm(foreignCwd, { recursive: true, force: true })
+		}
+	})
+
+	it("completes review-edge-case-hunter step 2 when the findings artifact exists with a current-task write proof", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-edge-case-step2-file-"))
+
+		try {
+			const outputFolder = path.join(tempDir, "output")
+			const findingsPath = path.join(outputFolder, "edge-case-review-findings.md")
+			const taskState = createTaskState({
+				workflowName: "review-edge-case-hunter.md",
+				workflowContents: `## Step 2: Exhaustive Path Analysis
+Persist the review findings artifact.
+
+## Step 3: Present Findings
+Deliver the findings.`,
+				checklistMarkdown: "- [ ] Step 2: Exhaustive Path Analysis\n- [ ] Step 3: Present Findings",
+				placeholderValues: {
+					output_folder: outputFolder,
+				},
+			})
+
+			await writeFileWithMtime(findingsPath, "# Findings\n", Date.now())
+			recordTaskWriteProof(taskState, findingsPath)
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+			})
+
+			expect(result.checklist).to.equal("- [x] Step 2: Exhaustive Path Analysis\n- [ ] Step 3: Present Findings")
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
+				"edge-case-review-findings.md was written during this task and the artifact still exists.",
+			)
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("does not complete review-edge-case-hunter step 2 when the findings artifact exists without a write proof", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-edge-case-step2-missing-proof-"))
+
+		try {
+			const outputFolder = path.join(tempDir, "output")
+			const findingsPath = path.join(outputFolder, "edge-case-review-findings.md")
+			const taskState = createTaskState({
+				workflowName: "review-edge-case-hunter.md",
+				workflowContents: `## Step 2: Exhaustive Path Analysis
+Persist the review findings artifact.`,
+				checklistMarkdown: "- [ ] Step 2: Exhaustive Path Analysis",
+				placeholderValues: {
+					output_folder: outputFolder,
+				},
+			})
+
+			await writeFileWithMtime(findingsPath, "# Findings\n", Date.now())
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+			})
+
+			expect(result.checklist).to.equal("- [ ] Step 2: Exhaustive Path Analysis")
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("completes review-edge-case-hunter step 2 from a relative output_folder when the findings artifact exists with a current-task write proof", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-edge-case-step2-relative-"))
+		const foreignCwd = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-edge-case-step2-foreign-cwd-"))
+		const originalCwd = process.cwd()
+
+		try {
+			const outputFolder = path.join(tempDir, "output")
+			const findingsPath = path.join(outputFolder, "edge-case-review-findings.md")
+			const taskState = createTaskState({
+				workflowName: "review-edge-case-hunter.md",
+				workflowContents: `## Step 2: Exhaustive Path Analysis
+Persist the review findings artifact.`,
+				checklistMarkdown: "- [ ] Step 2: Exhaustive Path Analysis",
+				stablePlaceholderValues: {
+					cwd: tempDir,
+					project_root: tempDir,
+				},
+				placeholderValues: {
+					output_folder: "output",
+				},
+			})
+
+			await writeFileWithMtime(findingsPath, "# Findings\n", Date.now())
+			recordTaskWriteProof(taskState, findingsPath)
+			process.chdir(foreignCwd)
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+			})
+
+			expect(result.checklist).to.equal("- [x] Step 2: Exhaustive Path Analysis")
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
+				"edge-case-review-findings.md was written during this task and the artifact still exists.",
+			)
+		} finally {
+			process.chdir(originalCwd)
+			await fs.rm(tempDir, { recursive: true, force: true })
+			await fs.rm(foreignCwd, { recursive: true, force: true })
+		}
+	})
+
+	it("completes review-edge-case-hunter step 3 from successful attempt_completion tool context", async () => {
+		const taskState = createTaskState({
+			workflowName: "review-edge-case-hunter.md",
+			workflowContents: `## Step 3: Present Findings
+Deliver findings using attempt_completion.`,
+			checklistMarkdown: "- [ ] Step 3: Present Findings",
+		})
+
+		const result = await applyDeterministicPlaceholderProgression({
+			taskState,
+			checklistMarkdown: getChecklistMarkdown(taskState),
+			toolContext: {
+				toolName: "attempt_completion",
+				toolParams: { result: "Done" },
+				toolResult: "[attempt_completion] Result:\nDone",
+				toolWasExecuted: true,
+			},
+		})
+
+		expect(result.checklist).to.equal("- [x] Step 3: Present Findings")
+		expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
+			"attempt_completion was executed successfully to deliver edge-case findings.",
+		)
+	})
+
+	it("does not complete review-edge-case-hunter step 3 when attempt_completion was not executed", async () => {
+		const taskState = createTaskState({
+			workflowName: "review-edge-case-hunter.md",
+			workflowContents: `## Step 3: Present Findings
+Deliver findings using attempt_completion.`,
+			checklistMarkdown: "- [ ] Step 3: Present Findings",
+		})
+
+		const result = await applyDeterministicPlaceholderProgression({
+			taskState,
+			checklistMarkdown: getChecklistMarkdown(taskState),
+			toolContext: {
+				toolName: "attempt_completion",
+				toolParams: { result: "Done" },
+				toolResult: "[attempt_completion] Result:\nDone",
+				toolWasExecuted: false,
+			},
+		})
+
+		expect(result.checklist).to.equal("- [ ] Step 3: Present Findings")
 		expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
 	})
 
@@ -1432,9 +1774,9 @@ Provide the final closeout report using attempt_completion.`,
 		)
 	})
 
-	it("leaves unsupported placeholder workflows unchanged and adds no notices", async () => {
+	it("leaves still-unsupported placeholder workflows unchanged and adds no notices", async () => {
 		const taskState = createTaskState({
-			workflowName: "review-edge-case-hunter.md",
+			workflowName: "unsupported-placeholder-review.md",
 			workflowContents: `## Step 1: Review
 Inspect the edge cases.`,
 			checklistMarkdown: "- [ ] Step 1: Review",
