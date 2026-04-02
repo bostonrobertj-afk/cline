@@ -448,6 +448,125 @@ describe("OpenAiNativeHandler", () => {
 		contextCompactedChunk.id.should.equal("cmp_test_123")
 	})
 
+	it("emits a single response_id before tool calls when Responses streaming starts a native tool turn", async () => {
+		const handler = new OpenAiNativeHandler({
+			openAiNativeApiKey: "test-api-key",
+			apiModelId: "gpt-5.4-mini-2026-03-17",
+		})
+
+		const fakeClient = {
+			responses: {
+				create: sinon.stub().resolves(
+					createAsyncIterable([
+						{
+							type: "response.created",
+							response: {
+								id: "resp_early_anchor_123",
+							},
+						},
+						{
+							type: "response.in_progress",
+							response: {
+								id: "resp_early_anchor_123",
+							},
+						},
+						{
+							type: "response.output_item.added",
+							item: {
+								type: "function_call",
+								id: "fc_test_early_123",
+								call_id: "call_test_early_123",
+								name: "read_file",
+								arguments: "",
+							},
+						},
+						{
+							type: "response.function_call_arguments.delta",
+							item_id: "fc_test_early_123",
+							delta: '{"path":"README.md"}',
+						},
+					]),
+				),
+			},
+		}
+		sinon.stub(handler as any, "ensureClient").returns(fakeClient as any)
+		sinon.stub(handler as any, "useWebsocketMode").returns(false)
+
+		const tools = [
+			{
+				type: "function",
+				function: {
+					name: "read_file",
+					description: "Read a file",
+					parameters: { type: "object" },
+				},
+			},
+		] as any
+
+		const chunks: any[] = []
+		for await (const chunk of handler.createMessage("system", [{ role: "user", content: "hi" }] as any, tools)) {
+			chunks.push(chunk)
+		}
+
+		const responseIdChunks = chunks.filter((chunk) => chunk.type === "response_id")
+		responseIdChunks.should.have.length(1)
+		responseIdChunks[0].id.should.equal("resp_early_anchor_123")
+		chunks.some((chunk) => chunk.type === "tool_calls").should.equal(true)
+		chunks
+			.findIndex((chunk) => chunk.type === "response_id")
+			.should.be.lessThan(chunks.findIndex((chunk) => chunk.type === "tool_calls"))
+	})
+
+	it("does not emit duplicate response_id chunks when created and in_progress share the same response id", async () => {
+		const handler = new OpenAiNativeHandler({
+			openAiNativeApiKey: "test-api-key",
+			apiModelId: "gpt-5.4-mini-2026-03-17",
+		})
+
+		const fakeClient = {
+			responses: {
+				create: sinon.stub().resolves(
+					createAsyncIterable([
+						{
+							type: "response.created",
+							response: {
+								id: "resp_early_anchor_123",
+							},
+						},
+						{
+							type: "response.in_progress",
+							response: {
+								id: "resp_early_anchor_123",
+							},
+						},
+					]),
+				),
+			},
+		}
+		sinon.stub(handler as any, "ensureClient").returns(fakeClient as any)
+		sinon.stub(handler as any, "useWebsocketMode").returns(false)
+
+		const tools = [
+			{
+				type: "function",
+				function: {
+					name: "read_file",
+					description: "Read a file",
+					parameters: { type: "object" },
+				},
+			},
+		] as any
+
+		const chunks: any[] = []
+		for await (const chunk of handler.createMessage("system", [{ role: "user", content: "hi" }] as any, tools)) {
+			chunks.push(chunk)
+		}
+
+		const responseIdChunks = chunks.filter((chunk) => chunk.type === "response_id")
+		responseIdChunks.should.have.length(1)
+		responseIdChunks[0].id.should.equal("resp_early_anchor_123")
+	})
+
 	it("should avoid duplicating Responses function call arguments when delta and done events both arrive", async () => {
 		const handler = new OpenAiNativeHandler({
 			openAiNativeApiKey: "test-api-key",

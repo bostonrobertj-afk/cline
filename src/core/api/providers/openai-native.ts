@@ -749,10 +749,25 @@ export class OpenAiNativeHandler implements ApiHandler {
 		const functionCallByItemId = new Map<string, { call_id?: string; name?: string; id?: string }>()
 		const functionCallItemsWithArgumentDeltas = new Set<string>()
 		const functionCallItemsWithFallbackArgumentsEmitted = new Set<string>()
+		const emittedResponseIds = new Set<string>()
 
 		for await (const chunk of stream) {
 			Logger.debug(`OpenAI Responses Chunk: ${JSON.stringify(chunk)}`)
 
+			if (chunk.type === "response.created") {
+				const responseId = chunk.response?.id
+				if (responseId && !emittedResponseIds.has(responseId)) {
+					emittedResponseIds.add(responseId)
+					yield { type: "response_id", id: responseId }
+				}
+			}
+			if (chunk.type === "response.in_progress") {
+				const responseId = chunk.response?.id
+				if (responseId && !emittedResponseIds.has(responseId)) {
+					emittedResponseIds.add(responseId)
+					yield { type: "response_id", id: responseId }
+				}
+			}
 			if (chunk.type === "response.output_item.added") {
 				const item = chunk.item
 				if (item.type === "function_call" && item.id) {
