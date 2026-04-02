@@ -640,6 +640,82 @@ describe("native tool placeholder replacement", () => {
 		)
 	})
 
+	it("uses direct-material-first compact exploration descriptions for review-edge-case-hunter step 2", () => {
+		const context: SystemPromptContext = {
+			...indxrContext,
+			enableNativeToolCalls: true,
+			useMinimalGptPrompt: true,
+			activePlaceholderWorkflowName: "review-edge-case-hunter.md",
+			activePlaceholderWorkflowStepNumber: 2,
+			visibleNativeToolNames: ["search_relevant", "get_file_summary"],
+			providerInfo: {
+				providerId: "openai",
+				model: { id: "gpt-5.4-2026-03-05", info: { supportsPromptCache: false } },
+				mode: "act",
+			},
+		}
+
+		const searchTool = toolSpecFunctionDefinition(search_files_variants[1], context)
+		const defsTool = toolSpecFunctionDefinition(list_code_definition_names_variants[1], context)
+		const readTool = toolSpecFunctionDefinition(read_file_variants[1], context)
+		const rangeTool = toolSpecFunctionDefinition(read_file_range_variants[1], context)
+		const mcpTool = toolSpecFunctionDefinition(use_mcp_tool_variants[0], context)
+
+		expect(getOpenAIFunctionTool(searchTool).description).to.equal(
+			"Use only after inspecting the supplied diff, review input, or directly changed code, or when exact raw-text regex search is specifically required.",
+		)
+		expect(getOpenAIFunctionTool(defsTool).description).to.equal(
+			"Use only after direct inspection of the changed or directly referenced file reveals a concrete need for a built-in top-level definition pass.",
+		)
+		expect(getOpenAIFunctionTool(readTool).description).to.equal(
+			"Start with directly changed or directly referenced files. Use read_file when you need the exact full raw contents of one concrete file at or below 800 lines and 65536 bytes to confirm a review finding.",
+		)
+		expect(getOpenAIFunctionTool(rangeTool).description).to.equal(
+			"Use this for targeted line-based inspection in directly changed or directly referenced code, or when a concrete file exceeds the full-read limit.",
+		)
+		expect(getOpenAIFunctionTool(mcpTool).description).to.equal(
+			"Use a connected MCP tool only after inspecting the supplied diff, review input, or directly changed code. Use it for targeted discovery or source reads on directly changed or directly referenced code, and broaden structural traversal only when a concrete unresolved question remains after direct inspection.",
+		)
+	})
+
+	it("uses file-first compact exploration descriptions for dev-story step 2", () => {
+		const context: SystemPromptContext = {
+			...indxrContext,
+			enableNativeToolCalls: true,
+			useMinimalGptPrompt: true,
+			activePlaceholderWorkflowName: "dev-story.md",
+			activePlaceholderWorkflowStepNumber: 2,
+			visibleNativeToolNames: ["search_relevant", "get_file_summary"],
+			providerInfo: {
+				providerId: "openai",
+				model: { id: "gpt-5.4-2026-03-05", info: { supportsPromptCache: false } },
+				mode: "act",
+			},
+		}
+
+		const searchTool = toolSpecFunctionDefinition(search_files_variants[1], context)
+		const defsTool = toolSpecFunctionDefinition(list_code_definition_names_variants[1], context)
+		const readTool = toolSpecFunctionDefinition(read_file_variants[1], context)
+		const rangeTool = toolSpecFunctionDefinition(read_file_range_variants[1], context)
+		const mcpTool = toolSpecFunctionDefinition(use_mcp_tool_variants[0], context)
+
+		expect(getOpenAIFunctionTool(searchTool).description).to.equal(
+			"Use only after direct reads of story-named or cited files fail to reveal the implementation seam, or when exact raw-text regex search is specifically required.",
+		)
+		expect(getOpenAIFunctionTool(defsTool).description).to.equal(
+			"Use only after direct reads of story-named or cited files fail to reveal the implementation seam and you need a built-in top-level definition pass.",
+		)
+		expect(getOpenAIFunctionTool(readTool).description).to.equal(
+			"For this implementation step, prefer direct reads of story-named or cited files before MCP exploration. Use read_file when you need the exact full raw contents of one concrete file at or below 800 lines and 65536 bytes.",
+		)
+		expect(getOpenAIFunctionTool(rangeTool).description).to.equal(
+			"Use this for targeted line-based inspection in a directly relevant file, or when a concrete file exceeds the full-read limit.",
+		)
+		expect(getOpenAIFunctionTool(mcpTool).description).to.equal(
+			"Use a connected MCP tool only after direct reads of story-named or cited files and narrow built-in search fail to reveal the implementation seam.",
+		)
+	})
+
 	it("compacts native set_workflow_placeholders.values to an object map description", () => {
 		const context: SystemPromptContext = {
 			...mockContext,

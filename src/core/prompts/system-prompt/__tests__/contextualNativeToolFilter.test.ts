@@ -255,16 +255,53 @@ describe("filterContextualNativeToolSpecs", () => {
 			ClineDefaultTool.FILE_READ,
 			ClineDefaultTool.FILE_READ_RANGE,
 		])
-		expect(keptNames).to.include.members([
-			"indxr-10mcp0search_relevant",
-			"indxr-10mcp0get_file_summary",
-			"indxr-10mcp0lookup_symbol",
-			"indxr-10mcp0get_callers",
-		])
+		expect(keptNames).to.include.members(["indxr-10mcp0search_relevant", "indxr-10mcp0get_file_summary"])
+		expect(keptNames).to.not.include("indxr-10mcp0lookup_symbol")
+		expect(keptNames).to.not.include("indxr-10mcp0get_callers")
 		expect(keptIds).to.not.include(ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT)
 		expect(keptIds).to.not.include(ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS)
 		expect(keptIds).to.not.include(ClineDefaultTool.WEB_SEARCH)
 		expect(keptNames).to.not.include("12345670mcp0test_tool")
+	})
+
+	it("applies review-adversarial-general step 2 row without symbol-graph Indxr tools", () => {
+		const registeredTools = [
+			makeRegisteredTool(ClineDefaultTool.LIST_FILES),
+			makeRegisteredTool(ClineDefaultTool.SEARCH),
+			makeRegisteredTool(ClineDefaultTool.LIST_CODE_DEF),
+			makeRegisteredTool(ClineDefaultTool.FILE_READ),
+			makeRegisteredTool(ClineDefaultTool.FILE_READ_RANGE),
+			makeRegisteredTool(ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT),
+			makeRegisteredTool(ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS),
+			makeRegisteredTool(ClineDefaultTool.WEB_SEARCH),
+			makeRegisteredTool(ClineDefaultTool.ASK),
+			makeRegisteredTool(ClineDefaultTool.SEND_USER_MESSAGE),
+			makeRegisteredTool(ClineDefaultTool.ATTEMPT),
+			makeRegisteredTool(ClineDefaultTool.PLAN_MODE),
+			makeRegisteredTool(ClineDefaultTool.BROWSER),
+			makeRegisteredTool(ClineDefaultTool.MCP_ACCESS),
+			makeRegisteredTool(ClineDefaultTool.MCP_DOCS),
+			makeRegisteredTool(ClineDefaultTool.NEW_TASK),
+		]
+
+		const result = filterContextualNativeToolSpecs({
+			context: makeContext({
+				activePlaceholderWorkflowName: "review-adversarial-general.md",
+				activePlaceholderWorkflowStepNumber: 2,
+			}),
+			registeredTools,
+			mcpTools: [
+				makeMcpTool("indxr-10mcp0search_relevant"),
+				makeMcpTool("indxr-10mcp0get_file_summary"),
+				makeMcpTool("indxr-10mcp0lookup_symbol"),
+				makeMcpTool("indxr-10mcp0get_callers"),
+			],
+		})
+
+		const keptNames = result.map((tool) => tool.name)
+		expect(keptNames).to.include.members(["indxr-10mcp0search_relevant", "indxr-10mcp0get_file_summary"])
+		expect(keptNames).to.not.include("indxr-10mcp0lookup_symbol")
+		expect(keptNames).to.not.include("indxr-10mcp0get_callers")
 	})
 
 	it("applies blind-review step 2 row and keeps write_to_file plus the allowed Indxr tools", () => {
@@ -324,11 +361,55 @@ describe("filterContextualNativeToolSpecs", () => {
 		expect(keptIds).to.not.include(ClineDefaultTool.BASH)
 		expect(keptIds).to.not.include(ClineDefaultTool.WEB_SEARCH)
 		expect(keptIds).to.not.include(ClineDefaultTool.PLAN_MODE)
-		expect(keptNames).to.include.members([
-			"indxr-10mcp0search_relevant",
-			"indxr-10mcp0get_file_summary",
-			"indxr-10mcp0lookup_symbol",
-		])
+		expect(keptNames).to.include.members(["indxr-10mcp0search_relevant", "indxr-10mcp0get_file_summary"])
+		expect(keptNames).to.not.include("indxr-10mcp0lookup_symbol")
 		expect(keptNames).to.not.include("12345670mcp0test_tool")
+	})
+
+	it("applies dev-story step 2 row without any Indxr MCP tools", () => {
+		const registeredTools = [
+			makeRegisteredTool(ClineDefaultTool.LIST_FILES),
+			makeRegisteredTool(ClineDefaultTool.SEARCH),
+			makeRegisteredTool(ClineDefaultTool.LIST_CODE_DEF),
+			makeRegisteredTool(ClineDefaultTool.FILE_READ),
+			makeRegisteredTool(ClineDefaultTool.FILE_READ_RANGE),
+			makeRegisteredTool(ClineDefaultTool.APPLY_PATCH),
+			makeRegisteredTool(ClineDefaultTool.FILE_NEW),
+			makeRegisteredTool(ClineDefaultTool.BASH),
+			makeRegisteredTool(ClineDefaultTool.ASK),
+			makeRegisteredTool(ClineDefaultTool.SEND_USER_MESSAGE),
+			makeRegisteredTool(ClineDefaultTool.ATTEMPT),
+			makeRegisteredTool(ClineDefaultTool.BROWSER),
+			makeRegisteredTool(ClineDefaultTool.MCP_ACCESS),
+			makeRegisteredTool(ClineDefaultTool.NEW_TASK),
+		]
+
+		const result = filterContextualNativeToolSpecs({
+			context: makeContext({
+				activePlaceholderWorkflowName: "dev-story.md",
+				activePlaceholderWorkflowStepNumber: 2,
+			}),
+			registeredTools,
+			mcpTools: [
+				makeMcpTool("indxr-10mcp0search_relevant"),
+				makeMcpTool("indxr-10mcp0get_file_summary"),
+				makeMcpTool("indxr-10mcp0read_source"),
+				makeMcpTool("indxr-10mcp0lookup_symbol"),
+			],
+		})
+
+		const keptIds = result.map((tool) => tool.id)
+		const keptNames = result.map((tool) => tool.name)
+		expect(keptIds).to.include.members([
+			ClineDefaultTool.LIST_FILES,
+			ClineDefaultTool.SEARCH,
+			ClineDefaultTool.LIST_CODE_DEF,
+			ClineDefaultTool.FILE_READ,
+			ClineDefaultTool.FILE_READ_RANGE,
+			ClineDefaultTool.APPLY_PATCH,
+			ClineDefaultTool.FILE_NEW,
+			ClineDefaultTool.BASH,
+		])
+		expect(keptNames.some((name) => name.startsWith("indxr-"))).to.equal(false)
 	})
 })

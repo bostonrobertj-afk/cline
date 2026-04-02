@@ -603,6 +603,31 @@ describe("Prompt System Integration Tests", () => {
 			)
 		})
 
+		it("uses direct-material-first Indxr guidance in continuation prompts for review-edge-case-hunter step 2", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: { ...mockProviderInfo, mode: "act" },
+					mcpHub: makeMcpHub([makeIndxrServer()]),
+					isContinuationTurn: true,
+					currentFocusChainChecklist: "- Inspect changed file",
+					activeWorkflowSupportsPlaceholders: true,
+					managedWorkflowActive: false,
+					activePlaceholderWorkflowName: "review-edge-case-hunter.md",
+					activePlaceholderWorkflowStepNumber: 2,
+				},
+				"fast",
+				async ({ systemPrompt }) => {
+					expect(systemPrompt).to.include("primary review boundary")
+					expect(systemPrompt).to.include("`search_relevant`")
+					expect(systemPrompt).to.not.include(
+						"before built-in `search_files`, `list_code_definition_names`, `read_file`, or `read_file_range` whenever feasible",
+					)
+				},
+			)
+		})
+
 		it("generates a PLAN-mode continuation prompt with multi-root and placeholder workflow", async function () {
 			await runPromptTest(
 				this,
@@ -751,6 +776,37 @@ describe("Prompt System Integration Tests", () => {
 			)
 		})
 
+		it("omits Indxr-aware MCP guidance for dev-story step 2 when the matrix removes all Indxr tools", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					mcpHub: makeMcpHub([makeIndxrServer()]),
+					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
+					enableNativeToolCalls: true,
+					useMinimalGptPrompt: true,
+					activeWorkflowSupportsPlaceholders: true,
+					managedWorkflowActive: false,
+					activePlaceholderWorkflowName: "dev-story.md",
+					activePlaceholderWorkflowStepNumber: 2,
+				},
+				"gpt-5.4-2026-03-05",
+				async ({ systemPrompt, tools }) => {
+					expect(systemPrompt).to.not.include("Indxr-Aware Exploration")
+					expect(systemPrompt).to.not.include("`search_relevant`")
+					expect(systemPrompt).to.not.include("`get_file_summary`")
+
+					const nativeToolNames = getNativeToolNames(tools)
+					expect(nativeToolNames).to.include("read_file")
+					expect(nativeToolNames).to.include("read_file_range")
+					expect(nativeToolNames).to.include("search_files")
+					expect(nativeToolNames).to.include("apply_patch")
+					expect(nativeToolNames).to.include("execute_command")
+					expect(nativeToolNames.some((name) => name.startsWith("indxr-"))).to.equal(false)
+				},
+			)
+		})
+
 		it("names only the visible subset of Indxr tools in native MCP guidance", async function () {
 			await runPromptTest(
 				this,
@@ -783,11 +839,15 @@ describe("Prompt System Integration Tests", () => {
 				"gpt-5.4-2026-03-05",
 				async ({ systemPrompt }) => {
 					expect(systemPrompt).to.include("Indxr-Aware Exploration")
+					expect(systemPrompt).to.include("primary review boundary")
 					expect(systemPrompt).to.include("`search_relevant`")
 					expect(systemPrompt).to.include("`get_file_summary`")
 					expect(systemPrompt).to.not.include("`lookup_symbol`")
 					expect(systemPrompt).to.not.include("`read_source`")
 					expect(systemPrompt).to.not.include("`get_public_api`")
+					expect(systemPrompt).to.not.include(
+						"before built-in `search_files`, `list_code_definition_names`, `read_file`, or `read_file_range` whenever feasible",
+					)
 				},
 			)
 		})
@@ -1238,12 +1298,9 @@ describe("Prompt System Integration Tests", () => {
 				async ({ tools }) => {
 					const nativeToolNames = getNativeToolNames(tools)
 
-					expect(nativeToolNames).to.include.members([
-						"indxr-10mcp0search_relevant",
-						"indxr-10mcp0get_file_summary",
-						"indxr-10mcp0lookup_symbol",
-						"indxr-10mcp0get_callers",
-					])
+					expect(nativeToolNames).to.include.members(["indxr-10mcp0search_relevant", "indxr-10mcp0get_file_summary"])
+					expect(nativeToolNames).to.not.include("indxr-10mcp0lookup_symbol")
+					expect(nativeToolNames).to.not.include("indxr-10mcp0get_callers")
 					expect(nativeToolNames).to.not.include("12345670mcp0test_tool")
 					expect(nativeToolNames).to.not.include("build_review_diff_output")
 					expect(nativeToolNames).to.not.include("set_workflow_placeholders")
