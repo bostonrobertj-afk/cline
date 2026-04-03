@@ -9,8 +9,8 @@ const AGENT_ROLE = [
 ]
 
 export async function getAgentRoleSection(variant: PromptVariant, context: SystemPromptContext): Promise<string> {
-	if (context.activeAgentId) {
-		return context.activeAgentRoleInstructions?.trim() || `Active BMAD agent persona: ${context.activeAgentId}`
+	if (context.activeWorkflowPersonaInstructions?.trim()) {
+		return context.activeWorkflowPersonaInstructions
 	}
 
 	const template = variant.componentOverrides?.[SystemPromptSection.AGENT_ROLE]?.template || AGENT_ROLE.join(" ")

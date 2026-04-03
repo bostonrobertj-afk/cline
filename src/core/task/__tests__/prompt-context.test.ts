@@ -6,29 +6,29 @@ import {
 } from "../index"
 
 describe("shouldIncludePersistentPromptContext", () => {
-	it("returns false when no active BMAD agent or workflow is set", () => {
+	it("returns false when no workflow state is set", () => {
 		expect(
 			shouldIncludePersistentPromptContext({
-				activeAgentId: undefined,
 				activeWorkflowId: undefined,
+				activePlaceholderWorkflowId: undefined,
 			}),
 		).to.equal(false)
 	})
 
-	it("returns true when an active BMAD agent is set", () => {
+	it("returns true when activeWorkflowId is present", () => {
 		expect(
 			shouldIncludePersistentPromptContext({
-				activeAgentId: "bmad-quick-flow-solo-dev",
-				activeWorkflowId: undefined,
+				activeWorkflowId: "bmad-quick-dev-new-preview",
+				activePlaceholderWorkflowId: undefined,
 			}),
 		).to.equal(true)
 	})
 
-	it("returns true when an active BMAD workflow is set", () => {
+	it("returns true when activePlaceholderWorkflowId is present", () => {
 		expect(
 			shouldIncludePersistentPromptContext({
-				activeAgentId: undefined,
-				activeWorkflowId: "bmad-quick-dev-new-preview",
+				activeWorkflowId: undefined,
+				activePlaceholderWorkflowId: "code-review.md",
 			}),
 		).to.equal(true)
 	})
@@ -56,7 +56,7 @@ describe("shouldIncludePersistentPromptContext", () => {
 			isActiveDeterministicPlaceholderWorkflowEnabled({
 				activePlaceholderWorkflowSource: {
 					type: "remote",
-					name: "review-edge-case-hunter.md",
+					name: "unsupported-placeholder-workflow.md",
 					contents: "# Review Workflow",
 				},
 			} as any),

@@ -82,14 +82,11 @@ export const buildReviewInputToolDictionaryConfig: WorkflowFormToolDictionaryCon
 	overviewLines: [
 		"Review Input Artifact. Build and replace the stable review-input artifact at {review_input}.",
 		"",
-		"Story File Path. The human must provide only the story markdown file path for the current review cycle.",
+		"Workflow-owned Story File. The active placeholder workflow must already provide {story_path}; the form does not recollect it from the human.",
 		"",
 		"Workflow-owned Diff Artifact. The stable diff artifact at {diff_output} is resolved automatically and is not recollected from the human.",
 	],
-	parameterDescriptions: {
-		story_path:
-			"Required story markdown file path. The workflow-owned diff artifact at {diff_output} is resolved automatically.",
-	},
+	parameterDescriptions: {},
 	termKeys: [],
 }
 export const WORKFLOW_FORM_TOOL_DICTIONARY_HEADING = buildReviewDiffOutputToolDictionaryConfig.heading

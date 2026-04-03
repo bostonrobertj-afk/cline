@@ -24,7 +24,7 @@ Description: Request to execute a CLI command on the system. Use this when you n
 Required params: command, requires_approval
 
 ## read_file
-Description: Request to read the contents of a file at the specified path. Prefer using search_files and list_code_definition_names first to narrow the target, then use read_file_range for targeted inspection. Use read_file only when the file is at or below 800 lines and 65536 bytes and you truly need the exact full contents. Automatically extracts raw text from PDF and DOCX files. Do NOT use this tool to list the contents of a directory.
+Description: Request to read the contents of a file at the specified path. Prefer using search_files and list_code_definition_names first to narrow the target, then use read_file_range for targeted inspection. Once you have narrowed the work to one concrete file, prefer a single read_file call when that file is at or below 800 lines and 65536 bytes and you need the full raw contents, rather than stitching together many nearby range reads. Automatically extracts raw text from PDF and DOCX files. Do NOT use this tool to list the contents of a directory.
 Required params: path
 
 ## read_file_range
@@ -87,8 +87,8 @@ Description: Build and replace the stable review diff artifact at {diff_output} 
 Required params: source
 
 ## build_review_input
-Description: Build review-input.md from a story file and the stable {diff_output} artifact. The only human-supplied parameter is story_path.
-Required params: story_path
+Description: Build and replace the stable review-input artifact at {review_input} from the workflow-owned story file at {story_path} plus the workflow-owned diff artifact at {diff_output}. Resolve all inputs from workflow state.
+Required params: none
 
 ## use_subagents
 Description: Run up to five focused in-process subagents in parallel. Each subagent gets its own prompt and returns a comprehensive research result with tool and token stats. Use this for broad exploration when reading many files would consume the main agent's context window. You do not need to launch multiple subagents every time; using one subagent is valid when it avoids unnecessary context usage for light discovery work.

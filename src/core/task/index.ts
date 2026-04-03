@@ -102,6 +102,7 @@ import * as path from "path"
 import { ulid } from "ulid"
 import type { SystemPromptContext } from "@/core/prompts/system-prompt"
 import { getSystemPrompt } from "@/core/prompts/system-prompt"
+import { resolveWorkflowPersonaInstructions } from "@/core/prompts/system-prompt/registry/workflowPersonaRegistry"
 import { HostProvider } from "@/hosts/host-provider"
 import { FileEditProvider } from "@/integrations/editor/FileEditProvider"
 import {
@@ -137,14 +138,7 @@ import { refreshWorkflowToggles } from "../context/instructions/user-instruction
 import { Controller } from "../controller"
 import { executeHook } from "../hooks/hook-executor"
 import { StateManager } from "../storage/StateManager"
-import {
-	buildBmadAgentRoleInstructions,
-	getBmadAgentById,
-	getBmadWorkflowReminder,
-	getOwningBmadAgentForSkill,
-	isSkillAllowedForBmadAgent,
-	resolvePlaceholderWorkflowManagedVariant,
-} from "./bmad-agent-mode"
+import { getBmadWorkflowReminder } from "./bmad-agent-mode"
 import { FocusChainManager } from "./focus-chain"
 import { logFocusChainDiagnosticEvent, summarizeFocusChainText, summarizeFocusChainTextBlocks } from "./focus-chain/diagnostics"
 import { buildManagedWorkflowPrompt, renderManagedWorkflowTaskProgress } from "./managed-workflows/ManagedWorkflowRenderer"
@@ -193,8 +187,10 @@ type TaskParams = {
 	taskLockAcquired: boolean
 }
 
-export function shouldIncludePersistentPromptContext(taskState: Pick<TaskState, "activeAgentId" | "activeWorkflowId">): boolean {
-	return !!taskState.activeAgentId || !!taskState.activeWorkflowId
+export function shouldIncludePersistentPromptContext(
+	taskState: Pick<TaskState, "activeWorkflowId" | "activePlaceholderWorkflowId">,
+): boolean {
+	return !!taskState.activeWorkflowId || !!taskState.activePlaceholderWorkflowId
 }
 
 export function appendPromptInjectionBlocksToSystemPrompt(
@@ -1383,10 +1379,11 @@ export class Task {
 		await this.persistWorkflowFormSession()
 	}
 
-	private async renderWorkflowFormMessage(payload: ClineWorkflowForm): Promise<void> {
+	private async renderWorkflowFormMessage(payload: ClineWorkflowForm, messageType: "ask" | "say"): Promise<void> {
 		const text = JSON.stringify(payload)
-		const nextThreadDisplayState = ThreadDisplayStates.AWAITING_USER_RESPONSE
-		const nextAwaitingSubtype = AwaitingUserResponseSubtypes.SYSTEM
+		const nextThreadDisplayState =
+			messageType === "ask" ? ThreadDisplayStates.AWAITING_USER_RESPONSE : ThreadDisplayStates.ACTIVE_RUN
+		const nextAwaitingSubtype = messageType === "ask" ? AwaitingUserResponseSubtypes.SYSTEM : undefined
 		const clineMessages = this.messageStateHandler.getClineMessages()
 
 		this.setThreadDisplayState(
@@ -1402,7 +1399,9 @@ export class Task {
 		let existingWorkflowFormMessageIndex = -1
 		for (let index = clineMessages.length - 1; index >= 0; index--) {
 			const message = clineMessages[index]
-			if (message.type !== "ask" || message.ask !== "workflow_form" || !message.text) {
+			const isWorkflowFormAsk = message.type === "ask" && message.ask === "workflow_form"
+			const isWorkflowFormSay = message.type === "say" && message.say === "workflow_form"
+			if ((!isWorkflowFormAsk && !isWorkflowFormSay) || !message.text) {
 				continue
 			}
 
@@ -1427,8 +1426,8 @@ export class Task {
 			this.taskState.lastMessageTs = askTs
 			await this.messageStateHandler.addToClineMessages({
 				ts: askTs,
-				type: "ask",
-				ask: "workflow_form",
+				type: messageType,
+				...(messageType === "ask" ? { ask: "workflow_form" as const } : { say: "workflow_form" as const }),
 				threadDisplayState: this.threadDisplayState,
 				awaitingUserResponseSubtype: this.awaitingUserResponseSubtype,
 				text,
@@ -1678,6 +1677,7 @@ export class Task {
 						break
 					}
 
+					const resolver = getWorkflowFormResolverDefinition(candidate.trigger.resolverId)
 					this.taskState.activeWorkflowFormSession = this.workflowFormRuntime.createSession({
 						resolverId: candidate.trigger.resolverId,
 						triggerSource: "deterministic_workflow_progression",
@@ -1686,7 +1686,7 @@ export class Task {
 							workflowName: this.taskState.activePlaceholderWorkflowSource!.name,
 							stepNumber: candidate.activeStep.stepNumber,
 						},
-						initialPhase: "confirm",
+						initialPhase: resolver.defaultInitialPhase ?? "confirm",
 						context: undefined,
 					})
 					await this.persistWorkflowFormSession()
@@ -1704,7 +1704,42 @@ export class Task {
 						await this.say("command_output", "")
 					},
 				})
-				await this.renderWorkflowFormMessage(this.workflowFormRuntime.buildPayload(currentSession))
+				const payload = this.workflowFormRuntime.buildPayload(currentSession)
+				if (payload.definition.presentation?.kind === "automatic_status") {
+					await this.renderWorkflowFormMessage(payload, "say")
+					const resolver = getWorkflowFormResolverDefinition(currentSession.resolverId)
+					const toolExecution = await this.executeWorkflowFormToolAndSync({
+						kind: "invoke_tool",
+						session: currentSession,
+						...resolver.buildToolExecutionRequest(currentSession, currentSession.values),
+					})
+
+					if (toolExecution.succeeded) {
+						const successPayload = this.workflowFormRuntime.buildSuccessPayload(
+							currentSession,
+							resolver.buildDefinition(currentSession).successMessage,
+						)
+						await this.clearWorkflowFormSession()
+						await this.renderWorkflowFormMessage(successPayload, "say")
+						restartDecisionLoop = true
+						break
+					}
+
+					const failurePayload = this.workflowFormRuntime.buildFailurePayload(currentSession)
+					await this.renderWorkflowFormMessage(failurePayload, "say")
+					if (toolExecution.fallbackToAgent === true) {
+						if (!this.taskState.suppressedWorkflowFormResolverIds.includes(currentSession.resolverId)) {
+							this.taskState.suppressedWorkflowFormResolverIds = [
+								...this.taskState.suppressedWorkflowFormResolverIds,
+								currentSession.resolverId,
+							]
+						}
+					}
+					await this.clearWorkflowFormSession()
+					break
+				}
+
+				await this.renderWorkflowFormMessage(payload, "ask")
 
 				await pWaitFor(() => this.pendingWorkflowFormOutcome !== undefined || this.taskState.abort, {
 					interval: 100,
@@ -1738,7 +1773,7 @@ export class Task {
 								definition.successMessage,
 							)
 							await this.clearWorkflowFormSession()
-							await this.renderWorkflowFormMessage(successPayload)
+							await this.renderWorkflowFormMessage(successPayload, "ask")
 							restartDecisionLoop = true
 							break
 						}
@@ -1748,7 +1783,7 @@ export class Task {
 								outcome.session,
 								toolExecution.errorMessage,
 							)
-							await this.renderWorkflowFormMessage(fallbackNoticePayload)
+							await this.renderWorkflowFormMessage(fallbackNoticePayload, "ask")
 							if (!this.taskState.suppressedWorkflowFormResolverIds.includes(outcome.session.resolverId)) {
 								this.taskState.suppressedWorkflowFormResolverIds = [
 									...this.taskState.suppressedWorkflowFormResolverIds,
@@ -1949,28 +1984,7 @@ export class Task {
 			return
 		}
 
-		const hadManagedWorkflowRun = !!this.taskState.managedWorkflowRun
-
 		if (action.type === "activate_managed_workflow") {
-			const owningAgent = await getOwningBmadAgentForSkill(this.cwd, action.workflowId)
-			if (this.taskState.activeAgentId) {
-				const activeAgent = await getBmadAgentById(this.cwd, this.taskState.activeAgentId)
-				if (activeAgent && !isSkillAllowedForBmadAgent(activeAgent, action.workflowId)) {
-					await this.say(
-						"error",
-						`Cannot activate workflow "${action.workflowId}" while BMAD agent "${activeAgent.id}" is active. Allowed skills for that agent: ${activeAgent.allowedSkills.join(
-							", ",
-						)}. Use /bmad-exit first or activate the matching agent for this workflow.`,
-					)
-					return
-				}
-			} else if (owningAgent) {
-				this.taskState.activeAgentId = owningAgent.id
-				this.taskState.activeAgentSkillName = owningAgent.id
-				this.taskState.activeAgentInvokedSlashCommand = action.slashCommand
-				this.taskState.activeAgentJustActivated = true
-			}
-
 			await activateManagedWorkflowInTaskState({
 				cwd: this.cwd,
 				taskState: this.taskState,
@@ -1979,25 +1993,6 @@ export class Task {
 			})
 			await this.refreshManagedWorkflowChecklistProjection()
 		} else if (action.type === "activate_placeholder_workflow") {
-			const managedVariant = await resolvePlaceholderWorkflowManagedVariant(this.cwd, action.workflowId)
-			if (managedVariant) {
-				if (this.taskState.activeAgentId) {
-					const activeAgent = await getBmadAgentById(this.cwd, this.taskState.activeAgentId)
-					if (activeAgent && !isSkillAllowedForBmadAgent(activeAgent, managedVariant.managedWorkflowId)) {
-						await this.say(
-							"error",
-							`Cannot activate workflow "${action.workflowId}" while BMAD agent "${activeAgent.id}" is active. That workflow maps to managed workflow "${managedVariant.managedWorkflowId}", which is not in the active agent allowlist. Use /bmad-exit first or activate a compatible BMAD agent.`,
-						)
-						return
-					}
-				} else if (managedVariant.owningAgent) {
-					this.taskState.activeAgentId = managedVariant.owningAgent.id
-					this.taskState.activeAgentSkillName = managedVariant.owningAgent.id
-					this.taskState.activeAgentInvokedSlashCommand = action.workflowId
-					this.taskState.activeAgentJustActivated = true
-				}
-			}
-
 			const activation = await activatePlaceholderWorkflowInTaskState({
 				cwd: this.cwd,
 				taskState: this.taskState,
@@ -2035,70 +2030,10 @@ export class Task {
 			if (!activation || activation.workflowChanged || this.taskState.currentFocusChainChecklist == null) {
 				await this.refreshPlaceholderWorkflowChecklistProjection(!activation || activation.workflowChanged === true)
 			}
-		} else if (action.type === "activate_bmad_agent") {
-			const targetAgent = await getBmadAgentById(this.cwd, action.agentId)
-			if (this.taskState.managedWorkflowRun && targetAgent) {
-				const activeWorkflowId = this.taskState.managedWorkflowRun.workflowId
-				if (!isSkillAllowedForBmadAgent(targetAgent, activeWorkflowId)) {
-					await this.say(
-						"error",
-						`Cannot activate BMAD agent "${targetAgent.id}" while managed workflow "${activeWorkflowId}" is active. Exit the workflow context first or use an agent permitted to run that workflow.`,
-					)
-					return
-				}
-			}
-
-			this.taskState.activeAgentId = action.agentId
-			this.taskState.activeAgentSkillName = action.skillName
-			this.taskState.activeAgentInvokedSlashCommand = action.invokedSlashCommand
-			this.taskState.activeAgentJustActivated = true
-			if (!this.taskState.managedWorkflowRun) {
-				this.taskState.activeWorkflowId = undefined
-				this.taskState.activePlaceholderWorkflowId = undefined
-				this.taskState.activePlaceholderWorkflowSource = undefined
-				this.taskState.activePlaceholderWorkflowStableValues = undefined
-				this.taskState.activePlaceholderWorkflowValues = undefined
-				this.taskState.activePlaceholderWorkflowDeterministicState = undefined
-				this.taskState.activePlaceholderWorkflowTaskWriteProofPaths = []
-				this.taskState.lastPromptedPlaceholderWorkflowChecklistLabel = undefined
-				this.taskState.activeWorkflowFormSession = undefined
-				this.taskState.suppressedWorkflowFormResolverIds = []
-				this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices = []
-				this.taskState.activeWorkflowJustStarted = false
-			} else if (hadManagedWorkflowRun) {
-				await this.refreshManagedWorkflowChecklistProjection()
-			} else if (this.taskState.currentFocusChainChecklist == null) {
-				await this.refreshManagedWorkflowChecklistProjection()
-			}
-		} else {
-			this.taskState.activeAgentId = undefined
-			this.taskState.activeAgentSkillName = undefined
-			this.taskState.activeAgentInvokedSlashCommand = undefined
-			this.taskState.activeAgentJustActivated = false
-			if (!this.taskState.managedWorkflowRun) {
-				this.taskState.activeWorkflowId = undefined
-				this.taskState.activePlaceholderWorkflowId = undefined
-				this.taskState.activePlaceholderWorkflowSource = undefined
-				this.taskState.activePlaceholderWorkflowStableValues = undefined
-				this.taskState.activePlaceholderWorkflowValues = undefined
-				this.taskState.activePlaceholderWorkflowDeterministicState = undefined
-				this.taskState.activePlaceholderWorkflowTaskWriteProofPaths = []
-				this.taskState.lastPromptedPlaceholderWorkflowChecklistLabel = undefined
-				this.taskState.activeWorkflowFormSession = undefined
-				this.taskState.suppressedWorkflowFormResolverIds = []
-				this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices = []
-				this.taskState.activeWorkflowJustStarted = false
-			}
-			if (hadManagedWorkflowRun && !this.taskState.managedWorkflowRun) {
-				await this.clearManagedWorkflowChecklistProjection()
-			}
 		}
 
 		try {
 			const taskMetadata = await getTaskMetadata(this.taskId)
-			taskMetadata.activeAgentId = this.taskState.activeAgentId
-			taskMetadata.activeAgentSkillName = this.taskState.activeAgentSkillName
-			taskMetadata.activeAgentInvokedSlashCommand = this.taskState.activeAgentInvokedSlashCommand
 			taskMetadata.activeWorkflowId = this.taskState.activeWorkflowId
 			taskMetadata.activePlaceholderWorkflowId = this.taskState.activePlaceholderWorkflowId
 			taskMetadata.activePlaceholderWorkflowSource = this.taskState.activePlaceholderWorkflowSource
@@ -2127,23 +2062,7 @@ export class Task {
 	}
 
 	private async buildPromptSkillScope(enabledSkills: SkillMetadata[]): Promise<SkillMetadata[]> {
-		if (!this.taskState.activeAgentId) {
-			const promptVisibility = await Promise.all(
-				enabledSkills.map(async (skill) => ({
-					skill,
-					matchingAgent: await getBmadAgentById(this.cwd, skill.name),
-				})),
-			)
-
-			return promptVisibility.filter(({ matchingAgent }) => !matchingAgent).map(({ skill }) => skill)
-		}
-
-		const activeAgent = await getBmadAgentById(this.cwd, this.taskState.activeAgentId)
-		if (!activeAgent) {
-			return []
-		}
-
-		return enabledSkills.filter((skill) => isSkillAllowedForBmadAgent(activeAgent, skill.name))
+		return enabledSkills
 	}
 
 	private mergePromptSkillEntries(skills: SkillMetadata[], workflows: SkillMetadata[]): SkillMetadata[] {
@@ -2189,18 +2108,13 @@ export class Task {
 		return contentBlocks.some(blockContainsHumanInput)
 	}
 
-	private async buildBmadPromptInstructions(): Promise<{
-		activeAgentRoleInstructions?: string
+	private async buildWorkflowPromptInstructions(): Promise<{
+		activeWorkflowPersonaInstructions?: string
 		activeWorkflowReminder?: string
 	}> {
-		let activeAgentRoleInstructions: string | undefined
+		const activeWorkflowName = this.taskState.activePlaceholderWorkflowSource?.name
+		const activeWorkflowPersonaInstructions = resolveWorkflowPersonaInstructions(activeWorkflowName)
 		let activeWorkflowReminder: string | undefined
-
-		if (this.taskState.activeAgentId) {
-			activeAgentRoleInstructions = await buildBmadAgentRoleInstructions(this.cwd, this.taskState.activeAgentId, {
-				includeActivation: this.taskState.activeAgentJustActivated,
-			})
-		}
 
 		if (this.taskState.managedWorkflowRun) {
 			activeWorkflowReminder = buildManagedWorkflowPrompt(this.taskState.managedWorkflowRun)
@@ -2208,7 +2122,7 @@ export class Task {
 			activeWorkflowReminder = await getBmadWorkflowReminder(this.cwd, this.taskState.activeWorkflowId)
 		}
 
-		return { activeAgentRoleInstructions, activeWorkflowReminder }
+		return { activeWorkflowPersonaInstructions, activeWorkflowReminder }
 	}
 
 	private getPromptRefreshFrequency(): number {
@@ -2221,7 +2135,6 @@ export class Task {
 		return shouldSendFullPromptAssembly({
 			isFirstRequest: this.taskState.apiRequestCount === 1,
 			hasHumanAuthoredInput,
-			activeAgentJustActivated: this.taskState.activeAgentJustActivated,
 			activeWorkflowJustStarted: this.taskState.activeWorkflowJustStarted,
 			didRespondToPlanAskBySwitchingMode: this.taskState.didRespondToPlanAskBySwitchingMode,
 			turnsSinceFullPromptRefresh: this.taskState.turnsSinceFullPromptRefresh,
@@ -2244,10 +2157,6 @@ export class Task {
 	private async restoreBmadStateFromMetadata(): Promise<void> {
 		try {
 			const metadata = await getTaskMetadata(this.taskId)
-			this.taskState.activeAgentId = metadata.activeAgentId
-			this.taskState.activeAgentSkillName = metadata.activeAgentSkillName
-			this.taskState.activeAgentInvokedSlashCommand = metadata.activeAgentInvokedSlashCommand
-			this.taskState.activeAgentJustActivated = false
 			this.taskState.activeWorkflowId = metadata.activeWorkflowId
 			this.taskState.activePlaceholderWorkflowId = metadata.activePlaceholderWorkflowId
 			this.taskState.activePlaceholderWorkflowSource = metadata.activePlaceholderWorkflowSource
@@ -3435,8 +3344,8 @@ export class Task {
 					this.mergePromptSkillEntries(availableSkills, createWorkflowSkillMetadata(workflowEntries)),
 				)
 			: []
-		const { activeAgentRoleInstructions, activeWorkflowReminder } = shouldIncludeBmadPromptContext
-			? await this.buildBmadPromptInstructions()
+		const { activeWorkflowPersonaInstructions, activeWorkflowReminder } = shouldIncludeBmadPromptContext
+			? await this.buildWorkflowPromptInstructions()
 			: {}
 
 		// Snapshot editor tabs so prompt tools can decide whether to include
@@ -3464,8 +3373,8 @@ export class Task {
 			editorTabs,
 			supportsBrowserUse,
 			mcpHub: this.mcpHub,
-			activeAgentId: shouldIncludeBmadPromptContext ? this.taskState.activeAgentId : undefined,
-			activeAgentRoleInstructions,
+			activeWorkflowName: this.taskState.activePlaceholderWorkflowSource?.name,
+			activeWorkflowPersonaInstructions,
 			activeWorkflowReminder,
 			activeWorkflowSupportsPlaceholders:
 				!!this.taskState.managedWorkflowRun || !!this.taskState.activePlaceholderWorkflowId,
@@ -3515,7 +3424,6 @@ export class Task {
 			systemPrompt,
 			this.currentRequestPromptInjectionBlocks,
 		)
-		this.taskState.activeAgentJustActivated = false
 		this.taskState.activeWorkflowJustStarted = false
 		this.useNativeToolCalls = !!tools?.length
 		await this.writePromptMetadataArtifacts({ systemPrompt: effectiveSystemPrompt, providerInfo })

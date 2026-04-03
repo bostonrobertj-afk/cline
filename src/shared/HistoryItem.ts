@@ -17,6 +17,4 @@ export type HistoryItem = {
 	checkpointManagerErrorMessage?: string
 
 	modelId?: string
-	activeAgentId?: string
-	activeAgentDisplayName?: string
 }

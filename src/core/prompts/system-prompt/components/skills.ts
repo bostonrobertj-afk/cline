@@ -1,20 +1,7 @@
-import { getBuiltinBmadAgentAllowlist } from "@/core/task/bmad-agent-mode"
 import type { PromptVariant, SystemPromptContext } from "../types"
 
-let builtinBmadAgentSkillNames: Set<string> | undefined
 // Do not switch this gate back on unless a human user has given direct, clear authorization.
 const SKILLS_PROMPT_SECTION_GATE: number = 2 // 1 = on, 2 = off
-
-function getBuiltinBmadAgentSkillNames(): Set<string> {
-	if (!builtinBmadAgentSkillNames) {
-		builtinBmadAgentSkillNames = new Set(getBuiltinBmadAgentAllowlist().map((agent) => agent.id))
-	}
-	return builtinBmadAgentSkillNames
-}
-
-function isPromptVisibleSkillName(skillName: string): boolean {
-	return !getBuiltinBmadAgentSkillNames().has(skillName)
-}
 
 /**
  * Generate the skills section for the system prompt.
@@ -24,7 +11,7 @@ export async function getSkillsSection(_variant: PromptVariant, context: SystemP
 		return undefined
 	}
 
-	const skills = (context.skills ?? []).filter((skill) => (context.activeAgentId ? true : isPromptVisibleSkillName(skill.name)))
+	const skills = context.skills ?? []
 	if (!skills || skills.length === 0) return undefined
 
 	if (context.useMinimalGptPrompt === true) {

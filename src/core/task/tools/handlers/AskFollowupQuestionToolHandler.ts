@@ -6,7 +6,6 @@ import { telemetryService } from "@/services/telemetry"
 import { ToolUse } from "../../../assistant-message"
 import { formatResponse } from "../../../prompts/responses"
 import { ToolResponse } from "../.."
-import { getBmadAgentDisplayName } from "../../bmad-agent-mode"
 import { emitAgentFeedback, readAgentFeedbackMessage } from "../response/agent-feedback"
 import { ResponseToolRuntime } from "../response/ResponseToolRuntime"
 import type { IPartialBlockHandler, IToolHandler } from "../ToolExecutorCoordinator"
@@ -65,9 +64,8 @@ export class AskFollowupQuestionToolHandler implements IToolHandler, IPartialBlo
 
 		// Show notification if enabled
 		if (config.autoApprovalSettings.enableNotifications) {
-			const assistantName = (await getBmadAgentDisplayName(config.cwd, config.taskState.activeAgentId)) || "Cline"
 			showSystemNotification({
-				subtitle: `${assistantName} has a question...`,
+				subtitle: "Cline has a question...",
 				message: question.replace(/\n/g, " "),
 			})
 		}

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document defines the requirements for a deterministic tool that applies the final triaged review output from `review_input.md` back into `{spec_file}` at the end of the `code-review.md` workflow.
+This document defines the requirements for a deterministic tool that applies the final triaged review output from `review_input.md` back into `{story_path}` at the end of the `code-review.md` workflow.
 
 The tool id for this capability is `code_review_spec_update`.
 
@@ -14,10 +14,10 @@ The tool exists so the primary code-review agent can work against the smaller no
 
 This capability must:
 
-- read `{review_input}` and `{spec_file}`
+- read `{review_input}` and `{story_path}`
 - detect review-authored content in the writable surfaces of `review_input.md`
-- merge only that new content into the correct sections of `{spec_file}`
-- persist the updated `{spec_file}`
+- merge only that new content into the correct sections of `{story_path}`
+- persist the updated `{story_path}`
 - record write proof so the Step 6 deterministic done signal can be satisfied
 - reset `review_input.md` so it is ready for a future review cycle
 
@@ -25,7 +25,7 @@ This capability must not:
 
 - perform a new code review
 - reinterpret reviewer intent from scratch
-- rewrite unrelated sections of `{spec_file}`
+- rewrite unrelated sections of `{story_path}`
 - guess when the merge target cannot be determined deterministically
 
 ## Inputs
@@ -33,7 +33,7 @@ This capability must not:
 The tool must consume these two workflow-owned artifacts:
 
 - `{review_input}`
-- `{spec_file}`
+- `{story_path}`
 
 Both paths must be resolved from the merged active placeholder-workflow value map at runtime, using workflow state rather than new user input or tool params.
 
@@ -69,14 +69,14 @@ The tool must treat these as carried-forward context only:
 
 The merge must be section-targeted and deterministic.
 
-The tool must not perform a freeform markdown patch against `{spec_file}`.
+The tool must not perform a freeform markdown patch against `{story_path}`.
 
 Instead, it must:
 
-1. Parse `{spec_file}` into target sections.
+1. Parse `{story_path}` into target sections.
 2. Parse `review_input.md` into its normalized sections.
 3. Compute the review-authored delta from the writable surfaces only.
-4. Apply only those deltas to the corresponding sections in `{spec_file}`.
+4. Apply only those deltas to the corresponding sections in `{story_path}`.
 
 ## Writable Surface Rules
 
@@ -87,10 +87,10 @@ Instead, it must:
 The tool must:
 
 - read the top-level `Status:` line in `{review_input}`
-- read the top-level `Status:` line in `{spec_file}`
-- replace the `Status:` line in `{spec_file}` with the one from `{review_input}`
+- read the top-level `Status:` line in `{story_path}`
+- replace the `Status:` line in `{story_path}` with the one from `{review_input}`
 
-If `{spec_file}` does not contain a top-level `Status:` line, the tool must add one near the beginning of the file.
+If `{story_path}` does not contain a top-level `Status:` line, the tool must add one near the beginning of the file.
 
 ### 2. Latest Review Findings
 
@@ -99,14 +99,14 @@ If `{spec_file}` does not contain a top-level `Status:` line, the tool must add 
 The tool must:
 
 - treat the full body of `## Latest Review Findings` in `{review_input}` as the desired new current-cycle findings content
-- replace the body of `## Latest Review Findings` in `{spec_file}` with that body
+- replace the body of `## Latest Review Findings` in `{story_path}` with that body
 
 The tool must not:
 
 - merge old and new latest-review content heuristically
-- preserve previous `## Latest Review Findings` content in `{spec_file}` when `review_input.md` provides a new body for that section
+- preserve previous `## Latest Review Findings` content in `{story_path}` when `review_input.md` provides a new body for that section
 
-If `review_input.md` leaves `## Latest Review Findings` empty, the tool must write an empty `## Latest Review Findings` section into `{spec_file}` rather than guessing whether old content should remain.
+If `review_input.md` leaves `## Latest Review Findings` empty, the tool must write an empty `## Latest Review Findings` section into `{story_path}` rather than guessing whether old content should remain.
 
 ### 3. Tasks / Subtasks
 
@@ -114,15 +114,15 @@ The tool must support review-authored remediation tasks being added to `## Tasks
 
 The deterministic rule is:
 
-- preserve existing story tasks already present in `{spec_file}`
-- detect task lines that are present in `{review_input}` but not present in `{spec_file}`
-- append only those new task/subtask lines into `{spec_file}` under `## Tasks / Subtasks`
+- preserve existing story tasks already present in `{story_path}`
+- detect task lines that are present in `{review_input}` but not present in `{story_path}`
+- append only those new task/subtask lines into `{story_path}` under `## Tasks / Subtasks`
 
 The tool must preserve the exact markdown lines authored in `review_input.md`, including indentation and checklist state.
 
 The tool must not:
 
-- remove existing tasks from `{spec_file}`
+- remove existing tasks from `{story_path}`
 - silently rewrite existing tasks
 - re-sort tasks
 
@@ -130,11 +130,11 @@ The tool must not:
 
 ### 1. Status Delta
 
-Status delta is determined by direct string comparison of the top-level `Status:` lines between `{review_input}` and `{spec_file}`.
+Status delta is determined by direct string comparison of the top-level `Status:` lines between `{review_input}` and `{story_path}`.
 
 ### 2. Latest Review Findings Delta
 
-The tool must not diff `## Latest Review Findings` line by line against `{spec_file}`.
+The tool must not diff `## Latest Review Findings` line by line against `{story_path}`.
 
 Instead, it must treat the `review_input.md` body for that section as the desired authoritative final content for the current cycle and replace the story/spec section body with it.
 
@@ -145,15 +145,15 @@ For `## Tasks / Subtasks`, delta detection is additive.
 The tool must identify lines that:
 
 - appear under `## Tasks / Subtasks` in `{review_input}`
-- do not already appear under `## Tasks / Subtasks` in `{spec_file}`
+- do not already appear under `## Tasks / Subtasks` in `{story_path}`
 
-Only those newly added lines may be appended to `{spec_file}`.
+Only those newly added lines may be appended to `{story_path}`.
 
 This matching must preserve exact line text and indentation.
 
 ## Section Creation Rules
 
-If `{spec_file}` is missing any required merge target, the tool must create the missing section rather than failing immediately.
+If `{story_path}` is missing any required merge target, the tool must create the missing section rather than failing immediately.
 
 The required merge targets are:
 
@@ -161,7 +161,7 @@ The required merge targets are:
 - `## Latest Review Findings`
 - `## Tasks / Subtasks`
 
-When created, missing sections must be appended at the end of `{spec_file}` in this order:
+When created, missing sections must be appended at the end of `{story_path}` in this order:
 
 1. `## Latest Review Findings`
 2. `## Tasks / Subtasks`
@@ -180,10 +180,10 @@ Those are not writable targets for this tool.
 
 ## Write-Proof And Workflow Completion
 
-After updating `{spec_file}`, the tool must:
+After updating `{story_path}`, the tool must:
 
 - persist the file to disk
-- record write proof for the updated `{spec_file}` path
+- record write proof for the updated `{story_path}` path
 
 This write proof is required so deterministic workflow progression can satisfy the Step 6 done signal.
 
@@ -201,11 +201,11 @@ The tool must not delete `review_input.md` outright.
 
 ### 1. Missing `review_input`
 
-If `{review_input}` cannot be resolved or read, the tool must surface an error in the chat UI and must not modify `{spec_file}`.
+If `{review_input}` cannot be resolved or read, the tool must surface an error in the chat UI and must not modify `{story_path}`.
 
-### 2. Missing `spec_file`
+### 2. Missing `story_path`
 
-If `{spec_file}` cannot be resolved or read, the tool must surface an error in the chat UI and must not modify `review_input.md`.
+If `{story_path}` cannot be resolved or read, the tool must surface an error in the chat UI and must not modify `review_input.md`.
 
 ### 3. Missing Required Writable Surface In `review_input`
 
@@ -228,13 +228,13 @@ This especially applies if:
 
 ### 5. Partial Failure
 
-The tool must not partially update `{spec_file}`.
+The tool must not partially update `{story_path}`.
 
-If any required merge step fails, neither the final `{spec_file}` update nor the `review_input.md` reset may be persisted.
+If any required merge step fails, neither the final `{story_path}` update nor the `review_input.md` reset may be persisted.
 
 ## Output Contract
 
-On success, the tool must return `formatResponse.toolResult(JSON.stringify({ persisted: true, spec_file_updated: true, review_input_cleared: true, spec_file_path: "<absolute path>", review_input_path: "<absolute path>" }))`.
+On success, the tool must return `formatResponse.toolResult(JSON.stringify({ persisted: true, story_path_updated: true, review_input_cleared: true, story_path_path: "<absolute path>", review_input_path: "<absolute path>" }))`.
 
 On failure, the tool must return surfaced `formatResponse.toolError(...)`.
 
@@ -256,7 +256,7 @@ Any action plan built from this document must include work for:
 
 - internal tool id and runtime registration for `code_review_spec_update`
 - deterministic parsing of `review_input.md` writable surfaces
-- deterministic section-targeted merge into `{spec_file}`
+- deterministic section-targeted merge into `{story_path}`
 - reset behavior for `review_input.md`
 - structured result contract
 - focused handler and merge tests

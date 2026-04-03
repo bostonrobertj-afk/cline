@@ -157,13 +157,14 @@ For Phase 1, that mechanism must:
 - render as a system-owned interactive frame within the task/chat UI
 - derive its field structure and required/optional semantics from the invoked tool's schema
 - reuse existing UI-visible primitives and patterns where appropriate
-- support a staged interaction flow for the Phase 1 use case:
+- support a staged interactive flow for the Phase 1 use case:
   - initial system prompt/question
   - affirmative path into structured input collection
   - field selection / field entry
   - submit
   - failure with retry
   - success indication
+- support a non-interactive automatic workflow-preparation status card for zero-human-input system-owned steps, with pending, success, and fallback-to-manual terminal states
 - include a UI control that opens the human-friendly tool dictionary at the line or entry where the invoked tool's documentation begins so the user can understand:
   - what the tool does
   - what the tool produces

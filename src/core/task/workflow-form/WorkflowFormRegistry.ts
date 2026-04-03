@@ -457,42 +457,29 @@ export const workflowFormRegistry: Record<string, WorkflowFormResolverDefinition
 	[CODE_REVIEW_STEP_3_REVIEW_INPUT_RESOLVER_ID]: {
 		id: CODE_REVIEW_STEP_3_REVIEW_INPUT_RESOLVER_ID,
 		toolName: ClineDefaultTool.BUILD_REVIEW_INPUT,
+		defaultInitialPhase: "collect_inputs",
 		buildDefinition(): WorkflowFormDefinition {
 			return {
 				toolName: ClineDefaultTool.BUILD_REVIEW_INPUT,
 				title: "Review Input Artifact",
 				toolDictionaryTitle: "Review Input Reference",
 				toolDictionaryMarkdown: buildRuntimeToolDictionaryMarkdownFromConfig(buildReviewInputToolDictionaryConfig),
+				presentation: {
+					kind: "automatic_status",
+					pendingLabel: "Preparing workflow documents",
+					successLabel: "Workflow documents ready",
+					failureLabel: "Automatic workflow preparation failed- falling back to manual LLM workflow preparation.",
+				},
 				pages: {
-					confirm: {
-						prompt: "This workflow requires the following tool-produced artifact: `review-input.md`.\n\nCan you provide the story file path required to produce `review-input.md`?",
-						options: ["Yes", "No"],
-					},
 					collect_inputs: {
-						prompt: "Provide the story file path needed to produce `review-input.md`. The workflow-owned `review-input.diff` artifact will be supplied automatically.",
-						fields: buildSchemaDerivedPublicToolFieldDefinitions({
-							toolName: ClineDefaultTool.BUILD_REVIEW_INPUT,
-							labelOverrides: { story_path: "Story File Path" },
-							helpOverrides: {
-								story_path:
-									"Path to the story markdown file being reviewed. The workflow-owned `review-input.diff` artifact will be supplied automatically.",
-							},
-							placeholderOverrides: { story_path: "/absolute/path/to/story.md" },
-						}),
+						prompt: "The system will now build `review-input.md` from the stored `story_path` and the workflow-owned `review-input.diff` artifact.",
+						fields: [],
 						submitLabel: "Submit",
 						cancelLabel: "Cancel",
 					},
 					retry_error: {
-						prompt: "The system could not produce `review-input.md`. Update the story file path or retry the request.",
-						fields: buildSchemaDerivedPublicToolFieldDefinitions({
-							toolName: ClineDefaultTool.BUILD_REVIEW_INPUT,
-							labelOverrides: { story_path: "Story File Path" },
-							helpOverrides: {
-								story_path:
-									"Path to the story markdown file being reviewed. The workflow-owned `review-input.diff` artifact will be supplied automatically.",
-							},
-							placeholderOverrides: { story_path: "/absolute/path/to/story.md" },
-						}),
+						prompt: "The system could not produce `review-input.md` from the stored workflow inputs. Retry the request or return to the Step 3 fallback instructions.",
+						fields: [],
 						submitLabel: "Submit",
 						cancelLabel: "Cancel",
 						retryLabel: "Start Over",
@@ -502,37 +489,13 @@ export const workflowFormRegistry: Record<string, WorkflowFormResolverDefinition
 			}
 		},
 		buildToolExecutionFailureFallbackMessage() {
-			return "The workflow form could not build the Step 3 review-input artifact. The workflow will return to the Step 3 fallback instructions."
+			return "The workflow form could not build the Step 3 review-input artifact from stored workflow inputs. The workflow will return to the Step 3 fallback instructions."
 		},
-		buildToolExecutionRequest(_session, values) {
-			const fields = buildSchemaDerivedPublicToolFieldDefinitions({
-				toolName: ClineDefaultTool.BUILD_REVIEW_INPUT,
-				labelOverrides: { story_path: "Story File Path" },
-				helpOverrides: {
-					story_path:
-						"Path to the story markdown file being reviewed. The workflow-owned `review-input.diff` artifact will be supplied automatically.",
-				},
-				placeholderOverrides: { story_path: "/absolute/path/to/story.md" },
-			})
-			const filteredValues = fields.reduce<Record<string, string>>((acc, field) => {
-				const value = getParsedFieldValue(fields, values, field.key)
-				if (typeof value === "string") {
-					acc[field.key] = value
-				}
-
-				return acc
-			}, {})
-
-			if (typeof filteredValues.story_path !== "string" || filteredValues.story_path.length === 0) {
-				throw new Error(
-					"Workflow form could not derive a valid build_review_input request from the schema-derived fields.",
-				)
-			}
-
+		buildToolExecutionRequest(_session, _values) {
 			return {
 				toolName: ClineDefaultTool.BUILD_REVIEW_INPUT,
-				toolInput: filteredValues,
-				toolParams: filteredValues,
+				toolInput: {},
+				toolParams: {},
 			}
 		},
 		evaluateToolExecutionResult(session, args) {

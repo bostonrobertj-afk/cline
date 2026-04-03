@@ -408,4 +408,10 @@ export const PLACEHOLDER_WORKFLOW_STEP_MATRIX: Record<string, Record<number, rea
 		11: ["DOC_READ", "DOC_WRITE"],
 		12: ["DOC_READ", "DOC_WRITE", "WORKFLOW_ROUTE"],
 	},
+	"write-remediation-story.md": {
+		1: ["DOC_READ", "PLACEHOLDER_WRITE"],
+		2: ["DOC_READ", "DOC_WRITE", "PLACEHOLDER_WRITE"],
+		3: ["DOC_READ", "DOC_WRITE", "CODE_READ", "INDXR_DISCOVERY", "INDXR_SOURCE_READ", "INDXR_SYMBOL_GRAPH", "LOCAL_EXEC"],
+		4: [],
+	},
 }

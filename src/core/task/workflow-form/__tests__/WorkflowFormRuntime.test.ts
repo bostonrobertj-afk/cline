@@ -120,24 +120,24 @@ describe("WorkflowFormRuntime", () => {
 
 	const confirmToCollectFormResolver: WorkflowFormResolverDefinition = {
 		id: "confirm_to_collect_form",
-		toolName: ClineDefaultTool.BUILD_REVIEW_INPUT,
+		toolName: ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
 		buildDefinition: (): WorkflowFormDefinition => ({
-			toolName: ClineDefaultTool.BUILD_REVIEW_INPUT,
+			toolName: ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
 			title: "Confirm To Collect Form",
-			toolDictionaryTitle: "Review Input Reference",
-			toolDictionaryMarkdown: "## build_review_input",
+			toolDictionaryTitle: "Placeholder Reference",
+			toolDictionaryMarkdown: "## set_workflow_placeholders",
 			pages: {
 				confirm: {
-					prompt: "Confirm the review-input form.",
+					prompt: "Confirm the placeholder form.",
 					options: ["Yes", "No"],
 				},
 				collect_inputs: {
-					prompt: "Collect the story path.",
+					prompt: "Collect the placeholder value.",
 					fields: [
 						{
-							key: "story_path",
-							label: "Story File Path",
-							help: "Path to the story markdown file being reviewed.",
+							key: "placeholder_value",
+							label: "Placeholder Value",
+							help: "Generic value used only for the confirm-to-collect transition test.",
 							control: "text",
 							valueSchema: { type: "string" },
 							required: true,
@@ -146,12 +146,12 @@ describe("WorkflowFormRuntime", () => {
 					],
 				},
 				retry_error: {
-					prompt: "Retry the review-input form.",
+					prompt: "Retry the placeholder form.",
 					fields: [
 						{
-							key: "story_path",
-							label: "Story File Path",
-							help: "Path to the story markdown file being reviewed.",
+							key: "placeholder_value",
+							label: "Placeholder Value",
+							help: "Generic value used only for the confirm-to-collect transition test.",
 							control: "text",
 							valueSchema: { type: "string" },
 							required: true,
@@ -165,13 +165,53 @@ describe("WorkflowFormRuntime", () => {
 		buildToolExecutionFailureFallbackMessage: () => "error",
 		evaluateToolExecutionResult: () => ({ succeeded: true }),
 		buildToolExecutionRequest: (_session: WorkflowFormSessionState, values: WorkflowFormValues) => ({
-			toolName: ClineDefaultTool.BUILD_REVIEW_INPUT,
+			toolName: ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
 			toolInput: {
-				story_path: values.story_path?.rawValue ?? "",
+				values: {
+					placeholder_value: values.placeholder_value?.rawValue ?? "",
+				},
 			},
 			toolParams: {
-				story_path: values.story_path?.rawValue ?? "",
+				values: JSON.stringify({
+					placeholder_value: values.placeholder_value?.rawValue ?? "",
+				}),
 			},
+		}),
+	}
+
+	const automaticStatusResolver: WorkflowFormResolverDefinition = {
+		id: "automatic_status_form",
+		toolName: ClineDefaultTool.BUILD_REVIEW_INPUT,
+		defaultInitialPhase: "collect_inputs",
+		buildDefinition: (): WorkflowFormDefinition => ({
+			toolName: ClineDefaultTool.BUILD_REVIEW_INPUT,
+			title: "Automatic Workflow Preparation",
+			toolDictionaryTitle: "Automatic Workflow Reference",
+			toolDictionaryMarkdown: "## build_review_input",
+			presentation: {
+				kind: "automatic_status",
+				pendingLabel: "Preparing workflow documents",
+				successLabel: "Workflow documents ready",
+				failureLabel: "Automatic workflow preparation failed- falling back to manual LLM workflow preparation.",
+			},
+			pages: {
+				collect_inputs: {
+					prompt: "The system will prepare workflow documents automatically.",
+					fields: [],
+				},
+				retry_error: {
+					prompt: "Retry automatic workflow preparation.",
+					fields: [],
+				},
+			},
+			successMessage: "legacy success",
+		}),
+		buildToolExecutionFailureFallbackMessage: () => "automatic failure",
+		evaluateToolExecutionResult: () => ({ succeeded: true }),
+		buildToolExecutionRequest: () => ({
+			toolName: ClineDefaultTool.BUILD_REVIEW_INPUT,
+			toolInput: {},
+			toolParams: {},
 		}),
 	}
 
@@ -181,6 +221,10 @@ describe("WorkflowFormRuntime", () => {
 
 	function createConfirmToCollectRuntime() {
 		return new WorkflowFormRuntime({ confirm_to_collect_form: confirmToCollectFormResolver })
+	}
+
+	function createAutomaticStatusRuntime() {
+		return new WorkflowFormRuntime({ automatic_status_form: automaticStatusResolver })
 	}
 
 	it("creates a confirm payload for the Phase 1 workflow form session", () => {
@@ -224,6 +268,85 @@ describe("WorkflowFormRuntime", () => {
 
 		expect(session.phase).to.equal("collect_inputs")
 		expect(session.context).to.deep.equal(context)
+	})
+
+	it("uses resolver defaultInitialPhase when createSession is called without an explicit initialPhase", () => {
+		const automaticRuntime = createAutomaticStatusRuntime()
+
+		const session = automaticRuntime.createSession({
+			resolverId: "automatic_status_form",
+			triggerSource: "deterministic_workflow_progression",
+			owner: {
+				kind: "placeholder_workflow_step",
+				workflowName: "code-review.md",
+				stepNumber: 3,
+			},
+		})
+
+		expect(session.phase).to.equal("collect_inputs")
+		expect(session.initialPhase).to.equal("collect_inputs")
+	})
+
+	it("builds pending automatic-status payloads for automatic workflow preparation", () => {
+		const automaticRuntime = createAutomaticStatusRuntime()
+		const session = automaticRuntime.createSession({
+			resolverId: "automatic_status_form",
+			triggerSource: "deterministic_workflow_progression",
+			owner: {
+				kind: "placeholder_workflow_step",
+				workflowName: "code-review.md",
+				stepNumber: 3,
+			},
+		})
+
+		const payload = automaticRuntime.buildPayload(session)
+
+		expect(payload.phase).to.equal("collect_inputs")
+		expect(payload.automaticStatusState).to.equal("pending")
+		expect(payload.definition.presentation).to.deep.equal({
+			kind: "automatic_status",
+			pendingLabel: "Preparing workflow documents",
+			successLabel: "Workflow documents ready",
+			failureLabel: "Automatic workflow preparation failed- falling back to manual LLM workflow preparation.",
+		})
+	})
+
+	it("builds success automatic-status payloads for automatic workflow preparation", () => {
+		const automaticRuntime = createAutomaticStatusRuntime()
+		const session = automaticRuntime.createSession({
+			resolverId: "automatic_status_form",
+			triggerSource: "deterministic_workflow_progression",
+			owner: {
+				kind: "placeholder_workflow_step",
+				workflowName: "code-review.md",
+				stepNumber: 3,
+			},
+		})
+
+		const payload = automaticRuntime.buildSuccessPayload(session, "legacy success")
+
+		expect(payload.phase).to.equal("success")
+		expect(payload.automaticStatusState).to.equal("success")
+		expect(payload.successMessage).to.equal("legacy success")
+	})
+
+	it("builds failure automatic-status payloads for automatic workflow preparation", () => {
+		const automaticRuntime = createAutomaticStatusRuntime()
+		const session = automaticRuntime.createSession({
+			resolverId: "automatic_status_form",
+			triggerSource: "deterministic_workflow_progression",
+			owner: {
+				kind: "placeholder_workflow_step",
+				workflowName: "code-review.md",
+				stepNumber: 3,
+			},
+		})
+
+		const payload = automaticRuntime.buildFailurePayload(session)
+
+		expect(payload.phase).to.equal("success")
+		expect(payload.automaticStatusState).to.equal("failure")
+		expect(payload.successMessage).to.equal("legacy success")
 	})
 
 	it("transitions from confirm to select_source when the Phase 1 resolver submission confirms yes", () => {
@@ -563,6 +686,67 @@ describe("WorkflowFormRuntime", () => {
 		)
 
 		expect(outcome.kind).to.equal("invoke_tool")
+	})
+
+	it("invokes the tool when collect_inputs has zero fields", () => {
+		const zeroFieldResolver: WorkflowFormResolverDefinition = {
+			id: "zero_field_review_input",
+			toolName: ClineDefaultTool.BUILD_REVIEW_INPUT,
+			buildDefinition: (): WorkflowFormDefinition => ({
+				toolName: ClineDefaultTool.BUILD_REVIEW_INPUT,
+				title: "Zero Field Review Input",
+				toolDictionaryTitle: "Review Input Reference",
+				toolDictionaryMarkdown: "## build_review_input",
+				pages: {
+					confirm: {
+						prompt: "Confirm the zero-field review-input form.",
+						options: ["Yes", "No"],
+					},
+					collect_inputs: {
+						prompt: "Build the review input.",
+						fields: [],
+					},
+					retry_error: {
+						prompt: "Retry the zero-field review-input form.",
+						fields: [],
+					},
+				},
+				successMessage: "success",
+			}),
+			buildToolExecutionFailureFallbackMessage: () => "error",
+			evaluateToolExecutionResult: () => ({ succeeded: true }),
+			buildToolExecutionRequest: () => ({
+				toolName: ClineDefaultTool.BUILD_REVIEW_INPUT,
+				toolInput: {},
+				toolParams: {},
+			}),
+		}
+		const customRuntime = new WorkflowFormRuntime({ zero_field_review_input: zeroFieldResolver })
+		const session = customRuntime.createSession({
+			resolverId: "zero_field_review_input",
+			triggerSource: "deterministic_workflow_progression",
+			owner: {
+				kind: "placeholder_workflow_step",
+				workflowName: "code-review.md",
+				stepNumber: 3,
+			},
+			initialPhase: "collect_inputs",
+		})
+
+		const outcome = customRuntime.handleSubmission(
+			session,
+			WorkflowFormSubmissionRequest.create({
+				sessionId: session.sessionId,
+				action: WorkflowFormAction.SUBMIT,
+				fields: [],
+			}),
+		)
+
+		expect(outcome.kind).to.equal("invoke_tool")
+		if (outcome.kind === "invoke_tool") {
+			expect(outcome.toolInput).to.deep.equal({})
+			expect(outcome.toolParams).to.deep.equal({})
+		}
 	})
 
 	it("drops schema-invalid optional collect_inputs values while still invoking the tool", () => {

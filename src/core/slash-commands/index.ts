@@ -14,7 +14,6 @@ import {
 	reportBugToolResponse,
 } from "../prompts/commands"
 import { StateManager } from "../storage/StateManager"
-import { isBmadExitCommand, resolveBmadAgentActivation } from "../task/bmad-agent-mode"
 import {
 	type ActivePlaceholderWorkflowSource,
 	buildActivePlaceholderWorkflowSource,
@@ -25,8 +24,6 @@ import { resolveWorkflowByName } from "../workflows/resolution/resolveAvailableW
 export type PersistentSlashCommandAction =
 	| { type: "activate_managed_workflow"; workflowId: string; slashCommand: string }
 	| { type: "activate_placeholder_workflow"; workflowId: string; workflowSource: ActivePlaceholderWorkflowSource }
-	| { type: "activate_bmad_agent"; agentId: string; skillName: string; invokedSlashCommand: string }
-	| { type: "exit_bmad_agent" }
 
 /**
  * Callback type for fetching MCP prompts
@@ -181,34 +178,6 @@ export async function parseSlashCommands(
 						workflowId: resolvedWorkflow.workflowId,
 						slashCommand: resolvedWorkflow.slashCommand,
 					},
-				}
-			}
-
-			if (cwd) {
-				const activation = await resolveBmadAgentActivation(cwd, commandName)
-				if (activation) {
-					const textWithoutSlashCommand = removeMatchedCommand()
-					telemetryService.captureSlashCommandUsed(ulid, commandName, "builtin")
-					return {
-						processedText: textWithoutSlashCommand,
-						needsClinerulesFileCheck: false,
-						persistentSlashCommandAction: {
-							type: "activate_bmad_agent",
-							agentId: activation.agent.id,
-							skillName: activation.skillName,
-							invokedSlashCommand: activation.invokedSlashCommand,
-						},
-					}
-				}
-
-				if (await isBmadExitCommand(cwd, commandName)) {
-					const textWithoutSlashCommand = removeMatchedCommand()
-					telemetryService.captureSlashCommandUsed(ulid, commandName, "builtin")
-					return {
-						processedText: textWithoutSlashCommand,
-						needsClinerulesFileCheck: false,
-						persistentSlashCommandAction: { type: "exit_bmad_agent" },
-					}
 				}
 			}
 

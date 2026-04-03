@@ -9,7 +9,6 @@ import {
 } from "@shared/ExtensionMessage"
 import { telemetryService } from "@/services/telemetry"
 import { ClineDefaultTool } from "@/shared/tools"
-import { getBmadAgentDisplayName } from "../../bmad-agent-mode"
 import type { ToolResponse } from "../../index"
 import { showNotificationForApproval } from "../../utils"
 import { AgentConfigLoader } from "../subagent/AgentConfigLoader"
@@ -151,11 +150,10 @@ export class UseSubagentsToolHandler implements IFullyManagedTool {
 				block.isNativeToolCall,
 			)
 		} else {
-			const assistantName = (await getBmadAgentDisplayName(config.cwd, config.taskState.activeAgentId)) || "Cline"
 			showNotificationForApproval(
 				prompts.length === 1
-					? `${assistantName} wants to use ${configuredSubagentName ? `the '${configuredSubagentName}' subagent` : "a subagent"}`
-					: `${assistantName} wants to use ${prompts.length} subagents`,
+					? `Cline wants to use ${configuredSubagentName ? `the '${configuredSubagentName}' subagent` : "a subagent"}`
+					: `Cline wants to use ${prompts.length} subagents`,
 				config.autoApprovalSettings.enableNotifications,
 			)
 			const didApprove = await ToolResultUtils.askApprovalAndPushFeedback("use_subagents", approvalBody, config)

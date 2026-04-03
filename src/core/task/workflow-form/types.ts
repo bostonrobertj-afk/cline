@@ -64,6 +64,7 @@ export interface WorkflowFormSessionState {
 export interface WorkflowFormResolverDefinition {
 	id: WorkflowFormResolverId
 	toolName: ClineDefaultTool
+	defaultInitialPhase?: Exclude<WorkflowFormSessionPhase, "success">
 	buildDefinition(session: WorkflowFormSessionState): WorkflowFormDefinition
 	buildToolExecutionFailureFallbackMessage(session: WorkflowFormSessionState): string
 	buildToolExecutionRequest(session: WorkflowFormSessionState, values: WorkflowFormValues): WorkflowFormToolExecutionRequest

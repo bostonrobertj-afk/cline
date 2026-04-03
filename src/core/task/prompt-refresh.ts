@@ -18,7 +18,6 @@ export function getPromptRefreshInterval(value: number | undefined): number {
 export function shouldSendFullPromptAssembly(params: {
 	isFirstRequest: boolean
 	hasHumanAuthoredInput: boolean
-	activeAgentJustActivated?: boolean
 	activeWorkflowJustStarted?: boolean
 	didRespondToPlanAskBySwitchingMode?: boolean
 	turnsSinceFullPromptRefresh: number
@@ -27,7 +26,6 @@ export function shouldSendFullPromptAssembly(params: {
 	if (
 		params.isFirstRequest ||
 		params.hasHumanAuthoredInput ||
-		params.activeAgentJustActivated ||
 		params.activeWorkflowJustStarted ||
 		params.didRespondToPlanAskBySwitchingMode
 	) {

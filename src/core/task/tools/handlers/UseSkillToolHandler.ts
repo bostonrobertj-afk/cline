@@ -7,12 +7,6 @@ import { buildPlaceholderWorkflowChecklist } from "@/core/workflows/placeholder-
 import { resolveWorkflowByName } from "@/core/workflows/resolution/resolveAvailableWorkflows"
 import { telemetryService } from "@/services/telemetry"
 import { ClineDefaultTool } from "@/shared/tools"
-import {
-	getBmadAgentById,
-	getOwningBmadAgentForSkill,
-	isSkillAllowedForBmadAgent,
-	resolvePlaceholderWorkflowManagedVariant,
-} from "../../bmad-agent-mode"
 import type { ToolResponse } from "../../index"
 import type { IPartialBlockHandler, IToolHandler } from "../ToolExecutorCoordinator"
 import type { TaskConfig } from "../types/TaskConfig"
@@ -60,38 +54,8 @@ export class UseSkillToolHandler implements IToolHandler, IPartialBlockHandler {
 			skillName,
 		)
 		const resolvedSkillName = resolvedWorkflow?.skillName ?? skillName
-		const placeholderManagedVariant =
-			resolvedWorkflow && resolvedWorkflow.source !== "managed"
-				? await resolvePlaceholderWorkflowManagedVariant(config.cwd, resolvedWorkflow.name)
-				: undefined
-		const resolvedAgentSkillName = placeholderManagedVariant?.managedWorkflowId ?? resolvedSkillName
-
-		const activeAgent = config.taskState.activeAgentId
-			? await getBmadAgentById(config.cwd, config.taskState.activeAgentId)
-			: undefined
-		if (config.taskState.activeAgentId) {
-			if (activeAgent && !isSkillAllowedForBmadAgent(activeAgent, resolvedAgentSkillName)) {
-				return `Error: Active agent "${activeAgent.id}" is not allowed to use skill "${skillName}". Allowed skills: ${activeAgent.allowedSkills.join(
-					", ",
-				)}. Use /bmad-exit to leave agent mode or switch to another /bmad-* agent.`
-			}
-		}
 
 		if (resolvedWorkflow?.source === "managed" && resolvedWorkflow.workflowId && resolvedWorkflow.slashCommand) {
-			if (activeAgent && !config.isSubagentExecution) {
-				return `Error: Managed workflows must be activated from a dedicated subagent while BMAD agent "${activeAgent.id}" is active. Spawn a subagent, tell it to call use_skill with "${resolvedWorkflow.skillName ?? resolvedWorkflow.name}", and keep the current thread in the active agent persona.`
-			}
-
-			if (!activeAgent) {
-				const owningAgent = await getOwningBmadAgentForSkill(config.cwd, resolvedWorkflow.workflowId)
-				if (owningAgent) {
-					config.taskState.activeAgentId = owningAgent.id
-					config.taskState.activeAgentSkillName = owningAgent.id
-					config.taskState.activeAgentInvokedSlashCommand = resolvedWorkflow.slashCommand
-					config.taskState.activeAgentJustActivated = true
-				}
-			}
-
 			const { run, resumed } = await activateManagedWorkflowInTaskState({
 				cwd: config.cwd,
 				taskState: config.taskState,
@@ -104,9 +68,6 @@ export class UseSkillToolHandler implements IToolHandler, IPartialBlockHandler {
 			if (!config.isSubagentExecution) {
 				try {
 					const metadata = await getTaskMetadata(config.taskId)
-					metadata.activeAgentId = config.taskState.activeAgentId
-					metadata.activeAgentSkillName = config.taskState.activeAgentSkillName
-					metadata.activeAgentInvokedSlashCommand = config.taskState.activeAgentInvokedSlashCommand
 					metadata.activeWorkflowId = config.taskState.activeWorkflowId
 					metadata.activePlaceholderWorkflowId = config.taskState.activePlaceholderWorkflowId
 					metadata.activePlaceholderWorkflowSource = config.taskState.activePlaceholderWorkflowSource
@@ -140,13 +101,6 @@ export class UseSkillToolHandler implements IToolHandler, IPartialBlockHandler {
 
 		if (resolvedWorkflow) {
 			try {
-				if (!activeAgent && placeholderManagedVariant?.owningAgent) {
-					config.taskState.activeAgentId = placeholderManagedVariant.owningAgent.id
-					config.taskState.activeAgentSkillName = placeholderManagedVariant.owningAgent.id
-					config.taskState.activeAgentInvokedSlashCommand = skillName
-					config.taskState.activeAgentJustActivated = true
-				}
-
 				const activation = await activatePlaceholderWorkflowInTaskState({
 					cwd: config.cwd,
 					taskState: config.taskState,
@@ -162,9 +116,6 @@ export class UseSkillToolHandler implements IToolHandler, IPartialBlockHandler {
 				if (!config.isSubagentExecution) {
 					try {
 						const metadata = await getTaskMetadata(config.taskId)
-						metadata.activeAgentId = config.taskState.activeAgentId
-						metadata.activeAgentSkillName = config.taskState.activeAgentSkillName
-						metadata.activeAgentInvokedSlashCommand = config.taskState.activeAgentInvokedSlashCommand
 						metadata.activeWorkflowId = config.taskState.activeWorkflowId
 						metadata.activePlaceholderWorkflowId = config.taskState.activePlaceholderWorkflowId
 						metadata.activePlaceholderWorkflowSource = config.taskState.activePlaceholderWorkflowSource

@@ -53,7 +53,6 @@ import { fetchRemoteConfig } from "../storage/remote-config/fetch"
 import { clearRemoteConfig } from "../storage/remote-config/utils"
 import { type PersistenceErrorEvent, StateManager } from "../storage/StateManager"
 import { Task } from "../task"
-import { getBmadAgentDisplayName } from "../task/bmad-agent-mode"
 import { sendMcpMarketplaceCatalogEvent } from "./mcp/subscribeToMcpMarketplaceCatalog"
 import { getClineOnboardingModels } from "./models/getClineOnboardingModels"
 import { appendClineStealthModels } from "./models/refreshOpenRouterModels"
@@ -1048,17 +1047,10 @@ export class Controller {
 		const currentTaskHistoryItem = this.task?.taskId
 			? (taskHistory || []).find((item) => item.id === this.task?.taskId)
 			: undefined
-		const activeAgentId = this.task?.taskState.activeAgentId
-		const activeAgentDisplayName =
-			activeAgentId && currentTaskHistoryItem?.cwdOnTaskInitialization
-				? await getBmadAgentDisplayName(currentTaskHistoryItem.cwdOnTaskInitialization, activeAgentId)
-				: undefined
 		const currentTaskItem = this.task?.taskId
 			? ({
 					...currentTaskHistoryItem,
 					threadDisplayState: this.task.getThreadDisplayState(),
-					activeAgentId,
-					activeAgentDisplayName,
 				} as HistoryItem & { threadDisplayState: string })
 			: undefined
 		// Spread to create new array reference - React needs this to detect changes in useEffect dependencies

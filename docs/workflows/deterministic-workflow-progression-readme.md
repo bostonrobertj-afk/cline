@@ -73,6 +73,7 @@ Side effects may also include:
   - `review-adversarial-general.md`
   - `blind-review.md`
   - `review-edge-case-hunter.md`
+  - `write-remediation-story.md`
 - A step is auto-completed only when its evaluator returns both `completed: true` and a concrete reason.
 - Checklist advancement still happens through the standard focus-chain update path; this capability does not mutate checklist markdown ad hoc.
 - Some artifact-backed completion checks rely on current-task write proofs, while others intentionally use plain file existence or file-stat checks depending on the workflow step.
@@ -95,7 +96,7 @@ At a high level, the runtime does this:
 Current evaluator examples:
 
 - `code-review.md`
-  - Step 1 checks placeholder presence
+  - Step 1 completes when `story_path` points to an existing story file
   - Step 2 requires task-written `diff_output` with a surviving write proof
   - Step 3 requires task-written `review_input` with a surviving write proof
   - Step 4 derives `review_mode` from available artifacts
@@ -116,6 +117,11 @@ Current evaluator examples:
   - Step 3 completes when the current turn successfully executes `attempt_completion`
 - `dev-story.md`
   - steps inspect story-file existence, checklist completion, and top-level status values
+  - Step 4 completes when the current turn successfully executes `attempt_completion`
+- `write-remediation-story.md`
+  - Step 1 completes when story_path points to an existing story file
+  - Step 2 completes when task-written `review_input` exists with a surviving write proof
+  - Step 3 completes when a current-task-written remediation story artifact distinct from story_path exists in implementation-artifacts and contains Status: ready-for-dev plus the required section headings
   - Step 4 completes when the current turn successfully executes `attempt_completion`
 
 ## Failure Modes
@@ -158,6 +164,7 @@ This is especially important for steps whose completion is defined by:
 - Add or update focused unit tests in [deterministicPlaceholderProgression.test.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/focus-chain/__tests__/deterministicPlaceholderProgression.test.ts) for every new evaluator branch.
 
 ## Examples
+- In `code-review.md`, if `story_path` points to an existing story file, Step 1 can complete immediately on the next deterministic pass.
 - In `code-review.md`, if `diff_output` was written during this task and the artifact still exists, Step 2 can complete without asking the model to re-confirm it.
 - In `code-review.md`, if `review_input` was written during this task and the artifact still exists, Step 3 can complete without asking the model to re-confirm it.
 - In `code-review.md`, if both `review_input` and `diff_output` exist as current-task artifacts, Step 4 derives `review_mode = full` automatically.
@@ -172,6 +179,10 @@ This is especially important for steps whose completion is defined by:
 - In `code-review.md`, if every required review layer already has a current-task fallback prompt artifact, Step 5 can auto-complete without another model confirmation turn.
 - In `code-review.md`, if `review_input` was updated during this task and now contains a terminal review status, Step 6 can auto-complete.
 - In `dev-story.md`, if the story file’s `## Tasks / Subtasks` section has no unchecked items, the task-execution step can auto-complete.
+- In `write-remediation-story.md`, if story_path already points to an existing story file, Step 1 can complete immediately on the next deterministic pass.
+- In `write-remediation-story.md`, if `review_input` was written during this task and the artifact still exists, Step 2 can auto-complete.
+- In `write-remediation-story.md`, if a remediation story artifact distinct from story_path is written during the current task under {output_folder}/implementation-artifacts and contains Status: ready-for-dev plus the required section headings, Step 3 can auto-complete.
+- In `write-remediation-story.md`, Step 4 can auto-complete when the current turn successfully executes `attempt_completion`.
 - In `code-review.md`, Step 7 can auto-complete when the current turn successfully executes `attempt_completion`.
 - In `review-adversarial-general.md`, Step 3 can auto-complete when the current turn successfully executes `attempt_completion`.
 - In `dev-story.md`, Step 4 can auto-complete when the current turn successfully executes `attempt_completion`.

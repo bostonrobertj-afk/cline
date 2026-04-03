@@ -44,7 +44,7 @@ Usage:
 </execute_command>
 
 ## read_file
-Description: Request to read the contents of a file at the specified path. Prefer using search_files and list_code_definition_names first to narrow the target, then use read_file_range for targeted inspection. Use read_file only when the file is at or below 800 lines and 65536 bytes and you truly need the exact full contents. Automatically extracts raw text from PDF and DOCX files. Do NOT use this tool to list the contents of a directory.
+Description: Request to read the contents of a file at the specified path. Prefer using search_files and list_code_definition_names first to narrow the target, then use read_file_range for targeted inspection. Once you have narrowed the work to one concrete file, prefer a single read_file call when that file is at or below 800 lines and 65536 bytes and you need the full raw contents, rather than stitching together many nearby range reads. Automatically extracts raw text from PDF and DOCX files. Do NOT use this tool to list the contents of a directory.
 Parameters:
 - path: (required) The path of the file to read (relative to the current working directory /test/project)
 - task_progress: (optional) Use as a top-level parameter on the next tool call, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step.
@@ -320,12 +320,10 @@ Usage:
 </build_review_diff_output>
 
 ## build_review_input
-Description: Build and replace the stable review-input artifact at {review_input} from a story file plus the workflow-owned diff artifact at {diff_output}. The human must only provide story_path.
-Parameters:
-- story_path: (required) Required path to the story markdown file that is being reviewed.
+Description: Build and replace the stable review-input artifact at {review_input} from the workflow-owned story file at {story_path} plus the workflow-owned diff artifact at {diff_output}. Resolve all inputs from workflow state.
+Parameters: None
 Usage:
 <build_review_input>
-<story_path></story_path>
 </build_review_input>
 
 ## use_subagents
@@ -476,8 +474,7 @@ return (
 
 1. In <thinking> tags, assess what information you already have and what information you need to proceed with the task.
 2. Choose the most appropriate tool based on the task and the tool descriptions provided. Assess if you need additional information to proceed, and which of the available tools would be most effective for gathering this information. For example using the list_files tool is more effective than running a command like `ls` in the terminal. It's critical that you think about each available tool and use the one that best fits the current step in the task.
-3. If multiple actions are needed, use one tool at a time per message to accomplish the task iteratively, with each tool use being informed by the result of the previous tool use. Do not assume the outcome of any tool use. Each step must be informed by the previous step's result.
-4. Formulate your tool use using the XML format specified for each tool.
+3. If multiple actions are needed, batch tool calls whenever they are not dependent on one another's output. 
 5. After non-response tool uses, the system will return the result of that tool use. This result will provide you with the necessary information to continue your task or make further decisions. This response may include:
   - Information about whether the tool succeeded or failed, along with any reasons for failure.
   - Linter errors that may have arisen due to the changes you made, which you'll need to address.

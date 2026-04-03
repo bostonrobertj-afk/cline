@@ -1,9 +1,15 @@
-import type { ClineWorkflowForm, WorkflowFormDefinition, WorkflowFormRenderablePhase } from "@shared/ExtensionMessage"
+import type {
+	ClineWorkflowForm,
+	WorkflowFormAutomaticStatusState,
+	WorkflowFormDefinition,
+	WorkflowFormRenderablePhase,
+} from "@shared/ExtensionMessage"
 import type { WorkflowFormSessionState } from "./types"
 
 export function buildWorkflowFormPayload(args: {
 	session: WorkflowFormSessionState
 	definition: WorkflowFormDefinition
+	automaticStatusState?: WorkflowFormAutomaticStatusState
 	errorMessage?: string
 	successMessage?: string
 }): ClineWorkflowForm {
@@ -14,6 +20,7 @@ export function buildWorkflowFormPayload(args: {
 			phase: "success",
 			definition: args.definition,
 			values: args.session.values,
+			automaticStatusState: args.automaticStatusState,
 			successMessage: args.successMessage ?? args.definition.successMessage,
 		}
 	}
@@ -29,6 +36,7 @@ export function buildWorkflowFormPayload(args: {
 		phase: args.session.phase,
 		definition: args.definition,
 		values: args.session.values,
+		automaticStatusState: args.automaticStatusState,
 		errorMessage: args.errorMessage,
 	}
 }

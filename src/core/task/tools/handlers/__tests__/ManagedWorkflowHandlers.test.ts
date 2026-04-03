@@ -10,7 +10,6 @@ import { formatResponse } from "@/core/prompts/responses"
 import { getCanonicalWorkflowConfigPath } from "@/core/workflows/workflow-placeholders"
 import { HostProvider } from "@/hosts/host-provider"
 import { setVscodeHostProviderMock } from "@/test/host-provider-test-utils"
-import { resolvePlaceholderWorkflowManagedVariant } from "../../../bmad-agent-mode"
 import { startOrResumeManagedWorkflowRun } from "../../../managed-workflows/ManagedWorkflowController"
 import type { ManagedWorkflowRunState } from "../../../managed-workflows/types"
 import { TaskState } from "../../../TaskState"
@@ -963,8 +962,8 @@ describe("Managed workflow handlers", () => {
 			expect(String(result)).to.contain('Managed workflow "bmad-cis-problem-solving" is now active')
 			expect(config.taskState.managedWorkflowRun?.workflowId).to.equal("bmad-cis-problem-solving")
 			expect(config.taskState.activeWorkflowId).to.equal("bmad-cis-problem-solving")
-			expect(config.taskState.activeAgentId).to.equal(undefined)
-			expect(config.taskState.activeAgentInvokedSlashCommand).to.equal(undefined)
+			expect((config.taskState as any).activeAgentId).to.equal(undefined)
+			expect((config.taskState as any).activeAgentInvokedSlashCommand).to.equal(undefined)
 			expect(getMetadataStub.calledOnce).to.equal(true)
 			expect(saveMetadataStub.calledOnce).to.equal(true)
 			expect((config.callbacks.updateFCListFromToolResponse as sinon.SinonStub).calledOnce).to.equal(true)
@@ -1034,13 +1033,9 @@ describe("Managed workflow handlers", () => {
 		}
 	})
 
-	it("rejects same-thread managed workflow activation when a BMAD agent is already active outside subagent execution", async () => {
+	it("activates managed workflows on the current thread with no activeAgent writes", async () => {
 		const handler = new UseSkillToolHandler()
 		const config = createConfig({ isSubagentExecution: false })
-		config.taskState.activeAgentId = "bmad-dev"
-		config.taskState.activeAgentSkillName = "bmad-dev"
-		config.taskState.activeAgentInvokedSlashCommand = "bmad-agent-bmm-dev"
-		config.taskState.activeAgentJustActivated = false
 
 		const result = await handler.execute(config, {
 			type: "tool_use",
@@ -1051,11 +1046,10 @@ describe("Managed workflow handlers", () => {
 			partial: false,
 		} as any)
 
-		expect(String(result)).to.contain("must be activated from a dedicated subagent")
-		expect(String(result)).to.contain('call use_skill with "bmad-code-review"')
-		expect(config.taskState.managedWorkflowRun).to.equal(undefined)
-		expect(config.taskState.activeWorkflowId).to.equal(undefined)
-		expect(config.taskState.activeAgentId).to.equal("bmad-dev")
+		expect(String(result)).to.contain('Managed workflow "bmad-code-review" is now active')
+		expect(config.taskState.managedWorkflowRun?.workflowId).to.equal("bmad-code-review")
+		expect(config.taskState.activeWorkflowId).to.equal("bmad-code-review")
+		expect((config.taskState as any).activeAgentId).to.equal(undefined)
 	})
 
 	it("activates local workflows through use_skill", async () => {
@@ -1482,7 +1476,7 @@ Inspect the prepared review input and write findings.`,
 		}
 	})
 
-	it("auto-binds the owning BMAD agent when mapped placeholder workflows are activated through use_skill", async () => {
+	it("activates placeholder workflows through use_skill with no activeAgent writes", async () => {
 		const sandbox = sinon.createSandbox()
 		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "use-skill-placeholder-autobind-"))
 		const managedWorkflowConfigPath = path.join(tempDir, "_bmad", "_config", "managed-workflows.json")
@@ -1512,10 +1506,6 @@ Inspect the prepared review input and write findings.`,
 		sandbox.stub(disk, "getTaskMetadata").resolves({} as any)
 		const saveMetadataStub = sandbox.stub(disk, "saveTaskMetadata").resolves()
 		try {
-			const resolvedVariant = await resolvePlaceholderWorkflowManagedVariant(tempDir, "code-review")
-			expect(resolvedVariant?.managedWorkflowId).to.equal("bmad-code-review")
-			expect(resolvedVariant?.owningAgent?.id).to.equal("bmad-dev")
-
 			const handler = new UseSkillToolHandler()
 			const config = createConfig({
 				cwd: tempDir,
@@ -1552,85 +1542,12 @@ Inspect the prepared review input and write findings.`,
 			expect(String(result)).to.contain(
 				"The workflow started successfully. Use the current checklist and current workflow step details to continue.",
 			)
-			expect(config.taskState.activeAgentId).to.equal("bmad-dev")
-			expect(config.taskState.activeAgentSkillName).to.equal("bmad-dev")
-			expect(config.taskState.activeAgentInvokedSlashCommand).to.equal("code-review")
 			expect(config.taskState.activePlaceholderWorkflowId).to.equal("code-review")
+			expect((config.taskState as any).activeAgentId).to.equal(undefined)
 			expect(saveMetadataStub.calledOnce).to.equal(true)
-			expect(saveMetadataStub.firstCall.args[1].activeAgentId).to.equal("bmad-dev")
+			expect((saveMetadataStub.firstCall.args[1] as any).activeAgentId).to.equal(undefined)
 		} finally {
 			sandbox.restore()
-			await fs.rm(tempDir, { recursive: true, force: true })
-		}
-	})
-
-	it("blocks mapped placeholder workflows through use_skill when the active BMAD agent is incompatible", async () => {
-		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "use-skill-placeholder-incompatible-"))
-		const managedWorkflowConfigPath = path.join(tempDir, "_bmad", "_config", "managed-workflows.json")
-		await fs.mkdir(path.dirname(managedWorkflowConfigPath), { recursive: true })
-		await fs.writeFile(
-			managedWorkflowConfigPath,
-			JSON.stringify([
-				{
-					workflowId: "bmad-code-review",
-					slashCommand: "bmad-code-review",
-					skillName: "bmad-code-review",
-					module: "bmm",
-					skillPath: ".cline/skills/bmad-code-review/SKILL.md",
-					workflowPath: ".cline/skills/bmad-code-review/workflow.md",
-					aliases: [],
-					phaseRoots: [],
-					checklistPath: null,
-					supportsManagedExecution: true,
-					strategyHints: [],
-					extractionMode: "linear",
-					primaryStepRange: null,
-					packagedAssetPaths: [],
-				},
-			]),
-			"utf8",
-		)
-
-		try {
-			const handler = new UseSkillToolHandler()
-			const config = createConfig({
-				cwd: tempDir,
-				services: {
-					stateManager: {
-						getGlobalStateKey: (key: string) => (key === "remoteWorkflowToggles" ? {} : undefined),
-						getGlobalSettingsKey: () => ({}),
-						getWorkspaceStateKey: () => ({}),
-						getRemoteConfigSettings: () => ({
-							remoteGlobalWorkflows: [
-								{
-									name: "code-review",
-									contents: "# Placeholder code review\nInspect the implementation.",
-									alwaysEnabled: true,
-								},
-							],
-						}),
-						getApiConfiguration: () => ({ planModeApiProvider: "openai", actModeApiProvider: "openai" }),
-					},
-				} as any,
-			})
-			config.taskState.activeAgentId = "bmad-pm"
-			config.taskState.activeAgentSkillName = "bmad-pm"
-			config.taskState.activeAgentInvokedSlashCommand = "bmad-pm"
-			config.taskState.activeAgentJustActivated = false
-
-			const result = await handler.execute(config, {
-				type: "tool_use",
-				name: "use_skill",
-				params: {
-					skill_name: "code-review",
-				},
-				partial: false,
-			} as any)
-
-			expect(String(result)).to.contain('Active agent "bmad-pm" is not allowed to use skill "code-review"')
-			expect(config.taskState.activePlaceholderWorkflowId).to.equal(undefined)
-			expect(config.taskState.activeAgentId).to.equal("bmad-pm")
-		} finally {
 			await fs.rm(tempDir, { recursive: true, force: true })
 		}
 	})
@@ -1851,13 +1768,12 @@ Inspect the prepared review input and write findings.`,
 
 			const handler = new BuildReviewInputToolHandler()
 			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowValues = { story_path: storyPath }
 
 			const result = await handler.execute(config, {
 				type: "tool_use",
 				name: "build_review_input",
-				params: {
-					story_path: storyPath,
-				},
+				params: {},
 				partial: false,
 			} as any)
 
@@ -1893,13 +1809,12 @@ Inspect the prepared review input and write findings.`,
 
 			const handler = new BuildReviewInputToolHandler()
 			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowValues = { story_path: storyPath }
 
 			const result = await handler.execute(config, {
 				type: "tool_use",
 				name: "build_review_input",
-				params: {
-					story_path: storyPath,
-				},
+				params: {},
 				partial: false,
 			} as any)
 
@@ -1940,13 +1855,12 @@ Inspect the prepared review input and write findings.`,
 
 			const handler = new BuildReviewInputToolHandler()
 			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowValues = { story_path: storyPath }
 
 			const result = await handler.execute(config, {
 				type: "tool_use",
 				name: "build_review_input",
-				params: {
-					story_path: storyPath,
-				},
+				params: {},
 				partial: false,
 			} as any)
 
@@ -1962,7 +1876,37 @@ Inspect the prepared review input and write findings.`,
 		}
 	})
 
-	it("updates spec_file from merged workflow placeholders, clears review_input.md, and records write proof for spec_file", async () => {
+	it("requires story_path from merged placeholder state", async () => {
+		const sandbox = sinon.createSandbox()
+		const { repoDir } = await createReviewInputRepo()
+
+		try {
+			setVscodeHostProviderMock()
+			sandbox.stub(HostProvider.workspace, "getWorkspacePaths").resolves({ paths: [repoDir] } as any)
+
+			const handler = new BuildReviewInputToolHandler()
+			const config = createConfig({ cwd: repoDir })
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "build_review_input",
+				params: {},
+				partial: false,
+			} as any)
+
+			expect(result).to.equal(
+				formatResponse.toolError(
+					"Could not resolve workflow placeholder 'story_path' from the active placeholder workflow state.",
+				),
+			)
+		} finally {
+			sandbox.restore()
+			HostProvider.reset()
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("updates story_path from merged workflow placeholders, clears review_input.md, and records write proof for story_path", async () => {
 		const sandbox = sinon.createSandbox()
 		const { repoDir, specFilePath, reviewInputPath } = await createCodeReviewSpecUpdateRepo()
 
@@ -1979,14 +1923,14 @@ Inspect the prepared review input and write findings.`,
 				"project-root": repoDir,
 			}
 			config.taskState.activePlaceholderWorkflowValues = {
-				spec_file: specFilePath,
+				story_path: specFilePath,
 			}
 
 			const result = await handler.execute(config, {
 				type: "tool_use",
 				name: "code_review_spec_update",
 				params: {
-					spec_file: "ignored.md",
+					story_path: "ignored.md",
 				},
 				partial: false,
 			} as any)
@@ -1994,9 +1938,9 @@ Inspect the prepared review input and write findings.`,
 			const payload = JSON.parse(String(result))
 			expect(payload).to.deep.equal({
 				persisted: true,
-				spec_file_updated: true,
+				story_path_updated: true,
 				review_input_cleared: true,
-				spec_file_path: specFilePath,
+				story_path_path: specFilePath,
 				review_input_path: reviewInputPath,
 			})
 
@@ -2028,7 +1972,7 @@ Inspect the prepared review input and write findings.`,
 				"project-root": repoDir,
 			}
 			config.taskState.activePlaceholderWorkflowValues = {
-				spec_file: specFilePath,
+				story_path: specFilePath,
 			}
 
 			const result = await handler.execute(config, {
@@ -2048,7 +1992,7 @@ Inspect the prepared review input and write findings.`,
 		}
 	})
 
-	it("requires spec_file from merged placeholder state", async () => {
+	it("requires story_path from merged placeholder state", async () => {
 		const handler = new CodeReviewSpecUpdateToolHandler()
 		const { repoDir, reviewInputPath } = await createCodeReviewSpecUpdateRepo()
 
@@ -2071,7 +2015,7 @@ Inspect the prepared review input and write findings.`,
 
 			expect(result).to.equal(
 				formatResponse.toolError(
-					"Could not resolve workflow placeholder 'spec_file' from the active placeholder workflow state.",
+					"Could not resolve workflow placeholder 'story_path' from the active placeholder workflow state.",
 				),
 			)
 		} finally {
@@ -2096,7 +2040,7 @@ Inspect the prepared review input and write findings.`,
 				"project-root": repoDir,
 			}
 			config.taskState.activePlaceholderWorkflowValues = {
-				spec_file: specFilePath,
+				story_path: specFilePath,
 			}
 			;(config.callbacks.shouldAutoApproveToolWithPath as sinon.SinonStub).callsFake(
 				async (_toolName: string, filePath: string) => filePath === specFilePath,
@@ -2145,7 +2089,7 @@ Status: ready-for-dev
 				"project-root": repoDir,
 			}
 			config.taskState.activePlaceholderWorkflowValues = {
-				spec_file: specFilePath,
+				story_path: specFilePath,
 			}
 
 			const result = await handler.execute(config, {

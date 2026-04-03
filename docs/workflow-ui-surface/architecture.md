@@ -394,11 +394,14 @@ Owns only presentation and interaction rendering.
 Best-fit existing areas:
 
 - [webview-ui/src/components/chat/](/Users/robertboston/Documents/Cline%20Extension/cline/webview-ui/src/components/chat/)
+- [webview-ui/components.json](/Users/robertboston/Documents/Cline%20Extension/cline/webview-ui/components.json)
 - [webview-ui/src/components/ui/dialog.tsx](/Users/robertboston/Documents/Cline%20Extension/cline/webview-ui/src/components/ui/dialog.tsx)
 - [webview-ui/src/components/common/AlertDialog.tsx](/Users/robertboston/Documents/Cline%20Extension/cline/webview-ui/src/components/common/AlertDialog.tsx)
 - [webview-ui/src/components/ui/button.tsx](/Users/robertboston/Documents/Cline%20Extension/cline/webview-ui/src/components/ui/button.tsx)
 - [webview-ui/src/components/ui/select.tsx](/Users/robertboston/Documents/Cline%20Extension/cline/webview-ui/src/components/ui/select.tsx)
 - [webview-ui/src/components/chat/OptionsButtons.tsx](/Users/robertboston/Documents/Cline%20Extension/cline/webview-ui/src/components/chat/OptionsButtons.tsx)
+
+Reusable workflow-form presentation components should live under `webview-ui/src/components/chat/`. Shared primitives should continue to come from `webview-ui/src/components/ui/` via the aliases declared in `webview-ui/components.json`. Workflow-specific copy must come from payload/resolver data rather than from code-review-specific JSX branches.
 
 ### Dictionary And Tool-Help Content Layer
 

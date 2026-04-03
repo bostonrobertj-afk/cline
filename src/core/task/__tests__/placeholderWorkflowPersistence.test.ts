@@ -52,6 +52,93 @@ function expectWorkflowStatusOnlyPrompt(prompt: string, checklistLabel: string) 
 	expect(prompt).to.contain(checklistLabel)
 }
 
+function buildInteractiveWorkflowFormPayload(session: WorkflowFormSessionState): ClineWorkflowForm {
+	return {
+		sessionId: session.sessionId,
+		resolverId: session.resolverId,
+		phase: session.phase,
+		definition: {
+			toolName:
+				session.resolverId === "placeholder_workflow_start_set_workflow_placeholders"
+					? ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS
+					: ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT,
+			title: "Interactive Workflow Form",
+			toolDictionaryTitle: "Workflow Reference",
+			toolDictionaryMarkdown: "## workflow_form",
+			presentation: { kind: "interactive_form" },
+			pages: {
+				confirm: {
+					prompt: "Confirm the workflow action.",
+					options: ["Yes", "No"],
+				},
+				select_source: {
+					prompt: "Select the workflow source.",
+					fields: [],
+					submitLabel: "Next",
+					cancelLabel: "Cancel",
+				},
+				collect_inputs: {
+					prompt: "Provide workflow inputs.",
+					fields: [],
+					submitLabel: "Submit",
+					cancelLabel: "Cancel",
+				},
+				retry_error: {
+					prompt: "Retry the workflow action.",
+					fields: [],
+					submitLabel: "Submit",
+					cancelLabel: "Cancel",
+					retryLabel: "Start Over",
+				},
+			},
+			successMessage: "Workflow form completed successfully.",
+		},
+		values: session.values,
+	}
+}
+
+function buildAutomaticWorkflowFormPayload(
+	session: WorkflowFormSessionState,
+	state: "pending" | "success" | "failure",
+): ClineWorkflowForm {
+	return {
+		sessionId: session.sessionId,
+		resolverId: session.resolverId,
+		phase: state === "pending" ? session.phase : "success",
+		definition: {
+			toolName: ClineDefaultTool.BUILD_REVIEW_INPUT,
+			title: "Review Input Artifact",
+			toolDictionaryTitle: "Review Input Reference",
+			toolDictionaryMarkdown: "## build_review_input",
+			presentation: {
+				kind: "automatic_status",
+				pendingLabel: "Preparing workflow documents",
+				successLabel: "Workflow documents ready",
+				failureLabel: "Automatic workflow preparation failed- falling back to manual LLM workflow preparation.",
+			},
+			pages: {
+				collect_inputs: {
+					prompt: "The system will now build `review-input.md` from the stored `story_path` and the workflow-owned `review-input.diff` artifact.",
+					fields: [],
+					submitLabel: "Submit",
+					cancelLabel: "Cancel",
+				},
+				retry_error: {
+					prompt: "The system could not produce `review-input.md` from the stored workflow inputs. Retry the request or return to the Step 3 fallback instructions.",
+					fields: [],
+					submitLabel: "Submit",
+					cancelLabel: "Cancel",
+					retryLabel: "Start Over",
+				},
+			},
+			successMessage: "The Step 3 review-input artifact is ready.",
+		},
+		values: session.values,
+		automaticStatusState: state,
+		successMessage: state === "success" ? "The Step 3 review-input artifact is ready." : undefined,
+	}
+}
+
 type TaskMethod<Args extends unknown[], Result> = (this: Record<string, unknown>, ...args: Args) => Result
 type FakeTaskBase = ReturnType<typeof createFakeTask> & Record<string, unknown>
 type FakeWorkflowFormTask = {
@@ -65,6 +152,7 @@ type FakeWorkflowFormTask = {
 		createSession: sinon.SinonStub
 		buildPayload: sinon.SinonStub
 		buildSuccessPayload?: sinon.SinonStub
+		buildFailurePayload?: sinon.SinonStub
 	}
 	persistWorkflowFormSession?: sinon.SinonStub
 	renderWorkflowFormMessage: sinon.SinonStub
@@ -82,7 +170,7 @@ const clearLastPromptedPlaceholderWorkflowChecklistLabelForContextCompaction = R
 	"clearLastPromptedPlaceholderWorkflowChecklistLabelForContextCompaction",
 ) as TaskMethod<[], Promise<void>>
 const renderWorkflowFormMessage = Reflect.get(Task.prototype, "renderWorkflowFormMessage") as TaskMethod<
-	[ClineWorkflowForm],
+	[ClineWorkflowForm, "ask" | "say"],
 	Promise<void>
 >
 const restorePlaceholderWorkflowChecklistFromDiskIfNeeded = Reflect.get(
@@ -417,11 +505,15 @@ Inspect the prepared review input and write findings.
 			postStateToWebview: sinon.stub().resolves(),
 		}
 
-		await renderWorkflowFormMessage.call(fakeTask, {
-			...basePayload,
-			phase: "retry_error",
-			errorMessage: "The first tool attempt failed.",
-		})
+		await renderWorkflowFormMessage.call(
+			fakeTask,
+			{
+				...basePayload,
+				phase: "retry_error",
+				errorMessage: "The first tool attempt failed.",
+			},
+			"ask",
+		)
 
 		messages.push({
 			ts: 4,
@@ -430,11 +522,15 @@ Inspect the prepared review input and write findings.
 			text: JSON.stringify({ status: "second-attempt-succeeded" }),
 		})
 
-		await renderWorkflowFormMessage.call(fakeTask, {
-			...basePayload,
-			phase: "success",
-			successMessage: "The workflow form completed successfully.",
-		})
+		await renderWorkflowFormMessage.call(
+			fakeTask,
+			{
+				...basePayload,
+				phase: "success",
+				successMessage: "The workflow form completed successfully.",
+			},
+			"ask",
+		)
 
 		const survivingMessages = messages.filter((message) => {
 			if (message.type !== "ask" || message.ask !== "workflow_form" || typeof message.text !== "string") {
@@ -1078,12 +1174,13 @@ Construct and persist review_input.md from the persisted diff output before cont
 					workflowName: "code-review.md",
 					stepNumber: 3,
 				},
-				phase: "confirm",
-				initialPhase: "confirm",
+				phase: "collect_inputs",
+				initialPhase: "collect_inputs",
 				values: {},
 			}
 
 			let renderCount = 0
+			let executeCallCount = 0
 			const fakeTask: FakeWorkflowFormTask = {
 				cwd: tempDir,
 				taskState,
@@ -1093,8 +1190,24 @@ Construct and persist review_input.md from the persisted diff output before cont
 				},
 				workflowFormRuntime: {
 					createSession: sinon.stub().onFirstCall().returns(stepTwoSession).onSecondCall().returns(stepThreeSession),
-					buildPayload: sinon.stub().callsFake((session: unknown) => ({ kind: "workflow_form", session })),
-					buildSuccessPayload: sinon.stub().returns({ kind: "workflow_form_success" }),
+					buildPayload: sinon
+						.stub()
+						.callsFake((session: WorkflowFormSessionState) =>
+							session.resolverId === "code_review_step_3_review_input"
+								? buildAutomaticWorkflowFormPayload(session, "pending")
+								: buildInteractiveWorkflowFormPayload(session),
+						),
+					buildSuccessPayload: sinon
+						.stub()
+						.callsFake((session: WorkflowFormSessionState) =>
+							session.resolverId === "code_review_step_3_review_input"
+								? buildAutomaticWorkflowFormPayload(session, "success")
+								: {
+										...buildInteractiveWorkflowFormPayload(session),
+										phase: "success",
+										successMessage: "Workflow form completed successfully.",
+									},
+						),
 				},
 				persistWorkflowFormSession: sinon.stub().resolves(),
 				renderWorkflowFormMessage: sinon.stub().callsFake(async () => {
@@ -1118,24 +1231,35 @@ Construct and persist review_input.md from the persisted diff output before cont
 							},
 						}
 					}
-					if (renderCount === 3) {
-						fakeTask.pendingWorkflowFormOutcome = {
-							kind: "fallback_to_agent",
-							session: stepThreeSession,
-						}
-					}
 				}),
 				executeWorkflowFormToolAndSync: sinon.stub().callsFake(async () => {
-					await fs.writeFile(diffOutputPath, "diff --git a/file.ts b/file.ts\n", "utf8")
-					taskState.activePlaceholderWorkflowValues = {
-						diff_output: diffOutputPath,
+					executeCallCount += 1
+					if (executeCallCount === 1) {
+						await fs.writeFile(diffOutputPath, "diff --git a/file.ts b/file.ts\n", "utf8")
+						taskState.activePlaceholderWorkflowValues = {
+							diff_output: diffOutputPath,
+						}
+						taskState.activePlaceholderWorkflowTaskWriteProofPaths = [diffOutputPath]
+						taskState.currentFocusChainChecklist = [
+							"- [x] Step 1: Determine Review Source",
+							"- [x] Step 2: System-Owned Diff Source Resolution And Diff Output Persistence",
+							"- [ ] Step 3: Construct & Persist Review Input File",
+						].join("\n")
 					}
-					taskState.activePlaceholderWorkflowTaskWriteProofPaths = [diffOutputPath]
-					taskState.currentFocusChainChecklist = [
-						"- [x] Step 1: Determine Review Source",
-						"- [x] Step 2: System-Owned Diff Source Resolution And Diff Output Persistence",
-						"- [ ] Step 3: Construct & Persist Review Input File",
-					].join("\n")
+
+					if (executeCallCount === 2) {
+						await fs.writeFile(reviewInputPath, "# review input\n", "utf8")
+						taskState.activePlaceholderWorkflowValues = {
+							diff_output: diffOutputPath,
+							review_input: reviewInputPath,
+						}
+						taskState.activePlaceholderWorkflowTaskWriteProofPaths = [diffOutputPath, reviewInputPath]
+						taskState.currentFocusChainChecklist = [
+							"- [x] Step 1: Determine Review Source",
+							"- [x] Step 2: System-Owned Diff Source Resolution And Diff Output Persistence",
+							"- [x] Step 3: Construct & Persist Review Input File",
+						].join("\n")
+					}
 					return { succeeded: true }
 				}),
 				clearWorkflowFormSession: sinon.stub().callsFake(async () => {
@@ -1167,7 +1291,7 @@ Construct and persist review_input.md from the persisted diff output before cont
 					workflowName: "code-review.md",
 					stepNumber: 3,
 				},
-				initialPhase: "confirm",
+				initialPhase: "collect_inputs",
 				context: undefined,
 			})
 		} finally {
@@ -1175,7 +1299,7 @@ Construct and persist review_input.md from the persisted diff output before cont
 		}
 	})
 
-	it("opens the Phase 3 review-input workflow form after Step 2 is complete and Step 3 is active", async () => {
+	it("auto-runs the Phase 3 review-input workflow preparation and renders pending then success status cards", async () => {
 		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "placeholder-step-3-review-input-open-"))
 		const workflowPath = path.join(tempDir, "code-review.md")
 		const diffOutputPath = path.join(tempDir, "workflow-output", "review-input.diff")
@@ -1227,10 +1351,11 @@ Construct and persist review_input.md from the persisted diff output before cont
 					workflowName: "code-review.md",
 					stepNumber: 3,
 				},
-				phase: "confirm",
-				initialPhase: "confirm",
+				phase: "collect_inputs",
+				initialPhase: "collect_inputs",
 				values: {},
 			}
+			const renderedPayloads: Array<{ payload: ClineWorkflowForm; messageType: "ask" | "say" }> = []
 
 			const fakeTask: FakeWorkflowFormTask = {
 				cwd: tempDir,
@@ -1241,17 +1366,37 @@ Construct and persist review_input.md from the persisted diff output before cont
 				},
 				workflowFormRuntime: {
 					createSession: sinon.stub().returns(createdSession),
-					buildPayload: sinon.stub().callsFake((session: WorkflowFormSessionState) => ({
-						phase: session.phase,
-						sessionId: session.sessionId,
-					})),
+					buildPayload: sinon
+						.stub()
+						.callsFake((session: WorkflowFormSessionState) => buildAutomaticWorkflowFormPayload(session, "pending")),
+					buildSuccessPayload: sinon
+						.stub()
+						.callsFake((session: WorkflowFormSessionState) => buildAutomaticWorkflowFormPayload(session, "success")),
 				},
 				persistWorkflowFormSession: sinon.stub().resolves(),
-				renderWorkflowFormMessage: sinon.stub().callsFake(async () => {
-					fakeTask.pendingWorkflowFormOutcome = {
-						kind: "fallback_to_agent",
-						session: createdSession,
+				renderWorkflowFormMessage: sinon
+					.stub()
+					.callsFake(async (payload: ClineWorkflowForm, messageType: "ask" | "say") => {
+						renderedPayloads.push({ payload, messageType })
+					}),
+				executeWorkflowFormToolAndSync: sinon.stub().callsFake(async () => {
+					expect(fakeTask.pendingWorkflowFormOutcome).to.equal(undefined)
+					await fs.mkdir(path.dirname(reviewInputPath), { recursive: true })
+					await fs.writeFile(reviewInputPath, "# review input\n", "utf8")
+					taskState.activePlaceholderWorkflowValues = {
+						diff_output: diffOutputPath,
+						review_input: reviewInputPath,
 					}
+					taskState.activePlaceholderWorkflowTaskWriteProofPaths = [reviewInputPath]
+					taskState.currentFocusChainChecklist = [
+						"- [x] Step 1: Determine Review Source",
+						"- [x] Step 2: System-Owned Diff Source Resolution And Diff Output Persistence",
+						"- [x] Step 3: Construct & Persist Review Input File",
+					].join("\n")
+					return { succeeded: true }
+				}),
+				clearWorkflowFormSession: sinon.stub().callsFake(async () => {
+					await clearWorkflowFormSession.call(fakeTask)
 				}),
 				setThreadDisplayState: sinon.stub(),
 				postStateToWebview: sinon.stub().resolves(),
@@ -1267,9 +1412,17 @@ Construct and persist review_input.md from the persisted diff output before cont
 					workflowName: "code-review.md",
 					stepNumber: 3,
 				},
-				initialPhase: "confirm",
+				initialPhase: "collect_inputs",
 				context: undefined,
 			})
+			sinon.assert.calledOnce(fakeTask.executeWorkflowFormToolAndSync!)
+			expect(renderedPayloads).to.have.length(2)
+			expect(renderedPayloads[0]?.messageType).to.equal("say")
+			expect(renderedPayloads[0]?.payload.sessionId).to.equal(createdSession.sessionId)
+			expect(renderedPayloads[0]?.payload.automaticStatusState).to.equal("pending")
+			expect(renderedPayloads[1]?.messageType).to.equal("say")
+			expect(renderedPayloads[1]?.payload.sessionId).to.equal(createdSession.sessionId)
+			expect(renderedPayloads[1]?.payload.automaticStatusState).to.equal("success")
 		} finally {
 			await fs.rm(tempDir, { recursive: true, force: true })
 		}
@@ -1330,10 +1483,9 @@ You are in the fallback path because the system-owned workflow-form path was not
 				},
 				workflowFormRuntime: {
 					createSession: sinon.stub().returns(createdSession),
-					buildPayload: sinon.stub().callsFake((session: WorkflowFormSessionState) => ({
-						phase: session.phase,
-						sessionId: session.sessionId,
-					})),
+					buildPayload: sinon
+						.stub()
+						.callsFake((session: WorkflowFormSessionState) => buildInteractiveWorkflowFormPayload(session)),
 				},
 				persistWorkflowFormSession: sinon.stub().resolves(),
 				renderWorkflowFormMessage: sinon.stub().callsFake(async () => {
@@ -1356,7 +1508,7 @@ You are in the fallback path because the system-owned workflow-form path was not
 		}
 	})
 
-	it("renders the exact Phase 3 diff/story mismatch message once as a terminal workflow-form notice, suppresses the resolver, and returns control to manual Step 3", async () => {
+	it("renders the automatic workflow preparation failure card, suppresses the resolver, and returns control to manual Step 3", async () => {
 		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "placeholder-step-3-mismatch-"))
 		const workflowPath = path.join(tempDir, "code-review.md")
 		const diffOutputPath = path.join(tempDir, "workflow-output", "review-input.diff")
@@ -1409,12 +1561,10 @@ Construct and persist review_input.md from the persisted diff output before cont
 					stepNumber: 3,
 				},
 				phase: "collect_inputs",
-				initialPhase: "confirm",
-				values: {
-					story_path: { rawValue: "docs/story.md" },
-				},
+				initialPhase: "collect_inputs",
+				values: {},
 			}
-			const renderedPayloads: ClineWorkflowForm[] = []
+			const renderedPayloads: Array<{ payload: ClineWorkflowForm; messageType: "ask" | "say" }> = []
 
 			const fakeTask: FakeWorkflowFormTask &
 				Record<string, unknown> & {
@@ -1432,28 +1582,40 @@ Construct and persist review_input.md from the persisted diff output before cont
 				workflowFormRuntime: {
 					createSession: sinon.stub().returns(createdSession),
 					buildPayload: sinon.stub().callsFake((session: WorkflowFormSessionState) => ({
+						definition: {
+							presentation: {
+								kind: "automatic_status",
+								pendingLabel: "Preparing workflow documents",
+								successLabel: "Workflow documents ready",
+								failureLabel:
+									"Automatic workflow preparation failed- falling back to manual LLM workflow preparation.",
+							},
+						},
 						sessionId: session.sessionId,
 						phase: session.phase,
+						automaticStatusState: "pending",
 					})),
-					buildSuccessPayload: sinon.stub().callsFake((session: WorkflowFormSessionState, successMessage: string) => ({
+					buildFailurePayload: sinon.stub().callsFake((session: WorkflowFormSessionState) => ({
+						definition: {
+							presentation: {
+								kind: "automatic_status",
+								pendingLabel: "Preparing workflow documents",
+								successLabel: "Workflow documents ready",
+								failureLabel:
+									"Automatic workflow preparation failed- falling back to manual LLM workflow preparation.",
+							},
+						},
 						sessionId: session.sessionId,
 						phase: "success",
-						successMessage,
+						automaticStatusState: "failure",
 					})),
 				},
 				persistWorkflowFormSession: sinon.stub().resolves(),
-				renderWorkflowFormMessage: sinon.stub().callsFake(async (payload: ClineWorkflowForm) => {
-					renderedPayloads.push(payload)
-					if (renderedPayloads.length === 1) {
-						fakeTask.pendingWorkflowFormOutcome = {
-							kind: "invoke_tool",
-							session: createdSession,
-							toolName: ClineDefaultTool.BUILD_REVIEW_INPUT,
-							toolInput: { story_path: "docs/story.md" },
-							toolParams: { story_path: "docs/story.md" },
-						}
-					}
-				}),
+				renderWorkflowFormMessage: sinon
+					.stub()
+					.callsFake(async (payload: ClineWorkflowForm, messageType: "ask" | "say") => {
+						renderedPayloads.push({ payload, messageType })
+					}),
 				executeWorkflowFormToolAndSync: sinon
 					.stub()
 					.callsFake(async (outcome: unknown) => executeWorkflowFormToolAndSync.call(fakeTask, outcome)),
@@ -1484,9 +1646,11 @@ Construct and persist review_input.md from the persisted diff output before cont
 			await maybeResolveWorkflowFormBeforeApiTurn.call(fakeTask)
 
 			expect(renderedPayloads).to.have.length(2)
-			expect(renderedPayloads[1]?.phase).to.equal("success")
-			expect(renderedPayloads[1]?.successMessage).to.equal(
-				"diff_output does not identify recent changes to the story file. Proceeding with AI generation of review_input.md using the fallback Step 3 instructions.",
+			expect(renderedPayloads[1]?.messageType).to.equal("say")
+			expect(renderedPayloads[1]?.payload.phase).to.equal("success")
+			expect(renderedPayloads[1]?.payload.automaticStatusState).to.equal("failure")
+			expect(JSON.stringify(renderedPayloads[1]?.payload)).to.not.contain(
+				"diff_output does not identify recent changes to the story file.",
 			)
 			expect(taskState.suppressedWorkflowFormResolverIds).to.include("code_review_step_3_review_input")
 			expect(taskState.activeWorkflowFormSession).to.equal(undefined)
@@ -1495,7 +1659,7 @@ Construct and persist review_input.md from the persisted diff output before cont
 		}
 	})
 
-	it("falls back after build_review_input tool errors and preserves the tool error in a terminal workflow-form notice", async () => {
+	it("falls back after build_review_input tool errors and renders the generic automatic workflow preparation failure card", async () => {
 		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "placeholder-step-3-tool-error-"))
 		const workflowPath = path.join(tempDir, "code-review.md")
 		const diffOutputPath = path.join(tempDir, "workflow-output", "review-input.diff")
@@ -1550,12 +1714,10 @@ Construct and persist review_input.md from the persisted diff output before cont
 					stepNumber: 3,
 				},
 				phase: "collect_inputs",
-				initialPhase: "confirm",
-				values: {
-					story_path: { rawValue: "docs/story.md" },
-				},
+				initialPhase: "collect_inputs",
+				values: {},
 			}
-			const renderedPayloads: ClineWorkflowForm[] = []
+			const renderedPayloads: Array<{ payload: ClineWorkflowForm; messageType: "ask" | "say" }> = []
 
 			const fakeTask: FakeWorkflowFormTask &
 				Record<string, unknown> & {
@@ -1573,28 +1735,40 @@ Construct and persist review_input.md from the persisted diff output before cont
 				workflowFormRuntime: {
 					createSession: sinon.stub().returns(createdSession),
 					buildPayload: sinon.stub().callsFake((session: WorkflowFormSessionState) => ({
+						definition: {
+							presentation: {
+								kind: "automatic_status",
+								pendingLabel: "Preparing workflow documents",
+								successLabel: "Workflow documents ready",
+								failureLabel:
+									"Automatic workflow preparation failed- falling back to manual LLM workflow preparation.",
+							},
+						},
 						sessionId: session.sessionId,
 						phase: session.phase,
+						automaticStatusState: "pending",
 					})),
-					buildSuccessPayload: sinon.stub().callsFake((session: WorkflowFormSessionState, successMessage: string) => ({
+					buildFailurePayload: sinon.stub().callsFake((session: WorkflowFormSessionState) => ({
+						definition: {
+							presentation: {
+								kind: "automatic_status",
+								pendingLabel: "Preparing workflow documents",
+								successLabel: "Workflow documents ready",
+								failureLabel:
+									"Automatic workflow preparation failed- falling back to manual LLM workflow preparation.",
+							},
+						},
 						sessionId: session.sessionId,
 						phase: "success",
-						successMessage,
+						automaticStatusState: "failure",
 					})),
 				},
 				persistWorkflowFormSession: sinon.stub().resolves(),
-				renderWorkflowFormMessage: sinon.stub().callsFake(async (payload: ClineWorkflowForm) => {
-					renderedPayloads.push(payload)
-					if (renderedPayloads.length === 1) {
-						fakeTask.pendingWorkflowFormOutcome = {
-							kind: "invoke_tool",
-							session: createdSession,
-							toolName: ClineDefaultTool.BUILD_REVIEW_INPUT,
-							toolInput: { story_path: "docs/story.md" },
-							toolParams: { story_path: "docs/story.md" },
-						}
-					}
-				}),
+				renderWorkflowFormMessage: sinon
+					.stub()
+					.callsFake(async (payload: ClineWorkflowForm, messageType: "ask" | "say") => {
+						renderedPayloads.push({ payload, messageType })
+					}),
 				executeWorkflowFormToolAndSync: sinon
 					.stub()
 					.callsFake(async (outcome: unknown) => executeWorkflowFormToolAndSync.call(fakeTask, outcome)),
@@ -1619,8 +1793,13 @@ Construct and persist review_input.md from the persisted diff output before cont
 			await maybeResolveWorkflowFormBeforeApiTurn.call(fakeTask)
 
 			expect(renderedPayloads).to.have.length(2)
-			expect(renderedPayloads[1]?.phase).to.equal("success")
-			expect(renderedPayloads[1]?.successMessage).to.equal(toolError)
+			expect(renderedPayloads[1]?.messageType).to.equal("say")
+			expect(renderedPayloads[1]?.payload.phase).to.equal("success")
+			expect(renderedPayloads[1]?.payload.automaticStatusState).to.equal("failure")
+			expect(JSON.stringify(renderedPayloads[1]?.payload)).to.contain(
+				"Automatic workflow preparation failed- falling back to manual LLM workflow preparation.",
+			)
+			expect(JSON.stringify(renderedPayloads[1]?.payload)).to.not.contain(toolError)
 			expect(taskState.suppressedWorkflowFormResolverIds).to.include("code_review_step_3_review_input")
 			expect(taskState.activeWorkflowFormSession).to.equal(undefined)
 		} finally {
@@ -1649,7 +1828,7 @@ Construct and persist review_input.md from the persisted diff output before cont
 				},
 			},
 		}
-		const renderedPayload = { kind: "workflow_form", session }
+		const renderedPayload = buildInteractiveWorkflowFormPayload(session)
 		const taskState = new TaskState()
 		taskState.activeWorkflowFormSession = session
 
@@ -1678,142 +1857,235 @@ Construct and persist review_input.md from the persisted diff output before cont
 
 		expect(fakeTask.workflowFormRuntime.createSession.called).to.equal(false)
 		expect(fakeTask.workflowFormRuntime.buildPayload.calledOnceWithExactly(session)).to.equal(true)
-		expect(fakeTask.renderWorkflowFormMessage.calledOnceWithExactly(renderedPayload)).to.equal(true)
+		expect(fakeTask.renderWorkflowFormMessage.calledOnceWithExactly(renderedPayload, "ask")).to.equal(true)
 	})
 
-	it("chains slash-command workflow-start success into the code-review Step 2 diff form before returning control", async () => {
-		const workflowStartSession: WorkflowFormSessionState = {
-			sessionId: "wf-session-start-chain",
-			resolverId: "placeholder_workflow_start_set_workflow_placeholders",
-			triggerSource: "slash_command",
-			owner: {
-				kind: "slash_command",
-				workflowName: "code-review.md",
-				stepNumber: 1,
-			},
-			phase: "collect_inputs",
-			initialPhase: "collect_inputs",
-			values: {
-				review_input: { rawValue: "docs/review.md" },
-			},
-			context: {
-				workflowName: "code-review.md",
-				workflowStartRequirements: {
-					requiredFieldKeys: [],
-					optionalFieldKeys: ["review_input"],
+	it("chains slash-command workflow-start story_path success through code-review Step 2 and opens the Step 3 review-input form with story_path preserved", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "workflow-start-story-path-chain-"))
+
+		try {
+			const workflowStartSession: WorkflowFormSessionState = {
+				sessionId: "wf-session-start-chain",
+				resolverId: "placeholder_workflow_start_set_workflow_placeholders",
+				triggerSource: "slash_command",
+				owner: {
+					kind: "slash_command",
+					workflowName: "code-review.md",
+					stepNumber: 1,
 				},
-			},
-		}
-		const stepTwoSession: WorkflowFormSessionState = {
-			sessionId: "wf-session-step-2-chain",
-			resolverId: "code_review_step_3_diff_source",
-			triggerSource: "deterministic_workflow_progression",
-			owner: {
-				kind: "placeholder_workflow_step",
-				workflowName: "code-review.md",
-				stepNumber: 2,
-			},
-			phase: "confirm",
-			initialPhase: "confirm",
-			values: {},
-		}
-		const taskState = new TaskState()
-		taskState.activePlaceholderWorkflowId = "code-review.md"
-		taskState.activePlaceholderWorkflowSource = {
-			type: "remote",
-			name: "code-review.md",
-			contents: `# Code Review
-
-## Step 1: Determine Review Source
-Optional: {{review_input}}
-
-## Step 2: System-Owned Diff Source Resolution And Diff Output Persistence
-Build the diff output before continuing.
-
-## Step 3: Construct & Persist Review Input File
-Build the review input before continuing.
-`,
-		}
-		taskState.currentFocusChainChecklist = [
-			"- [ ] Step 1: Determine Review Source",
-			"- [ ] Step 2: System-Owned Diff Source Resolution And Diff Output Persistence",
-			"- [ ] Step 3: Construct & Persist Review Input File",
-		].join("\n")
-
-		let renderCount = 0
-		const fakeTask: FakeWorkflowFormTask & {
-			executeWorkflowFormToolAndSync: sinon.SinonStub
-		} = {
-			cwd: process.cwd(),
-			taskState,
-			pendingWorkflowFormOutcome: undefined,
-			messageStateHandler: {
-				getClineMessages: sinon.stub().returns([]),
-			},
-			workflowFormRuntime: {
-				createSession: sinon.stub().onFirstCall().returns(workflowStartSession).onSecondCall().returns(stepTwoSession),
-				buildPayload: sinon.stub().callsFake((session: WorkflowFormSessionState) => ({
-					sessionId: session.sessionId,
-					phase: session.phase,
-				})),
-				buildSuccessPayload: sinon.stub().callsFake((session: WorkflowFormSessionState, successMessage: string) => ({
-					sessionId: session.sessionId,
-					phase: "success",
-					successMessage,
-				})),
-			},
-			persistWorkflowFormSession: sinon.stub().resolves(),
-			renderWorkflowFormMessage: sinon.stub().callsFake(async () => {
-				renderCount += 1
-				if (renderCount === 1) {
-					fakeTask.pendingWorkflowFormOutcome = {
-						kind: "invoke_tool",
-						session: workflowStartSession,
-						toolName: ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
-						toolInput: { values: { review_input: "docs/review.md" } },
-						toolParams: { values: JSON.stringify({ review_input: "docs/review.md" }) },
-					}
-				}
-				if (renderCount === 3) {
-					fakeTask.pendingWorkflowFormOutcome = {
-						kind: "fallback_to_agent",
-						session: stepTwoSession,
-					}
-				}
-			}),
-			executeWorkflowFormToolAndSync: sinon.stub().callsFake(async (outcome: WorkflowFormRuntimeOutcome) => {
-				expect(outcome).to.include({ kind: "invoke_tool" })
-				taskState.currentFocusChainChecklist = [
-					"- [x] Step 1: Determine Review Source",
-					"- [ ] Step 2: System-Owned Diff Source Resolution And Diff Output Persistence",
-					"- [ ] Step 3: Construct & Persist Review Input File",
-				].join("\n")
-				return { succeeded: true }
-			}),
-			clearWorkflowFormSession: sinon.stub().callsFake(async () => {
-				taskState.activeWorkflowFormSession = undefined
-			}),
-			setThreadDisplayState: sinon.stub(),
-			postStateToWebview: sinon.stub().resolves(),
-		}
-
-		await maybeResolveWorkflowFormBeforeApiTurn.call(fakeTask, {
-			type: "activate_placeholder_workflow",
-			workflowId: "code-review.md",
-			workflowSource: {
+				phase: "collect_inputs",
+				initialPhase: "collect_inputs",
+				values: {
+					story_path: { rawValue: "docs/story.md" },
+				},
+				context: {
+					workflowName: "code-review.md",
+					workflowStartRequirements: {
+						requiredFieldKeys: ["story_path"],
+						optionalFieldKeys: ["review_target"],
+					},
+				},
+			}
+			const stepTwoSession: WorkflowFormSessionState = {
+				sessionId: "wf-session-step-2-chain",
+				resolverId: "code_review_step_3_diff_source",
+				triggerSource: "deterministic_workflow_progression",
+				owner: {
+					kind: "placeholder_workflow_step",
+					workflowName: "code-review.md",
+					stepNumber: 2,
+				},
+				phase: "confirm",
+				initialPhase: "confirm",
+				values: {},
+			}
+			const stepThreeSession: WorkflowFormSessionState = {
+				sessionId: "wf-session-step-3-chain",
+				resolverId: "code_review_step_3_review_input",
+				triggerSource: "deterministic_workflow_progression",
+				owner: {
+					kind: "placeholder_workflow_step",
+					workflowName: "code-review.md",
+					stepNumber: 3,
+				},
+				phase: "collect_inputs",
+				initialPhase: "collect_inputs",
+				values: {},
+			}
+			const taskState = new TaskState()
+			taskState.activePlaceholderWorkflowId = "code-review.md"
+			taskState.activePlaceholderWorkflowSource = {
 				type: "remote",
 				name: "code-review.md",
-				contents: "# Code review\nInspect the implementation.",
-			},
-		})
+				contents: `# Code Review
 
-		expect(fakeTask.workflowFormRuntime.createSession.callCount).to.equal(2)
-		expect(fakeTask.workflowFormRuntime.createSession.firstCall.args[0]?.resolverId).to.equal(
-			"placeholder_workflow_start_set_workflow_placeholders",
-		)
-		expect(fakeTask.workflowFormRuntime.createSession.secondCall.args[0]?.resolverId).to.equal(
-			"code_review_step_3_diff_source",
-		)
+## Step 1: (System Owned) Determine Review Source
+Required: {story_path}
+Optional: {review_target}
+
+## Step 2: (System-Owned) Diff Source Resolution And Diff Output Persistence
+Build the diff output before continuing.
+
+## Step 3: (System-Owned) Construct & Persist Review Input File
+Build the review input before continuing.
+`,
+			}
+			taskState.currentFocusChainChecklist = [
+				"- [ ] Step 1: Determine Review Source",
+				"- [ ] Step 2: System-Owned Diff Source Resolution And Diff Output Persistence",
+				"- [ ] Step 3: Construct & Persist Review Input File",
+			].join("\n")
+			taskState.activePlaceholderWorkflowStableValues = {
+				output_folder: path.join(tempDir, "workflow-output"),
+				review_input: path.join(tempDir, "workflow-output", "review-input.md"),
+			}
+
+			let renderCount = 0
+			let executeCallCount = 0
+			const fakeTask: FakeWorkflowFormTask & {
+				executeWorkflowFormToolAndSync: sinon.SinonStub
+			} = {
+				cwd: tempDir,
+				taskState,
+				pendingWorkflowFormOutcome: undefined,
+				messageStateHandler: {
+					getClineMessages: sinon.stub().returns([]),
+				},
+				workflowFormRuntime: {
+					createSession: sinon
+						.stub()
+						.onFirstCall()
+						.returns(workflowStartSession)
+						.onSecondCall()
+						.returns(stepTwoSession)
+						.onThirdCall()
+						.returns(stepThreeSession),
+					buildPayload: sinon
+						.stub()
+						.callsFake((session: WorkflowFormSessionState) =>
+							session.resolverId === "code_review_step_3_review_input"
+								? buildAutomaticWorkflowFormPayload(session, "pending")
+								: buildInteractiveWorkflowFormPayload(session),
+						),
+					buildSuccessPayload: sinon.stub().callsFake((session: WorkflowFormSessionState, successMessage: string) => ({
+						...(session.resolverId === "code_review_step_3_review_input"
+							? buildAutomaticWorkflowFormPayload(session, "success")
+							: buildInteractiveWorkflowFormPayload(session)),
+						phase: "success",
+						successMessage,
+					})),
+				},
+				persistWorkflowFormSession: sinon.stub().resolves(),
+				renderWorkflowFormMessage: sinon.stub().callsFake(async () => {
+					renderCount += 1
+					if (renderCount === 1) {
+						fakeTask.pendingWorkflowFormOutcome = {
+							kind: "invoke_tool",
+							session: workflowStartSession,
+							toolName: ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
+							toolInput: { values: { story_path: "docs/story.md" } },
+							toolParams: { values: JSON.stringify({ story_path: "docs/story.md" }) },
+						}
+					}
+					if (renderCount === 3) {
+						fakeTask.pendingWorkflowFormOutcome = {
+							kind: "invoke_tool",
+							session: stepTwoSession,
+							toolName: ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT,
+							toolInput: {
+								source: {
+									type: "commit",
+									commit: "abc1234",
+								},
+							},
+							toolParams: {
+								source: JSON.stringify({
+									type: "commit",
+									commit: "abc1234",
+								}),
+							},
+						}
+					}
+				}),
+				executeWorkflowFormToolAndSync: sinon.stub().callsFake(async (outcome: WorkflowFormRuntimeOutcome) => {
+					expect(outcome).to.include({ kind: "invoke_tool" })
+					executeCallCount += 1
+
+					if (executeCallCount === 1) {
+						taskState.activePlaceholderWorkflowValues = {
+							story_path: "docs/story.md",
+						}
+						taskState.currentFocusChainChecklist = [
+							"- [x] Step 1: Determine Review Source",
+							"- [ ] Step 2: System-Owned Diff Source Resolution And Diff Output Persistence",
+							"- [ ] Step 3: Construct & Persist Review Input File",
+						].join("\n")
+					}
+
+					if (executeCallCount === 2) {
+						taskState.activePlaceholderWorkflowValues = {
+							story_path: "docs/story.md",
+							diff_output: path.join(tempDir, "workflow-output", "review-input.diff"),
+						}
+						taskState.currentFocusChainChecklist = [
+							"- [x] Step 1: Determine Review Source",
+							"- [x] Step 2: System-Owned Diff Source Resolution And Diff Output Persistence",
+							"- [ ] Step 3: Construct & Persist Review Input File",
+						].join("\n")
+					}
+
+					if (executeCallCount === 3) {
+						expect(taskState.activePlaceholderWorkflowValues?.story_path).to.equal("docs/story.md")
+						taskState.activePlaceholderWorkflowValues = {
+							story_path: "docs/story.md",
+							diff_output: path.join(tempDir, "workflow-output", "review-input.diff"),
+							review_input: path.join(tempDir, "workflow-output", "review-input.md"),
+						}
+						taskState.activePlaceholderWorkflowTaskWriteProofPaths = [
+							path.join(tempDir, "workflow-output", "review-input.md"),
+						]
+						taskState.currentFocusChainChecklist = [
+							"- [x] Step 1: Determine Review Source",
+							"- [x] Step 2: System-Owned Diff Source Resolution And Diff Output Persistence",
+							"- [x] Step 3: Construct & Persist Review Input File",
+						].join("\n")
+					}
+
+					return { succeeded: true }
+				}),
+				clearWorkflowFormSession: sinon.stub().callsFake(async () => {
+					taskState.activeWorkflowFormSession = undefined
+				}),
+				setThreadDisplayState: sinon.stub(),
+				postStateToWebview: sinon.stub().resolves(),
+			}
+
+			await maybeResolveWorkflowFormBeforeApiTurn.call(fakeTask, {
+				type: "activate_placeholder_workflow",
+				workflowId: "code-review.md",
+				workflowSource: {
+					type: "remote",
+					name: "code-review.md",
+					contents: "# Code review\nInspect the implementation.",
+				},
+			})
+
+			expect(fakeTask.workflowFormRuntime.createSession.callCount).to.equal(3)
+			expect(fakeTask.workflowFormRuntime.createSession.firstCall.args[0]?.resolverId).to.equal(
+				"placeholder_workflow_start_set_workflow_placeholders",
+			)
+			expect(fakeTask.workflowFormRuntime.createSession.secondCall.args[0]?.resolverId).to.equal(
+				"code_review_step_3_diff_source",
+			)
+			expect(fakeTask.workflowFormRuntime.createSession.thirdCall.args[0]?.resolverId).to.equal(
+				"code_review_step_3_review_input",
+			)
+			expect(fakeTask.workflowFormRuntime.createSession.thirdCall.args[0]?.initialPhase).to.equal("collect_inputs")
+			expect(executeCallCount).to.equal(3)
+			expect(taskState.activePlaceholderWorkflowValues?.story_path).to.equal("docs/story.md")
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
 	})
 
 	it("treats workflow-start placeholder storage as workflow-form success even when Step 1 remains active", async () => {
@@ -1922,12 +2194,11 @@ Build the diff output before continuing.
 			},
 			workflowFormRuntime: {
 				createSession: sinon.stub().returns(workflowStartSession),
-				buildPayload: sinon.stub().callsFake((session: WorkflowFormSessionState) => ({
-					sessionId: session.sessionId,
-					phase: session.phase,
-				})),
+				buildPayload: sinon
+					.stub()
+					.callsFake((session: WorkflowFormSessionState) => buildInteractiveWorkflowFormPayload(session)),
 				buildSuccessPayload: sinon.stub().callsFake((session: WorkflowFormSessionState, successMessage: string) => ({
-					sessionId: session.sessionId,
+					...buildInteractiveWorkflowFormPayload(session),
 					phase: "success",
 					successMessage,
 				})),
@@ -2161,7 +2432,7 @@ Build the diff output before continuing.
 		expect(result.errorMessage).to.equal("No Git-backed diff content was available for the requested source and scope.")
 	})
 
-	it("auto-binds the owning BMAD agent when a placeholder workflow maps to a managed BMAD twin", async () => {
+	it("activates placeholder workflows and persists workflow source without any activeAgent metadata", async () => {
 		const sandbox = sinon.createSandbox()
 		try {
 			sandbox.stub(disk, "getTaskMetadata").resolves({} as never)
@@ -2178,42 +2449,23 @@ Build the diff output before continuing.
 				},
 			})
 
-			expect(fakeTask.taskState.activeAgentId).to.equal("bmad-dev")
-			expect(fakeTask.taskState.activeAgentSkillName).to.equal("bmad-dev")
-			expect(fakeTask.taskState.activeAgentInvokedSlashCommand).to.equal("code-review.md")
 			expect(fakeTask.taskState.activePlaceholderWorkflowId).to.equal("code-review.md")
+			expect(fakeTask.taskState.activePlaceholderWorkflowSource).to.include({
+				type: "remote",
+				name: "code-review.md",
+				contents: "# Code review\nInspect the implementation.",
+			})
+			expect(fakeTask.taskState.activePlaceholderWorkflowSource?.configPath).to.be.a("string")
+			expect((fakeTask.taskState as any).activeAgentId).to.equal(undefined)
 			expect(saveMetadataStub.calledOnce).to.equal(true)
 			const [, savedMetadata] = saveMetadataStub.firstCall.args
-			expect(savedMetadata.activeAgentId).to.equal("bmad-dev")
-		} finally {
-			sandbox.restore()
-		}
-	})
-
-	it("blocks mapped placeholder workflow activation when the active BMAD agent is not allowed for the managed twin", async () => {
-		const sandbox = sinon.createSandbox()
-		try {
-			sandbox.stub(disk, "getTaskMetadata").resolves({} as never)
-			const saveMetadataStub = sandbox.stub(disk, "saveTaskMetadata").resolves()
-			const fakeTask = createFakeTask("task-placeholder-incompatible-agent")
-			fakeTask.taskState.activeAgentId = "bmad-pm"
-			fakeTask.taskState.activeAgentSkillName = "bmad-pm"
-			fakeTask.taskState.activeAgentInvokedSlashCommand = "bmad-pm"
-			fakeTask.taskState.activeAgentJustActivated = false
-
-			await applyPersistentSlashCommandAction.call(fakeTask, {
-				type: "activate_placeholder_workflow",
-				workflowId: "code-review.md",
-				workflowSource: {
-					type: "remote",
-					name: "code-review.md",
-					contents: "# Code review\nInspect the implementation.",
-				},
+			expect(savedMetadata.activePlaceholderWorkflowSource).to.include({
+				type: "remote",
+				name: "code-review.md",
+				contents: "# Code review\nInspect the implementation.",
 			})
-
-			expect(fakeTask.say.calledOnce).to.equal(true)
-			expect(fakeTask.taskState.activePlaceholderWorkflowId).to.equal(undefined)
-			expect(saveMetadataStub.called).to.equal(false)
+			expect(savedMetadata.activePlaceholderWorkflowSource?.configPath).to.be.a("string")
+			expect((savedMetadata as any).activeAgentId).to.equal(undefined)
 		} finally {
 			sandbox.restore()
 		}
@@ -2261,7 +2513,7 @@ Inspect the prepared review input and write findings.
 
 			expect(getMetadataStub.calledOnce).to.equal(true)
 			expect(fakeTask.refreshPlaceholderWorkflowChecklistProjection.calledOnceWith(true)).to.equal(true)
-			expect(fakeTask.taskState.activeAgentId).to.equal(undefined)
+			expect((fakeTask.taskState as any).activeAgentId).to.equal(undefined)
 			expect(fakeTask.taskState.activePlaceholderWorkflowId).to.equal("local-flow.md")
 			expect(fakeTask.taskState.activePlaceholderWorkflowSource).to.include({
 				type: "local",

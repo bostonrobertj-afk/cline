@@ -486,19 +486,12 @@
     "type": "function",
     "function": {
       "name": "build_review_input",
-      "description": "Build review-input.md from a story file and the stable {diff_output} artifact. The only human-supplied parameter is story_path.",
+      "description": "Build review-input.md from workflow-owned {story_path} and {diff_output}. Resolve inputs from workflow state; there are no human-supplied parameters.",
       "strict": false,
       "parameters": {
         "type": "object",
-        "properties": {
-          "story_path": {
-            "type": "string",
-            "description": "Path to the story markdown file that is being reviewed."
-          }
-        },
-        "required": [
-          "story_path"
-        ],
+        "properties": {},
+        "required": [],
         "additionalProperties": false
       }
     }

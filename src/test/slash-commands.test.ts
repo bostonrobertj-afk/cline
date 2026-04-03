@@ -19,6 +19,9 @@ describe("getAvailableSlashCommands", () => {
 		getGlobalStateKey: sinon.SinonStub
 		getRemoteConfigSettings: sinon.SinonStub
 	}
+	let mockWorkspaceManager: {
+		getPrimaryRoot: sinon.SinonStub
+	}
 
 	beforeEach(() => {
 		mockStateManager = {
@@ -34,8 +37,14 @@ describe("getAvailableSlashCommands", () => {
 		mockStateManager.getGlobalStateKey.returns(null)
 		mockStateManager.getRemoteConfigSettings.returns(null)
 
+		mockWorkspaceManager = {
+			getPrimaryRoot: sinon.stub().returns({ path: process.cwd() }),
+		}
+
 		mockController = {
 			stateManager: mockStateManager as any,
+			getWorkspaceManager: sinon.stub().returns(undefined),
+			ensureWorkspaceManager: sinon.stub().resolves(undefined),
 		}
 	})
 
@@ -66,6 +75,16 @@ describe("getAvailableSlashCommands", () => {
 			;(deprecatedCommand === undefined).should.be.true()
 		})
 
+		it("should not advertise retired BMAD persona slash commands", async () => {
+			const response = await getAvailableSlashCommands(mockController as Controller, EmptyRequest.create())
+
+			const retiredCommands = ["bmad-agent-bmm-dev", "bmad-dev", "bmad-exit"]
+			for (const retiredCommand of retiredCommands) {
+				const found = response.commands.find((cmd) => cmd.name === retiredCommand)
+				;(found === undefined).should.be.true()
+			}
+		})
+
 		it("should mark base commands with section 'default'", async () => {
 			const response = await getAvailableSlashCommands(mockController as Controller, EmptyRequest.create())
 
@@ -89,9 +108,7 @@ describe("getAvailableSlashCommands", () => {
 
 		it("should include managed BMAD workflows from the generated registry when a workspace is active", async () => {
 			clearManagedWorkflowRegistryCache(process.cwd())
-			;(mockController as any).workspaceManager = {
-				getPrimaryRoot: () => ({ path: process.cwd() }),
-			}
+			;(mockController.getWorkspaceManager as sinon.SinonStub).returns(mockWorkspaceManager)
 
 			const response = await getAvailableSlashCommands(mockController as Controller, EmptyRequest.create())
 			const workflow = response.commands.find((cmd) => cmd.name === "bmad-code-review")
@@ -153,7 +170,9 @@ describe("getAvailableSlashCommands", () => {
 
 			const response = await getAvailableSlashCommands(mockController as Controller, EmptyRequest.create())
 
-			const workflow = response.commands.find((cmd) => cmd.name === "windows-workflow.md")
+			const workflow = response.commands.find(
+				(cmd) => cmd.name === "C:\\Users\\test\\project\\.clinerules\\workflows\\windows-workflow.md",
+			)
 			workflow!.should.not.be.undefined()
 		})
 	})
@@ -294,8 +313,8 @@ describe("getAvailableSlashCommands", () => {
 
 			const response = await getAvailableSlashCommands(mockController as Controller, EmptyRequest.create())
 
-			// Should only have base commands
-			response.commands.length.should.equal(BASE_SLASH_COMMANDS.length)
+			// Should only have built-in commands
+			response.commands.length.should.equal(BASE_SLASH_COMMANDS.length + VSCODE_ONLY_COMMANDS.length)
 		})
 
 		it("should handle remote config with no remoteGlobalWorkflows property", async () => {

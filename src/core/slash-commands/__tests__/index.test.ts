@@ -5,7 +5,6 @@ import os from "os"
 import path from "path"
 import * as sinon from "sinon"
 import { StateManager } from "../../storage/StateManager"
-import * as bmadAgentMode from "../../task/bmad-agent-mode"
 import { getCanonicalWorkflowConfigPath } from "../../workflows/workflow-placeholders"
 import { formatMcpPromptResponse, McpPromptFetcher, parseSlashCommands } from "../index"
 
@@ -153,11 +152,8 @@ describe("slash-commands", () => {
 		// through to workflow checking. The core MCP functionality is covered above.
 	})
 
-	describe("parseSlashCommands BMAD activation", () => {
-		it("should resolve managed workflow aliases before BMAD agent activation", async () => {
-			sinon.stub(bmadAgentMode, "resolveBmadAgentActivation").resolves(undefined)
-			sinon.stub(bmadAgentMode, "isBmadExitCommand").resolves(false)
-
+	describe("parseSlashCommands workflow persona regression", () => {
+		it("still resolves managed workflow aliases to managed workflow activation", async () => {
 			const result = await parseSlashCommands(
 				"<task>/bmad-problem-solving help me untangle this issue</task>",
 				{},
@@ -179,20 +175,7 @@ describe("slash-commands", () => {
 			})
 		})
 
-		it("should resolve preferred BMAD alias commands into persistent activation state", async () => {
-			sinon.stub(bmadAgentMode, "resolveBmadAgentActivation").resolves({
-				agent: {
-					id: "bmad-quick-flow-solo-dev",
-					slashCommand: "bmad-quick-flow-solo-dev",
-					personaFile: "_bmad/bmm/agents/quick-flow-solo-dev.md",
-					allowedSkills: ["bmad-quick-spec", "bmad-quick-dev"],
-				},
-				skillName: "bmad-quick-flow-solo-dev",
-				invokedSlashCommand: "bmad-agent-bmm-quick-flow-solo-dev",
-				preferredActivationCommand: "bmad-agent-bmm-quick-flow-solo-dev",
-			})
-			sinon.stub(bmadAgentMode, "isBmadExitCommand").resolves(false)
-
+		it("no longer emits persistent activation for slash-prefixed BMAD persona aliases", async () => {
 			const result = await parseSlashCommands(
 				"<task>/bmad-agent-bmm-quick-flow-solo-dev ch how are you today</task>",
 				{},
@@ -205,31 +188,11 @@ describe("slash-commands", () => {
 				"/test/project",
 			)
 
-			expect(result.processedText).to.equal("<task> ch how are you today</task>")
-			expect(result.needsClinerulesFileCheck).to.equal(false)
-			expect(result.persistentSlashCommandAction).to.deep.equal({
-				type: "activate_bmad_agent",
-				agentId: "bmad-quick-flow-solo-dev",
-				skillName: "bmad-quick-flow-solo-dev",
-				invokedSlashCommand: "bmad-agent-bmm-quick-flow-solo-dev",
-			})
+			expect(result.persistentSlashCommandAction).to.equal(undefined)
 		})
 
-		it("should resolve BMAD activation when the command token arrives without a leading slash", async () => {
-			sinon.stub(bmadAgentMode, "resolveBmadAgentActivation").resolves({
-				agent: {
-					id: "bmad-quick-flow-solo-dev",
-					slashCommand: "bmad-quick-flow-solo-dev",
-					personaFile: "_bmad/bmm/agents/quick-flow-solo-dev.md",
-					allowedSkills: ["bmad-quick-spec", "bmad-quick-dev"],
-				},
-				skillName: "bmad-quick-flow-solo-dev",
-				invokedSlashCommand: "bmad-agent-bmm-quick-flow-solo-dev",
-				preferredActivationCommand: "bmad-agent-bmm-quick-flow-solo-dev",
-			})
-			sinon.stub(bmadAgentMode, "isBmadExitCommand").resolves(false)
-
-			const result = await parseSlashCommands(
+		it("no longer emits persistent activation for bare BMAD persona aliases or /bmad-exit", async () => {
+			const bareAliasResult = await parseSlashCommands(
 				"<task>bmad-agent-bmm-quick-flow-solo-dev CR target is entity-creation-engine.ts</task>",
 				{},
 				{},
@@ -241,14 +204,20 @@ describe("slash-commands", () => {
 				"/test/project",
 			)
 
-			expect(result.processedText).to.equal("<task> CR target is entity-creation-engine.ts</task>")
-			expect(result.needsClinerulesFileCheck).to.equal(false)
-			expect(result.persistentSlashCommandAction).to.deep.equal({
-				type: "activate_bmad_agent",
-				agentId: "bmad-quick-flow-solo-dev",
-				skillName: "bmad-quick-flow-solo-dev",
-				invokedSlashCommand: "bmad-agent-bmm-quick-flow-solo-dev",
-			})
+			const exitResult = await parseSlashCommands(
+				"<task>/bmad-exit close it out</task>",
+				{},
+				{},
+				"test-ulid",
+				undefined,
+				false,
+				undefined,
+				undefined,
+				"/test/project",
+			)
+
+			expect(bareAliasResult.persistentSlashCommandAction).to.equal(undefined)
+			expect(exitResult.persistentSlashCommandAction).to.equal(undefined)
 		})
 	})
 

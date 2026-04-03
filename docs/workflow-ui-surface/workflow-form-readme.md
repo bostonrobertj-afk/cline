@@ -61,6 +61,7 @@ The capability does not replace workflow progression, slash-command activation, 
 
 - Represent workflow forms through a dedicated shared contract.
 - Render a system-owned staged form in chat.
+- Render non-interactive automatic workflow-preparation status cards in chat for zero-human-input system-owned steps.
 - Keep raw form inputs out of model-visible conversational context.
 - Derive field typing from the invoked tool schema at runtime.
 - Allow use cases to specialize field discovery, ordering, labels, help text, and staged UX.
@@ -97,7 +98,7 @@ Current delivered use cases:
 
 - workflow-start forms for slash-command-started placeholder workflows
 - `code-review.md` Step 2 diff artifact form using `build_review_diff_output`
-- `code-review.md` Step 3 review-input form using `build_review_input`
+- `code-review.md` Step 3 automatic workflow-preparation status card using `build_review_input` with workflow-owned inputs
 
 ## Outputs
 
@@ -129,8 +130,8 @@ Current delivered use cases:
 1. A trigger path decides that a workflow form is needed.
 2. The runtime creates or resumes a workflow-form session.
 3. The resolver builds the current staged form definition.
-4. The webview renders that definition as a system-owned chat form.
-5. The user submits raw values through the dedicated workflow-form submission transport.
+4. The webview renders that definition as either a system-owned staged form or a non-interactive automatic-status card.
+5. For interactive forms, the user submits raw values through the dedicated workflow-form submission transport; for automatic-status cards, the runtime executes the tool immediately.
 6. The runtime merges those values into session state and validates the current page.
 7. If the current page is incomplete, the runtime re-renders the form with retry state.
 8. If the submission is valid, the resolver builds the canonical tool input and tool params.
@@ -138,7 +139,7 @@ Current delivered use cases:
 10. The resolver evaluates the tool result and returns success or failure.
 11. On success, the session is cleared and control returns to runtime-owned workflow progression first.
 12. After a successful form resolution, the runtime may immediately re-enter deterministic progression and open another eligible system-owned form before any AI turn begins.
-13. On failure, the session remains active in `retry_error` and the user can retry or fall back.
+13. On failure, interactive forms remain active in `retry_error` while automatic-status failures render a terminal failure card and then fall back to the normal agent path.
 
 Important implementation note:
 
@@ -167,7 +168,7 @@ Typical live `code-review.md` path:
 3. The runtime invokes `set_workflow_placeholders` when the start form succeeds.
 4. Deterministic progression re-evaluates the now-current checklist state immediately after that tool runs.
 5. If Step 2 is now active and still unresolved, the runtime opens the Step 2 diff artifact form and invokes `build_review_diff_output` on success.
-6. Deterministic progression runs again and may advance directly into the Step 3 review-input form, which invokes `build_review_input` on success.
+6. Deterministic progression runs again and may advance directly into the Step 3 automatic workflow-preparation status card, which invokes `build_review_input` from stored workflow state and then renders terminal success or fallback-to-manual status.
 7. Deterministic progression then derives Step 4 `review_mode` when the current-task artifacts prove it.
 8. The AI enters at Step 5 only after the pre-turn system-owned decision loop has no further eligible workflow-start or step-triggered form work to perform.
 

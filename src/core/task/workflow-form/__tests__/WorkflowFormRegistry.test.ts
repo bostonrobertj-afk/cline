@@ -22,7 +22,7 @@ describe("WorkflowFormRegistry", () => {
 		expect(resolver.toolName).to.equal("build_review_input")
 	})
 
-	it("derives the Phase 3 review-input form field list from the build_review_input tool schema", () => {
+	it("declares the code-review step 3 review-input resolver as automatic workflow preparation", () => {
 		const resolver = getWorkflowFormResolverDefinition(CODE_REVIEW_STEP_3_REVIEW_INPUT_RESOLVER_ID)
 		const definition = resolver.buildDefinition({
 			sessionId: "session-phase-3-fields",
@@ -37,11 +37,15 @@ describe("WorkflowFormRegistry", () => {
 			initialPhase: "confirm",
 			values: {},
 		})
-		const fields = definition.pages.collect_inputs?.fields ?? []
 
-		expect(fields.map((field) => field.key)).to.deep.equal(["story_path"])
-		expect(fields[0]?.valueSchema.type).to.equal("string")
-		expect(fields[0]?.required).to.equal(true)
+		expect(resolver.defaultInitialPhase).to.equal("collect_inputs")
+		expect(definition.presentation).to.deep.equal({
+			kind: "automatic_status",
+			pendingLabel: "Preparing workflow documents",
+			successLabel: "Workflow documents ready",
+			failureLabel: "Automatic workflow preparation failed- falling back to manual LLM workflow preparation.",
+		})
+		expect(definition.pages.collect_inputs?.fields).to.deep.equal([])
 	})
 
 	it("serializes the Phase 1 review-diff resolver into tool params", () => {
@@ -195,17 +199,11 @@ describe("WorkflowFormRegistry", () => {
 				initialPhase: "confirm",
 				values: {},
 			},
-			{
-				story_path: { rawValue: "docs/story.md" },
-			},
+			{},
 		)
 
-		expect(outcome.toolInput).to.deep.equal({
-			story_path: "docs/story.md",
-		})
-		expect(outcome.toolParams).to.deep.equal({
-			story_path: "docs/story.md",
-		})
+		expect(outcome.toolInput).to.deep.equal({})
+		expect(outcome.toolParams).to.deep.equal({})
 	})
 
 	it("treats persisted diff-output tool results as success", () => {

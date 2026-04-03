@@ -37,9 +37,6 @@ export interface TaskMetadata {
 	files_in_context: FileMetadataEntry[]
 	model_usage: ModelMetadataEntry[]
 	environment_history: EnvironmentMetadataEntry[]
-	activeAgentId?: string
-	activeAgentSkillName?: string
-	activeAgentInvokedSlashCommand?: string
 	activeWorkflowId?: string
 	activePlaceholderWorkflowId?: string
 	activePlaceholderWorkflowSource?: ActivePlaceholderWorkflowSource

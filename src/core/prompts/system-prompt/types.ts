@@ -102,8 +102,8 @@ export interface SystemPromptContext {
 	}
 	readonly supportsBrowserUse?: boolean
 	readonly mcpHub?: McpHub
-	readonly activeAgentId?: string
-	readonly activeAgentRoleInstructions?: string
+	readonly activeWorkflowName?: string
+	readonly activeWorkflowPersonaInstructions?: string
 	readonly activeWorkflowReminder?: string
 	readonly activeWorkflowSupportsPlaceholders?: boolean
 	readonly activePlaceholderWorkflowName?: string

@@ -195,7 +195,7 @@ Determine what to review from the user's prompt before asking follow-up question
 				workflowName: "code-review.md",
 				stepNumber: 1,
 				checklistLabel: "Step 1: Gather Context",
-				reason: "spec_file is present.",
+				reason: "story_path points to an existing story file.",
 			})
 
 			const manager = new FocusChainManager(createDependencies(taskState))
@@ -203,7 +203,7 @@ Determine what to review from the user's prompt before asking follow-up question
 
 			expect(prompt).to.contain("# CURRENT WORKFLOW STATUS")
 			expect(prompt).to.contain("# AUTO-COMPLETED WORKFLOW STEPS")
-			expect(prompt).to.contain("- Step 1: Gather Context — spec_file is present.")
+			expect(prompt).to.contain("- Step 1: Gather Context — story_path points to an existing story file.")
 			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
 		} finally {
 			await fs.rm(tempDir, { recursive: true, force: true })

@@ -1,4 +1,4 @@
-import type { ClineMessage, WorkflowFormPhase } from "@shared/ExtensionMessage"
+import type { ClineMessage, WorkflowFormAutomaticStatusState, WorkflowFormPhase } from "@shared/ExtensionMessage"
 import { fireEvent, render, screen } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { ChatRowContent, getFollowupPresentation } from "./ChatRow"
@@ -141,6 +141,43 @@ function createWorkflowFormMessage(phase: WorkflowFormPhase, overrides?: Partial
 	}
 }
 
+function createAutomaticWorkflowStatusMessage(
+	state: WorkflowFormAutomaticStatusState,
+	overrides?: Partial<Record<string, unknown>>,
+): ClineMessage {
+	return {
+		ts: Date.now(),
+		type: "say",
+		say: "workflow_form",
+		text: JSON.stringify({
+			sessionId: "automatic-session-1",
+			resolverId: "code_review_step_3_review_input",
+			phase: state === "pending" ? "collect_inputs" : "success",
+			definition: {
+				toolName: "build_review_input",
+				title: "Review Input Artifact",
+				toolDictionaryTitle: "Review Input Reference",
+				toolDictionaryMarkdown: "## build_review_input",
+				presentation: {
+					kind: "automatic_status",
+					pendingLabel: "Preparing workflow documents",
+					successLabel: "Workflow documents ready",
+					failureLabel: "Automatic workflow preparation failed- falling back to manual LLM workflow preparation.",
+				},
+				pages: {
+					collect_inputs: {
+						prompt: "The system will now build `review-input.md` from the stored `story_path` and the workflow-owned `review-input.diff` artifact.",
+						fields: [],
+					},
+				},
+				successMessage: "The Step 3 review-input artifact is ready.",
+			},
+			automaticStatusState: state,
+			...overrides,
+		}),
+	}
+}
+
 function renderWorkflowFormRow(phase: WorkflowFormPhase, overrides?: Partial<Record<string, unknown>>) {
 	return render(
 		<ChatRowContent
@@ -148,6 +185,19 @@ function renderWorkflowFormRow(phase: WorkflowFormPhase, overrides?: Partial<Rec
 			isExpanded={true}
 			isLast={true}
 			message={createWorkflowFormMessage(phase, overrides)}
+			onSetQuote={vi.fn()}
+			onToggleExpand={vi.fn()}
+		/>,
+	)
+}
+
+function renderAutomaticWorkflowStatusRow(state: WorkflowFormAutomaticStatusState, overrides?: Partial<Record<string, unknown>>) {
+	return render(
+		<ChatRowContent
+			inputValue=""
+			isExpanded={true}
+			isLast={true}
+			message={createAutomaticWorkflowStatusMessage(state, overrides)}
 			onSetQuote={vi.fn()}
 			onToggleExpand={vi.fn()}
 		/>,
@@ -274,6 +324,29 @@ describe("ChatRow followup presentation", () => {
 		expect(screen.getByRole("button", { name: "Open inputs reference" })).toBeInTheDocument()
 		expect(screen.getByRole("button", { name: "Yes" })).toBeInTheDocument()
 		expect(screen.getByRole("button", { name: "No" })).toBeInTheDocument()
+	})
+
+	it("renders automatic workflow preparation rows with the pending label and no interactive controls", () => {
+		renderAutomaticWorkflowStatusRow("pending")
+
+		expect(screen.getByText("Preparing workflow documents")).toBeInTheDocument()
+		expect(screen.queryByRole("button", { name: "Yes" })).not.toBeInTheDocument()
+		expect(screen.queryByRole("button", { name: "No" })).not.toBeInTheDocument()
+		expect(screen.queryByRole("button", { name: "Open inputs reference" })).not.toBeInTheDocument()
+	})
+
+	it("renders automatic workflow preparation rows with the success label", () => {
+		renderAutomaticWorkflowStatusRow("success")
+
+		expect(screen.getByText("Workflow documents ready")).toBeInTheDocument()
+	})
+
+	it("renders automatic workflow preparation rows with the failure label", () => {
+		renderAutomaticWorkflowStatusRow("failure")
+
+		expect(
+			screen.getByText("Automatic workflow preparation failed- falling back to manual LLM workflow preparation."),
+		).toBeInTheDocument()
 	})
 
 	it("renders workflow-form title and prompt from the canonical definition", () => {

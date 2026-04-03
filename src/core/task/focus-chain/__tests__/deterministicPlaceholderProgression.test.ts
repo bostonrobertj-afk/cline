@@ -56,6 +56,8 @@ describe("deterministicPlaceholderProgression", () => {
 		expect(isDeterministicPlaceholderWorkflowSupported("code-review")).to.equal(false)
 		expect(isDeterministicPlaceholderWorkflowSupported("dev-story")).to.equal(false)
 		expect(isDeterministicPlaceholderWorkflowSupported("review-edge-case-hunter.md")).to.equal(true)
+		expect(isDeterministicPlaceholderWorkflowSupported("write-remediation-story.md")).to.equal(true)
+		expect(isDeterministicPlaceholderWorkflowSupported("write-remediation-story")).to.equal(false)
 	})
 
 	it("completes review-adversarial-general step 1 when diff_output resolves to an existing file", async () => {
@@ -1044,7 +1046,42 @@ Deliver findings using attempt_completion.`,
 		expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
 	})
 
-	it("completes code-review step 1 when spec_file is already available without review_target", async () => {
+	it("completes code-review step 1 when story_path points to an existing story file", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-code-review-step1-"))
+
+		try {
+			const storyPath = path.join(tempDir, "story.md")
+			const taskState = createTaskState({
+				workflowName: "code-review.md",
+				workflowContents: `## Step 1: Determine Review Source
+Resolve the review source placeholders.
+
+## Step 2: Construct & Persist Review Input File
+Build the review input artifact.`,
+				checklistMarkdown: "- [ ] Step 1: Determine Review Source\n- [ ] Step 2: Construct & Persist Review Input File",
+				placeholderValues: {
+					story_path: storyPath,
+				},
+			})
+			await fs.writeFile(storyPath, "# Story")
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+			})
+
+			expect(result.checklist).to.equal(
+				"- [x] Step 1: Determine Review Source\n- [ ] Step 2: Construct & Persist Review Input File",
+			)
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
+				"story_path points to an existing story file.",
+			)
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("does not complete code-review step 1 when story_path is missing", async () => {
 		const taskState = createTaskState({
 			workflowName: "code-review.md",
 			workflowContents: `## Step 1: Determine Review Source
@@ -1053,9 +1090,7 @@ Resolve the review source placeholders.
 ## Step 2: Construct & Persist Review Input File
 Build the review input artifact.`,
 			checklistMarkdown: "- [ ] Step 1: Determine Review Source\n- [ ] Step 2: Construct & Persist Review Input File",
-			placeholderValues: {
-				spec_file: "/tmp/spec.md",
-			},
+			placeholderValues: {},
 		})
 
 		const result = await applyDeterministicPlaceholderProgression({
@@ -1064,9 +1099,9 @@ Build the review input artifact.`,
 		})
 
 		expect(result.checklist).to.equal(
-			"- [x] Step 1: Determine Review Source\n- [ ] Step 2: Construct & Persist Review Input File",
+			"- [ ] Step 1: Determine Review Source\n- [ ] Step 2: Construct & Persist Review Input File",
 		)
-		expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal("spec_file is present.")
+		expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
 	})
 
 	it("derives review_mode=full when fresh review input and diff artifacts exist", async () => {
@@ -1772,6 +1807,529 @@ Provide the final closeout report using attempt_completion.`,
 		expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
 			"attempt_completion was executed successfully for the final closeout report.",
 		)
+	})
+
+	it("completes write-remediation-story step 1 when story_path points to an existing story file", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-write-remediation-step1-"))
+
+		try {
+			const storyPath = path.join(tempDir, "story.md")
+			const taskState = createTaskState({
+				workflowName: "write-remediation-story.md",
+				workflowContents: `## Step 1: (System-Owned) Gather Necessary Inputs
+Wait for {story_path} to be available.`,
+				checklistMarkdown: "- [ ] Step 1: (System-Owned) Gather Necessary Inputs",
+				placeholderValues: {
+					story_path: storyPath,
+				},
+			})
+
+			await writeFileWithMtime(storyPath, "# Story\n", Date.now())
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+			})
+
+			expect(result.checklist).to.equal("- [x] Step 1: (System-Owned) Gather Necessary Inputs")
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
+				"story_path points to an existing story file.",
+			)
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("does not complete write-remediation-story step 1 when story_path is missing", async () => {
+		const taskState = createTaskState({
+			workflowName: "write-remediation-story.md",
+			workflowContents: `## Step 1: (System-Owned) Gather Necessary Inputs
+Wait for {story_path} to be available.`,
+			checklistMarkdown: "- [ ] Step 1: (System-Owned) Gather Necessary Inputs",
+		})
+
+		const result = await applyDeterministicPlaceholderProgression({
+			taskState,
+			checklistMarkdown: getChecklistMarkdown(taskState),
+		})
+
+		expect(result.checklist).to.equal("- [ ] Step 1: (System-Owned) Gather Necessary Inputs")
+		expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+	})
+
+	it("completes write-remediation-story step 2 when review_input points to a fresh review-input.md artifact", async () => {
+		const tempDir = await fs.mkdtemp(
+			path.join(os.tmpdir(), "deterministic-placeholder-write-remediation-step2-review-input-"),
+		)
+
+		try {
+			const outputFolder = path.join(tempDir, "output")
+			const reviewInputPath = path.join(outputFolder, "review-input.md")
+			const taskState = createTaskState({
+				workflowName: "write-remediation-story.md",
+				workflowContents: `## Step 2: (System-Owned) Build review-input.md
+Wait for review_input to be prepared.`,
+				checklistMarkdown: "- [ ] Step 2: (System-Owned) Build review-input.md",
+				placeholderValues: {
+					output_folder: outputFolder,
+					review_input: reviewInputPath,
+				},
+			})
+
+			await writeFileWithMtime(reviewInputPath, "# review input\n", Date.now())
+			recordTaskWriteProof(taskState, reviewInputPath)
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+			})
+
+			expect(result.checklist).to.equal("- [x] Step 2: (System-Owned) Build review-input.md")
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
+				"review_input was written during this task and the artifact still exists.",
+			)
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("completes write-remediation-story step 2 when review_input is stored as a relative path resolved from workflow cwd", async () => {
+		const tempDir = await fs.mkdtemp(
+			path.join(os.tmpdir(), "deterministic-placeholder-write-remediation-step2-review-input-relative-"),
+		)
+		const foreignCwd = await fs.mkdtemp(
+			path.join(os.tmpdir(), "deterministic-placeholder-write-remediation-step2-review-input-foreign-cwd-"),
+		)
+		const originalCwd = process.cwd()
+
+		try {
+			const reviewInputPath = path.join(tempDir, "output", "review-input.md")
+			const taskState = createTaskState({
+				workflowName: "write-remediation-story.md",
+				workflowContents: `## Step 2: (System-Owned) Build review-input.md
+Wait for review_input to be prepared.`,
+				checklistMarkdown: "- [ ] Step 2: (System-Owned) Build review-input.md",
+				stablePlaceholderValues: {
+					cwd: tempDir,
+					project_root: tempDir,
+				},
+				placeholderValues: {
+					output_folder: "output",
+					review_input: path.join("output", "review-input.md"),
+				},
+			})
+
+			await writeFileWithMtime(reviewInputPath, "# review input\n", Date.now())
+			recordTaskWriteProof(taskState, reviewInputPath)
+			process.chdir(foreignCwd)
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+			})
+
+			expect(result.checklist).to.equal("- [x] Step 2: (System-Owned) Build review-input.md")
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
+				"review_input was written during this task and the artifact still exists.",
+			)
+		} finally {
+			process.chdir(originalCwd)
+			await fs.rm(tempDir, { recursive: true, force: true })
+			await fs.rm(foreignCwd, { recursive: true, force: true })
+		}
+	})
+
+	it("does not complete write-remediation-story step 2 from fallback file existence alone when review_input is missing", async () => {
+		const tempDir = await fs.mkdtemp(
+			path.join(os.tmpdir(), "deterministic-placeholder-write-remediation-step2-review-input-missing-"),
+		)
+
+		try {
+			const outputFolder = path.join(tempDir, "output")
+			const taskState = createTaskState({
+				workflowName: "write-remediation-story.md",
+				workflowContents: `## Step 2: (System-Owned) Build review-input.md
+Wait for review_input to be prepared.`,
+				checklistMarkdown: "- [ ] Step 2: (System-Owned) Build review-input.md",
+				placeholderValues: {
+					output_folder: outputFolder,
+				},
+			})
+
+			await writeFileWithMtime(path.join(outputFolder, "review-input.md"), "# review input\n", Date.now())
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+			})
+
+			expect(result.checklist).to.equal("- [ ] Step 2: (System-Owned) Build review-input.md")
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("completes write-remediation-story step 3 when a distinct remediation story artifact exists with a current-task write proof, Status: ready-for-dev, and all required headings", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-write-remediation-step3-"))
+
+		try {
+			const implementationArtifactsDir = path.join(tempDir, "implementation-artifacts")
+			const storyPath = path.join(implementationArtifactsDir, "4-2-original-story.md")
+			const remediationArtifactPath = path.join(implementationArtifactsDir, "4-2_remediation_1.md")
+			const taskState = createTaskState({
+				workflowName: "write-remediation-story.md",
+				workflowContents: `## Step 3: Persist Remediation Story with Tasks / Subtasks Based on Recent Review Findings
+Wait for the remediation story to be persisted.`,
+				checklistMarkdown:
+					"- [ ] Step 3: Persist Remediation Story with Tasks / Subtasks Based on Recent Review Findings",
+				placeholderValues: {
+					story_path: storyPath,
+					implementation_artifacts: implementationArtifactsDir,
+				},
+			})
+
+			await writeFileWithMtime(storyPath, "# Original Story\n", Date.now())
+			await writeFileWithMtime(
+				remediationArtifactPath,
+				`Status: ready-for-dev
+
+# Remediation Story
+
+## Acceptance Criteria
+- Criterion
+
+## Allowed Files List
+- file.md
+
+## Tasks / Subtasks
+- [ ] Task
+
+## Latest Review Findings
+- Finding
+
+## Testing Requirements
+- test
+
+## Completion Notes List
+`,
+				Date.now(),
+			)
+			recordTaskWriteProof(taskState, remediationArtifactPath)
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+			})
+
+			expect(result.checklist).to.equal(
+				"- [x] Step 3: Persist Remediation Story with Tasks / Subtasks Based on Recent Review Findings",
+			)
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
+				"A remediation story artifact distinct from story_path was written during this task and contains Status: ready-for-dev plus all required section headings.",
+			)
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("does not complete write-remediation-story step 3 when the candidate artifact exists without a current-task write proof", async () => {
+		const tempDir = await fs.mkdtemp(
+			path.join(os.tmpdir(), "deterministic-placeholder-write-remediation-step3-missing-proof-"),
+		)
+
+		try {
+			const implementationArtifactsDir = path.join(tempDir, "implementation-artifacts")
+			const storyPath = path.join(implementationArtifactsDir, "4-2-original-story.md")
+			const remediationArtifactPath = path.join(implementationArtifactsDir, "4-2_remediation_1.md")
+			const taskState = createTaskState({
+				workflowName: "write-remediation-story.md",
+				workflowContents: `## Step 3: Persist Remediation Story with Tasks / Subtasks Based on Recent Review Findings
+Wait for the remediation story to be persisted.`,
+				checklistMarkdown:
+					"- [ ] Step 3: Persist Remediation Story with Tasks / Subtasks Based on Recent Review Findings",
+				placeholderValues: {
+					story_path: storyPath,
+					implementation_artifacts: implementationArtifactsDir,
+				},
+			})
+
+			await writeFileWithMtime(storyPath, "# Original Story\n", Date.now())
+			await writeFileWithMtime(
+				remediationArtifactPath,
+				`Status: ready-for-dev
+
+# Remediation Story
+
+## Acceptance Criteria
+- Criterion
+
+## Allowed Files List
+- file.md
+
+## Tasks / Subtasks
+- [ ] Task
+
+## Latest Review Findings
+- Finding
+
+## Testing Requirements
+- test
+
+## Completion Notes List
+`,
+				Date.now(),
+			)
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+			})
+
+			expect(result.checklist).to.equal(
+				"- [ ] Step 3: Persist Remediation Story with Tasks / Subtasks Based on Recent Review Findings",
+			)
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("does not complete write-remediation-story step 3 when only story_path itself was updated", async () => {
+		const tempDir = await fs.mkdtemp(
+			path.join(os.tmpdir(), "deterministic-placeholder-write-remediation-step3-story-path-only-"),
+		)
+
+		try {
+			const implementationArtifactsDir = path.join(tempDir, "implementation-artifacts")
+			const storyPath = path.join(implementationArtifactsDir, "4-2-original-story.md")
+			const taskState = createTaskState({
+				workflowName: "write-remediation-story.md",
+				workflowContents: `## Step 3: Persist Remediation Story with Tasks / Subtasks Based on Recent Review Findings
+Wait for the remediation story to be persisted.`,
+				checklistMarkdown:
+					"- [ ] Step 3: Persist Remediation Story with Tasks / Subtasks Based on Recent Review Findings",
+				placeholderValues: {
+					story_path: storyPath,
+					implementation_artifacts: implementationArtifactsDir,
+				},
+			})
+
+			await writeFileWithMtime(
+				storyPath,
+				`Status: ready-for-dev
+
+# Remediation Story
+
+## Acceptance Criteria
+- Criterion
+
+## Allowed Files List
+- file.md
+
+## Tasks / Subtasks
+- [ ] Task
+
+## Latest Review Findings
+- Finding
+
+## Testing Requirements
+- test
+
+## Completion Notes List
+`,
+				Date.now(),
+			)
+			recordTaskWriteProof(taskState, storyPath)
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+			})
+
+			expect(result.checklist).to.equal(
+				"- [ ] Step 3: Persist Remediation Story with Tasks / Subtasks Based on Recent Review Findings",
+			)
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("does not complete write-remediation-story step 3 when the candidate artifact is missing a required section heading", async () => {
+		const tempDir = await fs.mkdtemp(
+			path.join(os.tmpdir(), "deterministic-placeholder-write-remediation-step3-missing-heading-"),
+		)
+
+		try {
+			const implementationArtifactsDir = path.join(tempDir, "implementation-artifacts")
+			const storyPath = path.join(implementationArtifactsDir, "4-2-original-story.md")
+			const remediationArtifactPath = path.join(implementationArtifactsDir, "4-2_remediation_1.md")
+			const taskState = createTaskState({
+				workflowName: "write-remediation-story.md",
+				workflowContents: `## Step 3: Persist Remediation Story with Tasks / Subtasks Based on Recent Review Findings
+Wait for the remediation story to be persisted.`,
+				checklistMarkdown:
+					"- [ ] Step 3: Persist Remediation Story with Tasks / Subtasks Based on Recent Review Findings",
+				placeholderValues: {
+					story_path: storyPath,
+					implementation_artifacts: implementationArtifactsDir,
+				},
+			})
+
+			await writeFileWithMtime(storyPath, "# Original Story\n", Date.now())
+			await writeFileWithMtime(
+				remediationArtifactPath,
+				`Status: ready-for-dev
+
+# Remediation Story
+
+## Acceptance Criteria
+- Criterion
+
+## Allowed Files List
+- file.md
+
+## Tasks / Subtasks
+- [ ] Task
+
+## Latest Review Findings
+- Finding
+
+## Completion Notes List
+`,
+				Date.now(),
+			)
+			recordTaskWriteProof(taskState, remediationArtifactPath)
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+			})
+
+			expect(result.checklist).to.equal(
+				"- [ ] Step 3: Persist Remediation Story with Tasks / Subtasks Based on Recent Review Findings",
+			)
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("completes write-remediation-story step 3 from a relative output_folder when the remediation artifact exists with a current-task write proof", async () => {
+		const tempDir = await fs.mkdtemp(
+			path.join(os.tmpdir(), "deterministic-placeholder-write-remediation-step3-relative-output-"),
+		)
+
+		try {
+			const remediationArtifactPath = path.join(tempDir, "output", "implementation-artifacts", "4-2_remediation_1.md")
+			const storyPath = path.join(tempDir, "output", "implementation-artifacts", "4-2-original-story.md")
+			const taskState = createTaskState({
+				workflowName: "write-remediation-story.md",
+				workflowContents: `## Step 3: Persist Remediation Story with Tasks / Subtasks Based on Recent Review Findings
+Wait for the remediation story to be persisted.`,
+				checklistMarkdown:
+					"- [ ] Step 3: Persist Remediation Story with Tasks / Subtasks Based on Recent Review Findings",
+				stablePlaceholderValues: {
+					cwd: tempDir,
+					project_root: tempDir,
+				},
+				placeholderValues: {
+					output_folder: "output",
+					story_path: "output/implementation-artifacts/4-2-original-story.md",
+				},
+			})
+
+			await writeFileWithMtime(storyPath, "# Original Story\n", Date.now())
+			await writeFileWithMtime(
+				remediationArtifactPath,
+				`Status: ready-for-dev
+
+# Remediation Story
+
+## Acceptance Criteria
+- Criterion
+
+## Allowed Files List
+- file.md
+
+## Tasks / Subtasks
+- [ ] Task
+
+## Latest Review Findings
+- Finding
+
+## Testing Requirements
+- test
+
+## Completion Notes List
+`,
+				Date.now(),
+			)
+			recordTaskWriteProof(taskState, remediationArtifactPath)
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+			})
+
+			expect(result.checklist).to.equal(
+				"- [x] Step 3: Persist Remediation Story with Tasks / Subtasks Based on Recent Review Findings",
+			)
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
+				"A remediation story artifact distinct from story_path was written during this task and contains Status: ready-for-dev plus all required section headings.",
+			)
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("completes write-remediation-story step 4 from successful attempt_completion tool context", async () => {
+		const taskState = createTaskState({
+			workflowName: "write-remediation-story.md",
+			workflowContents: `## Step 4: Notify User of Completion
+Use attempt_completion to notify the user.`,
+			checklistMarkdown: "- [ ] Step 4: Notify User of Completion",
+		})
+
+		const result = await applyDeterministicPlaceholderProgression({
+			taskState,
+			checklistMarkdown: getChecklistMarkdown(taskState),
+			toolContext: {
+				toolName: "attempt_completion",
+				toolParams: { result: "Done" },
+				toolResult: "[attempt_completion] Result:\nDone",
+				toolWasExecuted: true,
+			},
+		})
+
+		expect(result.checklist).to.equal("- [x] Step 4: Notify User of Completion")
+		expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
+			"attempt_completion was executed successfully for the remediation story delivery.",
+		)
+	})
+
+	it("does not complete write-remediation-story step 4 when attempt_completion was not executed", async () => {
+		const taskState = createTaskState({
+			workflowName: "write-remediation-story.md",
+			workflowContents: `## Step 4: Notify User of Completion
+Use attempt_completion to notify the user.`,
+			checklistMarkdown: "- [ ] Step 4: Notify User of Completion",
+		})
+
+		const result = await applyDeterministicPlaceholderProgression({
+			taskState,
+			checklistMarkdown: getChecklistMarkdown(taskState),
+			toolContext: {
+				toolName: "attempt_completion",
+				toolParams: { result: "Done" },
+				toolResult: "[attempt_completion] Result:\nDone",
+				toolWasExecuted: false,
+			},
+		})
+
+		expect(result.checklist).to.equal("- [ ] Step 4: Notify User of Completion")
+		expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
 	})
 
 	it("leaves still-unsupported placeholder workflows unchanged and adds no notices", async () => {

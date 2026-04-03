@@ -63,13 +63,16 @@ export class WorkflowFormRuntime {
 	constructor(private readonly resolvers: Record<string, WorkflowFormResolverDefinition> = workflowFormRegistry) {}
 
 	createSession(options: WorkflowFormRuntimeCreateSessionOptions): WorkflowFormSessionState {
+		const resolver = this.getResolver(options.resolverId)
+		const initialPhase = options.initialPhase ?? resolver.defaultInitialPhase ?? "confirm"
+
 		return {
 			sessionId: randomUUID(),
 			resolverId: options.resolverId,
 			triggerSource: options.triggerSource,
 			owner: options.owner,
-			phase: options.initialPhase ?? "confirm",
-			initialPhase: options.initialPhase ?? "confirm",
+			phase: initialPhase,
+			initialPhase,
 			values: {},
 			context: options.context,
 		}
@@ -79,7 +82,11 @@ export class WorkflowFormRuntime {
 		const resolver = this.getResolver(session.resolverId)
 		const definition = resolver.buildDefinition(session)
 
-		return buildWorkflowFormPayload({ session, definition })
+		return buildWorkflowFormPayload({
+			session,
+			definition,
+			automaticStatusState: definition.presentation?.kind === "automatic_status" ? "pending" : undefined,
+		})
 	}
 
 	buildRetryPayload(session: WorkflowFormSessionState, errorMessage: string): ClineWorkflowForm {
@@ -106,7 +113,20 @@ export class WorkflowFormRuntime {
 		return buildWorkflowFormPayload({
 			session: successSession,
 			definition,
+			automaticStatusState: definition.presentation?.kind === "automatic_status" ? "success" : undefined,
 			successMessage,
+		})
+	}
+
+	buildFailurePayload(session: WorkflowFormSessionState): ClineWorkflowForm {
+		const resolver = this.getResolver(session.resolverId)
+		const failureSession = { ...session, phase: "success" as const }
+		const definition = resolver.buildDefinition(failureSession)
+
+		return buildWorkflowFormPayload({
+			session: failureSession,
+			definition,
+			automaticStatusState: "failure",
 		})
 	}
 

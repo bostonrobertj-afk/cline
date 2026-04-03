@@ -74,6 +74,7 @@ import SearchResultsDisplay from "./SearchResultsDisplay"
 import SubagentStatusRow from "./SubagentStatusRow"
 import { ThinkingRow } from "./ThinkingRow"
 import UserMessage from "./UserMessage"
+import { WorkflowPreparationStatusRow } from "./WorkflowPreparationStatusRow"
 
 const HEADER_CLASSNAMES = "flex items-center gap-2.5 mb-3"
 
@@ -274,7 +275,10 @@ export const ChatRowContent = memo(
 
 		const type = message.type === "ask" ? message.ask : message.say
 		const workflowForm = useMemo(() => {
-			if (message.ask !== "workflow_form" || !message.text) {
+			const isWorkflowFormMessage =
+				(message.type === "ask" && message.ask === "workflow_form") ||
+				(message.type === "say" && message.say === "workflow_form")
+			if (!isWorkflowFormMessage || !message.text) {
 				return undefined
 			}
 
@@ -284,7 +288,7 @@ export const ChatRowContent = memo(
 				console.error("Failed to parse workflow form payload:", error)
 				return undefined
 			}
-		}, [message.ask, message.text])
+		}, [message.ask, message.say, message.text, message.type])
 		const [workflowFormValues, setWorkflowFormValues] = useState<Record<string, string>>({})
 		const [workflowFormSubmissionPending, setWorkflowFormSubmissionPending] = useState(false)
 		const [isWorkflowDictionaryOpen, setIsWorkflowDictionaryOpen] = useState(false)
@@ -538,6 +542,227 @@ export const ChatRowContent = memo(
 
 			setIsWorkflowDictionaryOpen(true)
 		}, [workflowForm])
+
+		const renderWorkflowFormContent = () => {
+			if (!workflowForm) {
+				return <InvisibleSpacer />
+			}
+
+			const automaticPresentation = workflowForm.definition.presentation
+			if (automaticPresentation?.kind === "automatic_status") {
+				const state = workflowForm.automaticStatusState ?? "pending"
+				const label =
+					state === "pending"
+						? automaticPresentation.pendingLabel
+						: state === "success"
+							? automaticPresentation.successLabel
+							: automaticPresentation.failureLabel
+
+				return <WorkflowPreparationStatusRow label={label} state={state} />
+			}
+
+			return (
+				<div className="border border-editor-group-border rounded-xs bg-code/40 p-3">
+					<div className={HEADER_CLASSNAMES}>
+						<SettingsIcon className="size-2" />
+						<span className="font-bold">System-owned form:</span>
+					</div>
+					<div className="text-sm font-semibold">{workflowForm.definition.title}</div>
+					<div className="pt-2">
+						<MarkdownRow
+							markdown={
+								workflowForm.phase === "success"
+									? workflowForm.successMessage || ""
+									: (workflowFormPage?.prompt ?? "")
+							}
+						/>
+					</div>
+					{workflowForm.phase !== "success" && (
+						<div className="pt-3">
+							<button
+								className="text-xs underline underline-offset-2 text-link disabled:opacity-50"
+								disabled={workflowFormSubmissionPending}
+								onClick={() => {
+									void handleWorkflowDictionaryOpen()
+								}}
+								type="button">
+								Open inputs reference
+							</button>
+							<Dialog
+								onOpenChange={(open) => {
+									if (!open) {
+										setIsWorkflowDictionaryOpen(false)
+									}
+								}}
+								open={isWorkflowDictionaryOpen}>
+								<DialogContent className="max-h-[80vh] overflow-y-auto">
+									<DialogHeader>
+										<DialogTitle>{workflowForm.definition.toolDictionaryTitle}</DialogTitle>
+										<DialogDescription>
+											Read-only reference for the current workflow form tool.
+										</DialogDescription>
+									</DialogHeader>
+									<MarkdownRow markdown={workflowForm.definition.toolDictionaryMarkdown} />
+								</DialogContent>
+							</Dialog>
+						</div>
+					)}
+					{workflowForm.phase === "confirm" && (
+						<div className="pt-3">
+							<OptionsButtons
+								isActive={isLast && message.ask === "workflow_form" && !workflowFormSubmissionPending}
+								onSelect={(option) =>
+									handleWorkflowFormAction(
+										option === "Yes" ? WorkflowFormAction.SUBMIT : WorkflowFormAction.CANCEL,
+										option === "Yes" ? { confirm: "yes" } : undefined,
+									)
+								}
+								options={workflowFormOptions.length > 0 ? workflowFormOptions : ["Yes", "No"]}
+							/>
+						</div>
+					)}
+					{workflowForm.phase === "select_source" && (
+						<div className="pt-3 space-y-3">
+							<div className="space-y-3">
+								{sourceSelectionWorkflowFormFields.map((field) => renderWorkflowFormField(field))}
+							</div>
+							<div className="flex flex-wrap gap-2">
+								<button
+									className="rounded-xs border border-editor-group-border px-3 py-2 text-sm text-foreground disabled:opacity-50"
+									disabled={workflowFormSubmissionPending}
+									onClick={() => {
+										void handleWorkflowFormAction(WorkflowFormAction.CANCEL)
+									}}
+									type="button">
+									{workflowFormPage?.cancelLabel || "Cancel"}
+								</button>
+								<button
+									className="rounded-xs bg-button-background px-3 py-2 text-sm text-primary-foreground disabled:opacity-50"
+									disabled={workflowFormSubmissionPending || isWorkflowFormSubmitDisabled}
+									onClick={() => {
+										void handleWorkflowFormAction(WorkflowFormAction.SUBMIT, {
+											"source.type": workflowFormValues["source.type"] ?? "",
+										})
+									}}
+									type="button">
+									{workflowFormPage?.submitLabel || "Next"}
+								</button>
+							</div>
+						</div>
+					)}
+					{workflowForm.phase === "collect_inputs" && (
+						<div className="pt-3 space-y-3">
+							<div className="space-y-3">
+								{ungroupedWorkflowFormFields.map((field) => renderWorkflowFormField(field))}
+								{Object.entries(groupedWorkflowFormFields).map(([groupId, groupFields]) => (
+									<div className="space-y-3" key={groupId}>
+										<div className="text-xs text-muted-foreground">Provide one of the following</div>
+										{groupFields.map((field, index) => (
+											<div className="space-y-3" key={field.key}>
+												{renderWorkflowFormField(field)}
+												{index < groupFields.length - 1 && (
+													<div className="text-xs font-semibold text-muted-foreground">OR</div>
+												)}
+											</div>
+										))}
+									</div>
+								))}
+							</div>
+							<div className="flex flex-wrap gap-2">
+								<button
+									className="rounded-xs border border-editor-group-border px-3 py-2 text-sm text-foreground disabled:opacity-50"
+									disabled={workflowFormSubmissionPending}
+									onClick={() => {
+										void handleWorkflowFormAction(WorkflowFormAction.CANCEL)
+									}}
+									type="button">
+									{workflowFormPage?.cancelLabel || "Cancel"}
+								</button>
+								<button
+									className="rounded-xs bg-button-background px-3 py-2 text-sm text-primary-foreground disabled:opacity-50"
+									disabled={workflowFormSubmissionPending || isWorkflowFormSubmitDisabled}
+									onClick={() => {
+										void handleWorkflowFormAction(
+											WorkflowFormAction.SUBMIT,
+											Object.fromEntries(
+												concreteWorkflowFormFields.map((field) => [
+													field.key,
+													workflowFormValues[field.key] ?? "",
+												]),
+											),
+										)
+									}}
+									type="button">
+									{workflowFormPage?.submitLabel || "Submit"}
+								</button>
+							</div>
+						</div>
+					)}
+					{workflowForm.phase === "retry_error" && (
+						<div className="pt-3 space-y-3">
+							{workflowForm.errorMessage && (
+								<div className="rounded-xs border border-error/50 bg-error/10 px-3 py-2 text-sm text-foreground">
+									{workflowForm.errorMessage}
+								</div>
+							)}
+							<div className="space-y-3">
+								{ungroupedWorkflowFormFields.map((field) => renderWorkflowFormField(field))}
+								{Object.entries(groupedWorkflowFormFields).map(([groupId, groupFields]) => (
+									<div className="space-y-3" key={groupId}>
+										<div className="text-xs text-muted-foreground">Provide one of the following</div>
+										{groupFields.map((field, index) => (
+											<div className="space-y-3" key={field.key}>
+												{renderWorkflowFormField(field)}
+												{index < groupFields.length - 1 && (
+													<div className="text-xs font-semibold text-muted-foreground">OR</div>
+												)}
+											</div>
+										))}
+									</div>
+								))}
+							</div>
+							<div className="flex flex-wrap gap-2">
+								<button
+									className="rounded-xs border border-editor-group-border px-3 py-2 text-sm text-foreground disabled:opacity-50"
+									disabled={workflowFormSubmissionPending}
+									onClick={() => {
+										void handleWorkflowFormAction(WorkflowFormAction.CANCEL)
+									}}
+									type="button">
+									{workflowFormPage?.cancelLabel || "Cancel"}
+								</button>
+								<button
+									className="rounded-xs border border-editor-group-border px-3 py-2 text-sm text-foreground disabled:opacity-50"
+									disabled={workflowFormSubmissionPending}
+									onClick={() => {
+										void handleWorkflowFormAction(WorkflowFormAction.RETRY)
+									}}
+									type="button">
+									{workflowFormPage?.retryLabel || "Start Over"}
+								</button>
+								<button
+									className="rounded-xs bg-button-background px-3 py-2 text-sm text-primary-foreground disabled:opacity-50"
+									disabled={workflowFormSubmissionPending || isWorkflowFormSubmitDisabled}
+									onClick={() => {
+										void handleWorkflowFormAction(
+											WorkflowFormAction.SUBMIT,
+											Object.fromEntries(
+												concreteWorkflowFormFields.map((field) => [
+													field.key,
+													workflowFormValues[field.key] ?? "",
+												]),
+											),
+										)
+									}}
+									type="button">
+									{workflowFormPage?.submitLabel || "Submit"}
+								</button>
+							</div>
+						</div>
+					)}
+				</div>
+			)
+		}
 
 		const renderWorkflowFormField = useCallback(
 			(field: WorkflowFormFieldDefinition) => (
@@ -1342,6 +1567,8 @@ export const ChatRowContent = memo(
 						return <InvisibleSpacer />
 					case "subagent":
 						return <SubagentStatusRow isLast={isLast} lastModifiedMessage={lastModifiedMessage} message={message} />
+					case "workflow_form":
+						return renderWorkflowFormContent()
 					case "shell_integration_warning_with_suggestion":
 						const isBackgroundModeEnabled = vscodeTerminalExecutionMode === "backgroundExec"
 						return (
@@ -1528,219 +1755,7 @@ export const ChatRowContent = memo(
 						)
 					}
 					case "workflow_form": {
-						if (!workflowForm) {
-							return <InvisibleSpacer />
-						}
-
-						return (
-							<div className="border border-editor-group-border rounded-xs bg-code/40 p-3">
-								<div className={HEADER_CLASSNAMES}>
-									<SettingsIcon className="size-2" />
-									<span className="font-bold">System-owned form:</span>
-								</div>
-								<div className="text-sm font-semibold">{workflowForm.definition.title}</div>
-								<div className="pt-2">
-									<MarkdownRow
-										markdown={
-											workflowForm.phase === "success"
-												? workflowForm.successMessage || ""
-												: (workflowFormPage?.prompt ?? "")
-										}
-									/>
-								</div>
-								{workflowForm.phase !== "success" && (
-									<div className="pt-3">
-										<button
-											className="text-xs underline underline-offset-2 text-link disabled:opacity-50"
-											disabled={workflowFormSubmissionPending}
-											onClick={() => {
-												void handleWorkflowDictionaryOpen()
-											}}
-											type="button">
-											Open inputs reference
-										</button>
-										<Dialog
-											onOpenChange={(open) => {
-												if (!open) {
-													setIsWorkflowDictionaryOpen(false)
-												}
-											}}
-											open={isWorkflowDictionaryOpen}>
-											<DialogContent className="max-h-[80vh] overflow-y-auto">
-												<DialogHeader>
-													<DialogTitle>{workflowForm.definition.toolDictionaryTitle}</DialogTitle>
-													<DialogDescription>
-														Read-only reference for the current workflow form tool.
-													</DialogDescription>
-												</DialogHeader>
-												<MarkdownRow markdown={workflowForm.definition.toolDictionaryMarkdown} />
-											</DialogContent>
-										</Dialog>
-									</div>
-								)}
-								{workflowForm.phase === "confirm" && (
-									<div className="pt-3">
-										<OptionsButtons
-											isActive={isLast && message.ask === "workflow_form" && !workflowFormSubmissionPending}
-											onSelect={(option) =>
-												handleWorkflowFormAction(
-													option === "Yes" ? WorkflowFormAction.SUBMIT : WorkflowFormAction.CANCEL,
-													option === "Yes" ? { confirm: "yes" } : undefined,
-												)
-											}
-											options={workflowFormOptions.length > 0 ? workflowFormOptions : ["Yes", "No"]}
-										/>
-									</div>
-								)}
-								{workflowForm.phase === "select_source" && (
-									<div className="pt-3 space-y-3">
-										<div className="space-y-3">
-											{sourceSelectionWorkflowFormFields.map((field) => renderWorkflowFormField(field))}
-										</div>
-										<div className="flex flex-wrap gap-2">
-											<button
-												className="rounded-xs border border-editor-group-border px-3 py-2 text-sm text-foreground disabled:opacity-50"
-												disabled={workflowFormSubmissionPending}
-												onClick={() => {
-													void handleWorkflowFormAction(WorkflowFormAction.CANCEL)
-												}}
-												type="button">
-												{workflowFormPage?.cancelLabel || "Cancel"}
-											</button>
-											<button
-												className="rounded-xs bg-button-background px-3 py-2 text-sm text-primary-foreground disabled:opacity-50"
-												disabled={workflowFormSubmissionPending || isWorkflowFormSubmitDisabled}
-												onClick={() => {
-													void handleWorkflowFormAction(WorkflowFormAction.SUBMIT, {
-														"source.type": workflowFormValues["source.type"] ?? "",
-													})
-												}}
-												type="button">
-												{workflowFormPage?.submitLabel || "Next"}
-											</button>
-										</div>
-									</div>
-								)}
-								{workflowForm.phase === "collect_inputs" && (
-									<div className="pt-3 space-y-3">
-										<div className="space-y-3">
-											{ungroupedWorkflowFormFields.map((field) => renderWorkflowFormField(field))}
-											{Object.entries(groupedWorkflowFormFields).map(([groupId, groupFields]) => (
-												<div className="space-y-3" key={groupId}>
-													<div className="text-xs text-muted-foreground">
-														Provide one of the following
-													</div>
-													{groupFields.map((field, index) => (
-														<div className="space-y-3" key={field.key}>
-															{renderWorkflowFormField(field)}
-															{index < groupFields.length - 1 && (
-																<div className="text-xs font-semibold text-muted-foreground">
-																	OR
-																</div>
-															)}
-														</div>
-													))}
-												</div>
-											))}
-										</div>
-										<div className="flex flex-wrap gap-2">
-											<button
-												className="rounded-xs border border-editor-group-border px-3 py-2 text-sm text-foreground disabled:opacity-50"
-												disabled={workflowFormSubmissionPending}
-												onClick={() => {
-													void handleWorkflowFormAction(WorkflowFormAction.CANCEL)
-												}}
-												type="button">
-												{workflowFormPage?.cancelLabel || "Cancel"}
-											</button>
-											<button
-												className="rounded-xs bg-button-background px-3 py-2 text-sm text-primary-foreground disabled:opacity-50"
-												disabled={workflowFormSubmissionPending || isWorkflowFormSubmitDisabled}
-												onClick={() => {
-													void handleWorkflowFormAction(
-														WorkflowFormAction.SUBMIT,
-														Object.fromEntries(
-															concreteWorkflowFormFields.map((field) => [
-																field.key,
-																workflowFormValues[field.key] ?? "",
-															]),
-														),
-													)
-												}}
-												type="button">
-												{workflowFormPage?.submitLabel || "Submit"}
-											</button>
-										</div>
-									</div>
-								)}
-								{workflowForm.phase === "retry_error" && (
-									<div className="pt-3 space-y-3">
-										{workflowForm.errorMessage && (
-											<div className="rounded-xs border border-error/50 bg-error/10 px-3 py-2 text-sm text-foreground">
-												{workflowForm.errorMessage}
-											</div>
-										)}
-										<div className="space-y-3">
-											{ungroupedWorkflowFormFields.map((field) => renderWorkflowFormField(field))}
-											{Object.entries(groupedWorkflowFormFields).map(([groupId, groupFields]) => (
-												<div className="space-y-3" key={groupId}>
-													<div className="text-xs text-muted-foreground">
-														Provide one of the following
-													</div>
-													{groupFields.map((field, index) => (
-														<div className="space-y-3" key={field.key}>
-															{renderWorkflowFormField(field)}
-															{index < groupFields.length - 1 && (
-																<div className="text-xs font-semibold text-muted-foreground">
-																	OR
-																</div>
-															)}
-														</div>
-													))}
-												</div>
-											))}
-										</div>
-										<div className="flex flex-wrap gap-2">
-											<button
-												className="rounded-xs border border-editor-group-border px-3 py-2 text-sm text-foreground disabled:opacity-50"
-												disabled={workflowFormSubmissionPending}
-												onClick={() => {
-													void handleWorkflowFormAction(WorkflowFormAction.CANCEL)
-												}}
-												type="button">
-												{workflowFormPage?.cancelLabel || "Cancel"}
-											</button>
-											<button
-												className="rounded-xs border border-editor-group-border px-3 py-2 text-sm text-foreground disabled:opacity-50"
-												disabled={workflowFormSubmissionPending}
-												onClick={() => {
-													void handleWorkflowFormAction(WorkflowFormAction.RETRY)
-												}}
-												type="button">
-												{workflowFormPage?.retryLabel || "Start Over"}
-											</button>
-											<button
-												className="rounded-xs bg-button-background px-3 py-2 text-sm text-primary-foreground disabled:opacity-50"
-												disabled={workflowFormSubmissionPending || isWorkflowFormSubmitDisabled}
-												onClick={() => {
-													void handleWorkflowFormAction(
-														WorkflowFormAction.SUBMIT,
-														Object.fromEntries(
-															concreteWorkflowFormFields.map((field) => [
-																field.key,
-																workflowFormValues[field.key] ?? "",
-															]),
-														),
-													)
-												}}
-												type="button">
-												{workflowFormPage?.submitLabel || "Submit"}
-											</button>
-										</div>
-									</div>
-								)}
-							</div>
-						)
+						return renderWorkflowFormContent()
 					}
 					default:
 						return <InvisibleSpacer />

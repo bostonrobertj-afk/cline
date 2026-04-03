@@ -1,5 +1,6 @@
 import type { ToolUse } from "@core/assistant-message"
 import { formatResponse } from "@core/prompts/responses"
+import { getPlaceholderWorkflowValueMap } from "@core/workflows/placeholder-workflow-rendering"
 import { buildWorkflowStablePlaceholders, resolveWorkflowPlaceholderText } from "@core/workflows/workflow-placeholders"
 import { getWorkspaceBasename } from "@core/workspace"
 import { getReadablePath, isLocatedInWorkspace } from "@utils/path"
@@ -38,33 +39,28 @@ async function atomicReplaceTextFile(filePath: string, content: string): Promise
 export class BuildReviewInputToolHandler implements IToolHandler, IPartialBlockHandler {
 	readonly name = ClineDefaultTool.BUILD_REVIEW_INPUT
 
-	getDescription(block: ToolUse): string {
-		const params = block.params as Record<string, unknown>
-		const storyPath = typeof params.story_path === "string" ? params.story_path.trim() : ""
-		const basename = storyPath ? path.basename(storyPath) : "unknown"
-		return `[build_review_input ${basename}]`
+	getDescription(_block: ToolUse): string {
+		return "[build_review_input]"
 	}
 
-	async handlePartialBlock(block: ToolUse, uiHelpers: StronglyTypedUIHelpers): Promise<void> {
-		const params = block.params as Record<string, unknown>
-		const storyPath = typeof params.story_path === "string" ? params.story_path.trim() : ""
-
-		await uiHelpers.say(
-			"tool",
-			JSON.stringify({ tool: "buildReviewInput", storyPathProvided: storyPath.length > 0 }),
-			undefined,
-			undefined,
-			true,
-		)
+	async handlePartialBlock(_block: ToolUse, uiHelpers: StronglyTypedUIHelpers): Promise<void> {
+		await uiHelpers.say("tool", JSON.stringify({ tool: "buildReviewInput" }), undefined, undefined, true)
 	}
 
 	async execute(config: TaskConfig, block: ToolUse): Promise<ToolResponse> {
 		const params = block.params as Record<string, unknown>
-		const storyPath = typeof params.story_path === "string" ? params.story_path.trim() : ""
+		const placeholders =
+			getPlaceholderWorkflowValueMap(
+				config.taskState.activePlaceholderWorkflowStableValues,
+				config.taskState.activePlaceholderWorkflowValues,
+			) ?? {}
+		const explicitStoryPath = typeof params.story_path === "string" ? params.story_path.trim() : ""
+		const storyPathRaw = placeholders.story_path?.trim() || explicitStoryPath
 
-		if (!storyPath) {
-			config.taskState.consecutiveMistakeCount++
-			return "Error: Missing required parameter 'story_path'."
+		if (!storyPathRaw) {
+			return formatResponse.toolError(
+				"Could not resolve workflow placeholder 'story_path' from the active placeholder workflow state.",
+			)
 		}
 
 		const stablePlaceholders = await buildWorkflowStablePlaceholders({ cwd: config.cwd })
@@ -87,7 +83,9 @@ export class BuildReviewInputToolHandler implements IToolHandler, IPartialBlockH
 			)
 		}
 
-		const storyAbsolutePath = path.isAbsolute(storyPath) ? storyPath : path.resolve(config.cwd, storyPath)
+		const resolutionBase =
+			placeholders.cwd?.trim() || placeholders.project_root?.trim() || placeholders["project-root"]?.trim() || config.cwd
+		const storyAbsolutePath = path.isAbsolute(storyPathRaw) ? storyPathRaw : path.resolve(resolutionBase, storyPathRaw)
 		const diffOutputPath = path.isAbsolute(diffOutputRaw) ? diffOutputRaw : path.resolve(config.cwd, diffOutputRaw)
 		const reviewInputPath = path.isAbsolute(reviewInputRaw) ? reviewInputRaw : path.resolve(config.cwd, reviewInputRaw)
 

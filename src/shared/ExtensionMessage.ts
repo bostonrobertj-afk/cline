@@ -429,11 +429,25 @@ export interface WorkflowFormPageDefinition {
 	retryLabel?: string
 }
 
+export type WorkflowFormPresentationKind = "interactive_form" | "automatic_status"
+
+export type WorkflowFormAutomaticStatusState = "pending" | "success" | "failure"
+
+export type WorkflowFormPresentation =
+	| { kind: "interactive_form" }
+	| {
+			kind: "automatic_status"
+			pendingLabel: string
+			successLabel: string
+			failureLabel: string
+	  }
+
 export interface WorkflowFormDefinition {
 	toolName: string
 	title: string
 	toolDictionaryTitle: string
 	toolDictionaryMarkdown: string
+	presentation?: WorkflowFormPresentation
 	pages: Partial<Record<WorkflowFormRenderablePhase, WorkflowFormPageDefinition>>
 	successMessage: string
 }
@@ -444,6 +458,7 @@ export interface ClineWorkflowForm {
 	phase: WorkflowFormPhase
 	definition: WorkflowFormDefinition
 	values?: Record<string, WorkflowFormFieldValuePayload>
+	automaticStatusState?: WorkflowFormAutomaticStatusState
 	errorMessage?: string
 	successMessage?: string
 }

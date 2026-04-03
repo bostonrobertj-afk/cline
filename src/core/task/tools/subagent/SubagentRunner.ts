@@ -6,13 +6,9 @@ import { parseAssistantMessageV2, ToolUse } from "@core/assistant-message"
 import { discoverSkills, getAvailableSkills } from "@core/context/instructions/user-instructions/skills"
 import { formatResponse } from "@core/prompts/responses"
 import { PromptRegistry } from "@core/prompts/system-prompt"
+import { resolveWorkflowPersonaInstructions } from "@core/prompts/system-prompt/registry/workflowPersonaRegistry"
 import type { SystemPromptContext } from "@core/prompts/system-prompt/types"
-import {
-	buildBmadAgentRoleInstructions,
-	getBmadWorkflowReminder,
-	getOwningBmadAgentForSkill,
-	resolvePlaceholderWorkflowManagedVariant,
-} from "@core/task/bmad-agent-mode"
+import { getBmadWorkflowReminder } from "@core/task/bmad-agent-mode"
 import { FocusChainManager } from "@core/task/focus-chain"
 import {
 	type DeterministicPlaceholderToolContext,
@@ -574,7 +570,6 @@ export class SubagentRunner {
 					return { status: "failed", error, stats }
 				}
 
-				state.activeAgentJustActivated = false
 				state.activeWorkflowJustStarted = false
 
 				if (
@@ -974,14 +969,11 @@ export class SubagentRunner {
 			? this.resolvePromptSkills(params.availableSkills, params.configuredSkillNames, params.assignedSkillNames)
 			: []
 
-		let activeAgentRoleInstructions: string | undefined
+		const activeWorkflowName = params.state.activePlaceholderWorkflowSource?.name
+		const activeWorkflowPersonaInstructions = params.shouldSendFullPromptAssembly
+			? resolveWorkflowPersonaInstructions(activeWorkflowName)
+			: undefined
 		let activeWorkflowReminder: string | undefined
-
-		if (params.shouldSendFullPromptAssembly && params.state.activeAgentId) {
-			activeAgentRoleInstructions = await buildBmadAgentRoleInstructions(this.baseConfig.cwd, params.state.activeAgentId, {
-				includeActivation: params.state.activeAgentJustActivated,
-			})
-		}
 
 		if (params.shouldSendFullPromptAssembly && params.state.managedWorkflowRun) {
 			activeWorkflowReminder = buildManagedWorkflowPrompt(params.state.managedWorkflowRun)
@@ -1005,8 +997,8 @@ export class SubagentRunner {
 			cwd: this.baseConfig.cwd,
 			ide: params.hostIde,
 			skills,
-			activeAgentId: params.shouldSendFullPromptAssembly ? params.state.activeAgentId : undefined,
-			activeAgentRoleInstructions,
+			activeWorkflowName,
+			activeWorkflowPersonaInstructions,
 			activeWorkflowReminder,
 			activeWorkflowSupportsPlaceholders: !!params.state.managedWorkflowRun || !!params.state.activePlaceholderWorkflowId,
 			...activePlaceholderWorkflowPromptContext,
@@ -1034,7 +1026,6 @@ export class SubagentRunner {
 		return shouldSendFullPromptAssembly({
 			isFirstRequest: state.apiRequestCount === 1,
 			hasHumanAuthoredInput: false,
-			activeAgentJustActivated: state.activeAgentJustActivated,
 			activeWorkflowJustStarted: state.activeWorkflowJustStarted,
 			didRespondToPlanAskBySwitchingMode: false,
 			turnsSinceFullPromptRefresh: state.turnsSinceFullPromptRefresh,
@@ -1059,16 +1050,6 @@ export class SubagentRunner {
 		const assignedSkill = assignedSkillNames[0]
 		const managedWorkflowDefinition = await getManagedWorkflowDefinition(this.baseConfig.cwd, assignedSkill)
 		if (managedWorkflowDefinition?.workflowId && managedWorkflowDefinition?.slashCommand) {
-			if (!state.activeAgentId) {
-				const owningAgent = await getOwningBmadAgentForSkill(this.baseConfig.cwd, managedWorkflowDefinition.workflowId)
-				if (owningAgent) {
-					state.activeAgentId = owningAgent.id
-					state.activeAgentSkillName = owningAgent.id
-					state.activeAgentInvokedSlashCommand = managedWorkflowDefinition.slashCommand
-					state.activeAgentJustActivated = true
-				}
-			}
-
 			await activateManagedWorkflowInTaskState({
 				cwd: this.baseConfig.cwd,
 				taskState: state,
@@ -1081,16 +1062,6 @@ export class SubagentRunner {
 		const resolvedWorkflow = findResolvedWorkflowByName(workflowEntries, assignedSkill)
 		if (!resolvedWorkflow) {
 			return
-		}
-
-		if (!state.activeAgentId) {
-			const managedVariant = await resolvePlaceholderWorkflowManagedVariant(this.baseConfig.cwd, assignedSkill)
-			if (managedVariant?.owningAgent) {
-				state.activeAgentId = managedVariant.owningAgent.id
-				state.activeAgentSkillName = managedVariant.owningAgent.id
-				state.activeAgentInvokedSlashCommand = assignedSkill
-				state.activeAgentJustActivated = true
-			}
 		}
 
 		await activatePlaceholderWorkflowInTaskState({

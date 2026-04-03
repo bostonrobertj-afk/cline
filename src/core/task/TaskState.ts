@@ -36,6 +36,7 @@ export type DeterministicPlaceholderWorkflowName =
 	| "review-adversarial-general.md"
 	| "blind-review.md"
 	| "review-edge-case-hunter.md"
+	| "write-remediation-story.md"
 
 export interface AutoCompletedPlaceholderWorkflowStepNotice {
 	workflowName: DeterministicPlaceholderWorkflowName
@@ -141,10 +142,6 @@ export class TaskState {
 
 	// Task Initialization
 	isInitialized = false
-	activeAgentId?: string
-	activeAgentSkillName?: string
-	activeAgentInvokedSlashCommand?: string
-	activeAgentJustActivated = false
 	activeWorkflowId?: string
 	activePlaceholderWorkflowId?: string
 	activePlaceholderWorkflowSource?: ActivePlaceholderWorkflowSource

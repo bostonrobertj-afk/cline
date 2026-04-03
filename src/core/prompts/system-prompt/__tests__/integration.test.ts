@@ -27,6 +27,7 @@ import { ModelFamily } from "@/shared/prompts"
 import type { ClineTool } from "@/shared/tools"
 import { isGPT5ModelFamily } from "@/utils/model-utils"
 import { getSystemPrompt, PromptRegistry } from "../index"
+import { resolveWorkflowPersonaInstructions } from "../registry/workflowPersonaRegistry"
 import type { SystemPromptContext } from "../types"
 import { AGENT_FEEDBACK_PROMPT_GUIDANCE } from "../types"
 
@@ -1308,7 +1309,7 @@ describe("Prompt System Integration Tests", () => {
 			)
 		})
 
-		it("does not inline the verbose tool catalog for BMAD-active GPT-5.4 OpenAI turns", async function () {
+		it("injects workflow persona guidance for GPT-5.4 OpenAI full prompts without XML artifacts", async function () {
 			await runPromptTest(
 				this,
 				{
@@ -1316,32 +1317,38 @@ describe("Prompt System Integration Tests", () => {
 					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
 					enableNativeToolCalls: true,
 					useMinimalGptPrompt: true,
-					activeAgentId: "bmad-quick-flow-solo-dev",
-					skills: [
-						{
-							name: "bmad-code-review",
-							description: "workflow",
-							path: "/skills/bmad-code-review/SKILL.md",
-							source: "project",
-						},
-					],
-					activeAgentRoleInstructions:
-						"Agent Metadata\nName: Barry\nTitle: Quick Flow Solo Dev\n\nActivation\n1. Load config\n\nPersona\nRole: Quick Flow Solo Dev",
+					activeWorkflowName: "code-review.md",
+					activeWorkflowPersonaInstructions: resolveWorkflowPersonaInstructions("code-review.md"),
 				},
 				"gpt-5.4-2026-03-05",
 				async ({ systemPrompt }) => {
-					expect(systemPrompt).to.include("Agent Metadata")
 					expect(systemPrompt).to.include("Persona")
-					expect(systemPrompt).to.not.include("You are Cline operating under the active BMAD agent persona")
+					expect(systemPrompt).to.include("Role: QA Agent")
 					expect(systemPrompt).to.not.include("<agent")
-					expect(systemPrompt).to.not.include("<activation")
 					expect(systemPrompt).to.not.include("<persona")
-					expect(systemPrompt).to.not.include("Installed skills and workflow activations available on this turn")
-					expect(systemPrompt).to.not.include("\nSKILLS\n")
-					expect(systemPrompt.match(/Role: Quick Flow Solo Dev/g)?.length).to.equal(1)
-					expect(systemPrompt).to.not.include("# Tools")
-					expect(systemPrompt).to.not.include("## execute_command")
-					expect(systemPrompt).to.not.include("Description: Request to execute a CLI command")
+					expect(systemPrompt).to.not.include("Active BMAD agent persona")
+				},
+			)
+		})
+
+		it("omits workflow persona guidance on continuation turns", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
+					enableNativeToolCalls: true,
+					useMinimalGptPrompt: true,
+					isContinuationTurn: true,
+					activeWorkflowName: "code-review.md",
+					activeWorkflowPersonaInstructions: undefined,
+				},
+				"gpt-5.4-2026-03-05",
+				async ({ systemPrompt }) => {
+					expect(systemPrompt).to.not.include("Role: QA Agent")
+					expect(systemPrompt).to.not.include(
+						"Identity: Meticulous code reviewer who finds every error, edge case, and missed detail.",
+					)
 				},
 			)
 		})

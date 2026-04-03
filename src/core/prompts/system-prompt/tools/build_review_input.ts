@@ -9,15 +9,8 @@ const generic: ClineToolSpec = {
 	variant: ModelFamily.GENERIC,
 	name: "build_review_input",
 	description:
-		"Build and replace the stable review-input artifact at {review_input} from a story file plus the workflow-owned diff artifact at {diff_output}. The human must only provide story_path.",
-	parameters: [
-		{
-			name: "story_path",
-			required: true,
-			type: "string",
-			instruction: "Required path to the story markdown file that is being reviewed.",
-		},
-	],
+		"Build and replace the stable review-input artifact at {review_input} from the workflow-owned story file at {story_path} plus the workflow-owned diff artifact at {diff_output}. Resolve all inputs from workflow state.",
+	parameters: [],
 }
 
 export const build_review_input_variants = [generic]

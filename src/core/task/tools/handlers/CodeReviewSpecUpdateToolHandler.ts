@@ -106,7 +106,7 @@ export class CodeReviewSpecUpdateToolHandler implements IToolHandler, IPartialBl
 			) ?? {}
 
 		const reviewInputRaw = placeholders.review_input?.trim()
-		const specFileRaw = placeholders.spec_file?.trim()
+		const storyPathRaw = placeholders.story_path?.trim()
 
 		if (!reviewInputRaw) {
 			return formatResponse.toolError(
@@ -114,20 +114,20 @@ export class CodeReviewSpecUpdateToolHandler implements IToolHandler, IPartialBl
 			)
 		}
 
-		if (!specFileRaw) {
+		if (!storyPathRaw) {
 			return formatResponse.toolError(
-				"Could not resolve workflow placeholder 'spec_file' from the active placeholder workflow state.",
+				"Could not resolve workflow placeholder 'story_path' from the active placeholder workflow state.",
 			)
 		}
 
 		const resolutionBase =
 			placeholders.cwd?.trim() || placeholders.project_root?.trim() || placeholders["project-root"]?.trim() || config.cwd
 		const reviewInputPath = path.isAbsolute(reviewInputRaw) ? reviewInputRaw : path.resolve(resolutionBase, reviewInputRaw)
-		const specFilePath = path.isAbsolute(specFileRaw) ? specFileRaw : path.resolve(resolutionBase, specFileRaw)
+		const storyFilePath = path.isAbsolute(storyPathRaw) ? storyPathRaw : path.resolve(resolutionBase, storyPathRaw)
 
 		try {
 			const reviewInputMarkdown = await fs.readFile(reviewInputPath, "utf8")
-			const specFileMarkdown = await fs.readFile(specFilePath, "utf8")
+			const specFileMarkdown = await fs.readFile(storyFilePath, "utf8")
 			const mergeResult = codeReviewSpecUpdateMerge({
 				specFileMarkdown,
 				reviewInputMarkdown,
@@ -139,15 +139,15 @@ export class CodeReviewSpecUpdateToolHandler implements IToolHandler, IPartialBl
 
 			const completeMessage = JSON.stringify({
 				tool: "codeReviewSpecUpdate",
-				path: getReadablePath(config.cwd, specFilePath),
-				content: `Spec file: ${getReadablePath(config.cwd, specFilePath)}\nReview input: ${getReadablePath(config.cwd, reviewInputPath)}`,
+				path: getReadablePath(config.cwd, storyFilePath),
+				content: `Story file: ${getReadablePath(config.cwd, storyFilePath)}\nReview input: ${getReadablePath(config.cwd, reviewInputPath)}`,
 				operationIsLocatedInWorkspace:
-					(await isLocatedInWorkspace(specFilePath)) && (await isLocatedInWorkspace(reviewInputPath)),
+					(await isLocatedInWorkspace(storyFilePath)) && (await isLocatedInWorkspace(reviewInputPath)),
 			})
 
 			const shouldAutoApprove =
 				config.isSubagentExecution ||
-				((await config.callbacks.shouldAutoApproveToolWithPath(block.name, specFilePath)) &&
+				((await config.callbacks.shouldAutoApproveToolWithPath(block.name, storyFilePath)) &&
 					(await config.callbacks.shouldAutoApproveToolWithPath(block.name, reviewInputPath)))
 
 			if (shouldAutoApprove) {
@@ -157,7 +157,7 @@ export class CodeReviewSpecUpdateToolHandler implements IToolHandler, IPartialBl
 				}
 			} else {
 				showNotificationForApproval(
-					`Cline wants to update ${getWorkspaceBasename(specFilePath, "CodeReviewSpecUpdate.notification")}`,
+					`Cline wants to update ${getWorkspaceBasename(storyFilePath, "CodeReviewSpecUpdate.notification")}`,
 					config.autoApprovalSettings.enableNotifications,
 				)
 
@@ -181,7 +181,7 @@ export class CodeReviewSpecUpdateToolHandler implements IToolHandler, IPartialBl
 			}
 
 			await atomicReplaceTwoTextFiles({
-				specFilePath,
+				specFilePath: storyFilePath,
 				specFileContent: mergeResult.updatedSpecFileMarkdown,
 				reviewInputPath,
 				reviewInputContent: mergeResult.clearedReviewInputMarkdown,
@@ -190,19 +190,19 @@ export class CodeReviewSpecUpdateToolHandler implements IToolHandler, IPartialBl
 			await recordAndPersistPlaceholderWorkflowWriteProof({
 				taskId: config.taskId,
 				taskState: config.taskState,
-				filePath: specFilePath,
+				filePath: storyFilePath,
 			})
 			config.taskState.didEditFile = true
-			config.taskState.fileReadCache.delete(specFilePath.toLowerCase())
+			config.taskState.fileReadCache.delete(storyFilePath.toLowerCase())
 			config.taskState.fileReadCache.delete(reviewInputPath.toLowerCase())
 			config.taskState.consecutiveMistakeCount = 0
 
 			return formatResponse.toolResult(
 				JSON.stringify({
 					persisted: true,
-					spec_file_updated: true,
+					story_path_updated: true,
 					review_input_cleared: true,
-					spec_file_path: specFilePath,
+					story_path_path: storyFilePath,
 					review_input_path: reviewInputPath,
 				}),
 			)

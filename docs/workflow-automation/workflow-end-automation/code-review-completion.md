@@ -21,9 +21,9 @@ When the `code-review.md` placeholder workflow completes, `workflowCompletionHan
 
 That tool is responsible for:
 
-- merging the final review-authored writable content from `review_input.md` into `{spec_file}`
+- merging the final review-authored writable content from `review_input.md` into `{story_path}`
 - clearing `review_input.md`
-- recording write proof for `{spec_file}`
+- recording write proof for `{story_path}`
 
 The tool contract itself is already defined in:
 
@@ -77,7 +77,7 @@ For this use case, `workflowCompletionHandler` must rely on the existing `code_r
 
 - placeholder resolution
 - file approval behavior
-- spec-file mutation
+- story-file mutation
 - review-input clearing
 - write-proof recording
 

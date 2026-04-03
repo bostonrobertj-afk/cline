@@ -797,10 +797,9 @@ describe("native tool placeholder replacement", () => {
 		const openAIProperties = getOpenAIProperties(openAI)
 
 		expect(getOpenAIFunctionTool(openAI).description).to.equal(
-			"Build review-input.md from a story file and the stable {diff_output} artifact. The only human-supplied parameter is story_path.",
+			"Build review-input.md from workflow-owned {story_path} and {diff_output}. Resolve inputs from workflow state; there are no human-supplied parameters.",
 		)
-		expect(openAIProperties.story_path?.description).to.equal("Path to the story markdown file that is being reviewed.")
-		expect(Object.keys(openAIProperties)).to.deep.equal(["story_path"])
+		expect(Object.keys(openAIProperties)).to.deep.equal([])
 	})
 
 	it("preserves integer types for read_file_range line parameters", () => {

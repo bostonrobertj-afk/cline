@@ -37,6 +37,8 @@ type PromptContextArgs = {
 type PromptContextResult = {
 	mcpHub?: unknown
 	managedWorkflowActive?: boolean
+	activeWorkflowName?: string
+	activeWorkflowPersonaInstructions?: string
 	activeWorkflowReminder?: string
 	activeWorkflowSupportsPlaceholders?: boolean
 	skills?: Array<{ name: string }>
@@ -406,7 +408,7 @@ describe("SubagentRunner", () => {
 		assert.equal(context.activePlaceholderWorkflowStepNumber, 1)
 		assert.equal(context.managedWorkflowActive, false)
 		assert.deepEqual(context.skills, [])
-		assert.equal(context.activeAgentId, undefined)
+		assert.equal(context.activeWorkflowPersonaInstructions, undefined)
 		assert.equal(context.activeWorkflowReminder, undefined)
 	})
 
@@ -1828,7 +1830,7 @@ Review the changed implementation for edge cases.`,
 		assert.match(followUpTexts, /Step 1: Gather Context/)
 	})
 
-	it("auto-binds the owning BMAD agent when an assigned placeholder workflow maps to a managed twin", async () => {
+	it("does not write activeAgent state when an assigned placeholder workflow is auto-activated", async () => {
 		const config = createTaskConfig(false)
 		config.cwd = process.cwd()
 		const runner = new SubagentRunner(config)
@@ -1853,10 +1855,10 @@ Review the changed implementation for edge cases.`,
 		)
 
 		sinon.assert.calledOnce(activatePlaceholderStub)
-		assert.equal(state.activeAgentId, "bmad-dev")
-		assert.equal(state.activeAgentSkillName, "bmad-dev")
-		assert.equal(state.activeAgentInvokedSlashCommand, "code-review")
-		assert.equal(state.activeAgentJustActivated, true)
+		assert.equal((state as any).activeAgentId, undefined)
+		assert.equal((state as any).activeAgentSkillName, undefined)
+		assert.equal((state as any).activeAgentInvokedSlashCommand, undefined)
+		assert.equal((state as any).activeAgentJustActivated, undefined)
 	})
 
 	it("falls back to the assigned-skill directive when the assigned skill is not a workflow", async () => {
@@ -2566,7 +2568,6 @@ Review the changed implementation for edge cases.`,
 			shouldUseContinuationPrompt: false,
 		})
 
-		assert.equal(context.activeAgentId, undefined)
 		assert.equal(context.managedWorkflowActive, true)
 		assert.ok(context.activeWorkflowReminder)
 		assert.match(context.activeWorkflowReminder!, /<active_bmad_workflow/)
@@ -2576,7 +2577,12 @@ Review the changed implementation for edge cases.`,
 	it("does not inject persistent workflow reminders for placeholder-only subagent workflows", async () => {
 		const runner = new SubagentRunner(createTaskConfig(false))
 		const state = new TaskState()
-		state.activePlaceholderWorkflowId = "local-review.md"
+		state.activePlaceholderWorkflowId = "code-review.md"
+		state.activePlaceholderWorkflowSource = {
+			type: "remote",
+			name: "code-review.md",
+			contents: "# Code review\nInspect implementation.",
+		}
 		state.activePlaceholderWorkflowValues = { story_id: "1.1" }
 
 		const context = await (runner as any).buildPromptContext({
@@ -2597,6 +2603,8 @@ Review the changed implementation for edge cases.`,
 		})
 
 		assert.equal(context.managedWorkflowActive, false)
+		assert.equal(context.activeWorkflowName, "code-review.md")
+		assert.match(context.activeWorkflowPersonaInstructions ?? "", /^Persona/m)
 		assert.equal(context.activeWorkflowReminder, undefined)
 		assert.equal(context.activeWorkflowSupportsPlaceholders, true)
 	})
@@ -2604,8 +2612,12 @@ Review the changed implementation for edge cases.`,
 	it("preserves base prompt context while suppressing dynamic reminder fields on internal turns", async () => {
 		const runner = new SubagentRunner(createTaskConfig(false))
 		const state = new TaskState()
-		state.activeAgentId = "bmad-dev"
-		state.activeWorkflowId = "bmad-review-edge-case-hunter"
+		state.activePlaceholderWorkflowId = "code-review.md"
+		state.activePlaceholderWorkflowSource = {
+			type: "remote",
+			name: "code-review.md",
+			contents: "# Code review\nInspect implementation.",
+		}
 
 		const context = await (runner as any).buildPromptContext({
 			state,
@@ -2627,7 +2639,8 @@ Review the changed implementation for edge cases.`,
 		})
 
 		assert.deepEqual(context.skills, [])
-		assert.equal(context.activeAgentId, undefined)
+		assert.equal(context.activeWorkflowName, "code-review.md")
+		assert.equal(context.activeWorkflowPersonaInstructions, undefined)
 		assert.equal(context.activeWorkflowReminder, undefined)
 		assert.equal(context.enableNativeToolCalls, true)
 		assert.equal(context.enableParallelToolCalling, false)

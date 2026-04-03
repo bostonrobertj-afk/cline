@@ -3,6 +3,7 @@ import path from "path"
 import { getPlaceholderWorkflowValueMap } from "@/core/workflows/placeholder-workflow-rendering"
 import { getActivePlaceholderWorkflowStepDetails } from "@/core/workflows/placeholder-workflow-step-details"
 import { FOCUS_CHAIN_COMPLETE_NEXT_STEP_SENTINEL } from "@/shared/focus-chain-utils"
+import { arePathsEqual } from "@/utils/path"
 import {
 	type ActivePlaceholderWorkflowDeterministicState,
 	type DeterministicPlaceholderWorkflowName,
@@ -36,7 +37,8 @@ export function isDeterministicPlaceholderWorkflowSupported(
 		workflowName === "dev-story.md" ||
 		workflowName === "review-adversarial-general.md" ||
 		workflowName === "blind-review.md" ||
-		workflowName === "review-edge-case-hunter.md"
+		workflowName === "review-edge-case-hunter.md" ||
+		workflowName === "write-remediation-story.md"
 	)
 }
 
@@ -155,6 +157,62 @@ async function resolveTaskWrittenPlaceholderArtifactPath(args: {
 		: undefined
 }
 
+async function resolveTaskWrittenWriteRemediationStoryArtifactPath(args: {
+	taskState: TaskState
+	placeholders: Record<string, string>
+	storyPath?: string
+}): Promise<string | undefined> {
+	const implementationArtifactsRaw = args.placeholders.implementation_artifacts?.trim()
+	const implementationArtifactsFolderRaw =
+		implementationArtifactsRaw || resolveOutputFolderFile(args.placeholders, "implementation-artifacts")
+	if (!implementationArtifactsFolderRaw) {
+		return undefined
+	}
+
+	const resolvedImplementationArtifactsDir = resolveArtifactPlaceholderPath(args.placeholders, implementationArtifactsFolderRaw)
+	const resolvedStoryPath = args.storyPath?.trim()
+		? resolveArtifactPlaceholderPath(args.placeholders, args.storyPath)
+		: undefined
+
+	for (const candidatePath of args.taskState.activePlaceholderWorkflowTaskWriteProofPaths) {
+		if (!arePathsEqual(path.dirname(candidatePath), resolvedImplementationArtifactsDir)) {
+			continue
+		}
+
+		if (resolvedStoryPath && arePathsEqual(candidatePath, resolvedStoryPath)) {
+			continue
+		}
+
+		if (!(await fileExistsForPlaceholderWorkflowWriteProof(candidatePath))) {
+			continue
+		}
+
+		const candidateText = await readFileIfExists(candidatePath)
+		if (!candidateText) {
+			continue
+		}
+
+		if (!hasTopLevelStatusValue(candidateText, ["ready-for-dev"])) {
+			continue
+		}
+
+		if (
+			extractMarkdownSection(candidateText, "## Acceptance Criteria") === undefined ||
+			extractMarkdownSection(candidateText, "## Allowed Files List") === undefined ||
+			extractMarkdownSection(candidateText, "## Tasks / Subtasks") === undefined ||
+			extractMarkdownSection(candidateText, "## Latest Review Findings") === undefined ||
+			extractMarkdownSection(candidateText, "## Testing Requirements") === undefined ||
+			extractMarkdownSection(candidateText, "## Completion Notes List") === undefined
+		) {
+			continue
+		}
+
+		return candidatePath
+	}
+
+	return undefined
+}
+
 async function evaluateCodeReviewStep(args: {
 	taskState: TaskState
 	stepNumber: number
@@ -164,14 +222,20 @@ async function evaluateCodeReviewStep(args: {
 
 	switch (args.stepNumber) {
 		case 1: {
-			const specFile = placeholders.spec_file?.trim()
-			if (!specFile) {
+			const storyPath = placeholders.story_path?.trim()
+			if (!storyPath) {
+				return { completed: false }
+			}
+
+			try {
+				await fs.access(storyPath)
+			} catch {
 				return { completed: false }
 			}
 
 			return {
 				completed: true,
-				reason: "spec_file is present.",
+				reason: "story_path points to an existing story file.",
 			}
 		}
 		case 2: {
@@ -583,6 +647,76 @@ async function evaluateDevStoryStep(args: {
 	}
 }
 
+async function evaluateWriteRemediationStoryStep(args: {
+	taskState: TaskState
+	stepNumber: number
+	toolContext?: DeterministicPlaceholderToolContext
+}): Promise<DeterministicStepEvaluationResult> {
+	const placeholders = getMergedPlaceholderValues(args.taskState)
+	const storyPath = placeholders.story_path?.trim()
+
+	switch (args.stepNumber) {
+		case 1: {
+			if (!storyPath) {
+				return { completed: false }
+			}
+
+			try {
+				await fs.access(storyPath)
+			} catch {
+				return { completed: false }
+			}
+
+			return {
+				completed: true,
+				reason: "story_path points to an existing story file.",
+			}
+		}
+		case 2: {
+			const reviewInputPath = await resolveTaskWrittenPlaceholderArtifactPath({
+				taskState: args.taskState,
+				placeholders,
+				placeholderKey: "review_input",
+			})
+			if (!reviewInputPath) {
+				return { completed: false }
+			}
+
+			return {
+				completed: true,
+				reason: "review_input was written during this task and the artifact still exists.",
+			}
+		}
+		case 3: {
+			const remediationStoryPath = await resolveTaskWrittenWriteRemediationStoryArtifactPath({
+				taskState: args.taskState,
+				placeholders,
+				storyPath,
+			})
+			if (!remediationStoryPath) {
+				return { completed: false }
+			}
+
+			return {
+				completed: true,
+				reason: "A remediation story artifact distinct from story_path was written during this task and contains Status: ready-for-dev plus all required section headings.",
+			}
+		}
+		case 4: {
+			if (!didSuccessfulAttemptCompletionOccur(args.toolContext)) {
+				return { completed: false }
+			}
+
+			return {
+				completed: true,
+				reason: "attempt_completion was executed successfully for the remediation story delivery.",
+			}
+		}
+		default:
+			return { completed: false }
+	}
+}
+
 async function evaluateDeterministicStep(args: {
 	taskState: TaskState
 	workflowName: DeterministicPlaceholderWorkflowName
@@ -599,6 +733,14 @@ async function evaluateDeterministicStep(args: {
 
 	if (args.workflowName === "dev-story.md") {
 		return evaluateDevStoryStep({
+			taskState: args.taskState,
+			stepNumber: args.stepNumber,
+			toolContext: args.toolContext,
+		})
+	}
+
+	if (args.workflowName === "write-remediation-story.md") {
+		return evaluateWriteRemediationStoryStep({
 			taskState: args.taskState,
 			stepNumber: args.stepNumber,
 			toolContext: args.toolContext,

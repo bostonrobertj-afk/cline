@@ -79,11 +79,11 @@ At runtime, the code-review completion path works like this:
 
 For this mapping, `workflowCompletionHandler` does not take over any of the tool's responsibilities. `code_review_spec_update` continues to own:
 
-- placeholder resolution for `{review_input}` and `{spec_file}`
+- placeholder resolution for `{review_input}` and `{story_path}`
 - approval and file-write behavior
-- spec-file mutation
+- story-file mutation
 - `review_input.md` clearing
-- write-proof recording for `{spec_file}`
+- write-proof recording for `{story_path}`
 
 The important failure rule for code review remains:
 
@@ -239,9 +239,6 @@ It then:
 
 It does **not** clear unrelated runtime state such as:
 
-- `activeAgentId`
-- `activeAgentSkillName`
-- `activeAgentInvokedSlashCommand`
 - `activeWorkflowId`
 - `managedWorkflowRun`
 
