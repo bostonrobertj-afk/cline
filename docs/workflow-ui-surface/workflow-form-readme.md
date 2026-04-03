@@ -172,6 +172,8 @@ Typical live `code-review.md` path:
 7. Deterministic progression then derives Step 4 `review_mode` when the current-task artifacts prove it.
 8. The AI enters at Step 5 only after the pre-turn system-owned decision loop has no further eligible workflow-start or step-triggered form work to perform.
 
+Typical live write-remediation-story.md path: Step 1 may open the workflow-start form to collect `story_path`, then deterministic progression may advance directly into the Step 2 automatic workflow-preparation status card, which invokes `build_review_input` from stored workflow state before the AI reaches Step 3.
+
 ## Extension Guidelines
 
 - Keep resolver definitions capability-owned.
@@ -200,6 +202,13 @@ Example 2: Workflow-start placeholder form
 - tool: `set_workflow_placeholders`
 - typical stage:
   - `collect_inputs`
+
+Example 3: Automatic review-input preparation
+
+- resolver id: `write_remediation_story_step_2_review_input`
+- tool: `build_review_input`
+- presentation: `automatic_status`
+- typical stage: `collect_inputs`
 
 ## (Optional) Performance
 

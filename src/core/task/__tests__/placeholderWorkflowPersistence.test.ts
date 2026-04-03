@@ -1197,17 +1197,15 @@ Construct and persist review_input.md from the persisted diff output before cont
 								? buildAutomaticWorkflowFormPayload(session, "pending")
 								: buildInteractiveWorkflowFormPayload(session),
 						),
-					buildSuccessPayload: sinon
-						.stub()
-						.callsFake((session: WorkflowFormSessionState) =>
-							session.resolverId === "code_review_step_3_review_input"
-								? buildAutomaticWorkflowFormPayload(session, "success")
-								: {
-										...buildInteractiveWorkflowFormPayload(session),
-										phase: "success",
-										successMessage: "Workflow form completed successfully.",
-									},
-						),
+					buildSuccessPayload: sinon.stub().callsFake((session: WorkflowFormSessionState) =>
+						session.resolverId === "code_review_step_3_review_input"
+							? buildAutomaticWorkflowFormPayload(session, "success")
+							: {
+									...buildInteractiveWorkflowFormPayload(session),
+									phase: "success",
+									successMessage: "Workflow form completed successfully.",
+								},
+					),
 				},
 				persistWorkflowFormSession: sinon.stub().resolves(),
 				renderWorkflowFormMessage: sinon.stub().callsFake(async () => {
@@ -2083,6 +2081,187 @@ Build the review input before continuing.
 			expect(fakeTask.workflowFormRuntime.createSession.thirdCall.args[0]?.initialPhase).to.equal("collect_inputs")
 			expect(executeCallCount).to.equal(3)
 			expect(taskState.activePlaceholderWorkflowValues?.story_path).to.equal("docs/story.md")
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("chains slash-command workflow-start story_path success through write-remediation-story Step 2 automatic review-input preparation", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "workflow-start-story-path-chain-"))
+
+		try {
+			const workflowStartSession: WorkflowFormSessionState = {
+				sessionId: "wf-session-start-chain",
+				resolverId: "placeholder_workflow_start_set_workflow_placeholders",
+				triggerSource: "slash_command",
+				owner: {
+					kind: "slash_command",
+					workflowName: "write-remediation-story.md",
+					stepNumber: 1,
+				},
+				phase: "collect_inputs",
+				initialPhase: "collect_inputs",
+				values: {
+					story_path: { rawValue: "docs/story.md" },
+				},
+				context: {
+					workflowName: "write-remediation-story.md",
+					workflowStartRequirements: {
+						requiredFieldKeys: ["story_path"],
+						optionalFieldKeys: [],
+					},
+				},
+			}
+			const stepTwoSession: WorkflowFormSessionState = {
+				sessionId: "wf-session-step-2-chain",
+				resolverId: "write_remediation_story_step_2_review_input",
+				triggerSource: "deterministic_workflow_progression",
+				owner: {
+					kind: "placeholder_workflow_step",
+					workflowName: "write-remediation-story.md",
+					stepNumber: 2,
+				},
+				phase: "collect_inputs",
+				initialPhase: "collect_inputs",
+				values: {},
+			}
+			const taskState = new TaskState()
+			taskState.activePlaceholderWorkflowId = "write-remediation-story.md"
+			taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "write-remediation-story.md",
+				contents: `# write-remediation-story
+
+## Step 1: (System-Owned) Gather Necessary Inputs
+Required: {story_path}
+
+## Step 2: (System-Owned) Build review-input.md
+System automatically generates a fresh version of review-input.md in this step.
+
+## Step 3: Persist Remediation Story with Tasks / Subtasks Based on Recent Review Findings
+Write the remediation story here.
+`,
+			}
+			taskState.currentFocusChainChecklist = [
+				"- [ ] Step 1: Gather Necessary Inputs",
+				"- [ ] Step 2: Build review-input.md",
+				"- [ ] Step 3: Persist Remediation Story with Tasks / Subtasks Based on Recent Review Findings",
+			].join("\n")
+			taskState.activePlaceholderWorkflowStableValues = {
+				output_folder: path.join(tempDir, "workflow-output"),
+			}
+
+			let renderCount = 0
+			let executeCallCount = 0
+			const fakeTask: FakeWorkflowFormTask & {
+				executeWorkflowFormToolAndSync: sinon.SinonStub
+			} = {
+				cwd: tempDir,
+				taskState,
+				pendingWorkflowFormOutcome: undefined,
+				messageStateHandler: {
+					getClineMessages: sinon.stub().returns([]),
+				},
+				workflowFormRuntime: {
+					createSession: sinon
+						.stub()
+						.onFirstCall()
+						.returns(workflowStartSession)
+						.onSecondCall()
+						.returns(stepTwoSession),
+					buildPayload: sinon
+						.stub()
+						.callsFake((session: WorkflowFormSessionState) =>
+							session.resolverId === "write_remediation_story_step_2_review_input"
+								? buildAutomaticWorkflowFormPayload(session, "pending")
+								: buildInteractiveWorkflowFormPayload(session),
+						),
+					buildSuccessPayload: sinon.stub().callsFake((session: WorkflowFormSessionState, successMessage: string) => ({
+						...(session.resolverId === "write_remediation_story_step_2_review_input"
+							? buildAutomaticWorkflowFormPayload(session, "success")
+							: buildInteractiveWorkflowFormPayload(session)),
+						phase: "success",
+						successMessage,
+					})),
+				},
+				persistWorkflowFormSession: sinon.stub().resolves(),
+				renderWorkflowFormMessage: sinon.stub().callsFake(async () => {
+					renderCount += 1
+					if (renderCount === 1) {
+						fakeTask.pendingWorkflowFormOutcome = {
+							kind: "invoke_tool",
+							session: workflowStartSession,
+							toolName: ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
+							toolInput: { values: { story_path: "docs/story.md" } },
+							toolParams: { values: JSON.stringify({ story_path: "docs/story.md" }) },
+						}
+					}
+				}),
+				executeWorkflowFormToolAndSync: sinon.stub().callsFake(async (outcome: WorkflowFormRuntimeOutcome) => {
+					expect(outcome).to.include({ kind: "invoke_tool" })
+					executeCallCount += 1
+
+					if (executeCallCount === 1) {
+						taskState.activePlaceholderWorkflowValues = {
+							story_path: "docs/story.md",
+						}
+						taskState.currentFocusChainChecklist = [
+							"- [x] Step 1: Gather Necessary Inputs",
+							"- [ ] Step 2: Build review-input.md",
+							"- [ ] Step 3: Persist Remediation Story with Tasks / Subtasks Based on Recent Review Findings",
+						].join("\n")
+					}
+
+					if (executeCallCount === 2) {
+						expect(taskState.activePlaceholderWorkflowValues?.story_path).to.equal("docs/story.md")
+						const reviewInputPath = path.join(tempDir, "workflow-output", "review-input.md")
+						await fs.mkdir(path.dirname(reviewInputPath), { recursive: true })
+						await fs.writeFile(reviewInputPath, "# review input\n", "utf8")
+						taskState.activePlaceholderWorkflowValues = {
+							story_path: "docs/story.md",
+							review_input: reviewInputPath,
+						}
+						taskState.activePlaceholderWorkflowTaskWriteProofPaths = [reviewInputPath]
+						taskState.currentFocusChainChecklist = [
+							"- [x] Step 1: Gather Necessary Inputs",
+							"- [x] Step 2: Build review-input.md",
+							"- [ ] Step 3: Persist Remediation Story with Tasks / Subtasks Based on Recent Review Findings",
+						].join("\n")
+					}
+
+					return { succeeded: true }
+				}),
+				clearWorkflowFormSession: sinon.stub().callsFake(async () => {
+					taskState.activeWorkflowFormSession = undefined
+				}),
+				setThreadDisplayState: sinon.stub(),
+				postStateToWebview: sinon.stub().resolves(),
+			}
+
+			await maybeResolveWorkflowFormBeforeApiTurn.call(fakeTask, {
+				type: "activate_placeholder_workflow",
+				workflowId: "write-remediation-story.md",
+				workflowSource: {
+					type: "remote",
+					name: "write-remediation-story.md",
+					contents: "# write-remediation-story\nBuild the remediation story.",
+				},
+			})
+
+			expect(fakeTask.workflowFormRuntime.createSession.callCount).to.equal(2)
+			expect(fakeTask.workflowFormRuntime.createSession.firstCall.args[0]?.resolverId).to.equal(
+				"placeholder_workflow_start_set_workflow_placeholders",
+			)
+			expect(fakeTask.workflowFormRuntime.createSession.secondCall.args[0]?.resolverId).to.equal(
+				"write_remediation_story_step_2_review_input",
+			)
+			expect(fakeTask.workflowFormRuntime.createSession.secondCall.args[0]?.initialPhase).to.equal("collect_inputs")
+			expect(executeCallCount).to.equal(2)
+			expect(taskState.activePlaceholderWorkflowValues?.story_path).to.equal("docs/story.md")
+			expect(taskState.activePlaceholderWorkflowValues?.review_input).to.equal(
+				path.join(tempDir, "workflow-output", "review-input.md"),
+			)
+			expect(fakeTask.renderWorkflowFormMessage.thirdCall.args[1]).to.equal("say")
 		} finally {
 			await fs.rm(tempDir, { recursive: true, force: true })
 		}

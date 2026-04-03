@@ -5,6 +5,7 @@ import {
 	CODE_REVIEW_STEP_3_REVIEW_INPUT_RESOLVER_ID,
 	getWorkflowFormResolverDefinition,
 	PLACEHOLDER_WORKFLOW_START_SET_WORKFLOW_PLACEHOLDERS_RESOLVER_ID,
+	WRITE_REMEDIATION_STORY_STEP_2_REVIEW_INPUT_RESOLVER_ID,
 } from "../WorkflowFormRegistry"
 
 describe("WorkflowFormRegistry", () => {
@@ -19,6 +20,13 @@ describe("WorkflowFormRegistry", () => {
 		const resolver = getWorkflowFormResolverDefinition(CODE_REVIEW_STEP_3_REVIEW_INPUT_RESOLVER_ID)
 
 		expect(resolver.id).to.equal("code_review_step_3_review_input")
+		expect(resolver.toolName).to.equal("build_review_input")
+	})
+
+	it("returns the write-remediation-story step 2 review-input resolver metadata by id", () => {
+		const resolver = getWorkflowFormResolverDefinition(WRITE_REMEDIATION_STORY_STEP_2_REVIEW_INPUT_RESOLVER_ID)
+
+		expect(resolver.id).to.equal("write_remediation_story_step_2_review_input")
 		expect(resolver.toolName).to.equal("build_review_input")
 	})
 
@@ -46,6 +54,32 @@ describe("WorkflowFormRegistry", () => {
 			failureLabel: "Automatic workflow preparation failed- falling back to manual LLM workflow preparation.",
 		})
 		expect(definition.pages.collect_inputs?.fields).to.deep.equal([])
+	})
+
+	it("declares the write-remediation-story step 2 review-input resolver as automatic workflow preparation", () => {
+		const resolver = getWorkflowFormResolverDefinition(WRITE_REMEDIATION_STORY_STEP_2_REVIEW_INPUT_RESOLVER_ID)
+		const definition = resolver.buildDefinition({
+			sessionId: "session-phase-2-fields",
+			resolverId: resolver.id,
+			triggerSource: "deterministic_workflow_progression",
+			owner: {
+				kind: "placeholder_workflow_step",
+				workflowName: "write-remediation-story.md",
+				stepNumber: 2,
+			},
+			phase: "collect_inputs",
+			initialPhase: "confirm",
+			values: {},
+		})
+
+		expect(resolver.defaultInitialPhase).to.equal("collect_inputs")
+		expect(definition.presentation).to.deep.equal({
+			kind: "automatic_status",
+			pendingLabel: "Preparing workflow documents",
+			successLabel: "Workflow documents ready",
+			failureLabel: "Automatic workflow preparation failed- falling back to manual LLM workflow preparation.",
+		})
+		expect(definition.successMessage).to.equal("The Step 2 review-input artifact is ready.")
 	})
 
 	it("serializes the Phase 1 review-diff resolver into tool params", () => {
@@ -206,6 +240,29 @@ describe("WorkflowFormRegistry", () => {
 		expect(outcome.toolParams).to.deep.equal({})
 	})
 
+	it("serializes the write-remediation-story step 2 review-input resolver into tool params", () => {
+		const resolver = getWorkflowFormResolverDefinition(WRITE_REMEDIATION_STORY_STEP_2_REVIEW_INPUT_RESOLVER_ID)
+		const outcome = resolver.buildToolExecutionRequest(
+			{
+				sessionId: "session-phase-2-serialize",
+				resolverId: resolver.id,
+				triggerSource: "deterministic_workflow_progression",
+				owner: {
+					kind: "placeholder_workflow_step",
+					workflowName: "write-remediation-story.md",
+					stepNumber: 2,
+				},
+				phase: "collect_inputs",
+				initialPhase: "confirm",
+				values: {},
+			},
+			{},
+		)
+
+		expect(outcome.toolInput).to.deep.equal({})
+		expect(outcome.toolParams).to.deep.equal({})
+	})
+
 	it("treats persisted diff-output tool results as success", () => {
 		const resolver = getWorkflowFormResolverDefinition(CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID)
 		const result = resolver.evaluateToolExecutionResult(
@@ -245,6 +302,34 @@ describe("WorkflowFormRegistry", () => {
 					kind: "placeholder_workflow_step",
 					workflowName: "code-review.md",
 					stepNumber: 3,
+				},
+				phase: "collect_inputs",
+				initialPhase: "confirm",
+				values: {},
+			},
+			{
+				toolResultText: JSON.stringify({
+					persisted: true,
+					review_input_available: true,
+					artifact_path: "/tmp/review-input.md",
+				}),
+			},
+		)
+
+		expect(result).to.deep.equal({ succeeded: true })
+	})
+
+	it("treats persisted write-remediation-story review-input tool results as success", () => {
+		const resolver = getWorkflowFormResolverDefinition(WRITE_REMEDIATION_STORY_STEP_2_REVIEW_INPUT_RESOLVER_ID)
+		const result = resolver.evaluateToolExecutionResult(
+			{
+				sessionId: "session-phase-2-success",
+				resolverId: resolver.id,
+				triggerSource: "deterministic_workflow_progression",
+				owner: {
+					kind: "placeholder_workflow_step",
+					workflowName: "write-remediation-story.md",
+					stepNumber: 2,
 				},
 				phase: "collect_inputs",
 				initialPhase: "confirm",

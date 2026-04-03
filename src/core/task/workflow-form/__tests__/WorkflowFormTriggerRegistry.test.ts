@@ -188,6 +188,12 @@ One of: {one}, {two}, {three}, {four}, {five}, {six}
 		)
 	})
 
+	it("maps write-remediation-story step 2 to the review-input workflow-form resolver", () => {
+		expect(getWorkflowFormWorkflowStepTriggerDefinition("write-remediation-story.md", 2)?.resolverId).to.equal(
+			"write_remediation_story_step_2_review_input",
+		)
+	})
+
 	it("does not intercept code-review step 3 when review_input has a current-task write proof and exists on disk", async () => {
 		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "workflow-form-trigger-"))
 		const reviewInputPath = path.join(tempDir, "review-input.md")
@@ -212,6 +218,42 @@ One of: {one}, {two}, {three}, {four}, {five}, {six}
 		await fs.writeFile(reviewInputPath, "# review input\n", "utf8")
 
 		const trigger = getWorkflowFormWorkflowStepTriggerDefinition("code-review.md", 3)
+		const shouldIntercept = await trigger?.shouldIntercept({
+			cwd: tempDir,
+			taskState: {
+				activePlaceholderWorkflowStableValues: { review_input: reviewInputPath },
+				activePlaceholderWorkflowValues: {},
+				activePlaceholderWorkflowTaskWriteProofPaths: [],
+			},
+		})
+
+		expect(shouldIntercept).to.equal(true)
+	})
+
+	it("does not intercept write-remediation-story step 2 when review_input has a current-task write proof and exists on disk", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "workflow-form-trigger-"))
+		const reviewInputPath = path.join(tempDir, "review-input.md")
+		await fs.writeFile(reviewInputPath, "# review input\n", "utf8")
+
+		const trigger = getWorkflowFormWorkflowStepTriggerDefinition("write-remediation-story.md", 2)
+		const shouldIntercept = await trigger?.shouldIntercept({
+			cwd: tempDir,
+			taskState: {
+				activePlaceholderWorkflowStableValues: { review_input: reviewInputPath },
+				activePlaceholderWorkflowValues: {},
+				activePlaceholderWorkflowTaskWriteProofPaths: [reviewInputPath],
+			},
+		})
+
+		expect(shouldIntercept).to.equal(false)
+	})
+
+	it("intercepts write-remediation-story step 2 when review_input is missing a current-task write proof", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "workflow-form-trigger-"))
+		const reviewInputPath = path.join(tempDir, "review-input.md")
+		await fs.writeFile(reviewInputPath, "# review input\n", "utf8")
+
+		const trigger = getWorkflowFormWorkflowStepTriggerDefinition("write-remediation-story.md", 2)
 		const shouldIntercept = await trigger?.shouldIntercept({
 			cwd: tempDir,
 			taskState: {
