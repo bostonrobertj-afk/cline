@@ -26,6 +26,10 @@ import { ReportBugHandler } from "./handlers/ReportBugHandler"
 import { SearchFilesToolHandler } from "./handlers/SearchFilesToolHandler"
 import { SendUserMessageHandler } from "./handlers/SendUserMessageHandler"
 import { SetWorkflowPlaceholdersToolHandler } from "./handlers/SetWorkflowPlaceholdersToolHandler"
+import { StoryNotesUpdateToolHandler } from "./handlers/StoryNotesUpdateToolHandler"
+import { StoryTaskCompleteToolHandler } from "./handlers/StoryTaskCompleteToolHandler"
+import { StoryTaskReminderToolHandler } from "./handlers/StoryTaskReminderToolHandler"
+import { StoryTestingCompleteToolHandler } from "./handlers/StoryTestingCompleteToolHandler"
 import { UseSubagentsToolHandler } from "./handlers/SubagentToolHandler"
 import { SummarizeTaskHandler } from "./handlers/SummarizeTaskHandler"
 import { UseMcpToolHandler } from "./handlers/UseMcpToolHandler"
@@ -119,6 +123,10 @@ export class ToolExecutorCoordinator {
 		[ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT]: (_v: ToolValidator) => new BuildReviewDiffOutputToolHandler(),
 		[ClineDefaultTool.BUILD_REVIEW_INPUT]: (_v: ToolValidator) => new BuildReviewInputToolHandler(),
 		[ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE]: (_v: ToolValidator) => new CodeReviewSpecUpdateToolHandler(),
+		[ClineDefaultTool.STORY_TASK_REMINDER]: (_v: ToolValidator) => new StoryTaskReminderToolHandler(),
+		[ClineDefaultTool.STORY_TASK_COMPLETE]: (_v: ToolValidator) => new StoryTaskCompleteToolHandler(),
+		[ClineDefaultTool.STORY_NOTES_UPDATE]: (_v: ToolValidator) => new StoryNotesUpdateToolHandler(),
+		[ClineDefaultTool.STORY_TESTING_COMPLETE]: (_v: ToolValidator) => new StoryTestingCompleteToolHandler(),
 		[ClineDefaultTool.USE_SUBAGENTS]: (_v: ToolValidator) => new UseSubagentsToolHandler(),
 	}
 

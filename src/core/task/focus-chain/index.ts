@@ -4,6 +4,11 @@ import * as fs from "fs/promises"
 import * as path from "path"
 import { getTaskMetadata, saveTaskMetadata } from "@/core/storage/disk"
 import {
+	buildCurrentStoryTaskPrompt,
+	buildTestingRequirementsPrompt,
+	resolveActiveStoryPath,
+} from "@/core/task/story-tools/storyTaskDocument"
+import {
 	buildPlaceholderWorkflowChecklist,
 	getActivePlaceholderWorkflowChecklistLabel,
 	getActivePlaceholderWorkflowStepDetails,
@@ -44,6 +49,7 @@ export interface FocusChainDependencies {
 	focusChainStorageTaskId?: string
 	focusChainStorageIdentity?: FocusChainStorageIdentity
 	focusChainDocumentLabel?: string
+	cwd: string
 	taskState: TaskState
 	mode: Mode
 	stateManager: StateManager
@@ -68,6 +74,7 @@ export class FocusChainManager {
 	private focusChainStorageTaskId: string
 	private focusChainStorageIdentity?: FocusChainStorageIdentity
 	private focusChainDocumentLabel: string
+	private cwd: string
 	private taskState: TaskState
 	private stateManager: StateManager
 	private postStateToWebview: () => Promise<void>
@@ -88,6 +95,7 @@ export class FocusChainManager {
 		this.focusChainStorageTaskId = dependencies.focusChainStorageTaskId ?? dependencies.taskId
 		this.focusChainStorageIdentity = dependencies.focusChainStorageIdentity
 		this.focusChainDocumentLabel = dependencies.focusChainDocumentLabel ?? `Task ${dependencies.taskId}`
+		this.cwd = dependencies.cwd
 		this.taskState = dependencies.taskState
 		this.stateManager = dependencies.stateManager
 		this.postStateToWebview = dependencies.postStateToWebview
@@ -104,6 +112,16 @@ export class FocusChainManager {
 
 	private renderChecklistForPrompt(checklist: string): string {
 		return ["```text", checklist.trim(), "```"].join("\n")
+	}
+
+	private normalizePlaceholderWorkflowSourceName(sourceName: string): string {
+		return path.posix.basename(sourceName.replaceAll("\\", "/")).trim().toLowerCase()
+	}
+
+	private clearActiveStoryTaskPromptState(): void {
+		this.taskState.activeStoryTaskId = undefined
+		this.taskState.activeStorySubtaskIds = []
+		this.taskState.lastPromptedStoryTaskKey = undefined
 	}
 
 	private async resolveFocusChainFilePath(): Promise<string> {
@@ -377,25 +395,26 @@ export class FocusChainManager {
 		)
 	}
 
-	public async consumeCurrentPlaceholderWorkflowStepPromptForInput(): Promise<string | undefined> {
+	public async consumeCurrentPlaceholderWorkflowStepPromptForInput(options?: {
+		shouldForceStoryTaskPrompt?: boolean
+	}): Promise<string | undefined> {
 		if (this.taskState.managedWorkflowRun) {
 			this.taskState.lastPromptedPlaceholderWorkflowChecklistLabel = undefined
+			this.clearActiveStoryTaskPromptState()
 			return undefined
 		}
 
 		const currentChecklist = this.taskState.currentFocusChainChecklist
 		if (!this.taskState.activePlaceholderWorkflowSource || !currentChecklist) {
 			this.taskState.lastPromptedPlaceholderWorkflowChecklistLabel = undefined
+			this.clearActiveStoryTaskPromptState()
 			return undefined
 		}
 
 		const activeChecklistLabel = getActivePlaceholderWorkflowChecklistLabel(currentChecklist)
 		if (!activeChecklistLabel) {
 			this.taskState.lastPromptedPlaceholderWorkflowChecklistLabel = undefined
-			return undefined
-		}
-
-		if (this.taskState.lastPromptedPlaceholderWorkflowChecklistLabel === activeChecklistLabel) {
+			this.clearActiveStoryTaskPromptState()
 			return undefined
 		}
 
@@ -417,6 +436,7 @@ export class FocusChainManager {
 				return undefined
 			}
 
+			const shouldEmitStaticPrompt = this.taskState.lastPromptedPlaceholderWorkflowChecklistLabel !== activeChecklistLabel
 			const unresolvedPlaceholders = findUnresolvedWorkflowPlaceholders(stepDetails.details)
 			logFocusChainDiagnosticEvent(this.taskId, "placeholder_step_prompt_resolution", {
 				entered: true,
@@ -427,28 +447,95 @@ export class FocusChainManager {
 				unresolvedPlaceholderCount: unresolvedPlaceholders.length,
 				unresolvedPlaceholders: unresolvedPlaceholders.length > 0 ? unresolvedPlaceholders : undefined,
 			})
-			this.taskState.lastPromptedPlaceholderWorkflowChecklistLabel = activeChecklistLabel
 
-			if (isDeterministicPlaceholderWorkflowSupported(stepDetails.sourceName)) {
-				return [
-					"### CURRENT WORKFLOW STEP",
-					`You are currently on this step: ${stepDetails.checklistLabel}`,
-					stepDetails.details.trim(),
-					"Focus on correctly completing this step.",
-					"Once you correctly complete this step, the next step's details will be shown automatically.",
-				].join("\n\n")
+			const basePrompt = isDeterministicPlaceholderWorkflowSupported(stepDetails.sourceName)
+				? [
+						"### CURRENT WORKFLOW STEP",
+						`You are currently on this step: ${stepDetails.checklistLabel}`,
+						stepDetails.details.trim(),
+						"Focus on correctly completing this step.",
+						"Once you correctly complete this step, the next step's details will be shown automatically.",
+					].join("\n\n")
+				: [
+						"### CURRENT WORKFLOW STEP",
+						`You are currently on this step: ${stepDetails.checklistLabel}`,
+						stepDetails.details.trim(),
+						"Focus on completing this step.",
+						"I determine the active step from your latest `task_progress` update.",
+						'Do not include `task_progress` on a tool call until the active step\'s "Done Signal" is true.',
+						'When the active step\'s "Done Signal" is true, use `task_progress` with `__COMPLETE_NEXT_STEP__` on the next relevant tool call, and use it only once in that assistant turn.',
+						"Once the checklist advances, I'll give you the next step's details.",
+					].join("\n\n")
+			const normalizedSourceName = this.normalizePlaceholderWorkflowSourceName(stepDetails.sourceName)
+			const isDevStoryWorkflow = normalizedSourceName === "dev-story.md"
+			const isDevStoryStep2 = isDevStoryWorkflow && stepDetails.stepNumber === 2
+			const isDevStoryStep3 =
+				isDevStoryWorkflow && (stepDetails.stepNumber === 3 || stepDetails.checklistLabel === "Step 3: Validate")
+
+			if (!isDevStoryStep2) {
+				this.clearActiveStoryTaskPromptState()
 			}
 
-			return [
-				"### CURRENT WORKFLOW STEP",
-				`You are currently on this step: ${stepDetails.checklistLabel}`,
-				stepDetails.details.trim(),
-				"Focus on completing this step.",
-				"I determine the active step from your latest `task_progress` update.",
-				'Do not include `task_progress` on a tool call until the active step\'s "Done Signal" is true.',
-				'When the active step\'s "Done Signal" is true, use `task_progress` with `__COMPLETE_NEXT_STEP__` on the next relevant tool call, and use it only once in that assistant turn.',
-				"Once the checklist advances, I'll give you the next step's details.",
-			].join("\n\n")
+			if (isDevStoryStep2) {
+				const resolvedStoryPath = resolveActiveStoryPath({
+					cwd: this.cwd,
+					stablePlaceholderValues: this.taskState.activePlaceholderWorkflowStableValues,
+					placeholderValues: this.taskState.activePlaceholderWorkflowValues,
+				})
+				if (resolvedStoryPath.ok) {
+					try {
+						const storyMarkdown = await fs.readFile(resolvedStoryPath.storyPath, "utf8")
+						const payload = buildCurrentStoryTaskPrompt(storyMarkdown)
+						if (!("error" in payload)) {
+							this.taskState.activeStoryTaskId = payload.storyTaskId
+							this.taskState.activeStorySubtaskIds = payload.storySubtaskIds
+
+							const shouldEmitDynamicPrompt =
+								options?.shouldForceStoryTaskPrompt === true ||
+								this.taskState.lastPromptedStoryTaskKey !== payload.promptKey
+
+							if (shouldEmitDynamicPrompt) {
+								this.taskState.lastPromptedStoryTaskKey = payload.promptKey
+								if (shouldEmitStaticPrompt) {
+									this.taskState.lastPromptedPlaceholderWorkflowChecklistLabel = activeChecklistLabel
+									return `${basePrompt}\n\n\n${payload.promptText}`
+								}
+
+								return payload.promptText
+							}
+						}
+					} catch {
+						// Fall through to the standard step prompt when the story file cannot be read.
+					}
+				}
+			}
+
+			if (isDevStoryStep3 && shouldEmitStaticPrompt) {
+				const resolvedStoryPath = resolveActiveStoryPath({
+					cwd: this.cwd,
+					stablePlaceholderValues: this.taskState.activePlaceholderWorkflowStableValues,
+					placeholderValues: this.taskState.activePlaceholderWorkflowValues,
+				})
+				if (resolvedStoryPath.ok) {
+					try {
+						const storyMarkdown = await fs.readFile(resolvedStoryPath.storyPath, "utf8")
+						const testingRequirementsPrompt = buildTestingRequirementsPrompt(storyMarkdown)
+						if (typeof testingRequirementsPrompt === "string") {
+							this.taskState.lastPromptedPlaceholderWorkflowChecklistLabel = activeChecklistLabel
+							return `${basePrompt}\n\n\n${testingRequirementsPrompt}`
+						}
+					} catch {
+						// Fall through to the standard step prompt when the story file cannot be read.
+					}
+				}
+			}
+
+			if (shouldEmitStaticPrompt) {
+				this.taskState.lastPromptedPlaceholderWorkflowChecklistLabel = activeChecklistLabel
+				return basePrompt
+			}
+
+			return undefined
 		} catch (error) {
 			logFocusChainDiagnosticEvent(this.taskId, "placeholder_step_prompt_resolution", {
 				entered: true,

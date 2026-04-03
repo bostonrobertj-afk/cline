@@ -376,6 +376,10 @@ describe("filterContextualNativeToolSpecs", () => {
 			makeRegisteredTool(ClineDefaultTool.APPLY_PATCH),
 			makeRegisteredTool(ClineDefaultTool.FILE_NEW),
 			makeRegisteredTool(ClineDefaultTool.BASH),
+			makeRegisteredTool(ClineDefaultTool.STORY_TASK_REMINDER),
+			makeRegisteredTool(ClineDefaultTool.STORY_TASK_COMPLETE),
+			makeRegisteredTool(ClineDefaultTool.STORY_NOTES_UPDATE),
+			makeRegisteredTool(ClineDefaultTool.STORY_TESTING_COMPLETE),
 			makeRegisteredTool(ClineDefaultTool.ASK),
 			makeRegisteredTool(ClineDefaultTool.SEND_USER_MESSAGE),
 			makeRegisteredTool(ClineDefaultTool.ATTEMPT),
@@ -409,7 +413,71 @@ describe("filterContextualNativeToolSpecs", () => {
 			ClineDefaultTool.APPLY_PATCH,
 			ClineDefaultTool.FILE_NEW,
 			ClineDefaultTool.BASH,
+			ClineDefaultTool.STORY_TASK_REMINDER,
+			ClineDefaultTool.STORY_TASK_COMPLETE,
+			ClineDefaultTool.STORY_NOTES_UPDATE,
 		])
+		expect(keptIds).to.not.include(ClineDefaultTool.STORY_TESTING_COMPLETE)
 		expect(keptNames.some((name) => name.startsWith("indxr-"))).to.equal(false)
+	})
+
+	it("applies dev-story step 3 row with validation tools and the existing Indxr bundles", () => {
+		const registeredTools = [
+			makeRegisteredTool(ClineDefaultTool.LIST_FILES),
+			makeRegisteredTool(ClineDefaultTool.SEARCH),
+			makeRegisteredTool(ClineDefaultTool.LIST_CODE_DEF),
+			makeRegisteredTool(ClineDefaultTool.FILE_READ),
+			makeRegisteredTool(ClineDefaultTool.FILE_READ_RANGE),
+			makeRegisteredTool(ClineDefaultTool.APPLY_PATCH),
+			makeRegisteredTool(ClineDefaultTool.FILE_NEW),
+			makeRegisteredTool(ClineDefaultTool.BASH),
+			makeRegisteredTool(ClineDefaultTool.STORY_TASK_REMINDER),
+			makeRegisteredTool(ClineDefaultTool.STORY_TASK_COMPLETE),
+			makeRegisteredTool(ClineDefaultTool.STORY_NOTES_UPDATE),
+			makeRegisteredTool(ClineDefaultTool.STORY_TESTING_COMPLETE),
+			makeRegisteredTool(ClineDefaultTool.ASK),
+			makeRegisteredTool(ClineDefaultTool.SEND_USER_MESSAGE),
+			makeRegisteredTool(ClineDefaultTool.ATTEMPT),
+			makeRegisteredTool(ClineDefaultTool.BROWSER),
+			makeRegisteredTool(ClineDefaultTool.MCP_ACCESS),
+			makeRegisteredTool(ClineDefaultTool.NEW_TASK),
+		]
+
+		const result = filterContextualNativeToolSpecs({
+			context: makeContext({
+				activePlaceholderWorkflowName: "dev-story.md",
+				activePlaceholderWorkflowStepNumber: 3,
+			}),
+			registeredTools,
+			mcpTools: [
+				makeMcpTool("indxr-10mcp0search_relevant"),
+				makeMcpTool("indxr-10mcp0get_file_summary"),
+				makeMcpTool("indxr-10mcp0lookup_symbol"),
+				makeMcpTool("indxr-10mcp0get_callers"),
+			],
+		})
+
+		const keptIds = result.map((tool) => tool.id)
+		const keptNames = result.map((tool) => tool.name)
+		expect(keptIds).to.include.members([
+			ClineDefaultTool.LIST_FILES,
+			ClineDefaultTool.SEARCH,
+			ClineDefaultTool.LIST_CODE_DEF,
+			ClineDefaultTool.FILE_READ,
+			ClineDefaultTool.FILE_READ_RANGE,
+			ClineDefaultTool.APPLY_PATCH,
+			ClineDefaultTool.FILE_NEW,
+			ClineDefaultTool.BASH,
+			ClineDefaultTool.STORY_NOTES_UPDATE,
+			ClineDefaultTool.STORY_TESTING_COMPLETE,
+		])
+		expect(keptIds).to.not.include(ClineDefaultTool.STORY_TASK_REMINDER)
+		expect(keptIds).to.not.include(ClineDefaultTool.STORY_TASK_COMPLETE)
+		expect(keptNames).to.include.members([
+			"indxr-10mcp0search_relevant",
+			"indxr-10mcp0get_file_summary",
+			"indxr-10mcp0lookup_symbol",
+			"indxr-10mcp0get_callers",
+		])
 	})
 })

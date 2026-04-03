@@ -212,6 +212,7 @@ function stubApiHandler(createMessage: sinon.SinonStub, options?: StubApiOptions
 function createFocusChainManager(taskState: TaskState, taskId = "task-1") {
 	return new FocusChainManager({
 		taskId,
+		cwd: "/tmp",
 		taskState,
 		mode: "act",
 		stateManager: {

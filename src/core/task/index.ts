@@ -45,6 +45,7 @@ import {
 	isDeterministicPlaceholderWorkflowSupported,
 } from "@core/task/focus-chain/deterministicPlaceholderProgression"
 import type { FocusChainChecklistUpdateResult } from "@core/task/focus-chain/types"
+import { buildDevStoryWorkflowStartPrompt, resolveActiveStoryPath } from "@core/task/story-tools/storyTaskDocument"
 import { releaseTaskLock } from "@core/task/TaskLockUtils"
 import { dismissTrailingCommandOutputAskIfPresent } from "@core/task/utils/dismissTrailingCommandOutputAsk"
 import { getWorkflowFormResolverDefinition } from "@core/task/workflow-form/WorkflowFormRegistry"
@@ -865,6 +866,7 @@ export class Task {
 		if (focusChainSettings.enabled) {
 			this.FocusChainManager = new FocusChainManager({
 				taskId: this.taskId,
+				cwd: this.cwd,
 				taskState: this.taskState,
 				mode: this.stateManager.getGlobalSettingsKey("mode"),
 				stateManager: this.stateManager,
@@ -1498,6 +1500,10 @@ export class Task {
 		return result
 	}
 
+	private normalizePlaceholderWorkflowSourceName(sourceName: string): string {
+		return path.posix.basename(sourceName.replaceAll("\\", "/")).trim().toLowerCase()
+	}
+
 	private async maybeFinalizeCompletedPlaceholderWorkflow(
 		previousChecklist: string | null | undefined,
 		noticeCountBefore: number,
@@ -1532,6 +1538,9 @@ export class Task {
 		this.taskState.activePlaceholderWorkflowDeterministicState = undefined
 		this.taskState.activePlaceholderWorkflowTaskWriteProofPaths = []
 		this.taskState.lastPromptedPlaceholderWorkflowChecklistLabel = undefined
+		this.taskState.activeStoryTaskId = undefined
+		this.taskState.activeStorySubtaskIds = []
+		this.taskState.lastPromptedStoryTaskKey = undefined
 		this.taskState.activeWorkflowFormSession = undefined
 		this.taskState.suppressedWorkflowFormResolverIds = []
 		this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices = []
@@ -1555,6 +1564,9 @@ export class Task {
 				this.taskState.activePlaceholderWorkflowTaskWriteProofPaths
 			taskMetadata.lastPromptedPlaceholderWorkflowChecklistLabel =
 				this.taskState.lastPromptedPlaceholderWorkflowChecklistLabel
+			taskMetadata.activeStoryTaskId = this.taskState.activeStoryTaskId
+			taskMetadata.activeStorySubtaskIds = this.taskState.activeStorySubtaskIds
+			taskMetadata.lastPromptedStoryTaskKey = this.taskState.lastPromptedStoryTaskKey
 			taskMetadata.activeWorkflowFormSession = this.taskState.activeWorkflowFormSession
 			taskMetadata.suppressedWorkflowFormResolverIds = this.taskState.suppressedWorkflowFormResolverIds
 			taskMetadata.pendingAutoCompletedPlaceholderWorkflowStepNotices =
@@ -2044,6 +2056,9 @@ export class Task {
 				this.taskState.activePlaceholderWorkflowTaskWriteProofPaths
 			taskMetadata.lastPromptedPlaceholderWorkflowChecklistLabel =
 				this.taskState.lastPromptedPlaceholderWorkflowChecklistLabel
+			taskMetadata.activeStoryTaskId = this.taskState.activeStoryTaskId
+			taskMetadata.activeStorySubtaskIds = this.taskState.activeStorySubtaskIds
+			taskMetadata.lastPromptedStoryTaskKey = this.taskState.lastPromptedStoryTaskKey
 			taskMetadata.activeWorkflowFormSession = this.taskState.activeWorkflowFormSession
 			taskMetadata.suppressedWorkflowFormResolverIds = this.taskState.suppressedWorkflowFormResolverIds
 			taskMetadata.pendingAutoCompletedPlaceholderWorkflowStepNotices =
@@ -2058,7 +2073,30 @@ export class Task {
 	private async buildPlaceholderWorkflowActivationInstructions(
 		_action?: PersistentSlashCommandAction,
 	): Promise<string | undefined> {
-		return undefined
+		if (this.taskState.activeWorkflowJustStarted !== true) {
+			return undefined
+		}
+
+		const sourceName = this.taskState.activePlaceholderWorkflowSource?.name
+		if (!sourceName || this.normalizePlaceholderWorkflowSourceName(sourceName) !== "dev-story.md") {
+			return undefined
+		}
+
+		const resolvedStoryPath = resolveActiveStoryPath({
+			cwd: this.cwd,
+			stablePlaceholderValues: this.taskState.activePlaceholderWorkflowStableValues,
+			placeholderValues: this.taskState.activePlaceholderWorkflowValues,
+		})
+		if (!resolvedStoryPath.ok) {
+			return undefined
+		}
+
+		try {
+			const storyMarkdown = await fs.readFile(resolvedStoryPath.storyPath, "utf8")
+			return buildDevStoryWorkflowStartPrompt(storyMarkdown)
+		} catch {
+			return undefined
+		}
 	}
 
 	private async buildPromptSkillScope(enabledSkills: SkillMetadata[]): Promise<SkillMetadata[]> {
@@ -2166,6 +2204,9 @@ export class Task {
 			this.taskState.activePlaceholderWorkflowTaskWriteProofPaths =
 				metadata.activePlaceholderWorkflowTaskWriteProofPaths ?? []
 			this.taskState.lastPromptedPlaceholderWorkflowChecklistLabel = metadata.lastPromptedPlaceholderWorkflowChecklistLabel
+			this.taskState.activeStoryTaskId = metadata.activeStoryTaskId
+			this.taskState.activeStorySubtaskIds = metadata.activeStorySubtaskIds ?? []
+			this.taskState.lastPromptedStoryTaskKey = metadata.lastPromptedStoryTaskKey
 			this.taskState.activeWorkflowFormSession = metadata.activeWorkflowFormSession as WorkflowFormSessionState | undefined
 			this.taskState.suppressedWorkflowFormResolverIds = metadata.suppressedWorkflowFormResolverIds ?? []
 			this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices =
@@ -2195,6 +2236,18 @@ export class Task {
 		}
 	}
 
+	private async persistActiveStoryTaskPromptState(): Promise<void> {
+		try {
+			const metadata = await getTaskMetadata(this.taskId)
+			metadata.activeStoryTaskId = this.taskState.activeStoryTaskId
+			metadata.activeStorySubtaskIds = this.taskState.activeStorySubtaskIds
+			metadata.lastPromptedStoryTaskKey = this.taskState.lastPromptedStoryTaskKey
+			await saveTaskMetadata(this.taskId, metadata)
+		} catch {
+			// Non-fatal: the in-memory story-task prompt state remains canonical for the active turn.
+		}
+	}
+
 	private async clearLastPromptedPlaceholderWorkflowChecklistLabelForContextCompaction(): Promise<void> {
 		if (this.taskState.lastPromptedPlaceholderWorkflowChecklistLabel === undefined) {
 			return
@@ -2202,6 +2255,15 @@ export class Task {
 
 		this.taskState.lastPromptedPlaceholderWorkflowChecklistLabel = undefined
 		await this.persistLastPromptedPlaceholderWorkflowChecklistLabel()
+	}
+
+	private async clearLastPromptedStoryTaskKeyForContextCompaction(): Promise<void> {
+		if (this.taskState.lastPromptedStoryTaskKey === undefined) {
+			return
+		}
+
+		this.taskState.lastPromptedStoryTaskKey = undefined
+		await this.persistActiveStoryTaskPromptState()
 	}
 
 	private async refreshManagedWorkflowChecklistProjection(): Promise<void> {
@@ -3232,6 +3294,7 @@ export class Task {
 
 		this.taskState.conversationHistoryDeletedRange = newDeletedRange
 		await this.clearLastPromptedPlaceholderWorkflowChecklistLabelForContextCompaction()
+		await this.clearLastPromptedStoryTaskKeyForContextCompaction()
 
 		await this.messageStateHandler.saveClineMessagesAndUpdateHistory()
 		await this.contextManager.triggerApplyStandardContextTruncationNoticeChange(
@@ -3443,6 +3506,7 @@ export class Task {
 		if (contextManagementMetadata.updatedConversationHistoryDeletedRange) {
 			this.taskState.conversationHistoryDeletedRange = contextManagementMetadata.conversationHistoryDeletedRange
 			await this.clearLastPromptedPlaceholderWorkflowChecklistLabelForContextCompaction()
+			await this.clearLastPromptedStoryTaskKeyForContextCompaction()
 			await this.messageStateHandler.saveClineMessagesAndUpdateHistory()
 			// saves task history item which we use to keep track of conversation history deleted range
 		}
@@ -3986,6 +4050,7 @@ export class Task {
 					if (end + 2 <= safeEnd) {
 						this.taskState.conversationHistoryDeletedRange = [start, end + 2]
 						await this.clearLastPromptedPlaceholderWorkflowChecklistLabelForContextCompaction()
+						await this.clearLastPromptedStoryTaskKeyForContextCompaction()
 						await this.messageStateHandler.saveClineMessagesAndUpdateHistory()
 					}
 				}
@@ -4409,6 +4474,7 @@ export class Task {
 						}
 						case "context_compacted": {
 							await this.clearLastPromptedPlaceholderWorkflowChecklistLabelForContextCompaction()
+							await this.clearLastPromptedStoryTaskKeyForContextCompaction()
 							break
 						}
 					}
@@ -4976,20 +5042,44 @@ export class Task {
 		this.currentRequestHasHumanAuthoredInput = requestHasHumanAuthoredInput
 		const shouldSendFullPromptAssembly = this.shouldSendFullPromptAssemblyForCurrentTurn(requestHasHumanAuthoredInput)
 		this.currentRequestShouldSendFullPromptAssembly = shouldSendFullPromptAssembly
+		const placeholderActivationInstructions =
+			await this.buildPlaceholderWorkflowActivationInstructions(persistentSlashCommandAction)
+		let placeholderActivationInstructionsAppended = false
 		if (!useCompactPrompt) {
+			if (placeholderActivationInstructions?.trim()) {
+				processedUserContent.push({
+					type: "text",
+					text: placeholderActivationInstructions,
+				})
+				placeholderActivationInstructionsAppended = true
+			}
+
 			const previousPromptedChecklistLabel = this.taskState.lastPromptedPlaceholderWorkflowChecklistLabel
-			const currentStepInputPrompt = await this.FocusChainManager?.consumeCurrentPlaceholderWorkflowStepPromptForInput()
+			const previousActiveStoryTaskId = this.taskState.activeStoryTaskId
+			const previousActiveStorySubtaskIds = [...this.taskState.activeStorySubtaskIds]
+			const previousLastPromptedStoryTaskKey = this.taskState.lastPromptedStoryTaskKey
+			const currentStepInputPrompt = await this.FocusChainManager?.consumeCurrentPlaceholderWorkflowStepPromptForInput({
+				shouldForceStoryTaskPrompt: shouldSendFullPromptAssembly,
+			})
 			if (currentStepInputPrompt?.trim()) {
 				processedUserContent.push({
 					type: "text",
 					text: currentStepInputPrompt,
 				})
 			}
-			if (this.taskState.lastPromptedPlaceholderWorkflowChecklistLabel !== previousPromptedChecklistLabel) {
+			const didPromptStateChange =
+				this.taskState.lastPromptedPlaceholderWorkflowChecklistLabel !== previousPromptedChecklistLabel ||
+				this.taskState.activeStoryTaskId !== previousActiveStoryTaskId ||
+				this.taskState.lastPromptedStoryTaskKey !== previousLastPromptedStoryTaskKey ||
+				this.taskState.activeStorySubtaskIds.length !== previousActiveStorySubtaskIds.length ||
+				this.taskState.activeStorySubtaskIds.some(
+					(subtaskId, index) => subtaskId !== previousActiveStorySubtaskIds[index],
+				)
+			if (didPromptStateChange) {
 				await this.persistLastPromptedPlaceholderWorkflowChecklistLabel()
+				await this.persistActiveStoryTaskPromptState()
 			}
 		}
-		const placeholderActivationInstructionsAppended = false
 
 		logFocusChainDiagnosticEvent(this.taskId, "load_context_snapshot", {
 			providerId: providerInfo.providerId,

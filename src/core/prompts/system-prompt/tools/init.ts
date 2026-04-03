@@ -23,6 +23,10 @@ import { replace_in_file_variants } from "./replace_in_file"
 import { search_files_variants } from "./search_files"
 import { send_user_message_variants } from "./send_user_message"
 import { set_workflow_placeholders_variants } from "./set_workflow_placeholders"
+import { story_notes_update_variants } from "./story_notes_update"
+import { story_task_complete_variants } from "./story_task_complete"
+import { story_task_reminder_variants } from "./story_task_reminder"
+import { story_testing_complete_variants } from "./story_testing_complete"
 import { subagent_variants } from "./subagent"
 import { use_mcp_tool_variants } from "./use_mcp_tool"
 import { use_skill_variants } from "./use_skill"
@@ -60,6 +64,10 @@ export function registerClineToolSets(): void {
 		...search_files_variants,
 		...send_user_message_variants,
 		...set_workflow_placeholders_variants,
+		...story_notes_update_variants,
+		...story_task_complete_variants,
+		...story_task_reminder_variants,
+		...story_testing_complete_variants,
 		...subagent_variants,
 		...use_mcp_tool_variants,
 		...use_skill_variants,

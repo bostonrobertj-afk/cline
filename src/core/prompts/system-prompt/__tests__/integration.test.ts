@@ -803,7 +803,40 @@ describe("Prompt System Integration Tests", () => {
 					expect(nativeToolNames).to.include("search_files")
 					expect(nativeToolNames).to.include("apply_patch")
 					expect(nativeToolNames).to.include("execute_command")
+					expect(nativeToolNames).to.include("story_task_reminder")
+					expect(nativeToolNames).to.include("story_task_complete")
+					expect(nativeToolNames).to.include("story_notes_update")
 					expect(nativeToolNames.some((name) => name.startsWith("indxr-"))).to.equal(false)
+				},
+			)
+		})
+
+		it("keeps Indxr-aware MCP guidance visible for dev-story step 3 while exposing validation tools", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					mcpHub: makeMcpHub([makeIndxrServer()]),
+					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
+					enableNativeToolCalls: true,
+					useMinimalGptPrompt: true,
+					activeWorkflowSupportsPlaceholders: true,
+					managedWorkflowActive: false,
+					activePlaceholderWorkflowName: "dev-story.md",
+					activePlaceholderWorkflowStepNumber: 3,
+				},
+				"gpt-5.4-2026-03-05",
+				async ({ systemPrompt, tools }) => {
+					expect(systemPrompt).to.include("Indxr-Aware Exploration")
+					expect(systemPrompt).to.include("`search_relevant`")
+					expect(systemPrompt).to.include("`get_file_summary`")
+
+					const nativeToolNames = getNativeToolNames(tools)
+					expect(nativeToolNames).to.include("story_notes_update")
+					expect(nativeToolNames).to.include("story_testing_complete")
+					expect(nativeToolNames).to.not.include("story_task_reminder")
+					expect(nativeToolNames).to.not.include("story_task_complete")
+					expect(nativeToolNames.some((name) => name.startsWith("indxr-"))).to.equal(true)
 				},
 			)
 		})

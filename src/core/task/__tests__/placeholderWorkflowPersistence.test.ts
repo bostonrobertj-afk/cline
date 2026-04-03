@@ -20,6 +20,7 @@ import type { WorkflowFormRuntimeOutcome, WorkflowFormSessionState } from "../wo
 function createFocusChainManager(taskState: TaskState) {
 	return new FocusChainManager({
 		taskId: "task-placeholder-persistence",
+		cwd: "/tmp",
 		taskState,
 		mode: "act",
 		stateManager: {
@@ -193,6 +194,14 @@ const persistLastPromptedPlaceholderWorkflowChecklistLabel = Reflect.get(
 	Task.prototype,
 	"persistLastPromptedPlaceholderWorkflowChecklistLabel",
 ) as TaskMethod<[], Promise<void>>
+const persistActiveStoryTaskPromptState = Reflect.get(Task.prototype, "persistActiveStoryTaskPromptState") as TaskMethod<
+	[],
+	Promise<void>
+>
+const clearLastPromptedStoryTaskKeyForContextCompaction = Reflect.get(
+	Task.prototype,
+	"clearLastPromptedStoryTaskKeyForContextCompaction",
+) as TaskMethod<[], Promise<void>>
 const clearWorkflowFormSession = Reflect.get(Task.prototype, "clearWorkflowFormSession") as TaskMethod<[], Promise<void>>
 const executeWorkflowFormToolAndSync = Reflect.get(Task.prototype, "executeWorkflowFormToolAndSync") as TaskMethod<
 	[unknown],
@@ -240,6 +249,9 @@ Inspect the prepared review input and write findings.
 				},
 				activePlaceholderWorkflowTaskWriteProofPaths: ["/tmp/review-input.md"],
 				lastPromptedPlaceholderWorkflowChecklistLabel: "Step 1: Gather Context",
+				activeStoryTaskId: "2",
+				activeStorySubtaskIds: ["1", "2"],
+				lastPromptedStoryTaskKey: "2:1,2:- [ ] Review findings",
 				suppressedWorkflowFormResolverIds: ["code_review_step_3_diff_source"],
 				pendingAutoCompletedPlaceholderWorkflowStepNotices: [
 					{
@@ -267,6 +279,9 @@ Inspect the prepared review input and write findings.
 				metadata.activePlaceholderWorkflowTaskWriteProofPaths,
 			)
 			expect(fakeTask.taskState.lastPromptedPlaceholderWorkflowChecklistLabel).to.equal("Step 1: Gather Context")
+			expect(fakeTask.taskState.activeStoryTaskId).to.equal("2")
+			expect(fakeTask.taskState.activeStorySubtaskIds).to.deep.equal(["1", "2"])
+			expect(fakeTask.taskState.lastPromptedStoryTaskKey).to.equal("2:1,2:- [ ] Review findings")
 			expect(fakeTask.taskState.suppressedWorkflowFormResolverIds).to.deep.equal(metadata.suppressedWorkflowFormResolverIds)
 			expect(fakeTask.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal(
 				metadata.pendingAutoCompletedPlaceholderWorkflowStepNotices,
@@ -304,6 +319,40 @@ Inspect the prepared review input and write findings.
 			expect(saveTaskMetadataStub.callCount).to.equal(1)
 			const lastSavedMetadata = saveTaskMetadataStub.getCall(saveTaskMetadataStub.callCount - 1).args[1]
 			expect(lastSavedMetadata.lastPromptedPlaceholderWorkflowChecklistLabel).to.equal(undefined)
+		} finally {
+			sandbox.restore()
+		}
+	})
+
+	it("persists and clears the story-task prompt state used for dev-story step 2 prompting", async () => {
+		const sandbox = sinon.createSandbox()
+		try {
+			sandbox.stub(disk, "getTaskMetadata").resolves({} as never)
+			const saveTaskMetadataStub = sandbox.stub(disk, "saveTaskMetadata").resolves()
+
+			const fakeTask = createFakeTask("task-story-task-prompt-state") as FakeTaskBase & {
+				persistActiveStoryTaskPromptState: () => Promise<void>
+			}
+			Object.setPrototypeOf(fakeTask, Task.prototype)
+			fakeTask.persistActiveStoryTaskPromptState = persistActiveStoryTaskPromptState.bind(fakeTask)
+			fakeTask.taskState.activeStoryTaskId = "3"
+			fakeTask.taskState.activeStorySubtaskIds = ["1", "2"]
+			fakeTask.taskState.lastPromptedStoryTaskKey = "3:1,2:- [ ] Validate the workflow"
+
+			await persistActiveStoryTaskPromptState.call(fakeTask)
+
+			expect(saveTaskMetadataStub.callCount).to.equal(1)
+			const persistedMetadata = saveTaskMetadataStub.getCall(0).args[1]
+			expect(persistedMetadata.activeStoryTaskId).to.equal("3")
+			expect(persistedMetadata.activeStorySubtaskIds).to.deep.equal(["1", "2"])
+			expect(persistedMetadata.lastPromptedStoryTaskKey).to.equal("3:1,2:- [ ] Validate the workflow")
+
+			await clearLastPromptedStoryTaskKeyForContextCompaction.call(fakeTask)
+
+			expect(fakeTask.taskState.lastPromptedStoryTaskKey).to.equal(undefined)
+			expect(saveTaskMetadataStub.callCount).to.equal(2)
+			const clearedMetadata = saveTaskMetadataStub.getCall(1).args[1]
+			expect(clearedMetadata.lastPromptedStoryTaskKey).to.equal(undefined)
 		} finally {
 			sandbox.restore()
 		}
@@ -739,6 +788,9 @@ ${step3Checklist}
 			}
 			fakeTask.taskState.suppressedWorkflowFormResolverIds = ["code_review_step_3_diff_source"]
 			fakeTask.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices = []
+			fakeTask.taskState.activeStoryTaskId = "2"
+			fakeTask.taskState.activeStorySubtaskIds = ["1", "2"]
+			fakeTask.taskState.lastPromptedStoryTaskKey = "2:1,2:- [ ] Review findings"
 			fakeTask.taskState.activeWorkflowJustStarted = true
 			fakeTask.taskState.currentFocusChainChecklist = "- [ ] Step 1: Gather Context"
 			const activeWorkflowFormSession = fakeTask.taskState.activeWorkflowFormSession
@@ -759,6 +811,9 @@ ${step3Checklist}
 			expect(fakeTask.taskState.activePlaceholderWorkflowDeterministicState).to.equal(undefined)
 			expect(fakeTask.taskState.activePlaceholderWorkflowTaskWriteProofPaths).to.deep.equal([])
 			expect(fakeTask.taskState.lastPromptedPlaceholderWorkflowChecklistLabel).to.equal(undefined)
+			expect(fakeTask.taskState.activeStoryTaskId).to.equal(undefined)
+			expect(fakeTask.taskState.activeStorySubtaskIds).to.deep.equal([])
+			expect(fakeTask.taskState.lastPromptedStoryTaskKey).to.equal(undefined)
 			expect(fakeTask.taskState.activeWorkflowFormSession).to.equal(undefined)
 			expect(fakeTask.taskState.suppressedWorkflowFormResolverIds).to.deep.equal([])
 			expect(fakeTask.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
@@ -776,6 +831,9 @@ ${step3Checklist}
 			expect(lastSavedMetadata.activePlaceholderWorkflowDeterministicState).to.equal(undefined)
 			expect(lastSavedMetadata.activePlaceholderWorkflowTaskWriteProofPaths).to.deep.equal([])
 			expect(lastSavedMetadata.lastPromptedPlaceholderWorkflowChecklistLabel).to.equal(undefined)
+			expect(lastSavedMetadata.activeStoryTaskId).to.equal(undefined)
+			expect(lastSavedMetadata.activeStorySubtaskIds).to.deep.equal([])
+			expect(lastSavedMetadata.lastPromptedStoryTaskKey).to.equal(undefined)
 			expect(lastSavedMetadata.activeWorkflowFormSession).to.equal(undefined)
 			expect(lastSavedMetadata.suppressedWorkflowFormResolverIds).to.deep.equal([])
 			expect(lastSavedMetadata.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
@@ -994,6 +1052,7 @@ Respond in {communication_language} from {config_source}. Write artifacts to {ou
 				...createFakeTask("task-slash-stable"),
 				cwd: tempDir,
 			}
+			Object.setPrototypeOf(fakeTask, Task.prototype)
 
 			await applyPersistentSlashCommandAction.call(fakeTask, parseResult.persistentSlashCommandAction)
 
@@ -1078,6 +1137,7 @@ Done Signal: You've persisted a new \`review-input.diff\` file in {output_folder
 				...createFakeTask("task-step-3-guidance"),
 				cwd: tempDir,
 			}
+			Object.setPrototypeOf(fakeTask, Task.prototype)
 			fakeTask.taskState.activePlaceholderWorkflowId = "code-review.md"
 			fakeTask.taskState.activePlaceholderWorkflowSource = {
 				type: "local",
@@ -2741,6 +2801,7 @@ Inspect the prepared review input and write findings.
 
 	it("renders stored dynamic placeholder values when building slash-activation instructions from task state", async () => {
 		const fakeTask = createFakeTask("task-slash-placeholder-render")
+		Object.setPrototypeOf(fakeTask, Task.prototype)
 		fakeTask.taskState.activePlaceholderWorkflowId = "remote-review"
 		fakeTask.taskState.activePlaceholderWorkflowSource = {
 			type: "remote",
@@ -2771,6 +2832,7 @@ Review {{story_id}} before asking follow-up questions.
 
 	it("lets dynamic placeholder values override stable values in activation instructions", async () => {
 		const fakeTask = createFakeTask("task-slash-placeholder-override")
+		Object.setPrototypeOf(fakeTask, Task.prototype)
 		fakeTask.taskState.activePlaceholderWorkflowId = "remote-review"
 		fakeTask.taskState.activePlaceholderWorkflowSource = {
 			type: "remote",
@@ -2801,5 +2863,79 @@ Review {{story_id}} in {communication_language}.
 		})
 
 		expect(prompt).to.equal(undefined)
+	})
+
+	it("returns the dev-story workflow-start context only while activeWorkflowJustStarted is true", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "dev-story-activation-instructions-"))
+		const storyPath = path.join(tempDir, "story.md")
+		await fs.writeFile(
+			storyPath,
+			`# Story 1.0
+Status: ready-for-dev
+
+## Acceptance Criteria
+- AC 1
+
+## Latest Review Findings
+- Fix the step gating
+
+## Tasks / Subtasks
+- [ ] Implement prompt injection
+`,
+			"utf8",
+		)
+
+		try {
+			const fakeTask = {
+				...createFakeTask("task-dev-story-activation"),
+				cwd: tempDir,
+			}
+			Object.setPrototypeOf(fakeTask, Task.prototype)
+			fakeTask.taskState.activeWorkflowJustStarted = true
+			fakeTask.taskState.activePlaceholderWorkflowId = "dev-story.md"
+			fakeTask.taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "dev-story.md",
+				contents: `# Dev Story
+
+## Step 1: Start
+Prepare the story.
+`,
+			}
+			fakeTask.taskState.activePlaceholderWorkflowValues = {
+				story_path: storyPath,
+			}
+
+			const workflowSource = fakeTask.taskState.activePlaceholderWorkflowSource
+			if (!workflowSource) {
+				throw new Error("Expected dev-story workflow source to be set")
+			}
+
+			const firstPrompt = await buildPlaceholderWorkflowActivationInstructions.call(fakeTask, {
+				type: "activate_placeholder_workflow",
+				workflowId: "dev-story.md",
+				workflowSource,
+			})
+
+			expect(firstPrompt).to.equal(`### WORKFLOW START CONTEXT
+
+## Acceptance Criteria
+- AC 1
+
+## Latest Review Findings
+- Fix the step gating`)
+
+			fakeTask.taskState.activeWorkflowJustStarted = false
+
+			const secondPrompt = await buildPlaceholderWorkflowActivationInstructions.call(fakeTask, {
+				type: "activate_placeholder_workflow",
+				workflowId: "dev-story.md",
+				workflowSource,
+			})
+
+			expect(secondPrompt).to.equal(undefined)
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
 	})
 })

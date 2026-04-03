@@ -150,6 +150,9 @@ export class TaskState {
 	activePlaceholderWorkflowDeterministicState?: ActivePlaceholderWorkflowDeterministicState
 	activePlaceholderWorkflowTaskWriteProofPaths: string[] = []
 	lastPromptedPlaceholderWorkflowChecklistLabel?: string
+	activeStoryTaskId?: string
+	activeStorySubtaskIds: string[] = []
+	lastPromptedStoryTaskKey?: string
 	activeWorkflowFormSession?: WorkflowFormSessionState
 	suppressedWorkflowFormResolverIds: string[] = []
 	pendingAutoCompletedPlaceholderWorkflowStepNotices: AutoCompletedPlaceholderWorkflowStepNotice[] = []

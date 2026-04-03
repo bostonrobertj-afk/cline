@@ -1,7 +1,10 @@
 import * as disk from "@core/storage/disk"
 import type { ClineContent, ClineTextContentBlock } from "@shared/messages/content"
 import { expect } from "chai"
+import fs from "fs/promises"
 import { describe, it } from "mocha"
+import os from "os"
+import path from "path"
 import proxyquire from "proxyquire"
 import type { SinonStub } from "sinon"
 import sinon from "sinon"
@@ -45,8 +48,9 @@ type LoadContextTaskHarness = {
 	getEnvironmentDetails: SinonStub
 	maybeResolveWorkflowFormBeforeApiTurn: sinon.SinonStub
 	applyPersistentSlashCommandAction: sinon.SinonStub
-	buildPlaceholderWorkflowActivationInstructions: sinon.SinonStub
+	buildPlaceholderWorkflowActivationInstructions: (...args: unknown[]) => Promise<string | undefined>
 	persistLastPromptedPlaceholderWorkflowChecklistLabel: () => Promise<void>
+	persistActiveStoryTaskPromptState: () => Promise<void>
 	hasHumanAuthoredInput: typeof Task.prototype.hasHumanAuthoredInput
 	getPromptRefreshFrequency: typeof Task.prototype.getPromptRefreshFrequency
 	shouldSendFullPromptAssemblyForCurrentTurn: typeof Task.prototype.shouldSendFullPromptAssemblyForCurrentTurn
@@ -92,6 +96,7 @@ function createStateManager(promptRefreshFrequency = 5) {
 function createFocusChainManager(taskState: TaskState, promptRefreshFrequency = 5) {
 	return new FocusChainManager({
 		taskId: "task-load-context-placeholder",
+		cwd: "/tmp",
 		taskState,
 		mode: "act",
 		stateManager: createStateManager(promptRefreshFrequency),
@@ -162,6 +167,7 @@ Use \`build_review_diff_output\` whenever a supported source is discovered.
 		applyPersistentSlashCommandAction: sinon.stub().resolves(),
 		buildPlaceholderWorkflowActivationInstructions: sinon.stub().resolves(undefined),
 		persistLastPromptedPlaceholderWorkflowChecklistLabel: sinon.stub().resolves(),
+		persistActiveStoryTaskPromptState: sinon.stub().resolves(),
 		hasHumanAuthoredInput: Task.prototype.hasHumanAuthoredInput,
 		getPromptRefreshFrequency: Task.prototype.getPromptRefreshFrequency,
 		shouldSendFullPromptAssemblyForCurrentTurn: Task.prototype.shouldSendFullPromptAssemblyForCurrentTurn,
@@ -333,6 +339,111 @@ describe("Task.loadContext placeholder workflow focus chain prompting", () => {
 
 		expect(userText).to.not.contain("# CURRENT WORKFLOW STEP")
 		expect(promptInjectionText).to.not.contain("# CURRENT WORKFLOW STEP")
+	})
+
+	it("appends dev-story workflow-start context before the current-step block and forces step 2 task prompting on full-prompt turns", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "load-context-dev-story-"))
+		const storyPath = path.join(tempDir, "load-context-dev-story-story.md")
+		await fs.writeFile(
+			storyPath,
+			`# Story 1.0
+Status: ready-for-dev
+
+## Acceptance Criteria
+- AC 1
+
+## Latest Review Findings
+- Fix the workflow prompt ordering
+
+## Tasks / Subtasks
+- [ ] Implement prompt injection
+  - [ ] Keep storyTaskId runtime-only
+`,
+			"utf8",
+		)
+
+		try {
+			const fakeTask = createFakeTask(0)
+			Object.setPrototypeOf(fakeTask, Task.prototype)
+			fakeTask.cwd = tempDir
+			fakeTask.taskState.activeWorkflowJustStarted = true
+			fakeTask.taskState.activePlaceholderWorkflowId = "dev-story.md"
+			fakeTask.taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "dev-story.md",
+				contents: `# Dev Story
+
+## Step 1: Start
+Prepare the story.
+
+## Step 2: Implement Tasks
+Complete the current task and its subtasks.
+
+## Step 3: Validate
+Run the required tests.
+`,
+			}
+			fakeTask.taskState.activePlaceholderWorkflowValues = {
+				story_path: storyPath,
+			}
+			fakeTask.taskState.currentFocusChainChecklist = [
+				"- [x] Step 1: Start",
+				"- [ ] Step 2: Implement Tasks",
+				"- [ ] Step 3: Validate",
+			].join("\n")
+			fakeTask.buildPlaceholderWorkflowActivationInstructions = Reflect.get(
+				Task.prototype,
+				"buildPlaceholderWorkflowActivationInstructions",
+			).bind(fakeTask)
+
+			const [firstProcessedUserContent] = await loadContext.call(
+				fakeTask,
+				[
+					{
+						type: "tool_result",
+						tool_use_id: "tool-1",
+						content: [{ type: "text", text: "Continue the workflow." }],
+					},
+				],
+				false,
+				false,
+				false,
+			)
+
+			const firstUserText = collectTextValues(firstProcessedUserContent).join("\n")
+			expect(firstUserText).to.contain("### WORKFLOW START CONTEXT")
+			expect(firstUserText).to.contain("## Acceptance Criteria")
+			expect(firstUserText).to.contain("### CURRENT WORKFLOW STEP")
+			expect(firstUserText.indexOf("### WORKFLOW START CONTEXT")).to.be.lessThan(
+				firstUserText.indexOf("### CURRENT WORKFLOW STEP"),
+			)
+			expect(firstUserText).to.contain("### CURRENT TASKS / SUBTASKS")
+			expect(firstUserText).to.contain("storyTaskId: 1")
+
+			fakeTask.taskState.activeWorkflowJustStarted = false
+
+			const [secondProcessedUserContent] = await loadContext.call(
+				fakeTask,
+				[
+					{
+						type: "tool_result",
+						tool_use_id: "tool-2",
+						content: [{ type: "text", text: "Continue the workflow again." }],
+					},
+				],
+				false,
+				false,
+				false,
+			)
+
+			const secondUserText = collectTextValues(secondProcessedUserContent).join("\n")
+			expect(secondUserText).to.not.contain("### WORKFLOW START CONTEXT")
+			expect(secondUserText).to.not.contain("## Acceptance Criteria")
+			expect(secondUserText).to.contain("### CURRENT TASKS / SUBTASKS")
+			expect(secondUserText).to.contain("storyTaskId: 1")
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
 	})
 
 	it("persists the last prompted placeholder workflow checklist label when loadContext injects a new active step", async () => {

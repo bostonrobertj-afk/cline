@@ -483,12 +483,10 @@ This section scopes only placeholder workflows under `/Users/robertboston/Docume
 
 ### dev-story.md
 
-- Step 1: `PLACEHOLDER_WRITE`
-- Step 2: `DOC_READ`
-- Step 3: no additional tools
-- Step 4: `CODE_READ`, `INDXR_DISCOVERY`, `INDXR_SOURCE_READ`, `INDXR_SYMBOL_GRAPH`, `DOC_WRITE`, `LOCAL_EXEC`
-- Step 5: `CODE_READ`, `INDXR_DISCOVERY`, `INDXR_SOURCE_READ`, `INDXR_SYMBOL_GRAPH`, `DOC_WRITE`, `LOCAL_EXEC`
-- Step 6: `DOC_READ`, `DOC_WRITE`, `LOCAL_EXEC`
+- Step 1: `DOC_READ`, `PLACEHOLDER_WRITE`
+- Step 2: `DOC_READ`, `DOC_WRITE`, `CODE_READ`, `LOCAL_EXEC`, `STORY_TASK_EXECUTION`
+- Step 3: `DOC_READ`, `DOC_WRITE`, `CODE_READ`, `INDXR_DISCOVERY`, `INDXR_SOURCE_READ`, `INDXR_SYMBOL_GRAPH`, `LOCAL_EXEC`, `STORY_TASK_VALIDATION`
+- Step 4: `DOC_READ`, `DOC_WRITE`, `LOCAL_EXEC`
 
 ### distillator.md
 

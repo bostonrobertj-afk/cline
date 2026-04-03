@@ -376,6 +376,7 @@ export class SubagentRunner {
 					scope: "subagent",
 				},
 				focusChainDocumentLabel: `Subagent ${storageKey}`,
+				cwd: this.baseConfig.cwd,
 				taskState: state,
 				mode: this.baseConfig.mode,
 				stateManager: this.baseConfig.services.stateManager,
@@ -1153,8 +1154,11 @@ export class SubagentRunner {
 	}
 
 	private async maybeAppendCurrentStepInputPrompt(state: TaskState, content: ClineUserContent[]): Promise<void> {
-		const prompt =
-			await this.getOrCreateSubagentFocusChainManager(state).consumeCurrentPlaceholderWorkflowStepPromptForInput()
+		const prompt = await this.getOrCreateSubagentFocusChainManager(state).consumeCurrentPlaceholderWorkflowStepPromptForInput(
+			{
+				shouldForceStoryTaskPrompt: true,
+			},
+		)
 		if (prompt?.trim()) {
 			content.push({
 				type: "text",
@@ -1164,11 +1168,8 @@ export class SubagentRunner {
 	}
 
 	private clearSubagentCurrentStepPromptMarkerForContextCompaction(state: TaskState): void {
-		if (state.lastPromptedPlaceholderWorkflowChecklistLabel === undefined) {
-			return
-		}
-
 		state.lastPromptedPlaceholderWorkflowChecklistLabel = undefined
+		state.lastPromptedStoryTaskKey = undefined
 	}
 
 	private async buildSubagentPromptInjectionBlocks(

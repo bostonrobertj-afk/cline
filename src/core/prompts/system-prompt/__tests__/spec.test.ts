@@ -29,6 +29,8 @@ import { read_file_range_variants } from "../tools/read_file_range"
 import { search_files_variants } from "../tools/search_files"
 import { send_user_message_variants } from "../tools/send_user_message"
 import { set_workflow_placeholders_variants } from "../tools/set_workflow_placeholders"
+import { story_notes_update_variants } from "../tools/story_notes_update"
+import { story_task_complete_variants } from "../tools/story_task_complete"
 import { use_mcp_tool_variants } from "../tools/use_mcp_tool"
 import { write_to_file_variants } from "../tools/write_to_file"
 import type { SystemPromptContext } from "../types"
@@ -752,6 +754,31 @@ describe("native tool placeholder replacement", () => {
 		expect(getOpenAIFunctionTool(openAI).description).to.equal(
 			'Persist dynamic placeholder values discovered during the active workflow. Call as {"values":{"story_path":"docs/story.md","project_context":"docs/project-context.md"}}. Stable config-backed placeholders like output_folder come from .cline/workflow-config.yaml.',
 		)
+	})
+
+	it("describes dev-story task completion and notes-update parameters with the locked runtime ids and section values", () => {
+		const context: SystemPromptContext = {
+			...mockContext,
+			enableNativeToolCalls: true,
+			useMinimalGptPrompt: true,
+			providerInfo: {
+				providerId: "openai",
+				model: { id: "gpt-5.4-2026-03-05", info: { supportsPromptCache: false } },
+				mode: "act",
+			},
+		}
+
+		const completeTool = toolSpecFunctionDefinition(story_task_complete_variants[0], context)
+		const notesTool = toolSpecFunctionDefinition(story_notes_update_variants[0], context)
+		const completeProperties = getOpenAIProperties(completeTool)
+		const notesProperties = getOpenAIProperties(notesTool)
+
+		expect(completeProperties.storyTaskId?.description).to.contain("1-based top-level task ordinal")
+		expect(completeProperties.storyTaskId?.description).to.contain("copied from the injected current task block")
+		expect(completeProperties.storySubtaskId?.description).to.contain("optional 1-based subtask ordinal")
+		expect(completeProperties.storySubtaskId?.description).to.contain("under that parent task")
+		expect(notesProperties.section?.enum).to.deep.equal(["Completion Notes List", "File List"])
+		expect(notesProperties.section?.description).to.contain("Allowed values")
 	})
 
 	it("compacts native build_review_diff_output descriptions and parameter text", () => {

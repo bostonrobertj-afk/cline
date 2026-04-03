@@ -13,6 +13,7 @@ import { FocusChainDependencies, FocusChainManager } from "../index"
 function createDependencies(taskState: TaskState) {
 	return {
 		taskId: "task-focus-chain-placeholder",
+		cwd: "/tmp",
 		taskState,
 		mode: "act" as const,
 		stateManager: {
@@ -129,6 +130,172 @@ Inspect the prepared review input and write findings.
 
 			expect(completedPrompt).to.equal(undefined)
 			expect(taskState.lastPromptedPlaceholderWorkflowChecklistLabel).to.equal(undefined)
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("re-injects dev-story step 2 task payloads when the current story task changes", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "focus-chain-dev-story-step-2-"))
+		const workflowPath = path.join(tempDir, "dev-story.md")
+		const storyPath = path.join(tempDir, "story.md")
+		await fs.writeFile(
+			workflowPath,
+			`# Dev Story
+
+## Step 1: Start
+Prepare the story.
+
+## Step 2: Implement Tasks
+Complete the current task and its subtasks.
+
+## Step 3: Validate
+Run the required tests.
+
+## Step 4: Wrap Up
+Finish the workflow.
+`,
+			"utf8",
+		)
+		await fs.writeFile(
+			storyPath,
+			`# Story 1.0
+Status: ready-for-dev
+
+## Tasks / Subtasks
+- [ ] Implement parser
+  - [ ] Build the task prompt
+- [ ] Wire prompt injection
+  - [ ] Persist the prompt state
+`,
+			"utf8",
+		)
+
+		try {
+			const taskState = new TaskState()
+			taskState.activePlaceholderWorkflowId = "dev-story.md"
+			taskState.activePlaceholderWorkflowSource = {
+				type: "local",
+				name: "dev-story.md",
+				path: workflowPath,
+			}
+			taskState.activePlaceholderWorkflowValues = {
+				story_path: storyPath,
+			}
+			taskState.currentFocusChainChecklist = [
+				"- [x] Step 1: Start",
+				"- [ ] Step 2: Implement Tasks",
+				"- [ ] Step 3: Validate",
+				"- [ ] Step 4: Wrap Up",
+			].join("\n")
+
+			const manager = new FocusChainManager(createDependencies(taskState))
+			const firstPrompt = await manager.consumeCurrentPlaceholderWorkflowStepPromptForInput()
+			const secondPrompt = await manager.consumeCurrentPlaceholderWorkflowStepPromptForInput()
+
+			expect(firstPrompt).to.contain("### CURRENT WORKFLOW STEP")
+			expect(firstPrompt).to.contain("Step 2: Implement Tasks")
+			expect(firstPrompt).to.contain("### CURRENT TASKS / SUBTASKS")
+			expect(firstPrompt).to.contain("storyTaskId: 1")
+			expect(firstPrompt).to.contain("- [ ] Implement parser")
+			expect(secondPrompt).to.equal(undefined)
+			expect(taskState.activeStoryTaskId).to.equal("1")
+			expect(taskState.activeStorySubtaskIds).to.deep.equal(["1"])
+
+			await fs.writeFile(
+				storyPath,
+				`# Story 1.0
+Status: ready-for-dev
+
+## Tasks / Subtasks
+- [x] Implement parser
+  - [x] Build the task prompt
+- [ ] Wire prompt injection
+  - [ ] Persist the prompt state
+`,
+				"utf8",
+			)
+
+			const thirdPrompt = await manager.consumeCurrentPlaceholderWorkflowStepPromptForInput()
+
+			expect(thirdPrompt).to.equal(`### CURRENT TASKS / SUBTASKS
+
+storyTaskId: 2
+- [ ] Wire prompt injection
+
+storySubtaskId: 1
+  - [ ] Persist the prompt state`)
+			expect(taskState.activeStoryTaskId).to.equal("2")
+			expect(taskState.activeStorySubtaskIds).to.deep.equal(["1"])
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("appends testing requirements when dev-story step 3 first becomes active", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "focus-chain-dev-story-step-3-"))
+		const workflowPath = path.join(tempDir, "dev-story.md")
+		const storyPath = path.join(tempDir, "story.md")
+		await fs.writeFile(
+			workflowPath,
+			`# Dev Story
+
+## Step 1: Start
+Prepare the story.
+
+## Step 2: Implement Tasks
+Complete the current task and its subtasks.
+
+## Step 3: Validate
+Run the required tests.
+`,
+			"utf8",
+		)
+		await fs.writeFile(
+			storyPath,
+			`# Story 1.0
+Status: ready-for-dev
+
+## Tasks / Subtasks
+- [x] Implement parser
+
+## Testing Requirements
+- npm run test:unit
+- Verify the placeholder workflow prompt
+`,
+			"utf8",
+		)
+
+		try {
+			const taskState = new TaskState()
+			taskState.activePlaceholderWorkflowId = "dev-story.md"
+			taskState.activePlaceholderWorkflowSource = {
+				type: "local",
+				name: "dev-story.md",
+				path: workflowPath,
+			}
+			taskState.activePlaceholderWorkflowValues = {
+				story_path: storyPath,
+			}
+			taskState.activeStoryTaskId = "1"
+			taskState.activeStorySubtaskIds = ["1"]
+			taskState.lastPromptedStoryTaskKey = "1:1:- [ ] Implement parser"
+			taskState.currentFocusChainChecklist = [
+				"- [x] Step 1: Start",
+				"- [x] Step 2: Implement Tasks",
+				"- [ ] Step 3: Validate",
+			].join("\n")
+
+			const manager = new FocusChainManager(createDependencies(taskState))
+			const prompt = await manager.consumeCurrentPlaceholderWorkflowStepPromptForInput()
+
+			expect(prompt).to.contain("### CURRENT WORKFLOW STEP")
+			expect(prompt).to.contain("Step 3: Validate")
+			expect(prompt).to.contain("### TESTING REQUIREMENTS")
+			expect(prompt).to.contain("- npm run test:unit")
+			expect(taskState.activeStoryTaskId).to.equal(undefined)
+			expect(taskState.activeStorySubtaskIds).to.deep.equal([])
+			expect(taskState.lastPromptedStoryTaskKey).to.equal(undefined)
 		} finally {
 			await fs.rm(tempDir, { recursive: true, force: true })
 		}
