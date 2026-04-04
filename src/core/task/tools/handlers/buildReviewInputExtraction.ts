@@ -236,8 +236,12 @@ export function buildReviewInputExtraction(args: BuildReviewInputExtractionArgs)
 
 	const priorReviewFindingsSection = findTopLevelSection(storyLines, "## Prior Review Findings")
 	const tasksSection = findTopLevelSection(storyLines, "## Tasks / Subtasks")
-	const devAgentRecordSection = findTopLevelSection(storyLines, "## Dev Agent Record")
-	const completionNotesListSection = findNestedSectionWithin(devAgentRecordSection, "### Completion Notes List")
+	const topLevelCompletionNotesListSection = findTopLevelSection(storyLines, "## Completion Notes List")
+	const devAgentRecordSection = topLevelCompletionNotesListSection
+		? undefined
+		: findTopLevelSection(storyLines, "## Dev Agent Record")
+	const completionNotesListSection =
+		topLevelCompletionNotesListSection ?? findNestedSectionWithin(devAgentRecordSection, "### Completion Notes List")
 	const diffFence = extractDiffFence(args.diffArtifactMarkdown)
 	if (!diffFence) {
 		return { kind: "no_recent_story_changes", recentStoryChangesDetected: false }

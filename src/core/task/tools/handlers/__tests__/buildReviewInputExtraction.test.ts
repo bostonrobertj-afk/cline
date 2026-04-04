@@ -99,6 +99,48 @@ This QA pass is reviewing work performed during a remediation cycle. Only the re
 		})
 	})
 
+	it("accepts top-level completion notes without requiring a dev-agent-record parent section", () => {
+		const result = buildReviewInputExtraction({
+			storyMarkdown: `# Story 3.2: Review Input Artifact
+Status: review
+
+## Acceptance Criteria
+- AC 1
+
+## Prior Review Findings
+- Existing prior review finding
+- Added prior review finding
+
+## Tasks / Subtasks
+- [x] Existing completed task
+- [x] Added completed task
+
+## Completion Notes List
+- Existing completion note
+  - Added completion note
+`,
+			storyAbsolutePath: "/repo/docs/story.md",
+			storyRelativePaths: ["docs/story.md"],
+			diffArtifactMarkdown: createDiffArtifact(`diff --git a/docs/story.md b/docs/story.md
+index 1111111..2222222 100644
+--- a/docs/story.md
++++ b/docs/story.md
+@@ -8,4 +8,6 @@
++- Added prior review finding
+
++- [x] Added completed task
++  - Added completion note
+  `),
+		})
+
+		expect(result.kind).to.equal("success")
+		if (result.kind === "success") {
+			expect(result.markdown).to.contain("## Completion Notes")
+			expect(result.markdown).to.contain("  - Added completion note")
+			expect(result.markdown).to.not.contain("## Dev Agent Record")
+		}
+	})
+
 	it("maps added checked tasks and completion notes from the story file even when the diff hunk omits section headings", () => {
 		const result = buildReviewInputExtraction({
 			storyMarkdown: `# Story 3.2: Review Input Artifact

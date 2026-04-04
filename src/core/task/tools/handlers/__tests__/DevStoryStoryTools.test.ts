@@ -38,18 +38,32 @@ function initializeHostProvider(workspacePath: string) {
 	)
 }
 
-function createConfig(storyPath: string): TaskConfig {
+function createConfig(storyPath: string): {
+	config: TaskConfig
+	taskState: TaskState
+	say: sinon.SinonStub
+	ask: sinon.SinonStub
+	shouldAutoApproveToolWithPath: sinon.SinonStub
+} {
 	initializeHostProvider(path.dirname(storyPath))
 	const taskState = new TaskState()
 	taskState.activePlaceholderWorkflowValues = {
 		story_path: storyPath,
 	}
-	taskState.fileReadCache.set(storyPath.toLowerCase(), "cached")
+	taskState.fileReadCache.set(storyPath.toLowerCase(), {
+		readCount: 1,
+		mtime: Date.now(),
+		snapshotText: "cached",
+	})
+
+	const say = sinon.stub().resolves(undefined)
+	const ask = sinon.stub().resolves({ response: "continue" })
+	const shouldAutoApproveToolWithPath = sinon.stub().resolves(true)
 
 	const callbacks = {
-		say: sinon.stub().resolves(undefined),
-		ask: sinon.stub().resolves({ response: "continue" }),
-		shouldAutoApproveToolWithPath: sinon.stub().resolves(true),
+		say,
+		ask,
+		shouldAutoApproveToolWithPath,
 		saveCheckpoint: sinon.stub().resolves(),
 		sayAndCreateMissingParamError: sinon.stub().resolves("missing"),
 		removeLastPartialMessageIfExistsWithType: sinon.stub().resolves(),
@@ -60,46 +74,52 @@ function createConfig(storyPath: string): TaskConfig {
 	} as any
 
 	return {
-		taskId: "task-dev-story-tools",
-		ulid: "ulid-dev-story-tools",
-		cwd: path.dirname(storyPath),
-		mode: "act",
-		strictPlanModeEnabled: false,
-		yoloModeToggled: false,
-		doubleCheckCompletionEnabled: false,
-		vscodeTerminalExecutionMode: "backgroundExec",
-		enableParallelToolCalling: true,
-		isSubagentExecution: false,
+		config: {
+			taskId: "task-dev-story-tools",
+			ulid: "ulid-dev-story-tools",
+			cwd: path.dirname(storyPath),
+			mode: "act",
+			strictPlanModeEnabled: false,
+			yoloModeToggled: false,
+			doubleCheckCompletionEnabled: false,
+			vscodeTerminalExecutionMode: "backgroundExec",
+			enableParallelToolCalling: true,
+			isSubagentExecution: false,
+			taskState,
+			messageState: {
+				getClineMessages: () => [],
+				setClineMessages: sinon.stub(),
+				saveClineMessagesAndUpdateHistory: sinon.stub().resolves(),
+			} as any,
+			api: {
+				getModel: () => ({ id: "test-model", info: { supportsImages: false } }),
+			} as any,
+			autoApprovalSettings: {
+				enableNotifications: false,
+				actions: { executeSafeCommands: false, executeAllCommands: false },
+			} as any,
+			autoApprover: {
+				shouldAutoApproveTool: sinon.stub().returns([true, true]),
+			} as any,
+			browserSettings: {} as any,
+			focusChainSettings: { enabled: false } as any,
+			services: {
+				stateManager: {
+					getGlobalStateKey: () => undefined,
+					getGlobalSettingsKey: (key: string) => (key === "hooksEnabled" ? false : undefined),
+					getWorkspaceStateKey: () => undefined,
+					getRemoteConfigSettings: () => ({}),
+					getApiConfiguration: () => ({ planModeApiProvider: "openai", actModeApiProvider: "openai" }),
+				},
+			} as any,
+			callbacks,
+			coordinator: { getHandler: sinon.stub() } as any,
+		} as TaskConfig,
 		taskState,
-		messageState: {
-			getClineMessages: () => [],
-			setClineMessages: sinon.stub(),
-			saveClineMessagesAndUpdateHistory: sinon.stub().resolves(),
-		} as any,
-		api: {
-			getModel: () => ({ id: "test-model", info: { supportsImages: false } }),
-		} as any,
-		autoApprovalSettings: {
-			enableNotifications: false,
-			actions: { executeSafeCommands: false, executeAllCommands: false },
-		} as any,
-		autoApprover: {
-			shouldAutoApproveTool: sinon.stub().returns([true, true]),
-		} as any,
-		browserSettings: {} as any,
-		focusChainSettings: { enabled: false } as any,
-		services: {
-			stateManager: {
-				getGlobalStateKey: () => undefined,
-				getGlobalSettingsKey: (key: string) => (key === "hooksEnabled" ? false : undefined),
-				getWorkspaceStateKey: () => undefined,
-				getRemoteConfigSettings: () => ({}),
-				getApiConfiguration: () => ({ planModeApiProvider: "openai", actModeApiProvider: "openai" }),
-			},
-		} as any,
-		callbacks,
-		coordinator: { getHandler: sinon.stub() } as any,
-	} as TaskConfig
+		say,
+		ask,
+		shouldAutoApproveToolWithPath,
+	}
 }
 
 function createStoryToolBlock(name: string, params: Record<string, unknown> = {}) {
@@ -127,8 +147,9 @@ Status: ready-for-dev
 		)
 
 		try {
+			const { config } = createConfig(storyPath)
 			const handler = new StoryTaskReminderToolHandler()
-			const result = await handler.execute(createConfig(storyPath), createStoryToolBlock("story_task_reminder"))
+			const result = await handler.execute(config, createStoryToolBlock("story_task_reminder"))
 
 			expect(result).to.equal(`### CURRENT TASKS / SUBTASKS
 
@@ -168,7 +189,7 @@ Status: ready-for-dev
 
 		try {
 			sandbox.stub(writeProofs, "recordAndPersistPlaceholderWorkflowWriteProof").resolves()
-			const config = createConfig(storyPath)
+			const { config, say, ask, shouldAutoApproveToolWithPath } = createConfig(storyPath)
 			const handler = new StoryTaskCompleteToolHandler()
 			const result = await handler.execute(
 				config,
@@ -185,9 +206,9 @@ Status: ready-for-dev
 				completed: true,
 				target: "subtask",
 			})
-			expect(config.callbacks.shouldAutoApproveToolWithPath.called).to.equal(false)
-			expect(config.callbacks.ask.called).to.equal(false)
-			expect(config.callbacks.say.calledOnce).to.equal(true)
+			expect(shouldAutoApproveToolWithPath.called).to.equal(false)
+			expect(ask.called).to.equal(false)
+			expect(say.calledOnce).to.equal(true)
 			expect(config.taskState.didEditFile).to.equal(true)
 			expect(config.taskState.fileReadCache.has(storyPath.toLowerCase())).to.equal(false)
 		} finally {
@@ -222,7 +243,7 @@ Status: ready-for-dev
 
 		try {
 			sandbox.stub(writeProofs, "recordAndPersistPlaceholderWorkflowWriteProof").resolves()
-			const config = createConfig(storyPath)
+			const { config, say, ask } = createConfig(storyPath)
 			const handler = new StoryTaskCompleteToolHandler()
 			const result = await handler.execute(
 				config,
@@ -238,8 +259,8 @@ Cannot complete story task 1 directly while it still has incomplete subtasks. Co
 </error>`)
 			expect(savedStory).to.contain("- [ ] Implement prompt injection")
 			expect(savedStory).to.contain("  - [ ] Keep storyTaskId runtime-only")
-			expect(config.callbacks.ask.called).to.equal(false)
-			expect(config.callbacks.say.called).to.equal(false)
+			expect(ask.called).to.equal(false)
+			expect(say.called).to.equal(false)
 			expect(config.taskState.didEditFile).to.equal(false)
 		} finally {
 			sandbox.restore()
@@ -271,7 +292,7 @@ Status: ready-for-dev
 
 		try {
 			sandbox.stub(writeProofs, "recordAndPersistPlaceholderWorkflowWriteProof").resolves()
-			const config = createConfig(storyPath)
+			const { config, say, ask, shouldAutoApproveToolWithPath } = createConfig(storyPath)
 			const handler = new StoryNotesUpdateToolHandler()
 			const result = await handler.execute(
 				config,
@@ -289,9 +310,9 @@ Status: ready-for-dev
 				appended: true,
 				section: "Completion Notes List",
 			})
-			expect(config.callbacks.shouldAutoApproveToolWithPath.called).to.equal(false)
-			expect(config.callbacks.ask.called).to.equal(false)
-			expect(config.callbacks.say.calledOnce).to.equal(true)
+			expect(shouldAutoApproveToolWithPath.called).to.equal(false)
+			expect(ask.called).to.equal(false)
+			expect(say.calledOnce).to.equal(true)
 		} finally {
 			sandbox.restore()
 			HostProvider.reset()
@@ -322,7 +343,7 @@ Status: ready-for-dev
 
 		try {
 			sandbox.stub(writeProofs, "recordAndPersistPlaceholderWorkflowWriteProof").resolves()
-			const config = createConfig(storyPath)
+			const { config } = createConfig(storyPath)
 			const handler = new StoryNotesUpdateToolHandler()
 			const result = await handler.execute(
 				config,
@@ -370,7 +391,7 @@ Status: ready-for-dev
 
 		try {
 			sandbox.stub(writeProofs, "recordAndPersistPlaceholderWorkflowWriteProof").resolves()
-			const config = createConfig(storyPath)
+			const { config, say, ask, shouldAutoApproveToolWithPath } = createConfig(storyPath)
 			const handler = new StoryTestingCompleteToolHandler()
 			const result = await handler.execute(config, createStoryToolBlock("story_testing_complete"))
 
@@ -380,9 +401,9 @@ Status: ready-for-dev
 				status_updated: true,
 				status: "review",
 			})
-			expect(config.callbacks.shouldAutoApproveToolWithPath.called).to.equal(false)
-			expect(config.callbacks.ask.called).to.equal(false)
-			expect(config.callbacks.say.calledOnce).to.equal(true)
+			expect(shouldAutoApproveToolWithPath.called).to.equal(false)
+			expect(ask.called).to.equal(false)
+			expect(say.calledOnce).to.equal(true)
 		} finally {
 			sandbox.restore()
 			HostProvider.reset()
@@ -415,7 +436,7 @@ Status: ready-for-dev
 			readFileStub.onCall(1).resolves(storyMarkdown)
 			readFileStub.onCall(2).resolves(storyMarkdown)
 
-			const config = createConfig(storyPath)
+			const { config, say, ask } = createConfig(storyPath)
 			const handler = new StoryNotesUpdateToolHandler()
 			const result = await handler.execute(
 				config,
@@ -429,9 +450,9 @@ Status: ready-for-dev
 				appended: false,
 				awaiting_manual_update: true,
 			})
-			expect(config.callbacks.ask.calledOnce).to.equal(true)
-			expect(config.callbacks.say.called).to.equal(false)
-			expect(config.callbacks.ask.firstCall.args).to.deep.equal([
+			expect(ask.calledOnce).to.equal(true)
+			expect(say.called).to.equal(false)
+			expect(ask.firstCall.args).to.deep.equal([
 				"followup",
 				JSON.stringify({
 					question:

@@ -12,6 +12,7 @@ import { FocusChainManager } from "../index"
 function createDependencies(taskState: TaskState) {
 	return {
 		taskId: "task-focus-chain-managed",
+		cwd: "/tmp",
 		taskState,
 		mode: "act" as const,
 		stateManager: {
