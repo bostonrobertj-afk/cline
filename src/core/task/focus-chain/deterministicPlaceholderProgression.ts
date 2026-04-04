@@ -34,6 +34,7 @@ export function isDeterministicPlaceholderWorkflowSupported(
 ): workflowName is DeterministicPlaceholderWorkflowName {
 	return (
 		workflowName === "code-review.md" ||
+		workflowName === "create-epics.md" ||
 		workflowName === "dev-story.md" ||
 		workflowName === "review-adversarial-general.md" ||
 		workflowName === "blind-review.md" ||
@@ -647,6 +648,44 @@ async function evaluateDevStoryStep(args: {
 	}
 }
 
+async function evaluateCreateEpicsStep(args: {
+	taskState: TaskState
+	stepNumber: number
+	toolContext?: DeterministicPlaceholderToolContext
+}): Promise<DeterministicStepEvaluationResult> {
+	const placeholders = getMergedPlaceholderValues(args.taskState)
+	const architectureDocument = placeholders.architecture_document?.trim()
+	const prd = placeholders.prd?.trim()
+	const mode = placeholders.mode?.trim()
+
+	switch (args.stepNumber) {
+		case 1: {
+			if (!architectureDocument) {
+				return { completed: false }
+			}
+
+			if (!prd) {
+				return { completed: false }
+			}
+
+			if (!mode) {
+				return { completed: false }
+			}
+
+			if (mode !== "new" && mode !== "continue") {
+				return { completed: false }
+			}
+
+			return {
+				completed: true,
+				reason: "architecture_document, prd, and a valid mode were already available in workflow placeholder state.",
+			}
+		}
+		default:
+			return { completed: false }
+	}
+}
+
 async function evaluateWriteRemediationStoryStep(args: {
 	taskState: TaskState
 	stepNumber: number
@@ -725,6 +764,14 @@ async function evaluateDeterministicStep(args: {
 }): Promise<DeterministicStepEvaluationResult> {
 	if (args.workflowName === "code-review.md") {
 		return evaluateCodeReviewStep({
+			taskState: args.taskState,
+			stepNumber: args.stepNumber,
+			toolContext: args.toolContext,
+		})
+	}
+
+	if (args.workflowName === "create-epics.md") {
+		return evaluateCreateEpicsStep({
 			taskState: args.taskState,
 			stepNumber: args.stepNumber,
 			toolContext: args.toolContext,

@@ -50,10 +50,12 @@ async function writeFileWithMtime(filePath: string, text: string, mtimeMs: numbe
 describe("deterministicPlaceholderProgression", () => {
 	it("supports only the prescribed deterministic placeholder workflows", () => {
 		expect(isDeterministicPlaceholderWorkflowSupported("code-review.md")).to.equal(true)
+		expect(isDeterministicPlaceholderWorkflowSupported("create-epics.md")).to.equal(true)
 		expect(isDeterministicPlaceholderWorkflowSupported("dev-story.md")).to.equal(true)
 		expect(isDeterministicPlaceholderWorkflowSupported("review-adversarial-general.md")).to.equal(true)
 		expect(isDeterministicPlaceholderWorkflowSupported("blind-review.md")).to.equal(true)
 		expect(isDeterministicPlaceholderWorkflowSupported("code-review")).to.equal(false)
+		expect(isDeterministicPlaceholderWorkflowSupported("create-epics")).to.equal(false)
 		expect(isDeterministicPlaceholderWorkflowSupported("dev-story")).to.equal(false)
 		expect(isDeterministicPlaceholderWorkflowSupported("review-edge-case-hunter.md")).to.equal(true)
 		expect(isDeterministicPlaceholderWorkflowSupported("write-remediation-story.md")).to.equal(true)
@@ -2330,6 +2332,186 @@ Use attempt_completion to notify the user.`,
 
 		expect(result.checklist).to.equal("- [ ] Step 4: Notify User of Completion")
 		expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+	})
+
+	it("completes create-epics step 1 when architecture_document, prd, and mode=new are present", async () => {
+		const taskState = createTaskState({
+			workflowName: "create-epics.md",
+			workflowContents: `## Step 1: (System-Owned) Confirm the input set
+Confirm the inputs are present.
+
+## Step 2: (System-Owned) Build the requirements inventory
+Build the requirements inventory.`,
+			checklistMarkdown:
+				"- [ ] Step 1: (System-Owned) Confirm the input set\n- [ ] Step 2: (System-Owned) Build the requirements inventory",
+			placeholderValues: {
+				architecture_document: "/tmp/architecture.md",
+				prd: "/tmp/prd.md",
+				mode: "new",
+			},
+		})
+
+		const result = await applyDeterministicPlaceholderProgression({
+			taskState,
+			checklistMarkdown: getChecklistMarkdown(taskState),
+		})
+
+		expect(result.checklist).to.equal(
+			"- [x] Step 1: (System-Owned) Confirm the input set\n- [ ] Step 2: (System-Owned) Build the requirements inventory",
+		)
+		expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
+			"architecture_document, prd, and a valid mode were already available in workflow placeholder state.",
+		)
+	})
+
+	it("completes create-epics step 1 when architecture_document, prd, and mode=continue are present", async () => {
+		const taskState = createTaskState({
+			workflowName: "create-epics.md",
+			workflowContents: `## Step 1: (System-Owned) Confirm the input set
+Confirm the inputs are present.
+
+## Step 2: (System-Owned) Build the requirements inventory
+Build the requirements inventory.`,
+			checklistMarkdown:
+				"- [ ] Step 1: (System-Owned) Confirm the input set\n- [ ] Step 2: (System-Owned) Build the requirements inventory",
+			placeholderValues: {
+				architecture_document: "/tmp/architecture.md",
+				prd: "/tmp/prd.md",
+				mode: "continue",
+			},
+		})
+
+		const result = await applyDeterministicPlaceholderProgression({
+			taskState,
+			checklistMarkdown: getChecklistMarkdown(taskState),
+		})
+
+		expect(result.checklist).to.equal(
+			"- [x] Step 1: (System-Owned) Confirm the input set\n- [ ] Step 2: (System-Owned) Build the requirements inventory",
+		)
+		expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
+			"architecture_document, prd, and a valid mode were already available in workflow placeholder state.",
+		)
+	})
+
+	it("does not complete create-epics step 1 when architecture_document is missing", async () => {
+		const taskState = createTaskState({
+			workflowName: "create-epics.md",
+			workflowContents: `## Step 1: (System-Owned) Confirm the input set
+Confirm the inputs are present.`,
+			checklistMarkdown: "- [ ] Step 1: (System-Owned) Confirm the input set",
+			placeholderValues: {
+				prd: "/tmp/prd.md",
+				mode: "new",
+			},
+		})
+
+		const result = await applyDeterministicPlaceholderProgression({
+			taskState,
+			checklistMarkdown: getChecklistMarkdown(taskState),
+		})
+
+		expect(result.checklist).to.equal("- [ ] Step 1: (System-Owned) Confirm the input set")
+		expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+	})
+
+	it("does not complete create-epics step 1 when prd is missing", async () => {
+		const taskState = createTaskState({
+			workflowName: "create-epics.md",
+			workflowContents: `## Step 1: (System-Owned) Confirm the input set
+Confirm the inputs are present.`,
+			checklistMarkdown: "- [ ] Step 1: (System-Owned) Confirm the input set",
+			placeholderValues: {
+				architecture_document: "/tmp/architecture.md",
+				mode: "new",
+			},
+		})
+
+		const result = await applyDeterministicPlaceholderProgression({
+			taskState,
+			checklistMarkdown: getChecklistMarkdown(taskState),
+		})
+
+		expect(result.checklist).to.equal("- [ ] Step 1: (System-Owned) Confirm the input set")
+		expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+	})
+
+	it("does not complete create-epics step 1 when mode is missing", async () => {
+		const taskState = createTaskState({
+			workflowName: "create-epics.md",
+			workflowContents: `## Step 1: (System-Owned) Confirm the input set
+Confirm the inputs are present.`,
+			checklistMarkdown: "- [ ] Step 1: (System-Owned) Confirm the input set",
+			placeholderValues: {
+				architecture_document: "/tmp/architecture.md",
+				prd: "/tmp/prd.md",
+			},
+		})
+
+		const result = await applyDeterministicPlaceholderProgression({
+			taskState,
+			checklistMarkdown: getChecklistMarkdown(taskState),
+		})
+
+		expect(result.checklist).to.equal("- [ ] Step 1: (System-Owned) Confirm the input set")
+		expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+	})
+
+	it("does not complete create-epics step 1 when mode is not new or continue", async () => {
+		const taskState = createTaskState({
+			workflowName: "create-epics.md",
+			workflowContents: `## Step 1: (System-Owned) Confirm the input set
+Confirm the inputs are present.`,
+			checklistMarkdown: "- [ ] Step 1: (System-Owned) Confirm the input set",
+			placeholderValues: {
+				architecture_document: "/tmp/architecture.md",
+				prd: "/tmp/prd.md",
+				mode: "replace",
+			},
+		})
+
+		const result = await applyDeterministicPlaceholderProgression({
+			taskState,
+			checklistMarkdown: getChecklistMarkdown(taskState),
+		})
+
+		expect(result.checklist).to.equal("- [ ] Step 1: (System-Owned) Confirm the input set")
+		expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+	})
+
+	it("advances only create-epics step 1 when the required placeholder state is present", async () => {
+		const taskState = createTaskState({
+			workflowName: "create-epics.md",
+			workflowContents: `## Step 1: (System-Owned) Confirm the input set
+Confirm the inputs are present.
+
+## Step 2: (System-Owned) Build the requirements inventory
+Build the requirements inventory.`,
+			checklistMarkdown:
+				"- [ ] Step 1: (System-Owned) Confirm the input set\n- [ ] Step 2: (System-Owned) Build the requirements inventory",
+			placeholderValues: {
+				architecture_document: "/tmp/architecture.md",
+				prd: "/tmp/prd.md",
+				mode: "new",
+			},
+		})
+
+		const result = await applyDeterministicPlaceholderProgression({
+			taskState,
+			checklistMarkdown: getChecklistMarkdown(taskState),
+		})
+
+		expect(result.checklist).to.equal(
+			"- [x] Step 1: (System-Owned) Confirm the input set\n- [ ] Step 2: (System-Owned) Build the requirements inventory",
+		)
+		expect(result.noticesAdded).to.equal(true)
+		expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.have.length(1)
+		expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices[0]).to.deep.equal({
+			workflowName: "create-epics.md",
+			stepNumber: 1,
+			checklistLabel: "Step 1: (System-Owned) Confirm the input set",
+			reason: "architecture_document, prd, and a valid mode were already available in workflow placeholder state.",
+		})
 	})
 
 	it("leaves still-unsupported placeholder workflows unchanged and adds no notices", async () => {

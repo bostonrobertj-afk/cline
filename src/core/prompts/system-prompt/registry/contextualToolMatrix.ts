@@ -172,7 +172,7 @@ export const PLACEHOLDER_WORKFLOW_STEP_MATRIX: Record<string, Record<number, rea
 		7: ["DOC_READ", "DOC_WRITE"],
 		8: ["DOC_READ", "DOC_WRITE"],
 	},
-	"create-epics-and-stories.md": {
+	"create-epics.md": {
 		1: ["DOC_READ"],
 		2: ["DOC_READ", "DOC_WRITE"],
 		3: ["DOC_READ", "DOC_WRITE", "WORKFLOW_ROUTE"],

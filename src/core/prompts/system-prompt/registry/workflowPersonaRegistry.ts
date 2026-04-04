@@ -23,7 +23,7 @@ export const WORKFLOW_PERSONA_BY_WORKFLOW: Record<string, WorkflowPersonaId | un
 	"code-review.md": "quality-control",
 	"correct-course.md": "scrum-master",
 	"create-architecture.md": "architect",
-	"create-epics-and-stories.md": "product-manager",
+	"create-epics.md": "product-manager",
 	"create-prd.md": "product-manager",
 	"create-product-brief.md": "analyst",
 	"create-story.md": "scrum-master",

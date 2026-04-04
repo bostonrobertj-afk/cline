@@ -29,6 +29,10 @@ Workflow Forms solve that by pausing normal agent execution at a supported trigg
 - Verify that the target step is a good deterministic boundary and already has, or can be given, a clear done signal.
 - Identify the tool the form will invoke.
 - Review that tool's schema before deployment.
+- For workflow-start forms, verify that Step 1 contains explicit workflow-start directive lines in the raw workflow text:
+  - `Required: {placeholder}`
+  - `Optional: {placeholder}`
+  - `One of: {placeholder_a}, {placeholder_b}`
 - If the tool expresses branching, variant selection, or required input structure only in prose, upgrade the tool schema so the workflow-form layer can consume that structure at runtime.
 - Add or reuse a resolver in [WorkflowFormRegistry.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/WorkflowFormRegistry.ts).
 - Add or reuse a trigger reference in [WorkflowFormTriggerRegistry.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/WorkflowFormTriggerRegistry.ts) or the slash-command start path.
@@ -99,6 +103,7 @@ Current delivered use cases:
 - workflow-start forms for slash-command-started placeholder workflows
 - `code-review.md` Step 2 diff artifact form using `build_review_diff_output`
 - `code-review.md` Step 3 automatic workflow-preparation status card using `build_review_input` with workflow-owned inputs
+- `write-remediation-story.md` Step 2 automatic workflow-preparation status card using `build_review_input` with workflow-owned inputs
 
 ## Outputs
 
@@ -119,6 +124,7 @@ Current delivered use cases:
 - Any layer between schema, form definition, submission transport, payload assembly, and tool invocation must remain compatible with the runtime-defined contract.
 - Use cases may override field discovery, staging, labels, help text, and requiredness when that responsibility belongs to the use case.
 - Workflow-start forms specialize field discovery and required/optional semantics from workflow documents, but still inherit field typing from `set_workflow_placeholders`.
+- Workflow-start forms are only recognized when Step 1 raw details include explicit `Required:`, `Optional:`, or `One of:` directive lines.
 - Existing systems remain authoritative:
   - workflow progression
   - slash-command activation
@@ -146,6 +152,8 @@ Important implementation note:
 - The shared transport now carries raw values generically.
 - Runtime parsing is handled in [schema.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/schema.ts).
 - That means the webview does not hard-code business field typing.
+- Workflow-start requirement parsing is handled in [workflowStartRequirements.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/workflowStartRequirements.ts).
+- The start-form trigger will not activate from placeholder mentions alone; it requires those directive lines in Step 1 raw details.
 
 ## Failure Modes
 
@@ -157,6 +165,7 @@ Important implementation note:
 - The tool executes and returns a structured failure.
 - The tool succeeds but the workflow-form evaluator fails to recognize the success result.
 - The user cancels, which returns control to the normal fallback path.
+- A workflow-start Step 1 omits the explicit `Required:`, `Optional:`, and `One of:` directive format, so no start-form candidate is produced.
 - A supported use case is deployed against a tool whose schema is not machine-readable enough for the intended staged UX.
 
 ## Usage

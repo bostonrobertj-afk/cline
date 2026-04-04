@@ -32,6 +32,7 @@ export interface PartialResponseToolPreview {
 
 export type DeterministicPlaceholderWorkflowName =
 	| "code-review.md"
+	| "create-epics.md"
 	| "dev-story.md"
 	| "review-adversarial-general.md"
 	| "blind-review.md"
