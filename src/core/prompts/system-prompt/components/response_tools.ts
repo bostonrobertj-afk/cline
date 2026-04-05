@@ -1,8 +1,11 @@
+import { shouldExposeWorkflowProgressRequest } from "@/shared/workflow-progress-request"
 import type { SystemPromptContext } from "../types"
 
 const RESPONSE_TOOL_LINES = {
 	attempt_completion: "- `attempt_completion`: Use once at the end of each workflow",
 	ask_followup_question: "- `ask_followup_question`: Use to ask a question + present options for user to select",
+	workflow_progress_request:
+		"- `workflow_progress_request`: Use when the active create-prd workflow step is complete and you need the runtime-owned Yes/No confirmation before advancing",
 	send_user_message: "- `send_user_message`: Use by default to send messages to the user",
 	act_mode_respond:
 		"- `act_mode_respond`: Use to send a brief ACT MODE progress update and intentionally wait for the user's next reply",
@@ -16,6 +19,15 @@ function getActModeResponseToolNames(context: SystemPromptContext): ResponseTool
 
 	if (context.yoloModeToggled !== true) {
 		tools.push("ask_followup_question")
+		if (
+			shouldExposeWorkflowProgressRequest({
+				workflowName: context.activePlaceholderWorkflowName,
+				stepNumber: context.activePlaceholderWorkflowStepNumber,
+				yoloModeToggled: context.yoloModeToggled,
+			})
+		) {
+			tools.push("workflow_progress_request")
+		}
 	}
 
 	tools.push("send_user_message")
@@ -27,6 +39,15 @@ function getPlanModeResponseToolNames(context: SystemPromptContext): ResponseToo
 
 	if (context.yoloModeToggled !== true) {
 		tools.push("ask_followup_question")
+		if (
+			shouldExposeWorkflowProgressRequest({
+				workflowName: context.activePlaceholderWorkflowName,
+				stepNumber: context.activePlaceholderWorkflowStepNumber,
+				yoloModeToggled: context.yoloModeToggled,
+			})
+		) {
+			tools.push("workflow_progress_request")
+		}
 	}
 
 	tools.push("send_user_message")

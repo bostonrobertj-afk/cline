@@ -57,6 +57,7 @@ export const config = createVariant(ModelFamily.GPT_5)
 		ClineDefaultTool.MCP_USE,
 		ClineDefaultTool.MCP_ACCESS,
 		ClineDefaultTool.ASK,
+		ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST,
 		ClineDefaultTool.ATTEMPT,
 		ClineDefaultTool.SEND_USER_MESSAGE,
 		ClineDefaultTool.PLAN_MODE,

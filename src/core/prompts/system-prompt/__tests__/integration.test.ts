@@ -664,6 +664,33 @@ describe("Prompt System Integration Tests", () => {
 				},
 			)
 		})
+
+		it("generates a continuation prompt for create-prd step 3 with workflow_progress_request guidance", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: { ...mockProviderInfo, mode: "act" },
+					isContinuationTurn: true,
+					currentFocusChainChecklist: "- [ ] Step 3: Discover and classify the project",
+					activeWorkflowSupportsPlaceholders: true,
+					managedWorkflowActive: false,
+					activePlaceholderWorkflowName: "create-prd.md",
+					activePlaceholderWorkflowStepNumber: 3,
+				},
+				"fast",
+				async ({ systemPrompt }) => {
+					expect(systemPrompt).to.include("workflow_progress_request")
+					expect(systemPrompt).to.include("Do not include `task_progress`")
+					expect(systemPrompt).to.include(
+						"runtime-owned `Yes` branch completes the next checklist step before the next model request is built",
+					)
+					expect(systemPrompt).to.not.include(
+						"use `send_user_message` tool call to briefly tell the user what step you are completing",
+					)
+				},
+			)
+		})
 	})
 
 	describe("Context-Specific Features", () => {
@@ -1237,6 +1264,38 @@ describe("Prompt System Integration Tests", () => {
 					expect(nativeToolNames).to.not.include("execute_command")
 					expect(nativeToolNames).to.not.include("generate_plan_output")
 					expect(nativeToolNames.some((name) => name.startsWith("indxr-"))).to.equal(false)
+				},
+			)
+		})
+
+		it("filters native tools for create-prd step 3", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
+					enableNativeToolCalls: true,
+					useMinimalGptPrompt: true,
+					activeWorkflowSupportsPlaceholders: true,
+					managedWorkflowActive: false,
+					activePlaceholderWorkflowName: "create-prd.md",
+					activePlaceholderWorkflowStepNumber: 3,
+				},
+				"gpt-5.4-2026-03-05",
+				async ({ tools }) => {
+					const nativeToolNames = getNativeToolNames(tools)
+
+					expect(nativeToolNames).to.include.members([
+						"workflow_progress_request",
+						"attempt_completion",
+						"ask_followup_question",
+						"send_user_message",
+						"apply_patch",
+					])
+					expect(nativeToolNames).to.not.include("read_file")
+					expect(nativeToolNames).to.not.include("read_file_range")
+					expect(nativeToolNames).to.not.include("search_files")
+					expect(nativeToolNames).to.not.include("generate_plan_output")
 				},
 			)
 		})

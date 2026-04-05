@@ -64,6 +64,22 @@ describe("placeholder workflow task progress prompt", () => {
 		expect(progress).to.contain("task_progress")
 		expect(progress).to.contain("__COMPLETE_NEXT_STEP__")
 	})
+
+	it("teaches workflow_progress_request for create-prd step 3", async () => {
+		const progress = await getUpdatingTaskProgress(variant, {
+			...context,
+			managedWorkflowActive: false,
+			activeWorkflowSupportsPlaceholders: true,
+			activeDeterministicPlaceholderWorkflowEnabled: false,
+			activePlaceholderWorkflowName: "create-prd.md",
+			activePlaceholderWorkflowStepNumber: 3,
+		})
+
+		expect(progress).to.be.a("string")
+		expect(progress).to.contain("workflow_progress_request")
+		expect(progress).to.not.contain("send_user_message")
+		expect(progress).to.contain("Do not include `task_progress` on `workflow_progress_request`")
+	})
 })
 
 describe("generic task progress prompt", () => {

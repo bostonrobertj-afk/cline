@@ -479,6 +479,8 @@ function getNativeToolDescription(tool: ClineToolSpec, context: SystemPromptCont
 			return "Present a concrete plan when the task is in PLAN MODE."
 		case "send_user_message":
 			return "Send a direct user-visible message when specialized response tools are not the right fit."
+		case "workflow_progress_request":
+			return "Ask whether the user is ready to move to the next create-prd workflow step. The runtime owns the Yes/No prompt, and the Yes branch advances the focus chain before the next request is built."
 		case "set_workflow_placeholders":
 			return 'Persist dynamic placeholder values discovered during the active workflow. Call as {"values":{"story_path":"docs/story.md","project_context":"docs/project-context.md"}}. Stable config-backed placeholders like output_folder come from .cline/workflow-config.yaml.'
 		case "build_review_diff_output":

@@ -33,6 +33,7 @@ import { use_mcp_tool_variants } from "./use_mcp_tool"
 import { use_skill_variants } from "./use_skill"
 import { web_fetch_variants } from "./web_fetch"
 import { web_search_variants } from "./web_search"
+import { workflow_progress_request_variants } from "./workflow_progress_request"
 import { write_to_file_variants } from "./write_to_file"
 
 /**
@@ -65,6 +66,7 @@ export function registerClineToolSets(): void {
 		...replace_in_file_variants,
 		...search_files_variants,
 		...send_user_message_variants,
+		...workflow_progress_request_variants,
 		...set_workflow_placeholders_variants,
 		...story_notes_update_variants,
 		...story_task_complete_variants,

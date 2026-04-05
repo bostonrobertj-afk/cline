@@ -33,6 +33,7 @@ import { set_workflow_placeholders_variants } from "../tools/set_workflow_placeh
 import { story_notes_update_variants } from "../tools/story_notes_update"
 import { story_task_complete_variants } from "../tools/story_task_complete"
 import { use_mcp_tool_variants } from "../tools/use_mcp_tool"
+import { workflow_progress_request_variants } from "../tools/workflow_progress_request"
 import { write_to_file_variants } from "../tools/write_to_file"
 import type { SystemPromptContext } from "../types"
 
@@ -349,6 +350,32 @@ describe("workflow placeholder tool gating", () => {
 	it("keeps build_epics_document globally available without workflow gating", () => {
 		const tool = build_epics_document_variants[0]
 		expect(tool.contextRequirements).to.equal(undefined)
+	})
+
+	it("gates workflow_progress_request to create-prd steps 3 through 14", () => {
+		const tool = workflow_progress_request_variants[0]
+
+		expect(
+			tool.contextRequirements?.({
+				...mockContext,
+				activePlaceholderWorkflowName: "create-prd.md",
+				activePlaceholderWorkflowStepNumber: 3,
+			}),
+		).to.equal(true)
+		expect(
+			tool.contextRequirements?.({
+				...mockContext,
+				activePlaceholderWorkflowName: "create-prd.md",
+				activePlaceholderWorkflowStepNumber: 2,
+			}),
+		).to.equal(false)
+		expect(
+			tool.contextRequirements?.({
+				...mockContext,
+				activePlaceholderWorkflowName: "create-epics.md",
+				activePlaceholderWorkflowStepNumber: 3,
+			}),
+		).to.equal(false)
 	})
 
 	it("encodes build_review_diff_output source variants as machine-readable schema", () => {
@@ -854,6 +881,28 @@ describe("native tool placeholder replacement", () => {
 			"Build or resolve the canonical epics artifact at {output_folder}/planning_artifacts/epics.md from workflow-owned placeholder state. Resolve inputs from workflow state; there are no human-supplied parameters.",
 		)
 		expect(Object.keys(openAIProperties)).to.deep.equal([])
+	})
+
+	it("compacts native workflow_progress_request descriptions with no parameters", () => {
+		const context: SystemPromptContext = {
+			...mockContext,
+			enableNativeToolCalls: true,
+			useMinimalGptPrompt: true,
+			providerInfo: {
+				providerId: "openai",
+				model: { id: "gpt-5.4-2026-03-05", info: { supportsPromptCache: false } },
+				mode: "act",
+			},
+			activePlaceholderWorkflowName: "create-prd.md",
+			activePlaceholderWorkflowStepNumber: 3,
+		}
+
+		const openAI = toolSpecFunctionDefinition(workflow_progress_request_variants[0], context)
+
+		expect(getOpenAIFunctionTool(openAI).description).to.equal(
+			"Ask whether the user is ready to move to the next create-prd workflow step. The runtime owns the Yes/No prompt, and the Yes branch advances the focus chain before the next request is built.",
+		)
+		expect(Object.keys(getOpenAIProperties(openAI))).to.deep.equal([])
 	})
 
 	it("preserves integer types for read_file_range line parameters", () => {

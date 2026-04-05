@@ -1,4 +1,5 @@
 import { FocusChainPrompts } from "@/core/task/focus-chain/prompts"
+import { shouldExposeWorkflowProgressRequest } from "@/shared/workflow-progress-request"
 import { MULTI_ROOT_HINT } from "../constants"
 import type { PromptVariant, SystemPromptContext } from "../types"
 import { getAgentFeedbackPromptGuidanceLine } from "./agent_feedback"
@@ -12,6 +13,16 @@ function renderChecklistForPrompt(checklist: string): string {
 function getFocusChainReminderLine(context: SystemPromptContext): string {
 	if (context.activeDeterministicPlaceholderWorkflowEnabled === true) {
 		return "- Once you correctly complete the current step, the next step's details will be shown automatically."
+	}
+
+	if (
+		shouldExposeWorkflowProgressRequest({
+			workflowName: context.activePlaceholderWorkflowName,
+			stepNumber: context.activePlaceholderWorkflowStepNumber,
+			yoloModeToggled: context.yoloModeToggled,
+		})
+	) {
+		return '- When the active step\'s "Done Signal" is true, use `workflow_progress_request`. Do not include `task_progress` on that tool call; the runtime-owned `Yes` branch completes the next checklist step before the next model request is built.'
 	}
 
 	if (context.activeWorkflowSupportsPlaceholders && !context.managedWorkflowActive) {

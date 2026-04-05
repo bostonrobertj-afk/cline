@@ -33,6 +33,16 @@ const RESPONSE_TOOL_METADATA: Record<ClineDefaultTool, ResponseToolMetadata | un
 			type: "text",
 		},
 	},
+	[ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST]: {
+		toolName: ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST,
+		defaultTurnBehavior: "end_turn",
+		threadDisplayStateAfterTurnEnds: ThreadDisplayStates.ACTIVE_USER,
+		dismissCommandOutputAskBeforeBlockingAsk: true,
+		partialMessage: {
+			channel: "ask",
+			type: "followup",
+		},
+	},
 	[ClineDefaultTool.PLAN_MODE]: {
 		toolName: ClineDefaultTool.PLAN_MODE,
 		defaultTurnBehavior: "end_turn",

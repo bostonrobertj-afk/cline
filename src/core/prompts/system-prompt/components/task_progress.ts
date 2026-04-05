@@ -1,4 +1,5 @@
 import { ModelFamily } from "@/shared/prompts"
+import { shouldExposeWorkflowProgressRequest } from "@/shared/workflow-progress-request"
 import { PromptVariant, SystemPromptContext, SystemPromptSection, TemplateEngine } from ".."
 
 const UPDATING_TASK_PROGRESS = `UPDATING TASK PROGRESS
@@ -28,6 +29,14 @@ Use \`task_progress\` only as a checklist parameter on the next tool call, not a
 - To create the list, pass a full Markdown checklist as the \`task_progress\` parameter.
 - Use \`__COMPLETE_NEXT_STEP__\` as the \`task_progress\` value to complete the next incomplete step.`
 
+const UPDATING_TASK_PROGRESS_WORKFLOW_PROGRESS_REQUEST = `UPDATING TASK PROGRESS
+
+The user has triggered a workflow with a prebuilt checklist.
+- Detailed instructions are automatically sent when a checklist item first becomes the active step.
+- When the active step's "Done Signal" is true, use \`workflow_progress_request\`.
+- Do not include \`task_progress\` on \`workflow_progress_request\`; the runtime-owned \`Yes\` branch completes the next checklist step before the next model request is built.
+- If the user selects \`No\`, continue the conversation on the next turn without advancing the workflow.`
+
 const UPDATING_TASK_PROGRESS_PLACEHOLDER_WORKFLOW = `UPDATING TASK PROGRESS
 
 The user has triggered a workflow with a prebuilt checklist.
@@ -52,6 +61,16 @@ The current checklist was built for you by the user at the beginning of the conv
 
 	if (context.activeDeterministicPlaceholderWorkflowEnabled === true) {
 		return undefined
+	}
+
+	if (
+		shouldExposeWorkflowProgressRequest({
+			workflowName: context.activePlaceholderWorkflowName,
+			stepNumber: context.activePlaceholderWorkflowStepNumber,
+			yoloModeToggled: context.yoloModeToggled,
+		})
+	) {
+		return UPDATING_TASK_PROGRESS_WORKFLOW_PROGRESS_REQUEST
 	}
 
 	if (context.activeWorkflowSupportsPlaceholders) {

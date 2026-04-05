@@ -46,6 +46,7 @@ export const config = createVariant(ModelFamily.NATIVE_NEXT_GEN)
 	)
 	.tools(
 		ClineDefaultTool.ASK,
+		ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST,
 		ClineDefaultTool.BASH,
 		ClineDefaultTool.FILE_READ,
 		ClineDefaultTool.FILE_NEW,

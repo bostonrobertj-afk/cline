@@ -37,6 +37,7 @@ import { UseMcpToolHandler } from "./handlers/UseMcpToolHandler"
 import { UseSkillToolHandler } from "./handlers/UseSkillToolHandler"
 import { WebFetchToolHandler } from "./handlers/WebFetchToolHandler"
 import { WebSearchToolHandler } from "./handlers/WebSearchToolHandler"
+import { WorkflowProgressRequestToolHandler } from "./handlers/WorkflowProgressRequestToolHandler"
 import { WriteToFileToolHandler } from "./handlers/WriteToFileToolHandler"
 import { AgentConfigLoader } from "./subagent/AgentConfigLoader"
 import { ToolValidator } from "./ToolValidator"
@@ -92,6 +93,7 @@ export class ToolExecutorCoordinator {
 		[ClineDefaultTool.ASK]: (_v: ToolValidator) => new AskFollowupQuestionToolHandler(),
 		[ClineDefaultTool.ATTEMPT]: (_v: ToolValidator) => new AttemptCompletionHandler(),
 		[ClineDefaultTool.SEND_USER_MESSAGE]: (_v: ToolValidator) => new SendUserMessageHandler(),
+		[ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST]: (_v: ToolValidator) => new WorkflowProgressRequestToolHandler(),
 		[ClineDefaultTool.BASH]: (v: ToolValidator) => new ExecuteCommandToolHandler(v),
 		[ClineDefaultTool.FILE_EDIT]: (v: ToolValidator) =>
 			new SharedToolHandler(ClineDefaultTool.FILE_EDIT, new WriteToFileToolHandler(v)),
