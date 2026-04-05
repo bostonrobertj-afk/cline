@@ -352,7 +352,7 @@ describe("workflow placeholder tool gating", () => {
 		expect(tool.contextRequirements).to.equal(undefined)
 	})
 
-	it("gates workflow_progress_request to create-prd steps 3 through 14", () => {
+	it("gates workflow_progress_request to create-prd steps 3 through 14 and create-epics step 3", () => {
 		const tool = workflow_progress_request_variants[0]
 
 		expect(
@@ -374,6 +374,13 @@ describe("workflow placeholder tool gating", () => {
 				...mockContext,
 				activePlaceholderWorkflowName: "create-epics.md",
 				activePlaceholderWorkflowStepNumber: 3,
+			}),
+		).to.equal(true)
+		expect(
+			tool.contextRequirements?.({
+				...mockContext,
+				activePlaceholderWorkflowName: "create-epics.md",
+				activePlaceholderWorkflowStepNumber: 2,
 			}),
 		).to.equal(false)
 	})
@@ -900,7 +907,7 @@ describe("native tool placeholder replacement", () => {
 		const openAI = toolSpecFunctionDefinition(workflow_progress_request_variants[0], context)
 
 		expect(getOpenAIFunctionTool(openAI).description).to.equal(
-			"Ask whether the user is ready to move to the next create-prd workflow step. The runtime owns the Yes/No prompt, and the Yes branch advances the focus chain before the next request is built.",
+			"Ask whether the user is ready to move to the next supported workflow step. The runtime owns the Yes/No prompt, and the Yes branch advances the focus chain before the next request is built.",
 		)
 		expect(Object.keys(getOpenAIProperties(openAI))).to.deep.equal([])
 	})

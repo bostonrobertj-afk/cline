@@ -46,7 +46,7 @@ export class WorkflowProgressRequestToolHandler implements IToolHandler, IPartia
 
 		if (!isWorkflowProgressRequestWorkflowName(config.taskState.activePlaceholderWorkflowSource?.name)) {
 			return formatResponse.toolError(
-				"workflow_progress_request can only be used during the active create-prd placeholder workflow.",
+				"workflow_progress_request can only be used during an active supported placeholder workflow step.",
 			)
 		}
 

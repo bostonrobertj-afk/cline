@@ -105,7 +105,7 @@ describe("WorkflowProgressRequestToolHandler", () => {
 			askResult: { text: "Yes" },
 			lastFollowupMessage,
 		})
-		config.taskState.activePlaceholderWorkflowSource = { name: "create-prd.md" } as any
+		config.taskState.activePlaceholderWorkflowSource = { name: "create-epics.md" } as any
 		config.taskState.currentFocusChainChecklist = "- [ ] Step 3: Discover and classify the project"
 		const handler = new WorkflowProgressRequestToolHandler()
 
@@ -183,9 +183,29 @@ describe("WorkflowProgressRequestToolHandler", () => {
 		assert.equal(config.taskState.pendingResponseToolFollowup, undefined)
 	})
 
+	it("returns a tool error when the active workflow is not supported", async () => {
+		const { config } = createConfig()
+		config.taskState.activePlaceholderWorkflowSource = { name: "brainstorming.md" } as any
+		const handler = new WorkflowProgressRequestToolHandler()
+
+		const result = await handler.execute(config, {
+			type: "tool_use",
+			name: "workflow_progress_request",
+			params: {},
+			partial: false,
+		} as any)
+
+		assert.equal(
+			result,
+			formatResponse.toolError(
+				"workflow_progress_request can only be used during an active supported placeholder workflow step.",
+			),
+		)
+	})
+
 	it("returns a tool error when no active checklist is available", async () => {
 		const { config } = createConfig()
-		config.taskState.activePlaceholderWorkflowSource = { name: "create-prd.md" } as any
+		config.taskState.activePlaceholderWorkflowSource = { name: "create-epics.md" } as any
 		const handler = new WorkflowProgressRequestToolHandler()
 
 		const result = await handler.execute(config, {

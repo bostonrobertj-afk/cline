@@ -11,10 +11,6 @@ function renderChecklistForPrompt(checklist: string): string {
 }
 
 function getFocusChainReminderLine(context: SystemPromptContext): string {
-	if (context.activeDeterministicPlaceholderWorkflowEnabled === true) {
-		return "- Once you correctly complete the current step, the next step's details will be shown automatically."
-	}
-
 	if (
 		shouldExposeWorkflowProgressRequest({
 			workflowName: context.activePlaceholderWorkflowName,
@@ -23,6 +19,10 @@ function getFocusChainReminderLine(context: SystemPromptContext): string {
 		})
 	) {
 		return '- When the active step\'s "Done Signal" is true, use `workflow_progress_request`. Do not include `task_progress` on that tool call; the runtime-owned `Yes` branch completes the next checklist step before the next model request is built.'
+	}
+
+	if (context.activeDeterministicPlaceholderWorkflowEnabled === true) {
+		return "- Once you correctly complete the current step, the next step's details will be shown automatically."
 	}
 
 	if (context.activeWorkflowSupportsPlaceholders && !context.managedWorkflowActive) {

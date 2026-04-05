@@ -2514,6 +2514,264 @@ Build the requirements inventory.`,
 		})
 	})
 
+	it("completes create-epics step 2 when the canonical epics artifact exists with a current-task write proof and output_file matches", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-create-epics-step2-new-"))
+
+		try {
+			const outputFolder = path.join(tempDir, "output")
+			const artifactPath = path.join(outputFolder, "planning_artifacts", "epics.md")
+			const taskState = createTaskState({
+				workflowName: "create-epics.md",
+				workflowContents: `## Step 2: (System-Owned) Build the requirements inventory
+Build the requirements inventory.
+
+## Step 3: Define the Epics
+Define the epics.`,
+				checklistMarkdown:
+					"- [ ] Step 2: (System-Owned) Build the requirements inventory\n- [ ] Step 3: Define the Epics",
+				stablePlaceholderValues: {
+					cwd: tempDir,
+					project_root: tempDir,
+					output_folder: outputFolder,
+				},
+				placeholderValues: {
+					mode: "new",
+					output_file: artifactPath,
+				},
+			})
+
+			await writeFileWithMtime(artifactPath, "# Epics", Date.now())
+			recordTaskWriteProof(taskState, artifactPath)
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+			})
+
+			expect(result.checklist).to.equal(
+				"- [x] Step 2: (System-Owned) Build the requirements inventory\n- [ ] Step 3: Define the Epics",
+			)
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
+				"The canonical epics artifact was written in this task and persisted as output_file.",
+			)
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("completes create-epics step 2 when the canonical epics artifact already exists and output_file matches", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-create-epics-step2-continue-"))
+
+		try {
+			const outputFolder = path.join(tempDir, "output")
+			const artifactPath = path.join(outputFolder, "planning_artifacts", "epics.md")
+			const taskState = createTaskState({
+				workflowName: "create-epics.md",
+				workflowContents: `## Step 2: (System-Owned) Build the requirements inventory
+Build the requirements inventory.
+
+## Step 3: Define the Epics
+Define the epics.`,
+				checklistMarkdown:
+					"- [ ] Step 2: (System-Owned) Build the requirements inventory\n- [ ] Step 3: Define the Epics",
+				stablePlaceholderValues: {
+					cwd: tempDir,
+					project_root: tempDir,
+					output_folder: outputFolder,
+				},
+				placeholderValues: {
+					mode: "continue",
+					output_file: artifactPath,
+				},
+			})
+
+			await writeFileWithMtime(artifactPath, "# Epics", Date.now())
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+			})
+
+			expect(result.checklist).to.equal(
+				"- [x] Step 2: (System-Owned) Build the requirements inventory\n- [ ] Step 3: Define the Epics",
+			)
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
+				"The canonical epics artifact already existed and was persisted as output_file.",
+			)
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("does not complete create-epics step 2 when the canonical epics artifact is missing", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-create-epics-step2-missing-artifact-"))
+
+		try {
+			const outputFolder = path.join(tempDir, "output")
+			const artifactPath = path.join(outputFolder, "planning_artifacts", "epics.md")
+			const taskState = createTaskState({
+				workflowName: "create-epics.md",
+				workflowContents: `## Step 2: (System-Owned) Build the requirements inventory
+Build the requirements inventory.
+
+## Step 3: Define the Epics
+Define the epics.`,
+				checklistMarkdown:
+					"- [ ] Step 2: (System-Owned) Build the requirements inventory\n- [ ] Step 3: Define the Epics",
+				stablePlaceholderValues: {
+					cwd: tempDir,
+					project_root: tempDir,
+					output_folder: outputFolder,
+				},
+				placeholderValues: {
+					mode: "continue",
+					output_file: artifactPath,
+				},
+			})
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+			})
+
+			expect(result.checklist).to.equal(
+				"- [ ] Step 2: (System-Owned) Build the requirements inventory\n- [ ] Step 3: Define the Epics",
+			)
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("does not complete create-epics step 2 when output_file is missing", async () => {
+		const tempDir = await fs.mkdtemp(
+			path.join(os.tmpdir(), "deterministic-placeholder-create-epics-step2-missing-output-file-"),
+		)
+
+		try {
+			const outputFolder = path.join(tempDir, "output")
+			const artifactPath = path.join(outputFolder, "planning_artifacts", "epics.md")
+			const taskState = createTaskState({
+				workflowName: "create-epics.md",
+				workflowContents: `## Step 2: (System-Owned) Build the requirements inventory
+Build the requirements inventory.
+
+## Step 3: Define the Epics
+Define the epics.`,
+				checklistMarkdown:
+					"- [ ] Step 2: (System-Owned) Build the requirements inventory\n- [ ] Step 3: Define the Epics",
+				stablePlaceholderValues: {
+					cwd: tempDir,
+					project_root: tempDir,
+					output_folder: outputFolder,
+				},
+				placeholderValues: {
+					mode: "continue",
+				},
+			})
+
+			await writeFileWithMtime(artifactPath, "# Epics", Date.now())
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+			})
+
+			expect(result.checklist).to.equal(
+				"- [ ] Step 2: (System-Owned) Build the requirements inventory\n- [ ] Step 3: Define the Epics",
+			)
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("does not complete create-epics step 2 when output_file does not match the canonical epics artifact", async () => {
+		const tempDir = await fs.mkdtemp(
+			path.join(os.tmpdir(), "deterministic-placeholder-create-epics-step2-mismatched-output-file-"),
+		)
+
+		try {
+			const outputFolder = path.join(tempDir, "output")
+			const artifactPath = path.join(outputFolder, "planning_artifacts", "epics.md")
+			const taskState = createTaskState({
+				workflowName: "create-epics.md",
+				workflowContents: `## Step 2: (System-Owned) Build the requirements inventory
+Build the requirements inventory.
+
+## Step 3: Define the Epics
+Define the epics.`,
+				checklistMarkdown:
+					"- [ ] Step 2: (System-Owned) Build the requirements inventory\n- [ ] Step 3: Define the Epics",
+				stablePlaceholderValues: {
+					cwd: tempDir,
+					project_root: tempDir,
+					output_folder: outputFolder,
+				},
+				placeholderValues: {
+					mode: "continue",
+					output_file: path.join(outputFolder, "planning_artifacts", "alternate-epics.md"),
+				},
+			})
+
+			await writeFileWithMtime(artifactPath, "# Epics", Date.now())
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+			})
+
+			expect(result.checklist).to.equal(
+				"- [ ] Step 2: (System-Owned) Build the requirements inventory\n- [ ] Step 3: Define the Epics",
+			)
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("does not complete create-epics step 2 for mode=new when the current-task write proof is missing", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-create-epics-step2-missing-proof-"))
+
+		try {
+			const outputFolder = path.join(tempDir, "output")
+			const artifactPath = path.join(outputFolder, "planning_artifacts", "epics.md")
+			const taskState = createTaskState({
+				workflowName: "create-epics.md",
+				workflowContents: `## Step 2: (System-Owned) Build the requirements inventory
+Build the requirements inventory.
+
+## Step 3: Define the Epics
+Define the epics.`,
+				checklistMarkdown:
+					"- [ ] Step 2: (System-Owned) Build the requirements inventory\n- [ ] Step 3: Define the Epics",
+				stablePlaceholderValues: {
+					cwd: tempDir,
+					project_root: tempDir,
+					output_folder: outputFolder,
+				},
+				placeholderValues: {
+					mode: "new",
+					output_file: artifactPath,
+				},
+			})
+
+			await writeFileWithMtime(artifactPath, "# Epics", Date.now())
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+			})
+
+			expect(result.checklist).to.equal(
+				"- [ ] Step 2: (System-Owned) Build the requirements inventory\n- [ ] Step 3: Define the Epics",
+			)
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
 	it("leaves still-unsupported placeholder workflows unchanged and adds no notices", async () => {
 		const taskState = createTaskState({
 			workflowName: "unsupported-placeholder-review.md",

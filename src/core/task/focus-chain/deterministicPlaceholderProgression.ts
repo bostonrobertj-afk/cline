@@ -117,6 +117,15 @@ function resolveOutputFolderFile(placeholders: Record<string, string>, fileName:
 	return path.join(outputFolder, fileName)
 }
 
+function getCreateEpicsCanonicalArtifactPath(placeholders: Record<string, string>): string | undefined {
+	const outputFolder = placeholders.output_folder?.trim()
+	if (!outputFolder) {
+		return undefined
+	}
+
+	return resolveArtifactPlaceholderPath(placeholders, path.join(outputFolder, "planning_artifacts", "epics.md"))
+}
+
 function didSuccessfulAttemptCompletionOccur(toolContext?: DeterministicPlaceholderToolContext): boolean {
 	return toolContext?.toolName === "attempt_completion" && toolContext.toolWasExecuted === true
 }
@@ -657,6 +666,7 @@ async function evaluateCreateEpicsStep(args: {
 	const architectureDocument = placeholders.architecture_document?.trim()
 	const prd = placeholders.prd?.trim()
 	const mode = placeholders.mode?.trim()
+	const outputFile = placeholders.output_file?.trim()
 
 	switch (args.stepNumber) {
 		case 1: {
@@ -679,6 +689,49 @@ async function evaluateCreateEpicsStep(args: {
 			return {
 				completed: true,
 				reason: "architecture_document, prd, and a valid mode were already available in workflow placeholder state.",
+			}
+		}
+		case 2: {
+			if (!mode) {
+				return { completed: false }
+			}
+
+			if (mode !== "new" && mode !== "continue") {
+				return { completed: false }
+			}
+
+			const canonicalArtifactPath = getCreateEpicsCanonicalArtifactPath(placeholders)
+			if (canonicalArtifactPath === undefined) {
+				return { completed: false }
+			}
+
+			const resolvedOutputFilePath = outputFile ? resolveArtifactPlaceholderPath(placeholders, outputFile) : undefined
+			if (!resolvedOutputFilePath || !arePathsEqual(resolvedOutputFilePath, canonicalArtifactPath)) {
+				return { completed: false }
+			}
+
+			if (mode === "new") {
+				if (!taskStateHasPlaceholderWorkflowWriteProof(args.taskState, canonicalArtifactPath)) {
+					return { completed: false }
+				}
+
+				if (!(await fileExistsForPlaceholderWorkflowWriteProof(canonicalArtifactPath))) {
+					return { completed: false }
+				}
+
+				return {
+					completed: true,
+					reason: "The canonical epics artifact was written in this task and persisted as output_file.",
+				}
+			}
+
+			if (!(await fileExistsForPlaceholderWorkflowWriteProof(canonicalArtifactPath))) {
+				return { completed: false }
+			}
+
+			return {
+				completed: true,
+				reason: "The canonical epics artifact already existed and was persisted as output_file.",
 			}
 		}
 		default:

@@ -259,6 +259,54 @@ describe("filterContextualNativeToolSpecs", () => {
 		expect(keptIds).to.not.include(ClineDefaultTool.PLAN_MODE)
 	})
 
+	it("applies create-epics step 3 row and keeps workflow_progress_request with workflow routing tools", () => {
+		const registeredTools = [
+			makeRegisteredTool(ClineDefaultTool.LIST_FILES),
+			makeRegisteredTool(ClineDefaultTool.SEARCH),
+			makeRegisteredTool(ClineDefaultTool.FILE_READ),
+			makeRegisteredTool(ClineDefaultTool.FILE_READ_RANGE),
+			makeRegisteredTool(ClineDefaultTool.APPLY_PATCH),
+			makeRegisteredTool(ClineDefaultTool.FILE_NEW),
+			makeRegisteredTool(ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST),
+			makeRegisteredTool(ClineDefaultTool.USE_SKILL),
+			makeRegisteredTool(ClineDefaultTool.ASK),
+			makeRegisteredTool(ClineDefaultTool.SEND_USER_MESSAGE),
+			makeRegisteredTool(ClineDefaultTool.ATTEMPT),
+			makeRegisteredTool(ClineDefaultTool.PLAN_MODE),
+			makeRegisteredTool(ClineDefaultTool.BROWSER),
+			makeRegisteredTool(ClineDefaultTool.MCP_ACCESS),
+			makeRegisteredTool(ClineDefaultTool.NEW_TASK),
+		]
+
+		const result = filterContextualNativeToolSpecs({
+			context: makeContext({
+				activePlaceholderWorkflowName: "create-epics.md",
+				activePlaceholderWorkflowStepNumber: 3,
+			}),
+			registeredTools,
+			mcpTools: [],
+		})
+
+		const keptIds = result.map((tool) => tool.id)
+		expect(keptIds).to.include.members([
+			ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST,
+			ClineDefaultTool.USE_SKILL,
+			ClineDefaultTool.LIST_FILES,
+			ClineDefaultTool.SEARCH,
+			ClineDefaultTool.FILE_READ,
+			ClineDefaultTool.FILE_READ_RANGE,
+			ClineDefaultTool.APPLY_PATCH,
+			ClineDefaultTool.FILE_NEW,
+			ClineDefaultTool.ASK,
+			ClineDefaultTool.SEND_USER_MESSAGE,
+			ClineDefaultTool.ATTEMPT,
+			ClineDefaultTool.BROWSER,
+			ClineDefaultTool.MCP_ACCESS,
+			ClineDefaultTool.NEW_TASK,
+		])
+		expect(keptIds).to.not.include(ClineDefaultTool.PLAN_MODE)
+	})
+
 	it("applies create-prd step 3 row and keeps workflow_progress_request without doc read tools", () => {
 		const registeredTools = [
 			makeRegisteredTool(ClineDefaultTool.LIST_FILES),

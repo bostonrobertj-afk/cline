@@ -842,6 +842,130 @@ ${step3Checklist}
 		}
 	})
 
+	it("tears down create-epics placeholder workflow state when Step 3 completion finishes with no configured automation", async () => {
+		const sandbox = sinon.createSandbox()
+		try {
+			sandbox.stub(disk, "getTaskMetadata").resolves({} as never)
+			const saveTaskMetadataStub = sandbox.stub(disk, "saveTaskMetadata").resolves()
+
+			const fakeTask = createFakeTask("task-complete-placeholder-no-automation") as FakeTaskBase & {
+				FocusChainManager?: {
+					updateFCListFromToolResponse: sinon.SinonStub
+					clearPlaceholderWorkflowChecklistProjection: sinon.SinonStub
+				}
+				toolExecutor?: {
+					executeInternalToolSilently: sinon.SinonStub
+				}
+				pendingWorkflowFormOutcome?: WorkflowFormRuntimeOutcome
+			}
+			Object.setPrototypeOf(fakeTask, Task.prototype)
+
+			const updateFCListFromToolResponse = sinon.stub().callsFake(async () => {
+				fakeTask.taskState.currentFocusChainChecklist = "- [x] Step 3: Define the Epics"
+				fakeTask.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.push({
+					workflowName: "create-epics.md",
+					stepNumber: 3,
+					checklistLabel: "Step 3: Define the Epics",
+					reason: "completed automatically",
+				})
+				return { accepted: true }
+			})
+			const clearProjectionStub = sinon.stub().resolves()
+			const executeInternalToolSilently = sinon.stub().resolves(true)
+
+			fakeTask.FocusChainManager = {
+				updateFCListFromToolResponse,
+				clearPlaceholderWorkflowChecklistProjection: clearProjectionStub,
+			}
+			fakeTask.toolExecutor = {
+				executeInternalToolSilently,
+			}
+
+			fakeTask.taskState.activePlaceholderWorkflowId = "create-epics.md"
+			fakeTask.taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "create-epics.md",
+				contents: "# Create Epics\n\n## Step 3: Define the Epics\nFinish the workflow.\n",
+			}
+			fakeTask.taskState.activePlaceholderWorkflowValues = { review_mode: "full" }
+			fakeTask.taskState.activePlaceholderWorkflowStableValues = { communication_language: "English" }
+			fakeTask.taskState.activePlaceholderWorkflowDeterministicState = {
+				codeReview: {
+					completedReviewLayers: {
+						blind_review: "subagent_report",
+					},
+				},
+			}
+			fakeTask.taskState.activePlaceholderWorkflowTaskWriteProofPaths = ["/tmp/review-input.md"]
+			fakeTask.taskState.activeWorkflowFormSession = {
+				sessionId: "wf-session-1",
+				resolverId: "code_review_step_3_diff_source",
+				triggerSource: "deterministic_workflow_progression",
+				owner: {
+					kind: "placeholder_workflow_step",
+					workflowName: "unmapped-workflow.md",
+					stepNumber: 1,
+				},
+				phase: "confirm",
+				initialPhase: "confirm",
+				values: {},
+			}
+			fakeTask.taskState.suppressedWorkflowFormResolverIds = ["code_review_step_3_diff_source"]
+			fakeTask.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices = []
+			fakeTask.taskState.activeStoryTaskId = "2"
+			fakeTask.taskState.activeStorySubtaskIds = ["1", "2"]
+			fakeTask.taskState.lastPromptedStoryTaskKey = "2:1,2:- [ ] Review findings"
+			fakeTask.taskState.activeWorkflowJustStarted = true
+			fakeTask.taskState.currentFocusChainChecklist = "- [ ] Step 3: Define the Epics"
+			const activeWorkflowFormSession = fakeTask.taskState.activeWorkflowFormSession
+			if (!activeWorkflowFormSession) {
+				throw new Error("Expected active workflow form session to be defined for this test")
+			}
+			fakeTask.pendingWorkflowFormOutcome = {
+				kind: "fallback_to_agent",
+				session: activeWorkflowFormSession,
+			}
+
+			await updatePlaceholderWorkflowProgressAndMaybeRunCompletion.call(fakeTask, "__COMPLETE_NEXT_STEP__")
+
+			expect(fakeTask.taskState.activePlaceholderWorkflowId).to.equal(undefined)
+			expect(fakeTask.taskState.activePlaceholderWorkflowSource).to.equal(undefined)
+			expect(fakeTask.taskState.activePlaceholderWorkflowValues).to.equal(undefined)
+			expect(fakeTask.taskState.activePlaceholderWorkflowStableValues).to.equal(undefined)
+			expect(fakeTask.taskState.activePlaceholderWorkflowDeterministicState).to.equal(undefined)
+			expect(fakeTask.taskState.activePlaceholderWorkflowTaskWriteProofPaths).to.deep.equal([])
+			expect(fakeTask.taskState.lastPromptedPlaceholderWorkflowChecklistLabel).to.equal(undefined)
+			expect(fakeTask.taskState.activeStoryTaskId).to.equal(undefined)
+			expect(fakeTask.taskState.activeStorySubtaskIds).to.deep.equal([])
+			expect(fakeTask.taskState.lastPromptedStoryTaskKey).to.equal(undefined)
+			expect(fakeTask.taskState.activeWorkflowFormSession).to.equal(undefined)
+			expect(fakeTask.taskState.suppressedWorkflowFormResolverIds).to.deep.equal([])
+			expect(fakeTask.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+			expect(fakeTask.taskState.activeWorkflowJustStarted).to.equal(false)
+			expect(fakeTask.pendingWorkflowFormOutcome).to.equal(undefined)
+			sinon.assert.notCalled(fakeTask.toolExecutor.executeInternalToolSilently)
+			sinon.assert.calledOnce(fakeTask.FocusChainManager.clearPlaceholderWorkflowChecklistProjection)
+			expect(saveTaskMetadataStub.callCount).to.equal(1)
+
+			const lastSavedMetadata = saveTaskMetadataStub.getCall(saveTaskMetadataStub.callCount - 1).args[1]
+			expect(lastSavedMetadata.activePlaceholderWorkflowId).to.equal(undefined)
+			expect(lastSavedMetadata.activePlaceholderWorkflowSource).to.equal(undefined)
+			expect(lastSavedMetadata.activePlaceholderWorkflowStableValues).to.equal(undefined)
+			expect(lastSavedMetadata.activePlaceholderWorkflowValues).to.equal(undefined)
+			expect(lastSavedMetadata.activePlaceholderWorkflowDeterministicState).to.equal(undefined)
+			expect(lastSavedMetadata.activePlaceholderWorkflowTaskWriteProofPaths).to.deep.equal([])
+			expect(lastSavedMetadata.lastPromptedPlaceholderWorkflowChecklistLabel).to.equal(undefined)
+			expect(lastSavedMetadata.activeStoryTaskId).to.equal(undefined)
+			expect(lastSavedMetadata.activeStorySubtaskIds).to.deep.equal([])
+			expect(lastSavedMetadata.lastPromptedStoryTaskKey).to.equal(undefined)
+			expect(lastSavedMetadata.activeWorkflowFormSession).to.equal(undefined)
+			expect(lastSavedMetadata.suppressedWorkflowFormResolverIds).to.deep.equal([])
+			expect(lastSavedMetadata.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+		} finally {
+			sandbox.restore()
+		}
+	})
+
 	it("preserves placeholder workflow state when workflow completion automation reports tool_failed", async () => {
 		const sandbox = sinon.createSandbox()
 
@@ -2641,7 +2765,7 @@ Draft the epics.
 		expect(taskState.activePlaceholderWorkflowValues?.ux_spec).to.equal(undefined)
 		expect(taskState.activePlaceholderWorkflowValues?.ui_spec).to.equal(undefined)
 		expect(taskState.activeWorkflowFormSession).to.equal(undefined)
-		expect(fakeTask.renderWorkflowFormMessage.secondCall.args[1]).to.equal("say")
+		expect(fakeTask.renderWorkflowFormMessage.secondCall.args[1]).to.equal("ask")
 	})
 
 	it("prefers appended decorated tool_result JSON over preceding tool text when evaluating workflow-form tool success", async () => {

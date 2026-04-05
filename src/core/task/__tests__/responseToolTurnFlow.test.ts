@@ -290,6 +290,52 @@ describe("response tool turn flow", () => {
 		sinon.assert.notCalled(postStateToWebview)
 	})
 
+	it("continues workflow_progress_request followup after placeholder workflow teardown has already occurred", async () => {
+		const taskState = new TaskState()
+		taskState.completedResponseToolResultContent = [
+			{
+				type: "tool_result",
+				tool_use_id: "toolu_workflow_progress_request",
+				content: "[Message displayed.]",
+			},
+		] as any
+		taskState.setPendingResponseToolFollowup({
+			toolName: ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST,
+			route: "normal_user_turn",
+			text: "Yes",
+		})
+
+		const recursivelyMakeClineRequests = sinon.stub().resolves(true)
+		const setThreadDisplayState = sinon.stub()
+		const postStateToWebview = sinon.stub().resolves()
+		const messageStateHandler = {
+			addToApiConversationHistory: sinon.stub().resolves(),
+		}
+
+		const result = await handleCompletedResponseToolTurn({
+			taskState,
+			completedResponseTool: {
+				toolName: ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST,
+				threadDisplayStateAfterTurnEnds: ThreadDisplayStates.ACTIVE_USER,
+			},
+			abort: false,
+			messageStateHandler,
+			recursivelyMakeClineRequests,
+			setThreadDisplayState,
+			postStateToWebview,
+		})
+
+		assert.equal(result, true)
+		sinon.assert.calledOnceWithExactly(recursivelyMakeClineRequests, [
+			{
+				type: "text",
+				text: formatResponse.normalNextTurnDialogue("user_message", "Yes"),
+			},
+		])
+		sinon.assert.notCalled(setThreadDisplayState)
+		sinon.assert.notCalled(postStateToWebview)
+	})
+
 	it("hands off to active_user immediately when no response-tool continuation content exists", async () => {
 		const taskState = new TaskState()
 		taskState.completedResponseToolResultContent = [

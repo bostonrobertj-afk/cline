@@ -59,10 +59,6 @@ The current checklist was built for you by the user at the beginning of the conv
 - task_progress is rendered based on the user's provided steps and the steps you've marked as complete.`
 	}
 
-	if (context.activeDeterministicPlaceholderWorkflowEnabled === true) {
-		return undefined
-	}
-
 	if (
 		shouldExposeWorkflowProgressRequest({
 			workflowName: context.activePlaceholderWorkflowName,
@@ -71,6 +67,10 @@ The current checklist was built for you by the user at the beginning of the conv
 		})
 	) {
 		return UPDATING_TASK_PROGRESS_WORKFLOW_PROGRESS_REQUEST
+	}
+
+	if (context.activeDeterministicPlaceholderWorkflowEnabled === true) {
+		return undefined
 	}
 
 	if (context.activeWorkflowSupportsPlaceholders) {

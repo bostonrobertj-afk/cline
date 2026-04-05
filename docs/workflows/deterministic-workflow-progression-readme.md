@@ -69,6 +69,7 @@ Side effects may also include:
 - Deterministic support is opt-in by exact workflow name, not by convention.
 - The currently supported workflows are:
   - `code-review.md`
+  - `create-epics.md`
   - `dev-story.md`
   - `review-adversarial-general.md`
   - `blind-review.md`
@@ -103,6 +104,9 @@ Current evaluator examples:
   - Step 5 requires every required review layer to have either an already-recorded completion source or a current-task fallback prompt artifact
   - Step 6 requires a task-written `review_input` that now carries a terminal review status
   - Step 7 completes when the current turn successfully executes `attempt_completion`
+- `create-epics.md`
+  - Step 1 completes when `architecture_document`, `prd`, and a valid `mode` already exist in workflow placeholder state
+  - Step 2 completes when the canonical epics artifact exists and `output_file` points to it; `mode === "new"` also requires a current-task write proof for that artifact
 - `review-adversarial-general.md`
   - Step 1 completes when `diff_output` resolves to an existing file path
   - Step 2 completes when `adversarial-review-findings.md` was written during the current task and still exists
@@ -168,6 +172,8 @@ This is especially important for steps whose completion is defined by:
 - In `code-review.md`, if `diff_output` was written during this task and the artifact still exists, Step 2 can complete without asking the model to re-confirm it.
 - In `code-review.md`, if `review_input` was written during this task and the artifact still exists, Step 3 can complete without asking the model to re-confirm it.
 - In `code-review.md`, if both `review_input` and `diff_output` exist as current-task artifacts, Step 4 derives `review_mode = full` automatically.
+- In `create-epics.md`, if `architecture_document`, `prd`, and `mode` already exist in placeholder state, Step 1 can complete immediately on the next deterministic pass.
+- In `create-epics.md`, if the canonical epics artifact exists at `{output_folder}/planning_artifacts/epics.md` and `output_file` points to it, Step 2 can auto-complete; when `mode` is `new`, the artifact must also have a current-task write proof.
 - In `review-adversarial-general.md`, if `diff_output` resolves to an existing file, Step 1 can complete immediately on the next deterministic pass.
 - In `review-adversarial-general.md`, if Step 2 writes `{output_folder}/adversarial-review-findings.md` during the current task and the artifact still exists, Step 2 can auto-complete.
 - In `blind-review.md`, if `diff_output` resolves to an existing file, Step 1 can complete immediately on the next deterministic pass.
