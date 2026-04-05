@@ -90,6 +90,26 @@ Required params: source
 Description: Build and replace the stable review-input artifact at {review_input} from the workflow-owned story file at {story_path} plus the workflow-owned diff artifact at {diff_output}. Resolve all inputs from workflow state.
 Required params: none
 
+## build_epics_document
+Description: Build or resolve the canonical epics artifact at {output_folder}/planning_artifacts/epics.md from workflow-owned placeholder state. Resolve inputs from workflow state; there are no human-supplied parameters.
+Required params: none
+
+## story_task_reminder
+Description: Resend the current first incomplete story task and its subtasks from the workflow-owned story file at {story_path}. Resolve the story path from workflow state.
+Required params: none
+
+## story_task_complete
+Description: Mark the addressed story task or subtask complete in the workflow-owned story file at {story_path}. Resolve the story path from workflow state.
+Required params: storyTaskId
+
+## story_notes_update
+Description: Append one new entry to ## Completion Notes List or ## File List in the workflow-owned story file at {story_path}. Resolve the story path from workflow state.
+Required params: section, entry
+
+## story_testing_complete
+Description: Mark the workflow-owned story file at {story_path} ready for review by setting Status: review. Resolve the story path from workflow state.
+Required params: none
+
 ## use_subagents
 Description: Run up to five focused in-process subagents in parallel. Each subagent gets its own prompt and returns a comprehensive research result with tool and token stats. Use this for broad exploration when reading many files would consume the main agent's context window. You do not need to launch multiple subagents every time; using one subagent is valid when it avoids unnecessary context usage for light discovery work.
 Required params: prompt_1

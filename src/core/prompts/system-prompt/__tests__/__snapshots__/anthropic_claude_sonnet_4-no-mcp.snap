@@ -297,6 +297,49 @@ Usage:
 <build_review_input>
 </build_review_input>
 
+## build_epics_document
+Description: Build or resolve the canonical epics artifact at {output_folder}/planning_artifacts/epics.md from workflow-owned placeholder state. Resolve inputs from workflow state; there are no human-supplied parameters.
+Parameters: None
+Usage:
+<build_epics_document>
+</build_epics_document>
+
+## story_task_reminder
+Description: Resend the current first incomplete story task and its subtasks from the workflow-owned story file at {story_path}. Resolve the story path from workflow state.
+Parameters: None
+Usage:
+<story_task_reminder>
+</story_task_reminder>
+
+## story_task_complete
+Description: Mark the addressed story task or subtask complete in the workflow-owned story file at {story_path}. Resolve the story path from workflow state.
+Parameters:
+- storyTaskId: (required) The 1-based top-level task ordinal copied from the injected current task block.
+- storySubtaskId: (optional) The optional 1-based subtask ordinal under that parent task, copied from the injected current task block.
+Usage:
+<story_task_complete>
+<storyTaskId></storyTaskId>
+<storySubtaskId></storySubtaskId>
+</story_task_complete>
+
+## story_notes_update
+Description: Append one new entry to ## Completion Notes List or ## File List in the workflow-owned story file at {story_path}. Resolve the story path from workflow state.
+Parameters:
+- section: (required) The exact target section name; Allowed values: "Completion Notes List" and "File List".
+- entry: (required) One new entry to append verbatim under the selected section heading.
+Usage:
+<story_notes_update>
+<section></section>
+<entry></entry>
+</story_notes_update>
+
+## story_testing_complete
+Description: Mark the workflow-owned story file at {story_path} ready for review by setting Status: review. Resolve the story path from workflow state.
+Parameters: None
+Usage:
+<story_testing_complete>
+</story_testing_complete>
+
 ## use_subagents
 Description: Run up to five focused in-process subagents in parallel. Each subagent gets its own prompt and returns a comprehensive research result with tool and token stats. Use this for broad exploration when reading many files would consume the main agent's context window. You do not need to launch multiple subagents every time; using one subagent is valid when it avoids unnecessary context usage for light discovery work.
 Parameters:

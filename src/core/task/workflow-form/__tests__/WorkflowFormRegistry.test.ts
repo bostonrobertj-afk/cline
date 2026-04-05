@@ -30,6 +30,86 @@ describe("WorkflowFormRegistry", () => {
 		expect(resolver.toolName).to.equal("build_review_input")
 	})
 
+	it("builds the create-epics workflow-start definition with the approved override copy", () => {
+		const resolver = getWorkflowFormResolverDefinition(PLACEHOLDER_WORKFLOW_START_SET_WORKFLOW_PLACEHOLDERS_RESOLVER_ID)
+		const definition = resolver.buildDefinition({
+			sessionId: "session-create-epics-definition",
+			resolverId: "placeholder_workflow_start_set_workflow_placeholders",
+			triggerSource: "slash_command",
+			owner: {
+				kind: "slash_command",
+				workflowName: "create-epics.md",
+				stepNumber: 1,
+			},
+			phase: "collect_inputs",
+			initialPhase: "collect_inputs",
+			values: {},
+			context: {
+				workflowName: "create-epics.md",
+				workflowStartRequirements: {
+					requiredFieldKeys: ["architecture_document", "prd", "mode"],
+					optionalFieldKeys: ["ux_spec", "ui_spec"],
+				},
+			},
+		})
+		const fields = definition.pages.collect_inputs?.fields ?? []
+
+		expect(definition.title).to.equal("Inputs for This Workflow")
+		expect(definition.pages.collect_inputs?.prompt).to.equal("Provide the following to start the workflow:")
+		expect(fields.map((field) => field.key)).to.deep.equal(["architecture_document", "prd", "mode", "ux_spec", "ui_spec"])
+		expect(fields[0]?.label).to.equal("Architecture Document")
+		expect(fields[2]?.placeholder).to.equal("new or continue")
+	})
+
+	it("omits blank optional create-epics values when serializing set_workflow_placeholders", () => {
+		const resolver = getWorkflowFormResolverDefinition(PLACEHOLDER_WORKFLOW_START_SET_WORKFLOW_PLACEHOLDERS_RESOLVER_ID)
+		const outcome = resolver.buildToolExecutionRequest(
+			{
+				sessionId: "session-create-epics-serialize",
+				resolverId: "placeholder_workflow_start_set_workflow_placeholders",
+				triggerSource: "slash_command",
+				owner: {
+					kind: "slash_command",
+					workflowName: "create-epics.md",
+					stepNumber: 1,
+				},
+				phase: "collect_inputs",
+				initialPhase: "collect_inputs",
+				values: {},
+				context: {
+					workflowName: "create-epics.md",
+					workflowStartRequirements: {
+						requiredFieldKeys: ["architecture_document", "prd", "mode"],
+						optionalFieldKeys: ["ux_spec", "ui_spec"],
+					},
+				},
+			},
+			{
+				architecture_document: { rawValue: "/abs/architecture.md" },
+				prd: { rawValue: "/abs/prd.md" },
+				mode: { rawValue: "new" },
+				ux_spec: { rawValue: "" },
+				ui_spec: { rawValue: "" },
+			},
+		)
+
+		expect(outcome.toolName).to.equal("set_workflow_placeholders")
+		expect(outcome.toolInput).to.deep.equal({
+			values: {
+				architecture_document: "/abs/architecture.md",
+				prd: "/abs/prd.md",
+				mode: "new",
+			},
+		})
+		expect(outcome.toolParams).to.deep.equal({
+			values: JSON.stringify({
+				architecture_document: "/abs/architecture.md",
+				prd: "/abs/prd.md",
+				mode: "new",
+			}),
+		})
+	})
+
 	it("declares the code-review step 3 review-input resolver as automatic workflow preparation", () => {
 		const resolver = getWorkflowFormResolverDefinition(CODE_REVIEW_STEP_3_REVIEW_INPUT_RESOLVER_ID)
 		const definition = resolver.buildDefinition({

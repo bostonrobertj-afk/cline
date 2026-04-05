@@ -248,6 +248,7 @@ interface WorkflowStartFormOverride {
 	prompt: string
 	labels: Record<string, string>
 	help: Record<string, string>
+	placeholders?: Record<string, string>
 }
 
 const workflowStartFormOverrides: Record<string, WorkflowStartFormOverride> = {
@@ -263,6 +264,31 @@ const workflowStartFormOverrides: Record<string, WorkflowStartFormOverride> = {
 			review_input: "Path to an existing review-input markdown file for this review.",
 			diff_output: "Path to an existing review-input diff file for this review.",
 			spec_file: "Optional path to a story, spec, or requirements file that defines expected behavior.",
+		},
+	},
+	"create-epics.md": {
+		title: "Inputs for This Workflow",
+		prompt: "Provide the following to start the workflow:",
+		labels: {
+			architecture_document: "Architecture Document",
+			prd: "PRD",
+			mode: "Mode",
+			ux_spec: "UX Spec",
+			ui_spec: "UI Spec",
+		},
+		help: {
+			architecture_document: "Provide the path to the architecture document.",
+			prd: "Provide the path to the PRD.",
+			mode: "Enter `new` to create a new epics document or `continue` to resume an existing one.",
+			ux_spec: "Optional path to a UX specification document.",
+			ui_spec: "Optional path to a UI specification document.",
+		},
+		placeholders: {
+			architecture_document: "/absolute/path/to/architecture.md",
+			prd: "/absolute/path/to/prd.md",
+			mode: "new or continue",
+			ux_spec: "/absolute/path/to/ux-spec.md",
+			ui_spec: "/absolute/path/to/ui-spec.md",
 		},
 	},
 }
@@ -299,7 +325,7 @@ function buildWorkflowStartPlaceholderFieldDefinitions(args: {
 				help: args.override?.help[key] ?? humanizeWorkflowPlaceholderKey(key),
 				required: requiredFieldKeySet.has(key),
 				oneOfGroupId: oneOfFieldKeySet.has(key) ? args.oneOfRequirement?.id : undefined,
-				placeholder: "/absolute/path/to/file-or-artifact",
+				placeholder: args.override?.placeholders?.[key] ?? "/absolute/path/to/file-or-artifact",
 				visible: true,
 			}),
 		)

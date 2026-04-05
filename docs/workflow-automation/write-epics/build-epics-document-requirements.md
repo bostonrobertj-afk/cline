@@ -163,13 +163,23 @@ At minimum, the tool must preserve the template's current top-level structure:
 
 ### 2. Frontmatter augmentation
 
-The tool must augment the template frontmatter with the Step 2 source-document references required by the authored workflow:
+The tool must preserve the template's existing `stepsCompleted` field and write the Step 2 source-document references into labeled frontmatter keys that match the authored workflow in [create-epics.md](/Users/robertboston/Documents/Cline/Workflows/create-epics.md):
 
-- architecture document path
-- PRD path
-- optional UI/UX document paths when provided
+```yaml
+Architecture: /path/to/architecture.md
+PRD: /path/to/prd.md
+UI/UX:
+  - /path/to/ui-spec.md
+  - /path/to/ux-spec.md
+```
 
-The tool must preserve existing template frontmatter fields while adding those references. It must not replace the entire frontmatter block with a narrower custom structure.
+Contract details:
+
+- `Architecture` must be set to the resolved `{architecture_document}` path.
+- `PRD` must be set to the resolved `{prd}` path.
+- `UI/UX` must be a YAML sequence containing only the resolved optional `ui_spec` and `ux_spec` paths that are actually present, in that order.
+- If neither optional UI/UX path is present, omit `UI/UX` from the generated frontmatter.
+- `inputDocuments` is a legacy template field and does not satisfy this requirement for `build_epics_document`.
 
 ### 3. Requirements inventory population
 

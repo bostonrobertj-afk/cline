@@ -9,6 +9,7 @@ export type PlaceholderToolBundle =
 	| "WORKFLOW_ROUTE"
 	| "SUBAGENT_COORD"
 	| "DIFF_BUILD"
+	| "EPICS_BUILD"
 	| "EXTERNAL_RESEARCH"
 	| "INDXR_DISCOVERY"
 	| "INDXR_SOURCE_READ"
@@ -37,6 +38,7 @@ export const PLACEHOLDER_BUILTIN_BUNDLE_TOOLS = {
 	WORKFLOW_ROUTE: [ClineDefaultTool.USE_SKILL],
 	SUBAGENT_COORD: [ClineDefaultTool.USE_SUBAGENTS],
 	DIFF_BUILD: [ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT],
+	EPICS_BUILD: [ClineDefaultTool.BUILD_EPICS_DOCUMENT],
 	EXTERNAL_RESEARCH: [ClineDefaultTool.WEB_SEARCH, ClineDefaultTool.WEB_FETCH],
 	STORY_TASK_EXECUTION: [
 		ClineDefaultTool.STORY_NOTES_UPDATE,
@@ -174,7 +176,7 @@ export const PLACEHOLDER_WORKFLOW_STEP_MATRIX: Record<string, Record<number, rea
 	},
 	"create-epics.md": {
 		1: ["DOC_READ"],
-		2: ["DOC_READ", "DOC_WRITE"],
+		2: ["DOC_READ", "DOC_WRITE", "EPICS_BUILD"],
 		3: ["DOC_READ", "DOC_WRITE", "WORKFLOW_ROUTE"],
 		4: ["DOC_READ", "DOC_WRITE", "WORKFLOW_ROUTE"],
 		5: ["DOC_READ"],

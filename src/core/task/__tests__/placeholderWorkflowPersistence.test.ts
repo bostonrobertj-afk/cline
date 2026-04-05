@@ -2485,6 +2485,165 @@ Build the diff output before continuing.
 		)
 	})
 
+	it("opens the create-epics workflow-start form on slash-command activation and stores only the supplied placeholders", async () => {
+		const workflowStartSession: WorkflowFormSessionState = {
+			sessionId: "wf-session-create-epics-start",
+			resolverId: "placeholder_workflow_start_set_workflow_placeholders",
+			triggerSource: "slash_command",
+			owner: {
+				kind: "slash_command",
+				workflowName: "create-epics.md",
+				stepNumber: 1,
+			},
+			phase: "collect_inputs",
+			initialPhase: "collect_inputs",
+			values: {
+				architecture_document: { rawValue: "docs/architecture.md" },
+				prd: { rawValue: "docs/prd.md" },
+				mode: { rawValue: "new" },
+			},
+			context: {
+				workflowName: "create-epics.md",
+				workflowStartRequirements: {
+					requiredFieldKeys: ["architecture_document", "prd", "mode"],
+					optionalFieldKeys: ["ux_spec", "ui_spec"],
+				},
+			},
+		}
+		const taskState = new TaskState()
+		taskState.activePlaceholderWorkflowId = "create-epics.md"
+		taskState.activePlaceholderWorkflowSource = {
+			type: "remote",
+			name: "create-epics.md",
+			contents: `# Create Epics
+
+## Step 1: (System-Owned) Confirm the input set
+Required: {architecture_document}, {prd}, {mode}
+Optional: {ux_spec}, {ui_spec}
+
+Use \`set_workflow_placeholders\` to persist the collected Step 1 inputs for this workflow before continuing.
+
+Done Signal: \`{architecture_document}\`, \`{prd}\`, and \`{mode}\` are present and non-empty in workflow placeholder state for the active task/workflow session.
+
+## Step 2: (System-Owned) Build the requirements inventory
+Build the epics scaffold.
+
+## Step 3: Define the Epics
+Draft the epics.
+`,
+		}
+		taskState.currentFocusChainChecklist = [
+			"- [ ] Step 1: Confirm the input set",
+			"- [ ] Step 2: Build the requirements inventory",
+			"- [ ] Step 3: Define the Epics",
+		].join("\n")
+
+		let renderCount = 0
+		const fakeTask: FakeWorkflowFormTask & {
+			executeWorkflowFormToolAndSync: sinon.SinonStub
+		} = {
+			cwd: process.cwd(),
+			taskState,
+			pendingWorkflowFormOutcome: undefined,
+			messageStateHandler: {
+				getClineMessages: sinon.stub().returns([]),
+			},
+			workflowFormRuntime: {
+				createSession: sinon.stub().returns(workflowStartSession),
+				buildPayload: sinon
+					.stub()
+					.callsFake((session: WorkflowFormSessionState) => buildInteractiveWorkflowFormPayload(session)),
+				buildSuccessPayload: sinon.stub().callsFake((session: WorkflowFormSessionState, successMessage: string) => ({
+					...buildInteractiveWorkflowFormPayload(session),
+					phase: "success",
+					successMessage,
+				})),
+			},
+			persistWorkflowFormSession: sinon.stub().resolves(),
+			renderWorkflowFormMessage: sinon.stub().callsFake(async () => {
+				renderCount += 1
+				if (renderCount === 1) {
+					fakeTask.pendingWorkflowFormOutcome = {
+						kind: "invoke_tool",
+						session: workflowStartSession,
+						toolName: ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
+						toolInput: {
+							values: {
+								architecture_document: "docs/architecture.md",
+								prd: "docs/prd.md",
+								mode: "new",
+							},
+						},
+						toolParams: {
+							values: JSON.stringify({
+								architecture_document: "docs/architecture.md",
+								prd: "docs/prd.md",
+								mode: "new",
+							}),
+						},
+					}
+				}
+			}),
+			executeWorkflowFormToolAndSync: sinon.stub().callsFake(async (outcome) => {
+				expect(outcome.toolInput).to.deep.equal({
+					values: {
+						architecture_document: "docs/architecture.md",
+						prd: "docs/prd.md",
+						mode: "new",
+					},
+				})
+				expect(outcome.toolParams).to.deep.equal({
+					values: JSON.stringify({
+						architecture_document: "docs/architecture.md",
+						prd: "docs/prd.md",
+						mode: "new",
+					}),
+				})
+				taskState.activePlaceholderWorkflowValues = {
+					architecture_document: "docs/architecture.md",
+					prd: "docs/prd.md",
+					mode: "new",
+				}
+				taskState.currentFocusChainChecklist = [
+					"- [ ] Step 1: Confirm the input set",
+					"- [ ] Step 2: Build the requirements inventory",
+					"- [ ] Step 3: Define the Epics",
+				].join("\n")
+				return { succeeded: true }
+			}),
+			clearWorkflowFormSession: sinon.stub().callsFake(async () => {
+				taskState.activeWorkflowFormSession = undefined
+			}),
+			setThreadDisplayState: sinon.stub(),
+			postStateToWebview: sinon.stub().resolves(),
+		}
+
+		await maybeResolveWorkflowFormBeforeApiTurn.call(fakeTask, {
+			type: "activate_placeholder_workflow",
+			workflowId: "create-epics",
+			workflowSource: {
+				type: "remote",
+				name: "create-epics.md",
+				contents: "# Create epics\nDraft the planning artifacts.",
+			},
+		})
+
+		expect(fakeTask.workflowFormRuntime.createSession.callCount).to.equal(1)
+		expect(fakeTask.workflowFormRuntime.createSession.firstCall.args[0]?.resolverId).to.equal(
+			"placeholder_workflow_start_set_workflow_placeholders",
+		)
+		expect(fakeTask.executeWorkflowFormToolAndSync.calledOnce).to.equal(true)
+		expect(taskState.activePlaceholderWorkflowValues).to.deep.equal({
+			architecture_document: "docs/architecture.md",
+			prd: "docs/prd.md",
+			mode: "new",
+		})
+		expect(taskState.activePlaceholderWorkflowValues?.ux_spec).to.equal(undefined)
+		expect(taskState.activePlaceholderWorkflowValues?.ui_spec).to.equal(undefined)
+		expect(taskState.activeWorkflowFormSession).to.equal(undefined)
+		expect(fakeTask.renderWorkflowFormMessage.secondCall.args[1]).to.equal("say")
+	})
+
 	it("prefers appended decorated tool_result JSON over preceding tool text when evaluating workflow-form tool success", async () => {
 		const session: WorkflowFormSessionState = {
 			sessionId: "wf-session-diff-success",

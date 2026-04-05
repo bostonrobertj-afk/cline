@@ -472,6 +472,7 @@ describe("Prompt System Integration Tests", () => {
 						expect(JSON.stringify(tools)).to.not.include('"focus_chain"')
 						expect(toolNames).to.include("build_review_diff_output")
 						expect(toolNames).to.include("build_review_input")
+						expect(toolNames).to.include("build_epics_document")
 						const snapshotName = `${providerId}_${family.replace(/[^a-zA-Z0-9]/g, "_")}.tools.snap`
 						await assertSnapshot(snapshotName, JSON.stringify(tools, null, 2))
 					})
@@ -494,6 +495,7 @@ describe("Prompt System Integration Tests", () => {
 								expect(toolNames).to.not.include("focus_chain")
 								expect(toolNames).to.include("build_review_diff_output")
 								expect(toolNames).to.include("build_review_input")
+								expect(toolNames).to.include("build_epics_document")
 							} else {
 								expect(tools).to.be.undefined
 							}
@@ -1201,6 +1203,40 @@ describe("Prompt System Integration Tests", () => {
 					expect(nativeToolNames.some((name) => name.includes("search_relevant"))).to.equal(false)
 					expect(nativeToolNames.some((name) => name.includes("get_file_summary"))).to.equal(false)
 					expect(nativeToolNames.some((name) => name.includes("lookup_symbol"))).to.equal(false)
+				},
+			)
+		})
+
+		it("filters native tools for create-epics step 2", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
+					enableNativeToolCalls: true,
+					useMinimalGptPrompt: true,
+					activeWorkflowSupportsPlaceholders: true,
+					managedWorkflowActive: false,
+					activePlaceholderWorkflowName: "create-epics.md",
+					activePlaceholderWorkflowStepNumber: 2,
+				},
+				"gpt-5.4-2026-03-05",
+				async ({ tools }) => {
+					const nativeToolNames = getNativeToolNames(tools)
+
+					expect(nativeToolNames).to.include.members([
+						"build_epics_document",
+						"list_files",
+						"search_files",
+						"read_file",
+						"read_file_range",
+						"apply_patch",
+						"attempt_completion",
+					])
+					expect(nativeToolNames).to.not.include("set_workflow_placeholders")
+					expect(nativeToolNames).to.not.include("execute_command")
+					expect(nativeToolNames).to.not.include("generate_plan_output")
+					expect(nativeToolNames.some((name) => name.startsWith("indxr-"))).to.equal(false)
 				},
 			)
 		})

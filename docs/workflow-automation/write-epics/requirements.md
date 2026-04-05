@@ -18,16 +18,18 @@ These requirements are grounded in the current runtime and capability docs:
 - [WorkflowFormRegistry.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/WorkflowFormRegistry.ts)
 - [WorkflowFormRuntime.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts)
 
-## Current Workflow Audit
+## Intended End State
 
-The current [create-epics.md](/Users/robertboston/Documents/Cline/Workflows/create-epics.md) Step 1 is not yet compatible with the live workflow-start form contract.
+The intended end state for this capability is a `create-epics.md` Step 1 that is fully compatible with the live workflow-start form contract and remains aligned with the preexisting workflow-form UX conventions already used by the runtime.
 
-Current gaps:
+The final intended buildout must therefore preserve all of these properties together:
 
-- Step 1 uses backticked bare keys on lines 5-6, not literal placeholder tokens such as `{architecture_document}`.
-- Step 1 uses `PRD` on line 5, while later workflow steps use `{prd}` on lines 16, 18, and 35.
-- Step 1 does not explicitly instruct the runtime/agent to store the collected values through `set_workflow_placeholders`.
-- Step 1 done-signal wording is high level, but the current pre-turn system-owned path works best when the completion condition is reducible to placeholder state.
+- Step 1 uses canonical workflow-start directive lines with literal placeholder tokens.
+- Step 1 uses the canonical `prd` placeholder spelling.
+- Step 1 explicitly references `set_workflow_placeholders`.
+- Step 1 completion is reducible to placeholder state.
+- the workflow-start form uses the existing slash-command workflow-start path and the existing workflow-start resolver.
+- the workflow-start form keeps the existing form-level dictionary/reference behavior and does not introduce a new field-level dictionary UI pattern.
 
 ## Core Requirement
 
@@ -139,10 +141,11 @@ The base start-form capability can function without a workflow-specific override
 
 The override must provide:
 
-- a workflow-specific title
-- a workflow-specific prompt
+- the approved title: `Inputs for This Workflow`
+- the approved prompt: `Provide the following to start the workflow:`
 - label overrides for all collected fields
 - help text overrides for all collected fields
+- placeholder overrides for all collected fields
 
 The override must at minimum clarify:
 
@@ -152,6 +155,23 @@ The override must at minimum clarify:
 - `ux_spec` and `ui_spec` are optional supporting inputs
 
 Because `mode` remains a text field in the current runtime, the help text must make the accepted literals explicit.
+
+## Dictionary And Help UX Requirements
+
+This workflow-start form must preserve the existing workflow-form reference UX pattern that already exists in runtime.
+
+That means:
+
+- the form may continue to use the existing form-level `Open inputs reference` affordance
+- field labels remain plain text
+- field help remains inline plain text beneath the label
+
+This buildout must not introduce:
+
+- a field-level clickable dictionary affordance
+- a second field-level dictionary dialog
+- shared workflow-form field metadata added solely to support field-level dictionary UI
+- workflow-specific dictionary-entry wiring on start-form fields
 
 ## Capability Boundary
 
@@ -199,7 +219,15 @@ Add negative coverage proving the candidate is absent when Step 1 regresses to b
 
 ### 2. Resolver definition coverage
 
-Add or extend tests proving the workflow-start resolver builds the expected `create-epics.md` field set and applies the new workflow-specific override copy.
+Add or extend tests proving the workflow-start resolver builds the expected `create-epics.md` field set and applies the approved override copy.
+
+That coverage must verify:
+
+- the approved title and prompt
+- the expected field order
+- the expected label/help/placeholder overrides
+
+It must not require or assert a field-level dictionary-entry contract.
 
 ### 3. Submission serialization coverage
 
@@ -231,6 +259,9 @@ This buildout does not require:
 - a workflow-specific trigger registry entry for Step 1
 - custom non-string form controls for `mode`
 - `One of:` semantics for the current `create-epics.md` input contract
+- field-level clickable dictionary elements
+- a new shared workflow-form field contract for dictionary-entry payloads
+- workflow-start-specific dictionary dialogs
 - deterministic Step 1 completion logic
 - deterministic progression allowlist changes
 

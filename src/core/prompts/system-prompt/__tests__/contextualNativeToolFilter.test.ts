@@ -211,6 +211,54 @@ describe("filterContextualNativeToolSpecs", () => {
 		expect(keptNames.some((name) => name.startsWith("indxr-"))).to.equal(false)
 	})
 
+	it("applies create-epics step 2 row and keeps build_epics_document without placeholder-write tools", () => {
+		const registeredTools = [
+			makeRegisteredTool(ClineDefaultTool.LIST_FILES),
+			makeRegisteredTool(ClineDefaultTool.SEARCH),
+			makeRegisteredTool(ClineDefaultTool.FILE_READ),
+			makeRegisteredTool(ClineDefaultTool.FILE_READ_RANGE),
+			makeRegisteredTool(ClineDefaultTool.APPLY_PATCH),
+			makeRegisteredTool(ClineDefaultTool.FILE_NEW),
+			makeRegisteredTool(ClineDefaultTool.BUILD_EPICS_DOCUMENT),
+			makeRegisteredTool(ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS),
+			makeRegisteredTool(ClineDefaultTool.ASK),
+			makeRegisteredTool(ClineDefaultTool.SEND_USER_MESSAGE),
+			makeRegisteredTool(ClineDefaultTool.ATTEMPT),
+			makeRegisteredTool(ClineDefaultTool.PLAN_MODE),
+			makeRegisteredTool(ClineDefaultTool.BROWSER),
+			makeRegisteredTool(ClineDefaultTool.MCP_ACCESS),
+			makeRegisteredTool(ClineDefaultTool.NEW_TASK),
+		]
+
+		const result = filterContextualNativeToolSpecs({
+			context: makeContext({
+				activePlaceholderWorkflowName: "create-epics.md",
+				activePlaceholderWorkflowStepNumber: 2,
+			}),
+			registeredTools,
+			mcpTools: [],
+		})
+
+		const keptIds = result.map((tool) => tool.id)
+		expect(keptIds).to.include.members([
+			ClineDefaultTool.LIST_FILES,
+			ClineDefaultTool.SEARCH,
+			ClineDefaultTool.FILE_READ,
+			ClineDefaultTool.FILE_READ_RANGE,
+			ClineDefaultTool.APPLY_PATCH,
+			ClineDefaultTool.FILE_NEW,
+			ClineDefaultTool.BUILD_EPICS_DOCUMENT,
+			ClineDefaultTool.ASK,
+			ClineDefaultTool.SEND_USER_MESSAGE,
+			ClineDefaultTool.ATTEMPT,
+			ClineDefaultTool.BROWSER,
+			ClineDefaultTool.MCP_ACCESS,
+			ClineDefaultTool.NEW_TASK,
+		])
+		expect(keptIds).to.not.include(ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS)
+		expect(keptIds).to.not.include(ClineDefaultTool.PLAN_MODE)
+	})
+
 	it("applies review-edge-case-hunter step 2 row and keeps only allowed prefixed Indxr tools", () => {
 		const registeredTools = [
 			makeRegisteredTool(ClineDefaultTool.LIST_FILES),

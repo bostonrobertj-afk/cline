@@ -20,6 +20,7 @@ import { access_mcp_resource_variants } from "../tools/access_mcp_resource"
 import { act_mode_respond_variants } from "../tools/act_mode_respond"
 import { ask_followup_question_variants } from "../tools/ask_followup_question"
 import { attempt_completion_variants } from "../tools/attempt_completion"
+import { build_epics_document_variants } from "../tools/build_epics_document"
 import { build_review_diff_output_variants } from "../tools/build_review_diff_output"
 import { build_review_input_variants } from "../tools/build_review_input"
 import { generate_plan_output_variants } from "../tools/generate_plan_output"
@@ -342,6 +343,11 @@ describe("workflow placeholder tool gating", () => {
 
 	it("keeps build_review_input globally available without workflow gating", () => {
 		const tool = build_review_input_variants[0]
+		expect(tool.contextRequirements).to.equal(undefined)
+	})
+
+	it("keeps build_epics_document globally available without workflow gating", () => {
+		const tool = build_epics_document_variants[0]
 		expect(tool.contextRequirements).to.equal(undefined)
 	})
 
@@ -825,6 +831,27 @@ describe("native tool placeholder replacement", () => {
 
 		expect(getOpenAIFunctionTool(openAI).description).to.equal(
 			"Build review-input.md from workflow-owned {story_path} and {diff_output}. Resolve inputs from workflow state; there are no human-supplied parameters.",
+		)
+		expect(Object.keys(openAIProperties)).to.deep.equal([])
+	})
+
+	it("compacts native build_epics_document descriptions and parameter text", () => {
+		const context: SystemPromptContext = {
+			...mockContext,
+			enableNativeToolCalls: true,
+			useMinimalGptPrompt: true,
+			providerInfo: {
+				providerId: "openai",
+				model: { id: "gpt-5.4-2026-03-05", info: { supportsPromptCache: false } },
+				mode: "act",
+			},
+		}
+
+		const openAI = toolSpecFunctionDefinition(build_epics_document_variants[0], context)
+		const openAIProperties = getOpenAIProperties(openAI)
+
+		expect(getOpenAIFunctionTool(openAI).description).to.equal(
+			"Build or resolve the canonical epics artifact at {output_folder}/planning_artifacts/epics.md from workflow-owned placeholder state. Resolve inputs from workflow state; there are no human-supplied parameters.",
 		)
 		expect(Object.keys(openAIProperties)).to.deep.equal([])
 	})

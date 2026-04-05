@@ -79,6 +79,10 @@ describe("ResponseToolRuntime", () => {
 		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.ACT_MODE)?.defaultTurnBehavior, "end_turn")
 	})
 
+	it("keeps build_epics_document registered as a non-response tool", () => {
+		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.BUILD_EPICS_DOCUMENT), undefined)
+	})
+
 	it("registers post-turn thread display states for governed response tools", () => {
 		assert.equal(
 			ResponseToolRegistry.get(ClineDefaultTool.ATTEMPT)?.threadDisplayStateAfterTurnEnds,

@@ -61,6 +61,85 @@ Continue the workflow.
 		})
 	})
 
+	it("returns a slash-command start candidate for create-epics step 1 when the workflow uses canonical directive placeholders", async () => {
+		const candidate = await resolveWorkflowFormSlashCommandStartCandidate({
+			cwd: "/workspace",
+			taskState: {
+				activePlaceholderWorkflowSource: {
+					type: "remote",
+					name: "create-epics.md",
+					contents: `# Create Epics
+
+## Step 1: (System-Owned) Confirm the input set
+Required: {architecture_document}, {prd}, {mode}
+Optional: {ux_spec}, {ui_spec}
+
+Use \`set_workflow_placeholders\` to persist the collected Step 1 inputs for this workflow before continuing.
+
+Done Signal: \`{architecture_document}\`, \`{prd}\`, and \`{mode}\` are present and non-empty in workflow placeholder state for the active task/workflow session.
+
+## Step 2: (System-Owned) Build the requirements inventory
+Build the epics scaffold.
+`,
+				},
+				currentFocusChainChecklist: "- [ ] Step 1: Confirm the input set\n- [ ] Step 2: Build the requirements inventory",
+				activePlaceholderWorkflowStableValues: {},
+				activePlaceholderWorkflowValues: {},
+			},
+			currentTurnSlashCommandAction: {
+				type: "activate_placeholder_workflow",
+				workflowId: "create-epics",
+				workflowSource: {
+					type: "remote",
+					name: "create-epics.md",
+					contents: "",
+				},
+			},
+		})
+
+		expect(candidate?.resolverId).to.equal("placeholder_workflow_start_set_workflow_placeholders")
+		expect(candidate?.initialPhase).to.equal("collect_inputs")
+		expect(candidate?.context).to.deep.equal({
+			workflowName: "create-epics.md",
+			workflowStartRequirements: {
+				requiredFieldKeys: ["architecture_document", "prd", "mode"],
+				optionalFieldKeys: ["ux_spec", "ui_spec"],
+			},
+		})
+	})
+
+	it("returns undefined for create-epics step 1 when the workflow regresses to backticked bare keys", async () => {
+		const candidate = await resolveWorkflowFormSlashCommandStartCandidate({
+			cwd: "/workspace",
+			taskState: {
+				activePlaceholderWorkflowSource: {
+					type: "remote",
+					name: "create-epics.md",
+					contents: `# Create Epics
+
+## Step 1: (System-Owned) Confirm the input set
+Required: \`architecture_document\`, \`PRD\`, \`mode\`
+Optional: \`ux_spec\`, \`ui_spec\`
+`,
+				},
+				currentFocusChainChecklist: "- [ ] Step 1: Confirm the input set",
+				activePlaceholderWorkflowStableValues: {},
+				activePlaceholderWorkflowValues: {},
+			},
+			currentTurnSlashCommandAction: {
+				type: "activate_placeholder_workflow",
+				workflowId: "create-epics",
+				workflowSource: {
+					type: "remote",
+					name: "create-epics.md",
+					contents: "",
+				},
+			},
+		})
+
+		expect(candidate).to.equal(undefined)
+	})
+
 	it("returns undefined when the current turn did not activate a placeholder workflow by slash command", async () => {
 		const candidate = await resolveWorkflowFormSlashCommandStartCandidate({
 			cwd: "/workspace",

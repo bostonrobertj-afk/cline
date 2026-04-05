@@ -16,6 +16,7 @@ import { TaskState } from "../../../TaskState"
 import { RESPONSE_TOOL_SUCCESS_MESSAGE } from "../../response/types"
 import type { TaskConfig } from "../../types/TaskConfig"
 import { AttemptCompletionHandler } from "../AttemptCompletionHandler"
+import { BuildEpicsDocumentToolHandler } from "../BuildEpicsDocumentToolHandler"
 import { BuildReviewDiffOutputToolHandler } from "../BuildReviewDiffOutputToolHandler"
 import { BuildReviewInputToolHandler } from "../BuildReviewInputToolHandler"
 import { CodeReviewSpecUpdateToolHandler } from "../CodeReviewSpecUpdateToolHandler"
@@ -269,6 +270,115 @@ index 1111111..2222222 100644
 		storyPath,
 		diffOutputPath,
 		reviewInputPath,
+	}
+}
+
+async function createBuildEpicsDocumentRepo(options?: { includeWorkflowConfig?: boolean; preexistingArtifact?: string }) {
+	const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), "build-epics-document-"))
+	const git = simpleGit(repoDir)
+	const workflowConfigPath = getCanonicalWorkflowConfigPath(repoDir)
+	const includeWorkflowConfig = options?.includeWorkflowConfig !== false
+	const templatePath = path.join(repoDir, ".cline", "skills", "bmad-create-epics-and-stories", "templates", "epics-template.md")
+	const architectureRelativePath = "docs/architecture.md"
+	const prdRelativePath = "docs/prd.md"
+	const uiSpecRelativePath = "docs/ui-spec.md"
+	const uxSpecRelativePath = "docs/ux-spec.md"
+	const architecturePath = path.join(repoDir, architectureRelativePath)
+	const prdPath = path.join(repoDir, prdRelativePath)
+	const uiSpecPath = path.join(repoDir, uiSpecRelativePath)
+	const uxSpecPath = path.join(repoDir, uxSpecRelativePath)
+	const artifactPath = path.join(repoDir, "planning", "planning_artifacts", "epics.md")
+
+	await git.init()
+	await git.addConfig("user.name", "Test User")
+	await git.addConfig("user.email", "test@example.com")
+
+	if (includeWorkflowConfig) {
+		await fs.mkdir(path.dirname(workflowConfigPath), { recursive: true })
+		await fs.writeFile(workflowConfigPath, ['output_folder: "planning"', ""].join("\n"))
+	}
+
+	await fs.mkdir(path.dirname(templatePath), { recursive: true })
+	await fs.writeFile(
+		templatePath,
+		`---
+stepsCompleted: []
+---
+
+# {{project_name}} - Epic Breakdown
+
+## Overview
+
+This document provides the complete epic and story breakdown for {{project_name}}, decomposing the requirements from the PRD, UX Design if it exists, and Architecture requirements into implementable stories.
+
+## Requirements Inventory
+
+### Functional Requirements
+
+
+### NonFunctional Requirements
+
+### Additional Requirements
+
+### UX Design Requirements
+
+### Domain-Specific Requirements
+
+## Roadmap
+
+### FR Coverage Map
+
+## Epic List
+
+<!-- Repeat for each epic in epics_list (N = 1, 2, 3...) -->
+
+## Epic {{N}}: {{epic_title_N}}
+
+
+
+`,
+	)
+
+	await fs.mkdir(path.dirname(architecturePath), { recursive: true })
+	await fs.writeFile(architecturePath, "# Architecture\n\nSystem architecture context.\n")
+	await fs.writeFile(
+		prdPath,
+		`# PRD
+
+## Functional Requirements
+
+FR1: Users can define epics from planning inputs.
+FR2: The document should preserve the template tail.
+
+## Non-Functional Requirements
+
+NFR1: Artifact generation must be deterministic.
+
+## Domain-Specific Requirements
+
+DSR1: Planning artifacts must stay inside the configured output folder.
+
+## Roadmap
+
+1. Draft epics
+2. Review coverage
+`,
+	)
+	await fs.writeFile(uiSpecPath, "# UI Spec\n\nUI notes.\n")
+	await fs.writeFile(uxSpecPath, "# UX Spec\n\nUX notes.\n")
+
+	if (options?.preexistingArtifact !== undefined) {
+		await fs.mkdir(path.dirname(artifactPath), { recursive: true })
+		await fs.writeFile(artifactPath, options.preexistingArtifact)
+	}
+
+	return {
+		repoDir,
+		architectureRelativePath,
+		prdRelativePath,
+		uiSpecRelativePath,
+		uxSpecRelativePath,
+		artifactPath,
 	}
 }
 
@@ -1902,6 +2012,330 @@ Inspect the prepared review input and write findings.`,
 		} finally {
 			sandbox.restore()
 			HostProvider.reset()
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("builds and atomically replaces planning_artifacts/epics.md from the template and PRD sections when mode=new", async () => {
+		const sandbox = sinon.createSandbox()
+		const { repoDir, architectureRelativePath, prdRelativePath, uiSpecRelativePath, uxSpecRelativePath, artifactPath } =
+			await createBuildEpicsDocumentRepo({ preexistingArtifact: "# stale\n" })
+
+		try {
+			setVscodeHostProviderMock()
+			sandbox.stub(HostProvider.workspace, "getWorkspacePaths").resolves({ paths: [repoDir] } as any)
+
+			const handler = new BuildEpicsDocumentToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "create-epics.md"
+			config.taskState.activePlaceholderWorkflowValues = {
+				mode: "new",
+				architecture_document: architectureRelativePath,
+				prd: prdRelativePath,
+				ui_spec: uiSpecRelativePath,
+				ux_spec: uxSpecRelativePath,
+			}
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "build_epics_document",
+				params: {},
+				partial: false,
+			} as any)
+
+			const payload = JSON.parse(String(result))
+			expect(payload.persisted).to.equal(true)
+			expect(payload.mode).to.equal("new")
+			expect(payload.output_file_available).to.equal(true)
+			expect(payload.artifact_path).to.equal(artifactPath)
+			expect(config.taskState.activePlaceholderWorkflowValues?.output_file).to.equal(artifactPath)
+			expect(config.taskState.activePlaceholderWorkflowTaskWriteProofPaths).to.include(artifactPath)
+
+			const artifact = await fs.readFile(artifactPath, "utf8")
+			expect(artifact).to.contain("stepsCompleted: []")
+			expect(artifact).to.contain(`Architecture: ${path.join(repoDir, architectureRelativePath)}`)
+			expect(artifact).to.contain(`PRD: ${path.join(repoDir, prdRelativePath)}`)
+			expect(artifact).to.contain("UI/UX:")
+			expect(artifact).to.contain(`- ${path.join(repoDir, uiSpecRelativePath)}`)
+			expect(artifact).to.contain(`- ${path.join(repoDir, uxSpecRelativePath)}`)
+			expect(artifact).to.not.contain("inputDocuments:")
+			expect(artifact).to.contain("### Functional Requirements")
+			expect(artifact).to.contain("FR1:")
+			expect(artifact).to.contain("### NonFunctional Requirements")
+			expect(artifact).to.contain("NFR1:")
+			expect(artifact).to.contain("### Additional Requirements")
+			expect(artifact).to.contain("### UX Design Requirements")
+			expect(artifact).to.contain("### Domain-Specific Requirements")
+			expect(artifact).to.contain("## Roadmap")
+			expect(artifact).to.contain("### FR Coverage Map")
+			expect(artifact).to.contain("## Epic {{N}}: {{epic_title_N}}")
+			expect(artifact).to.contain(
+				`### Additional Requirements
+
+### UX Design Requirements
+
+### Domain-Specific Requirements`,
+			)
+		} finally {
+			sandbox.restore()
+			HostProvider.reset()
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("omits UI/UX frontmatter when optional workflow inputs are absent for build_epics_document", async () => {
+		const sandbox = sinon.createSandbox()
+		const { repoDir, architectureRelativePath, prdRelativePath, artifactPath } = await createBuildEpicsDocumentRepo({
+			preexistingArtifact: "# stale\n",
+		})
+
+		try {
+			setVscodeHostProviderMock()
+			sandbox.stub(HostProvider.workspace, "getWorkspacePaths").resolves({ paths: [repoDir] } as any)
+
+			const handler = new BuildEpicsDocumentToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "create-epics.md"
+			config.taskState.activePlaceholderWorkflowValues = {
+				mode: "new",
+				architecture_document: architectureRelativePath,
+				prd: prdRelativePath,
+			}
+
+			await handler.execute(config, {
+				type: "tool_use",
+				name: "build_epics_document",
+				params: {},
+				partial: false,
+			} as any)
+
+			const artifact = await fs.readFile(artifactPath, "utf8")
+			expect(artifact).to.contain("stepsCompleted: []")
+			expect(artifact).to.contain(`Architecture: ${path.join(repoDir, architectureRelativePath)}`)
+			expect(artifact).to.contain(`PRD: ${path.join(repoDir, prdRelativePath)}`)
+			expect(artifact).to.not.contain("UI/UX:")
+			expect(artifact).to.not.contain("inputDocuments:")
+		} finally {
+			sandbox.restore()
+			HostProvider.reset()
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("resolves the canonical epics artifact and sets output_file when mode=continue", async () => {
+		const sandbox = sinon.createSandbox()
+		const { repoDir, architectureRelativePath, prdRelativePath, artifactPath } = await createBuildEpicsDocumentRepo({
+			preexistingArtifact: "# existing epics\n",
+		})
+
+		try {
+			setVscodeHostProviderMock()
+			sandbox.stub(HostProvider.workspace, "getWorkspacePaths").resolves({ paths: [repoDir] } as any)
+
+			const handler = new BuildEpicsDocumentToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "create-epics.md"
+			config.taskState.activePlaceholderWorkflowValues = {
+				mode: "continue",
+				architecture_document: architectureRelativePath,
+				prd: prdRelativePath,
+			}
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "build_epics_document",
+				params: {},
+				partial: false,
+			} as any)
+
+			const payload = JSON.parse(String(result))
+			expect(payload.persisted).to.equal(false)
+			expect(payload.mode).to.equal("continue")
+			expect(payload.output_file_available).to.equal(true)
+			expect(payload.artifact_path).to.equal(artifactPath)
+			expect(config.taskState.activePlaceholderWorkflowValues?.output_file).to.equal(artifactPath)
+			expect(await fs.readFile(artifactPath, "utf8")).to.equal("# existing epics\n")
+			expect(config.taskState.activePlaceholderWorkflowTaskWriteProofPaths).to.deep.equal([])
+		} finally {
+			sandbox.restore()
+			HostProvider.reset()
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("requires mode from merged placeholder state for build_epics_document", async () => {
+		const { repoDir, architectureRelativePath, prdRelativePath } = await createBuildEpicsDocumentRepo()
+
+		try {
+			const handler = new BuildEpicsDocumentToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "create-epics.md"
+			config.taskState.activePlaceholderWorkflowValues = {
+				architecture_document: architectureRelativePath,
+				prd: prdRelativePath,
+			}
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "build_epics_document",
+				params: {},
+				partial: false,
+			} as any)
+
+			expect(result).to.equal(
+				formatResponse.toolError(
+					"Could not resolve workflow placeholder 'mode' from the active placeholder workflow state.",
+				),
+			)
+		} finally {
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("rejects unsupported mode values for build_epics_document", async () => {
+		const { repoDir, architectureRelativePath, prdRelativePath } = await createBuildEpicsDocumentRepo()
+
+		try {
+			const handler = new BuildEpicsDocumentToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "create-epics.md"
+			config.taskState.activePlaceholderWorkflowValues = {
+				mode: "resume",
+				architecture_document: architectureRelativePath,
+				prd: prdRelativePath,
+			}
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "build_epics_document",
+				params: {},
+				partial: false,
+			} as any)
+
+			expect(result).to.equal(
+				formatResponse.toolError('Unsupported workflow mode "resume". Supported values: new, continue.'),
+			)
+		} finally {
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("requires architecture_document from merged placeholder state for build_epics_document", async () => {
+		const { repoDir, prdRelativePath } = await createBuildEpicsDocumentRepo()
+
+		try {
+			const handler = new BuildEpicsDocumentToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "create-epics.md"
+			config.taskState.activePlaceholderWorkflowValues = {
+				mode: "new",
+				prd: prdRelativePath,
+			}
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "build_epics_document",
+				params: {},
+				partial: false,
+			} as any)
+
+			expect(result).to.equal(
+				formatResponse.toolError(
+					"Could not resolve workflow placeholder 'architecture_document' from the active placeholder workflow state.",
+				),
+			)
+		} finally {
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("requires prd from merged placeholder state for build_epics_document", async () => {
+		const { repoDir, architectureRelativePath } = await createBuildEpicsDocumentRepo()
+
+		try {
+			const handler = new BuildEpicsDocumentToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "create-epics.md"
+			config.taskState.activePlaceholderWorkflowValues = {
+				mode: "new",
+				architecture_document: architectureRelativePath,
+			}
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "build_epics_document",
+				params: {},
+				partial: false,
+			} as any)
+
+			expect(result).to.equal(
+				formatResponse.toolError(
+					"Could not resolve workflow placeholder 'prd' from the active placeholder workflow state.",
+				),
+			)
+		} finally {
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("requires output_folder from workflow-config stable placeholders for build_epics_document", async () => {
+		const { repoDir, architectureRelativePath, prdRelativePath } = await createBuildEpicsDocumentRepo({
+			includeWorkflowConfig: false,
+		})
+
+		try {
+			const handler = new BuildEpicsDocumentToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "create-epics.md"
+			config.taskState.activePlaceholderWorkflowValues = {
+				mode: "new",
+				architecture_document: architectureRelativePath,
+				prd: prdRelativePath,
+			}
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "build_epics_document",
+				params: {},
+				partial: false,
+			} as any)
+
+			expect(result).to.equal(
+				formatResponse.toolError(
+					"Could not resolve stable placeholder 'output_folder' from .cline/workflow-config.yaml.",
+				),
+			)
+		} finally {
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("fails continue mode when the canonical epics artifact does not exist", async () => {
+		const { repoDir, architectureRelativePath, prdRelativePath, artifactPath } = await createBuildEpicsDocumentRepo()
+
+		try {
+			const handler = new BuildEpicsDocumentToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "create-epics.md"
+			config.taskState.activePlaceholderWorkflowValues = {
+				mode: "continue",
+				architecture_document: architectureRelativePath,
+				prd: prdRelativePath,
+			}
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "build_epics_document",
+				params: {},
+				partial: false,
+			} as any)
+
+			expect(result).to.equal(
+				formatResponse.toolError(
+					`Could not continue create-epics workflow because the canonical epics artifact does not exist at ${artifactPath}.`,
+				),
+			)
+		} finally {
 			await fs.rm(repoDir, { recursive: true, force: true })
 		}
 	})

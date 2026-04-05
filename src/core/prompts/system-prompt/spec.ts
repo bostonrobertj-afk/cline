@@ -485,6 +485,8 @@ function getNativeToolDescription(tool: ClineToolSpec, context: SystemPromptCont
 			return "Build and atomically replace {diff_output} from an explicit Git-backed source. Use for code-review diff artifact construction, not for arbitrary file writes."
 		case "build_review_input":
 			return "Build review-input.md from workflow-owned {story_path} and {diff_output}. Resolve inputs from workflow state; there are no human-supplied parameters."
+		case "build_epics_document":
+			return "Build or resolve the canonical epics artifact at {output_folder}/planning_artifacts/epics.md from workflow-owned placeholder state. Resolve inputs from workflow state; there are no human-supplied parameters."
 		case "use_skill":
 			return "Activate a skill by exact name when the request matches an available skill."
 		case "use_mcp_tool":

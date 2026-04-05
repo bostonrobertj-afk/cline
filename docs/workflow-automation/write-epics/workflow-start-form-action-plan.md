@@ -11,6 +11,16 @@ instructions:
 
 # create-epics workflow-start form action plan
 
+## Supersession
+
+The field-level dictionary-entry contract and UI prescribed in Steps 2-4 of this plan were authored without explicit user approval and are superseded by [workflow-start-form-remediation-action-plan.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/workflow-automation/write-epics/workflow-start-form-remediation-action-plan.md).
+
+For `create-epics.md`, preserve the existing workflow-form UX pattern:
+
+- keep the form-level `Open inputs reference` affordance
+- keep field labels and inline help as plain text
+- do not add field-level clickable dictionary elements in this pass
+
 ## Scope
 
 This plan implements the workflow-start form buildout for [`create-epics.md`](/Users/robertboston/Documents/Cline/Workflows/create-epics.md) using the existing slash-command placeholder-workflow path and the existing `placeholder_workflow_start_set_workflow_placeholders` resolver.
@@ -19,7 +29,7 @@ This plan is intentionally limited to:
 
 - Step 1 workflow authoring for the start-form parser
 - workflow-start override wiring for `create-epics.md`
-- field-level dictionary-entry support needed by this form
+- preserving the existing form-level dictionary reference UX for this form
 - focused trigger, registry, persistence, and webview regressions
 
 This plan does **not** implement:
@@ -64,11 +74,8 @@ This plan does **not** implement:
   - `Inputs for This Workflow`
 - The workflow-specific start-form prompt is exactly:
   - `Provide the following to start the workflow:`
-- The field-level dictionary behavior for this pass is:
-  - the field label itself is the clickable affordance
-  - clicking the label opens a read-only dialog for that field's dictionary entry
-  - no additional per-field helper-link copy is introduced
-- The field-level dictionary keys are exactly the same as the workflow placeholder keys listed above.
+- The existing form-level `Open inputs reference` affordance remains the only approved dictionary-access path for this pass.
+- This pass must not add a new field-level clickable dictionary affordance.
 - `mode` remains a text field. This plan must not introduce a workflow-specific dropdown.
 
 ## String-contract audit
@@ -99,7 +106,7 @@ Use these exact strings everywhere in this plan:
   - `/absolute/path/to/ux-spec.md`
   - `/absolute/path/to/ui-spec.md`
 
-[ ] Step 1: Reauthor `create-epics.md` Step 1 so the live workflow-start parser can discover the form and the fallback instructions stay usable.
+[x] Step 1: Reauthor `create-epics.md` Step 1 so the live workflow-start parser can discover the form and the fallback instructions stay usable.
 Allowed files:
 - `/Users/robertboston/Documents/Cline/Workflows/create-epics.md`
 
@@ -117,7 +124,7 @@ Done Signal: `{architecture_document}`, `{prd}`, and `{mode}` are present and no
 
 Do not change Step 2 or later workflow text in this step.
 
-[ ] Step 2: Extend the shared workflow-form field contract and system dictionary so workflow-start fields can carry clickable per-field dictionary entries for `create-epics.md`.
+[x] Step 2: Extend the shared workflow-form field contract and system dictionary so workflow-start fields can carry clickable per-field dictionary entries for `create-epics.md`.
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/shared/ExtensionMessage.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/dictionaries/systemDictionary.ts`
@@ -221,7 +228,7 @@ export function renderSystemDictionaryEntryMarkdown(key: WorkflowFormSystemDicti
 
 In `renderSystemDictionaryMarkdown()`, replace the inline per-entry line-building block with a call to `renderSystemDictionaryEntryMarkdown(key).trimEnd()` so the single-entry renderer is the only source of truth for entry markdown formatting.
 
-[ ] Step 3: Add the `create-epics.md` workflow-start override and bind each field to its system-dictionary entry without changing the shared trigger path.
+[x] Step 3: Add the `create-epics.md` workflow-start override and bind each field to its system-dictionary entry without changing the shared trigger path.
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRegistry.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRegistry.test.ts`
@@ -344,7 +351,7 @@ In [`WorkflowFormRegistry.test.ts:11`](/Users/robertboston/Documents/Cline%20Ext
 }
 ```
 
-[ ] Step 4: Render field-level dictionary-entry dialogs in the workflow-form UI by making the field label itself the clickable affordance.
+[x] Step 4: Render field-level dictionary-entry dialogs in the workflow-form UI by making the field label itself the clickable affordance.
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/webview-ui/src/components/chat/ChatRow.tsx`
 - `/Users/robertboston/Documents/Cline Extension/cline/webview-ui/src/components/chat/ChatRow.test.tsx`
@@ -407,7 +414,7 @@ In [`ChatRow.test.tsx:377`](/Users/robertboston/Documents/Cline%20Extension/clin
   - assert the dialog title `Architecture Document` appears
   - assert the dialog body includes `architecture_document`
 
-[ ] Step 5: Add focused start-form trigger and persistence regressions for `create-epics.md`, then run the exact verification commands and final string-contract audit.
+[x] Step 5: Add focused start-form trigger and persistence regressions for `create-epics.md`, then run the exact verification commands and final string-contract audit.
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormTriggerRegistry.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/placeholderWorkflowPersistence.test.ts`

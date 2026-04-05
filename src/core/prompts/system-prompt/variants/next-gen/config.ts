@@ -73,6 +73,7 @@ export const config = createVariant(ModelFamily.NEXT_GEN)
 		ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
 		ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT,
 		ClineDefaultTool.BUILD_REVIEW_INPUT,
+		ClineDefaultTool.BUILD_EPICS_DOCUMENT,
 		ClineDefaultTool.STORY_TASK_REMINDER,
 		ClineDefaultTool.STORY_TASK_COMPLETE,
 		ClineDefaultTool.STORY_NOTES_UPDATE,
