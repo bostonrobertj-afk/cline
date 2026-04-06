@@ -37,6 +37,7 @@ export const WORKFLOW_PERSONA_BY_WORKFLOW: Record<string, WorkflowPersonaId | un
 	"generate-project-context.md": "analyst",
 	"index-docs.md": "tech-writer",
 	"market-research.md": "analyst",
+	"pi-planning.md": "scrum-master",
 	"qa-generate-e2e-tests.md": "quality-control",
 	"quick-dev-new-preview.md": "quick-flow-solo-dev",
 	"quick-dev.md": "quick-flow-solo-dev",

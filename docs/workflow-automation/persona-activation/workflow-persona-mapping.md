@@ -56,6 +56,7 @@ This document inventories every placeholder workflow currently present in `/User
 | `help.md` | `unassigned` | No unique current automatic owner. |
 | `index-docs.md` | `tech-writer` | Preserves current unique owner (`bmad-tech-writer`). |
 | `market-research.md` | `analyst` | Preserves current unique owner (`bmad-analyst`). |
+| `pi-planning.md` | `scrum-master` | New explicit mapping. |
 | `qa-generate-e2e-tests.md` | `quality-control` | Preserves current unique owner (`bmad-qa`). |
 | `quick-dev-new-preview.md` | `quick-flow-solo-dev` | Preserves current unique owner (`bmad-quick-flow-solo-dev`). |
 | `quick-dev.md` | `quick-flow-solo-dev` | Preserves current unique owner (`bmad-quick-flow-solo-dev`). |

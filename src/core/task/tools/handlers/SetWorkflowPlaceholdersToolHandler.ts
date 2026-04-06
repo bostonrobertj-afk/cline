@@ -93,6 +93,28 @@ export interface WorkflowPlaceholderPersistenceResult {
 	nextStepGuidance: string
 }
 
+function applyGenericWorkflowPlaceholders(
+	workflowId: string,
+	currentStablePlaceholders: Record<string, string> | undefined,
+	currentPlaceholders: Record<string, string> | undefined,
+	values: Record<string, unknown>,
+) {
+	const syntheticRun: ManagedWorkflowRunState = {
+		workflowId,
+		slashCommand: workflowId,
+		status: "active",
+		currentPhaseIndex: 0,
+		phases: [],
+		createdAt: 0,
+		updatedAt: 0,
+		allRequiredComplete: false,
+		stablePlaceholders: currentStablePlaceholders,
+		dynamicPlaceholders: currentPlaceholders,
+	}
+
+	return applyManagedWorkflowDynamicPlaceholders(syntheticRun, values)
+}
+
 export async function persistWorkflowPlaceholderValues(
 	config: TaskConfig,
 	values: Record<string, unknown>,
@@ -133,8 +155,7 @@ export async function persistWorkflowPlaceholderValues(
 			throw new Error("No active workflow with placeholder support is currently active.")
 		}
 
-		const handler = new SetWorkflowPlaceholdersToolHandler()
-		const genericResult = handler.applyGenericWorkflowPlaceholders(
+		const genericResult = applyGenericWorkflowPlaceholders(
 			genericWorkflowId,
 			config.taskState.activePlaceholderWorkflowStableValues,
 			config.taskState.activePlaceholderWorkflowValues,
@@ -188,28 +209,6 @@ export async function persistWorkflowPlaceholderValues(
 
 export class SetWorkflowPlaceholdersToolHandler implements IToolHandler, IPartialBlockHandler {
 	readonly name = ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS
-
-	private applyGenericWorkflowPlaceholders(
-		workflowId: string,
-		currentStablePlaceholders: Record<string, string> | undefined,
-		currentPlaceholders: Record<string, string> | undefined,
-		values: Record<string, unknown>,
-	) {
-		const syntheticRun: ManagedWorkflowRunState = {
-			workflowId,
-			slashCommand: workflowId,
-			status: "active",
-			currentPhaseIndex: 0,
-			phases: [],
-			createdAt: 0,
-			updatedAt: 0,
-			allRequiredComplete: false,
-			stablePlaceholders: currentStablePlaceholders,
-			dynamicPlaceholders: currentPlaceholders,
-		}
-
-		return applyManagedWorkflowDynamicPlaceholders(syntheticRun, values)
-	}
 
 	getDescription(block: ToolUse): string {
 		const values = getWorkflowPlaceholderValues(block)

@@ -8,6 +8,7 @@ import { ApplyPatchHandler } from "./handlers/ApplyPatchHandler"
 import { AskFollowupQuestionToolHandler } from "./handlers/AskFollowupQuestionToolHandler"
 import { AttemptCompletionHandler } from "./handlers/AttemptCompletionHandler"
 import { BrowserToolHandler } from "./handlers/BrowserToolHandler"
+import { BuildEpicDeliverySpecToolHandler } from "./handlers/BuildEpicDeliverySpecToolHandler"
 import { BuildEpicsDocumentToolHandler } from "./handlers/BuildEpicsDocumentToolHandler"
 import { BuildReviewDiffOutputToolHandler } from "./handlers/BuildReviewDiffOutputToolHandler"
 import { BuildReviewInputToolHandler } from "./handlers/BuildReviewInputToolHandler"
@@ -127,6 +128,7 @@ export class ToolExecutorCoordinator {
 		[ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT]: (_v: ToolValidator) => new BuildReviewDiffOutputToolHandler(),
 		[ClineDefaultTool.BUILD_REVIEW_INPUT]: (_v: ToolValidator) => new BuildReviewInputToolHandler(),
 		[ClineDefaultTool.BUILD_EPICS_DOCUMENT]: (_v: ToolValidator) => new BuildEpicsDocumentToolHandler(),
+		[ClineDefaultTool.BUILD_EPIC_DELIVERY_SPEC]: (_v: ToolValidator) => new BuildEpicDeliverySpecToolHandler(),
 		[ClineDefaultTool.SELECT_TARGET_EPIC]: (_v: ToolValidator) => new SelectTargetEpicToolHandler(),
 		[ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE]: (_v: ToolValidator) => new CodeReviewSpecUpdateToolHandler(),
 		[ClineDefaultTool.STORY_TASK_REMINDER]: (_v: ToolValidator) => new StoryTaskReminderToolHandler(),

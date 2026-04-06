@@ -6,6 +6,7 @@ import { apply_patch_variants } from "./apply_patch"
 import { ask_followup_question_variants } from "./ask_followup_question"
 import { attempt_completion_variants } from "./attempt_completion"
 import { browser_action_variants } from "./browser_action"
+import { build_epic_delivery_spec_variants } from "./build_epic_delivery_spec"
 import { build_epics_document_variants } from "./build_epics_document"
 import { build_review_diff_output_variants } from "./build_review_diff_output"
 import { build_review_input_variants } from "./build_review_input"
@@ -53,6 +54,7 @@ export function registerClineToolSets(): void {
 		...build_review_diff_output_variants,
 		...build_review_input_variants,
 		...build_epics_document_variants,
+		...build_epic_delivery_spec_variants,
 		...complete_workflow_item_variants,
 		...execute_command_variants,
 		...focus_chain_variants,

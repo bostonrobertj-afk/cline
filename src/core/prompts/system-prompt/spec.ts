@@ -489,6 +489,8 @@ function getNativeToolDescription(tool: ClineToolSpec, context: SystemPromptCont
 			return "Build review-input.md from workflow-owned {story_path} and {diff_output}. Resolve inputs from workflow state; there are no human-supplied parameters."
 		case "build_epics_document":
 			return "Build or resolve the canonical epics artifact at {output_folder}/planning_artifacts/epics.md from workflow-owned placeholder state. Resolve inputs from workflow state; there are no human-supplied parameters."
+		case "build_epic_delivery_spec":
+			return "Build the canonical pi-planning Step 3 delivery spec at {output_folder}/implementation-artifacts/epic-<number>-delivery-spec.md from workflow-owned placeholder state. Resolve {epics_document} and {target_epic} from workflow state, preserve the full template structure, and persist the resolved artifact path as {epic_delivery_spec}."
 		case "select_target_epic":
 			return "Show the runtime-owned pi-planning Step 2 epic picker. Resolve {epics_document} from workflow state, extract canonical epic headings, ask the exact runtime-owned followup question, and persist the clicked label as {target_epic}."
 		case "use_skill":

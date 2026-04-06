@@ -301,6 +301,144 @@ describe("filterContextualNativeToolSpecs", () => {
 		expect(keptIds).to.not.include(ClineDefaultTool.PLAN_MODE)
 	})
 
+	it("applies pi-planning step 3 row and keeps only the delivery-spec builder plus preserved tools", () => {
+		const registeredTools = [
+			makeRegisteredTool(ClineDefaultTool.BUILD_EPIC_DELIVERY_SPEC),
+			makeRegisteredTool(ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS),
+			makeRegisteredTool(ClineDefaultTool.LIST_FILES),
+			makeRegisteredTool(ClineDefaultTool.SEARCH),
+			makeRegisteredTool(ClineDefaultTool.FILE_READ),
+			makeRegisteredTool(ClineDefaultTool.FILE_READ_RANGE),
+			makeRegisteredTool(ClineDefaultTool.ASK),
+			makeRegisteredTool(ClineDefaultTool.SEND_USER_MESSAGE),
+			makeRegisteredTool(ClineDefaultTool.ATTEMPT),
+			makeRegisteredTool(ClineDefaultTool.PLAN_MODE),
+			makeRegisteredTool(ClineDefaultTool.BROWSER),
+			makeRegisteredTool(ClineDefaultTool.MCP_ACCESS),
+			makeRegisteredTool(ClineDefaultTool.NEW_TASK),
+		]
+
+		const result = filterContextualNativeToolSpecs({
+			context: makeContext({
+				activePlaceholderWorkflowName: "pi-planning.md",
+				activePlaceholderWorkflowStepNumber: 3,
+			}),
+			registeredTools,
+			mcpTools: [],
+		})
+
+		const keptIds = result.map((tool) => tool.id)
+		expect(keptIds).to.include.members([
+			ClineDefaultTool.BUILD_EPIC_DELIVERY_SPEC,
+			ClineDefaultTool.ASK,
+			ClineDefaultTool.SEND_USER_MESSAGE,
+			ClineDefaultTool.ATTEMPT,
+			ClineDefaultTool.BROWSER,
+			ClineDefaultTool.MCP_ACCESS,
+			ClineDefaultTool.NEW_TASK,
+		])
+		expect(keptIds).to.not.include(ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS)
+		expect(keptIds).to.not.include(ClineDefaultTool.LIST_FILES)
+		expect(keptIds).to.not.include(ClineDefaultTool.FILE_READ)
+		expect(keptIds).to.not.include(ClineDefaultTool.PLAN_MODE)
+	})
+
+	it("applies pi-planning step 4 row and keeps workflow_progress_request without doc read or write bundles", () => {
+		const registeredTools = [
+			makeRegisteredTool(ClineDefaultTool.LIST_FILES),
+			makeRegisteredTool(ClineDefaultTool.SEARCH),
+			makeRegisteredTool(ClineDefaultTool.FILE_READ),
+			makeRegisteredTool(ClineDefaultTool.FILE_READ_RANGE),
+			makeRegisteredTool(ClineDefaultTool.APPLY_PATCH),
+			makeRegisteredTool(ClineDefaultTool.FILE_NEW),
+			makeRegisteredTool(ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST),
+			makeRegisteredTool(ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS),
+			makeRegisteredTool(ClineDefaultTool.ASK),
+			makeRegisteredTool(ClineDefaultTool.SEND_USER_MESSAGE),
+			makeRegisteredTool(ClineDefaultTool.ATTEMPT),
+			makeRegisteredTool(ClineDefaultTool.PLAN_MODE),
+			makeRegisteredTool(ClineDefaultTool.BROWSER),
+			makeRegisteredTool(ClineDefaultTool.MCP_ACCESS),
+			makeRegisteredTool(ClineDefaultTool.NEW_TASK),
+		]
+
+		const result = filterContextualNativeToolSpecs({
+			context: makeContext({
+				activePlaceholderWorkflowName: "pi-planning.md",
+				activePlaceholderWorkflowStepNumber: 4,
+			}),
+			registeredTools,
+			mcpTools: [],
+		})
+
+		const keptIds = result.map((tool) => tool.id)
+		expect(keptIds).to.include.members([
+			ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST,
+			ClineDefaultTool.ASK,
+			ClineDefaultTool.SEND_USER_MESSAGE,
+			ClineDefaultTool.ATTEMPT,
+			ClineDefaultTool.BROWSER,
+			ClineDefaultTool.MCP_ACCESS,
+			ClineDefaultTool.NEW_TASK,
+		])
+		expect(keptIds).to.not.include(ClineDefaultTool.LIST_FILES)
+		expect(keptIds).to.not.include(ClineDefaultTool.SEARCH)
+		expect(keptIds).to.not.include(ClineDefaultTool.FILE_READ)
+		expect(keptIds).to.not.include(ClineDefaultTool.FILE_READ_RANGE)
+		expect(keptIds).to.not.include(ClineDefaultTool.APPLY_PATCH)
+		expect(keptIds).to.not.include(ClineDefaultTool.FILE_NEW)
+		expect(keptIds).to.not.include(ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS)
+		expect(keptIds).to.not.include(ClineDefaultTool.PLAN_MODE)
+	})
+
+	it("applies pi-planning step 5 row and keeps workflow_progress_request with document read and write bundles", () => {
+		const registeredTools = [
+			makeRegisteredTool(ClineDefaultTool.LIST_FILES),
+			makeRegisteredTool(ClineDefaultTool.SEARCH),
+			makeRegisteredTool(ClineDefaultTool.FILE_READ),
+			makeRegisteredTool(ClineDefaultTool.FILE_READ_RANGE),
+			makeRegisteredTool(ClineDefaultTool.APPLY_PATCH),
+			makeRegisteredTool(ClineDefaultTool.FILE_NEW),
+			makeRegisteredTool(ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST),
+			makeRegisteredTool(ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS),
+			makeRegisteredTool(ClineDefaultTool.ASK),
+			makeRegisteredTool(ClineDefaultTool.SEND_USER_MESSAGE),
+			makeRegisteredTool(ClineDefaultTool.ATTEMPT),
+			makeRegisteredTool(ClineDefaultTool.PLAN_MODE),
+			makeRegisteredTool(ClineDefaultTool.BROWSER),
+			makeRegisteredTool(ClineDefaultTool.MCP_ACCESS),
+			makeRegisteredTool(ClineDefaultTool.NEW_TASK),
+		]
+
+		const result = filterContextualNativeToolSpecs({
+			context: makeContext({
+				activePlaceholderWorkflowName: "pi-planning.md",
+				activePlaceholderWorkflowStepNumber: 5,
+			}),
+			registeredTools,
+			mcpTools: [],
+		})
+
+		const keptIds = result.map((tool) => tool.id)
+		expect(keptIds).to.include.members([
+			ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST,
+			ClineDefaultTool.LIST_FILES,
+			ClineDefaultTool.SEARCH,
+			ClineDefaultTool.FILE_READ,
+			ClineDefaultTool.FILE_READ_RANGE,
+			ClineDefaultTool.APPLY_PATCH,
+			ClineDefaultTool.FILE_NEW,
+			ClineDefaultTool.ASK,
+			ClineDefaultTool.SEND_USER_MESSAGE,
+			ClineDefaultTool.ATTEMPT,
+			ClineDefaultTool.BROWSER,
+			ClineDefaultTool.MCP_ACCESS,
+			ClineDefaultTool.NEW_TASK,
+		])
+		expect(keptIds).to.not.include(ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS)
+		expect(keptIds).to.not.include(ClineDefaultTool.PLAN_MODE)
+	})
+
 	it("applies create-epics step 3 row and keeps workflow_progress_request with workflow routing tools", () => {
 		const registeredTools = [
 			makeRegisteredTool(ClineDefaultTool.LIST_FILES),

@@ -36,12 +36,12 @@ Gathers required inputs `epics_document`, `architecture_document` and optionally
 - When user clicks one of the epics' buttons, that epic name is set as the `target_epic` variable for the session.
 
 # Step 3 Automation
-[ ] requirements doc
-[ ] action plan
-[ ] implementation
-[ ] QA
+[x] requirements doc
+[x] action plan
+[x] implementation
+[x] QA
 - Reference document: /Users/robertboston/Documents/Cline%20Extension/cline/docs/tools-reference/how-to-add-a-tool.md
-- Persists an epic delivery document in `{output_folder}/implementation-artifacts` using naming convention `target_epic-delivery-spec.md` using `{project_root}/cline/.cline/skills/create-epics/epic-delivery-spec-template.md` as the template.
+- Persists an epic delivery document in `{output_folder}/implementation-artifacts` using naming convention `epic#-delivery-spec.md` using `{project_root}/cline/.cline/skills/create-epics/epic-delivery-spec-template.md` as the template.
 Extracts the following from `{epics_document}` for `{target_epic}`:
   - Objective
   - Description
@@ -53,10 +53,10 @@ includes the extracted content in the new epic delivery spec.
 Then, sets the full file path of the delivery spec as `epic_delivery_spec` variable for this session.
 
 # Contextual Tool Matrix
-[ ] requirements doc
-[ ] action plan
-[ ] implementation
-[ ] QA
+[x] requirements doc
+[x] action plan
+[x] implementation
+[x] QA
 - Defines allowed native tools for each step of this workflow
 - Must include workflow_progress_request for steps 4 and 5.
 - step exposure in contextualToolMatrix.ts (line 179)

@@ -16,6 +16,7 @@ import { TaskState } from "../../../TaskState"
 import { RESPONSE_TOOL_SUCCESS_MESSAGE } from "../../response/types"
 import type { TaskConfig } from "../../types/TaskConfig"
 import { AttemptCompletionHandler } from "../AttemptCompletionHandler"
+import { BuildEpicDeliverySpecToolHandler } from "../BuildEpicDeliverySpecToolHandler"
 import { BuildEpicsDocumentToolHandler } from "../BuildEpicsDocumentToolHandler"
 import { BuildReviewDiffOutputToolHandler } from "../BuildReviewDiffOutputToolHandler"
 import { BuildReviewInputToolHandler } from "../BuildReviewInputToolHandler"
@@ -378,6 +379,102 @@ DSR1: Planning artifacts must stay inside the configured output folder.
 		prdRelativePath,
 		uiSpecRelativePath,
 		uxSpecRelativePath,
+		artifactPath,
+	}
+}
+
+async function createBuildEpicDeliverySpecRepo(options?: {
+	includeWorkflowConfig?: boolean
+	preexistingArtifact?: string
+	omitRequiredSection?: "Objective" | "Description" | "Success Measures" | "Scope" | "Scope Boundary"
+	selectedEpicMissing?: boolean
+}) {
+	const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), "build-epic-delivery-spec-"))
+	const workflowConfigPath = getCanonicalWorkflowConfigPath(repoDir)
+	const includeWorkflowConfig = options?.includeWorkflowConfig !== false
+	const epicsRelativePath = "docs/epics.md"
+	const epicsPath = path.join(repoDir, epicsRelativePath)
+	const templatePath = path.join(repoDir, ".cline", "skills", "create-epics", "epic-delivery-spec-template.md")
+	const artifactPath = path.join(repoDir, "planning", "implementation-artifacts", "epic-3-delivery-spec.md")
+
+	if (includeWorkflowConfig) {
+		await fs.mkdir(path.dirname(workflowConfigPath), { recursive: true })
+		await fs.writeFile(workflowConfigPath, ['output_folder: "planning"', ""].join("\n"))
+	}
+
+	await fs.mkdir(path.dirname(templatePath), { recursive: true })
+	await fs.writeFile(
+		templatePath,
+		`# Epic Name
+
+### Epic #: Epic_Name
+
+#### Objective
+As a Product Owner
+I want
+So that
+
+#### Description
+
+
+#### Success Measures
+
+
+#### Scope
+
+
+#### Scope Boundary
+
+# User Stories
+
+## Story #
+<!-- Repeat this block for each epic -->
+
+### Objective
+As a
+I want
+so that
+
+### Acceptance Criteria
+
+### Sequencing/ Dependencies
+`,
+	)
+
+	const epicThreeSections = [
+		options?.omitRequiredSection === "Objective" ? undefined : "#### Objective\nDeliver checkout.\n",
+		options?.omitRequiredSection === "Description" ? undefined : "#### Description\nDetailed checkout description.\n",
+		options?.omitRequiredSection === "Success Measures" ? undefined : "#### Success Measures\n- Conversion improves.\n",
+		options?.omitRequiredSection === "Scope" ? undefined : "#### Scope\n- Checkout flow.\n",
+		options?.omitRequiredSection === "Scope Boundary" ? undefined : "#### Scope Boundary\n- No post-purchase changes.\n",
+	]
+		.filter((section): section is string => typeof section === "string")
+		.join("\n")
+
+	await fs.mkdir(path.dirname(epicsPath), { recursive: true })
+	await fs.writeFile(
+		epicsPath,
+		`# Epics
+
+### Epic List
+
+### Epic 2: Catalog
+
+### Epic 3: Checkout
+${options?.selectedEpicMissing === true ? "" : `\n${epicThreeSections}`}
+`,
+	)
+
+	if (options?.preexistingArtifact !== undefined) {
+		await fs.mkdir(path.dirname(artifactPath), { recursive: true })
+		await fs.writeFile(artifactPath, options.preexistingArtifact)
+	}
+
+	return {
+		repoDir,
+		epicsRelativePath,
+		epicsPath,
+		templatePath,
 		artifactPath,
 	}
 }
@@ -2336,6 +2433,326 @@ Inspect the prepared review input and write findings.`,
 				),
 			)
 		} finally {
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("builds the canonical epic delivery spec from the full template and persists epic_delivery_spec", async () => {
+		const sandbox = sinon.createSandbox()
+		const { repoDir, epicsRelativePath, artifactPath } = await createBuildEpicDeliverySpecRepo({
+			preexistingArtifact: "# stale\n",
+		})
+
+		try {
+			setVscodeHostProviderMock()
+			sandbox.stub(HostProvider.workspace, "getWorkspacePaths").resolves({ paths: [repoDir] } as any)
+
+			const handler = new BuildEpicDeliverySpecToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "pi-planning.md"
+			config.taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "pi-planning.md",
+				contents: "## Step 3: Build Epic Delivery Spec\nBuild the canonical delivery spec.\n",
+			}
+			config.taskState.currentFocusChainChecklist =
+				"- [x] Step 1: Gather Requirements\n- [x] Step 2: Identify Target Epic\n- [ ] Step 3: Build Epic Delivery Spec"
+			config.taskState.activePlaceholderWorkflowValues = {
+				epics_document: epicsRelativePath,
+				target_epic: "Epic 3: Checkout",
+			}
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "build_epic_delivery_spec",
+				params: {},
+				partial: false,
+			} as any)
+
+			const payload = JSON.parse(String(result))
+			expect(payload.persisted).to.equal(true)
+			expect(payload.artifact_path).to.equal(artifactPath)
+			expect(payload.epic_delivery_spec_available).to.equal(true)
+			expect(config.taskState.activePlaceholderWorkflowValues?.epic_delivery_spec).to.equal(artifactPath)
+			expect(config.taskState.activePlaceholderWorkflowTaskWriteProofPaths).to.include(artifactPath)
+			expect(config.taskState.didEditFile).to.equal(true)
+			expect(config.taskState.fileReadCache.has(artifactPath.toLowerCase())).to.equal(false)
+
+			const artifact = await fs.readFile(artifactPath, "utf8")
+			expect(artifact).to.contain("# Epic 3: Checkout")
+			expect(artifact).to.contain("### Epic 3: Checkout")
+			expect(artifact).to.contain("#### Objective")
+			expect(artifact).to.contain("#### Description")
+			expect(artifact).to.contain("#### Success Measures")
+			expect(artifact).to.contain("#### Scope")
+			expect(artifact).to.contain("#### Scope Boundary")
+			expect(artifact).to.contain("# User Stories")
+			expect(artifact).to.contain("## Story #")
+			expect(artifact).to.contain("### Objective")
+			expect(artifact).to.contain("### Acceptance Criteria")
+			expect(artifact).to.contain("### Sequencing/ Dependencies")
+		} finally {
+			sandbox.restore()
+			HostProvider.reset()
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("requires epics_document from merged placeholder workflow state for build_epic_delivery_spec", async () => {
+		const { repoDir } = await createBuildEpicDeliverySpecRepo()
+
+		try {
+			const handler = new BuildEpicDeliverySpecToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "pi-planning.md"
+			config.taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "pi-planning.md",
+				contents: "## Step 3: Build Epic Delivery Spec\nBuild the canonical delivery spec.\n",
+			}
+			config.taskState.currentFocusChainChecklist =
+				"- [x] Step 1: Gather Requirements\n- [x] Step 2: Identify Target Epic\n- [ ] Step 3: Build Epic Delivery Spec"
+			config.taskState.activePlaceholderWorkflowValues = {
+				target_epic: "Epic 3: Checkout",
+			}
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "build_epic_delivery_spec",
+				params: {},
+				partial: false,
+			} as any)
+
+			expect(result).to.equal(
+				formatResponse.toolError(
+					"Could not resolve workflow placeholder 'epics_document' from the active placeholder workflow state.",
+				),
+			)
+		} finally {
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("requires target_epic from merged placeholder workflow state for build_epic_delivery_spec", async () => {
+		const { repoDir, epicsRelativePath } = await createBuildEpicDeliverySpecRepo()
+
+		try {
+			const handler = new BuildEpicDeliverySpecToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "pi-planning.md"
+			config.taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "pi-planning.md",
+				contents: "## Step 3: Build Epic Delivery Spec\nBuild the canonical delivery spec.\n",
+			}
+			config.taskState.currentFocusChainChecklist =
+				"- [x] Step 1: Gather Requirements\n- [x] Step 2: Identify Target Epic\n- [ ] Step 3: Build Epic Delivery Spec"
+			config.taskState.activePlaceholderWorkflowValues = {
+				epics_document: epicsRelativePath,
+			}
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "build_epic_delivery_spec",
+				params: {},
+				partial: false,
+			} as any)
+
+			expect(result).to.equal(
+				formatResponse.toolError(
+					"Could not resolve workflow placeholder 'target_epic' from the active placeholder workflow state.",
+				),
+			)
+		} finally {
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("requires output_folder from workflow-config stable placeholders for build_epic_delivery_spec", async () => {
+		const { repoDir, epicsRelativePath } = await createBuildEpicDeliverySpecRepo({ includeWorkflowConfig: false })
+
+		try {
+			const handler = new BuildEpicDeliverySpecToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "pi-planning.md"
+			config.taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "pi-planning.md",
+				contents: "## Step 3: Build Epic Delivery Spec\nBuild the canonical delivery spec.\n",
+			}
+			config.taskState.currentFocusChainChecklist =
+				"- [x] Step 1: Gather Requirements\n- [x] Step 2: Identify Target Epic\n- [ ] Step 3: Build Epic Delivery Spec"
+			config.taskState.activePlaceholderWorkflowValues = {
+				epics_document: epicsRelativePath,
+				target_epic: "Epic 3: Checkout",
+			}
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "build_epic_delivery_spec",
+				params: {},
+				partial: false,
+			} as any)
+
+			expect(result).to.equal(
+				formatResponse.toolError(
+					"Could not resolve stable placeholder 'output_folder' from .cline/workflow-config.yaml.",
+				),
+			)
+		} finally {
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("fails when the canonical epic delivery spec template cannot be read", async () => {
+		const { repoDir, epicsRelativePath, templatePath } = await createBuildEpicDeliverySpecRepo()
+
+		try {
+			await fs.rm(templatePath, { force: true })
+
+			const handler = new BuildEpicDeliverySpecToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "pi-planning.md"
+			config.taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "pi-planning.md",
+				contents: "## Step 3: Build Epic Delivery Spec\nBuild the canonical delivery spec.\n",
+			}
+			config.taskState.currentFocusChainChecklist =
+				"- [x] Step 1: Gather Requirements\n- [x] Step 2: Identify Target Epic\n- [ ] Step 3: Build Epic Delivery Spec"
+			config.taskState.activePlaceholderWorkflowValues = {
+				epics_document: epicsRelativePath,
+				target_epic: "Epic 3: Checkout",
+			}
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "build_epic_delivery_spec",
+				params: {},
+				partial: false,
+			} as any)
+
+			expect(result).to.equal(
+				formatResponse.toolError(`Could not read the canonical epic delivery spec template at ${templatePath}.`),
+			)
+		} finally {
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("fails with the approved user-facing message when the selected epic cannot be found", async () => {
+		const { repoDir, epicsRelativePath } = await createBuildEpicDeliverySpecRepo({ selectedEpicMissing: true })
+
+		try {
+			const handler = new BuildEpicDeliverySpecToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "pi-planning.md"
+			config.taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "pi-planning.md",
+				contents: "## Step 3: Build Epic Delivery Spec\nBuild the canonical delivery spec.\n",
+			}
+			config.taskState.currentFocusChainChecklist =
+				"- [x] Step 1: Gather Requirements\n- [x] Step 2: Identify Target Epic\n- [ ] Step 3: Build Epic Delivery Spec"
+			config.taskState.activePlaceholderWorkflowValues = {
+				epics_document: epicsRelativePath,
+				target_epic: "Epic 3: Checkout",
+			}
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "build_epic_delivery_spec",
+				params: {},
+				partial: false,
+			} as any)
+
+			expect(result).to.equal(
+				formatResponse.toolError(
+					"Unable to populate delivery spec from the epics document. Please ensure the epics document is complete before attempting this workflow.",
+				),
+			)
+		} finally {
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("fails with the approved user-facing message when a required epic section is missing", async () => {
+		const { repoDir, epicsRelativePath } = await createBuildEpicDeliverySpecRepo({
+			omitRequiredSection: "Scope Boundary",
+		})
+
+		try {
+			const handler = new BuildEpicDeliverySpecToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "pi-planning.md"
+			config.taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "pi-planning.md",
+				contents: "## Step 3: Build Epic Delivery Spec\nBuild the canonical delivery spec.\n",
+			}
+			config.taskState.currentFocusChainChecklist =
+				"- [x] Step 1: Gather Requirements\n- [x] Step 2: Identify Target Epic\n- [ ] Step 3: Build Epic Delivery Spec"
+			config.taskState.activePlaceholderWorkflowValues = {
+				epics_document: epicsRelativePath,
+				target_epic: "Epic 3: Checkout",
+			}
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "build_epic_delivery_spec",
+				params: {},
+				partial: false,
+			} as any)
+
+			expect(result).to.equal(
+				formatResponse.toolError(
+					"Unable to populate delivery spec from the epics document. Please ensure the epics document is complete before attempting this workflow.",
+				),
+			)
+		} finally {
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("overwrites an existing canonical artifact atomically for build_epic_delivery_spec", async () => {
+		const sandbox = sinon.createSandbox()
+		const staleContent = "# stale\n"
+		const { repoDir, epicsRelativePath, artifactPath } = await createBuildEpicDeliverySpecRepo({
+			preexistingArtifact: staleContent,
+		})
+
+		try {
+			setVscodeHostProviderMock()
+			sandbox.stub(HostProvider.workspace, "getWorkspacePaths").resolves({ paths: [repoDir] } as any)
+
+			const handler = new BuildEpicDeliverySpecToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "pi-planning.md"
+			config.taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "pi-planning.md",
+				contents: "## Step 3: Build Epic Delivery Spec\nBuild the canonical delivery spec.\n",
+			}
+			config.taskState.currentFocusChainChecklist =
+				"- [x] Step 1: Gather Requirements\n- [x] Step 2: Identify Target Epic\n- [ ] Step 3: Build Epic Delivery Spec"
+			config.taskState.activePlaceholderWorkflowValues = {
+				epics_document: epicsRelativePath,
+				target_epic: "Epic 3: Checkout",
+			}
+
+			await handler.execute(config, {
+				type: "tool_use",
+				name: "build_epic_delivery_spec",
+				params: {},
+				partial: false,
+			} as any)
+
+			const artifact = await fs.readFile(artifactPath, "utf8")
+			expect(artifact).to.not.equal(staleContent)
+			expect(artifact).to.contain("# Epic 3: Checkout")
+		} finally {
+			sandbox.restore()
+			HostProvider.reset()
 			await fs.rm(repoDir, { recursive: true, force: true })
 		}
 	})

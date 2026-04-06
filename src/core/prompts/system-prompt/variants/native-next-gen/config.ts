@@ -71,6 +71,7 @@ export const config = createVariant(ModelFamily.NATIVE_NEXT_GEN)
 		ClineDefaultTool.BUILD_REVIEW_INPUT,
 		ClineDefaultTool.BUILD_EPICS_DOCUMENT,
 		ClineDefaultTool.SELECT_TARGET_EPIC,
+		ClineDefaultTool.BUILD_EPIC_DELIVERY_SPEC,
 		ClineDefaultTool.STORY_TASK_REMINDER,
 		ClineDefaultTool.STORY_TASK_COMPLETE,
 		ClineDefaultTool.STORY_NOTES_UPDATE,

@@ -20,6 +20,7 @@ import { access_mcp_resource_variants } from "../tools/access_mcp_resource"
 import { act_mode_respond_variants } from "../tools/act_mode_respond"
 import { ask_followup_question_variants } from "../tools/ask_followup_question"
 import { attempt_completion_variants } from "../tools/attempt_completion"
+import { build_epic_delivery_spec_variants } from "../tools/build_epic_delivery_spec"
 import { build_epics_document_variants } from "../tools/build_epics_document"
 import { build_review_diff_output_variants } from "../tools/build_review_diff_output"
 import { build_review_input_variants } from "../tools/build_review_input"
@@ -375,6 +376,32 @@ describe("workflow placeholder tool gating", () => {
 				...mockContext,
 				activePlaceholderWorkflowName: "create-epics.md",
 				activePlaceholderWorkflowStepNumber: 2,
+			}),
+		).to.equal(false)
+	})
+
+	it("gates build_epic_delivery_spec to pi-planning step 3", () => {
+		const tool = build_epic_delivery_spec_variants[0]
+
+		expect(
+			tool.contextRequirements?.({
+				...mockContext,
+				activePlaceholderWorkflowName: "pi-planning.md",
+				activePlaceholderWorkflowStepNumber: 3,
+			}),
+		).to.equal(true)
+		expect(
+			tool.contextRequirements?.({
+				...mockContext,
+				activePlaceholderWorkflowName: "pi-planning.md",
+				activePlaceholderWorkflowStepNumber: 2,
+			}),
+		).to.equal(false)
+		expect(
+			tool.contextRequirements?.({
+				...mockContext,
+				activePlaceholderWorkflowName: "create-epics.md",
+				activePlaceholderWorkflowStepNumber: 3,
 			}),
 		).to.equal(false)
 	})
@@ -934,6 +961,29 @@ describe("native tool placeholder replacement", () => {
 
 		expect(getOpenAIFunctionTool(openAI).description).to.equal(
 			"Build or resolve the canonical epics artifact at {output_folder}/planning_artifacts/epics.md from workflow-owned placeholder state. Resolve inputs from workflow state; there are no human-supplied parameters.",
+		)
+		expect(Object.keys(openAIProperties)).to.deep.equal([])
+	})
+
+	it("compacts native build_epic_delivery_spec descriptions and parameter text", () => {
+		const context: SystemPromptContext = {
+			...mockContext,
+			enableNativeToolCalls: true,
+			useMinimalGptPrompt: true,
+			providerInfo: {
+				providerId: "openai",
+				model: { id: "gpt-5.4-2026-03-05", info: { supportsPromptCache: false } },
+				mode: "act",
+			},
+			activePlaceholderWorkflowName: "pi-planning.md",
+			activePlaceholderWorkflowStepNumber: 3,
+		}
+
+		const openAI = toolSpecFunctionDefinition(build_epic_delivery_spec_variants[0], context)
+		const openAIProperties = getOpenAIProperties(openAI)
+
+		expect(getOpenAIFunctionTool(openAI).description).to.equal(
+			"Build the canonical pi-planning Step 3 delivery spec at {output_folder}/implementation-artifacts/epic-<number>-delivery-spec.md from workflow-owned placeholder state. Resolve {epics_document} and {target_epic} from workflow state, preserve the full template structure, and persist the resolved artifact path as {epic_delivery_spec}.",
 		)
 		expect(Object.keys(openAIProperties)).to.deep.equal([])
 	})

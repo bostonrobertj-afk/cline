@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, it } from "mocha"
 import os from "os"
 import path from "path"
 import sinon from "sinon"
+import { resolveWorkflowPersonaInstructions } from "@/core/prompts/system-prompt/registry/workflowPersonaRegistry"
 import { HostProvider } from "@/hosts/host-provider"
 import { ApiFormat } from "@/shared/proto/cline/models"
 import { Logger } from "@/shared/services/Logger"
@@ -2610,6 +2611,42 @@ Review the changed implementation for edge cases.`,
 		assert.equal(context.activeWorkflowSupportsPlaceholders, true)
 	})
 
+	it("builds scrum-master workflow persona instructions for pi-planning full prompt assembly", async () => {
+		const runner = new SubagentRunner(createTaskConfig(false))
+		const state = new TaskState()
+		state.activePlaceholderWorkflowId = "pi-planning.md"
+		state.activePlaceholderWorkflowSource = {
+			type: "remote",
+			name: "pi-planning.md",
+			contents: "# PI Planning\nPlan and refine stories.",
+		}
+		state.activePlaceholderWorkflowValues = { story_id: "1.1" }
+
+		const context = await (runner as any).buildPromptContext({
+			state,
+			hostIde: "test",
+			providerInfo: {
+				providerId: "anthropic",
+				model: { id: "anthropic/claude-sonnet-4.5", info: { contextWindow: 200_000 } },
+				mode: "act",
+				customPrompt: undefined,
+			},
+			availableSkills: [],
+			configuredSkillNames: undefined,
+			assignedSkillNames: [],
+			nativeToolCallsRequested: false,
+			shouldSendFullPromptAssembly: true,
+			shouldUseContinuationPrompt: false,
+		})
+
+		assert.equal(context.managedWorkflowActive, false)
+		assert.equal(context.activeWorkflowName, "pi-planning.md")
+		assert.equal(context.activeWorkflowPersonaInstructions, resolveWorkflowPersonaInstructions("pi-planning.md"))
+		assert.match(context.activeWorkflowPersonaInstructions ?? "", /Role: Scrum Master/)
+		assert.equal(context.activeWorkflowReminder, undefined)
+		assert.equal(context.activeWorkflowSupportsPlaceholders, true)
+	})
+
 	it("preserves base prompt context while suppressing dynamic reminder fields on internal turns", async () => {
 		const runner = new SubagentRunner(createTaskConfig(false))
 		const state = new TaskState()
@@ -2641,6 +2678,43 @@ Review the changed implementation for edge cases.`,
 
 		assert.deepEqual(context.skills, [])
 		assert.equal(context.activeWorkflowName, "code-review.md")
+		assert.equal(context.activeWorkflowPersonaInstructions, undefined)
+		assert.equal(context.activeWorkflowReminder, undefined)
+		assert.equal(context.enableNativeToolCalls, true)
+		assert.equal(context.enableParallelToolCalling, false)
+		assert.equal(context.isSubagentRun, true)
+	})
+
+	it("suppresses pi-planning workflow persona instructions on internal turns without full prompt assembly", async () => {
+		const runner = new SubagentRunner(createTaskConfig(false))
+		const state = new TaskState()
+		state.activePlaceholderWorkflowId = "pi-planning.md"
+		state.activePlaceholderWorkflowSource = {
+			type: "remote",
+			name: "pi-planning.md",
+			contents: "# PI Planning\nPlan and refine stories.",
+		}
+
+		const context = await (runner as any).buildPromptContext({
+			state,
+			hostIde: "test",
+			providerInfo: {
+				providerId: "anthropic",
+				model: { id: "anthropic/claude-sonnet-4.5", info: { contextWindow: 200_000 } },
+				mode: "act",
+				customPrompt: undefined,
+			},
+			availableSkills: [
+				{ name: "review-edge-case-hunter", description: "Review", path: "/skills/review", source: "project" },
+			],
+			configuredSkillNames: undefined,
+			assignedSkillNames: [],
+			nativeToolCallsRequested: true,
+			shouldSendFullPromptAssembly: false,
+			shouldUseContinuationPrompt: false,
+		})
+
+		assert.equal(context.activeWorkflowName, "pi-planning.md")
 		assert.equal(context.activeWorkflowPersonaInstructions, undefined)
 		assert.equal(context.activeWorkflowReminder, undefined)
 		assert.equal(context.enableNativeToolCalls, true)
