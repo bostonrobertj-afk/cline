@@ -22,6 +22,7 @@ import { read_file_variants } from "./read_file"
 import { read_file_range_variants } from "./read_file_range"
 import { replace_in_file_variants } from "./replace_in_file"
 import { search_files_variants } from "./search_files"
+import { select_target_epic_variants } from "./select_target_epic"
 import { send_user_message_variants } from "./send_user_message"
 import { set_workflow_placeholders_variants } from "./set_workflow_placeholders"
 import { story_notes_update_variants } from "./story_notes_update"
@@ -65,6 +66,7 @@ export function registerClineToolSets(): void {
 		...read_file_range_variants,
 		...replace_in_file_variants,
 		...search_files_variants,
+		...select_target_epic_variants,
 		...send_user_message_variants,
 		...workflow_progress_request_variants,
 		...set_workflow_placeholders_variants,

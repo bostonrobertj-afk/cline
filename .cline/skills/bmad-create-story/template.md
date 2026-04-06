@@ -40,9 +40,9 @@ so that {{benefit}}.
 
 ## Dev Agent Record
 
-## Review Agent Record
+### Agent Model Used
 
-### Latest Review Findings
+{{agent_model_name_version}}
 
 ### Debug Log References
 

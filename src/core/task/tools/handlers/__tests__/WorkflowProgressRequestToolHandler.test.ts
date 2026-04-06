@@ -160,6 +160,58 @@ describe("WorkflowProgressRequestToolHandler", () => {
 		})
 	})
 
+	it("queues selected Yes responses for pi-planning after completing step 4", async () => {
+		const { config, callbacks } = createConfig({
+			askResult: { text: "Yes" },
+		})
+		config.taskState.activePlaceholderWorkflowSource = { name: "pi-planning.md" } as any
+		config.taskState.currentFocusChainChecklist = "- [ ] Step 4: Set Expectations"
+		const handler = new WorkflowProgressRequestToolHandler()
+
+		const result = await handler.execute(config, {
+			type: "tool_use",
+			name: "workflow_progress_request",
+			params: {},
+			partial: false,
+		} as any)
+
+		assert.equal(result, RESPONSE_TOOL_SUCCESS_MESSAGE)
+		sinon.assert.calledOnceWithExactly(callbacks.updateFCListFromToolResponse, FOCUS_CHAIN_COMPLETE_NEXT_STEP_SENTINEL)
+		assert.deepEqual(config.taskState.pendingResponseToolFollowup, {
+			toolName: ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST,
+			route: "normal_user_turn",
+			text: "Yes",
+			images: undefined,
+			files: undefined,
+		})
+	})
+
+	it("queues selected No responses for pi-planning step 5 without advancing the workflow", async () => {
+		const { config, callbacks } = createConfig({
+			askResult: { text: "No" },
+		})
+		config.taskState.activePlaceholderWorkflowSource = { name: "pi-planning.md" } as any
+		config.taskState.currentFocusChainChecklist = "- [ ] Step 5: Build User Stories"
+		const handler = new WorkflowProgressRequestToolHandler()
+
+		const result = await handler.execute(config, {
+			type: "tool_use",
+			name: "workflow_progress_request",
+			params: {},
+			partial: false,
+		} as any)
+
+		assert.equal(result, RESPONSE_TOOL_SUCCESS_MESSAGE)
+		sinon.assert.notCalled(callbacks.updateFCListFromToolResponse)
+		assert.deepEqual(config.taskState.pendingResponseToolFollowup, {
+			toolName: ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST,
+			route: "normal_user_turn",
+			text: "No",
+			images: undefined,
+			files: undefined,
+		})
+	})
+
 	it("returns a tool error when checklist advancement is rejected", async () => {
 		const { config, callbacks } = createConfig({
 			askResult: { text: "Yes" },

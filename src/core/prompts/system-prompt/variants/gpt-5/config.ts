@@ -70,6 +70,7 @@ export const config = createVariant(ModelFamily.GPT_5)
 		ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT,
 		ClineDefaultTool.BUILD_REVIEW_INPUT,
 		ClineDefaultTool.BUILD_EPICS_DOCUMENT,
+		ClineDefaultTool.SELECT_TARGET_EPIC,
 		ClineDefaultTool.STORY_TASK_REMINDER,
 		ClineDefaultTool.STORY_TASK_COMPLETE,
 		ClineDefaultTool.STORY_NOTES_UPDATE,

@@ -25,6 +25,7 @@ import { ReadFileRangeToolHandler } from "./handlers/ReadFileRangeToolHandler"
 import { ReadFileToolHandler } from "./handlers/ReadFileToolHandler"
 import { ReportBugHandler } from "./handlers/ReportBugHandler"
 import { SearchFilesToolHandler } from "./handlers/SearchFilesToolHandler"
+import { SelectTargetEpicToolHandler } from "./handlers/SelectTargetEpicToolHandler"
 import { SendUserMessageHandler } from "./handlers/SendUserMessageHandler"
 import { SetWorkflowPlaceholdersToolHandler } from "./handlers/SetWorkflowPlaceholdersToolHandler"
 import { StoryNotesUpdateToolHandler } from "./handlers/StoryNotesUpdateToolHandler"
@@ -126,6 +127,7 @@ export class ToolExecutorCoordinator {
 		[ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT]: (_v: ToolValidator) => new BuildReviewDiffOutputToolHandler(),
 		[ClineDefaultTool.BUILD_REVIEW_INPUT]: (_v: ToolValidator) => new BuildReviewInputToolHandler(),
 		[ClineDefaultTool.BUILD_EPICS_DOCUMENT]: (_v: ToolValidator) => new BuildEpicsDocumentToolHandler(),
+		[ClineDefaultTool.SELECT_TARGET_EPIC]: (_v: ToolValidator) => new SelectTargetEpicToolHandler(),
 		[ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE]: (_v: ToolValidator) => new CodeReviewSpecUpdateToolHandler(),
 		[ClineDefaultTool.STORY_TASK_REMINDER]: (_v: ToolValidator) => new StoryTaskReminderToolHandler(),
 		[ClineDefaultTool.STORY_TASK_COMPLETE]: (_v: ToolValidator) => new StoryTaskCompleteToolHandler(),

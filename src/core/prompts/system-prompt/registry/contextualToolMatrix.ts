@@ -10,6 +10,7 @@ export type PlaceholderToolBundle =
 	| "SUBAGENT_COORD"
 	| "DIFF_BUILD"
 	| "EPICS_BUILD"
+	| "TARGET_EPIC_SELECT"
 	| "WORKFLOW_PROGRESS_REQUEST"
 	| "EXTERNAL_RESEARCH"
 	| "INDXR_DISCOVERY"
@@ -40,6 +41,7 @@ export const PLACEHOLDER_BUILTIN_BUNDLE_TOOLS = {
 	SUBAGENT_COORD: [ClineDefaultTool.USE_SUBAGENTS],
 	DIFF_BUILD: [ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT],
 	EPICS_BUILD: [ClineDefaultTool.BUILD_EPICS_DOCUMENT],
+	TARGET_EPIC_SELECT: [ClineDefaultTool.SELECT_TARGET_EPIC],
 	WORKFLOW_PROGRESS_REQUEST: [ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST],
 	EXTERNAL_RESEARCH: [ClineDefaultTool.WEB_SEARCH, ClineDefaultTool.WEB_FETCH],
 	STORY_TASK_EXECUTION: [
@@ -310,6 +312,9 @@ export const PLACEHOLDER_WORKFLOW_STEP_MATRIX: Record<string, Record<number, rea
 		1: ["DOC_READ"],
 		2: ["SUBAGENT_COORD"],
 		3: [],
+	},
+	"pi-planning.md": {
+		2: ["TARGET_EPIC_SELECT"],
 	},
 	"qa-generate-e2e-tests.md": {
 		1: ["CODE_READ", "INDXR_DISCOVERY", "INDXR_SOURCE_READ", "INDXR_SYMBOL_GRAPH"],

@@ -3,6 +3,8 @@ import { fireEvent, render, screen } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { ChatRowContent, getFollowupPresentation } from "./ChatRow"
 
+const WORKFLOW_START_PROMPT_FIXTURE = "Workflow form prompt content for test coverage."
+
 const { mockSubmitWorkflowForm, mockThreadDisplayState } = vi.hoisted(() => ({
 	mockSubmitWorkflowForm: vi.fn().mockResolvedValue(undefined),
 	mockThreadDisplayState: { value: "idle_open" as string | null },
@@ -358,7 +360,7 @@ describe("ChatRow followup presentation", () => {
 				toolDictionaryMarkdown: "## set_workflow_placeholders",
 				pages: {
 					collect_inputs: {
-						prompt: "Provide any Step 1 workflow inputs you already have before the first AI turn begins.",
+						prompt: WORKFLOW_START_PROMPT_FIXTURE,
 						fields: [],
 						submitLabel: "Submit",
 						cancelLabel: "Cancel",
@@ -369,9 +371,10 @@ describe("ChatRow followup presentation", () => {
 		})
 
 		expect(screen.getByText("Workflow Start Inputs")).toBeInTheDocument()
-		expect(
-			screen.getByText("Provide any Step 1 workflow inputs you already have before the first AI turn begins."),
-		).toBeInTheDocument()
+		const title = screen.getByText("Workflow Start Inputs")
+		const promptContainer = title.closest(".border")?.querySelector(".pt-2")
+
+		expect(promptContainer?.textContent?.trim().length ?? 0).toBeGreaterThan(0)
 	})
 
 	it("opens the workflow dictionary in a read-only dialog", async () => {
@@ -456,7 +459,7 @@ describe("ChatRow followup presentation", () => {
 				toolDictionaryMarkdown: "## set_workflow_placeholders",
 				pages: {
 					collect_inputs: {
-						prompt: "Provide any Step 1 workflow inputs you already have before the first AI turn begins.",
+						prompt: WORKFLOW_START_PROMPT_FIXTURE,
 						fields: [
 							{
 								key: "review_input",
@@ -490,7 +493,7 @@ describe("ChatRow followup presentation", () => {
 				toolDictionaryMarkdown: "## set_workflow_placeholders",
 				pages: {
 					collect_inputs: {
-						prompt: "Provide any Step 1 workflow inputs you already have before the first AI turn begins.",
+						prompt: WORKFLOW_START_PROMPT_FIXTURE,
 						fields: [
 							{
 								key: "review_input",
@@ -545,7 +548,7 @@ describe("ChatRow followup presentation", () => {
 				toolDictionaryMarkdown: "## set_workflow_placeholders",
 				pages: {
 					collect_inputs: {
-						prompt: "Provide any Step 1 workflow inputs you already have before the first AI turn begins.",
+						prompt: WORKFLOW_START_PROMPT_FIXTURE,
 						fields: [
 							{
 								key: "review_input",

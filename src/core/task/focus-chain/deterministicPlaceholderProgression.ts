@@ -35,6 +35,7 @@ export function isDeterministicPlaceholderWorkflowSupported(
 	return (
 		workflowName === "code-review.md" ||
 		workflowName === "create-epics.md" ||
+		workflowName === "pi-planning.md" ||
 		workflowName === "dev-story.md" ||
 		workflowName === "review-adversarial-general.md" ||
 		workflowName === "blind-review.md" ||
@@ -809,6 +810,69 @@ async function evaluateWriteRemediationStoryStep(args: {
 	}
 }
 
+async function evaluatePiPlanningStep(args: {
+	taskState: TaskState
+	stepNumber: number
+	toolContext?: DeterministicPlaceholderToolContext
+}): Promise<DeterministicStepEvaluationResult> {
+	const placeholders = getMergedPlaceholderValues(args.taskState)
+	const epicsDocument = placeholders.epics_document?.trim()
+	const architectureDocument = placeholders.architecture_document?.trim()
+	const targetEpic = placeholders.target_epic?.trim()
+	const epicDeliverySpec = placeholders.epic_delivery_spec?.trim()
+
+	switch (args.stepNumber) {
+		case 1: {
+			if (!epicsDocument) {
+				return { completed: false }
+			}
+
+			if (!architectureDocument) {
+				return { completed: false }
+			}
+
+			return {
+				completed: true,
+				reason: "epics_document and architecture_document were already available in workflow placeholder state.",
+			}
+		}
+		case 2: {
+			if (!targetEpic) {
+				return { completed: false }
+			}
+
+			return {
+				completed: true,
+				reason: "target_epic was already available in workflow placeholder state.",
+			}
+		}
+		case 3: {
+			if (!epicDeliverySpec) {
+				return { completed: false }
+			}
+
+			const resolvedEpicDeliverySpecPath = resolveArtifactPlaceholderPath(placeholders, epicDeliverySpec)
+			if (!(await fileExistsForPlaceholderWorkflowWriteProof(resolvedEpicDeliverySpecPath))) {
+				return { completed: false }
+			}
+
+			if (taskStateHasPlaceholderWorkflowWriteProof(args.taskState, resolvedEpicDeliverySpecPath)) {
+				return {
+					completed: true,
+					reason: "epic_delivery_spec was written during this task and the artifact still exists.",
+				}
+			}
+
+			return {
+				completed: true,
+				reason: "epic_delivery_spec already resolves to an existing file.",
+			}
+		}
+		default:
+			return { completed: false }
+	}
+}
+
 async function evaluateDeterministicStep(args: {
 	taskState: TaskState
 	workflowName: DeterministicPlaceholderWorkflowName
@@ -825,6 +889,14 @@ async function evaluateDeterministicStep(args: {
 
 	if (args.workflowName === "create-epics.md") {
 		return evaluateCreateEpicsStep({
+			taskState: args.taskState,
+			stepNumber: args.stepNumber,
+			toolContext: args.toolContext,
+		})
+	}
+
+	if (args.workflowName === "pi-planning.md") {
+		return evaluatePiPlanningStep({
 			taskState: args.taskState,
 			stepNumber: args.stepNumber,
 			toolContext: args.toolContext,

@@ -644,8 +644,7 @@ export const workflowFormRegistry: Record<string, WorkflowFormResolverDefinition
 				oneOfRequirement: workflowStartRequirements.oneOfRequirement,
 				override,
 			})
-			const prompt =
-				override?.prompt ?? "Provide any Step 1 workflow inputs you already have before the first AI turn begins."
+			const prompt = override?.prompt ?? "Please provide the inputs necessary to start this workflow."
 
 			return {
 				toolName: ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,

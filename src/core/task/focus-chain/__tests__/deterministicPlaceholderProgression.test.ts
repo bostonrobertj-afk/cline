@@ -51,11 +51,13 @@ describe("deterministicPlaceholderProgression", () => {
 	it("supports only the prescribed deterministic placeholder workflows", () => {
 		expect(isDeterministicPlaceholderWorkflowSupported("code-review.md")).to.equal(true)
 		expect(isDeterministicPlaceholderWorkflowSupported("create-epics.md")).to.equal(true)
+		expect(isDeterministicPlaceholderWorkflowSupported("pi-planning.md")).to.equal(true)
 		expect(isDeterministicPlaceholderWorkflowSupported("dev-story.md")).to.equal(true)
 		expect(isDeterministicPlaceholderWorkflowSupported("review-adversarial-general.md")).to.equal(true)
 		expect(isDeterministicPlaceholderWorkflowSupported("blind-review.md")).to.equal(true)
 		expect(isDeterministicPlaceholderWorkflowSupported("code-review")).to.equal(false)
 		expect(isDeterministicPlaceholderWorkflowSupported("create-epics")).to.equal(false)
+		expect(isDeterministicPlaceholderWorkflowSupported("pi-planning")).to.equal(false)
 		expect(isDeterministicPlaceholderWorkflowSupported("dev-story")).to.equal(false)
 		expect(isDeterministicPlaceholderWorkflowSupported("review-edge-case-hunter.md")).to.equal(true)
 		expect(isDeterministicPlaceholderWorkflowSupported("write-remediation-story.md")).to.equal(true)
@@ -2766,6 +2768,439 @@ Define the epics.`,
 			expect(result.checklist).to.equal(
 				"- [ ] Step 2: (System-Owned) Build the requirements inventory\n- [ ] Step 3: Define the Epics",
 			)
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("completes pi-planning step 1 when epics_document and architecture_document are present", async () => {
+		const taskState = createTaskState({
+			workflowName: "pi-planning.md",
+			workflowContents: `## Step 1:  (System-Owned) Gather Requirements
+Gather requirements.
+
+## Step 2: (System-Owned) Identify Target Epic
+Identify the target epic.`,
+			checklistMarkdown:
+				"- [ ] Step 1:  (System-Owned) Gather Requirements\n- [ ] Step 2: (System-Owned) Identify Target Epic",
+			placeholderValues: {
+				epics_document: "/tmp/epics.md",
+				architecture_document: "/tmp/architecture.md",
+			},
+		})
+
+		const result = await applyDeterministicPlaceholderProgression({
+			taskState,
+			checklistMarkdown: getChecklistMarkdown(taskState),
+		})
+
+		expect(result.checklist).to.equal(
+			"- [x] Step 1:  (System-Owned) Gather Requirements\n- [ ] Step 2: (System-Owned) Identify Target Epic",
+		)
+		expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
+			"epics_document and architecture_document were already available in workflow placeholder state.",
+		)
+	})
+
+	it("does not complete pi-planning step 1 when epics_document is missing", async () => {
+		const taskState = createTaskState({
+			workflowName: "pi-planning.md",
+			workflowContents: `## Step 1:  (System-Owned) Gather Requirements
+Gather requirements.
+
+## Step 2: (System-Owned) Identify Target Epic
+Identify the target epic.`,
+			checklistMarkdown:
+				"- [ ] Step 1:  (System-Owned) Gather Requirements\n- [ ] Step 2: (System-Owned) Identify Target Epic",
+			placeholderValues: {
+				architecture_document: "/tmp/architecture.md",
+			},
+		})
+
+		const result = await applyDeterministicPlaceholderProgression({
+			taskState,
+			checklistMarkdown: getChecklistMarkdown(taskState),
+		})
+
+		expect(result.checklist).to.equal(
+			"- [ ] Step 1:  (System-Owned) Gather Requirements\n- [ ] Step 2: (System-Owned) Identify Target Epic",
+		)
+		expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+	})
+
+	it("does not complete pi-planning step 1 when architecture_document is missing", async () => {
+		const taskState = createTaskState({
+			workflowName: "pi-planning.md",
+			workflowContents: `## Step 1:  (System-Owned) Gather Requirements
+Gather requirements.
+
+## Step 2: (System-Owned) Identify Target Epic
+Identify the target epic.`,
+			checklistMarkdown:
+				"- [ ] Step 1:  (System-Owned) Gather Requirements\n- [ ] Step 2: (System-Owned) Identify Target Epic",
+			placeholderValues: {
+				epics_document: "/tmp/epics.md",
+			},
+		})
+
+		const result = await applyDeterministicPlaceholderProgression({
+			taskState,
+			checklistMarkdown: getChecklistMarkdown(taskState),
+		})
+
+		expect(result.checklist).to.equal(
+			"- [ ] Step 1:  (System-Owned) Gather Requirements\n- [ ] Step 2: (System-Owned) Identify Target Epic",
+		)
+		expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+	})
+
+	it("completes pi-planning step 2 when target_epic is present and non-empty", async () => {
+		const taskState = createTaskState({
+			workflowName: "pi-planning.md",
+			workflowContents: `## Step 2: (System-Owned) Identify Target Epic
+Identify the target epic.
+
+## Step 3:  (System-Owned) Build Epic Delivery Spec
+Build the delivery spec.`,
+			checklistMarkdown:
+				"- [ ] Step 2: (System-Owned) Identify Target Epic\n- [ ] Step 3:  (System-Owned) Build Epic Delivery Spec",
+			placeholderValues: {
+				target_epic: "Epic 3 - Checkout",
+			},
+		})
+
+		const result = await applyDeterministicPlaceholderProgression({
+			taskState,
+			checklistMarkdown: getChecklistMarkdown(taskState),
+		})
+
+		expect(result.checklist).to.equal(
+			"- [x] Step 2: (System-Owned) Identify Target Epic\n- [ ] Step 3:  (System-Owned) Build Epic Delivery Spec",
+		)
+		expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
+			"target_epic was already available in workflow placeholder state.",
+		)
+	})
+
+	it("does not complete pi-planning step 2 when target_epic is missing", async () => {
+		const taskState = createTaskState({
+			workflowName: "pi-planning.md",
+			workflowContents: `## Step 2: (System-Owned) Identify Target Epic
+Identify the target epic.
+
+## Step 3:  (System-Owned) Build Epic Delivery Spec
+Build the delivery spec.`,
+			checklistMarkdown:
+				"- [ ] Step 2: (System-Owned) Identify Target Epic\n- [ ] Step 3:  (System-Owned) Build Epic Delivery Spec",
+		})
+
+		const result = await applyDeterministicPlaceholderProgression({
+			taskState,
+			checklistMarkdown: getChecklistMarkdown(taskState),
+		})
+
+		expect(result.checklist).to.equal(
+			"- [ ] Step 2: (System-Owned) Identify Target Epic\n- [ ] Step 3:  (System-Owned) Build Epic Delivery Spec",
+		)
+		expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+	})
+
+	it("does not complete pi-planning step 2 when target_epic is blank after trimming", async () => {
+		const taskState = createTaskState({
+			workflowName: "pi-planning.md",
+			workflowContents: `## Step 2: (System-Owned) Identify Target Epic
+Identify the target epic.
+
+## Step 3:  (System-Owned) Build Epic Delivery Spec
+Build the delivery spec.`,
+			checklistMarkdown:
+				"- [ ] Step 2: (System-Owned) Identify Target Epic\n- [ ] Step 3:  (System-Owned) Build Epic Delivery Spec",
+			placeholderValues: {
+				target_epic: "   ",
+			},
+		})
+
+		const result = await applyDeterministicPlaceholderProgression({
+			taskState,
+			checklistMarkdown: getChecklistMarkdown(taskState),
+		})
+
+		expect(result.checklist).to.equal(
+			"- [ ] Step 2: (System-Owned) Identify Target Epic\n- [ ] Step 3:  (System-Owned) Build Epic Delivery Spec",
+		)
+		expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+	})
+
+	it("completes pi-planning step 3 when epic_delivery_spec already resolves to an existing file", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-pi-planning-step3-existing-"))
+
+		try {
+			const outputDir = path.join(tempDir, "output")
+			const artifactPath = path.join(outputDir, "implementation-artifacts", "epic-3-delivery-spec.md")
+			const taskState = createTaskState({
+				workflowName: "pi-planning.md",
+				workflowContents: `## Step 3:  (System-Owned) Build Epic Delivery Spec
+Build the delivery spec.`,
+				checklistMarkdown: "- [ ] Step 3:  (System-Owned) Build Epic Delivery Spec",
+				stablePlaceholderValues: {
+					cwd: tempDir,
+					project_root: tempDir,
+				},
+				placeholderValues: {
+					epic_delivery_spec: path.join("output", "implementation-artifacts", "epic-3-delivery-spec.md"),
+				},
+			})
+
+			await writeFileWithMtime(artifactPath, "# Epic Delivery Spec\n", Date.now())
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+			})
+
+			expect(result.checklist).to.equal("- [x] Step 3:  (System-Owned) Build Epic Delivery Spec")
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
+				"epic_delivery_spec already resolves to an existing file.",
+			)
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("completes pi-planning step 3 when epic_delivery_spec resolves to an existing task-written file", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-pi-planning-step3-task-written-"))
+
+		try {
+			const outputDir = path.join(tempDir, "output")
+			const artifactPath = path.join(outputDir, "implementation-artifacts", "epic-3-delivery-spec.md")
+			const taskState = createTaskState({
+				workflowName: "pi-planning.md",
+				workflowContents: `## Step 3:  (System-Owned) Build Epic Delivery Spec
+Build the delivery spec.`,
+				checklistMarkdown: "- [ ] Step 3:  (System-Owned) Build Epic Delivery Spec",
+				stablePlaceholderValues: {
+					cwd: tempDir,
+					project_root: tempDir,
+				},
+				placeholderValues: {
+					epic_delivery_spec: path.join("output", "implementation-artifacts", "epic-3-delivery-spec.md"),
+				},
+			})
+
+			await writeFileWithMtime(artifactPath, "# Epic Delivery Spec\n", Date.now())
+			recordTaskWriteProof(taskState, artifactPath)
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+			})
+
+			expect(result.checklist).to.equal("- [x] Step 3:  (System-Owned) Build Epic Delivery Spec")
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
+				"epic_delivery_spec was written during this task and the artifact still exists.",
+			)
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("does not complete pi-planning step 3 when epic_delivery_spec is missing", async () => {
+		const taskState = createTaskState({
+			workflowName: "pi-planning.md",
+			workflowContents: `## Step 3:  (System-Owned) Build Epic Delivery Spec
+Build the delivery spec.`,
+			checklistMarkdown: "- [ ] Step 3:  (System-Owned) Build Epic Delivery Spec",
+		})
+
+		const result = await applyDeterministicPlaceholderProgression({
+			taskState,
+			checklistMarkdown: getChecklistMarkdown(taskState),
+		})
+
+		expect(result.checklist).to.equal("- [ ] Step 3:  (System-Owned) Build Epic Delivery Spec")
+		expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+	})
+
+	it("does not complete pi-planning step 3 when epic_delivery_spec resolves to a missing file", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-pi-planning-step3-missing-file-"))
+
+		try {
+			const taskState = createTaskState({
+				workflowName: "pi-planning.md",
+				workflowContents: `## Step 3:  (System-Owned) Build Epic Delivery Spec
+Build the delivery spec.`,
+				checklistMarkdown: "- [ ] Step 3:  (System-Owned) Build Epic Delivery Spec",
+				stablePlaceholderValues: {
+					cwd: tempDir,
+					project_root: tempDir,
+				},
+				placeholderValues: {
+					epic_delivery_spec: "output/implementation-artifacts/missing-delivery-spec.md",
+				},
+			})
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+			})
+
+			expect(result.checklist).to.equal("- [ ] Step 3:  (System-Owned) Build Epic Delivery Spec")
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("advances through pi-planning steps 1 and 2 in one deterministic pass when the setup placeholders are already present", async () => {
+		const taskState = createTaskState({
+			workflowName: "pi-planning.md",
+			workflowContents: `## Step 1:  (System-Owned) Gather Requirements
+Gather requirements.
+
+## Step 2: (System-Owned) Identify Target Epic
+Identify the target epic.
+
+## Step 3:  (System-Owned) Build Epic Delivery Spec
+Build the delivery spec.`,
+			checklistMarkdown:
+				"- [ ] Step 1:  (System-Owned) Gather Requirements\n- [ ] Step 2: (System-Owned) Identify Target Epic\n- [ ] Step 3:  (System-Owned) Build Epic Delivery Spec",
+			placeholderValues: {
+				epics_document: "/tmp/epics.md",
+				architecture_document: "/tmp/architecture.md",
+				target_epic: "Epic 3 - Checkout",
+			},
+		})
+
+		const result = await applyDeterministicPlaceholderProgression({
+			taskState,
+			checklistMarkdown: getChecklistMarkdown(taskState),
+		})
+
+		expect(result.checklist).to.equal(
+			"- [x] Step 1:  (System-Owned) Gather Requirements\n- [x] Step 2: (System-Owned) Identify Target Epic\n- [ ] Step 3:  (System-Owned) Build Epic Delivery Spec",
+		)
+		expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.have.length(2)
+		expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.map((notice) => notice.reason)).to.deep.equal([
+			"epics_document and architecture_document were already available in workflow placeholder state.",
+			"target_epic was already available in workflow placeholder state.",
+		])
+	})
+
+	it("advances through pi-planning steps 1, 2, and 3 in one deterministic pass when epic_delivery_spec already resolves to an existing file", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-pi-planning-step123-existing-"))
+
+		try {
+			const artifactPath = path.join(tempDir, "output", "implementation-artifacts", "epic-3-delivery-spec.md")
+			const taskState = createTaskState({
+				workflowName: "pi-planning.md",
+				workflowContents: `## Step 1:  (System-Owned) Gather Requirements
+Gather requirements.
+
+## Step 2: (System-Owned) Identify Target Epic
+Identify the target epic.
+
+## Step 3:  (System-Owned) Build Epic Delivery Spec
+Build the delivery spec.`,
+				checklistMarkdown:
+					"- [ ] Step 1:  (System-Owned) Gather Requirements\n- [ ] Step 2: (System-Owned) Identify Target Epic\n- [ ] Step 3:  (System-Owned) Build Epic Delivery Spec",
+				stablePlaceholderValues: {
+					cwd: tempDir,
+					project_root: tempDir,
+				},
+				placeholderValues: {
+					epics_document: "/tmp/epics.md",
+					architecture_document: "/tmp/architecture.md",
+					target_epic: "Epic 3 - Checkout",
+					epic_delivery_spec: path.join("output", "implementation-artifacts", "epic-3-delivery-spec.md"),
+				},
+			})
+
+			await writeFileWithMtime(artifactPath, "# Epic Delivery Spec\n", Date.now())
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+			})
+
+			expect(result.checklist).to.equal(
+				"- [x] Step 1:  (System-Owned) Gather Requirements\n- [x] Step 2: (System-Owned) Identify Target Epic\n- [x] Step 3:  (System-Owned) Build Epic Delivery Spec",
+			)
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.have.length(3)
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
+				"epic_delivery_spec already resolves to an existing file.",
+			)
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("does not deterministically complete pi-planning step 4 when setup placeholders and artifacts are already present", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-pi-planning-step4-governed-"))
+
+		try {
+			const artifactPath = path.join(tempDir, "output", "implementation-artifacts", "epic-3-delivery-spec.md")
+			const taskState = createTaskState({
+				workflowName: "pi-planning.md",
+				workflowContents: `## Step 4: Set Expectations
+Set expectations.`,
+				checklistMarkdown: "- [ ] Step 4: Set Expectations",
+				stablePlaceholderValues: {
+					cwd: tempDir,
+					project_root: tempDir,
+				},
+				placeholderValues: {
+					epics_document: "/tmp/epics.md",
+					architecture_document: "/tmp/architecture.md",
+					target_epic: "Epic 3 - Checkout",
+					epic_delivery_spec: path.join("output", "implementation-artifacts", "epic-3-delivery-spec.md"),
+				},
+			})
+
+			await writeFileWithMtime(artifactPath, "# Epic Delivery Spec\n", Date.now())
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+			})
+
+			expect(result.checklist).to.equal("- [ ] Step 4: Set Expectations")
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("does not deterministically complete pi-planning step 5 when setup placeholders and artifacts are already present", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-pi-planning-step5-governed-"))
+
+		try {
+			const artifactPath = path.join(tempDir, "output", "implementation-artifacts", "epic-3-delivery-spec.md")
+			const taskState = createTaskState({
+				workflowName: "pi-planning.md",
+				workflowContents: `## Step 5: Build User Stories
+Build user stories.`,
+				checklistMarkdown: "- [ ] Step 5: Build User Stories",
+				stablePlaceholderValues: {
+					cwd: tempDir,
+					project_root: tempDir,
+				},
+				placeholderValues: {
+					epics_document: "/tmp/epics.md",
+					architecture_document: "/tmp/architecture.md",
+					target_epic: "Epic 3 - Checkout",
+					epic_delivery_spec: path.join("output", "implementation-artifacts", "epic-3-delivery-spec.md"),
+				},
+			})
+
+			await writeFileWithMtime(artifactPath, "# Epic Delivery Spec\n", Date.now())
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+			})
+
+			expect(result.checklist).to.equal("- [ ] Step 5: Build User Stories")
 			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
 		} finally {
 			await fs.rm(tempDir, { recursive: true, force: true })

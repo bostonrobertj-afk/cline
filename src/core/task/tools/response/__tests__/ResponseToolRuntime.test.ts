@@ -81,6 +81,7 @@ describe("ResponseToolRuntime", () => {
 
 	it("keeps build_epics_document registered as a non-response tool", () => {
 		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.BUILD_EPICS_DOCUMENT), undefined)
+		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.SELECT_TARGET_EPIC), undefined)
 	})
 
 	it("registers post-turn thread display states for governed response tools", () => {

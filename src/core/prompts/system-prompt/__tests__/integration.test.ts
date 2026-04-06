@@ -1295,6 +1295,32 @@ describe("Prompt System Integration Tests", () => {
 			)
 		})
 
+		it("filters native tools for pi-planning step 2", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
+					enableNativeToolCalls: true,
+					useMinimalGptPrompt: true,
+					activeWorkflowSupportsPlaceholders: true,
+					managedWorkflowActive: false,
+					activePlaceholderWorkflowName: "pi-planning.md",
+					activePlaceholderWorkflowStepNumber: 2,
+				},
+				"gpt-5.4-2026-03-05",
+				async ({ tools }) => {
+					const nativeToolNames = getNativeToolNames(tools)
+
+					expect(nativeToolNames).to.include.members(["select_target_epic", "attempt_completion"])
+					expect(nativeToolNames).to.not.include("set_workflow_placeholders")
+					expect(nativeToolNames).to.not.include("read_file")
+					expect(nativeToolNames).to.not.include("execute_command")
+					expect(nativeToolNames).to.not.include("generate_plan_output")
+				},
+			)
+		})
+
 		it("filters native tools for create-epics step 3", async function () {
 			await runPromptTest(
 				this,

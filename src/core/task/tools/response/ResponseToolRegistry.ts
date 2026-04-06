@@ -94,6 +94,7 @@ const RESPONSE_TOOL_METADATA: Record<ClineDefaultTool, ResponseToolMetadata | un
 	[ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT]: undefined,
 	[ClineDefaultTool.BUILD_REVIEW_INPUT]: undefined,
 	[ClineDefaultTool.BUILD_EPICS_DOCUMENT]: undefined,
+	[ClineDefaultTool.SELECT_TARGET_EPIC]: undefined,
 	[ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE]: undefined,
 	[ClineDefaultTool.USE_SUBAGENTS]: undefined,
 }

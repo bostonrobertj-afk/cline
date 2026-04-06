@@ -28,6 +28,7 @@ import { list_code_definition_names_variants } from "../tools/list_code_definiti
 import { read_file_variants } from "../tools/read_file"
 import { read_file_range_variants } from "../tools/read_file_range"
 import { search_files_variants } from "../tools/search_files"
+import { select_target_epic_variants } from "../tools/select_target_epic"
 import { send_user_message_variants } from "../tools/send_user_message"
 import { set_workflow_placeholders_variants } from "../tools/set_workflow_placeholders"
 import { story_notes_update_variants } from "../tools/story_notes_update"
@@ -352,7 +353,33 @@ describe("workflow placeholder tool gating", () => {
 		expect(tool.contextRequirements).to.equal(undefined)
 	})
 
-	it("gates workflow_progress_request to create-prd steps 3 through 14 and create-epics step 3", () => {
+	it("gates select_target_epic to pi-planning step 2", () => {
+		const tool = select_target_epic_variants[0]
+
+		expect(
+			tool.contextRequirements?.({
+				...mockContext,
+				activePlaceholderWorkflowName: "pi-planning.md",
+				activePlaceholderWorkflowStepNumber: 2,
+			}),
+		).to.equal(true)
+		expect(
+			tool.contextRequirements?.({
+				...mockContext,
+				activePlaceholderWorkflowName: "pi-planning.md",
+				activePlaceholderWorkflowStepNumber: 3,
+			}),
+		).to.equal(false)
+		expect(
+			tool.contextRequirements?.({
+				...mockContext,
+				activePlaceholderWorkflowName: "create-epics.md",
+				activePlaceholderWorkflowStepNumber: 2,
+			}),
+		).to.equal(false)
+	})
+
+	it("gates workflow_progress_request to create-prd steps 3 through 14, create-epics step 3, and pi-planning steps 4 and 5", () => {
 		const tool = workflow_progress_request_variants[0]
 
 		expect(
@@ -381,6 +408,27 @@ describe("workflow placeholder tool gating", () => {
 				...mockContext,
 				activePlaceholderWorkflowName: "create-epics.md",
 				activePlaceholderWorkflowStepNumber: 2,
+			}),
+		).to.equal(false)
+		expect(
+			tool.contextRequirements?.({
+				...mockContext,
+				activePlaceholderWorkflowName: "pi-planning.md",
+				activePlaceholderWorkflowStepNumber: 4,
+			}),
+		).to.equal(true)
+		expect(
+			tool.contextRequirements?.({
+				...mockContext,
+				activePlaceholderWorkflowName: "pi-planning.md",
+				activePlaceholderWorkflowStepNumber: 5,
+			}),
+		).to.equal(true)
+		expect(
+			tool.contextRequirements?.({
+				...mockContext,
+				activePlaceholderWorkflowName: "pi-planning.md",
+				activePlaceholderWorkflowStepNumber: 3,
 			}),
 		).to.equal(false)
 	})
@@ -888,6 +936,27 @@ describe("native tool placeholder replacement", () => {
 			"Build or resolve the canonical epics artifact at {output_folder}/planning_artifacts/epics.md from workflow-owned placeholder state. Resolve inputs from workflow state; there are no human-supplied parameters.",
 		)
 		expect(Object.keys(openAIProperties)).to.deep.equal([])
+	})
+
+	it("compacts native select_target_epic descriptions", () => {
+		const context: SystemPromptContext = {
+			...mockContext,
+			enableNativeToolCalls: true,
+			useMinimalGptPrompt: true,
+			providerInfo: {
+				providerId: "openai",
+				model: { id: "gpt-5.4-2026-03-05", info: { supportsPromptCache: false } },
+				mode: "act",
+			},
+			activePlaceholderWorkflowName: "pi-planning.md",
+			activePlaceholderWorkflowStepNumber: 2,
+		}
+
+		const openAI = toolSpecFunctionDefinition(select_target_epic_variants[0], context)
+
+		expect(getOpenAIFunctionTool(openAI).description).to.equal(
+			"Show the runtime-owned pi-planning Step 2 epic picker. Resolve {epics_document} from workflow state, extract canonical epic headings, ask the exact runtime-owned followup question, and persist the clicked label as {target_epic}.",
+		)
 	})
 
 	it("compacts native workflow_progress_request descriptions with no parameters", () => {
