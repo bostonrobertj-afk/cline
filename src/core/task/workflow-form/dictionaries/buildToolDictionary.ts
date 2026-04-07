@@ -90,7 +90,7 @@ export const buildReviewInputToolDictionaryConfig: WorkflowFormToolDictionaryCon
 	overviewLines: [
 		"Review Input Artifact. Build and replace the stable review-input artifact at {review_input}.",
 		"",
-		"Workflow-owned Story File. The active placeholder workflow must already provide {story_path}; the form does not recollect it from the human.",
+		"Workflow-owned Story File. The active workflow must already provide {story_path}; the form does not recollect it from the human.",
 		"",
 		"Workflow-owned Diff Artifact. The stable diff artifact at {diff_output} is resolved automatically and is not recollected from the human.",
 	],
