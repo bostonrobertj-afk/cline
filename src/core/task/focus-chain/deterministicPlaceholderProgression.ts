@@ -36,6 +36,7 @@ export function isDeterministicPlaceholderWorkflowSupported(
 		workflowName === "code-review.md" ||
 		workflowName === "create-epics.md" ||
 		workflowName === "pi-planning.md" ||
+		workflowName === "create-story.md" ||
 		workflowName === "dev-story.md" ||
 		workflowName === "review-adversarial-general.md" ||
 		workflowName === "blind-review.md" ||
@@ -50,6 +51,21 @@ type DeterministicStepEvaluationResult = {
 	placeholderValuesChanged?: boolean
 	deterministicStateChanged?: boolean
 }
+
+const CREATE_STORY_REQUIRED_TEMPLATE_HEADINGS = [
+	"## Story",
+	"## Acceptance Criteria",
+	"## Tasks / Subtasks",
+	"## Senior Developer QA Findings",
+	"## Dev Notes",
+	"### Project Structure Notes",
+	"### References",
+	"## Dev Agent Record",
+	"### Agent Model Used",
+	"### Debug Log References",
+	"### Completion Notes List",
+	"### File List",
+] as const
 
 function getMergedPlaceholderValues(taskState: TaskState): Record<string, string> {
 	return (
@@ -105,6 +121,56 @@ function extractMarkdownSection(fileText: string, heading: string): string | und
 	return fileText.slice(sectionStart, sectionEnd).trim()
 }
 
+function normalizeInsignificantWhitespace(value: string): string {
+	return value
+		.replace(/\r\n/g, "\n")
+		.replace(/[ \t]+$/gm, "")
+		.replace(/\n{3,}/g, "\n\n")
+		.trim()
+}
+
+function extractCreateStoryTopHeadingLine(fileText: string): string | undefined {
+	return fileText.match(/^# Story[^\n]*$/m)?.[0].trim()
+}
+
+function extractCreateStoryEpicDeliverySpecStoryBlock(fileText: string, storyNumber: string): string | undefined {
+	const trimmedStoryNumber = storyNumber.trim()
+	if (!trimmedStoryNumber) {
+		return undefined
+	}
+
+	const escapedStoryNumber = trimmedStoryNumber.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+	const headingRegex = new RegExp(`^##\\s+Story\\s+${escapedStoryNumber}\\s*$`, "m")
+	const headingMatch = headingRegex.exec(fileText)
+	if (!headingMatch) {
+		return undefined
+	}
+
+	const sectionStart = headingMatch.index
+	const remainingText = fileText.slice(sectionStart + headingMatch[0].length)
+	const nextHeadingMatch = /^##\s+Story\s+/m.exec(remainingText)
+	const sectionEnd = nextHeadingMatch ? sectionStart + headingMatch[0].length + nextHeadingMatch.index : fileText.length
+	return fileText.slice(sectionStart, sectionEnd).trim()
+}
+
+function extractCreateStoryEpicDeliverySpecSection(
+	storyBlock: string,
+	heading: "### Objective" | "### Acceptance Criteria",
+): string | undefined {
+	const escapedHeading = heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+	const headingRegex = new RegExp(`^${escapedHeading}\\s*$`, "m")
+	const headingMatch = headingRegex.exec(storyBlock)
+	if (!headingMatch) {
+		return undefined
+	}
+
+	const sectionStart = headingMatch.index + headingMatch[0].length
+	const remainingText = storyBlock.slice(sectionStart)
+	const nextHeadingMatch = /^###\s+/m.exec(remainingText)
+	const sectionEnd = nextHeadingMatch ? sectionStart + nextHeadingMatch.index : storyBlock.length
+	return storyBlock.slice(sectionStart, sectionEnd).trim()
+}
+
 function sectionHasNoUncheckedChecklistItems(sectionText: string): boolean {
 	return !/^\s*-\s*\[\s\]\s+/m.test(sectionText)
 }
@@ -125,6 +191,92 @@ function getCreateEpicsCanonicalArtifactPath(placeholders: Record<string, string
 	}
 
 	return resolveArtifactPlaceholderPath(placeholders, path.join(outputFolder, "planning_artifacts", "epics.md"))
+}
+
+function getCreateStoryCanonicalArtifactDir(placeholders: Record<string, string>): string | undefined {
+	const outputFolder = placeholders.output_folder?.trim()
+	if (!outputFolder) {
+		return undefined
+	}
+
+	return resolveArtifactPlaceholderPath(placeholders, path.join(outputFolder, "implementation-artifacts"))
+}
+
+async function validateCreateStoryScaffoldAgainstEpicDeliverySpec(args: {
+	placeholders: Record<string, string>
+}): Promise<boolean> {
+	const storyDoc = args.placeholders.story_doc?.trim()
+	const epicDeliverySpec = args.placeholders.epic_delivery_spec?.trim()
+	const storyNumber = args.placeholders.story_number?.trim()
+	if (!storyDoc || !epicDeliverySpec || !storyNumber) {
+		return false
+	}
+
+	const resolvedStoryDocPath = resolveArtifactPlaceholderPath(args.placeholders, storyDoc)
+	const resolvedEpicDeliverySpecPath = resolveArtifactPlaceholderPath(args.placeholders, epicDeliverySpec)
+	const canonicalArtifactDir = getCreateStoryCanonicalArtifactDir(args.placeholders)
+	if (!canonicalArtifactDir || !arePathsEqual(path.dirname(resolvedStoryDocPath), canonicalArtifactDir)) {
+		return false
+	}
+
+	const [storyDocText, epicDeliverySpecText] = await Promise.all([
+		readFileIfExists(resolvedStoryDocPath),
+		readFileIfExists(resolvedEpicDeliverySpecPath),
+	])
+	if (!storyDocText || !epicDeliverySpecText) {
+		return false
+	}
+
+	if (!hasTopLevelStatusValue(storyDocText, ["backlog"])) {
+		return false
+	}
+
+	for (const heading of CREATE_STORY_REQUIRED_TEMPLATE_HEADINGS) {
+		if (extractMarkdownSection(storyDocText, heading) === undefined) {
+			return false
+		}
+	}
+
+	const storyHeadingLine = extractCreateStoryTopHeadingLine(storyDocText)
+	if (!storyHeadingLine || storyHeadingLine.includes("{{")) {
+		return false
+	}
+
+	const escapedStoryNumber = storyNumber.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+	if (!new RegExp(`^# Story\\s+${escapedStoryNumber}(?::|\\s|$)`).test(normalizeInsignificantWhitespace(storyHeadingLine))) {
+		return false
+	}
+
+	const storySection = extractMarkdownSection(storyDocText, "## Story")
+	if (!storySection || storySection.includes("{{")) {
+		return false
+	}
+
+	const acceptanceCriteriaSection = extractMarkdownSection(storyDocText, "## Acceptance Criteria")
+	if (!acceptanceCriteriaSection || acceptanceCriteriaSection.includes("[Add acceptance criteria from epics/PRD]")) {
+		return false
+	}
+
+	const storyBlock = extractCreateStoryEpicDeliverySpecStoryBlock(epicDeliverySpecText, storyNumber)
+	if (!storyBlock) {
+		return false
+	}
+
+	const deliverySpecObjective = extractCreateStoryEpicDeliverySpecSection(storyBlock, "### Objective")
+	if (!deliverySpecObjective) {
+		return false
+	}
+
+	const deliverySpecAcceptanceCriteria = extractCreateStoryEpicDeliverySpecSection(storyBlock, "### Acceptance Criteria")
+	if (!deliverySpecAcceptanceCriteria) {
+		return false
+	}
+
+	return (
+		normalizeInsignificantWhitespace(storySection) === normalizeInsignificantWhitespace(deliverySpecObjective) &&
+		normalizeInsignificantWhitespace(acceptanceCriteriaSection) ===
+			normalizeInsignificantWhitespace(deliverySpecAcceptanceCriteria)
+	)
 }
 
 function didSuccessfulAttemptCompletionOccur(toolContext?: DeterministicPlaceholderToolContext): boolean {
@@ -740,6 +892,63 @@ async function evaluateCreateEpicsStep(args: {
 	}
 }
 
+async function evaluateCreateStoryStep(args: {
+	taskState: TaskState
+	stepNumber: number
+	toolContext?: DeterministicPlaceholderToolContext
+}): Promise<DeterministicStepEvaluationResult> {
+	const placeholders = getMergedPlaceholderValues(args.taskState)
+
+	switch (args.stepNumber) {
+		case 1: {
+			const epicDeliverySpec = placeholders.epic_delivery_spec?.trim()
+			const storyNumber = placeholders.story_number?.trim()
+			if (!epicDeliverySpec || !storyNumber) {
+				return { completed: false }
+			}
+
+			const resolvedEpicDeliverySpecPath = resolveArtifactPlaceholderPath(placeholders, epicDeliverySpec)
+			if (!(await fileExistsForPlaceholderWorkflowWriteProof(resolvedEpicDeliverySpecPath))) {
+				return { completed: false }
+			}
+
+			return {
+				completed: true,
+				reason: "epic_delivery_spec resolves to an existing file path and story_number was already available in workflow placeholder state.",
+			}
+		}
+		case 2: {
+			if (!(await validateCreateStoryScaffoldAgainstEpicDeliverySpec({ placeholders }))) {
+				return { completed: false }
+			}
+
+			return {
+				completed: true,
+				reason: "story_doc already exists in the canonical implementation-artifacts location, preserves the full story template heading set, and matches the selected story content from epic_delivery_spec.",
+			}
+		}
+		case 5: {
+			const storyDoc = placeholders.story_doc?.trim()
+			if (!storyDoc) {
+				return { completed: false }
+			}
+
+			const resolvedStoryDocPath = resolveArtifactPlaceholderPath(placeholders, storyDoc)
+			const storyDocText = await readFileIfExists(resolvedStoryDocPath)
+			if (!storyDocText || !hasTopLevelStatusValue(storyDocText, ["ready-for-dev"])) {
+				return { completed: false }
+			}
+
+			return {
+				completed: true,
+				reason: "The story document now contains Status: ready-for-dev.",
+			}
+		}
+		default:
+			return { completed: false }
+	}
+}
+
 async function evaluateWriteRemediationStoryStep(args: {
 	taskState: TaskState
 	stepNumber: number
@@ -897,6 +1106,14 @@ async function evaluateDeterministicStep(args: {
 
 	if (args.workflowName === "pi-planning.md") {
 		return evaluatePiPlanningStep({
+			taskState: args.taskState,
+			stepNumber: args.stepNumber,
+			toolContext: args.toolContext,
+		})
+	}
+
+	if (args.workflowName === "create-story.md") {
+		return evaluateCreateStoryStep({
 			taskState: args.taskState,
 			stepNumber: args.stepNumber,
 			toolContext: args.toolContext,

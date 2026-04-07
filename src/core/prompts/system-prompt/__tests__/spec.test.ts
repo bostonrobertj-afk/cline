@@ -24,6 +24,7 @@ import { build_epic_delivery_spec_variants } from "../tools/build_epic_delivery_
 import { build_epics_document_variants } from "../tools/build_epics_document"
 import { build_review_diff_output_variants } from "../tools/build_review_diff_output"
 import { build_review_input_variants } from "../tools/build_review_input"
+import { build_story_document_variants } from "../tools/build_story_document"
 import { generate_plan_output_variants } from "../tools/generate_plan_output"
 import { list_code_definition_names_variants } from "../tools/list_code_definition_names"
 import { read_file_variants } from "../tools/read_file"
@@ -406,7 +407,33 @@ describe("workflow placeholder tool gating", () => {
 		).to.equal(false)
 	})
 
-	it("gates workflow_progress_request to create-prd steps 3 through 14, create-epics step 3, and pi-planning steps 4 and 5", () => {
+	it("gates build_story_document to create-story step 2", () => {
+		const tool = build_story_document_variants[0]
+
+		expect(
+			tool.contextRequirements?.({
+				...mockContext,
+				activePlaceholderWorkflowName: "create-story.md",
+				activePlaceholderWorkflowStepNumber: 2,
+			}),
+		).to.equal(true)
+		expect(
+			tool.contextRequirements?.({
+				...mockContext,
+				activePlaceholderWorkflowName: "create-story.md",
+				activePlaceholderWorkflowStepNumber: 3,
+			}),
+		).to.equal(false)
+		expect(
+			tool.contextRequirements?.({
+				...mockContext,
+				activePlaceholderWorkflowName: "pi-planning.md",
+				activePlaceholderWorkflowStepNumber: 2,
+			}),
+		).to.equal(false)
+	})
+
+	it("gates workflow_progress_request to create-prd steps 3 through 14, create-story steps 3 and 4, create-epics step 3, and pi-planning steps 4 and 5", () => {
 		const tool = workflow_progress_request_variants[0]
 
 		expect(
@@ -421,6 +448,27 @@ describe("workflow placeholder tool gating", () => {
 				...mockContext,
 				activePlaceholderWorkflowName: "create-prd.md",
 				activePlaceholderWorkflowStepNumber: 2,
+			}),
+		).to.equal(false)
+		expect(
+			tool.contextRequirements?.({
+				...mockContext,
+				activePlaceholderWorkflowName: "create-story.md",
+				activePlaceholderWorkflowStepNumber: 3,
+			}),
+		).to.equal(true)
+		expect(
+			tool.contextRequirements?.({
+				...mockContext,
+				activePlaceholderWorkflowName: "create-story.md",
+				activePlaceholderWorkflowStepNumber: 4,
+			}),
+		).to.equal(true)
+		expect(
+			tool.contextRequirements?.({
+				...mockContext,
+				activePlaceholderWorkflowName: "create-story.md",
+				activePlaceholderWorkflowStepNumber: 5,
 			}),
 		).to.equal(false)
 		expect(
@@ -984,6 +1032,29 @@ describe("native tool placeholder replacement", () => {
 
 		expect(getOpenAIFunctionTool(openAI).description).to.equal(
 			"Build the canonical pi-planning Step 3 delivery spec at {output_folder}/implementation-artifacts/epic-<number>-delivery-spec.md from workflow-owned placeholder state. Resolve {epics_document} and {target_epic} from workflow state, preserve the full template structure, and persist the resolved artifact path as {epic_delivery_spec}.",
+		)
+		expect(Object.keys(openAIProperties)).to.deep.equal([])
+	})
+
+	it("compacts native build_story_document descriptions and parameter text", () => {
+		const context: SystemPromptContext = {
+			...mockContext,
+			enableNativeToolCalls: true,
+			useMinimalGptPrompt: true,
+			providerInfo: {
+				providerId: "openai",
+				model: { id: "gpt-5.4-2026-03-05", info: { supportsPromptCache: false } },
+				mode: "act",
+			},
+			activePlaceholderWorkflowName: "create-story.md",
+			activePlaceholderWorkflowStepNumber: 2,
+		}
+
+		const openAI = toolSpecFunctionDefinition(build_story_document_variants[0], context)
+		const openAIProperties = getOpenAIProperties(openAI)
+
+		expect(getOpenAIFunctionTool(openAI).description).to.equal(
+			"Build the canonical create-story Step 2 scaffold at {output_folder}/implementation-artifacts/story<epic>.<story>.md from workflow-owned placeholder state. Resolve {epic_delivery_spec}, {story_number}, and {story_template} from workflow state, preserve the full story template structure, and persist the resolved artifact path as {story_doc}.",
 		)
 		expect(Object.keys(openAIProperties)).to.deep.equal([])
 	})

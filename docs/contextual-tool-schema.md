@@ -467,11 +467,10 @@ This section scopes only placeholder workflows under `/Users/robertboston/Docume
 ### create-story.md
 
 - Step 1: `DOC_READ`, `DOC_WRITE`
-- Step 2: `DOC_READ`, `LOCAL_EXEC`
-- Step 3: `DOC_READ`
-- Step 4: `EXTERNAL_RESEARCH`
+- Step 2: `STORY_DOCUMENT_BUILD`
+- Step 3: `DOC_READ`, `DOC_WRITE`, `CODE_READ`, `INDXR_DISCOVERY`, `INDXR_SOURCE_READ`, `INDXR_SYMBOL_GRAPH`, `WORKFLOW_PROGRESS_REQUEST`
+- Step 4: `DOC_READ`, `DOC_WRITE`, `CODE_READ`, `INDXR_DISCOVERY`, `INDXR_SOURCE_READ`, `INDXR_SYMBOL_GRAPH`, `SUBAGENT_COORD`, `WORKFLOW_PROGRESS_REQUEST`
 - Step 5: `DOC_READ`, `DOC_WRITE`
-- Step 6: `DOC_READ`, `DOC_WRITE`
 
 ### create-ux-design.md
 

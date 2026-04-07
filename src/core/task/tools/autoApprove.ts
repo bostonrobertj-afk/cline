@@ -56,6 +56,7 @@ export class AutoApprove {
 				case ClineDefaultTool.BUILD_EPICS_DOCUMENT:
 				case ClineDefaultTool.SELECT_TARGET_EPIC:
 				case ClineDefaultTool.BUILD_EPIC_DELIVERY_SPEC:
+				case ClineDefaultTool.BUILD_STORY_DOCUMENT:
 				case ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE:
 				case ClineDefaultTool.BASH:
 				case ClineDefaultTool.USE_SUBAGENTS:
@@ -86,6 +87,7 @@ export class AutoApprove {
 				case ClineDefaultTool.BUILD_EPICS_DOCUMENT:
 				case ClineDefaultTool.SELECT_TARGET_EPIC:
 				case ClineDefaultTool.BUILD_EPIC_DELIVERY_SPEC:
+				case ClineDefaultTool.BUILD_STORY_DOCUMENT:
 				case ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE:
 				case ClineDefaultTool.BASH:
 				case ClineDefaultTool.USE_SUBAGENTS:
@@ -118,6 +120,7 @@ export class AutoApprove {
 			case ClineDefaultTool.BUILD_EPICS_DOCUMENT:
 			case ClineDefaultTool.SELECT_TARGET_EPIC:
 			case ClineDefaultTool.BUILD_EPIC_DELIVERY_SPEC:
+			case ClineDefaultTool.BUILD_STORY_DOCUMENT:
 			case ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE:
 				return [autoApprovalSettings.actions.editFiles, autoApprovalSettings.actions.editFilesExternally ?? false]
 			case ClineDefaultTool.BASH:

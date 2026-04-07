@@ -71,6 +71,7 @@ Side effects may also include:
   - `code-review.md`
   - `create-epics.md`
   - `pi-planning.md`
+  - `create-story.md`
   - `dev-story.md`
   - `review-adversarial-general.md`
   - `blind-review.md`
@@ -113,6 +114,11 @@ Current evaluator examples:
   - Step 2 completes when `target_epic` already exists in workflow placeholder state and is non-empty after trimming
   - Step 3 completes when `epic_delivery_spec` resolves to an existing file; a current-task write proof only changes the completion reason
   - Steps 4 and 5 are not evaluator-completed; they transition through `workflow_progress_request`
+- `create-story.md`
+  - Step 1 completes when `epic_delivery_spec` resolves to an existing file path and `story_number` is already present in workflow placeholder state
+  - Step 2 completes when `story_doc` exists under `{output_folder}/implementation-artifacts`, keeps `Status: backlog`, preserves every required template heading, and matches the selected epic-delivery-spec story content for the story body and acceptance criteria after insignificant whitespace normalization
+  - Steps 3 and 4 are not evaluator-completed; they transition through `workflow_progress_request`
+  - Step 5 completes when `story_doc` contains `Status: ready-for-dev`
 - `review-adversarial-general.md`
   - Step 1 completes when `diff_output` resolves to an existing file path
   - Step 2 completes when `adversarial-review-findings.md` was written during the current task and still exists
@@ -182,6 +188,10 @@ This is especially important for steps whose completion is defined by:
 - In `create-epics.md`, if the canonical epics artifact exists at `{output_folder}/planning_artifacts/epics.md` and `output_file` points to it, Step 2 can auto-complete; when `mode` is `new`, the artifact must also have a current-task write proof.
 - In `pi-planning.md`, if `epics_document` and `architecture_document` already exist in placeholder state, Step 1 can complete immediately on the next deterministic pass.
 - In `pi-planning.md`, if Step 2 auto-completes and `epic_delivery_spec` already resolves to an existing file, Step 3 can also auto-complete in the same deterministic pass without another assistant turn.
+- In `create-story.md`, if `epic_delivery_spec` already resolves to an existing file and `story_number` is already present, Step 1 can complete immediately on the next deterministic pass.
+- In `create-story.md`, if `story_doc` already exists under `{output_folder}/implementation-artifacts` with `Status: backlog`, keeps every required template heading, and its story body plus acceptance criteria match the selected delivery-spec story after insignificant whitespace normalization, Step 2 can auto-complete.
+- In `create-story.md`, Steps 3 and 4 do not auto-complete from document state alone because they are governed by `workflow_progress_request`.
+- In `create-story.md`, if `story_doc` now contains `Status: ready-for-dev`, Step 5 can auto-complete.
 - In `review-adversarial-general.md`, if `diff_output` resolves to an existing file, Step 1 can complete immediately on the next deterministic pass.
 - In `review-adversarial-general.md`, if Step 2 writes `{output_folder}/adversarial-review-findings.md` during the current task and the artifact still exists, Step 2 can auto-complete.
 - In `blind-review.md`, if `diff_output` resolves to an existing file, Step 1 can complete immediately on the next deterministic pass.

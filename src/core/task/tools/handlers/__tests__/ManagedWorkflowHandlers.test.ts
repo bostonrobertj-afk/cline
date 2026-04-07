@@ -20,6 +20,7 @@ import { BuildEpicDeliverySpecToolHandler } from "../BuildEpicDeliverySpecToolHa
 import { BuildEpicsDocumentToolHandler } from "../BuildEpicsDocumentToolHandler"
 import { BuildReviewDiffOutputToolHandler } from "../BuildReviewDiffOutputToolHandler"
 import { BuildReviewInputToolHandler } from "../BuildReviewInputToolHandler"
+import { BuildStoryDocumentToolHandler } from "../BuildStoryDocumentToolHandler"
 import { CodeReviewSpecUpdateToolHandler } from "../CodeReviewSpecUpdateToolHandler"
 import { CompleteWorkflowItemToolHandler } from "../CompleteWorkflowItemToolHandler"
 import { SetWorkflowPlaceholdersToolHandler } from "../SetWorkflowPlaceholdersToolHandler"
@@ -474,6 +475,121 @@ ${options?.selectedEpicMissing === true ? "" : `\n${epicThreeSections}`}
 		repoDir,
 		epicsRelativePath,
 		epicsPath,
+		templatePath,
+		artifactPath,
+	}
+}
+
+async function createBuildStoryDocumentRepo(options?: {
+	includeWorkflowConfig?: boolean
+	omitStoryTemplate?: boolean
+	preexistingArtifact?: string
+	omitRequiredSection?: "Objective" | "Acceptance Criteria" | "Sequencing/ Dependencies"
+	selectedStoryMissing?: boolean
+}) {
+	const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), "build-story-document-"))
+	const workflowConfigPath = getCanonicalWorkflowConfigPath(repoDir)
+	const includeWorkflowConfig = options?.includeWorkflowConfig !== false
+	const epicDeliverySpecRelativePath = "planning/implementation-artifacts/epic-3-delivery-spec.md"
+	const epicDeliverySpecPath = path.join(repoDir, epicDeliverySpecRelativePath)
+	const templatePath = path.join(repoDir, ".cline", "skills", "bmad-create-story", "template.md")
+	const artifactPath = path.join(repoDir, "planning", "implementation-artifacts", "story3.2.md")
+
+	if (includeWorkflowConfig) {
+		await fs.mkdir(path.dirname(workflowConfigPath), { recursive: true })
+		const workflowConfigLines = ['output_folder: "planning"']
+		if (options?.omitStoryTemplate !== true) {
+			workflowConfigLines.push('story_template: "{project-root}/.cline/skills/bmad-create-story/template.md"')
+		}
+		workflowConfigLines.push("")
+		await fs.writeFile(workflowConfigPath, workflowConfigLines.join("\n"))
+	}
+
+	await fs.mkdir(path.dirname(templatePath), { recursive: true })
+	await fs.writeFile(
+		templatePath,
+		`# Story {{epic_num}}.{{story_num}}
+
+Status: backlog
+
+<!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
+
+## Story
+
+As a 
+I want 
+so that
+
+## Acceptance Criteria
+
+## Sequencing / Dependencies
+
+## Tasks / Subtasks
+
+- [ ] Task 1 (AC: #)
+  - [ ] Subtask 1.1
+- [ ] Task 2 (AC: #)
+  - [ ] Subtask 2.1
+
+## Latest Review Findings
+
+## Dev Notes
+
+- Relevant architecture patterns and constraints
+- Source tree components to touch
+- Testing standards summary
+
+### Project Structure Notes
+
+- Alignment with unified project structure (paths, modules, naming)
+- Detected conflicts or variances (with rationale)
+
+### References
+
+- Cite all technical details with source paths and sections, e.g. [Source: docs/<file>.md#Section]
+
+## Dev Agent Record
+
+### Debug Log References
+
+### Completion Notes List
+
+### File List
+`,
+	)
+
+	const selectedStorySections = [
+		options?.omitRequiredSection === "Objective"
+			? undefined
+			: "### Objective\nAs a release manager\nI want checkout instrumentation\nso that launch readiness stays visible\n",
+		options?.omitRequiredSection === "Acceptance Criteria"
+			? undefined
+			: "### Acceptance Criteria\n- Capture checkout success rate.\n- Surface funnel drop-off by step.\n",
+		options?.omitRequiredSection === "Sequencing/ Dependencies"
+			? undefined
+			: "### Sequencing/ Dependencies\n- Depends on Epic 3 platform telemetry hooks.\n- Follow Story 3.1 event contract rollout.\n",
+	]
+		.filter((section): section is string => typeof section === "string")
+		.join("\n")
+
+	await fs.mkdir(path.dirname(epicDeliverySpecPath), { recursive: true })
+	await fs.writeFile(
+		epicDeliverySpecPath,
+		`# Epic 3 Delivery Spec
+
+${options?.selectedStoryMissing === true ? "" : `## Story 3.2\n\n${selectedStorySections}\n`}
+`,
+	)
+
+	if (options?.preexistingArtifact !== undefined) {
+		await fs.mkdir(path.dirname(artifactPath), { recursive: true })
+		await fs.writeFile(artifactPath, options.preexistingArtifact)
+	}
+
+	return {
+		repoDir,
+		epicDeliverySpecRelativePath,
+		epicDeliverySpecPath,
 		templatePath,
 		artifactPath,
 	}
@@ -2750,6 +2866,567 @@ Inspect the prepared review input and write findings.`,
 			const artifact = await fs.readFile(artifactPath, "utf8")
 			expect(artifact).to.not.equal(staleContent)
 			expect(artifact).to.contain("# Epic 3: Checkout")
+		} finally {
+			sandbox.restore()
+			HostProvider.reset()
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("builds the canonical story document from the full template and persists story_doc", async () => {
+		const sandbox = sinon.createSandbox()
+		const { repoDir, epicDeliverySpecRelativePath, artifactPath } = await createBuildStoryDocumentRepo({
+			preexistingArtifact: "# stale\n",
+		})
+
+		try {
+			setVscodeHostProviderMock()
+			sandbox.stub(HostProvider.workspace, "getWorkspacePaths").resolves({ paths: [repoDir] } as any)
+
+			const handler = new BuildStoryDocumentToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "create-story.md"
+			config.taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "create-story.md",
+				contents: "## Step 2: Build Story Document Scaffold\nBuild the canonical story scaffold.\n",
+			}
+			config.taskState.currentFocusChainChecklist =
+				"- [x] Step 1:  (System-Owned) Resolve the target story\n- [ ] Step 2:  (System-Owned) Build Story Document Scaffold"
+			config.taskState.activePlaceholderWorkflowValues = {
+				epic_delivery_spec: epicDeliverySpecRelativePath,
+				story_number: "3.2",
+			}
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "build_story_document",
+				params: {},
+				partial: false,
+			} as any)
+
+			const payload = JSON.parse(String(result))
+			expect(payload.persisted).to.equal(true)
+			expect(payload.artifact_path).to.equal(artifactPath)
+			expect(payload.story_doc_available).to.equal(true)
+			expect(config.taskState.activePlaceholderWorkflowValues?.story_doc).to.equal(artifactPath)
+			expect(config.taskState.activePlaceholderWorkflowTaskWriteProofPaths).to.include(artifactPath)
+			expect(config.taskState.didEditFile).to.equal(true)
+			expect(config.taskState.fileReadCache.has(artifactPath.toLowerCase())).to.equal(false)
+
+			const artifact = await fs.readFile(artifactPath, "utf8")
+			expect(artifact).to.contain("# Story 3.2")
+			expect(artifact).to.contain("Status: backlog")
+			expect(artifact).to.contain("## Story")
+			expect(artifact).to.contain("As a release manager")
+			expect(artifact).to.contain("I want checkout instrumentation")
+			expect(artifact).to.contain("so that launch readiness stays visible")
+			expect(artifact).to.contain("## Acceptance Criteria")
+			expect(artifact).to.contain("- Capture checkout success rate.")
+			expect(artifact).to.contain("- Surface funnel drop-off by step.")
+			expect(artifact).to.contain("## Sequencing / Dependencies")
+			expect(artifact).to.contain("- Depends on Epic 3 platform telemetry hooks.")
+			expect(artifact).to.contain("- Follow Story 3.1 event contract rollout.")
+			expect(artifact).to.contain("## Tasks / Subtasks")
+			expect(artifact).to.contain("## Latest Review Findings")
+			expect(artifact).to.contain("## Dev Notes")
+			expect(artifact).to.contain("### Project Structure Notes")
+			expect(artifact).to.contain("### References")
+			expect(artifact).to.contain("## Dev Agent Record")
+			expect(artifact).to.contain("### Debug Log References")
+			expect(artifact).to.contain("### Completion Notes List")
+			expect(artifact).to.contain("### File List")
+		} finally {
+			sandbox.restore()
+			HostProvider.reset()
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("requires epic_delivery_spec from merged placeholder workflow state for build_story_document", async () => {
+		const { repoDir } = await createBuildStoryDocumentRepo()
+
+		try {
+			const handler = new BuildStoryDocumentToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "create-story.md"
+			config.taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "create-story.md",
+				contents: "## Step 2: Build Story Document Scaffold\nBuild the canonical story scaffold.\n",
+			}
+			config.taskState.currentFocusChainChecklist =
+				"- [x] Step 1:  (System-Owned) Resolve the target story\n- [ ] Step 2:  (System-Owned) Build Story Document Scaffold"
+			config.taskState.activePlaceholderWorkflowValues = {
+				story_number: "3.2",
+			}
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "build_story_document",
+				params: {},
+				partial: false,
+			} as any)
+
+			expect(result).to.equal(
+				formatResponse.toolError(
+					"Could not resolve workflow placeholder 'epic_delivery_spec' from the active placeholder workflow state.",
+				),
+			)
+		} finally {
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("requires story_number from merged placeholder workflow state for build_story_document", async () => {
+		const { repoDir, epicDeliverySpecRelativePath } = await createBuildStoryDocumentRepo()
+
+		try {
+			const handler = new BuildStoryDocumentToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "create-story.md"
+			config.taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "create-story.md",
+				contents: "## Step 2: Build Story Document Scaffold\nBuild the canonical story scaffold.\n",
+			}
+			config.taskState.currentFocusChainChecklist =
+				"- [x] Step 1:  (System-Owned) Resolve the target story\n- [ ] Step 2:  (System-Owned) Build Story Document Scaffold"
+			config.taskState.activePlaceholderWorkflowValues = {
+				epic_delivery_spec: epicDeliverySpecRelativePath,
+			}
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "build_story_document",
+				params: {},
+				partial: false,
+			} as any)
+
+			expect(result).to.equal(
+				formatResponse.toolError(
+					"Could not resolve workflow placeholder 'story_number' from the active placeholder workflow state.",
+				),
+			)
+		} finally {
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("rejects build_story_document outside create-story step 2 context", async () => {
+		const { repoDir, epicDeliverySpecRelativePath } = await createBuildStoryDocumentRepo()
+
+		try {
+			const handler = new BuildStoryDocumentToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "create-story.md"
+			config.taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "create-story.md",
+				contents:
+					"## Step 2: Build Story Document Scaffold\nBuild the canonical story scaffold.\n\n## Step 3: Add Dev Notes\nCapture structure guidance.\n",
+			}
+			config.taskState.currentFocusChainChecklist =
+				"- [x] Step 1:  (System-Owned) Resolve the target story\n- [x] Step 2:  (System-Owned) Build Story Document Scaffold\n- [ ] Step 3: Add Dev Notes"
+			config.taskState.activePlaceholderWorkflowValues = {
+				epic_delivery_spec: epicDeliverySpecRelativePath,
+				story_number: "3.2",
+			}
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "build_story_document",
+				params: {},
+				partial: false,
+			} as any)
+
+			expect(result).to.equal(
+				formatResponse.toolError(
+					"build_story_document can only be used while create-story.md Step 2 is the active placeholder workflow context.",
+				),
+			)
+		} finally {
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("fails with the story_template stable-placeholder error when workflow-config is missing for build_story_document", async () => {
+		const { repoDir, epicDeliverySpecRelativePath } = await createBuildStoryDocumentRepo({ includeWorkflowConfig: false })
+
+		try {
+			const handler = new BuildStoryDocumentToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "create-story.md"
+			config.taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "create-story.md",
+				contents: "## Step 2: Build Story Document Scaffold\nBuild the canonical story scaffold.\n",
+			}
+			config.taskState.currentFocusChainChecklist =
+				"- [x] Step 1:  (System-Owned) Resolve the target story\n- [ ] Step 2:  (System-Owned) Build Story Document Scaffold"
+			config.taskState.activePlaceholderWorkflowValues = {
+				epic_delivery_spec: epicDeliverySpecRelativePath,
+				story_number: "3.2",
+			}
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "build_story_document",
+				params: {},
+				partial: false,
+			} as any)
+
+			expect(result).to.equal(
+				formatResponse.toolError(
+					"Could not resolve stable placeholder 'story_template' from .cline/workflow-config.yaml.",
+				),
+			)
+		} finally {
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("requires story_template from workflow-config stable placeholders for build_story_document", async () => {
+		const { repoDir, epicDeliverySpecRelativePath } = await createBuildStoryDocumentRepo({ omitStoryTemplate: true })
+
+		try {
+			const handler = new BuildStoryDocumentToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "create-story.md"
+			config.taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "create-story.md",
+				contents: "## Step 2: Build Story Document Scaffold\nBuild the canonical story scaffold.\n",
+			}
+			config.taskState.currentFocusChainChecklist =
+				"- [x] Step 1:  (System-Owned) Resolve the target story\n- [ ] Step 2:  (System-Owned) Build Story Document Scaffold"
+			config.taskState.activePlaceholderWorkflowValues = {
+				epic_delivery_spec: epicDeliverySpecRelativePath,
+				story_number: "3.2",
+			}
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "build_story_document",
+				params: {},
+				partial: false,
+			} as any)
+
+			expect(result).to.equal(
+				formatResponse.toolError(
+					"Could not resolve stable placeholder 'story_template' from .cline/workflow-config.yaml.",
+				),
+			)
+		} finally {
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("fails when the canonical story template cannot be read for build_story_document", async () => {
+		const { repoDir, epicDeliverySpecRelativePath, templatePath } = await createBuildStoryDocumentRepo()
+
+		try {
+			await fs.rm(templatePath, { force: true })
+
+			const handler = new BuildStoryDocumentToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "create-story.md"
+			config.taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "create-story.md",
+				contents: "## Step 2: Build Story Document Scaffold\nBuild the canonical story scaffold.\n",
+			}
+			config.taskState.currentFocusChainChecklist =
+				"- [x] Step 1:  (System-Owned) Resolve the target story\n- [ ] Step 2:  (System-Owned) Build Story Document Scaffold"
+			config.taskState.activePlaceholderWorkflowValues = {
+				epic_delivery_spec: epicDeliverySpecRelativePath,
+				story_number: "3.2",
+			}
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "build_story_document",
+				params: {},
+				partial: false,
+			} as any)
+
+			expect(result).to.equal(formatResponse.toolError(`Could not read the canonical story template at ${templatePath}.`))
+		} finally {
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("fails with the approved user-facing message when the selected story cannot be found", async () => {
+		const { repoDir, epicDeliverySpecRelativePath, artifactPath } = await createBuildStoryDocumentRepo({
+			selectedStoryMissing: true,
+		})
+
+		try {
+			const handler = new BuildStoryDocumentToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "create-story.md"
+			config.taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "create-story.md",
+				contents: "## Step 2: Build Story Document Scaffold\nBuild the canonical story scaffold.\n",
+			}
+			config.taskState.currentFocusChainChecklist =
+				"- [x] Step 1:  (System-Owned) Resolve the target story\n- [ ] Step 2:  (System-Owned) Build Story Document Scaffold"
+			config.taskState.activePlaceholderWorkflowValues = {
+				epic_delivery_spec: epicDeliverySpecRelativePath,
+				story_number: "3.2",
+			}
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "build_story_document",
+				params: {},
+				partial: false,
+			} as any)
+
+			expect(result).to.equal(
+				formatResponse.toolError(
+					"Unable to populate story document from the epic delivery spec. Please ensure the epic delivery spec is complete before attempting this workflow.",
+				),
+			)
+			const artifactExists = await fs
+				.access(artifactPath)
+				.then(() => true)
+				.catch(() => false)
+			expect(artifactExists).to.equal(false)
+		} finally {
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("fails with the approved user-facing message when the Objective section is missing", async () => {
+		const { repoDir, epicDeliverySpecRelativePath, artifactPath } = await createBuildStoryDocumentRepo({
+			omitRequiredSection: "Objective",
+		})
+
+		try {
+			const handler = new BuildStoryDocumentToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "create-story.md"
+			config.taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "create-story.md",
+				contents: "## Step 2: Build Story Document Scaffold\nBuild the canonical story scaffold.\n",
+			}
+			config.taskState.currentFocusChainChecklist =
+				"- [x] Step 1:  (System-Owned) Resolve the target story\n- [ ] Step 2:  (System-Owned) Build Story Document Scaffold"
+			config.taskState.activePlaceholderWorkflowValues = {
+				epic_delivery_spec: epicDeliverySpecRelativePath,
+				story_number: "3.2",
+			}
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "build_story_document",
+				params: {},
+				partial: false,
+			} as any)
+
+			expect(result).to.equal(
+				formatResponse.toolError(
+					"Unable to populate story document from the epic delivery spec. Please ensure the epic delivery spec is complete before attempting this workflow.",
+				),
+			)
+			const artifactExists = await fs
+				.access(artifactPath)
+				.then(() => true)
+				.catch(() => false)
+			expect(artifactExists).to.equal(false)
+		} finally {
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("fails with the approved user-facing message when the Acceptance Criteria section is missing", async () => {
+		const { repoDir, epicDeliverySpecRelativePath, artifactPath } = await createBuildStoryDocumentRepo({
+			omitRequiredSection: "Acceptance Criteria",
+		})
+
+		try {
+			const handler = new BuildStoryDocumentToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "create-story.md"
+			config.taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "create-story.md",
+				contents: "## Step 2: Build Story Document Scaffold\nBuild the canonical story scaffold.\n",
+			}
+			config.taskState.currentFocusChainChecklist =
+				"- [x] Step 1:  (System-Owned) Resolve the target story\n- [ ] Step 2:  (System-Owned) Build Story Document Scaffold"
+			config.taskState.activePlaceholderWorkflowValues = {
+				epic_delivery_spec: epicDeliverySpecRelativePath,
+				story_number: "3.2",
+			}
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "build_story_document",
+				params: {},
+				partial: false,
+			} as any)
+
+			expect(result).to.equal(
+				formatResponse.toolError(
+					"Unable to populate story document from the epic delivery spec. Please ensure the epic delivery spec is complete before attempting this workflow.",
+				),
+			)
+			const artifactExists = await fs
+				.access(artifactPath)
+				.then(() => true)
+				.catch(() => false)
+			expect(artifactExists).to.equal(false)
+		} finally {
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("fails with the approved user-facing message when the Sequencing/ Dependencies section is missing", async () => {
+		const { repoDir, epicDeliverySpecRelativePath, artifactPath } = await createBuildStoryDocumentRepo({
+			omitRequiredSection: "Sequencing/ Dependencies",
+		})
+
+		try {
+			const handler = new BuildStoryDocumentToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "create-story.md"
+			config.taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "create-story.md",
+				contents: "## Step 2: Build Story Document Scaffold\nBuild the canonical story scaffold.\n",
+			}
+			config.taskState.currentFocusChainChecklist =
+				"- [x] Step 1:  (System-Owned) Resolve the target story\n- [ ] Step 2:  (System-Owned) Build Story Document Scaffold"
+			config.taskState.activePlaceholderWorkflowValues = {
+				epic_delivery_spec: epicDeliverySpecRelativePath,
+				story_number: "3.2",
+			}
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "build_story_document",
+				params: {},
+				partial: false,
+			} as any)
+
+			expect(result).to.equal(
+				formatResponse.toolError(
+					"Unable to populate story document from the epic delivery spec. Please ensure the epic delivery spec is complete before attempting this workflow.",
+				),
+			)
+			const artifactExists = await fs
+				.access(artifactPath)
+				.then(() => true)
+				.catch(() => false)
+			expect(artifactExists).to.equal(false)
+		} finally {
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("overwrites an existing canonical artifact atomically for build_story_document", async () => {
+		const sandbox = sinon.createSandbox()
+		const staleContent = "# stale\n"
+		const { repoDir, epicDeliverySpecRelativePath, artifactPath } = await createBuildStoryDocumentRepo({
+			preexistingArtifact: staleContent,
+		})
+
+		try {
+			setVscodeHostProviderMock()
+			sandbox.stub(HostProvider.workspace, "getWorkspacePaths").resolves({ paths: [repoDir] } as any)
+
+			const handler = new BuildStoryDocumentToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "create-story.md"
+			config.taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "create-story.md",
+				contents: "## Step 2: Build Story Document Scaffold\nBuild the canonical story scaffold.\n",
+			}
+			config.taskState.currentFocusChainChecklist =
+				"- [x] Step 1:  (System-Owned) Resolve the target story\n- [ ] Step 2:  (System-Owned) Build Story Document Scaffold"
+			config.taskState.activePlaceholderWorkflowValues = {
+				epic_delivery_spec: epicDeliverySpecRelativePath,
+				story_number: "3.2",
+			}
+
+			await handler.execute(config, {
+				type: "tool_use",
+				name: "build_story_document",
+				params: {},
+				partial: false,
+			} as any)
+
+			const artifact = await fs.readFile(artifactPath, "utf8")
+			expect(artifact).to.not.equal(staleContent)
+			expect(artifact).to.contain("# Story 3.2")
+		} finally {
+			sandbox.restore()
+			HostProvider.reset()
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("copies objective, acceptance criteria, and sequencing/dependencies into the correct destination sections for build_story_document", async () => {
+		const sandbox = sinon.createSandbox()
+		const { repoDir, epicDeliverySpecRelativePath, artifactPath } = await createBuildStoryDocumentRepo()
+
+		try {
+			setVscodeHostProviderMock()
+			sandbox.stub(HostProvider.workspace, "getWorkspacePaths").resolves({ paths: [repoDir] } as any)
+
+			const handler = new BuildStoryDocumentToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "create-story.md"
+			config.taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "create-story.md",
+				contents: "## Step 2: Build Story Document Scaffold\nBuild the canonical story scaffold.\n",
+			}
+			config.taskState.currentFocusChainChecklist =
+				"- [x] Step 1:  (System-Owned) Resolve the target story\n- [ ] Step 2:  (System-Owned) Build Story Document Scaffold"
+			config.taskState.activePlaceholderWorkflowValues = {
+				epic_delivery_spec: epicDeliverySpecRelativePath,
+				story_number: "3.2",
+			}
+
+			await handler.execute(config, {
+				type: "tool_use",
+				name: "build_story_document",
+				params: {},
+				partial: false,
+			} as any)
+
+			const artifact = await fs.readFile(artifactPath, "utf8")
+			const objectiveSection = artifact.slice(artifact.indexOf("## Story\n"), artifact.indexOf("## Acceptance Criteria\n"))
+			const acceptanceCriteriaSection = artifact.slice(
+				artifact.indexOf("## Acceptance Criteria\n"),
+				artifact.indexOf("## Sequencing / Dependencies\n"),
+			)
+			const sequencingDependenciesSection = artifact.slice(
+				artifact.indexOf("## Sequencing / Dependencies\n"),
+				artifact.indexOf("## Tasks / Subtasks\n"),
+			)
+
+			expect(objectiveSection).to.contain("As a release manager")
+			expect(objectiveSection).to.contain("I want checkout instrumentation")
+			expect(objectiveSection).to.contain("so that launch readiness stays visible")
+			expect(objectiveSection).to.not.contain("- Capture checkout success rate.")
+			expect(objectiveSection).to.not.contain("- Depends on Epic 3 platform telemetry hooks.")
+
+			expect(acceptanceCriteriaSection).to.contain("- Capture checkout success rate.")
+			expect(acceptanceCriteriaSection).to.contain("- Surface funnel drop-off by step.")
+			expect(acceptanceCriteriaSection).to.not.contain("As a release manager")
+			expect(acceptanceCriteriaSection).to.not.contain("- Depends on Epic 3 platform telemetry hooks.")
+
+			expect(sequencingDependenciesSection).to.contain("- Depends on Epic 3 platform telemetry hooks.")
+			expect(sequencingDependenciesSection).to.contain("- Follow Story 3.1 event contract rollout.")
+			expect(sequencingDependenciesSection).to.not.contain("As a release manager")
+			expect(sequencingDependenciesSection).to.not.contain("- Capture checkout success rate.")
 		} finally {
 			sandbox.restore()
 			HostProvider.reset()

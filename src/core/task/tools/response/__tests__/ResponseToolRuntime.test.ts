@@ -83,6 +83,7 @@ describe("ResponseToolRuntime", () => {
 		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.BUILD_EPICS_DOCUMENT), undefined)
 		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.SELECT_TARGET_EPIC), undefined)
 		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.BUILD_EPIC_DELIVERY_SPEC), undefined)
+		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.BUILD_STORY_DOCUMENT), undefined)
 	})
 
 	it("registers post-turn thread display states for governed response tools", () => {

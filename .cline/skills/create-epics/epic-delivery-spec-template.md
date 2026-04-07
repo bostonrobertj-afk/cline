@@ -21,7 +21,7 @@ So that
 # User Stories
 
 ## Story #
-<!-- Repeat this block for each epic -->
+<!-- Repeat this block for each story -->
 
 ### Objective
 As a

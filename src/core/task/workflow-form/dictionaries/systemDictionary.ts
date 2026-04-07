@@ -76,6 +76,7 @@ export const WORKFLOW_START_SYSTEM_DICTIONARY_KEYS = [
 	"story_doc",
 	"story_key",
 	"story_number",
+	"story_template",
 	"story_path",
 	"target_epic",
 	"target_file",
@@ -559,10 +560,17 @@ export const workflowFormSystemDictionary: Record<WorkflowFormSystemDictionaryKe
 	},
 	story_number: {
 		label: "story_number",
-		medium: "The story number to be assigned to a newly created story.",
+		medium: "Used to identify a story.",
 		long: "",
 		examples: [],
 		contextTags: ["story_number"],
+	},
+	story_template: {
+		label: "story_template",
+		medium: "A fixed template which indicates required sections and structure for a story document.",
+		long: "",
+		examples: [],
+		contextTags: ["story_template"],
 	},
 	story_path: {
 		label: "story_path",

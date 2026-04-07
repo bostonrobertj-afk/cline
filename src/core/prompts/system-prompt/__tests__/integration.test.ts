@@ -780,6 +780,89 @@ describe("Prompt System Integration Tests", () => {
 				},
 			)
 		})
+
+		it("generates a continuation prompt for create-story step 3 with workflow_progress_request guidance", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: { ...mockProviderInfo, mode: "act" },
+					isContinuationTurn: true,
+					activeWorkflowSupportsPlaceholders: true,
+					managedWorkflowActive: false,
+					activePlaceholderWorkflowName: "create-story.md",
+					activePlaceholderWorkflowStepNumber: 3,
+					currentFocusChainChecklist: "- [ ] Step 3: Draft the story narrative",
+				},
+				"fast",
+				async ({ systemPrompt }) => {
+					expect(systemPrompt).to.include("workflow_progress_request")
+					expect(systemPrompt).to.include("Do not include `task_progress`")
+					expect(systemPrompt).to.include(
+						"runtime-owned `Yes` branch completes the next checklist step before the next model request is built",
+					)
+					expect(systemPrompt).to.not.include(
+						"Once you correctly complete the current step, the next step's details will be shown automatically.",
+					)
+					expect(systemPrompt).to.not.include(
+						"use `send_user_message` tool call to briefly tell the user what step you are completing",
+					)
+					expect(systemPrompt).to.include("`workflow_progress_request`")
+				},
+			)
+		})
+
+		it("generates a continuation prompt for create-story step 4 with workflow_progress_request guidance", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: { ...mockProviderInfo, mode: "act" },
+					isContinuationTurn: true,
+					activeWorkflowSupportsPlaceholders: true,
+					managedWorkflowActive: false,
+					activePlaceholderWorkflowName: "create-story.md",
+					activePlaceholderWorkflowStepNumber: 4,
+					currentFocusChainChecklist: "- [ ] Step 4: Refine implementation tasks",
+				},
+				"fast",
+				async ({ systemPrompt }) => {
+					expect(systemPrompt).to.include("workflow_progress_request")
+					expect(systemPrompt).to.include("Do not include `task_progress`")
+					expect(systemPrompt).to.include(
+						"runtime-owned `Yes` branch completes the next checklist step before the next model request is built",
+					)
+					expect(systemPrompt).to.not.include(
+						"Once you correctly complete the current step, the next step's details will be shown automatically.",
+					)
+					expect(systemPrompt).to.not.include(
+						"use `send_user_message` tool call to briefly tell the user what step you are completing",
+					)
+					expect(systemPrompt).to.include("`workflow_progress_request`")
+				},
+			)
+		})
+
+		it("does not generate workflow_progress_request guidance for create-story step 5", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: { ...mockProviderInfo, mode: "act" },
+					isContinuationTurn: true,
+					activeWorkflowSupportsPlaceholders: true,
+					managedWorkflowActive: false,
+					activePlaceholderWorkflowName: "create-story.md",
+					activePlaceholderWorkflowStepNumber: 5,
+					currentFocusChainChecklist: "- [ ] Step 5: Finalize the story document",
+				},
+				"fast",
+				async ({ systemPrompt }) => {
+					expect(systemPrompt).to.not.include("workflow_progress_request")
+					expect(systemPrompt).to.not.include("Do not include `task_progress`")
+				},
+			)
+		})
 	})
 
 	describe("Context-Specific Features", () => {
@@ -1510,6 +1593,147 @@ describe("Prompt System Integration Tests", () => {
 					expect(nativeToolNames).to.not.include("set_workflow_placeholders")
 					expect(nativeToolNames).to.not.include("generate_plan_output")
 					expect(nativeToolNames).to.not.include("execute_command")
+				},
+			)
+		})
+
+		it("filters native tools for create-story step 2", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
+					enableNativeToolCalls: true,
+					useMinimalGptPrompt: true,
+					activeWorkflowSupportsPlaceholders: true,
+					managedWorkflowActive: false,
+					activePlaceholderWorkflowName: "create-story.md",
+					activePlaceholderWorkflowStepNumber: 2,
+				},
+				"gpt-5.4-2026-03-05",
+				async ({ tools }) => {
+					const nativeToolNames = getNativeToolNames(tools)
+
+					expect(nativeToolNames).to.include.members(["build_story_document", "attempt_completion"])
+					expect(nativeToolNames).to.not.include("set_workflow_placeholders")
+					expect(nativeToolNames).to.not.include("read_file")
+					expect(nativeToolNames).to.not.include("search_files")
+					expect(nativeToolNames).to.not.include("execute_command")
+					expect(nativeToolNames).to.not.include("generate_plan_output")
+				},
+			)
+		})
+
+		it("filters native tools for create-story step 3", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
+					enableNativeToolCalls: true,
+					useMinimalGptPrompt: true,
+					activeWorkflowSupportsPlaceholders: true,
+					managedWorkflowActive: false,
+					activePlaceholderWorkflowName: "create-story.md",
+					activePlaceholderWorkflowStepNumber: 3,
+				},
+				"gpt-5.4-2026-03-05",
+				async ({ tools }) => {
+					const nativeToolNames = getNativeToolNames(tools)
+
+					expect(nativeToolNames).to.include.members([
+						"workflow_progress_request",
+						"attempt_completion",
+						"ask_followup_question",
+						"send_user_message",
+						"list_files",
+						"search_files",
+						"read_file",
+						"read_file_range",
+						"list_code_definition_names",
+						"apply_patch",
+					])
+					expect(nativeToolNames).to.not.include("use_subagents")
+					expect(nativeToolNames).to.not.include("set_workflow_placeholders")
+					expect(nativeToolNames).to.not.include("web_search")
+					expect(nativeToolNames).to.not.include("execute_command")
+					expect(nativeToolNames).to.not.include("generate_plan_output")
+				},
+			)
+		})
+
+		it("filters native tools for create-story step 4", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
+					enableNativeToolCalls: true,
+					useMinimalGptPrompt: true,
+					activeWorkflowSupportsPlaceholders: true,
+					managedWorkflowActive: false,
+					activePlaceholderWorkflowName: "create-story.md",
+					activePlaceholderWorkflowStepNumber: 4,
+				},
+				"gpt-5.4-2026-03-05",
+				async ({ tools }) => {
+					const nativeToolNames = getNativeToolNames(tools)
+
+					expect(nativeToolNames).to.include.members([
+						"workflow_progress_request",
+						"attempt_completion",
+						"ask_followup_question",
+						"send_user_message",
+						"list_files",
+						"search_files",
+						"read_file",
+						"read_file_range",
+						"list_code_definition_names",
+						"apply_patch",
+						"use_subagents",
+					])
+					expect(nativeToolNames).to.not.include("set_workflow_placeholders")
+					expect(nativeToolNames).to.not.include("web_search")
+					expect(nativeToolNames).to.not.include("execute_command")
+					expect(nativeToolNames).to.not.include("generate_plan_output")
+				},
+			)
+		})
+
+		it("filters native tools for create-story step 5", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
+					enableNativeToolCalls: true,
+					useMinimalGptPrompt: true,
+					activeWorkflowSupportsPlaceholders: true,
+					managedWorkflowActive: false,
+					activePlaceholderWorkflowName: "create-story.md",
+					activePlaceholderWorkflowStepNumber: 5,
+				},
+				"gpt-5.4-2026-03-05",
+				async ({ tools }) => {
+					const nativeToolNames = getNativeToolNames(tools)
+
+					expect(nativeToolNames).to.include.members([
+						"attempt_completion",
+						"ask_followup_question",
+						"send_user_message",
+						"list_files",
+						"search_files",
+						"read_file",
+						"read_file_range",
+						"apply_patch",
+					])
+					expect(nativeToolNames).to.not.include("workflow_progress_request")
+					expect(nativeToolNames).to.not.include("list_code_definition_names")
+					expect(nativeToolNames).to.not.include("use_subagents")
+					expect(nativeToolNames).to.not.include("set_workflow_placeholders")
+					expect(nativeToolNames).to.not.include("web_search")
+					expect(nativeToolNames).to.not.include("execute_command")
+					expect(nativeToolNames).to.not.include("generate_plan_output")
 				},
 			)
 		})

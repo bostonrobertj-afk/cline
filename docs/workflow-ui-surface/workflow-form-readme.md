@@ -33,6 +33,7 @@ Workflow Forms solve that by pausing normal agent execution at a supported trigg
   - `Required: {placeholder}`
   - `Optional: {placeholder}`
   - `One of: {placeholder_a}, {placeholder_b}`
+- For workflow-start forms, verify that any placeholder keys you expect humans to understand cleanly are defined in the workflow-start key inventory at [workflow-start keys.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/workflow-ui-surface/workflow-start%20keys.md) and mapped in the runtime system dictionary.
 - If the tool expresses branching, variant selection, or required input structure only in prose, upgrade the tool schema so the workflow-form layer can consume that structure at runtime.
 - Add or reuse a resolver in [WorkflowFormRegistry.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/WorkflowFormRegistry.ts).
 - Add or reuse a trigger reference in [WorkflowFormTriggerRegistry.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/WorkflowFormTriggerRegistry.ts) or the slash-command start path.
@@ -51,6 +52,10 @@ Key seams:
   - [WorkflowFormRuntime.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts)
 - capability-owned resolver definitions:
   - [WorkflowFormRegistry.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/WorkflowFormRegistry.ts)
+- capability-owned tool-dictionary builders:
+  - [buildToolDictionary.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/dictionaries/buildToolDictionary.ts)
+- capability-owned system dictionary:
+  - [systemDictionary.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/dictionaries/systemDictionary.ts)
 - trigger references:
   - [WorkflowFormTriggerRegistry.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/WorkflowFormTriggerRegistry.ts)
 - task integration:
@@ -69,6 +74,8 @@ The capability does not replace workflow progression, slash-command activation, 
 - Keep raw form inputs out of model-visible conversational context.
 - Derive field typing from the invoked tool schema at runtime.
 - Allow use cases to specialize field discovery, ordering, labels, help text, and staged UX.
+- Build runtime tool-reference markdown through the shared dictionary builders instead of hard-coding per-resolver dictionary entries.
+- For workflow-start forms, scope the `Term Reference` section to the active ordered placeholder keys when those keys are mapped in the runtime system dictionary.
 - Validate required and one-of semantics before invoking a tool.
 - Translate submitted form values into the canonical tool call shape.
 - Invoke the target tool through the existing tool execution path.
@@ -124,6 +131,9 @@ Current delivered use cases:
 - Any layer between schema, form definition, submission transport, payload assembly, and tool invocation must remain compatible with the runtime-defined contract.
 - Use cases may override field discovery, staging, labels, help text, and requiredness when that responsibility belongs to the use case.
 - Workflow-start forms specialize field discovery and required/optional semantics from workflow documents, but still inherit field typing from `set_workflow_placeholders`.
+- Workflow-start forms build their tool dictionary through the same shared dictionary-building path as the other form types.
+- The workflow-start tool dictionary must derive its `Term Reference` rows from the active ordered placeholder field keys, filtered to keys known by the runtime system dictionary.
+- If no active workflow-start field keys map into the runtime system dictionary, the workflow-start tool dictionary must omit the `Term Reference` section entirely.
 - Workflow-start forms are only recognized when Step 1 raw details include explicit `Required:`, `Optional:`, or `One of:` directive lines.
 - Existing systems remain authoritative:
   - workflow progression
@@ -153,6 +163,9 @@ Important implementation note:
 - Runtime parsing is handled in [schema.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/schema.ts).
 - That means the webview does not hard-code business field typing.
 - Workflow-start requirement parsing is handled in [workflowStartRequirements.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/workflowStartRequirements.ts).
+- Workflow-start field ordering is normalized once in the resolver, then reused for both form-field construction and the runtime tool dictionary.
+- Workflow-start tool dictionary generation is handled in [buildToolDictionary.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/dictionaries/buildToolDictionary.ts) through `buildWorkflowStartRuntimeToolDictionary(...)`, not through a workflow-start-only dictionary config embedded in the resolver.
+- The workflow-start placeholder glossary is maintained in [workflow-start keys.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/workflow-ui-surface/workflow-start%20keys.md) and realized at runtime through [systemDictionary.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/dictionaries/systemDictionary.ts).
 - The start-form trigger will not activate from placeholder mentions alone; it requires those directive lines in Step 1 raw details.
 
 ## Failure Modes
@@ -211,6 +224,10 @@ Example 2: Workflow-start placeholder form
 - tool: `set_workflow_placeholders`
 - typical stage:
   - `collect_inputs`
+- tool dictionary behavior:
+  - `Workflow Placeholder Reference` is generated at runtime from the active ordered field keys
+  - `Term Reference` includes only mapped workflow-start keys for the current form
+  - `Term Reference` is omitted when the active form fields have no mapped dictionary keys
 
 Example 3: Automatic review-input preparation
 
@@ -252,3 +269,4 @@ Focused regression coverage exists in:
 - [WorkflowFormRuntime.test.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts)
 - [WorkflowFormRegistry.test.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRegistry.test.ts)
 - [schema.test.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/__tests__/schema.test.ts)
+- [buildToolDictionary.test.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/dictionaries/__tests__/buildToolDictionary.test.ts)

@@ -10,6 +10,7 @@ import { build_epic_delivery_spec_variants } from "./build_epic_delivery_spec"
 import { build_epics_document_variants } from "./build_epics_document"
 import { build_review_diff_output_variants } from "./build_review_diff_output"
 import { build_review_input_variants } from "./build_review_input"
+import { build_story_document_variants } from "./build_story_document"
 import { complete_workflow_item_variants } from "./complete_workflow_item"
 import { execute_command_variants } from "./execute_command"
 import { focus_chain_variants } from "./focus_chain"
@@ -55,6 +56,7 @@ export function registerClineToolSets(): void {
 		...build_review_input_variants,
 		...build_epics_document_variants,
 		...build_epic_delivery_spec_variants,
+		...build_story_document_variants,
 		...complete_workflow_item_variants,
 		...execute_command_variants,
 		...focus_chain_variants,

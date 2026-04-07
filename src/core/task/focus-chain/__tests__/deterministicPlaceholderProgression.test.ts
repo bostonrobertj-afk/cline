@@ -52,6 +52,8 @@ describe("deterministicPlaceholderProgression", () => {
 		expect(isDeterministicPlaceholderWorkflowSupported("code-review.md")).to.equal(true)
 		expect(isDeterministicPlaceholderWorkflowSupported("create-epics.md")).to.equal(true)
 		expect(isDeterministicPlaceholderWorkflowSupported("pi-planning.md")).to.equal(true)
+		expect(isDeterministicPlaceholderWorkflowSupported("create-story.md")).to.equal(true)
+		expect(isDeterministicPlaceholderWorkflowSupported("create-story")).to.equal(false)
 		expect(isDeterministicPlaceholderWorkflowSupported("dev-story.md")).to.equal(true)
 		expect(isDeterministicPlaceholderWorkflowSupported("review-adversarial-general.md")).to.equal(true)
 		expect(isDeterministicPlaceholderWorkflowSupported("blind-review.md")).to.equal(true)
@@ -3205,6 +3207,750 @@ Build user stories.`,
 		} finally {
 			await fs.rm(tempDir, { recursive: true, force: true })
 		}
+	})
+
+	describe("create-story.md", () => {
+		const createStoryStep1Heading = "## Step 1:  (System-Owned) Resolve the target story"
+		const createStoryStep2Heading = "## Step 2:  (System-Owned) Build Story Document Scaffold"
+		const createStoryStep3Heading = "## Step 3: Author Story Context and Project Structure Notes"
+		const createStoryStep4Heading = "## Step 4: Author Implementation-Ready Story Guidance"
+		const createStoryStep5Heading = "## Step 5: Validate and finalize the story"
+		const createStoryEpicDeliverySpecFixture = `# Epic Name
+
+## Story 3.2
+
+### Objective
+As a release manager,
+I want the story scaffold to inherit exactly the approved objective,
+so that the story starts from the right implementation intent.
+
+### Acceptance Criteria
+1. The scaffold copies the approved objective into the story document.
+2. The scaffold copies the approved acceptance criteria without drift.
+
+### Sequencing/ Dependencies
+Depends on Story 3.1
+`
+		const createStoryStoryDocFixture = `# Story 3.2: Placeholder Title
+
+Status: backlog
+
+## Story
+
+As a release manager,
+I want the story scaffold to inherit exactly the approved objective,
+so that the story starts from the right implementation intent.
+
+## Acceptance Criteria
+
+1. The scaffold copies the approved objective into the story document.
+2. The scaffold copies the approved acceptance criteria without drift.
+
+## Tasks / Subtasks
+
+- [ ] Task 1 (AC: #)
+  - [ ] Subtask 1.1
+
+## Senior Developer QA Findings
+
+## Dev Notes
+
+- Relevant architecture patterns and constraints
+
+### Project Structure Notes
+
+- Alignment with unified project structure (paths, modules, naming)
+
+### References
+
+- Cite all technical details with source paths and sections, e.g. [Source: docs/<file>.md#Section]
+
+## Dev Agent Record
+
+### Agent Model Used
+
+{{agent_model_name_version}}
+
+### Debug Log References
+
+### Completion Notes List
+
+### File List
+`
+		const createStoryStep2WhitespaceVariantFixture = `# Story 3.2: Placeholder Title
+
+Status: backlog
+
+## Story
+
+As a release manager,   
+I want the story scaffold to inherit exactly the approved objective,   
+so that the story starts from the right implementation intent.   
+
+## Acceptance Criteria
+
+1. The scaffold copies the approved objective into the story document.   
+2. The scaffold copies the approved acceptance criteria without drift.   
+
+## Tasks / Subtasks
+
+- [ ] Task 1 (AC: #)
+  - [ ] Subtask 1.1
+
+## Senior Developer QA Findings
+
+## Dev Notes
+
+- Relevant architecture patterns and constraints
+
+### Project Structure Notes
+
+- Alignment with unified project structure (paths, modules, naming)
+
+### References
+
+- Cite all technical details with source paths and sections, e.g. [Source: docs/<file>.md#Section]
+
+## Dev Agent Record
+
+### Agent Model Used
+
+{{agent_model_name_version}}
+
+### Debug Log References
+
+### Completion Notes List
+
+### File List
+`
+
+		it("completes create-story step 1 when epic_delivery_spec resolves to an existing file and story_number is non-empty", async () => {
+			const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-create-story-step1-success-"))
+
+			try {
+				const epicDeliverySpecPath = path.join(tempDir, "output", "implementation-artifacts", "epic-3-delivery-spec.md")
+				const taskState = createTaskState({
+					workflowName: "create-story.md",
+					workflowContents: `${createStoryStep1Heading}
+Resolve the target story.
+
+${createStoryStep2Heading}
+Build the story scaffold.`,
+					checklistMarkdown:
+						"- [ ] Step 1:  (System-Owned) Resolve the target story\n- [ ] Step 2:  (System-Owned) Build Story Document Scaffold",
+					stablePlaceholderValues: {
+						cwd: tempDir,
+						project_root: tempDir,
+					},
+					placeholderValues: {
+						epic_delivery_spec: path.join("output", "implementation-artifacts", "epic-3-delivery-spec.md"),
+						story_number: "3.2",
+						output_folder: "output",
+					},
+				})
+
+				await writeFileWithMtime(epicDeliverySpecPath, createStoryEpicDeliverySpecFixture, Date.now())
+
+				const result = await applyDeterministicPlaceholderProgression({
+					taskState,
+					checklistMarkdown: getChecklistMarkdown(taskState),
+				})
+
+				expect(result.checklist).to.equal(
+					"- [x] Step 1:  (System-Owned) Resolve the target story\n- [ ] Step 2:  (System-Owned) Build Story Document Scaffold",
+				)
+				expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
+					"epic_delivery_spec resolves to an existing file path and story_number was already available in workflow placeholder state.",
+				)
+			} finally {
+				await fs.rm(tempDir, { recursive: true, force: true })
+			}
+		})
+
+		it("does not complete create-story step 1 when epic_delivery_spec is missing", async () => {
+			const taskState = createTaskState({
+				workflowName: "create-story.md",
+				workflowContents: `${createStoryStep1Heading}
+Resolve the target story.`,
+				checklistMarkdown: "- [ ] Step 1:  (System-Owned) Resolve the target story",
+				placeholderValues: {
+					story_number: "3.2",
+				},
+			})
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+			})
+
+			expect(result.checklist).to.equal("- [ ] Step 1:  (System-Owned) Resolve the target story")
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+		})
+
+		it("does not complete create-story step 1 when story_number is blank after trimming", async () => {
+			const taskState = createTaskState({
+				workflowName: "create-story.md",
+				workflowContents: `${createStoryStep1Heading}
+Resolve the target story.`,
+				checklistMarkdown: "- [ ] Step 1:  (System-Owned) Resolve the target story",
+				placeholderValues: {
+					epic_delivery_spec: "/tmp/epic-3-delivery-spec.md",
+					story_number: "   ",
+				},
+			})
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+			})
+
+			expect(result.checklist).to.equal("- [ ] Step 1:  (System-Owned) Resolve the target story")
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+		})
+
+		it("does not complete create-story step 1 when epic_delivery_spec resolves to a missing file", async () => {
+			const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-create-story-step1-missing-"))
+
+			try {
+				const taskState = createTaskState({
+					workflowName: "create-story.md",
+					workflowContents: `${createStoryStep1Heading}
+Resolve the target story.
+
+${createStoryStep2Heading}
+Build the story scaffold.`,
+					checklistMarkdown:
+						"- [ ] Step 1:  (System-Owned) Resolve the target story\n- [ ] Step 2:  (System-Owned) Build Story Document Scaffold",
+					stablePlaceholderValues: {
+						cwd: tempDir,
+						project_root: tempDir,
+					},
+					placeholderValues: {
+						epic_delivery_spec: path.join("output", "implementation-artifacts", "epic-3-delivery-spec.md"),
+						story_number: "3.2",
+						output_folder: "output",
+					},
+				})
+
+				const result = await applyDeterministicPlaceholderProgression({
+					taskState,
+					checklistMarkdown: getChecklistMarkdown(taskState),
+				})
+
+				expect(result.checklist).to.equal(
+					"- [ ] Step 1:  (System-Owned) Resolve the target story\n- [ ] Step 2:  (System-Owned) Build Story Document Scaffold",
+				)
+				expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+			} finally {
+				await fs.rm(tempDir, { recursive: true, force: true })
+			}
+		})
+
+		it("completes create-story step 2 when story_doc exists in implementation-artifacts with backlog status, all required headings, and matching selected story content", async () => {
+			const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-create-story-step2-success-"))
+
+			try {
+				const epicDeliverySpecPath = path.join(tempDir, "output", "implementation-artifacts", "epic-3-delivery-spec.md")
+				const storyDocPath = path.join(tempDir, "output", "implementation-artifacts", "story3.2.md")
+				const taskState = createTaskState({
+					workflowName: "create-story.md",
+					workflowContents: `${createStoryStep2Heading}
+Build the story scaffold.`,
+					checklistMarkdown: "- [ ] Step 2:  (System-Owned) Build Story Document Scaffold",
+					stablePlaceholderValues: {
+						cwd: tempDir,
+						project_root: tempDir,
+					},
+					placeholderValues: {
+						story_doc: path.join("output", "implementation-artifacts", "story3.2.md"),
+						epic_delivery_spec: path.join("output", "implementation-artifacts", "epic-3-delivery-spec.md"),
+						story_number: "3.2",
+						output_folder: "output",
+					},
+				})
+
+				await writeFileWithMtime(epicDeliverySpecPath, createStoryEpicDeliverySpecFixture, Date.now())
+				await writeFileWithMtime(storyDocPath, createStoryStep2WhitespaceVariantFixture, Date.now())
+
+				const result = await applyDeterministicPlaceholderProgression({
+					taskState,
+					checklistMarkdown: getChecklistMarkdown(taskState),
+				})
+
+				expect(result.checklist).to.equal("- [x] Step 2:  (System-Owned) Build Story Document Scaffold")
+				expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
+					"story_doc already exists in the canonical implementation-artifacts location, preserves the full story template heading set, and matches the selected story content from epic_delivery_spec.",
+				)
+			} finally {
+				await fs.rm(tempDir, { recursive: true, force: true })
+			}
+		})
+
+		it("does not complete create-story step 2 when a required template heading is missing", async () => {
+			const tempDir = await fs.mkdtemp(
+				path.join(os.tmpdir(), "deterministic-placeholder-create-story-step2-missing-heading-"),
+			)
+
+			try {
+				const epicDeliverySpecPath = path.join(tempDir, "output", "implementation-artifacts", "epic-3-delivery-spec.md")
+				const storyDocPath = path.join(tempDir, "output", "implementation-artifacts", "story3.2.md")
+				const taskState = createTaskState({
+					workflowName: "create-story.md",
+					workflowContents: `${createStoryStep2Heading}
+Build the story scaffold.`,
+					checklistMarkdown: "- [ ] Step 2:  (System-Owned) Build Story Document Scaffold",
+					stablePlaceholderValues: {
+						cwd: tempDir,
+						project_root: tempDir,
+					},
+					placeholderValues: {
+						story_doc: path.join("output", "implementation-artifacts", "story3.2.md"),
+						epic_delivery_spec: path.join("output", "implementation-artifacts", "epic-3-delivery-spec.md"),
+						story_number: "3.2",
+						output_folder: "output",
+					},
+				})
+
+				await writeFileWithMtime(epicDeliverySpecPath, createStoryEpicDeliverySpecFixture, Date.now())
+				await writeFileWithMtime(
+					storyDocPath,
+					createStoryStoryDocFixture.replace(
+						"\n### References\n\n- Cite all technical details with source paths and sections, e.g. [Source: docs/<file>.md#Section]\n",
+						"",
+					),
+					Date.now(),
+				)
+
+				const result = await applyDeterministicPlaceholderProgression({
+					taskState,
+					checklistMarkdown: getChecklistMarkdown(taskState),
+				})
+
+				expect(result.checklist).to.equal("- [ ] Step 2:  (System-Owned) Build Story Document Scaffold")
+				expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+			} finally {
+				await fs.rm(tempDir, { recursive: true, force: true })
+			}
+		})
+
+		it("does not complete create-story step 2 when the selected story block cannot be found in epic_delivery_spec", async () => {
+			const tempDir = await fs.mkdtemp(
+				path.join(os.tmpdir(), "deterministic-placeholder-create-story-step2-story-block-missing-"),
+			)
+
+			try {
+				const epicDeliverySpecPath = path.join(tempDir, "output", "implementation-artifacts", "epic-3-delivery-spec.md")
+				const storyDocPath = path.join(tempDir, "output", "implementation-artifacts", "story3.2.md")
+				const taskState = createTaskState({
+					workflowName: "create-story.md",
+					workflowContents: `${createStoryStep2Heading}
+Build the story scaffold.`,
+					checklistMarkdown: "- [ ] Step 2:  (System-Owned) Build Story Document Scaffold",
+					stablePlaceholderValues: {
+						cwd: tempDir,
+						project_root: tempDir,
+					},
+					placeholderValues: {
+						story_doc: path.join("output", "implementation-artifacts", "story3.2.md"),
+						epic_delivery_spec: path.join("output", "implementation-artifacts", "epic-3-delivery-spec.md"),
+						story_number: "3.2",
+						output_folder: "output",
+					},
+				})
+
+				await writeFileWithMtime(
+					epicDeliverySpecPath,
+					createStoryEpicDeliverySpecFixture.replace("## Story 3.2", "## Story 9.9"),
+					Date.now(),
+				)
+				await writeFileWithMtime(storyDocPath, createStoryStoryDocFixture, Date.now())
+
+				const result = await applyDeterministicPlaceholderProgression({
+					taskState,
+					checklistMarkdown: getChecklistMarkdown(taskState),
+				})
+
+				expect(result.checklist).to.equal("- [ ] Step 2:  (System-Owned) Build Story Document Scaffold")
+				expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+			} finally {
+				await fs.rm(tempDir, { recursive: true, force: true })
+			}
+		})
+
+		it("does not complete create-story step 2 when the story objective content differs from epic_delivery_spec", async () => {
+			const tempDir = await fs.mkdtemp(
+				path.join(os.tmpdir(), "deterministic-placeholder-create-story-step2-objective-drift-"),
+			)
+
+			try {
+				const epicDeliverySpecPath = path.join(tempDir, "output", "implementation-artifacts", "epic-3-delivery-spec.md")
+				const storyDocPath = path.join(tempDir, "output", "implementation-artifacts", "story3.2.md")
+				const taskState = createTaskState({
+					workflowName: "create-story.md",
+					workflowContents: `${createStoryStep2Heading}
+Build the story scaffold.`,
+					checklistMarkdown: "- [ ] Step 2:  (System-Owned) Build Story Document Scaffold",
+					stablePlaceholderValues: {
+						cwd: tempDir,
+						project_root: tempDir,
+					},
+					placeholderValues: {
+						story_doc: path.join("output", "implementation-artifacts", "story3.2.md"),
+						epic_delivery_spec: path.join("output", "implementation-artifacts", "epic-3-delivery-spec.md"),
+						story_number: "3.2",
+						output_folder: "output",
+					},
+				})
+
+				await writeFileWithMtime(epicDeliverySpecPath, createStoryEpicDeliverySpecFixture, Date.now())
+				await writeFileWithMtime(
+					storyDocPath,
+					createStoryStoryDocFixture.replace("As a release manager,", "As a different stakeholder,"),
+					Date.now(),
+				)
+
+				const result = await applyDeterministicPlaceholderProgression({
+					taskState,
+					checklistMarkdown: getChecklistMarkdown(taskState),
+				})
+
+				expect(result.checklist).to.equal("- [ ] Step 2:  (System-Owned) Build Story Document Scaffold")
+				expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+			} finally {
+				await fs.rm(tempDir, { recursive: true, force: true })
+			}
+		})
+
+		it("does not complete create-story step 2 when the acceptance criteria stub text remains", async () => {
+			const tempDir = await fs.mkdtemp(
+				path.join(os.tmpdir(), "deterministic-placeholder-create-story-step2-acceptance-stub-"),
+			)
+
+			try {
+				const epicDeliverySpecPath = path.join(tempDir, "output", "implementation-artifacts", "epic-3-delivery-spec.md")
+				const storyDocPath = path.join(tempDir, "output", "implementation-artifacts", "story3.2.md")
+				const taskState = createTaskState({
+					workflowName: "create-story.md",
+					workflowContents: `${createStoryStep2Heading}
+Build the story scaffold.`,
+					checklistMarkdown: "- [ ] Step 2:  (System-Owned) Build Story Document Scaffold",
+					stablePlaceholderValues: {
+						cwd: tempDir,
+						project_root: tempDir,
+					},
+					placeholderValues: {
+						story_doc: path.join("output", "implementation-artifacts", "story3.2.md"),
+						epic_delivery_spec: path.join("output", "implementation-artifacts", "epic-3-delivery-spec.md"),
+						story_number: "3.2",
+						output_folder: "output",
+					},
+				})
+
+				await writeFileWithMtime(epicDeliverySpecPath, createStoryEpicDeliverySpecFixture, Date.now())
+				await writeFileWithMtime(
+					storyDocPath,
+					createStoryStoryDocFixture.replace(
+						"1. The scaffold copies the approved objective into the story document.\n2. The scaffold copies the approved acceptance criteria without drift.",
+						"1. [Add acceptance criteria from epics/PRD]",
+					),
+					Date.now(),
+				)
+
+				const result = await applyDeterministicPlaceholderProgression({
+					taskState,
+					checklistMarkdown: getChecklistMarkdown(taskState),
+				})
+
+				expect(result.checklist).to.equal("- [ ] Step 2:  (System-Owned) Build Story Document Scaffold")
+				expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+			} finally {
+				await fs.rm(tempDir, { recursive: true, force: true })
+			}
+		})
+
+		it("does not complete create-story step 2 when story_doc is outside output_folder/implementation-artifacts", async () => {
+			const tempDir = await fs.mkdtemp(
+				path.join(os.tmpdir(), "deterministic-placeholder-create-story-step2-outside-canonical-dir-"),
+			)
+
+			try {
+				const epicDeliverySpecPath = path.join(tempDir, "output", "implementation-artifacts", "epic-3-delivery-spec.md")
+				const storyDocPath = path.join(tempDir, "output", "story-3-2.md")
+				const taskState = createTaskState({
+					workflowName: "create-story.md",
+					workflowContents: `${createStoryStep2Heading}
+Build the story scaffold.`,
+					checklistMarkdown: "- [ ] Step 2:  (System-Owned) Build Story Document Scaffold",
+					stablePlaceholderValues: {
+						cwd: tempDir,
+						project_root: tempDir,
+					},
+					placeholderValues: {
+						story_doc: path.join("output", "story-3-2.md"),
+						epic_delivery_spec: path.join("output", "implementation-artifacts", "epic-3-delivery-spec.md"),
+						story_number: "3.2",
+						output_folder: "output",
+					},
+				})
+
+				await writeFileWithMtime(epicDeliverySpecPath, createStoryEpicDeliverySpecFixture, Date.now())
+				await writeFileWithMtime(storyDocPath, createStoryStoryDocFixture, Date.now())
+
+				const result = await applyDeterministicPlaceholderProgression({
+					taskState,
+					checklistMarkdown: getChecklistMarkdown(taskState),
+				})
+
+				expect(result.checklist).to.equal("- [ ] Step 2:  (System-Owned) Build Story Document Scaffold")
+				expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+			} finally {
+				await fs.rm(tempDir, { recursive: true, force: true })
+			}
+		})
+
+		it("does not complete create-story step 2 when story_doc has Status: ready-for-dev", async () => {
+			const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-create-story-step2-ready-status-"))
+
+			try {
+				const epicDeliverySpecPath = path.join(tempDir, "output", "implementation-artifacts", "epic-3-delivery-spec.md")
+				const storyDocPath = path.join(tempDir, "output", "implementation-artifacts", "story3.2.md")
+				const taskState = createTaskState({
+					workflowName: "create-story.md",
+					workflowContents: `${createStoryStep2Heading}
+Build the story scaffold.`,
+					checklistMarkdown: "- [ ] Step 2:  (System-Owned) Build Story Document Scaffold",
+					stablePlaceholderValues: {
+						cwd: tempDir,
+						project_root: tempDir,
+					},
+					placeholderValues: {
+						story_doc: path.join("output", "implementation-artifacts", "story3.2.md"),
+						epic_delivery_spec: path.join("output", "implementation-artifacts", "epic-3-delivery-spec.md"),
+						story_number: "3.2",
+						output_folder: "output",
+					},
+				})
+
+				await writeFileWithMtime(epicDeliverySpecPath, createStoryEpicDeliverySpecFixture, Date.now())
+				await writeFileWithMtime(
+					storyDocPath,
+					createStoryStoryDocFixture.replace("Status: backlog", "Status: ready-for-dev"),
+					Date.now(),
+				)
+
+				const result = await applyDeterministicPlaceholderProgression({
+					taskState,
+					checklistMarkdown: getChecklistMarkdown(taskState),
+				})
+
+				expect(result.checklist).to.equal("- [ ] Step 2:  (System-Owned) Build Story Document Scaffold")
+				expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+			} finally {
+				await fs.rm(tempDir, { recursive: true, force: true })
+			}
+		})
+
+		it("does not deterministically complete create-story step 3 when project structure notes are already populated", async () => {
+			const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-create-story-step3-governed-"))
+
+			try {
+				const storyDocPath = path.join(tempDir, "output", "implementation-artifacts", "story3.2.md")
+				const taskState = createTaskState({
+					workflowName: "create-story.md",
+					workflowContents: `${createStoryStep3Heading}
+Author the story context and project structure notes.`,
+					checklistMarkdown: "- [ ] Step 3: Author Story Context and Project Structure Notes",
+					stablePlaceholderValues: {
+						cwd: tempDir,
+						project_root: tempDir,
+					},
+					placeholderValues: {
+						story_doc: path.join("output", "implementation-artifacts", "story3.2.md"),
+						output_folder: "output",
+					},
+				})
+
+				await writeFileWithMtime(storyDocPath, createStoryStoryDocFixture, Date.now())
+
+				const result = await applyDeterministicPlaceholderProgression({
+					taskState,
+					checklistMarkdown: getChecklistMarkdown(taskState),
+				})
+
+				expect(result.checklist).to.equal("- [ ] Step 3: Author Story Context and Project Structure Notes")
+				expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+			} finally {
+				await fs.rm(tempDir, { recursive: true, force: true })
+			}
+		})
+
+		it("does not deterministically complete create-story step 4 when tasks and subtasks are already populated", async () => {
+			const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-create-story-step4-governed-"))
+
+			try {
+				const storyDocPath = path.join(tempDir, "output", "implementation-artifacts", "story3.2.md")
+				const taskState = createTaskState({
+					workflowName: "create-story.md",
+					workflowContents: `${createStoryStep4Heading}
+Author implementation-ready story guidance.`,
+					checklistMarkdown: "- [ ] Step 4: Author Implementation-Ready Story Guidance",
+					stablePlaceholderValues: {
+						cwd: tempDir,
+						project_root: tempDir,
+					},
+					placeholderValues: {
+						story_doc: path.join("output", "implementation-artifacts", "story3.2.md"),
+						output_folder: "output",
+					},
+				})
+
+				await writeFileWithMtime(
+					storyDocPath,
+					createStoryStoryDocFixture.replace(
+						"- [ ] Task 1 (AC: #)\n  - [ ] Subtask 1.1",
+						"- [x] Task 1 (AC: 1)\n  - [x] Subtask 1.1\n- [x] Task 2 (AC: 2)\n  - [x] Subtask 2.1",
+					),
+					Date.now(),
+				)
+
+				const result = await applyDeterministicPlaceholderProgression({
+					taskState,
+					checklistMarkdown: getChecklistMarkdown(taskState),
+				})
+
+				expect(result.checklist).to.equal("- [ ] Step 4: Author Implementation-Ready Story Guidance")
+				expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+			} finally {
+				await fs.rm(tempDir, { recursive: true, force: true })
+			}
+		})
+
+		it("completes create-story step 5 when story_doc contains Status: ready-for-dev", async () => {
+			const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-create-story-step5-success-"))
+
+			try {
+				const storyDocPath = path.join(tempDir, "output", "implementation-artifacts", "story3.2.md")
+				const taskState = createTaskState({
+					workflowName: "create-story.md",
+					workflowContents: `${createStoryStep5Heading}
+Validate and finalize the story.`,
+					checklistMarkdown: "- [ ] Step 5: Validate and finalize the story",
+					stablePlaceholderValues: {
+						cwd: tempDir,
+						project_root: tempDir,
+					},
+					placeholderValues: {
+						story_doc: path.join("output", "implementation-artifacts", "story3.2.md"),
+						output_folder: "output",
+					},
+				})
+
+				await writeFileWithMtime(
+					storyDocPath,
+					createStoryStoryDocFixture.replace("Status: backlog", "Status: ready-for-dev"),
+					Date.now(),
+				)
+
+				const result = await applyDeterministicPlaceholderProgression({
+					taskState,
+					checklistMarkdown: getChecklistMarkdown(taskState),
+				})
+
+				expect(result.checklist).to.equal("- [x] Step 5: Validate and finalize the story")
+				expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
+					"The story document now contains Status: ready-for-dev.",
+				)
+			} finally {
+				await fs.rm(tempDir, { recursive: true, force: true })
+			}
+		})
+
+		it("does not complete create-story step 5 when story_doc still contains Status: backlog", async () => {
+			const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-create-story-step5-backlog-"))
+
+			try {
+				const storyDocPath = path.join(tempDir, "output", "implementation-artifacts", "story3.2.md")
+				const taskState = createTaskState({
+					workflowName: "create-story.md",
+					workflowContents: `${createStoryStep5Heading}
+Validate and finalize the story.`,
+					checklistMarkdown: "- [ ] Step 5: Validate and finalize the story",
+					stablePlaceholderValues: {
+						cwd: tempDir,
+						project_root: tempDir,
+					},
+					placeholderValues: {
+						story_doc: path.join("output", "implementation-artifacts", "story3.2.md"),
+						output_folder: "output",
+					},
+				})
+
+				await writeFileWithMtime(storyDocPath, createStoryStoryDocFixture, Date.now())
+
+				const result = await applyDeterministicPlaceholderProgression({
+					taskState,
+					checklistMarkdown: getChecklistMarkdown(taskState),
+				})
+
+				expect(result.checklist).to.equal("- [ ] Step 5: Validate and finalize the story")
+				expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+			} finally {
+				await fs.rm(tempDir, { recursive: true, force: true })
+			}
+		})
+
+		it("advances through create-story steps 1 and 2 in one deterministic pass when both are already provable", async () => {
+			const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-create-story-step12-pass-"))
+
+			try {
+				const epicDeliverySpecPath = path.join(tempDir, "output", "implementation-artifacts", "epic-3-delivery-spec.md")
+				const storyDocPath = path.join(tempDir, "output", "implementation-artifacts", "story3.2.md")
+				const taskState = createTaskState({
+					workflowName: "create-story.md",
+					workflowContents: `${createStoryStep1Heading}
+Resolve the target story.
+
+${createStoryStep2Heading}
+Build the story scaffold.
+
+${createStoryStep3Heading}
+Author the story context and project structure notes.`,
+					checklistMarkdown:
+						"- [ ] Step 1:  (System-Owned) Resolve the target story\n- [ ] Step 2:  (System-Owned) Build Story Document Scaffold\n- [ ] Step 3: Author Story Context and Project Structure Notes",
+					stablePlaceholderValues: {
+						cwd: tempDir,
+						project_root: tempDir,
+					},
+					placeholderValues: {
+						epic_delivery_spec: path.join("output", "implementation-artifacts", "epic-3-delivery-spec.md"),
+						story_doc: path.join("output", "implementation-artifacts", "story3.2.md"),
+						story_number: "3.2",
+						output_folder: "output",
+					},
+				})
+
+				await writeFileWithMtime(epicDeliverySpecPath, createStoryEpicDeliverySpecFixture, Date.now())
+				await writeFileWithMtime(storyDocPath, createStoryStoryDocFixture, Date.now())
+
+				const result = await applyDeterministicPlaceholderProgression({
+					taskState,
+					checklistMarkdown: getChecklistMarkdown(taskState),
+				})
+
+				expect(result.checklist).to.equal(
+					"- [x] Step 1:  (System-Owned) Resolve the target story\n- [x] Step 2:  (System-Owned) Build Story Document Scaffold\n- [ ] Step 3: Author Story Context and Project Structure Notes",
+				)
+				expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.have.length(2)
+				expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.map((notice) => notice.reason)).to.deep.equal(
+					[
+						"epic_delivery_spec resolves to an existing file path and story_number was already available in workflow placeholder state.",
+						"story_doc already exists in the canonical implementation-artifacts location, preserves the full story template heading set, and matches the selected story content from epic_delivery_spec.",
+					],
+				)
+			} finally {
+				await fs.rm(tempDir, { recursive: true, force: true })
+			}
+		})
 	})
 
 	it("leaves still-unsupported placeholder workflows unchanged and adds no notices", async () => {

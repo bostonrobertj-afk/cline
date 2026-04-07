@@ -12,6 +12,7 @@ import { BuildEpicDeliverySpecToolHandler } from "./handlers/BuildEpicDeliverySp
 import { BuildEpicsDocumentToolHandler } from "./handlers/BuildEpicsDocumentToolHandler"
 import { BuildReviewDiffOutputToolHandler } from "./handlers/BuildReviewDiffOutputToolHandler"
 import { BuildReviewInputToolHandler } from "./handlers/BuildReviewInputToolHandler"
+import { BuildStoryDocumentToolHandler } from "./handlers/BuildStoryDocumentToolHandler"
 import { CodeReviewSpecUpdateToolHandler } from "./handlers/CodeReviewSpecUpdateToolHandler"
 import { CompleteWorkflowItemToolHandler } from "./handlers/CompleteWorkflowItemToolHandler"
 import { CondenseHandler } from "./handlers/CondenseHandler"
@@ -129,6 +130,7 @@ export class ToolExecutorCoordinator {
 		[ClineDefaultTool.BUILD_REVIEW_INPUT]: (_v: ToolValidator) => new BuildReviewInputToolHandler(),
 		[ClineDefaultTool.BUILD_EPICS_DOCUMENT]: (_v: ToolValidator) => new BuildEpicsDocumentToolHandler(),
 		[ClineDefaultTool.BUILD_EPIC_DELIVERY_SPEC]: (_v: ToolValidator) => new BuildEpicDeliverySpecToolHandler(),
+		[ClineDefaultTool.BUILD_STORY_DOCUMENT]: (_v: ToolValidator) => new BuildStoryDocumentToolHandler(),
 		[ClineDefaultTool.SELECT_TARGET_EPIC]: (_v: ToolValidator) => new SelectTargetEpicToolHandler(),
 		[ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE]: (_v: ToolValidator) => new CodeReviewSpecUpdateToolHandler(),
 		[ClineDefaultTool.STORY_TASK_REMINDER]: (_v: ToolValidator) => new StoryTaskReminderToolHandler(),
