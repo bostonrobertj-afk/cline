@@ -544,7 +544,7 @@ describe("useMessageHandlers active_user routing", () => {
 					title: "Prepare Diff Input",
 					prompt: "System-owned collection flow",
 					phase: "confirm",
-					toolDictionaryTitle: "Diff Source Reference",
+					toolDictionaryTitle: "Diff Output Reference",
 					toolDictionaryMarkdown: "## build_review_diff_output\n\nTool reference body.",
 					options: ["Yes", "No"],
 				}),

@@ -4,6 +4,7 @@ import {
 	buildReviewDiffOutputToolDictionaryConfig,
 	buildReviewInputToolDictionaryConfig,
 	buildRuntimeToolDictionaryMarkdownFromConfig,
+	buildWorkflowStartRuntimeToolDictionary,
 } from "@/core/task/workflow-form/dictionaries/buildToolDictionary"
 import {
 	type WorkflowFormSystemDictionaryKey,
@@ -232,17 +233,6 @@ function buildSchemaDerivedPublicToolFieldDefinitions(args: {
 	)
 }
 
-const WORKFLOW_START_TOOL_DICTIONARY_CONFIG = {
-	toolName: ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
-	heading: "## set_workflow_placeholders",
-	runtimeTitle: "Workflow Placeholder Reference",
-	overviewLines: ["Persist dynamic placeholder values for the active workflow before the first AI turn begins."],
-	parameterDescriptions: {
-		values: "Workflow placeholder key/value map. Submit only the placeholders the human actually supplied.",
-	},
-	termKeys: [],
-}
-
 interface WorkflowStartFormOverride {
 	title: string
 	prompt: string
@@ -301,13 +291,24 @@ function humanizeWorkflowPlaceholderKey(key: string): string {
 		.join(" ")
 }
 
+function getWorkflowStartOrderedFieldKeys(args: {
+	requiredFieldKeys: string[]
+	optionalFieldKeys: string[]
+	oneOfRequirement?: { id: string; fieldKeys: string[] }
+}): string[] {
+	const orderedKeys = [...args.requiredFieldKeys, ...args.optionalFieldKeys, ...(args.oneOfRequirement?.fieldKeys ?? [])]
+
+	return orderedKeys.filter((key, index) => orderedKeys.indexOf(key) === index)
+}
+
 function buildWorkflowStartPlaceholderFieldDefinitions(args: {
 	requiredFieldKeys: string[]
 	optionalFieldKeys: string[]
 	oneOfRequirement?: { id: string; fieldKeys: string[] }
 	override?: WorkflowStartFormOverride
+	orderedFieldKeys?: string[]
 }): WorkflowFormFieldDefinition[] {
-	const orderedKeys = [...args.requiredFieldKeys, ...args.optionalFieldKeys, ...(args.oneOfRequirement?.fieldKeys ?? [])]
+	const orderedKeys = args.orderedFieldKeys ?? getWorkflowStartOrderedFieldKeys(args)
 	const requiredFieldKeySet = new Set(args.requiredFieldKeys)
 	const oneOfFieldKeySet = new Set(args.oneOfRequirement?.fieldKeys ?? [])
 
@@ -368,7 +369,7 @@ export const workflowFormRegistry: Record<string, WorkflowFormResolverDefinition
 			return {
 				toolName: ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT,
 				title: "Review Diff Artifact",
-				toolDictionaryTitle: "Diff Source Reference",
+				toolDictionaryTitle: "Diff Output Reference",
 				toolDictionaryMarkdown: buildRuntimeToolDictionaryMarkdownFromConfig(buildReviewDiffOutputToolDictionaryConfig),
 				pages: {
 					confirm: {
@@ -638,19 +639,26 @@ export const workflowFormRegistry: Record<string, WorkflowFormResolverDefinition
 			}
 
 			const override = workflowStartFormOverrides[workflowName]
+			const orderedFieldKeys = getWorkflowStartOrderedFieldKeys({
+				requiredFieldKeys: workflowStartRequirements.requiredFieldKeys,
+				optionalFieldKeys: workflowStartRequirements.optionalFieldKeys,
+				oneOfRequirement: workflowStartRequirements.oneOfRequirement,
+			})
 			const fields = buildWorkflowStartPlaceholderFieldDefinitions({
 				requiredFieldKeys: workflowStartRequirements.requiredFieldKeys,
 				optionalFieldKeys: workflowStartRequirements.optionalFieldKeys,
 				oneOfRequirement: workflowStartRequirements.oneOfRequirement,
 				override,
+				orderedFieldKeys,
 			})
+			const { title, markdown } = buildWorkflowStartRuntimeToolDictionary({ fieldKeys: orderedFieldKeys })
 			const prompt = override?.prompt ?? "Please provide the inputs necessary to start this workflow."
 
 			return {
 				toolName: ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
 				title: override?.title ?? "Workflow Start Inputs",
-				toolDictionaryTitle: "Workflow Placeholder Reference",
-				toolDictionaryMarkdown: buildRuntimeToolDictionaryMarkdownFromConfig(WORKFLOW_START_TOOL_DICTIONARY_CONFIG),
+				toolDictionaryTitle: title,
+				toolDictionaryMarkdown: markdown,
 				pages: {
 					collect_inputs: {
 						prompt,

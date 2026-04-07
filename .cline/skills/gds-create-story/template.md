@@ -1,21 +1,20 @@
 # Story {{epic_num}}.{{story_num}}: {{story_title}}
 
-Status: ready-for-dev
+Status: backlog
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
 ## Story
 
-As a {{role}},
-I want {{action}},
-so that {{benefit}}.
+As a 
+I want 
+so that 
 
 ## Acceptance Criteria
-
-1. [Add acceptance criteria from epics/PRD]
+AC must either be directly copied from the epic delivery spec, or must directly aign with/support the epic's acceptance criteria.
 
 ## Tasks / Subtasks
-
+Tasks & subtasks must include exact file and line number-level instructions with exact changes prescribed, leaving no decision space deferred to the agent executing the action plan
 - [ ] Task 1 (AC: #)
   - [ ] Subtask 1.1
 - [ ] Task 2 (AC: #)

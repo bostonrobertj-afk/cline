@@ -104,6 +104,7 @@ Build the epics scaffold.
 			workflowStartRequirements: {
 				requiredFieldKeys: ["architecture_document", "prd", "mode"],
 				optionalFieldKeys: ["ux_spec", "ui_spec"],
+				oneOfRequirement: undefined,
 			},
 		})
 	})

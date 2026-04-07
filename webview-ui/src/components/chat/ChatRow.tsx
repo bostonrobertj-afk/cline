@@ -599,7 +599,7 @@ export const ChatRowContent = memo(
 									<DialogHeader>
 										<DialogTitle>{workflowForm.definition.toolDictionaryTitle}</DialogTitle>
 										<DialogDescription>
-											Read-only reference for the current workflow form tool.
+											Detailed Information Regarding This Workflow's Inputs.
 										</DialogDescription>
 									</DialogHeader>
 									<MarkdownRow markdown={workflowForm.definition.toolDictionaryMarkdown} />

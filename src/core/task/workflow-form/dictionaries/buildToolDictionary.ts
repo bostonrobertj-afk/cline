@@ -23,6 +23,7 @@ function getVariantReferenceLine(key: WorkflowFormSystemDictionaryKey): string {
 
 function buildToolDictionaryEntryLines(config: WorkflowFormToolDictionaryConfig, tool: ClineToolSpec): string[] {
 	const parameters = tool.parameters ?? []
+	const resolvedTermKeys = config.termKeys ?? PHASE_1_SYSTEM_DICTIONARY_KEYS
 	const lines = [
 		config.heading,
 		"",
@@ -40,18 +41,25 @@ function buildToolDictionaryEntryLines(config: WorkflowFormToolDictionaryConfig,
 		)
 	}
 
-	lines.push("")
-	lines.push("### Term Reference")
-	lines.push("")
+	if (resolvedTermKeys.length > 0) {
+		lines.push("")
+		lines.push("### Term Reference")
+		lines.push("")
 
-	for (const key of config.termKeys ?? PHASE_1_SYSTEM_DICTIONARY_KEYS) {
-		lines.push(getVariantReferenceLine(key))
+		for (const key of resolvedTermKeys) {
+			lines.push(getVariantReferenceLine(key))
+		}
 	}
 
 	return lines
 }
 
 export const TOOL_DICTIONARY_TERM_KEYS = PHASE_1_SYSTEM_DICTIONARY_KEYS
+
+export function isWorkflowFormSystemDictionaryKey(key: string): key is WorkflowFormSystemDictionaryKey {
+	return key in workflowFormSystemDictionary
+}
+
 export const buildReviewDiffOutputToolDictionaryConfig: WorkflowFormToolDictionaryConfig = {
 	toolName: ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT,
 	heading: "## build_review_diff_output",
@@ -91,6 +99,25 @@ export const buildReviewInputToolDictionaryConfig: WorkflowFormToolDictionaryCon
 }
 export const WORKFLOW_FORM_TOOL_DICTIONARY_HEADING = buildReviewDiffOutputToolDictionaryConfig.heading
 export const WORKFLOW_FORM_RUNTIME_TOOL_REFERENCE_TITLE = buildReviewDiffOutputToolDictionaryConfig.runtimeTitle
+
+export function buildWorkflowStartRuntimeToolDictionary(args: { fieldKeys: readonly string[] }) {
+	const termKeys = args.fieldKeys.filter(isWorkflowFormSystemDictionaryKey)
+	const config: WorkflowFormToolDictionaryConfig = {
+		toolName: ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
+		heading: "## set_workflow_placeholders",
+		runtimeTitle: "Workflow Placeholder Reference",
+		overviewLines: ["Persist dynamic placeholder values for the active workflow before the first AI turn begins."],
+		parameterDescriptions: {
+			values: "Workflow placeholder key/value map. Submit only the placeholders the human actually supplied.",
+		},
+		termKeys,
+	}
+
+	return {
+		title: config.runtimeTitle,
+		markdown: buildRuntimeToolDictionaryMarkdownFromConfig(config),
+	}
+}
 
 export function buildToolDictionaryMarkdownFromConfig(config: WorkflowFormToolDictionaryConfig): string {
 	const tool = resolveWorkflowFormToolSpec(config.toolName)

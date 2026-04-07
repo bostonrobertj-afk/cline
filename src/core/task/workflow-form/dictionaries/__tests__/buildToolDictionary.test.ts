@@ -6,6 +6,7 @@ import {
 	buildRuntimeToolDictionaryMarkdownFromConfig,
 	buildToolDictionaryMarkdown,
 	buildToolDictionaryMarkdownFromConfig,
+	buildWorkflowStartRuntimeToolDictionary,
 	TOOL_DICTIONARY_TERM_KEYS,
 	WORKFLOW_FORM_TOOL_DICTIONARY_HEADING,
 } from "../buildToolDictionary"
@@ -54,6 +55,29 @@ describe("buildToolDictionaryMarkdown", () => {
 		expect(markdown).to.include("- `values` (required, object): Workflow placeholder key/value map.")
 		expect(runtimeMarkdown).to.include("## set_workflow_placeholders")
 		expect(runtimeMarkdown).to.not.include("# Workflow UI Surface Tool Dictionary")
+	})
+
+	it("builds a workflow-start runtime dictionary with contextual term reference rows", () => {
+		const { title, markdown } = buildWorkflowStartRuntimeToolDictionary({
+			fieldKeys: ["review_input", "spec_file"],
+		})
+
+		expect(title).to.equal("Workflow Placeholder Reference")
+		expect(markdown).to.include("## set_workflow_placeholders")
+		expect(markdown).to.include("- `values` (required, object):")
+		expect(markdown).to.include("### Term Reference")
+		expect(markdown).to.include("`review_input`")
+		expect(markdown).to.include("`spec_file`")
+	})
+
+	it("omits the workflow-start term reference section when no mapped keys exist", () => {
+		const { markdown } = buildWorkflowStartRuntimeToolDictionary({
+			fieldKeys: ["unmapped_input"],
+		})
+
+		expect(markdown).to.include("## set_workflow_placeholders")
+		expect(markdown).to.include("### Parameters")
+		expect(markdown).to.not.include("### Term Reference")
 	})
 })
 

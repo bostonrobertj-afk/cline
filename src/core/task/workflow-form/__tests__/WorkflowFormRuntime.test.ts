@@ -586,6 +586,51 @@ describe("WorkflowFormRuntime", () => {
 		}
 	})
 
+	it("builds workflow-start payloads with contextual mapped term reference rows", () => {
+		const session = runtime.createSession({
+			resolverId: "placeholder_workflow_start_set_workflow_placeholders",
+			triggerSource: "slash_command",
+			owner: {
+				kind: "slash_command",
+				workflowName: "review-adversarial-general.md",
+				stepNumber: 1,
+			},
+			initialPhase: "collect_inputs",
+			context: createWorkflowStartContext({
+				requiredFieldKeys: ["review_input"],
+				optionalFieldKeys: ["spec_file", "diff_output"],
+			}),
+		})
+
+		const payload = runtime.buildPayload(session)
+
+		expect(payload.definition.toolDictionaryTitle).to.equal("Workflow Placeholder Reference")
+		expect(payload.definition.toolDictionaryMarkdown).to.include("`review_input`")
+		expect(payload.definition.toolDictionaryMarkdown).to.include("`diff_output`")
+		expect(payload.definition.toolDictionaryMarkdown).to.include("### Term Reference")
+	})
+
+	it("builds workflow-start payloads without a term reference section when all keys are unmapped", () => {
+		const session = runtime.createSession({
+			resolverId: "placeholder_workflow_start_set_workflow_placeholders",
+			triggerSource: "slash_command",
+			owner: {
+				kind: "slash_command",
+				workflowName: "review-adversarial-general.md",
+				stepNumber: 1,
+			},
+			initialPhase: "collect_inputs",
+			context: createWorkflowStartContext({
+				requiredFieldKeys: ["unmapped_input"],
+				optionalFieldKeys: [],
+			}),
+		})
+
+		const payload = runtime.buildPayload(session)
+
+		expect(payload.definition.toolDictionaryMarkdown).to.not.include("### Term Reference")
+	})
+
 	it("renders retry_error when required workflow-start fields are missing", () => {
 		const customRuntime = createCustomRuntime()
 		const session = customRuntime.createSession({
@@ -977,7 +1022,7 @@ describe("WorkflowFormRuntime", () => {
 
 			const payload = runtimeWithDefaultReader.buildPayload(session)
 			expect(payload.definition.title).to.equal("Review Diff Artifact")
-			expect(payload.definition.toolDictionaryTitle).to.equal("Diff Source Reference")
+			expect(payload.definition.toolDictionaryTitle).to.equal("Diff Output Reference")
 			expect(payload.definition.toolDictionaryMarkdown).to.include("## build_review_diff_output")
 			expect(payload.definition.toolDictionaryMarkdown).to.not.include("# Workflow UI Surface Tool Dictionary")
 			expect(payload.definition.toolDictionaryMarkdown).to.not.include("Generated from")

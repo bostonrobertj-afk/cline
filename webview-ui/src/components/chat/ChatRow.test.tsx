@@ -90,7 +90,7 @@ function createWorkflowFormMessage(phase: WorkflowFormPhase, overrides?: Partial
 	const definition = {
 		toolName: "build_review_diff_output",
 		title: "Review Diff Artifact",
-		toolDictionaryTitle: "Diff Source Reference",
+		toolDictionaryTitle: "Diff Output Reference",
 		toolDictionaryMarkdown: "## build_review_diff_output\n\nTool reference body.",
 		pages: {
 			confirm: {
@@ -382,7 +382,7 @@ describe("ChatRow followup presentation", () => {
 
 		fireEvent.click(screen.getByRole("button", { name: "Open inputs reference" }))
 
-		expect(await screen.findByText("Diff Source Reference")).toBeInTheDocument()
+		expect(await screen.findByText("Diff Output Reference")).toBeInTheDocument()
 		expect(await screen.findByText("build_review_diff_output")).toBeInTheDocument()
 	})
 

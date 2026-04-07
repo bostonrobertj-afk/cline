@@ -55,6 +55,10 @@ describe("WorkflowFormRegistry", () => {
 		const fields = definition.pages.collect_inputs?.fields ?? []
 
 		expect(definition.title).to.equal("Inputs for This Workflow")
+		expect(definition.toolDictionaryTitle).to.equal("Workflow Placeholder Reference")
+		expect(definition.toolDictionaryMarkdown).to.include("## set_workflow_placeholders")
+		expect(definition.toolDictionaryMarkdown).to.include("### Term Reference")
+		expect(definition.toolDictionaryMarkdown).to.include("`architecture_document`")
 		expect(definition.pages.collect_inputs?.prompt).to.equal("Provide the following to start the workflow:")
 		expect(fields.map((field) => field.key)).to.deep.equal(["architecture_document", "prd", "mode", "ux_spec", "ui_spec"])
 		expect(fields[0]?.label).to.equal("Architecture Document")
@@ -542,9 +546,12 @@ describe("WorkflowFormRegistry", () => {
 				},
 			},
 		})
+
 		const fields = definition.pages.collect_inputs?.fields ?? []
 
 		expect(definition.title).to.equal("Adversarial Review Inputs")
+		expect(definition.toolDictionaryMarkdown).to.include("`review_input`")
+		expect(definition.toolDictionaryMarkdown).to.include("`diff_output`")
 		expect(definition.pages.collect_inputs?.prompt).to.equal(
 			"Provide the review material needed to begin this workflow. Supply at least one review target. If you also have a supporting spec or story file, include it as `spec_file`.",
 		)
@@ -583,6 +590,33 @@ describe("WorkflowFormRegistry", () => {
 				valueSchemaType: "string",
 			},
 		])
+	})
+
+	it("omits workflow-start term reference content when the active session contains only unmapped keys", () => {
+		const resolver = getWorkflowFormResolverDefinition(PLACEHOLDER_WORKFLOW_START_SET_WORKFLOW_PLACEHOLDERS_RESOLVER_ID)
+		const definition = resolver.buildDefinition({
+			sessionId: "session-unmapped-workflow-start-definition",
+			resolverId: "placeholder_workflow_start_set_workflow_placeholders",
+			triggerSource: "slash_command",
+			owner: {
+				kind: "slash_command",
+				workflowName: "review-adversarial-general.md",
+				stepNumber: 1,
+			},
+			phase: "collect_inputs",
+			initialPhase: "collect_inputs",
+			values: {},
+			context: {
+				workflowName: "review-adversarial-general.md",
+				workflowStartRequirements: {
+					requiredFieldKeys: ["unmapped_input"],
+					optionalFieldKeys: [],
+				},
+			},
+		})
+
+		expect(definition.toolDictionaryMarkdown).to.include("## set_workflow_placeholders")
+		expect(definition.toolDictionaryMarkdown).to.not.include("### Term Reference")
 	})
 
 	it("serializes workflow-start placeholder submissions into set_workflow_placeholders input", () => {
