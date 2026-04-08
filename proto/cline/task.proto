@@ -34,6 +34,7 @@ service TaskService {
   rpc askResponse(AskResponseRequest) returns (Empty);
   // Sends a structured workflow-form submission to the active task/runtime
   rpc submitWorkflowForm(WorkflowFormSubmissionRequest) returns (Empty);
+  rpc submitWorkflowStartCard(WorkflowStartCardSubmissionRequest) returns (Empty);
   // Records task feedback (thumbs up/down)
   rpc taskFeedback(StringRequest) returns (Empty);
   // Shows task completion changes diff in a view
@@ -137,6 +138,17 @@ message WorkflowFormSubmissionRequest {
   string session_id = 2;
   WorkflowFormAction action = 3;
   repeated WorkflowFormFieldSubmission fields = 4;
+}
+
+enum WorkflowStartCardAction {
+  WORKFLOW_START_CARD_ACTION_UNSPECIFIED = 0;
+  CONTINUE = 1;
+}
+
+message WorkflowStartCardSubmissionRequest {
+  Metadata metadata = 1;
+  string session_id = 2;
+  WorkflowStartCardAction action = 3;
 }
 
 // Request for executing a quick win task

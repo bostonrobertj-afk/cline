@@ -1,10 +1,11 @@
 import type {
 	ClineMessage,
 	ClineWorkflowForm,
+	ClineWorkflowStartCard,
 	WorkflowFormFieldDefinition,
 	WorkflowFormJsonSchema,
 } from "@shared/ExtensionMessage"
-import { WorkflowFormAction } from "@shared/proto/cline/task"
+import { WorkflowFormAction, WorkflowStartCardAction } from "@shared/proto/cline/task"
 import { act, renderHook } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import type { ChatState } from "../types/chatTypes"
@@ -13,6 +14,7 @@ const {
 	mockAskResponse,
 	mockNewTask,
 	mockSubmitWorkflowForm,
+	mockSubmitWorkflowStartCard,
 	mockClearTask,
 	mockCancelTask,
 	mockCancelBackgroundCommand,
@@ -24,6 +26,7 @@ const {
 	mockAskResponse: vi.fn().mockResolvedValue(undefined),
 	mockNewTask: vi.fn(),
 	mockSubmitWorkflowForm: vi.fn().mockResolvedValue(undefined),
+	mockSubmitWorkflowStartCard: vi.fn().mockResolvedValue(undefined),
 	mockClearTask: vi.fn(),
 	mockCancelTask: vi.fn(),
 	mockCancelBackgroundCommand: vi.fn(),
@@ -50,13 +53,19 @@ vi.mock("@/services/grpc-client", () => ({
 		askResponse: mockAskResponse,
 		newTask: mockNewTask,
 		submitWorkflowForm: mockSubmitWorkflowForm,
+		submitWorkflowStartCard: mockSubmitWorkflowStartCard,
 		clearTask: mockClearTask,
 		cancelTask: mockCancelTask,
 		cancelBackgroundCommand: mockCancelBackgroundCommand,
 	},
 }))
 
-import { submitWorkflowForm, useMessageHandlers } from "./useMessageHandlers"
+import {
+	buildWorkflowStartCardSubmissionRequest,
+	submitWorkflowForm,
+	submitWorkflowStartCard,
+	useMessageHandlers,
+} from "./useMessageHandlers"
 
 function createField(args: {
 	key: string
@@ -147,6 +156,15 @@ function createChatState(): ChatState {
 		handleFocusChange: vi.fn(),
 		clearExpandedRows: vi.fn(),
 		resetState: vi.fn(),
+	}
+}
+
+function createWorkflowStartCard(): ClineWorkflowStartCard {
+	return {
+		sessionId: "start-card-session-1",
+		title: "Welcome to the Quick Spec Workflow!",
+		markdownBody: "Start card body",
+		ctaLabel: "Get Started",
 	}
 }
 
@@ -400,6 +418,25 @@ describe("useMessageHandlers active_user routing", () => {
 		)
 	})
 
+	it("builds workflow-start-card submissions with the CONTINUE action", () => {
+		const request = buildWorkflowStartCardSubmissionRequest(createWorkflowStartCard())
+
+		expect(request.sessionId).toBe("start-card-session-1")
+		expect(request.action).toBe(WorkflowStartCardAction.CONTINUE)
+	})
+
+	it("routes workflow-start-card submissions through submitWorkflowStartCard", async () => {
+		await submitWorkflowStartCard(createWorkflowStartCard())
+
+		expect(mockSubmitWorkflowStartCard).toHaveBeenCalledTimes(1)
+		expect(mockSubmitWorkflowStartCard).toHaveBeenCalledWith(
+			expect.objectContaining({
+				sessionId: "start-card-session-1",
+				action: WorkflowStartCardAction.CONTINUE,
+			}),
+		)
+	})
+
 	it("includes generic workflow-start placeholder fields in workflow form submissions", async () => {
 		const workflowForm = createWorkflowForm({
 			phase: "collect_inputs",
@@ -564,6 +601,34 @@ describe("useMessageHandlers active_user routing", () => {
 
 		expect(mockAskResponse).not.toHaveBeenCalled()
 		expect(mockSubmitWorkflowForm).not.toHaveBeenCalled()
+		expect(chatState.setInputValue).not.toHaveBeenCalled()
+	})
+
+	it("does not allow composer sends while a workflow_start_card is awaiting system input", async () => {
+		mockThreadDisplayState.value = "awaiting_user_response"
+		mockAwaitingUserResponseSubtype.value = "system"
+		const messages: ClineMessage[] = [
+			{
+				ts: Date.now(),
+				type: "ask",
+				ask: "workflow_start_card",
+				text: JSON.stringify(createWorkflowStartCard()),
+			},
+		]
+
+		const chatState = {
+			...createChatState(),
+			clineAsk: "workflow_start_card" as const,
+			lastMessage: messages[0],
+		}
+		const { result } = renderHook(() => useMessageHandlers(messages, chatState))
+
+		await act(async () => {
+			await result.current.handleSendMessage("Blocked workflow start card input", [], [])
+		})
+
+		expect(mockAskResponse).not.toHaveBeenCalled()
+		expect(mockSubmitWorkflowStartCard).not.toHaveBeenCalled()
 		expect(chatState.setInputValue).not.toHaveBeenCalled()
 	})
 })

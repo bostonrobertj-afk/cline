@@ -176,6 +176,7 @@ export type ClineAsk =
 	| "report_bug"
 	| "use_subagents"
 	| "workflow_form"
+	| "workflow_start_card"
 
 export type ClineSay =
 	| "task"
@@ -461,6 +462,13 @@ export interface ClineWorkflowForm {
 	automaticStatusState?: WorkflowFormAutomaticStatusState
 	errorMessage?: string
 	successMessage?: string
+}
+
+export interface ClineWorkflowStartCard {
+	sessionId: string
+	title: string
+	markdownBody: string
+	ctaLabel: "Get Started"
 }
 
 export interface ClineApiReqInfo {

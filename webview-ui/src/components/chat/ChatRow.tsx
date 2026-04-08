@@ -9,6 +9,7 @@ import {
 	ClineSayGenerateExplanation,
 	ClineSayTool,
 	ClineWorkflowForm,
+	ClineWorkflowStartCard,
 	COMPLETION_RESULT_CHANGES_FLAG,
 	WorkflowFormFieldDefinition,
 	WorkflowFormFieldValuePayload,
@@ -57,7 +58,7 @@ import { findMatchingResourceOrTemplate, getMcpServerDisplayName } from "@/utils
 import CodeAccordian, { cleanPathPrefix } from "../common/CodeAccordian"
 import { CommandOutputContent, CommandOutputRow } from "./CommandOutputRow"
 import { CompletionOutputRow } from "./CompletionOutputRow"
-import { submitWorkflowForm } from "./chat-view/hooks/useMessageHandlers"
+import { submitWorkflowForm, submitWorkflowStartCard } from "./chat-view/hooks/useMessageHandlers"
 import { getActiveAssistantName } from "./chat-view/shared/assistantName"
 import { isPassiveThreadOpen } from "./chat-view/shared/buttonConfig"
 import { DiffEditRow } from "./DiffEditRow"
@@ -274,6 +275,19 @@ export const ChatRowContent = memo(
 				: undefined
 
 		const type = message.type === "ask" ? message.ask : message.say
+		const workflowStartCard = useMemo(() => {
+			const isWorkflowStartCardMessage = message.type === "ask" && message.ask === "workflow_start_card"
+			if (!isWorkflowStartCardMessage || !message.text) {
+				return undefined
+			}
+
+			try {
+				return JSON.parse(message.text) as ClineWorkflowStartCard
+			} catch (error) {
+				console.error("Failed to parse workflow start card payload:", error)
+				return undefined
+			}
+		}, [message.ask, message.text, message.type])
 		const workflowForm = useMemo(() => {
 			const isWorkflowFormMessage =
 				(message.type === "ask" && message.ask === "workflow_form") ||
@@ -289,9 +303,14 @@ export const ChatRowContent = memo(
 				return undefined
 			}
 		}, [message.ask, message.say, message.text, message.type])
+		const [workflowStartCardSubmissionPending, setWorkflowStartCardSubmissionPending] = useState(false)
 		const [workflowFormValues, setWorkflowFormValues] = useState<Record<string, string>>({})
 		const [workflowFormSubmissionPending, setWorkflowFormSubmissionPending] = useState(false)
 		const [isWorkflowDictionaryOpen, setIsWorkflowDictionaryOpen] = useState(false)
+
+		useEffect(() => {
+			setWorkflowStartCardSubmissionPending(false)
+		}, [workflowStartCard])
 
 		useEffect(() => {
 			if (!workflowForm) {
@@ -518,6 +537,20 @@ export const ChatRowContent = memo(
 			}))
 		}, [])
 
+		const handleWorkflowStartCardContinue = useCallback(async () => {
+			if (!workflowStartCard || workflowStartCardSubmissionPending) {
+				return
+			}
+
+			setWorkflowStartCardSubmissionPending(true)
+			try {
+				await submitWorkflowStartCard(workflowStartCard)
+			} catch (error) {
+				console.error("Failed to submit workflow start card:", error)
+				setWorkflowStartCardSubmissionPending(false)
+			}
+		}, [workflowStartCard, workflowStartCardSubmissionPending])
+
 		const handleWorkflowFormAction = useCallback(
 			async (action: WorkflowFormAction, values?: Record<string, string>) => {
 				if (!workflowForm || workflowFormSubmissionPending) {
@@ -542,6 +575,36 @@ export const ChatRowContent = memo(
 
 			setIsWorkflowDictionaryOpen(true)
 		}, [workflowForm])
+
+		const renderWorkflowStartCardContent = () => {
+			if (!workflowStartCard) {
+				return <InvisibleSpacer />
+			}
+
+			return (
+				<div className="border border-editor-group-border rounded-xs bg-code/40 p-3">
+					<div className={HEADER_CLASSNAMES}>
+						<SettingsIcon className="size-2" />
+						<span className="font-bold">System-owned startup:</span>
+					</div>
+					<div className="text-sm font-semibold">{workflowStartCard.title}</div>
+					<div className="pt-2">
+						<MarkdownRow markdown={workflowStartCard.markdownBody} />
+					</div>
+					<div className="pt-3">
+						<button
+							className="rounded-xs bg-button-background px-3 py-2 text-sm text-primary-foreground disabled:opacity-50"
+							disabled={workflowStartCardSubmissionPending}
+							onClick={() => {
+								void handleWorkflowStartCardContinue()
+							}}
+							type="button">
+							{workflowStartCard.ctaLabel}
+						</button>
+					</div>
+				</div>
+			)
+		}
 
 		const renderWorkflowFormContent = () => {
 			if (!workflowForm) {
@@ -1753,6 +1816,9 @@ export const ChatRowContent = memo(
 								/>
 							</div>
 						)
+					}
+					case "workflow_start_card": {
+						return renderWorkflowStartCardContent()
 					}
 					case "workflow_form": {
 						return renderWorkflowFormContent()

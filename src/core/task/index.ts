@@ -84,11 +84,17 @@ import {
 	ClineAsk,
 	ClineSay,
 	type ClineWorkflowForm,
+	type ClineWorkflowStartCard,
 	ThreadDisplayState,
 	ThreadDisplayStates,
 } from "@shared/ExtensionMessage"
 import { HistoryItem } from "@shared/HistoryItem"
 import { DEFAULT_LANGUAGE_SETTINGS, getLanguageKey, LanguageDisplay } from "@shared/Languages"
+import {
+	WorkflowFormSubmissionRequest,
+	WorkflowStartCardAction,
+	WorkflowStartCardSubmissionRequest,
+} from "@shared/proto/cline/task"
 import { convertClineMessageToProto } from "@shared/proto-conversions/cline-message"
 import type { SkillMetadata } from "@shared/skills"
 import { ClineDefaultTool, READ_ONLY_TOOLS } from "@shared/tools"
@@ -96,6 +102,7 @@ import { ClineAskResponse } from "@shared/WebviewMessage"
 import { isGPT5ModelFamily, isLocalModel, isNextGenModelFamily, isParallelToolCallingEnabled } from "@utils/model-utils"
 import { filterExistingFiles } from "@utils/tabFiltering"
 import cloneDeep from "clone-deep"
+import { randomUUID } from "crypto"
 import fs from "fs/promises"
 import Mutex from "p-mutex"
 import pWaitFor from "p-wait-for"
@@ -104,6 +111,9 @@ import { ulid } from "ulid"
 import type { SystemPromptContext } from "@/core/prompts/system-prompt"
 import { getSystemPrompt } from "@/core/prompts/system-prompt"
 import { resolveWorkflowPersonaInstructions } from "@/core/prompts/system-prompt/registry/workflowPersonaRegistry"
+import { buildWorkflowStartCardPayload } from "@/core/task/workflow-start-card/buildWorkflowStartCardPayload"
+import type { WorkflowStartCardSessionState } from "@/core/task/workflow-start-card/types"
+import { getWorkflowStartCardRegistryEntry } from "@/core/task/workflow-start-card/WorkflowStartCardRegistry"
 import { HostProvider } from "@/hosts/host-provider"
 import { FileEditProvider } from "@/integrations/editor/FileEditProvider"
 import {
@@ -128,7 +138,6 @@ import {
 	ClineUserContent,
 } from "@/shared/messages"
 import { ApiFormat } from "@/shared/proto/cline/models"
-import { WorkflowFormSubmissionRequest } from "@/shared/proto/cline/task"
 import { ShowMessageType } from "@/shared/proto/index.host"
 import { Logger } from "@/shared/services/Logger"
 import { Session } from "@/shared/services/Session"
@@ -689,7 +698,7 @@ export class Task {
 			return undefined
 		}
 
-		if (type === "workflow_form") {
+		if (type === "workflow_form" || type === "workflow_start_card") {
 			return AwaitingUserResponseSubtypes.SYSTEM
 		}
 
@@ -1328,6 +1337,23 @@ export class Task {
 		this.taskState.askResponseFiles = files
 	}
 
+	async handleWorkflowStartCardSubmission(request: WorkflowStartCardSubmissionRequest) {
+		const activeSession = this.taskState.activeWorkflowStartCardSession
+		if (!activeSession) {
+			return
+		}
+
+		if (request.sessionId !== activeSession.sessionId) {
+			return
+		}
+
+		if (request.action !== WorkflowStartCardAction.CONTINUE) {
+			return
+		}
+
+		await this.clearWorkflowStartCardSession()
+	}
+
 	async handleWorkflowFormSubmission(request: WorkflowFormSubmissionRequest) {
 		const activeSession = this.taskState.activeWorkflowFormSession
 		if (!activeSession) {
@@ -1363,6 +1389,77 @@ export class Task {
 		}
 
 		this.pendingWorkflowFormOutcome = outcome
+	}
+
+	private async persistWorkflowStartCardSession() {
+		try {
+			const taskMetadata = await getTaskMetadata(this.taskId)
+			taskMetadata.activeWorkflowStartCardSession = this.taskState.activeWorkflowStartCardSession
+			await saveTaskMetadata(this.taskId, taskMetadata)
+		} catch {
+			// Non-fatal: prompt/runtime state should continue even if metadata persistence fails.
+		}
+	}
+
+	private async clearWorkflowStartCardSession() {
+		this.taskState.activeWorkflowStartCardSession = undefined
+		await this.persistWorkflowStartCardSession()
+	}
+
+	private async renderWorkflowStartCardMessage(payload: ClineWorkflowStartCard): Promise<void> {
+		const text = JSON.stringify(payload)
+		const nextThreadDisplayState = ThreadDisplayStates.AWAITING_USER_RESPONSE
+		const nextAwaitingSubtype = AwaitingUserResponseSubtypes.SYSTEM
+		const clineMessages = this.messageStateHandler.getClineMessages()
+
+		this.setThreadDisplayState(
+			nextThreadDisplayState,
+			"workflow_start_card_render",
+			{
+				sessionId: payload.sessionId,
+				workflowName: this.taskState.activeWorkflowStartCardSession?.workflowName,
+			},
+			nextAwaitingSubtype,
+		)
+
+		let existingWorkflowStartCardMessageIndex = -1
+		for (let index = clineMessages.length - 1; index >= 0; index--) {
+			const message = clineMessages[index]
+			const isWorkflowStartCardAsk = message.type === "ask" && message.ask === "workflow_start_card"
+			if (!isWorkflowStartCardAsk || !message.text) {
+				continue
+			}
+
+			try {
+				const parsedPayload = JSON.parse(message.text) as ClineWorkflowStartCard
+				if (parsedPayload.sessionId === payload.sessionId) {
+					existingWorkflowStartCardMessageIndex = index
+					break
+				}
+			} catch {}
+		}
+
+		if (existingWorkflowStartCardMessageIndex >= 0) {
+			await this.messageStateHandler.updateClineMessage(existingWorkflowStartCardMessageIndex, {
+				text,
+				partial: false,
+				threadDisplayState: nextThreadDisplayState,
+				awaitingUserResponseSubtype: nextAwaitingSubtype,
+			})
+		} else {
+			const askTs = Date.now()
+			this.taskState.lastMessageTs = askTs
+			await this.messageStateHandler.addToClineMessages({
+				ts: askTs,
+				type: "ask",
+				ask: "workflow_start_card",
+				threadDisplayState: this.threadDisplayState,
+				awaitingUserResponseSubtype: this.awaitingUserResponseSubtype,
+				text,
+			})
+		}
+
+		await this.postStateToWebview()
 	}
 
 	private async persistWorkflowFormSession() {
@@ -1541,6 +1638,7 @@ export class Task {
 		this.taskState.activeStoryTaskId = undefined
 		this.taskState.activeStorySubtaskIds = []
 		this.taskState.lastPromptedStoryTaskKey = undefined
+		this.taskState.activeWorkflowStartCardSession = undefined
 		this.taskState.activeWorkflowFormSession = undefined
 		this.taskState.suppressedWorkflowFormResolverIds = []
 		this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices = []
@@ -1567,6 +1665,7 @@ export class Task {
 			taskMetadata.activeStoryTaskId = this.taskState.activeStoryTaskId
 			taskMetadata.activeStorySubtaskIds = this.taskState.activeStorySubtaskIds
 			taskMetadata.lastPromptedStoryTaskKey = this.taskState.lastPromptedStoryTaskKey
+			taskMetadata.activeWorkflowStartCardSession = this.taskState.activeWorkflowStartCardSession
 			taskMetadata.activeWorkflowFormSession = this.taskState.activeWorkflowFormSession
 			taskMetadata.suppressedWorkflowFormResolverIds = this.taskState.suppressedWorkflowFormResolverIds
 			taskMetadata.pendingAutoCompletedPlaceholderWorkflowStepNotices =
@@ -1652,6 +1751,46 @@ export class Task {
 				this.getWorkflowFormToolErrorMessage(outcome.session, previousUserMessageContentLength),
 			fallbackToAgent: evaluation.fallbackToAgent ?? false,
 		}
+	}
+
+	private async maybeResolveWorkflowStartCardBeforeApiTurn(
+		currentTurnSlashCommandAction?: PersistentSlashCommandAction,
+	): Promise<void> {
+		if (this.taskState.activeWorkflowStartCardSession) {
+			const payload = buildWorkflowStartCardPayload(this.taskState.activeWorkflowStartCardSession)
+			await this.renderWorkflowStartCardMessage(payload)
+			await pWaitFor(() => !this.taskState.activeWorkflowStartCardSession || this.taskState.abort, {
+				interval: 100,
+			})
+			return
+		}
+
+		if (currentTurnSlashCommandAction?.type !== "activate_placeholder_workflow") {
+			return
+		}
+
+		const workflowName = this.taskState.activePlaceholderWorkflowSource?.name
+		if (!workflowName) {
+			return
+		}
+
+		const registryEntry = getWorkflowStartCardRegistryEntry(workflowName)
+		if (!registryEntry) {
+			return
+		}
+
+		this.taskState.activeWorkflowStartCardSession = {
+			sessionId: randomUUID(),
+			workflowName,
+			markdownBody: registryEntry.markdownBody,
+		}
+		await this.persistWorkflowStartCardSession()
+
+		const payload = buildWorkflowStartCardPayload(this.taskState.activeWorkflowStartCardSession)
+		await this.renderWorkflowStartCardMessage(payload)
+		await pWaitFor(() => !this.taskState.activeWorkflowStartCardSession || this.taskState.abort, {
+			interval: 100,
+		})
 	}
 
 	private async maybeResolveWorkflowFormBeforeApiTurn(
@@ -2059,6 +2198,7 @@ export class Task {
 			taskMetadata.activeStoryTaskId = this.taskState.activeStoryTaskId
 			taskMetadata.activeStorySubtaskIds = this.taskState.activeStorySubtaskIds
 			taskMetadata.lastPromptedStoryTaskKey = this.taskState.lastPromptedStoryTaskKey
+			taskMetadata.activeWorkflowStartCardSession = this.taskState.activeWorkflowStartCardSession
 			taskMetadata.activeWorkflowFormSession = this.taskState.activeWorkflowFormSession
 			taskMetadata.suppressedWorkflowFormResolverIds = this.taskState.suppressedWorkflowFormResolverIds
 			taskMetadata.pendingAutoCompletedPlaceholderWorkflowStepNotices =
@@ -2207,6 +2347,9 @@ export class Task {
 			this.taskState.activeStoryTaskId = metadata.activeStoryTaskId
 			this.taskState.activeStorySubtaskIds = metadata.activeStorySubtaskIds ?? []
 			this.taskState.lastPromptedStoryTaskKey = metadata.lastPromptedStoryTaskKey
+			this.taskState.activeWorkflowStartCardSession = metadata.activeWorkflowStartCardSession as
+				| WorkflowStartCardSessionState
+				| undefined
 			this.taskState.activeWorkflowFormSession = metadata.activeWorkflowFormSession as WorkflowFormSessionState | undefined
 			this.taskState.suppressedWorkflowFormResolverIds = metadata.suppressedWorkflowFormResolverIds ?? []
 			this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices =
@@ -5037,6 +5180,7 @@ export class Task {
 			: false
 
 		await this.applyPersistentSlashCommandAction(persistentSlashCommandAction)
+		await this.maybeResolveWorkflowStartCardBeforeApiTurn(persistentSlashCommandAction)
 		await this.maybeResolveWorkflowFormBeforeApiTurn(persistentSlashCommandAction)
 		const requestHasHumanAuthoredInput = this.hasHumanAuthoredInput(processedUserContent)
 		this.currentRequestHasHumanAuthoredInput = requestHasHumanAuthoredInput

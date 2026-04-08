@@ -1,12 +1,18 @@
-import type { ClineMessage, WorkflowFormAutomaticStatusState, WorkflowFormPhase } from "@shared/ExtensionMessage"
+import type {
+	ClineMessage,
+	ClineWorkflowStartCard,
+	WorkflowFormAutomaticStatusState,
+	WorkflowFormPhase,
+} from "@shared/ExtensionMessage"
 import { fireEvent, render, screen } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { ChatRowContent, getFollowupPresentation } from "./ChatRow"
 
 const WORKFLOW_START_PROMPT_FIXTURE = "Workflow form prompt content for test coverage."
 
-const { mockSubmitWorkflowForm, mockThreadDisplayState } = vi.hoisted(() => ({
+const { mockSubmitWorkflowForm, mockSubmitWorkflowStartCard, mockThreadDisplayState } = vi.hoisted(() => ({
 	mockSubmitWorkflowForm: vi.fn().mockResolvedValue(undefined),
+	mockSubmitWorkflowStartCard: vi.fn().mockResolvedValue(undefined),
 	mockThreadDisplayState: { value: "idle_open" as string | null },
 }))
 
@@ -31,6 +37,7 @@ vi.mock("@/services/grpc-client", async (importOriginal) => {
 		...actual,
 		TaskServiceClient: {
 			submitWorkflowForm: mockSubmitWorkflowForm,
+			submitWorkflowStartCard: mockSubmitWorkflowStartCard,
 		},
 		UiServiceClient: {
 			openUrl: vi.fn(),
@@ -180,6 +187,22 @@ function createAutomaticWorkflowStatusMessage(
 	}
 }
 
+function createWorkflowStartCardMessage(overrides?: Partial<ClineWorkflowStartCard>): ClineMessage {
+	return {
+		ts: Date.now(),
+		type: "ask",
+		ask: "workflow_start_card",
+		text: JSON.stringify({
+			sessionId: "start-card-session-1",
+			title: "Welcome to the Quick Spec Workflow!",
+			markdownBody:
+				"In this workflow you will build a small implementation-ready tech spec through guided discovery, scoped planning, and a final review pass.",
+			ctaLabel: "Get Started",
+			...overrides,
+		}),
+	}
+}
+
 function renderWorkflowFormRow(phase: WorkflowFormPhase, overrides?: Partial<Record<string, unknown>>) {
 	return render(
 		<ChatRowContent
@@ -200,6 +223,19 @@ function renderAutomaticWorkflowStatusRow(state: WorkflowFormAutomaticStatusStat
 			isExpanded={true}
 			isLast={true}
 			message={createAutomaticWorkflowStatusMessage(state, overrides)}
+			onSetQuote={vi.fn()}
+			onToggleExpand={vi.fn()}
+		/>,
+	)
+}
+
+function renderWorkflowStartCardRow(overrides?: Partial<ClineWorkflowStartCard>) {
+	return render(
+		<ChatRowContent
+			inputValue=""
+			isExpanded={true}
+			isLast={true}
+			message={createWorkflowStartCardMessage(overrides)}
 			onSetQuote={vi.fn()}
 			onToggleExpand={vi.fn()}
 		/>,
@@ -326,6 +362,31 @@ describe("ChatRow followup presentation", () => {
 		expect(screen.getByRole("button", { name: "Open inputs reference" })).toBeInTheDocument()
 		expect(screen.getByRole("button", { name: "Yes" })).toBeInTheDocument()
 		expect(screen.getByRole("button", { name: "No" })).toBeInTheDocument()
+	})
+
+	it("renders workflow_start_card with only the Get Started CTA and submits through the dedicated transport", async () => {
+		renderWorkflowStartCardRow()
+
+		expect(screen.getByText("Welcome to the Quick Spec Workflow!")).toBeInTheDocument()
+		expect(
+			screen.getByText(
+				"In this workflow you will build a small implementation-ready tech spec through guided discovery, scoped planning, and a final review pass.",
+			),
+		).toBeInTheDocument()
+		expect(screen.getByRole("button", { name: "Get Started" })).toBeInTheDocument()
+		expect(screen.queryByRole("button", { name: "Open inputs reference" })).not.toBeInTheDocument()
+		expect(screen.queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument()
+		expect(screen.queryByRole("button", { name: "Yes" })).not.toBeInTheDocument()
+		expect(screen.queryByRole("button", { name: "No" })).not.toBeInTheDocument()
+
+		fireEvent.click(screen.getByRole("button", { name: "Get Started" }))
+
+		expect(mockSubmitWorkflowStartCard).toHaveBeenCalledTimes(1)
+		expect(mockSubmitWorkflowStartCard).toHaveBeenCalledWith(
+			expect.objectContaining({
+				sessionId: "start-card-session-1",
+			}),
+		)
 	})
 
 	it("renders automatic workflow preparation rows with the pending label and no interactive controls", () => {

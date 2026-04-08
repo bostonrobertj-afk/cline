@@ -1,5 +1,6 @@
 import * as disk from "@core/storage/disk"
-import type { ClineWorkflowForm } from "@shared/ExtensionMessage"
+import type { ClineWorkflowForm, ClineWorkflowStartCard } from "@shared/ExtensionMessage"
+import { WorkflowStartCardAction, WorkflowStartCardSubmissionRequest } from "@shared/proto/cline/task"
 import { ClineDefaultTool } from "@shared/tools"
 import { expect } from "chai"
 import fs from "fs/promises"
@@ -188,6 +189,14 @@ const buildPlaceholderWorkflowActivationInstructions = Reflect.get(
 ) as TaskMethod<[unknown], Promise<string | undefined>>
 const maybeResolveWorkflowFormBeforeApiTurn = Reflect.get(Task.prototype, "maybeResolveWorkflowFormBeforeApiTurn") as TaskMethod<
 	[unknown?],
+	Promise<void>
+>
+const maybeResolveWorkflowStartCardBeforeApiTurn = Reflect.get(
+	Task.prototype,
+	"maybeResolveWorkflowStartCardBeforeApiTurn",
+) as TaskMethod<[unknown?], Promise<void>>
+const handleWorkflowStartCardSubmission = Reflect.get(Task.prototype, "handleWorkflowStartCardSubmission") as TaskMethod<
+	[WorkflowStartCardSubmissionRequest],
 	Promise<void>
 >
 const persistLastPromptedPlaceholderWorkflowChecklistLabel = Reflect.get(
@@ -2040,6 +2049,146 @@ Construct and persist review_input.md from the persisted diff output before cont
 		expect(fakeTask.workflowFormRuntime.createSession.called).to.equal(false)
 		expect(fakeTask.workflowFormRuntime.buildPayload.calledOnceWithExactly(session)).to.equal(true)
 		expect(fakeTask.renderWorkflowFormMessage.calledOnceWithExactly(renderedPayload, "ask")).to.equal(true)
+	})
+
+	it("opens the quick-spec workflow-start card before later pre-turn phases continue", async () => {
+		const taskState = new TaskState()
+		taskState.activePlaceholderWorkflowSource = {
+			type: "remote",
+			name: "quick-spec.md",
+			contents: "# Quick Spec\n",
+		}
+		const fakeTask = {
+			taskState,
+			persistWorkflowStartCardSession: sinon.stub().resolves(),
+			renderWorkflowStartCardMessage: sinon.stub().callsFake(async () => undefined),
+		}
+		let workflowFormLoopReached = false
+
+		const execution = (async () => {
+			await maybeResolveWorkflowStartCardBeforeApiTurn.call(fakeTask, {
+				type: "activate_placeholder_workflow",
+			})
+			workflowFormLoopReached = true
+		})()
+
+		await new Promise((resolve) => setTimeout(resolve, 20))
+
+		expect(fakeTask.renderWorkflowStartCardMessage.calledOnce).to.equal(true)
+		expect(workflowFormLoopReached).to.equal(false)
+		expect(taskState.activeWorkflowStartCardSession?.workflowName).to.equal("quick-spec.md")
+		expect(taskState.activeWorkflowStartCardSession?.markdownBody).to.equal(
+			"In this workflow you will build a small implementation-ready tech spec through guided discovery, scoped planning, and a final review pass. You'll define the objective, solution, scope, context, acceptance criteria, seams, and executable tasks needed for quick implementation.",
+		)
+
+		const renderedPayload = fakeTask.renderWorkflowStartCardMessage.firstCall.args[0] as ClineWorkflowStartCard
+		expect(renderedPayload.title).to.equal("Welcome to the Quick Spec Workflow!")
+		expect(renderedPayload.ctaLabel).to.equal("Get Started")
+
+		taskState.activeWorkflowStartCardSession = undefined
+		await execution
+
+		expect(workflowFormLoopReached).to.equal(true)
+		expect(fakeTask.persistWorkflowStartCardSession.calledOnce).to.equal(true)
+	})
+
+	it("skips the workflow-start-card capability when the active workflow has no registry entry", async () => {
+		const taskState = new TaskState()
+		taskState.activePlaceholderWorkflowSource = {
+			type: "remote",
+			name: "brainstorming.md",
+			contents: "# Brainstorming\n",
+		}
+		const fakeTask = {
+			taskState,
+			persistWorkflowStartCardSession: sinon.stub().resolves(),
+			renderWorkflowStartCardMessage: sinon.stub().resolves(),
+		}
+
+		await maybeResolveWorkflowStartCardBeforeApiTurn.call(fakeTask, {
+			type: "activate_placeholder_workflow",
+		})
+
+		expect(taskState.activeWorkflowStartCardSession).to.equal(undefined)
+		expect(fakeTask.persistWorkflowStartCardSession.called).to.equal(false)
+		expect(fakeTask.renderWorkflowStartCardMessage.called).to.equal(false)
+	})
+
+	it("restores a pending workflow-start-card session from metadata and re-renders it on resume", async () => {
+		const sandbox = sinon.createSandbox()
+		const session = {
+			sessionId: "start-card-session-1",
+			workflowName: "quick-spec.md",
+			markdownBody:
+				"In this workflow you will build a small implementation-ready tech spec through guided discovery, scoped planning, and a final review pass. You'll define the objective, solution, scope, context, acceptance criteria, seams, and executable tasks needed for quick implementation.",
+		}
+
+		try {
+			sandbox.stub(disk, "getTaskMetadata").resolves({
+				activeWorkflowStartCardSession: session,
+			} as never)
+
+			const fakeTask = createFakeTask("task-workflow-start-card-resume") as FakeTaskBase & {
+				persistWorkflowStartCardSession: sinon.SinonStub
+				renderWorkflowStartCardMessage: sinon.SinonStub
+			}
+			fakeTask.persistWorkflowStartCardSession = sinon.stub().resolves()
+			fakeTask.renderWorkflowStartCardMessage = sinon.stub().callsFake(async () => {
+				fakeTask.taskState.activeWorkflowStartCardSession = undefined
+			})
+
+			await restoreBmadStateFromMetadata.call(fakeTask)
+			expect(fakeTask.taskState.activeWorkflowStartCardSession).to.deep.equal(session)
+
+			await maybeResolveWorkflowStartCardBeforeApiTurn.call(fakeTask, undefined)
+
+			expect(fakeTask.persistWorkflowStartCardSession.called).to.equal(false)
+			expect(fakeTask.renderWorkflowStartCardMessage.calledOnce).to.equal(true)
+			expect(fakeTask.renderWorkflowStartCardMessage.firstCall.args[0]).to.deep.equal({
+				sessionId: "start-card-session-1",
+				title: "Welcome to the Quick Spec Workflow!",
+				markdownBody: session.markdownBody,
+				ctaLabel: "Get Started",
+			})
+		} finally {
+			sandbox.restore()
+		}
+	})
+
+	it("clears the pending workflow-start-card session only for matching CONTINUE submissions", async () => {
+		const fakeTask = {
+			taskState: new TaskState(),
+			clearWorkflowStartCardSession: sinon.stub().resolves(),
+		}
+		fakeTask.taskState.activeWorkflowStartCardSession = {
+			sessionId: "start-card-session-1",
+			workflowName: "quick-spec.md",
+			markdownBody: "Body",
+		}
+
+		await handleWorkflowStartCardSubmission.call(
+			fakeTask,
+			WorkflowStartCardSubmissionRequest.create({
+				sessionId: "different-session",
+				action: WorkflowStartCardAction.CONTINUE,
+			}),
+		)
+		await handleWorkflowStartCardSubmission.call(
+			fakeTask,
+			WorkflowStartCardSubmissionRequest.create({
+				sessionId: "start-card-session-1",
+				action: WorkflowStartCardAction.WORKFLOW_START_CARD_ACTION_UNSPECIFIED,
+			}),
+		)
+		await handleWorkflowStartCardSubmission.call(
+			fakeTask,
+			WorkflowStartCardSubmissionRequest.create({
+				sessionId: "start-card-session-1",
+				action: WorkflowStartCardAction.CONTINUE,
+			}),
+		)
+
+		sinon.assert.calledOnce(fakeTask.clearWorkflowStartCardSession)
 	})
 
 	it("chains slash-command workflow-start story_path success through code-review Step 2 and opens the Step 3 review-input form with story_path preserved", async () => {

@@ -127,5 +127,4 @@ Message: In this workflow you will review and validate PRD completeness, clarity
 write-remediation-story:
 Message: In this workflow you will turn validated review findings into a remediation story with exact acceptance criteria, file boundaries, and implementation tasks. You'll trace each real defect through its full runtime seam and produce a ready-for-dev story that closes the issue completely.
 
-pi-planning:
-message: In this workflow, you'll break an epic down into stories and document the basic information for each story. This workflow requires an existing epics document and architecture document, and produces an epic delivery spec, which is used to write stories during create-story. Run this workflow once per epic in your epics document.
+

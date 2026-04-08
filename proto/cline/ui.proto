@@ -52,6 +52,7 @@ enum ClineAsk {
   ACT_MODE_RESPOND = 16;
   USE_SUBAGENTS = 17;
   WORKFLOW_FORM = 18;
+  WORKFLOW_START_CARD = 19;
 }
 
 // Enum for ClineSay types

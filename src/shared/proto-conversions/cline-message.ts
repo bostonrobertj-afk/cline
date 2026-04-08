@@ -40,6 +40,7 @@ function convertClineAskToProtoEnum(ask: AppClineAsk | undefined): ClineAsk | un
 		report_bug: ClineAsk.REPORT_BUG,
 		use_subagents: ClineAsk.USE_SUBAGENTS,
 		workflow_form: ClineAsk.WORKFLOW_FORM,
+		workflow_start_card: ClineAsk.WORKFLOW_START_CARD,
 	}
 
 	const result = mapping[ask]
@@ -74,6 +75,7 @@ function convertProtoEnumToClineAsk(ask: ClineAsk): AppClineAsk | undefined {
 		[ClineAsk.REPORT_BUG]: "report_bug",
 		[ClineAsk.USE_SUBAGENTS]: "use_subagents",
 		[ClineAsk.WORKFLOW_FORM]: "workflow_form",
+		[ClineAsk.WORKFLOW_START_CARD]: "workflow_start_card",
 	}
 
 	return mapping[ask]

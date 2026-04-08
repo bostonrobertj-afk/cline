@@ -6,6 +6,8 @@ Workflow Forms
 
 Request inputs from the user through a system-owned chat form, then invoke an appropriate tool with those inputs to resolve a workflow step deterministically without putting the raw human inputs into model context.
 
+Workflow-start cards are a separate startup capability, are not workflow forms, and are documented in [workflow-start-card/README.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/workflow-automation/workflow-start-card/README.md).
+
 ## System Context
 
 BMAD workflows rely on documentation. In many cases the AI agent would otherwise need to:

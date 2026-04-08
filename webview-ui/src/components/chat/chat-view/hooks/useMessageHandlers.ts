@@ -1,6 +1,13 @@
-import type { ClineMessage, ClineWorkflowForm } from "@shared/ExtensionMessage"
+import type { ClineMessage, ClineWorkflowForm, ClineWorkflowStartCard } from "@shared/ExtensionMessage"
 import { EmptyRequest, StringRequest } from "@shared/proto/cline/common"
-import { AskResponseRequest, NewTaskRequest, WorkflowFormAction, WorkflowFormSubmissionRequest } from "@shared/proto/cline/task"
+import {
+	AskResponseRequest,
+	NewTaskRequest,
+	WorkflowFormAction,
+	WorkflowFormSubmissionRequest,
+	WorkflowStartCardAction,
+	WorkflowStartCardSubmissionRequest,
+} from "@shared/proto/cline/task"
 import { useCallback, useRef } from "react"
 import { useExtensionState } from "@/context/ExtensionStateContext"
 import { SlashServiceClient, TaskServiceClient } from "@/services/grpc-client"
@@ -49,6 +56,19 @@ export function buildWorkflowFormSubmissionRequest(
 	})
 }
 
+export function buildWorkflowStartCardSubmissionRequest(
+	workflowStartCard: ClineWorkflowStartCard,
+): WorkflowStartCardSubmissionRequest {
+	return WorkflowStartCardSubmissionRequest.create({
+		sessionId: workflowStartCard.sessionId,
+		action: WorkflowStartCardAction.CONTINUE,
+	})
+}
+
+export async function submitWorkflowStartCard(workflowStartCard: ClineWorkflowStartCard) {
+	await TaskServiceClient.submitWorkflowStartCard(buildWorkflowStartCardSubmissionRequest(workflowStartCard))
+}
+
 export async function submitWorkflowForm(
 	workflowForm: ClineWorkflowForm,
 	action: WorkflowFormAction,
@@ -73,6 +93,8 @@ export function useMessageHandlers(messages: ClineMessage[], chatState: ChatStat
 	const cancelInFlightRef = useRef(false)
 	const isWorkflowFormAwaitingSystemState =
 		isAwaitingUserResponseThreadState && awaitingUserResponseSubtype === "system" && clineAsk === "workflow_form"
+	const isWorkflowStartCardAwaitingSystemState =
+		isAwaitingUserResponseThreadState && awaitingUserResponseSubtype === "system" && clineAsk === "workflow_start_card"
 
 	const sendSteerMessage = useCallback(async (text: string, images: string[], files: string[]) => {
 		await TaskServiceClient.askResponse(
@@ -91,7 +113,7 @@ export function useMessageHandlers(messages: ClineMessage[], chatState: ChatStat
 			let messageToSend = text.trim()
 			const hasContent = messageToSend || images.length > 0 || files.length > 0
 
-			if (isWorkflowFormAwaitingSystemState) {
+			if (isWorkflowFormAwaitingSystemState || isWorkflowStartCardAwaitingSystemState) {
 				return
 			}
 
@@ -254,6 +276,7 @@ export function useMessageHandlers(messages: ClineMessage[], chatState: ChatStat
 			isAwaitingUserResponseUserState,
 			isAwaitingUserResponseSystemState,
 			isWorkflowFormAwaitingSystemState,
+			isWorkflowStartCardAwaitingSystemState,
 			isPassiveThreadOpenState,
 			sendSteerMessage,
 			setInputValue,

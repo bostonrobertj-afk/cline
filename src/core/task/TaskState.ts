@@ -2,6 +2,7 @@ import { Anthropic } from "@anthropic-ai/sdk"
 import { AssistantMessageContent } from "@core/assistant-message"
 import { ClineAskResponse } from "@shared/WebviewMessage"
 import type { WorkflowFormSessionState } from "@/core/task/workflow-form/types"
+import type { WorkflowStartCardSessionState } from "@/core/task/workflow-start-card/types"
 import type { ActivePlaceholderWorkflowSource } from "@/core/workflows/placeholder-workflow-step-details"
 import type { ThreadDisplayState } from "@/shared/ExtensionMessage"
 import type { ClineDefaultTool } from "@/shared/tools"
@@ -156,6 +157,7 @@ export class TaskState {
 	activeStoryTaskId?: string
 	activeStorySubtaskIds: string[] = []
 	lastPromptedStoryTaskKey?: string
+	activeWorkflowStartCardSession?: WorkflowStartCardSessionState
 	activeWorkflowFormSession?: WorkflowFormSessionState
 	suppressedWorkflowFormResolverIds: string[] = []
 	pendingAutoCompletedPlaceholderWorkflowStepNotices: AutoCompletedPlaceholderWorkflowStepNotice[] = []
