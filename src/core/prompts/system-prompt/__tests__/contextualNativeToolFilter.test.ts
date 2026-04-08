@@ -1,5 +1,7 @@
 import { expect } from "chai"
+import fs from "fs"
 import { describe, it } from "mocha"
+import path from "path"
 import { ModelFamily } from "@/shared/prompts"
 import { ClineDefaultTool } from "@/shared/tools"
 import { filterContextualNativeToolSpecs } from "../registry/contextualNativeToolFilter"
@@ -79,6 +81,29 @@ describe("filterContextualNativeToolSpecs", () => {
 			],
 			10: ["DOC_READ", "DOC_WRITE"],
 		})
+	})
+
+	it("defines the canonical quick-dev 5-step row", () => {
+		expect(PLACEHOLDER_WORKFLOW_STEP_MATRIX["quick-dev.md"]).to.deep.equal({
+			1: ["PLACEHOLDER_WRITE"],
+			2: ["DOC_READ", "DOC_WRITE", "WORKFLOW_PROGRESS_REQUEST"],
+			3: ["DOC_READ", "DOC_WRITE", "CODE_READ", "INDXR_DISCOVERY", "INDXR_SOURCE_READ", "INDXR_SYMBOL_GRAPH", "LOCAL_EXEC"],
+			4: ["LOCAL_EXEC"],
+			5: [],
+		})
+	})
+
+	it("keeps the canonical quick-dev docs block aligned with the runtime matrix row", () => {
+		const docPath = path.resolve("/Users/robertboston/Documents/Cline Extension/cline/docs/contextual-tool-schema.md")
+		const docsText = fs.readFileSync(docPath, "utf8")
+
+		expect(docsText).to.contain(`### quick-dev.md
+
+- Step 1: \`PLACEHOLDER_WRITE\`
+- Step 2: \`DOC_READ\`, \`DOC_WRITE\`, \`WORKFLOW_PROGRESS_REQUEST\`
+- Step 3: \`DOC_READ\`, \`DOC_WRITE\`, \`CODE_READ\`, \`INDXR_DISCOVERY\`, \`INDXR_SOURCE_READ\`, \`INDXR_SYMBOL_GRAPH\`, \`LOCAL_EXEC\`
+- Step 4: \`LOCAL_EXEC\`
+- Step 5: no additional tools`)
 	})
 
 	it("filters native response tools for ACT mode", () => {
@@ -580,6 +605,264 @@ describe("filterContextualNativeToolSpecs", () => {
 		expect(keptIds).to.not.include(ClineDefaultTool.SEARCH)
 		expect(keptIds).to.not.include(ClineDefaultTool.BASH)
 		expect(keptIds).to.not.include(ClineDefaultTool.PLAN_MODE)
+	})
+
+	it("applies quick-dev step 1 row and keeps only placeholder-write among workflow-specific bundles", () => {
+		const registeredTools = [
+			makeRegisteredTool(ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS),
+			makeRegisteredTool(ClineDefaultTool.BASH),
+			makeRegisteredTool(ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST),
+			makeRegisteredTool(ClineDefaultTool.LIST_FILES),
+			makeRegisteredTool(ClineDefaultTool.SEARCH),
+			makeRegisteredTool(ClineDefaultTool.FILE_READ),
+			makeRegisteredTool(ClineDefaultTool.FILE_READ_RANGE),
+			makeRegisteredTool(ClineDefaultTool.LIST_CODE_DEF),
+			makeRegisteredTool(ClineDefaultTool.APPLY_PATCH),
+			makeRegisteredTool(ClineDefaultTool.FILE_NEW),
+			makeRegisteredTool(ClineDefaultTool.ASK),
+			makeRegisteredTool(ClineDefaultTool.SEND_USER_MESSAGE),
+			makeRegisteredTool(ClineDefaultTool.ATTEMPT),
+			makeRegisteredTool(ClineDefaultTool.PLAN_MODE),
+			makeRegisteredTool(ClineDefaultTool.BROWSER),
+			makeRegisteredTool(ClineDefaultTool.MCP_ACCESS),
+			makeRegisteredTool(ClineDefaultTool.NEW_TASK),
+		]
+
+		const result = filterContextualNativeToolSpecs({
+			context: makeContext({
+				activePlaceholderWorkflowName: "quick-dev.md",
+				activePlaceholderWorkflowStepNumber: 1,
+			}),
+			registeredTools,
+			mcpTools: [],
+		})
+
+		const keptIds = result.map((tool) => tool.id)
+		expect(keptIds).to.include.members([
+			ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
+			ClineDefaultTool.ASK,
+			ClineDefaultTool.SEND_USER_MESSAGE,
+			ClineDefaultTool.ATTEMPT,
+			ClineDefaultTool.BROWSER,
+			ClineDefaultTool.MCP_ACCESS,
+			ClineDefaultTool.NEW_TASK,
+		])
+		expect(keptIds).to.not.include(ClineDefaultTool.BASH)
+		expect(keptIds).to.not.include(ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST)
+		expect(keptIds).to.not.include(ClineDefaultTool.LIST_FILES)
+		expect(keptIds).to.not.include(ClineDefaultTool.SEARCH)
+		expect(keptIds).to.not.include(ClineDefaultTool.FILE_READ)
+		expect(keptIds).to.not.include(ClineDefaultTool.FILE_READ_RANGE)
+		expect(keptIds).to.not.include(ClineDefaultTool.LIST_CODE_DEF)
+		expect(keptIds).to.not.include(ClineDefaultTool.APPLY_PATCH)
+		expect(keptIds).to.not.include(ClineDefaultTool.FILE_NEW)
+	})
+
+	it("applies quick-dev step 2 row and keeps workflow_progress_request with document read and write bundles", () => {
+		const registeredTools = [
+			makeRegisteredTool(ClineDefaultTool.LIST_FILES),
+			makeRegisteredTool(ClineDefaultTool.SEARCH),
+			makeRegisteredTool(ClineDefaultTool.FILE_READ),
+			makeRegisteredTool(ClineDefaultTool.FILE_READ_RANGE),
+			makeRegisteredTool(ClineDefaultTool.APPLY_PATCH),
+			makeRegisteredTool(ClineDefaultTool.FILE_NEW),
+			makeRegisteredTool(ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST),
+			makeRegisteredTool(ClineDefaultTool.BASH),
+			makeRegisteredTool(ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS),
+			makeRegisteredTool(ClineDefaultTool.LIST_CODE_DEF),
+			makeRegisteredTool(ClineDefaultTool.ASK),
+			makeRegisteredTool(ClineDefaultTool.SEND_USER_MESSAGE),
+			makeRegisteredTool(ClineDefaultTool.ATTEMPT),
+			makeRegisteredTool(ClineDefaultTool.PLAN_MODE),
+			makeRegisteredTool(ClineDefaultTool.BROWSER),
+			makeRegisteredTool(ClineDefaultTool.MCP_ACCESS),
+			makeRegisteredTool(ClineDefaultTool.NEW_TASK),
+		]
+
+		const result = filterContextualNativeToolSpecs({
+			context: makeContext({
+				activePlaceholderWorkflowName: "quick-dev.md",
+				activePlaceholderWorkflowStepNumber: 2,
+			}),
+			registeredTools,
+			mcpTools: [],
+		})
+
+		const keptIds = result.map((tool) => tool.id)
+		expect(keptIds).to.include.members([
+			ClineDefaultTool.LIST_FILES,
+			ClineDefaultTool.SEARCH,
+			ClineDefaultTool.FILE_READ,
+			ClineDefaultTool.FILE_READ_RANGE,
+			ClineDefaultTool.APPLY_PATCH,
+			ClineDefaultTool.FILE_NEW,
+			ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST,
+			ClineDefaultTool.ASK,
+			ClineDefaultTool.SEND_USER_MESSAGE,
+			ClineDefaultTool.ATTEMPT,
+			ClineDefaultTool.BROWSER,
+			ClineDefaultTool.MCP_ACCESS,
+			ClineDefaultTool.NEW_TASK,
+		])
+		expect(keptIds).to.not.include(ClineDefaultTool.BASH)
+		expect(keptIds).to.not.include(ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS)
+		expect(keptIds).to.not.include(ClineDefaultTool.LIST_CODE_DEF)
+	})
+
+	it("applies quick-dev step 3 row and keeps document, code-read, Indxr, and local-exec bundles without workflow_progress_request or placeholder-write", () => {
+		const registeredTools = [
+			makeRegisteredTool(ClineDefaultTool.LIST_FILES),
+			makeRegisteredTool(ClineDefaultTool.SEARCH),
+			makeRegisteredTool(ClineDefaultTool.LIST_CODE_DEF),
+			makeRegisteredTool(ClineDefaultTool.FILE_READ),
+			makeRegisteredTool(ClineDefaultTool.FILE_READ_RANGE),
+			makeRegisteredTool(ClineDefaultTool.APPLY_PATCH),
+			makeRegisteredTool(ClineDefaultTool.FILE_NEW),
+			makeRegisteredTool(ClineDefaultTool.BASH),
+			makeRegisteredTool(ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST),
+			makeRegisteredTool(ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS),
+			makeRegisteredTool(ClineDefaultTool.ASK),
+			makeRegisteredTool(ClineDefaultTool.SEND_USER_MESSAGE),
+			makeRegisteredTool(ClineDefaultTool.ATTEMPT),
+			makeRegisteredTool(ClineDefaultTool.PLAN_MODE),
+			makeRegisteredTool(ClineDefaultTool.BROWSER),
+			makeRegisteredTool(ClineDefaultTool.MCP_ACCESS),
+			makeRegisteredTool(ClineDefaultTool.MCP_DOCS),
+			makeRegisteredTool(ClineDefaultTool.NEW_TASK),
+		]
+
+		const result = filterContextualNativeToolSpecs({
+			context: makeContext({
+				activePlaceholderWorkflowName: "quick-dev.md",
+				activePlaceholderWorkflowStepNumber: 3,
+			}),
+			registeredTools,
+			mcpTools: [
+				makeMcpTool("indxr-10mcp0search_relevant"),
+				makeMcpTool("indxr-10mcp0read_source"),
+				makeMcpTool("indxr-10mcp0lookup_symbol"),
+				makeMcpTool("12345670mcp0test_tool"),
+			],
+		})
+
+		const keptIds = result.map((tool) => tool.id)
+		const keptNames = result.map((tool) => tool.name)
+		expect(keptIds).to.include.members([
+			ClineDefaultTool.LIST_FILES,
+			ClineDefaultTool.SEARCH,
+			ClineDefaultTool.LIST_CODE_DEF,
+			ClineDefaultTool.FILE_READ,
+			ClineDefaultTool.FILE_READ_RANGE,
+			ClineDefaultTool.APPLY_PATCH,
+			ClineDefaultTool.FILE_NEW,
+			ClineDefaultTool.BASH,
+			ClineDefaultTool.ASK,
+			ClineDefaultTool.SEND_USER_MESSAGE,
+			ClineDefaultTool.ATTEMPT,
+			ClineDefaultTool.BROWSER,
+			ClineDefaultTool.MCP_ACCESS,
+			ClineDefaultTool.NEW_TASK,
+		])
+		expect(keptIds).to.not.include(ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST)
+		expect(keptIds).to.not.include(ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS)
+		expect(keptNames).to.include("indxr-10mcp0search_relevant")
+		expect(keptNames).to.include("indxr-10mcp0read_source")
+		expect(keptNames).to.include("indxr-10mcp0lookup_symbol")
+		expect(keptNames).to.not.include("12345670mcp0test_tool")
+	})
+
+	it("applies quick-dev step 4 row and keeps only local-exec among workflow-specific bundles", () => {
+		const registeredTools = [
+			makeRegisteredTool(ClineDefaultTool.BASH),
+			makeRegisteredTool(ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS),
+			makeRegisteredTool(ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST),
+			makeRegisteredTool(ClineDefaultTool.LIST_FILES),
+			makeRegisteredTool(ClineDefaultTool.FILE_READ),
+			makeRegisteredTool(ClineDefaultTool.APPLY_PATCH),
+			makeRegisteredTool(ClineDefaultTool.FILE_NEW),
+			makeRegisteredTool(ClineDefaultTool.ASK),
+			makeRegisteredTool(ClineDefaultTool.SEND_USER_MESSAGE),
+			makeRegisteredTool(ClineDefaultTool.ATTEMPT),
+			makeRegisteredTool(ClineDefaultTool.PLAN_MODE),
+			makeRegisteredTool(ClineDefaultTool.BROWSER),
+			makeRegisteredTool(ClineDefaultTool.MCP_ACCESS),
+			makeRegisteredTool(ClineDefaultTool.NEW_TASK),
+		]
+
+		const result = filterContextualNativeToolSpecs({
+			context: makeContext({
+				activePlaceholderWorkflowName: "quick-dev.md",
+				activePlaceholderWorkflowStepNumber: 4,
+			}),
+			registeredTools,
+			mcpTools: [],
+		})
+
+		const keptIds = result.map((tool) => tool.id)
+		expect(keptIds).to.include.members([
+			ClineDefaultTool.BASH,
+			ClineDefaultTool.ASK,
+			ClineDefaultTool.SEND_USER_MESSAGE,
+			ClineDefaultTool.ATTEMPT,
+			ClineDefaultTool.BROWSER,
+			ClineDefaultTool.MCP_ACCESS,
+			ClineDefaultTool.NEW_TASK,
+		])
+		expect(keptIds).to.not.include(ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS)
+		expect(keptIds).to.not.include(ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST)
+		expect(keptIds).to.not.include(ClineDefaultTool.LIST_FILES)
+		expect(keptIds).to.not.include(ClineDefaultTool.FILE_READ)
+		expect(keptIds).to.not.include(ClineDefaultTool.APPLY_PATCH)
+		expect(keptIds).to.not.include(ClineDefaultTool.FILE_NEW)
+	})
+
+	it("applies quick-dev step 5 row with no workflow-specific native bundles", () => {
+		const registeredTools = [
+			makeRegisteredTool(ClineDefaultTool.BASH),
+			makeRegisteredTool(ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS),
+			makeRegisteredTool(ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST),
+			makeRegisteredTool(ClineDefaultTool.LIST_FILES),
+			makeRegisteredTool(ClineDefaultTool.FILE_READ),
+			makeRegisteredTool(ClineDefaultTool.APPLY_PATCH),
+			makeRegisteredTool(ClineDefaultTool.FILE_NEW),
+			makeRegisteredTool(ClineDefaultTool.LIST_CODE_DEF),
+			makeRegisteredTool(ClineDefaultTool.SEARCH),
+			makeRegisteredTool(ClineDefaultTool.ASK),
+			makeRegisteredTool(ClineDefaultTool.SEND_USER_MESSAGE),
+			makeRegisteredTool(ClineDefaultTool.ATTEMPT),
+			makeRegisteredTool(ClineDefaultTool.PLAN_MODE),
+			makeRegisteredTool(ClineDefaultTool.BROWSER),
+			makeRegisteredTool(ClineDefaultTool.MCP_ACCESS),
+			makeRegisteredTool(ClineDefaultTool.NEW_TASK),
+		]
+
+		const result = filterContextualNativeToolSpecs({
+			context: makeContext({
+				activePlaceholderWorkflowName: "quick-dev.md",
+				activePlaceholderWorkflowStepNumber: 5,
+			}),
+			registeredTools,
+			mcpTools: [],
+		})
+
+		const keptIds = result.map((tool) => tool.id)
+		expect(keptIds).to.include.members([
+			ClineDefaultTool.ASK,
+			ClineDefaultTool.SEND_USER_MESSAGE,
+			ClineDefaultTool.ATTEMPT,
+			ClineDefaultTool.BROWSER,
+			ClineDefaultTool.MCP_ACCESS,
+			ClineDefaultTool.NEW_TASK,
+		])
+		expect(keptIds).to.not.include(ClineDefaultTool.BASH)
+		expect(keptIds).to.not.include(ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS)
+		expect(keptIds).to.not.include(ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST)
+		expect(keptIds).to.not.include(ClineDefaultTool.LIST_FILES)
+		expect(keptIds).to.not.include(ClineDefaultTool.FILE_READ)
+		expect(keptIds).to.not.include(ClineDefaultTool.APPLY_PATCH)
+		expect(keptIds).to.not.include(ClineDefaultTool.FILE_NEW)
+		expect(keptIds).to.not.include(ClineDefaultTool.LIST_CODE_DEF)
+		expect(keptIds).to.not.include(ClineDefaultTool.SEARCH)
 	})
 
 	it("applies quick-spec step 9 row and keeps the document, code, Indxr, subagent, and workflow-progress bundles without placeholder-write or local-exec tools", () => {

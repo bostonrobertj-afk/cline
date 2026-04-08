@@ -37,6 +37,7 @@ export function isDeterministicPlaceholderWorkflowSupported(
 		workflowName === "create-epics.md" ||
 		workflowName === "pi-planning.md" ||
 		workflowName === "create-story.md" ||
+		workflowName === "quick-dev.md" ||
 		workflowName === "quick-spec.md" ||
 		workflowName === "dev-story.md" ||
 		workflowName === "review-adversarial-general.md" ||
@@ -192,6 +193,26 @@ function extractCreateStoryEpicDeliverySpecSection(
 
 function sectionHasNoUncheckedChecklistItems(sectionText: string): boolean {
 	return !/^\s*-\s*\[\s\]\s+/m.test(sectionText)
+}
+
+function didSuccessfulGitCommitOccur(toolContext?: DeterministicPlaceholderToolContext): boolean {
+	if (toolContext?.toolName !== "execute_command" || toolContext.toolWasExecuted !== true) {
+		return false
+	}
+
+	const command = typeof toolContext.toolParams?.command === "string" ? toolContext.toolParams.command : undefined
+	if (!command) {
+		return false
+	}
+
+	if (!/(^|&&\s*|;\s*)git commit\b/.test(command)) {
+		return false
+	}
+
+	return (
+		typeof toolContext.toolResult === "string" &&
+		toolContext.toolResult.startsWith("Command executed successfully (exit code 0).")
+	)
 }
 
 function resolveOutputFolderFile(placeholders: Record<string, string>, fileName: string): string | undefined {
@@ -1011,6 +1032,96 @@ async function evaluateQuickSpecStep(args: {
 	}
 }
 
+async function evaluateQuickDevStep(args: {
+	taskState: TaskState
+	stepNumber: number
+	toolContext?: DeterministicPlaceholderToolContext
+}): Promise<DeterministicStepEvaluationResult> {
+	const placeholders = getMergedPlaceholderValues(args.taskState)
+	const specFile = placeholders.spec_file?.trim()
+	const resolvedSpecFile = specFile ? resolveArtifactPlaceholderPath(placeholders, specFile) : undefined
+
+	switch (args.stepNumber) {
+		case 1: {
+			if (!resolvedSpecFile) {
+				return { completed: false }
+			}
+
+			try {
+				await fs.access(resolvedSpecFile)
+			} catch {
+				return { completed: false }
+			}
+
+			return {
+				completed: true,
+				reason: "spec_file resolves to an existing file path.",
+			}
+		}
+		case 2:
+			return { completed: false }
+		case 3: {
+			if (!resolvedSpecFile) {
+				return { completed: false }
+			}
+
+			const specText = await readFileIfExists(resolvedSpecFile)
+			if (!specText) {
+				return { completed: false }
+			}
+
+			const tasksHeadingMatch = /^### Tasks\s*$/m.exec(specText)
+			if (!tasksHeadingMatch) {
+				return { completed: false }
+			}
+
+			const tasksSectionStart = tasksHeadingMatch.index + tasksHeadingMatch[0].length
+			const remainingText = specText.slice(tasksSectionStart)
+			const nextHeadingMatch = /^(?:###|##)\s+/m.exec(remainingText)
+			const tasksSectionEnd = nextHeadingMatch ? tasksSectionStart + nextHeadingMatch.index : specText.length
+			const tasksSection = specText.slice(tasksSectionStart, tasksSectionEnd).trim()
+			if (!tasksSection) {
+				return { completed: false }
+			}
+
+			if (!/^\s*-\s*\[[ xX]\]\s+/m.test(tasksSection)) {
+				return { completed: false }
+			}
+
+			if (!sectionHasNoUncheckedChecklistItems(tasksSection)) {
+				return { completed: false }
+			}
+
+			return {
+				completed: true,
+				reason: "The ### Tasks section contains no unchecked items.",
+			}
+		}
+		case 4: {
+			if (!didSuccessfulGitCommitOccur(args.toolContext)) {
+				return { completed: false }
+			}
+
+			return {
+				completed: true,
+				reason: "A git commit command was executed successfully for the commit step.",
+			}
+		}
+		case 5: {
+			if (!didSuccessfulAttemptCompletionOccur(args.toolContext)) {
+				return { completed: false }
+			}
+
+			return {
+				completed: true,
+				reason: "attempt_completion was executed successfully for the final quick-dev closeout.",
+			}
+		}
+		default:
+			return { completed: false }
+	}
+}
+
 async function evaluateCreateStoryStep(args: {
 	taskState: TaskState
 	stepNumber: number
@@ -1233,6 +1344,14 @@ async function evaluateDeterministicStep(args: {
 
 	if (args.workflowName === "quick-spec.md") {
 		return evaluateQuickSpecStep({
+			taskState: args.taskState,
+			stepNumber: args.stepNumber,
+			toolContext: args.toolContext,
+		})
+	}
+
+	if (args.workflowName === "quick-dev.md") {
+		return evaluateQuickDevStep({
 			taskState: args.taskState,
 			stepNumber: args.stepNumber,
 			toolContext: args.toolContext,

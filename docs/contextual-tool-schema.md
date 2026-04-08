@@ -588,12 +588,11 @@ This section scopes only placeholder workflows under `/Users/robertboston/Docume
 
 ### quick-dev.md
 
-- Step 1: `DOC_READ`, `LOCAL_EXEC`
-- Step 2: `CODE_READ`, `INDXR_DISCOVERY`, `INDXR_SOURCE_READ`, `INDXR_SYMBOL_GRAPH`
-- Step 3: `CODE_READ`, `INDXR_DISCOVERY`, `INDXR_SOURCE_READ`, `INDXR_SYMBOL_GRAPH`, `DOC_WRITE`, `LOCAL_EXEC`
-- Step 4: `DOC_READ`, `DOC_WRITE`
-- Step 5: `DOC_READ`, `LOCAL_EXEC`, `SUBAGENT_COORD`
-- Step 6: `CODE_READ`, `INDXR_DISCOVERY`, `INDXR_SOURCE_READ`, `INDXR_SYMBOL_GRAPH`, `DOC_WRITE`
+- Step 1: `PLACEHOLDER_WRITE`
+- Step 2: `DOC_READ`, `DOC_WRITE`, `WORKFLOW_PROGRESS_REQUEST`
+- Step 3: `DOC_READ`, `DOC_WRITE`, `CODE_READ`, `INDXR_DISCOVERY`, `INDXR_SOURCE_READ`, `INDXR_SYMBOL_GRAPH`, `LOCAL_EXEC`
+- Step 4: `LOCAL_EXEC`
+- Step 5: no additional tools
 
 ### quick-spec.md
 

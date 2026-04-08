@@ -54,6 +54,8 @@ describe("deterministicPlaceholderProgression", () => {
 		expect(isDeterministicPlaceholderWorkflowSupported("pi-planning.md")).to.equal(true)
 		expect(isDeterministicPlaceholderWorkflowSupported("create-story.md")).to.equal(true)
 		expect(isDeterministicPlaceholderWorkflowSupported("create-story")).to.equal(false)
+		expect(isDeterministicPlaceholderWorkflowSupported("quick-dev.md")).to.equal(true)
+		expect(isDeterministicPlaceholderWorkflowSupported("quick-dev")).to.equal(false)
 		expect(isDeterministicPlaceholderWorkflowSupported("quick-spec.md")).to.equal(true)
 		expect(isDeterministicPlaceholderWorkflowSupported("quick-spec")).to.equal(false)
 		expect(isDeterministicPlaceholderWorkflowSupported("dev-story.md")).to.equal(true)
@@ -1815,6 +1817,490 @@ Provide the final closeout report using attempt_completion.`,
 		expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
 			"attempt_completion was executed successfully for the final closeout report.",
 		)
+	})
+
+	describe("quick-dev.md", () => {
+		it("completes quick-dev step 1 when spec_file resolves to an existing file", async () => {
+			const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-quick-dev-step1-"))
+
+			try {
+				const specFile = path.join(tempDir, "tech-spec.md")
+				const taskState = createTaskState({
+					workflowName: "quick-dev.md",
+					workflowContents: `## Step 1: Identify Spec File
+Wait for {spec_file} to be available.`,
+					checklistMarkdown: "- [ ] Step 1: Identify Spec File",
+					placeholderValues: {
+						spec_file: specFile,
+					},
+				})
+
+				await writeFileWithMtime(specFile, "# Tech-Spec: Quick Dev Work\n", Date.now())
+
+				const result = await applyDeterministicPlaceholderProgression({
+					taskState,
+					checklistMarkdown: getChecklistMarkdown(taskState),
+				})
+
+				expect(result.checklist).to.equal("- [x] Step 1: Identify Spec File")
+				expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
+					"spec_file resolves to an existing file path.",
+				)
+			} finally {
+				await fs.rm(tempDir, { recursive: true, force: true })
+			}
+		})
+
+		it("completes quick-dev step 1 when spec_file is a stable relative path that resolves from workflow cwd", async () => {
+			const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-quick-dev-step1-relative-"))
+			const foreignCwd = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-quick-dev-step1-foreign-cwd-"))
+			const originalCwd = process.cwd()
+
+			try {
+				const specFile = path.join(tempDir, "specs", "tech-spec.md")
+				const taskState = createTaskState({
+					workflowName: "quick-dev.md",
+					workflowContents: `## Step 1: Identify Spec File
+Wait for {spec_file} to be available.`,
+					checklistMarkdown: "- [ ] Step 1: Identify Spec File",
+					stablePlaceholderValues: {
+						cwd: tempDir,
+						project_root: tempDir,
+					},
+					placeholderValues: {
+						spec_file: path.join("specs", "tech-spec.md"),
+					},
+				})
+
+				await writeFileWithMtime(specFile, "# Tech-Spec: Quick Dev Work\n", Date.now())
+				process.chdir(foreignCwd)
+
+				const result = await applyDeterministicPlaceholderProgression({
+					taskState,
+					checklistMarkdown: getChecklistMarkdown(taskState),
+				})
+
+				expect(result.checklist).to.equal("- [x] Step 1: Identify Spec File")
+				expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
+					"spec_file resolves to an existing file path.",
+				)
+			} finally {
+				process.chdir(originalCwd)
+				await fs.rm(tempDir, { recursive: true, force: true })
+				await fs.rm(foreignCwd, { recursive: true, force: true })
+			}
+		})
+
+		it("does not complete quick-dev step 1 when spec_file is missing", async () => {
+			const taskState = createTaskState({
+				workflowName: "quick-dev.md",
+				workflowContents: `## Step 1: Identify Spec File
+Wait for {spec_file} to be available.`,
+				checklistMarkdown: "- [ ] Step 1: Identify Spec File",
+			})
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+			})
+
+			expect(result.checklist).to.equal("- [ ] Step 1: Identify Spec File")
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+		})
+
+		it("does not complete quick-dev step 1 when spec_file points to a missing file", async () => {
+			const taskState = createTaskState({
+				workflowName: "quick-dev.md",
+				workflowContents: `## Step 1: Identify Spec File
+Wait for {spec_file} to be available.`,
+				checklistMarkdown: "- [ ] Step 1: Identify Spec File",
+				placeholderValues: {
+					spec_file: path.join(os.tmpdir(), "missing-quick-dev-spec.md"),
+				},
+			})
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+			})
+
+			expect(result.checklist).to.equal("- [ ] Step 1: Identify Spec File")
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+		})
+
+		it("completes quick-dev step 3 when the ### Tasks section has only checked items", async () => {
+			const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-quick-dev-checked-"))
+
+			try {
+				const specFile = path.join(tempDir, "tech-spec.md")
+				const taskState = createTaskState({
+					workflowName: "quick-dev.md",
+					workflowContents: `## Step 3: Execute Tasks
+Wait for the implementation checklist to be fully checked off.`,
+					checklistMarkdown: "- [ ] Step 3: Execute Tasks",
+					placeholderValues: {
+						spec_file: specFile,
+					},
+				})
+
+				await writeFileWithMtime(
+					specFile,
+					`# Tech-Spec: Quick Dev Work
+
+## Implementation Plan
+
+### Tasks
+- [x] Main task
+  - [x] Nested task
+
+## Latest Review Findings
+None.
+`,
+					Date.now(),
+				)
+
+				const result = await applyDeterministicPlaceholderProgression({
+					taskState,
+					checklistMarkdown: getChecklistMarkdown(taskState),
+				})
+
+				expect(result.checklist).to.equal("- [x] Step 3: Execute Tasks")
+				expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
+					"The ### Tasks section contains no unchecked items.",
+				)
+			} finally {
+				await fs.rm(tempDir, { recursive: true, force: true })
+			}
+		})
+
+		it("completes quick-dev step 3 when spec_file is a stable relative path that resolves from workflow cwd", async () => {
+			const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-quick-dev-step3-relative-"))
+			const foreignCwd = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-quick-dev-step3-foreign-cwd-"))
+			const originalCwd = process.cwd()
+
+			try {
+				const specFile = path.join(tempDir, "specs", "tech-spec.md")
+				const taskState = createTaskState({
+					workflowName: "quick-dev.md",
+					workflowContents: `## Step 3: Execute Tasks
+Wait for the implementation checklist to be fully checked off.`,
+					checklistMarkdown: "- [ ] Step 3: Execute Tasks",
+					stablePlaceholderValues: {
+						cwd: tempDir,
+						project_root: tempDir,
+					},
+					placeholderValues: {
+						spec_file: path.join("specs", "tech-spec.md"),
+					},
+				})
+
+				await writeFileWithMtime(
+					specFile,
+					`# Tech-Spec: Quick Dev Work
+
+## Implementation Plan
+
+### Tasks
+- [x] Main task
+  - [x] Nested task
+
+## Latest Review Findings
+None.
+`,
+					Date.now(),
+				)
+				process.chdir(foreignCwd)
+
+				const result = await applyDeterministicPlaceholderProgression({
+					taskState,
+					checklistMarkdown: getChecklistMarkdown(taskState),
+				})
+
+				expect(result.checklist).to.equal("- [x] Step 3: Execute Tasks")
+				expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
+					"The ### Tasks section contains no unchecked items.",
+				)
+			} finally {
+				process.chdir(originalCwd)
+				await fs.rm(tempDir, { recursive: true, force: true })
+				await fs.rm(foreignCwd, { recursive: true, force: true })
+			}
+		})
+
+		it("does not complete quick-dev step 3 when the ### Tasks section has an unchecked nested item", async () => {
+			const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-quick-dev-open-"))
+
+			try {
+				const specFile = path.join(tempDir, "tech-spec.md")
+				const taskState = createTaskState({
+					workflowName: "quick-dev.md",
+					workflowContents: `## Step 3: Execute Tasks
+Wait for the implementation checklist to be fully checked off.`,
+					checklistMarkdown: "- [ ] Step 3: Execute Tasks",
+					placeholderValues: {
+						spec_file: specFile,
+					},
+				})
+
+				await writeFileWithMtime(
+					specFile,
+					`# Tech-Spec: Quick Dev Work
+
+## Implementation Plan
+
+### Tasks
+- [x] Main task
+  - [ ] Nested task
+
+## Latest Review Findings
+None.
+`,
+					Date.now(),
+				)
+
+				const result = await applyDeterministicPlaceholderProgression({
+					taskState,
+					checklistMarkdown: getChecklistMarkdown(taskState),
+				})
+
+				expect(result.checklist).to.equal("- [ ] Step 3: Execute Tasks")
+				expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+			} finally {
+				await fs.rm(tempDir, { recursive: true, force: true })
+			}
+		})
+
+		it("does not complete quick-dev step 3 when checklist items exist only outside the ### Tasks section", async () => {
+			const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-quick-dev-outside-"))
+
+			try {
+				const specFile = path.join(tempDir, "tech-spec.md")
+				const taskState = createTaskState({
+					workflowName: "quick-dev.md",
+					workflowContents: `## Step 3: Execute Tasks
+Wait for the implementation checklist to be fully checked off.`,
+					checklistMarkdown: "- [ ] Step 3: Execute Tasks",
+					placeholderValues: {
+						spec_file: specFile,
+					},
+				})
+
+				await writeFileWithMtime(
+					specFile,
+					`# Tech-Spec: Quick Dev Work
+
+## Implementation Plan
+
+### Tasks
+
+## Later Work
+- [ ] Outside checklist item
+`,
+					Date.now(),
+				)
+
+				const result = await applyDeterministicPlaceholderProgression({
+					taskState,
+					checklistMarkdown: getChecklistMarkdown(taskState),
+				})
+
+				expect(result.checklist).to.equal("- [ ] Step 3: Execute Tasks")
+				expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+			} finally {
+				await fs.rm(tempDir, { recursive: true, force: true })
+			}
+		})
+
+		it("ignores unchecked checklist items under a sibling ### heading after ### Tasks for quick-dev step 3", async () => {
+			const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-quick-dev-sibling-"))
+
+			try {
+				const specFile = path.join(tempDir, "tech-spec.md")
+				const taskState = createTaskState({
+					workflowName: "quick-dev.md",
+					workflowContents: `## Step 3: Execute Tasks
+Wait for the implementation checklist to be fully checked off.`,
+					checklistMarkdown: "- [ ] Step 3: Execute Tasks",
+					placeholderValues: {
+						spec_file: specFile,
+					},
+				})
+
+				await writeFileWithMtime(
+					specFile,
+					`# Tech-Spec: Quick Dev Work
+
+## Implementation Plan
+
+### Tasks
+- [x] Main task
+
+### Notes
+- [ ] Outside checklist item
+`,
+					Date.now(),
+				)
+
+				const result = await applyDeterministicPlaceholderProgression({
+					taskState,
+					checklistMarkdown: getChecklistMarkdown(taskState),
+				})
+
+				expect(result.checklist).to.equal("- [x] Step 3: Execute Tasks")
+				expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
+					"The ### Tasks section contains no unchecked items.",
+				)
+			} finally {
+				await fs.rm(tempDir, { recursive: true, force: true })
+			}
+		})
+
+		it("completes quick-dev step 4 from successful execute_command tool context running git commit", async () => {
+			const taskState = createTaskState({
+				workflowName: "quick-dev.md",
+				workflowContents: `## Step 4: Commit Changes
+Create the commit for this quick-dev slice.`,
+				checklistMarkdown: "- [ ] Step 4: Commit Changes",
+			})
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+				toolContext: {
+					toolName: "execute_command",
+					toolParams: { command: 'cd /repo && git commit -m "quick dev closeout"' },
+					toolResult: `Command executed successfully (exit code 0).
+Output:
+[execute_command for 'cd /repo && git commit -m "quick dev closeout"'] Result:
+[done]`,
+					toolWasExecuted: true,
+				},
+			})
+
+			expect(result.checklist).to.equal("- [x] Step 4: Commit Changes")
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
+				"A git commit command was executed successfully for the commit step.",
+			)
+		})
+
+		it("does not complete quick-dev step 4 when execute_command runs a non-commit command", async () => {
+			const taskState = createTaskState({
+				workflowName: "quick-dev.md",
+				workflowContents: `## Step 4: Commit Changes
+Create the commit for this quick-dev slice.`,
+				checklistMarkdown: "- [ ] Step 4: Commit Changes",
+			})
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+				toolContext: {
+					toolName: "execute_command",
+					toolParams: { command: "cd /repo && git status" },
+					toolResult:
+						"Command executed successfully (exit code 0).\nOutput:\n[execute_command for 'cd /repo && git status'] Result:\n[done]",
+					toolWasExecuted: true,
+				},
+			})
+
+			expect(result.checklist).to.equal("- [ ] Step 4: Commit Changes")
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+		})
+
+		it("does not complete quick-dev step 4 when git commit returns a failed command result", async () => {
+			const taskState = createTaskState({
+				workflowName: "quick-dev.md",
+				workflowContents: `## Step 4: Commit Changes
+Create the commit for this quick-dev slice.`,
+				checklistMarkdown: "- [ ] Step 4: Commit Changes",
+			})
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+				toolContext: {
+					toolName: "execute_command",
+					toolParams: { command: 'cd /repo && git commit -m "quick dev closeout"' },
+					toolResult: "Command failed with exit code 1.\nOutput:\nnothing to commit, working tree clean",
+					toolWasExecuted: true,
+				},
+			})
+
+			expect(result.checklist).to.equal("- [ ] Step 4: Commit Changes")
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+		})
+
+		it("does not complete quick-dev step 4 when execute_command was not executed", async () => {
+			const taskState = createTaskState({
+				workflowName: "quick-dev.md",
+				workflowContents: `## Step 4: Commit Changes
+Create the commit for this quick-dev slice.`,
+				checklistMarkdown: "- [ ] Step 4: Commit Changes",
+			})
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+				toolContext: {
+					toolName: "execute_command",
+					toolParams: { command: 'cd /repo && git commit -m "quick dev closeout"' },
+					toolResult: `[execute_command for 'cd /repo && git commit -m "quick dev closeout"'] Result:
+[done]`,
+					toolWasExecuted: false,
+				},
+			})
+
+			expect(result.checklist).to.equal("- [ ] Step 4: Commit Changes")
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+		})
+
+		it("completes quick-dev step 5 from successful attempt_completion tool context", async () => {
+			const taskState = createTaskState({
+				workflowName: "quick-dev.md",
+				workflowContents: `## Step 5: Close Out
+Deliver the final quick-dev closeout using attempt_completion.`,
+				checklistMarkdown: "- [ ] Step 5: Close Out",
+			})
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+				toolContext: {
+					toolName: "attempt_completion",
+					toolParams: { result: "Done" },
+					toolResult: "[attempt_completion] Result:\nDone",
+					toolWasExecuted: true,
+				},
+			})
+
+			expect(result.checklist).to.equal("- [x] Step 5: Close Out")
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
+				"attempt_completion was executed successfully for the final quick-dev closeout.",
+			)
+		})
+
+		it("does not complete quick-dev step 5 when attempt_completion was not executed", async () => {
+			const taskState = createTaskState({
+				workflowName: "quick-dev.md",
+				workflowContents: `## Step 5: Close Out
+Deliver the final quick-dev closeout using attempt_completion.`,
+				checklistMarkdown: "- [ ] Step 5: Close Out",
+			})
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+				toolContext: {
+					toolName: "attempt_completion",
+					toolParams: { result: "Done" },
+					toolResult: "[attempt_completion] Result:\nDone",
+					toolWasExecuted: false,
+				},
+			})
+
+			expect(result.checklist).to.equal("- [ ] Step 5: Close Out")
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+		})
 	})
 
 	it("completes write-remediation-story step 1 when story_path points to an existing story file", async () => {

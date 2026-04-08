@@ -864,6 +864,93 @@ describe("Prompt System Integration Tests", () => {
 			)
 		})
 
+		it("generates a continuation prompt for quick-dev step 2 with workflow_progress_request guidance", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: { ...mockProviderInfo, mode: "act" },
+					isContinuationTurn: true,
+					activeWorkflowSupportsPlaceholders: true,
+					managedWorkflowActive: false,
+					activePlaceholderWorkflowName: "quick-dev.md",
+					activePlaceholderWorkflowStepNumber: 2,
+					currentFocusChainChecklist: "- [ ] Step 2: Review the spec with the user",
+				},
+				"fast",
+				async ({ systemPrompt }) => {
+					expect(systemPrompt).to.include("workflow_progress_request")
+					expect(systemPrompt).to.include("Do not include `task_progress`")
+					expect(systemPrompt).to.include(
+						"runtime-owned `Yes` branch completes the next checklist step before the next model request is built",
+					)
+				},
+			)
+		})
+
+		it("does not generate workflow_progress_request guidance for quick-dev step 3", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: { ...mockProviderInfo, mode: "act" },
+					isContinuationTurn: true,
+					activeWorkflowSupportsPlaceholders: true,
+					managedWorkflowActive: false,
+					activePlaceholderWorkflowName: "quick-dev.md",
+					activePlaceholderWorkflowStepNumber: 3,
+					currentFocusChainChecklist: "- [ ] Step 3: Execute the planned work",
+				},
+				"fast",
+				async ({ systemPrompt }) => {
+					expect(systemPrompt).to.not.include("workflow_progress_request")
+					expect(systemPrompt).to.not.include("Do not include `task_progress`")
+				},
+			)
+		})
+
+		it("does not generate workflow_progress_request guidance for quick-dev step 4", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: { ...mockProviderInfo, mode: "act" },
+					isContinuationTurn: true,
+					activeWorkflowSupportsPlaceholders: true,
+					managedWorkflowActive: false,
+					activePlaceholderWorkflowName: "quick-dev.md",
+					activePlaceholderWorkflowStepNumber: 4,
+					currentFocusChainChecklist: "- [ ] Step 4: Commit the work",
+				},
+				"fast",
+				async ({ systemPrompt }) => {
+					expect(systemPrompt).to.not.include("workflow_progress_request")
+					expect(systemPrompt).to.not.include("Do not include `task_progress`")
+				},
+			)
+		})
+
+		it("does not generate workflow_progress_request guidance for quick-dev step 5", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: { ...mockProviderInfo, mode: "act" },
+					isContinuationTurn: true,
+					activeWorkflowSupportsPlaceholders: true,
+					managedWorkflowActive: false,
+					activePlaceholderWorkflowName: "quick-dev.md",
+					activePlaceholderWorkflowStepNumber: 5,
+					currentFocusChainChecklist: "- [ ] Step 5: Close out with the user",
+				},
+				"fast",
+				async ({ systemPrompt }) => {
+					expect(systemPrompt).to.not.include("workflow_progress_request")
+					expect(systemPrompt).to.not.include("Do not include `task_progress`")
+				},
+			)
+		})
+
 		it("generates a continuation prompt for quick-spec step 3 with workflow_progress_request guidance", async function () {
 			await runPromptTest(
 				this,
@@ -1665,6 +1752,150 @@ describe("Prompt System Integration Tests", () => {
 					expect(nativeToolNames).to.not.include("search_files")
 					expect(nativeToolNames).to.not.include("execute_command")
 					expect(nativeToolNames).to.not.include("generate_plan_output")
+				},
+			)
+		})
+
+		it("filters native tools for quick-dev step 1", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
+					enableNativeToolCalls: true,
+					useMinimalGptPrompt: true,
+					activeWorkflowSupportsPlaceholders: true,
+					managedWorkflowActive: false,
+					activePlaceholderWorkflowName: "quick-dev.md",
+					activePlaceholderWorkflowStepNumber: 1,
+				},
+				"gpt-5.4-2026-03-05",
+				async ({ tools }) => {
+					const nativeToolNames = getNativeToolNames(tools)
+
+					expect(nativeToolNames).to.include.members(["set_workflow_placeholders", "attempt_completion"])
+					expect(nativeToolNames).to.not.include("read_file")
+					expect(nativeToolNames).to.not.include("apply_patch")
+					expect(nativeToolNames).to.not.include("execute_command")
+					expect(nativeToolNames).to.not.include("workflow_progress_request")
+				},
+			)
+		})
+
+		it("filters native tools for quick-dev step 2", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
+					enableNativeToolCalls: true,
+					useMinimalGptPrompt: true,
+					activeWorkflowSupportsPlaceholders: true,
+					managedWorkflowActive: false,
+					activePlaceholderWorkflowName: "quick-dev.md",
+					activePlaceholderWorkflowStepNumber: 2,
+				},
+				"gpt-5.4-2026-03-05",
+				async ({ tools }) => {
+					const nativeToolNames = getNativeToolNames(tools)
+
+					expect(nativeToolNames).to.include.members([
+						"read_file",
+						"read_file_range",
+						"search_files",
+						"apply_patch",
+						"workflow_progress_request",
+						"attempt_completion",
+					])
+					expect(nativeToolNames).to.not.include("execute_command")
+					expect(nativeToolNames).to.not.include("set_workflow_placeholders")
+					expect(nativeToolNames).to.not.include("list_code_definition_names")
+				},
+			)
+		})
+
+		it("filters native tools for quick-dev step 3", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
+					enableNativeToolCalls: true,
+					useMinimalGptPrompt: true,
+					mcpHub: makeMcpHub([makeIndxrServer()]),
+					activeWorkflowSupportsPlaceholders: true,
+					managedWorkflowActive: false,
+					activePlaceholderWorkflowName: "quick-dev.md",
+					activePlaceholderWorkflowStepNumber: 3,
+				},
+				"gpt-5.4-2026-03-05",
+				async ({ tools }) => {
+					const nativeToolNames = getNativeToolNames(tools)
+
+					expect(nativeToolNames).to.include.members([
+						"read_file",
+						"read_file_range",
+						"search_files",
+						"list_code_definition_names",
+						"apply_patch",
+						"execute_command",
+						"attempt_completion",
+					])
+					expect(nativeToolNames).to.not.include("workflow_progress_request")
+					expect(nativeToolNames).to.not.include("set_workflow_placeholders")
+					expect(nativeToolNames.some((toolName) => toolName.startsWith("indxr-"))).to.equal(true)
+				},
+			)
+		})
+
+		it("filters native tools for quick-dev step 4", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
+					enableNativeToolCalls: true,
+					useMinimalGptPrompt: true,
+					activeWorkflowSupportsPlaceholders: true,
+					managedWorkflowActive: false,
+					activePlaceholderWorkflowName: "quick-dev.md",
+					activePlaceholderWorkflowStepNumber: 4,
+				},
+				"gpt-5.4-2026-03-05",
+				async ({ tools }) => {
+					const nativeToolNames = getNativeToolNames(tools)
+
+					expect(nativeToolNames).to.include.members(["execute_command", "attempt_completion"])
+					expect(nativeToolNames).to.not.include("read_file")
+					expect(nativeToolNames).to.not.include("apply_patch")
+					expect(nativeToolNames).to.not.include("workflow_progress_request")
+					expect(nativeToolNames).to.not.include("set_workflow_placeholders")
+				},
+			)
+		})
+
+		it("filters native tools for quick-dev step 5", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
+					enableNativeToolCalls: true,
+					useMinimalGptPrompt: true,
+					activeWorkflowSupportsPlaceholders: true,
+					managedWorkflowActive: false,
+					activePlaceholderWorkflowName: "quick-dev.md",
+					activePlaceholderWorkflowStepNumber: 5,
+				},
+				"gpt-5.4-2026-03-05",
+				async ({ tools }) => {
+					const nativeToolNames = getNativeToolNames(tools)
+
+					expect(nativeToolNames).to.not.include("execute_command")
+					expect(nativeToolNames).to.not.include("read_file")
+					expect(nativeToolNames).to.not.include("apply_patch")
+					expect(nativeToolNames).to.not.include("workflow_progress_request")
+					expect(nativeToolNames).to.not.include("set_workflow_placeholders")
 				},
 			)
 		})

@@ -13,11 +13,7 @@
 - Step 1: Required variables are set as workflow variables and resolve to valid filepaths where appropriate.
 
 # Workflow Start Form- enablement not needed
-[ ] requirements doc
-[ ] action plan
-[ ] implementation
-[ ] QA
-Gathers inputs using existing workflow start mechanism tied to the workflow source document.
+No enablement needed.
 
 # Contextual Tool Matrix
 [ ] requirements doc

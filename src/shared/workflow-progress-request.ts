@@ -1,6 +1,7 @@
 export const WORKFLOW_PROGRESS_REQUEST_WORKFLOW_STEPS = {
 	"create-prd.md": [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
 	"create-story.md": [3, 4],
+	"quick-dev.md": [2],
 	"quick-spec.md": [3, 4, 5, 6, 7, 8, 9],
 	"create-epics.md": [3],
 	"pi-planning.md": [4, 5],
@@ -19,6 +20,10 @@ function normalizeWorkflowProgressRequestWorkflowName(workflowName?: string) {
 
 	if (normalized === "create-story.md" || normalized === "create-story") {
 		return "create-story.md"
+	}
+
+	if (normalized === "quick-dev.md" || normalized === "quick-dev") {
+		return "quick-dev.md"
 	}
 
 	if (normalized === "quick-spec.md" || normalized === "quick-spec") {

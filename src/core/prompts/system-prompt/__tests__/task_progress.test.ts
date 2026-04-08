@@ -176,6 +176,67 @@ describe("placeholder workflow task progress prompt", () => {
 		expect(progress).to.not.contain("Do not include `task_progress` on `workflow_progress_request`")
 	})
 
+	it("teaches workflow_progress_request for quick-dev step 2", async () => {
+		const progress = await getUpdatingTaskProgress(variant, {
+			...context,
+			managedWorkflowActive: false,
+			activeWorkflowSupportsPlaceholders: true,
+			activeDeterministicPlaceholderWorkflowEnabled: false,
+			activePlaceholderWorkflowName: "quick-dev.md",
+			activePlaceholderWorkflowStepNumber: 2,
+		})
+
+		expect(progress).to.be.a("string")
+		expect(progress).to.contain("workflow_progress_request")
+		expect(progress).to.not.contain("send_user_message")
+		expect(progress).to.contain("Do not include `task_progress` on `workflow_progress_request`")
+	})
+
+	it("does not teach workflow_progress_request for quick-dev step 3", async () => {
+		const progress = await getUpdatingTaskProgress(variant, {
+			...context,
+			managedWorkflowActive: false,
+			activeWorkflowSupportsPlaceholders: true,
+			activeDeterministicPlaceholderWorkflowEnabled: false,
+			activePlaceholderWorkflowName: "quick-dev.md",
+			activePlaceholderWorkflowStepNumber: 3,
+		})
+
+		expect(progress).to.be.a("string")
+		expect(progress).to.not.contain("workflow_progress_request")
+		expect(progress).to.not.contain("Do not include `task_progress` on `workflow_progress_request`")
+	})
+
+	it("does not teach workflow_progress_request for quick-dev step 4", async () => {
+		const progress = await getUpdatingTaskProgress(variant, {
+			...context,
+			managedWorkflowActive: false,
+			activeWorkflowSupportsPlaceholders: true,
+			activeDeterministicPlaceholderWorkflowEnabled: false,
+			activePlaceholderWorkflowName: "quick-dev.md",
+			activePlaceholderWorkflowStepNumber: 4,
+		})
+
+		expect(progress).to.be.a("string")
+		expect(progress).to.not.contain("workflow_progress_request")
+		expect(progress).to.not.contain("Do not include `task_progress` on `workflow_progress_request`")
+	})
+
+	it("does not teach workflow_progress_request for quick-dev step 5", async () => {
+		const progress = await getUpdatingTaskProgress(variant, {
+			...context,
+			managedWorkflowActive: false,
+			activeWorkflowSupportsPlaceholders: true,
+			activeDeterministicPlaceholderWorkflowEnabled: false,
+			activePlaceholderWorkflowName: "quick-dev.md",
+			activePlaceholderWorkflowStepNumber: 5,
+		})
+
+		expect(progress).to.be.a("string")
+		expect(progress).to.not.contain("workflow_progress_request")
+		expect(progress).to.not.contain("Do not include `task_progress` on `workflow_progress_request`")
+	})
+
 	it("teaches workflow_progress_request for quick-spec step 3", async () => {
 		const progress = await getUpdatingTaskProgress(variant, {
 			...context,

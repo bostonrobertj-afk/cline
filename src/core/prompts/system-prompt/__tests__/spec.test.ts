@@ -460,7 +460,7 @@ describe("workflow placeholder tool gating", () => {
 		).to.equal(false)
 	})
 
-	it("gates workflow_progress_request to create-prd steps 3 through 14, create-story steps 3 and 4, quick-spec steps 3 through 9, create-epics step 3, and pi-planning steps 4 and 5", () => {
+	it("gates workflow_progress_request to create-prd steps 3 through 14, create-story steps 3 and 4, quick-dev step 2, quick-spec steps 3 through 9, create-epics step 3, and pi-planning steps 4 and 5", () => {
 		const tool = workflow_progress_request_variants[0]
 
 		expect(
@@ -495,6 +495,41 @@ describe("workflow placeholder tool gating", () => {
 			tool.contextRequirements?.({
 				...mockContext,
 				activePlaceholderWorkflowName: "create-story.md",
+				activePlaceholderWorkflowStepNumber: 5,
+			}),
+		).to.equal(false)
+		expect(
+			tool.contextRequirements?.({
+				...mockContext,
+				activePlaceholderWorkflowName: "quick-dev.md",
+				activePlaceholderWorkflowStepNumber: 2,
+			}),
+		).to.equal(true)
+		expect(
+			tool.contextRequirements?.({
+				...mockContext,
+				activePlaceholderWorkflowName: "quick-dev.md",
+				activePlaceholderWorkflowStepNumber: 1,
+			}),
+		).to.equal(false)
+		expect(
+			tool.contextRequirements?.({
+				...mockContext,
+				activePlaceholderWorkflowName: "quick-dev.md",
+				activePlaceholderWorkflowStepNumber: 3,
+			}),
+		).to.equal(false)
+		expect(
+			tool.contextRequirements?.({
+				...mockContext,
+				activePlaceholderWorkflowName: "quick-dev.md",
+				activePlaceholderWorkflowStepNumber: 4,
+			}),
+		).to.equal(false)
+		expect(
+			tool.contextRequirements?.({
+				...mockContext,
+				activePlaceholderWorkflowName: "quick-dev.md",
 				activePlaceholderWorkflowStepNumber: 5,
 			}),
 		).to.equal(false)
