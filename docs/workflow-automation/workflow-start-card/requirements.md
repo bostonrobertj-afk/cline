@@ -14,9 +14,7 @@ The capability must:
 
 This slice is intended to be workflow-agnostic.
 
-The first workflow to use it will be:
-
-- `quick-spec.md`
+The runtime registry must be seeded for every placeholder workflow that has an approved entry in `workflow-start-messages.md`.
 
 ## Source Of Truth
 
@@ -281,13 +279,13 @@ The body copy used in the runtime registry must match the approved per-workflow 
 
 The heading must not be copied from the reference file. It must be generated from the workflow filename using the runtime heading contract above.
 
-### 3. First delivery target
+### 3. Registry Coverage Target
 
-The first required runtime copy entry is for:
+This slice must seed the runtime registry with every approved workflow/message pair documented in:
 
-- `quick-spec.md`
+- [workflow-start-messages.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/workflow-automation/workflow-start-card/workflow-start-messages.md)
 
-This slice must make it straightforward to add future entries for other placeholder workflows without changing the underlying runtime mechanism.
+Missing registry entries for workflows documented there are requirements failures for this capability.
 
 ## Testing Requirements
 

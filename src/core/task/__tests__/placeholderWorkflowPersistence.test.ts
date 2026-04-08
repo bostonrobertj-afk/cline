@@ -2092,12 +2092,53 @@ Construct and persist review_input.md from the persisted diff output before cont
 		expect(fakeTask.persistWorkflowStartCardSession.calledOnce).to.equal(true)
 	})
 
+	it("opens the create-story workflow-start card when that workflow is activated through the same pre-turn path", async () => {
+		const taskState = new TaskState()
+		taskState.activePlaceholderWorkflowSource = {
+			type: "remote",
+			name: "create-story.md",
+			contents: "# Create Story\n",
+		}
+		const fakeTask = {
+			taskState,
+			persistWorkflowStartCardSession: sinon.stub().resolves(),
+			renderWorkflowStartCardMessage: sinon.stub().callsFake(async () => undefined),
+		}
+		let workflowFormLoopReached = false
+
+		const execution = (async () => {
+			await maybeResolveWorkflowStartCardBeforeApiTurn.call(fakeTask, {
+				type: "activate_placeholder_workflow",
+			})
+			workflowFormLoopReached = true
+		})()
+
+		await new Promise((resolve) => setTimeout(resolve, 20))
+
+		expect(fakeTask.renderWorkflowStartCardMessage.calledOnce).to.equal(true)
+		expect(workflowFormLoopReached).to.equal(false)
+		expect(taskState.activeWorkflowStartCardSession?.workflowName).to.equal("create-story.md")
+		expect(taskState.activeWorkflowStartCardSession?.markdownBody).to.equal(
+			"In this workflow you will turn a planned backlog story into a detailed implementation-ready story file. You'll load the story context, define executable tasks and subtasks, capture technical guidance, and prepare the work for development. Run this workflow once for each story in your epic delivery spec.",
+		)
+
+		const renderedPayload = fakeTask.renderWorkflowStartCardMessage.firstCall.args[0] as ClineWorkflowStartCard
+		expect(renderedPayload.title).to.equal("Welcome to the Create Story Workflow!")
+		expect(renderedPayload.ctaLabel).to.equal("Get Started")
+
+		taskState.activeWorkflowStartCardSession = undefined
+		await execution
+
+		expect(workflowFormLoopReached).to.equal(true)
+		expect(fakeTask.persistWorkflowStartCardSession.calledOnce).to.equal(true)
+	})
+
 	it("skips the workflow-start-card capability when the active workflow has no registry entry", async () => {
 		const taskState = new TaskState()
 		taskState.activePlaceholderWorkflowSource = {
 			type: "remote",
-			name: "brainstorming.md",
-			contents: "# Brainstorming\n",
+			name: "unconfigured-workflow.md",
+			contents: "# Unconfigured Workflow\n",
 		}
 		const fakeTask = {
 			taskState,
