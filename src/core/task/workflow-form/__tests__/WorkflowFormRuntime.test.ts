@@ -349,6 +349,79 @@ describe("WorkflowFormRuntime", () => {
 		expect(payload.successMessage).to.equal("legacy success")
 	})
 
+	it("invokes build_tech_spec_document from a collect_inputs automatic-status session", () => {
+		const quickSpecAutomaticResolver: WorkflowFormResolverDefinition = {
+			id: "quick_spec_step_2_build_tech_spec_document",
+			toolName: ClineDefaultTool.BUILD_TECH_SPEC_DOCUMENT,
+			defaultInitialPhase: "collect_inputs",
+			buildDefinition: (): WorkflowFormDefinition => ({
+				toolName: ClineDefaultTool.BUILD_TECH_SPEC_DOCUMENT,
+				title: "Tech Spec Scaffold",
+				toolDictionaryTitle: "Tech Spec Scaffold Reference",
+				toolDictionaryMarkdown: "",
+				presentation: {
+					kind: "automatic_status",
+					pendingLabel: "Preparing workflow documents",
+					successLabel: "Workflow documents ready",
+					failureLabel: "Automatic workflow preparation failed- falling back to manual LLM workflow preparation.",
+				},
+				pages: {
+					collect_inputs: {
+						prompt: "The system will now build the canonical quick-spec scaffold from the stored workflow title and the canonical quick-spec template.",
+						fields: [],
+						submitLabel: "Submit",
+						cancelLabel: "Cancel",
+					},
+					retry_error: {
+						prompt: "The system could not produce the canonical quick-spec scaffold from the stored workflow inputs. Retry the request or return to the Step 2 fallback instructions.",
+						fields: [],
+						submitLabel: "Submit",
+						cancelLabel: "Cancel",
+						retryLabel: "Start Over",
+					},
+				},
+				successMessage: "The Step 2 tech-spec scaffold is ready.",
+			}),
+			buildToolExecutionFailureFallbackMessage: () =>
+				"The workflow form could not build the Step 2 tech-spec scaffold from stored workflow inputs. The workflow will return to the Step 2 fallback instructions.",
+			evaluateToolExecutionResult: () => ({ succeeded: true }),
+			buildToolExecutionRequest: () => ({
+				toolName: ClineDefaultTool.BUILD_TECH_SPEC_DOCUMENT,
+				toolInput: {},
+				toolParams: {},
+			}),
+		}
+		const quickSpecRuntime = new WorkflowFormRuntime({
+			quick_spec_step_2_build_tech_spec_document: quickSpecAutomaticResolver,
+		})
+		const session = quickSpecRuntime.createSession({
+			resolverId: "quick_spec_step_2_build_tech_spec_document",
+			triggerSource: "deterministic_workflow_progression",
+			owner: {
+				kind: "placeholder_workflow_step",
+				workflowName: "quick-spec.md",
+				stepNumber: 2,
+			},
+			initialPhase: "collect_inputs",
+		})
+
+		const outcome = quickSpecRuntime.handleSubmission(
+			session,
+			WorkflowFormSubmissionRequest.create({
+				sessionId: session.sessionId,
+				action: WorkflowFormAction.SUBMIT,
+				fields: [],
+			}),
+		)
+
+		expect(outcome.kind).to.equal("invoke_tool")
+		if (outcome.kind === "invoke_tool") {
+			expect(outcome.toolName).to.equal("build_tech_spec_document")
+			expect(outcome.toolInput).to.deep.equal({})
+			expect(outcome.toolParams).to.deep.equal({})
+		}
+	})
+
 	it("transitions from confirm to select_source when the Phase 1 resolver submission confirms yes", () => {
 		const session = runtime.createSession({
 			resolverId: "code_review_step_3_diff_source",

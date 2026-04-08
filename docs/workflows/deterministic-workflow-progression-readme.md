@@ -72,6 +72,7 @@ Side effects may also include:
   - `create-epics.md`
   - `pi-planning.md`
   - `create-story.md`
+  - `quick-spec.md`
   - `dev-story.md`
   - `review-adversarial-general.md`
   - `blind-review.md`
@@ -119,6 +120,11 @@ Current evaluator examples:
   - Step 2 completes when `story_doc` exists under `{output_folder}/implementation-artifacts`, keeps `Status: backlog`, preserves every required template heading, and matches the selected epic-delivery-spec story content for the story body and acceptance criteria after insignificant whitespace normalization
   - Steps 3 and 4 are not evaluator-completed; they transition through `workflow_progress_request`
   - Step 5 completes when `story_doc` contains `Status: ready-for-dev`
+- `quick-spec.md`
+  - Step 1 completes when `title` already exists in workflow placeholder state and is non-empty after trimming
+  - Step 2 completes when `output_file` resolves to the canonical `tech-spec-wip.md`, the scaffold preserves the required template heading set, and the YAML frontmatter plus top heading are initialized correctly
+  - Steps 3 through 9 are not evaluator-completed; they transition through `workflow_progress_request`
+  - Step 10 completes when the current turn successfully executes `attempt_completion`
 - `review-adversarial-general.md`
   - Step 1 completes when `diff_output` resolves to an existing file path
   - Step 2 completes when `adversarial-review-findings.md` was written during the current task and still exists
@@ -192,6 +198,10 @@ This is especially important for steps whose completion is defined by:
 - In `create-story.md`, if `story_doc` already exists under `{output_folder}/implementation-artifacts` with `Status: backlog`, keeps every required template heading, and its story body plus acceptance criteria match the selected delivery-spec story after insignificant whitespace normalization, Step 2 can auto-complete.
 - In `create-story.md`, Steps 3 and 4 do not auto-complete from document state alone because they are governed by `workflow_progress_request`.
 - In `create-story.md`, if `story_doc` now contains `Status: ready-for-dev`, Step 5 can auto-complete.
+- In `quick-spec.md`, if `title` is already available in placeholder state, Step 1 can complete immediately on the next deterministic pass.
+- In `quick-spec.md`, if `output_file` already points to the canonical `tech-spec-wip.md` scaffold with the required heading set and initialized frontmatter, Step 2 can auto-complete.
+- In `quick-spec.md`, Steps 3 through 9 do not auto-complete from document state alone because they are governed by `workflow_progress_request`.
+- In `quick-spec.md`, Step 10 can auto-complete when the current turn successfully executes `attempt_completion`.
 - In `review-adversarial-general.md`, if `diff_output` resolves to an existing file, Step 1 can complete immediately on the next deterministic pass.
 - In `review-adversarial-general.md`, if Step 2 writes `{output_folder}/adversarial-review-findings.md` during the current task and the artifact still exists, Step 2 can auto-complete.
 - In `blind-review.md`, if `diff_output` resolves to an existing file, Step 1 can complete immediately on the next deterministic pass.

@@ -1,55 +1,48 @@
 # Buildout Steps
-[ ] Step Progression Configuration
-[ ] Step 1 Automation
-[ ] Workflow Start Custom Card
-[ ] Contextual Tool Matrix
+[x] Step Progression Configuration
+[x] Workflow Start Form
+[x] Step 2 Automation
+[x] Contextual Tool Matrix
 [ ] Persona Activation
 
 
 # Deterministic Workflow Progression / Step Progression Configuration
-[ ] requirements doc
-[ ] action plan
-[ ] implementation
-[ ] QA
-- Step 1: The quick spec document is present, has the correct sections from the spec template, and the file path has been set as output_file.
-- Steps 2-8: workflow_progress_request receives a "yes" response from the user.
-- Step 9: Agent uses attempt_completion successfully to deliver the completion recap to the user.
+[x] requirements doc
+[x] action plan
+[x] implementation
+[x] QA
+- Step 1: `{title}` is set for the workflow
+- Step 2: The quick spec document is present, has the correct sections from the spec template, and the file path has been set as output_file.
+- Steps 3-9: workflow_progress_request receives a "yes" response from the user.
+- Step 10: Agent uses attempt_completion successfully to deliver the completion recap to the user.
 
-# Workflow Start Custom Card
-[ ] requirements doc
-[ ] action plan
-[ ] implementation
-[ ] QA
-Surfaces a modal upon workflow invocation via slash command that says:
-Heading: 
-`Welcome to the Quick Spec Workflow!`
-Text:
-`In this workflow, you'll work through a compact project-planning process that produces a single document encapsulating high-level planning and tactical execution requirements.`
-`This workflow is highly structured. The agent will guide you through step-by-step. Take your time on each step- being diligent here will significantly reduce issues during implementation.`
-`Once you're done with this workflow, run the quick-dev workflow to execute the project you've built here.`
-The modal must show a button beneath the text that says "Get Started". When clicked, this triggers step 1 of the workflow, which is an automatic system-owned step.
-
-# Step 1 Automation
+# Step 2 Automation
+[x] requirements doc
+[x] action plan
+[x] implementation
+[x] QA
 Build a tool that runs on step 1 and accomplishes the following:
     Set `{output_file}` to `{implementation_artifacts}/tech-spec-wip.md`. Check whether `{implementation_artifacts}/tech-spec-wip.md` already exists. If it does, clear the existing contents of the file. 
     Populate the document as an empty quick spec scaffold using this template: `{project_root}/.cline/skills/bmad-quick-spec/tech-spec-template.md`, then initialize it with the current title, slug, date, and draft status (incomplete).
-Step 1 must use the existing architecture which uses non-interactive workflow form UI components to indicate invocation and success.
+Step 1 must use the existing architecture which uses non-interactive workflow form UI components to indicate invocation and success in the chat UI.
+
 
 # Contextual Tool Matrix
-[ ] requirements doc
-[ ] action plan
-[ ] implementation
-[ ] QA
+[x] requirements doc
+[x] action plan
+[x] implementation
+[x] QA
 - Defines allowed native tools for each step of this workflow
 - step exposure in contextualToolMatrix.ts (line 179)
 - shared workflow/step support in workflow-progress-request.ts (line 1)
 - prompt teaching in task_progress.ts (line 62)
 - continuation guidance in continuation_turn.ts (line 13)
+
 # Persona Activation
-[ ] requirements doc
-[ ] action plan
-[ ] implementation
-[ ] QA
-- Add entry for the workflow to /Users/robertboston/Documents/Cline%20Extension/cline/src/core/prompts/system-prompt/registry/workflowPersonaRegistry.ts indicating that the appropriate agent for this workflow is scrum-master
+[x] requirements doc
+[x] action plan
+[x] implementation
+[x] QA
+- Add entry for the workflow to /Users/robertboston/Documents/Cline%20Extension/cline/src/core/prompts/system-prompt/registry/workflowPersonaRegistry.ts indicating that the appropriate agent for this workflow is quick-flow-solo-dev
 <!-- user note: be sure to update the agent name above when using this template for workflow enablement -->
 - Update /Users/robertboston/Documents/Cline%20Extension/cline/docs/workflow-automation/persona-activation/workflow-persona-mapping.md to reflect the new entry in /Users/robertboston/Documents/Cline%20Extension/cline/src/core/prompts/system-prompt/registry/workflowPersonaRegistry.ts

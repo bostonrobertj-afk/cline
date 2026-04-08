@@ -175,6 +175,37 @@ describe("placeholder workflow task progress prompt", () => {
 		expect(progress).to.not.contain("workflow_progress_request")
 		expect(progress).to.not.contain("Do not include `task_progress` on `workflow_progress_request`")
 	})
+
+	it("teaches workflow_progress_request for quick-spec step 3", async () => {
+		const progress = await getUpdatingTaskProgress(variant, {
+			...context,
+			managedWorkflowActive: false,
+			activeWorkflowSupportsPlaceholders: true,
+			activeDeterministicPlaceholderWorkflowEnabled: false,
+			activePlaceholderWorkflowName: "quick-spec.md",
+			activePlaceholderWorkflowStepNumber: 3,
+		})
+
+		expect(progress).to.be.a("string")
+		expect(progress).to.contain("workflow_progress_request")
+		expect(progress).to.not.contain("send_user_message")
+		expect(progress).to.contain("Do not include `task_progress` on `workflow_progress_request`")
+	})
+
+	it("does not teach workflow_progress_request for quick-spec step 10", async () => {
+		const progress = await getUpdatingTaskProgress(variant, {
+			...context,
+			managedWorkflowActive: false,
+			activeWorkflowSupportsPlaceholders: true,
+			activeDeterministicPlaceholderWorkflowEnabled: false,
+			activePlaceholderWorkflowName: "quick-spec.md",
+			activePlaceholderWorkflowStepNumber: 10,
+		})
+
+		expect(progress).to.be.a("string")
+		expect(progress).to.not.contain("workflow_progress_request")
+		expect(progress).to.not.contain("Do not include `task_progress` on `workflow_progress_request`")
+	})
 })
 
 describe("generic task progress prompt", () => {

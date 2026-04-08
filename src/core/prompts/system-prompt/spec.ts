@@ -493,6 +493,8 @@ function getNativeToolDescription(tool: ClineToolSpec, context: SystemPromptCont
 			return "Build the canonical pi-planning Step 3 delivery spec at {output_folder}/implementation-artifacts/epic-<number>-delivery-spec.md from workflow-owned placeholder state. Resolve {epics_document} and {target_epic} from workflow state, preserve the full template structure, and persist the resolved artifact path as {epic_delivery_spec}."
 		case "build_story_document":
 			return "Build the canonical create-story Step 2 scaffold at {output_folder}/implementation-artifacts/story<epic>.<story>.md from workflow-owned placeholder state. Resolve {epic_delivery_spec}, {story_number}, and {story_template} from workflow state, preserve the full story template structure, and persist the resolved artifact path as {story_doc}."
+		case "build_tech_spec_document":
+			return "Build the canonical quick-spec Step 2 scaffold at {implementation_artifacts}/tech-spec-wip.md from workflow-owned placeholder state. Resolve {title} from workflow state, derive {slug}, preserve the full tech-spec template structure, and persist the resolved artifact path as {output_file}."
 		case "select_target_epic":
 			return "Show the runtime-owned pi-planning Step 2 epic picker. Resolve {epics_document} from workflow state, extract canonical epic headings, ask the exact runtime-owned followup question, and persist the clicked label as {target_epic}."
 		case "use_skill":

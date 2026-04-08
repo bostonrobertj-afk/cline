@@ -5,6 +5,7 @@ import {
 	CODE_REVIEW_STEP_3_REVIEW_INPUT_RESOLVER_ID,
 	getWorkflowFormResolverDefinition,
 	PLACEHOLDER_WORKFLOW_START_SET_WORKFLOW_PLACEHOLDERS_RESOLVER_ID,
+	QUICK_SPEC_STEP_2_BUILD_TECH_SPEC_DOCUMENT_RESOLVER_ID,
 	WRITE_REMEDIATION_STORY_STEP_2_REVIEW_INPUT_RESOLVER_ID,
 } from "../WorkflowFormRegistry"
 
@@ -164,6 +165,33 @@ describe("WorkflowFormRegistry", () => {
 			failureLabel: "Automatic workflow preparation failed- falling back to manual LLM workflow preparation.",
 		})
 		expect(definition.successMessage).to.equal("The Step 2 review-input artifact is ready.")
+	})
+
+	it("declares the quick-spec step 2 tech-spec resolver as automatic workflow preparation", () => {
+		const resolver = getWorkflowFormResolverDefinition(QUICK_SPEC_STEP_2_BUILD_TECH_SPEC_DOCUMENT_RESOLVER_ID)
+		const definition = resolver.buildDefinition({
+			sessionId: "session-quick-spec-step-2-fields",
+			resolverId: resolver.id,
+			triggerSource: "deterministic_workflow_progression",
+			owner: {
+				kind: "placeholder_workflow_step",
+				workflowName: "quick-spec.md",
+				stepNumber: 2,
+			},
+			phase: "collect_inputs",
+			initialPhase: "confirm",
+			values: {},
+		})
+
+		expect(resolver.defaultInitialPhase).to.equal("collect_inputs")
+		expect(definition.presentation).to.deep.equal({
+			kind: "automatic_status",
+			pendingLabel: "Preparing workflow documents",
+			successLabel: "Workflow documents ready",
+			failureLabel: "Automatic workflow preparation failed- falling back to manual LLM workflow preparation.",
+		})
+		expect(definition.successMessage).to.equal("The Step 2 tech-spec scaffold is ready.")
+		expect(definition.pages.collect_inputs?.fields).to.deep.equal([])
 	})
 
 	it("serializes the Phase 1 review-diff resolver into tool params", () => {

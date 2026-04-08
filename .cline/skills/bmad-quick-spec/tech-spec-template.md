@@ -2,7 +2,7 @@
 title: '{title}'
 slug: '{slug}'
 created: '{date}'
-status: 'in-progress'
+status: 'backlog'
 stepsCompleted: []
 tech_stack: []
 files_to_modify: []

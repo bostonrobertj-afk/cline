@@ -37,6 +37,7 @@ export function isDeterministicPlaceholderWorkflowSupported(
 		workflowName === "create-epics.md" ||
 		workflowName === "pi-planning.md" ||
 		workflowName === "create-story.md" ||
+		workflowName === "quick-spec.md" ||
 		workflowName === "dev-story.md" ||
 		workflowName === "review-adversarial-general.md" ||
 		workflowName === "blind-review.md" ||
@@ -65,6 +66,24 @@ const CREATE_STORY_REQUIRED_TEMPLATE_HEADINGS = [
 	"### Debug Log References",
 	"### Completion Notes List",
 	"### File List",
+] as const
+
+const QUICK_SPEC_REQUIRED_TEMPLATE_HEADINGS = [
+	"## Overview",
+	"### Problem Statement",
+	"### Solution",
+	"### Scope",
+	"#### In Scope",
+	"#### Out of Scope",
+	"## Context for Development",
+	"### Codebase Patterns",
+	"### Files to Reference",
+	"### Technical Decisions",
+	"## Implementation Plan",
+	"### Acceptance Criteria",
+	"### Implementation Seams",
+	"### Tasks",
+	"## Latest Review Findings",
 ] as const
 
 function getMergedPlaceholderValues(taskState: TaskState): Record<string, string> {
@@ -277,6 +296,62 @@ async function validateCreateStoryScaffoldAgainstEpicDeliverySpec(args: {
 		normalizeInsignificantWhitespace(acceptanceCriteriaSection) ===
 			normalizeInsignificantWhitespace(deliverySpecAcceptanceCriteria)
 	)
+}
+
+async function validateQuickSpecScaffoldStructure(args: { placeholders: Record<string, string> }): Promise<boolean> {
+	const outputFile = args.placeholders.output_file?.trim()
+	const implementationArtifacts = args.placeholders.implementation_artifacts?.trim()
+	const title = args.placeholders.title?.trim()
+	const date = args.placeholders.date?.trim()
+	if (!outputFile || !implementationArtifacts || !title || !date) {
+		return false
+	}
+
+	const resolvedOutputFilePath = resolveArtifactPlaceholderPath(args.placeholders, outputFile)
+	const resolvedCanonicalArtifactPath = resolveArtifactPlaceholderPath(
+		args.placeholders,
+		path.join(implementationArtifacts, "tech-spec-wip.md"),
+	)
+	if (!arePathsEqual(resolvedOutputFilePath, resolvedCanonicalArtifactPath)) {
+		return false
+	}
+
+	const fileText = await readFileIfExists(resolvedOutputFilePath)
+	if (!fileText) {
+		return false
+	}
+
+	const expectedSlug = title
+		.trim()
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "-")
+		.replace(/-+/g, "-")
+		.replace(/^-+|-+$/g, "")
+	if (!expectedSlug) {
+		return false
+	}
+
+	if (
+		!fileText.includes(`title: '${title}'`) ||
+		!fileText.includes(`slug: '${expectedSlug}'`) ||
+		!fileText.includes(`created: '${date}'`) ||
+		!fileText.includes("status: 'backlog'") ||
+		!fileText.includes(`# Tech-Spec: ${title}`)
+	) {
+		return false
+	}
+
+	if (fileText.includes("{title}") || fileText.includes("{slug}") || fileText.includes("{date}")) {
+		return false
+	}
+
+	for (const heading of QUICK_SPEC_REQUIRED_TEMPLATE_HEADINGS) {
+		if (extractMarkdownSection(fileText, heading) === undefined) {
+			return false
+		}
+	}
+
+	return true
 }
 
 function didSuccessfulAttemptCompletionOccur(toolContext?: DeterministicPlaceholderToolContext): boolean {
@@ -892,6 +967,50 @@ async function evaluateCreateEpicsStep(args: {
 	}
 }
 
+async function evaluateQuickSpecStep(args: {
+	taskState: TaskState
+	stepNumber: number
+	toolContext?: DeterministicPlaceholderToolContext
+}): Promise<DeterministicStepEvaluationResult> {
+	const placeholders = getMergedPlaceholderValues(args.taskState)
+
+	switch (args.stepNumber) {
+		case 1: {
+			const title = placeholders.title?.trim()
+			if (!title) {
+				return { completed: false }
+			}
+
+			return {
+				completed: true,
+				reason: "title was already available in workflow placeholder state.",
+			}
+		}
+		case 2: {
+			if (!(await validateQuickSpecScaffoldStructure({ placeholders }))) {
+				return { completed: false }
+			}
+
+			return {
+				completed: true,
+				reason: "The canonical quick-spec scaffold already exists, preserves the required template heading set, and is initialized correctly.",
+			}
+		}
+		case 10: {
+			if (!didSuccessfulAttemptCompletionOccur(args.toolContext)) {
+				return { completed: false }
+			}
+
+			return {
+				completed: true,
+				reason: "attempt_completion was executed successfully for the final quick-spec closeout.",
+			}
+		}
+		default:
+			return { completed: false }
+	}
+}
+
 async function evaluateCreateStoryStep(args: {
 	taskState: TaskState
 	stepNumber: number
@@ -1106,6 +1225,14 @@ async function evaluateDeterministicStep(args: {
 
 	if (args.workflowName === "pi-planning.md") {
 		return evaluatePiPlanningStep({
+			taskState: args.taskState,
+			stepNumber: args.stepNumber,
+			toolContext: args.toolContext,
+		})
+	}
+
+	if (args.workflowName === "quick-spec.md") {
+		return evaluateQuickSpecStep({
 			taskState: args.taskState,
 			stepNumber: args.stepNumber,
 			toolContext: args.toolContext,

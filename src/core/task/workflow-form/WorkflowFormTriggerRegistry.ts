@@ -12,6 +12,7 @@ import {
 	CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID,
 	CODE_REVIEW_STEP_3_REVIEW_INPUT_RESOLVER_ID,
 	PLACEHOLDER_WORKFLOW_START_SET_WORKFLOW_PLACEHOLDERS_RESOLVER_ID,
+	QUICK_SPEC_STEP_2_BUILD_TECH_SPEC_DOCUMENT_RESOLVER_ID,
 	WRITE_REMEDIATION_STORY_STEP_2_REVIEW_INPUT_RESOLVER_ID,
 } from "./WorkflowFormRegistry"
 import { parseWorkflowStartRequirements } from "./workflowStartRequirements"
@@ -105,7 +106,7 @@ async function shouldInterceptUntilCurrentTaskArtifactExists(args: {
 		| "activePlaceholderWorkflowValues"
 		| "activePlaceholderWorkflowTaskWriteProofPaths"
 	>
-	placeholderKey: "diff_output" | "review_input"
+	placeholderKey: "diff_output" | "review_input" | "output_file"
 }): Promise<boolean> {
 	const placeholders = getPlaceholderWorkflowValueMap(
 		args.taskState.activePlaceholderWorkflowStableValues,
@@ -146,6 +147,14 @@ export const workflowFormWorkflowStepTriggerRegistry: WorkflowFormWorkflowStepTr
 		resolverId: WRITE_REMEDIATION_STORY_STEP_2_REVIEW_INPUT_RESOLVER_ID,
 		async shouldIntercept({ cwd, taskState }) {
 			return shouldInterceptUntilCurrentTaskArtifactExists({ cwd, taskState, placeholderKey: "review_input" })
+		},
+	},
+	{
+		workflowName: "quick-spec.md",
+		stepNumber: 2,
+		resolverId: QUICK_SPEC_STEP_2_BUILD_TECH_SPEC_DOCUMENT_RESOLVER_ID,
+		async shouldIntercept({ cwd, taskState }) {
+			return shouldInterceptUntilCurrentTaskArtifactExists({ cwd, taskState, placeholderKey: "output_file" })
 		},
 	},
 ]

@@ -863,6 +863,51 @@ describe("Prompt System Integration Tests", () => {
 				},
 			)
 		})
+
+		it("generates a continuation prompt for quick-spec step 3 with workflow_progress_request guidance", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: { ...mockProviderInfo, mode: "act" },
+					isContinuationTurn: true,
+					activeWorkflowSupportsPlaceholders: true,
+					managedWorkflowActive: false,
+					activePlaceholderWorkflowName: "quick-spec.md",
+					activePlaceholderWorkflowStepNumber: 3,
+					currentFocusChainChecklist: "- [ ] Step 3: Identify the Objective",
+				},
+				"fast",
+				async ({ systemPrompt }) => {
+					expect(systemPrompt).to.include("workflow_progress_request")
+					expect(systemPrompt).to.include("Do not include `task_progress`")
+					expect(systemPrompt).to.include(
+						"runtime-owned `Yes` branch completes the next checklist step before the next model request is built",
+					)
+				},
+			)
+		})
+
+		it("does not generate workflow_progress_request guidance for quick-spec step 10", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: { ...mockProviderInfo, mode: "act" },
+					isContinuationTurn: true,
+					activeWorkflowSupportsPlaceholders: true,
+					managedWorkflowActive: false,
+					activePlaceholderWorkflowName: "quick-spec.md",
+					activePlaceholderWorkflowStepNumber: 10,
+					currentFocusChainChecklist: "- [ ] Step 10: Final Review & Closeuout",
+				},
+				"fast",
+				async ({ systemPrompt }) => {
+					expect(systemPrompt).to.not.include("workflow_progress_request")
+					expect(systemPrompt).to.not.include("Do not include `task_progress`")
+				},
+			)
+		})
 	})
 
 	describe("Context-Specific Features", () => {
@@ -1615,6 +1660,33 @@ describe("Prompt System Integration Tests", () => {
 					const nativeToolNames = getNativeToolNames(tools)
 
 					expect(nativeToolNames).to.include.members(["build_story_document", "attempt_completion"])
+					expect(nativeToolNames).to.not.include("set_workflow_placeholders")
+					expect(nativeToolNames).to.not.include("read_file")
+					expect(nativeToolNames).to.not.include("search_files")
+					expect(nativeToolNames).to.not.include("execute_command")
+					expect(nativeToolNames).to.not.include("generate_plan_output")
+				},
+			)
+		})
+
+		it("filters native tools for quick-spec step 2", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
+					enableNativeToolCalls: true,
+					useMinimalGptPrompt: true,
+					activeWorkflowSupportsPlaceholders: true,
+					managedWorkflowActive: false,
+					activePlaceholderWorkflowName: "quick-spec.md",
+					activePlaceholderWorkflowStepNumber: 2,
+				},
+				"gpt-5.4-2026-03-05",
+				async ({ tools }) => {
+					const nativeToolNames = getNativeToolNames(tools)
+
+					expect(nativeToolNames).to.include.members(["build_tech_spec_document", "attempt_completion"])
 					expect(nativeToolNames).to.not.include("set_workflow_placeholders")
 					expect(nativeToolNames).to.not.include("read_file")
 					expect(nativeToolNames).to.not.include("search_files")

@@ -97,6 +97,7 @@ const RESPONSE_TOOL_METADATA: Record<ClineDefaultTool, ResponseToolMetadata | un
 	[ClineDefaultTool.SELECT_TARGET_EPIC]: undefined,
 	[ClineDefaultTool.BUILD_EPIC_DELIVERY_SPEC]: undefined,
 	[ClineDefaultTool.BUILD_STORY_DOCUMENT]: undefined,
+	[ClineDefaultTool.BUILD_TECH_SPEC_DOCUMENT]: undefined,
 	[ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE]: undefined,
 	[ClineDefaultTool.USE_SUBAGENTS]: undefined,
 }

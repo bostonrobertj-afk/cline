@@ -274,6 +274,12 @@ One of: {one}, {two}, {three}, {four}, {five}, {six}
 		)
 	})
 
+	it("maps quick-spec step 2 to the tech-spec workflow-form resolver", () => {
+		expect(getWorkflowFormWorkflowStepTriggerDefinition("quick-spec.md", 2)?.resolverId).to.equal(
+			"quick_spec_step_2_build_tech_spec_document",
+		)
+	})
+
 	it("does not intercept code-review step 3 when review_input has a current-task write proof and exists on disk", async () => {
 		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "workflow-form-trigger-"))
 		const reviewInputPath = path.join(tempDir, "review-input.md")
@@ -344,5 +350,53 @@ One of: {one}, {two}, {three}, {four}, {five}, {six}
 		})
 
 		expect(shouldIntercept).to.equal(true)
+	})
+
+	it("intercepts quick-spec step 2 when output_file is missing a current-task write proof", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "workflow-form-trigger-"))
+		const techSpecPath = path.join(tempDir, "planning", "implementation-artifacts", "tech-spec-wip.md")
+
+		try {
+			await fs.mkdir(path.dirname(techSpecPath), { recursive: true })
+			await fs.writeFile(techSpecPath, "# tech spec\n", "utf8")
+
+			const trigger = getWorkflowFormWorkflowStepTriggerDefinition("quick-spec.md", 2)
+			const shouldIntercept = await trigger?.shouldIntercept({
+				cwd: tempDir,
+				taskState: {
+					activePlaceholderWorkflowStableValues: {},
+					activePlaceholderWorkflowValues: { output_file: techSpecPath },
+					activePlaceholderWorkflowTaskWriteProofPaths: [],
+				},
+			})
+
+			expect(shouldIntercept).to.equal(true)
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("does not intercept quick-spec step 2 when output_file has a current-task write proof and exists on disk", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "workflow-form-trigger-"))
+		const techSpecPath = path.join(tempDir, "planning", "implementation-artifacts", "tech-spec-wip.md")
+
+		try {
+			await fs.mkdir(path.dirname(techSpecPath), { recursive: true })
+			await fs.writeFile(techSpecPath, "# tech spec\n", "utf8")
+
+			const trigger = getWorkflowFormWorkflowStepTriggerDefinition("quick-spec.md", 2)
+			const shouldIntercept = await trigger?.shouldIntercept({
+				cwd: tempDir,
+				taskState: {
+					activePlaceholderWorkflowStableValues: {},
+					activePlaceholderWorkflowValues: { output_file: techSpecPath },
+					activePlaceholderWorkflowTaskWriteProofPaths: [techSpecPath],
+				},
+			})
+
+			expect(shouldIntercept).to.equal(false)
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
 	})
 })

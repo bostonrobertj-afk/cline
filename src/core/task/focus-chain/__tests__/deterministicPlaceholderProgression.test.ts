@@ -54,6 +54,8 @@ describe("deterministicPlaceholderProgression", () => {
 		expect(isDeterministicPlaceholderWorkflowSupported("pi-planning.md")).to.equal(true)
 		expect(isDeterministicPlaceholderWorkflowSupported("create-story.md")).to.equal(true)
 		expect(isDeterministicPlaceholderWorkflowSupported("create-story")).to.equal(false)
+		expect(isDeterministicPlaceholderWorkflowSupported("quick-spec.md")).to.equal(true)
+		expect(isDeterministicPlaceholderWorkflowSupported("quick-spec")).to.equal(false)
 		expect(isDeterministicPlaceholderWorkflowSupported("dev-story.md")).to.equal(true)
 		expect(isDeterministicPlaceholderWorkflowSupported("review-adversarial-general.md")).to.equal(true)
 		expect(isDeterministicPlaceholderWorkflowSupported("blind-review.md")).to.equal(true)
@@ -3207,6 +3209,487 @@ Build user stories.`,
 		} finally {
 			await fs.rm(tempDir, { recursive: true, force: true })
 		}
+	})
+
+	describe("quick-spec.md", () => {
+		const quickSpecStep1Heading = "## Step 1: Gather Project Info"
+		const quickSpecStep2Heading = "## Step 2: (System-Owned) Resolve or start the spec draft"
+		const quickSpecStep3Heading = "## Step 3: Identify the Objective"
+		const quickSpecStep9Heading = "## Step 9: Build Tasks / Subtasks"
+		const quickSpecStep10Heading = "## Step 10: Final Review & Closeuout"
+		const quickSpecScaffoldFixture = `---
+title: 'Quick Spec Workflow'
+slug: 'quick-spec-workflow'
+created: '2026-04-08'
+status: 'backlog'
+stepsCompleted: []
+tech_stack: []
+files_to_modify: []
+code_patterns: []
+test_patterns: []
+---
+
+# Tech-Spec: Quick Spec Workflow
+
+Created: 
+
+## Overview
+
+### Problem Statement
+
+### Solution
+
+### Scope
+
+#### In Scope
+
+#### Out of Scope
+
+## Context for Development
+
+### Codebase Patterns
+
+### Files to Reference
+
+### Technical Decisions
+
+## Implementation Plan
+
+### Acceptance Criteria
+
+### Implementation Seams
+
+### Tasks
+
+
+## Latest Review Findings
+`
+
+		it("completes quick-spec step 1 when title is already available in workflow placeholder state", async () => {
+			const taskState = createTaskState({
+				workflowName: "quick-spec.md",
+				workflowContents: `${quickSpecStep1Heading}
+Gather project info.
+
+${quickSpecStep2Heading}
+Resolve or start the spec draft.`,
+				checklistMarkdown:
+					"- [ ] Step 1: Gather Project Info\n- [ ] Step 2: (System-Owned) Resolve or start the spec draft",
+				placeholderValues: {
+					title: "Quick Spec Workflow",
+				},
+			})
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+			})
+
+			expect(result.checklist).to.equal(
+				"- [x] Step 1: Gather Project Info\n- [ ] Step 2: (System-Owned) Resolve or start the spec draft",
+			)
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
+				"title was already available in workflow placeholder state.",
+			)
+		})
+
+		it("does not complete quick-spec step 1 when title is missing", async () => {
+			const taskState = createTaskState({
+				workflowName: "quick-spec.md",
+				workflowContents: `${quickSpecStep1Heading}
+Gather project info.`,
+				checklistMarkdown: "- [ ] Step 1: Gather Project Info",
+			})
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+			})
+
+			expect(result.checklist).to.equal("- [ ] Step 1: Gather Project Info")
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+		})
+
+		it("does not complete quick-spec step 1 when title is blank after trimming", async () => {
+			const taskState = createTaskState({
+				workflowName: "quick-spec.md",
+				workflowContents: `${quickSpecStep1Heading}
+Gather project info.`,
+				checklistMarkdown: "- [ ] Step 1: Gather Project Info",
+				placeholderValues: {
+					title: "   ",
+				},
+			})
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+			})
+
+			expect(result.checklist).to.equal("- [ ] Step 1: Gather Project Info")
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+		})
+
+		it("completes quick-spec step 2 when output_file points to the canonical initialized scaffold", async () => {
+			const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-quick-spec-step2-success-"))
+
+			try {
+				const scaffoldPath = path.join(tempDir, "planning", "implementation-artifacts", "tech-spec-wip.md")
+				const taskState = createTaskState({
+					workflowName: "quick-spec.md",
+					workflowContents: `${quickSpecStep2Heading}
+Resolve or start the spec draft.
+
+${quickSpecStep3Heading}
+Identify the objective.`,
+					checklistMarkdown:
+						"- [ ] Step 2: (System-Owned) Resolve or start the spec draft\n- [ ] Step 3: Identify the Objective",
+					stablePlaceholderValues: {
+						cwd: tempDir,
+						project_root: tempDir,
+						implementation_artifacts: path.join(tempDir, "planning", "implementation-artifacts"),
+						date: "2026-04-08",
+					},
+					placeholderValues: {
+						title: "Quick Spec Workflow",
+						output_file: path.join("planning", "implementation-artifacts", "tech-spec-wip.md"),
+					},
+				})
+
+				await writeFileWithMtime(scaffoldPath, quickSpecScaffoldFixture, Date.now())
+
+				const result = await applyDeterministicPlaceholderProgression({
+					taskState,
+					checklistMarkdown: getChecklistMarkdown(taskState),
+				})
+
+				expect(result.checklist).to.equal(
+					"- [x] Step 2: (System-Owned) Resolve or start the spec draft\n- [ ] Step 3: Identify the Objective",
+				)
+				expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
+					"The canonical quick-spec scaffold already exists, preserves the required template heading set, and is initialized correctly.",
+				)
+			} finally {
+				await fs.rm(tempDir, { recursive: true, force: true })
+			}
+		})
+
+		it("does not complete quick-spec step 2 when output_file is missing", async () => {
+			const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-quick-spec-step2-missing-output-"))
+
+			try {
+				const taskState = createTaskState({
+					workflowName: "quick-spec.md",
+					workflowContents: `${quickSpecStep2Heading}
+Resolve or start the spec draft.`,
+					checklistMarkdown: "- [ ] Step 2: (System-Owned) Resolve or start the spec draft",
+					stablePlaceholderValues: {
+						cwd: tempDir,
+						project_root: tempDir,
+						implementation_artifacts: path.join(tempDir, "planning", "implementation-artifacts"),
+						date: "2026-04-08",
+					},
+					placeholderValues: {
+						title: "Quick Spec Workflow",
+					},
+				})
+
+				const result = await applyDeterministicPlaceholderProgression({
+					taskState,
+					checklistMarkdown: getChecklistMarkdown(taskState),
+				})
+
+				expect(result.checklist).to.equal("- [ ] Step 2: (System-Owned) Resolve or start the spec draft")
+				expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+			} finally {
+				await fs.rm(tempDir, { recursive: true, force: true })
+			}
+		})
+
+		it("does not complete quick-spec step 2 when output_file is outside implementation_artifacts/tech-spec-wip.md", async () => {
+			const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-quick-spec-step2-wrong-path-"))
+
+			try {
+				const scaffoldPath = path.join(tempDir, "planning", "other", "tech-spec-wip.md")
+				const taskState = createTaskState({
+					workflowName: "quick-spec.md",
+					workflowContents: `${quickSpecStep2Heading}
+Resolve or start the spec draft.`,
+					checklistMarkdown: "- [ ] Step 2: (System-Owned) Resolve or start the spec draft",
+					stablePlaceholderValues: {
+						cwd: tempDir,
+						project_root: tempDir,
+						implementation_artifacts: path.join(tempDir, "planning", "implementation-artifacts"),
+						date: "2026-04-08",
+					},
+					placeholderValues: {
+						title: "Quick Spec Workflow",
+						output_file: path.join("planning", "other", "tech-spec-wip.md"),
+					},
+				})
+
+				await writeFileWithMtime(scaffoldPath, quickSpecScaffoldFixture, Date.now())
+
+				const result = await applyDeterministicPlaceholderProgression({
+					taskState,
+					checklistMarkdown: getChecklistMarkdown(taskState),
+				})
+
+				expect(result.checklist).to.equal("- [ ] Step 2: (System-Owned) Resolve or start the spec draft")
+				expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+			} finally {
+				await fs.rm(tempDir, { recursive: true, force: true })
+			}
+		})
+
+		it("does not complete quick-spec step 2 when the scaffold status is not backlog", async () => {
+			const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-quick-spec-step2-status-"))
+
+			try {
+				const scaffoldPath = path.join(tempDir, "planning", "implementation-artifacts", "tech-spec-wip.md")
+				const taskState = createTaskState({
+					workflowName: "quick-spec.md",
+					workflowContents: `${quickSpecStep2Heading}
+Resolve or start the spec draft.`,
+					checklistMarkdown: "- [ ] Step 2: (System-Owned) Resolve or start the spec draft",
+					stablePlaceholderValues: {
+						cwd: tempDir,
+						project_root: tempDir,
+						implementation_artifacts: path.join(tempDir, "planning", "implementation-artifacts"),
+						date: "2026-04-08",
+					},
+					placeholderValues: {
+						title: "Quick Spec Workflow",
+						output_file: path.join("planning", "implementation-artifacts", "tech-spec-wip.md"),
+					},
+				})
+
+				await writeFileWithMtime(
+					scaffoldPath,
+					quickSpecScaffoldFixture.replace("status: 'backlog'", "status: 'ready-for-dev'"),
+					Date.now(),
+				)
+
+				const result = await applyDeterministicPlaceholderProgression({
+					taskState,
+					checklistMarkdown: getChecklistMarkdown(taskState),
+				})
+
+				expect(result.checklist).to.equal("- [ ] Step 2: (System-Owned) Resolve or start the spec draft")
+				expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+			} finally {
+				await fs.rm(tempDir, { recursive: true, force: true })
+			}
+		})
+
+		it("does not complete quick-spec step 2 when a required template heading is missing", async () => {
+			const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-quick-spec-step2-heading-"))
+
+			try {
+				const scaffoldPath = path.join(tempDir, "planning", "implementation-artifacts", "tech-spec-wip.md")
+				const taskState = createTaskState({
+					workflowName: "quick-spec.md",
+					workflowContents: `${quickSpecStep2Heading}
+Resolve or start the spec draft.`,
+					checklistMarkdown: "- [ ] Step 2: (System-Owned) Resolve or start the spec draft",
+					stablePlaceholderValues: {
+						cwd: tempDir,
+						project_root: tempDir,
+						implementation_artifacts: path.join(tempDir, "planning", "implementation-artifacts"),
+						date: "2026-04-08",
+					},
+					placeholderValues: {
+						title: "Quick Spec Workflow",
+						output_file: path.join("planning", "implementation-artifacts", "tech-spec-wip.md"),
+					},
+				})
+
+				await writeFileWithMtime(
+					scaffoldPath,
+					quickSpecScaffoldFixture.replace("### Files to Reference\n\n", ""),
+					Date.now(),
+				)
+
+				const result = await applyDeterministicPlaceholderProgression({
+					taskState,
+					checklistMarkdown: getChecklistMarkdown(taskState),
+				})
+
+				expect(result.checklist).to.equal("- [ ] Step 2: (System-Owned) Resolve or start the spec draft")
+				expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+			} finally {
+				await fs.rm(tempDir, { recursive: true, force: true })
+			}
+		})
+
+		it("does not complete quick-spec step 2 when unresolved placeholder tokens remain", async () => {
+			const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-quick-spec-step2-placeholders-"))
+
+			try {
+				const scaffoldPath = path.join(tempDir, "planning", "implementation-artifacts", "tech-spec-wip.md")
+				const taskState = createTaskState({
+					workflowName: "quick-spec.md",
+					workflowContents: `${quickSpecStep2Heading}
+Resolve or start the spec draft.`,
+					checklistMarkdown: "- [ ] Step 2: (System-Owned) Resolve or start the spec draft",
+					stablePlaceholderValues: {
+						cwd: tempDir,
+						project_root: tempDir,
+						implementation_artifacts: path.join(tempDir, "planning", "implementation-artifacts"),
+						date: "2026-04-08",
+					},
+					placeholderValues: {
+						title: "Quick Spec Workflow",
+						output_file: path.join("planning", "implementation-artifacts", "tech-spec-wip.md"),
+					},
+				})
+
+				await writeFileWithMtime(
+					scaffoldPath,
+					quickSpecScaffoldFixture.replace("# Tech-Spec: Quick Spec Workflow", "# Tech-Spec: {title}"),
+					Date.now(),
+				)
+
+				const result = await applyDeterministicPlaceholderProgression({
+					taskState,
+					checklistMarkdown: getChecklistMarkdown(taskState),
+				})
+
+				expect(result.checklist).to.equal("- [ ] Step 2: (System-Owned) Resolve or start the spec draft")
+				expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+			} finally {
+				await fs.rm(tempDir, { recursive: true, force: true })
+			}
+		})
+
+		it("does not deterministically complete quick-spec step 3 when overview content is already populated", async () => {
+			const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-quick-spec-step3-governed-"))
+
+			try {
+				const scaffoldPath = path.join(tempDir, "planning", "implementation-artifacts", "tech-spec-wip.md")
+				const taskState = createTaskState({
+					workflowName: "quick-spec.md",
+					workflowContents: `${quickSpecStep3Heading}
+Identify the objective.`,
+					checklistMarkdown: "- [ ] Step 3: Identify the Objective",
+					stablePlaceholderValues: {
+						cwd: tempDir,
+						project_root: tempDir,
+						implementation_artifacts: path.join(tempDir, "planning", "implementation-artifacts"),
+						date: "2026-04-08",
+					},
+					placeholderValues: {
+						title: "Quick Spec Workflow",
+						output_file: path.join("planning", "implementation-artifacts", "tech-spec-wip.md"),
+					},
+				})
+
+				await writeFileWithMtime(
+					scaffoldPath,
+					quickSpecScaffoldFixture.replace(
+						"## Overview\n\n",
+						"## Overview\n\nThe objective has already been drafted.\n\n",
+					),
+					Date.now(),
+				)
+
+				const result = await applyDeterministicPlaceholderProgression({
+					taskState,
+					checklistMarkdown: getChecklistMarkdown(taskState),
+				})
+
+				expect(result.checklist).to.equal("- [ ] Step 3: Identify the Objective")
+				expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+			} finally {
+				await fs.rm(tempDir, { recursive: true, force: true })
+			}
+		})
+
+		it("does not deterministically complete quick-spec step 9 when tasks are already populated", async () => {
+			const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "deterministic-placeholder-quick-spec-step9-governed-"))
+
+			try {
+				const scaffoldPath = path.join(tempDir, "planning", "implementation-artifacts", "tech-spec-wip.md")
+				const taskState = createTaskState({
+					workflowName: "quick-spec.md",
+					workflowContents: `${quickSpecStep9Heading}
+Build tasks and subtasks.`,
+					checklistMarkdown: "- [ ] Step 9: Build Tasks / Subtasks",
+					stablePlaceholderValues: {
+						cwd: tempDir,
+						project_root: tempDir,
+						implementation_artifacts: path.join(tempDir, "planning", "implementation-artifacts"),
+						date: "2026-04-08",
+					},
+					placeholderValues: {
+						title: "Quick Spec Workflow",
+						output_file: path.join("planning", "implementation-artifacts", "tech-spec-wip.md"),
+					},
+				})
+
+				await writeFileWithMtime(
+					scaffoldPath,
+					quickSpecScaffoldFixture.replace("### Tasks\n\n", "### Tasks\n\n- [ ] Define implementation tasks\n\n"),
+					Date.now(),
+				)
+
+				const result = await applyDeterministicPlaceholderProgression({
+					taskState,
+					checklistMarkdown: getChecklistMarkdown(taskState),
+				})
+
+				expect(result.checklist).to.equal("- [ ] Step 9: Build Tasks / Subtasks")
+				expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+			} finally {
+				await fs.rm(tempDir, { recursive: true, force: true })
+			}
+		})
+
+		it("completes quick-spec step 10 from successful attempt_completion tool context", async () => {
+			const taskState = createTaskState({
+				workflowName: "quick-spec.md",
+				workflowContents: `${quickSpecStep10Heading}
+Close out the workflow with attempt_completion.`,
+				checklistMarkdown: "- [ ] Step 10: Final Review & Closeuout",
+			})
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+				toolContext: {
+					toolName: "attempt_completion",
+					toolWasExecuted: true,
+					toolResult: "[attempt_completion] Result:\nDone",
+				},
+			})
+
+			expect(result.checklist).to.equal("- [x] Step 10: Final Review & Closeuout")
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.at(-1)?.reason).to.equal(
+				"attempt_completion was executed successfully for the final quick-spec closeout.",
+			)
+		})
+
+		it("does not complete quick-spec step 10 when attempt_completion was not executed", async () => {
+			const taskState = createTaskState({
+				workflowName: "quick-spec.md",
+				workflowContents: `${quickSpecStep10Heading}
+Close out the workflow with attempt_completion.`,
+				checklistMarkdown: "- [ ] Step 10: Final Review & Closeuout",
+			})
+
+			const result = await applyDeterministicPlaceholderProgression({
+				taskState,
+				checklistMarkdown: getChecklistMarkdown(taskState),
+				toolContext: {
+					toolName: "attempt_completion",
+					toolWasExecuted: false,
+					toolResult: "[attempt_completion] Result:\nDone",
+				},
+			})
+
+			expect(result.checklist).to.equal("- [ ] Step 10: Final Review & Closeuout")
+			expect(taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices).to.deep.equal([])
+		})
 	})
 
 	describe("create-story.md", () => {

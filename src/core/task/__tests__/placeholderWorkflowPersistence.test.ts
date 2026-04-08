@@ -103,15 +103,17 @@ function buildAutomaticWorkflowFormPayload(
 	session: WorkflowFormSessionState,
 	state: "pending" | "success" | "failure",
 ): ClineWorkflowForm {
+	const isQuickSpecStepTwo = session.resolverId === "quick_spec_step_2_build_tech_spec_document"
+
 	return {
 		sessionId: session.sessionId,
 		resolverId: session.resolverId,
 		phase: state === "pending" ? session.phase : "success",
 		definition: {
-			toolName: ClineDefaultTool.BUILD_REVIEW_INPUT,
-			title: "Review Input Artifact",
-			toolDictionaryTitle: "Review Input Reference",
-			toolDictionaryMarkdown: "## build_review_input",
+			toolName: isQuickSpecStepTwo ? ClineDefaultTool.BUILD_TECH_SPEC_DOCUMENT : ClineDefaultTool.BUILD_REVIEW_INPUT,
+			title: isQuickSpecStepTwo ? "Tech Spec Scaffold" : "Review Input Artifact",
+			toolDictionaryTitle: isQuickSpecStepTwo ? "Tech Spec Scaffold Reference" : "Review Input Reference",
+			toolDictionaryMarkdown: isQuickSpecStepTwo ? "" : "## build_review_input",
 			presentation: {
 				kind: "automatic_status",
 				pendingLabel: "Preparing workflow documents",
@@ -120,24 +122,35 @@ function buildAutomaticWorkflowFormPayload(
 			},
 			pages: {
 				collect_inputs: {
-					prompt: "The system will now build `review-input.md` from the stored `story_path` and the workflow-owned `review-input.diff` artifact.",
+					prompt: isQuickSpecStepTwo
+						? "The system will now build the canonical quick-spec scaffold from the stored workflow title and the canonical quick-spec template."
+						: "The system will now build `review-input.md` from the stored `story_path` and the workflow-owned `review-input.diff` artifact.",
 					fields: [],
 					submitLabel: "Submit",
 					cancelLabel: "Cancel",
 				},
 				retry_error: {
-					prompt: "The system could not produce `review-input.md` from the stored workflow inputs. Retry the request or return to the Step 3 fallback instructions.",
+					prompt: isQuickSpecStepTwo
+						? "The system could not produce the canonical quick-spec scaffold from the stored workflow inputs. Retry the request or return to the Step 2 fallback instructions."
+						: "The system could not produce `review-input.md` from the stored workflow inputs. Retry the request or return to the Step 3 fallback instructions.",
 					fields: [],
 					submitLabel: "Submit",
 					cancelLabel: "Cancel",
 					retryLabel: "Start Over",
 				},
 			},
-			successMessage: "The Step 3 review-input artifact is ready.",
+			successMessage: isQuickSpecStepTwo
+				? "The Step 2 tech-spec scaffold is ready."
+				: "The Step 3 review-input artifact is ready.",
 		},
 		values: session.values,
 		automaticStatusState: state,
-		successMessage: state === "success" ? "The Step 3 review-input artifact is ready." : undefined,
+		successMessage:
+			state === "success"
+				? isQuickSpecStepTwo
+					? "The Step 2 tech-spec scaffold is ready."
+					: "The Step 3 review-input artifact is ready."
+				: undefined,
 	}
 }
 
@@ -2131,6 +2144,189 @@ Construct and persist review_input.md from the persisted diff output before cont
 
 		expect(workflowFormLoopReached).to.equal(true)
 		expect(fakeTask.persistWorkflowStartCardSession.calledOnce).to.equal(true)
+	})
+
+	it("chains the quick-spec workflow-start title collection into the Step 2 tech-spec automatic workflow-preparation form before the AI turn", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "workflow-start-title-chain-"))
+
+		try {
+			const workflowStartSession: WorkflowFormSessionState = {
+				sessionId: "wf-session-start-chain",
+				resolverId: "placeholder_workflow_start_set_workflow_placeholders",
+				triggerSource: "slash_command",
+				owner: {
+					kind: "slash_command",
+					workflowName: "quick-spec.md",
+					stepNumber: 1,
+				},
+				phase: "collect_inputs",
+				initialPhase: "collect_inputs",
+				values: {
+					title: { rawValue: "Quick Spec Workflow" },
+				},
+				context: {
+					workflowName: "quick-spec.md",
+					workflowStartRequirements: {
+						requiredFieldKeys: ["title"],
+						optionalFieldKeys: [],
+					},
+				},
+			}
+			const stepTwoSession: WorkflowFormSessionState = {
+				sessionId: "wf-session-step-2-chain",
+				resolverId: "quick_spec_step_2_build_tech_spec_document",
+				triggerSource: "deterministic_workflow_progression",
+				owner: {
+					kind: "placeholder_workflow_step",
+					workflowName: "quick-spec.md",
+					stepNumber: 2,
+				},
+				phase: "collect_inputs",
+				initialPhase: "collect_inputs",
+				values: {},
+			}
+			const taskState = new TaskState()
+			taskState.activePlaceholderWorkflowId = "quick-spec.md"
+			taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "quick-spec.md",
+				contents: `# Quick Spec
+
+## Step 1: Gather Project Info
+Required: {title}
+
+## Step 2: (System-Owned) Resolve or start the spec draft
+Set {output_file} to {implementation_artifacts}/tech-spec-wip.md.
+
+## Step 3: Identify the Objective
+Ask the user to describe what they'd like to work on.
+`,
+			}
+			taskState.currentFocusChainChecklist = [
+				"- [ ] Step 1: Gather Project Info",
+				"- [ ] Step 2:  (System-Owned) Resolve or start the spec draft",
+				"- [ ] Step 3: Identify the Objective",
+			].join("\n")
+			taskState.activePlaceholderWorkflowStableValues = {
+				implementation_artifacts: path.join(tempDir, "planning", "implementation-artifacts"),
+			}
+
+			let renderCount = 0
+			let executeCallCount = 0
+			const fakeTask: FakeWorkflowFormTask & {
+				executeWorkflowFormToolAndSync: sinon.SinonStub
+			} = {
+				cwd: tempDir,
+				taskState,
+				pendingWorkflowFormOutcome: undefined,
+				messageStateHandler: {
+					getClineMessages: sinon.stub().returns([]),
+				},
+				workflowFormRuntime: {
+					createSession: sinon
+						.stub()
+						.onFirstCall()
+						.returns(workflowStartSession)
+						.onSecondCall()
+						.returns(stepTwoSession),
+					buildPayload: sinon
+						.stub()
+						.callsFake((session: WorkflowFormSessionState) =>
+							session.resolverId === "quick_spec_step_2_build_tech_spec_document"
+								? buildAutomaticWorkflowFormPayload(session, "pending")
+								: buildInteractiveWorkflowFormPayload(session),
+						),
+					buildSuccessPayload: sinon.stub().callsFake((session: WorkflowFormSessionState, successMessage: string) => ({
+						...(session.resolverId === "quick_spec_step_2_build_tech_spec_document"
+							? buildAutomaticWorkflowFormPayload(session, "success")
+							: buildInteractiveWorkflowFormPayload(session)),
+						phase: "success",
+						successMessage,
+					})),
+				},
+				persistWorkflowFormSession: sinon.stub().resolves(),
+				renderWorkflowFormMessage: sinon.stub().callsFake(async () => {
+					renderCount += 1
+					if (renderCount === 1) {
+						fakeTask.pendingWorkflowFormOutcome = {
+							kind: "invoke_tool",
+							session: workflowStartSession,
+							toolName: ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
+							toolInput: { values: { title: "Quick Spec Workflow" } },
+							toolParams: { values: JSON.stringify({ title: "Quick Spec Workflow" }) },
+						}
+					}
+				}),
+				executeWorkflowFormToolAndSync: sinon.stub().callsFake(async (outcome: WorkflowFormRuntimeOutcome) => {
+					expect(outcome).to.include({ kind: "invoke_tool" })
+					executeCallCount += 1
+
+					if (executeCallCount === 1) {
+						taskState.activePlaceholderWorkflowValues = {
+							title: "Quick Spec Workflow",
+						}
+						taskState.currentFocusChainChecklist = [
+							"- [x] Step 1: Gather Project Info",
+							"- [ ] Step 2:  (System-Owned) Resolve or start the spec draft",
+							"- [ ] Step 3: Identify the Objective",
+						].join("\n")
+					}
+
+					if (executeCallCount === 2) {
+						if (outcome.kind === "invoke_tool") {
+							expect(outcome.toolName).to.equal(ClineDefaultTool.BUILD_TECH_SPEC_DOCUMENT)
+						}
+						expect(taskState.activePlaceholderWorkflowValues?.title).to.equal("Quick Spec Workflow")
+						const outputFile = path.join(tempDir, "planning", "implementation-artifacts", "tech-spec-wip.md")
+						await fs.mkdir(path.dirname(outputFile), { recursive: true })
+						await fs.writeFile(outputFile, "# Tech-Spec: Quick Spec Workflow\n", "utf8")
+						taskState.activePlaceholderWorkflowValues = {
+							title: "Quick Spec Workflow",
+							output_file: outputFile,
+						}
+						taskState.activePlaceholderWorkflowTaskWriteProofPaths = [outputFile]
+						taskState.currentFocusChainChecklist = [
+							"- [x] Step 1: Gather Project Info",
+							"- [x] Step 2:  (System-Owned) Resolve or start the spec draft",
+							"- [ ] Step 3: Identify the Objective",
+						].join("\n")
+					}
+
+					return { succeeded: true }
+				}),
+				clearWorkflowFormSession: sinon.stub().callsFake(async () => {
+					taskState.activeWorkflowFormSession = undefined
+				}),
+				setThreadDisplayState: sinon.stub(),
+				postStateToWebview: sinon.stub().resolves(),
+			}
+
+			await maybeResolveWorkflowFormBeforeApiTurn.call(fakeTask, {
+				type: "activate_placeholder_workflow",
+				workflowId: "quick-spec.md",
+				workflowSource: {
+					type: "remote",
+					name: "quick-spec.md",
+					contents: "# Quick Spec\nCreate a small implementation-ready tech spec.",
+				},
+			})
+
+			expect(fakeTask.workflowFormRuntime.createSession.callCount).to.equal(2)
+			expect(fakeTask.workflowFormRuntime.createSession.firstCall.args[0]?.resolverId).to.equal(
+				"placeholder_workflow_start_set_workflow_placeholders",
+			)
+			expect(fakeTask.workflowFormRuntime.createSession.secondCall.args[0]?.resolverId).to.equal(
+				"quick_spec_step_2_build_tech_spec_document",
+			)
+			expect(fakeTask.workflowFormRuntime.createSession.secondCall.args[0]?.initialPhase).to.equal("collect_inputs")
+			expect(executeCallCount).to.equal(2)
+			expect(taskState.activePlaceholderWorkflowValues?.title).to.equal("Quick Spec Workflow")
+			expect(taskState.activePlaceholderWorkflowValues?.output_file).to.equal(
+				path.join(tempDir, "planning", "implementation-artifacts", "tech-spec-wip.md"),
+			)
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
 	})
 
 	it("skips the workflow-start-card capability when the active workflow has no registry entry", async () => {

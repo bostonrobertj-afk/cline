@@ -80,6 +80,7 @@ export const config = createVariant(ModelFamily.NATIVE_GPT_5_1)
 		ClineDefaultTool.SELECT_TARGET_EPIC,
 		ClineDefaultTool.BUILD_EPIC_DELIVERY_SPEC,
 		ClineDefaultTool.BUILD_STORY_DOCUMENT,
+		ClineDefaultTool.BUILD_TECH_SPEC_DOCUMENT,
 		ClineDefaultTool.STORY_TASK_REMINDER,
 		ClineDefaultTool.STORY_TASK_COMPLETE,
 		ClineDefaultTool.STORY_NOTES_UPDATE,

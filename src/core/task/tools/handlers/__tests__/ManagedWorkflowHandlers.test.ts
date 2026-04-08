@@ -21,6 +21,7 @@ import { BuildEpicsDocumentToolHandler } from "../BuildEpicsDocumentToolHandler"
 import { BuildReviewDiffOutputToolHandler } from "../BuildReviewDiffOutputToolHandler"
 import { BuildReviewInputToolHandler } from "../BuildReviewInputToolHandler"
 import { BuildStoryDocumentToolHandler } from "../BuildStoryDocumentToolHandler"
+import { BuildTechSpecDocumentToolHandler } from "../BuildTechSpecDocumentToolHandler"
 import { CodeReviewSpecUpdateToolHandler } from "../CodeReviewSpecUpdateToolHandler"
 import { CompleteWorkflowItemToolHandler } from "../CompleteWorkflowItemToolHandler"
 import { SetWorkflowPlaceholdersToolHandler } from "../SetWorkflowPlaceholdersToolHandler"
@@ -592,6 +593,93 @@ ${options?.selectedStoryMissing === true ? "" : `## Story 3.2\n\n${selectedStory
 		epicDeliverySpecPath,
 		templatePath,
 		artifactPath,
+	}
+}
+
+async function createBuildTechSpecDocumentRepo(options?: {
+	includeWorkflowConfig?: boolean
+	preexistingArtifact?: string
+	title?: string
+	templateOverride?: string
+}) {
+	const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), "build-tech-spec-document-"))
+	const workflowConfigPath = getCanonicalWorkflowConfigPath(repoDir)
+	const includeWorkflowConfig = options?.includeWorkflowConfig !== false
+	const templatePath = path.join(repoDir, ".cline", "skills", "bmad-quick-spec", "tech-spec-template.md")
+	const artifactPath = path.join(repoDir, "planning", "implementation-artifacts", "tech-spec-wip.md")
+	const title = options?.title ?? "Quick Spec Workflow"
+
+	if (includeWorkflowConfig) {
+		await fs.mkdir(path.dirname(workflowConfigPath), { recursive: true })
+		await fs.writeFile(
+			workflowConfigPath,
+			['implementation_artifacts: "{project-root}/planning/implementation-artifacts"', ""].join("\n"),
+		)
+	}
+
+	await fs.mkdir(path.dirname(templatePath), { recursive: true })
+	await fs.writeFile(
+		templatePath,
+		options?.templateOverride ??
+			`---
+title: '{title}'
+slug: '{slug}'
+created: '{date}'
+status: 'backlog'
+stepsCompleted: []
+tech_stack: []
+files_to_modify: []
+code_patterns: []
+test_patterns: []
+---
+
+# Tech-Spec: {title}
+
+Created: 
+
+## Overview
+
+### Problem Statement
+
+### Solution
+
+### Scope
+
+#### In Scope
+
+#### Out of Scope
+
+## Context for Development
+
+### Codebase Patterns
+
+### Files to Reference
+
+### Technical Decisions
+
+## Implementation Plan
+
+### Acceptance Criteria
+
+### Implementation Seams
+
+### Tasks
+
+
+## Latest Review Findings
+`,
+	)
+
+	if (options?.preexistingArtifact !== undefined) {
+		await fs.mkdir(path.dirname(artifactPath), { recursive: true })
+		await fs.writeFile(artifactPath, options.preexistingArtifact)
+	}
+
+	return {
+		repoDir,
+		templatePath,
+		artifactPath,
+		title,
 	}
 }
 
@@ -3427,6 +3515,293 @@ Inspect the prepared review input and write findings.`,
 			expect(sequencingDependenciesSection).to.contain("- Follow Story 3.1 event contract rollout.")
 			expect(sequencingDependenciesSection).to.not.contain("As a release manager")
 			expect(sequencingDependenciesSection).to.not.contain("- Capture checkout success rate.")
+		} finally {
+			sandbox.restore()
+			HostProvider.reset()
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("builds the canonical quick-spec scaffold from the full template and persists output_file", async () => {
+		const sandbox = sinon.createSandbox()
+		const { repoDir, artifactPath, title } = await createBuildTechSpecDocumentRepo({
+			preexistingArtifact: "# stale\n",
+		})
+
+		try {
+			setVscodeHostProviderMock()
+			sandbox.stub(HostProvider.workspace, "getWorkspacePaths").resolves({ paths: [repoDir] } as any)
+
+			const handler = new BuildTechSpecDocumentToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "quick-spec.md"
+			config.taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "quick-spec.md",
+				contents: `# Quick Spec
+
+## Step 1: Gather Project Info
+Required: \`{title}\`
+
+## Step 2: (System-Owned) Resolve or start the spec draft
+Set \`{output_file}\` to \`{implementation_artifacts}/tech-spec-wip.md\`.
+`,
+			}
+			config.taskState.currentFocusChainChecklist =
+				"- [x] Step 1: Gather Project Info\n- [ ] Step 2:  (System-Owned) Resolve or start the spec draft"
+			config.taskState.activePlaceholderWorkflowValues = { title }
+			config.taskState.fileReadCache.set(artifactPath.toLowerCase(), "stale" as any)
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "build_tech_spec_document",
+				params: {},
+				partial: false,
+			} as any)
+
+			const payload = JSON.parse(String(result))
+			const createdDate = new Date().toISOString().split("T")[0]
+			expect(payload.persisted).to.equal(true)
+			expect(payload.artifact_path).to.equal(artifactPath)
+			expect(payload.output_file_available).to.equal(true)
+			expect(config.taskState.activePlaceholderWorkflowValues?.output_file).to.equal(artifactPath)
+			expect(config.taskState.activePlaceholderWorkflowTaskWriteProofPaths).to.include(artifactPath)
+			expect(config.taskState.didEditFile).to.equal(true)
+			expect(config.taskState.fileReadCache.has(artifactPath.toLowerCase())).to.equal(false)
+
+			const artifact = await fs.readFile(artifactPath, "utf8")
+			expect(artifact).to.contain(`title: '${title}'`)
+			expect(artifact).to.contain("slug: 'quick-spec-workflow'")
+			expect(artifact).to.contain(`created: '${createdDate}'`)
+			expect(artifact).to.contain("status: 'backlog'")
+			expect(artifact).to.contain(`# Tech-Spec: ${title}`)
+			expect(artifact).to.not.contain("# stale")
+			for (const heading of [
+				"## Overview",
+				"### Problem Statement",
+				"### Solution",
+				"### Scope",
+				"#### In Scope",
+				"#### Out of Scope",
+				"## Context for Development",
+				"### Codebase Patterns",
+				"### Files to Reference",
+				"### Technical Decisions",
+				"## Implementation Plan",
+				"### Acceptance Criteria",
+				"### Implementation Seams",
+				"### Tasks",
+				"## Latest Review Findings",
+			]) {
+				expect(artifact).to.contain(heading)
+			}
+		} finally {
+			sandbox.restore()
+			HostProvider.reset()
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("requires title from merged placeholder workflow state for build_tech_spec_document", async () => {
+		const { repoDir } = await createBuildTechSpecDocumentRepo()
+
+		try {
+			const handler = new BuildTechSpecDocumentToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "quick-spec.md"
+			config.taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "quick-spec.md",
+				contents: `# Quick Spec
+
+## Step 1: Gather Project Info
+Required: \`{title}\`
+
+## Step 2: (System-Owned) Resolve or start the spec draft
+Set \`{output_file}\` to \`{implementation_artifacts}/tech-spec-wip.md\`.
+`,
+			}
+			config.taskState.currentFocusChainChecklist =
+				"- [x] Step 1: Gather Project Info\n- [ ] Step 2:  (System-Owned) Resolve or start the spec draft"
+			config.taskState.activePlaceholderWorkflowValues = {}
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "build_tech_spec_document",
+				params: {},
+				partial: false,
+			} as any)
+
+			expect(result).to.equal(
+				formatResponse.toolError(
+					"Could not resolve workflow placeholder 'title' from the active placeholder workflow state.",
+				),
+			)
+		} finally {
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("rejects build_tech_spec_document outside quick-spec step 2 context", async () => {
+		const { repoDir, title } = await createBuildTechSpecDocumentRepo()
+
+		try {
+			const handler = new BuildTechSpecDocumentToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "quick-spec.md"
+			config.taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "quick-spec.md",
+				contents: `# Quick Spec
+
+## Step 1: Gather Project Info
+Required: \`{title}\`
+
+## Step 3: Identify the Objective
+Ask the user to describe what they'd like to work on.
+`,
+			}
+			config.taskState.currentFocusChainChecklist =
+				"- [x] Step 1: Gather Project Info\n- [ ] Step 2:  (System-Owned) Resolve or start the spec draft"
+			config.taskState.activePlaceholderWorkflowValues = { title }
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "build_tech_spec_document",
+				params: {},
+				partial: false,
+			} as any)
+
+			expect(result).to.equal(
+				formatResponse.toolError(
+					"build_tech_spec_document can only be used while quick-spec.md Step 2 is the active placeholder workflow context.",
+				),
+			)
+		} finally {
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("requires implementation_artifacts from workflow-config stable placeholders for build_tech_spec_document", async () => {
+		const { repoDir, title } = await createBuildTechSpecDocumentRepo({ includeWorkflowConfig: false })
+
+		try {
+			const handler = new BuildTechSpecDocumentToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "quick-spec.md"
+			config.taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "quick-spec.md",
+				contents: `# Quick Spec
+
+## Step 1: Gather Project Info
+Required: \`{title}\`
+
+## Step 2: (System-Owned) Resolve or start the spec draft
+Set \`{output_file}\` to \`{implementation_artifacts}/tech-spec-wip.md\`.
+`,
+			}
+			config.taskState.currentFocusChainChecklist =
+				"- [x] Step 1: Gather Project Info\n- [ ] Step 2:  (System-Owned) Resolve or start the spec draft"
+			config.taskState.activePlaceholderWorkflowValues = { title }
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "build_tech_spec_document",
+				params: {},
+				partial: false,
+			} as any)
+
+			expect(result).to.equal(
+				formatResponse.toolError(
+					"Could not resolve stable placeholder 'implementation_artifacts' from .cline/workflow-config.yaml.",
+				),
+			)
+		} finally {
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("fails when the canonical quick-spec template cannot be read for build_tech_spec_document", async () => {
+		const { repoDir, templatePath, title } = await createBuildTechSpecDocumentRepo()
+
+		try {
+			await fs.rm(templatePath, { force: true })
+
+			const handler = new BuildTechSpecDocumentToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "quick-spec.md"
+			config.taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "quick-spec.md",
+				contents: `# Quick Spec
+
+## Step 1: Gather Project Info
+Required: \`{title}\`
+
+## Step 2: (System-Owned) Resolve or start the spec draft
+Set \`{output_file}\` to \`{implementation_artifacts}/tech-spec-wip.md\`.
+`,
+			}
+			config.taskState.currentFocusChainChecklist =
+				"- [x] Step 1: Gather Project Info\n- [ ] Step 2:  (System-Owned) Resolve or start the spec draft"
+			config.taskState.activePlaceholderWorkflowValues = { title }
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "build_tech_spec_document",
+				params: {},
+				partial: false,
+			} as any)
+
+			expect(result).to.equal(
+				formatResponse.toolError(`Could not read the canonical quick-spec template at ${templatePath}.`),
+			)
+		} finally {
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("overwrites an existing canonical tech-spec-wip artifact atomically for build_tech_spec_document", async () => {
+		const sandbox = sinon.createSandbox()
+		const staleContent = "# stale\n"
+		const { repoDir, artifactPath, title } = await createBuildTechSpecDocumentRepo({
+			preexistingArtifact: staleContent,
+		})
+
+		try {
+			setVscodeHostProviderMock()
+			sandbox.stub(HostProvider.workspace, "getWorkspacePaths").resolves({ paths: [repoDir] } as any)
+
+			const handler = new BuildTechSpecDocumentToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "quick-spec.md"
+			config.taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "quick-spec.md",
+				contents: `# Quick Spec
+
+## Step 1: Gather Project Info
+Required: \`{title}\`
+
+## Step 2: (System-Owned) Resolve or start the spec draft
+Set \`{output_file}\` to \`{implementation_artifacts}/tech-spec-wip.md\`.
+`,
+			}
+			config.taskState.currentFocusChainChecklist =
+				"- [x] Step 1: Gather Project Info\n- [ ] Step 2:  (System-Owned) Resolve or start the spec draft"
+			config.taskState.activePlaceholderWorkflowValues = { title }
+
+			await handler.execute(config, {
+				type: "tool_use",
+				name: "build_tech_spec_document",
+				params: {},
+				partial: false,
+			} as any)
+
+			const artifact = await fs.readFile(artifactPath, "utf8")
+			expect(artifact).to.not.equal(staleContent)
+			expect(artifact).to.contain(`# Tech-Spec: ${title}`)
 		} finally {
 			sandbox.restore()
 			HostProvider.reset()

@@ -36,6 +36,7 @@ export type DeterministicPlaceholderWorkflowName =
 	| "create-epics.md"
 	| "pi-planning.md"
 	| "create-story.md"
+	| "quick-spec.md"
 	| "dev-story.md"
 	| "review-adversarial-general.md"
 	| "blind-review.md"
