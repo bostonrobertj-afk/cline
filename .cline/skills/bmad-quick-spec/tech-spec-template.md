@@ -12,63 +12,35 @@ test_patterns: []
 
 # Tech-Spec: {title}
 
-**Created:** {date}
+Created: 
 
 ## Overview
 
 ### Problem Statement
 
-{problem_statement}
-
 ### Solution
-
-{solution}
 
 ### Scope
 
-**In Scope:**
-{in_scope}
+#### In Scope
 
-**Out of Scope:**
-{out_of_scope}
+#### Out of Scope
 
 ## Context for Development
 
 ### Codebase Patterns
 
-{codebase_patterns}
-
 ### Files to Reference
-
-| File | Purpose |
-| ---- | ------- |
-
-{files_table}
 
 ### Technical Decisions
 
-{technical_decisions}
-
 ## Implementation Plan
-
-### Tasks
-
-{tasks}
 
 ### Acceptance Criteria
 
-{acceptance_criteria}
+### Implementation Seams
 
-## Additional Context
+### Tasks
 
-### Dependencies
 
-{dependencies}
-
-### Testing Strategy
-
-{testing_strategy}
-
-### Notes
-
-{notes}
+## Latest Review Findings
