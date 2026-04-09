@@ -5,8 +5,17 @@
 [ ] Contextual Tool Matrix
 [ ] Persona Activation
 
+# Step 2 Automation
+Persists the output file for the workflow using a the workflow's template.
+
 # Step 3 Automation
-Presents user with four approaches to adopt for the brainstorming session. Requires a dedicated entry in the back-end tool dictionary so the user can view a definition for each of the four approaches in the "references" modal.
+Asks the user what they want the brainstorming session to focus on, then adds their response to the output file.
+Must use this:
+    Title: "What topics and/or goals would you like to focus on for this brainstorming session?"
+    Text: "Be as detailed as you can- we'll worry about formatting later!"
+
+# Step 4 Automation
+Presents the user with three options for how they want to approach selecting the brainstorming technique, then runs special handling based on the user's response.
 
 # Deterministic Workflow Progression / Step Progression Configuration
 [ ] requirements doc
@@ -14,6 +23,11 @@ Presents user with four approaches to adopt for the brainstorming session. Requi
 [ ] implementation
 [ ] QA
 - Step 1: Required variables are set as workflow variables and resolve to valid filepaths where appropriate.
+- Step 2: output file path is set as `{output_file}` workflow variable, and the file has been correctly populated from the workflow's template.
+- Step 3: User's input has been added to the output file in the "Topic" section.
+- Step 4: The "Selected Techniques" section of the output file has been updated with the user's selection.
+- Step 5: workflow_progress_request receives a "yes" response.
+- Step 6: attempt_completion is successfully used.
 
 
 # Workflow Start Form- enablement not needed
@@ -38,6 +52,6 @@ Gathers inputs using existing workflow start mechanism tied to the workflow sour
 [ ] action plan
 [ ] implementation
 [ ] QA
-- Add entry for the workflow to /Users/robertboston/Documents/Cline%20Extension/cline/src/core/prompts/system-prompt/registry/workflowPersonaRegistry.ts indicating that the appropriate agent for this workflow is scrum-master
+- Add entry for the workflow to /Users/robertboston/Documents/Cline%20Extension/cline/src/core/prompts/system-prompt/registry/workflowPersonaRegistry.ts indicating that the appropriate agent for this workflow is analyst
 <!-- user note: be sure to update the agent name above when using this template for workflow enablement -->
 - Update /Users/robertboston/Documents/Cline%20Extension/cline/docs/workflow-automation/persona-activation/workflow-persona-mapping.md to reflect the new entry in /Users/robertboston/Documents/Cline%20Extension/cline/src/core/prompts/system-prompt/registry/workflowPersonaRegistry.ts

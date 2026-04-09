@@ -11,6 +11,5 @@ context_file: ''
 
 # Brainstorming Session Results
 
-# Topic
-
-## Selected Approach
+**Facilitator:** {{user_name}}
+**Date:** {{date}}
