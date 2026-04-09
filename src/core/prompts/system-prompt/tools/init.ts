@@ -21,6 +21,7 @@ import { list_code_definition_names_variants } from "./list_code_definition_name
 import { list_files_variants } from "./list_files"
 import { load_mcp_documentation_variants } from "./load_mcp_documentation"
 import { new_task_variants } from "./new_task"
+import { prepare_brainstorming_session_variants } from "./prepare_brainstorming_session"
 import { read_file_variants } from "./read_file"
 import { read_file_range_variants } from "./read_file_range"
 import { replace_in_file_variants } from "./replace_in_file"
@@ -67,6 +68,7 @@ export function registerClineToolSets(): void {
 		...list_files_variants,
 		...load_mcp_documentation_variants,
 		...new_task_variants,
+		...prepare_brainstorming_session_variants,
 		...generate_plan_output_variants,
 		...read_file_variants,
 		...read_file_range_variants,

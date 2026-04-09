@@ -40,6 +40,7 @@ export enum ClineDefaultTool {
 	BUILD_REVIEW_DIFF_OUTPUT = "build_review_diff_output",
 	BUILD_REVIEW_INPUT = "build_review_input",
 	BUILD_EPICS_DOCUMENT = "build_epics_document",
+	PREPARE_BRAINSTORMING_SESSION = "prepare_brainstorming_session",
 	SELECT_TARGET_EPIC = "select_target_epic",
 	BUILD_EPIC_DELIVERY_SPEC = "build_epic_delivery_spec",
 	BUILD_STORY_DOCUMENT = "build_story_document",

@@ -17,6 +17,7 @@ import type { ClineDefaultTool } from "@shared/tools"
 import type { ClineAskResponse } from "@shared/WebviewMessage"
 import type { DeterministicPlaceholderToolContext } from "@/core/task/focus-chain/deterministicPlaceholderProgression"
 import type { FocusChainChecklistUpdateResult } from "@/core/task/focus-chain/types"
+import type { WorkflowFormSessionContext, WorkflowFormSessionOwner } from "@/core/task/workflow-form/types"
 import { WorkspaceRootManager } from "@/core/workspace"
 import type { ToolUse } from "../../../assistant-message"
 import type { ContextManager } from "../../../context/context-management/ContextManager"
@@ -153,6 +154,12 @@ export interface TaskCallbacks {
 		userContent: ClineContent[],
 		context: "initial_task" | "resume" | "feedback",
 	) => Promise<{ cancel?: boolean; wasCancelled?: boolean; contextModification?: string; errorMessage?: string }>
+	runWorkflowFormSession: (args: {
+		resolverId: string
+		owner: WorkflowFormSessionOwner
+		initialPhase: "collect_inputs"
+		context?: WorkflowFormSessionContext
+	}) => Promise<void>
 }
 
 /**

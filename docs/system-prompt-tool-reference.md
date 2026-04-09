@@ -33,6 +33,7 @@ These are the tools currently registered from [init.ts](/Users/robertboston/Docu
 | `browser_action` | Browser | Interact with the Puppeteer-controlled browser one action at a time. | Browser automation and screenshots. |
 | `build_epic_delivery_spec` | Workflow-specific | Build the canonical pi-planning Step 3 delivery spec from workflow-owned state and persist `{epic_delivery_spec}`. | Context-gated to supported workflow/step. |
 | `build_epics_document` | Workflow-specific | Build or resolve the canonical epics artifact at `{output_folder}/planning_artifacts/epics.md` from workflow-owned state. | No human-supplied parameters. |
+| `prepare_brainstorming_session` | Workflow-specific | Resolve and persist the brainstorming Step 2 session path from workflow-owned state, including continue, start-new, and list-all flows. | Context-gated to supported workflow/step. |
 | `build_review_diff_output` | Workflow-specific | Build and replace the stable review diff artifact at `{diff_output}` from a supported Git-backed source. | Used by `code-review` workflow. |
 | `build_review_input` | Workflow-specific | Build and replace the stable review-input artifact at `{review_input}` from workflow-owned `{story_path}` and `{diff_output}`. | No human-supplied parameters. |
 | `build_story_document` | Workflow-specific | Build the canonical create-story Step 2 scaffold from workflow-owned state and persist `{story_doc}`. | Context-gated to supported workflow/step. |
@@ -85,6 +86,7 @@ These are the workflow-enablement tools that were easy to miss in older audits:
 - managed-workflow completion surface
   - `complete_workflow_item`
 - workflow selection / routing helpers
+  - `prepare_brainstorming_session`
   - `select_target_epic`
 
 ## Shared Tool Ids That Are Not Part Of The Normal Prompt Tool Catalog
@@ -176,7 +178,7 @@ These notes matter because “tool exists in source” is not the same thing as 
 - `use_subagents` is hidden when subagents are disabled and during subagent runs.
 - `complete_workflow_item` is managed-workflow-only.
 - `set_workflow_placeholders` is available only when a managed workflow is active or the active workflow supports placeholders.
-- `build_epic_delivery_spec`, `build_story_document`, and `build_tech_spec_document` are context-gated to their supported workflow steps.
+- `select_target_epic`, `prepare_brainstorming_session`, `build_epic_delivery_spec`, `build_story_document`, and `build_tech_spec_document` are context-gated to their supported workflow steps.
 - `web_search` and `web_fetch` require the `cline` provider plus web tools enabled.
 - `access_mcp_resource` and `use_mcp_tool` require MCP availability.
 - `load_mcp_documentation` is currently disabled from agent-visible schema.

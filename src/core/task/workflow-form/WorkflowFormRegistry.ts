@@ -10,6 +10,11 @@ import {
 	type WorkflowFormSystemDictionaryKey,
 	workflowFormSystemDictionary,
 } from "@/core/task/workflow-form/dictionaries/systemDictionary"
+import {
+	PREPARE_BRAINSTORMING_SESSION_LIST_FIELD_LABEL,
+	PREPARE_BRAINSTORMING_SESSION_LIST_PROMPT,
+	PREPARE_BRAINSTORMING_SESSION_LIST_TITLE,
+} from "@/shared/prepare-brainstorming-session"
 import { ClineDefaultTool } from "@/shared/tools"
 import {
 	deriveWorkflowFormControl,
@@ -26,6 +31,7 @@ export const CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID = "code_review_step_3_di
 export const CODE_REVIEW_STEP_3_REVIEW_INPUT_RESOLVER_ID = "code_review_step_3_review_input"
 export const WRITE_REMEDIATION_STORY_STEP_2_REVIEW_INPUT_RESOLVER_ID = "write_remediation_story_step_2_review_input"
 export const QUICK_SPEC_STEP_2_BUILD_TECH_SPEC_DOCUMENT_RESOLVER_ID = "quick_spec_step_2_build_tech_spec_document"
+export const BRAINSTORMING_STEP_2_SELECT_SESSION_RESOLVER_ID = "brainstorming_step_2_select_session"
 export const PLACEHOLDER_WORKFLOW_START_SET_WORKFLOW_PLACEHOLDERS_RESOLVER_ID =
 	"placeholder_workflow_start_set_workflow_placeholders"
 const CODE_REVIEW_STEP_3_REVIEW_INPUT_DIFF_MISMATCH_MESSAGE =
@@ -694,6 +700,75 @@ export const workflowFormRegistry: Record<string, WorkflowFormResolverDefinition
 				errorMessage: this.buildToolExecutionFailureFallbackMessage(session),
 				fallbackToAgent: true,
 			}
+		},
+	},
+	[BRAINSTORMING_STEP_2_SELECT_SESSION_RESOLVER_ID]: {
+		id: BRAINSTORMING_STEP_2_SELECT_SESSION_RESOLVER_ID,
+		toolName: ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
+		buildDefinition(session): WorkflowFormDefinition {
+			const options = session.context?.brainstormingSessionOptions
+			if (!options || options.length === 0) {
+				throw new Error("Brainstorming session picker definition requires brainstormingSessionOptions.")
+			}
+
+			const { title, markdown } = buildWorkflowStartRuntimeToolDictionary({ fieldKeys: ["output_file"] })
+			const fields: WorkflowFormFieldDefinition[] = [
+				{
+					key: "output_file",
+					label: PREPARE_BRAINSTORMING_SESSION_LIST_FIELD_LABEL,
+					help: "Choose an existing brainstorming session file to continue.",
+					control: "select",
+					valueSchema: { type: "string", enum: options.map((option) => option.value) },
+					required: true,
+					options,
+					visible: true,
+				},
+			]
+
+			return {
+				toolName: ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
+				title: PREPARE_BRAINSTORMING_SESSION_LIST_TITLE,
+				toolDictionaryTitle: title,
+				toolDictionaryMarkdown: markdown,
+				pages: {
+					collect_inputs: {
+						prompt: PREPARE_BRAINSTORMING_SESSION_LIST_PROMPT,
+						fields,
+						submitLabel: "Continue",
+						cancelLabel: "Cancel",
+					},
+					retry_error: {
+						prompt: PREPARE_BRAINSTORMING_SESSION_LIST_PROMPT,
+						fields,
+						submitLabel: "Continue",
+						cancelLabel: "Cancel",
+						retryLabel: "Start Over",
+					},
+				},
+				successMessage: "The brainstorming session output file is ready.",
+			}
+		},
+		buildToolExecutionFailureFallbackMessage() {
+			return "The brainstorming session picker could not store output_file. Review the selected session and try again."
+		},
+		buildToolExecutionRequest(_session, values) {
+			const selected = values.output_file?.rawValue?.trim() ?? ""
+
+			return {
+				toolName: ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
+				toolInput: { values: { output_file: selected } },
+				toolParams: { values: JSON.stringify({ output_file: selected }) },
+			}
+		},
+		evaluateToolExecutionResult(session, args) {
+			if (isWorkflowFormFailureText(args.toolResultText)) {
+				return {
+					succeeded: false,
+					errorMessage: args.toolResultText?.trim() ?? this.buildToolExecutionFailureFallbackMessage(session),
+				}
+			}
+
+			return { succeeded: true }
 		},
 	},
 	[PLACEHOLDER_WORKFLOW_START_SET_WORKFLOW_PLACEHOLDERS_RESOLVER_ID]: {

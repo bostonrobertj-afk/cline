@@ -169,7 +169,12 @@ import { buildUserFeedbackContent } from "./utils/buildUserFeedbackContent"
 import { buildUserMessageContent } from "./utils/buildUserMessageContent"
 import { hasExplicitMentionSyntax, hasUserContentTag } from "./utils/userContentProcessing"
 import { activateManagedWorkflowInTaskState, activatePlaceholderWorkflowInTaskState } from "./workflow-activation"
-import type { WorkflowFormRuntimeOutcome, WorkflowFormSessionState } from "./workflow-form/types"
+import type {
+	WorkflowFormRuntimeOutcome,
+	WorkflowFormSessionContext,
+	WorkflowFormSessionOwner,
+	WorkflowFormSessionState,
+} from "./workflow-form/types"
 import { workflowCompletionRunner } from "./workflowCompletionRunner"
 
 export type ToolResponse = ClineToolResponseContent
@@ -1078,6 +1083,7 @@ export class Task {
 			this.clearActiveHookExecution.bind(this),
 			this.getActiveHookExecution.bind(this),
 			this.runUserPromptSubmitHook.bind(this),
+			this.runWorkflowFormSession.bind(this),
 		)
 	}
 
@@ -1476,6 +1482,27 @@ export class Task {
 	private async clearWorkflowFormSession() {
 		this.taskState.activeWorkflowFormSession = undefined
 		await this.persistWorkflowFormSession()
+	}
+
+	private async runWorkflowFormSession(args: {
+		resolverId: string
+		owner: WorkflowFormSessionOwner
+		initialPhase: "collect_inputs"
+		context?: WorkflowFormSessionContext
+	}) {
+		if (this.taskState.activeWorkflowFormSession) {
+			throw new Error("A workflow form session is already active.")
+		}
+
+		this.taskState.activeWorkflowFormSession = this.workflowFormRuntime.createSession({
+			resolverId: args.resolverId,
+			triggerSource: "tool_handler",
+			owner: args.owner,
+			initialPhase: args.initialPhase,
+			context: args.context,
+		})
+		await this.persistWorkflowFormSession()
+		await this.maybeResolveWorkflowFormBeforeApiTurn()
 	}
 
 	private async renderWorkflowFormMessage(payload: ClineWorkflowForm, messageType: "ask" | "say"): Promise<void> {

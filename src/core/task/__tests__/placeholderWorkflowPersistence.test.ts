@@ -16,7 +16,12 @@ import { getFocusChainFilePath } from "../focus-chain/file-utils"
 import { Task, type ToolResponse } from "../index"
 import { TaskState } from "../TaskState"
 import { activateManagedWorkflowInTaskState } from "../workflow-activation"
-import type { WorkflowFormRuntimeOutcome, WorkflowFormSessionState } from "../workflow-form/types"
+import type {
+	WorkflowFormRuntimeOutcome,
+	WorkflowFormSessionContext,
+	WorkflowFormSessionOwner,
+	WorkflowFormSessionState,
+} from "../workflow-form/types"
 
 function createFocusChainManager(taskState: TaskState) {
 	return new FocusChainManager({
@@ -225,6 +230,17 @@ const clearLastPromptedStoryTaskKeyForContextCompaction = Reflect.get(
 	"clearLastPromptedStoryTaskKeyForContextCompaction",
 ) as TaskMethod<[], Promise<void>>
 const clearWorkflowFormSession = Reflect.get(Task.prototype, "clearWorkflowFormSession") as TaskMethod<[], Promise<void>>
+const runWorkflowFormSession = Reflect.get(Task.prototype, "runWorkflowFormSession") as TaskMethod<
+	[
+		{
+			resolverId: string
+			owner: WorkflowFormSessionOwner
+			initialPhase: "collect_inputs"
+			context?: WorkflowFormSessionContext
+		},
+	],
+	Promise<void>
+>
 const executeWorkflowFormToolAndSync = Reflect.get(Task.prototype, "executeWorkflowFormToolAndSync") as TaskMethod<
 	[unknown],
 	Promise<{ succeeded: boolean; errorMessage?: string; fallbackToAgent?: boolean }>
@@ -505,6 +521,66 @@ Inspect the prepared review input and write findings.
 		} finally {
 			sandbox.restore()
 		}
+	})
+
+	it("creates and runs a tool-owned workflow form session", async () => {
+		const createdSession: WorkflowFormSessionState = {
+			sessionId: "wf-session-tool-handler",
+			resolverId: "brainstorming_step_2_select_session",
+			triggerSource: "tool_handler",
+			owner: {
+				kind: "placeholder_workflow_step",
+				workflowName: "brainstorming.md",
+				stepNumber: 2,
+			},
+			phase: "collect_inputs",
+			initialPhase: "collect_inputs",
+			values: {},
+		}
+
+		const fakeTask = createFakeTask("task-run-workflow-form-session") as FakeTaskBase & {
+			workflowFormRuntime: {
+				createSession: sinon.SinonStub
+			}
+			persistWorkflowFormSession: sinon.SinonStub
+			maybeResolveWorkflowFormBeforeApiTurn: sinon.SinonStub
+		}
+		Object.setPrototypeOf(fakeTask, Task.prototype)
+		fakeTask.taskState.activeWorkflowFormSession = undefined
+		fakeTask.workflowFormRuntime = {
+			createSession: sinon.stub().returns(createdSession),
+		}
+		fakeTask.persistWorkflowFormSession = sinon.stub().resolves()
+		fakeTask.maybeResolveWorkflowFormBeforeApiTurn = sinon.stub().resolves()
+
+		await runWorkflowFormSession.call(fakeTask, {
+			resolverId: "brainstorming_step_2_select_session",
+			owner: {
+				kind: "placeholder_workflow_step",
+				workflowName: "brainstorming.md",
+				stepNumber: 2,
+			},
+			initialPhase: "collect_inputs",
+			context: {
+				brainstormingSessionOptions: [{ value: "/tmp/session-a.md", label: "session-a.md" }],
+			},
+		})
+
+		sinon.assert.calledOnceWithExactly(fakeTask.workflowFormRuntime.createSession, {
+			resolverId: "brainstorming_step_2_select_session",
+			triggerSource: "tool_handler",
+			owner: {
+				kind: "placeholder_workflow_step",
+				workflowName: "brainstorming.md",
+				stepNumber: 2,
+			},
+			initialPhase: "collect_inputs",
+			context: {
+				brainstormingSessionOptions: [{ value: "/tmp/session-a.md", label: "session-a.md" }],
+			},
+		})
+		sinon.assert.calledOnce(fakeTask.persistWorkflowFormSession)
+		sinon.assert.calledOnce(fakeTask.maybeResolveWorkflowFormBeforeApiTurn)
 	})
 
 	it("keeps only one workflow-form ask message for the active session after retry_error followed by success", async () => {

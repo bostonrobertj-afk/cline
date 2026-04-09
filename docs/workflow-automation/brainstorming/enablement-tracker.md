@@ -6,9 +6,17 @@
 [ ] Persona Activation
 
 # Step 2 Automation
-Persists the output file for the workflow using a the workflow's template.
+[x] requirements doc
+[x] action plan
+[x] implementation
+[x] QA
+Persists the output file for the workflow using the workflow's template.
 
 # Step 3 Automation
+[ ] requirements doc
+[ ] action plan
+[ ] implementation
+[ ] QA
 Asks the user what they want the brainstorming session to focus on, then adds their response to the output file.
 Must use this:
     Title: "What topics and/or goals would you like to focus on for this brainstorming session?"

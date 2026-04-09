@@ -28,6 +28,7 @@ import { build_story_document_variants } from "../tools/build_story_document"
 import { build_tech_spec_document_variants } from "../tools/build_tech_spec_document"
 import { generate_plan_output_variants } from "../tools/generate_plan_output"
 import { list_code_definition_names_variants } from "../tools/list_code_definition_names"
+import { prepare_brainstorming_session_variants } from "../tools/prepare_brainstorming_session"
 import { read_file_variants } from "../tools/read_file"
 import { read_file_range_variants } from "../tools/read_file_range"
 import { search_files_variants } from "../tools/search_files"
@@ -377,6 +378,32 @@ describe("workflow placeholder tool gating", () => {
 			tool.contextRequirements?.({
 				...mockContext,
 				activePlaceholderWorkflowName: "create-epics.md",
+				activePlaceholderWorkflowStepNumber: 2,
+			}),
+		).to.equal(false)
+	})
+
+	it("gates prepare_brainstorming_session to brainstorming step 2", () => {
+		const tool = prepare_brainstorming_session_variants[0]
+
+		expect(
+			tool.contextRequirements?.({
+				...mockContext,
+				activePlaceholderWorkflowName: "brainstorming.md",
+				activePlaceholderWorkflowStepNumber: 2,
+			}),
+		).to.equal(true)
+		expect(
+			tool.contextRequirements?.({
+				...mockContext,
+				activePlaceholderWorkflowName: "brainstorming.md",
+				activePlaceholderWorkflowStepNumber: 3,
+			}),
+		).to.equal(false)
+		expect(
+			tool.contextRequirements?.({
+				...mockContext,
+				activePlaceholderWorkflowName: "pi-planning.md",
 				activePlaceholderWorkflowStepNumber: 2,
 			}),
 		).to.equal(false)
@@ -1190,6 +1217,27 @@ describe("native tool placeholder replacement", () => {
 
 		expect(getOpenAIFunctionTool(openAI).description).to.equal(
 			"Show the runtime-owned pi-planning Step 2 epic picker. Resolve {epics_document} from workflow state, extract canonical epic headings, ask the exact runtime-owned followup question, and persist the clicked label as {target_epic}.",
+		)
+	})
+
+	it("compacts native prepare_brainstorming_session descriptions", () => {
+		const context: SystemPromptContext = {
+			...mockContext,
+			enableNativeToolCalls: true,
+			useMinimalGptPrompt: true,
+			providerInfo: {
+				providerId: "openai",
+				model: { id: "gpt-5.4-2026-03-05", info: { supportsPromptCache: false } },
+				mode: "act",
+			},
+			activePlaceholderWorkflowName: "brainstorming.md",
+			activePlaceholderWorkflowStepNumber: 2,
+		}
+
+		const openAI = toolSpecFunctionDefinition(prepare_brainstorming_session_variants[0], context)
+
+		expect(getOpenAIFunctionTool(openAI).description).to.equal(
+			"Show the runtime-owned brainstorming Step 2 session-preparation flow.",
 		)
 	})
 

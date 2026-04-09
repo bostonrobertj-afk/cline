@@ -1,6 +1,7 @@
 import type {
 	ClineWorkflowForm,
 	WorkflowFormDefinition,
+	WorkflowFormFieldOption,
 	WorkflowFormFieldValuePayload,
 	WorkflowFormPhase,
 } from "@shared/ExtensionMessage"
@@ -8,7 +9,7 @@ import type { WorkflowFormSubmissionRequest } from "@shared/proto/cline/task"
 import type { ClineDefaultTool } from "@/shared/tools"
 
 export type WorkflowFormResolverId = string
-export type WorkflowFormTriggerSource = "deterministic_workflow_progression" | "slash_command"
+export type WorkflowFormTriggerSource = "deterministic_workflow_progression" | "slash_command" | "tool_handler"
 
 export interface WorkflowFormSessionOwner {
 	kind: "placeholder_workflow_step" | "slash_command"
@@ -47,6 +48,7 @@ export interface WorkflowFormStartRequirements {
 export interface WorkflowFormSessionContext {
 	workflowName?: string
 	workflowStartRequirements?: WorkflowFormStartRequirements
+	brainstormingSessionOptions?: WorkflowFormFieldOption[]
 }
 
 export interface WorkflowFormSessionState {

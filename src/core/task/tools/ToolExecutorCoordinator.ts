@@ -24,6 +24,7 @@ import { ListFilesToolHandler } from "./handlers/ListFilesToolHandler"
 import { LoadMcpDocumentationHandler } from "./handlers/LoadMcpDocumentationHandler"
 import { NewTaskHandler } from "./handlers/NewTaskHandler"
 import { PlanModeRespondHandler } from "./handlers/PlanModeRespondHandler"
+import { PrepareBrainstormingSessionToolHandler } from "./handlers/PrepareBrainstormingSessionToolHandler"
 import { ReadFileRangeToolHandler } from "./handlers/ReadFileRangeToolHandler"
 import { ReadFileToolHandler } from "./handlers/ReadFileToolHandler"
 import { ReportBugHandler } from "./handlers/ReportBugHandler"
@@ -130,6 +131,7 @@ export class ToolExecutorCoordinator {
 		[ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT]: (_v: ToolValidator) => new BuildReviewDiffOutputToolHandler(),
 		[ClineDefaultTool.BUILD_REVIEW_INPUT]: (_v: ToolValidator) => new BuildReviewInputToolHandler(),
 		[ClineDefaultTool.BUILD_EPICS_DOCUMENT]: (_v: ToolValidator) => new BuildEpicsDocumentToolHandler(),
+		[ClineDefaultTool.PREPARE_BRAINSTORMING_SESSION]: (_v: ToolValidator) => new PrepareBrainstormingSessionToolHandler(),
 		[ClineDefaultTool.BUILD_EPIC_DELIVERY_SPEC]: (_v: ToolValidator) => new BuildEpicDeliverySpecToolHandler(),
 		[ClineDefaultTool.BUILD_STORY_DOCUMENT]: (_v: ToolValidator) => new BuildStoryDocumentToolHandler(),
 		[ClineDefaultTool.BUILD_TECH_SPEC_DOCUMENT]: (_v: ToolValidator) => new BuildTechSpecDocumentToolHandler(),

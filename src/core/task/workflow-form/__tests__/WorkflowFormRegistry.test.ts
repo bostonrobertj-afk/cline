@@ -1,6 +1,7 @@
 import { expect } from "chai"
 import { describe, it } from "mocha"
 import {
+	BRAINSTORMING_STEP_2_SELECT_SESSION_RESOLVER_ID,
 	CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID,
 	CODE_REVIEW_STEP_3_REVIEW_INPUT_RESOLVER_ID,
 	getWorkflowFormResolverDefinition,
@@ -29,6 +30,13 @@ describe("WorkflowFormRegistry", () => {
 
 		expect(resolver.id).to.equal("write_remediation_story_step_2_review_input")
 		expect(resolver.toolName).to.equal("build_review_input")
+	})
+
+	it("returns the brainstorming step 2 session-picker resolver metadata by id", () => {
+		const resolver = getWorkflowFormResolverDefinition(BRAINSTORMING_STEP_2_SELECT_SESSION_RESOLVER_ID)
+
+		expect(resolver.id).to.equal("brainstorming_step_2_select_session")
+		expect(resolver.toolName).to.equal("set_workflow_placeholders")
 	})
 
 	it("builds the create-epics workflow-start definition with the approved override copy", () => {
@@ -64,6 +72,99 @@ describe("WorkflowFormRegistry", () => {
 		expect(fields.map((field) => field.key)).to.deep.equal(["architecture_document", "prd", "mode", "ux_spec", "ui_spec"])
 		expect(fields[0]?.label).to.equal("Architecture Document")
 		expect(fields[2]?.placeholder).to.equal("new or continue")
+	})
+
+	it("builds the brainstorming session-picker definition", () => {
+		const resolver = getWorkflowFormResolverDefinition(BRAINSTORMING_STEP_2_SELECT_SESSION_RESOLVER_ID)
+		const definition = resolver.buildDefinition({
+			sessionId: "session-brainstorming-picker",
+			resolverId: resolver.id,
+			triggerSource: "tool_handler",
+			owner: {
+				kind: "placeholder_workflow_step",
+				workflowName: "brainstorming.md",
+				stepNumber: 2,
+			},
+			phase: "collect_inputs",
+			initialPhase: "collect_inputs",
+			values: {},
+			context: {
+				brainstormingSessionOptions: [
+					{
+						value: "/tmp/brainstorming-session-2026-04-08.md",
+						label: "brainstorming-session-2026-04-08.md",
+						description: "/tmp/brainstorming-session-2026-04-08.md",
+					},
+				],
+			},
+		})
+		const fields = definition.pages.collect_inputs?.fields ?? []
+
+		expect(definition.title).to.equal("Select a Brainstorming Session")
+		expect(definition.pages.collect_inputs?.prompt).to.equal("Choose an existing brainstorming session to continue.")
+		expect(fields.map((field) => field.key)).to.deep.equal(["output_file"])
+		expect(fields[0]?.label).to.equal("Session")
+		expect(fields[0]?.control).to.equal("select")
+		expect(fields[0]?.options?.[0]?.value).to.equal("/tmp/brainstorming-session-2026-04-08.md")
+		expect(definition.pages.collect_inputs?.submitLabel).to.equal("Continue")
+	})
+
+	it("throws when the brainstorming session-picker definition is built without brainstormingSessionOptions", () => {
+		const resolver = getWorkflowFormResolverDefinition(BRAINSTORMING_STEP_2_SELECT_SESSION_RESOLVER_ID)
+
+		expect(() =>
+			resolver.buildDefinition({
+				sessionId: "session-brainstorming-picker-missing-options",
+				resolverId: resolver.id,
+				triggerSource: "tool_handler",
+				owner: {
+					kind: "placeholder_workflow_step",
+					workflowName: "brainstorming.md",
+					stepNumber: 2,
+				},
+				phase: "collect_inputs",
+				initialPhase: "collect_inputs",
+				values: {},
+				context: {},
+			}),
+		).to.throw("Brainstorming session picker definition requires brainstormingSessionOptions.")
+	})
+
+	it("serializes the brainstorming session-picker selection into set_workflow_placeholders", () => {
+		const resolver = getWorkflowFormResolverDefinition(BRAINSTORMING_STEP_2_SELECT_SESSION_RESOLVER_ID)
+		const outcome = resolver.buildToolExecutionRequest(
+			{
+				sessionId: "session-brainstorming-picker-serialize",
+				resolverId: resolver.id,
+				triggerSource: "tool_handler",
+				owner: {
+					kind: "placeholder_workflow_step",
+					workflowName: "brainstorming.md",
+					stepNumber: 2,
+				},
+				phase: "collect_inputs",
+				initialPhase: "collect_inputs",
+				values: {},
+				context: {
+					brainstormingSessionOptions: [
+						{
+							value: "/tmp/brainstorming-session-2026-04-08.md",
+							label: "brainstorming-session-2026-04-08.md",
+							description: "/tmp/brainstorming-session-2026-04-08.md",
+						},
+					],
+				},
+			},
+			{
+				output_file: { rawValue: "/tmp/brainstorming-session-2026-04-08.md" },
+			},
+		)
+
+		expect(outcome).to.deep.equal({
+			toolName: "set_workflow_placeholders",
+			toolInput: { values: { output_file: "/tmp/brainstorming-session-2026-04-08.md" } },
+			toolParams: { values: '{"output_file":"/tmp/brainstorming-session-2026-04-08.md"}' },
+		})
 	})
 
 	it("omits blank optional create-epics values when serializing set_workflow_placeholders", () => {

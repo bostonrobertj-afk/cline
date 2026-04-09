@@ -66,6 +66,7 @@ describe("ToolExecutor focus chain protection", () => {
 			sinon.stub().resolves(undefined),
 			sinon.stub().resolves(undefined),
 			sinon.stub().resolves(undefined),
+			sinon.stub().resolves(),
 		)
 
 		;(executor as any).coordinator = {
@@ -150,6 +151,7 @@ describe("ToolExecutor focus chain protection", () => {
 			sinon.stub().resolves(undefined),
 			sinon.stub().resolves(undefined),
 			sinon.stub().resolves(undefined),
+			sinon.stub().resolves(),
 		)
 
 		const executeStub = sinon.stub().resolves("[attempt_completion] Result:\nDone")
@@ -239,6 +241,7 @@ describe("ToolExecutor focus chain protection", () => {
 			sinon.stub().resolves(undefined),
 			sinon.stub().resolves(undefined),
 			sinon.stub().resolves(undefined),
+			sinon.stub().resolves(),
 		)
 
 		;(executor as any).coordinator = {

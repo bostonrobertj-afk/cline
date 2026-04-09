@@ -72,6 +72,7 @@ function createExecutor() {
 		sinon.stub().resolves(undefined),
 		sinon.stub().resolves(undefined),
 		sinon.stub().resolves(undefined),
+		sinon.stub().resolves(),
 	)
 
 	const coordinator = (executor as any).coordinator
