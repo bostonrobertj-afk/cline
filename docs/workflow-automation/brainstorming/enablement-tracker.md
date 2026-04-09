@@ -16,6 +16,10 @@ Must use this:
 
 # Step 4 Automation
 Presents the user with three options for how they want to approach selecting the brainstorming technique, then runs special handling based on the user's response.
+Need to break this up into three separate patches:
+- “I want to choose”: two-panel workflow form, category-to-technique derivation from brain-methods.csv (line 1), and Back behavior
+- “I want a random technique”: random selection plus confirm/retry loop
+- “I want you to suggest a technique”: sentinel write now, actual selection deferred to Step 5
 
 # Deterministic Workflow Progression / Step Progression Configuration
 [ ] requirements doc
@@ -25,7 +29,7 @@ Presents the user with three options for how they want to approach selecting the
 - Step 1: Required variables are set as workflow variables and resolve to valid filepaths where appropriate.
 - Step 2: output file path is set as `{output_file}` workflow variable, and the file has been correctly populated from the workflow's template.
 - Step 3: User's input has been added to the output file in the "Topic" section.
-- Step 4: The "Selected Techniques" section of the output file has been updated with the user's selection.
+- Step 4: The "Selected Approach" and "Selected Techniques" sections of the output file has been updated with the user's selection.
 - Step 5: workflow_progress_request receives a "yes" response.
 - Step 6: attempt_completion is successfully used.
 
