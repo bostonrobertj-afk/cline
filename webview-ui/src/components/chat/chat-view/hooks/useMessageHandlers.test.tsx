@@ -118,12 +118,14 @@ function createWorkflowForm(args: {
 					fields,
 					submitLabel: "Submit",
 					cancelLabel: "Cancel",
+					backLabel: "Back",
 				},
 				retry_error: {
 					prompt: "Retry",
 					fields,
 					submitLabel: "Submit",
 					cancelLabel: "Cancel",
+					backLabel: "Back",
 					retryLabel: "Start Over",
 				},
 			},
@@ -413,6 +415,42 @@ describe("useMessageHandlers active_user routing", () => {
 							rawValue: "5",
 						},
 					},
+				],
+			}),
+		)
+	})
+
+	it("routes BACK workflow-form submissions through submitWorkflowForm using the current page fields", async () => {
+		const workflowForm = createWorkflowForm({
+			phase: "collect_inputs",
+			fields: [
+				createField({
+					key: "source.commit",
+					label: "Commit",
+					control: "text",
+					valueSchema: { type: "string" },
+				}),
+				createField({
+					key: "context_lines",
+					label: "Context lines",
+					control: "number",
+					valueSchema: { type: "integer" },
+				}),
+			],
+		})
+
+		await submitWorkflowForm(workflowForm, WorkflowFormAction.BACK, {
+			"source.commit": "abc1234",
+			context_lines: "5",
+		})
+
+		expect(mockSubmitWorkflowForm).toHaveBeenCalledWith(
+			expect.objectContaining({
+				sessionId: "session-1",
+				action: WorkflowFormAction.BACK,
+				fields: [
+					{ key: "source.commit", value: { rawValue: "abc1234" } },
+					{ key: "context_lines", value: { rawValue: "5" } },
 				],
 			}),
 		)

@@ -255,6 +255,29 @@ describe("WorkflowFormRegistry", () => {
 		])
 	})
 
+	it("exposes Back only on the staged diff resolver pages after source selection", () => {
+		const resolver = getWorkflowFormResolverDefinition(CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID)
+		const definition = resolver.buildDefinition({
+			sessionId: "session-1",
+			resolverId: resolver.id,
+			triggerSource: "deterministic_workflow_progression",
+			owner: {
+				kind: "placeholder_workflow_step",
+				workflowName: "code-review.md",
+				stepNumber: 2,
+			},
+			phase: "collect_inputs",
+			initialPhase: "confirm",
+			values: {
+				"source.type": { rawValue: "commit" },
+			},
+		})
+
+		expect(definition.pages.select_source?.backLabel).to.equal(undefined)
+		expect(definition.pages.collect_inputs?.backLabel).to.equal("Back")
+		expect(definition.pages.retry_error?.backLabel).to.equal("Back")
+	})
+
 	it("attaches schema-derived value types to Phase 1 concrete input fields", () => {
 		const resolver = getWorkflowFormResolverDefinition(CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID)
 		const definition = resolver.buildDefinition({

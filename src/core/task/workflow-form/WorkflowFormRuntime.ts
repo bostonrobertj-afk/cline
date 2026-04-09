@@ -59,6 +59,10 @@ function buildValuesFromSubmissions(fields: WorkflowFormFieldSubmission[]): Work
 	}, {})
 }
 
+function filterWorkflowFormValues(values: WorkflowFormValues, allowedKeys: string[]): WorkflowFormValues {
+	return Object.fromEntries(Object.entries(values).filter(([key]) => allowedKeys.includes(key)))
+}
+
 export class WorkflowFormRuntime {
 	constructor(private readonly resolvers: Record<string, WorkflowFormResolverDefinition> = workflowFormRegistry) {}
 
@@ -144,6 +148,42 @@ export class WorkflowFormRuntime {
 					...session,
 					values: nextValues,
 				},
+			}
+		}
+
+		if (
+			request.action === WorkflowFormAction.BACK &&
+			(session.phase === "collect_inputs" || session.phase === "retry_error")
+		) {
+			const selectSourceSession = {
+				...session,
+				phase: "select_source" as const,
+				values: nextValues,
+				lastError: undefined,
+			}
+			const selectSourceDefinition = resolver.buildDefinition(selectSourceSession)
+			const selectSourceFields = selectSourceDefinition.pages.select_source?.fields ?? []
+
+			if (!selectSourceDefinition.pages.select_source) {
+				return {
+					kind: "render_form",
+					session,
+					payload: this.buildPayload(session),
+				}
+			}
+
+			const allowedKeys = ["confirm", ...selectSourceFields.map((field) => field.key)]
+			const nextSession: WorkflowFormSessionState = {
+				...session,
+				phase: "select_source",
+				values: filterWorkflowFormValues(nextValues, allowedKeys),
+				lastError: undefined,
+			}
+
+			return {
+				kind: "render_form",
+				session: nextSession,
+				payload: this.buildPayload(nextSession),
 			}
 		}
 

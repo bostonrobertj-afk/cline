@@ -742,6 +742,23 @@ export const ChatRowContent = memo(
 									{workflowFormPage?.cancelLabel || "Cancel"}
 								</button>
 								<button
+									className="rounded-xs border border-editor-group-border px-3 py-2 text-sm text-foreground disabled:opacity-50"
+									disabled={workflowFormSubmissionPending}
+									onClick={() => {
+										void handleWorkflowFormAction(
+											WorkflowFormAction.BACK,
+											Object.fromEntries(
+												concreteWorkflowFormFields.map((field) => [
+													field.key,
+													workflowFormValues[field.key] ?? "",
+												]),
+											),
+										)
+									}}
+									type="button">
+									{workflowFormPage?.backLabel || "Back"}
+								</button>
+								<button
 									className="rounded-xs bg-button-background px-3 py-2 text-sm text-primary-foreground disabled:opacity-50"
 									disabled={workflowFormSubmissionPending || isWorkflowFormSubmitDisabled}
 									onClick={() => {
@@ -793,6 +810,23 @@ export const ChatRowContent = memo(
 									}}
 									type="button">
 									{workflowFormPage?.cancelLabel || "Cancel"}
+								</button>
+								<button
+									className="rounded-xs border border-editor-group-border px-3 py-2 text-sm text-foreground disabled:opacity-50"
+									disabled={workflowFormSubmissionPending}
+									onClick={() => {
+										void handleWorkflowFormAction(
+											WorkflowFormAction.BACK,
+											Object.fromEntries(
+												concreteWorkflowFormFields.map((field) => [
+													field.key,
+													workflowFormValues[field.key] ?? "",
+												]),
+											),
+										)
+									}}
+									type="button">
+									{workflowFormPage?.backLabel || "Back"}
 								</button>
 								<button
 									className="rounded-xs border border-editor-group-border px-3 py-2 text-sm text-foreground disabled:opacity-50"

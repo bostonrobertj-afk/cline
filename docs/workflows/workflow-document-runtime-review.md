@@ -2,207 +2,381 @@
 
 ## Purpose
 
-This document records what the current runtime actually does with placeholder workflow documents, based on the code in this repo as of March 30, 2026.
+This document is the runtime-oriented overview of how placeholder workflows are actually run and managed in this repo as of April 8, 2026.
 
-It is specifically focused on runtime paths that:
+It is meant to help new agents quickly understand the real placeholder-workflow lifecycle, not just one silo such as workflow-start forms.
 
-- load workflow documents
-- parse step headings and step bodies
-- render placeholder values into workflow text
-- derive current-step details from workflow documents
-- derive workflow-start form shape from workflow documents
-- inject workflow step text into focus-chain guidance
-- make deterministic progression decisions that depend on workflow structure or placeholder state
+## Scope
 
-## High-Level Summary
+This document is about placeholder workflows, not managed workflows.
 
-In the current implementation, placeholder workflow documents are not used only by the workflow-start form.
+It covers the runtime capabilities that currently shape placeholder-workflow behavior:
 
-They are also used by:
+- workflow activation and placeholder rendering
+- checklist and active-step resolution
+- workflow-start cards
+- workflow-start forms
+- step-triggered workflow forms and automatic-status cards
+- deterministic workflow progression
+- contextual native-tool filtering
+- `workflow_progress_request` exposure and prompt teaching
+- workflow persona activation
+- workflow completion and teardown
 
-- workflow activation
-- checklist generation
-- current-step detail resolution
-- focus-chain prompt injection
-- placeholder extraction
-- deterministic progression support and step evaluation
+## High-Level Runtime Flow
 
-Because of that, any authoring convention for Step 1 must preserve compatibility with all of those consumers, not just the start-form path.
+For placeholder workflows, the runtime currently follows this order:
 
-## Runtime Touchpoints
+1. Activate the workflow and load the workflow document.
+2. Build stable placeholder values and preserve any previously-entered dynamic placeholder values when appropriate.
+3. Render the workflow document with current placeholder state.
+4. Build the checklist from markdown step headings in the rendered document.
+5. Before the first API turn of a slash-command-started workflow, run the pre-turn system-owned loop:
+   - workflow-start card, if the workflow has one
+   - workflow-start form, if Step 1 raw details contain explicit start-form directives
+   - step-triggered workflow forms or automatic-status cards, if the active step is registered for interception
+   - deterministic progression after those system-owned actions mutate workflow state
+6. If the pre-turn loop has no more eligible work, assemble the model prompt using:
+   - active workflow reminder/instructions
+   - current active step details
+   - active workflow persona instructions
+   - contextual tool filtering for the active workflow and step
+   - prompt teaching for `workflow_progress_request` when that step supports it
+7. During normal tool execution, focus-chain updates and deterministic progression continue to advance the workflow.
+8. When the checklist becomes fully complete, the workflow completion runner may invoke workflow-end automation and then tear the workflow down.
 
-### 1. Workflow activation loads and renders the full document
+Relevant seams:
+
+- [workflow-activation.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-activation.ts)
+- [placeholder-workflow-step-details.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/workflows/placeholder-workflow-step-details.ts)
+- [index.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/index.ts)
+- [deterministicPlaceholderProgression.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/focus-chain/deterministicPlaceholderProgression.ts)
+- [workflowCompletionRunner.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflowCompletionRunner.ts)
+
+## Placeholder Workflow State Model
+
+Placeholder-workflow runtime behavior is driven primarily by task-owned state in [TaskState.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/TaskState.ts).
+
+The important state buckets are:
+
+- `activePlaceholderWorkflowId`
+- `activePlaceholderWorkflowSource`
+- `activePlaceholderWorkflowStableValues`
+- `activePlaceholderWorkflowValues`
+- `activePlaceholderWorkflowDeterministicState`
+- `activePlaceholderWorkflowTaskWriteProofPaths`
+- `activeWorkflowStartCardSession`
+- `activeWorkflowFormSession`
+- `pendingAutoCompletedPlaceholderWorkflowStepNotices`
+
+Important implication:
+
+- placeholder workflows are not managed only by the workflow document itself
+- they are managed by the combination of rendered workflow text, checklist state, placeholder state, task-written artifact proofs, and current-turn tool context
+
+## 1. Workflow Activation And Placeholder Rendering
 
 Relevant code:
 
 - [workflow-activation.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-activation.ts)
-- [placeholder-workflow-step-details.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/workflows/placeholder-workflow-step-details.ts)
 - [workflow-placeholders.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/workflows/workflow-placeholders.ts)
+- [placeholder-workflow-step-details.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/workflows/placeholder-workflow-step-details.ts)
 
 What happens:
 
-- `activatePlaceholderWorkflowInTaskState(...)` loads workflow contents and stores an `ActivePlaceholderWorkflowSource`.
-- Stable placeholders are built from `.cline/workflow-config.yaml` by `buildWorkflowStablePlaceholders(...)`.
-- The workflow text is rendered through `getRenderedActivePlaceholderWorkflowSourceContents(...)`.
-- Unresolved placeholder tokens are logged but left in place.
+- `activatePlaceholderWorkflowInTaskState(...)` loads the workflow document and builds an `ActivePlaceholderWorkflowSource`.
+- Stable placeholders are loaded through `buildWorkflowStablePlaceholders(...)`.
+- Dynamic placeholder values come from `activePlaceholderWorkflowValues`.
+- The runtime renders workflow text through `getRenderedActivePlaceholderWorkflowSourceContents(...)`.
+- Unresolved placeholder tokens are logged, but rendering does not fail on them.
+- Activation resets placeholder-workflow runtime state when the workflow changed.
 
-Important implication:
+Important implications:
 
-- The runtime expects workflow documents to contain real placeholder tokens like `{review_input}` or `{spec_file}`.
-- Bare keys like `review_input` do not participate in placeholder rendering.
+- placeholder workflow documents are live runtime inputs, not passive docs
+- literal `{placeholder}` tokens still matter because multiple runtime consumers depend on them
+- slash-command activation does not directly hand Step 1 to the model; startup surfaces may intercept before Turn 1
 
-### 2. Checklist generation is driven by markdown step headings
+## 2. Checklist And Active-Step Resolution
 
 Relevant code:
 
-- [placeholder-workflow-step-details.ts:197](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/workflows/placeholder-workflow-step-details.ts#L197)
-- [placeholder-workflow-step-details.ts:273](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/workflows/placeholder-workflow-step-details.ts#L273)
-- [placeholder-workflow-step-details.ts:58](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/workflows/placeholder-workflow-step-details.ts#L58)
+- [placeholder-workflow-step-details.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/workflows/placeholder-workflow-step-details.ts)
 
 What happens:
 
-- `buildPlaceholderWorkflowChecklist(...)` parses workflow sections from the rendered workflow text.
-- A section becomes a checklist step only when its heading matches `STEP_HEADING_REGEX`.
-- The regex requires a markdown heading whose text starts with `Step <number>`.
+- `buildPlaceholderWorkflowChecklist(...)` parses rendered workflow text into checklist steps.
+- A section becomes a workflow step only if its heading matches `Step <number>`.
+- `getActivePlaceholderWorkflowStepDetails(...)` resolves the first incomplete checklist step.
+- It returns both:
+  - rendered `details`
+  - unrendered `rawDetails`
 
-Safe authoring conclusion:
+Important implications:
 
-- Inner subheadings like `### Workflow Form Inputs` do not create a new checklist step.
-- Inner headings that look like `### Step 2: ...` do create a new workflow section and will affect checklist behavior.
+- step headings are structural runtime contracts
+- inner headings are safe only if they do not look like `Step <number>`
+- rendered step details become agent-visible instructions
+- raw step details remain available for document-derived parsing such as workflow-start requirement directives
 
-### 3. Current-step detail resolution uses both rendered and raw workflow text
+## 3. Workflow-Start Cards
 
 Relevant code:
 
-- [placeholder-workflow-step-details.ts:120](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/workflows/placeholder-workflow-step-details.ts#L120)
+- [WorkflowStartCardRegistry.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-start-card/WorkflowStartCardRegistry.ts)
+- [buildWorkflowStartCardPayload.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-start-card/buildWorkflowStartCardPayload.ts)
+- [index.ts:1756](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/index.ts#L1756)
+- [docs/workflow-automation/workflow-start-card/README.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/workflow-automation/workflow-start-card/README.md)
 
 What happens:
 
-- `getActivePlaceholderWorkflowStepDetails(...)` finds the first incomplete checklist item.
-- It resolves `details` from rendered workflow contents.
-- It separately resolves `rawDetails` from the unrendered workflow contents.
+- before the first API turn of a slash-command-started placeholder workflow, `maybeResolveWorkflowStartCardBeforeApiTurn(...)` checks the code-owned registry
+- if the workflow has an entry, the runtime creates `activeWorkflowStartCardSession`
+- the payload title is generated from the workflow filename
+- the markdown body comes from the code-owned registry
+- the fixed CTA is `Get Started`
+- the runtime waits for the session to clear before continuing startup
 
-Important implication:
+Important implications:
 
-- Any future metadata convention added inside Step 1 can be read from `rawDetails` without losing unresolved placeholder tokens.
-- But the rest of the runtime still consumes `details`, which is the rendered step body shown to the agent.
+- workflow-start cards are pre-Turn-1 startup surfaces
+- they are outside the workflow-step system
+- they are not workflow forms
+- they are code-owned, not document-derived
 
-### 4. Placeholder extraction only recognizes real placeholder tokens
+## 4. Workflow-Start Forms
 
 Relevant code:
 
-- [workflow-placeholders.ts:83](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/workflows/workflow-placeholders.ts#L83)
-- [workflow-placeholders.ts:7](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/workflows/workflow-placeholders.ts#L7)
+- [WorkflowFormTriggerRegistry.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/WorkflowFormTriggerRegistry.ts)
+- [workflowStartRequirements.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/workflowStartRequirements.ts)
+- [WorkflowFormRegistry.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/WorkflowFormRegistry.ts)
+- [WorkflowFormRuntime.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts)
+- [workflow-form-readme.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/workflow-ui-surface/workflow-form-readme.md)
 
 What happens:
 
-- `extractWorkflowPlaceholderKeys(...)` scans text for `{key}` or `{{key}}`.
-- It returns the extracted keys without braces.
+- workflow-start forms are only considered for slash-command-started placeholder workflows
+- the runtime resolves the active step and only proceeds when Step 1 is active
+- start-form shape is derived from explicit directive lines in Step 1 raw details, not from generic placeholder extraction alone
+- the recognized directives are:
+  - `Required: {placeholder}`
+  - `Optional: {placeholder}`
+  - `One of: {placeholder_a}, {placeholder_b}`
+- the runtime creates a workflow-form session owned by the slash-command start path
+- field typing still comes from the `set_workflow_placeholders` tool schema and runtime dictionaries
 
-Important implication:
+Important implications:
 
-- Workflow text must still contain actual `{placeholder}` tokens for runtime extraction to work.
-- A metadata block that uses bare keys only is not sufficient for the current runtime.
+- the older mental model “start forms are just placeholder-token extraction from Step 1” is no longer accurate
+- Step 1 must contain explicit start-form directive lines if a workflow wants the generic start-form path
+- start cards and start forms can both participate in startup, in sequence
 
-### 5. Focus-chain prompt injection uses the current rendered step body directly
+## 5. Step-Triggered Workflow Forms And Automatic-Status Cards
 
 Relevant code:
 
-- [focus-chain/index.ts:365](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/focus-chain/index.ts#L365)
-- [focus-chain/index.ts:398](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/focus-chain/index.ts#L398)
+- [WorkflowFormTriggerRegistry.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/WorkflowFormTriggerRegistry.ts)
+- [WorkflowFormRuntime.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts)
+- [WorkflowFormRegistry.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/WorkflowFormRegistry.ts)
+- [index.ts:1796](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/index.ts#L1796)
 
 What happens:
 
-- The focus-chain manager calls `getActivePlaceholderWorkflowStepDetails(...)`.
-- It injects `stepDetails.details` into the prompt as the current workflow step instructions.
-- It also checks `findUnresolvedWorkflowPlaceholders(stepDetails.details)`.
+- after the slash-command start form check, the runtime can intercept supported workflow steps through the step-trigger registry
+- some resolvers render interactive forms
+- some render non-interactive `automatic_status` cards for zero-human-input system-owned steps
+- the runtime executes the corresponding tool through the normal tool path
+- on success, the workflow-form session clears and deterministic progression can run again before the first AI turn
+- on terminal failure, automatic-status cards can fall back to the normal agent path
+
+Current examples include:
+
+- `code-review.md`
+- `write-remediation-story.md`
+- `quick-spec.md`
 
 Important implication:
 
-- Any authoring added to Step 1 becomes part of the instructions the agent sees.
-- Step 1 metadata must therefore be readable and non-destructive as part of the visible workflow instructions unless explicitly filtered in future code.
+- workflow forms are broader than startup input collection
+- they are also used for step-owned deterministic preparation work before the model gets control
 
-### 6. Workflow-start form shape currently derives from Step 1 placeholder extraction
+## 6. Deterministic Workflow Progression
 
 Relevant code:
 
-- [WorkflowFormTriggerRegistry.ts:49](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/WorkflowFormTriggerRegistry.ts#L49)
-- [WorkflowFormTriggerRegistry.ts:78](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/WorkflowFormTriggerRegistry.ts#L78)
+- [deterministicPlaceholderProgression.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/focus-chain/deterministicPlaceholderProgression.ts)
+- [deterministic-workflow-progression-readme.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/workflows/deterministic-workflow-progression-readme.md)
 
 What happens:
 
-- `resolveWorkflowFormSlashCommandStartCandidate(...)` runs only for slash-command placeholder-workflow activation.
-- It resolves the active step from the workflow document and checklist.
-- It extracts placeholder keys from `activeStep.details`.
-- It also reads `activeStep.rawDetails` for a current workflow-specific forced-field exception.
+- deterministic support is opt-in by exact workflow name
+- the runtime resolves the current active step and dispatches to a workflow-specific evaluator
+- evaluators may inspect:
+  - placeholder values
+  - file existence
+  - file content
+  - current-task write proofs
+  - current-turn tool execution context
+- when a step is proven complete, the checklist advances through the normal focus-chain path
+- deterministic progression can loop across multiple steps in one pass
+- auto-completion notices are recorded in task state
 
-Important implication:
+Important implications:
 
-- The current workflow-start form is document-derived.
-- More specifically, it is placeholder-token-derived from Step 1.
-- If Step 1 stops including real `{placeholder}` tokens, the current start-form path cannot infer its fields.
+- deterministic progression is hardcoded per workflow, not inferred from free-form workflow prose
+- workflow authoring alone does not make a workflow deterministic
+- runtime completion logic for supported workflows lives in code
 
-### 7. Deterministic progression support is hardcoded per workflow, not inferred from document metadata
+## 7. Contextual Tool Matrix And Native Tool Filtering
 
 Relevant code:
 
-- [deterministicPlaceholderProgression.ts:31](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/focus-chain/deterministicPlaceholderProgression.ts#L31)
-- [deterministicPlaceholderProgression.ts:299](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/focus-chain/deterministicPlaceholderProgression.ts#L299)
+- [contextualToolMatrix.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/prompts/system-prompt/registry/contextualToolMatrix.ts)
+- [contextualNativeToolFilter.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/prompts/system-prompt/registry/contextualNativeToolFilter.ts)
+- [contextual-tool-schema.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/contextual-tool-schema.md)
 
 What happens:
 
-- Deterministic support is enabled by exact workflow name.
-- Step completion logic is implemented in hardcoded evaluators per supported workflow.
-- For `review-adversarial-general.md`, Step 1 logic is currently implemented in code, not parsed from workflow-file metadata.
+- prompt-side native-tool exposure for placeholder workflows is controlled by `PLACEHOLDER_WORKFLOW_STEP_MATRIX`
+- each row is keyed by exact workflow name and step number
+- matrix entries use bundle names, not raw tool ids
+- the filter resolves those bundles into built-in tool ids and Indxr tool names
+- if a workflow/step has a row, only the allowed native tools plus always-preserved tools and response tools remain visible
+
+Important implications:
+
+- placeholder workflow behavior is partly shaped by prompt-side tool visibility, not only by workflow text
+- the contextual tool surface is code-owned
+- changing workflow step structure without updating the matrix can create real runtime drift
+
+## 8. `workflow_progress_request` Support And Prompt Teaching
+
+Relevant code:
+
+- [workflow-progress-request.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/shared/workflow-progress-request.ts)
+- [task_progress.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/prompts/system-prompt/components/task_progress.ts)
+- [response_tools.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/prompts/system-prompt/components/response_tools.ts)
+
+What happens:
+
+- `workflow_progress_request` support is opt-in by exact workflow name and step number
+- when the current step is in that allowlist:
+  - the response tool is exposed
+  - prompt teaching changes from normal placeholder-workflow completion guidance to runtime-owned Yes/No advancement guidance
+- when the current step is not allowed, the response tool is not taught or exposed through that path
+
+Important implications:
+
+- not every placeholder-workflow step completes through `send_user_message + task_progress`
+- some steps are intentionally mediated by runtime-owned `workflow_progress_request`
+- this behavior is shared-code-driven, not document-derived
+
+## 9. Persona Activation
+
+Relevant code:
+
+- [workflowPersonaRegistry.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/prompts/system-prompt/registry/workflowPersonaRegistry.ts)
+- [index.ts:2288](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/index.ts#L2288)
+
+What happens:
+
+- placeholder workflows can map to a workflow persona by exact workflow name
+- prompt assembly resolves persona instructions through the workflow persona registry
+- those instructions are part of the workflow-aware prompt assembly path
 
 Important implication:
 
-- The runtime does not currently understand required vs optional vs `one_of` semantics from workflow documents.
-- If that behavior is needed now, the current document-derived implementation must be expanded to parse it explicitly.
+- workflow behavior is also shaped by code-owned persona mapping, not only by the workflow document itself
 
-## Authoring Constraints Implied By Current Runtime
+## 10. Focus-Chain Prompt Injection
 
-Based on the code above, the current runtime imposes these real constraints on placeholder workflow documents:
+Relevant code:
 
-- Workflow steps must be introduced by headings matching `Step <number>`.
-- Inner headings are safe only if they do not look like `Step <number>`.
-- Step bodies may contain additional markdown, but that markdown remains part of the current-step prompt shown to the agent.
-- Placeholder-dependent runtime behavior still requires literal `{placeholder}` tokens in the workflow text.
-- Bare placeholder keys alone are not enough.
-- Any new metadata convention must be additive to placeholder-bearing workflow text unless the runtime is changed to stop depending on token extraction.
+- [focus-chain/index.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/focus-chain/index.ts)
+- [placeholder-workflow-step-details.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/workflows/placeholder-workflow-step-details.ts)
 
-## Immediate Conclusion For Step 1 Input Semantics
+What happens:
 
-The current runtime does not yet have a workable built-in representation for:
+- the focus-chain manager resolves the active step from the checklist
+- current step details are injected into prompt assembly
+- unresolved placeholders in the rendered step details are still detectable and surfaced
 
-- required workflow-start inputs
-- optional workflow-start inputs
-- `one_of` workflow-start inputs
+Important implication:
 
-The current implementation only knows how to:
+- workflow step bodies remain agent-visible runtime instructions
+- any metadata or extra markdown authored inside a step may affect what the model sees unless another runtime layer filters it
 
-- extract placeholder keys from Step 1 text
-- build a form from that key set
-- apply form-side validation rules that are configured in runtime code
+## 11. Tool-Response Progression, Write Proofs, And Notices
 
-So if Step 1 input semantics must be expressed through workflow documents in the current architecture, any solution must:
+Relevant code:
 
-- preserve literal `{placeholder}` tokens for the rest of the runtime
-- add parseable requirement markers alongside them
-- update the start-form runtime to parse and enforce those markers from Step 1 `rawDetails`
+- [focus-chain/updateFromToolResponse.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/focus-chain/updateFromToolResponse.ts)
+- [placeholderWorkflowWriteProofs.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/focus-chain/placeholderWorkflowWriteProofs.ts)
+- [SetWorkflowPlaceholdersToolHandler.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/handlers/SetWorkflowPlaceholdersToolHandler.ts)
+
+What happens:
+
+- after tools run, focus-chain update logic can refresh the checklist
+- deterministic progression can consume current-turn tool context such as:
+  - executed tool name
+  - tool params
+  - tool result text
+- some workflows also depend on current-task write-proof tracking for generated artifacts
+- deterministic auto-completion reasons are recorded as notices for later prompt/UI surfacing
+
+Important implication:
+
+- placeholder workflows are managed partly through runtime facts gathered during tool execution, not just static document parsing
+
+## 12. Workflow Completion And Teardown
+
+Relevant code:
+
+- [workflowCompletionRunner.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflowCompletionRunner.ts)
+- [workflowCompletionHandler.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflowCompletionHandler.ts)
+- [index.ts:1601](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/index.ts#L1601)
+
+What happens:
+
+- when the checklist transitions to fully complete, `workflowCompletionRunner(...)` checks whether workflow-end handling should run
+- the workflow completion handler may invoke workflow-end automation
+- if completion handling does not fail terminally, the task tears the placeholder workflow down and clears its state
+
+Important implication:
+
+- placeholder workflows have a real runtime completion phase
+- “all checklist items complete” is not always the last thing that happens
+
+## Authoring Constraints Implied By The Current Runtime
+
+The current runtime imposes these real constraints on placeholder workflow documents:
+
+- workflow steps must use headings that match `Step <number>`
+- inner headings are safe only if they do not accidentally create new `Step <number>` sections
+- placeholder-dependent behavior still requires literal `{placeholder}` tokens where placeholder rendering or extraction matters
+- workflow-start forms require explicit Step 1 directive lines in raw details
+- workflow-start cards are not document-derived, so adding card copy to a workflow document does nothing by itself
+- deterministic progression is code-owned per workflow
+- contextual native-tool exposure is code-owned per workflow and step
+- `workflow_progress_request` support is code-owned per workflow and step
+- persona activation is code-owned per workflow
 
 ## Practical Takeaway
 
-Workflow documents are currently part of a shared runtime contract, not just form configuration.
+Placeholder workflows are currently governed by a shared runtime contract across multiple subsystems.
 
-Any authoring change meant to help workflow-start forms must be evaluated against all of these consumers:
+If you change or enable a workflow, you need to think across all of these seams:
 
-- activation rendering
-- checklist generation
-- current-step resolution
-- focus-chain prompt injection
-- placeholder extraction
-- workflow-start form trigger generation
-- deterministic progression logic
+- workflow activation and placeholder rendering
+- checklist parsing and active-step resolution
+- workflow-start cards
+- workflow-start forms
+- step-triggered workflow forms and automatic-status cards
+- deterministic progression
+- contextual native-tool filtering
+- `workflow_progress_request` support and prompt teaching
+- persona activation
+- workflow completion and teardown
 
-If a proposed Step 1 format breaks literal placeholder-token usage, it is not compatible with the current runtime.
+The workflow document is important, but it is only one part of the runtime contract.

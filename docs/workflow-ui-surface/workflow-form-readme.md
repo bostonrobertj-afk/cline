@@ -76,6 +76,7 @@ The capability does not replace workflow progression, slash-command activation, 
 - Keep raw form inputs out of model-visible conversational context.
 - Derive field typing from the invoked tool schema at runtime.
 - Allow use cases to specialize field discovery, ordering, labels, help text, and staged UX.
+- Allow staged forms with a live `select_source` page to expose a Back action that returns to that page without preserving downstream collected-input values.
 - Build runtime tool-reference markdown through the shared dictionary builders instead of hard-coding per-resolver dictionary entries.
 - For workflow-start forms, scope the `Term Reference` section to the active ordered placeholder keys when those keys are mapped in the runtime system dictionary.
 - Validate required and one-of semantics before invoking a tool.
@@ -149,15 +150,16 @@ Current delivered use cases:
 2. The runtime creates or resumes a workflow-form session.
 3. The resolver builds the current staged form definition.
 4. The webview renders that definition as either a system-owned staged form or a non-interactive automatic-status card.
-5. For interactive forms, the user submits raw values through the dedicated workflow-form submission transport; for automatic-status cards, the runtime executes the tool immediately.
-6. The runtime merges those values into session state and validates the current page.
-7. If the current page is incomplete, the runtime re-renders the form with retry state.
-8. If the submission is valid, the resolver builds the canonical tool input and tool params.
-9. The task runtime executes the tool through the normal tool path.
-10. The resolver evaluates the tool result and returns success or failure.
-11. On success, the session is cleared and control returns to runtime-owned workflow progression first.
-12. After a successful form resolution, the runtime may immediately re-enter deterministic progression and open another eligible system-owned form before any AI turn begins.
-13. On failure, interactive forms remain active in `retry_error` while automatic-status failures render a terminal failure card and then fall back to the normal agent path.
+5. Interactive forms submit raw values through the dedicated transport.
+6. The runtime merges those values into session state.
+7. If the user submits `BACK` from `collect_inputs` or `retry_error` and the resolver exposes `select_source`, the runtime returns to `select_source` while preserving only `confirm` plus the live `select_source` fields.
+8. If the current page is incomplete, the runtime re-renders the form with retry state.
+9. If the submission is valid, the resolver builds the canonical tool input and tool params.
+10. The task runtime executes the tool through the normal tool path.
+11. The resolver evaluates the tool result and returns success or failure.
+12. On success, the session is cleared and control returns to runtime-owned workflow progression first.
+13. After a successful form resolution, the runtime may immediately re-enter deterministic progression and open another eligible system-owned form before any AI turn begins.
+14. On failure, interactive forms remain active in `retry_error` while automatic-status failures render a terminal failure card and then fall back to the normal agent path.
 
 Important implementation note:
 
@@ -219,6 +221,7 @@ Example 1: Phase 1 diff-source form
   - `confirm`
   - `select_source`
   - `collect_inputs`
+- `collect_inputs` and `retry_error` may expose `Back`, which returns to `select_source` and clears downstream concrete-input values.
 
 Example 2: Workflow-start placeholder form
 

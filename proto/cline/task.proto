@@ -122,6 +122,7 @@ enum WorkflowFormAction {
   SUBMIT = 1;
   CANCEL = 2;
   RETRY = 3;
+  BACK = 4;
 }
 
 message WorkflowFormFieldValue {

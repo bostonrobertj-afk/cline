@@ -474,6 +474,125 @@ describe("WorkflowFormRuntime", () => {
 		}
 	})
 
+	it("returns from collect_inputs to select_source when BACK is submitted", () => {
+		const session = runtime.createSession({
+			resolverId: "code_review_step_3_diff_source",
+			triggerSource: "deterministic_workflow_progression",
+			owner: {
+				kind: "placeholder_workflow_step",
+				workflowName: "code-review.md",
+				stepNumber: 2,
+			},
+		})
+
+		const outcome = runtime.handleSubmission(
+			{
+				...session,
+				phase: "collect_inputs",
+				initialPhase: "confirm",
+				values: {
+					confirm: { rawValue: "yes" },
+					"source.type": { rawValue: "commit" },
+					"source.commit": { rawValue: "abc1234" },
+					context_lines: { rawValue: "5" },
+				},
+			},
+			WorkflowFormSubmissionRequest.create({
+				sessionId: session.sessionId,
+				action: WorkflowFormAction.BACK,
+				fields: [],
+			}),
+		)
+
+		expect(outcome.kind).to.equal("render_form")
+		if (outcome.kind === "render_form") {
+			expect(outcome.session.phase).to.equal("select_source")
+			expect(outcome.payload.phase).to.equal("select_source")
+			expect(outcome.session.values).to.deep.equal({
+				confirm: { rawValue: "yes" },
+				"source.type": { rawValue: "commit" },
+			})
+		}
+	})
+
+	it("returns from retry_error to select_source when BACK is submitted and clears downstream values", () => {
+		const session = runtime.createSession({
+			resolverId: "code_review_step_3_diff_source",
+			triggerSource: "deterministic_workflow_progression",
+			owner: {
+				kind: "placeholder_workflow_step",
+				workflowName: "code-review.md",
+				stepNumber: 2,
+			},
+		})
+
+		const outcome = runtime.handleSubmission(
+			{
+				...session,
+				phase: "retry_error",
+				initialPhase: "confirm",
+				values: {
+					confirm: { rawValue: "yes" },
+					"source.type": { rawValue: "commit_range" },
+					"source.base": { rawValue: "main" },
+					"source.head": { rawValue: "feature/review-form" },
+					context_lines: { rawValue: "7" },
+				},
+				lastError: "required fields are missing input",
+			},
+			WorkflowFormSubmissionRequest.create({
+				sessionId: session.sessionId,
+				action: WorkflowFormAction.BACK,
+				fields: [],
+			}),
+		)
+
+		expect(outcome.kind).to.equal("render_form")
+		if (outcome.kind === "render_form") {
+			expect(outcome.session.phase).to.equal("select_source")
+			expect(outcome.session.lastError).to.equal(undefined)
+			expect(outcome.session.values).to.deep.equal({
+				confirm: { rawValue: "yes" },
+				"source.type": { rawValue: "commit_range" },
+			})
+		}
+	})
+
+	it("re-renders the current phase unchanged when BACK is submitted for a resolver without select_source", () => {
+		const customRuntime = createConfirmToCollectRuntime()
+		const session = customRuntime.createSession({
+			resolverId: "confirm_to_collect_form",
+			triggerSource: "deterministic_workflow_progression",
+			owner: {
+				kind: "placeholder_workflow_step",
+			},
+		})
+
+		const outcome = customRuntime.handleSubmission(
+			{
+				...session,
+				phase: "collect_inputs",
+				initialPhase: "confirm",
+				values: {
+					confirm: { rawValue: "yes" },
+					placeholder_value: { rawValue: "example" },
+				},
+			},
+			WorkflowFormSubmissionRequest.create({
+				sessionId: session.sessionId,
+				action: WorkflowFormAction.BACK,
+				fields: [],
+			}),
+		)
+
+		expect(outcome.kind).to.equal("render_form")
+		if (outcome.kind === "render_form") {
+			expect(outcome.session.phase).to.equal("collect_inputs")
+			expect(outcome.payload.phase).to.equal("collect_inputs")
+			expect(outcome.session.values.placeholder_value?.rawValue).to.equal("example")
+		}
+	})
+
 	it("transitions from select_source to collect_inputs without invoking the tool", () => {
 		const session = runtime.createSession({
 			resolverId: "code_review_step_3_diff_source",

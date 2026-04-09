@@ -4,6 +4,7 @@ import type {
 	WorkflowFormAutomaticStatusState,
 	WorkflowFormPhase,
 } from "@shared/ExtensionMessage"
+import { WorkflowFormAction } from "@shared/proto/cline/task"
 import { fireEvent, render, screen } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { ChatRowContent, getFollowupPresentation } from "./ChatRow"
@@ -115,12 +116,14 @@ function createWorkflowFormMessage(phase: WorkflowFormPhase, overrides?: Partial
 				fields: concreteCommitFields,
 				submitLabel: "Submit",
 				cancelLabel: "Cancel",
+				backLabel: "Back",
 			},
 			retry_error: {
 				prompt: "The system could not produce `review-input.diff`. Update the inputs or retry the request.",
 				fields: concreteCommitFields,
 				submitLabel: "Submit",
 				cancelLabel: "Cancel",
+				backLabel: "Back",
 				retryLabel: "Start Over",
 			},
 		},
@@ -452,6 +455,7 @@ describe("ChatRow followup presentation", () => {
 
 		expect(screen.getByLabelText("Source type")).toBeInTheDocument()
 		expect(screen.getByRole("button", { name: "Next" })).toBeInTheDocument()
+		expect(screen.queryByRole("button", { name: "Back" })).not.toBeInTheDocument()
 		expect(screen.queryByRole("button", { name: "Submit" })).not.toBeInTheDocument()
 	})
 
@@ -461,16 +465,50 @@ describe("ChatRow followup presentation", () => {
 		expect(screen.getByLabelText("Commit")).toBeInTheDocument()
 		expect(screen.getByLabelText("Scoped paths")).toBeInTheDocument()
 		expect(screen.getByLabelText("Context lines")).toBeInTheDocument()
+		expect(screen.getByRole("button", { name: "Back" })).toBeInTheDocument()
 		expect(screen.getByRole("button", { name: "Submit" })).toBeInTheDocument()
 		expect(screen.queryByRole("button", { name: "Next" })).not.toBeInTheDocument()
+	})
+
+	it("submits BACK from collect_inputs through the workflow-form transport", () => {
+		renderWorkflowFormRow("collect_inputs")
+
+		fireEvent.change(screen.getByLabelText("Commit"), { target: { value: "abc1234" } })
+		fireEvent.click(screen.getByRole("button", { name: "Back" }))
+
+		expect(mockSubmitWorkflowForm).toHaveBeenCalledTimes(1)
+		expect(mockSubmitWorkflowForm).toHaveBeenCalledWith(
+			expect.objectContaining({
+				sessionId: "session-1",
+				action: WorkflowFormAction.BACK,
+				fields: [{ key: "source.commit", value: { rawValue: "abc1234" } }],
+			}),
+		)
 	})
 
 	it("renders the retry_error workflow form with the error banner, Start Over, and Submit", () => {
 		renderWorkflowFormRow("retry_error")
 
 		expect(screen.getByText("The system could not produce review-input.diff.")).toBeInTheDocument()
+		expect(screen.getByRole("button", { name: "Back" })).toBeInTheDocument()
 		expect(screen.getByRole("button", { name: "Start Over" })).toBeInTheDocument()
 		expect(screen.getByRole("button", { name: "Submit" })).toBeInTheDocument()
+	})
+
+	it("submits BACK from retry_error through the workflow-form transport", () => {
+		renderWorkflowFormRow("retry_error")
+
+		fireEvent.change(screen.getByLabelText("Commit"), { target: { value: "def5678" } })
+		fireEvent.click(screen.getByRole("button", { name: "Back" }))
+
+		expect(mockSubmitWorkflowForm).toHaveBeenCalledTimes(1)
+		expect(mockSubmitWorkflowForm).toHaveBeenCalledWith(
+			expect.objectContaining({
+				sessionId: "session-1",
+				action: WorkflowFormAction.BACK,
+				fields: [{ key: "source.commit", value: { rawValue: "def5678" } }],
+			}),
+		)
 	})
 
 	it("keeps Next disabled in select_source until source.type is chosen", () => {

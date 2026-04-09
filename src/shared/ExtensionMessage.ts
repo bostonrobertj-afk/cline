@@ -427,6 +427,7 @@ export interface WorkflowFormPageDefinition {
 	fields?: WorkflowFormFieldDefinition[]
 	submitLabel?: string
 	cancelLabel?: string
+	backLabel?: string
 	retryLabel?: string
 }
 

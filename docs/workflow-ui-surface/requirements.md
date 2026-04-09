@@ -161,6 +161,7 @@ For Phase 1, that mechanism must:
   - initial system prompt/question
   - affirmative path into structured input collection
   - field selection / field entry
+  - back navigation to an earlier structured selection page when the resolver exposes it
   - submit
   - failure with retry
   - success indication
