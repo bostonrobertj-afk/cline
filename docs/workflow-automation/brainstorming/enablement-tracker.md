@@ -4,6 +4,8 @@
 [ ] Workflow Start Form
 [ ] Contextual Tool Matrix
 [ ] Persona Activation
+[ ] update workflow-form-inventory with any new form use cases
+[ ] update system-prompt/tools/readme.md with any new tools
 
 # Step 2 Automation
 [x] requirements doc
