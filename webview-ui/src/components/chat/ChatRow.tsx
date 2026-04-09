@@ -898,7 +898,9 @@ export const ChatRowContent = memo(
 					{field.control === "textarea" && (
 						<textarea
 							aria-label={field.label}
-							className="min-h-24 w-full rounded-xs border border-editor-group-border bg-background px-3 py-2 text-sm text-foreground"
+							className={`${
+								field.presentation?.textareaSize === "large" ? "min-h-48" : "min-h-24"
+							} w-full rounded-xs border border-editor-group-border bg-background px-3 py-2 text-sm text-foreground`}
 							disabled={workflowFormSubmissionPending}
 							onChange={(event) => handleWorkflowFormFieldChange(field.key, event.target.value)}
 							placeholder={field.placeholder}

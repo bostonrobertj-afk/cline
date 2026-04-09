@@ -403,6 +403,10 @@ export interface WorkflowFormFieldValuePayload {
 	rawValue?: string
 }
 
+export interface WorkflowFormFieldPresentation {
+	textareaSize?: "default" | "large"
+}
+
 export interface WorkflowFormFieldDefinition {
 	key: string
 	label: string
@@ -414,6 +418,7 @@ export interface WorkflowFormFieldDefinition {
 	placeholder?: string
 	options?: WorkflowFormFieldOption[]
 	visible?: boolean
+	presentation?: WorkflowFormFieldPresentation
 }
 
 export type WorkflowFormRenderablePhase = Extract<

@@ -95,6 +95,7 @@ const RESPONSE_TOOL_METADATA: Record<ClineDefaultTool, ResponseToolMetadata | un
 	[ClineDefaultTool.BUILD_REVIEW_INPUT]: undefined,
 	[ClineDefaultTool.BUILD_EPICS_DOCUMENT]: undefined,
 	[ClineDefaultTool.PREPARE_BRAINSTORMING_SESSION]: undefined,
+	[ClineDefaultTool.CAPTURE_BRAINSTORMING_TOPIC]: undefined,
 	[ClineDefaultTool.SELECT_TARGET_EPIC]: undefined,
 	[ClineDefaultTool.BUILD_EPIC_DELIVERY_SPEC]: undefined,
 	[ClineDefaultTool.BUILD_STORY_DOCUMENT]: undefined,

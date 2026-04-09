@@ -2913,6 +2913,196 @@ Write the remediation story here.
 		}
 	})
 
+	it("intercepts brainstorming Step 3 before an ordinary AI turn and runs the topic-capture workflow form", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "brainstorming-step-3-chain-"))
+		const outputFilePath = path.join(tempDir, "workflow-output", "brainstorming", "brainstorming-session.md")
+		const submittedTopic = "Line one\n\nLine two"
+
+		try {
+			await fs.mkdir(path.dirname(outputFilePath), { recursive: true })
+			await fs.writeFile(
+				outputFilePath,
+				`# Brainstorming Session Results
+
+## Topic
+
+## Selected Approach
+
+## Selected Techniques
+
+### Techniques Used
+
+## Ideas Generated
+`,
+				"utf8",
+			)
+
+			const stepThreeSession: WorkflowFormSessionState = {
+				sessionId: "wf-session-brainstorming-step-3",
+				resolverId: "brainstorming_step_3_capture_topic",
+				triggerSource: "deterministic_workflow_progression",
+				owner: {
+					kind: "placeholder_workflow_step",
+					workflowName: "brainstorming.md",
+					stepNumber: 3,
+				},
+				phase: "collect_inputs",
+				initialPhase: "collect_inputs",
+				values: {
+					topic: { rawValue: submittedTopic },
+				},
+			}
+			const taskState = new TaskState()
+			taskState.activePlaceholderWorkflowId = "brainstorming.md"
+			taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "brainstorming.md",
+				contents: `# Brainstorming Session Workflow
+
+## Step 1: (System-Owned) Open or start a session
+Optional: {context_file}
+
+## Step 2: (System-Owned) Create Output File
+Prepare the output file.
+
+## Step 3: (System-Owned) Identify Brainstorming Session Topic & Goals
+Capture the Topic section in {output_file} before continuing.
+
+## Step 4: (System-Owned) Choose a brainstorming approach
+Continue after the topic is captured.
+`,
+			}
+			taskState.currentFocusChainChecklist = [
+				"- [x] Step 1: Open or start a session",
+				"- [x] Step 2: Create Output File",
+				"- [ ] Step 3: Identify Brainstorming Session Topic & Goals",
+				"- [ ] Step 4: Choose a brainstorming approach",
+			].join("\n")
+			taskState.activePlaceholderWorkflowValues = {
+				output_file: outputFilePath,
+			}
+			taskState.activePlaceholderWorkflowTaskWriteProofPaths = [outputFilePath]
+
+			let renderCount = 0
+			let executeCallCount = 0
+			const fakeTask: FakeWorkflowFormTask & {
+				executeWorkflowFormToolAndSync: sinon.SinonStub
+			} = {
+				cwd: tempDir,
+				taskState,
+				pendingWorkflowFormOutcome: undefined,
+				messageStateHandler: {
+					getClineMessages: sinon.stub().returns([]),
+				},
+				workflowFormRuntime: {
+					createSession: sinon.stub().returns(stepThreeSession),
+					buildPayload: sinon.stub().callsFake((session: WorkflowFormSessionState) => ({
+						...buildInteractiveWorkflowFormPayload(session),
+						definition: {
+							...buildInteractiveWorkflowFormPayload(session).definition,
+							toolName: ClineDefaultTool.CAPTURE_BRAINSTORMING_TOPIC,
+							title: "What topics and/or goals would you like to focus on for this brainstorming session?",
+							toolDictionaryTitle: "Brainstorming Topic Reference",
+							toolDictionaryMarkdown: "## capture_brainstorming_topic",
+						},
+					})),
+					buildSuccessPayload: sinon.stub().callsFake((session: WorkflowFormSessionState, successMessage: string) => ({
+						...buildInteractiveWorkflowFormPayload(session),
+						phase: "success",
+						definition: {
+							...buildInteractiveWorkflowFormPayload(session).definition,
+							toolName: ClineDefaultTool.CAPTURE_BRAINSTORMING_TOPIC,
+							title: "What topics and/or goals would you like to focus on for this brainstorming session?",
+							toolDictionaryTitle: "Brainstorming Topic Reference",
+							toolDictionaryMarkdown: "## capture_brainstorming_topic",
+						},
+						successMessage,
+					})),
+				},
+				persistWorkflowFormSession: sinon.stub().resolves(),
+				renderWorkflowFormMessage: sinon.stub().callsFake(async (payload: ClineWorkflowForm, channel: "ask" | "say") => {
+					renderCount += 1
+					if (renderCount === 1) {
+						expect(channel).to.equal("ask")
+						expect(payload.definition.presentation?.kind).to.equal("interactive_form")
+						fakeTask.pendingWorkflowFormOutcome = {
+							kind: "invoke_tool",
+							session: stepThreeSession,
+							toolName: ClineDefaultTool.CAPTURE_BRAINSTORMING_TOPIC,
+							toolInput: { topic: submittedTopic },
+							toolParams: { topic: submittedTopic },
+						}
+					}
+				}),
+				executeWorkflowFormToolAndSync: sinon.stub().callsFake(async (outcome: WorkflowFormRuntimeOutcome) => {
+					expect(outcome).to.deep.include({
+						kind: "invoke_tool",
+						toolName: ClineDefaultTool.CAPTURE_BRAINSTORMING_TOPIC,
+					})
+					expect(outcome.toolInput).to.deep.equal({ topic: submittedTopic })
+					expect(outcome.toolParams).to.deep.equal({ topic: submittedTopic })
+					executeCallCount += 1
+
+					await fs.writeFile(
+						outputFilePath,
+						`# Brainstorming Session Results
+
+## Topic
+${submittedTopic}
+
+## Selected Approach
+
+## Selected Techniques
+
+### Techniques Used
+
+## Ideas Generated
+`,
+						"utf8",
+					)
+					taskState.activePlaceholderWorkflowValues = {
+						output_file: outputFilePath,
+					}
+					taskState.activePlaceholderWorkflowTaskWriteProofPaths = [outputFilePath]
+					taskState.currentFocusChainChecklist = [
+						"- [x] Step 1: Open or start a session",
+						"- [x] Step 2: Create Output File",
+						"- [x] Step 3: Identify Brainstorming Session Topic & Goals",
+						"- [ ] Step 4: Choose a brainstorming approach",
+					].join("\n")
+
+					return { succeeded: true }
+				}),
+				clearWorkflowFormSession: sinon.stub().callsFake(async () => {
+					taskState.activeWorkflowFormSession = undefined
+				}),
+				setThreadDisplayState: sinon.stub(),
+				postStateToWebview: sinon.stub().resolves(),
+			}
+
+			await maybeResolveWorkflowFormBeforeApiTurn.call(fakeTask, undefined)
+
+			sinon.assert.calledOnceWithExactly(fakeTask.workflowFormRuntime.createSession, {
+				resolverId: "brainstorming_step_3_capture_topic",
+				triggerSource: "deterministic_workflow_progression",
+				owner: {
+					kind: "placeholder_workflow_step",
+					workflowName: "brainstorming.md",
+					stepNumber: 3,
+				},
+				initialPhase: "collect_inputs",
+				context: undefined,
+			})
+			expect(renderCount).to.equal(2)
+			expect(executeCallCount).to.equal(1)
+			expect(fakeTask.renderWorkflowFormMessage.firstCall.args[1]).to.equal("ask")
+			expect(fakeTask.executeWorkflowFormToolAndSync.calledOnce).to.equal(true)
+			expect(taskState.activeWorkflowFormSession).to.equal(undefined)
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
 	it("treats workflow-start placeholder storage as workflow-form success even when Step 1 remains active", async () => {
 		const session: WorkflowFormSessionState = {
 			sessionId: "wf-session-start-success",
@@ -3302,6 +3492,108 @@ Draft the epics.
 			call_id: "workflow_form_wf-session-diff-success",
 		})
 		expect(result.succeeded).to.equal(true)
+	})
+
+	it("evaluates capture_brainstorming_topic workflow-form execution as success from the native synthetic call result", async () => {
+		const session: WorkflowFormSessionState = {
+			sessionId: "wf-session-brainstorming-success",
+			resolverId: "brainstorming_step_3_capture_topic",
+			triggerSource: "deterministic_workflow_progression",
+			owner: {
+				kind: "placeholder_workflow_step",
+				workflowName: "brainstorming.md",
+				stepNumber: 3,
+			},
+			phase: "collect_inputs",
+			initialPhase: "collect_inputs",
+			values: {},
+		}
+		const taskState = new TaskState()
+		const fakeTask = {
+			taskState,
+			toolExecutor: {
+				executeTool: sinon.stub().callsFake(async (block: { call_id?: string; isNativeToolCall?: boolean }) => {
+					if (block.isNativeToolCall && block.call_id) {
+						taskState.userMessageContent.push({
+							type: "tool_result",
+							tool_use_id: block.call_id,
+							content:
+								"[capture_brainstorming_topic] Result:\n" +
+								JSON.stringify({
+									persisted: true,
+									artifact_path: "/tmp/brainstorming-session.md",
+									topic_captured: true,
+								}),
+						})
+					}
+				}),
+			},
+			syncDeterministicProgressionAfterWorkflowFormTool: sinon.stub().resolves(),
+			getWorkflowFormToolResultText: getWorkflowFormToolResultText,
+			getWorkflowFormToolErrorMessage: getWorkflowFormToolErrorMessage,
+		}
+
+		const result = await executeWorkflowFormToolAndSync.call(fakeTask, {
+			kind: "invoke_tool",
+			session,
+			toolName: "capture_brainstorming_topic",
+			toolInput: { topic: "Line one\n\nLine two" },
+			toolParams: { topic: "Line one\n\nLine two" },
+		})
+
+		expect(fakeTask.toolExecutor.executeTool.firstCall.args[0]).to.include({
+			isNativeToolCall: true,
+			call_id: "workflow_form_wf-session-brainstorming-success",
+		})
+		expect(result).to.deep.equal({
+			succeeded: true,
+			errorMessage: '{"persisted":true,"artifact_path":"/tmp/brainstorming-session.md","topic_captured":true}',
+			fallbackToAgent: false,
+		})
+	})
+
+	it("keeps the brainstorming Step 3 workflow form in failure state when capture_brainstorming_topic returns the canonical Topic-section error", async () => {
+		const session: WorkflowFormSessionState = {
+			sessionId: "wf-session-brainstorming-failure",
+			resolverId: "brainstorming_step_3_capture_topic",
+			triggerSource: "deterministic_workflow_progression",
+			owner: {
+				kind: "placeholder_workflow_step",
+				workflowName: "brainstorming.md",
+				stepNumber: 3,
+			},
+			phase: "collect_inputs",
+			initialPhase: "collect_inputs",
+			values: {},
+		}
+		const taskState = new TaskState()
+		const fakeTask = {
+			taskState,
+			toolExecutor: {
+				executeTool: sinon.stub().callsFake(async () => {
+					taskState.userMessageContent.push({
+						type: "text",
+						text: "Error: The resolved brainstorming session output file does not contain the canonical '## Topic' section.",
+					})
+				}),
+			},
+			syncDeterministicProgressionAfterWorkflowFormTool: sinon.stub().resolves(),
+			getWorkflowFormToolResultText: getWorkflowFormToolResultText,
+			getWorkflowFormToolErrorMessage: getWorkflowFormToolErrorMessage,
+		}
+
+		const result = await executeWorkflowFormToolAndSync.call(fakeTask, {
+			kind: "invoke_tool",
+			session,
+			toolName: "capture_brainstorming_topic",
+			toolInput: { topic: "Line one\n\nLine two" },
+			toolParams: { topic: "Line one\n\nLine two" },
+		})
+
+		expect(result.succeeded).to.equal(false)
+		expect(result.errorMessage).to.equal(
+			"Error: The resolved brainstorming session output file does not contain the canonical '## Topic' section.",
+		)
 	})
 
 	it("keeps the workflow-start form in failure state when set_workflow_placeholders returns the empty-values error", async () => {

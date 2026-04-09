@@ -21,6 +21,7 @@ Asks the user what they want the brainstorming session to focus on, then adds th
 Must use this:
     Title: "What topics and/or goals would you like to focus on for this brainstorming session?"
     Text: "Be as detailed as you can- we'll worry about formatting later!"
+Ideally this does not present a workflow form with a text box- would prefer that user be able to reply through the normal chat UI response textarea, and that their response be added tot he appropriate section in the session's output file without triggering system prompt generation and GPT invocation.
 
 # Step 4 Automation
 Presents the user with three options for how they want to approach selecting the brainstorming technique, then runs special handling based on the user's response.

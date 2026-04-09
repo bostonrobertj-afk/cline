@@ -1,3 +1,4 @@
+import fs from "fs/promises"
 import path from "path"
 import type { PersistentSlashCommandAction } from "@/core/slash-commands"
 import { getPlaceholderWorkflowValueMap } from "@/core/workflows/placeholder-workflow-rendering"
@@ -9,6 +10,7 @@ import {
 import type { TaskState } from "../TaskState"
 import type { WorkflowFormSessionContext, WorkflowFormSessionOwner, WorkflowFormTriggerSource } from "./types"
 import {
+	BRAINSTORMING_STEP_3_CAPTURE_TOPIC_RESOLVER_ID,
 	CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID,
 	CODE_REVIEW_STEP_3_REVIEW_INPUT_RESOLVER_ID,
 	PLACEHOLDER_WORKFLOW_START_SET_WORKFLOW_PLACEHOLDERS_RESOLVER_ID,
@@ -124,6 +126,40 @@ async function shouldInterceptUntilCurrentTaskArtifactExists(args: {
 	)
 }
 
+async function shouldInterceptUntilBrainstormingTopicExists(args: {
+	cwd: string
+	taskState: Pick<
+		TaskState,
+		| "activePlaceholderWorkflowStableValues"
+		| "activePlaceholderWorkflowValues"
+		| "activePlaceholderWorkflowTaskWriteProofPaths"
+	>
+}): Promise<boolean> {
+	const placeholders = getPlaceholderWorkflowValueMap(
+		args.taskState.activePlaceholderWorkflowStableValues,
+		args.taskState.activePlaceholderWorkflowValues,
+	)
+	const artifactPath = placeholders?.output_file?.trim()
+	if (!artifactPath) {
+		return true
+	}
+
+	const resolvedArtifactPath = path.isAbsolute(artifactPath) ? artifactPath : path.resolve(args.cwd, artifactPath)
+	if (!taskStateHasPlaceholderWorkflowWriteProof(args.taskState, resolvedArtifactPath)) {
+		return true
+	}
+
+	if (!(await fileExistsForPlaceholderWorkflowWriteProof(resolvedArtifactPath))) {
+		return true
+	}
+
+	const content = await fs.readFile(resolvedArtifactPath, "utf8")
+	const topicMatch = content.match(/^## Topic\s*\n([\s\S]*?)(?=^##\s|$)/m)
+	const topicBody = topicMatch?.[1] ?? ""
+
+	return topicBody.trim().length === 0
+}
+
 export const workflowFormWorkflowStepTriggerRegistry: WorkflowFormWorkflowStepTriggerDefinition[] = [
 	{
 		workflowName: "code-review.md",
@@ -155,6 +191,14 @@ export const workflowFormWorkflowStepTriggerRegistry: WorkflowFormWorkflowStepTr
 		resolverId: QUICK_SPEC_STEP_2_BUILD_TECH_SPEC_DOCUMENT_RESOLVER_ID,
 		async shouldIntercept({ cwd, taskState }) {
 			return shouldInterceptUntilCurrentTaskArtifactExists({ cwd, taskState, placeholderKey: "output_file" })
+		},
+	},
+	{
+		workflowName: "brainstorming.md",
+		stepNumber: 3,
+		resolverId: BRAINSTORMING_STEP_3_CAPTURE_TOPIC_RESOLVER_ID,
+		async shouldIntercept({ cwd, taskState }) {
+			return shouldInterceptUntilBrainstormingTopicExists({ cwd, taskState })
 		},
 	},
 ]

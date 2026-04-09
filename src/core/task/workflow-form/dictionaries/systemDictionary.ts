@@ -82,6 +82,7 @@ export const WORKFLOW_START_SYSTEM_DICTIONARY_KEYS = [
 	"target_file",
 	"test_artifacts",
 	"time",
+	"topic",
 	"title",
 	"ui_spec",
 	"UI_spec",
@@ -606,6 +607,13 @@ export const workflowFormSystemDictionary: Record<WorkflowFormSystemDictionaryKe
 		long: "",
 		examples: [],
 		contextTags: ["time"],
+	},
+	topic: {
+		label: "The main focus area for this brainstorming session",
+		medium: "The topic and/or goals you provide are added to the brainstorming document before GPT invocation",
+		long: "",
+		examples: [],
+		contextTags: ["topic"],
 	},
 	title: {
 		label: "title",

@@ -61,6 +61,7 @@ export const config = createVariant(ModelFamily.GLM)
 		ClineDefaultTool.BUILD_REVIEW_INPUT,
 		ClineDefaultTool.BUILD_EPICS_DOCUMENT,
 		ClineDefaultTool.PREPARE_BRAINSTORMING_SESSION,
+		ClineDefaultTool.CAPTURE_BRAINSTORMING_TOPIC,
 		ClineDefaultTool.SELECT_TARGET_EPIC,
 		ClineDefaultTool.BUILD_EPIC_DELIVERY_SPEC,
 		ClineDefaultTool.BUILD_STORY_DOCUMENT,

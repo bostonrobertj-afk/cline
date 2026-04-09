@@ -7,6 +7,7 @@ import {
 	buildToolDictionaryMarkdown,
 	buildToolDictionaryMarkdownFromConfig,
 	buildWorkflowStartRuntimeToolDictionary,
+	captureBrainstormingTopicToolDictionaryConfig,
 	TOOL_DICTIONARY_TERM_KEYS,
 	WORKFLOW_FORM_TOOL_DICTIONARY_HEADING,
 } from "../buildToolDictionary"
@@ -55,6 +56,23 @@ describe("buildToolDictionaryMarkdown", () => {
 		expect(markdown).to.include("- `values` (required, object): Workflow placeholder key/value map.")
 		expect(runtimeMarkdown).to.include("## set_workflow_placeholders")
 		expect(runtimeMarkdown).to.not.include("# Workflow UI Surface Tool Dictionary")
+	})
+
+	it("renders the brainstorming topic runtime tool dictionary", () => {
+		const markdown = buildRuntimeToolDictionaryMarkdownFromConfig(captureBrainstormingTopicToolDictionaryConfig)
+
+		expect(markdown).to.equal(`## capture_brainstorming_topic
+
+This form gathers your input regarding the topic for this brainstorming session and adds it to the brainstorming document before invoking the AI Agent.
+
+### Parameters
+
+- \`topic\` (required, string): The topic and/or goals you provide are added to the brainstorming document before GPT invocation
+
+### Term Reference
+
+- \`topic\`: The main focus area for this brainstorming session. The topic and/or goals you provide are added to the brainstorming document before GPT invocation
+`)
 	})
 
 	it("builds a workflow-start runtime dictionary with contextual term reference rows", () => {

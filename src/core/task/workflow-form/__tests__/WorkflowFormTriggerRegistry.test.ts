@@ -280,6 +280,12 @@ One of: {one}, {two}, {three}, {four}, {five}, {six}
 		)
 	})
 
+	it("maps brainstorming step 3 to the topic-capture workflow-form resolver", () => {
+		expect(getWorkflowFormWorkflowStepTriggerDefinition("brainstorming.md", 3)?.resolverId).to.equal(
+			"brainstorming_step_3_capture_topic",
+		)
+	})
+
 	it("does not intercept code-review step 3 when review_input has a current-task write proof and exists on disk", async () => {
 		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "workflow-form-trigger-"))
 		const reviewInputPath = path.join(tempDir, "review-input.md")
@@ -395,6 +401,101 @@ One of: {one}, {two}, {three}, {four}, {five}, {six}
 			})
 
 			expect(shouldIntercept).to.equal(false)
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("intercepts brainstorming step 3 when output_file is missing", async () => {
+		const trigger = getWorkflowFormWorkflowStepTriggerDefinition("brainstorming.md", 3)
+		const shouldIntercept = await trigger?.shouldIntercept({
+			cwd: "/workspace",
+			taskState: {
+				activePlaceholderWorkflowStableValues: {},
+				activePlaceholderWorkflowValues: {},
+				activePlaceholderWorkflowTaskWriteProofPaths: [],
+			},
+		})
+
+		expect(shouldIntercept).to.equal(true)
+	})
+
+	it("intercepts brainstorming step 3 when the canonical topic section is empty", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "workflow-form-trigger-"))
+		const brainstormingPath = path.join(tempDir, "brainstorming.md")
+
+		try {
+			await fs.writeFile(
+				brainstormingPath,
+				"# Brainstorming Session Results\n\n## Topic\n\n## Selected Approach\n\n## Selected Techniques\n\n### Techniques Used\n\n## Ideas Generated\n",
+				"utf8",
+			)
+
+			const trigger = getWorkflowFormWorkflowStepTriggerDefinition("brainstorming.md", 3)
+			const shouldIntercept = await trigger?.shouldIntercept({
+				cwd: tempDir,
+				taskState: {
+					activePlaceholderWorkflowStableValues: { output_file: brainstormingPath },
+					activePlaceholderWorkflowValues: {},
+					activePlaceholderWorkflowTaskWriteProofPaths: [brainstormingPath],
+				},
+			})
+
+			expect(shouldIntercept).to.equal(true)
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("does not intercept brainstorming step 3 when the canonical topic section contains text and the file has a write proof", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "workflow-form-trigger-"))
+		const brainstormingPath = path.join(tempDir, "brainstorming.md")
+
+		try {
+			await fs.writeFile(
+				brainstormingPath,
+				"# Brainstorming Session Results\n\n## Topic\nFocus on release automation.\n\n## Selected Approach\n\n## Selected Techniques\n\n### Techniques Used\n\n## Ideas Generated\n",
+				"utf8",
+			)
+
+			const trigger = getWorkflowFormWorkflowStepTriggerDefinition("brainstorming.md", 3)
+			const shouldIntercept = await trigger?.shouldIntercept({
+				cwd: tempDir,
+				taskState: {
+					activePlaceholderWorkflowStableValues: { output_file: brainstormingPath },
+					activePlaceholderWorkflowValues: {},
+					activePlaceholderWorkflowTaskWriteProofPaths: [brainstormingPath],
+				},
+			})
+
+			expect(shouldIntercept).to.equal(false)
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("intercepts brainstorming step 3 when the topic section contains text but the file lacks a current-task write proof", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "workflow-form-trigger-"))
+		const brainstormingPath = path.join(tempDir, "brainstorming.md")
+
+		try {
+			await fs.writeFile(
+				brainstormingPath,
+				"# Brainstorming Session Results\n\n## Topic\nFocus on release automation.\n\n## Selected Approach\n\n## Selected Techniques\n\n### Techniques Used\n\n## Ideas Generated\n",
+				"utf8",
+			)
+
+			const trigger = getWorkflowFormWorkflowStepTriggerDefinition("brainstorming.md", 3)
+			const shouldIntercept = await trigger?.shouldIntercept({
+				cwd: tempDir,
+				taskState: {
+					activePlaceholderWorkflowStableValues: { output_file: brainstormingPath },
+					activePlaceholderWorkflowValues: {},
+					activePlaceholderWorkflowTaskWriteProofPaths: [],
+				},
+			})
+
+			expect(shouldIntercept).to.equal(true)
 		} finally {
 			await fs.rm(tempDir, { recursive: true, force: true })
 		}

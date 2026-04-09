@@ -22,6 +22,7 @@ import { BuildReviewDiffOutputToolHandler } from "../BuildReviewDiffOutputToolHa
 import { BuildReviewInputToolHandler } from "../BuildReviewInputToolHandler"
 import { BuildStoryDocumentToolHandler } from "../BuildStoryDocumentToolHandler"
 import { BuildTechSpecDocumentToolHandler } from "../BuildTechSpecDocumentToolHandler"
+import { CaptureBrainstormingTopicToolHandler } from "../CaptureBrainstormingTopicToolHandler"
 import { CodeReviewSpecUpdateToolHandler } from "../CodeReviewSpecUpdateToolHandler"
 import { CompleteWorkflowItemToolHandler } from "../CompleteWorkflowItemToolHandler"
 import { SetWorkflowPlaceholdersToolHandler } from "../SetWorkflowPlaceholdersToolHandler"
@@ -592,6 +593,34 @@ ${options?.selectedStoryMissing === true ? "" : `## Story 3.2\n\n${selectedStory
 		epicDeliverySpecRelativePath,
 		epicDeliverySpecPath,
 		templatePath,
+		artifactPath,
+	}
+}
+
+async function createCaptureBrainstormingTopicRepo(options?: { outputFileContents?: string; outputFileRelativePath?: string }) {
+	const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), "capture-brainstorming-topic-"))
+	const outputFileRelativePath = options?.outputFileRelativePath ?? "planning/brainstorming/brainstorming-session.md"
+	const artifactPath = path.join(repoDir, outputFileRelativePath)
+	const outputFileContents =
+		options?.outputFileContents ??
+		`# Brainstorming Session Results
+
+## Topic
+
+## Selected Approach
+
+## Selected Techniques
+
+### Techniques Used
+
+## Ideas Generated
+`
+
+	await fs.mkdir(path.dirname(artifactPath), { recursive: true })
+	await fs.writeFile(artifactPath, outputFileContents)
+
+	return {
+		repoDir,
 		artifactPath,
 	}
 }
@@ -2954,6 +2983,306 @@ Inspect the prepared review input and write findings.`,
 			const artifact = await fs.readFile(artifactPath, "utf8")
 			expect(artifact).to.not.equal(staleContent)
 			expect(artifact).to.contain("# Epic 3: Checkout")
+		} finally {
+			sandbox.restore()
+			HostProvider.reset()
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("captures the brainstorming topic, preserves the remaining template headings, and records write proof", async () => {
+		const sandbox = sinon.createSandbox()
+		const topic = "Primary goal: map the MVP.\n\nSecondary goal: identify technical unknowns."
+		const { repoDir, artifactPath } = await createCaptureBrainstormingTopicRepo()
+
+		try {
+			setVscodeHostProviderMock()
+			sandbox.stub(HostProvider.workspace, "getWorkspacePaths").resolves({ paths: [repoDir] } as any)
+
+			const handler = new CaptureBrainstormingTopicToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "brainstorming.md"
+			config.taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "brainstorming.md",
+				contents: "## Step 3: Capture Topic\nCapture the brainstorming topic.\n",
+			}
+			config.taskState.currentFocusChainChecklist =
+				"- [x] Step 1: Establish context\n- [x] Step 2: Select or create session\n- [ ] Step 3: Capture topic"
+			config.taskState.activePlaceholderWorkflowValues = {
+				output_file: artifactPath,
+			}
+			config.taskState.fileReadCache.set(artifactPath.toLowerCase(), "stale" as any)
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "capture_brainstorming_topic",
+				params: {
+					topic,
+				},
+				partial: false,
+			} as any)
+
+			const payload = JSON.parse(String(result))
+			expect(payload.persisted).to.equal(true)
+			expect(payload.artifact_path).to.equal(artifactPath)
+			expect(payload.topic_captured).to.equal(true)
+			expect(config.taskState.activePlaceholderWorkflowTaskWriteProofPaths).to.include(artifactPath)
+			expect(config.taskState.didEditFile).to.equal(true)
+			expect(config.taskState.fileReadCache.has(artifactPath.toLowerCase())).to.equal(false)
+
+			const artifact = await fs.readFile(artifactPath, "utf8")
+			expect(getTopLevelSectionBody(artifact, "## Topic")).to.equal(topic)
+			expect(artifact).to.contain("## Selected Approach")
+			expect(artifact).to.contain("## Selected Techniques")
+			expect(artifact).to.contain("### Techniques Used")
+			expect(artifact).to.contain("## Ideas Generated")
+		} finally {
+			sandbox.restore()
+			HostProvider.reset()
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("rejects capture_brainstorming_topic outside brainstorming step 3", async () => {
+		const { repoDir, artifactPath } = await createCaptureBrainstormingTopicRepo()
+
+		try {
+			const handler = new CaptureBrainstormingTopicToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "brainstorming.md"
+			config.taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "brainstorming.md",
+				contents: "## Step 2: Select or Create Brainstorming Session\nPrepare the session artifact.\n",
+			}
+			config.taskState.currentFocusChainChecklist =
+				"- [x] Step 1: Establish context\n- [ ] Step 2: Select or create session\n- [ ] Step 3: Capture topic"
+			config.taskState.activePlaceholderWorkflowValues = {
+				output_file: artifactPath,
+			}
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "capture_brainstorming_topic",
+				params: {
+					topic: "Focus the session around onboarding friction.",
+				},
+				partial: false,
+			} as any)
+
+			expect(result).to.equal(
+				formatResponse.toolError(
+					"capture_brainstorming_topic can only be used while brainstorming.md Step 3 is the active placeholder workflow context.",
+				),
+			)
+		} finally {
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("requires a non-empty topic for capture_brainstorming_topic", async () => {
+		const { repoDir, artifactPath } = await createCaptureBrainstormingTopicRepo()
+
+		try {
+			const handler = new CaptureBrainstormingTopicToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "brainstorming.md"
+			config.taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "brainstorming.md",
+				contents: "## Step 3: Capture Topic\nCapture the brainstorming topic.\n",
+			}
+			config.taskState.currentFocusChainChecklist =
+				"- [x] Step 1: Establish context\n- [x] Step 2: Select or create session\n- [ ] Step 3: Capture topic"
+			config.taskState.activePlaceholderWorkflowValues = {
+				output_file: artifactPath,
+			}
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "capture_brainstorming_topic",
+				params: {
+					topic: "   \n\t  ",
+				},
+				partial: false,
+			} as any)
+
+			expect(result).to.equal(formatResponse.toolError("capture_brainstorming_topic requires a non-empty 'topic' value."))
+		} finally {
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("requires output_file from merged placeholder workflow state for capture_brainstorming_topic", async () => {
+		const { repoDir } = await createCaptureBrainstormingTopicRepo()
+
+		try {
+			const handler = new CaptureBrainstormingTopicToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "brainstorming.md"
+			config.taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "brainstorming.md",
+				contents: "## Step 3: Capture Topic\nCapture the brainstorming topic.\n",
+			}
+			config.taskState.currentFocusChainChecklist =
+				"- [x] Step 1: Establish context\n- [x] Step 2: Select or create session\n- [ ] Step 3: Capture topic"
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "capture_brainstorming_topic",
+				params: {
+					topic: "Focus the session around onboarding friction.",
+				},
+				partial: false,
+			} as any)
+
+			expect(result).to.equal(
+				formatResponse.toolError(
+					"Could not resolve workflow placeholder 'output_file' from the active placeholder workflow state.",
+				),
+			)
+		} finally {
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("fails when the resolved output_file cannot be read for capture_brainstorming_topic", async () => {
+		const { repoDir } = await createCaptureBrainstormingTopicRepo()
+		const outputFilePath = path.join(repoDir, "planning", "brainstorming", "missing-session.md")
+
+		try {
+			const handler = new CaptureBrainstormingTopicToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "brainstorming.md"
+			config.taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "brainstorming.md",
+				contents: "## Step 3: Capture Topic\nCapture the brainstorming topic.\n",
+			}
+			config.taskState.currentFocusChainChecklist =
+				"- [x] Step 1: Establish context\n- [x] Step 2: Select or create session\n- [ ] Step 3: Capture topic"
+			config.taskState.activePlaceholderWorkflowValues = {
+				output_file: outputFilePath,
+			}
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "capture_brainstorming_topic",
+				params: {
+					topic: "Focus the session around onboarding friction.",
+				},
+				partial: false,
+			} as any)
+
+			expect(result).to.equal(formatResponse.toolError(`Could not read the resolved output_file at ${outputFilePath}.`))
+		} finally {
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("fails when the brainstorming artifact lacks the canonical Topic heading", async () => {
+		const { repoDir, artifactPath } = await createCaptureBrainstormingTopicRepo({
+			outputFileContents: `# Brainstorming Session Results
+
+## Selected Approach
+
+## Selected Techniques
+
+### Techniques Used
+
+## Ideas Generated
+`,
+		})
+
+		try {
+			const handler = new CaptureBrainstormingTopicToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "brainstorming.md"
+			config.taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "brainstorming.md",
+				contents: "## Step 3: Capture Topic\nCapture the brainstorming topic.\n",
+			}
+			config.taskState.currentFocusChainChecklist =
+				"- [x] Step 1: Establish context\n- [x] Step 2: Select or create session\n- [ ] Step 3: Capture topic"
+			config.taskState.activePlaceholderWorkflowValues = {
+				output_file: artifactPath,
+			}
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "capture_brainstorming_topic",
+				params: {
+					topic: "Focus the session around onboarding friction.",
+				},
+				partial: false,
+			} as any)
+
+			expect(result).to.equal(
+				formatResponse.toolError(
+					"The resolved brainstorming session output file does not contain the canonical '## Topic' section.",
+				),
+			)
+		} finally {
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("replaces the existing Topic section body instead of appending for capture_brainstorming_topic", async () => {
+		const sandbox = sinon.createSandbox()
+		const priorTopic = "Prior topic text that should be replaced."
+		const nextTopic = "Replacement topic text.\n\nWith a second paragraph."
+		const { repoDir, artifactPath } = await createCaptureBrainstormingTopicRepo({
+			outputFileContents: `# Brainstorming Session Results
+
+## Topic
+${priorTopic}
+
+## Selected Approach
+
+## Selected Techniques
+
+### Techniques Used
+
+## Ideas Generated
+`,
+		})
+
+		try {
+			setVscodeHostProviderMock()
+			sandbox.stub(HostProvider.workspace, "getWorkspacePaths").resolves({ paths: [repoDir] } as any)
+
+			const handler = new CaptureBrainstormingTopicToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "brainstorming.md"
+			config.taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "brainstorming.md",
+				contents: "## Step 3: Capture Topic\nCapture the brainstorming topic.\n",
+			}
+			config.taskState.currentFocusChainChecklist =
+				"- [x] Step 1: Establish context\n- [x] Step 2: Select or create session\n- [ ] Step 3: Capture topic"
+			config.taskState.activePlaceholderWorkflowValues = {
+				output_file: artifactPath,
+			}
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "capture_brainstorming_topic",
+				params: {
+					topic: nextTopic,
+				},
+				partial: false,
+			} as any)
+
+			const payload = JSON.parse(String(result))
+			expect(payload.persisted).to.equal(true)
+
+			const artifact = await fs.readFile(artifactPath, "utf8")
+			expect(getTopLevelSectionBody(artifact, "## Topic")).to.equal(nextTopic)
+			expect(artifact).to.not.contain(priorTopic)
 		} finally {
 			sandbox.restore()
 			HostProvider.reset()

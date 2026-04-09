@@ -473,6 +473,7 @@ describe("Prompt System Integration Tests", () => {
 						expect(toolNames).to.include("build_review_diff_output")
 						expect(toolNames).to.include("build_review_input")
 						expect(toolNames).to.include("build_epics_document")
+						expect(toolNames).to.include("capture_brainstorming_topic")
 						const snapshotName = `${providerId}_${family.replace(/[^a-zA-Z0-9]/g, "_")}.tools.snap`
 						await assertSnapshot(snapshotName, JSON.stringify(tools, null, 2))
 					})
@@ -496,6 +497,7 @@ describe("Prompt System Integration Tests", () => {
 								expect(toolNames).to.include("build_review_diff_output")
 								expect(toolNames).to.include("build_review_input")
 								expect(toolNames).to.include("build_epics_document")
+								expect(toolNames).to.include("capture_brainstorming_topic")
 							} else {
 								expect(tools).to.be.undefined
 							}
@@ -1594,6 +1596,48 @@ describe("Prompt System Integration Tests", () => {
 					expect(nativeToolNames).to.not.include("read_file")
 					expect(nativeToolNames).to.not.include("execute_command")
 					expect(nativeToolNames).to.not.include("generate_plan_output")
+				},
+			)
+		})
+
+		it("filters native tools for brainstorming step 3", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
+					enableNativeToolCalls: true,
+					useMinimalGptPrompt: true,
+					activeWorkflowSupportsPlaceholders: true,
+					managedWorkflowActive: false,
+					activePlaceholderWorkflowName: "brainstorming.md",
+					activePlaceholderWorkflowStepNumber: 3,
+				},
+				"gpt-5.4-2026-03-05",
+				async ({ tools }) => {
+					const nativeToolNames = getNativeToolNames(tools)
+
+					expect(nativeToolNames).to.include("capture_brainstorming_topic")
+				},
+			)
+
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
+					enableNativeToolCalls: true,
+					useMinimalGptPrompt: true,
+					activeWorkflowSupportsPlaceholders: true,
+					managedWorkflowActive: false,
+					activePlaceholderWorkflowName: "brainstorming.md",
+					activePlaceholderWorkflowStepNumber: 2,
+				},
+				"gpt-5.4-2026-03-05",
+				async ({ tools }) => {
+					const nativeToolNames = getNativeToolNames(tools)
+
+					expect(nativeToolNames).to.not.include("capture_brainstorming_topic")
 				},
 			)
 		})

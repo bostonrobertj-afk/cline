@@ -26,6 +26,7 @@ import { build_review_diff_output_variants } from "../tools/build_review_diff_ou
 import { build_review_input_variants } from "../tools/build_review_input"
 import { build_story_document_variants } from "../tools/build_story_document"
 import { build_tech_spec_document_variants } from "../tools/build_tech_spec_document"
+import { capture_brainstorming_topic_variants } from "../tools/capture_brainstorming_topic"
 import { generate_plan_output_variants } from "../tools/generate_plan_output"
 import { list_code_definition_names_variants } from "../tools/list_code_definition_names"
 import { prepare_brainstorming_session_variants } from "../tools/prepare_brainstorming_session"
@@ -349,6 +350,11 @@ describe("workflow placeholder tool gating", () => {
 
 	it("keeps build_review_input globally available without workflow gating", () => {
 		const tool = build_review_input_variants[0]
+		expect(tool.contextRequirements).to.equal(undefined)
+	})
+
+	it("keeps capture_brainstorming_topic globally available without workflow gating", () => {
+		const tool = capture_brainstorming_topic_variants[0]
 		expect(tool.contextRequirements).to.equal(undefined)
 	})
 
@@ -1107,6 +1113,27 @@ describe("native tool placeholder replacement", () => {
 			"Build review-input.md from workflow-owned {story_path} and {diff_output}. Resolve inputs from workflow state; there are no human-supplied parameters.",
 		)
 		expect(Object.keys(openAIProperties)).to.deep.equal([])
+	})
+
+	it("compacts native capture_brainstorming_topic descriptions", () => {
+		const context: SystemPromptContext = {
+			...mockContext,
+			enableNativeToolCalls: true,
+			useMinimalGptPrompt: true,
+			providerInfo: {
+				providerId: "openai",
+				model: { id: "gpt-5.4-2026-03-05", info: { supportsPromptCache: false } },
+				mode: "act",
+			},
+		}
+
+		const openAI = toolSpecFunctionDefinition(capture_brainstorming_topic_variants[0], context)
+		const openAIProperties = getOpenAIProperties(openAI)
+
+		expect(getOpenAIFunctionTool(openAI).description).to.equal(
+			"Capture the runtime-owned brainstorming Step 3 topic text. Resolve {output_file} from workflow state, replace only the body of the canonical ## Topic section with the submitted long-form topic/goals text, preserve the rest of the brainstorming template unchanged, and persist the updated artifact.",
+		)
+		expect(Object.keys(openAIProperties)).to.deep.equal(["topic"])
 	})
 
 	it("compacts native build_epics_document descriptions and parameter text", () => {

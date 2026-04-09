@@ -497,6 +497,8 @@ function getNativeToolDescription(tool: ClineToolSpec, context: SystemPromptCont
 			return "Build the canonical quick-spec Step 2 scaffold at {implementation_artifacts}/tech-spec-wip.md from workflow-owned placeholder state. Resolve {title} from workflow state, derive {slug}, preserve the full tech-spec template structure, and persist the resolved artifact path as {output_file}."
 		case "select_target_epic":
 			return "Show the runtime-owned pi-planning Step 2 epic picker. Resolve {epics_document} from workflow state, extract canonical epic headings, ask the exact runtime-owned followup question, and persist the clicked label as {target_epic}."
+		case "capture_brainstorming_topic":
+			return "Capture the runtime-owned brainstorming Step 3 topic text. Resolve {output_file} from workflow state, replace only the body of the canonical ## Topic section with the submitted long-form topic/goals text, preserve the rest of the brainstorming template unchanged, and persist the updated artifact."
 		case "use_skill":
 			return "Activate a skill by exact name when the request matches an available skill."
 		case "use_mcp_tool":

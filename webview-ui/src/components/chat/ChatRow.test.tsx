@@ -711,4 +711,69 @@ describe("ChatRow followup presentation", () => {
 		expect(screen.getByDisplayValue("abc1234")).toBeInTheDocument()
 		expect(screen.getByDisplayValue("7")).toBeInTheDocument()
 	})
+
+	it("renders workflow_form large textareas with the large sizing class", () => {
+		renderWorkflowFormRow("collect_inputs", {
+			definition: {
+				toolName: "capture_brainstorming_topic",
+				title: "Brainstorming Topic Reference",
+				toolDictionaryTitle: "Brainstorming Topic Reference",
+				toolDictionaryMarkdown: "## capture_brainstorming_topic\n\nTool reference body.",
+				pages: {
+					collect_inputs: {
+						prompt: "Provide the topic.",
+						fields: [
+							{
+								key: "topic",
+								label: "Topic and Goals",
+								help: "",
+								control: "textarea",
+								valueSchema: { type: "string" },
+								required: true,
+								visible: true,
+								presentation: { textareaSize: "large" },
+							},
+						],
+						submitLabel: "Submit",
+						cancelLabel: "Cancel",
+					},
+				},
+				successMessage: "Stored.",
+			},
+		})
+
+		expect(screen.getByLabelText("Topic and Goals")).toHaveClass("min-h-48")
+	})
+
+	it("keeps the default workflow_form textarea sizing when no presentation override is provided", () => {
+		renderWorkflowFormRow("collect_inputs", {
+			definition: {
+				toolName: "capture_brainstorming_topic",
+				title: "Brainstorming Topic Reference",
+				toolDictionaryTitle: "Brainstorming Topic Reference",
+				toolDictionaryMarkdown: "## capture_brainstorming_topic\n\nTool reference body.",
+				pages: {
+					collect_inputs: {
+						prompt: "Provide the topic.",
+						fields: [
+							{
+								key: "topic",
+								label: "Topic and Goals",
+								help: "",
+								control: "textarea",
+								valueSchema: { type: "string" },
+								required: true,
+								visible: true,
+							},
+						],
+						submitLabel: "Submit",
+						cancelLabel: "Cancel",
+					},
+				},
+				successMessage: "Stored.",
+			},
+		})
+
+		expect(screen.getByLabelText("Topic and Goals")).toHaveClass("min-h-24")
+	})
 })

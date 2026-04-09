@@ -5,11 +5,19 @@ import {
 	buildReviewInputToolDictionaryConfig,
 	buildRuntimeToolDictionaryMarkdownFromConfig,
 	buildWorkflowStartRuntimeToolDictionary,
+	captureBrainstormingTopicToolDictionaryConfig,
 } from "@/core/task/workflow-form/dictionaries/buildToolDictionary"
 import {
 	type WorkflowFormSystemDictionaryKey,
 	workflowFormSystemDictionary,
 } from "@/core/task/workflow-form/dictionaries/systemDictionary"
+import {
+	CAPTURE_BRAINSTORMING_TOPIC_FIELD_KEY,
+	CAPTURE_BRAINSTORMING_TOPIC_FIELD_LABEL,
+	CAPTURE_BRAINSTORMING_TOPIC_PROMPT,
+	CAPTURE_BRAINSTORMING_TOPIC_TITLE,
+	CAPTURE_BRAINSTORMING_TOPIC_TOOL_DICTIONARY_TITLE,
+} from "@/shared/capture-brainstorming-topic"
 import {
 	PREPARE_BRAINSTORMING_SESSION_LIST_FIELD_LABEL,
 	PREPARE_BRAINSTORMING_SESSION_LIST_PROMPT,
@@ -32,6 +40,7 @@ export const CODE_REVIEW_STEP_3_REVIEW_INPUT_RESOLVER_ID = "code_review_step_3_r
 export const WRITE_REMEDIATION_STORY_STEP_2_REVIEW_INPUT_RESOLVER_ID = "write_remediation_story_step_2_review_input"
 export const QUICK_SPEC_STEP_2_BUILD_TECH_SPEC_DOCUMENT_RESOLVER_ID = "quick_spec_step_2_build_tech_spec_document"
 export const BRAINSTORMING_STEP_2_SELECT_SESSION_RESOLVER_ID = "brainstorming_step_2_select_session"
+export const BRAINSTORMING_STEP_3_CAPTURE_TOPIC_RESOLVER_ID = "brainstorming_step_3_capture_topic"
 export const PLACEHOLDER_WORKFLOW_START_SET_WORKFLOW_PLACEHOLDERS_RESOLVER_ID =
 	"placeholder_workflow_start_set_workflow_placeholders"
 const CODE_REVIEW_STEP_3_REVIEW_INPUT_DIFF_MISMATCH_MESSAGE =
@@ -769,6 +778,78 @@ export const workflowFormRegistry: Record<string, WorkflowFormResolverDefinition
 			}
 
 			return { succeeded: true }
+		},
+	},
+	[BRAINSTORMING_STEP_3_CAPTURE_TOPIC_RESOLVER_ID]: {
+		id: BRAINSTORMING_STEP_3_CAPTURE_TOPIC_RESOLVER_ID,
+		toolName: ClineDefaultTool.CAPTURE_BRAINSTORMING_TOPIC,
+		defaultInitialPhase: "collect_inputs",
+		buildDefinition(): WorkflowFormDefinition {
+			const fields: WorkflowFormFieldDefinition[] = [
+				{
+					key: CAPTURE_BRAINSTORMING_TOPIC_FIELD_KEY,
+					label: CAPTURE_BRAINSTORMING_TOPIC_FIELD_LABEL,
+					help: "",
+					control: "textarea",
+					valueSchema: { type: "string" },
+					required: true,
+					visible: true,
+					presentation: { textareaSize: "large" },
+				},
+			]
+
+			return {
+				toolName: ClineDefaultTool.CAPTURE_BRAINSTORMING_TOPIC,
+				title: CAPTURE_BRAINSTORMING_TOPIC_TITLE,
+				toolDictionaryTitle: CAPTURE_BRAINSTORMING_TOPIC_TOOL_DICTIONARY_TITLE,
+				toolDictionaryMarkdown: buildRuntimeToolDictionaryMarkdownFromConfig(
+					captureBrainstormingTopicToolDictionaryConfig,
+				),
+				pages: {
+					collect_inputs: {
+						prompt: CAPTURE_BRAINSTORMING_TOPIC_PROMPT,
+						fields,
+						submitLabel: "Submit",
+						cancelLabel: "Cancel",
+					},
+					retry_error: {
+						prompt: CAPTURE_BRAINSTORMING_TOPIC_PROMPT,
+						fields,
+						submitLabel: "Submit",
+						cancelLabel: "Cancel",
+						retryLabel: "Start Over",
+					},
+				},
+				successMessage: "The brainstorming session topic is ready.",
+			}
+		},
+		buildToolExecutionFailureFallbackMessage() {
+			return "The workflow form could not store the brainstorming session topic. Review the topic text and try again."
+		},
+		buildToolExecutionRequest(_session, values) {
+			return {
+				toolName: ClineDefaultTool.CAPTURE_BRAINSTORMING_TOPIC,
+				toolInput: { topic: values.topic?.rawValue ?? "" },
+				toolParams: { topic: values.topic?.rawValue ?? "" },
+			}
+		},
+		evaluateToolExecutionResult(session, args) {
+			const parsed = parseWorkflowFormJsonToolResult(args.toolResultText)
+			if (parsed?.persisted === true && parsed?.topic_captured === true && typeof parsed?.artifact_path === "string") {
+				return { succeeded: true }
+			}
+
+			if (isWorkflowFormFailureText(args.toolResultText)) {
+				return {
+					succeeded: false,
+					errorMessage: args.toolResultText?.trim() ?? this.buildToolExecutionFailureFallbackMessage(session),
+				}
+			}
+
+			return {
+				succeeded: false,
+				errorMessage: this.buildToolExecutionFailureFallbackMessage(session),
+			}
 		},
 	},
 	[PLACEHOLDER_WORKFLOW_START_SET_WORKFLOW_PLACEHOLDERS_RESOLVER_ID]: {

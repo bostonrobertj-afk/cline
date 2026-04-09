@@ -97,6 +97,18 @@ export const buildReviewInputToolDictionaryConfig: WorkflowFormToolDictionaryCon
 	parameterDescriptions: {},
 	termKeys: [],
 }
+export const captureBrainstormingTopicToolDictionaryConfig: WorkflowFormToolDictionaryConfig = {
+	toolName: ClineDefaultTool.CAPTURE_BRAINSTORMING_TOPIC,
+	heading: "## capture_brainstorming_topic",
+	runtimeTitle: "Brainstorming Topic Reference",
+	overviewLines: [
+		"This form gathers your input regarding the topic for this brainstorming session and adds it to the brainstorming document before invoking the AI Agent.",
+	],
+	parameterDescriptions: {
+		topic: workflowFormSystemDictionary.topic.medium,
+	},
+	termKeys: ["topic"],
+}
 export const WORKFLOW_FORM_TOOL_DICTIONARY_HEADING = buildReviewDiffOutputToolDictionaryConfig.heading
 export const WORKFLOW_FORM_RUNTIME_TOOL_REFERENCE_TITLE = buildReviewDiffOutputToolDictionaryConfig.runtimeTitle
 

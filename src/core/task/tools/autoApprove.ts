@@ -55,6 +55,7 @@ export class AutoApprove {
 				case ClineDefaultTool.BUILD_REVIEW_INPUT:
 				case ClineDefaultTool.BUILD_EPICS_DOCUMENT:
 				case ClineDefaultTool.SELECT_TARGET_EPIC:
+				case ClineDefaultTool.CAPTURE_BRAINSTORMING_TOPIC:
 				case ClineDefaultTool.BUILD_EPIC_DELIVERY_SPEC:
 				case ClineDefaultTool.BUILD_STORY_DOCUMENT:
 				case ClineDefaultTool.BUILD_TECH_SPEC_DOCUMENT:
@@ -87,6 +88,7 @@ export class AutoApprove {
 				case ClineDefaultTool.BUILD_REVIEW_INPUT:
 				case ClineDefaultTool.BUILD_EPICS_DOCUMENT:
 				case ClineDefaultTool.SELECT_TARGET_EPIC:
+				case ClineDefaultTool.CAPTURE_BRAINSTORMING_TOPIC:
 				case ClineDefaultTool.BUILD_EPIC_DELIVERY_SPEC:
 				case ClineDefaultTool.BUILD_STORY_DOCUMENT:
 				case ClineDefaultTool.BUILD_TECH_SPEC_DOCUMENT:
@@ -121,6 +123,7 @@ export class AutoApprove {
 			case ClineDefaultTool.BUILD_REVIEW_INPUT:
 			case ClineDefaultTool.BUILD_EPICS_DOCUMENT:
 			case ClineDefaultTool.SELECT_TARGET_EPIC:
+			case ClineDefaultTool.CAPTURE_BRAINSTORMING_TOPIC:
 			case ClineDefaultTool.BUILD_EPIC_DELIVERY_SPEC:
 			case ClineDefaultTool.BUILD_STORY_DOCUMENT:
 			case ClineDefaultTool.BUILD_TECH_SPEC_DOCUMENT:

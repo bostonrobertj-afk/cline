@@ -14,6 +14,7 @@ import { BuildReviewDiffOutputToolHandler } from "./handlers/BuildReviewDiffOutp
 import { BuildReviewInputToolHandler } from "./handlers/BuildReviewInputToolHandler"
 import { BuildStoryDocumentToolHandler } from "./handlers/BuildStoryDocumentToolHandler"
 import { BuildTechSpecDocumentToolHandler } from "./handlers/BuildTechSpecDocumentToolHandler"
+import { CaptureBrainstormingTopicToolHandler } from "./handlers/CaptureBrainstormingTopicToolHandler"
 import { CodeReviewSpecUpdateToolHandler } from "./handlers/CodeReviewSpecUpdateToolHandler"
 import { CompleteWorkflowItemToolHandler } from "./handlers/CompleteWorkflowItemToolHandler"
 import { CondenseHandler } from "./handlers/CondenseHandler"
@@ -132,6 +133,7 @@ export class ToolExecutorCoordinator {
 		[ClineDefaultTool.BUILD_REVIEW_INPUT]: (_v: ToolValidator) => new BuildReviewInputToolHandler(),
 		[ClineDefaultTool.BUILD_EPICS_DOCUMENT]: (_v: ToolValidator) => new BuildEpicsDocumentToolHandler(),
 		[ClineDefaultTool.PREPARE_BRAINSTORMING_SESSION]: (_v: ToolValidator) => new PrepareBrainstormingSessionToolHandler(),
+		[ClineDefaultTool.CAPTURE_BRAINSTORMING_TOPIC]: (_v: ToolValidator) => new CaptureBrainstormingTopicToolHandler(),
 		[ClineDefaultTool.BUILD_EPIC_DELIVERY_SPEC]: (_v: ToolValidator) => new BuildEpicDeliverySpecToolHandler(),
 		[ClineDefaultTool.BUILD_STORY_DOCUMENT]: (_v: ToolValidator) => new BuildStoryDocumentToolHandler(),
 		[ClineDefaultTool.BUILD_TECH_SPEC_DOCUMENT]: (_v: ToolValidator) => new BuildTechSpecDocumentToolHandler(),

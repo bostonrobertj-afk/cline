@@ -2,6 +2,7 @@ import { expect } from "chai"
 import { describe, it } from "mocha"
 import {
 	BRAINSTORMING_STEP_2_SELECT_SESSION_RESOLVER_ID,
+	BRAINSTORMING_STEP_3_CAPTURE_TOPIC_RESOLVER_ID,
 	CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID,
 	CODE_REVIEW_STEP_3_REVIEW_INPUT_RESOLVER_ID,
 	getWorkflowFormResolverDefinition,
@@ -37,6 +38,13 @@ describe("WorkflowFormRegistry", () => {
 
 		expect(resolver.id).to.equal("brainstorming_step_2_select_session")
 		expect(resolver.toolName).to.equal("set_workflow_placeholders")
+	})
+
+	it("returns the brainstorming step 3 topic resolver metadata by id", () => {
+		const resolver = getWorkflowFormResolverDefinition(BRAINSTORMING_STEP_3_CAPTURE_TOPIC_RESOLVER_ID)
+
+		expect(resolver.id).to.equal("brainstorming_step_3_capture_topic")
+		expect(resolver.toolName).to.equal("capture_brainstorming_topic")
 	})
 
 	it("builds the create-epics workflow-start definition with the approved override copy", () => {
@@ -165,6 +173,85 @@ describe("WorkflowFormRegistry", () => {
 			toolInput: { values: { output_file: "/tmp/brainstorming-session-2026-04-08.md" } },
 			toolParams: { values: '{"output_file":"/tmp/brainstorming-session-2026-04-08.md"}' },
 		})
+	})
+
+	it("builds the brainstorming step 3 topic definition", () => {
+		const resolver = getWorkflowFormResolverDefinition(BRAINSTORMING_STEP_3_CAPTURE_TOPIC_RESOLVER_ID)
+		const definition = resolver.buildDefinition({
+			sessionId: "session-brainstorming-step-3-definition",
+			resolverId: resolver.id,
+			triggerSource: "deterministic_workflow_progression",
+			owner: {
+				kind: "placeholder_workflow_step",
+				workflowName: "brainstorming.md",
+				stepNumber: 3,
+			},
+			phase: "collect_inputs",
+			initialPhase: "collect_inputs",
+			values: {},
+		})
+		const fields = definition.pages.collect_inputs?.fields ?? []
+
+		expect(definition.title).to.equal("What topics and/or goals would you like to focus on for this brainstorming session?")
+		expect(definition.pages.collect_inputs?.prompt).to.equal("Be as detailed as you can- we'll worry about formatting later!")
+		expect(definition.toolDictionaryTitle).to.equal("Brainstorming Topic Reference")
+		expect(fields).to.have.lengthOf(1)
+		expect(fields[0]?.key).to.equal("topic")
+		expect(fields[0]?.control).to.equal("textarea")
+		expect(fields[0]?.help).to.equal("")
+		expect(fields[0]?.presentation).to.deep.equal({ textareaSize: "large" })
+	})
+
+	it("serializes the brainstorming step 3 topic request without altering multiline raw text", () => {
+		const resolver = getWorkflowFormResolverDefinition(BRAINSTORMING_STEP_3_CAPTURE_TOPIC_RESOLVER_ID)
+		const outcome = resolver.buildToolExecutionRequest(
+			{
+				sessionId: "session-brainstorming-step-3-serialize",
+				resolverId: resolver.id,
+				triggerSource: "deterministic_workflow_progression",
+				owner: {
+					kind: "placeholder_workflow_step",
+					workflowName: "brainstorming.md",
+					stepNumber: 3,
+				},
+				phase: "collect_inputs",
+				initialPhase: "collect_inputs",
+				values: {},
+			},
+			{
+				topic: { rawValue: "Line one\n\nLine two" },
+			},
+		)
+
+		expect(outcome).to.deep.equal({
+			toolName: "capture_brainstorming_topic",
+			toolInput: { topic: "Line one\n\nLine two" },
+			toolParams: { topic: "Line one\n\nLine two" },
+		})
+	})
+
+	it("treats the brainstorming step 3 tool result as success only when the approved JSON contract is returned", () => {
+		const resolver = getWorkflowFormResolverDefinition(BRAINSTORMING_STEP_3_CAPTURE_TOPIC_RESOLVER_ID)
+		const evaluation = resolver.evaluateToolExecutionResult(
+			{
+				sessionId: "session-brainstorming-step-3-result",
+				resolverId: resolver.id,
+				triggerSource: "deterministic_workflow_progression",
+				owner: {
+					kind: "placeholder_workflow_step",
+					workflowName: "brainstorming.md",
+					stepNumber: 3,
+				},
+				phase: "collect_inputs",
+				initialPhase: "collect_inputs",
+				values: {},
+			},
+			{
+				toolResultText: '{"persisted":true,"artifact_path":"/tmp/brainstorming.md","topic_captured":true}',
+			},
+		)
+
+		expect(evaluation).to.deep.equal({ succeeded: true })
 	})
 
 	it("omits blank optional create-epics values when serializing set_workflow_placeholders", () => {
