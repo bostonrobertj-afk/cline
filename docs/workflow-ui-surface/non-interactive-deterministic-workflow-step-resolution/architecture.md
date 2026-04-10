@@ -9,7 +9,7 @@ It is not a requirements document. Its job is to:
 - establish the correct boundary for zero-input system-owned workflow steps
 - map that boundary onto the live runtime seams that currently carry `automatic_status` inside Workflow Forms
 - preserve broader platform architecture rules while removing this responsibility from Workflow Form v2
-- provide the architectural foundation for a later requirements and action-plan document
+- document the active shared capability boundary and implementation target
 
 This document is grounded in:
 
@@ -181,7 +181,7 @@ It must not duplicate workflow progression state already owned elsewhere.
 
 ## Proposed Capability Shape
 
-The exact type names are deferred to the later requirements document, but the architecture requires the following conceptual pieces.
+The exact type names are now defined in the paired requirements and implementation, but the architecture requires the following conceptual pieces.
 
 ### A. Typed step-resolution definition payload
 
@@ -226,7 +226,7 @@ The architecture should move toward a dedicated payload/transport family for non
 - the capability is not a form
 - the capability’s contract is status-driven, not input-driven
 
-The exact message naming can be finalized later, but it should be separate from Workflow Forms.
+The message naming is now finalized as a separate transport from Workflow Forms.
 
 ## Current Code Seams This Capability Should Evolve
 
@@ -363,7 +363,7 @@ This architecture does not define:
 - the full requirements for the new capability
 - migration timing for every existing automatic-status use case
 
-Those belong in the later requirements and planning documents.
+Those are covered by the paired requirements and action-plan documents for this implemented capability.
 
 ## Bottom Line
 

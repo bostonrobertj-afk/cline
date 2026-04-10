@@ -51,6 +51,9 @@ Placeholder workflows can be intercepted by system-owned startup and step-resolu
   - [docs/workflow-automation/workflow-start-card/README.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/workflow-automation/workflow-start-card/README.md)
 - Workflow forms:
   - [docs/workflow-ui-surface/workflow-form-readme.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/workflow-ui-surface/workflow-form-readme.md)
+- Non-interactive deterministic workflow-step resolution:
+  - [architecture.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/workflow-ui-surface/non-interactive-deterministic-workflow-step-resolution/architecture.md)
+  - [requirements.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/workflow-ui-surface/non-interactive-deterministic-workflow-step-resolution/requirements.md)
 
 ## Prompt And Tooling
 

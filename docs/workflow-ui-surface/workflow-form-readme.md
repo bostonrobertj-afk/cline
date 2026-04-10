@@ -72,7 +72,6 @@ The capability does not replace workflow progression, slash-command activation, 
 
 - Represent workflow forms through a dedicated shared contract.
 - Render a system-owned staged form in chat.
-- Render non-interactive automatic workflow-preparation status cards in chat for zero-human-input system-owned steps.
 - Keep raw form inputs out of model-visible conversational context.
 - Derive field typing from the invoked tool schema at runtime.
 - Allow use cases to specialize field discovery, ordering, labels, help text, and staged UX.
@@ -112,8 +111,6 @@ Current delivered use cases:
 
 - workflow-start forms for slash-command-started placeholder workflows
 - `code-review.md` Step 2 diff artifact form using `build_review_diff_output`
-- `code-review.md` Step 3 automatic workflow-preparation status card using `build_review_input` with workflow-owned inputs
-- `write-remediation-story.md` Step 2 automatic workflow-preparation status card using `build_review_input` with workflow-owned inputs
 
 ## Outputs
 
@@ -149,7 +146,7 @@ Current delivered use cases:
 1. A trigger path decides that a workflow form is needed.
 2. The runtime creates or resumes a workflow-form session.
 3. The resolver builds the current staged form definition.
-4. The webview renders that definition as either a system-owned staged form or a non-interactive automatic-status card.
+4. The webview renders that definition as a system-owned staged form.
 5. Interactive forms submit raw values through the dedicated transport.
 6. The runtime merges those values into session state.
 7. If the user submits `BACK` from `collect_inputs` or `retry_error` and the resolver exposes `select_source`, the runtime returns to `select_source` while preserving only `confirm` plus the live `select_source` fields.
@@ -159,7 +156,7 @@ Current delivered use cases:
 11. The resolver evaluates the tool result and returns success or failure.
 12. On success, the session is cleared and control returns to runtime-owned workflow progression first.
 13. After a successful form resolution, the runtime may immediately re-enter deterministic progression and open another eligible system-owned form before any AI turn begins.
-14. On failure, interactive forms remain active in `retry_error` while automatic-status failures render a terminal failure card and then fall back to the normal agent path.
+14. On failure, interactive forms remain active in `retry_error` until the user retries or falls back to the agent path.
 
 Important implementation note:
 
@@ -233,13 +230,6 @@ Example 2: Workflow-start placeholder form
   - `Workflow Placeholder Reference` is generated at runtime from the active ordered field keys
   - `Term Reference` includes only mapped workflow-start keys for the current form
   - `Term Reference` is omitted when the active form fields have no mapped dictionary keys
-
-Example 3: Automatic review-input preparation
-
-- resolver id: `write_remediation_story_step_2_review_input`
-- tool: `build_review_input`
-- presentation: `automatic_status`
-- typical stage: `collect_inputs`
 
 ## (Optional) Performance
 

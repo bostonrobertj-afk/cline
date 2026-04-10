@@ -2,7 +2,6 @@ import type { WorkflowFormDefinition, WorkflowFormFieldDefinition, WorkflowFormF
 import { formatResponse } from "@/core/prompts/responses"
 import {
 	buildReviewDiffOutputToolDictionaryConfig,
-	buildReviewInputToolDictionaryConfig,
 	buildRuntimeToolDictionaryMarkdownFromConfig,
 	buildWorkflowStartRuntimeToolDictionary,
 	captureBrainstormingTopicToolDictionaryConfig,
@@ -36,15 +35,10 @@ import {
 import type { WorkflowFormResolverDefinition, WorkflowFormResolverId, WorkflowFormValues } from "./types"
 
 export const CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID = "code_review_step_3_diff_source"
-export const CODE_REVIEW_STEP_3_REVIEW_INPUT_RESOLVER_ID = "code_review_step_3_review_input"
-export const WRITE_REMEDIATION_STORY_STEP_2_REVIEW_INPUT_RESOLVER_ID = "write_remediation_story_step_2_review_input"
-export const QUICK_SPEC_STEP_2_BUILD_TECH_SPEC_DOCUMENT_RESOLVER_ID = "quick_spec_step_2_build_tech_spec_document"
 export const BRAINSTORMING_STEP_2_SELECT_SESSION_RESOLVER_ID = "brainstorming_step_2_select_session"
 export const BRAINSTORMING_STEP_3_CAPTURE_TOPIC_RESOLVER_ID = "brainstorming_step_3_capture_topic"
 export const PLACEHOLDER_WORKFLOW_START_SET_WORKFLOW_PLACEHOLDERS_RESOLVER_ID =
 	"placeholder_workflow_start_set_workflow_placeholders"
-const CODE_REVIEW_STEP_3_REVIEW_INPUT_DIFF_MISMATCH_MESSAGE =
-	"diff_output does not identify recent changes to the story file. Proceeding with AI generation of review_input.md using the fallback Step 3 instructions."
 
 const SOURCE_TYPE_FIELD_KEY = "source.type"
 const SOURCE_COMMIT_FIELD_KEY = "source.commit"
@@ -497,217 +491,6 @@ export const workflowFormRegistry: Record<string, WorkflowFormResolverDefinition
 			return {
 				succeeded: false,
 				errorMessage: this.buildToolExecutionFailureFallbackMessage(session),
-			}
-		},
-	},
-	[CODE_REVIEW_STEP_3_REVIEW_INPUT_RESOLVER_ID]: {
-		id: CODE_REVIEW_STEP_3_REVIEW_INPUT_RESOLVER_ID,
-		toolName: ClineDefaultTool.BUILD_REVIEW_INPUT,
-		defaultInitialPhase: "collect_inputs",
-		buildDefinition(): WorkflowFormDefinition {
-			return {
-				toolName: ClineDefaultTool.BUILD_REVIEW_INPUT,
-				title: "Review Input Artifact",
-				toolDictionaryTitle: "Review Input Reference",
-				toolDictionaryMarkdown: buildRuntimeToolDictionaryMarkdownFromConfig(buildReviewInputToolDictionaryConfig),
-				presentation: {
-					kind: "automatic_status",
-					pendingLabel: "Preparing workflow documents",
-					successLabel: "Workflow documents ready",
-					failureLabel: "Automatic workflow preparation failed- falling back to manual LLM workflow preparation.",
-				},
-				pages: {
-					collect_inputs: {
-						prompt: "The system will now build `review-input.md` from the stored `story_path` and the workflow-owned `review-input.diff` artifact.",
-						fields: [],
-						submitLabel: "Submit",
-						cancelLabel: "Cancel",
-					},
-					retry_error: {
-						prompt: "The system could not produce `review-input.md` from the stored workflow inputs. Retry the request or return to the Step 3 fallback instructions.",
-						fields: [],
-						submitLabel: "Submit",
-						cancelLabel: "Cancel",
-						retryLabel: "Start Over",
-					},
-				},
-				successMessage: "The Step 3 review-input artifact is ready.",
-			}
-		},
-		buildToolExecutionFailureFallbackMessage() {
-			return "The workflow form could not build the Step 3 review-input artifact from stored workflow inputs. The workflow will return to the Step 3 fallback instructions."
-		},
-		buildToolExecutionRequest(_session, _values) {
-			return {
-				toolName: ClineDefaultTool.BUILD_REVIEW_INPUT,
-				toolInput: {},
-				toolParams: {},
-			}
-		},
-		evaluateToolExecutionResult(session, args) {
-			const parsed = parseWorkflowFormJsonToolResult(args.toolResultText)
-			if (parsed?.persisted === true && parsed?.review_input_available === true) {
-				return { succeeded: true }
-			}
-
-			if (parsed?.reason === "diff_output does not identify recent changes to the story file.") {
-				return {
-					succeeded: false,
-					errorMessage: CODE_REVIEW_STEP_3_REVIEW_INPUT_DIFF_MISMATCH_MESSAGE,
-					fallbackToAgent: true,
-				}
-			}
-
-			if (isWorkflowFormFailureText(args.toolResultText)) {
-				return {
-					succeeded: false,
-					errorMessage: args.toolResultText?.trim() ?? this.buildToolExecutionFailureFallbackMessage(session),
-					fallbackToAgent: true,
-				}
-			}
-
-			return {
-				succeeded: false,
-				errorMessage: this.buildToolExecutionFailureFallbackMessage(session),
-				fallbackToAgent: true,
-			}
-		},
-	},
-	[WRITE_REMEDIATION_STORY_STEP_2_REVIEW_INPUT_RESOLVER_ID]: {
-		id: WRITE_REMEDIATION_STORY_STEP_2_REVIEW_INPUT_RESOLVER_ID,
-		toolName: ClineDefaultTool.BUILD_REVIEW_INPUT,
-		defaultInitialPhase: "collect_inputs",
-		buildDefinition(): WorkflowFormDefinition {
-			return {
-				toolName: ClineDefaultTool.BUILD_REVIEW_INPUT,
-				title: "Review Input Artifact",
-				toolDictionaryTitle: "Review Input Reference",
-				toolDictionaryMarkdown: buildRuntimeToolDictionaryMarkdownFromConfig(buildReviewInputToolDictionaryConfig),
-				presentation: {
-					kind: "automatic_status",
-					pendingLabel: "Preparing workflow documents",
-					successLabel: "Workflow documents ready",
-					failureLabel: "Automatic workflow preparation failed- falling back to manual LLM workflow preparation.",
-				},
-				pages: {
-					collect_inputs: {
-						prompt: "The system will now build `review-input.md` from the stored `story_path` and the workflow-owned `review-input.diff` artifact.",
-						fields: [],
-						submitLabel: "Submit",
-						cancelLabel: "Cancel",
-					},
-					retry_error: {
-						prompt: "The system could not produce `review-input.md` from the stored workflow inputs. Retry the request or return to the Step 2 fallback instructions.",
-						fields: [],
-						submitLabel: "Submit",
-						cancelLabel: "Cancel",
-						retryLabel: "Start Over",
-					},
-				},
-				successMessage: "The Step 2 review-input artifact is ready.",
-			}
-		},
-		buildToolExecutionFailureFallbackMessage() {
-			return "The workflow form could not build the Step 2 review-input artifact from stored workflow inputs. The workflow will return to the Step 2 fallback instructions."
-		},
-		buildToolExecutionRequest(_session, _values) {
-			return {
-				toolName: ClineDefaultTool.BUILD_REVIEW_INPUT,
-				toolInput: {},
-				toolParams: {},
-			}
-		},
-		evaluateToolExecutionResult(session, args) {
-			const parsed = parseWorkflowFormJsonToolResult(args.toolResultText)
-			if (parsed?.persisted === true && parsed?.review_input_available === true) {
-				return { succeeded: true }
-			}
-
-			if (parsed?.reason === "diff_output does not identify recent changes to the story file.") {
-				return {
-					succeeded: false,
-					errorMessage: CODE_REVIEW_STEP_3_REVIEW_INPUT_DIFF_MISMATCH_MESSAGE,
-					fallbackToAgent: true,
-				}
-			}
-
-			if (isWorkflowFormFailureText(args.toolResultText)) {
-				return {
-					succeeded: false,
-					errorMessage: args.toolResultText?.trim() ?? this.buildToolExecutionFailureFallbackMessage(session),
-					fallbackToAgent: true,
-				}
-			}
-
-			return {
-				succeeded: false,
-				errorMessage: this.buildToolExecutionFailureFallbackMessage(session),
-				fallbackToAgent: true,
-			}
-		},
-	},
-	[QUICK_SPEC_STEP_2_BUILD_TECH_SPEC_DOCUMENT_RESOLVER_ID]: {
-		id: QUICK_SPEC_STEP_2_BUILD_TECH_SPEC_DOCUMENT_RESOLVER_ID,
-		toolName: ClineDefaultTool.BUILD_TECH_SPEC_DOCUMENT,
-		defaultInitialPhase: "collect_inputs",
-		buildDefinition(): WorkflowFormDefinition {
-			return {
-				toolName: ClineDefaultTool.BUILD_TECH_SPEC_DOCUMENT,
-				title: "Tech Spec Scaffold",
-				toolDictionaryTitle: "Tech Spec Scaffold Reference",
-				toolDictionaryMarkdown: "",
-				presentation: {
-					kind: "automatic_status",
-					pendingLabel: "Preparing workflow documents",
-					successLabel: "Workflow documents ready",
-					failureLabel: "Automatic workflow preparation failed- falling back to manual LLM workflow preparation.",
-				},
-				pages: {
-					collect_inputs: {
-						prompt: "The system will now build the canonical quick-spec scaffold from the stored workflow title and the canonical quick-spec template.",
-						fields: [],
-						submitLabel: "Submit",
-						cancelLabel: "Cancel",
-					},
-					retry_error: {
-						prompt: "The system could not produce the canonical quick-spec scaffold from the stored workflow inputs. Retry the request or return to the Step 2 fallback instructions.",
-						fields: [],
-						submitLabel: "Submit",
-						cancelLabel: "Cancel",
-						retryLabel: "Start Over",
-					},
-				},
-				successMessage: "The Step 2 tech-spec scaffold is ready.",
-			}
-		},
-		buildToolExecutionFailureFallbackMessage() {
-			return "The workflow form could not build the Step 2 tech-spec scaffold from stored workflow inputs. The workflow will return to the Step 2 fallback instructions."
-		},
-		buildToolExecutionRequest(_session, _values) {
-			return {
-				toolName: ClineDefaultTool.BUILD_TECH_SPEC_DOCUMENT,
-				toolInput: {},
-				toolParams: {},
-			}
-		},
-		evaluateToolExecutionResult(session, args) {
-			const parsed = parseWorkflowFormJsonToolResult(args.toolResultText)
-			if (parsed?.persisted === true && parsed?.output_file_available === true) {
-				return { succeeded: true }
-			}
-
-			if (isWorkflowFormFailureText(args.toolResultText)) {
-				return {
-					succeeded: false,
-					errorMessage: args.toolResultText?.trim() ?? this.buildToolExecutionFailureFallbackMessage(session),
-					fallbackToAgent: true,
-				}
-			}
-
-			return {
-				succeeded: false,
-				errorMessage: this.buildToolExecutionFailureFallbackMessage(session),
-				fallbackToAgent: true,
 			}
 		},
 	},

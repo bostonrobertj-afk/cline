@@ -12,10 +12,7 @@ import type { WorkflowFormSessionContext, WorkflowFormSessionOwner, WorkflowForm
 import {
 	BRAINSTORMING_STEP_3_CAPTURE_TOPIC_RESOLVER_ID,
 	CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID,
-	CODE_REVIEW_STEP_3_REVIEW_INPUT_RESOLVER_ID,
 	PLACEHOLDER_WORKFLOW_START_SET_WORKFLOW_PLACEHOLDERS_RESOLVER_ID,
-	QUICK_SPEC_STEP_2_BUILD_TECH_SPEC_DOCUMENT_RESOLVER_ID,
-	WRITE_REMEDIATION_STORY_STEP_2_REVIEW_INPUT_RESOLVER_ID,
 } from "./WorkflowFormRegistry"
 import { parseWorkflowStartRequirements } from "./workflowStartRequirements"
 
@@ -167,30 +164,6 @@ export const workflowFormWorkflowStepTriggerRegistry: WorkflowFormWorkflowStepTr
 		resolverId: CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID,
 		async shouldIntercept({ cwd, taskState }) {
 			return shouldInterceptUntilCurrentTaskArtifactExists({ cwd, taskState, placeholderKey: "diff_output" })
-		},
-	},
-	{
-		workflowName: "code-review.md",
-		stepNumber: 3,
-		resolverId: CODE_REVIEW_STEP_3_REVIEW_INPUT_RESOLVER_ID,
-		async shouldIntercept({ cwd, taskState }) {
-			return shouldInterceptUntilCurrentTaskArtifactExists({ cwd, taskState, placeholderKey: "review_input" })
-		},
-	},
-	{
-		workflowName: "write-remediation-story.md",
-		stepNumber: 2,
-		resolverId: WRITE_REMEDIATION_STORY_STEP_2_REVIEW_INPUT_RESOLVER_ID,
-		async shouldIntercept({ cwd, taskState }) {
-			return shouldInterceptUntilCurrentTaskArtifactExists({ cwd, taskState, placeholderKey: "review_input" })
-		},
-	},
-	{
-		workflowName: "quick-spec.md",
-		stepNumber: 2,
-		resolverId: QUICK_SPEC_STEP_2_BUILD_TECH_SPEC_DOCUMENT_RESOLVER_ID,
-		async shouldIntercept({ cwd, taskState }) {
-			return shouldInterceptUntilCurrentTaskArtifactExists({ cwd, taskState, placeholderKey: "output_file" })
 		},
 	},
 	{

@@ -5,6 +5,7 @@ import type {
 } from "@/core/task/TaskState"
 import type { WorkflowFormSessionState } from "@/core/task/workflow-form/types"
 import type { WorkflowStartCardSessionState } from "@/core/task/workflow-start-card/types"
+import type { WorkflowStepResolutionSessionState } from "@/core/task/workflow-step-resolution/types"
 import type { ActivePlaceholderWorkflowSource } from "@/core/workflows/placeholder-workflow-step-details"
 
 // Type definitions for FileContextTracker
@@ -51,6 +52,8 @@ export interface TaskMetadata {
 	lastPromptedStoryTaskKey?: string
 	activeWorkflowStartCardSession?: WorkflowStartCardSessionState
 	activeWorkflowFormSession?: WorkflowFormSessionState
+	activeWorkflowStepResolutionSession?: WorkflowStepResolutionSessionState
+	suppressedWorkflowStepResolutionDefinitionIds?: string[]
 	suppressedWorkflowFormResolverIds?: string[]
 	pendingAutoCompletedPlaceholderWorkflowStepNotices?: AutoCompletedPlaceholderWorkflowStepNotice[]
 	managedWorkflowRun?: ManagedWorkflowRunState

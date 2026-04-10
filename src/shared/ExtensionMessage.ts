@@ -219,6 +219,7 @@ export type ClineSay =
 	| "subagent_usage"
 	| "conditional_rules_applied"
 	| "workflow_form"
+	| "workflow_step_resolution_status"
 
 export interface ClineSayTool {
 	tool:
@@ -468,6 +469,28 @@ export interface ClineWorkflowForm {
 	automaticStatusState?: WorkflowFormAutomaticStatusState
 	errorMessage?: string
 	successMessage?: string
+}
+
+export type WorkflowStepResolutionStatusState = "pending" | "success" | "failure"
+
+export interface WorkflowStepResolutionStatusDefinition {
+	title: string
+	pendingLabel: string
+	successLabel: string
+	failureLabel: string
+}
+
+export interface WorkflowStepResolutionStatusOwner {
+	workflowName: string
+	stepNumber: number
+}
+
+export interface ClineWorkflowStepResolutionStatus {
+	sessionId: string
+	definitionId: string
+	owner: WorkflowStepResolutionStatusOwner
+	state: WorkflowStepResolutionStatusState
+	definition: WorkflowStepResolutionStatusDefinition
 }
 
 export interface ClineWorkflowStartCard {

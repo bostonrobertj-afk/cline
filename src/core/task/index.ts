@@ -55,6 +55,14 @@ import {
 	resolveWorkflowFormSlashCommandStartCandidate,
 } from "@core/task/workflow-form/WorkflowFormTriggerRegistry"
 import {
+	CODE_REVIEW_STEP_3_REVIEW_INPUT_DEFINITION_ID,
+	getWorkflowStepResolutionDefinition,
+	QUICK_SPEC_STEP_2_BUILD_TECH_SPEC_DOCUMENT_DEFINITION_ID,
+	WRITE_REMEDIATION_STORY_STEP_2_REVIEW_INPUT_DEFINITION_ID,
+} from "@core/task/workflow-step-resolution/WorkflowStepResolutionRegistry"
+import { WorkflowStepResolutionRuntime } from "@core/task/workflow-step-resolution/WorkflowStepResolutionRuntime"
+import { getWorkflowStepResolutionTriggerDefinition } from "@core/task/workflow-step-resolution/WorkflowStepResolutionTriggerRegistry"
+import {
 	buildPlaceholderWorkflowChecklist,
 	getActivePlaceholderWorkflowStepDetails,
 	resolveActivePlaceholderWorkflowPromptContext,
@@ -85,6 +93,7 @@ import {
 	ClineSay,
 	type ClineWorkflowForm,
 	type ClineWorkflowStartCard,
+	type ClineWorkflowStepResolutionStatus,
 	ThreadDisplayState,
 	ThreadDisplayStates,
 } from "@shared/ExtensionMessage"
@@ -175,6 +184,10 @@ import type {
 	WorkflowFormSessionOwner,
 	WorkflowFormSessionState,
 } from "./workflow-form/types"
+import type {
+	WorkflowStepResolutionSessionState,
+	WorkflowStepResolutionToolExecutionRequest,
+} from "./workflow-step-resolution/types"
 import { workflowCompletionRunner } from "./workflowCompletionRunner"
 
 export type ToolResponse = ClineToolResponseContent
@@ -270,6 +283,50 @@ export async function resolveWorkflowFormInterceptionCandidate(args: {
 	return shouldIntercept ? { trigger, activeStep } : undefined
 }
 
+export async function resolveWorkflowStepResolutionInterceptionCandidate(args: {
+	cwd: string
+	taskState: Pick<
+		TaskState,
+		| "activePlaceholderWorkflowSource"
+		| "currentFocusChainChecklist"
+		| "activePlaceholderWorkflowStableValues"
+		| "activePlaceholderWorkflowValues"
+		| "activePlaceholderWorkflowTaskWriteProofPaths"
+		| "suppressedWorkflowStepResolutionDefinitionIds"
+	>
+}) {
+	if (!args.taskState.activePlaceholderWorkflowSource) {
+		return undefined
+	}
+
+	if (!args.taskState.currentFocusChainChecklist) {
+		return undefined
+	}
+
+	const activeStep = await getActivePlaceholderWorkflowStepDetails({
+		checklistMarkdown: args.taskState.currentFocusChainChecklist,
+		source: args.taskState.activePlaceholderWorkflowSource,
+		stablePlaceholderValues: args.taskState.activePlaceholderWorkflowStableValues,
+		placeholderValues: args.taskState.activePlaceholderWorkflowValues,
+	})
+	if (!activeStep?.stepNumber) {
+		return undefined
+	}
+
+	const activeWorkflowName = args.taskState.activePlaceholderWorkflowSource.name
+	const trigger = getWorkflowStepResolutionTriggerDefinition(activeWorkflowName, activeStep.stepNumber)
+	if (!trigger) {
+		return undefined
+	}
+
+	if (args.taskState.suppressedWorkflowStepResolutionDefinitionIds.includes(trigger.definitionId)) {
+		return undefined
+	}
+
+	const shouldIntercept = await trigger.shouldIntercept({ cwd: args.cwd, taskState: args.taskState })
+	return shouldIntercept ? { trigger, activeStep } : undefined
+}
+
 export async function shouldInterceptWorkflowFormBeforeApiTurn(args: {
 	cwd: string
 	taskState: Pick<
@@ -297,6 +354,12 @@ export function isPassiveThreadDisplayState(threadDisplayState: ThreadDisplaySta
 export function hasAssistantResponseContent(assistantTextOnly: string, finalizedToolCallCount: number): boolean {
 	return assistantTextOnly.trim().length > 0 || finalizedToolCallCount > 0
 }
+
+const migratedWorkflowStepResolutionDefinitionIds = [
+	CODE_REVIEW_STEP_3_REVIEW_INPUT_DEFINITION_ID,
+	WRITE_REMEDIATION_STORY_STEP_2_REVIEW_INPUT_DEFINITION_ID,
+	QUICK_SPEC_STEP_2_BUILD_TECH_SPEC_DOCUMENT_DEFINITION_ID,
+] as const
 
 export function prepareApiConversationHistoryForResume(
 	existingApiConversationHistory: ClineStorageMessage[],
@@ -727,6 +790,7 @@ export class Task {
 	private commandPermissionController: CommandPermissionController
 	private toolExecutor: ToolExecutor
 	private workflowFormRuntime: WorkflowFormRuntime
+	private workflowStepResolutionRuntime: WorkflowStepResolutionRuntime
 	private pendingWorkflowFormOutcome?: WorkflowFormRuntimeOutcome
 	/**
 	 * Whether the task is using native tool calls.
@@ -831,6 +895,7 @@ export class Task {
 		this.contextManager = new ContextManager()
 		this.streamHandler = new StreamResponseHandler()
 		this.workflowFormRuntime = new WorkflowFormRuntime()
+		this.workflowStepResolutionRuntime = new WorkflowStepResolutionRuntime()
 		this.cwd = cwd
 		this.stateManager = stateManager
 		this.workspaceManager = workspaceManager
@@ -1484,6 +1549,23 @@ export class Task {
 		await this.persistWorkflowFormSession()
 	}
 
+	private async persistWorkflowStepResolutionSession() {
+		try {
+			const taskMetadata = await getTaskMetadata(this.taskId)
+			taskMetadata.activeWorkflowStepResolutionSession = this.taskState.activeWorkflowStepResolutionSession
+			taskMetadata.suppressedWorkflowStepResolutionDefinitionIds =
+				this.taskState.suppressedWorkflowStepResolutionDefinitionIds
+			await saveTaskMetadata(this.taskId, taskMetadata)
+		} catch {
+			// Non-fatal: prompt/runtime state should continue even if metadata persistence fails.
+		}
+	}
+
+	private async clearWorkflowStepResolutionSession() {
+		this.taskState.activeWorkflowStepResolutionSession = undefined
+		await this.persistWorkflowStepResolutionSession()
+	}
+
 	private async runWorkflowFormSession(args: {
 		resolverId: string
 		owner: WorkflowFormSessionOwner
@@ -1505,11 +1587,10 @@ export class Task {
 		await this.maybeResolveWorkflowFormBeforeApiTurn()
 	}
 
-	private async renderWorkflowFormMessage(payload: ClineWorkflowForm, messageType: "ask" | "say"): Promise<void> {
+	private async renderWorkflowFormMessage(payload: ClineWorkflowForm): Promise<void> {
 		const text = JSON.stringify(payload)
-		const nextThreadDisplayState =
-			messageType === "ask" ? ThreadDisplayStates.AWAITING_USER_RESPONSE : ThreadDisplayStates.ACTIVE_RUN
-		const nextAwaitingSubtype = messageType === "ask" ? AwaitingUserResponseSubtypes.SYSTEM : undefined
+		const nextThreadDisplayState = ThreadDisplayStates.AWAITING_USER_RESPONSE
+		const nextAwaitingSubtype = AwaitingUserResponseSubtypes.SYSTEM
 		const clineMessages = this.messageStateHandler.getClineMessages()
 
 		this.setThreadDisplayState(
@@ -1526,8 +1607,7 @@ export class Task {
 		for (let index = clineMessages.length - 1; index >= 0; index--) {
 			const message = clineMessages[index]
 			const isWorkflowFormAsk = message.type === "ask" && message.ask === "workflow_form"
-			const isWorkflowFormSay = message.type === "say" && message.say === "workflow_form"
-			if ((!isWorkflowFormAsk && !isWorkflowFormSay) || !message.text) {
+			if (!isWorkflowFormAsk || !message.text) {
 				continue
 			}
 
@@ -1552,8 +1632,61 @@ export class Task {
 			this.taskState.lastMessageTs = askTs
 			await this.messageStateHandler.addToClineMessages({
 				ts: askTs,
-				type: messageType,
-				...(messageType === "ask" ? { ask: "workflow_form" as const } : { say: "workflow_form" as const }),
+				type: "ask",
+				ask: "workflow_form",
+				threadDisplayState: this.threadDisplayState,
+				awaitingUserResponseSubtype: this.awaitingUserResponseSubtype,
+				text,
+			})
+		}
+
+		await this.postStateToWebview()
+	}
+
+	private async renderWorkflowStepResolutionStatusMessage(payload: ClineWorkflowStepResolutionStatus): Promise<void> {
+		const text = JSON.stringify(payload)
+		const clineMessages = this.messageStateHandler.getClineMessages()
+
+		this.setThreadDisplayState(
+			ThreadDisplayStates.ACTIVE_RUN,
+			"workflow_step_resolution_status_render",
+			{
+				definitionId: payload.definitionId,
+				state: payload.state,
+			},
+			undefined,
+		)
+
+		let existingWorkflowStepResolutionMessageIndex = -1
+		for (let index = clineMessages.length - 1; index >= 0; index--) {
+			const message = clineMessages[index]
+			if (message.type !== "say" || message.say !== "workflow_step_resolution_status" || !message.text) {
+				continue
+			}
+
+			try {
+				const parsedPayload = JSON.parse(message.text) as Partial<ClineWorkflowStepResolutionStatus>
+				if (parsedPayload.sessionId === payload.sessionId) {
+					existingWorkflowStepResolutionMessageIndex = index
+					break
+				}
+			} catch {}
+		}
+
+		if (existingWorkflowStepResolutionMessageIndex >= 0) {
+			await this.messageStateHandler.updateClineMessage(existingWorkflowStepResolutionMessageIndex, {
+				text,
+				partial: false,
+				threadDisplayState: ThreadDisplayStates.ACTIVE_RUN,
+				awaitingUserResponseSubtype: undefined,
+			})
+		} else {
+			const sayTs = Date.now()
+			this.taskState.lastMessageTs = sayTs
+			await this.messageStateHandler.addToClineMessages({
+				ts: sayTs,
+				type: "say",
+				say: "workflow_step_resolution_status",
 				threadDisplayState: this.threadDisplayState,
 				awaitingUserResponseSubtype: this.awaitingUserResponseSubtype,
 				text,
@@ -1667,6 +1800,8 @@ export class Task {
 		this.taskState.lastPromptedStoryTaskKey = undefined
 		this.taskState.activeWorkflowStartCardSession = undefined
 		this.taskState.activeWorkflowFormSession = undefined
+		this.taskState.activeWorkflowStepResolutionSession = undefined
+		this.taskState.suppressedWorkflowStepResolutionDefinitionIds = []
 		this.taskState.suppressedWorkflowFormResolverIds = []
 		this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices = []
 		this.taskState.activeWorkflowJustStarted = false
@@ -1694,6 +1829,9 @@ export class Task {
 			taskMetadata.lastPromptedStoryTaskKey = this.taskState.lastPromptedStoryTaskKey
 			taskMetadata.activeWorkflowStartCardSession = this.taskState.activeWorkflowStartCardSession
 			taskMetadata.activeWorkflowFormSession = this.taskState.activeWorkflowFormSession
+			taskMetadata.activeWorkflowStepResolutionSession = this.taskState.activeWorkflowStepResolutionSession
+			taskMetadata.suppressedWorkflowStepResolutionDefinitionIds =
+				this.taskState.suppressedWorkflowStepResolutionDefinitionIds
 			taskMetadata.suppressedWorkflowFormResolverIds = this.taskState.suppressedWorkflowFormResolverIds
 			taskMetadata.pendingAutoCompletedPlaceholderWorkflowStepNotices =
 				this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices
@@ -1777,6 +1915,38 @@ export class Task {
 				evaluation.errorMessage ??
 				this.getWorkflowFormToolErrorMessage(outcome.session, previousUserMessageContentLength),
 			fallbackToAgent: evaluation.fallbackToAgent ?? false,
+		}
+	}
+
+	private async executeWorkflowStepResolutionToolAndSync(args: {
+		session: WorkflowStepResolutionSessionState
+		toolExecutionRequest: WorkflowStepResolutionToolExecutionRequest
+	}) {
+		const previousUserMessageContentLength = this.taskState.userMessageContent.length
+
+		await this.toolExecutor.executeTool({
+			type: "tool_use",
+			name: args.toolExecutionRequest.toolName,
+			params: args.toolExecutionRequest.toolParams as any,
+			partial: false,
+			isNativeToolCall: true,
+			call_id: `workflow_step_resolution_${args.session.sessionId}`,
+		})
+
+		await this.syncDeterministicProgressionAfterWorkflowFormTool({
+			toolName: args.toolExecutionRequest.toolName,
+			toolParams: args.toolExecutionRequest.toolInput,
+			toolResult: this.taskState.userMessageContent.at(-1),
+			toolWasExecuted: true,
+		})
+		const definition = getWorkflowStepResolutionDefinition(args.session.definitionId)
+		const toolResultText = this.getWorkflowFormToolResultText(previousUserMessageContentLength)
+		const evaluation = definition.evaluateToolExecutionResult(args.session, { toolResultText })
+
+		return {
+			succeeded: evaluation.succeeded,
+			errorMessage: evaluation.succeeded ? undefined : evaluation.errorMessage,
+			fallbackToAgent: evaluation.succeeded ? false : (evaluation.fallbackToAgent ?? false),
 		}
 	}
 
@@ -1883,41 +2053,7 @@ export class Task {
 					},
 				})
 				const payload = this.workflowFormRuntime.buildPayload(currentSession)
-				if (payload.definition.presentation?.kind === "automatic_status") {
-					await this.renderWorkflowFormMessage(payload, "say")
-					const resolver = getWorkflowFormResolverDefinition(currentSession.resolverId)
-					const toolExecution = await this.executeWorkflowFormToolAndSync({
-						kind: "invoke_tool",
-						session: currentSession,
-						...resolver.buildToolExecutionRequest(currentSession, currentSession.values),
-					})
-
-					if (toolExecution.succeeded) {
-						const successPayload = this.workflowFormRuntime.buildSuccessPayload(
-							currentSession,
-							resolver.buildDefinition(currentSession).successMessage,
-						)
-						await this.clearWorkflowFormSession()
-						await this.renderWorkflowFormMessage(successPayload, "say")
-						restartDecisionLoop = true
-						break
-					}
-
-					const failurePayload = this.workflowFormRuntime.buildFailurePayload(currentSession)
-					await this.renderWorkflowFormMessage(failurePayload, "say")
-					if (toolExecution.fallbackToAgent === true) {
-						if (!this.taskState.suppressedWorkflowFormResolverIds.includes(currentSession.resolverId)) {
-							this.taskState.suppressedWorkflowFormResolverIds = [
-								...this.taskState.suppressedWorkflowFormResolverIds,
-								currentSession.resolverId,
-							]
-						}
-					}
-					await this.clearWorkflowFormSession()
-					break
-				}
-
-				await this.renderWorkflowFormMessage(payload, "ask")
+				await this.renderWorkflowFormMessage(payload)
 
 				await pWaitFor(() => this.pendingWorkflowFormOutcome !== undefined || this.taskState.abort, {
 					interval: 100,
@@ -1951,7 +2087,7 @@ export class Task {
 								definition.successMessage,
 							)
 							await this.clearWorkflowFormSession()
-							await this.renderWorkflowFormMessage(successPayload, "ask")
+							await this.renderWorkflowFormMessage(successPayload)
 							restartDecisionLoop = true
 							break
 						}
@@ -1961,7 +2097,7 @@ export class Task {
 								outcome.session,
 								toolExecution.errorMessage,
 							)
-							await this.renderWorkflowFormMessage(fallbackNoticePayload, "ask")
+							await this.renderWorkflowFormMessage(fallbackNoticePayload)
 							if (!this.taskState.suppressedWorkflowFormResolverIds.includes(outcome.session.resolverId)) {
 								this.taskState.suppressedWorkflowFormResolverIds = [
 									...this.taskState.suppressedWorkflowFormResolverIds,
@@ -1996,6 +2132,120 @@ export class Task {
 			sessionPresent: !!this.taskState.activeWorkflowFormSession,
 		})
 		await this.postStateToWebview()
+	}
+
+	private async maybeResolveWorkflowStepResolutionBeforeApiTurn(): Promise<void> {
+		while (!this.taskState.abort) {
+			if (!this.taskState.activeWorkflowStepResolutionSession) {
+				const candidate = await resolveWorkflowStepResolutionInterceptionCandidate({
+					cwd: this.cwd,
+					taskState: this.taskState,
+				})
+				if (candidate === undefined) {
+					break
+				}
+
+				this.taskState.activeWorkflowStepResolutionSession = this.workflowStepResolutionRuntime.createSession({
+					definitionId: candidate.trigger.definitionId,
+					triggerSource: "deterministic_workflow_progression",
+					owner: {
+						kind: "placeholder_workflow_step",
+						workflowName: this.taskState.activePlaceholderWorkflowSource!.name,
+						stepNumber: candidate.activeStep.stepNumber,
+					},
+				})
+				await this.persistWorkflowStepResolutionSession()
+			}
+
+			const currentSession = this.taskState.activeWorkflowStepResolutionSession
+			if (!currentSession) {
+				break
+			}
+
+			if (!this.taskState.activePlaceholderWorkflowSource) {
+				await this.clearWorkflowStepResolutionSession()
+				break
+			}
+
+			if (!this.taskState.currentFocusChainChecklist) {
+				await this.clearWorkflowStepResolutionSession()
+				break
+			}
+
+			if (currentSession.owner.workflowName !== this.taskState.activePlaceholderWorkflowSource.name) {
+				await this.clearWorkflowStepResolutionSession()
+				break
+			}
+
+			const activeStep = await getActivePlaceholderWorkflowStepDetails({
+				checklistMarkdown: this.taskState.currentFocusChainChecklist,
+				source: this.taskState.activePlaceholderWorkflowSource,
+				stablePlaceholderValues: this.taskState.activePlaceholderWorkflowStableValues,
+				placeholderValues: this.taskState.activePlaceholderWorkflowValues,
+			})
+
+			if (!activeStep || activeStep.stepNumber !== currentSession.owner.stepNumber) {
+				await this.clearWorkflowStepResolutionSession()
+				break
+			}
+
+			const currentTrigger = getWorkflowStepResolutionTriggerDefinition(
+				this.taskState.activePlaceholderWorkflowSource.name,
+				activeStep.stepNumber,
+			)
+			if (!currentTrigger || currentTrigger.definitionId !== currentSession.definitionId) {
+				await this.clearWorkflowStepResolutionSession()
+				break
+			}
+
+			await dismissTrailingCommandOutputAskIfPresent({
+				getClineMessages: () => this.messageStateHandler.getClineMessages(),
+				dismissCommandOutputAsk: async () => {
+					await this.say("command_output", "")
+				},
+			})
+
+			const pendingPayload = this.workflowStepResolutionRuntime.buildPayload(currentSession)
+			await this.renderWorkflowStepResolutionStatusMessage(pendingPayload)
+
+			const toolExecutionRequest = getWorkflowStepResolutionDefinition(
+				currentSession.definitionId,
+			).buildToolExecutionRequest(currentSession)
+			const toolExecution = await this.executeWorkflowStepResolutionToolAndSync({
+				session: currentSession,
+				toolExecutionRequest,
+			})
+
+			if (toolExecution.succeeded) {
+				const successSession = this.workflowStepResolutionRuntime.buildTerminalSession(currentSession, "success")
+				await this.renderWorkflowStepResolutionStatusMessage(
+					this.workflowStepResolutionRuntime.buildPayload(successSession),
+				)
+				await this.clearWorkflowStepResolutionSession()
+				continue
+			}
+
+			const failureSession = this.workflowStepResolutionRuntime.buildTerminalSession(
+				currentSession,
+				"failure",
+				toolExecution.errorMessage,
+			)
+			await this.renderWorkflowStepResolutionStatusMessage(this.workflowStepResolutionRuntime.buildPayload(failureSession))
+
+			if (toolExecution.fallbackToAgent === true) {
+				if (!this.taskState.suppressedWorkflowStepResolutionDefinitionIds.includes(currentSession.definitionId)) {
+					this.taskState.suppressedWorkflowStepResolutionDefinitionIds = [
+						...this.taskState.suppressedWorkflowStepResolutionDefinitionIds,
+						currentSession.definitionId,
+					]
+				}
+				await this.clearWorkflowStepResolutionSession()
+				break
+			}
+
+			await this.clearWorkflowStepResolutionSession()
+			break
+		}
 	}
 
 	async say(
@@ -2201,6 +2451,8 @@ export class Task {
 				this.taskState.activePlaceholderWorkflowTaskWriteProofPaths = []
 				this.taskState.lastPromptedPlaceholderWorkflowChecklistLabel = undefined
 				this.taskState.activeWorkflowFormSession = undefined
+				this.taskState.activeWorkflowStepResolutionSession = undefined
+				this.taskState.suppressedWorkflowStepResolutionDefinitionIds = []
 				this.taskState.suppressedWorkflowFormResolverIds = []
 				this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices = []
 				this.taskState.activeWorkflowJustStarted = true
@@ -2227,6 +2479,9 @@ export class Task {
 			taskMetadata.lastPromptedStoryTaskKey = this.taskState.lastPromptedStoryTaskKey
 			taskMetadata.activeWorkflowStartCardSession = this.taskState.activeWorkflowStartCardSession
 			taskMetadata.activeWorkflowFormSession = this.taskState.activeWorkflowFormSession
+			taskMetadata.activeWorkflowStepResolutionSession = this.taskState.activeWorkflowStepResolutionSession
+			taskMetadata.suppressedWorkflowStepResolutionDefinitionIds =
+				this.taskState.suppressedWorkflowStepResolutionDefinitionIds
 			taskMetadata.suppressedWorkflowFormResolverIds = this.taskState.suppressedWorkflowFormResolverIds
 			taskMetadata.pendingAutoCompletedPlaceholderWorkflowStepNotices =
 				this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices
@@ -2378,6 +2633,43 @@ export class Task {
 				| WorkflowStartCardSessionState
 				| undefined
 			this.taskState.activeWorkflowFormSession = metadata.activeWorkflowFormSession as WorkflowFormSessionState | undefined
+			this.taskState.activeWorkflowStepResolutionSession = metadata.activeWorkflowStepResolutionSession as
+				| WorkflowStepResolutionSessionState
+				| undefined
+			this.taskState.suppressedWorkflowStepResolutionDefinitionIds =
+				metadata.suppressedWorkflowStepResolutionDefinitionIds ?? []
+			if (
+				this.taskState.activeWorkflowFormSession &&
+				migratedWorkflowStepResolutionDefinitionIds.includes(this.taskState.activeWorkflowFormSession.resolverId as any)
+			) {
+				const restoredWorkflowFormSession = this.taskState.activeWorkflowFormSession
+				this.taskState.activeWorkflowStepResolutionSession = {
+					sessionId: restoredWorkflowFormSession.sessionId,
+					definitionId: restoredWorkflowFormSession.resolverId,
+					triggerSource: restoredWorkflowFormSession.triggerSource,
+					owner: restoredWorkflowFormSession.owner as WorkflowStepResolutionSessionState["owner"],
+					state: "pending",
+					...(restoredWorkflowFormSession.lastError
+						? {
+								lastError: restoredWorkflowFormSession.lastError,
+							}
+						: {}),
+				}
+				this.taskState.activeWorkflowFormSession = undefined
+			}
+			for (const resolverId of metadata.suppressedWorkflowFormResolverIds ?? []) {
+				if (
+					migratedWorkflowStepResolutionDefinitionIds.includes(
+						resolverId as (typeof migratedWorkflowStepResolutionDefinitionIds)[number],
+					) &&
+					!this.taskState.suppressedWorkflowStepResolutionDefinitionIds.includes(resolverId)
+				) {
+					this.taskState.suppressedWorkflowStepResolutionDefinitionIds = [
+						...this.taskState.suppressedWorkflowStepResolutionDefinitionIds,
+						resolverId,
+					]
+				}
+			}
 			this.taskState.suppressedWorkflowFormResolverIds = metadata.suppressedWorkflowFormResolverIds ?? []
 			this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices =
 				metadata.pendingAutoCompletedPlaceholderWorkflowStepNotices ?? []
@@ -5209,6 +5501,7 @@ export class Task {
 		await this.applyPersistentSlashCommandAction(persistentSlashCommandAction)
 		await this.maybeResolveWorkflowStartCardBeforeApiTurn(persistentSlashCommandAction)
 		await this.maybeResolveWorkflowFormBeforeApiTurn(persistentSlashCommandAction)
+		await this.maybeResolveWorkflowStepResolutionBeforeApiTurn()
 		const requestHasHumanAuthoredInput = this.hasHumanAuthoredInput(processedUserContent)
 		this.currentRequestHasHumanAuthoredInput = requestHasHumanAuthoredInput
 		const shouldSendFullPromptAssembly = this.shouldSendFullPromptAssemblyForCurrentTurn(requestHasHumanAuthoredInput)

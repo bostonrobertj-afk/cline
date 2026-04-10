@@ -3,6 +3,7 @@ import { AssistantMessageContent } from "@core/assistant-message"
 import { ClineAskResponse } from "@shared/WebviewMessage"
 import type { WorkflowFormSessionState } from "@/core/task/workflow-form/types"
 import type { WorkflowStartCardSessionState } from "@/core/task/workflow-start-card/types"
+import type { WorkflowStepResolutionSessionState } from "@/core/task/workflow-step-resolution/types"
 import type { ActivePlaceholderWorkflowSource } from "@/core/workflows/placeholder-workflow-step-details"
 import type { ThreadDisplayState } from "@/shared/ExtensionMessage"
 import type { ClineDefaultTool } from "@/shared/tools"
@@ -161,6 +162,8 @@ export class TaskState {
 	lastPromptedStoryTaskKey?: string
 	activeWorkflowStartCardSession?: WorkflowStartCardSessionState
 	activeWorkflowFormSession?: WorkflowFormSessionState
+	activeWorkflowStepResolutionSession?: WorkflowStepResolutionSessionState
+	suppressedWorkflowStepResolutionDefinitionIds: string[] = []
 	suppressedWorkflowFormResolverIds: string[] = []
 	pendingAutoCompletedPlaceholderWorkflowStepNotices: AutoCompletedPlaceholderWorkflowStepNotice[] = []
 	activeWorkflowJustStarted = false

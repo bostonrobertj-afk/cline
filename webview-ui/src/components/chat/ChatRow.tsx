@@ -10,6 +10,7 @@ import {
 	ClineSayTool,
 	ClineWorkflowForm,
 	ClineWorkflowStartCard,
+	ClineWorkflowStepResolutionStatus,
 	COMPLETION_RESULT_CHANGES_FLAG,
 	WorkflowFormFieldDefinition,
 	WorkflowFormFieldValuePayload,
@@ -303,6 +304,20 @@ export const ChatRowContent = memo(
 				return undefined
 			}
 		}, [message.ask, message.say, message.text, message.type])
+		const workflowStepResolutionStatus = useMemo(() => {
+			const isWorkflowStepResolutionStatusMessage =
+				message.type === "say" && message.say === "workflow_step_resolution_status"
+			if (!isWorkflowStepResolutionStatusMessage || !message.text) {
+				return undefined
+			}
+
+			try {
+				return JSON.parse(message.text) as ClineWorkflowStepResolutionStatus
+			} catch (error) {
+				console.error("Failed to parse workflow step resolution status payload:", error)
+				return undefined
+			}
+		}, [message.say, message.text, message.type])
 		const [workflowStartCardSubmissionPending, setWorkflowStartCardSubmissionPending] = useState(false)
 		const [workflowFormValues, setWorkflowFormValues] = useState<Record<string, string>>({})
 		const [workflowFormSubmissionPending, setWorkflowFormSubmissionPending] = useState(false)
@@ -859,6 +874,21 @@ export const ChatRowContent = memo(
 					)}
 				</div>
 			)
+		}
+
+		const renderWorkflowStepResolutionStatusContent = () => {
+			if (!workflowStepResolutionStatus) {
+				return <InvisibleSpacer />
+			}
+
+			const label =
+				workflowStepResolutionStatus.state === "pending"
+					? workflowStepResolutionStatus.definition.pendingLabel
+					: workflowStepResolutionStatus.state === "success"
+						? workflowStepResolutionStatus.definition.successLabel
+						: workflowStepResolutionStatus.definition.failureLabel
+
+			return <WorkflowPreparationStatusRow label={label} state={workflowStepResolutionStatus.state} />
 		}
 
 		const renderWorkflowFormField = useCallback(
@@ -1668,6 +1698,8 @@ export const ChatRowContent = memo(
 						return <SubagentStatusRow isLast={isLast} lastModifiedMessage={lastModifiedMessage} message={message} />
 					case "workflow_form":
 						return renderWorkflowFormContent()
+					case "workflow_step_resolution_status":
+						return renderWorkflowStepResolutionStatusContent()
 					case "shell_integration_warning_with_suggestion":
 						const isBackgroundModeEnabled = vscodeTerminalExecutionMode === "backgroundExec"
 						return (

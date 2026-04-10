@@ -89,7 +89,6 @@ export class WorkflowFormRuntime {
 		return buildWorkflowFormPayload({
 			session,
 			definition,
-			automaticStatusState: definition.presentation?.kind === "automatic_status" ? "pending" : undefined,
 		})
 	}
 
@@ -117,20 +116,7 @@ export class WorkflowFormRuntime {
 		return buildWorkflowFormPayload({
 			session: successSession,
 			definition,
-			automaticStatusState: definition.presentation?.kind === "automatic_status" ? "success" : undefined,
 			successMessage,
-		})
-	}
-
-	buildFailurePayload(session: WorkflowFormSessionState): ClineWorkflowForm {
-		const resolver = this.getResolver(session.resolverId)
-		const failureSession = { ...session, phase: "success" as const }
-		const definition = resolver.buildDefinition(failureSession)
-
-		return buildWorkflowFormPayload({
-			session: failureSession,
-			definition,
-			automaticStatusState: "failure",
 		})
 	}
 

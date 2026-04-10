@@ -96,6 +96,7 @@ enum ClineSay {
   USE_SUBAGENTS_SAY = 36;
   SUBAGENT_USAGE = 37;
   WORKFLOW_FORM_SAY = 38;
+  WORKFLOW_STEP_RESOLUTION_STATUS = 39;
 }
 
 // Enum for ClineSayTool tool types

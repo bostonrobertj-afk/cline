@@ -1,5 +1,5 @@
 import * as disk from "@core/storage/disk"
-import type { ClineWorkflowForm, ClineWorkflowStartCard } from "@shared/ExtensionMessage"
+import type { ClineWorkflowForm, ClineWorkflowStartCard, ClineWorkflowStepResolutionStatus } from "@shared/ExtensionMessage"
 import { WorkflowStartCardAction, WorkflowStartCardSubmissionRequest } from "@shared/proto/cline/task"
 import { ClineDefaultTool } from "@shared/tools"
 import { expect } from "chai"
@@ -22,6 +22,10 @@ import type {
 	WorkflowFormSessionOwner,
 	WorkflowFormSessionState,
 } from "../workflow-form/types"
+import type {
+	WorkflowStepResolutionSessionState,
+	WorkflowStepResolutionToolExecutionRequest,
+} from "../workflow-step-resolution/types"
 
 function createFocusChainManager(taskState: TaskState) {
 	return new FocusChainManager({
@@ -104,58 +108,26 @@ function buildInteractiveWorkflowFormPayload(session: WorkflowFormSessionState):
 	}
 }
 
-function buildAutomaticWorkflowFormPayload(
-	session: WorkflowFormSessionState,
+function buildWorkflowStepResolutionStatusPayload(
+	session: WorkflowStepResolutionSessionState,
 	state: "pending" | "success" | "failure",
-): ClineWorkflowForm {
-	const isQuickSpecStepTwo = session.resolverId === "quick_spec_step_2_build_tech_spec_document"
+): ClineWorkflowStepResolutionStatus {
+	const isQuickSpecStepTwo = session.definitionId === "quick_spec_step_2_build_tech_spec_document"
 
 	return {
 		sessionId: session.sessionId,
-		resolverId: session.resolverId,
-		phase: state === "pending" ? session.phase : "success",
-		definition: {
-			toolName: isQuickSpecStepTwo ? ClineDefaultTool.BUILD_TECH_SPEC_DOCUMENT : ClineDefaultTool.BUILD_REVIEW_INPUT,
-			title: isQuickSpecStepTwo ? "Tech Spec Scaffold" : "Review Input Artifact",
-			toolDictionaryTitle: isQuickSpecStepTwo ? "Tech Spec Scaffold Reference" : "Review Input Reference",
-			toolDictionaryMarkdown: isQuickSpecStepTwo ? "" : "## build_review_input",
-			presentation: {
-				kind: "automatic_status",
-				pendingLabel: "Preparing workflow documents",
-				successLabel: "Workflow documents ready",
-				failureLabel: "Automatic workflow preparation failed- falling back to manual LLM workflow preparation.",
-			},
-			pages: {
-				collect_inputs: {
-					prompt: isQuickSpecStepTwo
-						? "The system will now build the canonical quick-spec scaffold from the stored workflow title and the canonical quick-spec template."
-						: "The system will now build `review-input.md` from the stored `story_path` and the workflow-owned `review-input.diff` artifact.",
-					fields: [],
-					submitLabel: "Submit",
-					cancelLabel: "Cancel",
-				},
-				retry_error: {
-					prompt: isQuickSpecStepTwo
-						? "The system could not produce the canonical quick-spec scaffold from the stored workflow inputs. Retry the request or return to the Step 2 fallback instructions."
-						: "The system could not produce `review-input.md` from the stored workflow inputs. Retry the request or return to the Step 3 fallback instructions.",
-					fields: [],
-					submitLabel: "Submit",
-					cancelLabel: "Cancel",
-					retryLabel: "Start Over",
-				},
-			},
-			successMessage: isQuickSpecStepTwo
-				? "The Step 2 tech-spec scaffold is ready."
-				: "The Step 3 review-input artifact is ready.",
+		definitionId: session.definitionId,
+		owner: {
+			workflowName: session.owner.workflowName,
+			stepNumber: session.owner.stepNumber,
 		},
-		values: session.values,
-		automaticStatusState: state,
-		successMessage:
-			state === "success"
-				? isQuickSpecStepTwo
-					? "The Step 2 tech-spec scaffold is ready."
-					: "The Step 3 review-input artifact is ready."
-				: undefined,
+		state,
+		definition: {
+			title: isQuickSpecStepTwo ? "Tech Spec Scaffold" : "Review Input Artifact",
+			pendingLabel: "Preparing workflow documents",
+			successLabel: "Workflow documents ready",
+			failureLabel: "Automatic workflow preparation failed- falling back to manual LLM workflow preparation.",
+		},
 	}
 }
 
@@ -183,6 +155,26 @@ type FakeWorkflowFormTask = {
 	postStateToWebview: sinon.SinonStub
 }
 
+type FakeWorkflowStepResolutionTask = {
+	cwd: string
+	taskState: TaskState
+	messageStateHandler?: {
+		getClineMessages: sinon.SinonStub
+	}
+	workflowStepResolutionRuntime: {
+		createSession: sinon.SinonStub
+		buildPayload: sinon.SinonStub
+		buildTerminalSession: sinon.SinonStub
+	}
+	persistWorkflowStepResolutionSession?: sinon.SinonStub
+	renderWorkflowStepResolutionStatusMessage: sinon.SinonStub
+	executeWorkflowStepResolutionToolAndSync?: sinon.SinonStub
+	clearWorkflowStepResolutionSession?: sinon.SinonStub
+	say?: sinon.SinonStub
+	setThreadDisplayState: sinon.SinonStub
+	postStateToWebview: sinon.SinonStub
+}
+
 const restoreBmadStateFromMetadata = Reflect.get(Task.prototype, "restoreBmadStateFromMetadata") as TaskMethod<[], Promise<void>>
 const persistWorkflowFormSession = Reflect.get(Task.prototype, "persistWorkflowFormSession") as TaskMethod<[], Promise<void>>
 const clearLastPromptedPlaceholderWorkflowChecklistLabelForContextCompaction = Reflect.get(
@@ -190,7 +182,7 @@ const clearLastPromptedPlaceholderWorkflowChecklistLabelForContextCompaction = R
 	"clearLastPromptedPlaceholderWorkflowChecklistLabelForContextCompaction",
 ) as TaskMethod<[], Promise<void>>
 const renderWorkflowFormMessage = Reflect.get(Task.prototype, "renderWorkflowFormMessage") as TaskMethod<
-	[ClineWorkflowForm, "ask" | "say"],
+	[ClineWorkflowForm],
 	Promise<void>
 >
 const restorePlaceholderWorkflowChecklistFromDiskIfNeeded = Reflect.get(
@@ -209,6 +201,10 @@ const maybeResolveWorkflowFormBeforeApiTurn = Reflect.get(Task.prototype, "maybe
 	[unknown?],
 	Promise<void>
 >
+const maybeResolveWorkflowStepResolutionBeforeApiTurn = Reflect.get(
+	Task.prototype,
+	"maybeResolveWorkflowStepResolutionBeforeApiTurn",
+) as TaskMethod<[], Promise<void>>
 const maybeResolveWorkflowStartCardBeforeApiTurn = Reflect.get(
 	Task.prototype,
 	"maybeResolveWorkflowStartCardBeforeApiTurn",
@@ -230,6 +226,14 @@ const clearLastPromptedStoryTaskKeyForContextCompaction = Reflect.get(
 	"clearLastPromptedStoryTaskKeyForContextCompaction",
 ) as TaskMethod<[], Promise<void>>
 const clearWorkflowFormSession = Reflect.get(Task.prototype, "clearWorkflowFormSession") as TaskMethod<[], Promise<void>>
+const persistWorkflowStepResolutionSession = Reflect.get(Task.prototype, "persistWorkflowStepResolutionSession") as TaskMethod<
+	[],
+	Promise<void>
+>
+const clearWorkflowStepResolutionSession = Reflect.get(Task.prototype, "clearWorkflowStepResolutionSession") as TaskMethod<
+	[],
+	Promise<void>
+>
 const runWorkflowFormSession = Reflect.get(Task.prototype, "runWorkflowFormSession") as TaskMethod<
 	[
 		{
@@ -243,6 +247,18 @@ const runWorkflowFormSession = Reflect.get(Task.prototype, "runWorkflowFormSessi
 >
 const executeWorkflowFormToolAndSync = Reflect.get(Task.prototype, "executeWorkflowFormToolAndSync") as TaskMethod<
 	[unknown],
+	Promise<{ succeeded: boolean; errorMessage?: string; fallbackToAgent?: boolean }>
+>
+const executeWorkflowStepResolutionToolAndSync = Reflect.get(
+	Task.prototype,
+	"executeWorkflowStepResolutionToolAndSync",
+) as TaskMethod<
+	[
+		{
+			session: WorkflowStepResolutionSessionState
+			toolExecutionRequest: WorkflowStepResolutionToolExecutionRequest
+		},
+	],
 	Promise<{ succeeded: boolean; errorMessage?: string; fallbackToAgent?: boolean }>
 >
 const getWorkflowFormToolResultText = Reflect.get(Task.prototype, "getWorkflowFormToolResultText") as TaskMethod<
@@ -523,6 +539,119 @@ Inspect the prepared review input and write findings.
 		}
 	})
 
+	it("persists and restores the active workflow-step-resolution session in task metadata", async () => {
+		const sandbox = sinon.createSandbox()
+		const session: WorkflowStepResolutionSessionState = {
+			sessionId: "step-resolution-session-1",
+			definitionId: "code_review_step_3_review_input",
+			triggerSource: "deterministic_workflow_progression",
+			owner: {
+				kind: "placeholder_workflow_step",
+				workflowName: "code-review.md",
+				stepNumber: 3,
+			},
+			state: "pending",
+			lastError: "Previous failure",
+		}
+
+		try {
+			sandbox.stub(disk, "getTaskMetadata").resolves({
+				activeWorkflowStepResolutionSession: session,
+				suppressedWorkflowStepResolutionDefinitionIds: ["code_review_step_3_review_input"],
+			} as never)
+			const saveTaskMetadataStub = sandbox.stub(disk, "saveTaskMetadata").resolves()
+
+			const fakeTask = createFakeTask("task-step-resolution-metadata")
+			fakeTask.taskState.activeWorkflowStepResolutionSession = session
+			fakeTask.taskState.suppressedWorkflowStepResolutionDefinitionIds = ["code_review_step_3_review_input"]
+
+			await persistWorkflowStepResolutionSession.call(fakeTask)
+			await restoreBmadStateFromMetadata.call(fakeTask)
+
+			expect(fakeTask.taskState.activeWorkflowStepResolutionSession).to.deep.equal(session)
+			expect(fakeTask.taskState.suppressedWorkflowStepResolutionDefinitionIds).to.deep.equal([
+				"code_review_step_3_review_input",
+			])
+			expect(saveTaskMetadataStub.called).to.equal(true)
+			const lastSavedMetadata = saveTaskMetadataStub.getCall(saveTaskMetadataStub.callCount - 1).args[1]
+			expect(lastSavedMetadata.activeWorkflowStepResolutionSession).to.deep.equal(session)
+			expect(lastSavedMetadata.suppressedWorkflowStepResolutionDefinitionIds).to.deep.equal([
+				"code_review_step_3_review_input",
+			])
+		} finally {
+			sandbox.restore()
+		}
+	})
+
+	it("migrates a legacy active workflow-form automatic-status session into the workflow-step-resolution session on restore", async () => {
+		const sandbox = sinon.createSandbox()
+
+		try {
+			sandbox.stub(disk, "getTaskMetadata").resolves({
+				activeWorkflowFormSession: {
+					sessionId: "legacy-wf-session-1",
+					resolverId: "code_review_step_3_review_input",
+					triggerSource: "deterministic_workflow_progression",
+					owner: {
+						kind: "placeholder_workflow_step",
+						workflowName: "code-review.md",
+						stepNumber: 3,
+					},
+					phase: "collect_inputs",
+					initialPhase: "collect_inputs",
+					values: {},
+				},
+			} as never)
+
+			const fakeTask = createFakeTask("task-legacy-step-resolution-restore")
+			await restoreBmadStateFromMetadata.call(fakeTask)
+
+			expect(fakeTask.taskState.activeWorkflowFormSession).to.equal(undefined)
+			expect(fakeTask.taskState.activeWorkflowStepResolutionSession).to.deep.equal({
+				sessionId: "legacy-wf-session-1",
+				definitionId: "code_review_step_3_review_input",
+				triggerSource: "deterministic_workflow_progression",
+				owner: {
+					kind: "placeholder_workflow_step",
+					workflowName: "code-review.md",
+					stepNumber: 3,
+				},
+				state: "pending",
+			})
+		} finally {
+			sandbox.restore()
+		}
+	})
+
+	it("migrates legacy suppressed workflow-form resolver ids into suppressed workflow-step-resolution definition ids", async () => {
+		const sandbox = sinon.createSandbox()
+
+		try {
+			sandbox.stub(disk, "getTaskMetadata").resolves({
+				suppressedWorkflowFormResolverIds: [
+					"code_review_step_3_diff_source",
+					"code_review_step_3_review_input",
+					"write_remediation_story_step_2_review_input",
+				],
+			} as never)
+
+			const fakeTask = createFakeTask("task-legacy-step-resolution-suppression-restore")
+			await restoreBmadStateFromMetadata.call(fakeTask)
+
+			expect(fakeTask.taskState.suppressedWorkflowFormResolverIds).to.deep.equal([
+				"code_review_step_3_diff_source",
+				"code_review_step_3_review_input",
+				"write_remediation_story_step_2_review_input",
+			])
+			expect(fakeTask.taskState.suppressedWorkflowStepResolutionDefinitionIds).to.deep.equal([
+				"code_review_step_3_review_input",
+				"write_remediation_story_step_2_review_input",
+			])
+		} finally {
+			sandbox.restore()
+		}
+	})
+
 	it("creates and runs a tool-owned workflow form session", async () => {
 		const createdSession: WorkflowFormSessionState = {
 			sessionId: "wf-session-tool-handler",
@@ -652,15 +781,11 @@ Inspect the prepared review input and write findings.
 			postStateToWebview: sinon.stub().resolves(),
 		}
 
-		await renderWorkflowFormMessage.call(
-			fakeTask,
-			{
-				...basePayload,
-				phase: "retry_error",
-				errorMessage: "The first tool attempt failed.",
-			},
-			"ask",
-		)
+		await renderWorkflowFormMessage.call(fakeTask, {
+			...basePayload,
+			phase: "retry_error",
+			errorMessage: "The first tool attempt failed.",
+		})
 
 		messages.push({
 			ts: 4,
@@ -669,15 +794,11 @@ Inspect the prepared review input and write findings.
 			text: JSON.stringify({ status: "second-attempt-succeeded" }),
 		})
 
-		await renderWorkflowFormMessage.call(
-			fakeTask,
-			{
-				...basePayload,
-				phase: "success",
-				successMessage: "The workflow form completed successfully.",
-			},
-			"ask",
-		)
+		await renderWorkflowFormMessage.call(fakeTask, {
+			...basePayload,
+			phase: "success",
+			successMessage: "The workflow form completed successfully.",
+		})
 
 		const survivingMessages = messages.filter((message) => {
 			if (message.type !== "ask" || message.ask !== "workflow_form" || typeof message.text !== "string") {
@@ -1387,7 +1508,7 @@ Done Signal: You've persisted a new \`review-input.diff\` file in {output_folder
 		}
 	})
 
-	it("chains successful Step 2 diff-output resolution into the Step 3 workflow form before returning control", async () => {
+	it("chains successful Step 2 diff-output resolution into the Step 3 workflow-step resolution before returning control", async () => {
 		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "placeholder-step-3-post-form-prompt-"))
 		const workflowPath = path.join(tempDir, "code-review.md")
 		const diffOutputPath = path.join(tempDir, "workflow-output", "review-input.diff")
@@ -1433,6 +1554,7 @@ Construct and persist review_input.md from the persisted diff output before cont
 				output_folder: path.join(tempDir, "workflow-output"),
 				review_input: reviewInputPath,
 			}
+			taskState.suppressedWorkflowFormResolverIds = ["code_review_step_3_review_input"]
 
 			const stepTwoSession: WorkflowFormSessionState = {
 				sessionId: "wf-session-step-2",
@@ -1447,23 +1569,22 @@ Construct and persist review_input.md from the persisted diff output before cont
 				initialPhase: "confirm",
 				values: {},
 			}
-			const stepThreeSession: WorkflowFormSessionState = {
-				sessionId: "wf-session-step-3-after-step-2",
-				resolverId: "code_review_step_3_review_input",
+			const stepThreeSession: WorkflowStepResolutionSessionState = {
+				sessionId: "step-resolution-session-step-3-after-step-2",
+				definitionId: "code_review_step_3_review_input",
 				triggerSource: "deterministic_workflow_progression",
 				owner: {
 					kind: "placeholder_workflow_step",
 					workflowName: "code-review.md",
 					stepNumber: 3,
 				},
-				phase: "collect_inputs",
-				initialPhase: "collect_inputs",
-				values: {},
+				state: "pending",
 			}
 
 			let renderCount = 0
 			let executeCallCount = 0
-			const fakeTask: FakeWorkflowFormTask = {
+			const renderedStepResolutionPayloads: ClineWorkflowStepResolutionStatus[] = []
+			const fakeTask: FakeWorkflowFormTask & FakeWorkflowStepResolutionTask = {
 				cwd: tempDir,
 				taskState,
 				pendingWorkflowFormOutcome: undefined,
@@ -1471,25 +1592,35 @@ Construct and persist review_input.md from the persisted diff output before cont
 					getClineMessages: sinon.stub().returns([]),
 				},
 				workflowFormRuntime: {
-					createSession: sinon.stub().onFirstCall().returns(stepTwoSession).onSecondCall().returns(stepThreeSession),
+					createSession: sinon.stub().returns(stepTwoSession),
 					buildPayload: sinon
 						.stub()
-						.callsFake((session: WorkflowFormSessionState) =>
-							session.resolverId === "code_review_step_3_review_input"
-								? buildAutomaticWorkflowFormPayload(session, "pending")
-								: buildInteractiveWorkflowFormPayload(session),
+						.callsFake((session: WorkflowFormSessionState) => buildInteractiveWorkflowFormPayload(session)),
+					buildSuccessPayload: sinon.stub().callsFake((session: WorkflowFormSessionState) => ({
+						...buildInteractiveWorkflowFormPayload(session),
+						phase: "success",
+						successMessage: "Workflow form completed successfully.",
+					})),
+				},
+				workflowStepResolutionRuntime: {
+					createSession: sinon.stub().returns(stepThreeSession),
+					buildPayload: sinon
+						.stub()
+						.callsFake((session: WorkflowStepResolutionSessionState) =>
+							buildWorkflowStepResolutionStatusPayload(session, session.state),
 						),
-					buildSuccessPayload: sinon.stub().callsFake((session: WorkflowFormSessionState) =>
-						session.resolverId === "code_review_step_3_review_input"
-							? buildAutomaticWorkflowFormPayload(session, "success")
-							: {
-									...buildInteractiveWorkflowFormPayload(session),
-									phase: "success",
-									successMessage: "Workflow form completed successfully.",
-								},
-					),
+					buildTerminalSession: sinon
+						.stub()
+						.callsFake(
+							(session: WorkflowStepResolutionSessionState, state: "success" | "failure", lastError?: string) => ({
+								...session,
+								state,
+								lastError,
+							}),
+						),
 				},
 				persistWorkflowFormSession: sinon.stub().resolves(),
+				persistWorkflowStepResolutionSession: sinon.stub().resolves(),
 				renderWorkflowFormMessage: sinon.stub().callsFake(async () => {
 					renderCount += 1
 					if (renderCount === 1) {
@@ -1512,6 +1643,11 @@ Construct and persist review_input.md from the persisted diff output before cont
 						}
 					}
 				}),
+				renderWorkflowStepResolutionStatusMessage: sinon
+					.stub()
+					.callsFake(async (payload: ClineWorkflowStepResolutionStatus) => {
+						renderedStepResolutionPayloads.push(payload)
+					}),
 				executeWorkflowFormToolAndSync: sinon.stub().callsFake(async () => {
 					executeCallCount += 1
 					if (executeCallCount === 1) {
@@ -1542,16 +1678,35 @@ Construct and persist review_input.md from the persisted diff output before cont
 					}
 					return { succeeded: true }
 				}),
+				executeWorkflowStepResolutionToolAndSync: sinon.stub().callsFake(async () => {
+					executeCallCount += 1
+					await fs.writeFile(reviewInputPath, "# review input\n", "utf8")
+					taskState.activePlaceholderWorkflowValues = {
+						diff_output: diffOutputPath,
+						review_input: reviewInputPath,
+					}
+					taskState.activePlaceholderWorkflowTaskWriteProofPaths = [diffOutputPath, reviewInputPath]
+					taskState.currentFocusChainChecklist = [
+						"- [x] Step 1: Determine Review Source",
+						"- [x] Step 2: System-Owned Diff Source Resolution And Diff Output Persistence",
+						"- [x] Step 3: Construct & Persist Review Input File",
+					].join("\n")
+					return { succeeded: true }
+				}),
 				clearWorkflowFormSession: sinon.stub().callsFake(async () => {
 					taskState.activeWorkflowFormSession = undefined
+				}),
+				clearWorkflowStepResolutionSession: sinon.stub().callsFake(async () => {
+					taskState.activeWorkflowStepResolutionSession = undefined
 				}),
 				setThreadDisplayState: sinon.stub(),
 				postStateToWebview: sinon.stub().resolves(),
 			}
 
 			await maybeResolveWorkflowFormBeforeApiTurn.call(fakeTask)
+			await maybeResolveWorkflowStepResolutionBeforeApiTurn.call(fakeTask)
 
-			expect(fakeTask.workflowFormRuntime.createSession.callCount).to.equal(2)
+			expect(fakeTask.workflowFormRuntime.createSession.callCount).to.equal(1)
 			expect(fakeTask.workflowFormRuntime.createSession.firstCall.args[0]).to.deep.equal({
 				resolverId: "code_review_step_3_diff_source",
 				triggerSource: "deterministic_workflow_progression",
@@ -1563,23 +1718,23 @@ Construct and persist review_input.md from the persisted diff output before cont
 				initialPhase: "confirm",
 				context: undefined,
 			})
-			expect(fakeTask.workflowFormRuntime.createSession.secondCall.args[0]).to.deep.equal({
-				resolverId: "code_review_step_3_review_input",
+			expect(fakeTask.workflowStepResolutionRuntime.createSession.callCount).to.equal(1)
+			expect(fakeTask.workflowStepResolutionRuntime.createSession.firstCall.args[0]).to.deep.equal({
+				definitionId: "code_review_step_3_review_input",
 				triggerSource: "deterministic_workflow_progression",
 				owner: {
 					kind: "placeholder_workflow_step",
 					workflowName: "code-review.md",
 					stepNumber: 3,
 				},
-				initialPhase: "collect_inputs",
-				context: undefined,
 			})
+			expect(renderedStepResolutionPayloads.map((payload) => payload.state)).to.deep.equal(["pending", "success"])
 		} finally {
 			await fs.rm(tempDir, { recursive: true, force: true })
 		}
 	})
 
-	it("auto-runs the Phase 3 review-input workflow preparation and renders pending then success status cards", async () => {
+	it("auto-runs the Phase 3 review-input workflow-step resolution and renders pending then success status cards", async () => {
 		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "placeholder-step-3-review-input-open-"))
 		const workflowPath = path.join(tempDir, "code-review.md")
 		const diffOutputPath = path.join(tempDir, "workflow-output", "review-input.diff")
@@ -1622,45 +1777,49 @@ Construct and persist review_input.md from the persisted diff output before cont
 				review_input: reviewInputPath,
 			}
 
-			const createdSession: WorkflowFormSessionState = {
-				sessionId: "wf-session-step-3-review-input",
-				resolverId: "code_review_step_3_review_input",
+			const createdSession: WorkflowStepResolutionSessionState = {
+				sessionId: "step-resolution-session-step-3-review-input",
+				definitionId: "code_review_step_3_review_input",
 				triggerSource: "deterministic_workflow_progression",
 				owner: {
 					kind: "placeholder_workflow_step",
 					workflowName: "code-review.md",
 					stepNumber: 3,
 				},
-				phase: "collect_inputs",
-				initialPhase: "collect_inputs",
-				values: {},
+				state: "pending",
 			}
-			const renderedPayloads: Array<{ payload: ClineWorkflowForm; messageType: "ask" | "say" }> = []
+			const renderedPayloads: ClineWorkflowStepResolutionStatus[] = []
 
-			const fakeTask: FakeWorkflowFormTask = {
+			const fakeTask: FakeWorkflowStepResolutionTask = {
 				cwd: tempDir,
 				taskState,
-				pendingWorkflowFormOutcome: undefined,
 				messageStateHandler: {
 					getClineMessages: sinon.stub().returns([]),
 				},
-				workflowFormRuntime: {
+				workflowStepResolutionRuntime: {
 					createSession: sinon.stub().returns(createdSession),
 					buildPayload: sinon
 						.stub()
-						.callsFake((session: WorkflowFormSessionState) => buildAutomaticWorkflowFormPayload(session, "pending")),
-					buildSuccessPayload: sinon
+						.callsFake((session: WorkflowStepResolutionSessionState) =>
+							buildWorkflowStepResolutionStatusPayload(session, session.state),
+						),
+					buildTerminalSession: sinon
 						.stub()
-						.callsFake((session: WorkflowFormSessionState) => buildAutomaticWorkflowFormPayload(session, "success")),
+						.callsFake(
+							(session: WorkflowStepResolutionSessionState, state: "success" | "failure", lastError?: string) => ({
+								...session,
+								state,
+								lastError,
+							}),
+						),
 				},
-				persistWorkflowFormSession: sinon.stub().resolves(),
-				renderWorkflowFormMessage: sinon
+				persistWorkflowStepResolutionSession: sinon.stub().resolves(),
+				renderWorkflowStepResolutionStatusMessage: sinon
 					.stub()
-					.callsFake(async (payload: ClineWorkflowForm, messageType: "ask" | "say") => {
-						renderedPayloads.push({ payload, messageType })
+					.callsFake(async (payload: ClineWorkflowStepResolutionStatus) => {
+						renderedPayloads.push(payload)
 					}),
-				executeWorkflowFormToolAndSync: sinon.stub().callsFake(async () => {
-					expect(fakeTask.pendingWorkflowFormOutcome).to.equal(undefined)
+				executeWorkflowStepResolutionToolAndSync: sinon.stub().callsFake(async () => {
 					await fs.mkdir(path.dirname(reviewInputPath), { recursive: true })
 					await fs.writeFile(reviewInputPath, "# review input\n", "utf8")
 					taskState.activePlaceholderWorkflowValues = {
@@ -1675,37 +1834,143 @@ Construct and persist review_input.md from the persisted diff output before cont
 					].join("\n")
 					return { succeeded: true }
 				}),
-				clearWorkflowFormSession: sinon.stub().callsFake(async () => {
-					await clearWorkflowFormSession.call(fakeTask)
+				clearWorkflowStepResolutionSession: sinon.stub().callsFake(async () => {
+					await clearWorkflowStepResolutionSession.call(fakeTask)
 				}),
 				setThreadDisplayState: sinon.stub(),
 				postStateToWebview: sinon.stub().resolves(),
 			}
 
-			await maybeResolveWorkflowFormBeforeApiTurn.call(fakeTask)
+			await maybeResolveWorkflowStepResolutionBeforeApiTurn.call(fakeTask)
 
-			sinon.assert.calledOnceWithExactly(fakeTask.workflowFormRuntime.createSession, {
-				resolverId: "code_review_step_3_review_input",
+			sinon.assert.calledOnceWithExactly(fakeTask.workflowStepResolutionRuntime.createSession, {
+				definitionId: "code_review_step_3_review_input",
 				triggerSource: "deterministic_workflow_progression",
 				owner: {
 					kind: "placeholder_workflow_step",
 					workflowName: "code-review.md",
 					stepNumber: 3,
 				},
-				initialPhase: "collect_inputs",
-				context: undefined,
 			})
-			sinon.assert.calledOnce(fakeTask.executeWorkflowFormToolAndSync!)
+			sinon.assert.calledOnce(fakeTask.executeWorkflowStepResolutionToolAndSync!)
 			expect(renderedPayloads).to.have.length(2)
-			expect(renderedPayloads[0]?.messageType).to.equal("say")
-			expect(renderedPayloads[0]?.payload.sessionId).to.equal(createdSession.sessionId)
-			expect(renderedPayloads[0]?.payload.automaticStatusState).to.equal("pending")
-			expect(renderedPayloads[1]?.messageType).to.equal("say")
-			expect(renderedPayloads[1]?.payload.sessionId).to.equal(createdSession.sessionId)
-			expect(renderedPayloads[1]?.payload.automaticStatusState).to.equal("success")
+			expect(renderedPayloads[0]?.sessionId).to.equal(createdSession.sessionId)
+			expect(renderedPayloads[0]?.state).to.equal("pending")
+			expect(renderedPayloads[1]?.sessionId).to.equal(createdSession.sessionId)
+			expect(renderedPayloads[1]?.state).to.equal("success")
 		} finally {
 			await fs.rm(tempDir, { recursive: true, force: true })
 		}
+	})
+
+	it("clears a restored workflow-step-resolution session when the active workflow context is missing before resume", async () => {
+		const taskState = new TaskState()
+		taskState.activeWorkflowStepResolutionSession = {
+			sessionId: "restored-step-resolution-session-missing-context",
+			definitionId: "code_review_step_3_review_input",
+			triggerSource: "deterministic_workflow_progression",
+			owner: {
+				kind: "placeholder_workflow_step",
+				workflowName: "code-review.md",
+				stepNumber: 3,
+			},
+			state: "pending",
+		}
+
+		const fakeTask: FakeWorkflowStepResolutionTask & Record<string, unknown> = {
+			cwd: process.cwd(),
+			taskState,
+			messageStateHandler: {
+				getClineMessages: sinon.stub().returns([]),
+			},
+			workflowStepResolutionRuntime: {
+				createSession: sinon.stub(),
+				buildPayload: sinon.stub(),
+				buildTerminalSession: sinon.stub(),
+			},
+			persistWorkflowStepResolutionSession: sinon.stub().resolves(),
+			renderWorkflowStepResolutionStatusMessage: sinon.stub().resolves(),
+			executeWorkflowStepResolutionToolAndSync: sinon.stub().resolves({ succeeded: true }),
+			clearWorkflowStepResolutionSession: sinon.stub(),
+			say: sinon.stub().resolves(undefined),
+			setThreadDisplayState: sinon.stub(),
+			postStateToWebview: sinon.stub().resolves(),
+		}
+		fakeTask.clearWorkflowStepResolutionSession = sinon.stub().callsFake(async () => {
+			await clearWorkflowStepResolutionSession.call(fakeTask)
+		})
+
+		await maybeResolveWorkflowStepResolutionBeforeApiTurn.call(fakeTask)
+
+		sinon.assert.calledOnce(fakeTask.clearWorkflowStepResolutionSession)
+		sinon.assert.notCalled(fakeTask.executeWorkflowStepResolutionToolAndSync!)
+		expect(taskState.activeWorkflowStepResolutionSession).to.equal(undefined)
+	})
+
+	it("clears a restored workflow-step-resolution session when the active workflow step no longer matches the resumed owner", async () => {
+		const taskState = new TaskState()
+		taskState.activeWorkflowStepResolutionSession = {
+			sessionId: "restored-step-resolution-session-step-mismatch",
+			definitionId: "code_review_step_3_review_input",
+			triggerSource: "deterministic_workflow_progression",
+			owner: {
+				kind: "placeholder_workflow_step",
+				workflowName: "code-review.md",
+				stepNumber: 3,
+			},
+			state: "pending",
+		}
+		taskState.activePlaceholderWorkflowSource = {
+			type: "remote",
+			name: "code-review.md",
+			contents: `# Code Review
+
+## Step 1: Determine Review Source
+Done.
+
+## Step 2: System-Owned Diff Source Resolution And Diff Output Persistence
+Done.
+
+## Step 3: Construct & Persist Review Input File
+Create review_input.md.
+`,
+		}
+		taskState.currentFocusChainChecklist = [
+			"- [x] Step 1: Determine Review Source",
+			"- [ ] Step 2: System-Owned Diff Source Resolution And Diff Output Persistence",
+			"- [ ] Step 3: Construct & Persist Review Input File",
+		].join("\n")
+		taskState.activePlaceholderWorkflowStableValues = {}
+		taskState.activePlaceholderWorkflowValues = {}
+
+		const fakeTask: FakeWorkflowStepResolutionTask & Record<string, unknown> = {
+			cwd: process.cwd(),
+			taskState,
+			messageStateHandler: {
+				getClineMessages: sinon.stub().returns([]),
+			},
+			workflowStepResolutionRuntime: {
+				createSession: sinon.stub(),
+				buildPayload: sinon.stub(),
+				buildTerminalSession: sinon.stub(),
+			},
+			persistWorkflowStepResolutionSession: sinon.stub().resolves(),
+			renderWorkflowStepResolutionStatusMessage: sinon.stub().resolves(),
+			executeWorkflowStepResolutionToolAndSync: sinon.stub().resolves({ succeeded: true }),
+			clearWorkflowStepResolutionSession: sinon.stub(),
+			say: sinon.stub().resolves(undefined),
+			setThreadDisplayState: sinon.stub(),
+			postStateToWebview: sinon.stub().resolves(),
+		}
+		fakeTask.clearWorkflowStepResolutionSession = sinon.stub().callsFake(async () => {
+			await clearWorkflowStepResolutionSession.call(fakeTask)
+		})
+
+		await maybeResolveWorkflowStepResolutionBeforeApiTurn.call(fakeTask)
+
+		sinon.assert.calledOnce(fakeTask.clearWorkflowStepResolutionSession)
+		sinon.assert.notCalled(fakeTask.executeWorkflowStepResolutionToolAndSync!)
+		expect(taskState.activeWorkflowStepResolutionSession).to.equal(undefined)
 	})
 
 	it("dismisses a trailing command_output ask before rendering a step-triggered workflow form", async () => {
@@ -1788,7 +2053,7 @@ You are in the fallback path because the system-owned workflow-form path was not
 		}
 	})
 
-	it("renders the automatic workflow preparation failure card, suppresses the resolver, and returns control to manual Step 3", async () => {
+	it('renders a terminal "failure" workflow-step-resolution status for the Step 3 diff mismatch and suppresses the definition id', async () => {
 		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "placeholder-step-3-mismatch-"))
 		const workflowPath = path.join(tempDir, "code-review.md")
 		const diffOutputPath = path.join(tempDir, "workflow-output", "review-input.diff")
@@ -1831,74 +2096,56 @@ Construct and persist review_input.md from the persisted diff output before cont
 				review_input: reviewInputPath,
 			}
 
-			const createdSession: WorkflowFormSessionState = {
-				sessionId: "wf-session-step-3-mismatch",
-				resolverId: "code_review_step_3_review_input",
+			const createdSession: WorkflowStepResolutionSessionState = {
+				sessionId: "step-resolution-session-step-3-mismatch",
+				definitionId: "code_review_step_3_review_input",
 				triggerSource: "deterministic_workflow_progression",
 				owner: {
 					kind: "placeholder_workflow_step",
 					workflowName: "code-review.md",
 					stepNumber: 3,
 				},
-				phase: "collect_inputs",
-				initialPhase: "collect_inputs",
-				values: {},
+				state: "pending",
 			}
-			const renderedPayloads: Array<{ payload: ClineWorkflowForm; messageType: "ask" | "say" }> = []
+			const renderedPayloads: ClineWorkflowStepResolutionStatus[] = []
 
-			const fakeTask: FakeWorkflowFormTask &
+			const fakeTask: FakeWorkflowStepResolutionTask &
 				Record<string, unknown> & {
 					toolExecutor: { executeTool: sinon.SinonStub }
 					syncDeterministicProgressionAfterWorkflowFormTool: sinon.SinonStub
 					getWorkflowFormToolResultText: typeof getWorkflowFormToolResultText
-					getWorkflowFormToolErrorMessage: typeof getWorkflowFormToolErrorMessage
 				} = {
 				cwd: tempDir,
 				taskState,
-				pendingWorkflowFormOutcome: undefined,
 				messageStateHandler: {
 					getClineMessages: sinon.stub().returns([]),
 				},
-				workflowFormRuntime: {
+				workflowStepResolutionRuntime: {
 					createSession: sinon.stub().returns(createdSession),
-					buildPayload: sinon.stub().callsFake((session: WorkflowFormSessionState) => ({
-						definition: {
-							presentation: {
-								kind: "automatic_status",
-								pendingLabel: "Preparing workflow documents",
-								successLabel: "Workflow documents ready",
-								failureLabel:
-									"Automatic workflow preparation failed- falling back to manual LLM workflow preparation.",
-							},
-						},
-						sessionId: session.sessionId,
-						phase: session.phase,
-						automaticStatusState: "pending",
-					})),
-					buildFailurePayload: sinon.stub().callsFake((session: WorkflowFormSessionState) => ({
-						definition: {
-							presentation: {
-								kind: "automatic_status",
-								pendingLabel: "Preparing workflow documents",
-								successLabel: "Workflow documents ready",
-								failureLabel:
-									"Automatic workflow preparation failed- falling back to manual LLM workflow preparation.",
-							},
-						},
-						sessionId: session.sessionId,
-						phase: "success",
-						automaticStatusState: "failure",
-					})),
+					buildPayload: sinon
+						.stub()
+						.callsFake((session: WorkflowStepResolutionSessionState) =>
+							buildWorkflowStepResolutionStatusPayload(session, session.state),
+						),
+					buildTerminalSession: sinon
+						.stub()
+						.callsFake(
+							(session: WorkflowStepResolutionSessionState, state: "success" | "failure", lastError?: string) => ({
+								...session,
+								state,
+								lastError,
+							}),
+						),
 				},
-				persistWorkflowFormSession: sinon.stub().resolves(),
-				renderWorkflowFormMessage: sinon
+				persistWorkflowStepResolutionSession: sinon.stub().resolves(),
+				renderWorkflowStepResolutionStatusMessage: sinon
 					.stub()
-					.callsFake(async (payload: ClineWorkflowForm, messageType: "ask" | "say") => {
-						renderedPayloads.push({ payload, messageType })
+					.callsFake(async (payload: ClineWorkflowStepResolutionStatus) => {
+						renderedPayloads.push(payload)
 					}),
-				executeWorkflowFormToolAndSync: sinon
+				executeWorkflowStepResolutionToolAndSync: sinon
 					.stub()
-					.callsFake(async (outcome: unknown) => executeWorkflowFormToolAndSync.call(fakeTask, outcome)),
+					.callsFake(async (args: unknown) => executeWorkflowStepResolutionToolAndSync.call(fakeTask, args)),
 				toolExecutor: {
 					executeTool: sinon.stub().callsFake(async () => {
 						taskState.userMessageContent.push({
@@ -1915,31 +2162,28 @@ Construct and persist review_input.md from the persisted diff output before cont
 				},
 				syncDeterministicProgressionAfterWorkflowFormTool: sinon.stub().resolves(),
 				getWorkflowFormToolResultText,
-				getWorkflowFormToolErrorMessage,
-				clearWorkflowFormSession: sinon.stub().callsFake(async () => {
-					await clearWorkflowFormSession.call(fakeTask)
+				clearWorkflowStepResolutionSession: sinon.stub().callsFake(async () => {
+					await clearWorkflowStepResolutionSession.call(fakeTask)
 				}),
 				setThreadDisplayState: sinon.stub(),
 				postStateToWebview: sinon.stub().resolves(),
 			}
 
-			await maybeResolveWorkflowFormBeforeApiTurn.call(fakeTask)
+			await maybeResolveWorkflowStepResolutionBeforeApiTurn.call(fakeTask)
 
 			expect(renderedPayloads).to.have.length(2)
-			expect(renderedPayloads[1]?.messageType).to.equal("say")
-			expect(renderedPayloads[1]?.payload.phase).to.equal("success")
-			expect(renderedPayloads[1]?.payload.automaticStatusState).to.equal("failure")
-			expect(JSON.stringify(renderedPayloads[1]?.payload)).to.not.contain(
+			expect(renderedPayloads[1]?.state).to.equal("failure")
+			expect(JSON.stringify(renderedPayloads[1])).to.not.contain(
 				"diff_output does not identify recent changes to the story file.",
 			)
-			expect(taskState.suppressedWorkflowFormResolverIds).to.include("code_review_step_3_review_input")
-			expect(taskState.activeWorkflowFormSession).to.equal(undefined)
+			expect(taskState.suppressedWorkflowStepResolutionDefinitionIds).to.include("code_review_step_3_review_input")
+			expect(taskState.activeWorkflowStepResolutionSession).to.equal(undefined)
 		} finally {
 			await fs.rm(tempDir, { recursive: true, force: true })
 		}
 	})
 
-	it("falls back after build_review_input tool errors and renders the generic automatic workflow preparation failure card", async () => {
+	it("falls back after build_review_input tool errors and renders the generic workflow-step-resolution failure status", async () => {
 		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "placeholder-step-3-tool-error-"))
 		const workflowPath = path.join(tempDir, "code-review.md")
 		const diffOutputPath = path.join(tempDir, "workflow-output", "review-input.diff")
@@ -1984,74 +2228,56 @@ Construct and persist review_input.md from the persisted diff output before cont
 				review_input: reviewInputPath,
 			}
 
-			const createdSession: WorkflowFormSessionState = {
-				sessionId: "wf-session-step-3-tool-error",
-				resolverId: "code_review_step_3_review_input",
+			const createdSession: WorkflowStepResolutionSessionState = {
+				sessionId: "step-resolution-session-step-3-tool-error",
+				definitionId: "code_review_step_3_review_input",
 				triggerSource: "deterministic_workflow_progression",
 				owner: {
 					kind: "placeholder_workflow_step",
 					workflowName: "code-review.md",
 					stepNumber: 3,
 				},
-				phase: "collect_inputs",
-				initialPhase: "collect_inputs",
-				values: {},
+				state: "pending",
 			}
-			const renderedPayloads: Array<{ payload: ClineWorkflowForm; messageType: "ask" | "say" }> = []
+			const renderedPayloads: ClineWorkflowStepResolutionStatus[] = []
 
-			const fakeTask: FakeWorkflowFormTask &
+			const fakeTask: FakeWorkflowStepResolutionTask &
 				Record<string, unknown> & {
 					toolExecutor: { executeTool: sinon.SinonStub }
 					syncDeterministicProgressionAfterWorkflowFormTool: sinon.SinonStub
 					getWorkflowFormToolResultText: typeof getWorkflowFormToolResultText
-					getWorkflowFormToolErrorMessage: typeof getWorkflowFormToolErrorMessage
 				} = {
 				cwd: tempDir,
 				taskState,
-				pendingWorkflowFormOutcome: undefined,
 				messageStateHandler: {
 					getClineMessages: sinon.stub().returns([]),
 				},
-				workflowFormRuntime: {
+				workflowStepResolutionRuntime: {
 					createSession: sinon.stub().returns(createdSession),
-					buildPayload: sinon.stub().callsFake((session: WorkflowFormSessionState) => ({
-						definition: {
-							presentation: {
-								kind: "automatic_status",
-								pendingLabel: "Preparing workflow documents",
-								successLabel: "Workflow documents ready",
-								failureLabel:
-									"Automatic workflow preparation failed- falling back to manual LLM workflow preparation.",
-							},
-						},
-						sessionId: session.sessionId,
-						phase: session.phase,
-						automaticStatusState: "pending",
-					})),
-					buildFailurePayload: sinon.stub().callsFake((session: WorkflowFormSessionState) => ({
-						definition: {
-							presentation: {
-								kind: "automatic_status",
-								pendingLabel: "Preparing workflow documents",
-								successLabel: "Workflow documents ready",
-								failureLabel:
-									"Automatic workflow preparation failed- falling back to manual LLM workflow preparation.",
-							},
-						},
-						sessionId: session.sessionId,
-						phase: "success",
-						automaticStatusState: "failure",
-					})),
+					buildPayload: sinon
+						.stub()
+						.callsFake((session: WorkflowStepResolutionSessionState) =>
+							buildWorkflowStepResolutionStatusPayload(session, session.state),
+						),
+					buildTerminalSession: sinon
+						.stub()
+						.callsFake(
+							(session: WorkflowStepResolutionSessionState, state: "success" | "failure", lastError?: string) => ({
+								...session,
+								state,
+								lastError,
+							}),
+						),
 				},
-				persistWorkflowFormSession: sinon.stub().resolves(),
-				renderWorkflowFormMessage: sinon
+				persistWorkflowStepResolutionSession: sinon.stub().resolves(),
+				renderWorkflowStepResolutionStatusMessage: sinon
 					.stub()
-					.callsFake(async (payload: ClineWorkflowForm, messageType: "ask" | "say") => {
-						renderedPayloads.push({ payload, messageType })
+					.callsFake(async (payload: ClineWorkflowStepResolutionStatus) => {
+						renderedPayloads.push(payload)
 					}),
-				executeWorkflowFormToolAndSync: sinon
+				executeWorkflowStepResolutionToolAndSync: sinon
 					.stub()
-					.callsFake(async (outcome: unknown) => executeWorkflowFormToolAndSync.call(fakeTask, outcome)),
+					.callsFake(async (args: unknown) => executeWorkflowStepResolutionToolAndSync.call(fakeTask, args)),
 				toolExecutor: {
 					executeTool: sinon.stub().callsFake(async () => {
 						taskState.userMessageContent.push({
@@ -2062,26 +2288,23 @@ Construct and persist review_input.md from the persisted diff output before cont
 				},
 				syncDeterministicProgressionAfterWorkflowFormTool: sinon.stub().resolves(),
 				getWorkflowFormToolResultText,
-				getWorkflowFormToolErrorMessage,
-				clearWorkflowFormSession: sinon.stub().callsFake(async () => {
-					await clearWorkflowFormSession.call(fakeTask)
+				clearWorkflowStepResolutionSession: sinon.stub().callsFake(async () => {
+					await clearWorkflowStepResolutionSession.call(fakeTask)
 				}),
 				setThreadDisplayState: sinon.stub(),
 				postStateToWebview: sinon.stub().resolves(),
 			}
 
-			await maybeResolveWorkflowFormBeforeApiTurn.call(fakeTask)
+			await maybeResolveWorkflowStepResolutionBeforeApiTurn.call(fakeTask)
 
 			expect(renderedPayloads).to.have.length(2)
-			expect(renderedPayloads[1]?.messageType).to.equal("say")
-			expect(renderedPayloads[1]?.payload.phase).to.equal("success")
-			expect(renderedPayloads[1]?.payload.automaticStatusState).to.equal("failure")
-			expect(JSON.stringify(renderedPayloads[1]?.payload)).to.contain(
+			expect(renderedPayloads[1]?.state).to.equal("failure")
+			expect(JSON.stringify(renderedPayloads[1])).to.contain(
 				"Automatic workflow preparation failed- falling back to manual LLM workflow preparation.",
 			)
-			expect(JSON.stringify(renderedPayloads[1]?.payload)).to.not.contain(toolError)
-			expect(taskState.suppressedWorkflowFormResolverIds).to.include("code_review_step_3_review_input")
-			expect(taskState.activeWorkflowFormSession).to.equal(undefined)
+			expect(JSON.stringify(renderedPayloads[1])).to.not.contain(toolError)
+			expect(taskState.suppressedWorkflowStepResolutionDefinitionIds).to.include("code_review_step_3_review_input")
+			expect(taskState.activeWorkflowStepResolutionSession).to.equal(undefined)
 		} finally {
 			await fs.rm(tempDir, { recursive: true, force: true })
 		}
@@ -2137,7 +2360,7 @@ Construct and persist review_input.md from the persisted diff output before cont
 
 		expect(fakeTask.workflowFormRuntime.createSession.called).to.equal(false)
 		expect(fakeTask.workflowFormRuntime.buildPayload.calledOnceWithExactly(session)).to.equal(true)
-		expect(fakeTask.renderWorkflowFormMessage.calledOnceWithExactly(renderedPayload, "ask")).to.equal(true)
+		expect(fakeTask.renderWorkflowFormMessage.calledOnceWithExactly(renderedPayload)).to.equal(true)
 	})
 
 	it("opens the quick-spec workflow-start card before later pre-turn phases continue", async () => {
@@ -2222,7 +2445,7 @@ Construct and persist review_input.md from the persisted diff output before cont
 		expect(fakeTask.persistWorkflowStartCardSession.calledOnce).to.equal(true)
 	})
 
-	it("chains the quick-spec workflow-start title collection into the Step 2 tech-spec automatic workflow-preparation form before the AI turn", async () => {
+	it("chains the quick-spec workflow-start title collection into the Step 2 workflow-step resolution before the AI turn", async () => {
 		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "workflow-start-title-chain-"))
 
 		try {
@@ -2248,18 +2471,16 @@ Construct and persist review_input.md from the persisted diff output before cont
 					},
 				},
 			}
-			const stepTwoSession: WorkflowFormSessionState = {
-				sessionId: "wf-session-step-2-chain",
-				resolverId: "quick_spec_step_2_build_tech_spec_document",
+			const stepTwoSession: WorkflowStepResolutionSessionState = {
+				sessionId: "step-resolution-session-step-2-chain",
+				definitionId: "quick_spec_step_2_build_tech_spec_document",
 				triggerSource: "deterministic_workflow_progression",
 				owner: {
 					kind: "placeholder_workflow_step",
 					workflowName: "quick-spec.md",
 					stepNumber: 2,
 				},
-				phase: "collect_inputs",
-				initialPhase: "collect_inputs",
-				values: {},
+				state: "pending",
 			}
 			const taskState = new TaskState()
 			taskState.activePlaceholderWorkflowId = "quick-spec.md"
@@ -2286,12 +2507,15 @@ Ask the user to describe what they'd like to work on.
 			taskState.activePlaceholderWorkflowStableValues = {
 				implementation_artifacts: path.join(tempDir, "planning", "implementation-artifacts"),
 			}
+			taskState.suppressedWorkflowFormResolverIds = ["quick_spec_step_2_build_tech_spec_document"]
 
 			let renderCount = 0
 			let executeCallCount = 0
-			const fakeTask: FakeWorkflowFormTask & {
-				executeWorkflowFormToolAndSync: sinon.SinonStub
-			} = {
+			const fakeTask: FakeWorkflowFormTask &
+				FakeWorkflowStepResolutionTask & {
+					executeWorkflowFormToolAndSync: sinon.SinonStub
+					executeWorkflowStepResolutionToolAndSync: sinon.SinonStub
+				} = {
 				cwd: tempDir,
 				taskState,
 				pendingWorkflowFormOutcome: undefined,
@@ -2299,28 +2523,35 @@ Ask the user to describe what they'd like to work on.
 					getClineMessages: sinon.stub().returns([]),
 				},
 				workflowFormRuntime: {
-					createSession: sinon
-						.stub()
-						.onFirstCall()
-						.returns(workflowStartSession)
-						.onSecondCall()
-						.returns(stepTwoSession),
+					createSession: sinon.stub().onFirstCall().returns(workflowStartSession),
 					buildPayload: sinon
 						.stub()
-						.callsFake((session: WorkflowFormSessionState) =>
-							session.resolverId === "quick_spec_step_2_build_tech_spec_document"
-								? buildAutomaticWorkflowFormPayload(session, "pending")
-								: buildInteractiveWorkflowFormPayload(session),
-						),
+						.callsFake((session: WorkflowFormSessionState) => buildInteractiveWorkflowFormPayload(session)),
 					buildSuccessPayload: sinon.stub().callsFake((session: WorkflowFormSessionState, successMessage: string) => ({
-						...(session.resolverId === "quick_spec_step_2_build_tech_spec_document"
-							? buildAutomaticWorkflowFormPayload(session, "success")
-							: buildInteractiveWorkflowFormPayload(session)),
+						...buildInteractiveWorkflowFormPayload(session),
 						phase: "success",
 						successMessage,
 					})),
 				},
+				workflowStepResolutionRuntime: {
+					createSession: sinon.stub().returns(stepTwoSession),
+					buildPayload: sinon
+						.stub()
+						.callsFake((session: WorkflowStepResolutionSessionState) =>
+							buildWorkflowStepResolutionStatusPayload(session, session.state),
+						),
+					buildTerminalSession: sinon
+						.stub()
+						.callsFake(
+							(session: WorkflowStepResolutionSessionState, state: "success" | "failure", lastError?: string) => ({
+								...session,
+								state,
+								lastError,
+							}),
+						),
+				},
 				persistWorkflowFormSession: sinon.stub().resolves(),
+				persistWorkflowStepResolutionSession: sinon.stub().resolves(),
 				renderWorkflowFormMessage: sinon.stub().callsFake(async () => {
 					renderCount += 1
 					if (renderCount === 1) {
@@ -2333,6 +2564,7 @@ Ask the user to describe what they'd like to work on.
 						}
 					}
 				}),
+				renderWorkflowStepResolutionStatusMessage: sinon.stub().resolves(),
 				executeWorkflowFormToolAndSync: sinon.stub().callsFake(async (outcome: WorkflowFormRuntimeOutcome) => {
 					expect(outcome).to.include({ kind: "invoke_tool" })
 					executeCallCount += 1
@@ -2348,30 +2580,31 @@ Ask the user to describe what they'd like to work on.
 						].join("\n")
 					}
 
-					if (executeCallCount === 2) {
-						if (outcome.kind === "invoke_tool") {
-							expect(outcome.toolName).to.equal(ClineDefaultTool.BUILD_TECH_SPEC_DOCUMENT)
-						}
-						expect(taskState.activePlaceholderWorkflowValues?.title).to.equal("Quick Spec Workflow")
-						const outputFile = path.join(tempDir, "planning", "implementation-artifacts", "tech-spec-wip.md")
-						await fs.mkdir(path.dirname(outputFile), { recursive: true })
-						await fs.writeFile(outputFile, "# Tech-Spec: Quick Spec Workflow\n", "utf8")
-						taskState.activePlaceholderWorkflowValues = {
-							title: "Quick Spec Workflow",
-							output_file: outputFile,
-						}
-						taskState.activePlaceholderWorkflowTaskWriteProofPaths = [outputFile]
-						taskState.currentFocusChainChecklist = [
-							"- [x] Step 1: Gather Project Info",
-							"- [x] Step 2:  (System-Owned) Resolve or start the spec draft",
-							"- [ ] Step 3: Identify the Objective",
-						].join("\n")
+					return { succeeded: true }
+				}),
+				executeWorkflowStepResolutionToolAndSync: sinon.stub().callsFake(async () => {
+					executeCallCount += 1
+					expect(taskState.activePlaceholderWorkflowValues?.title).to.equal("Quick Spec Workflow")
+					const outputFile = path.join(tempDir, "planning", "implementation-artifacts", "tech-spec-wip.md")
+					await fs.mkdir(path.dirname(outputFile), { recursive: true })
+					await fs.writeFile(outputFile, "# Tech-Spec: Quick Spec Workflow\n", "utf8")
+					taskState.activePlaceholderWorkflowValues = {
+						title: "Quick Spec Workflow",
+						output_file: outputFile,
 					}
-
+					taskState.activePlaceholderWorkflowTaskWriteProofPaths = [outputFile]
+					taskState.currentFocusChainChecklist = [
+						"- [x] Step 1: Gather Project Info",
+						"- [x] Step 2:  (System-Owned) Resolve or start the spec draft",
+						"- [ ] Step 3: Identify the Objective",
+					].join("\n")
 					return { succeeded: true }
 				}),
 				clearWorkflowFormSession: sinon.stub().callsFake(async () => {
 					taskState.activeWorkflowFormSession = undefined
+				}),
+				clearWorkflowStepResolutionSession: sinon.stub().callsFake(async () => {
+					taskState.activeWorkflowStepResolutionSession = undefined
 				}),
 				setThreadDisplayState: sinon.stub(),
 				postStateToWebview: sinon.stub().resolves(),
@@ -2386,15 +2619,15 @@ Ask the user to describe what they'd like to work on.
 					contents: "# Quick Spec\nCreate a small implementation-ready tech spec.",
 				},
 			})
+			await maybeResolveWorkflowStepResolutionBeforeApiTurn.call(fakeTask)
 
-			expect(fakeTask.workflowFormRuntime.createSession.callCount).to.equal(2)
+			expect(fakeTask.workflowFormRuntime.createSession.callCount).to.equal(1)
 			expect(fakeTask.workflowFormRuntime.createSession.firstCall.args[0]?.resolverId).to.equal(
 				"placeholder_workflow_start_set_workflow_placeholders",
 			)
-			expect(fakeTask.workflowFormRuntime.createSession.secondCall.args[0]?.resolverId).to.equal(
+			expect(fakeTask.workflowStepResolutionRuntime.createSession.firstCall.args[0]?.definitionId).to.equal(
 				"quick_spec_step_2_build_tech_spec_document",
 			)
-			expect(fakeTask.workflowFormRuntime.createSession.secondCall.args[0]?.initialPhase).to.equal("collect_inputs")
 			expect(executeCallCount).to.equal(2)
 			expect(taskState.activePlaceholderWorkflowValues?.title).to.equal("Quick Spec Workflow")
 			expect(taskState.activePlaceholderWorkflowValues?.output_file).to.equal(
@@ -2504,7 +2737,7 @@ Ask the user to describe what they'd like to work on.
 		sinon.assert.calledOnce(fakeTask.clearWorkflowStartCardSession)
 	})
 
-	it("chains slash-command workflow-start story_path success through code-review Step 2 and opens the Step 3 review-input form with story_path preserved", async () => {
+	it("chains slash-command workflow-start story_path success through code-review Step 2 and Step 3 workflow-step resolution with story_path preserved", async () => {
 		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "workflow-start-story-path-chain-"))
 
 		try {
@@ -2543,18 +2776,16 @@ Ask the user to describe what they'd like to work on.
 				initialPhase: "confirm",
 				values: {},
 			}
-			const stepThreeSession: WorkflowFormSessionState = {
-				sessionId: "wf-session-step-3-chain",
-				resolverId: "code_review_step_3_review_input",
+			const stepThreeSession: WorkflowStepResolutionSessionState = {
+				sessionId: "step-resolution-session-step-3-chain",
+				definitionId: "code_review_step_3_review_input",
 				triggerSource: "deterministic_workflow_progression",
 				owner: {
 					kind: "placeholder_workflow_step",
 					workflowName: "code-review.md",
 					stepNumber: 3,
 				},
-				phase: "collect_inputs",
-				initialPhase: "collect_inputs",
-				values: {},
+				state: "pending",
 			}
 			const taskState = new TaskState()
 			taskState.activePlaceholderWorkflowId = "code-review.md"
@@ -2583,12 +2814,15 @@ Build the review input before continuing.
 				output_folder: path.join(tempDir, "workflow-output"),
 				review_input: path.join(tempDir, "workflow-output", "review-input.md"),
 			}
+			taskState.suppressedWorkflowFormResolverIds = ["code_review_step_3_review_input"]
 
 			let renderCount = 0
 			let executeCallCount = 0
-			const fakeTask: FakeWorkflowFormTask & {
-				executeWorkflowFormToolAndSync: sinon.SinonStub
-			} = {
+			const fakeTask: FakeWorkflowFormTask &
+				FakeWorkflowStepResolutionTask & {
+					executeWorkflowFormToolAndSync: sinon.SinonStub
+					executeWorkflowStepResolutionToolAndSync: sinon.SinonStub
+				} = {
 				cwd: tempDir,
 				taskState,
 				pendingWorkflowFormOutcome: undefined,
@@ -2601,25 +2835,35 @@ Build the review input before continuing.
 						.onFirstCall()
 						.returns(workflowStartSession)
 						.onSecondCall()
-						.returns(stepTwoSession)
-						.onThirdCall()
-						.returns(stepThreeSession),
+						.returns(stepTwoSession),
 					buildPayload: sinon
 						.stub()
-						.callsFake((session: WorkflowFormSessionState) =>
-							session.resolverId === "code_review_step_3_review_input"
-								? buildAutomaticWorkflowFormPayload(session, "pending")
-								: buildInteractiveWorkflowFormPayload(session),
-						),
+						.callsFake((session: WorkflowFormSessionState) => buildInteractiveWorkflowFormPayload(session)),
 					buildSuccessPayload: sinon.stub().callsFake((session: WorkflowFormSessionState, successMessage: string) => ({
-						...(session.resolverId === "code_review_step_3_review_input"
-							? buildAutomaticWorkflowFormPayload(session, "success")
-							: buildInteractiveWorkflowFormPayload(session)),
+						...buildInteractiveWorkflowFormPayload(session),
 						phase: "success",
 						successMessage,
 					})),
 				},
+				workflowStepResolutionRuntime: {
+					createSession: sinon.stub().returns(stepThreeSession),
+					buildPayload: sinon
+						.stub()
+						.callsFake((session: WorkflowStepResolutionSessionState) =>
+							buildWorkflowStepResolutionStatusPayload(session, session.state),
+						),
+					buildTerminalSession: sinon
+						.stub()
+						.callsFake(
+							(session: WorkflowStepResolutionSessionState, state: "success" | "failure", lastError?: string) => ({
+								...session,
+								state,
+								lastError,
+							}),
+						),
+				},
 				persistWorkflowFormSession: sinon.stub().resolves(),
+				persistWorkflowStepResolutionSession: sinon.stub().resolves(),
 				renderWorkflowFormMessage: sinon.stub().callsFake(async () => {
 					renderCount += 1
 					if (renderCount === 1) {
@@ -2651,6 +2895,7 @@ Build the review input before continuing.
 						}
 					}
 				}),
+				renderWorkflowStepResolutionStatusMessage: sinon.stub().resolves(),
 				executeWorkflowFormToolAndSync: sinon.stub().callsFake(async (outcome: WorkflowFormRuntimeOutcome) => {
 					expect(outcome).to.include({ kind: "invoke_tool" })
 					executeCallCount += 1
@@ -2678,27 +2923,31 @@ Build the review input before continuing.
 						].join("\n")
 					}
 
-					if (executeCallCount === 3) {
-						expect(taskState.activePlaceholderWorkflowValues?.story_path).to.equal("docs/story.md")
-						taskState.activePlaceholderWorkflowValues = {
-							story_path: "docs/story.md",
-							diff_output: path.join(tempDir, "workflow-output", "review-input.diff"),
-							review_input: path.join(tempDir, "workflow-output", "review-input.md"),
-						}
-						taskState.activePlaceholderWorkflowTaskWriteProofPaths = [
-							path.join(tempDir, "workflow-output", "review-input.md"),
-						]
-						taskState.currentFocusChainChecklist = [
-							"- [x] Step 1: Determine Review Source",
-							"- [x] Step 2: System-Owned Diff Source Resolution And Diff Output Persistence",
-							"- [x] Step 3: Construct & Persist Review Input File",
-						].join("\n")
+					return { succeeded: true }
+				}),
+				executeWorkflowStepResolutionToolAndSync: sinon.stub().callsFake(async () => {
+					executeCallCount += 1
+					expect(taskState.activePlaceholderWorkflowValues?.story_path).to.equal("docs/story.md")
+					taskState.activePlaceholderWorkflowValues = {
+						story_path: "docs/story.md",
+						diff_output: path.join(tempDir, "workflow-output", "review-input.diff"),
+						review_input: path.join(tempDir, "workflow-output", "review-input.md"),
 					}
-
+					taskState.activePlaceholderWorkflowTaskWriteProofPaths = [
+						path.join(tempDir, "workflow-output", "review-input.md"),
+					]
+					taskState.currentFocusChainChecklist = [
+						"- [x] Step 1: Determine Review Source",
+						"- [x] Step 2: System-Owned Diff Source Resolution And Diff Output Persistence",
+						"- [x] Step 3: Construct & Persist Review Input File",
+					].join("\n")
 					return { succeeded: true }
 				}),
 				clearWorkflowFormSession: sinon.stub().callsFake(async () => {
 					taskState.activeWorkflowFormSession = undefined
+				}),
+				clearWorkflowStepResolutionSession: sinon.stub().callsFake(async () => {
+					taskState.activeWorkflowStepResolutionSession = undefined
 				}),
 				setThreadDisplayState: sinon.stub(),
 				postStateToWebview: sinon.stub().resolves(),
@@ -2713,18 +2962,18 @@ Build the review input before continuing.
 					contents: "# Code review\nInspect the implementation.",
 				},
 			})
+			await maybeResolveWorkflowStepResolutionBeforeApiTurn.call(fakeTask)
 
-			expect(fakeTask.workflowFormRuntime.createSession.callCount).to.equal(3)
+			expect(fakeTask.workflowFormRuntime.createSession.callCount).to.equal(2)
 			expect(fakeTask.workflowFormRuntime.createSession.firstCall.args[0]?.resolverId).to.equal(
 				"placeholder_workflow_start_set_workflow_placeholders",
 			)
 			expect(fakeTask.workflowFormRuntime.createSession.secondCall.args[0]?.resolverId).to.equal(
 				"code_review_step_3_diff_source",
 			)
-			expect(fakeTask.workflowFormRuntime.createSession.thirdCall.args[0]?.resolverId).to.equal(
+			expect(fakeTask.workflowStepResolutionRuntime.createSession.firstCall.args[0]?.definitionId).to.equal(
 				"code_review_step_3_review_input",
 			)
-			expect(fakeTask.workflowFormRuntime.createSession.thirdCall.args[0]?.initialPhase).to.equal("collect_inputs")
 			expect(executeCallCount).to.equal(3)
 			expect(taskState.activePlaceholderWorkflowValues?.story_path).to.equal("docs/story.md")
 		} finally {
@@ -2732,7 +2981,7 @@ Build the review input before continuing.
 		}
 	})
 
-	it("chains slash-command workflow-start story_path success through write-remediation-story Step 2 automatic review-input preparation", async () => {
+	it("chains slash-command workflow-start story_path success through write-remediation-story Step 2 workflow-step resolution", async () => {
 		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "workflow-start-story-path-chain-"))
 
 		try {
@@ -2758,18 +3007,16 @@ Build the review input before continuing.
 					},
 				},
 			}
-			const stepTwoSession: WorkflowFormSessionState = {
-				sessionId: "wf-session-step-2-chain",
-				resolverId: "write_remediation_story_step_2_review_input",
+			const stepTwoSession: WorkflowStepResolutionSessionState = {
+				sessionId: "step-resolution-session-step-2-chain",
+				definitionId: "write_remediation_story_step_2_review_input",
 				triggerSource: "deterministic_workflow_progression",
 				owner: {
 					kind: "placeholder_workflow_step",
 					workflowName: "write-remediation-story.md",
 					stepNumber: 2,
 				},
-				phase: "collect_inputs",
-				initialPhase: "collect_inputs",
-				values: {},
+				state: "pending",
 			}
 			const taskState = new TaskState()
 			taskState.activePlaceholderWorkflowId = "write-remediation-story.md"
@@ -2796,12 +3043,15 @@ Write the remediation story here.
 			taskState.activePlaceholderWorkflowStableValues = {
 				output_folder: path.join(tempDir, "workflow-output"),
 			}
+			taskState.suppressedWorkflowFormResolverIds = ["write_remediation_story_step_2_review_input"]
 
 			let renderCount = 0
 			let executeCallCount = 0
-			const fakeTask: FakeWorkflowFormTask & {
-				executeWorkflowFormToolAndSync: sinon.SinonStub
-			} = {
+			const fakeTask: FakeWorkflowFormTask &
+				FakeWorkflowStepResolutionTask & {
+					executeWorkflowFormToolAndSync: sinon.SinonStub
+					executeWorkflowStepResolutionToolAndSync: sinon.SinonStub
+				} = {
 				cwd: tempDir,
 				taskState,
 				pendingWorkflowFormOutcome: undefined,
@@ -2809,28 +3059,35 @@ Write the remediation story here.
 					getClineMessages: sinon.stub().returns([]),
 				},
 				workflowFormRuntime: {
-					createSession: sinon
-						.stub()
-						.onFirstCall()
-						.returns(workflowStartSession)
-						.onSecondCall()
-						.returns(stepTwoSession),
+					createSession: sinon.stub().onFirstCall().returns(workflowStartSession),
 					buildPayload: sinon
 						.stub()
-						.callsFake((session: WorkflowFormSessionState) =>
-							session.resolverId === "write_remediation_story_step_2_review_input"
-								? buildAutomaticWorkflowFormPayload(session, "pending")
-								: buildInteractiveWorkflowFormPayload(session),
-						),
+						.callsFake((session: WorkflowFormSessionState) => buildInteractiveWorkflowFormPayload(session)),
 					buildSuccessPayload: sinon.stub().callsFake((session: WorkflowFormSessionState, successMessage: string) => ({
-						...(session.resolverId === "write_remediation_story_step_2_review_input"
-							? buildAutomaticWorkflowFormPayload(session, "success")
-							: buildInteractiveWorkflowFormPayload(session)),
+						...buildInteractiveWorkflowFormPayload(session),
 						phase: "success",
 						successMessage,
 					})),
 				},
+				workflowStepResolutionRuntime: {
+					createSession: sinon.stub().returns(stepTwoSession),
+					buildPayload: sinon
+						.stub()
+						.callsFake((session: WorkflowStepResolutionSessionState) =>
+							buildWorkflowStepResolutionStatusPayload(session, session.state),
+						),
+					buildTerminalSession: sinon
+						.stub()
+						.callsFake(
+							(session: WorkflowStepResolutionSessionState, state: "success" | "failure", lastError?: string) => ({
+								...session,
+								state,
+								lastError,
+							}),
+						),
+				},
 				persistWorkflowFormSession: sinon.stub().resolves(),
+				persistWorkflowStepResolutionSession: sinon.stub().resolves(),
 				renderWorkflowFormMessage: sinon.stub().callsFake(async () => {
 					renderCount += 1
 					if (renderCount === 1) {
@@ -2843,6 +3100,7 @@ Write the remediation story here.
 						}
 					}
 				}),
+				renderWorkflowStepResolutionStatusMessage: sinon.stub().resolves(),
 				executeWorkflowFormToolAndSync: sinon.stub().callsFake(async (outcome: WorkflowFormRuntimeOutcome) => {
 					expect(outcome).to.include({ kind: "invoke_tool" })
 					executeCallCount += 1
@@ -2858,27 +3116,31 @@ Write the remediation story here.
 						].join("\n")
 					}
 
-					if (executeCallCount === 2) {
-						expect(taskState.activePlaceholderWorkflowValues?.story_path).to.equal("docs/story.md")
-						const reviewInputPath = path.join(tempDir, "workflow-output", "review-input.md")
-						await fs.mkdir(path.dirname(reviewInputPath), { recursive: true })
-						await fs.writeFile(reviewInputPath, "# review input\n", "utf8")
-						taskState.activePlaceholderWorkflowValues = {
-							story_path: "docs/story.md",
-							review_input: reviewInputPath,
-						}
-						taskState.activePlaceholderWorkflowTaskWriteProofPaths = [reviewInputPath]
-						taskState.currentFocusChainChecklist = [
-							"- [x] Step 1: Gather Necessary Inputs",
-							"- [x] Step 2: Build review-input.md",
-							"- [ ] Step 3: Persist Remediation Story with Tasks / Subtasks Based on Recent Review Findings",
-						].join("\n")
+					return { succeeded: true }
+				}),
+				executeWorkflowStepResolutionToolAndSync: sinon.stub().callsFake(async () => {
+					executeCallCount += 1
+					expect(taskState.activePlaceholderWorkflowValues?.story_path).to.equal("docs/story.md")
+					const reviewInputPath = path.join(tempDir, "workflow-output", "review-input.md")
+					await fs.mkdir(path.dirname(reviewInputPath), { recursive: true })
+					await fs.writeFile(reviewInputPath, "# review input\n", "utf8")
+					taskState.activePlaceholderWorkflowValues = {
+						story_path: "docs/story.md",
+						review_input: reviewInputPath,
 					}
-
+					taskState.activePlaceholderWorkflowTaskWriteProofPaths = [reviewInputPath]
+					taskState.currentFocusChainChecklist = [
+						"- [x] Step 1: Gather Necessary Inputs",
+						"- [x] Step 2: Build review-input.md",
+						"- [ ] Step 3: Persist Remediation Story with Tasks / Subtasks Based on Recent Review Findings",
+					].join("\n")
 					return { succeeded: true }
 				}),
 				clearWorkflowFormSession: sinon.stub().callsFake(async () => {
 					taskState.activeWorkflowFormSession = undefined
+				}),
+				clearWorkflowStepResolutionSession: sinon.stub().callsFake(async () => {
+					taskState.activeWorkflowStepResolutionSession = undefined
 				}),
 				setThreadDisplayState: sinon.stub(),
 				postStateToWebview: sinon.stub().resolves(),
@@ -2893,21 +3155,20 @@ Write the remediation story here.
 					contents: "# write-remediation-story\nBuild the remediation story.",
 				},
 			})
+			await maybeResolveWorkflowStepResolutionBeforeApiTurn.call(fakeTask)
 
-			expect(fakeTask.workflowFormRuntime.createSession.callCount).to.equal(2)
+			expect(fakeTask.workflowFormRuntime.createSession.callCount).to.equal(1)
 			expect(fakeTask.workflowFormRuntime.createSession.firstCall.args[0]?.resolverId).to.equal(
 				"placeholder_workflow_start_set_workflow_placeholders",
 			)
-			expect(fakeTask.workflowFormRuntime.createSession.secondCall.args[0]?.resolverId).to.equal(
+			expect(fakeTask.workflowStepResolutionRuntime.createSession.firstCall.args[0]?.definitionId).to.equal(
 				"write_remediation_story_step_2_review_input",
 			)
-			expect(fakeTask.workflowFormRuntime.createSession.secondCall.args[0]?.initialPhase).to.equal("collect_inputs")
 			expect(executeCallCount).to.equal(2)
 			expect(taskState.activePlaceholderWorkflowValues?.story_path).to.equal("docs/story.md")
 			expect(taskState.activePlaceholderWorkflowValues?.review_input).to.equal(
 				path.join(tempDir, "workflow-output", "review-input.md"),
 			)
-			expect(fakeTask.renderWorkflowFormMessage.thirdCall.args[1]).to.equal("say")
 		} finally {
 			await fs.rm(tempDir, { recursive: true, force: true })
 		}
@@ -3020,10 +3281,9 @@ Continue after the topic is captured.
 					})),
 				},
 				persistWorkflowFormSession: sinon.stub().resolves(),
-				renderWorkflowFormMessage: sinon.stub().callsFake(async (payload: ClineWorkflowForm, channel: "ask" | "say") => {
+				renderWorkflowFormMessage: sinon.stub().callsFake(async (payload: ClineWorkflowForm) => {
 					renderCount += 1
 					if (renderCount === 1) {
-						expect(channel).to.equal("ask")
 						expect(payload.definition.presentation?.kind).to.equal("interactive_form")
 						fakeTask.pendingWorkflowFormOutcome = {
 							kind: "invoke_tool",
@@ -3099,7 +3359,6 @@ ${submittedTopic}
 			})
 			expect(renderCount).to.equal(2)
 			expect(executeCallCount).to.equal(1)
-			expect(fakeTask.renderWorkflowFormMessage.firstCall.args[1]).to.equal("ask")
 			expect(fakeTask.executeWorkflowFormToolAndSync.calledOnce).to.equal(true)
 			expect(taskState.activeWorkflowFormSession).to.equal(undefined)
 		} finally {
@@ -3421,7 +3680,6 @@ Draft the epics.
 		expect(taskState.activePlaceholderWorkflowValues?.ux_spec).to.equal(undefined)
 		expect(taskState.activePlaceholderWorkflowValues?.ui_spec).to.equal(undefined)
 		expect(taskState.activeWorkflowFormSession).to.equal(undefined)
-		expect(fakeTask.renderWorkflowFormMessage.secondCall.args[1]).to.equal("ask")
 	})
 
 	it("prefers appended decorated tool_result JSON over preceding tool text when evaluating workflow-form tool success", async () => {

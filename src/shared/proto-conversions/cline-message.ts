@@ -221,6 +221,7 @@ function convertClineSayToProtoEnum(say: AppClineSay | undefined): ClineSay | un
 		subagent_usage: ClineSay.SUBAGENT_USAGE,
 		generate_explanation: ClineSay.GENERATE_EXPLANATION,
 		workflow_form: ClineSay.WORKFLOW_FORM_SAY,
+		workflow_step_resolution_status: ClineSay.WORKFLOW_STEP_RESOLUTION_STATUS,
 	}
 
 	const result = mapping[say]
@@ -274,6 +275,7 @@ function convertProtoEnumToClineSay(say: ClineSay): AppClineSay | undefined {
 		[ClineSay.USE_SUBAGENTS_SAY]: "use_subagents",
 		[ClineSay.SUBAGENT_USAGE]: "subagent_usage",
 		[ClineSay.WORKFLOW_FORM_SAY]: "workflow_form",
+		[ClineSay.WORKFLOW_STEP_RESOLUTION_STATUS]: "workflow_step_resolution_status",
 	}
 
 	return mapping[say]

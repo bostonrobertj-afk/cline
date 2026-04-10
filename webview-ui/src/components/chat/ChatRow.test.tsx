@@ -1,6 +1,7 @@
 import type {
 	ClineMessage,
 	ClineWorkflowStartCard,
+	ClineWorkflowStepResolutionStatus,
 	WorkflowFormAutomaticStatusState,
 	WorkflowFormPhase,
 } from "@shared/ExtensionMessage"
@@ -190,6 +191,33 @@ function createAutomaticWorkflowStatusMessage(
 	}
 }
 
+function createWorkflowStepResolutionStatusMessage(
+	state: "pending" | "success" | "failure",
+	overrides?: Partial<ClineWorkflowStepResolutionStatus>,
+): ClineMessage {
+	return {
+		ts: Date.now(),
+		type: "say",
+		say: "workflow_step_resolution_status",
+		text: JSON.stringify({
+			sessionId: "step-resolution-session-1",
+			definitionId: "code_review_step_3_review_input",
+			owner: {
+				workflowName: "code-review.md",
+				stepNumber: 3,
+			},
+			state,
+			definition: {
+				title: "Review Input Artifact",
+				pendingLabel: "Preparing workflow documents",
+				successLabel: "Workflow documents ready",
+				failureLabel: "Automatic workflow preparation failed- falling back to manual LLM workflow preparation.",
+			},
+			...overrides,
+		}),
+	}
+}
+
 function createWorkflowStartCardMessage(overrides?: Partial<ClineWorkflowStartCard>): ClineMessage {
 	return {
 		ts: Date.now(),
@@ -226,6 +254,22 @@ function renderAutomaticWorkflowStatusRow(state: WorkflowFormAutomaticStatusStat
 			isExpanded={true}
 			isLast={true}
 			message={createAutomaticWorkflowStatusMessage(state, overrides)}
+			onSetQuote={vi.fn()}
+			onToggleExpand={vi.fn()}
+		/>,
+	)
+}
+
+function renderWorkflowStepResolutionStatusRow(
+	state: "pending" | "success" | "failure",
+	overrides?: Partial<ClineWorkflowStepResolutionStatus>,
+) {
+	return render(
+		<ChatRowContent
+			inputValue=""
+			isExpanded={true}
+			isLast={true}
+			message={createWorkflowStepResolutionStatusMessage(state, overrides)}
 			onSetQuote={vi.fn()}
 			onToggleExpand={vi.fn()}
 		/>,
@@ -392,8 +436,8 @@ describe("ChatRow followup presentation", () => {
 		)
 	})
 
-	it("renders automatic workflow preparation rows with the pending label and no interactive controls", () => {
-		renderAutomaticWorkflowStatusRow("pending")
+	it("renders workflow_step_resolution_status rows with the pending label", () => {
+		renderWorkflowStepResolutionStatusRow("pending")
 
 		expect(screen.getByText("Preparing workflow documents")).toBeInTheDocument()
 		expect(screen.queryByRole("button", { name: "Yes" })).not.toBeInTheDocument()
@@ -401,18 +445,24 @@ describe("ChatRow followup presentation", () => {
 		expect(screen.queryByRole("button", { name: "Open inputs reference" })).not.toBeInTheDocument()
 	})
 
-	it("renders automatic workflow preparation rows with the success label", () => {
-		renderAutomaticWorkflowStatusRow("success")
+	it("renders workflow_step_resolution_status rows with the success label", () => {
+		renderWorkflowStepResolutionStatusRow("success")
 
 		expect(screen.getByText("Workflow documents ready")).toBeInTheDocument()
 	})
 
-	it("renders automatic workflow preparation rows with the failure label", () => {
-		renderAutomaticWorkflowStatusRow("failure")
+	it("renders workflow_step_resolution_status rows with the failure label", () => {
+		renderWorkflowStepResolutionStatusRow("failure")
 
 		expect(
 			screen.getByText("Automatic workflow preparation failed- falling back to manual LLM workflow preparation."),
 		).toBeInTheDocument()
+	})
+
+	it("continues to render legacy workflow_form automatic-status rows for persisted history", () => {
+		renderAutomaticWorkflowStatusRow("pending")
+
+		expect(screen.getByText("Preparing workflow documents")).toBeInTheDocument()
 	})
 
 	it("renders workflow-form title and prompt from the canonical definition", () => {
