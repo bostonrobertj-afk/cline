@@ -42,7 +42,7 @@ The locked prompt-exposed tools that must remain in the prompt-tool bucket for t
 
 ## Step 1
 
-- [ ] Create the canonical backend workflow tool contract types and registry.
+- [x] Create the canonical backend workflow tool contract types and registry.
 
 Allowed files:
 
@@ -156,7 +156,7 @@ Verification:
 
 ## Step 2
 
-- [ ] Convert workflow-form schema and dictionary lookup to the unified workflow-form contract resolver.
+- [x] Convert workflow-form schema and dictionary lookup to the unified workflow-form contract resolver.
 
 Allowed files:
 
@@ -224,7 +224,7 @@ Verification:
 
 ## Step 3
 
-- [ ] Repoint workflow-form runtime callers and existing tests to the new contract terminology and backend registry behavior.
+- [x] Repoint workflow-form runtime callers and existing tests to the new contract terminology and backend registry behavior.
 
 Allowed files:
 
@@ -269,7 +269,7 @@ Verification:
 
 ## Step 4
 
-- [ ] Remove the backend-only migration set from prompt registration, prompt variants, native compaction, and contextual gating.
+- [x] Remove the backend-only migration set from prompt registration, prompt variants, native compaction, and contextual gating.
 
 Allowed files:
 
@@ -374,7 +374,7 @@ Verification:
 
 ## Step 5
 
-- [ ] Update prompt-surface tests so they stop asserting prompt exposure for backend-only workflow tools.
+- [x] Update prompt-surface tests so they stop asserting prompt exposure for backend-only workflow tools.
 
 Allowed files:
 
@@ -462,7 +462,7 @@ Verification:
 
 ## Step 6
 
-- [ ] Update the canonical docs and README so future agents classify tools into the correct bucket.
+- [x] Update the canonical docs and README so future agents classify tools into the correct bucket.
 
 Allowed files:
 
@@ -533,7 +533,7 @@ Verification:
 
 ## Step 7
 
-- [ ] Run the prescribed verification commands and complete the final string-contract audit.
+- [x] Run the prescribed verification commands and complete the final string-contract audit.
 
 Allowed files:
 

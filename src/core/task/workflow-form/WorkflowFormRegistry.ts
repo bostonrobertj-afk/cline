@@ -30,7 +30,7 @@ import {
 	parseWorkflowFormRawValue,
 	resolveWorkflowFormOneOfVariant,
 	resolveWorkflowFormSchema,
-	resolveWorkflowFormToolSpec,
+	resolveWorkflowFormToolContract,
 	type WorkflowFormFieldSchemaBinding,
 } from "./schema"
 import type { WorkflowFormResolverDefinition, WorkflowFormResolverId, WorkflowFormValues } from "./types"
@@ -234,7 +234,7 @@ function buildSchemaDerivedPublicToolFieldDefinitions(args: {
 	helpOverrides?: Record<string, string>
 	placeholderOverrides?: Record<string, string>
 }): WorkflowFormFieldDefinition[] {
-	const tool = resolveWorkflowFormToolSpec(args.toolName)
+	const tool = resolveWorkflowFormToolContract(args.toolName)
 	return (tool.parameters ?? []).map((parameter) =>
 		buildSchemaBackedField({
 			toolName: args.toolName,

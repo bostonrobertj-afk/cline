@@ -1,13 +1,13 @@
-import type { ClineToolSpec } from "@/core/prompts/system-prompt/spec"
+import type { BackendWorkflowToolContract } from "@/core/task/tools/backendWorkflowToolContractTypes"
 import { ClineDefaultTool } from "@/shared/tools"
-import { resolveWorkflowFormToolSpec } from "../schema"
+import { resolveWorkflowFormToolContract } from "../schema"
 import {
 	PHASE_1_SYSTEM_DICTIONARY_KEYS,
 	type WorkflowFormSystemDictionaryKey,
 	workflowFormSystemDictionary,
 } from "./systemDictionary"
 
-export interface WorkflowFormToolDictionaryConfig {
+export interface WorkflowFormToolDictionaryContractConfig {
 	toolName: ClineDefaultTool
 	heading: string
 	runtimeTitle: string
@@ -21,7 +21,10 @@ function getVariantReferenceLine(key: WorkflowFormSystemDictionaryKey): string {
 	return `- \`${key}\`: ${entry.label}. ${entry.medium}`
 }
 
-function buildToolDictionaryEntryLines(config: WorkflowFormToolDictionaryConfig, tool: ClineToolSpec): string[] {
+function buildToolDictionaryEntryLines(
+	config: WorkflowFormToolDictionaryContractConfig,
+	tool: BackendWorkflowToolContract,
+): string[] {
 	const parameters = tool.parameters ?? []
 	const resolvedTermKeys = config.termKeys ?? PHASE_1_SYSTEM_DICTIONARY_KEYS
 	const lines = [
@@ -60,7 +63,7 @@ export function isWorkflowFormSystemDictionaryKey(key: string): key is WorkflowF
 	return key in workflowFormSystemDictionary
 }
 
-export const buildReviewDiffOutputToolDictionaryConfig: WorkflowFormToolDictionaryConfig = {
+export const buildReviewDiffOutputToolDictionaryConfig: WorkflowFormToolDictionaryContractConfig = {
 	toolName: ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT,
 	heading: "## build_review_diff_output",
 	runtimeTitle: "Diff Source Reference",
@@ -83,7 +86,7 @@ export const buildReviewDiffOutputToolDictionaryConfig: WorkflowFormToolDictiona
 	},
 	termKeys: TOOL_DICTIONARY_TERM_KEYS,
 }
-export const buildReviewInputToolDictionaryConfig: WorkflowFormToolDictionaryConfig = {
+export const buildReviewInputToolDictionaryConfig: WorkflowFormToolDictionaryContractConfig = {
 	toolName: ClineDefaultTool.BUILD_REVIEW_INPUT,
 	heading: "## build_review_input",
 	runtimeTitle: "Review Input Reference",
@@ -97,7 +100,7 @@ export const buildReviewInputToolDictionaryConfig: WorkflowFormToolDictionaryCon
 	parameterDescriptions: {},
 	termKeys: [],
 }
-export const captureBrainstormingTopicToolDictionaryConfig: WorkflowFormToolDictionaryConfig = {
+export const captureBrainstormingTopicToolDictionaryConfig: WorkflowFormToolDictionaryContractConfig = {
 	toolName: ClineDefaultTool.CAPTURE_BRAINSTORMING_TOPIC,
 	heading: "## capture_brainstorming_topic",
 	runtimeTitle: "Brainstorming Topic Reference",
@@ -114,7 +117,7 @@ export const WORKFLOW_FORM_RUNTIME_TOOL_REFERENCE_TITLE = buildReviewDiffOutputT
 
 export function buildWorkflowStartRuntimeToolDictionary(args: { fieldKeys: readonly string[] }) {
 	const termKeys = args.fieldKeys.filter(isWorkflowFormSystemDictionaryKey)
-	const config: WorkflowFormToolDictionaryConfig = {
+	const config: WorkflowFormToolDictionaryContractConfig = {
 		toolName: ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
 		heading: "## set_workflow_placeholders",
 		runtimeTitle: "Workflow Placeholder Reference",
@@ -131,8 +134,8 @@ export function buildWorkflowStartRuntimeToolDictionary(args: { fieldKeys: reado
 	}
 }
 
-export function buildToolDictionaryMarkdownFromConfig(config: WorkflowFormToolDictionaryConfig): string {
-	const tool = resolveWorkflowFormToolSpec(config.toolName)
+export function buildToolDictionaryMarkdownFromConfig(config: WorkflowFormToolDictionaryContractConfig): string {
+	const tool = resolveWorkflowFormToolContract(config.toolName)
 	const lines = [
 		"# Workflow UI Surface Tool Dictionary",
 		"",
@@ -144,8 +147,8 @@ export function buildToolDictionaryMarkdownFromConfig(config: WorkflowFormToolDi
 	return `${lines.join("\n").trimEnd()}\n`
 }
 
-export function buildRuntimeToolDictionaryMarkdownFromConfig(config: WorkflowFormToolDictionaryConfig): string {
-	return `${buildToolDictionaryEntryLines(config, resolveWorkflowFormToolSpec(config.toolName)).join("\n").trimEnd()}\n`
+export function buildRuntimeToolDictionaryMarkdownFromConfig(config: WorkflowFormToolDictionaryContractConfig): string {
+	return `${buildToolDictionaryEntryLines(config, resolveWorkflowFormToolContract(config.toolName)).join("\n").trimEnd()}\n`
 }
 
 export function buildToolDictionaryMarkdown(): string {

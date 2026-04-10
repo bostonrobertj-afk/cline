@@ -416,40 +416,6 @@
     }
   },
   {
-    "name": "build_review_input",
-    "description": "Build and replace the stable review-input artifact at {review_input} from the workflow-owned story file at {story_path} plus the workflow-owned diff artifact at {diff_output}. Resolve all inputs from workflow state.",
-    "parameters": {
-      "type": "OBJECT",
-      "properties": {},
-      "required": []
-    }
-  },
-  {
-    "name": "build_epics_document",
-    "description": "Build or resolve the canonical epics artifact at {output_folder}/planning_artifacts/epics.md from workflow-owned placeholder state. Resolve inputs from workflow state; there are no human-supplied parameters.",
-    "parameters": {
-      "type": "OBJECT",
-      "properties": {},
-      "required": []
-    }
-  },
-  {
-    "name": "capture_brainstorming_topic",
-    "description": "Capture the runtime-owned brainstorming Step 3 topic text. Resolve {output_file} from workflow state, replace only the body of the canonical ## Topic section with the submitted long-form topic/goals text, preserve the rest of the brainstorming template unchanged, and persist the updated artifact.",
-    "parameters": {
-      "type": "OBJECT",
-      "properties": {
-        "topic": {
-          "type": "STRING",
-          "description": "Provide the raw Step 3 topic/goals text exactly as collected from the workflow form."
-        }
-      },
-      "required": [
-        "topic"
-      ]
-    }
-  },
-  {
     "name": "story_task_reminder",
     "description": "Resend the current first incomplete story task and its subtasks from the workflow-owned story file at {story_path}. Resolve the story path from workflow state.",
     "parameters": {

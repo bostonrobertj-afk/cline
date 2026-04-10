@@ -605,6 +605,8 @@ export const write_to_file_variants = [GENERIC, NATIVE_NEXT_GEN]
 - Concise instructions
 - Parameter ordering hints (e.g., "Always output X first")
 
+Note: the registration and variant-config guidance below is only for prompt-exposed tools. Backend-only workflow automation tools must not be added to `tools/index.ts`, `tools/init.ts`, or prompt variant configs, and must instead follow the runtime-owned backend contract path.
+
 ### Registering Tool Variants
 
 **1. Export from [`tools/index.ts`](./tools/index.ts):**

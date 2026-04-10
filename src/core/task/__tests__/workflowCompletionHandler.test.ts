@@ -3,6 +3,7 @@ import { assert } from "chai"
 import { beforeEach, describe, it } from "mocha"
 import sinon from "sinon"
 
+import { getBackendWorkflowToolContract } from "../tools/backendWorkflowToolContracts"
 import {
 	type WorkflowCompletionHandlerResult,
 	workflowCompletionHandler,
@@ -24,6 +25,14 @@ describe("workflowCompletionHandler", () => {
 			"code-review.md": {
 				toolName: ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE,
 			},
+		})
+	})
+
+	it("ships code_review_spec_update in the shared backend workflow tool contract bucket", () => {
+		assert.deepEqual(getBackendWorkflowToolContract(ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE), {
+			id: ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE,
+			name: "code_review_spec_update",
+			parameters: [],
 		})
 	})
 

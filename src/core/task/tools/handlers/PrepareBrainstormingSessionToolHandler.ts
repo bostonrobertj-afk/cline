@@ -1,5 +1,6 @@
 import { findLast } from "@shared/array"
 import { ClineAskQuestion } from "@shared/ExtensionMessage"
+import type { Dirent } from "fs"
 import fs from "fs/promises"
 import path from "path"
 import { recordAndPersistPlaceholderWorkflowWriteProof } from "@/core/task/focus-chain/placeholderWorkflowWriteProofs"
@@ -70,7 +71,7 @@ function resolveOutputFolderPath(config: TaskConfig): string | undefined {
 }
 
 async function discoverBrainstormingSessions(sessionDirectory: string): Promise<BrainstormingSessionFile[]> {
-	let entries: Awaited<ReturnType<typeof fs.readdir>>
+	let entries: Dirent[]
 	try {
 		entries = await fs.readdir(sessionDirectory, { withFileTypes: true })
 	} catch (error) {
@@ -80,33 +81,33 @@ async function discoverBrainstormingSessions(sessionDirectory: string): Promise<
 		throw error
 	}
 
-	return entries
-		.map((entry) => {
-			if (!entry.isFile()) {
-				return undefined
-			}
+	const sessions: BrainstormingSessionFile[] = []
+	for (const entry of entries) {
+		if (!entry.isFile()) {
+			continue
+		}
 
-			const match = SESSION_FILENAME_PATTERN.exec(entry.name)
-			if (!match) {
-				return undefined
-			}
+		const match = SESSION_FILENAME_PATTERN.exec(entry.name)
+		if (!match) {
+			continue
+		}
 
-			const [, date, suffix] = match
-			return {
-				absolutePath: path.join(sessionDirectory, entry.name),
-				fileName: entry.name,
-				date,
-				sequence: suffix ? Number.parseInt(suffix, 10) : 1,
-			} satisfies BrainstormingSessionFile
+		const [, date, suffix] = match
+		sessions.push({
+			absolutePath: path.join(sessionDirectory, entry.name),
+			fileName: entry.name,
+			date,
+			sequence: suffix ? Number.parseInt(suffix, 10) : 1,
 		})
-		.filter((session): session is BrainstormingSessionFile => !!session)
-		.sort((left, right) => {
-			if (left.date !== right.date) {
-				return right.date.localeCompare(left.date)
-			}
+	}
 
-			return right.sequence - left.sequence
-		})
+	return sessions.sort((left, right) => {
+		if (left.date !== right.date) {
+			return right.date.localeCompare(left.date)
+		}
+
+		return right.sequence - left.sequence
+	})
 }
 
 async function resolveNextSessionPath(sessionDirectory: string, date: string): Promise<string> {

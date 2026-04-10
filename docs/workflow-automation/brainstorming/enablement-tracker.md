@@ -15,10 +15,10 @@
 Persists the output file for the workflow using the workflow's template.
 
 # Step 3 Automation
-[ ] requirements doc
-[ ] action plan
-[ ] implementation
-[ ] QA
+[x] requirements doc
+[x]] action plan
+[x] implementation
+[x] QA
 Asks the user what they want the brainstorming session to focus on, then adds their response to the output file.
 Must use this:
     Title: "What topics and/or goals would you like to focus on for this brainstorming session?"
@@ -28,8 +28,14 @@ Ideally this does not present a workflow form with a text box- would prefer that
 # Step 4 Automation
 Presents the user with three options for how they want to approach selecting the brainstorming technique, then runs special handling based on the user's response.
 Need to break this up into three separate patches:
+
+## 4.1: "I want to choose" Path:
 - “I want to choose”: two-panel workflow form, category-to-technique derivation from brain-methods.csv (line 1), and Back behavior
+
+## 4.2: "I Want a Random Technique" Path:
 - “I want a random technique”: random selection plus confirm/retry loop
+
+## 4.3: "I want You to Suggest a Technique" Path:
 - “I want you to suggest a technique”: sentinel write now, actual selection deferred to Step 5
 
 # Deterministic Workflow Progression / Step Progression Configuration

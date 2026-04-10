@@ -27,6 +27,14 @@ describe("workflow-form schema helpers", () => {
 		expect(schema).to.deep.equal({ type: "integer" })
 	})
 
+	it("resolves capture_brainstorming_topic topic as a string schema", () => {
+		const schema = resolveWorkflowFormSchema(ClineDefaultTool.CAPTURE_BRAINSTORMING_TOPIC, {
+			parameterName: "topic",
+		})
+
+		expect(schema).to.deep.equal({ type: "string" })
+	})
+
 	it("derives select control and options from an enum string schema", () => {
 		const schema = { type: "string" as const, enum: ["commit", "commit_range"] }
 

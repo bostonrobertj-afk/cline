@@ -1,13 +1,29 @@
-# Workflow Completion Automation Readme
+# Workflow Automation Readme
 
 ## Purpose
 
-This document explains the generic workflow-completion automation capability now deployed through:
+This document explains the shared backend-only workflow automation bucket now deployed through:
 
+- [backendWorkflowToolContractTypes.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/backendWorkflowToolContractTypes.ts)
+- [backendWorkflowToolContracts.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/backendWorkflowToolContracts.ts)
 - [workflowCompletionRunner.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflowCompletionRunner.ts)
 - [workflowCompletionHandler.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflowCompletionHandler.ts)
 
-This capability is for **placeholder workflow completion**, not task completion. In this repo, a task is the conversation thread. The workflow-completion automation only handles the moment when an active placeholder workflow finishes and any optional end-of-workflow bookkeeping that should run at that moment.
+This bucket is for backend-owned workflow automation, not normal prompt-exposed tools. In this repo, a task is the conversation thread. Backend-only workflow automation is used by runtime-owned seams such as workflow forms and workflow completion.
+
+## Architecture
+
+The canonical backend-only workflow automation contract lives in:
+
+- [backendWorkflowToolContractTypes.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/backendWorkflowToolContractTypes.ts)
+- [backendWorkflowToolContracts.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/backendWorkflowToolContracts.ts)
+
+Current runtime consumers of that same backend-only bucket include:
+
+- workflow-form schema and dictionary generation under [src/core/task/workflow-form](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form)
+- workflow completion handling under [workflowCompletionHandler.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflowCompletionHandler.ts)
+
+Backend-only workflow automation tools are not prompt-exposed tools and must not be registered through the system-prompt tool layer.
 
 ## What Shipped
 
@@ -34,11 +50,11 @@ The deployed generic capability consists of four parts:
   - UI refresh
 
 4. `ToolExecutor.executeInternalToolSilently(...)`
-- gives `Task` and `workflowCompletionHandler` a way to invoke an internal runtime tool without routing through normal assistant-authored tool execution flow
+- gives `Task`, workflow forms, and `workflowCompletionHandler` a way to invoke an internal runtime tool without routing through normal assistant-authored tool execution flow
 
 ## Current Deployment Status
 
-The generic infrastructure is deployed, and the first workflow-specific production mapping is now configured in:
+The shared backend-only bucket is deployed, and the first workflow-completion-specific production mapping is now configured in:
 
 - [workflowCompletionHandler.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflowCompletionHandler.ts)
 
@@ -48,6 +64,8 @@ The live mapping is:
 
 That means:
 
+- the shared backend-only workflow automation contract registry is live
+- workflow forms now resolve backend-only tool contracts from that runtime-owned registry
 - workflow completion detection and teardown are live
 - optional workflow-end automation dispatch infrastructure is live
 - the `code-review.md` placeholder workflow now runs `code_review_spec_update` at workflow completion through `workflowCompletionHandler`
@@ -193,7 +211,7 @@ The internal dispatch seam is:
 - [ToolExecutor.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/ToolExecutor.ts)
 - `executeInternalToolSilently(...)`
 
-This helper exists so workflow-end automation can invoke an internal runtime tool without pretending the AI asked for that tool in the conversation.
+This helper exists so backend-only workflow automation can invoke an internal runtime tool without pretending the AI asked for that tool in the conversation.
 
 Its behavior:
 
@@ -210,6 +228,15 @@ It intentionally does **not** route through normal tool execution side effects l
 - checkpoint behavior
 - focus-chain post-tool updates
 - native tool-call tracking
+
+## Future Guidance
+
+When adding a new backend-only workflow automation tool, update all of these:
+
+- the runtime-owned contract registry in [backendWorkflowToolContracts.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/backendWorkflowToolContracts.ts)
+- the runtime handler map in [ToolExecutorCoordinator.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/ToolExecutorCoordinator.ts)
+- approval routing in [autoApprove.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/autoApprove.ts)
+- response-tool exhaustiveness in [ResponseToolRegistry.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/response/ResponseToolRegistry.ts)
 
 ## Placeholder Workflow Teardown
 

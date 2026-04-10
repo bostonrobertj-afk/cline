@@ -3035,6 +3035,10 @@ Continue after the topic is captured.
 					}
 				}),
 				executeWorkflowFormToolAndSync: sinon.stub().callsFake(async (outcome: WorkflowFormRuntimeOutcome) => {
+					if (outcome.kind !== "invoke_tool") {
+						throw new Error(`Expected invoke_tool outcome, received ${outcome.kind}.`)
+					}
+
 					expect(outcome).to.deep.include({
 						kind: "invoke_tool",
 						toolName: ClineDefaultTool.CAPTURE_BRAINSTORMING_TOPIC,

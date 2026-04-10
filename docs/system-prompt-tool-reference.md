@@ -31,13 +31,7 @@ These are the tools currently registered from [init.ts](/Users/robertboston/Docu
 | `ask_followup_question` | Response | Ask the user a concise question, optionally with choices, and end the current turn. | Hidden in YOLO mode. |
 | `attempt_completion` | Response | Present the final result of completed work to the user and end the current turn. | End-of-task response tool. |
 | `browser_action` | Browser | Interact with the Puppeteer-controlled browser one action at a time. | Browser automation and screenshots. |
-| `build_epic_delivery_spec` | Workflow-specific | Build the canonical pi-planning Step 3 delivery spec from workflow-owned state and persist `{epic_delivery_spec}`. | Context-gated to supported workflow/step. |
-| `build_epics_document` | Workflow-specific | Build or resolve the canonical epics artifact at `{output_folder}/planning_artifacts/epics.md` from workflow-owned state. | No human-supplied parameters. |
-| `prepare_brainstorming_session` | Workflow-specific | Resolve and persist the brainstorming Step 2 session path from workflow-owned state, including continue, start-new, and list-all flows. | Context-gated to supported workflow/step. |
 | `build_review_diff_output` | Workflow-specific | Build and replace the stable review diff artifact at `{diff_output}` from a supported Git-backed source. | Used by `code-review` workflow. |
-| `build_review_input` | Workflow-specific | Build and replace the stable review-input artifact at `{review_input}` from workflow-owned `{story_path}` and `{diff_output}`. | No human-supplied parameters. |
-| `build_story_document` | Workflow-specific | Build the canonical create-story Step 2 scaffold from workflow-owned state and persist `{story_doc}`. | Context-gated to supported workflow/step. |
-| `build_tech_spec_document` | Workflow-specific | Build the canonical quick-spec Step 2 scaffold at `{implementation_artifacts}/tech-spec-wip.md` and persist `{output_file}`. | Context-gated to supported workflow/step. |
 | `complete_workflow_item` | Managed workflow | Mark the current backend-managed workflow item complete. | Managed-workflow-only tool. |
 | `execute_command` | Execution | Execute a CLI command in the current working directory. | Shared enum id is `BASH`. |
 | `focus_chain` | Internal | Placeholder/dependency tool used to support focus-chain behavior. | Not a practical agent-facing operational tool. |
@@ -51,7 +45,6 @@ These are the tools currently registered from [init.ts](/Users/robertboston/Docu
 | `read_file_range` | File reading | Read a specific line range from a file. | Targeted follow-up read tool. |
 | `replace_in_file` | Editing | Make targeted in-file edits using SEARCH/REPLACE blocks. | Good for localized modifications. |
 | `search_files` | Search | Run a regex search across files in a directory and return context-rich matches. | Raw-text discovery tool. |
-| `select_target_epic` | Workflow-specific | Resolve and persist the selected target epic from workflow-owned state and/or structured user input. | Used by `pi-planning` enablement. |
 | `send_user_message` | Response | Send a normal direct message to the user. | Available in ACT and PLAN mode. |
 | `set_workflow_placeholders` | Workflow-specific | Persist dynamic placeholder values discovered during the active workflow. | Used by managed and placeholder workflows that support placeholders. |
 | `story_notes_update` | Workflow-specific | Append one entry to `## Completion Notes List` or `## File List` in the workflow-owned story file at `{story_path}`. | Story-state mutation tool. |
@@ -68,15 +61,12 @@ These are the tools currently registered from [init.ts](/Users/robertboston/Docu
 
 ## Prompt-Defined Tool Families Added By Recent Workflow Enablement
 
-These are the workflow-enablement tools that were easy to miss in older audits:
+These are the prompt-exposed workflow tools that remain easy to miss in older audits:
 
-- workflow document builders
-  - `build_review_input`
-  - `build_epics_document`
-  - `build_epic_delivery_spec`
-  - `build_story_document`
-  - `build_tech_spec_document`
-- workflow progression / runtime-owned advancement
+- workflow input and placeholder tools
+  - `build_review_diff_output`
+  - `set_workflow_placeholders`
+- workflow progression / runtime-owned advancement request
   - `workflow_progress_request`
 - workflow-owned story-state mutation tools
   - `story_notes_update`
@@ -85,9 +75,6 @@ These are the workflow-enablement tools that were easy to miss in older audits:
   - `story_testing_complete`
 - managed-workflow completion surface
   - `complete_workflow_item`
-- workflow selection / routing helpers
-  - `prepare_brainstorming_session`
-  - `select_target_epic`
 
 ## Shared Tool Ids That Are Not Part Of The Normal Prompt Tool Catalog
 
@@ -95,8 +82,16 @@ The shared enum in [src/shared/tools.ts](/Users/robertboston/Documents/Cline%20E
 
 Important current cases:
 
+- `build_review_input`
+- `build_tech_spec_document`
+- `capture_brainstorming_topic`
+- `prepare_brainstorming_session`
+- `select_target_epic`
+- `build_epic_delivery_spec`
+- `build_story_document`
+- `build_epics_document`
 - `code_review_spec_update`
-  - internal runtime tool used by workflow completion handling
+  - backend-only workflow automation tools owned by the runtime contract registry in `src/core/task/tools`
   - not exposed through the normal AI prompt tool catalog
 - `condense`
 - `summarize_task`
@@ -178,7 +173,6 @@ These notes matter because “tool exists in source” is not the same thing as 
 - `use_subagents` is hidden when subagents are disabled and during subagent runs.
 - `complete_workflow_item` is managed-workflow-only.
 - `set_workflow_placeholders` is available only when a managed workflow is active or the active workflow supports placeholders.
-- `select_target_epic`, `prepare_brainstorming_session`, `build_epic_delivery_spec`, `build_story_document`, and `build_tech_spec_document` are context-gated to their supported workflow steps.
 - `web_search` and `web_fetch` require the `cline` provider plus web tools enabled.
 - `access_mcp_resource` and `use_mcp_tool` require MCP availability.
 - `load_mcp_documentation` is currently disabled from agent-visible schema.

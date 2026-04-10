@@ -865,6 +865,8 @@ const generic: ClineToolSpec = {
 export const my_new_tool_variants = [generic]
 ```
 
+Note: the `tools/index.ts`, `tools/init.ts`, and variant-config steps below apply only to prompt-exposed tools. Backend-only workflow automation tools must follow the runtime-owned contract path documented in [docs/tools-reference/how-to-add-a-tool.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/tools-reference/how-to-add-a-tool.md) and [docs/workflows/workflow-automation-readme.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/workflows/workflow-automation-readme.md).
+
 #### 3. Export Tool from Index
 
 Add your tool export to the tools index file:

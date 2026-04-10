@@ -1,12 +1,12 @@
 import { ClineToolSet } from "@/core/prompts/system-prompt/registry/ClineToolSet"
-import type { ClineToolSpec } from "@/core/prompts/system-prompt/spec"
 import { registerClineToolSets } from "@/core/prompts/system-prompt/tools/init"
+import { getBackendWorkflowToolContract } from "@/core/task/tools/backendWorkflowToolContracts"
 import type {
-	WorkflowFormFieldControl,
-	WorkflowFormFieldOption,
-	WorkflowFormJsonSchema,
-	WorkflowFormJsonSchemaType,
-} from "@/shared/ExtensionMessage"
+	BackendWorkflowToolContract,
+	BackendWorkflowToolParameterContract,
+	BackendWorkflowToolSchemaNode,
+} from "@/core/task/tools/backendWorkflowToolContractTypes"
+import type { WorkflowFormFieldControl, WorkflowFormFieldOption, WorkflowFormJsonSchema } from "@/shared/ExtensionMessage"
 import { ModelFamily } from "@/shared/prompts"
 import { ClineDefaultTool } from "@/shared/tools"
 
@@ -16,26 +16,39 @@ export interface WorkflowFormFieldSchemaBinding {
 	useAdditionalProperties?: boolean
 }
 
-type WorkflowFormSchemaSource = {
-	type?: WorkflowFormJsonSchemaType
-	enum?: unknown
-	const?: string | number | boolean
-	items?: WorkflowFormSchemaSource
-	properties?: Record<string, WorkflowFormSchemaSource>
-	required?: string[] | boolean
-	requiredProperties?: string[]
-	additionalProperties?: WorkflowFormSchemaSource
-	oneOf?: WorkflowFormSchemaSource[]
-}
+type WorkflowFormSchemaSource = BackendWorkflowToolSchemaNode
 
-export function resolveWorkflowFormToolSpec(toolName: ClineDefaultTool): ClineToolSpec {
+export function resolveWorkflowFormToolContract(toolName: ClineDefaultTool): BackendWorkflowToolContract {
+	const backendToolContract = getBackendWorkflowToolContract(toolName)
+	if (backendToolContract) {
+		return backendToolContract
+	}
+
 	registerClineToolSets()
 	const tool = ClineToolSet.getToolByNameWithFallback(toolName, ModelFamily.GENERIC)
 	if (!tool) {
-		throw new Error(`Unknown workflow-form tool spec: ${toolName}`)
+		throw new Error(`Unknown workflow-form tool contract: ${toolName}`)
 	}
 
-	return tool.config
+	return {
+		id: tool.config.id,
+		name: tool.config.name,
+		parameters: (tool.config.parameters ?? []).map(
+			(parameter): BackendWorkflowToolParameterContract => ({
+				name: parameter.name,
+				required: parameter.required,
+				description: parameter.description,
+				type: parameter.type,
+				enum: parameter.enum,
+				const: parameter.const as string | number | boolean | undefined,
+				items: parameter.items as BackendWorkflowToolSchemaNode | undefined,
+				properties: parameter.properties as Record<string, BackendWorkflowToolSchemaNode> | undefined,
+				requiredProperties: parameter.requiredProperties,
+				additionalProperties: parameter.additionalProperties as BackendWorkflowToolSchemaNode | undefined,
+				oneOf: parameter.oneOf as BackendWorkflowToolSchemaNode[] | undefined,
+			}),
+		),
+	}
 }
 
 function normalizeWorkflowFormSchema(schema: WorkflowFormSchemaSource | undefined): WorkflowFormJsonSchema {
@@ -85,7 +98,7 @@ export function resolveWorkflowFormSchema(
 	toolName: ClineDefaultTool,
 	binding: WorkflowFormFieldSchemaBinding,
 ): WorkflowFormJsonSchema {
-	const tool = resolveWorkflowFormToolSpec(toolName)
+	const tool = resolveWorkflowFormToolContract(toolName)
 	const parameter = tool.parameters?.find((entry) => entry.name === binding.parameterName)
 	if (!parameter) {
 		throw new Error("Workflow form schema binding could not be resolved.")

@@ -471,9 +471,6 @@ describe("Prompt System Integration Tests", () => {
 						expect(toolNames).to.not.include("focus_chain")
 						expect(JSON.stringify(tools)).to.not.include('"focus_chain"')
 						expect(toolNames).to.include("build_review_diff_output")
-						expect(toolNames).to.include("build_review_input")
-						expect(toolNames).to.include("build_epics_document")
-						expect(toolNames).to.include("capture_brainstorming_topic")
 						const snapshotName = `${providerId}_${family.replace(/[^a-zA-Z0-9]/g, "_")}.tools.snap`
 						await assertSnapshot(snapshotName, JSON.stringify(tools, null, 2))
 					})
@@ -495,9 +492,6 @@ describe("Prompt System Integration Tests", () => {
 								const toolNames = getNativeToolNames(tools)
 								expect(toolNames).to.not.include("focus_chain")
 								expect(toolNames).to.include("build_review_diff_output")
-								expect(toolNames).to.include("build_review_input")
-								expect(toolNames).to.include("build_epics_document")
-								expect(toolNames).to.include("capture_brainstorming_topic")
 							} else {
 								expect(tools).to.be.undefined
 							}
@@ -1558,7 +1552,6 @@ describe("Prompt System Integration Tests", () => {
 					const nativeToolNames = getNativeToolNames(tools)
 
 					expect(nativeToolNames).to.include.members([
-						"build_epics_document",
 						"list_files",
 						"search_files",
 						"read_file",
@@ -1591,7 +1584,8 @@ describe("Prompt System Integration Tests", () => {
 				async ({ tools }) => {
 					const nativeToolNames = getNativeToolNames(tools)
 
-					expect(nativeToolNames).to.include.members(["select_target_epic", "attempt_completion"])
+					expect(nativeToolNames).to.include("attempt_completion")
+					expect(nativeToolNames).to.not.include("select_target_epic")
 					expect(nativeToolNames).to.not.include("set_workflow_placeholders")
 					expect(nativeToolNames).to.not.include("read_file")
 					expect(nativeToolNames).to.not.include("execute_command")
@@ -1617,7 +1611,7 @@ describe("Prompt System Integration Tests", () => {
 				async ({ tools }) => {
 					const nativeToolNames = getNativeToolNames(tools)
 
-					expect(nativeToolNames).to.include("capture_brainstorming_topic")
+					expect(nativeToolNames).to.not.include("capture_brainstorming_topic")
 				},
 			)
 
@@ -1659,7 +1653,8 @@ describe("Prompt System Integration Tests", () => {
 				async ({ tools }) => {
 					const nativeToolNames = getNativeToolNames(tools)
 
-					expect(nativeToolNames).to.include.members(["build_epic_delivery_spec", "attempt_completion"])
+					expect(nativeToolNames).to.include("attempt_completion")
+					expect(nativeToolNames).to.not.include("build_epic_delivery_spec")
 					expect(nativeToolNames).to.not.include("set_workflow_placeholders")
 					expect(nativeToolNames).to.not.include("read_file")
 					expect(nativeToolNames).to.not.include("execute_command")
@@ -1790,7 +1785,8 @@ describe("Prompt System Integration Tests", () => {
 				async ({ tools }) => {
 					const nativeToolNames = getNativeToolNames(tools)
 
-					expect(nativeToolNames).to.include.members(["build_story_document", "attempt_completion"])
+					expect(nativeToolNames).to.include("attempt_completion")
+					expect(nativeToolNames).to.not.include("build_story_document")
 					expect(nativeToolNames).to.not.include("set_workflow_placeholders")
 					expect(nativeToolNames).to.not.include("read_file")
 					expect(nativeToolNames).to.not.include("search_files")
@@ -1961,7 +1957,8 @@ describe("Prompt System Integration Tests", () => {
 				async ({ tools }) => {
 					const nativeToolNames = getNativeToolNames(tools)
 
-					expect(nativeToolNames).to.include.members(["build_tech_spec_document", "attempt_completion"])
+					expect(nativeToolNames).to.include("attempt_completion")
+					expect(nativeToolNames).to.not.include("build_tech_spec_document")
 					expect(nativeToolNames).to.not.include("set_workflow_placeholders")
 					expect(nativeToolNames).to.not.include("read_file")
 					expect(nativeToolNames).to.not.include("search_files")

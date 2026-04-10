@@ -37,7 +37,7 @@ describe("buildToolDictionaryMarkdown", () => {
 		}
 	})
 
-	it("renders any configured tool by looking up its schema through the shared tool registry", () => {
+	it("renders any configured tool by looking up its schema through the workflow-form contract resolver", () => {
 		const config = {
 			toolName: ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
 			heading: "## set_workflow_placeholders",
@@ -56,6 +56,12 @@ describe("buildToolDictionaryMarkdown", () => {
 		expect(markdown).to.include("- `values` (required, object): Workflow placeholder key/value map.")
 		expect(runtimeMarkdown).to.include("## set_workflow_placeholders")
 		expect(runtimeMarkdown).to.not.include("# Workflow UI Surface Tool Dictionary")
+	})
+
+	it("renders the capture_brainstorming_topic parameter row from the workflow-form contract resolver", () => {
+		const markdown = buildRuntimeToolDictionaryMarkdownFromConfig(captureBrainstormingTopicToolDictionaryConfig)
+
+		expect(markdown).to.include("- `topic` (required, string):")
 	})
 
 	it("renders the brainstorming topic runtime tool dictionary", () => {

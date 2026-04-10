@@ -28,6 +28,7 @@ Read these first if you need to get productive quickly:
   - [deterministic-workflow-progression-readme.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/workflows/deterministic-workflow-progression-readme.md)
 - Prompt and tool surface:
   - [system-prompt-tool-reference.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/system-prompt-tool-reference.md)
+  - [how-to-add-a-tool.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/tools-reference/how-to-add-a-tool.md)
   - [src/core/prompts/system-prompt/README.md](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/prompts/system-prompt/README.md)
   - [src/core/prompts/system-prompt/tools/README.md](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/prompts/system-prompt/tools/README.md)
 
@@ -57,6 +58,8 @@ These files are useful when you need to understand what the model can see and wh
 
 - Consolidated tool inventory:
   - [docs/system-prompt-tool-reference.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/system-prompt-tool-reference.md)
+- Bucket selection and tool wiring:
+  - [docs/tools-reference/how-to-add-a-tool.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/tools-reference/how-to-add-a-tool.md)
 - System prompt architecture:
   - [src/core/prompts/system-prompt/README.md](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/prompts/system-prompt/README.md)
 - Prompt-defined tool registration:
@@ -103,6 +106,6 @@ For any workflow-related task, check at least:
 
 - the authored workflow file in `/Users/robertboston/Documents/Cline/Workflows/`
 - workflow runtime docs in `docs/workflows/`
-- prompt/tool docs in `docs/system-prompt-tool-reference.md` and `src/core/prompts/system-prompt/`
+- prompt/tool bucket docs in `docs/tools-reference/how-to-add-a-tool.md`, `docs/system-prompt-tool-reference.md`, and `src/core/prompts/system-prompt/`
 - startup / workflow-form docs if the task touches pre-turn interception or deterministic UI
 - relevant UI docs if the behavior is rendered in the webview

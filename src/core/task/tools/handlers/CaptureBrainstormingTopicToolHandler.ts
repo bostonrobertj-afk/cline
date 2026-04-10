@@ -109,7 +109,8 @@ export class CaptureBrainstormingTopicToolHandler implements IToolHandler {
 				)
 			}
 
-			const topic = typeof block.params.topic === "string" ? block.params.topic.trim() : ""
+			const rawTopic = (block.params as Record<string, unknown>).topic
+			const topic = typeof rawTopic === "string" ? rawTopic.trim() : ""
 			if (!topic) {
 				return formatResponse.toolError("capture_brainstorming_topic requires a non-empty 'topic' value.")
 			}

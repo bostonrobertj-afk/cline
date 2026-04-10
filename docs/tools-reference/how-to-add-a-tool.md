@@ -13,21 +13,47 @@ It is grounded in the live runtime and prompt surfaces, including:
 
 ## Source Of Truth
 
-Use these layers in this order:
+Bucket selection is the first required decision.
 
-1. Shared tool id: [tools.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/shared/tools.ts#L8)
-2. Prompt-tool spec: [src/core/prompts/system-prompt/tools](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/prompts/system-prompt/tools)
-3. Prompt-tool registration: [init.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/prompts/system-prompt/tools/init.ts#L1)
-4. Variant exposure: [variants](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/prompts/system-prompt/variants)
-5. Runtime handler registration: [ToolExecutorCoordinator.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/ToolExecutorCoordinator.ts#L91)
-6. Approval behavior: [autoApprove.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/autoApprove.ts#L42)
-7. Response-tool exhaustiveness: [ResponseToolRegistry.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/response/ResponseToolRegistry.ts#L5)
-8. Native-schema compaction: [spec.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/prompts/system-prompt/spec.ts#L461)
-9. Workflow-specific gating if needed: [contextualToolMatrix.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/prompts/system-prompt/registry/contextualToolMatrix.ts#L177)
+### 1. Shared Tool Ids
+
+All built-in tools start in [tools.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/shared/tools.ts#L8) under `ClineDefaultTool`.
+
+Adding an enum member there does **not** decide prompt exposure by itself.
+
+### 2. Prompt-Exposed Tools
+
+Prompt-exposed tools follow the system-prompt tool path:
+
+1. shared tool id in [tools.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/shared/tools.ts#L8)
+2. prompt-tool spec in [src/core/prompts/system-prompt/tools](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/prompts/system-prompt/tools)
+3. prompt-tool registration in [init.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/prompts/system-prompt/tools/init.ts#L1)
+4. variant exposure in [variants](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/prompts/system-prompt/variants)
+5. native-schema compaction in [spec.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/prompts/system-prompt/spec.ts#L461)
+6. workflow-specific contextual gating in [contextualToolMatrix.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/prompts/system-prompt/registry/contextualToolMatrix.ts#L177) when needed
+
+### 3. Backend-Only Workflow Automation Tools
+
+Backend-only workflow automation tools follow the runtime-owned backend contract path under [src/core/task/tools](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools):
+
+1. shared tool id in [tools.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/shared/tools.ts#L8)
+2. backend contract shape in [backendWorkflowToolContractTypes.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/backendWorkflowToolContractTypes.ts)
+3. backend contract registry in [backendWorkflowToolContracts.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/backendWorkflowToolContracts.ts)
+4. runtime handler registration in [ToolExecutorCoordinator.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/ToolExecutorCoordinator.ts#L91)
+
+Backend-only workflow automation tools must **not** be added to prompt tool specs, [init.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/prompts/system-prompt/tools/init.ts), prompt variant configs, [spec.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/prompts/system-prompt/spec.ts) native-compaction branches, or [contextualToolMatrix.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/prompts/system-prompt/registry/contextualToolMatrix.ts).
+
+### 4. Shared Runtime Seams
+
+Both buckets still share these runtime requirements:
+
+1. runtime handler registration: [ToolExecutorCoordinator.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/ToolExecutorCoordinator.ts#L91)
+2. approval behavior: [autoApprove.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/autoApprove.ts#L42)
+3. response-tool exhaustiveness: [ResponseToolRegistry.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/response/ResponseToolRegistry.ts#L5)
 
 ## Important Note
 
-[tools/README.md](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/prompts/system-prompt/tools/README.md#L100) is directionally useful, but it is stale in one important way: it still refers to `register.ts`. The live registration entry point is [init.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/prompts/system-prompt/tools/init.ts#L43).
+[tools/README.md](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/prompts/system-prompt/tools/README.md) is the repo-local reference for prompt-exposed tool registration details in `tools/` and already reflects the current `init.ts` entrypoint.
 
 ## Required Steps
 
@@ -37,9 +63,9 @@ Add the new enum member to [tools.ts](/Users/robertboston/Documents/Cline%20Exte
 
 Also decide whether the tool belongs in `READ_ONLY_TOOLS` at [tools.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/shared/tools.ts#L68). Only add it there if it truly does not modify workspace state.
 
-### 2. Add the prompt-tool spec
+### 2. If the tool is prompt-exposed, add the prompt-tool spec
 
-Create a new file in [src/core/prompts/system-prompt/tools](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/prompts/system-prompt/tools) following the current pattern used by [build_epics_document.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/prompts/system-prompt/tools/build_epics_document.ts#L1):
+Create a new file in [src/core/prompts/system-prompt/tools](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/prompts/system-prompt/tools) following the current pattern used by [build_review_diff_output.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/prompts/system-prompt/tools/build_review_diff_output.ts#L1):
 
 - import `ModelFamily`
 - import `ClineDefaultTool`
@@ -48,7 +74,7 @@ Create a new file in [src/core/prompts/system-prompt/tools](/Users/robertboston/
 
 If the tool does not need model-specific behavior, a single `ModelFamily.GENERIC` variant is enough.
 
-### 3. Register the prompt-tool spec
+### 3. If the tool is prompt-exposed, register the prompt-tool spec
 
 Update both files:
 
@@ -62,7 +88,7 @@ In `init.ts`:
 
 Without this step, the tool will not be available to the prompt registry or native tool schemas.
 
-### 4. Expose the tool in variant configs
+### 4. If the tool is prompt-exposed, expose the tool in variant configs
 
 Add the tool to each relevant variant config under [variants](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/prompts/system-prompt/variants).
 
@@ -70,7 +96,15 @@ Example live placement: [gpt-5/config.ts](/Users/robertboston/Documents/Cline%20
 
 If the tool should be globally available, add it to all applicable prompt variants. If it is workflow- or context-specific, pair this with contextual gating instead of relying only on broad variant exposure.
 
-### 5. Register the runtime handler
+### 5. If the tool is backend-only workflow automation, add the backend contract
+
+Update [backendWorkflowToolContractTypes.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/backendWorkflowToolContractTypes.ts) only if the shared runtime contract shape itself must change.
+
+Add the tool contract entry to [backendWorkflowToolContracts.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/backendWorkflowToolContracts.ts) instead of creating a prompt-tool file.
+
+This is the canonical contract source for backend-only workflow automation used by workflow forms, workflow completion, and other runtime-owned automation seams.
+
+### 6. Register the runtime handler
 
 Create a handler in [src/core/task/tools/handlers](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/handlers), then wire it into [ToolExecutorCoordinator.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/ToolExecutorCoordinator.ts#L91):
 
@@ -79,7 +113,7 @@ Create a handler in [src/core/task/tools/handlers](/Users/robertboston/Documents
 
 If the tool reuses an existing implementation under a different name, use `SharedToolHandler`. Otherwise register a dedicated handler.
 
-### 6. Wire approval behavior
+### 7. Wire approval behavior
 
 Update [autoApprove.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/autoApprove.ts#L42).
 
@@ -92,7 +126,7 @@ Map the tool into the correct approval branch:
 
 If you skip this, the tool may not obey the existing UI approval settings correctly.
 
-### 7. Update response-tool exhaustiveness
+### 8. Update response-tool exhaustiveness
 
 Update [ResponseToolRegistry.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/response/ResponseToolRegistry.ts#L5).
 
@@ -102,7 +136,7 @@ Every `ClineDefaultTool` enum member must be represented there, even if the new 
 [ClineDefaultTool.YOUR_TOOL]: undefined,
 ```
 
-### 8. Add native-schema compaction
+### 9. If the tool is prompt-exposed, add native-schema compaction
 
 If the tool is exposed to native tool-calling variants, add a concise native description branch in [spec.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/prompts/system-prompt/spec.ts#L467).
 
@@ -110,11 +144,11 @@ This repo actively compacts native tool descriptions for GPT-native surfaces. If
 
 If the tool has structured parameters that need special compact wording, also add parameter-description handling in the same file.
 
-### 9. Add contextual gating if the tool is not globally available
+### 10. If the tool is prompt-exposed and not globally available, add contextual gating
 
 If the tool should only appear for certain workflows or steps, update [contextualToolMatrix.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/prompts/system-prompt/registry/contextualToolMatrix.ts#L177) and any related bundle definitions it depends on.
 
-This is how tools like `build_epics_document` are narrowed to specific workflow steps in this fork.
+This is how prompt-exposed workflow tools are narrowed to specific workflow steps in this fork.
 
 ## Testing Checklist
 
@@ -141,11 +175,11 @@ If integration snapshots change intentionally, rerun with `--update-snapshots`.
 
 ## Workflow-Owned Tool Pattern
 
-For workflow-owned deterministic tools in this fork, the closest live sibling patterns are:
+For backend-only workflow automation tools in this fork, the closest live sibling patterns are:
 
-- [build_review_input.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/prompts/system-prompt/tools/build_review_input.ts)
+- [backendWorkflowToolContracts.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/backendWorkflowToolContracts.ts)
+- [backendWorkflowToolContractTypes.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/backendWorkflowToolContractTypes.ts)
 - [BuildReviewInputToolHandler.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/handlers/BuildReviewInputToolHandler.ts)
-- [build_epics_document.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/prompts/system-prompt/tools/build_epics_document.ts)
 - [BuildEpicsDocumentToolHandler.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/tools/handlers/BuildEpicsDocumentToolHandler.ts)
 
 Those tools are good references when your tool:
@@ -160,15 +194,17 @@ Those tools are good references when your tool:
 Before you consider a new tool fully wired, verify all of these:
 
 - the tool id exists in `ClineDefaultTool`
-- the prompt-tool file exports `*_variants`
-- `tools/index.ts` exports it
-- `init.ts` imports and registers it
-- every intended variant config includes it
+- prompt-exposed tools only: the prompt-tool file exports `*_variants`
+- prompt-exposed tools only: `tools/index.ts` exports it
+- prompt-exposed tools only: `init.ts` imports and registers it
+- prompt-exposed tools only: every intended variant config includes it
+- backend-only workflow automation tools only: `backendWorkflowToolContracts.ts` includes the runtime-owned contract entry
+- backend-only workflow automation tools only: no prompt-tool file, `init.ts` entry, variant-config entry, native-compaction branch, or contextual-tool bundle was added for the backend-only tool
 - `ToolExecutorCoordinator` can instantiate its handler
 - `autoApprove.ts` routes it to the right approval category
 - `ResponseToolRegistry.ts` includes an entry for exhaustiveness
 - `spec.ts` has native compaction if native variants expose it
-- contextual gating is updated if availability is step-specific
+- contextual gating is updated if a prompt-exposed tool is step-specific
 - tests cover runtime, exposure, and gating
 
 ## Best Existing References

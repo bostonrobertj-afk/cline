@@ -1,6 +1,7 @@
 # Tool Registration System
 
 This directory contains the prompt-defined tool modules for the system prompt architecture.
+This directory is only for prompt-exposed tools and must not hold backend-only workflow automation tools.
 
 The runtime registration entrypoint is `init.ts`, which collects tool variant arrays from this directory and registers them with `ClineToolSet`.
 
@@ -92,13 +93,7 @@ The following prompt-defined tool variant arrays are currently registered from `
 - `ask_followup_question`
 - `attempt_completion`
 - `browser_action`
-- `build_epic_delivery_spec`
-- `build_epics_document`
 - `build_review_diff_output`
-- `build_review_input`
-- `build_story_document`
-- `build_tech_spec_document`
-- `capture_brainstorming_topic`
 - `complete_workflow_item`
 - `execute_command`
 - `focus_chain`
@@ -108,12 +103,10 @@ The following prompt-defined tool variant arrays are currently registered from `
 - `list_files`
 - `load_mcp_documentation`
 - `new_task`
-- `prepare_brainstorming_session`
 - `read_file`
 - `read_file_range`
 - `replace_in_file`
 - `search_files`
-- `select_target_epic`
 - `send_user_message`
 - `set_workflow_placeholders`
 - `story_notes_update`
@@ -130,10 +123,11 @@ The following prompt-defined tool variant arrays are currently registered from `
 
 ## Adding New Tools
 
-1. Create a new tool file following the naming pattern: `{tool_name}.ts`
-2. Export a `{tool_name}_variants` array with tool specifications
-3. Add the import and spread to `init.ts` so the tool is registered at runtime
-4. Add the export to `index.ts` if the tool should be re-exported from the barrel file
+1. Classify the tool into the prompt-exposed bucket or the backend-only workflow automation bucket before creating any file in this directory.
+2. Create a new tool file following the naming pattern: `{tool_name}.ts`
+3. Export a `{tool_name}_variants` array with tool specifications
+4. Add the import and spread to `init.ts` so the tool is registered at runtime
+5. Add the export to `index.ts` if the tool should be re-exported from the barrel file
 
 ## Notes
 

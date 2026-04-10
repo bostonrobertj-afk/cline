@@ -38,7 +38,7 @@ describe("filterContextualNativeToolSpecs", () => {
 	it("defines the canonical quick-spec 10-step row", () => {
 		expect(PLACEHOLDER_WORKFLOW_STEP_MATRIX["quick-spec.md"]).to.deep.equal({
 			1: ["PLACEHOLDER_WRITE"],
-			2: ["TECH_SPEC_DOCUMENT_BUILD"],
+			2: [],
 			3: ["DOC_READ", "DOC_WRITE", "WORKFLOW_PROGRESS_REQUEST"],
 			4: [
 				"DOC_READ",
@@ -285,7 +285,7 @@ describe("filterContextualNativeToolSpecs", () => {
 		expect(keptNames.some((name) => name.startsWith("indxr-"))).to.equal(false)
 	})
 
-	it("applies create-epics step 2 row and keeps build_epics_document without placeholder-write tools", () => {
+	it("applies create-epics step 2 row and keeps only document bundles without placeholder-write tools", () => {
 		const registeredTools = [
 			makeRegisteredTool(ClineDefaultTool.LIST_FILES),
 			makeRegisteredTool(ClineDefaultTool.SEARCH),
@@ -293,7 +293,6 @@ describe("filterContextualNativeToolSpecs", () => {
 			makeRegisteredTool(ClineDefaultTool.FILE_READ_RANGE),
 			makeRegisteredTool(ClineDefaultTool.APPLY_PATCH),
 			makeRegisteredTool(ClineDefaultTool.FILE_NEW),
-			makeRegisteredTool(ClineDefaultTool.BUILD_EPICS_DOCUMENT),
 			makeRegisteredTool(ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS),
 			makeRegisteredTool(ClineDefaultTool.ASK),
 			makeRegisteredTool(ClineDefaultTool.SEND_USER_MESSAGE),
@@ -321,7 +320,6 @@ describe("filterContextualNativeToolSpecs", () => {
 			ClineDefaultTool.FILE_READ_RANGE,
 			ClineDefaultTool.APPLY_PATCH,
 			ClineDefaultTool.FILE_NEW,
-			ClineDefaultTool.BUILD_EPICS_DOCUMENT,
 			ClineDefaultTool.ASK,
 			ClineDefaultTool.SEND_USER_MESSAGE,
 			ClineDefaultTool.ATTEMPT,
@@ -333,13 +331,12 @@ describe("filterContextualNativeToolSpecs", () => {
 		expect(keptIds).to.not.include(ClineDefaultTool.PLAN_MODE)
 	})
 
-	it("applies pi-planning step 2 row and keeps only the runtime-owned epic selector plus preserved tools", () => {
+	it("applies pi-planning step 2 row and keeps only preserved tools", () => {
 		const registeredTools = [
 			makeRegisteredTool(ClineDefaultTool.LIST_FILES),
 			makeRegisteredTool(ClineDefaultTool.SEARCH),
 			makeRegisteredTool(ClineDefaultTool.FILE_READ),
 			makeRegisteredTool(ClineDefaultTool.FILE_READ_RANGE),
-			makeRegisteredTool(ClineDefaultTool.SELECT_TARGET_EPIC),
 			makeRegisteredTool(ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS),
 			makeRegisteredTool(ClineDefaultTool.ASK),
 			makeRegisteredTool(ClineDefaultTool.SEND_USER_MESSAGE),
@@ -361,7 +358,6 @@ describe("filterContextualNativeToolSpecs", () => {
 
 		const keptIds = result.map((tool) => tool.id)
 		expect(keptIds).to.include.members([
-			ClineDefaultTool.SELECT_TARGET_EPIC,
 			ClineDefaultTool.ASK,
 			ClineDefaultTool.SEND_USER_MESSAGE,
 			ClineDefaultTool.ATTEMPT,
@@ -371,13 +367,13 @@ describe("filterContextualNativeToolSpecs", () => {
 		])
 		expect(keptIds).to.not.include(ClineDefaultTool.LIST_FILES)
 		expect(keptIds).to.not.include(ClineDefaultTool.FILE_READ)
+		expect(keptIds).to.not.include(ClineDefaultTool.SELECT_TARGET_EPIC)
 		expect(keptIds).to.not.include(ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS)
 		expect(keptIds).to.not.include(ClineDefaultTool.PLAN_MODE)
 	})
 
-	it("applies pi-planning step 3 row and keeps only the delivery-spec builder plus preserved tools", () => {
+	it("applies pi-planning step 3 row and keeps only preserved tools", () => {
 		const registeredTools = [
-			makeRegisteredTool(ClineDefaultTool.BUILD_EPIC_DELIVERY_SPEC),
 			makeRegisteredTool(ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS),
 			makeRegisteredTool(ClineDefaultTool.LIST_FILES),
 			makeRegisteredTool(ClineDefaultTool.SEARCH),
@@ -403,7 +399,6 @@ describe("filterContextualNativeToolSpecs", () => {
 
 		const keptIds = result.map((tool) => tool.id)
 		expect(keptIds).to.include.members([
-			ClineDefaultTool.BUILD_EPIC_DELIVERY_SPEC,
 			ClineDefaultTool.ASK,
 			ClineDefaultTool.SEND_USER_MESSAGE,
 			ClineDefaultTool.ATTEMPT,
@@ -411,6 +406,7 @@ describe("filterContextualNativeToolSpecs", () => {
 			ClineDefaultTool.MCP_ACCESS,
 			ClineDefaultTool.NEW_TASK,
 		])
+		expect(keptIds).to.not.include(ClineDefaultTool.BUILD_EPIC_DELIVERY_SPEC)
 		expect(keptIds).to.not.include(ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS)
 		expect(keptIds).to.not.include(ClineDefaultTool.LIST_FILES)
 		expect(keptIds).to.not.include(ClineDefaultTool.FILE_READ)
@@ -513,9 +509,8 @@ describe("filterContextualNativeToolSpecs", () => {
 		expect(keptIds).to.not.include(ClineDefaultTool.PLAN_MODE)
 	})
 
-	it("applies create-story step 2 row and keeps only the story-document builder plus preserved tools", () => {
+	it("applies create-story step 2 row and keeps only preserved tools", () => {
 		const registeredTools = [
-			makeRegisteredTool(ClineDefaultTool.BUILD_STORY_DOCUMENT),
 			makeRegisteredTool(ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS),
 			makeRegisteredTool(ClineDefaultTool.LIST_FILES),
 			makeRegisteredTool(ClineDefaultTool.SEARCH),
@@ -542,7 +537,6 @@ describe("filterContextualNativeToolSpecs", () => {
 
 		const keptIds = result.map((tool) => tool.id)
 		expect(keptIds).to.include.members([
-			ClineDefaultTool.BUILD_STORY_DOCUMENT,
 			ClineDefaultTool.ASK,
 			ClineDefaultTool.SEND_USER_MESSAGE,
 			ClineDefaultTool.ATTEMPT,
@@ -554,14 +548,14 @@ describe("filterContextualNativeToolSpecs", () => {
 		expect(keptIds).to.not.include(ClineDefaultTool.LIST_FILES)
 		expect(keptIds).to.not.include(ClineDefaultTool.FILE_READ)
 		expect(keptIds).to.not.include(ClineDefaultTool.FILE_READ_RANGE)
+		expect(keptIds).to.not.include(ClineDefaultTool.BUILD_STORY_DOCUMENT)
 		expect(keptIds).to.not.include(ClineDefaultTool.SEARCH)
 		expect(keptIds).to.not.include(ClineDefaultTool.BASH)
 		expect(keptIds).to.not.include(ClineDefaultTool.PLAN_MODE)
 	})
 
-	it("applies quick-spec step 2 row and keeps only the tech-spec-document builder plus preserved tools", () => {
+	it("applies quick-spec step 2 row and keeps only preserved tools", () => {
 		const registeredTools = [
-			makeRegisteredTool(ClineDefaultTool.BUILD_TECH_SPEC_DOCUMENT),
 			makeRegisteredTool(ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS),
 			makeRegisteredTool(ClineDefaultTool.LIST_FILES),
 			makeRegisteredTool(ClineDefaultTool.SEARCH),
@@ -589,7 +583,6 @@ describe("filterContextualNativeToolSpecs", () => {
 
 		const keptIds = result.map((tool) => tool.id)
 		expect(keptIds).to.include.members([
-			ClineDefaultTool.BUILD_TECH_SPEC_DOCUMENT,
 			ClineDefaultTool.ASK,
 			ClineDefaultTool.SEND_USER_MESSAGE,
 			ClineDefaultTool.ATTEMPT,
@@ -601,6 +594,7 @@ describe("filterContextualNativeToolSpecs", () => {
 		expect(keptIds).to.not.include(ClineDefaultTool.LIST_FILES)
 		expect(keptIds).to.not.include(ClineDefaultTool.FILE_READ)
 		expect(keptIds).to.not.include(ClineDefaultTool.FILE_READ_RANGE)
+		expect(keptIds).to.not.include(ClineDefaultTool.BUILD_TECH_SPEC_DOCUMENT)
 		expect(keptIds).to.not.include(ClineDefaultTool.LIST_CODE_DEF)
 		expect(keptIds).to.not.include(ClineDefaultTool.SEARCH)
 		expect(keptIds).to.not.include(ClineDefaultTool.BASH)

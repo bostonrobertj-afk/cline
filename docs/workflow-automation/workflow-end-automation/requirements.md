@@ -4,10 +4,11 @@
 - immediately performs a direct call + await to workflowCompletionHandler and provides:
     - completedWorkflowId, derived from activePlaceholderWorkflowId
 - Does not perform its additional duties until workflowCompletionHandler returns
-- If workflowCompletionHandler returns `no_op` or `tool_completed`, it clears workflow-active runtime state
-- If workflowCompletionHandler returns `tool_failed`, it does not clear workflow-active runtime state
-- Owns placeholder-workflow completion teardown. There is no separate existing placeholder-workflow teardown capability that should perform this work instead.
-- Clears workflow-active runtime state:
+- Returns a structured completion decision to `Task`
+- If workflowCompletionHandler returns `no_op` or `tool_completed`, it returns `shouldTeardown: true`
+- If workflowCompletionHandler returns `tool_failed`, it returns `shouldTeardown: false`
+- Does not own placeholder-workflow completion teardown. `Task` owns teardown, focus-chain projection clearing, metadata persistence, and UI refresh after interpreting the runner result.
+- Does not clear workflow-active runtime state directly. When `Task` receives `shouldTeardown: true`, `Task` clears:
     - activePlaceholderWorkflowId
     - activePlaceholderWorkflowSource
     - activePlaceholderWorkflowValues
@@ -19,13 +20,13 @@
     - pendingAutoCompletedPlaceholderWorkflowStepNotices
     - activeWorkflowJustStarted
     - pending workflow-form outcome if one exists in Task runtime state
-- Clears the placeholder-workflow focus-chain projection after successful completion handling:
+- Does not clear the placeholder-workflow focus-chain projection directly. When `Task` receives `shouldTeardown: true`, `Task` clears:
     - currentFocusChainChecklist
     - todoListWasUpdatedByUser reset state
     - apiRequestsSinceLastTodoUpdate reset state
     - persisted focus-chain markdown file on disk
-- Persists the cleared placeholder-workflow metadata after teardown so resumed tasks do not restore a completed workflow as still active
-- Refreshes UI/runtime state after teardown so the cleared workflow state is reflected immediately
+- Does not persist cleared placeholder-workflow metadata itself. `Task` persists the cleared metadata after teardown so resumed tasks do not restore a completed workflow as still active
+- Does not refresh UI/runtime state itself. `Task` refreshes state after teardown so the cleared workflow state is reflected immediately
 - Does not own task-ending responsibilities:
     - it does not end the conversation thread
     - it does not change thread display state as a task-complete behavior

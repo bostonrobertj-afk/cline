@@ -6,13 +6,7 @@ import { apply_patch_variants } from "./apply_patch"
 import { ask_followup_question_variants } from "./ask_followup_question"
 import { attempt_completion_variants } from "./attempt_completion"
 import { browser_action_variants } from "./browser_action"
-import { build_epic_delivery_spec_variants } from "./build_epic_delivery_spec"
-import { build_epics_document_variants } from "./build_epics_document"
 import { build_review_diff_output_variants } from "./build_review_diff_output"
-import { build_review_input_variants } from "./build_review_input"
-import { build_story_document_variants } from "./build_story_document"
-import { build_tech_spec_document_variants } from "./build_tech_spec_document"
-import { capture_brainstorming_topic_variants } from "./capture_brainstorming_topic"
 import { complete_workflow_item_variants } from "./complete_workflow_item"
 import { execute_command_variants } from "./execute_command"
 import { focus_chain_variants } from "./focus_chain"
@@ -22,12 +16,10 @@ import { list_code_definition_names_variants } from "./list_code_definition_name
 import { list_files_variants } from "./list_files"
 import { load_mcp_documentation_variants } from "./load_mcp_documentation"
 import { new_task_variants } from "./new_task"
-import { prepare_brainstorming_session_variants } from "./prepare_brainstorming_session"
 import { read_file_variants } from "./read_file"
 import { read_file_range_variants } from "./read_file_range"
 import { replace_in_file_variants } from "./replace_in_file"
 import { search_files_variants } from "./search_files"
-import { select_target_epic_variants } from "./select_target_epic"
 import { send_user_message_variants } from "./send_user_message"
 import { set_workflow_placeholders_variants } from "./set_workflow_placeholders"
 import { story_notes_update_variants } from "./story_notes_update"
@@ -56,11 +48,6 @@ export function registerClineToolSets(): void {
 		...attempt_completion_variants,
 		...browser_action_variants,
 		...build_review_diff_output_variants,
-		...build_review_input_variants,
-		...build_epics_document_variants,
-		...build_epic_delivery_spec_variants,
-		...build_story_document_variants,
-		...build_tech_spec_document_variants,
 		...complete_workflow_item_variants,
 		...execute_command_variants,
 		...focus_chain_variants,
@@ -69,14 +56,11 @@ export function registerClineToolSets(): void {
 		...list_files_variants,
 		...load_mcp_documentation_variants,
 		...new_task_variants,
-		...prepare_brainstorming_session_variants,
-		...capture_brainstorming_topic_variants,
 		...generate_plan_output_variants,
 		...read_file_variants,
 		...read_file_range_variants,
 		...replace_in_file_variants,
 		...search_files_variants,
-		...select_target_epic_variants,
 		...send_user_message_variants,
 		...workflow_progress_request_variants,
 		...set_workflow_placeholders_variants,
