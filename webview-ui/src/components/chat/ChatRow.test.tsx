@@ -1,21 +1,12 @@
-import type {
-	ClineMessage,
-	ClineWorkflowStartCard,
-	ClineWorkflowStepResolutionStatus,
-	WorkflowFormAutomaticStatusState,
-	WorkflowFormPhase,
-} from "@shared/ExtensionMessage"
-import { WorkflowFormAction } from "@shared/proto/cline/task"
-import { fireEvent, render, screen } from "@testing-library/react"
-import { beforeEach, describe, expect, it, vi } from "vitest"
-import { ChatRowContent, getFollowupPresentation } from "./ChatRow"
-
-const WORKFLOW_START_PROMPT_FIXTURE = "Workflow form prompt content for test coverage."
+import type { ClineMessage } from "@shared/ExtensionMessage"
+import { render, screen } from "@testing-library/react"
+import { describe, expect, it, vi } from "vitest"
+import { ChatRowContent } from "./ChatRow"
 
 const { mockSubmitWorkflowForm, mockSubmitWorkflowStartCard, mockThreadDisplayState } = vi.hoisted(() => ({
 	mockSubmitWorkflowForm: vi.fn().mockResolvedValue(undefined),
 	mockSubmitWorkflowStartCard: vi.fn().mockResolvedValue(undefined),
-	mockThreadDisplayState: { value: "idle_open" as string | null },
+	mockThreadDisplayState: { value: "awaiting_user_response" as string | null },
 }))
 
 vi.mock("@/context/ExtensionStateContext", () => ({
@@ -48,782 +39,411 @@ vi.mock("@/services/grpc-client", async (importOriginal) => {
 	}
 })
 
-function createWorkflowFormMessage(phase: WorkflowFormPhase, overrides?: Partial<Record<string, unknown>>): ClineMessage {
-	const sourceSelectionFields = [
-		{
-			key: "source.type",
-			label: "Source type",
-			help: "Choose a diff source.",
-			control: "select" as const,
-			valueSchema: { type: "string" as const, enum: ["commit", "commit_range"] },
-			required: true,
-			options: [
-				{ value: "commit", label: "Commit" },
-				{ value: "commit_range", label: "Commit range" },
-			],
-			visible: true,
-		},
-	]
-	const concreteCommitFields = [
-		{
-			key: "source.commit",
-			label: "Commit",
-			help: "Enter the commit SHA.",
-			control: "text" as const,
-			valueSchema: { type: "string" as const },
-			required: true,
-			placeholder: "abc1234",
-			visible: true,
-		},
-		{
-			key: "scoped_paths",
-			label: "Scoped paths",
-			help: "Optional path filter.",
-			control: "textarea" as const,
-			valueSchema: { type: "array" as const, items: { type: "string" as const } },
-			required: false,
-			placeholder: "src/core/task/index.ts",
-			visible: true,
-		},
-		{
-			key: "context_lines",
-			label: "Context lines",
-			help: "Optional context lines.",
-			control: "number" as const,
-			valueSchema: { type: "integer" as const },
-			required: false,
-			placeholder: "3",
-			visible: true,
-		},
-	]
-	const definition = {
-		toolName: "build_review_diff_output",
-		title: "Review Diff Artifact",
-		toolDictionaryTitle: "Diff Output Reference",
-		toolDictionaryMarkdown: "## build_review_diff_output\n\nTool reference body.",
-		pages: {
-			confirm: {
-				prompt: "This workflow requires the following tool-produced artifact: `review-input.diff`.\n\nCan you provide the inputs required to produce `review-input.diff`?",
-				options: ["Yes", "No"],
-			},
-			select_source: {
-				prompt: "This workflow requires the tool-produced artifact `review-input.diff`.\n\nChoose which diff source you have so we can collect the right inputs.",
-				fields: sourceSelectionFields,
-				submitLabel: "Next",
-				cancelLabel: "Cancel",
-			},
-			collect_inputs: {
-				prompt: "Provide the concrete inputs needed to produce `review-input.diff`.",
-				fields: concreteCommitFields,
-				submitLabel: "Submit",
-				cancelLabel: "Cancel",
-				backLabel: "Back",
-			},
-			retry_error: {
-				prompt: "The system could not produce `review-input.diff`. Update the inputs or retry the request.",
-				fields: concreteCommitFields,
-				submitLabel: "Submit",
-				cancelLabel: "Cancel",
-				backLabel: "Back",
-				retryLabel: "Start Over",
-			},
-		},
-		successMessage: "The workflow form completed successfully.",
-	}
-
+function createWorkflowFormMessage(payloadOverrides?: Partial<Record<string, unknown>>): ClineMessage {
 	return {
 		ts: Date.now(),
 		type: "ask",
 		ask: "workflow_form",
 		text: JSON.stringify({
-			sessionId: "session-1",
-			resolverId: "code_review_step_3_diff_source",
-			phase,
-			definition,
-			values:
-				phase === "collect_inputs" || phase === "retry_error"
-					? {
-							confirm: { rawValue: "yes" },
-							"source.type": { rawValue: "commit" },
-						}
-					: undefined,
-			errorMessage: phase === "retry_error" ? "The system could not produce review-input.diff." : undefined,
-			successMessage: phase === "success" ? "The workflow form completed successfully." : undefined,
-			...overrides,
+			sessionId: "workflow-form-session",
+			resolverId: "brainstorming_step_4_choose_approach",
+			title: "Workflow Form V2",
+			toolDictionaryTitle: "Workflow Dictionary",
+			toolDictionaryMarkdown: "## workflow_form",
+			renderState: "panel",
+			panel: {
+				panelId: "active_panel",
+				title: "Active Panel",
+				promptMarkdown: "Panel prompt markdown.",
+				fields: [],
+				allowedActions: ["submit", "cancel"],
+				actionLabels: {
+					submit: "Continue",
+					cancel: "Cancel",
+				},
+			},
+			values: {},
+			...payloadOverrides,
 		}),
 	}
 }
 
-function createAutomaticWorkflowStatusMessage(
-	state: WorkflowFormAutomaticStatusState,
-	overrides?: Partial<Record<string, unknown>>,
-): ClineMessage {
-	return {
-		ts: Date.now(),
-		type: "say",
-		say: "workflow_form",
-		text: JSON.stringify({
-			sessionId: "automatic-session-1",
-			resolverId: "code_review_step_3_review_input",
-			phase: state === "pending" ? "collect_inputs" : "success",
-			definition: {
-				toolName: "build_review_input",
-				title: "Review Input Artifact",
-				toolDictionaryTitle: "Review Input Reference",
-				toolDictionaryMarkdown: "## build_review_input",
-				presentation: {
-					kind: "automatic_status",
-					pendingLabel: "Preparing workflow documents",
-					successLabel: "Workflow documents ready",
-					failureLabel: "Automatic workflow preparation failed- falling back to manual LLM workflow preparation.",
-				},
-				pages: {
-					collect_inputs: {
-						prompt: "The system will now build `review-input.md` from the stored `story_path` and the workflow-owned `review-input.diff` artifact.",
-						fields: [],
+function renderWorkflowForm(message: ClineMessage) {
+	return render(
+		<ChatRowContent
+			inputValue=""
+			isExpanded={true}
+			isLast={true}
+			message={message}
+			onSetQuote={vi.fn()}
+			onToggleExpand={vi.fn()}
+		/>,
+	)
+}
+
+describe("ChatRow workflow form v2 rendering", () => {
+	it("renders a simple sequential workflow form generically", () => {
+		renderWorkflowForm(
+			createWorkflowFormMessage({
+				panel: {
+					panelId: "sequential_panel",
+					title: "Sequential Panel",
+					promptMarkdown: "Collect sequential inputs.",
+					fields: [
+						{
+							key: "review_input",
+							kind: "small_text",
+							label: "Review Input",
+							required: true,
+							allowedValueType: "string",
+						},
+					],
+					allowedActions: ["submit", "cancel"],
+					actionLabels: {
+						submit: "Next",
+						cancel: "Cancel",
 					},
 				},
-				successMessage: "The Step 3 review-input artifact is ready.",
-			},
-			automaticStatusState: state,
-			...overrides,
-		}),
-	}
-}
-
-function createWorkflowStepResolutionStatusMessage(
-	state: "pending" | "success" | "failure",
-	overrides?: Partial<ClineWorkflowStepResolutionStatus>,
-): ClineMessage {
-	return {
-		ts: Date.now(),
-		type: "say",
-		say: "workflow_step_resolution_status",
-		text: JSON.stringify({
-			sessionId: "step-resolution-session-1",
-			definitionId: "code_review_step_3_review_input",
-			owner: {
-				workflowName: "code-review.md",
-				stepNumber: 3,
-			},
-			state,
-			definition: {
-				title: "Review Input Artifact",
-				pendingLabel: "Preparing workflow documents",
-				successLabel: "Workflow documents ready",
-				failureLabel: "Automatic workflow preparation failed- falling back to manual LLM workflow preparation.",
-			},
-			...overrides,
-		}),
-	}
-}
-
-function createWorkflowStartCardMessage(overrides?: Partial<ClineWorkflowStartCard>): ClineMessage {
-	return {
-		ts: Date.now(),
-		type: "ask",
-		ask: "workflow_start_card",
-		text: JSON.stringify({
-			sessionId: "start-card-session-1",
-			title: "Welcome to the Quick Spec Workflow!",
-			markdownBody:
-				"In this workflow you will build a small implementation-ready tech spec through guided discovery, scoped planning, and a final review pass.",
-			ctaLabel: "Get Started",
-			...overrides,
-		}),
-	}
-}
-
-function renderWorkflowFormRow(phase: WorkflowFormPhase, overrides?: Partial<Record<string, unknown>>) {
-	return render(
-		<ChatRowContent
-			inputValue=""
-			isExpanded={true}
-			isLast={true}
-			message={createWorkflowFormMessage(phase, overrides)}
-			onSetQuote={vi.fn()}
-			onToggleExpand={vi.fn()}
-		/>,
-	)
-}
-
-function renderAutomaticWorkflowStatusRow(state: WorkflowFormAutomaticStatusState, overrides?: Partial<Record<string, unknown>>) {
-	return render(
-		<ChatRowContent
-			inputValue=""
-			isExpanded={true}
-			isLast={true}
-			message={createAutomaticWorkflowStatusMessage(state, overrides)}
-			onSetQuote={vi.fn()}
-			onToggleExpand={vi.fn()}
-		/>,
-	)
-}
-
-function renderWorkflowStepResolutionStatusRow(
-	state: "pending" | "success" | "failure",
-	overrides?: Partial<ClineWorkflowStepResolutionStatus>,
-) {
-	return render(
-		<ChatRowContent
-			inputValue=""
-			isExpanded={true}
-			isLast={true}
-			message={createWorkflowStepResolutionStatusMessage(state, overrides)}
-			onSetQuote={vi.fn()}
-			onToggleExpand={vi.fn()}
-		/>,
-	)
-}
-
-function renderWorkflowStartCardRow(overrides?: Partial<ClineWorkflowStartCard>) {
-	return render(
-		<ChatRowContent
-			inputValue=""
-			isExpanded={true}
-			isLast={true}
-			message={createWorkflowStartCardMessage(overrides)}
-			onSetQuote={vi.fn()}
-			onToggleExpand={vi.fn()}
-		/>,
-	)
-}
-
-describe("ChatRow followup presentation", () => {
-	beforeEach(() => {
-		mockThreadDisplayState.value = "idle_open"
-		vi.clearAllMocks()
-	})
-
-	it("renders reopened followup messages as a passive thread label", () => {
-		const presentation = getFollowupPresentation(undefined, true)
-
-		expect(presentation.hasQuestion).to.equal(false)
-		expect(presentation.title).to.equal("Conversation reopened:")
-	})
-
-	it("renders genuine follow-up questions with question framing", () => {
-		const presentation = getFollowupPresentation(JSON.stringify({ question: "What should I do next?" }))
-
-		expect(presentation.hasQuestion).to.equal(true)
-		expect(presentation.title).to.equal("Cline has a question:")
-		expect(presentation.question).to.equal("What should I do next?")
-	})
-
-	it("uses the active persona name for follow-up questions when available", () => {
-		const presentation = getFollowupPresentation(JSON.stringify({ question: "What should I do next?" }), false, "Barry")
-
-		expect(presentation.hasQuestion).to.equal(true)
-		expect(presentation.title).to.equal("Barry has a question:")
-	})
-
-	it("renders the reopened banner for idle_open followup rows", () => {
-		mockThreadDisplayState.value = "idle_open"
-
-		const message: ClineMessage = {
-			ts: Date.now(),
-			type: "ask",
-			ask: "followup",
-			text: JSON.stringify({ question: "What should I do next?" }),
-		}
-
-		render(
-			<ChatRowContent
-				inputValue=""
-				isExpanded={true}
-				isLast={false}
-				message={message}
-				onSetQuote={vi.fn()}
-				onToggleExpand={vi.fn()}
-			/>,
-		)
-
-		expect(screen.getByText("Conversation reopened.")).toBeInTheDocument()
-		expect(screen.getByText("Conversation reopened:")).toBeInTheDocument()
-	})
-
-	it("does not render the reopened banner for active_user followup rows", () => {
-		mockThreadDisplayState.value = "active_user"
-
-		const message: ClineMessage = {
-			ts: Date.now(),
-			type: "ask",
-			ask: "followup",
-			text: JSON.stringify({ question: "What should I do next?" }),
-		}
-
-		render(
-			<ChatRowContent
-				inputValue=""
-				isExpanded={true}
-				isLast={false}
-				message={message}
-				onSetQuote={vi.fn()}
-				onToggleExpand={vi.fn()}
-			/>,
-		)
-
-		expect(screen.queryByText("Conversation reopened.")).not.toBeInTheDocument()
-		expect(screen.getByText("Cline has a question:")).toBeInTheDocument()
-		expect(screen.getByText("What should I do next?")).toBeInTheDocument()
-	})
-
-	it("renders agent feedback rows", () => {
-		mockThreadDisplayState.value = "idle_open"
-
-		const message: ClineMessage = {
-			ts: Date.now(),
-			type: "say",
-			say: "agent_feedback",
-			text: JSON.stringify({
-				label: "Real-Time Agent Feedback",
-				message: "Blocked on unstable behavior.",
-				timestamp: "2026-03-28T12:00:00.000Z",
-				toolName: "send_user_message",
-				taskId: "task-1",
-				turnIdentifier: 1,
-				apiCallIdentifier: 1,
-			}),
-		}
-
-		render(
-			<ChatRowContent
-				inputValue=""
-				isExpanded={true}
-				isLast={false}
-				message={message}
-				onSetQuote={vi.fn()}
-				onToggleExpand={vi.fn()}
-			/>,
-		)
-
-		expect(screen.getByText("Real-Time Agent Feedback")).toBeInTheDocument()
-		expect(screen.getByText("Blocked on unstable behavior.")).toBeInTheDocument()
-	})
-
-	it("renders workflow_form confirm rows as a system-owned form", () => {
-		renderWorkflowFormRow("confirm")
-
-		expect(screen.getByText("System-owned form:")).toBeInTheDocument()
-		expect(screen.getByText("Review Diff Artifact")).toBeInTheDocument()
-		expect(screen.getByRole("button", { name: "Open inputs reference" })).toBeInTheDocument()
-		expect(screen.getByRole("button", { name: "Yes" })).toBeInTheDocument()
-		expect(screen.getByRole("button", { name: "No" })).toBeInTheDocument()
-	})
-
-	it("renders workflow_start_card with only the Get Started CTA and submits through the dedicated transport", async () => {
-		renderWorkflowStartCardRow()
-
-		expect(screen.getByText("Welcome to the Quick Spec Workflow!")).toBeInTheDocument()
-		expect(
-			screen.getByText(
-				"In this workflow you will build a small implementation-ready tech spec through guided discovery, scoped planning, and a final review pass.",
-			),
-		).toBeInTheDocument()
-		expect(screen.getByRole("button", { name: "Get Started" })).toBeInTheDocument()
-		expect(screen.queryByRole("button", { name: "Open inputs reference" })).not.toBeInTheDocument()
-		expect(screen.queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument()
-		expect(screen.queryByRole("button", { name: "Yes" })).not.toBeInTheDocument()
-		expect(screen.queryByRole("button", { name: "No" })).not.toBeInTheDocument()
-
-		fireEvent.click(screen.getByRole("button", { name: "Get Started" }))
-
-		expect(mockSubmitWorkflowStartCard).toHaveBeenCalledTimes(1)
-		expect(mockSubmitWorkflowStartCard).toHaveBeenCalledWith(
-			expect.objectContaining({
-				sessionId: "start-card-session-1",
 			}),
 		)
-	})
 
-	it("renders workflow_step_resolution_status rows with the pending label", () => {
-		renderWorkflowStepResolutionStatusRow("pending")
-
-		expect(screen.getByText("Preparing workflow documents")).toBeInTheDocument()
-		expect(screen.queryByRole("button", { name: "Yes" })).not.toBeInTheDocument()
-		expect(screen.queryByRole("button", { name: "No" })).not.toBeInTheDocument()
-		expect(screen.queryByRole("button", { name: "Open inputs reference" })).not.toBeInTheDocument()
-	})
-
-	it("renders workflow_step_resolution_status rows with the success label", () => {
-		renderWorkflowStepResolutionStatusRow("success")
-
-		expect(screen.getByText("Workflow documents ready")).toBeInTheDocument()
-	})
-
-	it("renders workflow_step_resolution_status rows with the failure label", () => {
-		renderWorkflowStepResolutionStatusRow("failure")
-
-		expect(
-			screen.getByText("Automatic workflow preparation failed- falling back to manual LLM workflow preparation."),
-		).toBeInTheDocument()
-	})
-
-	it("continues to render legacy workflow_form automatic-status rows for persisted history", () => {
-		renderAutomaticWorkflowStatusRow("pending")
-
-		expect(screen.getByText("Preparing workflow documents")).toBeInTheDocument()
-	})
-
-	it("renders workflow-form title and prompt from the canonical definition", () => {
-		renderWorkflowFormRow("collect_inputs", {
-			definition: {
-				toolName: "set_workflow_placeholders",
-				title: "Workflow Start Inputs",
-				toolDictionaryTitle: "Workflow Placeholder Reference",
-				toolDictionaryMarkdown: "## set_workflow_placeholders",
-				pages: {
-					collect_inputs: {
-						prompt: WORKFLOW_START_PROMPT_FIXTURE,
-						fields: [],
-						submitLabel: "Submit",
-						cancelLabel: "Cancel",
-					},
-				},
-				successMessage: "Workflow start inputs were stored.",
-			},
-		})
-
-		expect(screen.getByText("Workflow Start Inputs")).toBeInTheDocument()
-		const title = screen.getByText("Workflow Start Inputs")
-		const promptContainer = title.closest(".border")?.querySelector(".pt-2")
-
-		expect(promptContainer?.textContent?.trim().length ?? 0).toBeGreaterThan(0)
-	})
-
-	it("opens the workflow dictionary in a read-only dialog", async () => {
-		renderWorkflowFormRow("confirm")
-
-		fireEvent.click(screen.getByRole("button", { name: "Open inputs reference" }))
-
-		expect(await screen.findByText("Diff Output Reference")).toBeInTheDocument()
-		expect(await screen.findByText("build_review_diff_output")).toBeInTheDocument()
-	})
-
-	it("renders the select_source workflow form with Next and without Submit", () => {
-		renderWorkflowFormRow("select_source")
-
-		expect(screen.getByLabelText("Source type")).toBeInTheDocument()
+		expect(screen.getByText("Workflow Form V2")).toBeInTheDocument()
+		expect(screen.getByText("Sequential Panel")).toBeInTheDocument()
+		expect(screen.getByText("Collect sequential inputs.")).toBeInTheDocument()
+		expect(screen.getByRole("textbox", { name: "Review Input" })).toBeInTheDocument()
 		expect(screen.getByRole("button", { name: "Next" })).toBeInTheDocument()
-		expect(screen.queryByRole("button", { name: "Back" })).not.toBeInTheDocument()
-		expect(screen.queryByRole("button", { name: "Submit" })).not.toBeInTheDocument()
+		expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument()
 	})
 
-	it("renders the collect_inputs workflow form with concrete commit inputs and Submit", () => {
-		renderWorkflowFormRow("collect_inputs")
-
-		expect(screen.getByLabelText("Commit")).toBeInTheDocument()
-		expect(screen.getByLabelText("Scoped paths")).toBeInTheDocument()
-		expect(screen.getByLabelText("Context lines")).toBeInTheDocument()
-		expect(screen.getByRole("button", { name: "Back" })).toBeInTheDocument()
-		expect(screen.getByRole("button", { name: "Submit" })).toBeInTheDocument()
-		expect(screen.queryByRole("button", { name: "Next" })).not.toBeInTheDocument()
-	})
-
-	it("submits BACK from collect_inputs through the workflow-form transport", () => {
-		renderWorkflowFormRow("collect_inputs")
-
-		fireEvent.change(screen.getByLabelText("Commit"), { target: { value: "abc1234" } })
-		fireEvent.click(screen.getByRole("button", { name: "Back" }))
-
-		expect(mockSubmitWorkflowForm).toHaveBeenCalledTimes(1)
-		expect(mockSubmitWorkflowForm).toHaveBeenCalledWith(
-			expect.objectContaining({
-				sessionId: "session-1",
-				action: WorkflowFormAction.BACK,
-				fields: [{ key: "source.commit", value: { rawValue: "abc1234" } }],
+	it("renders a conditional workflow form with generic actions", () => {
+		renderWorkflowForm(
+			createWorkflowFormMessage({
+				panel: {
+					panelId: "conditional_panel",
+					title: "Conditional Panel",
+					promptMarkdown: "Choose a branch.",
+					fields: [
+						{
+							key: "route",
+							kind: "radio_group",
+							label: "Route",
+							required: true,
+							options: [
+								{ value: "left", label: "Left" },
+								{ value: "right", label: "Right" },
+							],
+						},
+					],
+					allowedActions: ["submit", "back", "cancel"],
+					actionLabels: {
+						submit: "Continue",
+						back: "Back",
+						cancel: "Cancel",
+					},
+				},
 			}),
 		)
-	})
 
-	it("renders the retry_error workflow form with the error banner, Start Over, and Submit", () => {
-		renderWorkflowFormRow("retry_error")
-
-		expect(screen.getByText("The system could not produce review-input.diff.")).toBeInTheDocument()
+		expect(screen.getByText("Conditional Panel")).toBeInTheDocument()
+		expect(screen.getByLabelText("Left")).toBeInTheDocument()
+		expect(screen.getByLabelText("Right")).toBeInTheDocument()
+		expect(screen.getByRole("button", { name: "Continue" })).toBeInTheDocument()
 		expect(screen.getByRole("button", { name: "Back" })).toBeInTheDocument()
-		expect(screen.getByRole("button", { name: "Start Over" })).toBeInTheDocument()
-		expect(screen.getByRole("button", { name: "Submit" })).toBeInTheDocument()
 	})
 
-	it("submits BACK from retry_error through the workflow-form transport", () => {
-		renderWorkflowFormRow("retry_error")
-
-		fireEvent.change(screen.getByLabelText("Commit"), { target: { value: "def5678" } })
-		fireEvent.click(screen.getByRole("button", { name: "Back" }))
-
-		expect(mockSubmitWorkflowForm).toHaveBeenCalledTimes(1)
-		expect(mockSubmitWorkflowForm).toHaveBeenCalledWith(
-			expect.objectContaining({
-				sessionId: "session-1",
-				action: WorkflowFormAction.BACK,
-				fields: [{ key: "source.commit", value: { rawValue: "def5678" } }],
+	it("hides Retry until the workflow form is rendering a failure state", () => {
+		renderWorkflowForm(
+			createWorkflowFormMessage({
+				renderState: "panel",
+				panel: {
+					panelId: "normal_panel",
+					title: "Normal Panel",
+					promptMarkdown: "Normal state should not expose Retry.",
+					fields: [],
+					allowedActions: ["submit", "retry"],
+					actionLabels: {
+						submit: "Continue",
+						retry: "Retry",
+					},
+				},
 			}),
 		)
+
+		expect(screen.getByRole("button", { name: "Continue" })).toBeInTheDocument()
+		expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument()
 	})
 
-	it("keeps Next disabled in select_source until source.type is chosen", () => {
-		renderWorkflowFormRow("select_source")
-
-		const nextButton = screen.getByRole("button", { name: "Next" })
-		expect(nextButton).toBeDisabled()
-
-		fireEvent.change(screen.getByLabelText("Source type"), { target: { value: "commit" } })
-
-		expect(nextButton).not.toBeDisabled()
-	})
-
-	it("keeps Submit disabled in collect_inputs until required concrete fields are populated", () => {
-		renderWorkflowFormRow("collect_inputs")
-
-		const submitButton = screen.getByRole("button", { name: "Submit" })
-		expect(submitButton).toBeDisabled()
-
-		fireEvent.change(screen.getByLabelText("Commit"), { target: { value: "abc1234" } })
-
-		expect(submitButton).not.toBeDisabled()
-	})
-
-	it("keeps Submit available for corrected retry_error inputs and Start Over available to restart", () => {
-		renderWorkflowFormRow("retry_error")
-
-		const submitButton = screen.getByRole("button", { name: "Submit" })
-		const startOverButton = screen.getByRole("button", { name: "Start Over" })
-
-		expect(submitButton).toBeDisabled()
-		expect(startOverButton).not.toBeDisabled()
-
-		fireEvent.change(screen.getByLabelText("Commit"), { target: { value: "def5678" } })
-
-		expect(submitButton).not.toBeDisabled()
-		expect(startOverButton).not.toBeDisabled()
-	})
-
-	it("shows a red asterisk on required workflow-start fields", () => {
-		renderWorkflowFormRow("collect_inputs", {
-			resolverId: "placeholder_workflow_start_set_workflow_placeholders",
-			definition: {
-				toolName: "set_workflow_placeholders",
-				title: "Workflow Start Inputs",
-				toolDictionaryTitle: "Workflow Placeholder Reference",
-				toolDictionaryMarkdown: "## set_workflow_placeholders",
-				pages: {
-					collect_inputs: {
-						prompt: WORKFLOW_START_PROMPT_FIXTURE,
-						fields: [
-							{
-								key: "review_input",
-								label: "Review Input File",
-								help: "Path to the review input file.",
-								control: "text",
-								valueSchema: { type: "string" },
-								required: true,
-								visible: true,
-							},
-						],
-						submitLabel: "Submit",
-						cancelLabel: "Cancel",
+	it("renders a failure-state form with Retry and Back", () => {
+		renderWorkflowForm(
+			createWorkflowFormMessage({
+				renderState: "failure",
+				errorMessage: "The operation failed.",
+				panel: {
+					panelId: "failure_panel",
+					title: "Failure Panel",
+					promptMarkdown: "Fix the inputs and retry.",
+					fields: [
+						{
+							key: "context_lines",
+							kind: "number",
+							label: "Context Lines",
+							required: true,
+							allowedValueType: "integer",
+						},
+					],
+					allowedActions: ["submit", "back", "retry"],
+					actionLabels: {
+						submit: "Retry Submit",
+						back: "Back",
+						retry: "Retry",
 					},
 				},
-				successMessage: "Workflow start inputs were stored.",
-			},
-			values: {},
-		})
+			}),
+		)
 
-		expect(screen.getByText("*")).toBeInTheDocument()
+		expect(screen.getByText("Failure Panel")).toBeInTheDocument()
+		expect(screen.getByText("The operation failed.")).toBeInTheDocument()
+		expect(screen.getByRole("button", { name: "Back" })).toBeInTheDocument()
+		expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument()
 	})
 
-	it("renders the workflow-start one-of group with OR separators", () => {
-		renderWorkflowFormRow("collect_inputs", {
-			resolverId: "placeholder_workflow_start_set_workflow_placeholders",
-			definition: {
-				toolName: "set_workflow_placeholders",
-				title: "Workflow Start Inputs",
-				toolDictionaryTitle: "Workflow Placeholder Reference",
-				toolDictionaryMarkdown: "## set_workflow_placeholders",
-				pages: {
-					collect_inputs: {
-						prompt: WORKFLOW_START_PROMPT_FIXTURE,
+	it("renders a success-state workflow form", () => {
+		renderWorkflowForm(
+			createWorkflowFormMessage({
+				renderState: "success",
+				panel: undefined,
+				successMessage: "Workflow form completed successfully.",
+			}),
+		)
+
+		expect(screen.getByText("Workflow Form V2")).toBeInTheDocument()
+		expect(screen.getByText("Workflow form completed successfully.")).toBeInTheDocument()
+		expect(screen.queryByText("Open inputs reference")).not.toBeInTheDocument()
+	})
+
+	it("renders option descriptions for dropdown, radio_group, and checkbox_group fields", () => {
+		renderWorkflowForm(
+			createWorkflowFormMessage({
+				panel: {
+					panelId: "described_options",
+					title: "Described Options",
+					promptMarkdown: "Render option descriptions.",
+					fields: [
+						{
+							key: "dropdown_choice",
+							kind: "dropdown",
+							label: "Dropdown Choice",
+							required: true,
+							options: [{ value: "mind_map", label: "Mind Map", description: "Visual mapping technique" }],
+						},
+						{
+							key: "radio_choice",
+							kind: "radio_group",
+							label: "Radio Choice",
+							required: true,
+							options: [{ value: "six_hats", label: "Six Hats", description: "Perspective shifting technique" }],
+						},
+						{
+							key: "checkbox_choice",
+							kind: "checkbox_group",
+							label: "Checkbox Choice",
+							required: false,
+							options: [{ value: "reverse", label: "Reverse Brainstorming", description: "Invert the problem" }],
+						},
+					],
+					allowedActions: ["submit"],
+				},
+			}),
+		)
+
+		expect(screen.getByRole("option", { name: "Mind Map - Visual mapping technique" })).toBeInTheDocument()
+		expect(screen.getByText("Perspective shifting technique")).toBeInTheDocument()
+		expect(screen.getByText("Invert the problem")).toBeInTheDocument()
+	})
+
+	it("rebuilds field-level conditional options after rerender", () => {
+		const { rerender } = renderWorkflowForm(
+			createWorkflowFormMessage({
+				panel: {
+					panelId: "conditional_options",
+					title: "Conditional Options",
+					promptMarkdown: "Choose an option.",
+					fields: [
+						{
+							key: "technique",
+							kind: "dropdown",
+							label: "Technique",
+							required: true,
+							options: [
+								{ value: "mind-map", label: "Mind Map" },
+								{ value: "six-hats", label: "Six Hats" },
+							],
+						},
+					],
+					allowedActions: ["submit", "back"],
+				},
+			}),
+		)
+
+		expect(screen.getByRole("option", { name: "Mind Map" })).toBeInTheDocument()
+		expect(screen.getByRole("option", { name: "Six Hats" })).toBeInTheDocument()
+
+		rerender(
+			<ChatRowContent
+				inputValue=""
+				isExpanded={true}
+				isLast={true}
+				message={createWorkflowFormMessage({
+					panel: {
+						panelId: "conditional_options",
+						title: "Conditional Options",
+						promptMarkdown: "Choose an option.",
 						fields: [
 							{
-								key: "review_input",
-								label: "Review Input File",
-								help: "Path to the review input file.",
-								control: "text",
-								valueSchema: { type: "string" },
+								key: "technique",
+								kind: "dropdown",
+								label: "Technique",
 								required: true,
-								visible: true,
-							},
-							{
-								key: "diff_output",
-								label: "Review Diff File",
-								help: "Path to the review diff file.",
-								control: "text",
-								valueSchema: { type: "string" },
-								required: false,
-								oneOfGroupId: "workflow_start_one_of",
-								visible: true,
-							},
-							{
-								key: "spec_file",
-								label: "Spec or Story File",
-								help: "Path to the supporting spec or story file.",
-								control: "text",
-								valueSchema: { type: "string" },
-								required: false,
-								oneOfGroupId: "workflow_start_one_of",
-								visible: true,
+								options: [
+									{ value: "crazy-eights", label: "Crazy Eights" },
+									{ value: "starbursting", label: "Starbursting" },
+								],
 							},
 						],
-						submitLabel: "Submit",
-						cancelLabel: "Cancel",
+						allowedActions: ["submit", "back"],
 					},
-				},
-				successMessage: "Workflow start inputs were stored.",
-			},
-			values: {},
-		})
+				})}
+				onSetQuote={vi.fn()}
+				onToggleExpand={vi.fn()}
+			/>,
+		)
 
-		expect(screen.getByText("Provide one of the following")).toBeInTheDocument()
-		expect(screen.getByText("OR")).toBeInTheDocument()
+		expect(screen.getByRole("option", { name: "Crazy Eights" })).toBeInTheDocument()
+		expect(screen.getByRole("option", { name: "Starbursting" })).toBeInTheDocument()
+		expect(screen.queryByRole("option", { name: "Mind Map" })).not.toBeInTheDocument()
 	})
 
-	it("keeps Submit disabled until required fields and the one-of group are satisfied", () => {
-		renderWorkflowFormRow("collect_inputs", {
-			resolverId: "placeholder_workflow_start_set_workflow_placeholders",
-			definition: {
-				toolName: "set_workflow_placeholders",
-				title: "Workflow Start Inputs",
-				toolDictionaryTitle: "Workflow Placeholder Reference",
-				toolDictionaryMarkdown: "## set_workflow_placeholders",
-				pages: {
-					collect_inputs: {
-						prompt: WORKFLOW_START_PROMPT_FIXTURE,
-						fields: [
-							{
-								key: "review_input",
-								label: "Review Input File",
-								help: "Path to the review input file.",
-								control: "text",
-								valueSchema: { type: "string" },
-								required: true,
-								visible: true,
-							},
-							{
-								key: "diff_output",
-								label: "Review Diff File",
-								help: "Path to the review diff file.",
-								control: "text",
-								valueSchema: { type: "string" },
-								required: false,
-								oneOfGroupId: "workflow_start_one_of",
-								visible: true,
-							},
-							{
-								key: "spec_file",
-								label: "Spec or Story File",
-								help: "Path to the supporting spec or story file.",
-								control: "text",
-								valueSchema: { type: "string" },
-								required: false,
-								oneOfGroupId: "workflow_start_one_of",
-								visible: true,
-							},
-						],
-						submitLabel: "Submit",
-						cancelLabel: "Cancel",
-					},
+	it("renders only the resolved field set provided by the runtime payload", () => {
+		renderWorkflowForm(
+			createWorkflowFormMessage({
+				panel: {
+					panelId: "resolved_only",
+					title: "Resolved Only",
+					promptMarkdown: "Render the runtime-resolved field set.",
+					fields: [
+						{
+							key: "visible_field",
+							kind: "small_text",
+							label: "Visible Field",
+							required: false,
+							allowedValueType: "string",
+						},
+					],
+					allowedActions: ["submit"],
 				},
-				successMessage: "Workflow start inputs were stored.",
-			},
-			values: {},
-		})
+			}),
+		)
 
-		const submitButton = screen.getByRole("button", { name: "Submit" })
-		expect(submitButton).toBeDisabled()
-
-		fireEvent.change(screen.getByLabelText("Review Input File"), { target: { value: "docs/review.md" } })
-		expect(submitButton).toBeDisabled()
-
-		fireEvent.change(screen.getByLabelText("Spec or Story File"), { target: { value: "docs/spec.md" } })
-		expect(submitButton).not.toBeDisabled()
+		expect(screen.getByRole("textbox", { name: "Visible Field" })).toBeInTheDocument()
+		expect(screen.queryByRole("textbox", { name: "Hidden Variant" })).not.toBeInTheDocument()
 	})
 
-	it("prefills workflow_form inputs from raw values", () => {
-		renderWorkflowFormRow("collect_inputs", {
-			values: {
-				confirm: { rawValue: "yes" },
-				"source.type": { rawValue: "commit" },
-				"source.commit": { rawValue: "abc1234" },
-				context_lines: { rawValue: "7" },
-			},
-		})
-
-		expect(screen.getByDisplayValue("abc1234")).toBeInTheDocument()
-		expect(screen.getByDisplayValue("7")).toBeInTheDocument()
-	})
-
-	it("renders workflow_form large textareas with the large sizing class", () => {
-		renderWorkflowFormRow("collect_inputs", {
-			definition: {
-				toolName: "capture_brainstorming_topic",
-				title: "Brainstorming Topic Reference",
-				toolDictionaryTitle: "Brainstorming Topic Reference",
-				toolDictionaryMarkdown: "## capture_brainstorming_topic\n\nTool reference body.",
-				pages: {
-					collect_inputs: {
-						prompt: "Provide the topic.",
-						fields: [
-							{
-								key: "topic",
-								label: "Topic and Goals",
-								help: "",
-								control: "textarea",
-								valueSchema: { type: "string" },
-								required: true,
-								visible: true,
-								presentation: { textareaSize: "large" },
-							},
-						],
-						submitLabel: "Submit",
-						cancelLabel: "Cancel",
-					},
+	it("renders every required v2 field kind", () => {
+		renderWorkflowForm(
+			createWorkflowFormMessage({
+				panel: {
+					panelId: "all_fields",
+					title: "All Fields",
+					promptMarkdown: "Render every field kind.",
+					fields: [
+						{
+							key: "dropdown_field",
+							kind: "dropdown",
+							label: "Dropdown Field",
+							required: false,
+							options: [{ value: "a", label: "Option A" }],
+						},
+						{ key: "boolean_field", kind: "boolean", label: "Boolean Field", required: false },
+						{ key: "small_text_field", kind: "small_text", label: "Small Text Field", required: false },
+						{
+							key: "large_text_field",
+							kind: "large_text",
+							label: "Large Text Field",
+							required: false,
+							allowedValueType: "string",
+						},
+						{
+							key: "number_field",
+							kind: "number",
+							label: "Number Field",
+							required: false,
+							allowedValueType: "integer",
+						},
+						{
+							key: "multi_select_field",
+							kind: "multi_select",
+							label: "Multi Select Field",
+							required: false,
+							options: [{ value: "a", label: "Option A" }],
+						},
+						{
+							key: "radio_group_field",
+							kind: "radio_group",
+							label: "Radio Group Field",
+							required: false,
+							options: [{ value: "left", label: "Left" }],
+						},
+						{
+							key: "checkbox_group_field",
+							kind: "checkbox_group",
+							label: "Checkbox Group Field",
+							required: false,
+							options: [{ value: "check", label: "Check" }],
+						},
+						{ key: "date_field", kind: "date", label: "Date Field", required: false },
+						{ key: "date_time_field", kind: "date_time", label: "Date Time Field", required: false },
+						{ key: "file_path_field", kind: "file_path", label: "File Path Field", required: false },
+						{ key: "directory_path_field", kind: "directory_path", label: "Directory Path Field", required: false },
+						{
+							key: "artifact_picker_field",
+							kind: "artifact_picker",
+							label: "Artifact Picker Field",
+							required: false,
+						},
+						{
+							key: "markdown_display_field",
+							kind: "markdown_display",
+							label: "Markdown Display Field",
+							required: false,
+							contentMarkdown: "Rendered markdown content.",
+						},
+						{
+							key: "static_notice_field",
+							kind: "static_notice",
+							label: "Static Notice Field",
+							required: false,
+							contentMarkdown: "Static notice content.",
+						},
+					],
+					allowedActions: ["submit"],
 				},
-				successMessage: "Stored.",
-			},
-		})
+			}),
+		)
 
-		expect(screen.getByLabelText("Topic and Goals")).toHaveClass("min-h-48")
-	})
-
-	it("keeps the default workflow_form textarea sizing when no presentation override is provided", () => {
-		renderWorkflowFormRow("collect_inputs", {
-			definition: {
-				toolName: "capture_brainstorming_topic",
-				title: "Brainstorming Topic Reference",
-				toolDictionaryTitle: "Brainstorming Topic Reference",
-				toolDictionaryMarkdown: "## capture_brainstorming_topic\n\nTool reference body.",
-				pages: {
-					collect_inputs: {
-						prompt: "Provide the topic.",
-						fields: [
-							{
-								key: "topic",
-								label: "Topic and Goals",
-								help: "",
-								control: "textarea",
-								valueSchema: { type: "string" },
-								required: true,
-								visible: true,
-							},
-						],
-						submitLabel: "Submit",
-						cancelLabel: "Cancel",
-					},
-				},
-				successMessage: "Stored.",
-			},
-		})
-
-		expect(screen.getByLabelText("Topic and Goals")).toHaveClass("min-h-24")
+		expect(screen.getByLabelText("Dropdown Field")).toBeInTheDocument()
+		expect(screen.getByLabelText("Boolean Field")).toBeInTheDocument()
+		expect(screen.getByRole("textbox", { name: "Small Text Field" })).toBeInTheDocument()
+		expect(screen.getByRole("textbox", { name: "Large Text Field" })).toBeInTheDocument()
+		expect(screen.getByLabelText("Number Field")).toBeInTheDocument()
+		expect(screen.getByLabelText("Multi Select Field")).toBeInTheDocument()
+		expect(screen.getByLabelText("Left")).toBeInTheDocument()
+		expect(screen.getByLabelText("Check")).toBeInTheDocument()
+		expect(screen.getByLabelText("Date Field")).toBeInTheDocument()
+		expect(screen.getByLabelText("Date Time Field")).toBeInTheDocument()
+		expect(screen.getByLabelText("File Path Field")).toBeInTheDocument()
+		expect(screen.getByLabelText("Directory Path Field")).toBeInTheDocument()
+		expect(screen.getByLabelText("Artifact Picker Field")).toBeInTheDocument()
+		expect(screen.getByText("Rendered markdown content.")).toBeInTheDocument()
+		expect(screen.getByText("Static notice content.")).toBeInTheDocument()
 	})
 })

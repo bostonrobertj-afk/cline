@@ -1,4 +1,9 @@
-import type { WorkflowFormDefinition, WorkflowFormFieldDefinition, WorkflowFormFieldOption } from "@shared/ExtensionMessage"
+import type {
+	WorkflowFormConditionDefinition,
+	WorkflowFormDefinitionPayload,
+	WorkflowFormFieldDefinition,
+	WorkflowFormOptionDefinition,
+} from "@shared/ExtensionMessage"
 import { formatResponse } from "@/core/prompts/responses"
 import {
 	buildReviewDiffOutputToolDictionaryConfig,
@@ -17,46 +22,117 @@ import {
 	CAPTURE_BRAINSTORMING_TOPIC_TITLE,
 	CAPTURE_BRAINSTORMING_TOPIC_TOOL_DICTIONARY_TITLE,
 } from "@/shared/capture-brainstorming-topic"
-import {
-	PREPARE_BRAINSTORMING_SESSION_LIST_FIELD_LABEL,
-	PREPARE_BRAINSTORMING_SESSION_LIST_PROMPT,
-	PREPARE_BRAINSTORMING_SESSION_LIST_TITLE,
-} from "@/shared/prepare-brainstorming-session"
 import { ClineDefaultTool } from "@/shared/tools"
 import {
-	deriveWorkflowFormControl,
+	convertWorkflowFormSubmittedValueToToolInput,
+	deriveWorkflowFormFieldKind,
 	deriveWorkflowFormOptions,
-	parseWorkflowFormRawValue,
 	resolveWorkflowFormOneOfVariant,
 	resolveWorkflowFormSchema,
-	resolveWorkflowFormToolContract,
 	type WorkflowFormFieldSchemaBinding,
 } from "./schema"
-import type { WorkflowFormResolverDefinition, WorkflowFormResolverId, WorkflowFormValues } from "./types"
+import type {
+	WorkflowFormResolverDefinition,
+	WorkflowFormResolverId,
+	WorkflowFormSessionState,
+	WorkflowFormStartRequirements,
+	WorkflowFormToolExecutionRequest,
+} from "./types"
 
 export const CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID = "code_review_step_3_diff_source"
-export const BRAINSTORMING_STEP_2_SELECT_SESSION_RESOLVER_ID = "brainstorming_step_2_select_session"
+export const BRAINSTORMING_STEP_2_PREPARE_SESSION_RESOLVER_ID = "brainstorming_step_2_prepare_session"
 export const BRAINSTORMING_STEP_3_CAPTURE_TOPIC_RESOLVER_ID = "brainstorming_step_3_capture_topic"
+export const BRAINSTORMING_STEP_4_CHOOSE_APPROACH_RESOLVER_ID = "brainstorming_step_4_choose_approach"
 export const PLACEHOLDER_WORKFLOW_START_SET_WORKFLOW_PLACEHOLDERS_RESOLVER_ID =
 	"placeholder_workflow_start_set_workflow_placeholders"
 
+const WORKFLOW_START_PANEL_ID = "workflow_start_inputs"
+const BRAINSTORMING_STEP_2_SESSION_STRATEGY_PANEL_ID = "session_strategy"
+const BRAINSTORMING_STEP_2_SESSION_SELECTION_PANEL_ID = "session_selection"
+const BRAINSTORMING_STEP_3_PANEL_ID = "capture_topic"
+const BRAINSTORMING_STEP_4_APPROACH_SELECTION_PANEL_ID = "approach_selection"
+const BRAINSTORMING_STEP_4_TECHNIQUE_SELECTION_PANEL_ID = "technique_selection"
+const BRAINSTORMING_STEP_4_RANDOM_PREVIEW_PANEL_ID = "random_preview"
+const CONFIRM_RESOLUTION_PANEL_ID = "confirm_resolution"
+const SOURCE_SELECTION_PANEL_ID = "source_selection"
+const SOURCE_DETAILS_PANEL_ID = "source_details"
+
+const SESSION_STRATEGY_FIELD_KEY = "session_strategy"
 const SOURCE_TYPE_FIELD_KEY = "source.type"
 const SOURCE_COMMIT_FIELD_KEY = "source.commit"
 const SOURCE_BASE_FIELD_KEY = "source.base"
 const SOURCE_HEAD_FIELD_KEY = "source.head"
 const SCOPED_PATHS_FIELD_KEY = "scoped_paths"
 const CONTEXT_LINES_FIELD_KEY = "context_lines"
+const BRAINSTORMING_OUTPUT_FILE_FIELD_KEY = "output_file"
+const BRAINSTORMING_SELECTED_APPROACH_FIELD_KEY = "selected_approach"
+const BRAINSTORMING_TECHNIQUE_CATEGORY_FIELD_KEY = "technique_category"
+const BRAINSTORMING_TECHNIQUE_NAME_FIELD_KEY = "technique_name"
+const BRAINSTORMING_RANDOM_PREVIEW_DATA_KEY = "random_preview"
 
-function getParsedFieldValue(fields: WorkflowFormFieldDefinition[], values: WorkflowFormValues, key: string): unknown {
-	const field = fields.find((entry) => entry.key === key)
-	return field ? parseWorkflowFormRawValue(values[key]?.rawValue, field.valueSchema) : undefined
-}
+const CODE_REVIEW_SUCCESS_MESSAGE = "The Step 2 diff artifact is ready."
+const CODE_REVIEW_FAILURE_MESSAGE = "The workflow form could not build the Step 2 diff artifact. Review the input and try again."
+const WORKFLOW_START_SUCCESS_MESSAGE = "Workflow start inputs were stored."
+const WORKFLOW_START_FAILURE_MESSAGE =
+	"The workflow form could not store the workflow start inputs. Review the values and try again."
+const BRAINSTORMING_STEP_3_SUCCESS_MESSAGE = "The brainstorming session topic is ready."
+const BRAINSTORMING_STEP_3_FAILURE_MESSAGE =
+	"The workflow form could not store the brainstorming session topic. Review the topic text and try again."
+const BRAINSTORMING_STEP_2_SUCCESS_MESSAGE = "The brainstorming session file is ready."
+const BRAINSTORMING_STEP_2_FAILURE_MESSAGE =
+	"The workflow form could not prepare the brainstorming session. Review the session choice and try again."
+const BRAINSTORMING_STEP_4_SUCCESS_MESSAGE = "The brainstorming technique is ready."
+const BRAINSTORMING_STEP_4_SUGGESTION_SUCCESS_MESSAGE = "The brainstorming technique suggestion request is ready."
+const BRAINSTORMING_STEP_4_FAILURE_MESSAGE =
+	"The workflow form could not store the brainstorming approach or technique. Review the selection and try again."
 
-function getCurrentCollectFields(
-	session: Parameters<WorkflowFormResolverDefinition["buildDefinition"]>[0],
-	buildDefinition: WorkflowFormResolverDefinition["buildDefinition"],
-): WorkflowFormFieldDefinition[] {
-	return buildDefinition(session).pages.collect_inputs?.fields ?? []
+const BRAINSTORMING_SESSION_STRATEGY_OPTIONS: WorkflowFormOptionDefinition[] = [
+	{
+		value: "continue_newest",
+		label: "Continue newest session",
+	},
+	{
+		value: "start_new",
+		label: "Start new session",
+	},
+	{
+		value: "list_all",
+		label: "List all sessions",
+	},
+]
+
+const BRAINSTORMING_APPROACH_OPTIONS: WorkflowFormOptionDefinition[] = [
+	{
+		value: "user_choose",
+		label: "Choose by category",
+	},
+	{
+		value: "random_technique",
+		label: "Pick a random technique",
+	},
+	{
+		value: "suggest_technique",
+		label: "Ask for a technique suggestion",
+	},
+]
+
+function deriveAllowedValueType(
+	schema: ReturnType<typeof resolveWorkflowFormSchema>,
+): WorkflowFormFieldDefinition["allowedValueType"] {
+	switch (schema.type) {
+		case "string":
+			return "string"
+		case "boolean":
+			return "boolean"
+		case "integer":
+			return "integer"
+		case "array":
+			return "array"
+		case "object":
+			return "object"
+		default:
+			return undefined
+	}
 }
 
 function buildSchemaBackedField(args: {
@@ -64,31 +140,77 @@ function buildSchemaBackedField(args: {
 	binding: WorkflowFormFieldSchemaBinding
 	key: string
 	label: string
-	help: string
+	helpText: string
 	required: boolean
-	placeholder?: string
-	visible?: boolean
 	oneOfGroupId?: string
-	options?: WorkflowFormFieldOption[]
+	placeholder?: string
+	options?: WorkflowFormOptionDefinition[]
+	kind?: WorkflowFormFieldDefinition["kind"]
+	allowedValueType?: WorkflowFormFieldDefinition["allowedValueType"]
+	visibilityCondition?: WorkflowFormConditionDefinition
+	presentation?: WorkflowFormFieldDefinition["presentation"]
+	resetValueKeysOnChange?: string[]
+	resetDataKeysOnChange?: string[]
 }): WorkflowFormFieldDefinition {
 	const valueSchema = resolveWorkflowFormSchema(args.toolName, args.binding)
 
 	return {
 		key: args.key,
+		kind: args.kind ?? deriveWorkflowFormFieldKind(valueSchema),
 		label: args.label,
-		help: args.help,
-		control: deriveWorkflowFormControl(valueSchema),
-		valueSchema,
+		helpText: args.helpText,
 		required: args.required,
 		oneOfGroupId: args.oneOfGroupId,
+		allowedValueType: args.allowedValueType ?? deriveAllowedValueType(valueSchema),
 		placeholder: args.placeholder,
 		options: args.options ?? deriveWorkflowFormOptions(valueSchema),
-		visible: args.visible,
+		visibilityCondition: args.visibilityCondition,
+		valueSchema,
+		presentation: args.presentation,
+		resetValueKeysOnChange: args.resetValueKeysOnChange,
+		resetDataKeysOnChange: args.resetDataKeysOnChange,
 	}
 }
 
-function getSelectedSourceType(values: WorkflowFormValues): string | undefined {
-	return values[SOURCE_TYPE_FIELD_KEY]?.rawValue?.trim()
+function sourceTypeEquals(...values: string[]): WorkflowFormConditionDefinition {
+	return values.length === 1
+		? { sourceKey: SOURCE_TYPE_FIELD_KEY, operator: "equals", value: values[0] }
+		: { sourceKey: SOURCE_TYPE_FIELD_KEY, operator: "equals", values }
+}
+
+function sourceTypeNotEquals(value: string): WorkflowFormConditionDefinition {
+	return { sourceKey: SOURCE_TYPE_FIELD_KEY, operator: "not_equals", value }
+}
+
+function getSubmittedValueAsToolInput(session: WorkflowFormSessionState, key: string): unknown {
+	return convertWorkflowFormSubmittedValueToToolInput(session.values[key])
+}
+
+function getSubmittedStringValue(session: WorkflowFormSessionState, key: string): string | undefined {
+	const value = getSubmittedValueAsToolInput(session, key)
+	if (typeof value !== "string") {
+		return undefined
+	}
+
+	const trimmed = value.trim()
+	return trimmed.length > 0 ? trimmed : undefined
+}
+
+function getSubmittedIntegerValue(session: WorkflowFormSessionState, key: string): number | undefined {
+	const value = getSubmittedValueAsToolInput(session, key)
+	return typeof value === "number" ? value : undefined
+}
+
+function parseScopedPathsValue(session: WorkflowFormSessionState): string[] {
+	const value = getSubmittedValueAsToolInput(session, SCOPED_PATHS_FIELD_KEY)
+	if (typeof value !== "string") {
+		return []
+	}
+
+	return value
+		.split("\n")
+		.map((segment) => segment.trim())
+		.filter(Boolean)
 }
 
 function resolveSelectedSourceVariantSchema(sourceType: string | undefined) {
@@ -129,118 +251,93 @@ function buildSourceSelectionFieldDefinitions(): WorkflowFormFieldDefinition[] {
 			binding: { parameterName: "source", propertyPath: ["type"] },
 			key: SOURCE_TYPE_FIELD_KEY,
 			label: workflowFormSystemDictionary.source.label,
-			help: workflowFormSystemDictionary.source.medium,
+			helpText: workflowFormSystemDictionary.source.medium,
 			required: true,
 			options,
-			visible: true,
+			resetValueKeysOnChange: [
+				SOURCE_COMMIT_FIELD_KEY,
+				SOURCE_BASE_FIELD_KEY,
+				SOURCE_HEAD_FIELD_KEY,
+				SCOPED_PATHS_FIELD_KEY,
+				CONTEXT_LINES_FIELD_KEY,
+			],
 		}),
 	]
 }
 
-function buildConcreteInputFieldDefinitions(values: WorkflowFormValues): WorkflowFormFieldDefinition[] {
-	const sourceType = getSelectedSourceType(values)
-	const worktreeScoped = sourceType === "worktree_head_scoped"
-	const fields: WorkflowFormFieldDefinition[] = []
+function buildSourceDetailsFieldDefinitions(): WorkflowFormFieldDefinition[] {
+	const scopedPathsHelpText = `${workflowFormSystemDictionary.scoped_paths.medium} Enter one repository-relative path per line.`
 
-	for (const propertyKey of getSelectedSourceVariantPropertyKeys(sourceType)) {
-		if (propertyKey === "commit") {
-			fields.push(
-				buildSchemaBackedField({
-					toolName: ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT,
-					binding: { parameterName: "source", propertyPath: ["commit"] },
-					key: SOURCE_COMMIT_FIELD_KEY,
-					label: workflowFormSystemDictionary.commit.label,
-					help: workflowFormSystemDictionary.commit.medium,
-					required: true,
-					placeholder: "abc1234",
-					visible: true,
-				}),
-			)
-			continue
-		}
-
-		if (propertyKey === "base") {
-			fields.push(
-				buildSchemaBackedField({
-					toolName: ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT,
-					binding: { parameterName: "source", propertyPath: ["base"] },
-					key: SOURCE_BASE_FIELD_KEY,
-					label: workflowFormSystemDictionary.base.label,
-					help: workflowFormSystemDictionary.base.medium,
-					required: true,
-					placeholder: "main",
-					visible: true,
-				}),
-			)
-			continue
-		}
-
-		fields.push(
-			buildSchemaBackedField({
-				toolName: ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT,
-				binding: { parameterName: "source", propertyPath: ["head"] },
-				key: SOURCE_HEAD_FIELD_KEY,
-				label: workflowFormSystemDictionary.head.label,
-				help: workflowFormSystemDictionary.head.medium,
-				required: true,
-				placeholder: "HEAD",
-				visible: true,
-			}),
-		)
-	}
-
-	if (sourceType) {
-		fields.push(
-			buildSchemaBackedField({
-				toolName: ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT,
-				binding: { parameterName: "scoped_paths" },
-				key: SCOPED_PATHS_FIELD_KEY,
-				label: workflowFormSystemDictionary.scoped_paths.label,
-				help: workflowFormSystemDictionary.scoped_paths.medium,
-				required: worktreeScoped,
-				placeholder: "src/core/task/index.ts",
-				visible: true,
-			}),
-		)
-	}
-
-	if (sourceType && !worktreeScoped) {
-		fields.push(
-			buildSchemaBackedField({
-				toolName: ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT,
-				binding: { parameterName: "context_lines" },
-				key: CONTEXT_LINES_FIELD_KEY,
-				label: workflowFormSystemDictionary.context_lines.label,
-				help: workflowFormSystemDictionary.context_lines.medium,
-				required: false,
-				placeholder: "3",
-				visible: true,
-			}),
-		)
-	}
-
-	return fields
-}
-
-function buildSchemaDerivedPublicToolFieldDefinitions(args: {
-	toolName: ClineDefaultTool
-	labelOverrides?: Record<string, string>
-	helpOverrides?: Record<string, string>
-	placeholderOverrides?: Record<string, string>
-}): WorkflowFormFieldDefinition[] {
-	const tool = resolveWorkflowFormToolContract(args.toolName)
-	return (tool.parameters ?? []).map((parameter) =>
+	return [
 		buildSchemaBackedField({
-			toolName: args.toolName,
-			binding: { parameterName: parameter.name },
-			key: parameter.name,
-			label: args.labelOverrides?.[parameter.name] ?? humanizeWorkflowPlaceholderKey(parameter.name),
-			help: args.helpOverrides?.[parameter.name] ?? parameter.description ?? humanizeWorkflowPlaceholderKey(parameter.name),
-			required: parameter.required ?? false,
-			placeholder: args.placeholderOverrides?.[parameter.name],
-			visible: true,
+			toolName: ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT,
+			binding: { parameterName: "source", propertyPath: ["commit"] },
+			key: SOURCE_COMMIT_FIELD_KEY,
+			label: workflowFormSystemDictionary.commit.label,
+			helpText: workflowFormSystemDictionary.commit.medium,
+			required: true,
+			placeholder: "abc1234",
+			visibilityCondition: sourceTypeEquals("commit"),
 		}),
-	)
+		buildSchemaBackedField({
+			toolName: ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT,
+			binding: { parameterName: "source", propertyPath: ["base"] },
+			key: SOURCE_BASE_FIELD_KEY,
+			label: workflowFormSystemDictionary.base.label,
+			helpText: workflowFormSystemDictionary.base.medium,
+			required: true,
+			placeholder: "main",
+			visibilityCondition: sourceTypeEquals("commit_range", "ref_diff"),
+		}),
+		buildSchemaBackedField({
+			toolName: ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT,
+			binding: { parameterName: "source", propertyPath: ["head"] },
+			key: SOURCE_HEAD_FIELD_KEY,
+			label: workflowFormSystemDictionary.head.label,
+			helpText: workflowFormSystemDictionary.head.medium,
+			required: true,
+			placeholder: "HEAD",
+			visibilityCondition: sourceTypeEquals("commit_range", "ref_diff"),
+		}),
+		buildSchemaBackedField({
+			toolName: ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT,
+			binding: { parameterName: "scoped_paths" },
+			key: SCOPED_PATHS_FIELD_KEY,
+			label: workflowFormSystemDictionary.scoped_paths.label,
+			helpText: scopedPathsHelpText,
+			required: true,
+			kind: "large_text",
+			allowedValueType: "string",
+			placeholder: "src/core/task/index.ts\nwebview-ui/src/components/chat",
+			visibilityCondition: sourceTypeEquals("worktree_head_scoped"),
+			presentation: { textareaSize: "large" },
+		}),
+		buildSchemaBackedField({
+			toolName: ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT,
+			binding: { parameterName: "scoped_paths" },
+			key: SCOPED_PATHS_FIELD_KEY,
+			label: workflowFormSystemDictionary.scoped_paths.label,
+			helpText: scopedPathsHelpText,
+			required: false,
+			kind: "large_text",
+			allowedValueType: "string",
+			placeholder: "src/core/task/index.ts\nwebview-ui/src/components/chat",
+			visibilityCondition: sourceTypeNotEquals("worktree_head_scoped"),
+			presentation: { textareaSize: "large" },
+		}),
+		buildSchemaBackedField({
+			toolName: ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT,
+			binding: { parameterName: "context_lines" },
+			key: CONTEXT_LINES_FIELD_KEY,
+			label: workflowFormSystemDictionary.context_lines.label,
+			helpText: workflowFormSystemDictionary.context_lines.medium,
+			required: false,
+			placeholder: "3",
+			kind: "number",
+			allowedValueType: "integer",
+			visibilityCondition: sourceTypeNotEquals("worktree_head_scoped"),
+		}),
+	]
 }
 
 interface WorkflowStartFormOverride {
@@ -301,11 +398,7 @@ function humanizeWorkflowPlaceholderKey(key: string): string {
 		.join(" ")
 }
 
-function getWorkflowStartOrderedFieldKeys(args: {
-	requiredFieldKeys: string[]
-	optionalFieldKeys: string[]
-	oneOfRequirement?: { id: string; fieldKeys: string[] }
-}): string[] {
+function getWorkflowStartOrderedFieldKeys(args: WorkflowFormStartRequirements): string[] {
 	const orderedKeys = [...args.requiredFieldKeys, ...args.optionalFieldKeys, ...(args.oneOfRequirement?.fieldKeys ?? [])]
 
 	return orderedKeys.filter((key, index) => orderedKeys.indexOf(key) === index)
@@ -333,16 +426,456 @@ function buildWorkflowStartPlaceholderFieldDefinitions(args: {
 				binding: { parameterName: "values", useAdditionalProperties: true },
 				key,
 				label: args.override?.labels[key] ?? humanizeWorkflowPlaceholderKey(key),
-				help: args.override?.help[key] ?? humanizeWorkflowPlaceholderKey(key),
+				helpText: args.override?.help[key] ?? humanizeWorkflowPlaceholderKey(key),
 				required: requiredFieldKeySet.has(key),
 				oneOfGroupId: oneOfFieldKeySet.has(key) ? args.oneOfRequirement?.id : undefined,
 				placeholder: args.override?.placeholders?.[key] ?? "/absolute/path/to/file-or-artifact",
-				visible: true,
 			}),
 		)
 
 		return fields
 	}, [])
+}
+
+export function buildWorkflowStartDefinitionPayload(args: {
+	workflowName: string
+	workflowStartRequirements: WorkflowFormStartRequirements
+}): WorkflowFormDefinitionPayload {
+	const override = workflowStartFormOverrides[args.workflowName]
+	const orderedFieldKeys = getWorkflowStartOrderedFieldKeys(args.workflowStartRequirements)
+	const fields = buildWorkflowStartPlaceholderFieldDefinitions({
+		requiredFieldKeys: args.workflowStartRequirements.requiredFieldKeys,
+		optionalFieldKeys: args.workflowStartRequirements.optionalFieldKeys,
+		oneOfRequirement: args.workflowStartRequirements.oneOfRequirement,
+		override,
+		orderedFieldKeys,
+	})
+	const { title, markdown } = buildWorkflowStartRuntimeToolDictionary({ fieldKeys: orderedFieldKeys })
+	const promptMarkdown = override?.prompt ?? "Please provide the inputs necessary to start this workflow."
+	const titleText = override?.title ?? "Workflow Start Inputs"
+
+	return {
+		definitionVersion: 2,
+		title: titleText,
+		toolDictionaryTitle: title,
+		toolDictionaryMarkdown: markdown,
+		firstPanelId: WORKFLOW_START_PANEL_ID,
+		panels: {
+			[WORKFLOW_START_PANEL_ID]: {
+				panelId: WORKFLOW_START_PANEL_ID,
+				title: titleText,
+				promptMarkdown,
+				fields,
+				allowedActions: ["submit", "cancel", "retry"],
+				actionLabels: {
+					submit: "Submit",
+					cancel: "Cancel",
+					retry: "Retry",
+				},
+				transition: {
+					type: "deterministic_operation",
+					operationId: ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
+					terminal: true,
+				},
+			},
+		},
+	}
+}
+
+function buildCodeReviewDefinitionPayload(): WorkflowFormDefinitionPayload {
+	return {
+		definitionVersion: 2,
+		title: "Review Diff Artifact",
+		toolDictionaryTitle: "Diff Source Reference",
+		toolDictionaryMarkdown: buildRuntimeToolDictionaryMarkdownFromConfig(buildReviewDiffOutputToolDictionaryConfig),
+		firstPanelId: CONFIRM_RESOLUTION_PANEL_ID,
+		panels: {
+			[CONFIRM_RESOLUTION_PANEL_ID]: {
+				panelId: CONFIRM_RESOLUTION_PANEL_ID,
+				title: "Confirm Diff Resolution",
+				promptMarkdown:
+					"This workflow requires the following tool-produced artifact: `review-input.diff`.\n\nCan you provide the inputs required to produce `review-input.diff`?",
+				fields: [],
+				allowedActions: ["submit", "cancel"],
+				actionLabels: {
+					submit: "Yes",
+					cancel: "No",
+				},
+				transition: {
+					type: "sequential",
+					nextPanelId: SOURCE_SELECTION_PANEL_ID,
+				},
+			},
+			[SOURCE_SELECTION_PANEL_ID]: {
+				panelId: SOURCE_SELECTION_PANEL_ID,
+				title: "Choose Diff Source",
+				promptMarkdown:
+					"This workflow requires the tool-produced artifact `review-input.diff`.\n\nChoose which diff source you have so we can collect the right inputs.",
+				fields: buildSourceSelectionFieldDefinitions(),
+				allowedActions: ["submit", "cancel", "retry"],
+				actionLabels: {
+					submit: "Next",
+					cancel: "Cancel",
+					retry: "Retry",
+				},
+				transition: {
+					type: "sequential",
+					nextPanelId: SOURCE_DETAILS_PANEL_ID,
+				},
+			},
+			[SOURCE_DETAILS_PANEL_ID]: {
+				panelId: SOURCE_DETAILS_PANEL_ID,
+				title: "Provide Diff Inputs",
+				promptMarkdown: "Provide the concrete inputs needed to produce `review-input.diff`.",
+				fields: buildSourceDetailsFieldDefinitions(),
+				allowedActions: ["submit", "cancel", "back", "retry"],
+				actionLabels: {
+					submit: "Submit",
+					cancel: "Cancel",
+					back: "Back",
+					retry: "Retry",
+				},
+				backDestinationPanelId: SOURCE_SELECTION_PANEL_ID,
+				backStaleValueKeysToClear: [
+					SOURCE_COMMIT_FIELD_KEY,
+					SOURCE_BASE_FIELD_KEY,
+					SOURCE_HEAD_FIELD_KEY,
+					SCOPED_PATHS_FIELD_KEY,
+					CONTEXT_LINES_FIELD_KEY,
+				],
+				transition: {
+					type: "deterministic_operation",
+					operationId: ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT,
+					terminal: true,
+				},
+			},
+		},
+	}
+}
+
+function buildBrainstormingStep3DefinitionPayload(): WorkflowFormDefinitionPayload {
+	return {
+		definitionVersion: 2,
+		title: CAPTURE_BRAINSTORMING_TOPIC_TITLE,
+		toolDictionaryTitle: CAPTURE_BRAINSTORMING_TOPIC_TOOL_DICTIONARY_TITLE,
+		toolDictionaryMarkdown: buildRuntimeToolDictionaryMarkdownFromConfig(captureBrainstormingTopicToolDictionaryConfig),
+		firstPanelId: BRAINSTORMING_STEP_3_PANEL_ID,
+		panels: {
+			[BRAINSTORMING_STEP_3_PANEL_ID]: {
+				panelId: BRAINSTORMING_STEP_3_PANEL_ID,
+				title: CAPTURE_BRAINSTORMING_TOPIC_TITLE,
+				promptMarkdown: CAPTURE_BRAINSTORMING_TOPIC_PROMPT,
+				fields: [
+					{
+						key: CAPTURE_BRAINSTORMING_TOPIC_FIELD_KEY,
+						kind: "large_text",
+						label: CAPTURE_BRAINSTORMING_TOPIC_FIELD_LABEL,
+						required: true,
+						allowedValueType: "string",
+						valueSchema: { type: "string" },
+						presentation: { textareaSize: "large" },
+					},
+				],
+				allowedActions: ["submit", "cancel", "retry"],
+				actionLabels: {
+					submit: "Submit",
+					cancel: "Cancel",
+					retry: "Retry",
+				},
+				transition: {
+					type: "deterministic_operation",
+					operationId: ClineDefaultTool.CAPTURE_BRAINSTORMING_TOPIC,
+					terminal: true,
+				},
+			},
+		},
+	}
+}
+
+export function buildBrainstormingStep2InitialDefinitionPayload(args: {
+	sessionOptions: WorkflowFormOptionDefinition[]
+}): WorkflowFormDefinitionPayload {
+	return {
+		definitionVersion: 2,
+		title: "Brainstorming Session",
+		toolDictionaryTitle: "Brainstorming Session Reference",
+		toolDictionaryMarkdown: "## Brainstorming Session Preparation",
+		firstPanelId: BRAINSTORMING_STEP_2_SESSION_STRATEGY_PANEL_ID,
+		panels: {
+			[BRAINSTORMING_STEP_2_SESSION_STRATEGY_PANEL_ID]: {
+				panelId: BRAINSTORMING_STEP_2_SESSION_STRATEGY_PANEL_ID,
+				title: "Choose Session Strategy",
+				promptMarkdown: "Choose how you want to prepare the brainstorming session file.",
+				fields: [
+					{
+						key: SESSION_STRATEGY_FIELD_KEY,
+						kind: "radio_group",
+						label: "Session Strategy",
+						helpText: "Continue the newest session, start a fresh session, or choose from all existing sessions.",
+						required: true,
+						allowedValueType: "string",
+						valueSchema: { type: "string" },
+						options: BRAINSTORMING_SESSION_STRATEGY_OPTIONS,
+					},
+				],
+				allowedActions: ["submit", "cancel", "retry"],
+				actionLabels: {
+					submit: "Continue",
+					cancel: "Cancel",
+					retry: "Retry",
+				},
+				transition: {
+					type: "conditional",
+					conditionSourceKey: SESSION_STRATEGY_FIELD_KEY,
+					branches: [
+						{
+							matchValue: "continue_newest",
+							operationId: ClineDefaultTool.CONTINUE_BRAINSTORMING_SESSION,
+							terminal: true,
+						},
+						{
+							matchValue: "start_new",
+							operationId: ClineDefaultTool.CREATE_BRAINSTORMING_SESSION,
+							terminal: true,
+						},
+						{
+							matchValue: "list_all",
+							nextPanelId: BRAINSTORMING_STEP_2_SESSION_SELECTION_PANEL_ID,
+						},
+					],
+				},
+			},
+			[BRAINSTORMING_STEP_2_SESSION_SELECTION_PANEL_ID]: {
+				panelId: BRAINSTORMING_STEP_2_SESSION_SELECTION_PANEL_ID,
+				title: "Select Session",
+				promptMarkdown: "Choose the existing brainstorming session to continue.",
+				fields: [
+					{
+						key: BRAINSTORMING_OUTPUT_FILE_FIELD_KEY,
+						kind: "dropdown",
+						label: "Session",
+						helpText: "Select one of the discovered brainstorming session files.",
+						required: true,
+						allowedValueType: "string",
+						valueSchema: { type: "string" },
+						options: args.sessionOptions,
+					},
+				],
+				allowedActions: ["submit", "cancel", "retry"],
+				actionLabels: {
+					submit: "Select Session",
+					cancel: "Cancel",
+					retry: "Retry",
+				},
+				transition: {
+					type: "deterministic_operation",
+					operationId: ClineDefaultTool.SELECT_BRAINSTORMING_SESSION,
+					terminal: true,
+				},
+			},
+		},
+	}
+}
+
+function buildBrainstormingTechniqueConditionalOptions(
+	techniqueOptionsByCategory: Record<string, WorkflowFormOptionDefinition[]>,
+) {
+	return Object.entries(techniqueOptionsByCategory).map(([category, options]) => ({
+		when: {
+			sourceKey: BRAINSTORMING_TECHNIQUE_CATEGORY_FIELD_KEY,
+			operator: "equals" as const,
+			value: category,
+		},
+		options,
+	}))
+}
+
+function getBrainstormingStep4TechniqueCatalog(definitionPayload: WorkflowFormDefinitionPayload) {
+	const techniquePanel = definitionPayload.panels[BRAINSTORMING_STEP_4_TECHNIQUE_SELECTION_PANEL_ID]
+	const categoryField = techniquePanel?.fields.find((field) => field.key === BRAINSTORMING_TECHNIQUE_CATEGORY_FIELD_KEY)
+	const techniqueField = techniquePanel?.fields.find((field) => field.key === BRAINSTORMING_TECHNIQUE_NAME_FIELD_KEY)
+	const techniqueOptionsByCategory = Object.fromEntries(
+		(techniqueField?.conditionalOptions ?? [])
+			.map((entry) => {
+				const category = entry.when.value
+				return typeof category === "string" ? [category, entry.options] : undefined
+			})
+			.filter((entry): entry is [string, WorkflowFormOptionDefinition[]] => Array.isArray(entry)),
+	)
+
+	return {
+		categoryOptions: categoryField?.options ?? [],
+		techniqueOptionsByCategory,
+	}
+}
+
+export function buildBrainstormingStep4DefinitionPayload(args: {
+	categoryOptions: WorkflowFormOptionDefinition[]
+	techniqueOptionsByCategory: Record<string, WorkflowFormOptionDefinition[]>
+	session?: WorkflowFormSessionState
+}): WorkflowFormDefinitionPayload {
+	const selectedApproach = args.session
+		? getSubmittedStringValue(args.session, BRAINSTORMING_SELECTED_APPROACH_FIELD_KEY)
+		: undefined
+	const randomPreviewData =
+		args.session?.data[BRAINSTORMING_RANDOM_PREVIEW_DATA_KEY] &&
+		typeof args.session.data[BRAINSTORMING_RANDOM_PREVIEW_DATA_KEY] === "object" &&
+		!Array.isArray(args.session.data[BRAINSTORMING_RANDOM_PREVIEW_DATA_KEY])
+			? (args.session.data[BRAINSTORMING_RANDOM_PREVIEW_DATA_KEY] as Record<string, unknown>)
+			: undefined
+	const randomTechniqueName =
+		typeof randomPreviewData?.technique_name === "string" ? randomPreviewData.technique_name : "Random Technique"
+	const randomTechniqueDescription =
+		typeof randomPreviewData?.technique_description === "string"
+			? randomPreviewData.technique_description
+			: "The selected technique preview will appear here after the random technique operation succeeds."
+	const approachSelectionTransition =
+		selectedApproach === undefined
+			? {
+					type: "deterministic_operation" as const,
+					operationId: ClineDefaultTool.PERSIST_BRAINSTORMING_APPROACH,
+					terminal: false,
+					rebuildDefinitionAfterSuccess: true,
+					recomputeDestinationAfterSuccess: true,
+				}
+			: selectedApproach === "user_choose"
+				? {
+						type: "sequential" as const,
+						nextPanelId: BRAINSTORMING_STEP_4_TECHNIQUE_SELECTION_PANEL_ID,
+					}
+				: selectedApproach === "random_technique"
+					? {
+							type: "deterministic_operation" as const,
+							operationId: ClineDefaultTool.SELECT_RANDOM_BRAINSTORMING_TECHNIQUE,
+							nextPanelId: BRAINSTORMING_STEP_4_RANDOM_PREVIEW_PANEL_ID,
+							terminal: false,
+							resultDataKey: BRAINSTORMING_RANDOM_PREVIEW_DATA_KEY,
+							rebuildDefinitionAfterSuccess: true,
+							staleDataKeysToClear: [BRAINSTORMING_RANDOM_PREVIEW_DATA_KEY],
+						}
+					: {
+							type: "deterministic_operation" as const,
+							operationId: ClineDefaultTool.REQUEST_BRAINSTORMING_TECHNIQUE_SUGGESTION,
+							terminal: true,
+						}
+
+	return {
+		definitionVersion: 2,
+		title: "Choose Brainstorming Approach",
+		toolDictionaryTitle: "Brainstorming Technique Reference",
+		toolDictionaryMarkdown: "## Brainstorming Technique Selection",
+		firstPanelId: BRAINSTORMING_STEP_4_APPROACH_SELECTION_PANEL_ID,
+		panels: {
+			[BRAINSTORMING_STEP_4_APPROACH_SELECTION_PANEL_ID]: {
+				panelId: BRAINSTORMING_STEP_4_APPROACH_SELECTION_PANEL_ID,
+				title: "Choose Approach",
+				promptMarkdown: "Choose how you want to select the brainstorming technique for this session.",
+				fields: [
+					{
+						key: BRAINSTORMING_SELECTED_APPROACH_FIELD_KEY,
+						kind: "radio_group",
+						label: "Approach",
+						helpText: "Choose by category, let the runtime pick a random technique, or request a suggestion.",
+						required: true,
+						allowedValueType: "string",
+						valueSchema: { type: "string" },
+						options: BRAINSTORMING_APPROACH_OPTIONS,
+						resetValueKeysOnChange: [
+							BRAINSTORMING_TECHNIQUE_CATEGORY_FIELD_KEY,
+							BRAINSTORMING_TECHNIQUE_NAME_FIELD_KEY,
+						],
+						resetDataKeysOnChange: [BRAINSTORMING_RANDOM_PREVIEW_DATA_KEY],
+					},
+				],
+				allowedActions: ["submit", "cancel", "retry"],
+				actionLabels: {
+					submit: "Continue",
+					cancel: "Cancel",
+					retry: "Retry",
+				},
+				transition: approachSelectionTransition,
+			},
+			[BRAINSTORMING_STEP_4_TECHNIQUE_SELECTION_PANEL_ID]: {
+				panelId: BRAINSTORMING_STEP_4_TECHNIQUE_SELECTION_PANEL_ID,
+				title: "Select Technique",
+				promptMarkdown: "Choose a brainstorming category and then select one technique from that category.",
+				fields: [
+					{
+						key: BRAINSTORMING_TECHNIQUE_CATEGORY_FIELD_KEY,
+						kind: "dropdown",
+						label: "Technique Category",
+						helpText: "Choose the category that best fits the brainstorming direction you want.",
+						required: true,
+						allowedValueType: "string",
+						valueSchema: { type: "string" },
+						options: args.categoryOptions,
+						resetValueKeysOnChange: [BRAINSTORMING_TECHNIQUE_NAME_FIELD_KEY],
+					},
+					{
+						key: BRAINSTORMING_TECHNIQUE_NAME_FIELD_KEY,
+						kind: "dropdown",
+						label: "Technique",
+						helpText: "Select the specific brainstorming technique to use for this session.",
+						required: true,
+						allowedValueType: "string",
+						valueSchema: { type: "string" },
+						options: [],
+						conditionalOptions: buildBrainstormingTechniqueConditionalOptions(args.techniqueOptionsByCategory),
+						dependsOn: [BRAINSTORMING_TECHNIQUE_CATEGORY_FIELD_KEY],
+					},
+				],
+				allowedActions: ["submit", "cancel", "back", "retry"],
+				actionLabels: {
+					submit: "Use Technique",
+					cancel: "Cancel",
+					back: "Back",
+					retry: "Retry",
+				},
+				backDestinationPanelId: BRAINSTORMING_STEP_4_APPROACH_SELECTION_PANEL_ID,
+				backStaleValueKeysToClear: [BRAINSTORMING_TECHNIQUE_CATEGORY_FIELD_KEY, BRAINSTORMING_TECHNIQUE_NAME_FIELD_KEY],
+				transition: {
+					type: "deterministic_operation",
+					operationId: ClineDefaultTool.PERSIST_BRAINSTORMING_TECHNIQUE,
+					terminal: true,
+				},
+			},
+			[BRAINSTORMING_STEP_4_RANDOM_PREVIEW_PANEL_ID]: {
+				panelId: BRAINSTORMING_STEP_4_RANDOM_PREVIEW_PANEL_ID,
+				title: "Random Technique Preview",
+				promptMarkdown: "Review the randomly selected technique and confirm if you want to use it.",
+				fields: [
+					{
+						key: "random_preview_name",
+						kind: "markdown_display",
+						label: "Technique Name",
+						required: false,
+						contentMarkdown: `### ${randomTechniqueName}`,
+					},
+					{
+						key: "random_preview_description",
+						kind: "markdown_display",
+						label: "Technique Description",
+						required: false,
+						contentMarkdown: randomTechniqueDescription,
+					},
+				],
+				allowedActions: ["submit", "cancel", "back", "retry"],
+				actionLabels: {
+					submit: "Use Technique",
+					cancel: "Cancel",
+					back: "Back",
+					retry: "Retry",
+				},
+				backDestinationPanelId: BRAINSTORMING_STEP_4_APPROACH_SELECTION_PANEL_ID,
+				backStaleDataKeysToClear: [BRAINSTORMING_RANDOM_PREVIEW_DATA_KEY],
+				transition: {
+					type: "deterministic_operation",
+					operationId: ClineDefaultTool.PERSIST_BRAINSTORMING_TECHNIQUE,
+					terminal: true,
+				},
+			},
+		},
+	}
 }
 
 function parseWorkflowFormJsonToolResult(text?: string): Record<string, unknown> | undefined {
@@ -371,348 +904,441 @@ function isWorkflowFormFailureText(text?: string): boolean {
 	)
 }
 
-export const workflowFormRegistry: Record<string, WorkflowFormResolverDefinition> = {
-	[CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID]: {
-		id: CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID,
+function buildWorkflowStartOperationRequest(session: WorkflowFormSessionState) {
+	const panel = session.definitionPayload.panels[WORKFLOW_START_PANEL_ID]
+	const values = panel.fields.reduce<Record<string, string>>((accumulator, field) => {
+		const value = getSubmittedStringValue(session, field.key)
+		if (value) {
+			accumulator[field.key] = value
+		}
+
+		return accumulator
+	}, {})
+
+	return {
+		toolName: ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
+		toolInput: { values },
+		toolParams: { values: JSON.stringify(values) },
+	}
+}
+
+function buildCodeReviewOperationRequest(session: WorkflowFormSessionState) {
+	const selectedSourceType = getSubmittedStringValue(session, SOURCE_TYPE_FIELD_KEY)
+	const selectedSourceVariant = resolveSelectedSourceVariantSchema(selectedSourceType)
+	if (!selectedSourceVariant || !selectedSourceType) {
+		throw new Error(`Unsupported workflow form source type: ${selectedSourceType ?? "undefined"}`)
+	}
+
+	const source: Record<string, unknown> = { type: selectedSourceType }
+	for (const propertyKey of getSelectedSourceVariantPropertyKeys(selectedSourceType)) {
+		const parsedValue = getSubmittedStringValue(session, `source.${propertyKey}`)
+		if (parsedValue) {
+			source[propertyKey] = parsedValue
+		}
+	}
+
+	const toolInput: Record<string, unknown> = { source }
+	const scopedPaths = parseScopedPathsValue(session)
+	const contextLines = getSubmittedIntegerValue(session, CONTEXT_LINES_FIELD_KEY)
+
+	if (selectedSourceType === "worktree_head_scoped") {
+		toolInput.scoped_paths = scopedPaths
+	} else if (scopedPaths.length > 0) {
+		toolInput.scoped_paths = scopedPaths
+	}
+
+	if (contextLines !== undefined) {
+		toolInput.context_lines = contextLines
+	}
+
+	const toolParams: Record<string, string> = {
+		source: JSON.stringify(toolInput.source),
+	}
+
+	if (toolInput.scoped_paths !== undefined) {
+		toolParams.scoped_paths = JSON.stringify(toolInput.scoped_paths)
+	}
+
+	if (toolInput.context_lines !== undefined) {
+		toolParams.context_lines = String(toolInput.context_lines)
+	}
+
+	return {
 		toolName: ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT,
-		buildDefinition(session): WorkflowFormDefinition {
+		toolInput,
+		toolParams,
+	}
+}
+
+function buildBrainstormingStep3OperationRequest(session: WorkflowFormSessionState) {
+	const topic = getSubmittedStringValue(session, CAPTURE_BRAINSTORMING_TOPIC_FIELD_KEY) ?? ""
+
+	return {
+		toolName: ClineDefaultTool.CAPTURE_BRAINSTORMING_TOPIC,
+		toolInput: { topic },
+		toolParams: { topic },
+	}
+}
+
+function buildBrainstormingStep2OperationRequest(
+	session: WorkflowFormSessionState,
+	operationId: string,
+): WorkflowFormToolExecutionRequest {
+	switch (operationId) {
+		case ClineDefaultTool.CONTINUE_BRAINSTORMING_SESSION:
 			return {
-				toolName: ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT,
-				title: "Review Diff Artifact",
-				toolDictionaryTitle: "Diff Output Reference",
-				toolDictionaryMarkdown: buildRuntimeToolDictionaryMarkdownFromConfig(buildReviewDiffOutputToolDictionaryConfig),
-				pages: {
-					confirm: {
-						prompt: "This workflow requires the following tool-produced artifact: `review-input.diff`.\n\nCan you provide the inputs required to produce `review-input.diff`?",
-						options: ["Yes", "No"],
-					},
-					select_source: {
-						prompt: "This workflow requires the tool-produced artifact `review-input.diff`.\n\nChoose which diff source you have so we can collect the right inputs.",
-						fields: buildSourceSelectionFieldDefinitions(),
-						submitLabel: "Next",
-						cancelLabel: "Cancel",
-					},
-					collect_inputs: {
-						prompt: "Provide the concrete inputs needed to produce `review-input.diff`.",
-						fields: buildConcreteInputFieldDefinitions(session.values),
-						submitLabel: "Submit",
-						cancelLabel: "Cancel",
-						backLabel: "Back",
-					},
-					retry_error: {
-						prompt: "The system could not produce `review-input.diff`. Update the inputs or retry the request.",
-						fields: buildConcreteInputFieldDefinitions(session.values),
-						submitLabel: "Submit",
-						cancelLabel: "Cancel",
-						backLabel: "Back",
-						retryLabel: "Start Over",
-					},
+				toolName: ClineDefaultTool.CONTINUE_BRAINSTORMING_SESSION,
+				toolInput: {},
+				toolParams: {},
+			}
+		case ClineDefaultTool.CREATE_BRAINSTORMING_SESSION:
+			return {
+				toolName: ClineDefaultTool.CREATE_BRAINSTORMING_SESSION,
+				toolInput: {},
+				toolParams: {},
+			}
+		case ClineDefaultTool.SELECT_BRAINSTORMING_SESSION: {
+			const outputFile = getSubmittedStringValue(session, BRAINSTORMING_OUTPUT_FILE_FIELD_KEY) ?? ""
+			return {
+				toolName: ClineDefaultTool.SELECT_BRAINSTORMING_SESSION,
+				toolInput: { output_file: outputFile },
+				toolParams: { output_file: outputFile },
+			}
+		}
+		default:
+			throw new Error(`Unsupported workflow form operation: ${operationId}`)
+	}
+}
+
+function resolveTechniqueDescriptionFromSelection(session: WorkflowFormSessionState): string | undefined {
+	const panel = session.definitionPayload.panels[BRAINSTORMING_STEP_4_TECHNIQUE_SELECTION_PANEL_ID]
+	const techniqueField = panel?.fields.find((field) => field.key === BRAINSTORMING_TECHNIQUE_NAME_FIELD_KEY)
+	const selectedTechniqueName = getSubmittedStringValue(session, BRAINSTORMING_TECHNIQUE_NAME_FIELD_KEY)
+	if (!selectedTechniqueName || !techniqueField) {
+		return undefined
+	}
+
+	const selectedCategory = getSubmittedStringValue(session, BRAINSTORMING_TECHNIQUE_CATEGORY_FIELD_KEY)
+	const matchingConditionalOptions = techniqueField.conditionalOptions?.find(
+		(entry) => entry.when.value === selectedCategory,
+	)?.options
+	const selectedOption = matchingConditionalOptions?.find((option) => option.value === selectedTechniqueName)
+	return selectedOption?.description
+}
+
+function buildBrainstormingStep4OperationRequest(
+	session: WorkflowFormSessionState,
+	operationId: string,
+): WorkflowFormToolExecutionRequest {
+	switch (operationId) {
+		case ClineDefaultTool.PERSIST_BRAINSTORMING_APPROACH: {
+			const selectedApproach = getSubmittedStringValue(session, BRAINSTORMING_SELECTED_APPROACH_FIELD_KEY) ?? ""
+			return {
+				toolName: ClineDefaultTool.PERSIST_BRAINSTORMING_APPROACH,
+				toolInput: { selected_approach: selectedApproach },
+				toolParams: { selected_approach: selectedApproach },
+			}
+		}
+		case ClineDefaultTool.SELECT_RANDOM_BRAINSTORMING_TECHNIQUE:
+			return {
+				toolName: ClineDefaultTool.SELECT_RANDOM_BRAINSTORMING_TECHNIQUE,
+				toolInput: {},
+				toolParams: {},
+			}
+		case ClineDefaultTool.REQUEST_BRAINSTORMING_TECHNIQUE_SUGGESTION:
+			return {
+				toolName: ClineDefaultTool.REQUEST_BRAINSTORMING_TECHNIQUE_SUGGESTION,
+				toolInput: {},
+				toolParams: {},
+			}
+		case ClineDefaultTool.PERSIST_BRAINSTORMING_TECHNIQUE: {
+			const randomPreviewData =
+				session.data[BRAINSTORMING_RANDOM_PREVIEW_DATA_KEY] &&
+				typeof session.data[BRAINSTORMING_RANDOM_PREVIEW_DATA_KEY] === "object" &&
+				!Array.isArray(session.data[BRAINSTORMING_RANDOM_PREVIEW_DATA_KEY])
+					? (session.data[BRAINSTORMING_RANDOM_PREVIEW_DATA_KEY] as Record<string, unknown>)
+					: undefined
+			const techniqueName =
+				typeof randomPreviewData?.technique_name === "string"
+					? randomPreviewData.technique_name
+					: (getSubmittedStringValue(session, BRAINSTORMING_TECHNIQUE_NAME_FIELD_KEY) ?? "")
+			const techniqueDescription =
+				typeof randomPreviewData?.technique_description === "string"
+					? randomPreviewData.technique_description
+					: (resolveTechniqueDescriptionFromSelection(session) ?? "")
+
+			return {
+				toolName: ClineDefaultTool.PERSIST_BRAINSTORMING_TECHNIQUE,
+				toolInput: {
+					technique_name: techniqueName,
+					technique_description: techniqueDescription,
 				},
-				successMessage: "The Step 2 diff artifact is ready.",
+				toolParams: {
+					technique_name: techniqueName,
+					technique_description: techniqueDescription,
+				},
 			}
-		},
-		buildToolExecutionFailureFallbackMessage() {
-			return "The workflow form could not build the Step 2 diff artifact. Review the input and try again."
-		},
-		buildToolExecutionRequest(session, values) {
-			const fields = getCurrentCollectFields({ ...session, values }, this.buildDefinition)
-			const sourceType = parseWorkflowFormRawValue(
-				values[SOURCE_TYPE_FIELD_KEY]?.rawValue,
-				resolveWorkflowFormSchema(ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT, {
-					parameterName: "source",
-					propertyPath: ["type"],
-				}),
-			)
-			const scopedPathsValue = getParsedFieldValue(fields, values, SCOPED_PATHS_FIELD_KEY)
-			const contextLinesValue = getParsedFieldValue(fields, values, CONTEXT_LINES_FIELD_KEY)
-			const scopedPaths = Array.isArray(scopedPathsValue) ? scopedPathsValue : []
-			const contextLines = typeof contextLinesValue === "number" ? contextLinesValue : undefined
-			const selectedSourceType = typeof sourceType === "string" ? sourceType : undefined
-			const selectedSourceVariant = resolveSelectedSourceVariantSchema(selectedSourceType)
-			if (!selectedSourceVariant) {
-				throw new Error(`Unsupported workflow form source type: ${selectedSourceType ?? "undefined"}`)
-			}
-			const source: Record<string, unknown> = { type: selectedSourceType }
-			for (const propertyKey of getSelectedSourceVariantPropertyKeys(selectedSourceType)) {
-				const parsedValue = getParsedFieldValue(fields, values, `source.${propertyKey}`)
-				if (typeof parsedValue === "string") {
-					source[propertyKey] = parsedValue
-				}
-			}
-			const toolInput: Record<string, unknown> = { source }
+		}
+		default:
+			throw new Error(`Unsupported workflow form operation: ${operationId}`)
+	}
+}
 
-			if (selectedSourceType === "worktree_head_scoped") {
-				toolInput.scoped_paths = scopedPaths
-			}
+function applyWorkflowStartOperationResult(_session: WorkflowFormSessionState, toolResultText?: string) {
+	if (isWorkflowFormFailureText(toolResultText)) {
+		return {
+			succeeded: false as const,
+			errorMessage: toolResultText?.trim() ?? WORKFLOW_START_FAILURE_MESSAGE,
+		}
+	}
 
-			if (selectedSourceType !== "worktree_head_scoped" && scopedPaths.length > 0) {
-				toolInput.scoped_paths = scopedPaths
-			}
+	return {
+		succeeded: true as const,
+		terminalSuccessMessage: WORKFLOW_START_SUCCESS_MESSAGE,
+	}
+}
 
-			if (contextLines !== undefined) {
-				toolInput.context_lines = contextLines
-			}
+function applyCodeReviewOperationResult(_session: WorkflowFormSessionState, toolResultText?: string) {
+	const parsed = parseWorkflowFormJsonToolResult(toolResultText)
+	if (parsed?.persisted === true && parsed?.diff_available === true) {
+		return {
+			succeeded: true as const,
+			terminalSuccessMessage: CODE_REVIEW_SUCCESS_MESSAGE,
+		}
+	}
 
-			const toolParams: Record<string, string> = {
-				source: JSON.stringify(toolInput.source),
-			}
+	if (typeof parsed?.reason === "string") {
+		return {
+			succeeded: false as const,
+			errorMessage: parsed.reason,
+		}
+	}
 
-			if (toolInput.scoped_paths !== undefined) {
-				toolParams.scoped_paths = JSON.stringify(toolInput.scoped_paths)
-			}
+	if (isWorkflowFormFailureText(toolResultText)) {
+		return {
+			succeeded: false as const,
+			errorMessage: toolResultText?.trim() ?? CODE_REVIEW_FAILURE_MESSAGE,
+		}
+	}
 
-			if (toolInput.context_lines !== undefined) {
-				toolParams.context_lines = String(toolInput.context_lines)
-			}
+	return {
+		succeeded: false as const,
+		errorMessage: CODE_REVIEW_FAILURE_MESSAGE,
+	}
+}
 
-			return {
-				toolName: ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT,
-				toolInput,
-				toolParams,
-			}
-		},
-		evaluateToolExecutionResult(session, args) {
-			const parsed = parseWorkflowFormJsonToolResult(args.toolResultText)
-			if (parsed?.persisted === true && parsed?.diff_available === true) {
-				return { succeeded: true }
-			}
+function applyBrainstormingStep3OperationResult(_session: WorkflowFormSessionState, toolResultText?: string) {
+	const parsed = parseWorkflowFormJsonToolResult(toolResultText)
+	if (parsed?.persisted === true && parsed?.topic_captured === true && typeof parsed?.artifact_path === "string") {
+		return {
+			succeeded: true as const,
+			terminalSuccessMessage: BRAINSTORMING_STEP_3_SUCCESS_MESSAGE,
+		}
+	}
 
-			if (typeof parsed?.reason === "string") {
-				return { succeeded: false, errorMessage: parsed.reason }
-			}
+	if (isWorkflowFormFailureText(toolResultText)) {
+		return {
+			succeeded: false as const,
+			errorMessage: toolResultText?.trim() ?? BRAINSTORMING_STEP_3_FAILURE_MESSAGE,
+		}
+	}
 
-			if (isWorkflowFormFailureText(args.toolResultText)) {
+	return {
+		succeeded: false as const,
+		errorMessage: BRAINSTORMING_STEP_3_FAILURE_MESSAGE,
+	}
+}
+
+function applyBrainstormingStep2OperationResult(operationId: string, toolResultText?: string) {
+	const parsed = parseWorkflowFormJsonToolResult(toolResultText)
+	if (
+		parsed?.persisted === true &&
+		parsed?.output_file_available === true &&
+		typeof parsed?.artifact_path === "string" &&
+		((operationId === ClineDefaultTool.CONTINUE_BRAINSTORMING_SESSION && parsed?.continued === true) ||
+			(operationId === ClineDefaultTool.CREATE_BRAINSTORMING_SESSION && parsed?.created === true) ||
+			(operationId === ClineDefaultTool.SELECT_BRAINSTORMING_SESSION && parsed?.selected === true))
+	) {
+		return {
+			succeeded: true as const,
+			terminalSuccessMessage: BRAINSTORMING_STEP_2_SUCCESS_MESSAGE,
+		}
+	}
+
+	if (isWorkflowFormFailureText(toolResultText)) {
+		return {
+			succeeded: false as const,
+			errorMessage: toolResultText?.trim() ?? BRAINSTORMING_STEP_2_FAILURE_MESSAGE,
+		}
+	}
+
+	return {
+		succeeded: false as const,
+		errorMessage: BRAINSTORMING_STEP_2_FAILURE_MESSAGE,
+	}
+}
+
+function applyBrainstormingStep4OperationResult(operationId: string, toolResultText?: string) {
+	const parsed = parseWorkflowFormJsonToolResult(toolResultText)
+
+	switch (operationId) {
+		case ClineDefaultTool.PERSIST_BRAINSTORMING_APPROACH:
+			if (parsed?.persisted === true && parsed?.approach_persisted === true) {
 				return {
-					succeeded: false,
-					errorMessage: args.toolResultText?.trim() ?? this.buildToolExecutionFailureFallbackMessage(session),
+					succeeded: true as const,
 				}
 			}
-
-			return {
-				succeeded: false,
-				errorMessage: this.buildToolExecutionFailureFallbackMessage(session),
+			break
+		case ClineDefaultTool.SELECT_RANDOM_BRAINSTORMING_TECHNIQUE:
+			if (
+				typeof parsed?.technique_name === "string" &&
+				typeof parsed?.technique_description === "string" &&
+				typeof parsed?.technique_category === "string"
+			) {
+				return {
+					succeeded: true as const,
+					operationData: parsed,
+				}
 			}
+			break
+		case ClineDefaultTool.PERSIST_BRAINSTORMING_TECHNIQUE:
+			if (parsed?.persisted === true && parsed?.technique_persisted === true) {
+				return {
+					succeeded: true as const,
+					terminalSuccessMessage: BRAINSTORMING_STEP_4_SUCCESS_MESSAGE,
+				}
+			}
+			break
+		case ClineDefaultTool.REQUEST_BRAINSTORMING_TECHNIQUE_SUGGESTION:
+			if (parsed?.persisted === true && parsed?.technique_suggestion_requested === true) {
+				return {
+					succeeded: true as const,
+					terminalSuccessMessage: BRAINSTORMING_STEP_4_SUGGESTION_SUCCESS_MESSAGE,
+				}
+			}
+			break
+		default:
+			throw new Error(`Unsupported workflow form operation: ${operationId}`)
+	}
+
+	if (isWorkflowFormFailureText(toolResultText)) {
+		return {
+			succeeded: false as const,
+			errorMessage: toolResultText?.trim() ?? BRAINSTORMING_STEP_4_FAILURE_MESSAGE,
+		}
+	}
+
+	return {
+		succeeded: false as const,
+		errorMessage: BRAINSTORMING_STEP_4_FAILURE_MESSAGE,
+	}
+}
+
+export const workflowFormRegistry: Record<string, WorkflowFormResolverDefinition> = {
+	[BRAINSTORMING_STEP_2_PREPARE_SESSION_RESOLVER_ID]: {
+		id: BRAINSTORMING_STEP_2_PREPARE_SESSION_RESOLVER_ID,
+		buildDefinition(session) {
+			return session.definitionPayload
+		},
+		buildOperationRequest(session, operationId) {
+			return buildBrainstormingStep2OperationRequest(session, operationId)
+		},
+		applyOperationResult(_session, args) {
+			return applyBrainstormingStep2OperationResult(args.operationId, args.toolResultText)
+		},
+		buildFailureFallbackMessage() {
+			return BRAINSTORMING_STEP_2_FAILURE_MESSAGE
 		},
 	},
-	[BRAINSTORMING_STEP_2_SELECT_SESSION_RESOLVER_ID]: {
-		id: BRAINSTORMING_STEP_2_SELECT_SESSION_RESOLVER_ID,
-		toolName: ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
-		buildDefinition(session): WorkflowFormDefinition {
-			const options = session.context?.brainstormingSessionOptions
-			if (!options || options.length === 0) {
-				throw new Error("Brainstorming session picker definition requires brainstormingSessionOptions.")
-			}
-
-			const { title, markdown } = buildWorkflowStartRuntimeToolDictionary({ fieldKeys: ["output_file"] })
-			const fields: WorkflowFormFieldDefinition[] = [
-				{
-					key: "output_file",
-					label: PREPARE_BRAINSTORMING_SESSION_LIST_FIELD_LABEL,
-					help: "Choose an existing brainstorming session file to continue.",
-					control: "select",
-					valueSchema: { type: "string", enum: options.map((option) => option.value) },
-					required: true,
-					options,
-					visible: true,
-				},
-			]
-
-			return {
-				toolName: ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
-				title: PREPARE_BRAINSTORMING_SESSION_LIST_TITLE,
-				toolDictionaryTitle: title,
-				toolDictionaryMarkdown: markdown,
-				pages: {
-					collect_inputs: {
-						prompt: PREPARE_BRAINSTORMING_SESSION_LIST_PROMPT,
-						fields,
-						submitLabel: "Continue",
-						cancelLabel: "Cancel",
-					},
-					retry_error: {
-						prompt: PREPARE_BRAINSTORMING_SESSION_LIST_PROMPT,
-						fields,
-						submitLabel: "Continue",
-						cancelLabel: "Cancel",
-						retryLabel: "Start Over",
-					},
-				},
-				successMessage: "The brainstorming session output file is ready.",
-			}
+	[CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID]: {
+		id: CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID,
+		buildDefinition() {
+			return buildCodeReviewDefinitionPayload()
 		},
-		buildToolExecutionFailureFallbackMessage() {
-			return "The brainstorming session picker could not store output_file. Review the selected session and try again."
-		},
-		buildToolExecutionRequest(_session, values) {
-			const selected = values.output_file?.rawValue?.trim() ?? ""
-
-			return {
-				toolName: ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
-				toolInput: { values: { output_file: selected } },
-				toolParams: { values: JSON.stringify({ output_file: selected }) },
-			}
-		},
-		evaluateToolExecutionResult(session, args) {
-			if (isWorkflowFormFailureText(args.toolResultText)) {
-				return {
-					succeeded: false,
-					errorMessage: args.toolResultText?.trim() ?? this.buildToolExecutionFailureFallbackMessage(session),
-				}
+		buildOperationRequest(session, operationId) {
+			if (operationId !== ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT) {
+				throw new Error(`Unsupported workflow form operation: ${operationId}`)
 			}
 
-			return { succeeded: true }
+			return buildCodeReviewOperationRequest(session)
+		},
+		applyOperationResult(session, args) {
+			if (args.operationId !== ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT) {
+				throw new Error(`Unsupported workflow form operation: ${args.operationId}`)
+			}
+
+			return applyCodeReviewOperationResult(session, args.toolResultText)
+		},
+		buildFailureFallbackMessage() {
+			return CODE_REVIEW_FAILURE_MESSAGE
 		},
 	},
 	[BRAINSTORMING_STEP_3_CAPTURE_TOPIC_RESOLVER_ID]: {
 		id: BRAINSTORMING_STEP_3_CAPTURE_TOPIC_RESOLVER_ID,
-		toolName: ClineDefaultTool.CAPTURE_BRAINSTORMING_TOPIC,
-		defaultInitialPhase: "collect_inputs",
-		buildDefinition(): WorkflowFormDefinition {
-			const fields: WorkflowFormFieldDefinition[] = [
-				{
-					key: CAPTURE_BRAINSTORMING_TOPIC_FIELD_KEY,
-					label: CAPTURE_BRAINSTORMING_TOPIC_FIELD_LABEL,
-					help: "",
-					control: "textarea",
-					valueSchema: { type: "string" },
-					required: true,
-					visible: true,
-					presentation: { textareaSize: "large" },
-				},
-			]
-
-			return {
-				toolName: ClineDefaultTool.CAPTURE_BRAINSTORMING_TOPIC,
-				title: CAPTURE_BRAINSTORMING_TOPIC_TITLE,
-				toolDictionaryTitle: CAPTURE_BRAINSTORMING_TOPIC_TOOL_DICTIONARY_TITLE,
-				toolDictionaryMarkdown: buildRuntimeToolDictionaryMarkdownFromConfig(
-					captureBrainstormingTopicToolDictionaryConfig,
-				),
-				pages: {
-					collect_inputs: {
-						prompt: CAPTURE_BRAINSTORMING_TOPIC_PROMPT,
-						fields,
-						submitLabel: "Submit",
-						cancelLabel: "Cancel",
-					},
-					retry_error: {
-						prompt: CAPTURE_BRAINSTORMING_TOPIC_PROMPT,
-						fields,
-						submitLabel: "Submit",
-						cancelLabel: "Cancel",
-						retryLabel: "Start Over",
-					},
-				},
-				successMessage: "The brainstorming session topic is ready.",
-			}
+		buildDefinition() {
+			return buildBrainstormingStep3DefinitionPayload()
 		},
-		buildToolExecutionFailureFallbackMessage() {
-			return "The workflow form could not store the brainstorming session topic. Review the topic text and try again."
-		},
-		buildToolExecutionRequest(_session, values) {
-			return {
-				toolName: ClineDefaultTool.CAPTURE_BRAINSTORMING_TOPIC,
-				toolInput: { topic: values.topic?.rawValue ?? "" },
-				toolParams: { topic: values.topic?.rawValue ?? "" },
-			}
-		},
-		evaluateToolExecutionResult(session, args) {
-			const parsed = parseWorkflowFormJsonToolResult(args.toolResultText)
-			if (parsed?.persisted === true && parsed?.topic_captured === true && typeof parsed?.artifact_path === "string") {
-				return { succeeded: true }
+		buildOperationRequest(session, operationId) {
+			if (operationId !== ClineDefaultTool.CAPTURE_BRAINSTORMING_TOPIC) {
+				throw new Error(`Unsupported workflow form operation: ${operationId}`)
 			}
 
-			if (isWorkflowFormFailureText(args.toolResultText)) {
-				return {
-					succeeded: false,
-					errorMessage: args.toolResultText?.trim() ?? this.buildToolExecutionFailureFallbackMessage(session),
-				}
+			return buildBrainstormingStep3OperationRequest(session)
+		},
+		applyOperationResult(session, args) {
+			if (args.operationId !== ClineDefaultTool.CAPTURE_BRAINSTORMING_TOPIC) {
+				throw new Error(`Unsupported workflow form operation: ${args.operationId}`)
 			}
 
-			return {
-				succeeded: false,
-				errorMessage: this.buildToolExecutionFailureFallbackMessage(session),
-			}
+			return applyBrainstormingStep3OperationResult(session, args.toolResultText)
+		},
+		buildFailureFallbackMessage() {
+			return BRAINSTORMING_STEP_3_FAILURE_MESSAGE
+		},
+	},
+	[BRAINSTORMING_STEP_4_CHOOSE_APPROACH_RESOLVER_ID]: {
+		id: BRAINSTORMING_STEP_4_CHOOSE_APPROACH_RESOLVER_ID,
+		buildDefinition(session) {
+			const { categoryOptions, techniqueOptionsByCategory } = getBrainstormingStep4TechniqueCatalog(
+				session.definitionPayload,
+			)
+			return buildBrainstormingStep4DefinitionPayload({
+				categoryOptions,
+				techniqueOptionsByCategory,
+				session,
+			})
+		},
+		buildOperationRequest(session, operationId) {
+			return buildBrainstormingStep4OperationRequest(session, operationId)
+		},
+		applyOperationResult(_session, args) {
+			return applyBrainstormingStep4OperationResult(args.operationId, args.toolResultText)
+		},
+		buildFailureFallbackMessage() {
+			return BRAINSTORMING_STEP_4_FAILURE_MESSAGE
 		},
 	},
 	[PLACEHOLDER_WORKFLOW_START_SET_WORKFLOW_PLACEHOLDERS_RESOLVER_ID]: {
 		id: PLACEHOLDER_WORKFLOW_START_SET_WORKFLOW_PLACEHOLDERS_RESOLVER_ID,
-		toolName: ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
-		buildDefinition(session): WorkflowFormDefinition {
-			const workflowName = session.context?.workflowName
-			const workflowStartRequirements = session.context?.workflowStartRequirements
-			if (!workflowName || !workflowStartRequirements) {
-				throw new Error("Workflow start form definition requires workflowName and workflowStartRequirements.")
-			}
-
-			const override = workflowStartFormOverrides[workflowName]
-			const orderedFieldKeys = getWorkflowStartOrderedFieldKeys({
-				requiredFieldKeys: workflowStartRequirements.requiredFieldKeys,
-				optionalFieldKeys: workflowStartRequirements.optionalFieldKeys,
-				oneOfRequirement: workflowStartRequirements.oneOfRequirement,
-			})
-			const fields = buildWorkflowStartPlaceholderFieldDefinitions({
-				requiredFieldKeys: workflowStartRequirements.requiredFieldKeys,
-				optionalFieldKeys: workflowStartRequirements.optionalFieldKeys,
-				oneOfRequirement: workflowStartRequirements.oneOfRequirement,
-				override,
-				orderedFieldKeys,
-			})
-			const { title, markdown } = buildWorkflowStartRuntimeToolDictionary({ fieldKeys: orderedFieldKeys })
-			const prompt = override?.prompt ?? "Please provide the inputs necessary to start this workflow."
-
-			return {
-				toolName: ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
-				title: override?.title ?? "Workflow Start Inputs",
-				toolDictionaryTitle: title,
-				toolDictionaryMarkdown: markdown,
-				pages: {
-					collect_inputs: {
-						prompt,
-						fields,
-						submitLabel: "Submit",
-						cancelLabel: "Cancel",
-					},
-					retry_error: {
-						prompt,
-						fields,
-						submitLabel: "Submit",
-						cancelLabel: "Cancel",
-						retryLabel: "Start Over",
-					},
-				},
-				successMessage: "Workflow start inputs were stored.",
-			}
+		buildDefinition(session) {
+			return session.definitionPayload
 		},
-		buildToolExecutionFailureFallbackMessage() {
-			return "The workflow form could not store the workflow start inputs. Review the values and try again."
-		},
-		buildToolExecutionRequest(session, values) {
-			const fields = getCurrentCollectFields({ ...session, values }, this.buildDefinition)
-			const filteredValues = fields.reduce<Record<string, string>>((acc, field) => {
-				const value = getParsedFieldValue(fields, values, field.key)
-				if (typeof value === "string") {
-					acc[field.key] = value
-				}
-
-				return acc
-			}, {})
-
-			return {
-				toolName: ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
-				toolInput: { values: filteredValues },
-				toolParams: { values: JSON.stringify(filteredValues) },
-			}
-		},
-		evaluateToolExecutionResult(session, args) {
-			if (isWorkflowFormFailureText(args.toolResultText)) {
-				return {
-					succeeded: false,
-					errorMessage: args.toolResultText?.trim() ?? this.buildToolExecutionFailureFallbackMessage(session),
-				}
+		buildOperationRequest(session, operationId) {
+			if (operationId !== ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS) {
+				throw new Error(`Unsupported workflow form operation: ${operationId}`)
 			}
 
-			return { succeeded: true }
+			return buildWorkflowStartOperationRequest(session)
+		},
+		applyOperationResult(session, args) {
+			if (args.operationId !== ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS) {
+				throw new Error(`Unsupported workflow form operation: ${args.operationId}`)
+			}
+
+			return applyWorkflowStartOperationResult(session, args.toolResultText)
+		},
+		buildFailureFallbackMessage() {
+			return WORKFLOW_START_FAILURE_MESSAGE
 		},
 	},
 }

@@ -2,11 +2,13 @@ import { expect } from "chai"
 import { describe, it } from "mocha"
 import { ClineDefaultTool } from "@/shared/tools"
 import {
-	deriveWorkflowFormControl,
+	convertWorkflowFormSubmittedValueToToolInput,
+	deriveWorkflowFormFieldKind,
 	deriveWorkflowFormOptions,
-	parseWorkflowFormRawValue,
+	normalizeWorkflowFormSubmittedValue,
 	resolveWorkflowFormOneOfVariant,
 	resolveWorkflowFormSchema,
+	validateWorkflowFormSubmittedValueAgainstSchema,
 } from "../schema"
 
 describe("workflow-form schema helpers", () => {
@@ -19,39 +21,102 @@ describe("workflow-form schema helpers", () => {
 		expect(schema).to.deep.equal({ type: "string" })
 	})
 
-	it("resolves build_review_diff_output context_lines as an integer schema", () => {
-		const schema = resolveWorkflowFormSchema(ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT, {
-			parameterName: "context_lines",
-		})
-
-		expect(schema).to.deep.equal({ type: "integer" })
-	})
-
-	it("resolves capture_brainstorming_topic topic as a string schema", () => {
-		const schema = resolveWorkflowFormSchema(ClineDefaultTool.CAPTURE_BRAINSTORMING_TOPIC, {
-			parameterName: "topic",
-		})
-
-		expect(schema).to.deep.equal({ type: "string" })
-	})
-
-	it("derives select control and options from an enum string schema", () => {
+	it("derives dropdown field kind and options from enum string schemas", () => {
 		const schema = { type: "string" as const, enum: ["commit", "commit_range"] }
 
-		expect(deriveWorkflowFormControl(schema)).to.equal("select")
+		expect(deriveWorkflowFormFieldKind(schema)).to.equal("dropdown")
 		expect(deriveWorkflowFormOptions(schema)).to.deep.equal([
 			{ value: "commit", label: "commit" },
 			{ value: "commit_range", label: "commit_range" },
 		])
 	})
 
-	it("parses line-delimited string-array raw values", () => {
-		const parsedValue = parseWorkflowFormRawValue(" src/a.ts \n\n src/b.ts ", {
-			type: "array",
-			items: { type: "string" },
+	it("normalizes boolean submissions into typed workflow-form values", () => {
+		const normalizedValue = normalizeWorkflowFormSubmittedValue({
+			booleanValue: true,
 		})
 
-		expect(parsedValue).to.deep.equal(["src/a.ts", "src/b.ts"])
+		expect(normalizedValue).to.deep.equal({
+			valueType: "boolean",
+			booleanValue: true,
+		})
+		expect(convertWorkflowFormSubmittedValueToToolInput(normalizedValue)).to.equal(true)
+	})
+
+	it("normalizes integer submissions into typed workflow-form values", () => {
+		const normalizedValue = normalizeWorkflowFormSubmittedValue({
+			integerValue: 12,
+		})
+
+		expect(normalizedValue).to.deep.equal({
+			valueType: "integer",
+			integerValue: 12,
+		})
+		expect(convertWorkflowFormSubmittedValueToToolInput(normalizedValue)).to.equal(12)
+	})
+
+	it("normalizes number submissions into typed workflow-form values", () => {
+		const normalizedValue = normalizeWorkflowFormSubmittedValue({
+			numberValue: 3.14,
+		})
+
+		expect(normalizedValue).to.deep.equal({
+			valueType: "number",
+			numberValue: 3.14,
+		})
+		expect(convertWorkflowFormSubmittedValueToToolInput(normalizedValue)).to.equal(3.14)
+	})
+
+	it("normalizes string-array submissions into canonical arrays", () => {
+		const normalizedValue = normalizeWorkflowFormSubmittedValue({
+			arrayValue: {
+				values: [{ stringValue: "src/a.ts" }, { stringValue: "src/b.ts" }],
+			},
+		})
+
+		expect(normalizedValue).to.deep.equal({
+			valueType: "array",
+			arrayValue: [
+				{ valueType: "string", stringValue: "src/a.ts" },
+				{ valueType: "string", stringValue: "src/b.ts" },
+			],
+		})
+		expect(convertWorkflowFormSubmittedValueToToolInput(normalizedValue)).to.deep.equal(["src/a.ts", "src/b.ts"])
+	})
+
+	it("normalizes object submissions into canonical objects", () => {
+		const normalizedValue = normalizeWorkflowFormSubmittedValue({
+			objectValue: {
+				entries: [
+					{
+						key: "base",
+						value: { stringValue: "main" },
+					},
+					{
+						key: "head",
+						value: { stringValue: "feature" },
+					},
+				],
+			},
+		})
+
+		expect(normalizedValue).to.deep.equal({
+			valueType: "object",
+			objectValue: [
+				{
+					key: "base",
+					value: { valueType: "string", stringValue: "main" },
+				},
+				{
+					key: "head",
+					value: { valueType: "string", stringValue: "feature" },
+				},
+			],
+		})
+		expect(convertWorkflowFormSubmittedValueToToolInput(normalizedValue)).to.deep.equal({
+			base: "main",
+			head: "feature",
+		})
 	})
 
 	it("resolves build_review_diff_output source variants from oneOf by discriminator", () => {
@@ -66,9 +131,27 @@ describe("workflow-form schema helpers", () => {
 		expect(variant?.properties?.head?.type).to.equal("string")
 	})
 
-	it("returns undefined for invalid integer raw values", () => {
-		const parsedValue = parseWorkflowFormRawValue("12px", { type: "integer" })
+	it("validates structured object submissions against required schema properties", () => {
+		const submittedValue = normalizeWorkflowFormSubmittedValue({
+			objectValue: {
+				entries: [
+					{
+						key: "base",
+						value: { stringValue: "main" },
+					},
+				],
+			},
+		})
 
-		expect(parsedValue).to.equal(undefined)
+		expect(
+			validateWorkflowFormSubmittedValueAgainstSchema(submittedValue, {
+				type: "object",
+				required: ["base", "head"],
+				properties: {
+					base: { type: "string" },
+					head: { type: "string" },
+				},
+			}),
+		).to.equal(false)
 	})
 })

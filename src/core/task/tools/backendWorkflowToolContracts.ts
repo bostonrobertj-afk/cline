@@ -44,11 +44,69 @@ export const backendWorkflowToolContracts: Record<ClineDefaultTool, BackendWorkf
 		name: "build_epics_document",
 		parameters: [],
 	},
-	[ClineDefaultTool.PREPARE_BRAINSTORMING_SESSION]: {
-		id: ClineDefaultTool.PREPARE_BRAINSTORMING_SESSION,
-		name: "prepare_brainstorming_session",
+	[ClineDefaultTool.CONTINUE_BRAINSTORMING_SESSION]: {
+		id: ClineDefaultTool.CONTINUE_BRAINSTORMING_SESSION,
+		name: "continue_brainstorming_session",
 		parameters: [],
 	},
+	[ClineDefaultTool.CREATE_BRAINSTORMING_SESSION]: {
+		id: ClineDefaultTool.CREATE_BRAINSTORMING_SESSION,
+		name: "create_brainstorming_session",
+		parameters: [],
+	},
+	[ClineDefaultTool.SELECT_BRAINSTORMING_SESSION]: {
+		id: ClineDefaultTool.SELECT_BRAINSTORMING_SESSION,
+		name: "select_brainstorming_session",
+		parameters: [
+			{
+				name: "output_file",
+				required: true,
+				type: "string",
+				description: "Canonical brainstorming session file path selected from the discovered session list.",
+			},
+		],
+	},
+	[ClineDefaultTool.PERSIST_BRAINSTORMING_APPROACH]: {
+		id: ClineDefaultTool.PERSIST_BRAINSTORMING_APPROACH,
+		name: "persist_brainstorming_approach",
+		parameters: [
+			{
+				name: "selected_approach",
+				required: true,
+				type: "string",
+				description: "The brainstorming approach selected from the Step 4 workflow form.",
+			},
+		],
+	},
+	[ClineDefaultTool.SELECT_RANDOM_BRAINSTORMING_TECHNIQUE]: {
+		id: ClineDefaultTool.SELECT_RANDOM_BRAINSTORMING_TECHNIQUE,
+		name: "select_random_brainstorming_technique",
+		parameters: [],
+	},
+	[ClineDefaultTool.PERSIST_BRAINSTORMING_TECHNIQUE]: {
+		id: ClineDefaultTool.PERSIST_BRAINSTORMING_TECHNIQUE,
+		name: "persist_brainstorming_technique",
+		parameters: [
+			{
+				name: "technique_name",
+				required: true,
+				type: "string",
+				description: "The brainstorming technique name selected or previewed in Step 4.",
+			},
+			{
+				name: "technique_description",
+				required: true,
+				type: "string",
+				description: "The brainstorming technique description paired with the selected technique name.",
+			},
+		],
+	},
+	[ClineDefaultTool.REQUEST_BRAINSTORMING_TECHNIQUE_SUGGESTION]: {
+		id: ClineDefaultTool.REQUEST_BRAINSTORMING_TECHNIQUE_SUGGESTION,
+		name: "request_brainstorming_technique_suggestion",
+		parameters: [],
+	},
+	[ClineDefaultTool.PREPARE_BRAINSTORMING_SESSION]: undefined,
 	[ClineDefaultTool.CAPTURE_BRAINSTORMING_TOPIC]: {
 		id: ClineDefaultTool.CAPTURE_BRAINSTORMING_TOPIC,
 		name: "capture_brainstorming_topic",

@@ -10,20 +10,18 @@ import { getWorkspaceBasename } from "@core/workspace"
 import { getReadablePath, isLocatedInWorkspace } from "@utils/path"
 import fs from "fs/promises"
 import { recordAndPersistPlaceholderWorkflowWriteProof } from "@/core/task/focus-chain/placeholderWorkflowWriteProofs"
-import { isCaptureBrainstormingTopicStep } from "@/shared/capture-brainstorming-topic"
 import { ClineDefaultTool } from "@/shared/tools"
 import type { ToolResponse } from "../../index"
 import { showNotificationForApproval } from "../../utils"
 import type { IToolHandler } from "../ToolExecutorCoordinator"
 import type { TaskConfig } from "../types/TaskConfig"
 import { ToolResultUtils } from "../utils/ToolResultUtils"
+import { persistWorkflowPlaceholderValues } from "./SetWorkflowPlaceholdersToolHandler"
 
-async function resolveActiveBrainstormingStepThree(config: TaskConfig) {
-	if (!config.taskState.activePlaceholderWorkflowSource) {
-		return undefined
-	}
+const TECHNIQUE_SUGGESTION_SENTINEL = "user requested technique suggestion"
 
-	if (!config.taskState.currentFocusChainChecklist?.trim()) {
+async function resolveActiveBrainstormingStepFour(config: TaskConfig) {
+	if (!config.taskState.activePlaceholderWorkflowSource || !config.taskState.currentFocusChainChecklist?.trim()) {
 		return undefined
 	}
 
@@ -35,26 +33,25 @@ async function resolveActiveBrainstormingStepThree(config: TaskConfig) {
 	})
 }
 
-export class CaptureBrainstormingTopicToolHandler implements IToolHandler {
-	readonly name = ClineDefaultTool.CAPTURE_BRAINSTORMING_TOPIC
+function isBrainstormingStepFour(workflowName?: string, stepNumber?: number): boolean {
+	const normalized = workflowName?.replaceAll("\\", "/").split("/").at(-1)?.trim().toLowerCase()
+	return (normalized === "brainstorming.md" || normalized === "brainstorming") && stepNumber === 4
+}
+
+export class RequestBrainstormingTechniqueSuggestionToolHandler implements IToolHandler {
+	readonly name = ClineDefaultTool.REQUEST_BRAINSTORMING_TECHNIQUE_SUGGESTION
 
 	getDescription(_block: ToolUse): string {
-		return "[capture_brainstorming_topic]"
+		return "[request_brainstorming_technique_suggestion]"
 	}
 
 	async execute(config: TaskConfig, block: ToolUse): Promise<ToolResponse> {
 		try {
-			const activeStep = await resolveActiveBrainstormingStepThree(config)
-			if (!isCaptureBrainstormingTopicStep(activeStep?.sourceName, activeStep?.stepNumber)) {
+			const activeStep = await resolveActiveBrainstormingStepFour(config)
+			if (!isBrainstormingStepFour(activeStep?.sourceName, activeStep?.stepNumber)) {
 				return formatResponse.toolError(
-					"capture_brainstorming_topic can only be used while brainstorming.md Step 3 is the active placeholder workflow context.",
+					"request_brainstorming_technique_suggestion can only be used while brainstorming.md Step 4 is the active placeholder workflow context.",
 				)
-			}
-
-			const rawTopic = (block.params as Record<string, unknown>).topic
-			const topic = typeof rawTopic === "string" ? rawTopic.trim() : ""
-			if (!topic) {
-				return formatResponse.toolError("capture_brainstorming_topic requires a non-empty 'topic' value.")
 			}
 
 			const outputFilePath = resolveBrainstormingOutputFilePath(config)
@@ -71,15 +68,19 @@ export class CaptureBrainstormingTopicToolHandler implements IToolHandler {
 				return formatResponse.toolError(`Could not read the resolved output_file at ${outputFilePath}.`)
 			}
 
-			const updatedOutputFile = replaceMarkdownSectionBody(outputFileContents, "## Topic", topic)
+			const updatedOutputFile = replaceMarkdownSectionBody(
+				outputFileContents,
+				"## Selected Techniques",
+				`### Techniques Used\n- ${TECHNIQUE_SUGGESTION_SENTINEL}`,
+			)
 			if (!updatedOutputFile) {
 				return formatResponse.toolError(
-					"The resolved brainstorming session output file does not contain the canonical '## Topic' section.",
+					"The resolved brainstorming session output file does not contain the canonical '## Selected Techniques' section.",
 				)
 			}
 
 			const completeMessage = JSON.stringify({
-				tool: "captureBrainstormingTopic",
+				tool: "requestBrainstormingTechniqueSuggestion",
 				path: getReadablePath(config.cwd, outputFilePath),
 				content: `Brainstorming artifact: ${getReadablePath(config.cwd, outputFilePath)}`,
 				operationIsLocatedInWorkspace: await isLocatedInWorkspace(outputFilePath),
@@ -95,10 +96,9 @@ export class CaptureBrainstormingTopicToolHandler implements IToolHandler {
 				}
 			} else {
 				showNotificationForApproval(
-					`Cline wants to update ${getWorkspaceBasename(outputFilePath, "CaptureBrainstormingTopic.notification")}`,
+					`Cline wants to update ${getWorkspaceBasename(outputFilePath, "RequestBrainstormingTechniqueSuggestion.notification")}`,
 					config.autoApprovalSettings.enableNotifications,
 				)
-
 				await config.callbacks.removeLastPartialMessageIfExistsWithType("say", "tool")
 
 				const didApprove = await ToolResultUtils.askApprovalAndPushFeedback("tool", completeMessage, config)
@@ -126,9 +126,15 @@ export class CaptureBrainstormingTopicToolHandler implements IToolHandler {
 			})
 			config.taskState.didEditFile = true
 			config.taskState.fileReadCache.delete(outputFilePath.toLowerCase())
+			await persistWorkflowPlaceholderValues(config, { selected_technique: TECHNIQUE_SUGGESTION_SENTINEL })
 
 			return formatResponse.toolResult(
-				JSON.stringify({ persisted: true, artifact_path: outputFilePath, topic_captured: true }),
+				JSON.stringify({
+					persisted: true,
+					artifact_path: outputFilePath,
+					selected_technique: TECHNIQUE_SUGGESTION_SENTINEL,
+					technique_suggestion_requested: true,
+				}),
 			)
 		} catch (error) {
 			return formatResponse.toolError(error instanceof Error ? error.message : String(error))

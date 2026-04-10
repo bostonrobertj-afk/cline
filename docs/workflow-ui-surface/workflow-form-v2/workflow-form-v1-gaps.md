@@ -4,6 +4,12 @@
 
 This document identifies the deficiencies, inconsistencies, missing capabilities, and architectural limitations of the current workflow-form implementation.
 
+Historical note:
+
+- this gap analysis documents the pre-remediation v1 limitations that motivated Workflow Form v2
+- it is retained for design history, not as the live runtime contract
+- use [workflow-form-readme.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/workflow-ui-surface/workflow-form-readme.md) and [workflow-form-v2-enablement-guide.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/workflow-ui-surface/workflow-form-v2/workflow-form-v2-enablement-guide.md) for the current behavior
+
 It is based on:
 
 - [workflow-form-v1-assessment.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/workflow-ui-surface/workflow-form-v2/workflow-form-v1-assessment.md)

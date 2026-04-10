@@ -4,6 +4,12 @@
 
 This document assesses the live workflow-form capability in v1 and inventories every current runtime use case.
 
+Historical note:
+
+- this assessment is retained as a pre-remediation v1 snapshot
+- it is not the live runtime contract after the Workflow Form v2 remediation
+- use [workflow-form-readme.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/workflow-ui-surface/workflow-form-readme.md) and [workflow-form-v2-enablement-guide.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/workflow-ui-surface/workflow-form-v2/workflow-form-v2-enablement-guide.md) for the current behavior
+
 It is grounded in the live implementation, primarily:
 
 - [WorkflowFormRegistry.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/WorkflowFormRegistry.ts)
@@ -13,7 +19,7 @@ It is grounded in the live implementation, primarily:
 - [ExtensionMessage.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/shared/ExtensionMessage.ts)
 - [ChatRow.tsx](/Users/robertboston/Documents/Cline%20Extension/cline/webview-ui/src/components/chat/ChatRow.tsx)
 
-## Current Shared Capability
+## Historical V1 Shared Capability Snapshot
 
 Workflow Form v1 is a single shared capability, not multiple separate systems.
 
@@ -37,7 +43,7 @@ The current shared form model supports:
 
 The main v1 constraint is that the shared capability is still organized around a small set of hard-coded phase names and transitions rather than a fully declarative multi-panel state machine.
 
-## Runtime Entry Paths
+## Historical V1 Runtime Entry Paths
 
 The live system currently opens workflow forms from three places:
 

@@ -6,8 +6,15 @@ import type {
 	BackendWorkflowToolParameterContract,
 	BackendWorkflowToolSchemaNode,
 } from "@/core/task/tools/backendWorkflowToolContractTypes"
-import type { WorkflowFormFieldControl, WorkflowFormFieldOption, WorkflowFormJsonSchema } from "@/shared/ExtensionMessage"
+import type {
+	WorkflowFormFieldKind,
+	WorkflowFormJsonSchema,
+	WorkflowFormOptionDefinition,
+	WorkflowFormSubmittedValueObjectEntry,
+	WorkflowFormSubmittedValuePayload,
+} from "@/shared/ExtensionMessage"
 import { ModelFamily } from "@/shared/prompts"
+import type { WorkflowFormValue } from "@/shared/proto/cline/task"
 import { ClineDefaultTool } from "@/shared/tools"
 
 export interface WorkflowFormFieldSchemaBinding {
@@ -127,34 +134,28 @@ export function resolveWorkflowFormSchema(
 	return normalizeWorkflowFormSchema(parameter)
 }
 
-export function deriveWorkflowFormControl(schema: WorkflowFormJsonSchema): WorkflowFormFieldControl {
+export function deriveWorkflowFormFieldKind(schema: WorkflowFormJsonSchema): WorkflowFormFieldKind {
 	if (schema.enum?.every((value) => typeof value === "string")) {
-		return "select"
+		return "dropdown"
 	}
 
 	switch (schema.type) {
 		case "boolean":
-			return "select"
+			return "boolean"
 		case "integer":
 			return "number"
 		case "array":
+			return schema.items?.type === "string" ? "multi_select" : "large_text"
 		case "object":
-			return "textarea"
+			return "large_text"
 		default:
-			return "text"
+			return "small_text"
 	}
 }
 
-export function deriveWorkflowFormOptions(schema: WorkflowFormJsonSchema): WorkflowFormFieldOption[] | undefined {
+export function deriveWorkflowFormOptions(schema: WorkflowFormJsonSchema): WorkflowFormOptionDefinition[] | undefined {
 	if (schema.enum?.every((value) => typeof value === "string")) {
 		return schema.enum.map((value) => ({ value, label: value }))
-	}
-
-	if (schema.type === "boolean") {
-		return [
-			{ value: "true", label: "True" },
-			{ value: "false", label: "False" },
-		]
 	}
 
 	return undefined
@@ -179,51 +180,183 @@ export function resolveWorkflowFormOneOfVariant(
 	return undefined
 }
 
-export function parseWorkflowFormRawValue(rawValue: string | undefined, schema: WorkflowFormJsonSchema): unknown {
-	const trimmedRawValue = rawValue?.trim()
-	if (!trimmedRawValue) {
+function hasSingleTypedValue(value: WorkflowFormValue): boolean {
+	return (
+		[
+			value.stringValue,
+			value.booleanValue,
+			value.integerValue,
+			value.numberValue,
+			value.arrayValue,
+			value.objectValue,
+		].filter((entry) => entry !== undefined).length === 1
+	)
+}
+
+export function normalizeWorkflowFormSubmittedValue(
+	value: WorkflowFormValue | undefined,
+): WorkflowFormSubmittedValuePayload | undefined {
+	if (!value) {
 		return undefined
+	}
+
+	if (!hasSingleTypedValue(value)) {
+		throw new Error("Workflow form submission values must contain exactly one typed value.")
+	}
+
+	if (value.stringValue !== undefined) {
+		return {
+			valueType: "string",
+			stringValue: value.stringValue,
+		}
+	}
+
+	if (value.booleanValue !== undefined) {
+		return {
+			valueType: "boolean",
+			booleanValue: value.booleanValue,
+		}
+	}
+
+	if (value.integerValue !== undefined) {
+		return {
+			valueType: "integer",
+			integerValue: value.integerValue,
+		}
+	}
+
+	if (value.numberValue !== undefined) {
+		return {
+			valueType: "number",
+			numberValue: value.numberValue,
+		}
+	}
+
+	if (value.arrayValue) {
+		return {
+			valueType: "array",
+			arrayValue: value.arrayValue.values
+				.map((entry) => normalizeWorkflowFormSubmittedValue(entry))
+				.filter((entry): entry is WorkflowFormSubmittedValuePayload => entry !== undefined),
+		}
+	}
+
+	if (value.objectValue) {
+		return {
+			valueType: "object",
+			objectValue: value.objectValue.entries
+				.map((entry): WorkflowFormSubmittedValueObjectEntry | undefined => {
+					const normalized = normalizeWorkflowFormSubmittedValue(entry.value)
+					if (!normalized) {
+						return undefined
+					}
+
+					return {
+						key: entry.key,
+						value: normalized,
+					}
+				})
+				.filter((entry): entry is WorkflowFormSubmittedValueObjectEntry => entry !== undefined),
+		}
+	}
+
+	return undefined
+}
+
+export function convertWorkflowFormSubmittedValueToToolInput(value: WorkflowFormSubmittedValuePayload | undefined): unknown {
+	if (!value) {
+		return undefined
+	}
+
+	switch (value.valueType) {
+		case "string":
+			return value.stringValue
+		case "boolean":
+			return value.booleanValue
+		case "integer":
+			return value.integerValue
+		case "number":
+			return value.numberValue
+		case "array":
+			return (value.arrayValue ?? []).map((entry) => convertWorkflowFormSubmittedValueToToolInput(entry))
+		case "object":
+			return Object.fromEntries(
+				(value.objectValue ?? []).map((entry) => [entry.key, convertWorkflowFormSubmittedValueToToolInput(entry.value)]),
+			)
+		default:
+			return undefined
+	}
+}
+
+function validateToolInputAgainstWorkflowFormSchema(value: unknown, schema: WorkflowFormJsonSchema): boolean {
+	if (schema.oneOf?.length) {
+		return schema.oneOf.some((variant) => validateToolInputAgainstWorkflowFormSchema(value, variant))
+	}
+
+	if (schema.const !== undefined) {
+		return value === schema.const
+	}
+
+	if (schema.enum) {
+		return typeof value === "string" && schema.enum.includes(value)
 	}
 
 	switch (schema.type) {
 		case "string":
-			return trimmedRawValue
+			return typeof value === "string"
 		case "integer":
-			if (!/^-?\d+$/.test(trimmedRawValue)) {
-				return undefined
-			}
-
-			return Number.parseInt(trimmedRawValue, 10)
+			return Number.isInteger(value)
 		case "boolean":
-			if (/^true$/i.test(trimmedRawValue)) {
-				return true
-			}
-			if (/^false$/i.test(trimmedRawValue)) {
+			return typeof value === "boolean"
+		case "array":
+			if (!Array.isArray(value)) {
 				return false
 			}
-			return undefined
-		case "array":
-			if (schema.items?.type === "string") {
-				return trimmedRawValue
-					.split("\n")
-					.map((line) => line.trim())
-					.filter((line) => line.length > 0)
+
+			return schema.items ? value.every((entry) => validateToolInputAgainstWorkflowFormSchema(entry, schema.items!)) : true
+		case "object": {
+			if (!value || typeof value !== "object" || Array.isArray(value)) {
+				return false
 			}
 
-			try {
-				const parsedValue = JSON.parse(trimmedRawValue)
-				return Array.isArray(parsedValue) ? parsedValue : undefined
-			} catch {
-				return undefined
+			const objectValue = value as Record<string, unknown>
+			const requiredKeys = schema.required ?? []
+			if (requiredKeys.some((key) => objectValue[key] === undefined)) {
+				return false
 			}
-		case "object":
-			try {
-				const parsedValue = JSON.parse(trimmedRawValue)
-				return parsedValue && typeof parsedValue === "object" && !Array.isArray(parsedValue) ? parsedValue : undefined
-			} catch {
-				return undefined
+
+			const declaredProperties = schema.properties ?? {}
+			for (const [key, propertySchema] of Object.entries(declaredProperties)) {
+				if (
+					objectValue[key] !== undefined &&
+					!validateToolInputAgainstWorkflowFormSchema(objectValue[key], propertySchema)
+				) {
+					return false
+				}
 			}
+
+			if (schema.additionalProperties) {
+				const declaredKeys = new Set(Object.keys(declaredProperties))
+				for (const [key, entryValue] of Object.entries(objectValue)) {
+					if (
+						!declaredKeys.has(key) &&
+						!validateToolInputAgainstWorkflowFormSchema(entryValue, schema.additionalProperties)
+					) {
+						return false
+					}
+				}
+			}
+
+			return true
+		}
 		default:
-			return trimmedRawValue
+			return false
 	}
+}
+
+export function validateWorkflowFormSubmittedValueAgainstSchema(
+	value: WorkflowFormSubmittedValuePayload | undefined,
+	schema: WorkflowFormJsonSchema,
+): boolean {
+	return validateToolInputAgainstWorkflowFormSchema(convertWorkflowFormSubmittedValueToToolInput(value), schema)
 }

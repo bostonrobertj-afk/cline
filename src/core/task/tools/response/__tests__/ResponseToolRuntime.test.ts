@@ -79,12 +79,19 @@ describe("ResponseToolRuntime", () => {
 		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.ACT_MODE)?.defaultTurnBehavior, "end_turn")
 	})
 
-	it("keeps build_epics_document registered as a non-response tool", () => {
+	it("keeps workflow-owned deterministic tools registered as non-response tools", () => {
 		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.BUILD_EPICS_DOCUMENT), undefined)
 		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.SELECT_TARGET_EPIC), undefined)
 		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.BUILD_EPIC_DELIVERY_SPEC), undefined)
 		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.BUILD_STORY_DOCUMENT), undefined)
 		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.BUILD_TECH_SPEC_DOCUMENT), undefined)
+		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.CONTINUE_BRAINSTORMING_SESSION), undefined)
+		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.CREATE_BRAINSTORMING_SESSION), undefined)
+		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.SELECT_BRAINSTORMING_SESSION), undefined)
+		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.PERSIST_BRAINSTORMING_APPROACH), undefined)
+		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.SELECT_RANDOM_BRAINSTORMING_TECHNIQUE), undefined)
+		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.PERSIST_BRAINSTORMING_TECHNIQUE), undefined)
+		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.REQUEST_BRAINSTORMING_TECHNIQUE_SUGGESTION), undefined)
 	})
 
 	it("registers post-turn thread display states for governed response tools", () => {

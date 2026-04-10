@@ -125,20 +125,41 @@ enum WorkflowFormAction {
   BACK = 4;
 }
 
-message WorkflowFormFieldValue {
-  string raw_value = 1;
+message WorkflowFormValueArray {
+  repeated WorkflowFormValue values = 1;
+}
+
+message WorkflowFormValueObjectEntry {
+  string key = 1;
+  WorkflowFormValue value = 2;
+}
+
+message WorkflowFormValueObject {
+  repeated WorkflowFormValueObjectEntry entries = 1;
+}
+
+message WorkflowFormValue {
+  oneof kind {
+    string string_value = 1;
+    bool boolean_value = 2;
+    sint64 integer_value = 3;
+    double number_value = 4;
+    WorkflowFormValueArray array_value = 5;
+    WorkflowFormValueObject object_value = 6;
+  }
 }
 
 message WorkflowFormFieldSubmission {
   string key = 1;
-  WorkflowFormFieldValue value = 2;
+  WorkflowFormValue value = 2;
 }
 
 message WorkflowFormSubmissionRequest {
   Metadata metadata = 1;
   string session_id = 2;
-  WorkflowFormAction action = 3;
-  repeated WorkflowFormFieldSubmission fields = 4;
+  string panel_id = 3;
+  WorkflowFormAction action = 4;
+  repeated WorkflowFormFieldSubmission fields = 5;
 }
 
 enum WorkflowStartCardAction {

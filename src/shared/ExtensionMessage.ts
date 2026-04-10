@@ -378,10 +378,32 @@ export interface ClineAskNewTask {
 	context: string
 }
 
-export type WorkflowFormPhase = "confirm" | "select_source" | "collect_inputs" | "retry_error" | "success"
-export type WorkflowFormFieldControl = "select" | "text" | "textarea" | "number"
+export type WorkflowFormFieldKind =
+	| "dropdown"
+	| "boolean"
+	| "small_text"
+	| "large_text"
+	| "number"
+	| "multi_select"
+	| "radio_group"
+	| "checkbox_group"
+	| "date"
+	| "date_time"
+	| "file_path"
+	| "directory_path"
+	| "artifact_picker"
+	| "markdown_display"
+	| "static_notice"
 
-export interface WorkflowFormFieldOption {
+export type WorkflowFormAllowedValueType = "string" | "boolean" | "integer" | "number" | "array" | "object"
+
+export type WorkflowFormSelectionCardinality = "single" | "fixed_count" | "unbounded"
+
+export type WorkflowFormPanelAction = "submit" | "cancel" | "back" | "retry"
+
+export type WorkflowFormRenderState = "panel" | "failure" | "success"
+
+export interface WorkflowFormOptionDefinition {
 	value: string
 	label: string
 	description?: string
@@ -400,73 +422,152 @@ export interface WorkflowFormJsonSchema {
 	oneOf?: WorkflowFormJsonSchema[]
 }
 
-export interface WorkflowFormFieldValuePayload {
-	rawValue?: string
-}
-
 export interface WorkflowFormFieldPresentation {
 	textareaSize?: "default" | "large"
 }
 
+export interface WorkflowFormSubmittedValueObjectEntry {
+	key: string
+	value: WorkflowFormSubmittedValuePayload
+}
+
+export interface WorkflowFormSubmittedValuePayload {
+	valueType: WorkflowFormAllowedValueType
+	stringValue?: string
+	booleanValue?: boolean
+	integerValue?: number
+	numberValue?: number
+	arrayValue?: WorkflowFormSubmittedValuePayload[]
+	objectValue?: WorkflowFormSubmittedValueObjectEntry[]
+}
+
+export type WorkflowFormComparableValue = string | boolean | number
+
+export interface WorkflowFormConditionDefinition {
+	sourceKey: string
+	operator?: "equals" | "not_equals" | "contains" | "not_contains" | "is_truthy" | "is_falsy"
+	value?: WorkflowFormComparableValue
+	values?: WorkflowFormComparableValue[]
+}
+
+export interface WorkflowFormConditionalOptionDefinition {
+	when: WorkflowFormConditionDefinition
+	options: WorkflowFormOptionDefinition[]
+}
+
+export interface WorkflowFormConditionalFieldOverrideDefinition {
+	when: WorkflowFormConditionDefinition
+	allowedValueType?: WorkflowFormAllowedValueType
+	required?: boolean
+	selectionCardinality?: WorkflowFormSelectionCardinality
+	selectionCount?: number
+	minimumSelectionCount?: number
+	contentMarkdown?: string
+}
+
 export interface WorkflowFormFieldDefinition {
 	key: string
+	kind: WorkflowFormFieldKind
 	label: string
-	help: string
-	control: WorkflowFormFieldControl
-	valueSchema: WorkflowFormJsonSchema
+	helpText?: string
 	required: boolean
 	oneOfGroupId?: string
+	allowedValueType?: WorkflowFormAllowedValueType
 	placeholder?: string
-	options?: WorkflowFormFieldOption[]
+	formatHint?: string
+	options?: WorkflowFormOptionDefinition[]
+	conditionalOptions?: WorkflowFormConditionalOptionDefinition[]
+	conditionalFieldOverrides?: WorkflowFormConditionalFieldOverrideDefinition[]
+	selectionCardinality?: WorkflowFormSelectionCardinality
+	selectionCount?: number
+	minimumSelectionCount?: number
+	trueLabel?: string
+	falseLabel?: string
+	dependsOn?: string[]
+	resetValueKeysOnChange?: string[]
+	resetDataKeysOnChange?: string[]
 	visible?: boolean
+	visibilityCondition?: WorkflowFormConditionDefinition
+	valueSchema?: WorkflowFormJsonSchema
+	contentMarkdown?: string
 	presentation?: WorkflowFormFieldPresentation
 }
 
-export type WorkflowFormRenderablePhase = Extract<
-	WorkflowFormPhase,
-	"confirm" | "select_source" | "collect_inputs" | "retry_error"
->
-
-export interface WorkflowFormPageDefinition {
-	prompt: string
-	options?: string[]
-	fields?: WorkflowFormFieldDefinition[]
-	submitLabel?: string
-	cancelLabel?: string
-	backLabel?: string
-	retryLabel?: string
-}
-
-export type WorkflowFormPresentationKind = "interactive_form" | "automatic_status"
-
-export type WorkflowFormAutomaticStatusState = "pending" | "success" | "failure"
-
-export type WorkflowFormPresentation =
-	| { kind: "interactive_form" }
+export type WorkflowFormTransitionDefinition =
 	| {
-			kind: "automatic_status"
-			pendingLabel: string
-			successLabel: string
-			failureLabel: string
+			type: "sequential"
+			nextPanelId: string
+			staleValueKeysToClear?: string[]
+			staleDataKeysToClear?: string[]
+	  }
+	| {
+			type: "conditional"
+			conditionSourceKey: string
+			branches: Array<{
+				matchValue: WorkflowFormComparableValue
+				nextPanelId?: string
+				operationId?: string
+				terminal?: boolean
+				staleValueKeysToClear?: string[]
+				staleDataKeysToClear?: string[]
+			}>
+			defaultNextPanelId?: string
+			defaultOperationId?: string
+			defaultTerminal?: boolean
+	  }
+	| {
+			type: "deterministic_operation"
+			operationId: string
+			nextPanelId?: string
+			terminal?: boolean
+			resultDataKey?: string
+			rebuildDefinitionAfterSuccess?: boolean
+			recomputeDestinationAfterSuccess?: boolean
+			successMessage?: string
+			staleValueKeysToClear?: string[]
+			staleDataKeysToClear?: string[]
 	  }
 
-export interface WorkflowFormDefinition {
-	toolName: string
+export interface WorkflowFormPanelDefinition {
+	panelId: string
+	title: string
+	promptMarkdown: string
+	fields: WorkflowFormFieldDefinition[]
+	allowedActions: WorkflowFormPanelAction[]
+	actionLabels?: Partial<Record<WorkflowFormPanelAction, string>>
+	transition: WorkflowFormTransitionDefinition
+	backDestinationPanelId?: string
+	backStaleValueKeysToClear?: string[]
+	backStaleDataKeysToClear?: string[]
+}
+
+export interface WorkflowFormDefinitionPayload {
+	definitionVersion: number
 	title: string
 	toolDictionaryTitle: string
 	toolDictionaryMarkdown: string
-	presentation?: WorkflowFormPresentation
-	pages: Partial<Record<WorkflowFormRenderablePhase, WorkflowFormPageDefinition>>
-	successMessage: string
+	firstPanelId: string
+	panels: Record<string, WorkflowFormPanelDefinition>
+}
+
+export interface WorkflowFormResolvedPanelPayload {
+	panelId: string
+	title: string
+	promptMarkdown: string
+	fields: WorkflowFormFieldDefinition[]
+	allowedActions: WorkflowFormPanelAction[]
+	actionLabels?: Partial<Record<WorkflowFormPanelAction, string>>
 }
 
 export interface ClineWorkflowForm {
 	sessionId: string
 	resolverId: string
-	phase: WorkflowFormPhase
-	definition: WorkflowFormDefinition
-	values?: Record<string, WorkflowFormFieldValuePayload>
-	automaticStatusState?: WorkflowFormAutomaticStatusState
+	title: string
+	toolDictionaryTitle: string
+	toolDictionaryMarkdown: string
+	renderState: WorkflowFormRenderState
+	panel?: WorkflowFormResolvedPanelPayload
+	values: Record<string, WorkflowFormSubmittedValuePayload>
 	errorMessage?: string
 	successMessage?: string
 }

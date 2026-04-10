@@ -51,8 +51,8 @@ import { dismissTrailingCommandOutputAskIfPresent } from "@core/task/utils/dismi
 import { getWorkflowFormResolverDefinition } from "@core/task/workflow-form/WorkflowFormRegistry"
 import { WorkflowFormRuntime } from "@core/task/workflow-form/WorkflowFormRuntime"
 import {
-	getWorkflowFormWorkflowStepTriggerDefinition,
 	resolveWorkflowFormSlashCommandStartCandidate,
+	resolveWorkflowFormWorkflowStepCandidate,
 } from "@core/task/workflow-form/WorkflowFormTriggerRegistry"
 import {
 	CODE_REVIEW_STEP_3_REVIEW_INPUT_DEFINITION_ID,
@@ -178,12 +178,7 @@ import { buildUserFeedbackContent } from "./utils/buildUserFeedbackContent"
 import { buildUserMessageContent } from "./utils/buildUserMessageContent"
 import { hasExplicitMentionSyntax, hasUserContentTag } from "./utils/userContentProcessing"
 import { activateManagedWorkflowInTaskState, activatePlaceholderWorkflowInTaskState } from "./workflow-activation"
-import type {
-	WorkflowFormRuntimeOutcome,
-	WorkflowFormSessionContext,
-	WorkflowFormSessionOwner,
-	WorkflowFormSessionState,
-} from "./workflow-form/types"
+import type { WorkflowFormRuntimeOutcome, WorkflowFormSessionState } from "./workflow-form/types"
 import type {
 	WorkflowStepResolutionSessionState,
 	WorkflowStepResolutionToolExecutionRequest,
@@ -251,36 +246,19 @@ export async function resolveWorkflowFormInterceptionCandidate(args: {
 		| "suppressedWorkflowFormResolverIds"
 	>
 }) {
-	if (!args.taskState.activePlaceholderWorkflowSource) {
-		return undefined
-	}
-
-	if (!args.taskState.currentFocusChainChecklist) {
-		return undefined
-	}
-
-	const activeStep = await getActivePlaceholderWorkflowStepDetails({
-		checklistMarkdown: args.taskState.currentFocusChainChecklist,
-		source: args.taskState.activePlaceholderWorkflowSource,
-		stablePlaceholderValues: args.taskState.activePlaceholderWorkflowStableValues,
-		placeholderValues: args.taskState.activePlaceholderWorkflowValues,
+	const candidate = await resolveWorkflowFormWorkflowStepCandidate({
+		cwd: args.cwd,
+		taskState: args.taskState,
 	})
-	if (!activeStep?.stepNumber) {
+	if (!candidate) {
 		return undefined
 	}
 
-	const activeWorkflowName = args.taskState.activePlaceholderWorkflowSource.name
-	const trigger = getWorkflowFormWorkflowStepTriggerDefinition(activeWorkflowName, activeStep.stepNumber)
-	if (!trigger) {
+	if (args.taskState.suppressedWorkflowFormResolverIds.includes(candidate.resolverId)) {
 		return undefined
 	}
 
-	if (args.taskState.suppressedWorkflowFormResolverIds.includes(trigger.resolverId)) {
-		return undefined
-	}
-
-	const shouldIntercept = await trigger.shouldIntercept({ cwd: args.cwd, taskState: args.taskState })
-	return shouldIntercept ? { trigger, activeStep } : undefined
+	return candidate
 }
 
 export async function resolveWorkflowStepResolutionInterceptionCandidate(args: {
@@ -1148,7 +1126,6 @@ export class Task {
 			this.clearActiveHookExecution.bind(this),
 			this.getActiveHookExecution.bind(this),
 			this.runUserPromptSubmitHook.bind(this),
-			this.runWorkflowFormSession.bind(this),
 		)
 	}
 
@@ -1439,14 +1416,15 @@ export class Task {
 
 		switch (outcome.kind) {
 			case "render_form":
-			case "invoke_tool":
+			case "invoke_deterministic_operation":
 				this.taskState.activeWorkflowFormSession = outcome.session
-				if (outcome.kind === "render_form") {
-					this.taskState.suppressedWorkflowFormResolverIds = this.taskState.suppressedWorkflowFormResolverIds.filter(
-						(id) => id !== outcome.session.resolverId,
-					)
-				}
+				this.taskState.suppressedWorkflowFormResolverIds = this.taskState.suppressedWorkflowFormResolverIds.filter(
+					(id) => id !== outcome.session.resolverId,
+				)
 				await this.persistWorkflowFormSession()
+				break
+			case "complete_success":
+				await this.clearWorkflowFormSession()
 				break
 			case "fallback_to_agent":
 				if (!this.taskState.suppressedWorkflowFormResolverIds.includes(activeSession.resolverId)) {
@@ -1546,6 +1524,7 @@ export class Task {
 
 	private async clearWorkflowFormSession() {
 		this.taskState.activeWorkflowFormSession = undefined
+		this.pendingWorkflowFormOutcome = undefined
 		await this.persistWorkflowFormSession()
 	}
 
@@ -1566,27 +1545,6 @@ export class Task {
 		await this.persistWorkflowStepResolutionSession()
 	}
 
-	private async runWorkflowFormSession(args: {
-		resolverId: string
-		owner: WorkflowFormSessionOwner
-		initialPhase: "collect_inputs"
-		context?: WorkflowFormSessionContext
-	}) {
-		if (this.taskState.activeWorkflowFormSession) {
-			throw new Error("A workflow form session is already active.")
-		}
-
-		this.taskState.activeWorkflowFormSession = this.workflowFormRuntime.createSession({
-			resolverId: args.resolverId,
-			triggerSource: "tool_handler",
-			owner: args.owner,
-			initialPhase: args.initialPhase,
-			context: args.context,
-		})
-		await this.persistWorkflowFormSession()
-		await this.maybeResolveWorkflowFormBeforeApiTurn()
-	}
-
 	private async renderWorkflowFormMessage(payload: ClineWorkflowForm): Promise<void> {
 		const text = JSON.stringify(payload)
 		const nextThreadDisplayState = ThreadDisplayStates.AWAITING_USER_RESPONSE
@@ -1597,7 +1555,8 @@ export class Task {
 			nextThreadDisplayState,
 			"workflow_form_render",
 			{
-				phase: payload.phase,
+				renderState: payload.renderState,
+				panelId: payload.panel?.panelId,
 				resolverId: payload.resolverId,
 			},
 			nextAwaitingSubtype,
@@ -1880,41 +1839,61 @@ export class Task {
 			.find((item): item is string => typeof item === "string" && item.trim().length > 0)
 	}
 
-	private getWorkflowFormToolErrorMessage(session: WorkflowFormSessionState, previousUserMessageContentLength: number): string {
+	private getWorkflowFormOperationErrorMessage(
+		session: WorkflowFormSessionState,
+		operationId: string,
+		previousUserMessageContentLength: number,
+	): string {
 		const textContent = this.getWorkflowFormToolResultText(previousUserMessageContentLength)
 		return (
-			textContent ?? getWorkflowFormResolverDefinition(session.resolverId).buildToolExecutionFailureFallbackMessage(session)
+			textContent ?? getWorkflowFormResolverDefinition(session.resolverId).buildFailureFallbackMessage(session, operationId)
 		)
 	}
 
-	private async executeWorkflowFormToolAndSync(outcome: Extract<WorkflowFormRuntimeOutcome, { kind: "invoke_tool" }>) {
+	private async executeWorkflowFormOperationAndSync(
+		outcome: Extract<WorkflowFormRuntimeOutcome, { kind: "invoke_deterministic_operation" }>,
+	) {
+		const resolver = getWorkflowFormResolverDefinition(outcome.session.resolverId)
+		const operationRequest = resolver.buildOperationRequest(outcome.session, outcome.operationId)
 		const previousUserMessageContentLength = this.taskState.userMessageContent.length
 
 		await this.toolExecutor.executeTool({
 			type: "tool_use",
-			name: outcome.toolName,
-			params: outcome.toolParams as any,
+			name: operationRequest.toolName,
+			params: operationRequest.toolParams as any,
 			partial: false,
 			isNativeToolCall: true,
 			call_id: `workflow_form_${outcome.session.sessionId}`,
 		})
 
 		await this.syncDeterministicProgressionAfterWorkflowFormTool({
-			toolName: outcome.toolName,
-			toolParams: outcome.toolInput,
+			toolName: operationRequest.toolName,
+			toolParams: operationRequest.toolInput,
 			toolResult: this.taskState.userMessageContent.at(-1),
 			toolWasExecuted: true,
 		})
-		const resolver = getWorkflowFormResolverDefinition(outcome.session.resolverId)
 		const toolResultText = this.getWorkflowFormToolResultText(previousUserMessageContentLength)
-		const evaluation = resolver.evaluateToolExecutionResult(outcome.session, { toolResultText })
+		const applicationResult = resolver.applyOperationResult(outcome.session, {
+			operationId: outcome.operationId,
+			toolResultText,
+		})
+
+		if (applicationResult.succeeded) {
+			return {
+				succeeded: true as const,
+				operationData: applicationResult.operationData,
+				fallbackToAgent: applicationResult.fallbackToAgent ?? false,
+				terminalSuccessMessage: applicationResult.terminalSuccessMessage,
+			}
+		}
 
 		return {
-			succeeded: evaluation.succeeded,
+			succeeded: false as const,
 			errorMessage:
-				evaluation.errorMessage ??
-				this.getWorkflowFormToolErrorMessage(outcome.session, previousUserMessageContentLength),
-			fallbackToAgent: evaluation.fallbackToAgent ?? false,
+				applicationResult.errorMessage ??
+				this.getWorkflowFormOperationErrorMessage(outcome.session, outcome.operationId, previousUserMessageContentLength),
+			fallbackToAgent: applicationResult.fallbackToAgent ?? false,
+			terminalSuccessMessage: applicationResult.terminalSuccessMessage,
 		}
 	}
 
@@ -2011,8 +1990,7 @@ export class Task {
 						resolverId: slashStartCandidate.resolverId,
 						triggerSource: slashStartCandidate.triggerSource,
 						owner: slashStartCandidate.owner,
-						initialPhase: slashStartCandidate.initialPhase,
-						context: slashStartCandidate.context,
+						definitionPayload: slashStartCandidate.definitionPayload,
 					})
 					await this.persistWorkflowFormSession()
 					startFormHandledForCurrentTurn = true
@@ -2025,17 +2003,11 @@ export class Task {
 						break
 					}
 
-					const resolver = getWorkflowFormResolverDefinition(candidate.trigger.resolverId)
 					this.taskState.activeWorkflowFormSession = this.workflowFormRuntime.createSession({
-						resolverId: candidate.trigger.resolverId,
-						triggerSource: "deterministic_workflow_progression",
-						owner: {
-							kind: "placeholder_workflow_step",
-							workflowName: this.taskState.activePlaceholderWorkflowSource!.name,
-							stepNumber: candidate.activeStep.stepNumber,
-						},
-						initialPhase: resolver.defaultInitialPhase ?? "confirm",
-						context: undefined,
+						resolverId: candidate.resolverId,
+						triggerSource: candidate.triggerSource,
+						owner: candidate.owner,
+						definitionPayload: candidate.definitionPayload,
 					})
 					await this.persistWorkflowFormSession()
 				}
@@ -2070,51 +2042,101 @@ export class Task {
 				const outcome = resolvedOutcome as
 					| Extract<WorkflowFormRuntimeOutcome, { kind: "render_form" }>
 					| Extract<WorkflowFormRuntimeOutcome, { kind: "fallback_to_agent" }>
-					| Extract<WorkflowFormRuntimeOutcome, { kind: "invoke_tool" }>
+					| Extract<WorkflowFormRuntimeOutcome, { kind: "invoke_deterministic_operation" }>
+					| Extract<WorkflowFormRuntimeOutcome, { kind: "complete_success" }>
 
 				switch (outcome.kind) {
 					case "render_form":
 						continue
+					case "complete_success":
+						await this.renderWorkflowFormMessage(outcome.payload)
+						await this.clearWorkflowFormSession()
+						restartDecisionLoop = true
+						break
 					case "fallback_to_agent":
 						break
-					case "invoke_tool": {
-						const toolExecution = await this.executeWorkflowFormToolAndSync(outcome)
-						if (toolExecution.succeeded) {
-							const resolver = getWorkflowFormResolverDefinition(outcome.session.resolverId)
-							const definition = resolver.buildDefinition(outcome.session)
-							const successPayload = this.workflowFormRuntime.buildSuccessPayload(
-								outcome.session,
-								definition.successMessage,
-							)
-							await this.clearWorkflowFormSession()
-							await this.renderWorkflowFormMessage(successPayload)
-							restartDecisionLoop = true
-							break
-						}
+					case "invoke_deterministic_operation": {
+						let pendingOperationOutcome = outcome
 
-						if (toolExecution.fallbackToAgent === true) {
-							const fallbackNoticePayload = this.workflowFormRuntime.buildSuccessPayload(
-								outcome.session,
-								toolExecution.errorMessage,
-							)
-							await this.renderWorkflowFormMessage(fallbackNoticePayload)
-							if (!this.taskState.suppressedWorkflowFormResolverIds.includes(outcome.session.resolverId)) {
-								this.taskState.suppressedWorkflowFormResolverIds = [
-									...this.taskState.suppressedWorkflowFormResolverIds,
-									outcome.session.resolverId,
-								]
+						while (true) {
+							const operationExecution = await this.executeWorkflowFormOperationAndSync(pendingOperationOutcome)
+							if (operationExecution.succeeded) {
+								if (pendingOperationOutcome.terminal === true) {
+									const successPayload = this.workflowFormRuntime.buildSuccessPayload(
+										pendingOperationOutcome.session,
+										operationExecution.terminalSuccessMessage ?? "",
+									)
+									await this.renderWorkflowFormMessage(successPayload)
+									await this.clearWorkflowFormSession()
+									restartDecisionLoop = true
+									break
+								}
+
+								const continuedSession =
+									pendingOperationOutcome.resultDataKey && operationExecution.operationData
+										? {
+												...pendingOperationOutcome.session,
+												data: {
+													...pendingOperationOutcome.session.data,
+													[pendingOperationOutcome.resultDataKey]: operationExecution.operationData,
+												},
+											}
+										: pendingOperationOutcome.session
+
+								const continuedOutcome = this.workflowFormRuntime.continueAfterDeterministicOperation({
+									session: continuedSession,
+									nextPanelId: pendingOperationOutcome.nextPanelId,
+									rebuildDefinitionAfterSuccess: pendingOperationOutcome.rebuildDefinitionAfterSuccess,
+									recomputeDestinationAfterSuccess: pendingOperationOutcome.recomputeDestinationAfterSuccess,
+								})
+
+								this.taskState.activeWorkflowFormSession = continuedOutcome.session
+								await this.persistWorkflowFormSession()
+
+								if (continuedOutcome.kind === "invoke_deterministic_operation") {
+									pendingOperationOutcome = continuedOutcome
+									continue
+								}
+
+								break
 							}
-							await this.clearWorkflowFormSession()
+
+							if (operationExecution.fallbackToAgent === true) {
+								const fallbackNoticePayload = this.workflowFormRuntime.buildSuccessPayload(
+									pendingOperationOutcome.session,
+									operationExecution.errorMessage,
+								)
+								await this.renderWorkflowFormMessage(fallbackNoticePayload)
+								if (
+									!this.taskState.suppressedWorkflowFormResolverIds.includes(
+										pendingOperationOutcome.session.resolverId,
+									)
+								) {
+									this.taskState.suppressedWorkflowFormResolverIds = [
+										...this.taskState.suppressedWorkflowFormResolverIds,
+										pendingOperationOutcome.session.resolverId,
+									]
+								}
+								await this.clearWorkflowFormSession()
+								break
+							}
+
+							this.taskState.activeWorkflowFormSession = {
+								...pendingOperationOutcome.session,
+								failure: {
+									panelId: pendingOperationOutcome.session.currentPanelId,
+									errorMessage: operationExecution.errorMessage,
+								},
+							}
+							await this.persistWorkflowFormSession()
 							break
 						}
 
-						this.taskState.activeWorkflowFormSession = {
-							...outcome.session,
-							phase: "retry_error",
-							lastError: toolExecution.errorMessage,
+						if (this.taskState.activeWorkflowFormSession && !restartDecisionLoop) {
+							continue
 						}
-						await this.persistWorkflowFormSession()
-						continue
+
+						break
 					}
 				}
 
@@ -2617,6 +2639,7 @@ export class Task {
 	private async restoreBmadStateFromMetadata(): Promise<void> {
 		try {
 			const metadata = await getTaskMetadata(this.taskId)
+			let shouldPersistClearedWorkflowFormMetadata = false
 			this.taskState.activeWorkflowId = metadata.activeWorkflowId
 			this.taskState.activePlaceholderWorkflowId = metadata.activePlaceholderWorkflowId
 			this.taskState.activePlaceholderWorkflowSource = metadata.activePlaceholderWorkflowSource
@@ -2632,31 +2655,24 @@ export class Task {
 			this.taskState.activeWorkflowStartCardSession = metadata.activeWorkflowStartCardSession as
 				| WorkflowStartCardSessionState
 				| undefined
-			this.taskState.activeWorkflowFormSession = metadata.activeWorkflowFormSession as WorkflowFormSessionState | undefined
+			const restoredWorkflowFormSession = metadata.activeWorkflowFormSession as WorkflowFormSessionState | undefined
+			const isRestoredWorkflowFormSessionV2 =
+				restoredWorkflowFormSession?.definitionVersion === 2 &&
+				restoredWorkflowFormSession.definitionPayload !== undefined &&
+				typeof restoredWorkflowFormSession.firstPanelId === "string" &&
+				restoredWorkflowFormSession.firstPanelId.length > 0 &&
+				typeof restoredWorkflowFormSession.currentPanelId === "string" &&
+				restoredWorkflowFormSession.currentPanelId.length > 0
+			this.taskState.activeWorkflowFormSession = isRestoredWorkflowFormSessionV2 ? restoredWorkflowFormSession : undefined
+			if (restoredWorkflowFormSession && !isRestoredWorkflowFormSessionV2) {
+				metadata.activeWorkflowFormSession = undefined
+				shouldPersistClearedWorkflowFormMetadata = true
+			}
 			this.taskState.activeWorkflowStepResolutionSession = metadata.activeWorkflowStepResolutionSession as
 				| WorkflowStepResolutionSessionState
 				| undefined
 			this.taskState.suppressedWorkflowStepResolutionDefinitionIds =
 				metadata.suppressedWorkflowStepResolutionDefinitionIds ?? []
-			if (
-				this.taskState.activeWorkflowFormSession &&
-				migratedWorkflowStepResolutionDefinitionIds.includes(this.taskState.activeWorkflowFormSession.resolverId as any)
-			) {
-				const restoredWorkflowFormSession = this.taskState.activeWorkflowFormSession
-				this.taskState.activeWorkflowStepResolutionSession = {
-					sessionId: restoredWorkflowFormSession.sessionId,
-					definitionId: restoredWorkflowFormSession.resolverId,
-					triggerSource: restoredWorkflowFormSession.triggerSource,
-					owner: restoredWorkflowFormSession.owner as WorkflowStepResolutionSessionState["owner"],
-					state: "pending",
-					...(restoredWorkflowFormSession.lastError
-						? {
-								lastError: restoredWorkflowFormSession.lastError,
-							}
-						: {}),
-				}
-				this.taskState.activeWorkflowFormSession = undefined
-			}
 			for (const resolverId of metadata.suppressedWorkflowFormResolverIds ?? []) {
 				if (
 					migratedWorkflowStepResolutionDefinitionIds.includes(
@@ -2675,6 +2691,9 @@ export class Task {
 				metadata.pendingAutoCompletedPlaceholderWorkflowStepNotices ?? []
 			this.taskState.activeWorkflowJustStarted = false
 			this.taskState.managedWorkflowRun = metadata.managedWorkflowRun
+			if (shouldPersistClearedWorkflowFormMetadata) {
+				await saveTaskMetadata(this.taskId, metadata)
+			}
 		} catch {
 			// Non-fatal: tasks without metadata should still resume normally.
 		}

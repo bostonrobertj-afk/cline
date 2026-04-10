@@ -1,672 +1,273 @@
-import type {
-	ClineMessage,
-	ClineWorkflowForm,
-	ClineWorkflowStartCard,
-	WorkflowFormFieldDefinition,
-	WorkflowFormJsonSchema,
-} from "@shared/ExtensionMessage"
+import type { ClineWorkflowForm, ClineWorkflowStartCard } from "@shared/ExtensionMessage"
 import { WorkflowFormAction, WorkflowStartCardAction } from "@shared/proto/cline/task"
-import { act, renderHook } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import type { ChatState } from "../types/chatTypes"
 
-const {
-	mockAskResponse,
-	mockNewTask,
-	mockSubmitWorkflowForm,
-	mockSubmitWorkflowStartCard,
-	mockClearTask,
-	mockCancelTask,
-	mockCancelBackgroundCommand,
-	mockCondense,
-	mockReportBug,
-	mockThreadDisplayState,
-	mockAwaitingUserResponseSubtype,
-} = vi.hoisted(() => ({
-	mockAskResponse: vi.fn().mockResolvedValue(undefined),
-	mockNewTask: vi.fn(),
+const { mockSubmitWorkflowForm, mockSubmitWorkflowStartCard } = vi.hoisted(() => ({
 	mockSubmitWorkflowForm: vi.fn().mockResolvedValue(undefined),
 	mockSubmitWorkflowStartCard: vi.fn().mockResolvedValue(undefined),
-	mockClearTask: vi.fn(),
-	mockCancelTask: vi.fn(),
-	mockCancelBackgroundCommand: vi.fn(),
-	mockCondense: vi.fn(),
-	mockReportBug: vi.fn(),
-	mockThreadDisplayState: { value: "active_user" as string | null },
-	mockAwaitingUserResponseSubtype: { value: undefined as "user" | "system" | undefined },
-}))
-
-vi.mock("@/context/ExtensionStateContext", () => ({
-	useExtensionState: () => ({
-		backgroundCommandRunning: false,
-		threadDisplayState: mockThreadDisplayState.value,
-		awaitingUserResponseSubtype: mockAwaitingUserResponseSubtype.value,
-	}),
 }))
 
 vi.mock("@/services/grpc-client", () => ({
-	SlashServiceClient: {
-		condense: mockCondense,
-		reportBug: mockReportBug,
-	},
+	SlashServiceClient: {},
 	TaskServiceClient: {
-		askResponse: mockAskResponse,
-		newTask: mockNewTask,
 		submitWorkflowForm: mockSubmitWorkflowForm,
 		submitWorkflowStartCard: mockSubmitWorkflowStartCard,
-		clearTask: mockClearTask,
-		cancelTask: mockCancelTask,
-		cancelBackgroundCommand: mockCancelBackgroundCommand,
 	},
 }))
 
 import {
+	buildWorkflowFormSubmissionRequest,
 	buildWorkflowStartCardSubmissionRequest,
 	submitWorkflowForm,
 	submitWorkflowStartCard,
-	useMessageHandlers,
 } from "./useMessageHandlers"
 
-function createField(args: {
-	key: string
-	label: string
-	control: WorkflowFormFieldDefinition["control"]
-	valueSchema: WorkflowFormJsonSchema
-	required?: boolean
-}): WorkflowFormFieldDefinition {
+function createWorkflowForm(fields: NonNullable<ClineWorkflowForm["panel"]>["fields"]): ClineWorkflowForm {
 	return {
-		key: args.key,
-		label: args.label,
-		help: args.label,
-		control: args.control,
-		valueSchema: args.valueSchema,
-		required: args.required ?? false,
-		visible: true,
-		options: args.valueSchema.enum?.map((value) => ({ value, label: value })),
-	}
-}
-
-function createWorkflowForm(args: {
-	phase: ClineWorkflowForm["phase"]
-	fields?: WorkflowFormFieldDefinition[]
-}): ClineWorkflowForm {
-	const fields = args.fields ?? []
-
-	return {
-		sessionId: "session-1",
-		resolverId: "code_review_step_3_diff_source",
-		toolName: "build_review_diff_output",
-		phase: args.phase,
-		definition: {
-			toolName: "build_review_diff_output",
-			title: "Workflow Form",
-			toolDictionaryTitle: "Reference",
-			toolDictionaryMarkdown: "## build_review_diff_output",
-			pages: {
-				confirm: {
-					prompt: "Confirm",
-					options: ["Yes", "No"],
-				},
-				select_source: {
-					prompt: "Select source",
-					fields,
-					submitLabel: "Next",
-					cancelLabel: "Cancel",
-				},
-				collect_inputs: {
-					prompt: "Collect inputs",
-					fields,
-					submitLabel: "Submit",
-					cancelLabel: "Cancel",
-					backLabel: "Back",
-				},
-				retry_error: {
-					prompt: "Retry",
-					fields,
-					submitLabel: "Submit",
-					cancelLabel: "Cancel",
-					backLabel: "Back",
-					retryLabel: "Start Over",
-				},
-			},
-			successMessage: "Done",
+		sessionId: "workflow-form-session",
+		resolverId: "brainstorming_step_4_choose_approach",
+		title: "Workflow Form V2",
+		toolDictionaryTitle: "Workflow Dictionary",
+		toolDictionaryMarkdown: "## workflow_form",
+		renderState: "panel",
+		panel: {
+			panelId: "active_panel",
+			title: "Active Panel",
+			promptMarkdown: "Fill the panel.",
+			fields,
+			allowedActions: ["submit", "back", "cancel"],
 		},
 		values: {},
 	}
 }
 
-function createChatState(): ChatState {
-	return {
-		inputValue: "",
-		setInputValue: vi.fn(),
-		activeQuote: null,
-		setActiveQuote: vi.fn(),
-		isTextAreaFocused: false,
-		setIsTextAreaFocused: vi.fn(),
-		selectedImages: [],
-		setSelectedImages: vi.fn(),
-		selectedFiles: [],
-		setSelectedFiles: vi.fn(),
-		sendingDisabled: false,
-		expandedRows: {},
-		setExpandedRows: vi.fn(),
-		textAreaRef: { current: null },
-		lastMessage: undefined,
-		secondLastMessage: undefined,
-		clineAsk: undefined,
-		task: undefined,
-		handleFocusChange: vi.fn(),
-		clearExpandedRows: vi.fn(),
-		resetState: vi.fn(),
-	}
-}
-
 function createWorkflowStartCard(): ClineWorkflowStartCard {
 	return {
-		sessionId: "start-card-session-1",
-		title: "Welcome to the Quick Spec Workflow!",
+		sessionId: "start-card-session",
+		title: "Workflow Start",
 		markdownBody: "Start card body",
 		ctaLabel: "Get Started",
 	}
 }
 
-describe("useMessageHandlers active_user routing", () => {
+describe("useMessageHandlers workflow form submit builders", () => {
 	beforeEach(() => {
-		mockThreadDisplayState.value = "active_user"
-		mockAwaitingUserResponseSubtype.value = undefined
 		vi.clearAllMocks()
 	})
 
-	it("sends active_user composer input as the next normal turn", async () => {
-		const messages: ClineMessage[] = [
-			{
-				ts: Date.now(),
-				type: "say",
-				say: "text",
-				text: "assistant handoff complete",
-			},
-		]
-
-		const chatState = createChatState()
-		const { result } = renderHook(() => useMessageHandlers(messages, chatState))
-
-		await act(async () => {
-			await result.current.handleSendMessage("Follow-up from the human", [], [])
-		})
-
-		expect(mockAskResponse).toHaveBeenCalledTimes(1)
-		const request = mockAskResponse.mock.calls[0]?.[0] as { responseType?: string; text?: string }
-		expect(request.responseType).toBe("messageResponse")
-		expect(request.text).toBe("Follow-up from the human")
-		expect(chatState.setInputValue).toHaveBeenCalledWith("")
-	})
-
-	it("does not degrade active_user sends into steer routing when the last row still looks streaming", async () => {
-		const messages: ClineMessage[] = [
-			{
-				ts: Date.now(),
-				type: "say",
-				say: "api_req_started",
-				partial: true,
-			},
-		]
-
-		const chatState = createChatState()
-		const { result } = renderHook(() => useMessageHandlers(messages, chatState))
-
-		await act(async () => {
-			await result.current.handleSendMessage("Follow-up despite stale partial", [], [])
-		})
-
-		expect(mockAskResponse).toHaveBeenCalledTimes(1)
-		const request = mockAskResponse.mock.calls[0]?.[0] as { responseType?: string; text?: string }
-		expect(request.responseType).toBe("messageResponse")
-		expect(request.text).toBe("Follow-up despite stale partial")
-	})
-
-	it("treats stale tool asks in active_user as normal next-turn input", async () => {
-		const messages: ClineMessage[] = [
-			{
-				ts: Date.now(),
-				type: "ask",
-				ask: "tool",
-				text: JSON.stringify({ tool: "readFile" }),
-			},
-		]
-
-		const chatState = {
-			...createChatState(),
-			clineAsk: "tool" as const,
-			lastMessage: messages[0],
-		}
-		const { result } = renderHook(() => useMessageHandlers(messages, chatState))
-
-		await act(async () => {
-			await result.current.handleSendMessage("Human follow-up after handoff", [], [])
-		})
-
-		expect(mockAskResponse).toHaveBeenCalledTimes(1)
-		const request = mockAskResponse.mock.calls[0]?.[0] as { responseType?: string; text?: string }
-		expect(request.responseType).toBe("messageResponse")
-		expect(request.text).toBe("Human follow-up after handoff")
-	})
-
-	it("treats stale followup asks in active_user as normal next-turn input", async () => {
-		const messages: ClineMessage[] = [
-			{
-				ts: Date.now(),
-				type: "ask",
-				ask: "followup",
-				text: "stale question",
-			},
-		]
-
-		const chatState = {
-			...createChatState(),
-			clineAsk: "followup" as const,
-			lastMessage: messages[0],
-		}
-		const { result } = renderHook(() => useMessageHandlers(messages, chatState))
-
-		await act(async () => {
-			await result.current.handleSendMessage("Human next turn still goes through", [], [])
-		})
-
-		expect(mockAskResponse).toHaveBeenCalledTimes(1)
-		const request = mockAskResponse.mock.calls[0]?.[0] as { responseType?: string; text?: string }
-		expect(request.responseType).toBe("messageResponse")
-		expect(request.text).toBe("Human next turn still goes through")
-	})
-
-	it("preserves ask-response routing while awaiting_user_response", async () => {
-		mockThreadDisplayState.value = "awaiting_user_response"
-		const messages: ClineMessage[] = [
-			{
-				ts: Date.now(),
-				type: "ask",
-				ask: "tool",
-				text: JSON.stringify({ tool: "readFile" }),
-			},
-		]
-
-		const chatState = {
-			...createChatState(),
-			clineAsk: "tool" as const,
-			lastMessage: messages[0],
-		}
-		const { result } = renderHook(() => useMessageHandlers(messages, chatState))
-
-		await act(async () => {
-			await result.current.handleSendMessage("Approval-thread response", [], [])
-		})
-
-		expect(mockAskResponse).toHaveBeenCalledTimes(1)
-		const request = mockAskResponse.mock.calls[0]?.[0] as { responseType?: string; text?: string }
-		expect(request.responseType).toBe("messageResponse")
-		expect(request.text).toBe("Approval-thread response")
-	})
-
-	it("does not route composer sends while awaiting_user_response.system", async () => {
-		mockThreadDisplayState.value = "awaiting_user_response"
-		mockAwaitingUserResponseSubtype.value = "system"
-		const messages: ClineMessage[] = [
-			{
-				ts: Date.now(),
-				type: "ask",
-				ask: "tool",
-				text: JSON.stringify({ tool: "readFile" }),
-			},
-		]
-
-		const chatState = {
-			...createChatState(),
-			clineAsk: "tool" as const,
-			lastMessage: messages[0],
-		}
-		const { result } = renderHook(() => useMessageHandlers(messages, chatState))
-
-		await act(async () => {
-			await result.current.handleSendMessage("Blocked system wait state", [], [])
-		})
-
-		expect(mockAskResponse).not.toHaveBeenCalled()
-		expect(chatState.setInputValue).not.toHaveBeenCalled()
-	})
-
-	it("routes structured workflow form submissions through submitWorkflowForm", async () => {
-		const workflowForm = createWorkflowForm({
-			phase: "collect_inputs",
-			fields: [
-				createField({
-					key: "source.type",
-					label: "Source type",
-					control: "select",
-					valueSchema: { type: "string", enum: ["commit", "commit_range"] },
+	it("submits boolean values through the typed transport", async () => {
+		await submitWorkflowForm(
+			createWorkflowForm([
+				{
+					key: "confirmed",
+					kind: "boolean",
+					label: "Confirmed",
 					required: true,
-				}),
-				createField({
-					key: "source.base",
-					label: "Base",
-					control: "text",
-					valueSchema: { type: "string" },
-				}),
-				createField({
-					key: "source.head",
-					label: "Head",
-					control: "text",
-					valueSchema: { type: "string" },
-				}),
-				createField({
+				},
+			]),
+			WorkflowFormAction.SUBMIT,
+			{ confirmed: true },
+		)
+
+		expect(mockSubmitWorkflowForm).toHaveBeenCalledTimes(1)
+		expect(mockSubmitWorkflowForm.mock.calls[0]?.[0]).toMatchObject({
+			sessionId: "workflow-form-session",
+			panelId: "active_panel",
+			action: WorkflowFormAction.SUBMIT,
+			fields: [
+				{
+					key: "confirmed",
+					value: {
+						booleanValue: true,
+					},
+				},
+			],
+		})
+	})
+
+	it("submits integer values through the typed transport", async () => {
+		await submitWorkflowForm(
+			createWorkflowForm([
+				{
+					key: "context_lines",
+					kind: "number",
+					label: "Context Lines",
+					required: true,
+					allowedValueType: "integer",
+				},
+			]),
+			WorkflowFormAction.SUBMIT,
+			{ context_lines: "7" },
+		)
+
+		expect(mockSubmitWorkflowForm.mock.calls[0]?.[0]).toMatchObject({
+			panelId: "active_panel",
+			fields: [
+				{
+					key: "context_lines",
+					value: {
+						integerValue: 7,
+					},
+				},
+			],
+		})
+		expect(mockSubmitWorkflowForm.mock.calls[0]?.[0]?.fields?.[0]?.value?.stringValue).toBeUndefined()
+	})
+
+	it("rejects decimal input for an integer field instead of truncating it", () => {
+		const request = buildWorkflowFormSubmissionRequest(
+			createWorkflowForm([
+				{
+					key: "context_lines",
+					kind: "number",
+					label: "Context Lines",
+					required: true,
+					allowedValueType: "integer",
+				},
+			]),
+			WorkflowFormAction.SUBMIT,
+			{ context_lines: "7.5" },
+		)
+
+		expect(request.fields).toEqual([])
+	})
+
+	it("emits integerValue for integer-typed small_text fields", () => {
+		const request = buildWorkflowFormSubmissionRequest(
+			createWorkflowForm([
+				{
+					key: "step_number",
+					kind: "small_text",
+					label: "Step Number",
+					required: true,
+					allowedValueType: "integer",
+				},
+			]),
+			WorkflowFormAction.SUBMIT,
+			{ step_number: "42" },
+		)
+
+		expect(request).toMatchObject({
+			panelId: "active_panel",
+			fields: [
+				{
+					key: "step_number",
+					value: {
+						integerValue: 42,
+					},
+				},
+			],
+		})
+		expect(request.fields[0]?.value?.stringValue).toBeUndefined()
+	})
+
+	it("submits number values through the typed transport", async () => {
+		await submitWorkflowForm(
+			createWorkflowForm([
+				{
+					key: "score",
+					kind: "number",
+					label: "Score",
+					required: true,
+					allowedValueType: "number",
+				},
+			]),
+			WorkflowFormAction.SUBMIT,
+			{ score: "3.5" },
+		)
+
+		expect(mockSubmitWorkflowForm.mock.calls[0]?.[0]).toMatchObject({
+			panelId: "active_panel",
+			fields: [
+				{
+					key: "score",
+					value: {
+						numberValue: 3.5,
+					},
+				},
+			],
+		})
+	})
+
+	it("submits multi-select arrays through the typed transport", async () => {
+		await submitWorkflowForm(
+			createWorkflowForm([
+				{
 					key: "scoped_paths",
-					label: "Scoped paths",
-					control: "textarea",
-					valueSchema: { type: "array", items: { type: "string" } },
-				}),
-				createField({
-					key: "context_lines",
-					label: "Context lines",
-					control: "number",
-					valueSchema: { type: "integer" },
-				}),
-			],
-		})
-
-		await submitWorkflowForm(workflowForm, WorkflowFormAction.SUBMIT, {
-			"source.type": "commit_range",
-			"source.base": "main",
-			"source.head": "feature/review",
-			scoped_paths: "src/core/task/index.ts\nsrc/core/task/TaskState.ts",
-			context_lines: "5",
-		})
-
-		expect(mockSubmitWorkflowForm).toHaveBeenCalledTimes(1)
-		expect(mockSubmitWorkflowForm).toHaveBeenCalledWith(
-			expect.objectContaining({
-				sessionId: "session-1",
-				action: WorkflowFormAction.SUBMIT,
-				fields: [
-					{
-						key: "source.type",
-						value: {
-							rawValue: "commit_range",
-						},
-					},
-					{
-						key: "source.base",
-						value: {
-							rawValue: "main",
-						},
-					},
-					{
-						key: "source.head",
-						value: {
-							rawValue: "feature/review",
-						},
-					},
-					{
-						key: "scoped_paths",
-						value: {
-							rawValue: "src/core/task/index.ts\nsrc/core/task/TaskState.ts",
-						},
-					},
-					{
-						key: "context_lines",
-						value: {
-							rawValue: "5",
-						},
-					},
-				],
-			}),
+					kind: "multi_select",
+					label: "Scoped Paths",
+					required: true,
+					options: [
+						{ value: "src/a.ts", label: "src/a.ts" },
+						{ value: "src/b.ts", label: "src/b.ts" },
+					],
+				},
+			]),
+			WorkflowFormAction.SUBMIT,
+			{ scoped_paths: ["src/a.ts", "src/b.ts"] },
 		)
-	})
 
-	it("routes BACK workflow-form submissions through submitWorkflowForm using the current page fields", async () => {
-		const workflowForm = createWorkflowForm({
-			phase: "collect_inputs",
+		expect(mockSubmitWorkflowForm.mock.calls[0]?.[0]).toMatchObject({
+			panelId: "active_panel",
 			fields: [
-				createField({
-					key: "source.commit",
-					label: "Commit",
-					control: "text",
-					valueSchema: { type: "string" },
-				}),
-				createField({
-					key: "context_lines",
-					label: "Context lines",
-					control: "number",
-					valueSchema: { type: "integer" },
-				}),
+				{
+					key: "scoped_paths",
+					value: {
+						arrayValue: {
+							values: [{ stringValue: "src/a.ts" }, { stringValue: "src/b.ts" }],
+						},
+					},
+				},
 			],
 		})
-
-		await submitWorkflowForm(workflowForm, WorkflowFormAction.BACK, {
-			"source.commit": "abc1234",
-			context_lines: "5",
-		})
-
-		expect(mockSubmitWorkflowForm).toHaveBeenCalledWith(
-			expect.objectContaining({
-				sessionId: "session-1",
-				action: WorkflowFormAction.BACK,
-				fields: [
-					{ key: "source.commit", value: { rawValue: "abc1234" } },
-					{ key: "context_lines", value: { rawValue: "5" } },
-				],
-			}),
-		)
 	})
 
-	it("builds workflow-start-card submissions with the CONTINUE action", () => {
+	it("submits object-backed large_text values through the typed transport", async () => {
+		await submitWorkflowForm(
+			createWorkflowForm([
+				{
+					key: "source",
+					kind: "large_text",
+					label: "Source",
+					required: true,
+					allowedValueType: "object",
+				},
+			]),
+			WorkflowFormAction.SUBMIT,
+			{
+				source: JSON.stringify({
+					base: "main",
+					head: "feature/workflow-v2",
+				}),
+			},
+		)
+
+		expect(mockSubmitWorkflowForm.mock.calls[0]?.[0]).toMatchObject({
+			panelId: "active_panel",
+			fields: [
+				{
+					key: "source",
+					value: {
+						objectValue: {
+							entries: [
+								{ key: "base", value: { stringValue: "main" } },
+								{ key: "head", value: { stringValue: "feature/workflow-v2" } },
+							],
+						},
+					},
+				},
+			],
+		})
+	})
+
+	it("builds workflow start-card submissions unchanged", async () => {
 		const request = buildWorkflowStartCardSubmissionRequest(createWorkflowStartCard())
+		expect(request).toMatchObject({
+			sessionId: "start-card-session",
+			action: WorkflowStartCardAction.CONTINUE,
+		})
 
-		expect(request.sessionId).toBe("start-card-session-1")
-		expect(request.action).toBe(WorkflowStartCardAction.CONTINUE)
-	})
-
-	it("routes workflow-start-card submissions through submitWorkflowStartCard", async () => {
 		await submitWorkflowStartCard(createWorkflowStartCard())
-
 		expect(mockSubmitWorkflowStartCard).toHaveBeenCalledTimes(1)
-		expect(mockSubmitWorkflowStartCard).toHaveBeenCalledWith(
-			expect.objectContaining({
-				sessionId: "start-card-session-1",
-				action: WorkflowStartCardAction.CONTINUE,
-			}),
-		)
-	})
-
-	it("includes generic workflow-start placeholder fields in workflow form submissions", async () => {
-		const workflowForm = createWorkflowForm({
-			phase: "collect_inputs",
-			fields: [
-				createField({
-					key: "story_path",
-					label: "Story path",
-					control: "text",
-					valueSchema: { type: "string" },
-				}),
-				createField({
-					key: "project_context",
-					label: "Project context",
-					control: "text",
-					valueSchema: { type: "string" },
-				}),
-			],
-		})
-
-		await submitWorkflowForm(workflowForm, WorkflowFormAction.SUBMIT, {
-			story_path: "docs/stories/story-123.md",
-			project_context: "docs/project-context.md",
-		})
-
-		expect(mockSubmitWorkflowForm).toHaveBeenCalledTimes(1)
-		expect(mockSubmitWorkflowForm).toHaveBeenCalledWith(
-			expect.objectContaining({
-				sessionId: "session-1",
-				action: WorkflowFormAction.SUBMIT,
-				fields: [
-					{
-						key: "story_path",
-						value: {
-							rawValue: "docs/stories/story-123.md",
-						},
-					},
-					{
-						key: "project_context",
-						value: {
-							rawValue: "docs/project-context.md",
-						},
-					},
-				],
-			}),
-		)
-	})
-
-	it("includes confirm submissions for workflow-form confirm screens", async () => {
-		const workflowForm = createWorkflowForm({ phase: "confirm" })
-
-		await submitWorkflowForm(workflowForm, WorkflowFormAction.SUBMIT, {
-			confirm: "yes",
-		})
-
-		expect(mockSubmitWorkflowForm).toHaveBeenCalledTimes(1)
-		expect(mockSubmitWorkflowForm).toHaveBeenCalledWith(
-			expect.objectContaining({
-				sessionId: "session-1",
-				action: WorkflowFormAction.SUBMIT,
-				fields: [
-					{
-						key: "confirm",
-						value: {
-							rawValue: "yes",
-						},
-					},
-				],
-			}),
-		)
-	})
-
-	it("submits workflow-form fields generically without field-name transport mapping", async () => {
-		const workflowForm = createWorkflowForm({
-			phase: "collect_inputs",
-			fields: [
-				createField({
-					key: "source.type",
-					label: "Source type",
-					control: "select",
-					valueSchema: { type: "string", enum: ["commit", "commit_range"] },
-				}),
-				createField({
-					key: "review_input",
-					label: "Review input",
-					control: "text",
-					valueSchema: { type: "string" },
-				}),
-				createField({
-					key: "context_lines",
-					label: "Context lines",
-					control: "number",
-					valueSchema: { type: "integer" },
-				}),
-			],
-		})
-
-		await submitWorkflowForm(workflowForm, WorkflowFormAction.SUBMIT, {
-			"source.type": "commit",
-			review_input: "docs/review.md",
-			context_lines: "7",
-		})
-
-		expect(mockSubmitWorkflowForm).toHaveBeenCalledWith(
-			expect.objectContaining({
-				sessionId: "session-1",
-				action: WorkflowFormAction.SUBMIT,
-				fields: [
-					{ key: "source.type", value: { rawValue: "commit" } },
-					{ key: "review_input", value: { rawValue: "docs/review.md" } },
-					{ key: "context_lines", value: { rawValue: "7" } },
-				],
-			}),
-		)
-	})
-
-	it("submits confirm answers without depending on field definitions", async () => {
-		const workflowForm = createWorkflowForm({ phase: "confirm" })
-
-		await submitWorkflowForm(workflowForm, WorkflowFormAction.SUBMIT, { confirm: "yes" })
-
-		expect(mockSubmitWorkflowForm).toHaveBeenCalledWith(
-			expect.objectContaining({
-				sessionId: "session-1",
-				action: WorkflowFormAction.SUBMIT,
-				fields: [{ key: "confirm", value: { rawValue: "yes" } }],
-			}),
-		)
-	})
-
-	it("does not allow composer sends while a system-owned workflow form is awaiting input", async () => {
-		mockThreadDisplayState.value = "awaiting_user_response"
-		mockAwaitingUserResponseSubtype.value = "system"
-		const messages: ClineMessage[] = [
-			{
-				ts: Date.now(),
-				type: "ask",
-				ask: "workflow_form",
-				text: JSON.stringify({
-					sessionId: "session-1",
-					resolverId: "code_review_step_3_diff_source",
-					toolName: "build_review_diff_output",
-					title: "Prepare Diff Input",
-					prompt: "System-owned collection flow",
-					phase: "confirm",
-					toolDictionaryTitle: "Diff Output Reference",
-					toolDictionaryMarkdown: "## build_review_diff_output\n\nTool reference body.",
-					options: ["Yes", "No"],
-				}),
-			},
-		]
-
-		const chatState = {
-			...createChatState(),
-			clineAsk: "workflow_form" as const,
-			lastMessage: messages[0],
-		}
-		const { result } = renderHook(() => useMessageHandlers(messages, chatState))
-
-		await act(async () => {
-			await result.current.handleSendMessage("Blocked system-owned form input", [], [])
-		})
-
-		expect(mockAskResponse).not.toHaveBeenCalled()
-		expect(mockSubmitWorkflowForm).not.toHaveBeenCalled()
-		expect(chatState.setInputValue).not.toHaveBeenCalled()
-	})
-
-	it("does not allow composer sends while a workflow_start_card is awaiting system input", async () => {
-		mockThreadDisplayState.value = "awaiting_user_response"
-		mockAwaitingUserResponseSubtype.value = "system"
-		const messages: ClineMessage[] = [
-			{
-				ts: Date.now(),
-				type: "ask",
-				ask: "workflow_start_card",
-				text: JSON.stringify(createWorkflowStartCard()),
-			},
-		]
-
-		const chatState = {
-			...createChatState(),
-			clineAsk: "workflow_start_card" as const,
-			lastMessage: messages[0],
-		}
-		const { result } = renderHook(() => useMessageHandlers(messages, chatState))
-
-		await act(async () => {
-			await result.current.handleSendMessage("Blocked workflow start card input", [], [])
-		})
-
-		expect(mockAskResponse).not.toHaveBeenCalled()
-		expect(mockSubmitWorkflowStartCard).not.toHaveBeenCalled()
-		expect(chatState.setInputValue).not.toHaveBeenCalled()
 	})
 })

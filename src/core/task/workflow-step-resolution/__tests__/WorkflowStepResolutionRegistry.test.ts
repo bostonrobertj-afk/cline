@@ -2,6 +2,7 @@ import { expect } from "chai"
 import { describe, it } from "mocha"
 import { ClineDefaultTool } from "@/shared/tools"
 import {
+	BRAINSTORMING_STEP_2_CREATE_SESSION_DEFINITION_ID,
 	CODE_REVIEW_STEP_3_REVIEW_INPUT_DEFINITION_ID,
 	getWorkflowStepResolutionDefinition,
 	QUICK_SPEC_STEP_2_BUILD_TECH_SPEC_DOCUMENT_DEFINITION_ID,
@@ -44,6 +45,13 @@ describe("WorkflowStepResolutionRegistry", () => {
 		expect(definition.toolName).to.equal(ClineDefaultTool.BUILD_TECH_SPEC_DOCUMENT)
 	})
 
+	it("returns the brainstorming step 2 create-session definition metadata by id", () => {
+		const definition = getWorkflowStepResolutionDefinition(BRAINSTORMING_STEP_2_CREATE_SESSION_DEFINITION_ID)
+
+		expect(definition.id).to.equal("brainstorming_step_2_create_session")
+		expect(definition.toolName).to.equal(ClineDefaultTool.CREATE_BRAINSTORMING_SESSION)
+	})
+
 	it("treats the code-review step 3 tool result as success when the review-input artifact is persisted", () => {
 		const definition = getWorkflowStepResolutionDefinition(CODE_REVIEW_STEP_3_REVIEW_INPUT_DEFINITION_ID)
 		const evaluation = definition.evaluateToolExecutionResult(createSession(definition.id, "code-review.md", 3), {
@@ -83,5 +91,27 @@ describe("WorkflowStepResolutionRegistry", () => {
 		})
 
 		expect(evaluation).to.deep.equal({ succeeded: true })
+	})
+
+	it("treats the brainstorming step 2 tool result as success when the initial session file is created", () => {
+		const definition = getWorkflowStepResolutionDefinition(BRAINSTORMING_STEP_2_CREATE_SESSION_DEFINITION_ID)
+		const evaluation = definition.evaluateToolExecutionResult(createSession(definition.id, "brainstorming.md", 2), {
+			toolResultText: '{"persisted":true,"output_file_available":true,"created":true}',
+		})
+
+		expect(evaluation).to.deep.equal({ succeeded: true })
+	})
+
+	it("treats ordinary brainstorming step 2 tool failure text as a fallback-to-agent failure", () => {
+		const definition = getWorkflowStepResolutionDefinition(BRAINSTORMING_STEP_2_CREATE_SESSION_DEFINITION_ID)
+		const evaluation = definition.evaluateToolExecutionResult(createSession(definition.id, "brainstorming.md", 2), {
+			toolResultText: "Error: session creation failed",
+		})
+
+		expect(evaluation).to.deep.equal({
+			succeeded: false,
+			errorMessage: "Error: session creation failed",
+			fallbackToAgent: true,
+		})
 	})
 })

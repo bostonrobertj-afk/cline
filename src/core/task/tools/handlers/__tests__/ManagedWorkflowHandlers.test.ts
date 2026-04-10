@@ -25,6 +25,13 @@ import { BuildTechSpecDocumentToolHandler } from "../BuildTechSpecDocumentToolHa
 import { CaptureBrainstormingTopicToolHandler } from "../CaptureBrainstormingTopicToolHandler"
 import { CodeReviewSpecUpdateToolHandler } from "../CodeReviewSpecUpdateToolHandler"
 import { CompleteWorkflowItemToolHandler } from "../CompleteWorkflowItemToolHandler"
+import { ContinueBrainstormingSessionToolHandler } from "../ContinueBrainstormingSessionToolHandler"
+import { CreateBrainstormingSessionToolHandler } from "../CreateBrainstormingSessionToolHandler"
+import { PersistBrainstormingApproachToolHandler } from "../PersistBrainstormingApproachToolHandler"
+import { PersistBrainstormingTechniqueToolHandler } from "../PersistBrainstormingTechniqueToolHandler"
+import { RequestBrainstormingTechniqueSuggestionToolHandler } from "../RequestBrainstormingTechniqueSuggestionToolHandler"
+import { SelectBrainstormingSessionToolHandler } from "../SelectBrainstormingSessionToolHandler"
+import { SelectRandomBrainstormingTechniqueToolHandler } from "../SelectRandomBrainstormingTechniqueToolHandler"
 import { SetWorkflowPlaceholdersToolHandler } from "../SetWorkflowPlaceholdersToolHandler"
 import { UseSkillToolHandler } from "../UseSkillToolHandler"
 
@@ -622,6 +629,85 @@ async function createCaptureBrainstormingTopicRepo(options?: { outputFileContent
 	return {
 		repoDir,
 		artifactPath,
+	}
+}
+
+async function createBrainstormingWorkflowRepo(options?: {
+	existingSessions?: Array<{ fileName: string; contents?: string }>
+	outputFolderRelativePath?: string
+	outputFileContents?: string
+	outputFileRelativePath?: string
+	templateContents?: string
+}) {
+	const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), "brainstorming-workflow-tool-"))
+	const outputFolderRelativePath = options?.outputFolderRelativePath ?? "planning"
+	const outputFolder = path.join(repoDir, outputFolderRelativePath)
+	const sessionDirectory = path.join(outputFolder, "brainstorming")
+	const templatePath = path.join(repoDir, ".cline", "skills", "bmad-brainstorming", "template.md")
+	const csvPath = path.join(repoDir, ".cline", "skills", "bmad-brainstorming", "brain-methods.csv")
+
+	await fs.mkdir(path.dirname(templatePath), { recursive: true })
+	await fs.writeFile(
+		templatePath,
+		options?.templateContents ??
+			`# Brainstorming Session Results
+
+## Topic
+
+## Selected Approach
+
+## Selected Techniques
+
+### Techniques Used
+
+## Ideas Generated
+`,
+	)
+	await fs.writeFile(
+		csvPath,
+		[
+			"category,technique_name,description",
+			"creative,Reverse Brainstorming,Generate problems before solutions.",
+			"structured,Six Thinking Hats,Explore the problem through six perspectives.",
+			"",
+		].join("\n"),
+	)
+
+	if (options?.existingSessions?.length) {
+		await fs.mkdir(sessionDirectory, { recursive: true })
+		for (const session of options.existingSessions) {
+			await fs.writeFile(path.join(sessionDirectory, session.fileName), session.contents ?? "# existing\n", "utf8")
+		}
+	}
+
+	const outputFileRelativePath = options?.outputFileRelativePath
+	if (outputFileRelativePath) {
+		const outputFilePath = path.join(repoDir, outputFileRelativePath)
+		await fs.mkdir(path.dirname(outputFilePath), { recursive: true })
+		await fs.writeFile(
+			outputFilePath,
+			options?.outputFileContents ??
+				`# Brainstorming Session Results
+
+## Topic
+
+## Selected Approach
+
+## Selected Techniques
+
+### Techniques Used
+
+## Ideas Generated
+`,
+		)
+	}
+
+	return {
+		repoDir,
+		outputFolder,
+		sessionDirectory,
+		templatePath,
+		csvPath,
 	}
 }
 
@@ -3283,6 +3369,315 @@ ${priorTopic}
 			const artifact = await fs.readFile(artifactPath, "utf8")
 			expect(getTopLevelSectionBody(artifact, "## Topic")).to.equal(nextTopic)
 			expect(artifact).to.not.contain(priorTopic)
+		} finally {
+			sandbox.restore()
+			HostProvider.reset()
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("continues the newest brainstorming session and persists output_file", async () => {
+		const { repoDir, sessionDirectory } = await createBrainstormingWorkflowRepo({
+			existingSessions: [
+				{ fileName: "brainstorming-session-2026-04-07.md", contents: "# older\n" },
+				{ fileName: "brainstorming-session-2026-04-08.md", contents: "# current\n" },
+				{ fileName: "brainstorming-session-2026-04-08-2.md", contents: "# newest\n" },
+			],
+		})
+
+		try {
+			const handler = new ContinueBrainstormingSessionToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "brainstorming.md"
+			config.taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "brainstorming.md",
+				contents: "## Step 2: Select or create session\nPrepare the session artifact.\n",
+			}
+			config.taskState.currentFocusChainChecklist =
+				"- [x] Step 1: Establish context\n- [ ] Step 2: Select or create session\n- [ ] Step 3: Capture topic\n- [ ] Step 4: Choose approach"
+			config.taskState.activePlaceholderWorkflowValues = {
+				output_folder: path.join(repoDir, "planning"),
+			}
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "continue_brainstorming_session",
+				params: {},
+				partial: false,
+			} as any)
+
+			const payload = JSON.parse(String(result))
+			expect(payload.persisted).to.equal(true)
+			expect(payload.continued).to.equal(true)
+			expect(payload.artifact_path).to.equal(path.join(sessionDirectory, "brainstorming-session-2026-04-08-2.md"))
+			expect(config.taskState.activePlaceholderWorkflowValues?.output_file).to.equal(payload.artifact_path)
+		} finally {
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("creates a new brainstorming session from the canonical template and persists output_file", async () => {
+		const sandbox = sinon.createSandbox()
+		const { repoDir, outputFolder } = await createBrainstormingWorkflowRepo({
+			existingSessions: [{ fileName: "brainstorming-session-2026-04-09.md", contents: "# existing\n" }],
+			templateContents: "# Canonical Brainstorming Template\n",
+		})
+
+		try {
+			setVscodeHostProviderMock()
+			sandbox.stub(HostProvider.workspace, "getWorkspacePaths").resolves({ paths: [repoDir] } as any)
+
+			const handler = new CreateBrainstormingSessionToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "brainstorming.md"
+			config.taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "brainstorming.md",
+				contents: "## Step 2: Select or create session\nPrepare the session artifact.\n",
+			}
+			config.taskState.currentFocusChainChecklist =
+				"- [x] Step 1: Establish context\n- [ ] Step 2: Select or create session\n- [ ] Step 3: Capture topic\n- [ ] Step 4: Choose approach"
+			config.taskState.activePlaceholderWorkflowValues = {
+				output_folder: outputFolder,
+			}
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "create_brainstorming_session",
+				params: {},
+				partial: false,
+			} as any)
+
+			const payload = JSON.parse(String(result))
+			expect(payload.persisted).to.equal(true)
+			expect(payload.created).to.equal(true)
+			expect(config.taskState.activePlaceholderWorkflowValues?.output_file).to.equal(payload.artifact_path)
+			expect(config.taskState.activePlaceholderWorkflowTaskWriteProofPaths).to.include(payload.artifact_path)
+			expect(config.taskState.didEditFile).to.equal(true)
+			expect(await fs.readFile(payload.artifact_path, "utf8")).to.equal("# Canonical Brainstorming Template\n")
+		} finally {
+			sandbox.restore()
+			HostProvider.reset()
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("validates the selected brainstorming session path before persisting output_file", async () => {
+		const { repoDir, sessionDirectory } = await createBrainstormingWorkflowRepo({
+			existingSessions: [
+				{ fileName: "brainstorming-session-2026-04-08.md", contents: "# selected\n" },
+				{ fileName: "brainstorming-session-2026-04-07.md", contents: "# older\n" },
+			],
+		})
+
+		try {
+			const handler = new SelectBrainstormingSessionToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "brainstorming.md"
+			config.taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "brainstorming.md",
+				contents: "## Step 2: Select or create session\nPrepare the session artifact.\n",
+			}
+			config.taskState.currentFocusChainChecklist =
+				"- [x] Step 1: Establish context\n- [ ] Step 2: Select or create session\n- [ ] Step 3: Capture topic\n- [ ] Step 4: Choose approach"
+			config.taskState.activePlaceholderWorkflowValues = {
+				output_folder: path.join(repoDir, "planning"),
+			}
+			const selectedPath = path.join(sessionDirectory, "brainstorming-session-2026-04-08.md")
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "select_brainstorming_session",
+				params: {
+					output_file: selectedPath,
+				},
+				partial: false,
+			} as any)
+
+			const payload = JSON.parse(String(result))
+			expect(payload.persisted).to.equal(true)
+			expect(payload.selected).to.equal(true)
+			expect(config.taskState.activePlaceholderWorkflowValues?.output_file).to.equal(selectedPath)
+		} finally {
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("persists the selected brainstorming approach into the canonical artifact", async () => {
+		const sandbox = sinon.createSandbox()
+		const { repoDir } = await createBrainstormingWorkflowRepo({
+			outputFileRelativePath: "planning/brainstorming/current-session.md",
+		})
+		const outputFilePath = path.join(repoDir, "planning", "brainstorming", "current-session.md")
+
+		try {
+			setVscodeHostProviderMock()
+			sandbox.stub(HostProvider.workspace, "getWorkspacePaths").resolves({ paths: [repoDir] } as any)
+
+			const handler = new PersistBrainstormingApproachToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "brainstorming.md"
+			config.taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "brainstorming.md",
+				contents: "## Step 4: Choose approach\nPersist the selected approach.\n",
+			}
+			config.taskState.currentFocusChainChecklist =
+				"- [x] Step 1: Establish context\n- [x] Step 2: Select or create session\n- [x] Step 3: Capture topic\n- [ ] Step 4: Choose approach"
+			config.taskState.activePlaceholderWorkflowValues = {
+				output_file: outputFilePath,
+			}
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "persist_brainstorming_approach",
+				params: {
+					selected_approach: "user_choose",
+				},
+				partial: false,
+			} as any)
+
+			const payload = JSON.parse(String(result))
+			expect(payload.approach_persisted).to.equal(true)
+			expect(payload.selected_approach).to.equal("user_choose")
+			expect(config.taskState.activePlaceholderWorkflowValues?.selected_approach).to.equal("user_choose")
+			expect(getTopLevelSectionBody(await fs.readFile(outputFilePath, "utf8"), "## Selected Approach")).to.equal(
+				"user_choose",
+			)
+		} finally {
+			sandbox.restore()
+			HostProvider.reset()
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("returns machine-readable random brainstorming technique data without writing the artifact", async () => {
+		const sandbox = sinon.createSandbox()
+		const { repoDir } = await createBrainstormingWorkflowRepo()
+
+		try {
+			sandbox.stub(Math, "random").returns(0)
+
+			const handler = new SelectRandomBrainstormingTechniqueToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "brainstorming.md"
+			config.taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "brainstorming.md",
+				contents: "## Step 4: Choose approach\nPick a technique.\n",
+			}
+			config.taskState.currentFocusChainChecklist =
+				"- [x] Step 1: Establish context\n- [x] Step 2: Select or create session\n- [x] Step 3: Capture topic\n- [ ] Step 4: Choose approach"
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "select_random_brainstorming_technique",
+				params: {},
+				partial: false,
+			} as any)
+
+			const payload = JSON.parse(String(result))
+			expect(payload.technique_name).to.equal("Reverse Brainstorming")
+			expect(payload.technique_description).to.equal("Generate problems before solutions.")
+			expect(payload.technique_category).to.equal("creative")
+		} finally {
+			sandbox.restore()
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("persists the selected brainstorming technique into the canonical artifact", async () => {
+		const sandbox = sinon.createSandbox()
+		const { repoDir } = await createBrainstormingWorkflowRepo({
+			outputFileRelativePath: "planning/brainstorming/current-session.md",
+		})
+		const outputFilePath = path.join(repoDir, "planning", "brainstorming", "current-session.md")
+
+		try {
+			setVscodeHostProviderMock()
+			sandbox.stub(HostProvider.workspace, "getWorkspacePaths").resolves({ paths: [repoDir] } as any)
+
+			const handler = new PersistBrainstormingTechniqueToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "brainstorming.md"
+			config.taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "brainstorming.md",
+				contents: "## Step 4: Choose approach\nPersist the selected technique.\n",
+			}
+			config.taskState.currentFocusChainChecklist =
+				"- [x] Step 1: Establish context\n- [x] Step 2: Select or create session\n- [x] Step 3: Capture topic\n- [ ] Step 4: Choose approach"
+			config.taskState.activePlaceholderWorkflowValues = {
+				output_file: outputFilePath,
+			}
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "persist_brainstorming_technique",
+				params: {
+					technique_name: "Six Thinking Hats",
+					technique_description: "Explore the problem through six perspectives.",
+				},
+				partial: false,
+			} as any)
+
+			const payload = JSON.parse(String(result))
+			expect(payload.technique_persisted).to.equal(true)
+			expect(payload.selected_technique).to.equal("Six Thinking Hats")
+			expect(config.taskState.activePlaceholderWorkflowValues?.selected_technique).to.equal("Six Thinking Hats")
+			expect(getTopLevelSectionBody(await fs.readFile(outputFilePath, "utf8"), "## Selected Techniques")).to.equal(
+				"### Techniques Used\n- Six Thinking Hats: Explore the problem through six perspectives.",
+			)
+		} finally {
+			sandbox.restore()
+			HostProvider.reset()
+			await fs.rm(repoDir, { recursive: true, force: true })
+		}
+	})
+
+	it("persists the suggestion sentinel when the user requests a brainstorming technique recommendation", async () => {
+		const sandbox = sinon.createSandbox()
+		const { repoDir } = await createBrainstormingWorkflowRepo({
+			outputFileRelativePath: "planning/brainstorming/current-session.md",
+		})
+		const outputFilePath = path.join(repoDir, "planning", "brainstorming", "current-session.md")
+
+		try {
+			setVscodeHostProviderMock()
+			sandbox.stub(HostProvider.workspace, "getWorkspacePaths").resolves({ paths: [repoDir] } as any)
+
+			const handler = new RequestBrainstormingTechniqueSuggestionToolHandler()
+			const config = createConfig({ cwd: repoDir })
+			config.taskState.activePlaceholderWorkflowId = "brainstorming.md"
+			config.taskState.activePlaceholderWorkflowSource = {
+				type: "remote",
+				name: "brainstorming.md",
+				contents: "## Step 4: Choose approach\nRequest a suggestion.\n",
+			}
+			config.taskState.currentFocusChainChecklist =
+				"- [x] Step 1: Establish context\n- [x] Step 2: Select or create session\n- [x] Step 3: Capture topic\n- [ ] Step 4: Choose approach"
+			config.taskState.activePlaceholderWorkflowValues = {
+				output_file: outputFilePath,
+			}
+
+			const result = await handler.execute(config, {
+				type: "tool_use",
+				name: "request_brainstorming_technique_suggestion",
+				params: {},
+				partial: false,
+			} as any)
+
+			const payload = JSON.parse(String(result))
+			expect(payload.technique_suggestion_requested).to.equal(true)
+			expect(payload.selected_technique).to.equal("user requested technique suggestion")
+			expect(config.taskState.activePlaceholderWorkflowValues?.selected_technique).to.equal(
+				"user requested technique suggestion",
+			)
+			expect(getTopLevelSectionBody(await fs.readFile(outputFilePath, "utf8"), "## Selected Techniques")).to.equal(
+				"### Techniques Used\n- user requested technique suggestion",
+			)
 		} finally {
 			sandbox.restore()
 			HostProvider.reset()

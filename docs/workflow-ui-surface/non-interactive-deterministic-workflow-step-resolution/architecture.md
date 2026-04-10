@@ -4,10 +4,12 @@
 
 This document defines the architecture for a separate shared capability that handles zero-human-input deterministic workflow-step resolution and user-visible status notifications in chat.
 
+This capability is now live. Where this document discusses `automatic_status` inside Workflow Forms, that content is historical migration context explaining what was replaced.
+
 It is not a requirements document. Its job is to:
 
 - establish the correct boundary for zero-input system-owned workflow steps
-- map that boundary onto the live runtime seams that currently carry `automatic_status` inside Workflow Forms
+- map that boundary onto the runtime seams that formerly carried `automatic_status` inside Workflow Forms
 - preserve broader platform architecture rules while removing this responsibility from Workflow Form v2
 - document the active shared capability boundary and implementation target
 
@@ -22,17 +24,18 @@ This document is grounded in:
 - the original automatic-status buildout doc in [automatic-workflow-preparation-status-action-plan.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/workflow-ui-surface/automatic-workflow-preparation-status-action-plan.md)
 - the Workflow Form v2 architecture in [workflow-form-v2-architecture.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/workflow-ui-surface/workflow-form-v2/workflow-form-v2-architecture.md)
 
-## Current-State Summary
+## Historical Migration Summary
 
-The live repo already has a shared zero-input workflow-step pattern, but it is currently carried inside the Workflow Form capability through:
+Before this capability was split out, the zero-input workflow-step pattern was carried inside the Workflow Form capability through:
 
 - `definition.presentation.kind === "automatic_status"` in [ExtensionMessage.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/shared/ExtensionMessage.ts#L439)
 - automatic-status resolver entries in [WorkflowFormRegistry.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/WorkflowFormRegistry.ts#L500)
 - automatic-status handling branches inside [WorkflowFormRuntime.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts#L78) and [index.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/index.ts#L1878)
 - rendering through the workflow-form message type in [ChatRow.tsx](/Users/robertboston/Documents/Cline%20Extension/cline/webview-ui/src/components/chat/ChatRow.tsx#L615)
 
-That path is used today for zero-human-input workflow-owned steps such as:
+That historical path covered zero-human-input workflow-owned steps such as:
 
+- `brainstorming.md` Step 2 zero-session session creation
 - `code-review.md` Step 3 review-input preparation
 - `write-remediation-story.md` Step 2 review-input preparation
 - `quick-spec.md` Step 2 tech-spec scaffold preparation

@@ -5,6 +5,7 @@ import type { WorkflowStepResolutionDefinition } from "./types"
 export const CODE_REVIEW_STEP_3_REVIEW_INPUT_DEFINITION_ID = "code_review_step_3_review_input"
 export const WRITE_REMEDIATION_STORY_STEP_2_REVIEW_INPUT_DEFINITION_ID = "write_remediation_story_step_2_review_input"
 export const QUICK_SPEC_STEP_2_BUILD_TECH_SPEC_DOCUMENT_DEFINITION_ID = "quick_spec_step_2_build_tech_spec_document"
+export const BRAINSTORMING_STEP_2_CREATE_SESSION_DEFINITION_ID = "brainstorming_step_2_create_session"
 
 const CODE_REVIEW_STEP_3_REVIEW_INPUT_DIFF_MISMATCH_MESSAGE =
 	"diff_output does not identify recent changes to the story file. Proceeding with AI generation of review_input.md using the fallback Step 3 instructions."
@@ -14,6 +15,8 @@ const WRITE_REMEDIATION_STORY_STEP_2_REVIEW_INPUT_FAILURE_MESSAGE =
 	"The workflow form could not build the Step 2 review-input artifact from stored workflow inputs. The workflow will return to the Step 2 fallback instructions."
 const QUICK_SPEC_STEP_2_BUILD_TECH_SPEC_DOCUMENT_FAILURE_MESSAGE =
 	"The workflow form could not build the Step 2 tech-spec scaffold from stored workflow inputs. The workflow will return to the Step 2 fallback instructions."
+const BRAINSTORMING_STEP_2_CREATE_SESSION_FAILURE_MESSAGE =
+	"The workflow could not create the initial brainstorming session file automatically. The workflow will return to the Step 2 fallback instructions."
 
 function buildDefaultStatusDefinition(title: string) {
 	return {
@@ -165,6 +168,40 @@ export const workflowStepResolutionRegistry: Record<string, WorkflowStepResoluti
 			return {
 				succeeded: false,
 				errorMessage: QUICK_SPEC_STEP_2_BUILD_TECH_SPEC_DOCUMENT_FAILURE_MESSAGE,
+				fallbackToAgent: true,
+			}
+		},
+	},
+	[BRAINSTORMING_STEP_2_CREATE_SESSION_DEFINITION_ID]: {
+		id: BRAINSTORMING_STEP_2_CREATE_SESSION_DEFINITION_ID,
+		toolName: ClineDefaultTool.CREATE_BRAINSTORMING_SESSION,
+		buildStatusDefinition() {
+			return buildDefaultStatusDefinition("Brainstorming Session File")
+		},
+		buildToolExecutionRequest() {
+			return {
+				toolName: ClineDefaultTool.CREATE_BRAINSTORMING_SESSION,
+				toolInput: {},
+				toolParams: {},
+			}
+		},
+		evaluateToolExecutionResult(_session, args) {
+			const parsed = parseWorkflowStepResolutionJsonToolResult(args.toolResultText)
+			if (parsed?.persisted === true && parsed?.output_file_available === true && parsed?.created === true) {
+				return { succeeded: true }
+			}
+
+			if (isWorkflowStepResolutionFailureText(args.toolResultText)) {
+				return {
+					succeeded: false,
+					errorMessage: args.toolResultText?.trim() ?? BRAINSTORMING_STEP_2_CREATE_SESSION_FAILURE_MESSAGE,
+					fallbackToAgent: true,
+				}
+			}
+
+			return {
+				succeeded: false,
+				errorMessage: BRAINSTORMING_STEP_2_CREATE_SESSION_FAILURE_MESSAGE,
 				fallbackToAgent: true,
 			}
 		},

@@ -85,7 +85,13 @@ Important current cases:
 - `build_review_input`
 - `build_tech_spec_document`
 - `capture_brainstorming_topic`
-- `prepare_brainstorming_session`
+- `continue_brainstorming_session`
+- `create_brainstorming_session`
+- `select_brainstorming_session`
+- `persist_brainstorming_approach`
+- `select_random_brainstorming_technique`
+- `persist_brainstorming_technique`
+- `request_brainstorming_technique_suggestion`
 - `select_target_epic`
 - `build_epic_delivery_spec`
 - `build_story_document`

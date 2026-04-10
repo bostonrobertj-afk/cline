@@ -12,6 +12,8 @@ Work is ongoing to enable more automated runtime behavior for placeholder workfl
 - UI startup and workflow-form surfaces
 - workflow-specific automation and progression logic
 
+There is not yet one canonical per-workflow orchestration/config layer that owns the end-to-end runtime contract for each placeholder workflow. The current runtime spine lives in `src/core/task/index.ts`, but workflow-specific behavior is still distributed across workflow documents, trigger registries, resolver registries, deterministic progression, and workflow-owned handlers.
+
 This document is a lightweight onboarding guide. It is not an exhaustive spec.
 
 ## Start Here
@@ -51,6 +53,10 @@ Placeholder workflows can be intercepted by system-owned startup and step-resolu
   - [docs/workflow-automation/workflow-start-card/README.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/workflow-automation/workflow-start-card/README.md)
 - Workflow forms:
   - [docs/workflow-ui-surface/workflow-form-readme.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/workflow-ui-surface/workflow-form-readme.md)
+- Workflow Form v2 modernization status:
+  - [workflow-form-v2-architecture.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/workflow-ui-surface/workflow-form-v2/workflow-form-v2-architecture.md)
+  - [requirements.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/workflow-ui-surface/workflow-form-v2/requirements.md)
+  - [remediation-plan.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/workflow-ui-surface/workflow-form-v2/remediation-plan.md)
 - Non-interactive deterministic workflow-step resolution:
   - [architecture.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/workflow-ui-surface/non-interactive-deterministic-workflow-step-resolution/architecture.md)
   - [requirements.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/workflow-ui-surface/non-interactive-deterministic-workflow-step-resolution/requirements.md)

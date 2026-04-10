@@ -23,6 +23,15 @@ This document is grounded in:
 
 ## Current-State Summary
 
+Remediation status note:
+
+- the live runtime now follows the human-input-only boundary described in this document
+- zero-input deterministic step execution/status now lives in the separate `workflow_step_resolution_status` capability
+- Brainstorming Step 2 now uses the shared Workflow Form v2 runtime only when existing sessions are available for human choice
+- Brainstorming Step 2 zero-session startup now resolves through zero-input `workflow_step_resolution_status`
+- Brainstorming Step 4 now runs on the shared Workflow Form v2 runtime
+- the runtime persists the full active `definitionPayload` and emits only resolved active-panel payloads to the webview
+
 Workflow Form v1 already has one shared runtime, one shared transport, one shared renderer, and one shared persistence loop.
 
 What is still too narrow in v1 is not reuse. It is the contract that reuse depends on.
@@ -43,7 +52,7 @@ That works for:
 
 but it does not cleanly express richer branching system-owned interactions such as:
 
-- Brainstorming Step 2
+- Brainstorming Step 2 existing-session human choice
 - Brainstorming Step 4
 
 The current implementation also still carries zero-human-input automatic workflow-step execution under the workflow-form umbrella. V2 should not carry that abstraction boundary forward.
@@ -102,6 +111,33 @@ It must tell the shared runtime:
 
 The shared runtime should validate that payload structurally, then execute it.
 
+The runtime-owned definition payload is not the same thing as the per-render payload sent to the webview.
+
+Workflow Form v2 should preserve a panel-by-panel runtime exchange:
+
+- the backend/runtime retains the full declarative workflow-form definition plus session state
+- the webview receives only the currently resolved panel payload needed for the active render
+- the webview submits typed structured values for the active panel rather than a string-only raw-value bag
+- after each panel submission, the runtime validates the typed submission, updates session state, evaluates transitions, runs deterministic operations if required, and then emits the next resolved panel payload
+
+The V2 transport therefore needs to evolve in two dimensions:
+
+- the runtime-owned definition payload is typed
+- the workflow-form submission transport is also typed
+
+Workflow Form v2 should not preserve V1's string-first submission assumption at the transport seam for field kinds such as:
+
+- `boolean`
+- `multi_select`
+- `checkbox_group`
+- `large_text` with `array`
+- `large_text` with `object`
+- `date`
+- `date_time`
+- `file_path`
+- `directory_path`
+- `artifact_picker`
+
 ### 2. Outer Orchestration Still Decides When To Invoke Workflow Forms
 
 Workflow Form v2 should not decide whether it ought to run for a workflow step.
@@ -128,6 +164,8 @@ It replaces most of what v1 currently spreads across:
 - fixed phase names
 - bespoke staged-form helpers
 - one-off session-context fields
+
+The full form-definition payload belongs to runtime/session state, not to a permanent full-graph payload cached in the webview.
 
 #### B. Session values
 
@@ -164,6 +202,9 @@ The current runtime lifecycle concerns should remain shared and runtime-owned:
 - active panel rendering
 - validation failure / recovery
 - terminal success handoff
+- per-panel resolution after each submission
+- transition evaluation between panels
+- deterministic-operation pause/rebuild behavior
 
 This preserves the architectural protections v1 was providing without forcing workflows to pretend their panels are `confirm`, `select_source`, or `collect_inputs`.
 
@@ -179,6 +220,17 @@ The payload must be able to declare:
 - which downstream values become stale when an upstream choice changes
 
 This is the V2 mechanism that lets Brainstorming Step 4 and the current Code Review Step 2 both fit naturally in one shared model.
+
+Conditionality must also exist below the panel level.
+
+The shared capability must support field-level conditional behavior within a panel, including:
+
+- fields whose visibility depends on upstream answers
+- fields whose allowed options depend on upstream answers
+- fields whose allowed value types or validation rules depend on upstream answers
+- fields whose displayed content depends on upstream answers or on deterministic-operation-produced session state
+
+V2 should not require a separate duplicate panel definition every time the panel itself stays the same but one field, one dropdown option set, or one validation rule changes based on prior state.
 
 ### 6. Back And Retry Are Shared Runtime Behaviors
 
@@ -205,13 +257,37 @@ For some workflows, a successful panel submission needs to do one of two things:
 - advance to another panel
 - trigger an immediate deterministic backend operation
 
-This is required to express flows like Brainstorming Step 2 directly through the shared workflow-form capability:
+This is required to express flows like the Brainstorming Step 2 existing-session choice path directly through the shared workflow-form capability:
 
 - one branch continues the newest session
 - one branch starts a new session
 - one branch advances to a later panel for explicit selection
 
-The runtime therefore needs a typed way to represent terminal panel outcomes that hand off to deterministic operations instead of always routing to another panel.
+The zero-session Brainstorming Step 2 startup path does not need a workflow form. That automatic create-session path now belongs to `workflow_step_resolution_status`.
+
+The runtime therefore needs a typed way to represent deterministic-operation transition points instead of always routing directly to another panel.
+
+Those transition points must support both:
+
+- terminal deterministic operations that end the workflow-form flow
+- non-terminal deterministic operations that enrich workflow-form session state and then continue the flow
+
+For non-terminal deterministic operations, the required runtime behavior is:
+
+- the panel submission reaches a declared deterministic-operation transition point
+- the runtime pauses panel progression
+- the runtime executes the declared deterministic backend operation through the normal backend tool path
+- the runtime merges the operation result into workflow-form session state
+- the runtime rebuilds the active workflow-form definition from the updated session state
+- only then does the runtime determine and render the next panel
+
+This is required for cases where deterministic backend work affects:
+
+- which panel comes next
+- which branch is active
+- which fields appear on the next panel
+- which dropdown options are available
+- which operation-produced result content the next panel must display
 
 ### 8. Deterministic Execution Stays Runtime-Owned
 
@@ -221,12 +297,29 @@ The correct ownership remains:
 
 - the webview submits structured values
 - the shared runtime validates the active panel
-- the runtime resolves the terminal outcome of that panel
-- runtime-owned deterministic execution then builds the canonical backend tool request and executes it through the normal tool path
+- the runtime resolves the declared transition outcome of that panel
+- if the transition requires deterministic execution, runtime-owned code builds the canonical backend tool request and executes it through the normal tool path
+- if that deterministic execution is non-terminal, the runtime merges the operation result into workflow-form session state before rebuilding the next panel
 
 This preserves the broader platform rule that tool execution stays on the existing backend execution path.
 
-### 9. Tool-Contract Alignment Remains A First-Class Rule
+### 9. The Webview Receives Resolved Panels, Not Runtime Graph Ownership
+
+Workflow Form v2 should preserve a clear ownership boundary between runtime and webview.
+
+The webview should receive the currently resolved panel payload and submit structured values for that panel.
+
+The webview should not become the owner of:
+
+- the full workflow-form graph
+- transition evaluation
+- conditional logic resolution
+- deterministic-operation orchestration
+- operation-result-to-state merging
+
+Those remain runtime-owned responsibilities.
+
+### 10. Tool-Contract Alignment Remains A First-Class Rule
 
 The live repo already has a schema/tool-contract helper layer in [schema.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/workflow-form/schema.ts).
 
@@ -238,7 +331,7 @@ V2 should preserve that principle:
 
 This preserves compatibility with current code-review behavior and avoids inventing a parallel input-contract system.
 
-### 10. Workflow Forms And Automatic Workflow-Step Status Must Be Split
+### 11. Workflow Forms And Automatic Workflow-Step Status Must Be Split
 
 V1 currently treats interactive forms and automatic zero-input workflow-step execution/status as one capability.
 
@@ -367,7 +460,9 @@ The current Code Review Step 2 staged diff-source interaction must map cleanly o
 
 ### 3. Brainstorming compatibility
 
-Brainstorming Step 2 and Step 4 must be representable directly through the shared workflow-form capability without requiring handler-owned orchestration solely to compensate for missing form capabilities.
+Brainstorming Step 2 existing-session human choice and Brainstorming Step 4 must be representable directly through the shared workflow-form capability without requiring handler-owned orchestration solely to compensate for missing form capabilities.
+
+Brainstorming Step 2 zero-session startup is a separate zero-input deterministic use case and belongs to `workflow_step_resolution_status`, not Workflow Form v2.
 
 ### 4. Persistence/resume compatibility
 
@@ -389,7 +484,7 @@ A safe migration shape is:
 2. Prove compatibility by expressing:
    - workflow-start
    - Code Review Step 2
-3. Add the missing branching/direct-operation support needed for Brainstorming Step 2 and Step 4.
+3. Add the missing branching/direct-operation support needed for the Brainstorming Step 2 existing-session choice flow and Brainstorming Step 4.
 4. Migrate automatic zero-input workflow-step execution/status onto its own shared capability instead of carrying that responsibility into Workflow Form v2.
 
 ## Explicit Non-Goals

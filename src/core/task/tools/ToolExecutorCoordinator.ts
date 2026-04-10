@@ -18,18 +18,24 @@ import { CaptureBrainstormingTopicToolHandler } from "./handlers/CaptureBrainsto
 import { CodeReviewSpecUpdateToolHandler } from "./handlers/CodeReviewSpecUpdateToolHandler"
 import { CompleteWorkflowItemToolHandler } from "./handlers/CompleteWorkflowItemToolHandler"
 import { CondenseHandler } from "./handlers/CondenseHandler"
+import { ContinueBrainstormingSessionToolHandler } from "./handlers/ContinueBrainstormingSessionToolHandler"
+import { CreateBrainstormingSessionToolHandler } from "./handlers/CreateBrainstormingSessionToolHandler"
 import { ExecuteCommandToolHandler } from "./handlers/ExecuteCommandToolHandler"
 import { GenerateExplanationToolHandler } from "./handlers/GenerateExplanationToolHandler"
 import { ListCodeDefinitionNamesToolHandler } from "./handlers/ListCodeDefinitionNamesToolHandler"
 import { ListFilesToolHandler } from "./handlers/ListFilesToolHandler"
 import { LoadMcpDocumentationHandler } from "./handlers/LoadMcpDocumentationHandler"
 import { NewTaskHandler } from "./handlers/NewTaskHandler"
+import { PersistBrainstormingApproachToolHandler } from "./handlers/PersistBrainstormingApproachToolHandler"
+import { PersistBrainstormingTechniqueToolHandler } from "./handlers/PersistBrainstormingTechniqueToolHandler"
 import { PlanModeRespondHandler } from "./handlers/PlanModeRespondHandler"
-import { PrepareBrainstormingSessionToolHandler } from "./handlers/PrepareBrainstormingSessionToolHandler"
 import { ReadFileRangeToolHandler } from "./handlers/ReadFileRangeToolHandler"
 import { ReadFileToolHandler } from "./handlers/ReadFileToolHandler"
 import { ReportBugHandler } from "./handlers/ReportBugHandler"
+import { RequestBrainstormingTechniqueSuggestionToolHandler } from "./handlers/RequestBrainstormingTechniqueSuggestionToolHandler"
 import { SearchFilesToolHandler } from "./handlers/SearchFilesToolHandler"
+import { SelectBrainstormingSessionToolHandler } from "./handlers/SelectBrainstormingSessionToolHandler"
+import { SelectRandomBrainstormingTechniqueToolHandler } from "./handlers/SelectRandomBrainstormingTechniqueToolHandler"
 import { SelectTargetEpicToolHandler } from "./handlers/SelectTargetEpicToolHandler"
 import { SendUserMessageHandler } from "./handlers/SendUserMessageHandler"
 import { SetWorkflowPlaceholdersToolHandler } from "./handlers/SetWorkflowPlaceholdersToolHandler"
@@ -132,7 +138,16 @@ export class ToolExecutorCoordinator {
 		[ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT]: (_v: ToolValidator) => new BuildReviewDiffOutputToolHandler(),
 		[ClineDefaultTool.BUILD_REVIEW_INPUT]: (_v: ToolValidator) => new BuildReviewInputToolHandler(),
 		[ClineDefaultTool.BUILD_EPICS_DOCUMENT]: (_v: ToolValidator) => new BuildEpicsDocumentToolHandler(),
-		[ClineDefaultTool.PREPARE_BRAINSTORMING_SESSION]: (_v: ToolValidator) => new PrepareBrainstormingSessionToolHandler(),
+		[ClineDefaultTool.CONTINUE_BRAINSTORMING_SESSION]: (_v: ToolValidator) => new ContinueBrainstormingSessionToolHandler(),
+		[ClineDefaultTool.CREATE_BRAINSTORMING_SESSION]: (_v: ToolValidator) => new CreateBrainstormingSessionToolHandler(),
+		[ClineDefaultTool.SELECT_BRAINSTORMING_SESSION]: (_v: ToolValidator) => new SelectBrainstormingSessionToolHandler(),
+		[ClineDefaultTool.PERSIST_BRAINSTORMING_APPROACH]: (_v: ToolValidator) => new PersistBrainstormingApproachToolHandler(),
+		[ClineDefaultTool.SELECT_RANDOM_BRAINSTORMING_TECHNIQUE]: (_v: ToolValidator) =>
+			new SelectRandomBrainstormingTechniqueToolHandler(),
+		[ClineDefaultTool.PERSIST_BRAINSTORMING_TECHNIQUE]: (_v: ToolValidator) => new PersistBrainstormingTechniqueToolHandler(),
+		[ClineDefaultTool.REQUEST_BRAINSTORMING_TECHNIQUE_SUGGESTION]: (_v: ToolValidator) =>
+			new RequestBrainstormingTechniqueSuggestionToolHandler(),
+		[ClineDefaultTool.PREPARE_BRAINSTORMING_SESSION]: (_v: ToolValidator) => undefined,
 		[ClineDefaultTool.CAPTURE_BRAINSTORMING_TOPIC]: (_v: ToolValidator) => new CaptureBrainstormingTopicToolHandler(),
 		[ClineDefaultTool.BUILD_EPIC_DELIVERY_SPEC]: (_v: ToolValidator) => new BuildEpicDeliverySpecToolHandler(),
 		[ClineDefaultTool.BUILD_STORY_DOCUMENT]: (_v: ToolValidator) => new BuildStoryDocumentToolHandler(),

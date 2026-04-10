@@ -34,7 +34,6 @@ import { TaskConfig, validateTaskConfig } from "./tools/types/TaskConfig"
 import { createUIHelpers } from "./tools/types/UIHelpers"
 import { ToolDisplayUtils } from "./tools/utils/ToolDisplayUtils"
 import { ToolResultUtils } from "./tools/utils/ToolResultUtils"
-import type { WorkflowFormSessionContext, WorkflowFormSessionOwner } from "./workflow-form/types"
 
 export function canonicalizeAttemptCompletionParams(block: ToolUse): boolean {
 	if (block.name === ClineDefaultTool.ATTEMPT && !block.params?.result && typeof block.params?.response === "string") {
@@ -135,12 +134,6 @@ export class ToolExecutor {
 			userContent: ClineContent[],
 			context: "initial_task" | "resume" | "feedback",
 		) => Promise<{ cancel?: boolean; wasCancelled?: boolean; contextModification?: string; errorMessage?: string }>,
-		private runWorkflowFormSession: (args: {
-			resolverId: string
-			owner: WorkflowFormSessionOwner
-			initialPhase: "collect_inputs"
-			context?: WorkflowFormSessionContext
-		}) => Promise<void>,
 	) {
 		this.autoApprover = new AutoApprove(this.stateManager)
 
@@ -221,7 +214,6 @@ export class ToolExecutor {
 				clearActiveHookExecution: this.clearActiveHookExecution,
 				getActiveHookExecution: this.getActiveHookExecution,
 				runUserPromptSubmitHook: this.runUserPromptSubmitHook,
-				runWorkflowFormSession: this.runWorkflowFormSession,
 			},
 			coordinator: this.coordinator,
 		}

@@ -2,7 +2,9 @@
 
 ## Purpose
 
-This document defines the requirements for introducing a separate shared capability for zero-human-input deterministic workflow-step resolution and user-visible status notifications.
+This document defines the requirements record for the separate shared capability for zero-human-input deterministic workflow-step resolution and user-visible status notifications.
+
+This workstream is now deployed. This document remains the requirements record for the shipped capability. For live runtime behavior, pair it with [workflow-document-runtime-review.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/workflows/workflow-document-runtime-review.md) and [workflow-form-readme.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/workflow-ui-surface/workflow-form-readme.md).
 
 This document bridges:
 
@@ -17,6 +19,7 @@ to the implemented action plan for this workstream.
 
 This workstream delivers one new shared runtime capability and migrates the current zero-input workflow-step use cases that still live under Workflow Forms:
 
+- `brainstorming.md` Step 2 zero-session automatic session creation
 - `code-review.md` Step 3 review-input preparation
 - `write-remediation-story.md` Step 2 review-input preparation
 - `quick-spec.md` Step 2 tech-spec scaffold preparation
@@ -24,6 +27,8 @@ This workstream delivers one new shared runtime capability and migrates the curr
 Delivered trigger scope for this workstream:
 
 - deterministic workflow progression inside an already-active placeholder workflow
+
+Deterministic workflow progression remains the triggering seam for `brainstorming.md` Step 2 zero-session automatic session creation as well.
 
 The architecture must remain compatible with other runtime-owned orchestrators, but this requirements set does not expand the delivered scope beyond the currently migrated deterministic workflow-step use cases.
 

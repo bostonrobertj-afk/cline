@@ -6,6 +6,12 @@ import path from "path"
 import { getWorkflowStepResolutionTriggerDefinition } from "../WorkflowStepResolutionTriggerRegistry"
 
 describe("WorkflowStepResolutionTriggerRegistry", () => {
+	it("maps brainstorming step 2 to the create-session workflow-step-resolution definition", () => {
+		expect(getWorkflowStepResolutionTriggerDefinition("brainstorming.md", 2)?.definitionId).to.equal(
+			"brainstorming_step_2_create_session",
+		)
+	})
+
 	it("maps code-review step 3 to the review-input workflow-step-resolution definition", () => {
 		expect(getWorkflowStepResolutionTriggerDefinition("code-review.md", 3)?.definitionId).to.equal(
 			"code_review_step_3_review_input",
@@ -85,6 +91,56 @@ describe("WorkflowStepResolutionTriggerRegistry", () => {
 					activePlaceholderWorkflowStableValues: {},
 					activePlaceholderWorkflowValues: { output_file: techSpecPath },
 					activePlaceholderWorkflowTaskWriteProofPaths: [techSpecPath],
+				},
+			})
+
+			expect(shouldIntercept).to.equal(false)
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("intercepts brainstorming step 2 when the brainstorming directory exists but contains no canonical session files", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "workflow-step-resolution-trigger-"))
+		const outputFolder = path.join(tempDir, "planning")
+		const sessionDirectory = path.join(outputFolder, "brainstorming")
+
+		try {
+			await fs.mkdir(sessionDirectory, { recursive: true })
+
+			const trigger = getWorkflowStepResolutionTriggerDefinition("brainstorming.md", 2)
+			const shouldIntercept = await trigger?.shouldIntercept({
+				cwd: tempDir,
+				taskState: {
+					activePlaceholderWorkflowStableValues: { output_folder: outputFolder },
+					activePlaceholderWorkflowValues: {},
+					activePlaceholderWorkflowTaskWriteProofPaths: [],
+				},
+			})
+
+			expect(shouldIntercept).to.equal(true)
+		} finally {
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("does not intercept brainstorming step 2 when a canonical brainstorming session file already exists", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "workflow-step-resolution-trigger-"))
+		const outputFolder = path.join(tempDir, "planning")
+		const sessionDirectory = path.join(outputFolder, "brainstorming")
+		const sessionPath = path.join(sessionDirectory, "brainstorming-session-2026-04-10.md")
+
+		try {
+			await fs.mkdir(sessionDirectory, { recursive: true })
+			await fs.writeFile(sessionPath, "# session\n", "utf8")
+
+			const trigger = getWorkflowStepResolutionTriggerDefinition("brainstorming.md", 2)
+			const shouldIntercept = await trigger?.shouldIntercept({
+				cwd: tempDir,
+				taskState: {
+					activePlaceholderWorkflowStableValues: { output_folder: outputFolder },
+					activePlaceholderWorkflowValues: {},
+					activePlaceholderWorkflowTaskWriteProofPaths: [],
 				},
 			})
 

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document is the runtime-oriented overview of how placeholder workflows are actually run and managed in this repo as of April 8, 2026.
+This document is the runtime-oriented overview of how placeholder workflows are actually run and managed in this repo as of April 10, 2026.
 
 It is meant to help new agents quickly understand the real placeholder-workflow lifecycle, not just one silo such as workflow-start forms.
 
@@ -16,12 +16,18 @@ It covers the runtime capabilities that currently shape placeholder-workflow beh
 - checklist and active-step resolution
 - workflow-start cards
 - workflow-start forms
-- step-triggered workflow forms and automatic-status cards
+- step-triggered workflow forms and zero-input workflow-step-resolution status
 - deterministic workflow progression
 - contextual native-tool filtering
 - `workflow_progress_request` exposure and prompt teaching
 - workflow persona activation
 - workflow completion and teardown
+
+One architectural caveat is important for current-state understanding:
+
+- the repo has a real top-level runtime spine in [index.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/task/index.ts)
+- but it does not yet have one clean per-workflow orchestration/config object that owns focus-chain, workflow-form, workflow-step-resolution, deterministic progression, and workflow-owned tool behavior end to end
+- workflow-specific behavior is still split across workflow documents, trigger registries, resolver registries, deterministic progression, and workflow-owned handlers
 
 ## High-Level Runtime Flow
 
@@ -34,7 +40,7 @@ For placeholder workflows, the runtime currently follows this order:
 5. Before the first API turn of a slash-command-started workflow, run the pre-turn system-owned loop:
    - workflow-start card, if the workflow has one
    - workflow-start form, if Step 1 raw details contain explicit start-form directives
-   - step-triggered workflow forms or automatic-status cards, if the active step is registered for interception
+   - step-triggered workflow forms or `workflow_step_resolution_status`, if the active step is registered for interception
    - deterministic progression after those system-owned actions mutate workflow state
 6. If the pre-turn loop has no more eligible work, assemble the model prompt using:
    - active workflow reminder/instructions
@@ -172,7 +178,7 @@ Important implications:
 - Step 1 must contain explicit start-form directive lines if a workflow wants the generic start-form path
 - start cards and start forms can both participate in startup, in sequence
 
-## 5. Step-Triggered Workflow Forms And Automatic-Status Cards
+## 5. Step-Triggered Workflow Forms And Zero-Input Status Resolution
 
 Relevant code:
 
@@ -183,23 +189,32 @@ Relevant code:
 
 What happens:
 
-- after the slash-command start form check, the runtime can intercept supported workflow steps through the step-trigger registry
-- some resolvers render interactive forms
-- some render non-interactive `automatic_status` cards for zero-human-input system-owned steps
-- the runtime executes the corresponding tool through the normal tool path
-- on success, the workflow-form session clears and deterministic progression can run again before the first AI turn
-- on terminal failure, automatic-status cards can fall back to the normal agent path
+- after the slash-command start check, the runtime can intercept supported workflow steps through the step-trigger registries
+- human-input workflow steps open Workflow Form v2
+- zero-input deterministic workflow steps render `workflow_step_resolution_status`
+- both paths execute the corresponding backend tool through the normal tool path
+- on success, the active system-owned session clears and deterministic progression can run again before the first AI turn
+- on terminal failure, the runtime can fall back to the normal agent path when the use case allows it
 
-Current examples include:
+Current split:
 
-- `code-review.md`
-- `write-remediation-story.md`
-- `quick-spec.md`
+- Workflow Form v2 for human-input interactions:
+  - `code-review.md` Step 2
+  - `brainstorming.md` Step 2 existing-session human choice
+  - `brainstorming.md` Step 3
+  - `brainstorming.md` Step 4
+- `workflow_step_resolution_status` for zero-input deterministic preparation:
+  - `brainstorming.md` Step 2 zero-session deterministic create-session startup
+  - `code-review.md` Step 3
+  - `write-remediation-story.md` Step 2
+  - `quick-spec.md` Step 2
 
 Important implication:
 
-- workflow forms are broader than startup input collection
-- they are also used for step-owned deterministic preparation work before the model gets control
+- workflow forms are no longer the umbrella for all pre-model deterministic workflow work
+- the live boundary is now:
+  - Workflow Form v2 for human-input steps
+  - `workflow_step_resolution_status` for zero-input deterministic step resolution
 
 ## 6. Deterministic Workflow Progression
 
@@ -372,7 +387,7 @@ If you change or enable a workflow, you need to think across all of these seams:
 - checklist parsing and active-step resolution
 - workflow-start cards
 - workflow-start forms
-- step-triggered workflow forms and automatic-status cards
+- step-triggered workflow forms and zero-input workflow-step-resolution status
 - deterministic progression
 - contextual native-tool filtering
 - `workflow_progress_request` support and prompt teaching

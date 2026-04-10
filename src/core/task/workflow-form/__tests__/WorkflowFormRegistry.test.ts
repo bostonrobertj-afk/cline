@@ -1,296 +1,200 @@
+import type { WorkflowFormDefinitionPayload, WorkflowFormSubmittedValuePayload } from "@shared/ExtensionMessage"
 import { expect } from "chai"
 import { describe, it } from "mocha"
+import type { WorkflowFormSessionOwner, WorkflowFormSessionState, WorkflowFormTriggerSource } from "../types"
 import {
-	BRAINSTORMING_STEP_2_SELECT_SESSION_RESOLVER_ID,
+	BRAINSTORMING_STEP_2_PREPARE_SESSION_RESOLVER_ID,
 	BRAINSTORMING_STEP_3_CAPTURE_TOPIC_RESOLVER_ID,
+	BRAINSTORMING_STEP_4_CHOOSE_APPROACH_RESOLVER_ID,
+	buildBrainstormingStep2InitialDefinitionPayload,
+	buildBrainstormingStep4DefinitionPayload,
+	buildWorkflowStartDefinitionPayload,
 	CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID,
 	getWorkflowFormResolverDefinition,
 	PLACEHOLDER_WORKFLOW_START_SET_WORKFLOW_PLACEHOLDERS_RESOLVER_ID,
 } from "../WorkflowFormRegistry"
 
+const EMPTY_DEFINITION: WorkflowFormDefinitionPayload = {
+	definitionVersion: 2,
+	title: "",
+	toolDictionaryTitle: "",
+	toolDictionaryMarkdown: "",
+	firstPanelId: "",
+	panels: {},
+}
+
+function createSession(args: {
+	resolverId: string
+	triggerSource: WorkflowFormTriggerSource
+	owner: WorkflowFormSessionOwner
+	definitionPayload?: WorkflowFormDefinitionPayload
+	values?: Record<string, WorkflowFormSubmittedValuePayload>
+	currentPanelId?: string
+	data?: WorkflowFormSessionState["data"]
+}): WorkflowFormSessionState {
+	const definitionPayload = args.definitionPayload ?? EMPTY_DEFINITION
+
+	return {
+		sessionId: `session-${args.resolverId}`,
+		resolverId: args.resolverId,
+		triggerSource: args.triggerSource,
+		owner: args.owner,
+		definitionVersion: 2,
+		definitionPayload,
+		firstPanelId: definitionPayload.firstPanelId,
+		currentPanelId: args.currentPanelId ?? definitionPayload.firstPanelId,
+		values: args.values ?? {},
+		data: args.data ?? {},
+	}
+}
+
 describe("WorkflowFormRegistry", () => {
-	it("returns the code-review diff resolver metadata by id", () => {
-		const resolver = getWorkflowFormResolverDefinition(CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID)
-
-		expect(resolver.id).to.equal("code_review_step_3_diff_source")
-		expect(resolver.toolName).to.equal("build_review_diff_output")
-	})
-
-	it("returns the brainstorming step 2 session-picker resolver metadata by id", () => {
-		const resolver = getWorkflowFormResolverDefinition(BRAINSTORMING_STEP_2_SELECT_SESSION_RESOLVER_ID)
-
-		expect(resolver.id).to.equal("brainstorming_step_2_select_session")
-		expect(resolver.toolName).to.equal("set_workflow_placeholders")
-	})
-
-	it("returns the brainstorming step 3 topic resolver metadata by id", () => {
-		const resolver = getWorkflowFormResolverDefinition(BRAINSTORMING_STEP_3_CAPTURE_TOPIC_RESOLVER_ID)
-
-		expect(resolver.id).to.equal("brainstorming_step_3_capture_topic")
-		expect(resolver.toolName).to.equal("capture_brainstorming_topic")
-	})
-
-	it("builds the create-epics workflow-start definition with the approved override copy", () => {
-		const resolver = getWorkflowFormResolverDefinition(PLACEHOLDER_WORKFLOW_START_SET_WORKFLOW_PLACEHOLDERS_RESOLVER_ID)
-		const definition = resolver.buildDefinition({
-			sessionId: "session-create-epics-definition",
-			resolverId: "placeholder_workflow_start_set_workflow_placeholders",
-			triggerSource: "slash_command",
-			owner: {
-				kind: "slash_command",
-				workflowName: "create-epics.md",
-				stepNumber: 1,
-			},
-			phase: "collect_inputs",
-			initialPhase: "collect_inputs",
-			values: {},
-			context: {
-				workflowName: "create-epics.md",
-				workflowStartRequirements: {
-					requiredFieldKeys: ["architecture_document", "prd", "mode"],
-					optionalFieldKeys: ["ux_spec", "ui_spec"],
-				},
+	it("builds the create-epics workflow-start V2 definition with the approved override copy", () => {
+		const definition = buildWorkflowStartDefinitionPayload({
+			workflowName: "create-epics.md",
+			workflowStartRequirements: {
+				requiredFieldKeys: ["architecture_document", "prd", "mode"],
+				optionalFieldKeys: ["ux_spec", "ui_spec"],
 			},
 		})
-		const fields = definition.pages.collect_inputs?.fields ?? []
+		const panel = definition.panels[definition.firstPanelId]
 
 		expect(definition.title).to.equal("Inputs for This Workflow")
 		expect(definition.toolDictionaryTitle).to.equal("Workflow Placeholder Reference")
 		expect(definition.toolDictionaryMarkdown).to.include("## set_workflow_placeholders")
 		expect(definition.toolDictionaryMarkdown).to.include("### Term Reference")
 		expect(definition.toolDictionaryMarkdown).to.include("`architecture_document`")
-		expect(definition.pages.collect_inputs?.prompt).to.equal("Provide the following to start the workflow:")
-		expect(fields.map((field) => field.key)).to.deep.equal(["architecture_document", "prd", "mode", "ux_spec", "ui_spec"])
-		expect(fields[0]?.label).to.equal("Architecture Document")
-		expect(fields[2]?.placeholder).to.equal("new or continue")
+		expect(definition.firstPanelId).to.equal("workflow_start_inputs")
+		expect(panel?.promptMarkdown).to.equal("Provide the following to start the workflow:")
+		expect(panel?.transition).to.deep.equal({
+			type: "deterministic_operation",
+			operationId: "set_workflow_placeholders",
+			terminal: true,
+		})
+		expect(panel?.fields.map((field) => field.key)).to.deep.equal([
+			"architecture_document",
+			"prd",
+			"mode",
+			"ux_spec",
+			"ui_spec",
+		])
+		expect(panel?.fields[0]?.label).to.equal("Architecture Document")
+		expect(panel?.fields[2]?.placeholder).to.equal("new or continue")
+		expect(panel?.allowedActions).to.include("retry")
 	})
 
-	it("builds the brainstorming session-picker definition", () => {
-		const resolver = getWorkflowFormResolverDefinition(BRAINSTORMING_STEP_2_SELECT_SESSION_RESOLVER_ID)
-		const definition = resolver.buildDefinition({
-			sessionId: "session-brainstorming-picker",
-			resolverId: resolver.id,
-			triggerSource: "tool_handler",
-			owner: {
-				kind: "placeholder_workflow_step",
-				workflowName: "brainstorming.md",
-				stepNumber: 2,
-			},
-			phase: "collect_inputs",
-			initialPhase: "collect_inputs",
-			values: {},
-			context: {
-				brainstormingSessionOptions: [
-					{
-						value: "/tmp/brainstorming-session-2026-04-08.md",
-						label: "brainstorming-session-2026-04-08.md",
-						description: "/tmp/brainstorming-session-2026-04-08.md",
-					},
-				],
+	it("marks workflow-start One of fields with the shared oneOfGroupId", () => {
+		const definition = buildWorkflowStartDefinitionPayload({
+			workflowName: "review-adversarial-general.md",
+			workflowStartRequirements: {
+				requiredFieldKeys: ["review_input"],
+				optionalFieldKeys: ["spec_file"],
+				oneOfRequirement: {
+					id: "workflow_start_one_of",
+					fieldKeys: ["review_input", "diff_output", "spec_file"],
+				},
 			},
 		})
-		const fields = definition.pages.collect_inputs?.fields ?? []
+		const panel = definition.panels[definition.firstPanelId]
 
-		expect(definition.title).to.equal("Select a Brainstorming Session")
-		expect(definition.pages.collect_inputs?.prompt).to.equal("Choose an existing brainstorming session to continue.")
-		expect(fields.map((field) => field.key)).to.deep.equal(["output_file"])
-		expect(fields[0]?.label).to.equal("Session")
-		expect(fields[0]?.control).to.equal("select")
-		expect(fields[0]?.options?.[0]?.value).to.equal("/tmp/brainstorming-session-2026-04-08.md")
-		expect(definition.pages.collect_inputs?.submitLabel).to.equal("Continue")
+		expect(panel?.fields.find((field) => field.key === "review_input")?.oneOfGroupId).to.equal("workflow_start_one_of")
+		expect(panel?.fields.find((field) => field.key === "diff_output")?.oneOfGroupId).to.equal("workflow_start_one_of")
+		expect(panel?.fields.find((field) => field.key === "spec_file")?.oneOfGroupId).to.equal("workflow_start_one_of")
+		expect(panel?.fields.find((field) => field.key === "review_input")?.required).to.equal(true)
 	})
 
-	it("throws when the brainstorming session-picker definition is built without brainstormingSessionOptions", () => {
-		const resolver = getWorkflowFormResolverDefinition(BRAINSTORMING_STEP_2_SELECT_SESSION_RESOLVER_ID)
-
-		expect(() =>
-			resolver.buildDefinition({
-				sessionId: "session-brainstorming-picker-missing-options",
-				resolverId: resolver.id,
-				triggerSource: "tool_handler",
-				owner: {
-					kind: "placeholder_workflow_step",
-					workflowName: "brainstorming.md",
-					stepNumber: 2,
-				},
-				phase: "collect_inputs",
-				initialPhase: "collect_inputs",
-				values: {},
-				context: {},
-			}),
-		).to.throw("Brainstorming session picker definition requires brainstormingSessionOptions.")
-	})
-
-	it("serializes the brainstorming session-picker selection into set_workflow_placeholders", () => {
-		const resolver = getWorkflowFormResolverDefinition(BRAINSTORMING_STEP_2_SELECT_SESSION_RESOLVER_ID)
-		const outcome = resolver.buildToolExecutionRequest(
-			{
-				sessionId: "session-brainstorming-picker-serialize",
-				resolverId: resolver.id,
-				triggerSource: "tool_handler",
-				owner: {
-					kind: "placeholder_workflow_step",
-					workflowName: "brainstorming.md",
-					stepNumber: 2,
-				},
-				phase: "collect_inputs",
-				initialPhase: "collect_inputs",
-				values: {},
-				context: {
-					brainstormingSessionOptions: [
-						{
-							value: "/tmp/brainstorming-session-2026-04-08.md",
-							label: "brainstorming-session-2026-04-08.md",
-							description: "/tmp/brainstorming-session-2026-04-08.md",
-						},
-					],
+	it("serializes workflow-start placeholder submissions into set_workflow_placeholders input", () => {
+		const resolver = getWorkflowFormResolverDefinition(PLACEHOLDER_WORKFLOW_START_SET_WORKFLOW_PLACEHOLDERS_RESOLVER_ID)
+		const definition = buildWorkflowStartDefinitionPayload({
+			workflowName: "review-adversarial-general.md",
+			workflowStartRequirements: {
+				requiredFieldKeys: ["review_input"],
+				optionalFieldKeys: ["spec_file"],
+				oneOfRequirement: {
+					id: "workflow_start_one_of",
+					fieldKeys: ["review_input", "diff_output", "spec_file"],
 				},
 			},
-			{
-				output_file: { rawValue: "/tmp/brainstorming-session-2026-04-08.md" },
+		})
+		const session = createSession({
+			resolverId: resolver.id,
+			triggerSource: "slash_command",
+			owner: {
+				kind: "slash_command",
+				workflowName: "review-adversarial-general.md",
+				stepNumber: 1,
 			},
-		)
+			definitionPayload: definition,
+			values: {
+				review_input: { valueType: "string", stringValue: " /tmp/review.md " },
+				diff_output: { valueType: "string", stringValue: "   " },
+				spec_file: { valueType: "string", stringValue: "/tmp/spec.md" },
+			},
+		})
+
+		const outcome = resolver.buildOperationRequest(session, "set_workflow_placeholders")
 
 		expect(outcome).to.deep.equal({
 			toolName: "set_workflow_placeholders",
-			toolInput: { values: { output_file: "/tmp/brainstorming-session-2026-04-08.md" } },
-			toolParams: { values: '{"output_file":"/tmp/brainstorming-session-2026-04-08.md"}' },
-		})
-	})
-
-	it("builds the brainstorming step 3 topic definition", () => {
-		const resolver = getWorkflowFormResolverDefinition(BRAINSTORMING_STEP_3_CAPTURE_TOPIC_RESOLVER_ID)
-		const definition = resolver.buildDefinition({
-			sessionId: "session-brainstorming-step-3-definition",
-			resolverId: resolver.id,
-			triggerSource: "deterministic_workflow_progression",
-			owner: {
-				kind: "placeholder_workflow_step",
-				workflowName: "brainstorming.md",
-				stepNumber: 3,
-			},
-			phase: "collect_inputs",
-			initialPhase: "collect_inputs",
-			values: {},
-		})
-		const fields = definition.pages.collect_inputs?.fields ?? []
-
-		expect(definition.title).to.equal("What topics and/or goals would you like to focus on for this brainstorming session?")
-		expect(definition.pages.collect_inputs?.prompt).to.equal("Be as detailed as you can- we'll worry about formatting later!")
-		expect(definition.toolDictionaryTitle).to.equal("Brainstorming Topic Reference")
-		expect(fields).to.have.lengthOf(1)
-		expect(fields[0]?.key).to.equal("topic")
-		expect(fields[0]?.control).to.equal("textarea")
-		expect(fields[0]?.help).to.equal("")
-		expect(fields[0]?.presentation).to.deep.equal({ textareaSize: "large" })
-	})
-
-	it("serializes the brainstorming step 3 topic request without altering multiline raw text", () => {
-		const resolver = getWorkflowFormResolverDefinition(BRAINSTORMING_STEP_3_CAPTURE_TOPIC_RESOLVER_ID)
-		const outcome = resolver.buildToolExecutionRequest(
-			{
-				sessionId: "session-brainstorming-step-3-serialize",
-				resolverId: resolver.id,
-				triggerSource: "deterministic_workflow_progression",
-				owner: {
-					kind: "placeholder_workflow_step",
-					workflowName: "brainstorming.md",
-					stepNumber: 3,
+			toolInput: {
+				values: {
+					review_input: "/tmp/review.md",
+					spec_file: "/tmp/spec.md",
 				},
-				phase: "collect_inputs",
-				initialPhase: "collect_inputs",
-				values: {},
 			},
-			{
-				topic: { rawValue: "Line one\n\nLine two" },
+			toolParams: {
+				values: JSON.stringify({
+					review_input: "/tmp/review.md",
+					spec_file: "/tmp/spec.md",
+				}),
 			},
-		)
-
-		expect(outcome).to.deep.equal({
-			toolName: "capture_brainstorming_topic",
-			toolInput: { topic: "Line one\n\nLine two" },
-			toolParams: { topic: "Line one\n\nLine two" },
 		})
 	})
 
-	it("treats the brainstorming step 3 tool result as success only when the approved JSON contract is returned", () => {
-		const resolver = getWorkflowFormResolverDefinition(BRAINSTORMING_STEP_3_CAPTURE_TOPIC_RESOLVER_ID)
-		const evaluation = resolver.evaluateToolExecutionResult(
-			{
-				sessionId: "session-brainstorming-step-3-result",
-				resolverId: resolver.id,
-				triggerSource: "deterministic_workflow_progression",
-				owner: {
-					kind: "placeholder_workflow_step",
-					workflowName: "brainstorming.md",
-					stepNumber: 3,
-				},
-				phase: "collect_inputs",
-				initialPhase: "collect_inputs",
-				values: {},
-			},
-			{
-				toolResultText: '{"persisted":true,"artifact_path":"/tmp/brainstorming.md","topic_captured":true}',
-			},
-		)
-
-		expect(evaluation).to.deep.equal({ succeeded: true })
-	})
-
-	it("omits blank optional create-epics values when serializing set_workflow_placeholders", () => {
+	it("classifies workflow-start tool results with the preserved success and failure behavior", () => {
 		const resolver = getWorkflowFormResolverDefinition(PLACEHOLDER_WORKFLOW_START_SET_WORKFLOW_PLACEHOLDERS_RESOLVER_ID)
-		const outcome = resolver.buildToolExecutionRequest(
-			{
-				sessionId: "session-create-epics-serialize",
-				resolverId: "placeholder_workflow_start_set_workflow_placeholders",
-				triggerSource: "slash_command",
-				owner: {
-					kind: "slash_command",
-					workflowName: "create-epics.md",
-					stepNumber: 1,
-				},
-				phase: "collect_inputs",
-				initialPhase: "collect_inputs",
-				values: {},
-				context: {
-					workflowName: "create-epics.md",
-					workflowStartRequirements: {
-						requiredFieldKeys: ["architecture_document", "prd", "mode"],
-						optionalFieldKeys: ["ux_spec", "ui_spec"],
-					},
-				},
-			},
-			{
-				architecture_document: { rawValue: "/abs/architecture.md" },
-				prd: { rawValue: "/abs/prd.md" },
-				mode: { rawValue: "new" },
-				ux_spec: { rawValue: "" },
-				ui_spec: { rawValue: "" },
-			},
-		)
-
-		expect(outcome.toolName).to.equal("set_workflow_placeholders")
-		expect(outcome.toolInput).to.deep.equal({
-			values: {
-				architecture_document: "/abs/architecture.md",
-				prd: "/abs/prd.md",
-				mode: "new",
+		const definition = buildWorkflowStartDefinitionPayload({
+			workflowName: "review-adversarial-general.md",
+			workflowStartRequirements: {
+				requiredFieldKeys: ["review_input"],
+				optionalFieldKeys: [],
 			},
 		})
-		expect(outcome.toolParams).to.deep.equal({
-			values: JSON.stringify({
-				architecture_document: "/abs/architecture.md",
-				prd: "/abs/prd.md",
-				mode: "new",
+		const session = createSession({
+			resolverId: resolver.id,
+			triggerSource: "slash_command",
+			owner: {
+				kind: "slash_command",
+				workflowName: "review-adversarial-general.md",
+				stepNumber: 1,
+			},
+			definitionPayload: definition,
+		})
+
+		expect(
+			resolver.applyOperationResult(session, {
+				operationId: "set_workflow_placeholders",
+				toolResultText: "Stored 1 workflow placeholder: review_input.",
 			}),
+		).to.deep.equal({
+			succeeded: true,
+			terminalSuccessMessage: "Workflow start inputs were stored.",
+		})
+
+		const failure = resolver.applyOperationResult(session, {
+			operationId: "set_workflow_placeholders",
+			toolResultText: "Error: Missing required parameter 'values'. Provide at least one placeholder value to store.",
+		})
+		expect(failure).to.deep.equal({
+			succeeded: false,
+			errorMessage: "Error: Missing required parameter 'values'. Provide at least one placeholder value to store.",
 		})
 	})
 
-	it("serializes the Phase 1 review-diff resolver into tool params", () => {
+	it("builds the Code Review Step 2 V2 definition with the prescribed panel ids and schema-derived source options", () => {
 		const resolver = getWorkflowFormResolverDefinition(CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID)
-		const outcome = resolver.buildToolExecutionRequest(
-			{
-				sessionId: "session-1",
+		const definition = resolver.buildDefinition(
+			createSession({
 				resolverId: resolver.id,
 				triggerSource: "deterministic_workflow_progression",
 				owner: {
@@ -298,19 +202,95 @@ describe("WorkflowFormRegistry", () => {
 					workflowName: "code-review.md",
 					stepNumber: 2,
 				},
-				phase: "collect_inputs",
-				initialPhase: "confirm",
-				values: {},
-			},
-			{
-				"source.type": { rawValue: "commit_range" },
-				"source.base": { rawValue: "main" },
-				"source.head": { rawValue: "feature/review-form" },
-				scoped_paths: { rawValue: "src/core/task/index.ts\nwebview-ui/src/components/chat" },
-				context_lines: { rawValue: "5" },
-			},
+			}),
 		)
+		const sourceSelectionPanel = definition.panels.source_selection
+		const sourceDetailsPanel = definition.panels.source_details
 
+		expect(definition.title).to.equal("Review Diff Artifact")
+		expect(definition.firstPanelId).to.equal("confirm_resolution")
+		expect(Object.keys(definition.panels)).to.deep.equal(["confirm_resolution", "source_selection", "source_details"])
+		expect(sourceSelectionPanel?.fields[0]?.key).to.equal("source.type")
+		expect(sourceSelectionPanel?.fields[0]?.options?.map((option) => option.value)).to.deep.equal([
+			"commit",
+			"commit_range",
+			"ref_diff",
+			"worktree_head_scoped",
+		])
+		expect(sourceDetailsPanel?.backDestinationPanelId).to.equal("source_selection")
+		expect(sourceDetailsPanel?.backStaleValueKeysToClear).to.deep.equal([
+			"source.commit",
+			"source.base",
+			"source.head",
+			"scoped_paths",
+			"context_lines",
+		])
+		expect(sourceDetailsPanel?.transition).to.deep.equal({
+			type: "deterministic_operation",
+			operationId: "build_review_diff_output",
+			terminal: true,
+		})
+		expect(sourceSelectionPanel?.allowedActions).to.include("retry")
+		expect(sourceDetailsPanel?.allowedActions).to.include("retry")
+		expect(sourceDetailsPanel?.fields.find((field) => field.key === "source.commit")?.visibilityCondition).to.deep.equal({
+			sourceKey: "source.type",
+			operator: "equals",
+			value: "commit",
+		})
+		expect(sourceDetailsPanel?.fields.find((field) => field.key === "source.base")?.visibilityCondition).to.deep.equal({
+			sourceKey: "source.type",
+			operator: "equals",
+			values: ["commit_range", "ref_diff"],
+		})
+		expect(sourceDetailsPanel?.fields.find((field) => field.key === "context_lines")?.allowedValueType).to.equal("integer")
+	})
+
+	it("serializes the Code Review Step 2 diff request from V2 submitted values", () => {
+		const resolver = getWorkflowFormResolverDefinition(CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID)
+		const definition = resolver.buildDefinition(
+			createSession({
+				resolverId: resolver.id,
+				triggerSource: "deterministic_workflow_progression",
+				owner: {
+					kind: "placeholder_workflow_step",
+					workflowName: "code-review.md",
+					stepNumber: 2,
+				},
+			}),
+		)
+		const session = createSession({
+			resolverId: resolver.id,
+			triggerSource: "deterministic_workflow_progression",
+			owner: {
+				kind: "placeholder_workflow_step",
+				workflowName: "code-review.md",
+				stepNumber: 2,
+			},
+			definitionPayload: definition,
+			currentPanelId: "source_details",
+			values: {
+				"source.type": { valueType: "string", stringValue: "commit_range" },
+				"source.base": { valueType: "string", stringValue: "main" },
+				"source.head": { valueType: "string", stringValue: "feature/review-form" },
+				scoped_paths: {
+					valueType: "string",
+					stringValue: "src/core/task/index.ts\nwebview-ui/src/components/chat",
+				},
+				context_lines: { valueType: "integer", integerValue: 5 },
+			},
+		})
+
+		const outcome = resolver.buildOperationRequest(session, "build_review_diff_output")
+
+		expect(outcome.toolInput).to.deep.equal({
+			source: {
+				type: "commit_range",
+				base: "main",
+				head: "feature/review-form",
+			},
+			scoped_paths: ["src/core/task/index.ts", "webview-ui/src/components/chat"],
+			context_lines: 5,
+		})
 		expect(outcome.toolParams).to.deep.equal({
 			source: JSON.stringify({
 				type: "commit_range",
@@ -322,10 +302,9 @@ describe("WorkflowFormRegistry", () => {
 		})
 	})
 
-	it("derives Phase 1 source-selection options from the build_review_diff_output schema", () => {
+	it("preserves the machine-checkable Code Review Step 2 success and failure classification", () => {
 		const resolver = getWorkflowFormResolverDefinition(CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID)
-		const definition = resolver.buildDefinition({
-			sessionId: "session-1",
+		const session = createSession({
 			resolverId: resolver.id,
 			triggerSource: "deterministic_workflow_progression",
 			owner: {
@@ -333,419 +312,325 @@ describe("WorkflowFormRegistry", () => {
 				workflowName: "code-review.md",
 				stepNumber: 2,
 			},
-			phase: "select_source",
-			initialPhase: "confirm",
-			values: {},
-		})
-		const sourceTypeField = definition.pages.select_source?.fields?.find((field) => field.key === "source.type")
-
-		expect(sourceTypeField?.options?.map((option) => option.value)).to.deep.equal([
-			"commit",
-			"commit_range",
-			"ref_diff",
-			"worktree_head_scoped",
-		])
-	})
-
-	it("exposes Back only on the staged diff resolver pages after source selection", () => {
-		const resolver = getWorkflowFormResolverDefinition(CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID)
-		const definition = resolver.buildDefinition({
-			sessionId: "session-1",
-			resolverId: resolver.id,
-			triggerSource: "deterministic_workflow_progression",
-			owner: {
-				kind: "placeholder_workflow_step",
-				workflowName: "code-review.md",
-				stepNumber: 2,
-			},
-			phase: "collect_inputs",
-			initialPhase: "confirm",
-			values: {
-				"source.type": { rawValue: "commit" },
-			},
 		})
 
-		expect(definition.pages.select_source?.backLabel).to.equal(undefined)
-		expect(definition.pages.collect_inputs?.backLabel).to.equal("Back")
-		expect(definition.pages.retry_error?.backLabel).to.equal("Back")
-	})
-
-	it("attaches schema-derived value types to Phase 1 concrete input fields", () => {
-		const resolver = getWorkflowFormResolverDefinition(CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID)
-		const definition = resolver.buildDefinition({
-			sessionId: "session-1",
-			resolverId: resolver.id,
-			triggerSource: "deterministic_workflow_progression",
-			owner: {
-				kind: "placeholder_workflow_step",
-				workflowName: "code-review.md",
-				stepNumber: 2,
-			},
-			phase: "collect_inputs",
-			initialPhase: "confirm",
-			values: {
-				"source.type": { rawValue: "commit" },
-			},
-		})
-		const fields = definition.pages.collect_inputs?.fields ?? []
-
-		expect(fields.find((field) => field.key === "source.commit")?.valueSchema.type).to.equal("string")
-		expect(fields.find((field) => field.key === "scoped_paths")?.valueSchema.type).to.equal("array")
-		expect(fields.find((field) => field.key === "context_lines")?.valueSchema.type).to.equal("integer")
-	})
-
-	it("derives Phase 1 branch-specific source fields from the selected source variant schema", () => {
-		const resolver = getWorkflowFormResolverDefinition(CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID)
-		const definition = resolver.buildDefinition({
-			sessionId: "session-1",
-			resolverId: resolver.id,
-			triggerSource: "deterministic_workflow_progression",
-			owner: {
-				kind: "placeholder_workflow_step",
-				workflowName: "code-review.md",
-				stepNumber: 2,
-			},
-			phase: "collect_inputs",
-			initialPhase: "confirm",
-			values: {
-				"source.type": { rawValue: "commit_range" },
-			},
-		})
-		const fieldKeys = (definition.pages.collect_inputs?.fields ?? []).map((field) => field.key)
-
-		expect(fieldKeys).to.include("source.base")
-		expect(fieldKeys).to.include("source.head")
-		expect(fieldKeys).to.not.include("source.commit")
-	})
-
-	it("assembles the Phase 1 source payload from the selected source variant schema", () => {
-		const resolver = getWorkflowFormResolverDefinition(CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID)
-		const outcome = resolver.buildToolExecutionRequest(
-			{
-				sessionId: "session-1",
-				resolverId: resolver.id,
-				triggerSource: "deterministic_workflow_progression",
-				owner: {
-					kind: "placeholder_workflow_step",
-					workflowName: "code-review.md",
-					stepNumber: 2,
-				},
-				phase: "collect_inputs",
-				initialPhase: "confirm",
-				values: {},
-			},
-			{
-				"source.type": { rawValue: "commit" },
-				"source.commit": { rawValue: "abc1234" },
-			},
-		)
-
-		expect(outcome.toolInput.source).to.deep.equal({ type: "commit", commit: "abc1234" })
-		expect(outcome.toolParams.source).to.equal(JSON.stringify({ type: "commit", commit: "abc1234" }))
-	})
-
-	it("treats persisted diff-output tool results as success", () => {
-		const resolver = getWorkflowFormResolverDefinition(CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID)
-		const result = resolver.evaluateToolExecutionResult(
-			{
-				sessionId: "session-1",
-				resolverId: resolver.id,
-				triggerSource: "deterministic_workflow_progression",
-				owner: {
-					kind: "placeholder_workflow_step",
-					workflowName: "code-review.md",
-					stepNumber: 2,
-				},
-				phase: "collect_inputs",
-				initialPhase: "confirm",
-				values: {},
-			},
-			{
+		expect(
+			resolver.applyOperationResult(session, {
+				operationId: "build_review_diff_output",
 				toolResultText: JSON.stringify({
 					persisted: true,
 					diff_available: true,
 					artifact_path: "/tmp/review-input.diff",
 				}),
-			},
-		)
+			}),
+		).to.deep.equal({
+			succeeded: true,
+			terminalSuccessMessage: "The Step 2 diff artifact is ready.",
+		})
 
-		expect(result).to.deep.equal({ succeeded: true })
-	})
-
-	it("treats non-persisted diff-output tool results as failure", () => {
-		const resolver = getWorkflowFormResolverDefinition(CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID)
-		const result = resolver.evaluateToolExecutionResult(
-			{
-				sessionId: "session-1",
-				resolverId: resolver.id,
-				triggerSource: "deterministic_workflow_progression",
-				owner: {
-					kind: "placeholder_workflow_step",
-					workflowName: "code-review.md",
-					stepNumber: 2,
-				},
-				phase: "collect_inputs",
-				initialPhase: "confirm",
-				values: {},
-			},
-			{
+		expect(
+			resolver.applyOperationResult(session, {
+				operationId: "build_review_diff_output",
 				toolResultText: JSON.stringify({
 					persisted: false,
 					diff_available: false,
 					reason: "No Git-backed diff content was available for the requested source and scope.",
 				}),
-			},
-		)
-
-		expect(result).to.deep.equal({
+			}),
+		).to.deep.equal({
 			succeeded: false,
 			errorMessage: "No Git-backed diff content was available for the requested source and scope.",
 		})
 	})
 
-	it("builds workflow-start definitions from normalized requirements", () => {
-		const resolver = getWorkflowFormResolverDefinition(PLACEHOLDER_WORKFLOW_START_SET_WORKFLOW_PLACEHOLDERS_RESOLVER_ID)
-		const definition = resolver.buildDefinition({
-			sessionId: "session-2",
-			resolverId: resolver.id,
-			triggerSource: "slash_command",
-			owner: {
-				kind: "slash_command",
-				workflowName: "review-adversarial-general.md",
-				stepNumber: 1,
-			},
-			phase: "collect_inputs",
-			initialPhase: "collect_inputs",
-			values: {},
-			context: {
-				workflowName: "review-adversarial-general.md",
-				workflowStartRequirements: {
-					requiredFieldKeys: ["spec_file", "review_input"],
-					optionalFieldKeys: ["review_input", "diff_output"],
-					oneOfRequirement: {
-						id: "workflow_start_one_of",
-						fieldKeys: ["review_input", "spec_file", "diff_output"],
-					},
+	it("builds the Brainstorming Step 2 V2 definition with the prescribed session panels and dropdown options", () => {
+		const definition = buildBrainstormingStep2InitialDefinitionPayload({
+			sessionOptions: [
+				{
+					value: "/workspace/planning/brainstorming/brainstorming-session-2026-04-10-2.md",
+					label: "brainstorming-session-2026-04-10-2.md",
+					description: "2026-04-10",
 				},
-			},
+				{
+					value: "/workspace/planning/brainstorming/brainstorming-session-2026-04-10.md",
+					label: "brainstorming-session-2026-04-10.md",
+					description: "2026-04-10",
+				},
+			],
 		})
 
-		const fields = definition.pages.collect_inputs?.fields ?? []
-
-		expect(definition.title).to.equal("Adversarial Review Inputs")
-		expect(definition.toolDictionaryMarkdown).to.include("`review_input`")
-		expect(definition.toolDictionaryMarkdown).to.include("`diff_output`")
-		expect(definition.pages.collect_inputs?.prompt).to.equal(
-			"Provide the review material needed to begin this workflow. Supply at least one review target. If you also have a supporting spec or story file, include it as `spec_file`.",
-		)
-		expect(
-			fields.map((field) => ({
-				key: field.key,
-				label: field.label,
-				help: field.help,
-				required: field.required,
-				oneOfGroupId: field.oneOfGroupId,
-				valueSchemaType: field.valueSchema.type,
-			})),
-		).to.deep.equal([
-			{
-				key: "spec_file",
-				label: "Spec or Story File",
-				help: "Optional path to a story, spec, or requirements file that defines expected behavior.",
-				required: true,
-				oneOfGroupId: "workflow_start_one_of",
-				valueSchemaType: "string",
-			},
-			{
-				key: "review_input",
-				label: "Review Input File",
-				help: "Path to an existing review-input markdown file for this review.",
-				required: true,
-				oneOfGroupId: "workflow_start_one_of",
-				valueSchemaType: "string",
-			},
-			{
-				key: "diff_output",
-				label: "Review Diff File",
-				help: "Path to an existing review-input diff file for this review.",
-				required: false,
-				oneOfGroupId: "workflow_start_one_of",
-				valueSchemaType: "string",
-			},
+		expect(definition.firstPanelId).to.equal("session_strategy")
+		expect(Object.keys(definition.panels)).to.deep.equal(["session_strategy", "session_selection"])
+		expect(definition.panels.session_strategy.fields[0]?.options?.map((option) => option.value)).to.deep.equal([
+			"continue_newest",
+			"start_new",
+			"list_all",
 		])
+		expect(definition.panels.session_selection.fields[0]?.key).to.equal("output_file")
+		expect(definition.panels.session_selection.fields[0]?.options?.map((option) => option.label)).to.deep.equal([
+			"brainstorming-session-2026-04-10-2.md",
+			"brainstorming-session-2026-04-10.md",
+		])
+		expect(definition.panels.session_strategy.allowedActions).to.include("retry")
+		expect(definition.panels.session_selection.allowedActions).to.include("retry")
 	})
 
-	it("omits workflow-start term reference content when the active session contains only unmapped keys", () => {
-		const resolver = getWorkflowFormResolverDefinition(PLACEHOLDER_WORKFLOW_START_SET_WORKFLOW_PLACEHOLDERS_RESOLVER_ID)
-		const definition = resolver.buildDefinition({
-			sessionId: "session-unmapped-workflow-start-definition",
-			resolverId: "placeholder_workflow_start_set_workflow_placeholders",
-			triggerSource: "slash_command",
-			owner: {
-				kind: "slash_command",
-				workflowName: "review-adversarial-general.md",
-				stepNumber: 1,
-			},
-			phase: "collect_inputs",
-			initialPhase: "collect_inputs",
-			values: {},
-			context: {
-				workflowName: "review-adversarial-general.md",
-				workflowStartRequirements: {
-					requiredFieldKeys: ["unmapped_input"],
-					optionalFieldKeys: [],
+	it("serializes and classifies Brainstorming Step 2 deterministic operations", () => {
+		const resolver = getWorkflowFormResolverDefinition(BRAINSTORMING_STEP_2_PREPARE_SESSION_RESOLVER_ID)
+		const definition = buildBrainstormingStep2InitialDefinitionPayload({
+			sessionOptions: [
+				{
+					value: "/workspace/planning/brainstorming/brainstorming-session-2026-04-10.md",
+					label: "brainstorming-session-2026-04-10.md",
 				},
-			},
+			],
 		})
-
-		expect(definition.toolDictionaryMarkdown).to.include("## set_workflow_placeholders")
-		expect(definition.toolDictionaryMarkdown).to.not.include("### Term Reference")
-	})
-
-	it("serializes workflow-start placeholder submissions into set_workflow_placeholders input", () => {
-		const resolver = getWorkflowFormResolverDefinition(PLACEHOLDER_WORKFLOW_START_SET_WORKFLOW_PLACEHOLDERS_RESOLVER_ID)
-		const outcome = resolver.buildToolExecutionRequest(
-			{
-				sessionId: "session-2",
-				resolverId: resolver.id,
-				triggerSource: "slash_command",
-				owner: {
-					kind: "slash_command",
-					workflowName: "review-adversarial-general.md",
-					stepNumber: 1,
-				},
-				phase: "collect_inputs",
-				initialPhase: "collect_inputs",
-				values: {},
-				context: {
-					workflowName: "review-adversarial-general.md",
-					workflowStartRequirements: {
-						requiredFieldKeys: ["review_input"],
-						optionalFieldKeys: ["spec_file"],
-						oneOfRequirement: {
-							id: "workflow_start_one_of",
-							fieldKeys: ["diff_output", "spec_file"],
-						},
-					},
-				},
-			},
-			{
-				review_input: { rawValue: " /tmp/review.md " },
-				diff_output: { rawValue: "   " },
-				spec_file: { rawValue: "/tmp/spec.md" },
-			},
-		)
-
-		expect(outcome.toolName).to.equal("set_workflow_placeholders")
-		expect(outcome.toolInput).to.deep.equal({
-			values: {
-				review_input: "/tmp/review.md",
-				spec_file: "/tmp/spec.md",
-			},
-		})
-		expect(outcome.toolParams.values).to.equal(
-			JSON.stringify({
-				review_input: "/tmp/review.md",
-				spec_file: "/tmp/spec.md",
-			}),
-		)
-	})
-
-	it("treats stored workflow-start placeholder results as success", () => {
-		const resolver = getWorkflowFormResolverDefinition(PLACEHOLDER_WORKFLOW_START_SET_WORKFLOW_PLACEHOLDERS_RESOLVER_ID)
-		const result = resolver.evaluateToolExecutionResult(
-			{
-				sessionId: "session-2",
-				resolverId: resolver.id,
-				triggerSource: "slash_command",
-				owner: {
-					kind: "slash_command",
-					workflowName: "review-adversarial-general.md",
-					stepNumber: 1,
-				},
-				phase: "collect_inputs",
-				initialPhase: "collect_inputs",
-				values: {},
-			},
-			{
-				toolResultText: "Stored 1 workflow placeholder: review_input.",
-			},
-		)
-
-		expect(result).to.deep.equal({ succeeded: true })
-	})
-
-	it("treats the empty-values set_workflow_placeholders error as failure", () => {
-		const resolver = getWorkflowFormResolverDefinition(PLACEHOLDER_WORKFLOW_START_SET_WORKFLOW_PLACEHOLDERS_RESOLVER_ID)
-		const result = resolver.evaluateToolExecutionResult(
-			{
-				sessionId: "session-2",
-				resolverId: resolver.id,
-				triggerSource: "slash_command",
-				owner: {
-					kind: "slash_command",
-					workflowName: "review-adversarial-general.md",
-					stepNumber: 1,
-				},
-				phase: "collect_inputs",
-				initialPhase: "collect_inputs",
-				values: {},
-			},
-			{
-				toolResultText: "Error: Missing required parameter 'values'. Provide at least one placeholder value to store.",
-			},
-		)
-
-		expect(result.succeeded).to.equal(false)
-	})
-
-	it("returns the canonical Phase 1 definition pages", () => {
-		const resolver = getWorkflowFormResolverDefinition(CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID)
-		const definition = resolver.buildDefinition({
-			sessionId: "session-3",
+		const session = createSession({
 			resolverId: resolver.id,
 			triggerSource: "deterministic_workflow_progression",
 			owner: {
 				kind: "placeholder_workflow_step",
-				workflowName: "code-review.md",
+				workflowName: "brainstorming.md",
 				stepNumber: 2,
 			},
-			phase: "collect_inputs",
-			initialPhase: "confirm",
-			values: {},
-		})
-
-		expect(definition.title).to.equal("Review Diff Artifact")
-		expect(Object.keys(definition.pages)).to.deep.equal(["confirm", "select_source", "collect_inputs", "retry_error"])
-	})
-
-	it("uses the canonical workflow-start definition success and failure copy", () => {
-		const resolver = getWorkflowFormResolverDefinition(PLACEHOLDER_WORKFLOW_START_SET_WORKFLOW_PLACEHOLDERS_RESOLVER_ID)
-		const session = {
-			sessionId: "session-3",
-			resolverId: resolver.id,
-			triggerSource: "slash_command" as const,
-			owner: {
-				kind: "slash_command" as const,
-				workflowName: "review-adversarial-general.md",
-				stepNumber: 1,
-			},
-			phase: "collect_inputs" as const,
-			initialPhase: "collect_inputs" as const,
-			values: {},
-			context: {
-				workflowName: "review-adversarial-general.md",
-				workflowStartRequirements: {
-					requiredFieldKeys: ["review_input"],
-					optionalFieldKeys: [],
+			definitionPayload: definition,
+			currentPanelId: "session_selection",
+			values: {
+				output_file: {
+					valueType: "string",
+					stringValue: "/workspace/planning/brainstorming/brainstorming-session-2026-04-10.md",
 				},
 			},
-		}
+		})
 
-		expect(resolver.buildDefinition(session).successMessage).to.equal("Workflow start inputs were stored.")
-		expect(resolver.buildToolExecutionFailureFallbackMessage(session)).to.equal(
-			"The workflow form could not store the workflow start inputs. Review the values and try again.",
+		expect(resolver.buildOperationRequest(session, "select_brainstorming_session")).to.deep.equal({
+			toolName: "select_brainstorming_session",
+			toolInput: {
+				output_file: "/workspace/planning/brainstorming/brainstorming-session-2026-04-10.md",
+			},
+			toolParams: {
+				output_file: "/workspace/planning/brainstorming/brainstorming-session-2026-04-10.md",
+			},
+		})
+
+		expect(
+			resolver.applyOperationResult(session, {
+				operationId: "select_brainstorming_session",
+				toolResultText: JSON.stringify({
+					persisted: true,
+					artifact_path: "/workspace/planning/brainstorming/brainstorming-session-2026-04-10.md",
+					output_file_available: true,
+					selected: true,
+				}),
+			}),
+		).to.deep.equal({
+			succeeded: true,
+			terminalSuccessMessage: "The brainstorming session file is ready.",
+		})
+	})
+
+	it("builds the Brainstorming Step 3 V2 definition as a single-panel large-text form", () => {
+		const resolver = getWorkflowFormResolverDefinition(BRAINSTORMING_STEP_3_CAPTURE_TOPIC_RESOLVER_ID)
+		const definition = resolver.buildDefinition(
+			createSession({
+				resolverId: resolver.id,
+				triggerSource: "deterministic_workflow_progression",
+				owner: {
+					kind: "placeholder_workflow_step",
+					workflowName: "brainstorming.md",
+					stepNumber: 3,
+				},
+			}),
 		)
+		const panel = definition.panels[definition.firstPanelId]
+
+		expect(definition.title).to.equal("What topics and/or goals would you like to focus on for this brainstorming session?")
+		expect(definition.toolDictionaryTitle).to.equal("Brainstorming Topic Reference")
+		expect(panel?.promptMarkdown).to.equal("Be as detailed as you can- we'll worry about formatting later!")
+		expect(panel?.fields).to.have.lengthOf(1)
+		expect(panel?.fields[0]).to.include({
+			key: "topic",
+			kind: "large_text",
+			label: "Topic and Goals",
+			required: true,
+			allowedValueType: "string",
+		})
+		expect(panel?.fields[0]?.presentation).to.deep.equal({ textareaSize: "large" })
+		expect(panel?.allowedActions).to.include("retry")
+	})
+
+	it("serializes Brainstorming Step 3 topic text and preserves the approved success contract", () => {
+		const resolver = getWorkflowFormResolverDefinition(BRAINSTORMING_STEP_3_CAPTURE_TOPIC_RESOLVER_ID)
+		const definition = resolver.buildDefinition(
+			createSession({
+				resolverId: resolver.id,
+				triggerSource: "deterministic_workflow_progression",
+				owner: {
+					kind: "placeholder_workflow_step",
+					workflowName: "brainstorming.md",
+					stepNumber: 3,
+				},
+			}),
+		)
+		const session = createSession({
+			resolverId: resolver.id,
+			triggerSource: "deterministic_workflow_progression",
+			owner: {
+				kind: "placeholder_workflow_step",
+				workflowName: "brainstorming.md",
+				stepNumber: 3,
+			},
+			definitionPayload: definition,
+			values: {
+				topic: { valueType: "string", stringValue: "Line one\n\nLine two" },
+			},
+		})
+
+		expect(resolver.buildOperationRequest(session, "capture_brainstorming_topic")).to.deep.equal({
+			toolName: "capture_brainstorming_topic",
+			toolInput: { topic: "Line one\n\nLine two" },
+			toolParams: { topic: "Line one\n\nLine two" },
+		})
+
+		expect(
+			resolver.applyOperationResult(session, {
+				operationId: "capture_brainstorming_topic",
+				toolResultText: '{"persisted":true,"artifact_path":"/tmp/brainstorming.md","topic_captured":true}',
+			}),
+		).to.deep.equal({
+			succeeded: true,
+			terminalSuccessMessage: "The brainstorming session topic is ready.",
+		})
+	})
+
+	it("builds the Brainstorming Step 4 V2 definition with the shared non-terminal approach flow", () => {
+		const definition = buildBrainstormingStep4DefinitionPayload({
+			categoryOptions: [
+				{ value: "creative", label: "creative" },
+				{ value: "structured", label: "structured" },
+			],
+			techniqueOptionsByCategory: {
+				creative: [
+					{
+						value: "Reverse Brainstorming",
+						label: "Reverse Brainstorming",
+						description: "Generate problems first.",
+					},
+				],
+				structured: [
+					{
+						value: "Six Thinking Hats",
+						label: "Six Thinking Hats",
+						description: "Explore six perspectives.",
+					},
+				],
+			},
+		})
+
+		expect(definition.firstPanelId).to.equal("approach_selection")
+		expect(Object.keys(definition.panels)).to.deep.equal(["approach_selection", "technique_selection", "random_preview"])
+		expect(definition.panels.approach_selection.fields[0]?.options?.map((option) => option.value)).to.deep.equal([
+			"user_choose",
+			"random_technique",
+			"suggest_technique",
+		])
+		expect(definition.panels.approach_selection.transition).to.deep.equal({
+			type: "deterministic_operation",
+			operationId: "persist_brainstorming_approach",
+			terminal: false,
+			rebuildDefinitionAfterSuccess: true,
+			recomputeDestinationAfterSuccess: true,
+		})
+		expect(definition.panels.technique_selection.fields.map((field) => field.key)).to.deep.equal([
+			"technique_category",
+			"technique_name",
+		])
+		expect(definition.panels.approach_selection.allowedActions).to.include("retry")
+		expect(definition.panels.technique_selection.allowedActions).to.include("retry")
+		expect(definition.panels.technique_selection.allowedActions).to.include("back")
+		expect(definition.panels.technique_selection.backDestinationPanelId).to.equal("approach_selection")
+		expect(definition.panels.technique_selection.backStaleValueKeysToClear).to.deep.equal([
+			"technique_category",
+			"technique_name",
+		])
+		expect(definition.panels.random_preview.allowedActions).to.deep.equal(["submit", "cancel", "back", "retry"])
+	})
+
+	it("serializes and classifies Brainstorming Step 4 deterministic operations", () => {
+		const resolver = getWorkflowFormResolverDefinition(BRAINSTORMING_STEP_4_CHOOSE_APPROACH_RESOLVER_ID)
+		const definition = buildBrainstormingStep4DefinitionPayload({
+			categoryOptions: [{ value: "creative", label: "creative" }],
+			techniqueOptionsByCategory: {
+				creative: [
+					{
+						value: "Reverse Brainstorming",
+						label: "Reverse Brainstorming",
+						description: "Generate problems first.",
+					},
+				],
+			},
+		})
+		const techniqueSelectionSession = createSession({
+			resolverId: resolver.id,
+			triggerSource: "deterministic_workflow_progression",
+			owner: {
+				kind: "placeholder_workflow_step",
+				workflowName: "brainstorming.md",
+				stepNumber: 4,
+			},
+			definitionPayload: definition,
+			currentPanelId: "technique_selection",
+			values: {
+				selected_approach: { valueType: "string", stringValue: "user_choose" },
+				technique_category: { valueType: "string", stringValue: "creative" },
+				technique_name: { valueType: "string", stringValue: "Reverse Brainstorming" },
+			},
+		})
+
+		expect(resolver.buildOperationRequest(techniqueSelectionSession, "persist_brainstorming_technique")).to.deep.equal({
+			toolName: "persist_brainstorming_technique",
+			toolInput: {
+				technique_name: "Reverse Brainstorming",
+				technique_description: "Generate problems first.",
+			},
+			toolParams: {
+				technique_name: "Reverse Brainstorming",
+				technique_description: "Generate problems first.",
+			},
+		})
+
+		expect(
+			resolver.applyOperationResult(techniqueSelectionSession, {
+				operationId: "select_random_brainstorming_technique",
+				toolResultText: JSON.stringify({
+					technique_name: "Reverse Brainstorming",
+					technique_description: "Generate problems first.",
+					technique_category: "creative",
+				}),
+			}),
+		).to.deep.equal({
+			succeeded: true,
+			operationData: {
+				technique_name: "Reverse Brainstorming",
+				technique_description: "Generate problems first.",
+				technique_category: "creative",
+			},
+		})
+
+		expect(
+			resolver.applyOperationResult(techniqueSelectionSession, {
+				operationId: "request_brainstorming_technique_suggestion",
+				toolResultText: JSON.stringify({
+					persisted: true,
+					artifact_path: "/tmp/brainstorming.md",
+					selected_technique: "user requested technique suggestion",
+					technique_suggestion_requested: true,
+				}),
+			}),
+		).to.deep.equal({
+			succeeded: true,
+			terminalSuccessMessage: "The brainstorming technique suggestion request is ready.",
+		})
 	})
 
 	it("throws for an unknown resolver id", () => {

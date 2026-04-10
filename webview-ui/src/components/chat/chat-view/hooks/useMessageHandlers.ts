@@ -1,4 +1,9 @@
-import type { ClineMessage, ClineWorkflowForm, ClineWorkflowStartCard } from "@shared/ExtensionMessage"
+import type {
+	ClineMessage,
+	ClineWorkflowForm,
+	ClineWorkflowStartCard,
+	WorkflowFormFieldDefinition,
+} from "@shared/ExtensionMessage"
 import { EmptyRequest, StringRequest } from "@shared/proto/cline/common"
 import {
 	AskResponseRequest,
@@ -18,39 +23,28 @@ import type { ChatState, MessageHandlers } from "../types/chatTypes"
 export function buildWorkflowFormSubmissionRequest(
 	workflowForm: ClineWorkflowForm,
 	action: WorkflowFormAction,
-	values: Record<string, string> = {},
+	values: Record<string, unknown> = {},
 ): WorkflowFormSubmissionRequest {
+	const panel = workflowForm.panel
 	const fields = []
 
-	if (workflowForm.phase === "confirm") {
-		const confirm = values.confirm?.trim()
-		if (confirm) {
-			fields.push({
-				key: "confirm",
-				value: {
-					rawValue: confirm,
-				},
-			})
-		}
-	} else if (workflowForm.phase !== "success") {
-		const page = workflowForm.definition.pages[workflowForm.phase]
-		for (const field of page?.fields ?? []) {
-			const rawValue = values[field.key]?.trim()
-			if (!rawValue) {
+	if (workflowForm.renderState !== "success" && panel) {
+		for (const field of panel.fields) {
+			const serializedValue = serializeWorkflowFormFieldValue(field, values[field.key])
+			if (!serializedValue) {
 				continue
 			}
 
 			fields.push({
 				key: field.key,
-				value: {
-					rawValue,
-				},
+				value: serializedValue,
 			})
 		}
 	}
 
 	return WorkflowFormSubmissionRequest.create({
 		sessionId: workflowForm.sessionId,
+		panelId: panel?.panelId ?? "",
 		action,
 		fields,
 	})
@@ -72,9 +66,142 @@ export async function submitWorkflowStartCard(workflowStartCard: ClineWorkflowSt
 export async function submitWorkflowForm(
 	workflowForm: ClineWorkflowForm,
 	action: WorkflowFormAction,
-	values: Record<string, string> = {},
+	values: Record<string, unknown> = {},
 ) {
 	await TaskServiceClient.submitWorkflowForm(buildWorkflowFormSubmissionRequest(workflowForm, action, values))
+}
+
+function serializeWorkflowFormFieldValue(field: WorkflowFormFieldDefinition, value: unknown) {
+	if (field.kind === "markdown_display" || field.kind === "static_notice") {
+		return undefined
+	}
+
+	if (value === undefined || value === null) {
+		return undefined
+	}
+
+	switch (field.kind) {
+		case "boolean":
+			return typeof value === "boolean" ? { booleanValue: value } : undefined
+		case "number": {
+			const normalized = typeof value === "number" ? value : Number(String(value).trim())
+			if (Number.isNaN(normalized)) {
+				return undefined
+			}
+			if (field.allowedValueType === "integer") {
+				return Number.isInteger(normalized) ? { integerValue: normalized } : undefined
+			}
+			return { numberValue: normalized }
+		}
+		case "multi_select":
+		case "checkbox_group":
+			return Array.isArray(value)
+				? {
+						arrayValue: {
+							values: value
+								.filter((entry): entry is string => typeof entry === "string")
+								.map((entry) => ({ stringValue: entry })),
+						},
+					}
+				: undefined
+		case "dropdown":
+			if ((field.selectionCardinality ?? "single") === "single") {
+				return typeof value === "string" && value.trim().length > 0 ? { stringValue: value.trim() } : undefined
+			}
+			return Array.isArray(value)
+				? {
+						arrayValue: {
+							values: value
+								.filter((entry): entry is string => typeof entry === "string")
+								.map((entry) => ({ stringValue: entry })),
+						},
+					}
+				: undefined
+		case "radio_group":
+		case "date":
+		case "date_time":
+		case "file_path":
+		case "directory_path":
+		case "artifact_picker":
+		case "small_text":
+			if (typeof value !== "string") {
+				return undefined
+			}
+			if (value.trim().length === 0) {
+				return undefined
+			}
+			if (field.kind === "small_text" && field.allowedValueType === "integer") {
+				const normalized = Number(value.trim())
+				return Number.isInteger(normalized) ? { integerValue: normalized } : undefined
+			}
+			return { stringValue: value.trim() }
+		case "large_text":
+			if (field.allowedValueType === "array") {
+				const parsedArray = typeof value === "string" ? tryParseJson(value) : value
+				return Array.isArray(parsedArray)
+					? {
+							arrayValue: {
+								values: parsedArray.map((entry) => serializeUnknownValue(entry)),
+							},
+						}
+					: undefined
+			}
+			if (field.allowedValueType === "object") {
+				const parsedObject = typeof value === "string" ? tryParseJson(value) : value
+				return parsedObject && typeof parsedObject === "object" && !Array.isArray(parsedObject)
+					? {
+							objectValue: {
+								entries: Object.entries(parsedObject).map(([key, entryValue]) => ({
+									key,
+									value: serializeUnknownValue(entryValue),
+								})),
+							},
+						}
+					: undefined
+			}
+			return typeof value === "string" && value.length > 0 ? { stringValue: value } : undefined
+		default:
+			return typeof value === "string" && value.trim().length > 0 ? { stringValue: value.trim() } : undefined
+	}
+}
+
+function tryParseJson(value: string): unknown {
+	try {
+		return JSON.parse(value)
+	} catch {
+		return undefined
+	}
+}
+
+function serializeUnknownValue(value: unknown): any {
+	if (typeof value === "string") {
+		return { stringValue: value }
+	}
+	if (typeof value === "boolean") {
+		return { booleanValue: value }
+	}
+	if (typeof value === "number") {
+		return Number.isInteger(value) ? { integerValue: value } : { numberValue: value }
+	}
+	if (Array.isArray(value)) {
+		return {
+			arrayValue: {
+				values: value.map((entry) => serializeUnknownValue(entry)),
+			},
+		}
+	}
+	if (value && typeof value === "object") {
+		return {
+			objectValue: {
+				entries: Object.entries(value).map(([key, entryValue]) => ({
+					key,
+					value: serializeUnknownValue(entryValue),
+				})),
+			},
+		}
+	}
+
+	return { stringValue: String(value ?? "") }
 }
 
 /**
