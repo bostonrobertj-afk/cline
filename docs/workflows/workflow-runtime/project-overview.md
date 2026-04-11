@@ -160,7 +160,7 @@ these become typescript constants/variables declared in the workflow runtime lay
 ### Agent Personas
 - In current state, prompt-owned mapping lives in workflowPersonaRegistry and is consumed from task/index.ts.
 - Persona activation relies on agent files in BMAD folders
-- Agent metadata and allowlisting live in agent-manifest.csv and agent-workflow-allowlist.csv
+- Agent metadata and allowlisting live in agent-manifest.csv and agent-workflow-allowlist.json
 
 ## Subagents
 In the new architecture, if a subagent is assigned a workflow via useSkill, the subagent runtime activates that workflow in the child session only
