@@ -11,3 +11,136 @@
 - That work has been ongoing, with methodical expansion one workflow at a time. The recent challenge has been that the underlying capabilities, built in successive layers as described above, did not foresee the needs of other workflowss and were limited in their capabilities, leading to each workflow hard-coding bespoke mechanisms to use things like workflow forms and deterministic progression.
 - A decision has been made to pause the expansion of the existing capabilities and make a clean break from the placeholder workflow config, which treats a workflow markdown file as the canonical authority, to a true workflow runtime that orchestrates an active workflow across all of the various supporting mechanisms, such as focus chain, welcome panels, deterministic progression, and workflow forms.
 - You are stepping in at the point where we know we need to do this work, but we have not yet begun project disovery and documentation. The immediate focus will be on drafting the high-level architecture, which will inform requirements, which will in turn inform action plans for implementation.
+
+# Goals
+- Eliminate reliance on BMAD documents and placeholder workflow documents- this includes the workflow documents as well as supporting files such as templates, workflow or agent persona-related .yaml files, etc. These functionality these files supports should be migrated to back-end code so that runtime code is no longer reliant on user-accesible markdown files.
+- Create a canonical workflow runtime which is invoked by index.ts. Index.ts remains the primary app-level orchestrator- the workflow runtime simply acts as a subrunner when a workflow is active with workflow-specific orchestration responsibility
+- Purge the managed workflow capability from the system
+
+## Active Workflow Variable
+- Persist activeWorkflowName as the single indicator of which workflow is active, and retire:
+    - activePlaceholderWorkflowId
+    - activePlaceholderWorkflowSource
+    - activePlaceholderWorkflowName in prompt context
+    - Managed-workflow state in managedWorkflowRun
+
+## Two-Layer Workflow Architecture
+- Establish a central worklow runtime orchestrator backed by workflow-specific modules:
+    - workflow module says: what this workflow is, what steps exist, what prompt strings should be used during this workflow, what transitions are allowed, what capabilities each step needs, what prompt/tool/UI projections apply, and which specialized evaluators or handlers are available
+    - shared workflow runtime says: given that definition and the current workflow session state, what happens now
+- Workflow Runtime should contain:
+    workflow activation entrypoint
+    active workflow session creation
+    canonical active-workflow state ownership
+    workflow definition loading / resolution
+    current-step resolution from runtime state
+    lifecycle orchestration across turns
+    dispatch to the correct capability for the active step
+    focus-chain projection from workflow definition + session state
+    prompt-context projection for system-prompt assembly
+    tool-surface projection for contextual gating
+    workflow start-card invocation orchestration
+    workflow-form invocation orchestration
+    non-interactive deterministic step-resolution orchestration
+    progression evaluation / advancement orchestration
+    completion detection orchestration
+    teardown / cleanup orchestration
+    persistence and resume orchestration
+    capability handoff boundaries and contracts
+    fallback handling when deterministic paths fail
+    runtime validation of workflow definitions
+    observability / diagnostics / logging
+    shared runtime error handling
+    workflow session mutation rules
+- Workflow-specific modules should contain:
+    workflow identity and metadata
+    step graph and transition definitions
+    steps to feed focus chain
+    per-workflow prompt/persona overlays
+    per-step prompting
+    workflow-level tool gating defaults
+    per-step tool matrix
+    per-step progression rules
+    start card configuration
+    workflow form configuration(s)
+    deterministic step-resolution configuration
+    completion / teardown rules
+    resume-state requirements
+    references to any workflow-specific evaluators or handlers
+
+## Current Workflow Step Indicator
+- Current runtime code has focus chain markdown as the canonical indicator of which step is active
+- In new architecture, the shared workflow runtime owns the active step indicator.
+
+## Workflow Progression Logic
+- In the current runtime, deterministic workflow progression is housed as a child of the focus chain capability, and orchestrated by both focus-chain/index.ts and task/index.ts.
+- In new architecture, the workflow-specific modules should contain the details for each workflow's step progression logic, and the workflow runtime should use those rules to orchestrate step progression, updating the active workflow step variable to signal when progression has occurred.
+- workflow_progress_request will continue to be the mechanism through which the AI agent can request workflow step progression, but the tool must only be available to the AI Agent when the workflow runtime indicates it should be provided, and the "yes" response to the tool's UI ask should not progress the workflow directly- it should be handed to the workflow runtime, and the workflow runtime should validate that workflow_progress_request is a permitted progress mechanism for the current workflow step, then update the workflow step variable to signal progression.
+- task_progress will be retired- focus chain will only progress when the active step variable changes.
+    - This means the tools that the AI agent uses to directly progress the focus chain must also be retired.
+
+## Workflow Forms
+- In the current runtime, WorkflowFormRuntime owns building per-panel workflow form payloads.
+- In the new architecture, the workflow runtime owns building the per-panel worfklow form payloads
+    - This means workflowFormRuntime must be retired
+
+### Tool Calls Associated with Workflow Forms
+- In the current runtime, workflow form resolvers decide what tools should be called, what inputs from the workflow form to use, interpret tool results, and supply fallback error messaging. Tool execution happens in task/index.ts via executeWorkflowFormOperationAndSync, which calls this.toolExecutor.executeTool
+- In the new architecture, the workflow runtime should execute deterministic operations for workflow forms via the normal tool path, apply the result to workflow session state, and decide what happens next
+- This means that task/index.ts will no longer own executeWorkflowFormOperationandSync- this moves into the workflow runtime.
+
+##  Make persistence/resume a first-class objective.
+- In the current runtime, workflow persistence/resume is fragmented across TaskState, task metadata on disk, and capability-specific session blobs, including:
+    activeWorkflowId
+    activePlaceholderWorkflowId
+    activePlaceholderWorkflowSource
+    placeholder stable/dynamic values
+    placeholder deterministic state
+    placeholder write-proof paths
+    activeWorkflowFormSession
+    activeWorkflowStepResolutionSession
+    managedWorkflowRun
+- The new runtime should own the minimum persisted workflow session state needed to resume safely and reconstruct active workflow state.
+
+## Workflow Prompting
+- In the current runtime, workflow-related prompting is scattered across many prompting mechanisms including (but not limited to):
+    src/core/task/index.ts (line 2593)
+    buildWorkflowPromptInstructions() assembles workflow persona and BMAD/workflow reminder text.
+    src/core/task/index.ts (line 3905)
+    prompt-context assembly injects workflow identity, placeholder step context, deterministic flags, and workflow capability flags into SystemPromptContext.
+    src/core/workflows/placeholder-workflow-step-details.ts (line 170)
+    derives step-aware workflow prompt context from the checklist plus workflow source.
+    src/core/prompts/system-prompt/registry/workflowPersonaRegistry.ts (line 151)
+    maps workflow name to persona instructions.
+    src/core/prompts/system-prompt/components/agent_role.ts (line 10)
+    injects workflow persona text.
+    src/core/prompts/system-prompt/components/user_instructions.ts (line 10)
+    injects workflow reminder/custom workflow instructions.
+    src/core/prompts/system-prompt/components/task_progress.ts (line 62)
+    teaches workflow-specific progression behavior like workflow_progress_request vs task_progress.
+    src/core/prompts/system-prompt/components/continuation_turn.ts (line 13)
+    adds step-completion guidance again on continuation turns.
+    src/core/prompts/system-prompt/registry/contextualNativeToolFilter.ts (line 18)
+    workflow-step-specific tool gating shapes what the model can see.
+    src/core/task/focus-chain/index.ts (line 250)
+    separately injects “current workflow status” and “current workflow step” prompt text outside the system-prompt component path.
+- In the new architecture, workflow runtime builds canonical workflow prompt data for the turn, while system prompt uses that to build the final workflow prompt section from that data.
+- The workflow modules contain the actual step-specific prompt strings and export them
+- The workflow runtime sends a payload to the prompt architecture telling it which prompt strings to import on that turn
+- The prompt architecture imports those prompt strings and builds the system prompt.
+- Example of something that might live in a workflow module:
+        export const codeReviewPromptContent = {
+    step1: {
+        full: `Step 1:\n\nFollow these instructions:\n- Blah\n- Blah\n- Blah`,
+        minimal: `Step 1: Do blah, blah, blah.`,
+    },
+    }
+
+## Workflow Completion/ Teardown
+- In the current runtime, task/index.ts handles workflow teardown. Each turn, it checks to see if the last item in the active focus chain was completed. If so, it calls workflowCompletionHandler, then teardownCompletedPlaceholderWorkflow, which clears all workflow-related task state, claers the checklist progression, and persists the cleared metadata. 
+- In the new architecture, the workflow runtime should own completion detection, and should own teardown of the canonical workflow session. Focus chain, prompt state, and other surfaces are then cleared as downstream projections of that teardown. 
+
+## Maintain external specialist capabilities
+- The workflow runtime should not in-line existing specialist capabilities such as workflow forms or tool execution.
+
+
