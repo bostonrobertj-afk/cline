@@ -23,6 +23,7 @@
     - activePlaceholderWorkflowSource
     - activePlaceholderWorkflowName in prompt context
     - Managed-workflow state in managedWorkflowRun
+- activeWorkflowName is the sole canonical workflow-identity flag answering whether a workflow is active and which workflow is active; it is not the carrier for workflow session state, active step state, or per-turn orchestration state.”
 
 ## Two-Layer Workflow Architecture
 - Establish a central worklow runtime orchestrator backed by workflow-specific modules:
@@ -78,6 +79,8 @@
 - workflow_progress_request will continue to be the mechanism through which the AI agent can request workflow step progression, but the tool must only be available to the AI Agent when the workflow runtime indicates it should be provided, and the "yes" response to the tool's UI ask should not progress the workflow directly- it should be handed to the workflow runtime, and the workflow runtime should validate that workflow_progress_request is a permitted progress mechanism for the current workflow step, then update the workflow step variable to signal progression.
 - task_progress will be retired- focus chain will only progress when the active step variable changes.
     - This means the tools that the AI agent uses to directly progress the focus chain must also be retired.
+    - This means that focus chain becomes a feature that only supports active workflows.
+- WorkflowStepResolutionRegistry should be retired- the information there belongs in the workflow modules, and is used during workflow orchestration by the workflow runtime. 
 
 ## Workflow Forms
 - In the current runtime, WorkflowFormRuntime owns building per-panel workflow form payloads.
@@ -135,6 +138,7 @@
         minimal: `Step 1: Do blah, blah, blah.`,
     },
     }
+- workflow reminders- these need to be retired or migrated to operate within the architecture described above.
 
 ## Workflow Completion/ Teardown
 - In the current runtime, task/index.ts handles workflow teardown. Each turn, it checks to see if the last item in the active focus chain was completed. If so, it calls workflowCompletionHandler, then teardownCompletedPlaceholderWorkflow, which clears all workflow-related task state, claers the checklist progression, and persists the cleared metadata. 
@@ -143,4 +147,45 @@
 ## Maintain external specialist capabilities
 - The workflow runtime should not in-line existing specialist capabilities such as workflow forms or tool execution.
 
+## Workflow Support Files
 
+### workflow-config.yaml
+these become typescript constants/variables declared in the workflow runtime layer, likely in something like workflowRuntimeConfig.ts, and exported for use elsewhere when needed.
+
+
+### Workflow Document Templates
+- In current runtime workflows rely on markdown files as templates for workflow-emitted documentation.
+- In the new architecture, workflow modules own coded definitions for document layout, and tools use that code to produce markdown documents during workflows.
+
+### Agent Personas
+- In current state, prompt-owned mapping lives in workflowPersonaRegistry and is consumed from task/index.ts.
+- Persona activation relies on agent files in BMAD folders
+- Agent metadata and allowlisting live in agent-manifest.csv and agent-workflow-allowlist.csv
+
+## Subagents
+In the new architecture, if a subagent is assigned a workflow via useSkill, the subagent runtime activates that workflow in the child session only
+the child gets its own:
+    activeWorkflowName
+    workflow session state
+    active step
+    prompt projection
+    tool gating
+    completion/teardown
+    the parent keeps its own workflow session untouched
+
+## Workflow Start Cards
+- In the new architecture, this capability remains outside workflow runtime, but workflow runtime passes the info needed to render a start card for each workflow.
+
+## BMAD packaging/skill enablement
+- This will be retired. It exists because of the current dependency on BMAD files. Once all necessary content lives in runtime code it will be redundant.
+
+## Discovery/Activation
+- resolveAvailableWorkflows.ts will be retired- this app will not support user-authored workflows, so does not need that registration and detection functionality.
+- workflow-activation.ts will be retired- this file's functionality belongs in 2 places- task/index.ts detects the invocation method (slash command or useSkill), then sets activeWorkflowName, and the rest of this file's accountability belongs in the workflow runtime.
+- The repo will need a canonical inventory of registered workflows.
+- workflow-placeholders.ts will be retired- workflow placeholders only exist because the current runtime has to turn markdown file scripting into dynamic prompts at runtime. In the new architecture, workflow step instructions can be rendered in Typescript from real values in scope, meaning:
+    placeholder substitution is no longer a first-class workflow runtime concern
+    workflow modules can express dynamic instructions as normal code
+    workflow config becomes typed data, not token replacement
+    unresolved-placeholder failure modes disappear entirely
+What remains of workflow-placeholder.ts' accountability (read config/state, compute needed value, project into prompt text or UI payload) is owned by the workflow runtime. 
