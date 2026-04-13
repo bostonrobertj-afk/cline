@@ -27,47 +27,47 @@ This document inventories every placeholder workflow currently present in `/User
 
 ## Inventory
 
-| Workflow | Persona | Notes |
+| Workflow | Persona | Notes | project subfolder |
 | --- | --- | --- |
-| `advanced-elicitation.md` | `analyst` | New explicit mapping |
-| `blind-review.md` | `quality-control` | New explicit mapping. |
-| `brainstorming.md` | `analyst` | Preserves current unique owner (`bmad-analyst`). |
-| `check-implementation-readiness.md` | `architect` | Preserves current unique owner (`bmad-architect`). |
-| `cis-design-thinking.md` | `ux-designer` |  New explicit mapping |
-| `cis-innovation-strategy.md` | `architect` | No unique current automatic owner. |
-| `cis-problem-solving.md` | `analyst` |  New explicit mapping |
-| `cis-storytelling.md` | `creative-writer` | No unique current automatic owner. |
-| `code-review.md` | `quality-control` | Overrides prior developer ownership. |
-| `correct-course.md` | `scrum-master` | Preserves current unique owner (`bmad-sm`). |
-| `create-architecture.md` | `architect` | Preserves current unique owner (`bmad-architect`). |
-| `create-epics-and-stories.md` | `product-manager` | Preserves current unique owner (`bmad-pm`). |
-| `create-prd.md` | `product-manager` | Preserves current unique owner (`bmad-pm`). |
-| `create-product-brief.md` | `analyst` | Preserves current unique owner (`bmad-analyst`). |
-| `create-story.md` | `scrum-master` | Preserves current unique owner (`bmad-sm`). |
-| `create-ux-design.md` | `ux-designer` | Preserves current unique owner (`bmad-ux-designer`). |
-| `dev-story.md` | `developer` | Preserves current unique owner (`bmad-dev`). |
-| `distillator.md` | `unassigned` | No unique current automatic owner. |
-| `document-project.md` | `analyst` | Preserves current unique owner (`bmad-analyst`). |
-| `domain-research.md` | `analyst` | Preserves current unique owner (`bmad-analyst`). |
-| `edit-prd.md` | `product-manager` | Preserves current unique owner (`bmad-pm`). |
-| `editorial-review-prose.md` | `tech-writer` | Preserves current unique owner (`bmad-tech-writer`). |
-| `editorial-review-structure.md` | `tech-writer` | Preserves current unique owner (`bmad-tech-writer`). |
-| `generate-project-context.md` | `analyst` | Preserves current unique owner (`bmad-analyst`). |
-| `help.md` | `unassigned` | No unique current automatic owner. |
-| `index-docs.md` | `tech-writer` | Preserves current unique owner (`bmad-tech-writer`). |
-| `market-research.md` | `analyst` | Preserves current unique owner (`bmad-analyst`). |
-| `pi-planning.md` | `scrum-master` | New explicit mapping. |
-| `qa-generate-e2e-tests.md` | `quality-control` | Preserves current unique owner (`bmad-qa`). |
-| `quick-dev-new-preview.md` | `quick-flow-solo-dev` | Preserves current unique owner (`bmad-quick-flow-solo-dev`). |
-| `quick-dev.md` | `quick-flow-solo-dev` | Preserves current unique owner (`bmad-quick-flow-solo-dev`). |
-| `quick-spec.md` | `quick-flow-solo-dev` | Preserves current unique owner (`bmad-quick-flow-solo-dev`). |
-| `retrospective.md` | `scrum-master` | Preserves current unique owner (`bmad-sm`). |
-| `review-adversarial-general.md` | `quality-control` | Overrides prior developer ownership. |
-| `review-edge-case-hunter.md` | `quality-control` | Overrides prior developer ownership. |
-| `shard-doc.md` | `tech-writer` | Preserves current unique owner (`bmad-tech-writer`). |
-| `sprint-planning.md` | `scrum-master` | Preserves current unique owner (`bmad-sm`). |
-| `sprint-status.md` | `scrum-master` | Preserves current unique owner (`bmad-sm`). |
-| `teach-me-testing.md` | `master-test-architect` | Preserves current unique owner (`bmad-tea`). |
-| `technical-research.md` | `analyst` | Preserves current unique owner (`bmad-analyst`). |
-| `validate-prd.md` | `product-manager` | Preserves current unique owner (`bmad-pm`). |
-| `write-remediation-story.md` | `developer` | New explicit mapping. |
+| `advanced-elicitation.md` | `analyst` | New explicit mapping | planning |
+| `blind-review.md` | `quality-control` | New explicit mapping. | review |
+| `brainstorming.md` | `analyst` | Preserves current unique owner (`bmad-analyst`). | discovery |
+| `check-implementation-readiness.md` | `architect` | Preserves current unique owner (`bmad-architect`). | planning |
+| `cis-design-thinking.md` | `ux-designer` |  New explicit mapping | planning |
+| `cis-innovation-strategy.md` | `architect` | No unique current automatic owner. | planning |
+| `cis-problem-solving.md` | `analyst` |  New explicit mapping | discovery |
+| `cis-storytelling.md` | `creative-writer` | No unique current automatic owner. | implementation |
+| `code-review.md` | `quality-control` | Overrides prior developer ownership. | review |
+| `correct-course.md` | `scrum-master` | Preserves current unique owner (`bmad-sm`). | planning |
+| `create-architecture.md` | `architect` | Preserves current unique owner (`bmad-architect`). | planning |
+| `create-epics-and-stories.md` | `product-manager` | Preserves current unique owner (`bmad-pm`). | planning |
+| `create-prd.md` | `product-manager` | Preserves current unique owner (`bmad-pm`). | planning |
+| `create-product-brief.md` | `analyst` | Preserves current unique owner (`bmad-analyst`). | planning |
+| `create-story.md` | `scrum-master` | Preserves current unique owner (`bmad-sm`). | planning |
+| `create-ux-design.md` | `ux-designer` | Preserves current unique owner (`bmad-ux-designer`). | planning |
+| `dev-story.md` | `developer` | Preserves current unique owner (`bmad-dev`). | implementation |
+| `distillator.md` | `unassigned` | No unique current automatic owner. | implementation |
+| `document-project.md` | `analyst` | Preserves current unique owner (`bmad-analyst`). | implementation |
+| `domain-research.md` | `analyst` | Preserves current unique owner (`bmad-analyst`). | discovery |
+| `edit-prd.md` | `product-manager` | Preserves current unique owner (`bmad-pm`). | discovery |
+| `editorial-review-prose.md` | `tech-writer` | Preserves current unique owner (`bmad-tech-writer`). | review |
+| `editorial-review-structure.md` | `tech-writer` | Preserves current unique owner (`bmad-tech-writer`). | review |
+| `generate-project-context.md` | `analyst` | Preserves current unique owner (`bmad-analyst`). | implementation |
+| `help.md` | `unassigned` | No unique current automatic owner. | planning |
+| `index-docs.md` | `tech-writer` | Preserves current unique owner (`bmad-tech-writer`). | implementation |
+| `market-research.md` | `analyst` | Preserves current unique owner (`bmad-analyst`). | discovery |
+| `pi-planning.md` | `scrum-master` | New explicit mapping. | planning |
+| `qa-generate-e2e-tests.md` | `quality-control` | Preserves current unique owner (`bmad-qa`). | testing |
+| `quick-dev-new-preview.md` | `quick-flow-solo-dev` | Preserves current unique owner (`bmad-quick-flow-solo-dev`). | implementation |
+| `quick-dev.md` | `quick-flow-solo-dev` | Preserves current unique owner (`bmad-quick-flow-solo-dev`). | implementation |
+| `quick-spec.md` | `quick-flow-solo-dev` | Preserves current unique owner (`bmad-quick-flow-solo-dev`). | planning |
+| `retrospective.md` | `scrum-master` | Preserves current unique owner (`bmad-sm`). | planning |
+| `review-adversarial-general.md` | `quality-control` | Overrides prior developer ownership. | review |
+| `review-edge-case-hunter.md` | `quality-control` | Overrides prior developer ownership. | review |
+| `shard-doc.md` | `tech-writer` | Preserves current unique owner (`bmad-tech-writer`). | implementation |
+| `sprint-planning.md` | `scrum-master` | Preserves current unique owner (`bmad-sm`). | planning |
+| `sprint-status.md` | `scrum-master` | Preserves current unique owner (`bmad-sm`). | planning |
+| `teach-me-testing.md` | `master-test-architect` | Preserves current unique owner (`bmad-tea`). | testing |
+| `technical-research.md` | `analyst` | Preserves current unique owner (`bmad-analyst`). | discovery |
+| `validate-prd.md` | `product-manager` | Preserves current unique owner (`bmad-pm`). | planning |
+| `write-remediation-story.md` | `developer` | New explicit mapping. | planning |

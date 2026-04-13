@@ -41,6 +41,7 @@ The architecture is constrained by the following discovery decisions and existin
 - Workflows will ship with the product and will be registered in product-owned runtime code.
 - Managed workflows are being retired.
 - Workflow placeholders are being retired as a concept.
+- Workflow-owned values discovered during execution still require one canonical runtime-owned persistence surface after placeholder workflows are retired.
 - Focus chain becomes a workflow-only downstream surface and no longer owns active-step state.
 - `task_progress` is retired.
 - The system prompt architecture remains responsible for final prompt assembly.
@@ -60,6 +61,7 @@ This architecture covers:
 - workflow activation after slash-command or `useSkill` invocation
 - workflow definition resolution from a product-owned registry
 - workflow session state ownership
+- workflow value ownership and mutation
 - active-step ownership
 - lifecycle orchestration across turns
 - workflow prompting projection into the system prompt architecture
@@ -113,7 +115,10 @@ The solution strategy is to replace the current document-owned workflow model wi
 The shared workflow runtime owns lifecycle and orchestration:
 
 - activation entrypoint
+- pre-workflow project bootstrap gate
 - workflow session creation and mutation
+- workflow value mutation and validation
+- shared artifact identity and numbering policy
 - current-step resolution from session state
 - orchestration across turns
 - dispatch to specialist capabilities
@@ -131,6 +136,7 @@ Each workflow-specific module owns workflow definition and workflow-owned conten
 - deterministic step-resolution definitions
 - completion and teardown rules
 - workflow-owned artifact/document builders
+- workflow-owned value rules, including explicit child-session inheritance rules where needed
 - references to workflow-specific evaluators or handlers
 
 The architecture intentionally removes several current concepts as canonical owners:
@@ -156,9 +162,11 @@ The workflow runtime slice is composed of the following major building blocks:
    Product-owned inventory of shipped workflows and their canonical identifiers.
 4. Workflow Modules
    One code-owned module per workflow implementing the runtime contract.
-5. Runtime Projection Adapters
+5. Workflow Value Mutation Seam
+   Canonical runtime-owned seam for persisting workflow values into the active session from backend logic or AI-callable tool paths.
+6. Runtime Projection Adapters
    Translate workflow session state into downstream prompt, focus-chain, form, and start-card payloads.
-6. Specialist Capabilities
+7. Specialist Capabilities
    Existing external capabilities that the runtime orchestrates rather than absorbs.
 
 ### 5.2 Level 2
@@ -175,11 +183,27 @@ Responsibilities:
 
 Responsibilities:
 
+- run the shared pre-workflow gate before workflow-specific step orchestration begins
+- obtain or resolve project identity for the active workflow session
+- drive the shared pre-workflow project-selection flow before workflow-specific step orchestration begins:
+  - present a `new` versus `existing` project choice
+  - if `existing` is chosen, project choices are derived from the per-project folder names beneath the visible project output root
+  - if `new` is chosen, collect a user-provided project title
+- ensure the per-project folder exists and that these canonical project subfolders exist within that project folder before workflow-specific artifact-producing steps can run:
+  - `discovery`
+  - `planning`
+  - `implementation`
+  - `review`
+  - `testing`
 - create and own workflow session state per execution context
+- create and own the canonical workflow value map for each workflow session
+- create and own canonical normalization of user-provided project titles into filesystem-safe project identity
+- create and own the canonical artifact identity and numbering chain used across related workflow outputs
 - load workflow definition by `activeWorkflowName`
 - determine active step from session state
 - orchestrate workflow lifecycle across turns
 - orchestrate multiple concurrent workflow sessions across parent and child execution contexts
+- validate and apply workflow-value mutations from backend-owned logic and AI-callable tool paths
 - validate allowed transitions and progression mechanisms
 - coordinate completion and teardown
 - persist and restore workflow session state
@@ -197,13 +221,24 @@ Responsibilities:
 Responsibilities:
 
 - declare workflow metadata
+- declare the canonical project subfolder designation for the workflow
 - declare step graph and transition rules
 - declare per-step prompt content
 - declare workflow-level and per-step native tool schema
 - declare workflow start-card and form configuration
 - declare deterministic step-resolution rules
 - declare workflow-owned artifact/document builders
+- declare expected workflow values and any explicit child-session inheritance rules
 - declare completion rules and workflow-specific handlers
+
+#### Workflow Value Mutation Seam
+
+Responsibilities:
+
+- provide one canonical runtime-owned way to persist workflow values into the active session
+- support backend-owned writes to workflow values
+- support AI-callable writes to workflow values
+- ensure both write paths target the same workflow session state surface
 
 #### Runtime Projection Adapters
 
@@ -249,8 +284,18 @@ Exact filenames beyond this level are deferred to requirements and implementatio
 3. `task/index.ts` invokes the workflow runtime activation entrypoint.
 4. Workflow runtime resolves the workflow definition from the shipped workflow registry.
 5. Workflow runtime creates or resumes the workflow session.
-6. Workflow runtime initializes active-step state and marks the workflow as just started.
-7. Workflow runtime projects downstream state for prompts, focus chain, tools, and any workflow start UI.
+6. Workflow runtime runs the shared pre-workflow gate to obtain or resolve project identity:
+   - present a `new` versus `existing` project choice
+   - if `existing` is chosen, populate the selection choices from the per-project folder names beneath the visible project output root
+   - if `new` is chosen, collect a user-provided project title
+7. Workflow runtime normalizes the chosen or provided project identity, ensures the per-project folder exists, and ensures these canonical project subfolders within that project folder are ready:
+   - `discovery`
+   - `planning`
+   - `implementation`
+   - `review`
+   - `testing`
+8. Workflow runtime initializes active-step state and marks the workflow as just started.
+9. Workflow runtime projects downstream state for prompts, focus chain, tools, and any workflow start UI.
 
 ### 6.2 Scenario: Normal Turn Orchestration
 
@@ -274,6 +319,14 @@ Exact filenames beyond this level are deferred to requirements and implementatio
    - keeps the workflow on the same step
    - advances the step
    - falls back to the model-driven path
+
+### 6.3a Scenario: Workflow Value Persistence
+
+1. A workflow turn discovers or computes one or more workflow values.
+2. The values may come from backend-owned deterministic logic or from an AI-callable workflow-value persistence tool.
+3. Workflow runtime validates that the write is allowed for the active workflow session.
+4. Workflow runtime writes the values into the active session's canonical workflow value map.
+5. Downstream prompt, artifact-path, form, and focus-chain projections consume those values from workflow session state.
 
 ### 6.4 Scenario: Deterministic Step Resolution
 
@@ -299,15 +352,19 @@ Exact filenames beyond this level are deferred to requirements and implementatio
 1. Workflow runtime evaluates workflow completion rules after a step mutation.
 2. If completion criteria are satisfied, workflow runtime executes any workflow-specific completion handling.
 3. Workflow runtime tears down the canonical workflow session.
-4. Downstream prompt, focus-chain, UI, and persisted workflow state are cleared as projections of that teardown.
+4. Because workflow-owned values live inside that session, teardown clears workflow values by clearing the workflow session rather than by clearing separate mirrored state.
+5. Downstream prompt, focus-chain, UI, and persisted workflow state are cleared as projections of that teardown.
 
 ### 6.7 Scenario: Subagent Workflow Session
 
 1. A subagent is created.
 2. The subagent runner creates a child execution context but does not become a separate workflow orchestrator.
 3. If the subagent is assigned a workflow through `useSkill`, the shared workflow runtime activates that workflow in the child session only.
-4. The child session gets its own workflow identity, session state, active step, prompt projection, tool gating, and completion lifecycle.
-5. The parent workflow session remains unchanged.
+4. The workflow module may declare specific workflow values that should be initialized in the child session from values already present in the parent session.
+5. Workflow runtime copies only those explicitly declared inherited values into the child session during activation.
+6. The child session gets its own workflow identity, session state, workflow values, active step, prompt projection, tool gating, and completion lifecycle.
+7. After activation, parent and child workflow values are isolated mutable state unless a higher-level coordination behavior explicitly synchronizes them.
+8. The parent workflow session remains unchanged by child-session mutations.
 
 ### 6.8 Scenario: Concurrent Parent and Child Workflow Sessions
 
@@ -350,6 +407,7 @@ Subagent workflow sessions are logical child execution contexts inside the same 
 The workflow runtime owns:
 
 - active workflow session
+- workflow-owned values contained within the active workflow session
 - active step
 - progression status
 - completion state
@@ -376,6 +434,8 @@ Workflow behavior moves into code-owned workflow modules, including:
 - document/artifact builders
 
 This removes the need for placeholder substitution as a first-class runtime concept.
+
+Workflow-owned values remain a first-class concept, but they are session-owned runtime state rather than placeholder-system state.
 
 ### 8.4 Workflow-Owned Tool Exposure
 
@@ -411,6 +471,7 @@ The new runtime owns the minimum persisted workflow session state needed to reco
 
 - which workflow is active
 - what step is active
+- what workflow values have been persisted for the active session
 - what progression state exists
 - what workflow-owned UI or deterministic state still matters
 
@@ -421,12 +482,98 @@ Workflow sessions are execution-context-local, but they are all owned by the sam
 - parent and child sessions are separate
 - the subagent runner is only a caller/bootstrap seam for child execution contexts, not a distinct workflow orchestrator
 - assigned child workflows are activated only in child state
+- child-session workflow values may be initialized from parent-session values only through workflow-module-declared inheritance rules
+- parent and child sessions do not share one mutable workflow-value map
 - parent workflow identity and state are not overwritten by child workflow activation
 - the shared runtime may orchestrate multiple parent/child workflow sessions simultaneously
 
 ### 8.9 Workflow-Owned Artifact Builders
 
 Workflow-emitted markdown artifacts remain output artifacts, but their template/source ownership moves into runtime code. Workflow modules own coded artifact definitions and builders rather than markdown template files as runtime dependencies.
+
+Each shipped workflow has one canonical designated project subfolder, and workflow runtime uses that designation when resolving the workflow's artifact destinations inside the selected project folder.
+
+Workflow runtime owns the shared artifact identity and numbering policy used to connect related workflow outputs inside a project.
+
+That numbering policy must carry forward across related artifact families, for example:
+
+- the epics document assigns canonical epic numbers
+- epic delivery specs consume those epic numbers
+- epic delivery specs assign canonical story numbers within an epic
+- story documents consume the composite epic/story identifiers
+- remediation stories extend the same identifier lineage rather than inventing a new naming scheme
+
+Workflow runtime also owns canonical normalization of user-provided project titles into filesystem-safe project identity.
+
+At the architectural level, that means:
+
+- the user-provided project title is preserved as human-facing project text
+- runtime derives a separate filesystem-safe identity from that title for folder creation and path resolution
+- invalid filesystem characters are removed or replaced during normalization
+- leading and trailing whitespace is removed
+- internal whitespace is collapsed into a single separator
+- casing is normalized consistently
+- repeated separators are collapsed
+- if normalization would produce an empty filesystem identity, runtime must reject the title rather than inventing an arbitrary folder name
+
+Workflow artifact and project discovery remain convention-driven filesystem behavior rather than hidden registry behavior.
+
+At the architectural level, that means:
+
+- runtime re-discovers projects and workflow artifacts from on-disk folder placement and naming conventions
+- runtime does not rely on a hidden project/artifact registry to recover identity when user-visible names change
+- workflow automation is only guaranteed for artifacts that continue to match the documented naming and placement conventions
+- if a user renames a project folder or artifact so it no longer matches the expected convention, downstream workflows may no longer recognize it
+- that outcome is acceptable within this architecture and is treated as user-managed document hygiene rather than runtime data corruption
+
+### 8.10 Canonical Workflow Mapping
+
+The canonical shipped workflow mapping for this architecture is:
+
+| Workflow | Persona | Project Subfolder |
+| --- | --- | --- |
+| `advanced-elicitation.md` | `analyst` | `planning` |
+| `blind-review.md` | `quality-control` | `review` |
+| `brainstorming.md` | `analyst` | `discovery` |
+| `check-implementation-readiness.md` | `architect` | `planning` |
+| `cis-design-thinking.md` | `ux-designer` | `planning` |
+| `cis-innovation-strategy.md` | `architect` | `planning` |
+| `cis-problem-solving.md` | `analyst` | `discovery` |
+| `cis-storytelling.md` | `creative-writer` | `implementation` |
+| `code-review.md` | `quality-control` | `review` |
+| `correct-course.md` | `scrum-master` | `planning` |
+| `create-architecture.md` | `architect` | `planning` |
+| `create-epics-and-stories.md` | `product-manager` | `planning` |
+| `create-prd.md` | `product-manager` | `planning` |
+| `create-product-brief.md` | `analyst` | `planning` |
+| `create-story.md` | `scrum-master` | `planning` |
+| `create-ux-design.md` | `ux-designer` | `planning` |
+| `dev-story.md` | `developer` | `implementation` |
+| `distillator.md` | `unassigned` | `implementation` |
+| `document-project.md` | `analyst` | `implementation` |
+| `domain-research.md` | `analyst` | `discovery` |
+| `edit-prd.md` | `product-manager` | `discovery` |
+| `editorial-review-prose.md` | `tech-writer` | `review` |
+| `editorial-review-structure.md` | `tech-writer` | `review` |
+| `generate-project-context.md` | `analyst` | `implementation` |
+| `help.md` | `unassigned` | `planning` |
+| `index-docs.md` | `tech-writer` | `implementation` |
+| `market-research.md` | `analyst` | `discovery` |
+| `pi-planning.md` | `scrum-master` | `planning` |
+| `qa-generate-e2e-tests.md` | `quality-control` | `testing` |
+| `quick-dev-new-preview.md` | `quick-flow-solo-dev` | `implementation` |
+| `quick-dev.md` | `quick-flow-solo-dev` | `implementation` |
+| `quick-spec.md` | `quick-flow-solo-dev` | `planning` |
+| `retrospective.md` | `scrum-master` | `planning` |
+| `review-adversarial-general.md` | `quality-control` | `review` |
+| `review-edge-case-hunter.md` | `quality-control` | `review` |
+| `shard-doc.md` | `tech-writer` | `implementation` |
+| `sprint-planning.md` | `scrum-master` | `planning` |
+| `sprint-status.md` | `scrum-master` | `planning` |
+| `teach-me-testing.md` | `master-test-architect` | `testing` |
+| `technical-research.md` | `analyst` | `discovery` |
+| `validate-prd.md` | `product-manager` | `planning` |
+| `write-remediation-story.md` | `developer` | `planning` |
 
 ## 9. Architectural Decisions
 
@@ -485,6 +632,55 @@ Rationale:
 
 - subagents receive explicit workflow assignment through `useSkill`
 - child workflow activation must not overwrite parent workflow state
+
+### AD-9: Workflow values are session-owned and use one canonical mutation seam
+
+Rationale:
+
+- workflow values discovered during execution still need a runtime-owned persisted carrier after placeholder workflows are retired
+- backend-owned writes and AI-callable writes must target the same state surface to avoid split ownership
+- teardown is safest when clearing the workflow session also clears workflow-owned values
+
+### AD-10: Child-session workflow-value inheritance is explicit and copy-based
+
+Rationale:
+
+- some child workflows need selected parent values to initialize correctly
+- automatic inheritance of all matching keys would create hidden coupling
+- copy-based initialization preserves parent/child isolation while still supporting same-key inheritance where explicitly declared
+
+### AD-11: Workflow runtime owns hierarchical artifact identity and numbering
+
+Rationale:
+
+- related workflow outputs depend on a shared numbering lineage across epics, delivery specs, stories, and remediation stories
+- distributing numbering logic across workflow modules would recreate drift and fragmented methodology
+- one runtime-owned numbering policy provides a single canonical identity chain for related artifacts inside a project
+
+### AD-12: Workflow runtime normalizes project titles into filesystem-safe identity
+
+Rationale:
+
+- user-provided project titles are human-facing text, not a safe filesystem contract
+- runtime needs a deterministic and cross-platform-safe folder identity for project output persistence
+- keeping display title separate from filesystem identity prevents whitespace, casing, and invalid-character variance from creating unstable path behavior
+
+### AD-13: Workflow discovery is convention-driven and filesystem-visible
+
+Rationale:
+
+- the chosen architecture keeps projects and workflow artifacts user-accessible on disk
+- hidden registry ownership is not required for this model
+- downstream workflow automation can rely on documented folder and filename conventions rather than opaque internal identity tracking
+
+### AD-14: Same-project concurrency is not a first-class runtime problem
+
+Rationale:
+
+- the intended operating model is a single user working in a normal workspace and source-control flow rather than multiple humans concurrently mutating the same project artifacts outside branch hygiene
+- parent and subagent workflow sessions may run concurrently, but the architecture does not introduce a dedicated locking, serialization, or anti-collision subsystem for that case
+- the runtime is designed around normal filesystem behavior and documented artifact conventions rather than a hidden coordination layer
+
 
 ## 10. Risks and Technical Debt
 
