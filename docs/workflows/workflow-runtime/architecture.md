@@ -6,7 +6,7 @@ This document translates the workflow runtime project overview into a high-level
 
 The core problem is that workflow behavior is currently fragmented across placeholder workflow markdown, focus chain ownership, prompt assembly seams, workflow forms, deterministic step handlers, task state, and BMAD support files. That fragmentation has made workflow expansion increasingly bespoke and has created multiple competing owners for workflow identity, step state, prompting, progression, and teardown.
 
-The proposed architecture introduces a shared workflow runtime that is invoked by `task/index.ts` whenever a workflow is active. `task/index.ts` remains the primary application-level orchestrator. The workflow runtime acts as a workflow-specific subrunner responsible for workflow session lifecycle, orchestration, and projection into existing specialist capabilities.
+The proposed architecture introduces a shared workflow runtime that is invoked by `task/index.ts` whenever an in-scope workflow is active. `task/index.ts` remains the primary application-level orchestrator. The workflow runtime acts as a workflow-specific subrunner responsible for workflow session lifecycle, orchestration, and projection into existing specialist capabilities.
 
 The primary goals are:
 
@@ -58,7 +58,7 @@ The system under design is the workflow runtime slice inside the extension backe
 
 This architecture covers:
 
-- workflow activation after slash-command or `useSkill` invocation
+- workflow activation after slash-command or `useSkill` invocation for the in-scope workflow set
 - workflow definition resolution from a product-owned registry
 - workflow session state ownership
 - workflow value ownership and mutation
@@ -71,6 +71,25 @@ This architecture covers:
 - deterministic step-resolution orchestration
 - progression, completion, teardown, persistence, and resume
 - subagent-local workflow sessions
+- the following in-scope workflow set only:
+  - `brainstorming.md`
+  - `create-prd.md`
+  - `create-architecture.md`
+  - `create-epics.md`
+  - `pi-planning.md`
+  - `create-story.md`
+  - `dev-story.md`
+  - `code-review.md`
+  - `review-adversarial-general.md`
+  - `review-edge-case-hunter.md`
+  - `blind-review.md`
+  - `problem-solving.md`
+  - `create-product-brief.md`
+  - `document-project.md`
+  - `quick-spec.md`
+  - `quick-dev.md`
+  - `correct-course.md`
+  - `write-remediation-story.md`
 
 ### 3.3 Out of Scope
 
@@ -81,6 +100,7 @@ This architecture does not redesign:
 - the internal implementation details of the generic tool executor
 - the internal implementation details of the generic system prompt builder
 - the generic UI rendering internals of the workflow start-card or workflow form surfaces
+- migration of any shipped workflow outside the in-scope workflow set listed in Section 3.2
 
 ### 3.4 External Interfaces and Neighboring Systems
 
@@ -107,10 +127,10 @@ The workflow runtime interacts with the following neighboring systems:
 
 ## 4. Solution Strategy
 
-The solution strategy is to replace the current document-owned workflow model with a two-layer code-owned model:
+The solution strategy is to replace the current document-owned workflow model for the in-scope workflow set with a two-layer code-owned model:
 
 - one shared workflow runtime/orchestrator
-- one workflow-specific module per shipped workflow
+- one workflow-specific module per in-scope workflow
 
 The shared workflow runtime owns lifecycle and orchestration:
 
@@ -159,7 +179,7 @@ The workflow runtime slice is composed of the following major building blocks:
 2. Shared Workflow Runtime
    Canonical orchestrator for workflow lifecycle and session state across main-agent and subagent execution contexts.
 3. Workflow Registry
-   Product-owned inventory of shipped workflows and their canonical identifiers.
+   Product-owned inventory of in-scope workflows and their canonical identifiers for this initiative.
 4. Workflow Modules
    One code-owned module per workflow implementing the runtime contract.
 5. Workflow Value Mutation Seam
@@ -212,7 +232,7 @@ Responsibilities:
 
 Responsibilities:
 
-- define the canonical inventory of shipped workflows
+- define the canonical inventory of in-scope workflows for this initiative
 - map slash command and `useSkill` entrypoints to workflow ids
 - resolve workflow id to workflow module
 
@@ -528,52 +548,30 @@ At the architectural level, that means:
 
 ### 8.10 Canonical Workflow Mapping
 
-The canonical shipped workflow mapping for this architecture is:
+The canonical in-scope workflow mapping for this architecture is:
 
 | Workflow | Persona | Project Subfolder |
 | --- | --- | --- |
-| `advanced-elicitation.md` | `analyst` | `planning` |
 | `blind-review.md` | `quality-control` | `review` |
 | `brainstorming.md` | `analyst` | `discovery` |
-| `check-implementation-readiness.md` | `architect` | `planning` |
-| `cis-design-thinking.md` | `ux-designer` | `planning` |
-| `cis-innovation-strategy.md` | `architect` | `planning` |
-| `cis-problem-solving.md` | `analyst` | `discovery` |
-| `cis-storytelling.md` | `creative-writer` | `implementation` |
 | `code-review.md` | `quality-control` | `review` |
 | `correct-course.md` | `scrum-master` | `planning` |
 | `create-architecture.md` | `architect` | `planning` |
-| `create-epics-and-stories.md` | `product-manager` | `planning` |
+| `create-epics.md` | `product-manager` | `planning` |
 | `create-prd.md` | `product-manager` | `planning` |
 | `create-product-brief.md` | `analyst` | `planning` |
 | `create-story.md` | `scrum-master` | `planning` |
-| `create-ux-design.md` | `ux-designer` | `planning` |
 | `dev-story.md` | `developer` | `implementation` |
-| `distillator.md` | `unassigned` | `implementation` |
 | `document-project.md` | `analyst` | `implementation` |
-| `domain-research.md` | `analyst` | `discovery` |
-| `edit-prd.md` | `product-manager` | `discovery` |
-| `editorial-review-prose.md` | `tech-writer` | `review` |
-| `editorial-review-structure.md` | `tech-writer` | `review` |
-| `generate-project-context.md` | `analyst` | `implementation` |
-| `help.md` | `unassigned` | `planning` |
-| `index-docs.md` | `tech-writer` | `implementation` |
-| `market-research.md` | `analyst` | `discovery` |
 | `pi-planning.md` | `scrum-master` | `planning` |
-| `qa-generate-e2e-tests.md` | `quality-control` | `testing` |
-| `quick-dev-new-preview.md` | `quick-flow-solo-dev` | `implementation` |
 | `quick-dev.md` | `quick-flow-solo-dev` | `implementation` |
+| `problem-solving.md` | `analyst` | `discovery` |
 | `quick-spec.md` | `quick-flow-solo-dev` | `planning` |
-| `retrospective.md` | `scrum-master` | `planning` |
 | `review-adversarial-general.md` | `quality-control` | `review` |
 | `review-edge-case-hunter.md` | `quality-control` | `review` |
-| `shard-doc.md` | `tech-writer` | `implementation` |
-| `sprint-planning.md` | `scrum-master` | `planning` |
-| `sprint-status.md` | `scrum-master` | `planning` |
-| `teach-me-testing.md` | `master-test-architect` | `testing` |
-| `technical-research.md` | `analyst` | `discovery` |
-| `validate-prd.md` | `product-manager` | `planning` |
 | `write-remediation-story.md` | `developer` | `planning` |
+
+`problem-solving.md` is the target migrated workflow name for this initiative and replaces the legacy `cis-problem-solving.md` naming in the in-scope runtime design.
 
 ## 9. Architectural Decisions
 

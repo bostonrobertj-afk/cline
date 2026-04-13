@@ -40,7 +40,7 @@ This document inventories every placeholder workflow currently present in `/User
 | `code-review.md` | `quality-control` | Overrides prior developer ownership. | review |
 | `correct-course.md` | `scrum-master` | Preserves current unique owner (`bmad-sm`). | planning |
 | `create-architecture.md` | `architect` | Preserves current unique owner (`bmad-architect`). | planning |
-| `create-epics-and-stories.md` | `product-manager` | Preserves current unique owner (`bmad-pm`). | planning |
+| `create-epics.md` | `product-manager` | Preserves current unique owner (`bmad-pm`). | planning |
 | `create-prd.md` | `product-manager` | Preserves current unique owner (`bmad-pm`). | planning |
 | `create-product-brief.md` | `analyst` | Preserves current unique owner (`bmad-analyst`). | planning |
 | `create-story.md` | `scrum-master` | Preserves current unique owner (`bmad-sm`). | planning |

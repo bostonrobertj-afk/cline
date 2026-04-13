@@ -54,14 +54,44 @@ Include this exact frontmatter at the top of every action plan document:
     - not explicitly defining generics parameters
 
 # Task / Subtask Authoring Rules:
-- Do not defer decision space to the dev agent - they have enough to manage ensuring that they execute every task given without having to solve for "how".
+*** Task / Subtask Section Structure: ***
 - If the action plan is not a simple patch with few steps, it must be broken into distinct phases with instructions to pause for QA review before moving on to the next section.
 - Tasks & Subtasks must be on their own lines starting with "[ ]" so that dev agents can mark completion as they progress through the action plan.
 - Subtasks must prescribe exact line-level revisions with target file indicated.
 - Subtasks must never prescribe more than ONE required revision
-- Every variable, field, file, and enum name/naming convention must be presented to the user for approval unless existing project documentation specifically indicates the appropriate/required convention. Do not infer naming conventions from runtime code.
-- Verify the real type/state shape at each target seam before prescribing exact edits. Do not infer data shapes from adjacent layers or related systems. If the plan touches data across backend, shared types, and UI, trace the value shape in each touched layer and ensure the prescribed changes match the actual declarations and runtime state in the target files.
-When prescribing revisions via tasks and sutasks, you must avoid these banned development bad habits:
+- Each task & subtasks should have clearly defined allowed files for the prescribed edit.
+
+*** Before turning a necessary revision into a task or subtask, you MUST: ***
+1. Verify solution quality and standards
+   - Ensure the proposed code or fix is appropriate, elegant, and consistent with modern, industry-standard practices for the project's tech stack, including CLEAN architecture.
+   - If you must deviate from best practices (e.g., due to constraints), clearly explain why and what the ideal pattern would be.
+
+2. Prescribe deep, architectural fixes over surface workarounds
+   - Check whether the issue can and should be solved at a deeper architectural layer (design, data flow, responsibilities) rather than with a shallow or hacky workaround.
+   - If you choose a workaround for pragmatic reasons, explicitly label it as such and describe the deeper architectural fix that would be ideal.
+
+3. Look for underlying design-pattern flaws
+   - Examine whether the issue reveals deeper design or pattern problems (e.g., responsibilities mixed, poor separation of concerns, leaky abstractions).
+   - If such problems exist, call them out explicitly and propose how they could be addressed, even if the full fix is out of scope for the immediate change.
+
+4. Consider downstream and peripheral impact
+   - Evaluate how the change may affect other modules, call sites, and features, including edge cases and lifecycle interactions. Search the codbase and read peripheral files if uncertain.
+   - If the change is likely to cause downstream or peripheral issues, that is acceptable only if:
+     a) You clearly identify and describe these risks, AND
+     b) You propose follow-up steps or mitigations as part of the solution.
+
+5. Avoid hardcoded values; prescribe integration with config/strings where appropriate
+   - Do NOT introduce hardcoded strings or values when they represent configuration, thresholds, labels, messages, or anything reasonably likely to change.
+   - Instead, integrate such values into the app’s configuration system when appropriate for user/admin/dev tweaking
+   - All user-facing or UI strings MUST go into a strings.xml (or similar)
+   - If you cannot follow this rule for some reason, explicitly state why.
+
+6. Prescribe removal of cruft and failed-attempt remnants
+   - Ensure that your changes do not leave behind obsolete code/imports, commented-out experiments, dead branches, or outdated patterns related to prior failed attempts.
+   - Consider related/downstream modules that may now contain redundant or inconsistent code as a result of your change.
+   - De-crufting should be treated as part of the fix: either perform it in your changes, or clearly specify what should be removed/refactored and where.
+
+7. Practice Good Code Hygiene by avoiding common bad habits:
     - "any" typing
     - val as SomeType
     - as any in tests
@@ -78,6 +108,14 @@ When prescribing revisions via tasks and sutasks, you must avoid these banned de
     - not using generics to abstract duplicated code
     - not using type narrowing
     - not explicitly defining generics parameters
+8. Do not introduce architecture in the action plan that is not prescribed in an upstream document.
+    - If there is an architecture or requirements document, the action plan must not introduce additional architecture beyond the scope of what those documents prescribe. 
+    - If you determine that additional or different architecture is necessary while authoring the action plan, you must stop and inform the user so that the appropriate revisions can be made to upstream documents first.
+
+If at any point you cannot satisfy one or more of these rules (for example, due to missing context or constraints in the existing architecture), you MUST:
+- Explicitly state which rule(s) you cannot fully satisfy, and why.
+- Propose the best available compromise, and outline what a more ideal long-term fix would look like.
+9. Avoid in-plan churn. Do not prescribe code in one task/ subtask only to replace the prescribed code in a subsequent task/ subtask. Identify the final shape of every line being prescribed, and require the dev agent to implement it that way in one task / subtask. 
 
 # Validation Section Rules
 - Prescribe exact tests to be executed after all tasks and subtasks are complete

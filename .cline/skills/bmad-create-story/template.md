@@ -1,8 +1,6 @@
-# Story {{epic_num}}.{{story_num}}: {{story_title}}
-
+# Story {{epic_num}}.{{story_num}}
 Status: ready-for-dev
 
-<!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
 ## Story
 
@@ -21,7 +19,7 @@ so that {{benefit}}.
 - [ ] Task 2 (AC: #)
   - [ ] Subtask 2.1
 
-## Senior Developer QA Findings
+## Latest Review Findings
 
 ## Dev Notes
 
