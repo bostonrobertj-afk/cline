@@ -1,36 +1,8 @@
-import { FocusChainPrompts } from "@/core/task/focus-chain/prompts"
-import { shouldExposeWorkflowProgressRequest } from "@/shared/workflow-progress-request"
 import { MULTI_ROOT_HINT } from "../constants"
 import type { PromptVariant, SystemPromptContext } from "../types"
 import { getAgentFeedbackPromptGuidanceLine } from "./agent_feedback"
 import { getIndxrExplorationGuidance } from "./mcp"
 import { getCurrentModeResponseToolsLine } from "./response_tools"
-
-function renderChecklistForPrompt(checklist: string): string {
-	return ["```text", checklist.trim(), "```"].join("\n")
-}
-
-function getFocusChainReminderLine(context: SystemPromptContext): string {
-	if (
-		shouldExposeWorkflowProgressRequest({
-			workflowName: context.activePlaceholderWorkflowName,
-			stepNumber: context.activePlaceholderWorkflowStepNumber,
-			yoloModeToggled: context.yoloModeToggled,
-		})
-	) {
-		return '- When the active step\'s "Done Signal" is true, use `workflow_progress_request`. Do not include `task_progress` on that tool call; the runtime-owned `Yes` branch completes the next checklist step before the next model request is built.'
-	}
-
-	if (context.activeDeterministicPlaceholderWorkflowEnabled === true) {
-		return "- Once you correctly complete the current step, the next step's details will be shown automatically."
-	}
-
-	if (context.activeWorkflowSupportsPlaceholders && !context.managedWorkflowActive) {
-		return '- When the active step\'s "Done Signal" is true, use `send_user_message` tool call to briefly tell the user what step you are completing, and include `task_progress` with `__COMPLETE_NEXT_STEP__`. Use it only once in that assistant turn.'
-	}
-
-	return `- ${FocusChainPrompts.reminder.trim()}`
-}
 
 export async function getContinuationTurnSection(
 	_variant: PromptVariant,
@@ -62,13 +34,14 @@ export async function getContinuationTurnSection(
 		lines.push(`- ${indxrGuidance}`)
 	}
 
-	const checklist = context.currentFocusChainChecklist?.trim()
-	if (checklist) {
-		if (!context.activePlaceholderWorkflowName) {
-			lines.push("", "CURRENT TASK LIST", renderChecklistForPrompt(checklist))
-		}
+	const workflowSystemBlock = context.workflowSystemInstructionsBlock
+	if (typeof workflowSystemBlock === "string" && workflowSystemBlock.trim().length > 0) {
+		lines.push("", workflowSystemBlock)
+	}
 
-		lines.push(getFocusChainReminderLine(context))
+	const workflowInputBlock = context.workflowInputInstructionsBlock
+	if (typeof workflowInputBlock === "string" && workflowInputBlock.trim().length > 0) {
+		lines.push("", workflowInputBlock)
 	}
 
 	return lines.join("\n")

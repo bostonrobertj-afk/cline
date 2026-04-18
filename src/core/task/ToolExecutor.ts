@@ -22,7 +22,6 @@ import { StateManager } from "../storage/StateManager"
 import { WorkspaceRootManager } from "../workspace"
 import { clearPartialResponseToolPreview, ToolResponse, upsertPartialResponseToolSayPreview } from "."
 import type { FocusChainChecklistUpdateResult } from "./focus-chain/types"
-import { applyPostToolTaskProgressUpdate, applyPreToolTaskProgressUpdate } from "./focus-chain/updateFromToolResponse"
 import { MessageStateHandler } from "./message-state"
 import { TaskState } from "./TaskState"
 import { AutoApprove } from "./tools/autoApprove"
@@ -34,6 +33,7 @@ import { TaskConfig, validateTaskConfig } from "./tools/types/TaskConfig"
 import { createUIHelpers } from "./tools/types/UIHelpers"
 import { ToolDisplayUtils } from "./tools/utils/ToolDisplayUtils"
 import { ToolResultUtils } from "./tools/utils/ToolResultUtils"
+import { WorkflowRuntime } from "./workflow-runtime/WorkflowRuntime"
 
 export function canonicalizeAttemptCompletionParams(block: ToolUse): boolean {
 	if (block.name === ClineDefaultTool.ATTEMPT && !block.params?.result && typeof block.params?.response === "string") {
@@ -82,6 +82,7 @@ export class ToolExecutor {
 		private commandPermissionController: CommandPermissionController,
 		private contextManager: ContextManager,
 		private stateManager: StateManager,
+		private workflowRuntime: WorkflowRuntime,
 
 		// Configuration & Settings
 
@@ -215,6 +216,7 @@ export class ToolExecutor {
 				getActiveHookExecution: this.getActiveHookExecution,
 				runUserPromptSubmitHook: this.runUserPromptSubmitHook,
 			},
+			workflowRuntime: this.workflowRuntime,
 			coordinator: this.coordinator,
 		}
 
@@ -689,7 +691,6 @@ export class ToolExecutor {
 		let toolResult: any = null
 		let toolWasExecuted = false
 		const executionStartTime = Date.now()
-		let skipPostExecutionFocusChainUpdate = false
 		let emittedToolResult = false
 
 		try {
@@ -697,24 +698,6 @@ export class ToolExecutor {
 			if (this.taskState.abort) {
 				this.markNativeToolCallBreaksPreviousResponseChain(block)
 				return { status: "skipped", emittedToolResult: false }
-			}
-
-			const preToolTaskProgressUpdate = await applyPreToolTaskProgressUpdate({
-				block,
-				focusChainEnabled: this.stateManager.getGlobalSettingsKey("focusChainSettings").enabled,
-				updateFCListFromToolResponse: this.updateFCListFromToolResponse,
-			})
-			skipPostExecutionFocusChainUpdate = preToolTaskProgressUpdate.skipPostExecutionUpdate
-			if (preToolTaskProgressUpdate.skipToolExecution) {
-				toolResult = preToolTaskProgressUpdate.toolResult
-				emittedToolResult = this.pushToolResult(toolResult, block)
-				if (block.isNativeToolCall && block.call_id) {
-					this.taskState.nativeToolCallIdsSkipped.add(block.call_id)
-				}
-				if (!emittedToolResult) {
-					this.markNativeToolCallBreaksPreviousResponseChain(block)
-				}
-				return { status: "skipped", emittedToolResult }
 			}
 
 			// Execute the actual tool
@@ -791,29 +774,6 @@ export class ToolExecutor {
 		// Early return if hook requested cancellation
 		if (shouldCancelAfterHook) {
 			return { status: "executed", emittedToolResult }
-		}
-
-		// Handle focus chain updates
-		const postToolTaskProgressUpdate = await applyPostToolTaskProgressUpdate({
-			block,
-			focusChainEnabled: this.stateManager.getGlobalSettingsKey("focusChainSettings").enabled,
-			skipPostExecutionUpdate: skipPostExecutionFocusChainUpdate,
-			toolContext: {
-				toolName: block.name,
-				toolParams: (block.params as Record<string, unknown>) ?? undefined,
-				toolResult,
-				toolWasExecuted,
-			},
-			updateFCListFromToolResponse: this.updateFCListFromToolResponse,
-		})
-		if (postToolTaskProgressUpdate.feedback) {
-			const feedbackTarget = this.shouldIsolateCompletedResponseToolContent(block)
-				? this.taskState.completedResponseToolResultContent
-				: this.taskState.userMessageContent
-			feedbackTarget.push({
-				type: "text",
-				text: postToolTaskProgressUpdate.feedback,
-			})
 		}
 
 		return { status: "executed", emittedToolResult }

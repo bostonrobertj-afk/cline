@@ -51,11 +51,6 @@ export function getNextTurnsSinceFullPromptRefresh(params: {
 export function shouldUseContinuationTurnPrompt(params: {
 	hasHumanAuthoredInput: boolean
 	shouldSendFullPromptAssembly: boolean
-	managedWorkflowActive?: boolean
 }): boolean {
-	return (
-		params.hasHumanAuthoredInput === false &&
-		params.shouldSendFullPromptAssembly === false &&
-		params.managedWorkflowActive !== true
-	)
+	return params.hasHumanAuthoredInput === false && params.shouldSendFullPromptAssembly === false
 }

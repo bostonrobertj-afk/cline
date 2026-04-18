@@ -1,7 +1,6 @@
 import { ModelFamily } from "@/shared/prompts"
 import { ClineDefaultTool } from "@/shared/tools"
 import type { ClineToolSpec } from "../spec"
-import { AGENT_FEEDBACK_PARAMETER } from "../types"
 
 /**
  * ## generate_plan_output
@@ -10,14 +9,10 @@ However, if while writing your response you realize you actually need to do more
 Parameters:
 - response: (required) The response to provide to the user. Do not try to use tools in this parameter, this is simply a chat response. (You MUST use the response parameter, do not simply place the response text directly within <generate_plan_output> tags.)
 - needs_more_exploration: (optional) Set to true if while formulating your response that you found you need to do more exploration with tools, for example reading files. (Remember, you can explore the project with tools like read_file in PLAN MODE without the user having to toggle to ACT MODE.) Defaults to false if not specified.
-${focusChainSettings.enabled ? `- task_progress: (optional) A checklist showing task progress after this tool use is completed. (See 'Updating Task Progress' section for more details)` : "" }
 Usage:
 <generate_plan_output>
 <response>Your response here</response>
 <needs_more_exploration>true or false (optional, but you MUST set to true if in <response> you need to read files or use other exploration tools)</needs_more_exploration>
-${focusChainSettings.enabled ? `<task_progress>
-Checklist here (If you have presented the user with concrete steps or requirements, you can optionally include a todo list outlining these steps.)
-</task_progress>` : "" }
 </generate_plan_output>
  */
 
@@ -45,17 +40,6 @@ However, if while writing your response you realize you actually need to do more
 			usage: "true or false (optional, but you MUST set to true if in <response> you need to read files or use other exploration tools)",
 			type: "boolean",
 		},
-		AGENT_FEEDBACK_PARAMETER,
-		// Different than the vanilla TASK_PROGRESS_PARAMETER
-		{
-			name: "task_progress",
-			required: false,
-			instruction:
-				" A checklist showing task progress after this tool use is completed. (See 'Updating Task Progress' section for more details)",
-			usage: "Checklist here (If you have presented the user with concrete steps or requirements, you can optionally include a todo list outlining these steps.)",
-			dependencies: [ClineDefaultTool.TODO],
-			contextRequirements: (context) => context.activeDeterministicPlaceholderWorkflowEnabled !== true,
-		},
 	],
 }
 
@@ -72,12 +56,13 @@ However, if while writing your response you realize you actually need to do more
 			required: true,
 			instruction: `The response to provide to the user.`,
 		},
-		AGENT_FEEDBACK_PARAMETER,
 		{
-			name: "task_progress",
+			name: "needs_more_exploration",
 			required: false,
-			instruction: "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool.",
-			contextRequirements: (context) => context.activeDeterministicPlaceholderWorkflowEnabled !== true,
+			instruction:
+				"Set to true if while formulating your response that you found you need to do more exploration with tools, for example reading files. (Remember, you can explore the project with tools like read_file in PLAN MODE without the user having to toggle to ACT MODE.) Defaults to false if not specified.",
+			usage: "true or false (optional, but you MUST set to true if in <response> you need to read files or use other exploration tools)",
+			type: "boolean",
 		},
 	],
 }
@@ -102,16 +87,6 @@ If it becomes apparent that additional exploration is required while the generat
 			instruction: `needs_more_exploration can be set to true if it is determined that further exploration with read_file/search tools is necessary to formulate a complete plan. This determination can be reached during the response generation process, but should not be acknowledged until this parameter is set to true if required.`,
 			usage: "true or false (optional, but you MUST set to true if in <response> you need to read files or use other exploration tools)",
 			type: "boolean",
-		},
-		AGENT_FEEDBACK_PARAMETER,
-		{
-			name: "task_progress",
-			required: false,
-			instruction:
-				"A checklist showing task progress after this tool use is completed. If you are presenting a final implementation plan to the user with needs_more_exploration set to false, you should include a checklist of items to be completed during Act Mode when implementation is underway. (See 'Updating Task Progress' section for more details)",
-			usage: "Checklist here (If you have presented the user with concrete steps or requirements, you can optionally include a todo list outlining these steps.)",
-			dependencies: [ClineDefaultTool.TODO],
-			contextRequirements: (context) => context.activeDeterministicPlaceholderWorkflowEnabled !== true,
 		},
 	],
 }

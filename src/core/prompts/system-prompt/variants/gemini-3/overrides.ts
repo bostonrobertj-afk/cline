@@ -3,9 +3,6 @@ import { getResponseToolsSection } from "../../components/response_tools"
 import { SystemPromptSection } from "../../templates/placeholders"
 import type { PromptVariant, SystemPromptContext } from "../../types"
 
-const GEMINI_3_AGENT_ROLE_TEMPLATE = (_context: SystemPromptContext) =>
-	`You are Cline, a software engineering AI. Your mission is to execute precisely what is requested - implement exactly what was asked for, with the simplest solution that fulfills all requirements. Ask clarifying questions to ensure you understand the user's requirements and that they understand your approach before proceeding.`
-
 const GEMINI_3_TOOL_USE_TEMPLATE = (context: SystemPromptContext) => `TOOL USE
 
 You have access to a set of tools that are executed upon the user's approval.${context.enableParallelToolCalling ? " You may use multiple tools in a single response when the operations are independent (e.g., reading several files, searching in parallel). For dependent operations where one result informs the next, use tools sequentially." : " You should use a single tool at a time and wait for the result before proceeding."} You will receive the results of all tool uses in the user's response.
@@ -212,20 +209,7 @@ During Act Mode, focus on efficient execution:
 3. Use tools directly - put user-visible explanations inside the appropriate response tool payload
 4. Test each feature after implementation to verify it works correctly${context.yoloModeToggled !== true ? "\n5. Verify with the user that the feature works as expected before using attempt_completion\n6. Use attempt_completion when confirmed complete, including your summary within the tool call itself" : "\n5. Use attempt_completion when the task is done, including your summary within the tool call itself"}`
 
-const GEMINI_3_UPDATING_TASK_PROGRESS_TEMPLATE = (_context: SystemPromptContext) => `UPDATING TASK PROGRESS
-
-Use \`task_progress\` only as a checklist parameter on the next tool call, not a standalone tool.
-
-- Use \`task_progress\` to create a task list when switching out of PLAN MODE.
-- Keep items brief and milestone-based.
-- To create the list, pass a full Markdown checklist as the \`task_progress\` parameter.
-- Use \`__COMPLETE_NEXT_STEP__\` as the \`task_progress\` value to complete the next incomplete step.
-`
-
 export const gemini3ComponentOverrides: PromptVariant["componentOverrides"] = {
-	[SystemPromptSection.AGENT_ROLE]: {
-		template: GEMINI_3_AGENT_ROLE_TEMPLATE,
-	},
 	[SystemPromptSection.TOOL_USE]: {
 		template: GEMINI_3_TOOL_USE_TEMPLATE,
 	},
@@ -243,8 +227,5 @@ export const gemini3ComponentOverrides: PromptVariant["componentOverrides"] = {
 	},
 	[SystemPromptSection.ACT_VS_PLAN]: {
 		template: GEMINI_3_ACT_VS_PLAN_TEMPLATE,
-	},
-	[SystemPromptSection.TASK_PROGRESS]: {
-		template: GEMINI_3_UPDATING_TASK_PROGRESS_TEMPLATE,
 	},
 }

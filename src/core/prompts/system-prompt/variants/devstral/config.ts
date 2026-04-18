@@ -5,7 +5,6 @@ import { isDevstralModelFamily } from "@/utils/model-utils"
 import { SystemPromptSection } from "../../templates/placeholders"
 import { createVariant } from "../variant-builder"
 import { validateVariant } from "../variant-validator"
-import { DEVSTRAL_AGENT_ROLE_TEMPLATE } from "./overrides"
 import { baseTemplate } from "./template"
 
 export const config = createVariant(ModelFamily.DEVSTRAL)
@@ -21,9 +20,8 @@ export const config = createVariant(ModelFamily.DEVSTRAL)
 	})
 	.template(baseTemplate)
 	.components(
-		SystemPromptSection.AGENT_ROLE,
+		SystemPromptSection.WORKFLOW_SYSTEM_INSTRUCTIONS,
 		SystemPromptSection.TOOL_USE,
-		SystemPromptSection.TASK_PROGRESS,
 		SystemPromptSection.MCP,
 		SystemPromptSection.EDITING_FILES,
 		SystemPromptSection.ACT_VS_PLAN,
@@ -31,6 +29,7 @@ export const config = createVariant(ModelFamily.DEVSTRAL)
 		SystemPromptSection.RULES,
 		SystemPromptSection.SYSTEM_INFO,
 		SystemPromptSection.OBJECTIVE,
+		SystemPromptSection.WORKFLOW_INPUT,
 		SystemPromptSection.USER_INSTRUCTIONS,
 		SystemPromptSection.SKILLS,
 	)
@@ -56,8 +55,8 @@ export const config = createVariant(ModelFamily.DEVSTRAL)
 		ClineDefaultTool.TODO,
 		ClineDefaultTool.USE_SKILL,
 		ClineDefaultTool.COMPLETE_WORKFLOW_ITEM,
-		ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
-		ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT,
+		ClineDefaultTool.SET_WORKFLOW_VALUES,
+		ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT,
 		ClineDefaultTool.STORY_TASK_REMINDER,
 		ClineDefaultTool.STORY_TASK_COMPLETE,
 		ClineDefaultTool.STORY_NOTES_UPDATE,
@@ -68,9 +67,6 @@ export const config = createVariant(ModelFamily.DEVSTRAL)
 		MODEL_FAMILY: "devstral",
 	})
 	.config({})
-	.overrideComponent(SystemPromptSection.AGENT_ROLE, {
-		template: DEVSTRAL_AGENT_ROLE_TEMPLATE,
-	})
 	.build()
 
 // Compile-time validation

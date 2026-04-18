@@ -84,12 +84,11 @@ describe("prompt refresh helpers", () => {
 })
 
 describe("shouldUseContinuationTurnPrompt", () => {
-	it("returns true for non-human turns without a full prompt refresh or managed workflow", () => {
+	it("returns true for non-human turns without a full prompt refresh", () => {
 		expect(
 			shouldUseContinuationTurnPrompt({
 				hasHumanAuthoredInput: false,
 				shouldSendFullPromptAssembly: false,
-				managedWorkflowActive: false,
 			}),
 		).to.equal(true)
 	})
@@ -99,7 +98,6 @@ describe("shouldUseContinuationTurnPrompt", () => {
 			shouldUseContinuationTurnPrompt({
 				hasHumanAuthoredInput: true,
 				shouldSendFullPromptAssembly: false,
-				managedWorkflowActive: false,
 			}),
 		).to.equal(false)
 	})
@@ -109,17 +107,6 @@ describe("shouldUseContinuationTurnPrompt", () => {
 			shouldUseContinuationTurnPrompt({
 				hasHumanAuthoredInput: false,
 				shouldSendFullPromptAssembly: true,
-				managedWorkflowActive: false,
-			}),
-		).to.equal(false)
-	})
-
-	it("returns false when a managed workflow is active", () => {
-		expect(
-			shouldUseContinuationTurnPrompt({
-				hasHumanAuthoredInput: false,
-				shouldSendFullPromptAssembly: false,
-				managedWorkflowActive: true,
 			}),
 		).to.equal(false)
 	})

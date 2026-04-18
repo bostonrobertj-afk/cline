@@ -1,12 +1,7 @@
 import { findLast } from "@shared/array"
 import { ClineAsk, ClineAskQuestion } from "@shared/ExtensionMessage"
-import { FOCUS_CHAIN_COMPLETE_NEXT_STEP_SENTINEL } from "@shared/focus-chain-utils"
 import { ClineDefaultTool } from "@shared/tools"
-import {
-	isWorkflowProgressRequestWorkflowName,
-	WORKFLOW_PROGRESS_REQUEST_OPTIONS,
-	WORKFLOW_PROGRESS_REQUEST_QUESTION,
-} from "@shared/workflow-progress-request"
+import { WORKFLOW_PROGRESS_REQUEST_OPTIONS, WORKFLOW_PROGRESS_REQUEST_QUESTION } from "@shared/workflow-progress-request"
 import { ToolUse } from "../../../assistant-message"
 import { formatResponse } from "../../../prompts/responses"
 import { ToolResponse } from "../.."
@@ -44,15 +39,9 @@ export class WorkflowProgressRequestToolHandler implements IToolHandler, IPartia
 			)
 		}
 
-		if (!isWorkflowProgressRequestWorkflowName(config.taskState.activePlaceholderWorkflowSource?.name)) {
+		if (!config.workflowRuntime.isWorkflowProgressRequestAllowed({ taskState: config.taskState })) {
 			return formatResponse.toolError(
-				"workflow_progress_request can only be used during an active supported placeholder workflow step.",
-			)
-		}
-
-		if (!config.taskState.currentFocusChainChecklist) {
-			return formatResponse.toolError(
-				"workflow_progress_request requires an active placeholder-workflow focus chain checklist before it can advance the workflow.",
+				"workflow_progress_request can only be used when the active workflow step allows progression approval.",
 			)
 		}
 
@@ -79,13 +68,12 @@ export class WorkflowProgressRequestToolHandler implements IToolHandler, IPartia
 				await config.messageState.saveClineMessagesAndUpdateHistory()
 			}
 
-			if (text === "Yes") {
-				const updateResult = await config.callbacks.updateFCListFromToolResponse(FOCUS_CHAIN_COMPLETE_NEXT_STEP_SENTINEL)
-				if (!updateResult.accepted) {
-					return formatResponse.toolError(
-						updateResult.feedback ?? "Failed to advance the active placeholder-workflow checklist.",
-					)
-				}
+			const nextAction = await config.workflowRuntime.submitWorkflowProgressRequest({
+				taskState: config.taskState,
+				approved: text === "Yes",
+			})
+			if (text === "Yes" && nextAction.kind === "no_op") {
+				return formatResponse.toolError("workflow_progress_request could not advance the active workflow step.")
 			}
 		} else {
 			await config.callbacks.say("user_feedback", text ?? "", images, followupFiles)

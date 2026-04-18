@@ -8,12 +8,9 @@ import type {
 	WorkflowStepResolutionSessionState,
 	WorkflowStepResolutionTriggerSource,
 } from "./types"
-import { getWorkflowStepResolutionDefinition, workflowStepResolutionRegistry } from "./WorkflowStepResolutionRegistry"
 
 export class WorkflowStepResolutionRuntime implements WorkflowStepResolutionRuntimeLike {
-	constructor(
-		private readonly definitions: Record<string, WorkflowStepResolutionDefinition> = workflowStepResolutionRegistry,
-	) {}
+	constructor(private readonly definitions: Record<string, WorkflowStepResolutionDefinition>) {}
 
 	createSession(options: {
 		definitionId: string
@@ -49,10 +46,6 @@ export class WorkflowStepResolutionRuntime implements WorkflowStepResolutionRunt
 	}
 
 	private getDefinition(definitionId: string) {
-		if (this.definitions === workflowStepResolutionRegistry) {
-			return getWorkflowStepResolutionDefinition(definitionId)
-		}
-
 		const definition = this.definitions[definitionId]
 		if (!definition) {
 			throw new Error(`Unknown workflow step resolution definition: ${definitionId}`)

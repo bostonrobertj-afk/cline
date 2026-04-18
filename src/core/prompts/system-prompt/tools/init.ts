@@ -6,7 +6,7 @@ import { apply_patch_variants } from "./apply_patch"
 import { ask_followup_question_variants } from "./ask_followup_question"
 import { attempt_completion_variants } from "./attempt_completion"
 import { browser_action_variants } from "./browser_action"
-import { build_review_diff_output_variants } from "./build_review_diff_output"
+import { build_workflow_document_variants } from "./build_workflow_document"
 import { complete_workflow_item_variants } from "./complete_workflow_item"
 import { execute_command_variants } from "./execute_command"
 import { focus_chain_variants } from "./focus_chain"
@@ -21,7 +21,7 @@ import { read_file_range_variants } from "./read_file_range"
 import { replace_in_file_variants } from "./replace_in_file"
 import { search_files_variants } from "./search_files"
 import { send_user_message_variants } from "./send_user_message"
-import { set_workflow_placeholders_variants } from "./set_workflow_placeholders"
+import { set_workflow_values_variants } from "./set_workflow_values"
 import { story_notes_update_variants } from "./story_notes_update"
 import { story_task_complete_variants } from "./story_task_complete"
 import { story_task_reminder_variants } from "./story_task_reminder"
@@ -47,7 +47,7 @@ export function registerClineToolSets(): void {
 		...ask_followup_question_variants,
 		...attempt_completion_variants,
 		...browser_action_variants,
-		...build_review_diff_output_variants,
+		...build_workflow_document_variants,
 		...complete_workflow_item_variants,
 		...execute_command_variants,
 		...focus_chain_variants,
@@ -63,7 +63,7 @@ export function registerClineToolSets(): void {
 		...search_files_variants,
 		...send_user_message_variants,
 		...workflow_progress_request_variants,
-		...set_workflow_placeholders_variants,
+		...set_workflow_values_variants,
 		...story_notes_update_variants,
 		...story_task_complete_variants,
 		...story_task_reminder_variants,

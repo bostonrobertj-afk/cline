@@ -1,5 +1,5 @@
 import type {
-	ClineWorkflowForm,
+	WorkflowForm,
 	WorkflowFormAllowedValueType,
 	WorkflowFormConditionDefinition,
 	WorkflowFormDefinitionPayload,
@@ -19,14 +19,12 @@ import { randomUUID } from "crypto"
 import { buildWorkflowFormPayload } from "./buildWorkflowFormPayload"
 import { normalizeWorkflowFormSubmittedValue, validateWorkflowFormSubmittedValueAgainstSchema } from "./schema"
 import type {
-	WorkflowFormResolverDefinition,
 	WorkflowFormRuntimeCreateSessionOptions,
 	WorkflowFormRuntimeOutcome,
 	WorkflowFormSessionData,
 	WorkflowFormSessionState,
 	WorkflowFormSessionValues,
 } from "./types"
-import { workflowFormRegistry } from "./WorkflowFormRegistry"
 
 const SUPPORTED_FIELD_KINDS: WorkflowFormFieldKind[] = [
 	"dropdown",
@@ -497,6 +495,20 @@ function applyFieldResetRules(
 	}
 }
 
+function buildResolvedPanelPayload(
+	panel: WorkflowFormPanelDefinition,
+	session: Pick<WorkflowFormSessionState, "values" | "data">,
+): WorkflowFormResolvedPanelPayload {
+	return {
+		panelId: panel.panelId,
+		title: panel.title,
+		promptMarkdown: panel.promptMarkdown,
+		fields: resolvePanelFields(panel, session),
+		allowedActions: panel.allowedActions,
+		actionLabels: panel.actionLabels,
+	}
+}
+
 function clearDeclaredKeys(
 	values: WorkflowFormSessionValues,
 	data: WorkflowFormSessionData,
@@ -527,9 +539,6 @@ function resolveTransitionOutcome(
 	nextPanelId?: string
 	operationId?: string
 	terminal?: boolean
-	resultDataKey?: string
-	rebuildDefinitionAfterSuccess: boolean
-	recomputeDestinationAfterSuccess: boolean
 	staleValueKeysToClear?: string[]
 	staleDataKeysToClear?: string[]
 } {
@@ -537,8 +546,6 @@ function resolveTransitionOutcome(
 		case "sequential":
 			return {
 				nextPanelId: transition.nextPanelId,
-				rebuildDefinitionAfterSuccess: false,
-				recomputeDestinationAfterSuccess: false,
 				staleValueKeysToClear: transition.staleValueKeysToClear,
 				staleDataKeysToClear: transition.staleDataKeysToClear,
 			}
@@ -547,9 +554,6 @@ function resolveTransitionOutcome(
 				nextPanelId: transition.nextPanelId,
 				operationId: transition.operationId,
 				terminal: transition.terminal,
-				resultDataKey: transition.resultDataKey,
-				rebuildDefinitionAfterSuccess: transition.rebuildDefinitionAfterSuccess ?? false,
-				recomputeDestinationAfterSuccess: transition.recomputeDestinationAfterSuccess ?? false,
 				staleValueKeysToClear: transition.staleValueKeysToClear,
 				staleDataKeysToClear: transition.staleDataKeysToClear,
 			}
@@ -561,8 +565,6 @@ function resolveTransitionOutcome(
 					nextPanelId: transition.defaultNextPanelId,
 					operationId: transition.defaultOperationId,
 					terminal: transition.defaultTerminal,
-					rebuildDefinitionAfterSuccess: false,
-					recomputeDestinationAfterSuccess: false,
 				}
 			}
 
@@ -570,8 +572,6 @@ function resolveTransitionOutcome(
 				nextPanelId: branch.nextPanelId,
 				operationId: branch.operationId,
 				terminal: branch.terminal,
-				rebuildDefinitionAfterSuccess: false,
-				recomputeDestinationAfterSuccess: false,
 				staleValueKeysToClear: branch.staleValueKeysToClear,
 				staleDataKeysToClear: branch.staleDataKeysToClear,
 			}
@@ -610,16 +610,12 @@ function collectPathToCurrentPanel(
 }
 
 export class WorkflowFormRuntime {
-	constructor(private readonly resolvers: Record<string, WorkflowFormResolverDefinition> = workflowFormRegistry) {}
-
 	createSession(options: WorkflowFormRuntimeCreateSessionOptions): WorkflowFormSessionState {
 		this.validateDefinition(options.definitionPayload)
 
 		return {
 			sessionId: randomUUID(),
-			resolverId: options.resolverId,
-			triggerSource: options.triggerSource,
-			owner: options.owner,
+			workflowFormId: options.workflowFormId,
 			definitionVersion: 2,
 			definitionPayload: options.definitionPayload,
 			firstPanelId: options.definitionPayload.firstPanelId,
@@ -629,46 +625,35 @@ export class WorkflowFormRuntime {
 		}
 	}
 
-	private resolvePanelPayload(session: WorkflowFormSessionState, panelId: string): WorkflowFormResolvedPanelPayload {
-		const panel = this.getPanel(session.definitionPayload, panelId)
-
-		return {
-			panelId: panel.panelId,
-			title: panel.title,
-			promptMarkdown: panel.promptMarkdown,
-			fields: resolvePanelFields(panel, session),
-			allowedActions: panel.allowedActions,
-			actionLabels: panel.actionLabels,
-		}
-	}
-
-	buildPayload(session: WorkflowFormSessionState): ClineWorkflowForm {
+	buildPayload(session: WorkflowFormSessionState): WorkflowForm {
 		const panelId = session.failure?.panelId ?? session.currentPanelId
+		const panel = this.getPanel(session.definitionPayload, panelId)
 
 		return buildWorkflowFormPayload({
 			session,
 			definition: session.definitionPayload,
-			panel: this.resolvePanelPayload(session, panelId),
+			panel: buildResolvedPanelPayload(panel, session),
 			errorMessage: session.failure?.errorMessage,
 		})
 	}
 
-	buildFailurePayload(session: WorkflowFormSessionState, errorMessage: string, panelId?: string): ClineWorkflowForm {
+	buildFailurePayload(session: WorkflowFormSessionState, errorMessage: string, panelId?: string): WorkflowForm {
 		const resolvedPanelId = panelId ?? session.failure?.panelId ?? session.currentPanelId
+		const panel = this.getPanel(session.definitionPayload, resolvedPanelId)
 
 		return buildWorkflowFormPayload({
 			session,
 			definition: session.definitionPayload,
-			panel: this.resolvePanelPayload(session, resolvedPanelId),
+			panel: buildResolvedPanelPayload(panel, session),
 			errorMessage,
 		})
 	}
 
-	buildRetryPayload(session: WorkflowFormSessionState, errorMessage: string): ClineWorkflowForm {
+	buildRetryPayload(session: WorkflowFormSessionState, errorMessage: string): WorkflowForm {
 		return this.buildFailurePayload(session, errorMessage)
 	}
 
-	buildSuccessPayload(session: WorkflowFormSessionState, successMessage: string): ClineWorkflowForm {
+	buildSuccessPayload(session: WorkflowFormSessionState, successMessage: string): WorkflowForm {
 		return buildWorkflowFormPayload({
 			session,
 			definition: session.definitionPayload,
@@ -798,13 +783,6 @@ export class WorkflowFormRuntime {
 			}
 		}
 
-		if (request.action === WorkflowFormAction.CANCEL) {
-			return {
-				kind: "fallback_to_agent",
-				session: nextSession,
-			}
-		}
-
 		if (request.action === WorkflowFormAction.BACK) {
 			return this.handleBack(nextSession, activePanel)
 		}
@@ -835,16 +813,12 @@ export class WorkflowFormRuntime {
 		}
 
 		if (transitionOutcome.operationId) {
-			const rebuiltSession = this.rebuildSessionDefinition(nextSession)
 			return {
 				kind: "invoke_deterministic_operation",
-				session: rebuiltSession,
+				session: nextSession,
 				operationId: transitionOutcome.operationId,
 				nextPanelId: transitionOutcome.nextPanelId,
 				terminal: transitionOutcome.terminal,
-				resultDataKey: transitionOutcome.resultDataKey,
-				rebuildDefinitionAfterSuccess: transitionOutcome.rebuildDefinitionAfterSuccess,
-				recomputeDestinationAfterSuccess: transitionOutcome.recomputeDestinationAfterSuccess,
 			}
 		}
 
@@ -852,95 +826,15 @@ export class WorkflowFormRuntime {
 			throw new Error(`Workflow form panel "${activePanel.panelId}" did not resolve to a next panel or operation.`)
 		}
 
-		const rebuiltSession = this.rebuildSessionDefinition({
+		const transitionedSession: WorkflowFormSessionState = {
 			...nextSession,
 			currentPanelId: transitionOutcome.nextPanelId,
-		})
-
-		return {
-			kind: "render_form",
-			session: rebuiltSession,
-			payload: this.buildPayload(rebuiltSession),
-		}
-	}
-
-	continueAfterDeterministicOperation(args: {
-		session: WorkflowFormSessionState
-		nextPanelId?: string
-		rebuildDefinitionAfterSuccess: boolean
-		recomputeDestinationAfterSuccess: boolean
-	}):
-		| Extract<WorkflowFormRuntimeOutcome, { kind: "render_form" }>
-		| Extract<WorkflowFormRuntimeOutcome, { kind: "invoke_deterministic_operation" }> {
-		const continuationBaseSession = args.rebuildDefinitionAfterSuccess
-			? this.rebuildSessionDefinition(args.session)
-			: args.session
-
-		let nextPanelId = args.nextPanelId
-		let values = continuationBaseSession.values
-		let data = continuationBaseSession.data
-		let continuationOperationId: string | undefined
-		let continuationTerminal: boolean | undefined
-		let continuationResultDataKey: string | undefined
-		let continuationRebuildDefinitionAfterSuccess = false
-		let continuationRecomputeDestinationAfterSuccess = false
-
-		if (args.recomputeDestinationAfterSuccess) {
-			const activePanel = this.getPanel(continuationBaseSession.definitionPayload, continuationBaseSession.currentPanelId)
-			const recomputedOutcome = resolveTransitionOutcome(activePanel.transition, continuationBaseSession)
-			nextPanelId = recomputedOutcome.nextPanelId
-			continuationOperationId = recomputedOutcome.operationId
-			continuationTerminal = recomputedOutcome.terminal
-			continuationResultDataKey = recomputedOutcome.resultDataKey
-			continuationRebuildDefinitionAfterSuccess = recomputedOutcome.rebuildDefinitionAfterSuccess
-			continuationRecomputeDestinationAfterSuccess = recomputedOutcome.recomputeDestinationAfterSuccess
-
-			const clearedAfterRecompute = clearDeclaredKeys(
-				values,
-				data,
-				recomputedOutcome.staleValueKeysToClear,
-				recomputedOutcome.staleDataKeysToClear,
-			)
-			values = clearedAfterRecompute.values
-			data = clearedAfterRecompute.data
-		}
-
-		const rebuiltSession = this.rebuildSessionDefinition({
-			...continuationBaseSession,
-			values,
-			data,
-			failure: undefined,
-		})
-
-		if (continuationOperationId) {
-			return {
-				kind: "invoke_deterministic_operation",
-				session: rebuiltSession,
-				operationId: continuationOperationId,
-				nextPanelId,
-				terminal: continuationTerminal,
-				resultDataKey: continuationResultDataKey,
-				rebuildDefinitionAfterSuccess: continuationRebuildDefinitionAfterSuccess,
-				recomputeDestinationAfterSuccess: continuationRecomputeDestinationAfterSuccess,
-			}
-		}
-
-		if (!nextPanelId) {
-			throw new Error(
-				`Workflow form deterministic operation did not resolve to a next panel: ${continuationBaseSession.currentPanelId}`,
-			)
 		}
 
 		return {
 			kind: "render_form",
-			session: {
-				...rebuiltSession,
-				currentPanelId: nextPanelId,
-			},
-			payload: this.buildPayload({
-				...rebuiltSession,
-				currentPanelId: nextPanelId,
-			}),
+			session: transitionedSession,
+			payload: this.buildPayload(transitionedSession),
 		}
 	}
 
@@ -963,13 +857,13 @@ export class WorkflowFormRuntime {
 			activePanel.backStaleValueKeysToClear,
 			activePanel.backStaleDataKeysToClear,
 		)
-		const nextSession = this.rebuildSessionDefinition({
+		const nextSession: WorkflowFormSessionState = {
 			...session,
 			currentPanelId: priorPanelId,
 			values: cleared.values,
 			data: cleared.data,
 			failure: undefined,
-		})
+		}
 
 		return {
 			kind: "render_form",
@@ -982,13 +876,13 @@ export class WorkflowFormRuntime {
 		const firstPanel = this.getPanel(session.definitionPayload, session.firstPanelId)
 		const firstPanelFieldKeys = new Set(firstPanel.fields.filter((field) => isInputField(field)).map((field) => field.key))
 		const retainedValues = Object.fromEntries(Object.entries(session.values).filter(([key]) => firstPanelFieldKeys.has(key)))
-		const nextSession = this.rebuildSessionDefinition({
+		const nextSession: WorkflowFormSessionState = {
 			...session,
 			currentPanelId: session.firstPanelId,
 			values: retainedValues,
 			data: {},
 			failure: undefined,
-		})
+		}
 
 		return {
 			kind: "render_form",
@@ -998,39 +892,18 @@ export class WorkflowFormRuntime {
 	}
 
 	private renderFailure(session: WorkflowFormSessionState, panelId: string, errorMessage: string): WorkflowFormRuntimeOutcome {
-		const failureSession = this.rebuildSessionDefinition({
+		const failureSession: WorkflowFormSessionState = {
 			...session,
 			failure: {
 				panelId,
 				errorMessage,
 			},
-		})
+		}
 
 		return {
 			kind: "render_form",
 			session: failureSession,
 			payload: this.buildFailurePayload(failureSession, errorMessage, panelId),
-		}
-	}
-
-	private buildValidatedDefinition(session: WorkflowFormSessionState): WorkflowFormDefinitionPayload {
-		const resolver = this.getResolver(session.resolverId)
-		const definition = resolver.buildDefinition(session)
-		this.validateDefinition(definition)
-		return definition
-	}
-
-	private rebuildSessionDefinition(session: WorkflowFormSessionState): WorkflowFormSessionState {
-		const definitionPayload = this.buildValidatedDefinition(session)
-		if (!definitionPayload.panels[session.currentPanelId]) {
-			throw new Error(`Workflow form definition is missing the panel: ${session.currentPanelId}`)
-		}
-
-		return {
-			...session,
-			definitionVersion: 2,
-			definitionPayload,
-			firstPanelId: definitionPayload.firstPanelId,
 		}
 	}
 
@@ -1130,15 +1003,6 @@ export class WorkflowFormRuntime {
 		}
 
 		return panel
-	}
-
-	private getResolver(resolverId: string): WorkflowFormResolverDefinition {
-		const resolver = this.resolvers[resolverId]
-		if (!resolver) {
-			throw new Error(`Unknown workflow form resolver: ${resolverId}`)
-		}
-
-		return resolver
 	}
 }
 

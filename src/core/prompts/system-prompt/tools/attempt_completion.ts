@@ -1,7 +1,6 @@
 import { ModelFamily } from "@/shared/prompts"
 import { ClineDefaultTool } from "@/shared/tools"
 import type { ClineToolSpec } from "../spec"
-import { AGENT_FEEDBACK_PARAMETER } from "../types"
 
 const id = ClineDefaultTool.ATTEMPT
 
@@ -24,18 +23,6 @@ IMPORTANT NOTE: This tool CANNOT be used until you've confirmed from the user th
 			instruction:
 				"A CLI command to execute to show a live demo of the result to the user. For example, use `open index.html` to display a created html website, or `open localhost:3000` to display a locally running development server. But DO NOT use commands like `echo` or `cat` that merely print text. This command should be valid for the current operating system. Ensure the command is properly formatted and does not contain any harmful instructions",
 			usage: "Your command here (optional)",
-		},
-		AGENT_FEEDBACK_PARAMETER,
-		// Different than the vanilla ASK_PROGRESS_PARAMETER
-		{
-			name: "task_progress",
-			required: false,
-			instruction: "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool.",
-			usage: "Checklist here (required if you used task_progress in previous tool uses)",
-			dependencies: [ClineDefaultTool.TODO],
-			contextRequirements: (context) => context.activeDeterministicPlaceholderWorkflowEnabled !== true,
-			description:
-				"If you were using task_progress to update the task progress, you must include the completed list in the result as well.",
 		},
 	],
 }
@@ -60,19 +47,6 @@ IMPORTANT NOTE: This tool CANNOT be used until you've confirmed from the user th
 				"A CLI command to execute to show a live demo of the result to the user. For example, use `open index.html` to display a created html website, or `open localhost:3000` to display a locally running development server. But DO NOT use commands like `echo` or `cat` that merely print text. This command should be valid for the current operating system. Ensure the command is properly formatted and does not contain any harmful instructions",
 			usage: "Your command here (optional)",
 		},
-		AGENT_FEEDBACK_PARAMETER,
-		// Different than the vanilla ASK_PROGRESS_PARAMETER
-		{
-			name: "task_progress",
-			required: false,
-			instruction:
-				"A checklist showing task progress after this tool use is completed. (See 'Updating Task Progress' section for more details)",
-			usage: "Checklist here (required if you used task_progress in previous tool uses)",
-			dependencies: [ClineDefaultTool.TODO],
-			contextRequirements: (context) => context.activeDeterministicPlaceholderWorkflowEnabled !== true,
-			description:
-				"If you were using task_progress to update the task progress, you must include the completed list in the result as well.",
-		},
 	],
 }
 
@@ -93,15 +67,6 @@ const NATIVE_NEXT_GEN: ClineToolSpec = {
 			required: false,
 			instruction:
 				"An actionable terminal command that is non-verbose that allows user to review the result of your work. For example, use `start localhost:3000` to start a locally running development server. Commands like `echo` or `cat` that merely print text or open a file are not allowed. Ensure the command is properly formatted for user's OS and does not contain any harmful instructions",
-		},
-		AGENT_FEEDBACK_PARAMETER,
-		{
-			name: "task_progress",
-			required: false,
-			dependencies: [ClineDefaultTool.TODO],
-			contextRequirements: (context) => context.activeDeterministicPlaceholderWorkflowEnabled !== true,
-			instruction:
-				"A checklist showing task progress with the latest status of each subtasks included previously, if any. If you are calling attempt completion, and all items in this list have been completed, they must be marked as completed in this response.",
 		},
 	],
 }

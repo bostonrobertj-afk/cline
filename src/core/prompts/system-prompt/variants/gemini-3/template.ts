@@ -1,6 +1,6 @@
 import { SystemPromptSection } from "../../templates/placeholders"
 
-export const baseTemplate = `{{${SystemPromptSection.AGENT_ROLE}}}
+export const baseTemplate = `{{${SystemPromptSection.WORKFLOW_SYSTEM_INSTRUCTIONS}}}
 
 {{${SystemPromptSection.TOOL_USE}}}
 
@@ -27,10 +27,6 @@ export const baseTemplate = `{{${SystemPromptSection.AGENT_ROLE}}}
 
 ====
 
-{{${SystemPromptSection.TASK_PROGRESS}}}
-
-====
-
 {{${SystemPromptSection.FEEDBACK}}}
 
 ====
@@ -44,6 +40,10 @@ export const baseTemplate = `{{${SystemPromptSection.AGENT_ROLE}}}
 ====
 
 {{${SystemPromptSection.OBJECTIVE}}}
+
+====
+
+{{${SystemPromptSection.WORKFLOW_INPUT}}}
 
 ====
 

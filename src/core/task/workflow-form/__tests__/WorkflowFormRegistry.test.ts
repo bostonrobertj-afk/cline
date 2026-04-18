@@ -1,7 +1,7 @@
 import type { WorkflowFormDefinitionPayload, WorkflowFormSubmittedValuePayload } from "@shared/ExtensionMessage"
 import { expect } from "chai"
 import { describe, it } from "mocha"
-import type { WorkflowFormSessionOwner, WorkflowFormSessionState, WorkflowFormTriggerSource } from "../types"
+import type { WorkflowFormSessionState } from "../types"
 import {
 	BRAINSTORMING_STEP_2_PREPARE_SESSION_RESOLVER_ID,
 	BRAINSTORMING_STEP_3_CAPTURE_TOPIC_RESOLVER_ID,
@@ -24,9 +24,7 @@ const EMPTY_DEFINITION: WorkflowFormDefinitionPayload = {
 }
 
 function createSession(args: {
-	resolverId: string
-	triggerSource: WorkflowFormTriggerSource
-	owner: WorkflowFormSessionOwner
+	workflowFormId?: string
 	definitionPayload?: WorkflowFormDefinitionPayload
 	values?: Record<string, WorkflowFormSubmittedValuePayload>
 	currentPanelId?: string
@@ -35,10 +33,8 @@ function createSession(args: {
 	const definitionPayload = args.definitionPayload ?? EMPTY_DEFINITION
 
 	return {
-		sessionId: `session-${args.resolverId}`,
-		resolverId: args.resolverId,
-		triggerSource: args.triggerSource,
-		owner: args.owner,
+		sessionId: `session-${args.workflowFormId ?? "test-form"}`,
+		workflowFormId: args.workflowFormId ?? "test-form",
 		definitionVersion: 2,
 		definitionPayload,
 		firstPanelId: definitionPayload.firstPanelId,
@@ -117,13 +113,7 @@ describe("WorkflowFormRegistry", () => {
 			},
 		})
 		const session = createSession({
-			resolverId: resolver.id,
-			triggerSource: "slash_command",
-			owner: {
-				kind: "slash_command",
-				workflowName: "review-adversarial-general.md",
-				stepNumber: 1,
-			},
+			workflowFormId: resolver.id,
 			definitionPayload: definition,
 			values: {
 				review_input: { valueType: "string", stringValue: " /tmp/review.md " },
@@ -161,13 +151,7 @@ describe("WorkflowFormRegistry", () => {
 			},
 		})
 		const session = createSession({
-			resolverId: resolver.id,
-			triggerSource: "slash_command",
-			owner: {
-				kind: "slash_command",
-				workflowName: "review-adversarial-general.md",
-				stepNumber: 1,
-			},
+			workflowFormId: resolver.id,
 			definitionPayload: definition,
 		})
 
@@ -195,13 +179,7 @@ describe("WorkflowFormRegistry", () => {
 		const resolver = getWorkflowFormResolverDefinition(CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID)
 		const definition = resolver.buildDefinition(
 			createSession({
-				resolverId: resolver.id,
-				triggerSource: "deterministic_workflow_progression",
-				owner: {
-					kind: "placeholder_workflow_step",
-					workflowName: "code-review.md",
-					stepNumber: 2,
-				},
+				workflowFormId: resolver.id,
 			}),
 		)
 		const sourceSelectionPanel = definition.panels.source_selection
@@ -249,23 +227,11 @@ describe("WorkflowFormRegistry", () => {
 		const resolver = getWorkflowFormResolverDefinition(CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID)
 		const definition = resolver.buildDefinition(
 			createSession({
-				resolverId: resolver.id,
-				triggerSource: "deterministic_workflow_progression",
-				owner: {
-					kind: "placeholder_workflow_step",
-					workflowName: "code-review.md",
-					stepNumber: 2,
-				},
+				workflowFormId: resolver.id,
 			}),
 		)
 		const session = createSession({
-			resolverId: resolver.id,
-			triggerSource: "deterministic_workflow_progression",
-			owner: {
-				kind: "placeholder_workflow_step",
-				workflowName: "code-review.md",
-				stepNumber: 2,
-			},
+			workflowFormId: resolver.id,
 			definitionPayload: definition,
 			currentPanelId: "source_details",
 			values: {
@@ -305,13 +271,7 @@ describe("WorkflowFormRegistry", () => {
 	it("preserves the machine-checkable Code Review Step 2 success and failure classification", () => {
 		const resolver = getWorkflowFormResolverDefinition(CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID)
 		const session = createSession({
-			resolverId: resolver.id,
-			triggerSource: "deterministic_workflow_progression",
-			owner: {
-				kind: "placeholder_workflow_step",
-				workflowName: "code-review.md",
-				stepNumber: 2,
-			},
+			workflowFormId: resolver.id,
 		})
 
 		expect(
@@ -386,13 +346,7 @@ describe("WorkflowFormRegistry", () => {
 			],
 		})
 		const session = createSession({
-			resolverId: resolver.id,
-			triggerSource: "deterministic_workflow_progression",
-			owner: {
-				kind: "placeholder_workflow_step",
-				workflowName: "brainstorming.md",
-				stepNumber: 2,
-			},
+			workflowFormId: resolver.id,
 			definitionPayload: definition,
 			currentPanelId: "session_selection",
 			values: {
@@ -433,13 +387,7 @@ describe("WorkflowFormRegistry", () => {
 		const resolver = getWorkflowFormResolverDefinition(BRAINSTORMING_STEP_3_CAPTURE_TOPIC_RESOLVER_ID)
 		const definition = resolver.buildDefinition(
 			createSession({
-				resolverId: resolver.id,
-				triggerSource: "deterministic_workflow_progression",
-				owner: {
-					kind: "placeholder_workflow_step",
-					workflowName: "brainstorming.md",
-					stepNumber: 3,
-				},
+				workflowFormId: resolver.id,
 			}),
 		)
 		const panel = definition.panels[definition.firstPanelId]
@@ -463,23 +411,11 @@ describe("WorkflowFormRegistry", () => {
 		const resolver = getWorkflowFormResolverDefinition(BRAINSTORMING_STEP_3_CAPTURE_TOPIC_RESOLVER_ID)
 		const definition = resolver.buildDefinition(
 			createSession({
-				resolverId: resolver.id,
-				triggerSource: "deterministic_workflow_progression",
-				owner: {
-					kind: "placeholder_workflow_step",
-					workflowName: "brainstorming.md",
-					stepNumber: 3,
-				},
+				workflowFormId: resolver.id,
 			}),
 		)
 		const session = createSession({
-			resolverId: resolver.id,
-			triggerSource: "deterministic_workflow_progression",
-			owner: {
-				kind: "placeholder_workflow_step",
-				workflowName: "brainstorming.md",
-				stepNumber: 3,
-			},
+			workflowFormId: resolver.id,
 			definitionPayload: definition,
 			values: {
 				topic: { valueType: "string", stringValue: "Line one\n\nLine two" },
@@ -571,13 +507,7 @@ describe("WorkflowFormRegistry", () => {
 			},
 		})
 		const techniqueSelectionSession = createSession({
-			resolverId: resolver.id,
-			triggerSource: "deterministic_workflow_progression",
-			owner: {
-				kind: "placeholder_workflow_step",
-				workflowName: "brainstorming.md",
-				stepNumber: 4,
-			},
+			workflowFormId: resolver.id,
 			definitionPayload: definition,
 			currentPanelId: "technique_selection",
 			values: {

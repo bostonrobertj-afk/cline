@@ -3,13 +3,9 @@ import { SystemPromptSection } from "../../templates/placeholders"
 /**
  * Base template for GPT-5 variant with structured sections
  */
-export const BASE = `{{${SystemPromptSection.AGENT_ROLE}}}
+export const BASE = `{{${SystemPromptSection.WORKFLOW_SYSTEM_INSTRUCTIONS}}}
 
 {{${SystemPromptSection.TOOL_USE}}}
-
-====
-
-{{${SystemPromptSection.TASK_PROGRESS}}}
 
 ====
 
@@ -38,6 +34,10 @@ export const BASE = `{{${SystemPromptSection.AGENT_ROLE}}}
 ====
 
 {{${SystemPromptSection.OBJECTIVE}}}
+
+====
+
+{{${SystemPromptSection.WORKFLOW_INPUT}}}
 
 ====
 

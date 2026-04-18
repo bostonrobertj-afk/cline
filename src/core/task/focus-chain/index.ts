@@ -2,40 +2,19 @@ import { FocusChainSettings } from "@shared/FocusChainSettings"
 import * as chokidar from "chokidar"
 import * as fs from "fs/promises"
 import * as path from "path"
-import { getTaskMetadata, saveTaskMetadata } from "@/core/storage/disk"
-import {
-	buildCurrentStoryTaskPrompt,
-	buildTestingRequirementsPrompt,
-	resolveActiveStoryPath,
-} from "@/core/task/story-tools/storyTaskDocument"
-import {
-	buildPlaceholderWorkflowChecklist,
-	getActivePlaceholderWorkflowChecklistLabel,
-	getActivePlaceholderWorkflowStepDetails,
-} from "@/core/workflows/placeholder-workflow-step-details"
-import { findUnresolvedWorkflowPlaceholders } from "@/core/workflows/workflow-placeholders"
 import { telemetryService } from "@/services/telemetry"
-import { isFocusChainCompleteNextStepSentinel } from "@/shared/focus-chain-utils"
 import { Logger } from "@/shared/services/Logger"
 import { ClineSay } from "../../../shared/ExtensionMessage"
 import { Mode } from "../../../shared/storage/types"
 import { writeFile } from "../../../utils/fs"
 import { ensureTaskDirectoryExists } from "../../storage/disk"
 import { StateManager } from "../../storage/StateManager"
-import { renderManagedWorkflowTaskProgress } from "../managed-workflows/ManagedWorkflowRenderer"
 import { TaskState } from "../TaskState"
-import {
-	applyDeterministicPlaceholderProgression,
-	type DeterministicPlaceholderToolContext,
-	isDeterministicPlaceholderWorkflowSupported,
-} from "./deterministicPlaceholderProgression"
 import { logFocusChainDiagnosticEvent, summarizeFocusChainText, summarizeFocusChainTextBlocks } from "./diagnostics"
 import {
 	buildFocusChainChecklistRejectionFeedback,
-	buildFocusChainMissingChecklistDirectiveFeedback,
 	createFocusChainMarkdownContent,
 	evaluateFocusChainChecklistUpdate,
-	extractFocusChainItemsFromText,
 	extractFocusChainListFromText,
 	type FocusChainStorageIdentity,
 	getFocusChainFilePath,
@@ -61,7 +40,7 @@ export interface FocusChainDependencies {
 export interface FocusChainInstructionDecision {
 	shouldInclude: boolean
 	inPlanMode: boolean
-	placeholderWorkflowActive: boolean
+	workflowActive: boolean
 	justSwitchedFromPlanMode: boolean
 	userUpdatedList: boolean
 	reachedReminderInterval: boolean
@@ -69,12 +48,15 @@ export interface FocusChainInstructionDecision {
 	hasNoTodoListAfterMultipleRequests: boolean
 }
 
+type WorkflowPresenceTaskState = TaskState & {
+	activeWorkflowName?: string | null
+}
+
 export class FocusChainManager {
 	private taskId: string
 	private focusChainStorageTaskId: string
 	private focusChainStorageIdentity?: FocusChainStorageIdentity
 	private focusChainDocumentLabel: string
-	private cwd: string
 	private taskState: TaskState
 	private stateManager: StateManager
 	private postStateToWebview: () => Promise<void>
@@ -95,7 +77,6 @@ export class FocusChainManager {
 		this.focusChainStorageTaskId = dependencies.focusChainStorageTaskId ?? dependencies.taskId
 		this.focusChainStorageIdentity = dependencies.focusChainStorageIdentity
 		this.focusChainDocumentLabel = dependencies.focusChainDocumentLabel ?? `Task ${dependencies.taskId}`
-		this.cwd = dependencies.cwd
 		this.taskState = dependencies.taskState
 		this.stateManager = dependencies.stateManager
 		this.postStateToWebview = dependencies.postStateToWebview
@@ -114,11 +95,17 @@ export class FocusChainManager {
 		return ["```text", checklist.trim(), "```"].join("\n")
 	}
 
-	private normalizePlaceholderWorkflowSourceName(sourceName: string): string {
-		return path.posix.basename(sourceName.replaceAll("\\", "/")).trim().toLowerCase()
+	private getActiveWorkflowName(): string | undefined {
+		const activeWorkflowName = (this.taskState as WorkflowPresenceTaskState).activeWorkflowName?.trim()
+		return activeWorkflowName ? activeWorkflowName : undefined
 	}
 
-	private clearActiveStoryTaskPromptState(): void {
+	private hasActiveWorkflow(): boolean {
+		return !!this.getActiveWorkflowName()
+	}
+
+	private clearWorkflowPromptState(): void {
+		this.taskState.lastPromptedPlaceholderWorkflowChecklistLabel = undefined
 		this.taskState.activeStoryTaskId = undefined
 		this.taskState.activeStorySubtaskIds = []
 		this.taskState.lastPromptedStoryTaskKey = undefined
@@ -129,9 +116,50 @@ export class FocusChainManager {
 		return getFocusChainFilePath(taskDir, this.taskId, this.focusChainStorageIdentity)
 	}
 
+	private async removeFocusChainFileFromDisk(): Promise<void> {
+		try {
+			const todoFilePath = await this.resolveFocusChainFilePath()
+			await fs.unlink(todoFilePath)
+		} catch {
+			// Missing focus chain file is fine when clearing projection state.
+		}
+	}
+
+	private async refreshWorkflowChecklistProjection(): Promise<void> {
+		const checklist = this.taskState.currentFocusChainChecklist?.trim()
+		this.taskState.apiRequestsSinceLastTodoUpdate = 0
+		this.taskState.todoListWasUpdatedByUser = false
+
+		if (!checklist) {
+			await this.removeFocusChainFileFromDisk()
+			await this.postStateToWebview()
+			return
+		}
+
+		this.taskState.currentFocusChainChecklist = checklist
+
+		try {
+			await this.writeFocusChainToDisk(checklist)
+			await this.say("task_progress", checklist)
+		} catch (error) {
+			Logger.error(`[Task ${this.taskId}] workflow checklist projection refresh failed:`, error)
+			await this.say("task_progress", checklist)
+		}
+
+		await this.postStateToWebview()
+	}
+
+	private async clearChecklistProjection(): Promise<void> {
+		this.taskState.currentFocusChainChecklist = null
+		this.taskState.todoListWasUpdatedByUser = false
+		this.taskState.apiRequestsSinceLastTodoUpdate = 0
+		await this.removeFocusChainFileFromDisk()
+		await this.postStateToWebview()
+	}
+
 	public getFocusChainInstructionsDecision(): FocusChainInstructionDecision {
 		const inPlanMode = this.stateManager.getGlobalSettingsKey("mode") === "plan"
-		const placeholderWorkflowActive = !!this.taskState.activePlaceholderWorkflowSource
+		const workflowActive = this.hasActiveWorkflow()
 		const justSwitchedFromPlanMode = this.taskState.didRespondToPlanAskBySwitchingMode
 		const userUpdatedList = this.taskState.todoListWasUpdatedByUser
 		const reachedReminderInterval =
@@ -142,7 +170,7 @@ export class FocusChainManager {
 
 		return {
 			shouldInclude:
-				placeholderWorkflowActive ||
+				workflowActive ||
 				reachedReminderInterval ||
 				justSwitchedFromPlanMode ||
 				userUpdatedList ||
@@ -150,7 +178,7 @@ export class FocusChainManager {
 				isFirstApiRequest ||
 				hasNoTodoListAfterMultipleRequests,
 			inPlanMode,
-			placeholderWorkflowActive,
+			workflowActive,
 			justSwitchedFromPlanMode,
 			userUpdatedList,
 			reachedReminderInterval,
@@ -159,17 +187,10 @@ export class FocusChainManager {
 		}
 	}
 
-	/**
-	 * Sets up a file watcher to monitor changes to the focus chain list markdown file.
-	 * Automatically updates the UI when the file is created, modified, or deleted by external editors.
-	 * @requires this.taskId, this.context to be initialized
-	 * @returns Promise<void> - Resolves when watcher is set up, logs errors if setup fails
-	 */
 	public async setupFocusChainFileWatcher() {
 		try {
 			const focusChainFilePath = await this.resolveFocusChainFilePath()
 
-			// Initialize chokidar watcher
 			this.focusChainFileWatcher = chokidar.watch(focusChainFilePath, {
 				persistent: true,
 				ignoreInitial: true,
@@ -179,7 +200,6 @@ export class FocusChainManager {
 				},
 			})
 
-			// Handle file changes
 			this.focusChainFileWatcher
 				.on("add", async () => {
 					await this.updateFCListFromMarkdownFileAndNotifyUI()
@@ -188,6 +208,11 @@ export class FocusChainManager {
 					await this.updateFCListFromMarkdownFileAndNotifyUI()
 				})
 				.on("unlink", async () => {
+					if (this.hasActiveWorkflow()) {
+						await this.postStateToWebview()
+						return
+					}
+
 					this.taskState.currentFocusChainChecklist = null
 					await this.postStateToWebview()
 				})
@@ -201,17 +226,8 @@ export class FocusChainManager {
 		}
 	}
 
-	/**
-	 * Reads the current focus chain list from the markdown file and updates the UI with any changes.
-	 * Uses debouncing (300ms) to prevent excessive updates and only notifies the webview when content actually changes.
-	 * @requires File watcher to be active and markdown file to exist
-	 * @returns Promise<void> - Updates taskState.currentFocusChainChecklist and calls postStateToWebview()
-	 */
 	private async updateFCListFromMarkdownFileAndNotifyUI() {
-		if (this.taskState.managedWorkflowRun) {
-			const managedTaskProgress = renderManagedWorkflowTaskProgress(this.taskState.managedWorkflowRun)
-			this.taskState.currentFocusChainChecklist = managedTaskProgress
-			await this.say("task_progress", managedTaskProgress)
+		if (this.hasActiveWorkflow()) {
 			await this.postStateToWebview()
 			return
 		}
@@ -220,14 +236,12 @@ export class FocusChainManager {
 			clearTimeout(this.fileUpdateDebounceTimer)
 		}
 
-		// Debounce file watcher to prevent false positives
 		this.fileUpdateDebounceTimer = setTimeout(async () => {
 			try {
 				const markdownTodoList = await this.readFocusChainFromDisk()
 				if (markdownTodoList) {
 					const previousList = this.taskState.currentFocusChainChecklist
 
-					// Only update if the content actually changed
 					if (previousList !== markdownTodoList) {
 						this.taskState.currentFocusChainChecklist = markdownTodoList
 						this.taskState.todoListWasUpdatedByUser = true
@@ -241,63 +255,42 @@ export class FocusChainManager {
 					}
 				}
 			} catch (error) {
-				Logger.error(`[Task ${this.taskId}] Error updating focuss chain list from markdown file:`, error)
+				Logger.error(`[Task ${this.taskId}] Error updating focus chain list from markdown file:`, error)
 			}
 		}, 300)
 	}
 
-	/**
-	 * Generates contextual instructions for focus chain list creation and management based on current task state.
-	 * Returns formatted markdown instructions that guide the AI on when and how to update progress tracking.
-	 * @requires this.taskState with current focus chain list state and API request counts
-	 * @returns string - Formatted markdown instructions for focus chain list management, varies by context
-	 */
 	public async generateFocusChainInstructions(): Promise<string> {
-		if (this.taskState.managedWorkflowRun) {
-			const currentChecklist = renderManagedWorkflowTaskProgress(this.taskState.managedWorkflowRun)
+		const activeWorkflowName = this.getActiveWorkflowName()
+		if (activeWorkflowName) {
 			return this.joinPromptSections(
 				"# CURRENT WORKFLOW STATUS",
-				"## WORKFLOW PROGRESS IS BACKEND MANAGED",
-				this.renderChecklistForPrompt(currentChecklist),
-				"Use the complete_workflow_item tool to mark the active workflow item complete.\nDo not create or rewrite task_progress manually.",
+				`## ACTIVE WORKFLOW: ${activeWorkflowName}`,
+				this.taskState.currentFocusChainChecklist
+					? this.renderChecklistForPrompt(this.taskState.currentFocusChainChecklist)
+					: "Workflow progress is runtime managed. The checklist projection is not available yet.",
+				"Workflow progress is runtime managed. Use the workflow tools for progress changes.\nDo not create or rewrite task_progress manually.",
 			)
 		}
 
-		// If list exists already exists, we need to remind it to update rather than demand initialization
 		if (this.taskState.currentFocusChainChecklist) {
-			// Parse the current list for counts/stats
 			const { totalItems, completedItems } = parseFocusChainListCounts(this.taskState.currentFocusChainChecklist)
 			const percentComplete = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0
-			const activeDeterministicPlaceholderWorkflowEnabled = isDeterministicPlaceholderWorkflowSupported(
-				this.taskState.activePlaceholderWorkflowSource?.name,
-			)
-
 			const listCurrentProgress = `**Current Progress: ${completedItems}/${totalItems} items completed (${percentComplete}%)**`
 			const userHasUpdatedList =
 				"**CRITICAL INFORMATION:** The user has modified this todo list - review ALL changes carefully"
 
-			const placeholderWorkflowStatusPrompt = await this.buildPlaceholderWorkflowStatusPrompt(
-				this.taskState.currentFocusChainChecklist,
-				listCurrentProgress,
-			)
-			if (placeholderWorkflowStatusPrompt) {
-				return this.joinPromptSections("# CURRENT WORKFLOW STATUS", placeholderWorkflowStatusPrompt)
-			}
-
-			// If user has updated the list, inform the model (and provide latest copy)
 			if (this.taskState.todoListWasUpdatedByUser) {
 				return this.joinPromptSections(
 					"# CURRENT WORKFLOW STATUS",
 					listCurrentProgress,
 					this.renderChecklistForPrompt(this.taskState.currentFocusChainChecklist),
 					userHasUpdatedList,
-					activeDeterministicPlaceholderWorkflowEnabled ? undefined : FocusChainPrompts.reminder,
+					FocusChainPrompts.reminder,
 				)
-
-				// If there are no user changes, proceed with reminders based on list progress
 			}
+
 			let progressBasedMessageStub = ""
-			// If there are items on the list, but none have been completed yet, remind the model to update the list when appropriate
 			if (completedItems === 0 && totalItems > 0) {
 				progressBasedMessageStub =
 					"\n\n**Note:** No items are marked complete yet. As you work through the task, remember to mark items as complete when finished."
@@ -307,327 +300,65 @@ export class FocusChainManager {
 				progressBasedMessageStub = `\n\n**Note:** ${percentComplete}% of items are complete. Proceed with the task.`
 			} else if (percentComplete >= 75) {
 				progressBasedMessageStub = `\n\n**Note:** ${percentComplete}% of items are complete! Focus on finishing the remaining items.`
-			}
-			// Every item on the list has been completed. Hooray!
-			else if (completedItems === totalItems && totalItems > 0) {
+			} else if (completedItems === totalItems && totalItems > 0) {
 				progressBasedMessageStub = FocusChainPrompts.completed
 					.replace("{{totalItems}}", totalItems.toString())
 					.replace("{{currentFocusChainChecklist}}", this.taskState.currentFocusChainChecklist)
 			}
 
-			// Return with progress-based stub
 			return this.joinPromptSections(
 				"# CURRENT WORKFLOW STATUS",
 				listCurrentProgress,
 				this.renderChecklistForPrompt(this.taskState.currentFocusChainChecklist),
-				activeDeterministicPlaceholderWorkflowEnabled ? undefined : FocusChainPrompts.reminder,
+				FocusChainPrompts.reminder,
 				progressBasedMessageStub,
 			)
 		}
-		// When switching from Plan to Act, request that a new list be generated
+
 		if (this.taskState.didRespondToPlanAskBySwitchingMode) {
-			return `${FocusChainPrompts.initial}`
+			return FocusChainPrompts.initial
 		}
 
-		// When in plan mode, lists are optional. TODO - May want to improve this soft prompt approach in a future version
 		if (this.stateManager.getGlobalSettingsKey("mode") === "plan") {
 			return FocusChainPrompts.planModeReminder
 		}
-		// Check if we're early in the task
-		const isEarlyInTask = this.taskState.apiRequestCount < 10
-		if (isEarlyInTask) {
+
+		if (this.taskState.apiRequestCount < 10) {
 			return FocusChainPrompts.recommended
 		}
+
 		return FocusChainPrompts.apiRequestCount.replace("{{apiRequestCount}}", this.taskState.apiRequestCount.toString())
 	}
 
-	private async consumeAutoCompletedPlaceholderWorkflowNoticesForPrompt(): Promise<string | undefined> {
-		if (this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.length === 0) {
-			return undefined
-		}
-
-		const section = [
-			"## AUTO-COMPLETED WORKFLOW STEPS",
-			"",
-			"The runtime auto-completed these workflow steps:",
-			...this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices.map(
-				(notice) => `- ${notice.checklistLabel} — ${notice.reason}`,
-			),
-			"",
-			"No action was required from you for those steps.",
-		].join("\n")
-		this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices = []
-		await this.persistPlaceholderWorkflowMetadata()
-		return section
-	}
-
-	private async buildPlaceholderWorkflowStatusPrompt(
-		currentChecklist: string,
-		listCurrentProgress: string,
-	): Promise<string | undefined> {
-		if (!this.taskState.activePlaceholderWorkflowSource) {
-			await logFocusChainDiagnosticEvent(this.taskId, "placeholder_step_prompt_resolution", {
-				entered: true,
-				resolved: false,
-				reason: "no_active_placeholder_workflow_source",
-				hasActivePlaceholderWorkflowSource: false,
-				currentChecklistItems: parseFocusChainListCounts(currentChecklist).totalItems,
-			})
-			return undefined
-		}
-
-		const userUpdatedWarning = this.taskState.todoListWasUpdatedByUser
-			? "**CRITICAL INFORMATION:** I updated this checklist manually. Review the current checklist carefully before you continue."
-			: ""
-		const deterministicWorkflowSupported = isDeterministicPlaceholderWorkflowSupported(
-			this.taskState.activePlaceholderWorkflowSource.name,
-		)
-		const autoCompletedNoticeSection = await this.consumeAutoCompletedPlaceholderWorkflowNoticesForPrompt()
-
-		return this.joinPromptSections(
-			deterministicWorkflowSupported
-				? "### Reminder: Detailed instructions for the current step are available in conversation history. Further Instructions will be provided once you complete the current step's requirements."
-				: "### Reminder: Detailed instructions for the current step are available in conversatoin history.. Keep `task_progress` moving so the active step and its details stay in sync.",
-			listCurrentProgress,
-			this.renderChecklistForPrompt(currentChecklist),
-			userUpdatedWarning,
-			autoCompletedNoticeSection,
-		)
-	}
-
-	public async consumeCurrentPlaceholderWorkflowStepPromptForInput(options?: {
+	public async consumeCurrentPlaceholderWorkflowStepPromptForInput(_options?: {
 		shouldForceStoryTaskPrompt?: boolean
 	}): Promise<string | undefined> {
-		if (this.taskState.managedWorkflowRun) {
-			this.taskState.lastPromptedPlaceholderWorkflowChecklistLabel = undefined
-			this.clearActiveStoryTaskPromptState()
-			return undefined
-		}
-
-		const currentChecklist = this.taskState.currentFocusChainChecklist
-		if (!this.taskState.activePlaceholderWorkflowSource || !currentChecklist) {
-			this.taskState.lastPromptedPlaceholderWorkflowChecklistLabel = undefined
-			this.clearActiveStoryTaskPromptState()
-			return undefined
-		}
-
-		const activeChecklistLabel = getActivePlaceholderWorkflowChecklistLabel(currentChecklist)
-		if (!activeChecklistLabel) {
-			this.taskState.lastPromptedPlaceholderWorkflowChecklistLabel = undefined
-			this.clearActiveStoryTaskPromptState()
-			return undefined
-		}
-
-		try {
-			const stepDetails = await getActivePlaceholderWorkflowStepDetails({
-				checklistMarkdown: currentChecklist,
-				source: this.taskState.activePlaceholderWorkflowSource,
-				stablePlaceholderValues: this.taskState.activePlaceholderWorkflowStableValues,
-				placeholderValues: this.taskState.activePlaceholderWorkflowValues,
-			})
-			if (!stepDetails) {
-				logFocusChainDiagnosticEvent(this.taskId, "placeholder_step_prompt_resolution", {
-					entered: true,
-					resolved: false,
-					reason: "no_step_details",
-					hasActivePlaceholderWorkflowSource: !!this.taskState.activePlaceholderWorkflowSource,
-					currentChecklistItems: parseFocusChainListCounts(currentChecklist).totalItems,
-				})
-				return undefined
-			}
-
-			const shouldEmitStaticPrompt = this.taskState.lastPromptedPlaceholderWorkflowChecklistLabel !== activeChecklistLabel
-			const unresolvedPlaceholders = findUnresolvedWorkflowPlaceholders(stepDetails.details)
-			logFocusChainDiagnosticEvent(this.taskId, "placeholder_step_prompt_resolution", {
-				entered: true,
-				resolved: true,
-				checklistLabel: stepDetails.checklistLabel,
-				hasActivePlaceholderWorkflowSource: !!this.taskState.activePlaceholderWorkflowSource,
-				currentChecklistItems: parseFocusChainListCounts(currentChecklist).totalItems,
-				unresolvedPlaceholderCount: unresolvedPlaceholders.length,
-				unresolvedPlaceholders: unresolvedPlaceholders.length > 0 ? unresolvedPlaceholders : undefined,
-			})
-
-			const basePrompt = isDeterministicPlaceholderWorkflowSupported(stepDetails.sourceName)
-				? [
-						"### CURRENT WORKFLOW STEP",
-						`You are currently on this step: ${stepDetails.checklistLabel}`,
-						stepDetails.details.trim(),
-						"Focus on correctly completing this step.",
-						"Once you correctly complete this step, the next step's details will be shown automatically.",
-					].join("\n\n")
-				: [
-						"### CURRENT WORKFLOW STEP",
-						`You are currently on this step: ${stepDetails.checklistLabel}`,
-						stepDetails.details.trim(),
-						"Focus on completing this step.",
-						"I determine the active step from your latest `task_progress` update.",
-						'Do not include `task_progress` on a tool call until the active step\'s "Done Signal" is true.',
-						'When the active step\'s "Done Signal" is true, use `task_progress` with `__COMPLETE_NEXT_STEP__` on the next relevant tool call, and use it only once in that assistant turn.',
-						"Once the checklist advances, I'll give you the next step's details.",
-					].join("\n\n")
-			const normalizedSourceName = this.normalizePlaceholderWorkflowSourceName(stepDetails.sourceName)
-			const isDevStoryWorkflow = normalizedSourceName === "dev-story.md"
-			const isDevStoryStep2 = isDevStoryWorkflow && stepDetails.stepNumber === 2
-			const isDevStoryStep3 =
-				isDevStoryWorkflow && (stepDetails.stepNumber === 3 || stepDetails.checklistLabel === "Step 3: Validate")
-
-			if (!isDevStoryStep2) {
-				this.clearActiveStoryTaskPromptState()
-			}
-
-			if (isDevStoryStep2) {
-				const resolvedStoryPath = resolveActiveStoryPath({
-					cwd: this.cwd,
-					stablePlaceholderValues: this.taskState.activePlaceholderWorkflowStableValues,
-					placeholderValues: this.taskState.activePlaceholderWorkflowValues,
-				})
-				if (resolvedStoryPath.ok) {
-					try {
-						const storyMarkdown = await fs.readFile(resolvedStoryPath.storyPath, "utf8")
-						const payload = buildCurrentStoryTaskPrompt(storyMarkdown)
-						if (!("error" in payload)) {
-							this.taskState.activeStoryTaskId = payload.storyTaskId
-							this.taskState.activeStorySubtaskIds = payload.storySubtaskIds
-
-							const shouldEmitDynamicPrompt =
-								options?.shouldForceStoryTaskPrompt === true ||
-								this.taskState.lastPromptedStoryTaskKey !== payload.promptKey
-
-							if (shouldEmitDynamicPrompt) {
-								this.taskState.lastPromptedStoryTaskKey = payload.promptKey
-								if (shouldEmitStaticPrompt) {
-									this.taskState.lastPromptedPlaceholderWorkflowChecklistLabel = activeChecklistLabel
-									return `${basePrompt}\n\n\n${payload.promptText}`
-								}
-
-								return payload.promptText
-							}
-						}
-					} catch {
-						// Fall through to the standard step prompt when the story file cannot be read.
-					}
-				}
-			}
-
-			if (isDevStoryStep3 && shouldEmitStaticPrompt) {
-				const resolvedStoryPath = resolveActiveStoryPath({
-					cwd: this.cwd,
-					stablePlaceholderValues: this.taskState.activePlaceholderWorkflowStableValues,
-					placeholderValues: this.taskState.activePlaceholderWorkflowValues,
-				})
-				if (resolvedStoryPath.ok) {
-					try {
-						const storyMarkdown = await fs.readFile(resolvedStoryPath.storyPath, "utf8")
-						const testingRequirementsPrompt = buildTestingRequirementsPrompt(storyMarkdown)
-						if (typeof testingRequirementsPrompt === "string") {
-							this.taskState.lastPromptedPlaceholderWorkflowChecklistLabel = activeChecklistLabel
-							return `${basePrompt}\n\n\n${testingRequirementsPrompt}`
-						}
-					} catch {
-						// Fall through to the standard step prompt when the story file cannot be read.
-					}
-				}
-			}
-
-			if (shouldEmitStaticPrompt) {
-				this.taskState.lastPromptedPlaceholderWorkflowChecklistLabel = activeChecklistLabel
-				return basePrompt
-			}
-
-			return undefined
-		} catch (error) {
-			logFocusChainDiagnosticEvent(this.taskId, "placeholder_step_prompt_resolution", {
-				entered: true,
-				resolved: false,
-				reason: "error",
-				errorMessage: error instanceof Error ? error.message : String(error),
-				hasActivePlaceholderWorkflowSource: !!this.taskState.activePlaceholderWorkflowSource,
-				currentChecklistItems: parseFocusChainListCounts(currentChecklist).totalItems,
-			})
-			Logger.warn(`[Task ${this.taskId}] Failed to resolve workflow step details`, error)
-			return undefined
-		}
-	}
-
-	private async persistPlaceholderWorkflowMetadata(): Promise<void> {
-		if (this.taskState.managedWorkflowRun) {
-			return
-		}
-
-		try {
-			const metadata = await getTaskMetadata(this.taskId)
-			metadata.activeWorkflowId = this.taskState.activeWorkflowId
-			metadata.activePlaceholderWorkflowId = this.taskState.activePlaceholderWorkflowId
-			metadata.activePlaceholderWorkflowSource = this.taskState.activePlaceholderWorkflowSource
-			metadata.activePlaceholderWorkflowStableValues = this.taskState.activePlaceholderWorkflowStableValues
-			metadata.activePlaceholderWorkflowValues = this.taskState.activePlaceholderWorkflowValues
-			metadata.activePlaceholderWorkflowDeterministicState = this.taskState.activePlaceholderWorkflowDeterministicState
-			metadata.activePlaceholderWorkflowTaskWriteProofPaths = this.taskState.activePlaceholderWorkflowTaskWriteProofPaths
-			metadata.pendingAutoCompletedPlaceholderWorkflowStepNotices =
-				this.taskState.pendingAutoCompletedPlaceholderWorkflowStepNotices
-			metadata.managedWorkflowRun = this.taskState.managedWorkflowRun
-			await saveTaskMetadata(this.taskId, metadata)
-		} catch {
-			// Non-fatal: the in-memory managed workflow run remains canonical for the active task.
-		}
+		this.clearWorkflowPromptState()
+		return undefined
 	}
 
 	public async refreshManagedWorkflowChecklistProjection(): Promise<void> {
-		if (!this.taskState.managedWorkflowRun) {
+		if (!this.hasActiveWorkflow()) {
 			await this.clearManagedWorkflowChecklistProjection()
 			return
 		}
 
-		const managedTaskProgress = renderManagedWorkflowTaskProgress(this.taskState.managedWorkflowRun)
-		this.taskState.apiRequestsSinceLastTodoUpdate = 0
-		this.taskState.todoListWasUpdatedByUser = false
-		this.taskState.currentFocusChainChecklist = managedTaskProgress
-
-		try {
-			await this.writeFocusChainToDisk(managedTaskProgress)
-			await this.say("task_progress", managedTaskProgress)
-		} catch (error) {
-			Logger.error(`[Task ${this.taskId}] managed workflow checklist projection refresh failed:`, error)
-			await this.say("task_progress", managedTaskProgress)
-		}
-
-		await this.postStateToWebview()
+		await this.refreshWorkflowChecklistProjection()
 	}
 
-	public async refreshPlaceholderWorkflowChecklistProjection(force = false): Promise<void> {
-		if (!this.taskState.activePlaceholderWorkflowSource) {
-			return
-		}
-		if (!force && this.taskState.currentFocusChainChecklist) {
+	public async refreshPlaceholderWorkflowChecklistProjection(_force = false): Promise<void> {
+		if (!this.hasActiveWorkflow()) {
 			return
 		}
 
-		const checklist = await buildPlaceholderWorkflowChecklist({
-			source: this.taskState.activePlaceholderWorkflowSource,
-			stablePlaceholderValues: this.taskState.activePlaceholderWorkflowStableValues,
-			placeholderValues: this.taskState.activePlaceholderWorkflowValues,
-		})
-		if (!checklist) {
-			return
-		}
-
-		this.taskState.apiRequestsSinceLastTodoUpdate = 0
-		this.taskState.todoListWasUpdatedByUser = false
-		this.taskState.currentFocusChainChecklist = checklist
-
-		try {
-			await this.writeFocusChainToDisk(checklist)
-			await this.say("task_progress", checklist)
-		} catch (error) {
-			Logger.error(`[Task ${this.taskId}] placeholder workflow checklist projection refresh failed:`, error)
-			await this.say("task_progress", checklist)
-		}
-
-		await this.postStateToWebview()
+		await this.refreshWorkflowChecklistProjection()
 	}
 
 	public async restoreCurrentChecklistFromDisk(): Promise<string | null> {
+		if (this.hasActiveWorkflow()) {
+			return this.taskState.currentFocusChainChecklist ?? null
+		}
+
 		const markdownTodoList = await this.readFocusChainFromDisk()
 		if (!markdownTodoList) {
 			return null
@@ -649,6 +380,7 @@ export class FocusChainManager {
 	}): Promise<void> {
 		const checklist = this.taskState.currentFocusChainChecklist
 		const checklistStats = checklist ? parseFocusChainListCounts(checklist) : undefined
+		const activeWorkflowName = this.getActiveWorkflowName()
 
 		logFocusChainDiagnosticEvent(this.taskId, "load_context_snapshot", {
 			providerId: context.providerId,
@@ -656,13 +388,13 @@ export class FocusChainManager {
 			useCompactPrompt: context.useCompactPrompt,
 			reducedEnvironmentDetails: !context.includeDetailedEnvironmentDetails,
 			focusChainManagerPresent: context.focusChainManagerPresent,
-			activePlaceholderWorkflowId: this.taskState.activePlaceholderWorkflowId ?? null,
-			activePlaceholderWorkflowSourcePresent: !!this.taskState.activePlaceholderWorkflowSource,
+			activePlaceholderWorkflowId: activeWorkflowName ?? null,
+			activePlaceholderWorkflowSourcePresent: !!activeWorkflowName,
+			activeWorkflowName: activeWorkflowName ?? null,
 			currentFocusChainChecklistPresent: !!checklist,
 			currentFocusChainChecklistItemCount: checklistStats?.totalItems ?? 0,
 			apiRequestCount: this.taskState.apiRequestCount,
 			apiRequestsSinceLastTodoUpdate: this.taskState.apiRequestsSinceLastTodoUpdate,
-			placeholderWorkflowJustStarted: this.taskState.activeWorkflowJustStarted,
 			placeholderActivationInstructionsAppended: context.placeholderActivationInstructionsAppended,
 		})
 	}
@@ -685,69 +417,24 @@ export class FocusChainManager {
 	}
 
 	public async clearManagedWorkflowChecklistProjection(): Promise<void> {
-		this.taskState.currentFocusChainChecklist = null
-		this.taskState.todoListWasUpdatedByUser = false
-		this.taskState.apiRequestsSinceLastTodoUpdate = 0
-
-		try {
-			const todoFilePath = await this.resolveFocusChainFilePath()
-			await fs.unlink(todoFilePath)
-		} catch {
-			// Missing focus chain file is fine when clearing projection state.
-		}
-
-		await this.postStateToWebview()
+		await this.clearChecklistProjection()
 	}
 
 	public async clearPlaceholderWorkflowChecklistProjection(): Promise<void> {
-		this.taskState.currentFocusChainChecklist = null
-		this.taskState.todoListWasUpdatedByUser = false
-		this.taskState.apiRequestsSinceLastTodoUpdate = 0
-
-		try {
-			const todoFilePath = await this.resolveFocusChainFilePath()
-			await fs.unlink(todoFilePath)
-		} catch {
-			// Missing focus chain file is fine when clearing projection state.
-		}
-
-		await this.postStateToWebview()
+		await this.clearChecklistProjection()
 	}
 
-	/**
-	 * Reads the focus chain list from the task's markdown file on disk and extracts the checklist content.
-	 * Returns the raw focus chain list string if found, or null if the file doesn't exist or contains no valid todos.
-	 * @requires this.taskId and this.context to locate the task directory
-	 * @returns Promise<string | null> - focus chain list content as string, or null if file missing/invalid
-	 * @throws Returns null on file read errors (file not found, permission issues)
-	 */
 	private async readFocusChainFromDisk(): Promise<string | null> {
 		try {
 			const todoFilePath = await this.resolveFocusChainFilePath()
 			const markdownContent = await fs.readFile(todoFilePath, "utf8")
-			const todoList = extractFocusChainListFromText(markdownContent)
-
-			if (todoList) {
-				const _todoLines = extractFocusChainItemsFromText(markdownContent)
-				return todoList
-			}
-
-			return null
+			return extractFocusChainListFromText(markdownContent)
 		} catch (error) {
-			// File doesn't exist or can't be read, return null
 			Logger.log(`[Task ${this.taskId}] focus chain list: Could not load from markdown file: ${error}`)
 			return null
 		}
 	}
 
-	/**
-	 * Writes the provided focus chain list to the task's markdown file on disk with proper formatting.
-	 * Creates the full markdown document structure and triggers file watchers to update the UI.
-	 * @param todoList - Raw focus chain list string with markdown checklist items
-	 * @requires this.taskId and this.context for file path generation
-	 * @returns Promise<void> - Resolves when file is written successfully
-	 * @throws Error if file write fails (disk full, permissions, etc.)
-	 */
 	private async writeFocusChainToDisk(todoList: string): Promise<void> {
 		try {
 			const todoFilePath = await this.resolveFocusChainFilePath()
@@ -760,60 +447,14 @@ export class FocusChainManager {
 		}
 	}
 
-	private async applyDeterministicPlaceholderWorkflowProgressionIfNeeded(
-		currentChecklist: string,
-		toolContext?: DeterministicPlaceholderToolContext,
-	): Promise<string> {
-		if (!this.taskState.activePlaceholderWorkflowSource) {
-			return currentChecklist
-		}
-
-		if (!isDeterministicPlaceholderWorkflowSupported(this.taskState.activePlaceholderWorkflowSource.name)) {
-			return currentChecklist
-		}
-
-		const progressionResult = await applyDeterministicPlaceholderProgression({
-			taskState: this.taskState,
-			checklistMarkdown: currentChecklist,
-			toolContext,
-		})
-		if (progressionResult.checklist !== currentChecklist) {
-			this.taskState.currentFocusChainChecklist = progressionResult.checklist
-		}
-		if (
-			progressionResult.placeholderValuesChanged ||
-			progressionResult.deterministicStateChanged ||
-			progressionResult.noticesAdded
-		) {
-			await this.persistPlaceholderWorkflowMetadata()
-		}
-
-		return progressionResult.checklist
-	}
-
-	/**
-	 * Processes focus chain list updates from the AI model's task_progress parameter and persists them to disk.
-	 * Handles telemetry tracking for progress updates and falls back to reading existing files if no update provided.
-	 * Also manages the apiRequestsSinceLastTodoUpdate counter and includes comprehensive error handling.
-	 * @param taskProgress - Optional focus chain list string from AI model's task_progress parameter
-	 * @requires this.taskState, this.say method, and telemetryService to be available
-	 * @returns Promise<void> - Updates taskState.currentFocusChainChecklist and sends UI messages
-	 */
 	public async updateFCListFromToolResponse(
 		taskProgress: string | undefined,
-		toolContext?: DeterministicPlaceholderToolContext,
+		_toolContext?: unknown,
 	): Promise<FocusChainChecklistUpdateResult> {
 		try {
-			if (this.taskState.managedWorkflowRun) {
-				await this.refreshManagedWorkflowChecklistProjection()
+			if (this.hasActiveWorkflow()) {
+				await this.refreshWorkflowChecklistProjection()
 				return { accepted: true }
-			}
-			if (!taskProgress && this.taskState.activePlaceholderWorkflowSource && !this.taskState.currentFocusChainChecklist) {
-				const restoredChecklist = await this.restoreCurrentChecklistFromDisk()
-				if (!restoredChecklist) {
-					await this.refreshPlaceholderWorkflowChecklistProjection()
-					return { accepted: true }
-				}
 			}
 
 			let nextChecklist: string | undefined
@@ -828,28 +469,6 @@ export class FocusChainManager {
 					this.taskState.currentFocusChainChecklist = currentChecklist
 				}
 
-				if (!currentChecklist && isFocusChainCompleteNextStepSentinel(trimmedTaskProgress)) {
-					return {
-						accepted: false,
-						feedback: buildFocusChainMissingChecklistDirectiveFeedback(),
-					}
-				}
-
-				if (
-					this.taskState.activePlaceholderWorkflowSource &&
-					isFocusChainCompleteNextStepSentinel(trimmedTaskProgress) &&
-					this.taskState.completedNextStepUpdatesThisTurn > 0
-				) {
-					return {
-						accepted: false,
-						feedback: [
-							"Workflow progress already advanced once in this assistant turn.",
-							'Do not include `task_progress` on a tool call until the active step\'s "Done Signal" is true.',
-							'When the active step\'s "Done Signal" is true, use `__COMPLETE_NEXT_STEP__` only once on the next relevant tool call in that turn.',
-						].join("\n\n"),
-					}
-				}
-
 				if (currentChecklist) {
 					const updateResult = evaluateFocusChainChecklistUpdate(currentChecklist, trimmedTaskProgress)
 					if (!updateResult.accepted) {
@@ -860,19 +479,12 @@ export class FocusChainManager {
 					}
 
 					nextChecklist = updateResult.checklist || trimmedTaskProgress
-					if (isFocusChainCompleteNextStepSentinel(trimmedTaskProgress)) {
-						this.taskState.completedNextStepUpdatesThisTurn += 1
-					}
 					shouldWriteFocusChainToDisk = true
 				} else {
-					if (isFocusChainCompleteNextStepSentinel(trimmedTaskProgress)) {
-						this.taskState.completedNextStepUpdatesThisTurn += 1
-					}
 					nextChecklist = trimmedTaskProgress
 					shouldWriteFocusChainToDisk = true
 				}
 			} else {
-				// No model update provided, check if markdown file exists and load it
 				const markdownTodoList = await this.readFocusChainFromDisk()
 				if (markdownTodoList) {
 					previousChecklist = this.taskState.currentFocusChainChecklist
@@ -886,18 +498,13 @@ export class FocusChainManager {
 				return { accepted: true }
 			}
 
-			const finalChecklist = await this.applyDeterministicPlaceholderWorkflowProgressionIfNeeded(nextChecklist, toolContext)
-			if (finalChecklist !== nextChecklist) {
-				shouldWriteFocusChainToDisk = true
-			}
-
 			this.taskState.apiRequestsSinceLastTodoUpdate = 0
-			this.taskState.currentFocusChainChecklist = finalChecklist
+			this.taskState.currentFocusChainChecklist = nextChecklist
 			Logger.debug(
 				`[Task ${this.taskId}] focus chain list: LLM provided focus chain list update via task_progress parameter. Length ${previousChecklist?.length || 0} > ${this.taskState.currentFocusChainChecklist.length}`,
 			)
 
-			const { totalItems, completedItems } = parseFocusChainListCounts(finalChecklist)
+			const { totalItems, completedItems } = parseFocusChainListCounts(nextChecklist)
 
 			if (!this.hasTrackedFirstProgress && totalItems > 0) {
 				telemetryService.captureFocusChainProgressFirst(this.taskId, totalItems)
@@ -908,15 +515,15 @@ export class FocusChainManager {
 
 			if (shouldWriteFocusChainToDisk) {
 				try {
-					await this.writeFocusChainToDisk(finalChecklist)
-					await this.say("task_progress", finalChecklist)
+					await this.writeFocusChainToDisk(nextChecklist)
+					await this.say("task_progress", nextChecklist)
 				} catch (error) {
 					Logger.error(`[Task ${this.taskId}] focus chain list: Failed to write to markdown file:`, error)
-					await this.say("task_progress", finalChecklist)
+					await this.say("task_progress", nextChecklist)
 					Logger.log(`[Task ${this.taskId}] focus chain list: Sent fallback task_progress message to UI`)
 				}
 			} else {
-				await this.say("task_progress", finalChecklist)
+				await this.say("task_progress", nextChecklist)
 			}
 
 			return { accepted: true }
@@ -926,56 +533,32 @@ export class FocusChainManager {
 		}
 	}
 
-	/**
-	 * Evaluates multiple conditions to determine if focus chain list instructions should be included in the AI prompt.
-	 * Returns true when in plan mode, after mode switches, when user edits exist, or at reminder intervals.
-	 * @requires this.mode, this.taskState, and this.focusChainSettings to be initialized
-	 * @returns boolean - True if instructions should be included in AI prompt, false otherwise
-	 */
 	public shouldIncludeFocusChainInstructions(): boolean {
-		// Always include when in Plan mode
 		const inPlanMode = this.stateManager.getGlobalSettingsKey("mode") === "plan"
-		// Always include when a placeholder workflow is active so checklist guidance remains
-		// present on every turn while the workflow is active.
-		const placeholderWorkflowActive = !!this.taskState.activePlaceholderWorkflowSource
-		// Always include when switching from Plan > Act
+		const workflowActive = this.hasActiveWorkflow()
 		const justSwitchedFromPlanMode = this.taskState.didRespondToPlanAskBySwitchingMode
-		// Always include when user had edited the list manually
 		const userUpdatedList = this.taskState.todoListWasUpdatedByUser
-		// Include when reaching the reminder interval, configured by settings
 		const reachedReminderInterval =
 			this.taskState.apiRequestsSinceLastTodoUpdate >= this.focusChainSettings.remindClineInterval
-		// Include on first API request or if list does not exist
 		const isFirstApiRequest = this.taskState.apiRequestCount === 1 && !this.taskState.currentFocusChainChecklist
-		// Include if no list has been created and multiple requests have completed
 		const hasNoTodoListAfterMultipleRequests =
 			!this.taskState.currentFocusChainChecklist && this.taskState.apiRequestCount >= 2
 
-		const shouldInclude =
-			placeholderWorkflowActive ||
+		return (
+			workflowActive ||
 			reachedReminderInterval ||
 			justSwitchedFromPlanMode ||
 			userUpdatedList ||
 			inPlanMode ||
 			isFirstApiRequest ||
 			hasNoTodoListAfterMultipleRequests
-
-		return shouldInclude
+		)
 	}
 
-	/**
-	 * Analyzes the current focus chain list for incomplete items when a task is marked as complete.
-	 * Captures telemetry data about unfinished progress items to help improve the focus chain system.
-	 * @param modelId The model ID being used (for telemetry)
-	 * @param provider The API provider being used (for telemetry)
-	 * @requires this.focusChainSettings.enabled and this.taskState.currentFocusChainChecklist to exist
-	 * @returns void - Sends telemetry data if incomplete items found, no return value
-	 */
 	public checkIncompleteProgressOnCompletion(modelId: string, provider: string) {
 		if (this.focusChainSettings.enabled && this.taskState.currentFocusChainChecklist) {
 			const { totalItems, completedItems } = parseFocusChainListCounts(this.taskState.currentFocusChainChecklist)
 
-			// Only track if there are items and not all are marked as completed
 			if (totalItems > 0 && completedItems < totalItems) {
 				const incompleteItems = totalItems - completedItems
 				telemetryService.captureFocusChainIncompleteOnCompletion(
@@ -990,12 +573,6 @@ export class FocusChainManager {
 		}
 	}
 
-	/**
-	 * Performs cleanup operations when the focus chain manager is no longer needed.
-	 * Cancels active file watchers and clears any pending debounce timers to prevent memory leaks.
-	 * @requires No parameters needed
-	 * @returns void - Cleans up timers and watchers, no return value
-	 */
 	public dispose() {
 		if (this.fileUpdateDebounceTimer) {
 			clearTimeout(this.fileUpdateDebounceTimer)

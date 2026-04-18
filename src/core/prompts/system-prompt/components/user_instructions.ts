@@ -9,7 +9,6 @@ General Instructions for This Repo:
 
 export async function getUserInstructions(variant: PromptVariant, context: SystemPromptContext): Promise<string | undefined> {
 	const customInstructions = buildUserInstructions(
-		context.activeWorkflowReminder,
 		context.globalClineRulesFileInstructions,
 		context.localClineRulesFileInstructions,
 		context.localCursorRulesFileInstructions,
@@ -33,7 +32,6 @@ export async function getUserInstructions(variant: PromptVariant, context: Syste
 }
 
 function buildUserInstructions(
-	activeWorkflowReminder?: string,
 	globalClineRulesFileInstructions?: string,
 	localClineRulesFileInstructions?: string,
 	localCursorRulesFileInstructions?: string,
@@ -44,9 +42,6 @@ function buildUserInstructions(
 	preferredLanguageInstructions?: string,
 ): string | undefined {
 	const customInstructions = []
-	if (activeWorkflowReminder) {
-		customInstructions.push(activeWorkflowReminder)
-	}
 	if (preferredLanguageInstructions) {
 		customInstructions.push(preferredLanguageInstructions)
 	}

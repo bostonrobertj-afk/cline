@@ -27,7 +27,6 @@ import { ModelFamily } from "@/shared/prompts"
 import type { ClineTool } from "@/shared/tools"
 import { isGPT5ModelFamily } from "@/utils/model-utils"
 import { getSystemPrompt, PromptRegistry } from "../index"
-import { resolveWorkflowPersonaInstructions } from "../registry/workflowPersonaRegistry"
 import type { SystemPromptContext } from "../types"
 import { AGENT_FEEDBACK_PROMPT_GUIDANCE } from "../types"
 
@@ -2251,7 +2250,7 @@ describe("Prompt System Integration Tests", () => {
 			)
 		})
 
-		it("injects workflow persona guidance for GPT-5.4 OpenAI full prompts without XML artifacts", async function () {
+		it("renders runtime-projected workflow system and input blocks in GPT-5.4 OpenAI full prompts", async function () {
 			await runPromptTest(
 				this,
 				{
@@ -2259,13 +2258,14 @@ describe("Prompt System Integration Tests", () => {
 					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
 					enableNativeToolCalls: true,
 					useMinimalGptPrompt: true,
-					activeWorkflowName: "code-review.md",
-					activeWorkflowPersonaInstructions: resolveWorkflowPersonaInstructions("code-review.md"),
+					activeWorkflowName: "review-workflow",
+					workflowSystemInstructionsBlock: "## WORKFLOW IDENTITY\nRole: Review Workflow",
+					workflowInputInstructionsBlock: "# CURRENT WORKFLOW STEP\nStep 1: Gather Context",
 				},
 				"gpt-5.4-2026-03-05",
 				async ({ systemPrompt }) => {
-					expect(systemPrompt).to.include("Persona")
-					expect(systemPrompt).to.include("Role: QA Agent")
+					expect(systemPrompt).to.include("## WORKFLOW IDENTITY\nRole: Review Workflow")
+					expect(systemPrompt).to.include("# CURRENT WORKFLOW STEP\nStep 1: Gather Context")
 					expect(systemPrompt).to.not.include("<agent")
 					expect(systemPrompt).to.not.include("<persona")
 					expect(systemPrompt).to.not.include("Active BMAD agent persona")
@@ -2273,32 +2273,7 @@ describe("Prompt System Integration Tests", () => {
 			)
 		})
 
-		it("injects scrum-master workflow persona guidance for pi-planning full prompts without XML artifacts", async function () {
-			await runPromptTest(
-				this,
-				{
-					...baseContext,
-					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
-					enableNativeToolCalls: true,
-					useMinimalGptPrompt: true,
-					activeWorkflowName: "pi-planning.md",
-					activeWorkflowPersonaInstructions: resolveWorkflowPersonaInstructions("pi-planning.md"),
-				},
-				"gpt-5.4-2026-03-05",
-				async ({ systemPrompt }) => {
-					const personaInstructions = resolveWorkflowPersonaInstructions("pi-planning.md") ?? ""
-
-					expect(personaInstructions).to.not.equal("")
-					expect(systemPrompt).to.include(personaInstructions)
-					expect(systemPrompt).to.include("Role: Scrum Master")
-					expect(systemPrompt).to.not.include("<agent")
-					expect(systemPrompt).to.not.include("<persona")
-					expect(systemPrompt).to.not.include("Active BMAD agent persona")
-				},
-			)
-		})
-
-		it("omits workflow persona guidance on continuation turns", async function () {
+		it("renders continuation-turn workflow blocks when both projected blocks are present", async function () {
 			await runPromptTest(
 				this,
 				{
@@ -2307,20 +2282,20 @@ describe("Prompt System Integration Tests", () => {
 					enableNativeToolCalls: true,
 					useMinimalGptPrompt: true,
 					isContinuationTurn: true,
-					activeWorkflowName: "code-review.md",
-					activeWorkflowPersonaInstructions: undefined,
+					activeWorkflowName: "review-workflow",
+					workflowSystemInstructionsBlock: "## WORKFLOW IDENTITY\nRole: Review Workflow",
+					workflowInputInstructionsBlock: "# CURRENT WORKFLOW STEP\nStep 1: Gather Context",
 				},
 				"gpt-5.4-2026-03-05",
 				async ({ systemPrompt }) => {
-					expect(systemPrompt).to.not.include("Role: QA Agent")
-					expect(systemPrompt).to.not.include(
-						"Identity: Meticulous code reviewer who finds every error, edge case, and missed detail.",
-					)
+					expect(systemPrompt).to.include("CONTINUATION TURN")
+					expect(systemPrompt).to.include("## WORKFLOW IDENTITY\nRole: Review Workflow")
+					expect(systemPrompt).to.include("# CURRENT WORKFLOW STEP\nStep 1: Gather Context")
 				},
 			)
 		})
 
-		it("omits pi-planning workflow persona guidance on continuation turns", async function () {
+		it("omits the workflow system block on continuation turns when only the workflow input block is projected", async function () {
 			await runPromptTest(
 				this,
 				{
@@ -2329,16 +2304,39 @@ describe("Prompt System Integration Tests", () => {
 					enableNativeToolCalls: true,
 					useMinimalGptPrompt: true,
 					isContinuationTurn: true,
-					activeWorkflowName: "pi-planning.md",
-					activeWorkflowPersonaInstructions: undefined,
+					activeWorkflowName: "review-workflow",
+					workflowSystemInstructionsBlock: undefined,
+					workflowInputInstructionsBlock: "# CURRENT WORKFLOW STEP\nStep 2: Review",
 				},
 				"gpt-5.4-2026-03-05",
 				async ({ systemPrompt }) => {
-					const personaInstructions = resolveWorkflowPersonaInstructions("pi-planning.md") ?? ""
+					expect(systemPrompt).to.include("CONTINUATION TURN")
+					expect(systemPrompt).to.include("# CURRENT WORKFLOW STEP")
+					expect(systemPrompt).to.include("Step 2: Review")
+					expect(systemPrompt).to.not.include("## WORKFLOW IDENTITY")
+				},
+			)
+		})
 
-					expect(personaInstructions).to.not.equal("")
-					expect(systemPrompt).to.not.include(personaInstructions)
-					expect(systemPrompt).to.not.include("Role: Scrum Master")
+		it("omits the workflow input block on continuation turns when only the workflow system block is projected", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
+					enableNativeToolCalls: true,
+					useMinimalGptPrompt: true,
+					isContinuationTurn: true,
+					activeWorkflowName: "review-workflow",
+					workflowSystemInstructionsBlock: "## WORKFLOW IDENTITY\nRole: Review Workflow",
+					workflowInputInstructionsBlock: undefined,
+				},
+				"gpt-5.4-2026-03-05",
+				async ({ systemPrompt }) => {
+					expect(systemPrompt).to.include("CONTINUATION TURN")
+					expect(systemPrompt).to.include("## WORKFLOW IDENTITY")
+					expect(systemPrompt).to.include("Role: Review Workflow")
+					expect(systemPrompt).to.not.include("# CURRENT WORKFLOW STEP")
 				},
 			)
 		})

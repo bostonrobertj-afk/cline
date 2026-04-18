@@ -29,6 +29,7 @@ export const TASK_CONFIG_KEYS = [
 	"browserSettings",
 	"focusChainSettings",
 	"callbacks",
+	"workflowRuntime",
 	"coordinator",
 ] as const
 

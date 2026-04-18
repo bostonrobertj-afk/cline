@@ -22,7 +22,7 @@ export const config = createVariant(ModelFamily.HERMES)
 	})
 	.template(baseTemplate)
 	.components(
-		SystemPromptSection.AGENT_ROLE,
+		SystemPromptSection.WORKFLOW_SYSTEM_INSTRUCTIONS,
 		SystemPromptSection.TOOL_USE,
 		SystemPromptSection.RULES,
 		SystemPromptSection.ACT_VS_PLAN,
@@ -30,9 +30,9 @@ export const config = createVariant(ModelFamily.HERMES)
 		SystemPromptSection.EDITING_FILES,
 		SystemPromptSection.TODO,
 		SystemPromptSection.MCP,
-		SystemPromptSection.TASK_PROGRESS,
 		SystemPromptSection.SYSTEM_INFO,
 		SystemPromptSection.OBJECTIVE,
+		SystemPromptSection.WORKFLOW_INPUT,
 		SystemPromptSection.USER_INSTRUCTIONS,
 		SystemPromptSection.SKILLS,
 	)
@@ -58,8 +58,8 @@ export const config = createVariant(ModelFamily.HERMES)
 		ClineDefaultTool.GENERATE_EXPLANATION,
 		ClineDefaultTool.USE_SKILL,
 		ClineDefaultTool.COMPLETE_WORKFLOW_ITEM,
-		ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
-		ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT,
+		ClineDefaultTool.SET_WORKFLOW_VALUES,
+		ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT,
 		ClineDefaultTool.STORY_TASK_REMINDER,
 		ClineDefaultTool.STORY_TASK_COMPLETE,
 		ClineDefaultTool.STORY_NOTES_UPDATE,
@@ -71,11 +71,9 @@ export const config = createVariant(ModelFamily.HERMES)
 	})
 	.config({})
 	// Apply Hermes-specific component overrides
-	.overrideComponent(SystemPromptSection.AGENT_ROLE, hermesComponentOverrides[SystemPromptSection.AGENT_ROLE])
 	.overrideComponent(SystemPromptSection.TOOL_USE, hermesComponentOverrides[SystemPromptSection.TOOL_USE])
 	.overrideComponent(SystemPromptSection.OBJECTIVE, hermesComponentOverrides[SystemPromptSection.OBJECTIVE])
 	.overrideComponent(SystemPromptSection.RULES, hermesComponentOverrides[SystemPromptSection.RULES])
-	.overrideComponent(SystemPromptSection.TASK_PROGRESS, hermesComponentOverrides[SystemPromptSection.TASK_PROGRESS])
 	.overrideComponent(SystemPromptSection.MCP, hermesComponentOverrides[SystemPromptSection.MCP])
 	.build()
 

@@ -6,11 +6,9 @@ import type { SystemPromptContext } from "../../types"
 /**
  * Base template for GPT-5 variant with structured sections
  */
-export const BASE = `{{${SystemPromptSection.AGENT_ROLE}}}
+export const BASE = `{{${SystemPromptSection.WORKFLOW_SYSTEM_INSTRUCTIONS}}}
 ====
 {{${SystemPromptSection.TOOL_USE}}}
-====
-{{${SystemPromptSection.TASK_PROGRESS}}}
 ====
 {{${SystemPromptSection.MCP}}}
 ====
@@ -26,19 +24,9 @@ export const BASE = `{{${SystemPromptSection.AGENT_ROLE}}}
 ====
 {{${SystemPromptSection.OBJECTIVE}}}
 ====
+{{${SystemPromptSection.WORKFLOW_INPUT}}}
+====
 {{${SystemPromptSection.USER_INSTRUCTIONS}}}`
-
-const TASK_PROGRESS = (context: SystemPromptContext) =>
-	context.activeDeterministicPlaceholderWorkflowEnabled
-		? ""
-		: `UPDATING TASK PROGRESS
-
-Use \`task_progress\` only as a checklist parameter on the next tool call, not a standalone tool.
-
-- Use \`task_progress\` to create a task list when switching out of PLAN MODE.
-- Keep items brief and milestone-based.
-- To create the list, pass a full Markdown checklist as the \`task_progress\` parameter.
-- When you complete the next step, use the next relevant \`send_user_message\` tool call to briefly tell the user what you finished and include \`task_progress: "__COMPLETE_NEXT_STEP__"\` on that same tool call.`
 
 const RULES = (_context: SystemPromptContext) => `RULES
 
@@ -74,7 +62,6 @@ When user is providing you with feedback on how you could improve, you can let t
 
 export const GPT_5_TEMPLATE_OVERRIDES = {
 	BASE,
-	TASK_PROGRESS,
 	RULES,
 	TOOL_USE,
 	OBJECTIVE,

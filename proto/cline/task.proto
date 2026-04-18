@@ -164,13 +164,22 @@ message WorkflowFormSubmissionRequest {
 
 enum WorkflowStartCardAction {
   WORKFLOW_START_CARD_ACTION_UNSPECIFIED = 0;
-  CONTINUE = 1;
+  WORKFLOW_START_CARD_ACTION_SUBMIT = 1;
+}
+
+enum WorkflowStartCardProjectMode {
+  WORKFLOW_START_CARD_PROJECT_MODE_UNSPECIFIED = 0;
+  WORKFLOW_START_CARD_PROJECT_MODE_NEW = 1;
+  WORKFLOW_START_CARD_PROJECT_MODE_EXISTING = 2;
 }
 
 message WorkflowStartCardSubmissionRequest {
   Metadata metadata = 1;
   string session_id = 2;
   WorkflowStartCardAction action = 3;
+  WorkflowStartCardProjectMode project_mode = 4;
+  string selected_existing_project = 5;
+  string new_project_title = 6;
 }
 
 // Request for executing a quick win task

@@ -32,7 +32,7 @@ export const config: Omit<PromptVariant, "id"> = createVariant(ModelFamily.GENER
 	.template(baseTemplate)
 	.components(
 		// Define component order - this is type-safe and will show available options
-		SystemPromptSection.AGENT_ROLE,
+		SystemPromptSection.WORKFLOW_SYSTEM_INSTRUCTIONS,
 		SystemPromptSection.TOOL_USE,
 		SystemPromptSection.MCP,
 		SystemPromptSection.EDITING_FILES,
@@ -42,6 +42,7 @@ export const config: Omit<PromptVariant, "id"> = createVariant(ModelFamily.GENER
 		SystemPromptSection.RULES,
 		SystemPromptSection.SYSTEM_INFO,
 		SystemPromptSection.OBJECTIVE,
+		SystemPromptSection.WORKFLOW_INPUT,
 		SystemPromptSection.USER_INSTRUCTIONS,
 	)
 	.tools(
@@ -106,12 +107,7 @@ export type VariantConfig = typeof config
 export const createMinimalVariant = (family: ModelFamily) =>
 	createVariant(family)
 		.description("Minimal variant for lightweight models")
-		.components(
-			SystemPromptSection.AGENT_ROLE,
-			SystemPromptSection.TOOL_USE,
-			SystemPromptSection.RULES,
-			SystemPromptSection.SYSTEM_INFO,
-		)
+		.components(SystemPromptSection.TOOL_USE, SystemPromptSection.RULES, SystemPromptSection.SYSTEM_INFO)
 		.tools(
 			ClineDefaultTool.FILE_READ,
 			ClineDefaultTool.FILE_NEW,
@@ -124,7 +120,7 @@ export const createAdvancedVariant = (family: ModelFamily) =>
 	createVariant(family)
 		.description("Full-featured variant for advanced models")
 		.components(
-			SystemPromptSection.AGENT_ROLE,
+			SystemPromptSection.WORKFLOW_SYSTEM_INSTRUCTIONS,
 			SystemPromptSection.TOOL_USE,
 			SystemPromptSection.MCP,
 			SystemPromptSection.EDITING_FILES,
@@ -135,6 +131,7 @@ export const createAdvancedVariant = (family: ModelFamily) =>
 			SystemPromptSection.RULES,
 			SystemPromptSection.SYSTEM_INFO,
 			SystemPromptSection.OBJECTIVE,
+			SystemPromptSection.WORKFLOW_INPUT,
 			SystemPromptSection.USER_INSTRUCTIONS,
 		)
 		.tools(
@@ -157,6 +154,6 @@ export const createAdvancedVariant = (family: ModelFamily) =>
 			ClineDefaultTool.MCP_DOCS,
 			ClineDefaultTool.TODO,
 			ClineDefaultTool.COMPLETE_WORKFLOW_ITEM,
-			ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
+			ClineDefaultTool.SET_WORKFLOW_VALUES,
 			ClineDefaultTool.USE_SUBAGENTS,
 		)

@@ -2,13 +2,9 @@ import { getCodeExplorationGuidance } from "../../components/mcp"
 import { SystemPromptSection } from "../../templates/placeholders"
 import type { SystemPromptContext } from "../../types"
 
-export const baseTemplate = `{{${SystemPromptSection.AGENT_ROLE}}}
+export const baseTemplate = `{{${SystemPromptSection.WORKFLOW_SYSTEM_INSTRUCTIONS}}}
 
 {{${SystemPromptSection.TOOL_USE}}}
-
-====
-
-{{${SystemPromptSection.TASK_PROGRESS}}}
 
 ====
 
@@ -45,6 +41,10 @@ export const baseTemplate = `{{${SystemPromptSection.AGENT_ROLE}}}
 ====
 
 {{${SystemPromptSection.OBJECTIVE}}}
+
+====
+
+{{${SystemPromptSection.WORKFLOW_INPUT}}}
 
 ====
 

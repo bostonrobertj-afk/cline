@@ -1,9 +1,4 @@
-import type {
-	ClineMessage,
-	ClineWorkflowForm,
-	ClineWorkflowStartCard,
-	WorkflowFormFieldDefinition,
-} from "@shared/ExtensionMessage"
+import type { ClineMessage, WorkflowForm, WorkflowFormFieldDefinition, WorkflowStartCard } from "@shared/ExtensionMessage"
 import { EmptyRequest, StringRequest } from "@shared/proto/cline/common"
 import {
 	AskResponseRequest,
@@ -11,6 +6,7 @@ import {
 	WorkflowFormAction,
 	WorkflowFormSubmissionRequest,
 	WorkflowStartCardAction,
+	WorkflowStartCardProjectMode,
 	WorkflowStartCardSubmissionRequest,
 } from "@shared/proto/cline/task"
 import { useCallback, useRef } from "react"
@@ -21,7 +17,7 @@ import { isPassiveThreadOpen } from "../shared/buttonConfig"
 import type { ChatState, MessageHandlers } from "../types/chatTypes"
 
 export function buildWorkflowFormSubmissionRequest(
-	workflowForm: ClineWorkflowForm,
+	workflowForm: WorkflowForm,
 	action: WorkflowFormAction,
 	values: Record<string, unknown> = {},
 ): WorkflowFormSubmissionRequest {
@@ -51,20 +47,28 @@ export function buildWorkflowFormSubmissionRequest(
 }
 
 export function buildWorkflowStartCardSubmissionRequest(
-	workflowStartCard: ClineWorkflowStartCard,
+	workflowStartCard: WorkflowStartCard,
 ): WorkflowStartCardSubmissionRequest {
 	return WorkflowStartCardSubmissionRequest.create({
 		sessionId: workflowStartCard.sessionId,
-		action: WorkflowStartCardAction.CONTINUE,
+		action: WorkflowStartCardAction.WORKFLOW_START_CARD_ACTION_SUBMIT,
+		projectMode:
+			workflowStartCard.projectMode === "existing"
+				? WorkflowStartCardProjectMode.WORKFLOW_START_CARD_PROJECT_MODE_EXISTING
+				: workflowStartCard.projectMode === "new"
+					? WorkflowStartCardProjectMode.WORKFLOW_START_CARD_PROJECT_MODE_NEW
+					: WorkflowStartCardProjectMode.WORKFLOW_START_CARD_PROJECT_MODE_UNSPECIFIED,
+		selectedExistingProject: workflowStartCard.selectedExistingProject ?? "",
+		newProjectTitle: workflowStartCard.newProjectTitle ?? "",
 	})
 }
 
-export async function submitWorkflowStartCard(workflowStartCard: ClineWorkflowStartCard) {
+export async function submitWorkflowStartCard(workflowStartCard: WorkflowStartCard) {
 	await TaskServiceClient.submitWorkflowStartCard(buildWorkflowStartCardSubmissionRequest(workflowStartCard))
 }
 
 export async function submitWorkflowForm(
-	workflowForm: ClineWorkflowForm,
+	workflowForm: WorkflowForm,
 	action: WorkflowFormAction,
 	values: Record<string, unknown> = {},
 ) {

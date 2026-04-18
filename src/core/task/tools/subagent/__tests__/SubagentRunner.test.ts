@@ -2,16 +2,15 @@ import { strict as assert } from "node:assert"
 import * as coreApi from "@core/api"
 import * as skills from "@core/context/instructions/user-instructions/skills"
 import { PromptRegistry } from "@core/prompts/system-prompt"
-import type { ManagedWorkflowRunState } from "@core/task/managed-workflows/types"
 import type { TaskConfig } from "@core/task/tools/types/TaskConfig"
-import * as workflowActivation from "@core/task/workflow-activation"
-import * as workflowResolution from "@core/workflows/resolution/resolveAvailableWorkflows"
 import fs from "fs/promises"
-import { afterEach, beforeEach, describe, it } from "mocha"
+import { afterEach, describe, it } from "mocha"
 import os from "os"
 import path from "path"
 import sinon from "sinon"
-import { resolveWorkflowPersonaInstructions } from "@/core/prompts/system-prompt/registry/workflowPersonaRegistry"
+import type { WorkflowDefinition } from "@/core/task/workflow-runtime/types"
+import * as WorkflowRegistry from "@/core/task/workflow-runtime/WorkflowRegistry"
+import { WorkflowRuntime } from "@/core/task/workflow-runtime/WorkflowRuntime"
 import { HostProvider } from "@/hosts/host-provider"
 import { ApiFormat } from "@/shared/proto/cline/models"
 import { Logger } from "@/shared/services/Logger"
@@ -37,12 +36,16 @@ type PromptContextArgs = {
 
 type PromptContextResult = {
 	mcpHub?: unknown
-	managedWorkflowActive?: boolean
 	activeWorkflowName?: string
-	activeWorkflowPersonaInstructions?: string
-	activeWorkflowReminder?: string
-	activeWorkflowSupportsPlaceholders?: boolean
+	activeWorkflowStepNumber?: number
+	workflowSystemInstructionsBlock?: string
+	workflowInputInstructionsBlock?: string
+	workflowToolSchemaOverride?: readonly unknown[]
 	skills?: Array<{ name: string }>
+	isContinuationTurn?: boolean
+	enableNativeToolCalls?: boolean
+	enableParallelToolCalling?: boolean
+	isSubagentRun?: boolean
 }
 
 const createSubagentTaskConfig = Reflect.get(SubagentRunner.prototype, "createSubagentTaskConfig") as (
@@ -57,12 +60,7 @@ const autoActivateAssignedWorkflow = Reflect.get(SubagentRunner.prototype, "auto
 	this: SubagentRunner,
 	state: TaskState,
 	assignedSkillNames: string[],
-	availableWorkflows: unknown[],
 ) => Promise<void>
-const inheritSharedParentPlaceholdersToActivatedWorkflow = Reflect.get(
-	SubagentRunner.prototype,
-	"inheritSharedParentPlaceholdersToActivatedWorkflow",
-) as (this: SubagentRunner, state: TaskState) => Promise<void>
 
 function getSubagentFocusChainStorageKey(runner: SubagentRunner): string {
 	return Reflect.get(runner, "subagentFocusChainStorageKey") as string
@@ -111,6 +109,7 @@ function createTaskConfig(nativeToolCallEnabled: boolean, promptRefreshFrequency
 		context: {},
 		taskState: new TaskState(),
 		messageState: {},
+		workflowRuntime: new WorkflowRuntime({ cwd: "/tmp" }),
 		api: {
 			getModel: () => ({
 				id: "anthropic/claude-sonnet-4.5",
@@ -190,6 +189,54 @@ function createTaskConfig(nativeToolCallEnabled: boolean, promptRefreshFrequency
 	} as unknown as TaskConfig
 }
 
+function createResolvedWorkflow(args?: {
+	name?: string
+	useSkillName?: string
+	stepOneChecklistLabel?: string
+	stepTwoChecklistLabel?: string
+	workflowSystemInstructionsBlock?: string
+	workflowInputInstructionsBlock?: string
+	workflowToolSchemaOverride?: readonly unknown[]
+	childInheritance?: WorkflowDefinition["childInheritance"]
+}): WorkflowDefinition {
+	const steps: WorkflowDefinition["steps"] = {
+		"step-1": {
+			id: "step-1",
+			stepNumber: 1,
+			checklistLabel: args?.stepOneChecklistLabel ?? "Step 1: Gather Context",
+			buildPromptProjection: () => ({
+				workflowSystemInstructionsBlock: args?.workflowSystemInstructionsBlock,
+				workflowInputInstructionsBlock: args?.workflowInputInstructionsBlock,
+				workflowToolSchemaOverride: args?.workflowToolSchemaOverride as any,
+			}),
+			allowWorkflowProgressRequest: false,
+		},
+	}
+	if (args?.stepTwoChecklistLabel) {
+		steps["step-2"] = {
+			id: "step-2",
+			stepNumber: 2,
+			checklistLabel: args.stepTwoChecklistLabel,
+			buildPromptProjection: () => ({
+				workflowSystemInstructionsBlock: args?.workflowSystemInstructionsBlock,
+				workflowInputInstructionsBlock: args?.workflowInputInstructionsBlock,
+				workflowToolSchemaOverride: args?.workflowToolSchemaOverride as any,
+			}),
+			allowWorkflowProgressRequest: false,
+		}
+	}
+	return {
+		name: args?.name ?? "review-workflow",
+		slashCommandName: args?.name ?? "review-workflow",
+		useSkillName: args?.useSkillName ?? "review-workflow",
+		persona: "engineer",
+		projectSubfolder: "review",
+		startCard: { markdownBody: "", submitLabel: "Continue" },
+		childInheritance: args?.childInheritance,
+		steps,
+	}
+}
+
 type StubApiOptions = {
 	modelId?: string
 	apiFormat?: ApiFormat
@@ -228,18 +275,7 @@ function createFocusChainManager(taskState: TaskState, taskId = "task-1") {
 	})
 }
 
-function extractTextFromMessage(message: { content: Array<{ type?: string; text?: string }> }) {
-	return message.content
-		.filter((block) => block.type === "text")
-		.map((block) => block.text || "")
-		.join("\n")
-}
-
 describe("SubagentRunner", () => {
-	beforeEach(() => {
-		sinon.stub(workflowResolution, "resolveAvailableWorkflows").resolves([])
-	})
-
 	afterEach(() => {
 		sinon.restore()
 		HostProvider.reset()
@@ -373,79 +409,6 @@ describe("SubagentRunner", () => {
 		await runner.run("Finish quickly", () => {})
 		assert.equal(promptRegistryGetStub.called, true)
 		assert.equal(buildSystemPromptStub.called, true)
-	})
-
-	it("marks suppressed internal subagent turns as continuation turns and forwards the current checklist", async () => {
-		const runner = new SubagentRunner(createTaskConfig(false))
-		const state = new TaskState()
-		state.currentFocusChainChecklist = "- [ ] Step 1\n- [ ] Step 2"
-		state.activePlaceholderWorkflowId = "review-edge-case-hunter"
-		state.activePlaceholderWorkflowSource = {
-			type: "remote",
-			name: "review-edge-case-hunter.md",
-			contents: "# Flow\n\n## Step 1: Gather Context\nReview the diff.\n\n## Step 2: Review\nWrite findings.\n",
-		}
-
-		const context = await (runner as any).buildPromptContext({
-			state,
-			hostIde: "test",
-			providerInfo: {
-				providerId: "anthropic",
-				model: { id: "anthropic/claude-sonnet-4.5", info: { contextWindow: 200_000 } },
-				mode: "act",
-				customPrompt: undefined,
-			},
-			availableSkills: [],
-			configuredSkillNames: undefined,
-			assignedSkillNames: [],
-			nativeToolCallsRequested: false,
-			shouldSendFullPromptAssembly: false,
-			shouldUseContinuationPrompt: true,
-		})
-
-		assert.equal(context.isContinuationTurn, true)
-		assert.equal(context.currentFocusChainChecklist, "- [ ] Step 1\n- [ ] Step 2")
-		assert.equal(context.activeWorkflowSupportsPlaceholders, true)
-		assert.equal(context.activePlaceholderWorkflowName, "review-edge-case-hunter.md")
-		assert.equal(context.activePlaceholderWorkflowStepNumber, 1)
-		assert.equal(context.managedWorkflowActive, false)
-		assert.deepEqual(context.skills, [])
-		assert.equal(context.activeWorkflowPersonaInstructions, undefined)
-		assert.equal(context.activeWorkflowReminder, undefined)
-	})
-
-	it("keeps deterministic placeholder workflows enabled even when step details cannot be resolved", async () => {
-		const runner = new SubagentRunner(createTaskConfig(false))
-		const state = new TaskState()
-		state.currentFocusChainChecklist = "- [ ] Step 1: Gather Context\n- [ ] Step 2: Review"
-		state.activePlaceholderWorkflowId = "code-review.md"
-		state.activePlaceholderWorkflowSource = {
-			type: "remote",
-			name: "code-review.md",
-			contents: "# Review Workflow\n\n## Step 9: Ship It\nFinish the release.\n",
-		}
-
-		const context = await (runner as any).buildPromptContext({
-			state,
-			hostIde: "test",
-			providerInfo: {
-				providerId: "anthropic",
-				model: { id: "anthropic/claude-sonnet-4.5", info: { contextWindow: 200_000 } },
-				mode: "act",
-				customPrompt: undefined,
-			},
-			availableSkills: [],
-			configuredSkillNames: undefined,
-			assignedSkillNames: [],
-			nativeToolCallsRequested: false,
-			shouldSendFullPromptAssembly: false,
-			shouldUseContinuationPrompt: true,
-		})
-
-		assert.equal(context.activePlaceholderWorkflowName, undefined)
-		assert.equal(context.activePlaceholderWorkflowStepNumber, undefined)
-		assert.equal(context.activeDeterministicPlaceholderWorkflowEnabled, true)
-		assert.equal(context.activeWorkflowSupportsPlaceholders, true)
 	})
 
 	it("emits native tool_use blocks with matching tool_result tool_use_id across turns", async () => {
@@ -1006,13 +969,90 @@ describe("SubagentRunner", () => {
 		assert.equal(createMessage.callCount, 1)
 	})
 
-	it("includes workflow-backed activations in subagent prompt context", async () => {
+	it("projects foundational workflow runtime fields into subagent prompt context", async () => {
+		const workflowToolSchemaOverride = [{ id: ClineDefaultTool.SET_WORKFLOW_VALUES }] as const
+		const config = createTaskConfig(false)
+		const runner = new SubagentRunner(config)
+		const state = new TaskState()
+
+		await config.workflowRuntime.activateWorkflow({
+			taskState: state,
+			workflow: createResolvedWorkflow({
+				name: "review-workflow",
+				useSkillName: "review-workflow",
+				workflowSystemInstructionsBlock: "SYSTEM BLOCK",
+				workflowInputInstructionsBlock: "INPUT BLOCK",
+				workflowToolSchemaOverride,
+			}),
+		})
+
+		const context = await buildPromptContext.call(runner, {
+			state,
+			hostIde: "TestIde",
+			providerInfo: { providerId: "openai", model: { id: "gpt-5" }, mode: "act" },
+			availableSkills: [],
+			configuredSkillNames: undefined,
+			assignedSkillNames: [],
+			nativeToolCallsRequested: false,
+			shouldSendFullPromptAssembly: true,
+			shouldUseContinuationPrompt: false,
+		})
+
+		assert.equal(context.activeWorkflowName, "review-workflow")
+		assert.equal(context.activeWorkflowStepNumber, 1)
+		assert.equal(context.workflowSystemInstructionsBlock, "SYSTEM BLOCK")
+		assert.equal(context.workflowInputInstructionsBlock, "INPUT BLOCK")
+		assert.equal(context.workflowToolSchemaOverride, workflowToolSchemaOverride)
+		assert.deepEqual(context.skills, [])
+		assert.equal(context.isContinuationTurn, false)
+		assert.equal(context.enableNativeToolCalls, false)
+		assert.equal(context.enableParallelToolCalling, false)
+		assert.equal(context.isSubagentRun, true)
+	})
+
+	it("suppresses prompt skills on internal turns while preserving workflow runtime projection", async () => {
+		const config = createTaskConfig(false)
+		const runner = new SubagentRunner(config)
+		const state = new TaskState()
+
+		await config.workflowRuntime.activateWorkflow({
+			taskState: state,
+			workflow: createResolvedWorkflow({
+				name: "review-workflow",
+				useSkillName: "review-workflow",
+				workflowSystemInstructionsBlock: "SYSTEM BLOCK",
+				workflowInputInstructionsBlock: "INPUT BLOCK",
+			}),
+		})
+
+		const context = await buildPromptContext.call(runner, {
+			state,
+			hostIde: "TestIde",
+			providerInfo: { providerId: "openai", model: { id: "gpt-5" }, mode: "act" },
+			availableSkills: [{ name: "alpha-skill", description: "Alpha", path: "/skills/alpha/SKILL.md", source: "project" }],
+			configuredSkillNames: undefined,
+			assignedSkillNames: [],
+			nativeToolCallsRequested: false,
+			shouldSendFullPromptAssembly: false,
+			shouldUseContinuationPrompt: true,
+		})
+
+		assert.deepEqual(context.skills, [])
+		assert.equal(context.activeWorkflowName, "review-workflow")
+		assert.equal(context.activeWorkflowStepNumber, 1)
+		assert.equal(context.workflowSystemInstructionsBlock, "SYSTEM BLOCK")
+		assert.equal(context.workflowInputInstructionsBlock, "INPUT BLOCK")
+		assert.equal(context.isContinuationTurn, true)
+		assert.equal(context.isSubagentRun, true)
+	})
+
+	it("auto-activates an explicitly assigned shipped workflow before the first subagent turn", async () => {
 		const createMessage = sinon.stub().callsFake(async function* () {
 			yield {
 				type: "tool_calls",
 				tool_call: {
 					function: {
-						id: "toolu_subagent_workflow_context_1",
+						id: "toolu_subagent_foundational_workflow_1",
 						name: ClineDefaultTool.ATTEMPT,
 						arguments: JSON.stringify({ result: "done" }),
 					},
@@ -1020,45 +1060,175 @@ describe("SubagentRunner", () => {
 			}
 		})
 
+		sinon.stub(WorkflowRegistry, "resolveWorkflowByUseSkillName").returns(
+			createResolvedWorkflow({
+				name: "review-workflow",
+				useSkillName: "review-workflow",
+				workflowSystemInstructionsBlock: "SYSTEM BLOCK",
+				workflowInputInstructionsBlock: "INPUT BLOCK",
+			}),
+		)
 		const promptRegistry = PromptRegistry.getInstance()
 		sinon.stub(promptRegistry, "get").callsFake(async (context) => {
-			assert.ok(context.skills)
-			assert.deepEqual(
-				context.skills.map((skill) => skill.name),
-				["alpha-skill", "address-pr-comments.md", "remote-review"],
-			)
+			assert.equal(context.activeWorkflowName, "review-workflow")
+			assert.equal(context.activeWorkflowStepNumber, 1)
+			assert.equal(context.workflowSystemInstructionsBlock, "SYSTEM BLOCK")
+			assert.equal(context.workflowInputInstructionsBlock, "INPUT BLOCK")
+			assert.equal(context.isSubagentRun, true)
 			promptRegistry.nativeTools = undefined
 			return "system prompt"
 		})
 		sinon.stub(SubagentBuilder.prototype, "getConfiguredSkills").returns(undefined)
 		sinon.stub(skills, "discoverSkills").resolves([])
-		sinon
-			.stub(skills, "getAvailableSkills")
-			.returns([{ name: "alpha-skill", description: "Alpha", path: "/skills/alpha/SKILL.md", source: "project" }])
-		;(workflowResolution.resolveAvailableWorkflows as sinon.SinonStub).resolves([
-			{
-				name: "address-pr-comments.md",
-				source: "local",
-				description: "Workspace workflow: address-pr-comments.md",
-				fileName: "address-pr-comments.md",
-				fullPath: "/project/.clinerules/workflows/address-pr-comments.md",
-			},
-			{
-				name: "remote-review",
-				source: "remote",
-				description: "Remote workflow: remote-review",
-				fileName: "remote-review",
-				contents: "# remote",
-			},
-		])
+		sinon.stub(skills, "getAvailableSkills").returns([])
 		stubApiHandler(createMessage)
 		initializeHostProvider()
 
 		const runner = new SubagentRunner(createTaskConfig(false))
-		const result = await runner.run("Run task", () => {})
+		const result = await runner.run("Skill: use_skill('review-workflow')", () => {})
 
 		assert.equal(result.status, "completed")
 		assert.equal(createMessage.callCount, 1)
+	})
+
+	it("leaves the parent workflow state unchanged while inheriting declared values into the child workflow session", async () => {
+		const config = createTaskConfig(false)
+		config.taskState.activeWorkflowName = "parent-workflow"
+		config.taskState.activeWorkflowSession = {
+			workflowName: "parent-workflow",
+			activeStepNumber: 1,
+			workflowValues: { review_input: "/tmp/review-input.md", ignored_parent: "drop" },
+			projectSelection: { projectMode: "new", projectTitle: "", projectFolderName: "" },
+			ui: {
+				startCardSession: undefined,
+				formSession: undefined,
+				stepResolutionSession: undefined,
+				suppressedWorkflowFormIds: [],
+				suppressedWorkflowStepResolutionDefinitionIds: [],
+			},
+		} as any
+		config.taskState.currentFocusChainChecklist = "- [ ] Parent Step"
+
+		const runner = new SubagentRunner(config)
+		const state = new TaskState()
+		sinon.stub(WorkflowRegistry, "resolveWorkflowByUseSkillName").returns(
+			createResolvedWorkflow({
+				name: "child-workflow",
+				useSkillName: "child-workflow",
+				childInheritance: [{ parentKey: "review_input", childKey: "review_input" }],
+			}),
+		)
+
+		await autoActivateAssignedWorkflow.call(runner, state, ["child-workflow"])
+
+		assert.equal(state.activeWorkflowName, "child-workflow")
+		assert.deepEqual(state.activeWorkflowSession?.workflowValues, { review_input: "/tmp/review-input.md" })
+		state.activeWorkflowSession!.workflowValues.review_input = "/tmp/child-mutated.md"
+		assert.equal(config.taskState.activeWorkflowSession?.workflowValues.review_input, "/tmp/review-input.md")
+		assert.equal(config.taskState.activeWorkflowName, "parent-workflow")
+		assert.equal(config.taskState.currentFocusChainChecklist, "- [ ] Parent Step")
+	})
+
+	it("does not auto-activate a second workflow when child state is already active", async () => {
+		const runner = new SubagentRunner(createTaskConfig(false))
+		const state = new TaskState()
+		state.activeWorkflowName = "existing-workflow"
+		state.activeWorkflowSession = {
+			workflowName: "existing-workflow",
+			activeStepNumber: 1,
+			workflowValues: {},
+			projectSelection: { projectMode: "new", projectTitle: "", projectFolderName: "" },
+			ui: {
+				startCardSession: undefined,
+				formSession: undefined,
+				stepResolutionSession: undefined,
+				suppressedWorkflowFormIds: [],
+				suppressedWorkflowStepResolutionDefinitionIds: [],
+			},
+		} as any
+
+		const resolveWorkflowByUseSkillNameStub = sinon.stub(WorkflowRegistry, "resolveWorkflowByUseSkillName")
+
+		await autoActivateAssignedWorkflow.call(runner, state, ["review-workflow"])
+
+		sinon.assert.notCalled(resolveWorkflowByUseSkillNameStub)
+		assert.equal(state.activeWorkflowName, "existing-workflow")
+	})
+
+	it("routes subagent task_progress updates to subagent-local focus chain storage instead of the parent callback", async () => {
+		const sandbox = sinon.createSandbox()
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "subagent-focus-chain-update-"))
+		try {
+			sandbox.stub(disk, "ensureTaskDirectoryExists").resolves(tempDir)
+			const config = createTaskConfig(false)
+			config.taskState.currentFocusChainChecklist = "- [ ] Parent Step"
+			const parentManager = createFocusChainManager(config.taskState, config.taskId)
+			await parentManager.updateFCListFromToolResponse(config.taskState.currentFocusChainChecklist)
+
+			const runner = new SubagentRunner(config)
+			const subagentState = new TaskState()
+			const subagentConfig = createSubagentTaskConfig.call(runner, subagentState)
+
+			const result = await subagentConfig.callbacks.updateFCListFromToolResponse("- [ ] Child Step")
+
+			assert.equal(result.accepted, true)
+			sinon.assert.notCalled(config.callbacks.updateFCListFromToolResponse as sinon.SinonStub)
+			assert.equal(subagentState.currentFocusChainChecklist, "- [ ] Child Step")
+
+			const parentFilePath = getFocusChainFilePath(tempDir, config.taskId)
+			const parentContent = await fs.readFile(parentFilePath, "utf8")
+			assert.match(parentContent, /Parent Step/)
+			assert.doesNotMatch(parentContent, /Child Step/)
+
+			const subagentStorageKey = getSubagentFocusChainStorageKey(runner)
+			const subagentFilePath = getFocusChainFilePath(tempDir, config.taskId, {
+				key: subagentStorageKey,
+				scope: "subagent",
+			})
+			const subagentContent = await fs.readFile(subagentFilePath, "utf8")
+			assert.match(subagentContent, /Child Step/)
+			assert.doesNotMatch(subagentContent, /Parent Step/)
+		} finally {
+			sandbox.restore()
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	it("uses distinct subagent-local focus-chain storage keys across multiple subagent runs", async () => {
+		const sandbox = sinon.createSandbox()
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "subagent-focus-chain-multi-"))
+		try {
+			sandbox.stub(disk, "ensureTaskDirectoryExists").resolves(tempDir)
+			const config = createTaskConfig(false)
+			const runnerOne = new SubagentRunner(config)
+			const runnerTwo = new SubagentRunner(config)
+			const stateOne = new TaskState()
+			const stateTwo = new TaskState()
+			const subagentConfigOne = createSubagentTaskConfig.call(runnerOne, stateOne)
+			const subagentConfigTwo = createSubagentTaskConfig.call(runnerTwo, stateTwo)
+
+			await subagentConfigOne.callbacks.updateFCListFromToolResponse("- [ ] Alpha Step")
+			await subagentConfigTwo.callbacks.updateFCListFromToolResponse("- [ ] Beta Step")
+
+			const storageKeyOne = getSubagentFocusChainStorageKey(runnerOne)
+			const storageKeyTwo = getSubagentFocusChainStorageKey(runnerTwo)
+			assert.notEqual(storageKeyOne, storageKeyTwo)
+
+			const subagentFileOne = getFocusChainFilePath(tempDir, config.taskId, {
+				key: storageKeyOne,
+				scope: "subagent",
+			})
+			const subagentFileTwo = getFocusChainFilePath(tempDir, config.taskId, {
+				key: storageKeyTwo,
+				scope: "subagent",
+			})
+			assert.notEqual(subagentFileOne, subagentFileTwo)
+			assert.match(await fs.readFile(subagentFileOne, "utf8"), /Alpha Step/)
+			assert.match(await fs.readFile(subagentFileTwo, "utf8"), /Beta Step/)
+		} finally {
+			sandbox.restore()
+			await fs.rm(tempDir, { recursive: true, force: true })
+		}
 	})
 
 	it("narrows visible skills from an explicit use_skill assignment in the delegated prompt", async () => {
@@ -1114,755 +1284,6 @@ describe("SubagentRunner", () => {
 		assert.equal(createMessage.callCount, 1)
 	})
 
-	it("auto-activates an explicitly assigned managed workflow before the first subagent turn", async () => {
-		const createMessage = sinon.stub().callsFake(async function* () {
-			yield {
-				type: "tool_calls",
-				tool_call: {
-					function: {
-						id: "toolu_subagent_autoworkflow_1",
-						name: ClineDefaultTool.ATTEMPT,
-						arguments: JSON.stringify({ result: "done" }),
-					},
-				},
-			}
-		})
-
-		const promptRegistry = PromptRegistry.getInstance()
-		sinon.stub(promptRegistry, "get").callsFake(async (context) => {
-			assert.equal(context.managedWorkflowActive, true)
-			assert.ok(context.activeWorkflowReminder)
-			assert.match(context.activeWorkflowReminder!, /<active_bmad_workflow/)
-			assert.match(context.activeWorkflowReminder!, /bmad-review-edge-case-hunter/)
-			promptRegistry.nativeTools = undefined
-			return "system prompt"
-		})
-		sinon.stub(SubagentBuilder.prototype, "getConfiguredSkills").returns(undefined)
-		sinon.stub(skills, "discoverSkills").resolves([])
-		sinon.stub(skills, "getAvailableSkills").returns([
-			{
-				name: "bmad-review-edge-case-hunter",
-				description: "Edge case review",
-				path: "/skills/bmad-review-edge-case-hunter/SKILL.md",
-				source: "project",
-			},
-		])
-		stubApiHandler(createMessage)
-		initializeHostProvider()
-
-		const config = createTaskConfig(false)
-		config.cwd = process.cwd()
-		const runner = new SubagentRunner(config)
-		const result = await runner.run(`Skill: use_skill('bmad-review-edge-case-hunter')`, () => {})
-
-		assert.equal(result.status, "completed")
-		assert.equal(createMessage.callCount, 1)
-	})
-
-	it("keeps managed-workflow subagent turns on the full-prompt path even on suppressed internal turns", async () => {
-		const createMessage = sinon.stub()
-		createMessage.onFirstCall().callsFake(async function* () {
-			yield {
-				type: "tool_calls",
-				tool_call: {
-					function: {
-						id: "toolu_subagent_managed_workflow_1",
-						name: ClineDefaultTool.LIST_FILES,
-						arguments: JSON.stringify({ path: ".", recursive: false }),
-					},
-				},
-			}
-		})
-		createMessage.onSecondCall().callsFake(async function* () {
-			yield {
-				type: "tool_calls",
-				tool_call: {
-					function: {
-						id: "toolu_subagent_managed_workflow_complete_1",
-						name: ClineDefaultTool.ATTEMPT,
-						arguments: JSON.stringify({ result: "done" }),
-					},
-				},
-			}
-		})
-
-		const promptRegistry = PromptRegistry.getInstance()
-		const promptGetStub = sinon.stub(promptRegistry, "get").callsFake(async (context) => {
-			promptRegistry.nativeTools = undefined
-			return context.isContinuationTurn === true ? "CONTINUATION TURN" : "system prompt"
-		})
-		sinon.stub(SubagentBuilder.prototype, "getConfiguredSkills").returns(undefined)
-		sinon.stub(skills, "discoverSkills").resolves([])
-		sinon.stub(skills, "getAvailableSkills").returns([
-			{
-				name: "bmad-review-edge-case-hunter",
-				description: "Edge case review",
-				path: "/skills/bmad-review-edge-case-hunter/SKILL.md",
-				source: "project",
-			},
-		])
-		stubApiHandler(createMessage)
-		initializeHostProvider()
-
-		const config = createTaskConfig(false)
-		config.cwd = process.cwd()
-		const runner = new SubagentRunner(config)
-		const result = await runner.run(`Skill: use_skill('bmad-review-edge-case-hunter')`, () => {})
-
-		assert.equal(result.status, "completed")
-		assert.equal(createMessage.callCount, 2)
-		assert.equal(promptGetStub.callCount, 2)
-		assert.equal(promptGetStub.firstCall.args[0].managedWorkflowActive, true)
-		assert.equal(promptGetStub.secondCall.args[0].managedWorkflowActive, true)
-		assert.equal(promptGetStub.firstCall.args[0].isContinuationTurn, false)
-		assert.equal(promptGetStub.secondCall.args[0].isContinuationTurn, false)
-		const secondSystemPrompt = createMessage.secondCall.args[0] as string
-		assert.doesNotMatch(secondSystemPrompt, /CONTINUATION TURN/)
-	})
-
-	it("auto-activates an explicitly assigned placeholder workflow before the first subagent turn", async () => {
-		const createMessage = sinon.stub().callsFake(async function* () {
-			yield {
-				type: "tool_calls",
-				tool_call: {
-					function: {
-						id: "toolu_subagent_placeholder_1",
-						name: ClineDefaultTool.ATTEMPT,
-						arguments: JSON.stringify({ result: "done" }),
-					},
-				},
-			}
-		})
-
-		const promptRegistry = PromptRegistry.getInstance()
-		sinon.stub(promptRegistry, "get").callsFake(async (context) => {
-			assert.equal(context.managedWorkflowActive, false)
-			assert.equal(context.activeWorkflowSupportsPlaceholders, true)
-			assert.equal(context.activeWorkflowReminder, undefined)
-			promptRegistry.nativeTools = undefined
-			return "system prompt"
-		})
-		sinon.stub(SubagentBuilder.prototype, "getConfiguredSkills").returns(undefined)
-		sinon.stub(skills, "discoverSkills").resolves([])
-		sinon.stub(skills, "getAvailableSkills").returns([])
-		;(workflowResolution.resolveAvailableWorkflows as sinon.SinonStub).resolves([
-			{
-				name: "review-edge-case-hunter",
-				source: "remote",
-				description: "Remote workflow: review-edge-case-hunter",
-				fileName: "review-edge-case-hunter",
-				contents: "# Edge case review instructions\nInspect the provided bundle.",
-			},
-		])
-		stubApiHandler(createMessage)
-		initializeHostProvider()
-
-		const runner = new SubagentRunner(createTaskConfig(false))
-		const result = await runner.run(`Skill: use_skill('review-edge-case-hunter')`, () => {})
-
-		assert.equal(result.status, "completed")
-		assert.equal(createMessage.callCount, 1)
-		const initialUser = createMessage.firstCall.args[1][0] as {
-			role: string
-			content: Array<{ type?: string; text?: string }>
-		}
-		const initialTexts = extractTextFromMessage(initialUser)
-		assert.doesNotMatch(initialTexts, /<explicit_instructions type="review-edge-case-hunter">/)
-		assert.doesNotMatch(initialTexts, /Edge case review instructions/)
-		assert.doesNotMatch(initialTexts, /# task_progress RECOMMENDED/)
-		const systemPrompt = createMessage.firstCall.args[0] as string
-		assert.doesNotMatch(systemPrompt, /<explicit_instructions type="review-edge-case-hunter">/)
-		assert.doesNotMatch(systemPrompt, /Edge case review instructions/)
-		assert.doesNotMatch(systemPrompt, /Inspect the provided bundle\./)
-		assert.match(systemPrompt, /# task_progress RECOMMENDED/)
-	})
-
-	it("keeps placeholder-workflow activation first-turn-only while relocating prompt injections into the system prompt for non-Responses subagents", async () => {
-		const createMessage = sinon.stub()
-		createMessage.onFirstCall().callsFake(async function* () {
-			yield {
-				type: "tool_calls",
-				tool_call: {
-					function: {
-						id: "toolu_subagent_placeholder_followup_1",
-						name: ClineDefaultTool.LIST_FILES,
-						arguments: JSON.stringify({ path: ".", recursive: false }),
-					},
-				},
-			}
-		})
-		createMessage.onSecondCall().callsFake(async function* () {
-			yield {
-				type: "tool_calls",
-				tool_call: {
-					function: {
-						id: "toolu_subagent_placeholder_followup_complete_1",
-						name: ClineDefaultTool.ATTEMPT,
-						arguments: JSON.stringify({ result: "done" }),
-					},
-				},
-			}
-		})
-
-		const promptRegistry = PromptRegistry.getInstance()
-		const promptGetStub = sinon.stub(promptRegistry, "get").callsFake(async (context) => {
-			assert.equal(context.activeWorkflowReminder, undefined)
-			promptRegistry.nativeTools = undefined
-			return context.isContinuationTurn === true ? "CONTINUATION TURN" : "system prompt"
-		})
-		sinon.stub(skills, "discoverSkills").resolves([])
-		sinon.stub(skills, "getAvailableSkills").returns([])
-		;(workflowResolution.resolveAvailableWorkflows as sinon.SinonStub).resolves([
-			{
-				name: "review-edge-case-hunter",
-				source: "remote",
-				description: "Remote workflow: review-edge-case-hunter",
-				fileName: "review-edge-case-hunter",
-				contents: `# Edge case review instructions
-
-## Step 1: Gather Context
-Inspect the provided bundle before running tools.
-
-## Step 2: Review
-Review the changed implementation for edge cases.`,
-			},
-		])
-		stubApiHandler(createMessage)
-		initializeHostProvider()
-
-		const runner = new SubagentRunner(createTaskConfig(false))
-		const result = await runner.run(`Skill: use_skill('review-edge-case-hunter')`, () => {})
-
-		assert.equal(result.status, "completed")
-		assert.equal(createMessage.callCount, 2)
-		assert.equal(promptGetStub.callCount, 2)
-		assert.equal(promptGetStub.firstCall.args[0].isContinuationTurn, false)
-		assert.equal(promptGetStub.secondCall.args[0].isContinuationTurn, true)
-		assert.equal(
-			promptGetStub.secondCall.args[0].currentFocusChainChecklist,
-			"- [ ] Step 1: Gather Context\n- [ ] Step 2: Review",
-		)
-		const initialUser = createMessage.firstCall.args[1][0] as {
-			role: string
-			content: Array<{ type?: string; text?: string }>
-		}
-		const initialTexts = extractTextFromMessage(initialUser)
-		assert.doesNotMatch(initialTexts, /<explicit_instructions type="review-edge-case-hunter">/)
-		assert.doesNotMatch(initialTexts, /### Reminder:/)
-		assert.match(initialTexts, /# CURRENT WORKFLOW STEP/)
-		assert.match(initialTexts, /Step 1: Gather Context/)
-		assert.doesNotMatch(initialTexts, /Step 2: Review/)
-
-		const firstSystemPrompt = createMessage.firstCall.args[0] as string
-		assert.doesNotMatch(firstSystemPrompt, /<explicit_instructions type="review-edge-case-hunter">/)
-		assert.match(firstSystemPrompt, /### Reminder:/)
-		assert.match(firstSystemPrompt, /# CURRENT WORKFLOW STATUS/)
-		assert.doesNotMatch(firstSystemPrompt, /# CURRENT WORKFLOW STEP/)
-		assert.doesNotMatch(firstSystemPrompt, /CONTINUATION TURN/)
-
-		const secondConversation = createMessage.secondCall.args[1] as Array<{
-			role: string
-			content: Array<{ type?: string; text?: string }>
-		}>
-		const followUpUser = secondConversation[secondConversation.length - 1] as {
-			role: string
-			content: Array<{ type?: string; text?: string }>
-		}
-		const followUpTexts = extractTextFromMessage(followUpUser)
-		assert.doesNotMatch(followUpTexts, /<explicit_instructions type="review-edge-case-hunter">/)
-		assert.doesNotMatch(followUpTexts, /### Reminder:/)
-		assert.doesNotMatch(followUpTexts, /Current Progress:/)
-		assert.doesNotMatch(followUpTexts, /# CURRENT WORKFLOW STEP/)
-		const secondSystemPrompt = createMessage.secondCall.args[0] as string
-		assert.match(secondSystemPrompt, /CONTINUATION TURN/)
-		assert.match(secondSystemPrompt, /### Reminder:/)
-		assert.match(secondSystemPrompt, /# CURRENT WORKFLOW STATUS/)
-		assert.match(secondSystemPrompt, /Current Progress:/)
-		assert.doesNotMatch(secondSystemPrompt, /# CURRENT WORKFLOW STEP/)
-		assert.doesNotMatch(secondSystemPrompt, /<explicit_instructions type="review-edge-case-hunter">/)
-	})
-
-	it("keeps focus-chain guidance in the system prompt on every internal turn when prompt refresh frequency is zero for non-Responses subagents", async () => {
-		const createMessage = sinon.stub()
-		createMessage.onFirstCall().callsFake(async function* () {
-			yield {
-				type: "tool_calls",
-				tool_call: {
-					function: {
-						id: "toolu_subagent_placeholder_refresh_1",
-						name: ClineDefaultTool.LIST_FILES,
-						arguments: JSON.stringify({ path: ".", recursive: false }),
-					},
-				},
-			}
-		})
-		createMessage.onSecondCall().callsFake(async function* () {
-			yield {
-				type: "tool_calls",
-				tool_call: {
-					function: {
-						id: "toolu_subagent_placeholder_refresh_complete_1",
-						name: ClineDefaultTool.ATTEMPT,
-						arguments: JSON.stringify({ result: "done" }),
-					},
-				},
-			}
-		})
-
-		const promptRegistry = PromptRegistry.getInstance()
-		const promptGetStub = sinon.stub(promptRegistry, "get").callsFake(async (context) => {
-			promptRegistry.nativeTools = undefined
-			return context.isContinuationTurn === true ? "CONTINUATION TURN" : "system prompt"
-		})
-		sinon.stub(skills, "discoverSkills").resolves([])
-		sinon.stub(skills, "getAvailableSkills").returns([])
-		;(workflowResolution.resolveAvailableWorkflows as sinon.SinonStub).resolves([
-			{
-				name: "review-edge-case-hunter",
-				source: "remote",
-				description: "Remote workflow: review-edge-case-hunter",
-				fileName: "review-edge-case-hunter",
-				contents: `# Edge case review instructions
-
-## Step 1: Gather Context
-Inspect the provided bundle before running tools.
-
-## Step 2: Review
-Review the changed implementation for edge cases.`,
-			},
-		])
-		stubApiHandler(createMessage)
-		initializeHostProvider()
-
-		const runner = new SubagentRunner(createTaskConfig(false, 0))
-		const result = await runner.run(`Skill: use_skill('review-edge-case-hunter')`, () => {})
-
-		assert.equal(result.status, "completed")
-		assert.equal(createMessage.callCount, 2)
-		assert.equal(promptGetStub.callCount, 2)
-		assert.equal(promptGetStub.firstCall.args[0].isContinuationTurn, false)
-		assert.equal(promptGetStub.secondCall.args[0].isContinuationTurn, false)
-
-		const secondConversation = createMessage.secondCall.args[1] as Array<{
-			role: string
-			content: Array<{ type?: string; text?: string }>
-		}>
-		const followUpUser = secondConversation[secondConversation.length - 1] as {
-			role: string
-			content: Array<{ type?: string; text?: string }>
-		}
-		const followUpTexts = extractTextFromMessage(followUpUser)
-		assert.doesNotMatch(followUpTexts, /### Reminder:/)
-		assert.doesNotMatch(followUpTexts, /Current Progress: 0\/2 items completed/)
-		assert.doesNotMatch(followUpTexts, /# CURRENT WORKFLOW STEP/)
-		const secondSystemPrompt = createMessage.secondCall.args[0] as string
-		assert.match(secondSystemPrompt, /### Reminder:/)
-		assert.match(secondSystemPrompt, /Current Progress: 0\/2 items completed/)
-		assert.doesNotMatch(secondSystemPrompt, /CONTINUATION TURN/)
-	})
-
-	it("re-injects the active current-step block on the next non-Responses subagent turn after local compaction clears the marker", async () => {
-		const createMessage = sinon.stub()
-		createMessage.onFirstCall().callsFake(async function* () {
-			yield {
-				type: "usage",
-				inputTokens: 11,
-				outputTokens: 7,
-				cacheWriteTokens: 0,
-				cacheReadTokens: 0,
-			}
-			yield {
-				type: "tool_calls",
-				tool_call: {
-					function: {
-						id: "toolu_subagent_placeholder_reinject_local_1",
-						name: ClineDefaultTool.LIST_FILES,
-						arguments: JSON.stringify({ path: ".", recursive: false }),
-					},
-				},
-			}
-		})
-		createMessage.onSecondCall().callsFake(async function* () {
-			yield {
-				type: "tool_calls",
-				tool_call: {
-					function: {
-						id: "toolu_subagent_placeholder_reinject_local_complete_1",
-						name: ClineDefaultTool.ATTEMPT,
-						arguments: JSON.stringify({ result: "done" }),
-					},
-				},
-			}
-		})
-
-		const promptRegistry = PromptRegistry.getInstance()
-		sinon.stub(promptRegistry, "get").callsFake(async (context) => {
-			promptRegistry.nativeTools = undefined
-			return context.isContinuationTurn === true ? "CONTINUATION TURN" : "system prompt"
-		})
-		sinon.stub(skills, "discoverSkills").resolves([])
-		sinon.stub(skills, "getAvailableSkills").returns([])
-		;(workflowResolution.resolveAvailableWorkflows as sinon.SinonStub).resolves([
-			{
-				name: "review-edge-case-hunter",
-				source: "remote",
-				description: "Remote workflow: review-edge-case-hunter",
-				fileName: "review-edge-case-hunter",
-				contents: `# Edge case review instructions
-
-## Step 1: Gather Context
-Inspect the provided bundle before running tools.
-
-## Step 2: Review
-Review the changed implementation for edge cases.`,
-			},
-		])
-		stubApiHandler(createMessage)
-		initializeHostProvider()
-
-		const config = createTaskConfig(false)
-		const runner = new SubagentRunner(config)
-		sinon.stub(runner as any, "shouldCompactBeforeNextRequest").returns(true)
-		sinon.stub(runner as any, "compactConversationForContextWindow").returns({
-			didCompact: true,
-			conversationHistoryDeletedRange: [2, 3],
-		})
-
-		const result = await runner.run(`Skill: use_skill('review-edge-case-hunter')`, () => {})
-
-		assert.equal(result.status, "completed")
-		assert.equal(createMessage.callCount, 2)
-
-		const secondConversation = createMessage.secondCall.args[1] as Array<{
-			role: string
-			content: Array<{ type?: string; text?: string }>
-		}>
-		const secondTurnUserTexts = secondConversation
-			.filter((message) => message.role === "user")
-			.map((message) => extractTextFromMessage(message))
-		assert.equal(
-			secondTurnUserTexts.some((text) => /# CURRENT WORKFLOW STEP/.test(text)),
-			true,
-		)
-		assert.equal(
-			secondTurnUserTexts.some((text) => /Step 1: Gather Context/.test(text)),
-			true,
-		)
-	})
-
-	it("moves placeholder workflow prompt injections into the system prompt for OpenAI Responses subagents", async () => {
-		const createMessage = sinon.stub()
-		createMessage.onFirstCall().callsFake(async function* () {
-			yield {
-				type: "tool_calls",
-				tool_call: {
-					function: {
-						id: "toolu_subagent_placeholder_refresh_responses_1",
-						name: ClineDefaultTool.LIST_FILES,
-						arguments: JSON.stringify({ path: ".", recursive: false }),
-					},
-				},
-			}
-		})
-		createMessage.onSecondCall().callsFake(async function* () {
-			yield {
-				type: "tool_calls",
-				tool_call: {
-					function: {
-						id: "toolu_subagent_placeholder_refresh_responses_complete_1",
-						name: ClineDefaultTool.ATTEMPT,
-						arguments: JSON.stringify({ result: "done" }),
-					},
-				},
-			}
-		})
-
-		const promptRegistry = PromptRegistry.getInstance()
-		sinon.stub(promptRegistry, "get").callsFake(async (context) => {
-			promptRegistry.nativeTools = undefined
-			return context.isContinuationTurn === true ? "CONTINUATION TURN" : "system prompt"
-		})
-		sinon.stub(skills, "discoverSkills").resolves([])
-		sinon.stub(skills, "getAvailableSkills").returns([])
-		;(workflowResolution.resolveAvailableWorkflows as sinon.SinonStub).resolves([
-			{
-				name: "review-edge-case-hunter",
-				source: "remote",
-				description: "Remote workflow: review-edge-case-hunter",
-				fileName: "review-edge-case-hunter",
-				contents: `# Edge case review instructions
-
-## Step 1: Gather Context
-Inspect the provided bundle before running tools.
-
-## Step 2: Review
-Review the changed implementation for edge cases.`,
-			},
-		])
-		stubApiHandler(createMessage, {
-			modelId: "gpt-5.4-mini-2026-03-17",
-			apiFormat: ApiFormat.OPENAI_RESPONSES,
-		})
-		initializeHostProvider()
-
-		const config = createTaskConfig(false, 0)
-		config.services.stateManager.getApiConfiguration = () => ({
-			actModeApiProvider: "openai-native",
-			planModeApiProvider: "openai-native",
-		})
-
-		const runner = new SubagentRunner(config)
-		const result = await runner.run(`Skill: use_skill('review-edge-case-hunter')`, () => {})
-
-		assert.equal(result.status, "completed")
-		assert.equal(createMessage.callCount, 2)
-
-		const initialUser = createMessage.firstCall.args[1][0] as {
-			role: string
-			content: Array<{ type?: string; text?: string }>
-		}
-		const initialTexts = extractTextFromMessage(initialUser)
-		assert.doesNotMatch(initialTexts, /^### Reminder:/m)
-		assert.match(initialTexts, /# CURRENT WORKFLOW STEP/)
-		assert.match(initialTexts, /Step 1: Gather Context/)
-		assert.doesNotMatch(initialTexts, /Step 2: Review/)
-		assert.doesNotMatch(initialTexts, /<explicit_instructions type="review-edge-case-hunter">/)
-
-		const firstSystemPrompt = createMessage.firstCall.args[0] as string
-		assert.doesNotMatch(firstSystemPrompt, /<explicit_instructions type="review-edge-case-hunter">/)
-		assert.match(firstSystemPrompt, /^### Reminder:/m)
-		assert.match(firstSystemPrompt, /# CURRENT WORKFLOW STATUS/)
-		assert.doesNotMatch(firstSystemPrompt, /# CURRENT WORKFLOW STEP/)
-
-		const secondConversation = createMessage.secondCall.args[1] as Array<{
-			role: string
-			content: Array<{ type?: string; text?: string }>
-		}>
-		const followUpUser = secondConversation[secondConversation.length - 1] as {
-			role: string
-			content: Array<{ type?: string; text?: string }>
-		}
-		const followUpTexts = extractTextFromMessage(followUpUser)
-		assert.doesNotMatch(followUpTexts, /^### Reminder:/m)
-		assert.doesNotMatch(followUpTexts, /Current Progress:/)
-		assert.doesNotMatch(followUpTexts, /# CURRENT WORKFLOW STEP/)
-		assert.doesNotMatch(followUpTexts, /<explicit_instructions type="review-edge-case-hunter">/)
-
-		const secondSystemPrompt = createMessage.secondCall.args[0] as string
-		assert.match(secondSystemPrompt, /^### Reminder:/m)
-		assert.match(secondSystemPrompt, /# CURRENT WORKFLOW STATUS/)
-		assert.match(secondSystemPrompt, /Current Progress:/)
-		assert.doesNotMatch(secondSystemPrompt, /# CURRENT WORKFLOW STEP/)
-		assert.doesNotMatch(secondSystemPrompt, /<explicit_instructions type="review-edge-case-hunter">/)
-		assert.doesNotMatch(secondSystemPrompt, /CONTINUATION TURN/)
-	})
-
-	it("keeps continuation-turn placeholder workflow guidance out of local user content for OpenAI Responses subagents", async () => {
-		const createMessage = sinon.stub()
-		createMessage.onFirstCall().callsFake(async function* () {
-			yield {
-				type: "tool_calls",
-				tool_call: {
-					function: {
-						id: "toolu_subagent_placeholder_followup_responses_1",
-						name: ClineDefaultTool.LIST_FILES,
-						arguments: JSON.stringify({ path: ".", recursive: false }),
-					},
-				},
-			}
-		})
-		createMessage.onSecondCall().callsFake(async function* () {
-			yield {
-				type: "tool_calls",
-				tool_call: {
-					function: {
-						id: "toolu_subagent_placeholder_followup_responses_complete_1",
-						name: ClineDefaultTool.ATTEMPT,
-						arguments: JSON.stringify({ result: "done" }),
-					},
-				},
-			}
-		})
-
-		const promptRegistry = PromptRegistry.getInstance()
-		const promptGetStub = sinon.stub(promptRegistry, "get").callsFake(async (context) => {
-			assert.equal(context.activeWorkflowReminder, undefined)
-			promptRegistry.nativeTools = undefined
-			return context.isContinuationTurn === true ? "CONTINUATION TURN" : "system prompt"
-		})
-		sinon.stub(skills, "discoverSkills").resolves([])
-		sinon.stub(skills, "getAvailableSkills").returns([])
-		;(workflowResolution.resolveAvailableWorkflows as sinon.SinonStub).resolves([
-			{
-				name: "review-edge-case-hunter",
-				source: "remote",
-				description: "Remote workflow: review-edge-case-hunter",
-				fileName: "review-edge-case-hunter",
-				contents: `# Edge case review instructions
-
-## Step 1: Gather Context
-Inspect the provided bundle before running tools.
-
-## Step 2: Review
-Review the changed implementation for edge cases.`,
-			},
-		])
-		stubApiHandler(createMessage, {
-			modelId: "gpt-5.4-mini-2026-03-17",
-			apiFormat: ApiFormat.OPENAI_RESPONSES,
-		})
-		initializeHostProvider()
-
-		const config = createTaskConfig(false)
-		config.services.stateManager.getApiConfiguration = () => ({
-			actModeApiProvider: "openai-native",
-			planModeApiProvider: "openai-native",
-		})
-
-		const runner = new SubagentRunner(config)
-		const result = await runner.run(`Skill: use_skill('review-edge-case-hunter')`, () => {})
-
-		assert.equal(result.status, "completed")
-		assert.equal(createMessage.callCount, 2)
-		assert.equal(promptGetStub.secondCall.args[0].isContinuationTurn, true)
-
-		const secondConversation = createMessage.secondCall.args[1] as Array<{
-			role: string
-			content: Array<{ type?: string; text?: string }>
-		}>
-		const followUpUser = secondConversation[secondConversation.length - 1] as {
-			role: string
-			content: Array<{ type?: string; text?: string }>
-		}
-		const followUpTexts = extractTextFromMessage(followUpUser)
-		assert.doesNotMatch(followUpTexts, /^### Reminder:/m)
-		assert.doesNotMatch(followUpTexts, /Current Progress: 0\/2 items completed/)
-		assert.doesNotMatch(followUpTexts, /# CURRENT WORKFLOW STEP/)
-		assert.doesNotMatch(followUpTexts, /<explicit_instructions type="review-edge-case-hunter">/)
-
-		const secondSystemPrompt = createMessage.secondCall.args[0] as string
-		assert.match(secondSystemPrompt, /CONTINUATION TURN/)
-		assert.match(secondSystemPrompt, /^### Reminder:/m)
-		assert.match(secondSystemPrompt, /Current Progress: 0\/2 items completed/)
-		assert.doesNotMatch(secondSystemPrompt, /<explicit_instructions type="review-edge-case-hunter">/)
-	})
-
-	it("re-injects the active current-step block on the next OpenAI Responses subagent turn after a context_compacted stream chunk", async () => {
-		const createMessage = sinon.stub()
-		createMessage.onFirstCall().callsFake(async function* () {
-			yield {
-				type: "context_compacted",
-				id: "cmp_subagent_1",
-			}
-			yield {
-				type: "tool_calls",
-				tool_call: {
-					function: {
-						id: "toolu_subagent_placeholder_reinject_responses_1",
-						name: ClineDefaultTool.LIST_FILES,
-						arguments: JSON.stringify({ path: ".", recursive: false }),
-					},
-				},
-			}
-		})
-		createMessage.onSecondCall().callsFake(async function* () {
-			yield {
-				type: "tool_calls",
-				tool_call: {
-					function: {
-						id: "toolu_subagent_placeholder_reinject_responses_complete_1",
-						name: ClineDefaultTool.ATTEMPT,
-						arguments: JSON.stringify({ result: "done" }),
-					},
-				},
-			}
-		})
-
-		const promptRegistry = PromptRegistry.getInstance()
-		sinon.stub(promptRegistry, "get").callsFake(async (context) => {
-			assert.equal(context.activeWorkflowReminder, undefined)
-			promptRegistry.nativeTools = undefined
-			return context.isContinuationTurn === true ? "CONTINUATION TURN" : "system prompt"
-		})
-		sinon.stub(skills, "discoverSkills").resolves([])
-		sinon.stub(skills, "getAvailableSkills").returns([])
-		;(workflowResolution.resolveAvailableWorkflows as sinon.SinonStub).resolves([
-			{
-				name: "review-edge-case-hunter",
-				source: "remote",
-				description: "Remote workflow: review-edge-case-hunter",
-				fileName: "review-edge-case-hunter",
-				contents: `# Edge case review instructions
-
-## Step 1: Gather Context
-Inspect the provided bundle before running tools.
-
-## Step 2: Review
-Review the changed implementation for edge cases.`,
-			},
-		])
-		stubApiHandler(createMessage, {
-			modelId: "gpt-5.4-mini-2026-03-17",
-			apiFormat: ApiFormat.OPENAI_RESPONSES,
-		})
-		initializeHostProvider()
-
-		const config = createTaskConfig(false)
-		config.services.stateManager.getApiConfiguration = () => ({
-			actModeApiProvider: "openai-native",
-			planModeApiProvider: "openai-native",
-		})
-
-		const runner = new SubagentRunner(config)
-		const result = await runner.run(`Skill: use_skill('review-edge-case-hunter')`, () => {})
-
-		assert.equal(result.status, "completed")
-		assert.equal(createMessage.callCount, 2)
-
-		const secondConversation = createMessage.secondCall.args[1] as Array<{
-			role: string
-			content: Array<{ type?: string; text?: string }>
-		}>
-		const followUpUser = secondConversation[secondConversation.length - 1] as {
-			role: string
-			content: Array<{ type?: string; text?: string }>
-		}
-		const followUpTexts = extractTextFromMessage(followUpUser)
-		assert.match(followUpTexts, /# CURRENT WORKFLOW STEP/)
-		assert.match(followUpTexts, /Step 1: Gather Context/)
-	})
-
-	it("does not write activeAgent state when an assigned placeholder workflow is auto-activated", async () => {
-		const config = createTaskConfig(false)
-		config.cwd = process.cwd()
-		const runner = new SubagentRunner(config)
-		const state = new TaskState()
-
-		const activatePlaceholderStub = sinon
-			.stub(workflowActivation, "activatePlaceholderWorkflowInTaskState")
-			.resolves(undefined)
-
-		await (runner as any).autoActivateAssignedWorkflow(
-			state,
-			["code-review"],
-			[
-				{
-					name: "code-review",
-					source: "remote",
-					description: "Remote workflow: code-review",
-					fileName: "code-review",
-					contents: "# Code review\nInspect implementation.",
-				},
-			],
-		)
-
-		sinon.assert.calledOnce(activatePlaceholderStub)
-		assert.equal((state as any).activeAgentId, undefined)
-		assert.equal((state as any).activeAgentSkillName, undefined)
-		assert.equal((state as any).activeAgentInvokedSlashCommand, undefined)
-		assert.equal((state as any).activeAgentJustActivated, undefined)
-	})
-
 	it("falls back to the assigned-skill directive when the assigned skill is not a workflow", async () => {
 		const createMessage = sinon.stub().callsFake(async function* (_systemPrompt: string) {
 			yield {
@@ -1878,9 +1299,7 @@ Review the changed implementation for edge cases.`,
 		})
 
 		const promptRegistry = PromptRegistry.getInstance()
-		sinon.stub(promptRegistry, "get").callsFake(async (context) => {
-			assert.equal(context.activeWorkflowReminder, undefined)
-			assert.equal(context.activeWorkflowSupportsPlaceholders, false)
+		sinon.stub(promptRegistry, "get").callsFake(async () => {
 			promptRegistry.nativeTools = undefined
 			return "system prompt"
 		})
@@ -1894,7 +1313,7 @@ Review the changed implementation for edge cases.`,
 				source: "project",
 			},
 		])
-		;(workflowResolution.resolveAvailableWorkflows as sinon.SinonStub).resolves([])
+		sinon.stub(WorkflowRegistry, "resolveWorkflowByUseSkillName").returns(undefined)
 		stubApiHandler(createMessage)
 		initializeHostProvider()
 
@@ -1906,571 +1325,6 @@ Review the changed implementation for edge cases.`,
 		const systemPrompt = createMessage.firstCall.args[0] as string
 		assert.match(systemPrompt, /Assigned Workflow Activation/)
 		assert.match(systemPrompt, /review-helper/)
-	})
-
-	it("does not re-activate a placeholder workflow that is already active in state", async () => {
-		const runner = new SubagentRunner(createTaskConfig(false))
-		const state = new TaskState()
-		state.activePlaceholderWorkflowId = "review-edge-case-hunter"
-		state.activePlaceholderWorkflowSource = {
-			type: "remote",
-			name: "review-edge-case-hunter",
-			contents: "# Edge case review instructions",
-		}
-		state.activePlaceholderWorkflowStableValues = { project_root: "/tmp" }
-		state.activePlaceholderWorkflowValues = { review_focus: "security" }
-
-		const activateManagedStub = sinon.stub(workflowActivation, "activateManagedWorkflowInTaskState")
-		const activatePlaceholderStub = sinon.stub(workflowActivation, "activatePlaceholderWorkflowInTaskState")
-
-		await (runner as any).autoActivateAssignedWorkflow(
-			state,
-			["review-edge-case-hunter"],
-			[
-				{
-					name: "review-edge-case-hunter",
-					source: "remote",
-					description: "Remote workflow: review-edge-case-hunter",
-					fileName: "review-edge-case-hunter",
-					contents: "# Edge case review instructions",
-				},
-			],
-		)
-
-		sinon.assert.notCalled(activateManagedStub)
-		sinon.assert.notCalled(activatePlaceholderStub)
-		assert.equal(state.activePlaceholderWorkflowId, "review-edge-case-hunter")
-		assert.deepEqual(state.activePlaceholderWorkflowValues, { review_focus: "security" })
-	})
-
-	it("inherits only shared referenced parent placeholders into an activated subagent workflow", async () => {
-		const config = createTaskConfig(false)
-		config.taskState.activePlaceholderWorkflowId = "code-review.md"
-		config.taskState.activePlaceholderWorkflowSource = {
-			type: "remote",
-			name: "code-review.md",
-			contents: "# Code Review",
-		}
-		config.taskState.activePlaceholderWorkflowStableValues = { project_root: "/tmp/project" }
-		config.taskState.activePlaceholderWorkflowValues = {
-			diff_output: "/tmp/project/review-input.diff",
-			review_input: "/tmp/project/review-input.md",
-			review_mode: "full",
-		}
-
-		const runner = new SubagentRunner(config)
-		const state = new TaskState()
-		state.activePlaceholderWorkflowSource = {
-			type: "remote",
-			name: "review-adversarial-general.md",
-			contents: `# Review
-
-## Step 1: Receive content and determine review scope
-Use {diff_output} when it is available.
-
-## Step 2: Perform adversarial analysis
-Inspect only the provided diff.`,
-		}
-
-		await (runner as any).inheritSharedParentPlaceholdersToActivatedWorkflow(state)
-
-		assert.deepEqual(state.activePlaceholderWorkflowValues, {
-			diff_output: "/tmp/project/review-input.diff",
-		})
-	})
-
-	it("does not overwrite child placeholder values that are already resolved", async () => {
-		const config = createTaskConfig(false)
-		config.taskState.activePlaceholderWorkflowValues = {
-			diff_output: "/tmp/project/parent-review-input.diff",
-		}
-
-		const runner = new SubagentRunner(config)
-		const state = new TaskState()
-		state.activePlaceholderWorkflowSource = {
-			type: "remote",
-			name: "review-adversarial-general.md",
-			contents: `# Review
-
-## Step 1: Receive content and determine review scope
-Use {diff_output} when it is available.`,
-		}
-		state.activePlaceholderWorkflowValues = {
-			diff_output: "/tmp/project/child-review-input.diff",
-		}
-
-		await (runner as any).inheritSharedParentPlaceholdersToActivatedWorkflow(state)
-
-		assert.deepEqual(state.activePlaceholderWorkflowValues, {
-			diff_output: "/tmp/project/child-review-input.diff",
-		})
-	})
-
-	it("seeds a placeholder checklist from step headings when auto-activating a subagent workflow", async () => {
-		const sandbox = sinon.createSandbox()
-		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "subagent-focus-chain-seed-"))
-		try {
-			sandbox.stub(disk, "ensureTaskDirectoryExists").resolves(tempDir)
-			const config = createTaskConfig(false)
-			config.taskState.currentFocusChainChecklist = "- [ ] Parent Step 1\n- [ ] Parent Step 2"
-			const parentManager = createFocusChainManager(config.taskState, config.taskId)
-			await parentManager.updateFCListFromToolResponse(config.taskState.currentFocusChainChecklist)
-
-			const runner = new SubagentRunner(config)
-			const state = new TaskState()
-
-			await (runner as any).autoActivateAssignedWorkflow(
-				state,
-				["review-edge-case-hunter"],
-				[
-					{
-						name: "review-edge-case-hunter",
-						source: "remote",
-						description: "Remote workflow: review-edge-case-hunter",
-						fileName: "review-edge-case-hunter",
-						contents: `# Edge case review
-
-## Step 1: Gather Context
-Load the review target and confirm scope.
-
-## Step 2: Review
-Inspect reachable edge cases in the changed code.`,
-					},
-				],
-			)
-
-			assert.equal(state.activePlaceholderWorkflowId, "review-edge-case-hunter")
-			assert.equal(state.currentFocusChainChecklist, "- [ ] Step 1: Gather Context\n- [ ] Step 2: Review")
-
-			const parentFilePath = getFocusChainFilePath(tempDir, config.taskId)
-			const parentContent = await fs.readFile(parentFilePath, "utf8")
-			assert.match(parentContent, /Parent Step 1/)
-			assert.doesNotMatch(parentContent, /Step 1: Gather Context/)
-
-			const subagentStorageKey = (runner as any).subagentFocusChainStorageKey as string
-			assert.ok(subagentStorageKey)
-			const subagentFilePath = getFocusChainFilePath(tempDir, config.taskId, {
-				key: subagentStorageKey,
-				scope: "subagent",
-			})
-			const subagentContent = await fs.readFile(subagentFilePath, "utf8")
-			assert.match(subagentContent, /Step 1: Gather Context/)
-			assert.match(subagentContent, /Step 2: Review/)
-		} finally {
-			sandbox.restore()
-			await fs.rm(tempDir, { recursive: true, force: true })
-		}
-	})
-
-	it("advances review-adversarial-general.md before the first subagent turn when inherited diff_output already satisfies step 1", async () => {
-		const sandbox = sinon.createSandbox()
-		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "subagent-review-adversarial-initial-deterministic-"))
-
-		try {
-			sandbox.stub(disk, "ensureTaskDirectoryExists").resolves(tempDir)
-
-			const config = createTaskConfig(false)
-			config.taskState.activePlaceholderWorkflowId = "code-review.md"
-			config.taskState.activePlaceholderWorkflowSource = {
-				type: "remote",
-				name: "code-review.md",
-				contents: "# Code Review",
-			}
-			config.taskState.activePlaceholderWorkflowStableValues = { project_root: tempDir }
-			config.taskState.activePlaceholderWorkflowValues = {
-				diff_output: path.join(tempDir, "review-input.diff"),
-			}
-			await fs.mkdir(path.dirname(config.taskState.activePlaceholderWorkflowValues!.diff_output), { recursive: true })
-			await fs.writeFile(config.taskState.activePlaceholderWorkflowValues!.diff_output, "diff --git a/file b/file", "utf8")
-
-			const runner = new SubagentRunner(config)
-			const state = new TaskState()
-
-			await (runner as any).autoActivateAssignedWorkflow(
-				state,
-				["review-adversarial-general.md"],
-				[
-					{
-						name: "review-adversarial-general.md",
-						source: "remote",
-						description: "Remote workflow: review-adversarial-general.md",
-						fileName: "review-adversarial-general.md",
-						contents: `# BMAD Review: Adversarial General
-
-## Step 1: Receive content and determine review scope
-Use {diff_output} when it is already available.
-
-## Step 2: Perform adversarial analysis
-Review the provided material only.
-
-## Step 3: Present findings
-Return the findings to the user.`,
-					},
-				],
-			)
-
-			assert.deepEqual(state.activePlaceholderWorkflowValues, {
-				diff_output: path.join(tempDir, "review-input.diff"),
-			})
-			assert.equal(
-				state.currentFocusChainChecklist,
-				"- [x] Step 1: Receive content and determine review scope\n- [ ] Step 2: Perform adversarial analysis\n- [ ] Step 3: Present findings",
-			)
-			assert.deepEqual(state.pendingAutoCompletedPlaceholderWorkflowStepNotices, [
-				{
-					workflowName: "review-adversarial-general.md",
-					stepNumber: 1,
-					checklistLabel: "Step 1: Receive content and determine review scope",
-					reason: "diff_output resolves to an existing file path.",
-				},
-			])
-		} finally {
-			sandbox.restore()
-			await fs.rm(tempDir, { recursive: true, force: true })
-		}
-	})
-
-	it("routes subagent task_progress updates to subagent-local focus chain storage instead of the parent callback", async () => {
-		const sandbox = sinon.createSandbox()
-		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "subagent-focus-chain-update-"))
-		try {
-			sandbox.stub(disk, "ensureTaskDirectoryExists").resolves(tempDir)
-			const config = createTaskConfig(false)
-			config.taskState.currentFocusChainChecklist = "- [ ] Parent Step"
-			const parentManager = createFocusChainManager(config.taskState, config.taskId)
-			await parentManager.updateFCListFromToolResponse(config.taskState.currentFocusChainChecklist)
-
-			const runner = new SubagentRunner(config)
-			const subagentState = new TaskState()
-			const subagentConfig = (runner as any).createSubagentTaskConfig(subagentState) as TaskConfig
-
-			const result = await subagentConfig.callbacks.updateFCListFromToolResponse("- [ ] Child Step")
-
-			assert.equal(result.accepted, true)
-			sinon.assert.notCalled(config.callbacks.updateFCListFromToolResponse as sinon.SinonStub)
-			assert.equal(subagentState.currentFocusChainChecklist, "- [ ] Child Step")
-
-			const parentFilePath = getFocusChainFilePath(tempDir, config.taskId)
-			const parentContent = await fs.readFile(parentFilePath, "utf8")
-			assert.match(parentContent, /Parent Step/)
-			assert.doesNotMatch(parentContent, /Child Step/)
-
-			const subagentStorageKey = (runner as any).subagentFocusChainStorageKey as string
-			const subagentFilePath = getFocusChainFilePath(tempDir, config.taskId, {
-				key: subagentStorageKey,
-				scope: "subagent",
-			})
-			const subagentContent = await fs.readFile(subagentFilePath, "utf8")
-			assert.match(subagentContent, /Child Step/)
-		} finally {
-			sandbox.restore()
-			await fs.rm(tempDir, { recursive: true, force: true })
-		}
-	})
-
-	it("updates the subagent-local focus chain markdown file when a live tool call includes task_progress", async () => {
-		const sandbox = sinon.createSandbox()
-		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "subagent-focus-chain-live-update-"))
-		const createMessage = sinon.stub()
-		createMessage.onFirstCall().callsFake(async function* () {
-			yield {
-				type: "tool_calls",
-				tool_call: {
-					function: {
-						id: "toolu_subagent_task_progress_update_1",
-						name: ClineDefaultTool.LIST_FILES,
-						arguments: JSON.stringify({
-							path: ".",
-							recursive: false,
-							task_progress: "- [x] Step 1: Gather Context\n- [ ] Step 2: Review",
-						}),
-					},
-				},
-			}
-		})
-		createMessage.onSecondCall().callsFake(async function* () {
-			yield {
-				type: "tool_calls",
-				tool_call: {
-					function: {
-						id: "toolu_subagent_task_progress_update_complete_1",
-						name: ClineDefaultTool.ATTEMPT,
-						arguments: JSON.stringify({ result: "done" }),
-					},
-				},
-			}
-		})
-
-		try {
-			sandbox.stub(disk, "ensureTaskDirectoryExists").resolves(tempDir)
-			const promptRegistry = PromptRegistry.getInstance()
-			sinon.stub(promptRegistry, "get").callsFake(async () => {
-				promptRegistry.nativeTools = undefined
-				return "system prompt"
-			})
-			sinon.stub(skills, "discoverSkills").resolves([])
-			sinon.stub(skills, "getAvailableSkills").returns([])
-			;(workflowResolution.resolveAvailableWorkflows as sinon.SinonStub).resolves([
-				{
-					name: "review-edge-case-hunter",
-					source: "remote",
-					description: "Remote workflow: review-edge-case-hunter",
-					fileName: "review-edge-case-hunter",
-					contents: `# Edge case review instructions
-
-## Step 1: Gather Context
-Inspect the provided bundle before running tools.
-
-## Step 2: Review
-Review the changed implementation for edge cases.`,
-				},
-			])
-			stubApiHandler(createMessage)
-			initializeHostProvider()
-
-			const config = createTaskConfig(false)
-			config.focusChainSettings = {
-				enabled: true,
-				remindClineInterval: 6,
-			} as any
-			config.taskState.currentFocusChainChecklist = "- [ ] Parent Step"
-			const parentManager = createFocusChainManager(config.taskState, config.taskId)
-			await parentManager.updateFCListFromToolResponse(config.taskState.currentFocusChainChecklist)
-
-			const runner = new SubagentRunner(config)
-			const result = await runner.run(`Skill: use_skill('review-edge-case-hunter')`, () => {})
-
-			assert.equal(result.status, "completed")
-			sinon.assert.notCalled(config.callbacks.updateFCListFromToolResponse as sinon.SinonStub)
-
-			const parentFilePath = getFocusChainFilePath(tempDir, config.taskId)
-			const parentContent = await fs.readFile(parentFilePath, "utf8")
-			assert.match(parentContent, /Parent Step/)
-			assert.doesNotMatch(parentContent, /Step 1: Gather Context/)
-
-			const subagentStorageKey = (runner as any).subagentFocusChainStorageKey as string
-			assert.ok(subagentStorageKey)
-			const subagentFilePath = getFocusChainFilePath(tempDir, config.taskId, {
-				key: subagentStorageKey,
-				scope: "subagent",
-			})
-			const subagentContent = await fs.readFile(subagentFilePath, "utf8")
-			assert.match(subagentContent, /- \[x\] Step 1: Gather Context/)
-			assert.match(subagentContent, /- \[ \] Step 2: Review/)
-		} finally {
-			sandbox.restore()
-			await fs.rm(tempDir, { recursive: true, force: true })
-		}
-	})
-
-	it("auto-completes a subagent final workflow step when attempt_completion succeeds", async () => {
-		const sandbox = sinon.createSandbox()
-		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "subagent-focus-chain-attempt-complete-"))
-		const createMessage = sinon.stub()
-		createMessage.onFirstCall().callsFake(async function* () {
-			yield {
-				type: "tool_calls",
-				tool_call: {
-					function: {
-						id: "toolu_subagent_attempt_completion_1",
-						name: ClineDefaultTool.ATTEMPT,
-						arguments: JSON.stringify({ result: "done" }),
-					},
-				},
-			}
-		})
-
-		try {
-			sandbox.stub(disk, "ensureTaskDirectoryExists").resolves(tempDir)
-			const promptRegistry = PromptRegistry.getInstance()
-			sinon.stub(promptRegistry, "get").callsFake(async () => {
-				promptRegistry.nativeTools = undefined
-				return "system prompt"
-			})
-			sinon.stub(skills, "discoverSkills").resolves([])
-			sinon.stub(skills, "getAvailableSkills").returns([])
-			;(workflowResolution.resolveAvailableWorkflows as sinon.SinonStub).resolves([
-				{
-					name: "review-adversarial-general.md",
-					source: "remote",
-					description: "Remote workflow: review-adversarial-general.md",
-					fileName: "review-adversarial-general.md",
-					contents: `# BMAD Review: Adversarial General
-
-## Step 3: Present findings
-Deliver findings using attempt_completion.`,
-				},
-			])
-			stubApiHandler(createMessage)
-			initializeHostProvider()
-
-			const config = createTaskConfig(false)
-			config.focusChainSettings = {
-				enabled: true,
-				remindClineInterval: 6,
-			} as any
-
-			const runner = new SubagentRunner(config)
-			const result = await runner.run("Skill: use_skill('review-adversarial-general.md')", () => {})
-
-			assert.equal(result.status, "completed")
-
-			const subagentFocusChainStorageKey = (runner as any).subagentFocusChainStorageKey as string
-			const subagentFilePath = getFocusChainFilePath(tempDir, config.taskId, {
-				key: subagentFocusChainStorageKey,
-				scope: "subagent",
-			})
-			const subagentContent = await fs.readFile(subagentFilePath, "utf8")
-			assert.match(subagentContent, /- \[x\] Step 3: Present findings/)
-		} finally {
-			sandbox.restore()
-			await fs.rm(tempDir, { recursive: true, force: true })
-		}
-	})
-
-	it("uses refreshed checklist state for later subagent workflow/current-step prompt generation after task_progress updates", async () => {
-		const createMessage = sinon.stub()
-		createMessage.onFirstCall().callsFake(async function* () {
-			yield {
-				type: "tool_calls",
-				tool_call: {
-					function: {
-						id: "toolu_subagent_task_progress_prompt_1",
-						name: ClineDefaultTool.LIST_FILES,
-						arguments: JSON.stringify({
-							path: ".",
-							recursive: false,
-							task_progress: "- [x] Step 1: Gather Context\n- [ ] Step 2: Review",
-						}),
-					},
-				},
-			}
-		})
-		createMessage.onSecondCall().callsFake(async function* (_systemPrompt: string, conversation: unknown[]) {
-			const secondConversation = conversation as Array<{
-				role: string
-				content: Array<{ type?: string; text?: string }>
-			}>
-			const followUpUser = secondConversation[secondConversation.length - 1]
-			const followUpTexts = extractTextFromMessage(followUpUser)
-
-			assert.doesNotMatch(followUpTexts, /Current Progress: 1\/2 items completed/)
-			assert.match(followUpTexts, /# CURRENT WORKFLOW STEP/)
-			assert.match(followUpTexts, /Step 2: Review/)
-			assert.doesNotMatch(followUpTexts, /Step 1: Gather Context/)
-
-			assert.match(_systemPrompt, /# CURRENT WORKFLOW STATUS/)
-			assert.match(_systemPrompt, /Current Progress:/)
-			assert.doesNotMatch(_systemPrompt, /You are currently on this step:/)
-
-			yield {
-				type: "tool_calls",
-				tool_call: {
-					function: {
-						id: "toolu_subagent_task_progress_prompt_complete_1",
-						name: ClineDefaultTool.ATTEMPT,
-						arguments: JSON.stringify({ result: "done" }),
-					},
-				},
-			}
-		})
-
-		const promptRegistry = PromptRegistry.getInstance()
-		sinon.stub(promptRegistry, "get").callsFake(async () => {
-			promptRegistry.nativeTools = undefined
-			return "system prompt"
-		})
-		sinon.stub(skills, "discoverSkills").resolves([])
-		sinon.stub(skills, "getAvailableSkills").returns([])
-		;(workflowResolution.resolveAvailableWorkflows as sinon.SinonStub).resolves([
-			{
-				name: "review-edge-case-hunter",
-				source: "remote",
-				description: "Remote workflow: review-edge-case-hunter",
-				fileName: "review-edge-case-hunter",
-				contents: `# Edge case review instructions
-
-## Step 1: Gather Context
-Inspect the provided bundle before running tools.
-
-## Step 2: Review
-Review the changed implementation for edge cases.`,
-			},
-		])
-		stubApiHandler(createMessage)
-		initializeHostProvider()
-
-		const config = createTaskConfig(false, 0)
-		config.focusChainSettings = {
-			enabled: true,
-			remindClineInterval: 6,
-		} as any
-		const runner = new SubagentRunner(config)
-		const result = await runner.run(`Skill: use_skill('review-edge-case-hunter')`, () => {})
-
-		assert.equal(result.status, "completed")
-		assert.equal(createMessage.callCount, 2)
-	})
-
-	it("isolates focus-chain storage across multiple subagent runs under the same parent task", async () => {
-		const sandbox = sinon.createSandbox()
-		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "subagent-focus-chain-multi-"))
-		try {
-			sandbox.stub(disk, "ensureTaskDirectoryExists").resolves(tempDir)
-			const config = createTaskConfig(false)
-			const runnerOne = new SubagentRunner(config)
-			const runnerTwo = new SubagentRunner(config)
-			const stateOne = new TaskState()
-			const stateTwo = new TaskState()
-
-			await (runnerOne as any).autoActivateAssignedWorkflow(
-				stateOne,
-				["review-a"],
-				[
-					{
-						name: "review-a",
-						source: "remote",
-						description: "Remote workflow: review-a",
-						fileName: "review-a",
-						contents: `## Step 1: Alpha\nInspect alpha.`,
-					},
-				],
-			)
-			await (runnerTwo as any).autoActivateAssignedWorkflow(
-				stateTwo,
-				["review-b"],
-				[
-					{
-						name: "review-b",
-						source: "remote",
-						description: "Remote workflow: review-b",
-						fileName: "review-b",
-						contents: `## Step 1: Beta\nInspect beta.`,
-					},
-				],
-			)
-
-			const storageKeyOne = (runnerOne as any).subagentFocusChainStorageKey as string
-			const storageKeyTwo = (runnerTwo as any).subagentFocusChainStorageKey as string
-			assert.ok(storageKeyOne)
-			assert.ok(storageKeyTwo)
-			assert.notEqual(storageKeyOne, storageKeyTwo)
-
-			const subagentFileOne = getFocusChainFilePath(tempDir, config.taskId, {
-				key: storageKeyOne,
-				scope: "subagent",
-			})
-			const subagentFileTwo = getFocusChainFilePath(tempDir, config.taskId, {
-				key: storageKeyTwo,
-				scope: "subagent",
-			})
-			assert.notEqual(subagentFileOne, subagentFileTwo)
-			assert.match(await fs.readFile(subagentFileOne, "utf8"), /Step 1: Alpha/)
-			assert.match(await fs.readFile(subagentFileTwo, "utf8"), /Step 1: Beta/)
-		} finally {
-			sandbox.restore()
-			await fs.rm(tempDir, { recursive: true, force: true })
-		}
 	})
 
 	it("logs a warning when a configured skill is not available", async () => {
@@ -2515,211 +1369,6 @@ Review the changed implementation for edge cases.`,
 			warnStub,
 			"[SubagentRunner] Configured or assigned skill 'missing-skill' not found for subagent run.",
 		)
-	})
-
-	it("builds workflow reminder context from the subagent's local workflow state", async () => {
-		const runner = new SubagentRunner(createTaskConfig(false))
-		const state = new TaskState()
-		const run = {
-			workflowId: "bmad-review-edge-case-hunter",
-			slashCommand: "bmad-review-edge-case-hunter",
-			status: "active",
-			currentPhaseIndex: 0,
-			createdAt: Date.now(),
-			updatedAt: Date.now(),
-			allRequiredComplete: false,
-			phases: [
-				{
-					id: "workflow",
-					title: "Workflow",
-					sourcePath: ".cline/skills/bmad-review-edge-case-hunter/workflow.md",
-					sourceContent: "# workflow",
-					completed: false,
-					items: [
-						{ id: "workflow::step-1", label: "Load review input", sourceText: "Load review input", completed: false },
-					],
-					execution: {
-						steps: [
-							{
-								id: "workflow::step-1",
-								goal: "Load review input",
-								instructions: [],
-							},
-						],
-					},
-				},
-			],
-		} as ManagedWorkflowRunState
-		state.managedWorkflowRun = run
-		state.activeWorkflowId = run.workflowId
-
-		const context = await (runner as any).buildPromptContext({
-			state,
-			hostIde: "test",
-			providerInfo: {
-				providerId: "anthropic",
-				model: { id: "anthropic/claude-sonnet-4.5", info: { contextWindow: 200_000 } },
-				mode: "act",
-				customPrompt: undefined,
-			},
-			availableSkills: [],
-			configuredSkillNames: undefined,
-			assignedSkillNames: [],
-			nativeToolCallsRequested: false,
-			shouldSendFullPromptAssembly: true,
-			shouldUseContinuationPrompt: false,
-		})
-
-		assert.equal(context.managedWorkflowActive, true)
-		assert.ok(context.activeWorkflowReminder)
-		assert.match(context.activeWorkflowReminder!, /<active_bmad_workflow/)
-		assert.match(context.activeWorkflowReminder!, /bmad-review-edge-case-hunter/)
-	})
-
-	it("does not inject persistent workflow reminders for placeholder-only subagent workflows", async () => {
-		const runner = new SubagentRunner(createTaskConfig(false))
-		const state = new TaskState()
-		state.activePlaceholderWorkflowId = "code-review.md"
-		state.activePlaceholderWorkflowSource = {
-			type: "remote",
-			name: "code-review.md",
-			contents: "# Code review\nInspect implementation.",
-		}
-		state.activePlaceholderWorkflowValues = { story_id: "1.1" }
-
-		const context = await (runner as any).buildPromptContext({
-			state,
-			hostIde: "test",
-			providerInfo: {
-				providerId: "anthropic",
-				model: { id: "anthropic/claude-sonnet-4.5", info: { contextWindow: 200_000 } },
-				mode: "act",
-				customPrompt: undefined,
-			},
-			availableSkills: [],
-			configuredSkillNames: undefined,
-			assignedSkillNames: [],
-			nativeToolCallsRequested: false,
-			shouldSendFullPromptAssembly: true,
-			shouldUseContinuationPrompt: false,
-		})
-
-		assert.equal(context.managedWorkflowActive, false)
-		assert.equal(context.activeWorkflowName, "code-review.md")
-		assert.match(context.activeWorkflowPersonaInstructions ?? "", /^Persona/m)
-		assert.equal(context.activeWorkflowReminder, undefined)
-		assert.equal(context.activeWorkflowSupportsPlaceholders, true)
-	})
-
-	it("builds scrum-master workflow persona instructions for pi-planning full prompt assembly", async () => {
-		const runner = new SubagentRunner(createTaskConfig(false))
-		const state = new TaskState()
-		state.activePlaceholderWorkflowId = "pi-planning.md"
-		state.activePlaceholderWorkflowSource = {
-			type: "remote",
-			name: "pi-planning.md",
-			contents: "# PI Planning\nPlan and refine stories.",
-		}
-		state.activePlaceholderWorkflowValues = { story_id: "1.1" }
-
-		const context = await (runner as any).buildPromptContext({
-			state,
-			hostIde: "test",
-			providerInfo: {
-				providerId: "anthropic",
-				model: { id: "anthropic/claude-sonnet-4.5", info: { contextWindow: 200_000 } },
-				mode: "act",
-				customPrompt: undefined,
-			},
-			availableSkills: [],
-			configuredSkillNames: undefined,
-			assignedSkillNames: [],
-			nativeToolCallsRequested: false,
-			shouldSendFullPromptAssembly: true,
-			shouldUseContinuationPrompt: false,
-		})
-
-		assert.equal(context.managedWorkflowActive, false)
-		assert.equal(context.activeWorkflowName, "pi-planning.md")
-		assert.equal(context.activeWorkflowPersonaInstructions, resolveWorkflowPersonaInstructions("pi-planning.md"))
-		assert.match(context.activeWorkflowPersonaInstructions ?? "", /Role: Scrum Master/)
-		assert.equal(context.activeWorkflowReminder, undefined)
-		assert.equal(context.activeWorkflowSupportsPlaceholders, true)
-	})
-
-	it("preserves base prompt context while suppressing dynamic reminder fields on internal turns", async () => {
-		const runner = new SubagentRunner(createTaskConfig(false))
-		const state = new TaskState()
-		state.activePlaceholderWorkflowId = "code-review.md"
-		state.activePlaceholderWorkflowSource = {
-			type: "remote",
-			name: "code-review.md",
-			contents: "# Code review\nInspect implementation.",
-		}
-
-		const context = await (runner as any).buildPromptContext({
-			state,
-			hostIde: "test",
-			providerInfo: {
-				providerId: "anthropic",
-				model: { id: "anthropic/claude-sonnet-4.5", info: { contextWindow: 200_000 } },
-				mode: "act",
-				customPrompt: undefined,
-			},
-			availableSkills: [
-				{ name: "review-edge-case-hunter", description: "Review", path: "/skills/review", source: "project" },
-			],
-			configuredSkillNames: undefined,
-			assignedSkillNames: [],
-			nativeToolCallsRequested: true,
-			shouldSendFullPromptAssembly: false,
-			shouldUseContinuationPrompt: false,
-		})
-
-		assert.deepEqual(context.skills, [])
-		assert.equal(context.activeWorkflowName, "code-review.md")
-		assert.equal(context.activeWorkflowPersonaInstructions, undefined)
-		assert.equal(context.activeWorkflowReminder, undefined)
-		assert.equal(context.enableNativeToolCalls, true)
-		assert.equal(context.enableParallelToolCalling, false)
-		assert.equal(context.isSubagentRun, true)
-	})
-
-	it("suppresses pi-planning workflow persona instructions on internal turns without full prompt assembly", async () => {
-		const runner = new SubagentRunner(createTaskConfig(false))
-		const state = new TaskState()
-		state.activePlaceholderWorkflowId = "pi-planning.md"
-		state.activePlaceholderWorkflowSource = {
-			type: "remote",
-			name: "pi-planning.md",
-			contents: "# PI Planning\nPlan and refine stories.",
-		}
-
-		const context = await (runner as any).buildPromptContext({
-			state,
-			hostIde: "test",
-			providerInfo: {
-				providerId: "anthropic",
-				model: { id: "anthropic/claude-sonnet-4.5", info: { contextWindow: 200_000 } },
-				mode: "act",
-				customPrompt: undefined,
-			},
-			availableSkills: [
-				{ name: "review-edge-case-hunter", description: "Review", path: "/skills/review", source: "project" },
-			],
-			configuredSkillNames: undefined,
-			assignedSkillNames: [],
-			nativeToolCallsRequested: true,
-			shouldSendFullPromptAssembly: false,
-			shouldUseContinuationPrompt: false,
-		})
-
-		assert.equal(context.activeWorkflowName, "pi-planning.md")
-		assert.equal(context.activeWorkflowPersonaInstructions, undefined)
-		assert.equal(context.activeWorkflowReminder, undefined)
-		assert.equal(context.enableNativeToolCalls, true)
-		assert.equal(context.enableParallelToolCalling, false)
-		assert.equal(context.isSubagentRun, true)
 	})
 
 	it("includes workspace metadata only in the initial user message", async () => {

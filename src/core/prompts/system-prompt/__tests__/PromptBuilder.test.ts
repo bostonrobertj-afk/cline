@@ -304,18 +304,12 @@ describe("PromptBuilder", () => {
 			const config = createVariant(ModelFamily.GENERIC)
 				.description("Test variant without explicit template")
 				.version(1)
-				.components(
-					SystemPromptSection.AGENT_ROLE,
-					SystemPromptSection.TOOL_USE,
-					SystemPromptSection.CAPABILITIES,
-					SystemPromptSection.RULES,
-				)
+				.components(SystemPromptSection.TOOL_USE, SystemPromptSection.CAPABILITIES, SystemPromptSection.RULES)
 				.matcher(() => true)
 				.build()
 
 			// Should have auto-generated a baseTemplate
 			expect(config.baseTemplate).to.exist
-			expect(config.baseTemplate).to.include("{{AGENT_ROLE_SECTION}}")
 			expect(config.baseTemplate).to.include("{{TOOL_USE_SECTION}}")
 			expect(config.baseTemplate).to.include("{{CAPABILITIES_SECTION}}")
 			expect(config.baseTemplate).to.include("{{RULES_SECTION}}")
@@ -324,11 +318,7 @@ describe("PromptBuilder", () => {
 			expect(config.baseTemplate).to.include("====")
 
 			// Should match the expected format
-			const expectedTemplate = `{{${SystemPromptSection.AGENT_ROLE}}}
-
-====
-
-{{${SystemPromptSection.TOOL_USE}}}
+			const expectedTemplate = `{{${SystemPromptSection.TOOL_USE}}}
 
 ====
 
@@ -341,14 +331,14 @@ describe("PromptBuilder", () => {
 		})
 
 		it("should use explicit baseTemplate when provided", () => {
-			const customTemplate = "Custom template with {{AGENT_ROLE_SECTION}}"
+			const customTemplate = "Custom template"
 
 			const config = createVariant(ModelFamily.GENERIC)
 				.description("Test variant with explicit template")
 				.version(1)
 				.template(customTemplate)
 				.matcher(() => true)
-				.components(SystemPromptSection.AGENT_ROLE, SystemPromptSection.TOOL_USE)
+				.components(SystemPromptSection.TOOL_USE, SystemPromptSection.CAPABILITIES, SystemPromptSection.RULES)
 				.build()
 
 			// Should use the explicitly provided template

@@ -559,9 +559,9 @@ export interface WorkflowFormResolvedPanelPayload {
 	actionLabels?: Partial<Record<WorkflowFormPanelAction, string>>
 }
 
-export interface ClineWorkflowForm {
+export interface WorkflowForm {
 	sessionId: string
-	resolverId: string
+	workflowFormId: string
 	title: string
 	toolDictionaryTitle: string
 	toolDictionaryMarkdown: string
@@ -594,11 +594,15 @@ export interface ClineWorkflowStepResolutionStatus {
 	definition: WorkflowStepResolutionStatusDefinition
 }
 
-export interface ClineWorkflowStartCard {
+export interface WorkflowStartCard {
 	sessionId: string
 	title: string
 	markdownBody: string
-	ctaLabel: "Get Started"
+	submitLabel: string
+	projectMode?: "new" | "existing"
+	existingProjectOptions: Array<{ value: string; label: string }>
+	selectedExistingProject?: string
+	newProjectTitle?: string
 }
 
 export interface ClineApiReqInfo {

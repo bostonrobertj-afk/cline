@@ -103,13 +103,10 @@ export interface SystemPromptContext {
 	readonly supportsBrowserUse?: boolean
 	readonly mcpHub?: McpHub
 	readonly activeWorkflowName?: string
-	readonly activeWorkflowPersonaInstructions?: string
-	readonly activeWorkflowReminder?: string
-	readonly activeWorkflowSupportsPlaceholders?: boolean
-	readonly activePlaceholderWorkflowName?: string
-	readonly activePlaceholderWorkflowStepNumber?: number
-	readonly activeDeterministicPlaceholderWorkflowEnabled?: boolean
-	readonly managedWorkflowActive?: boolean
+	readonly activeWorkflowStepNumber?: number
+	readonly workflowSystemInstructionsBlock?: string
+	readonly workflowInputInstructionsBlock?: string
+	readonly workflowToolSchemaOverride?: readonly ClineToolSpec[]
 	readonly isContinuationTurn?: boolean
 	readonly isPromptRefreshTurn?: boolean
 	readonly currentFocusChainChecklist?: string | null
@@ -286,7 +283,6 @@ export const TASK_PROGRESS_PARAMETER = {
 	instruction: `Use as a top-level parameter on the next tool call, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use \`${FOCUS_CHAIN_COMPLETE_NEXT_STEP_SENTINEL}\` to complete the next incomplete step.`,
 	usage: "Checklist here (optional)",
 	dependencies: [ClineDefaultTool.TODO],
-	contextRequirements: (context: SystemPromptContext) => context.activeDeterministicPlaceholderWorkflowEnabled !== true,
 }
 
 export const AGENT_FEEDBACK_PROMPT_GUIDANCE =

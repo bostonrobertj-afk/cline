@@ -1,6 +1,6 @@
 import { EmptyRequest } from "@shared/proto/cline/common"
 import { SlashCommandInfo, SlashCommandsResponse } from "@shared/proto/cline/slash"
-import { resolveAvailableWorkflows } from "@/core/workflows/resolution/resolveAvailableWorkflows"
+import { getShippedWorkflowSlashCommands } from "@/core/task/workflow-runtime/WorkflowRegistry"
 import { BASE_SLASH_COMMANDS, VSCODE_ONLY_COMMANDS } from "@/shared/slashCommands"
 import { Controller } from ".."
 
@@ -22,23 +22,7 @@ export async function getAvailableSlashCommands(controller: Controller, _request
 		)
 	}
 
-	const workspaceManager = controller.getWorkspaceManager?.() ?? (await controller.ensureWorkspaceManager?.())
-	const cwd = workspaceManager?.getPrimaryRoot()?.path
-	const localWorkflowToggles = controller.stateManager.getWorkspaceStateKey("workflowToggles") ?? {}
-	const globalWorkflowToggles = controller.stateManager.getGlobalSettingsKey("globalWorkflowToggles") ?? {}
-	const remoteWorkflowToggles = controller.stateManager.getGlobalStateKey("remoteWorkflowToggles") ?? {}
-	const remoteConfigSettings = controller.stateManager.getRemoteConfigSettings()
-	const remoteWorkflows = remoteConfigSettings?.remoteGlobalWorkflows ?? []
-
-	const workflows = await resolveAvailableWorkflows({
-		cwd,
-		localWorkflowToggles,
-		globalWorkflowToggles,
-		remoteWorkflowToggles,
-		remoteWorkflows,
-	})
-
-	for (const workflow of workflows) {
+	for (const workflow of getShippedWorkflowSlashCommands()) {
 		commands.push(
 			SlashCommandInfo.create({
 				name: workflow.name,

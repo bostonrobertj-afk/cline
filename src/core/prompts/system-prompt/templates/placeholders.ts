@@ -1,5 +1,4 @@
 export enum SystemPromptSection {
-	AGENT_ROLE = "AGENT_ROLE_SECTION",
 	TOOL_USE = "TOOL_USE_SECTION",
 	CONTINUATION_TURN = "CONTINUATION_TURN_SECTION",
 	TOOLS = "TOOLS_SECTION",
@@ -12,9 +11,10 @@ export enum SystemPromptSection {
 	RULES = "RULES_SECTION",
 	SYSTEM_INFO = "SYSTEM_INFO_SECTION",
 	OBJECTIVE = "OBJECTIVE_SECTION",
+	WORKFLOW_SYSTEM_INSTRUCTIONS = "WORKFLOW_SYSTEM_INSTRUCTIONS_SECTION",
+	WORKFLOW_INPUT = "WORKFLOW_INPUT_SECTION",
 	USER_INSTRUCTIONS = "USER_INSTRUCTIONS_SECTION",
 	FEEDBACK = "FEEDBACK_SECTION",
-	TASK_PROGRESS = "TASK_PROGRESS_SECTION",
 }
 
 /**
@@ -45,7 +45,7 @@ export type StandardPlaceholder = (typeof STANDARD_PLACEHOLDERS)[keyof typeof ST
 /**
  * Required placeholders that must be provided for basic prompt functionality
  */
-export const REQUIRED_PLACEHOLDERS: StandardPlaceholder[] = [STANDARD_PLACEHOLDERS.AGENT_ROLE, STANDARD_PLACEHOLDERS.SYSTEM_INFO]
+export const REQUIRED_PLACEHOLDERS: StandardPlaceholder[] = [STANDARD_PLACEHOLDERS.SYSTEM_INFO]
 
 /**
  * Optional placeholders that enhance prompt functionality when available

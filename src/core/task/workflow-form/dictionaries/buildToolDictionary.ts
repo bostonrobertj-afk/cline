@@ -118,12 +118,12 @@ export const WORKFLOW_FORM_RUNTIME_TOOL_REFERENCE_TITLE = buildReviewDiffOutputT
 export function buildWorkflowStartRuntimeToolDictionary(args: { fieldKeys: readonly string[] }) {
 	const termKeys = args.fieldKeys.filter(isWorkflowFormSystemDictionaryKey)
 	const config: WorkflowFormToolDictionaryContractConfig = {
-		toolName: ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
-		heading: "## set_workflow_placeholders",
-		runtimeTitle: "Workflow Placeholder Reference",
-		overviewLines: ["Persist dynamic placeholder values for the active workflow before the first AI turn begins."],
+		toolName: ClineDefaultTool.SET_WORKFLOW_VALUES,
+		heading: "## set_workflow_values",
+		runtimeTitle: "Workflow Value Reference",
+		overviewLines: ["Persist workflow values for the active workflow before the first AI turn begins."],
 		parameterDescriptions: {
-			values: "Workflow placeholder key/value map. Submit only the placeholders the human actually supplied.",
+			values: "Workflow value key/value map. Submit only the values the human actually supplied.",
 		},
 		termKeys,
 	}

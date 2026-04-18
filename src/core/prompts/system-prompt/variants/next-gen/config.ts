@@ -33,9 +33,8 @@ export const config = createVariant(ModelFamily.NEXT_GEN)
 	})
 	.template(baseTemplate)
 	.components(
-		SystemPromptSection.AGENT_ROLE,
+		SystemPromptSection.WORKFLOW_SYSTEM_INSTRUCTIONS,
 		SystemPromptSection.TOOL_USE,
-		SystemPromptSection.TASK_PROGRESS,
 		SystemPromptSection.MCP,
 		SystemPromptSection.EDITING_FILES,
 		SystemPromptSection.ACT_VS_PLAN,
@@ -44,6 +43,7 @@ export const config = createVariant(ModelFamily.NEXT_GEN)
 		SystemPromptSection.RULES,
 		SystemPromptSection.SYSTEM_INFO,
 		SystemPromptSection.OBJECTIVE,
+		SystemPromptSection.WORKFLOW_INPUT,
 		SystemPromptSection.USER_INSTRUCTIONS,
 		SystemPromptSection.SKILLS,
 	)
@@ -71,8 +71,8 @@ export const config = createVariant(ModelFamily.NEXT_GEN)
 		ClineDefaultTool.GENERATE_EXPLANATION,
 		ClineDefaultTool.USE_SKILL,
 		ClineDefaultTool.COMPLETE_WORKFLOW_ITEM,
-		ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
-		ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT,
+		ClineDefaultTool.SET_WORKFLOW_VALUES,
+		ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT,
 		ClineDefaultTool.STORY_TASK_REMINDER,
 		ClineDefaultTool.STORY_TASK_COMPLETE,
 		ClineDefaultTool.STORY_NOTES_UPDATE,

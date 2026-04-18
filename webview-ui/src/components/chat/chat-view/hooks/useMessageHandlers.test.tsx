@@ -1,5 +1,5 @@
-import type { ClineWorkflowForm, ClineWorkflowStartCard } from "@shared/ExtensionMessage"
-import { WorkflowFormAction, WorkflowStartCardAction } from "@shared/proto/cline/task"
+import type { WorkflowForm, WorkflowStartCard } from "@shared/ExtensionMessage"
+import { WorkflowFormAction, WorkflowStartCardAction, WorkflowStartCardProjectMode } from "@shared/proto/cline/task"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const { mockSubmitWorkflowForm, mockSubmitWorkflowStartCard } = vi.hoisted(() => ({
@@ -22,10 +22,10 @@ import {
 	submitWorkflowStartCard,
 } from "./useMessageHandlers"
 
-function createWorkflowForm(fields: NonNullable<ClineWorkflowForm["panel"]>["fields"]): ClineWorkflowForm {
+function createWorkflowForm(fields: NonNullable<WorkflowForm["panel"]>["fields"]): WorkflowForm {
 	return {
 		sessionId: "workflow-form-session",
-		resolverId: "brainstorming_step_4_choose_approach",
+		workflowFormId: "brainstorming_step_4_choose_approach",
 		title: "Workflow Form V2",
 		toolDictionaryTitle: "Workflow Dictionary",
 		toolDictionaryMarkdown: "## workflow_form",
@@ -41,12 +41,20 @@ function createWorkflowForm(fields: NonNullable<ClineWorkflowForm["panel"]>["fie
 	}
 }
 
-function createWorkflowStartCard(): ClineWorkflowStartCard {
+function createWorkflowStartCard(payloadOverrides?: Partial<WorkflowStartCard>): WorkflowStartCard {
 	return {
 		sessionId: "start-card-session",
 		title: "Workflow Start",
 		markdownBody: "Start card body",
-		ctaLabel: "Get Started",
+		submitLabel: "Start project",
+		projectMode: "existing",
+		existingProjectOptions: [
+			{ value: "existing-a", label: "Existing Project A" },
+			{ value: "existing-b", label: "Existing Project B" },
+		],
+		selectedExistingProject: "existing-b",
+		newProjectTitle: "New Workspace",
+		...payloadOverrides,
 	}
 }
 
@@ -260,14 +268,55 @@ describe("useMessageHandlers workflow form submit builders", () => {
 		})
 	})
 
-	it("builds workflow start-card submissions unchanged", async () => {
-		const request = buildWorkflowStartCardSubmissionRequest(createWorkflowStartCard())
+	it("builds and submits existing-project workflow start-card requests", async () => {
+		const startCard = createWorkflowStartCard()
+		const request = buildWorkflowStartCardSubmissionRequest(startCard)
+
 		expect(request).toMatchObject({
 			sessionId: "start-card-session",
-			action: WorkflowStartCardAction.CONTINUE,
+			action: WorkflowStartCardAction.WORKFLOW_START_CARD_ACTION_SUBMIT,
+			projectMode: WorkflowStartCardProjectMode.WORKFLOW_START_CARD_PROJECT_MODE_EXISTING,
+			selectedExistingProject: "existing-b",
+			newProjectTitle: "New Workspace",
 		})
 
-		await submitWorkflowStartCard(createWorkflowStartCard())
+		await submitWorkflowStartCard(startCard)
+
 		expect(mockSubmitWorkflowStartCard).toHaveBeenCalledTimes(1)
+		expect(mockSubmitWorkflowStartCard.mock.calls[0]?.[0]).toMatchObject({
+			sessionId: "start-card-session",
+			action: WorkflowStartCardAction.WORKFLOW_START_CARD_ACTION_SUBMIT,
+			projectMode: WorkflowStartCardProjectMode.WORKFLOW_START_CARD_PROJECT_MODE_EXISTING,
+			selectedExistingProject: "existing-b",
+			newProjectTitle: "New Workspace",
+		})
+	})
+
+	it("builds and submits new-project workflow start-card requests", async () => {
+		const startCard = createWorkflowStartCard({
+			projectMode: "new",
+			selectedExistingProject: "",
+			newProjectTitle: "Fresh Workspace",
+		})
+		const request = buildWorkflowStartCardSubmissionRequest(startCard)
+
+		expect(request).toMatchObject({
+			sessionId: "start-card-session",
+			action: WorkflowStartCardAction.WORKFLOW_START_CARD_ACTION_SUBMIT,
+			projectMode: WorkflowStartCardProjectMode.WORKFLOW_START_CARD_PROJECT_MODE_NEW,
+			selectedExistingProject: "",
+			newProjectTitle: "Fresh Workspace",
+		})
+
+		await submitWorkflowStartCard(startCard)
+
+		expect(mockSubmitWorkflowStartCard).toHaveBeenCalledTimes(1)
+		expect(mockSubmitWorkflowStartCard.mock.calls[0]?.[0]).toMatchObject({
+			sessionId: "start-card-session",
+			action: WorkflowStartCardAction.WORKFLOW_START_CARD_ACTION_SUBMIT,
+			projectMode: WorkflowStartCardProjectMode.WORKFLOW_START_CARD_PROJECT_MODE_NEW,
+			selectedExistingProject: "",
+			newProjectTitle: "Fresh Workspace",
+		})
 	})
 })

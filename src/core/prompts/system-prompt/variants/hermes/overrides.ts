@@ -3,14 +3,6 @@ import { getResponseToolsSection } from "../../components/response_tools"
 import { SystemPromptSection } from "../../templates/placeholders"
 import type { SystemPromptContext } from "../../types"
 
-// Hermes-specific system prompt component overrides - Nous recommends the thinking component be added explicitly for hermes-4
-const HERMES_AGENT_ROLE_TEMPLATE = [
-	"You are a deep thinking AI, you may use extremely long chains of thought to deeply consider the problem and deliberate with yourself via systematic reasoning processes to help come to a correct solution prior to answering. You should enclose your thoughts and internal monologue inside <think> </think> tags, and then provide your solution or response to the problem. \n",
-	"You are Cline, ",
-	"a highly skilled software engineer ",
-	"with extensive knowledge in many programming languages, frameworks, design patterns, and best practices. ",
-].join("")
-
 const HERMES_TOOL_USE_TEMPLATE = (
 	context: SystemPromptContext,
 ) => `Begin every task by exploring the codebase (e.g., list_files, search_files, read_file) and outlining the required changes. Do not implement until exploration yields enough context to state objectives, approach, affected files, and risks. Briefly summarize the plan, then proceed with implementation.
@@ -125,14 +117,6 @@ You accomplish a given task iteratively, breaking it down into clear steps and w
 3. Before calling a tool, briefly analyze within <think></think> tags: review the file structure in environment_details for context, select the most relevant tool, and verify all required parameters are present or can be reasonably inferred. If a required parameter is missing, use ask_followup_question to request it rather than invoking the tool with placeholder values. Do not ask about optional parameters.
 4. Once you've completed the user's task, you must use the attempt_completion tool to present the result of the task to the user. You may also provide a CLI command to showcase the result of your task; this can be particularly useful for web development tasks, where you can run e.g. \`open index.html\` to show the website you've built. You should only use attempt_completion when you are fully done with the task and have no further steps to take.
 5. The user may provide feedback, which you can use to make improvements and try again. But DO NOT continue in pointless back and forth conversations, i.e. don't end your responses with questions or offers for further assistance.`
-const HERMES_TASK_PROGRESS_TEMPLATE = `UPDATING TASK PROGRESS
-
-Use \`task_progress\` only as a checklist parameter on the next tool call, not a standalone tool.
-
-- Use \`task_progress\` to create a task list when switching out of PLAN MODE.
-- Keep items brief and milestone-based.
-- To create the list, pass a full Markdown checklist as the \`task_progress\` parameter.
-- Use \`__COMPLETE_NEXT_STEP__\` as the \`task_progress\` value to complete the next incomplete step.`
 
 const HERMES_MCP_TEMPLATE = `MCP SERVERS
 
@@ -167,9 +151,6 @@ const HERMES_RULES_TEMPLATE = (context: SystemPromptContext) => `RULES
 `
 
 export const hermesComponentOverrides = {
-	[SystemPromptSection.AGENT_ROLE]: {
-		template: HERMES_AGENT_ROLE_TEMPLATE,
-	},
 	[SystemPromptSection.OBJECTIVE]: {
 		template: HERMES_OBJECTIVE_TEMPLATE,
 	},
@@ -178,9 +159,6 @@ export const hermesComponentOverrides = {
 	},
 	[SystemPromptSection.RULES]: {
 		template: HERMES_RULES_TEMPLATE,
-	},
-	[SystemPromptSection.TASK_PROGRESS]: {
-		template: HERMES_TASK_PROGRESS_TEMPLATE,
 	},
 	[SystemPromptSection.MCP]: {
 		template: HERMES_MCP_TEMPLATE,

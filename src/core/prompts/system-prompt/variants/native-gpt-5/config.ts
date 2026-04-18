@@ -45,9 +45,9 @@ export const config = createVariant(ModelFamily.NATIVE_GPT_5)
 	.template(GPT_5_TEMPLATE_OVERRIDES.BASE)
 	.components(
 		SystemPromptSection.USER_INSTRUCTIONS,
-		SystemPromptSection.AGENT_ROLE,
+		SystemPromptSection.WORKFLOW_SYSTEM_INSTRUCTIONS,
 		SystemPromptSection.TOOL_USE,
-		SystemPromptSection.TASK_PROGRESS,
+		SystemPromptSection.WORKFLOW_INPUT,
 		SystemPromptSection.MCP,
 		SystemPromptSection.RULES,
 		SystemPromptSection.SYSTEM_INFO,
@@ -78,8 +78,8 @@ export const config = createVariant(ModelFamily.NATIVE_GPT_5)
 		ClineDefaultTool.GENERATE_EXPLANATION,
 		ClineDefaultTool.USE_SKILL,
 		ClineDefaultTool.COMPLETE_WORKFLOW_ITEM,
-		ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
-		ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT,
+		ClineDefaultTool.SET_WORKFLOW_VALUES,
+		ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT,
 		ClineDefaultTool.STORY_TASK_REMINDER,
 		ClineDefaultTool.STORY_TASK_COMPLETE,
 		ClineDefaultTool.STORY_NOTES_UPDATE,
@@ -90,9 +90,6 @@ export const config = createVariant(ModelFamily.NATIVE_GPT_5)
 		MODEL_FAMILY: ModelFamily.NATIVE_GPT_5,
 	})
 	.config({})
-	.overrideComponent(SystemPromptSection.TASK_PROGRESS, {
-		template: GPT_5_TEMPLATE_OVERRIDES.TASK_PROGRESS,
-	})
 	// Override the RULES component with custom template
 	.overrideComponent(SystemPromptSection.RULES, {
 		template: GPT_5_TEMPLATE_OVERRIDES.RULES,

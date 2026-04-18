@@ -168,23 +168,11 @@ export class VariantValidator {
 
 	private validateBestPractices(variant: PromptVariant, warnings: string[]): void {
 		// Check for recommended components
-		const recommendedComponents = [SystemPromptSection.AGENT_ROLE, SystemPromptSection.RULES, SystemPromptSection.SYSTEM_INFO]
+		const recommendedComponents = [SystemPromptSection.RULES, SystemPromptSection.SYSTEM_INFO]
 
 		const missingRecommended = recommendedComponents.filter((c) => !variant.componentOrder.includes(c))
 		if (missingRecommended.length > 0) {
 			warnings.push(`Missing recommended components: ${missingRecommended.join(", ")}`)
-		}
-
-		// Check for proper component ordering
-		const agentRoleIndex = variant.componentOrder.indexOf(SystemPromptSection.AGENT_ROLE)
-		const toolUseIndex = variant.componentOrder.indexOf(SystemPromptSection.TOOL_USE)
-
-		if (agentRoleIndex > 0) {
-			warnings.push("AGENT_ROLE should typically be the first component")
-		}
-
-		if (toolUseIndex >= 0 && agentRoleIndex >= 0 && toolUseIndex < agentRoleIndex) {
-			warnings.push("TOOL_USE should typically come after AGENT_ROLE")
 		}
 
 		// Check for meaningful description

@@ -1,4 +1,3 @@
-import fs from "node:fs/promises"
 import * as path from "node:path"
 import { setTimeout as delay } from "node:timers/promises"
 import type { ApiHandler, buildApiHandler } from "@core/api"
@@ -6,17 +5,8 @@ import { parseAssistantMessageV2, ToolUse } from "@core/assistant-message"
 import { discoverSkills, getAvailableSkills } from "@core/context/instructions/user-instructions/skills"
 import { formatResponse } from "@core/prompts/responses"
 import { PromptRegistry } from "@core/prompts/system-prompt"
-import { resolveWorkflowPersonaInstructions } from "@core/prompts/system-prompt/registry/workflowPersonaRegistry"
 import type { SystemPromptContext } from "@core/prompts/system-prompt/types"
-import { getBmadWorkflowReminder } from "@core/task/bmad-agent-mode"
 import { FocusChainManager } from "@core/task/focus-chain"
-import {
-	type DeterministicPlaceholderToolContext,
-	isDeterministicPlaceholderWorkflowSupported,
-} from "@core/task/focus-chain/deterministicPlaceholderProgression"
-import { applyPostToolTaskProgressUpdate, applyPreToolTaskProgressUpdate } from "@core/task/focus-chain/updateFromToolResponse"
-import { getManagedWorkflowDefinition } from "@core/task/managed-workflows/ManagedWorkflowRegistry"
-import { buildManagedWorkflowPrompt } from "@core/task/managed-workflows/ManagedWorkflowRenderer"
 import {
 	getNextTurnsSinceFullPromptRefresh,
 	normalizePromptRefreshFrequency,
@@ -24,15 +14,6 @@ import {
 	shouldUseContinuationTurnPrompt,
 } from "@core/task/prompt-refresh"
 import { StreamResponseHandler } from "@core/task/StreamResponseHandler"
-import { activateManagedWorkflowInTaskState, activatePlaceholderWorkflowInTaskState } from "@core/task/workflow-activation"
-import { getPlaceholderWorkflowValueMap } from "@core/workflows/placeholder-workflow-rendering"
-import { resolveActivePlaceholderWorkflowPromptContext } from "@core/workflows/placeholder-workflow-step-details"
-import {
-	createWorkflowSkillMetadata,
-	findResolvedWorkflowByName,
-	resolveAvailableWorkflows,
-} from "@core/workflows/resolution/resolveAvailableWorkflows"
-import { extractWorkflowPlaceholderKeys } from "@core/workflows/workflow-placeholders"
 import { ClineAssistantToolUseBlock, ClineStorageMessage, ClineTextContentBlock, ClineUserContent } from "@shared/messages"
 import type { ClineMessageModelInfo } from "@shared/messages/metrics"
 import { Logger } from "@shared/services/Logger"
@@ -42,6 +23,7 @@ import { ulid } from "ulid"
 import { ContextManager } from "@/core/context/context-management/ContextManager"
 import { checkContextWindowExceededError } from "@/core/context/context-management/context-error-handling"
 import { getContextWindowInfo } from "@/core/context/context-management/context-window-utils"
+import { getWorkflowSkillMetadata, resolveWorkflowByUseSkillName } from "@/core/task/workflow-runtime/WorkflowRegistry"
 import { HostRegistryInfo } from "@/registry"
 import { ClineError, ClineErrorType } from "@/services/error"
 import { ApiFormat } from "@/shared/proto/cline/models"
@@ -468,20 +450,10 @@ export class SubagentRunner {
 
 			const host = HostRegistryInfo.get()
 			const discoveredSkills = await discoverSkills(this.baseConfig.cwd)
-			const workflowEntries = await resolveAvailableWorkflows({
-				cwd: this.baseConfig.cwd,
-				localWorkflowToggles: this.baseConfig.services.stateManager.getWorkspaceStateKey("workflowToggles") ?? {},
-				globalWorkflowToggles: this.baseConfig.services.stateManager.getGlobalSettingsKey("globalWorkflowToggles") ?? {},
-				remoteWorkflowToggles: this.baseConfig.services.stateManager.getGlobalStateKey("remoteWorkflowToggles") ?? {},
-				remoteWorkflows: this.baseConfig.services.stateManager.getRemoteConfigSettings()?.remoteGlobalWorkflows ?? [],
-			})
-			const availableSkills = this.mergePromptSkillEntries(
-				getAvailableSkills(discoveredSkills),
-				createWorkflowSkillMetadata(workflowEntries),
-			)
+			const availableSkills = this.mergePromptSkillEntries(getAvailableSkills(discoveredSkills), getWorkflowSkillMetadata())
 			const configuredSkillNames = this.agent.getConfiguredSkills()
 			const assignedSkillNames = extractAssignedSkillNames(prompt)
-			await this.autoActivateAssignedWorkflow(state, assignedSkillNames, workflowEntries)
+			await this.autoActivateAssignedWorkflow(state, assignedSkillNames)
 			const promptRegistry = PromptRegistry.getInstance()
 			const workspaceMetadataEnvironmentBlock = await this.getWorkspaceMetadataEnvironmentBlock()
 
@@ -508,7 +480,6 @@ export class SubagentRunner {
 						]
 					: []),
 			]
-			await this.maybeAppendCurrentStepInputPrompt(state, initialUserContent)
 
 			const conversation: ClineStorageMessage[] = [
 				{
@@ -524,7 +495,6 @@ export class SubagentRunner {
 				const shouldUseContinuationPrompt = shouldUseContinuationTurnPrompt({
 					hasHumanAuthoredInput: false,
 					shouldSendFullPromptAssembly,
-					managedWorkflowActive: !!state.managedWorkflowRun,
 				})
 				state.turnsSinceFullPromptRefresh = getNextTurnsSinceFullPromptRefresh({
 					didSendFullPromptAssembly: shouldSendFullPromptAssembly,
@@ -552,10 +522,7 @@ export class SubagentRunner {
 				const nativeTools = useNativeToolCalls ? candidateNativeTools : undefined
 				const baseSystemPrompt = this.agent.buildSystemPrompt(generatedSystemPrompt, promptContext)
 				const systemPrompt =
-					assignedSkillNames.length > 0 &&
-					!state.activeWorkflowId &&
-					!state.managedWorkflowRun &&
-					!state.activePlaceholderWorkflowId
+					assignedSkillNames.length > 0 && !state.activeWorkflowName
 						? `${baseSystemPrompt}${buildAssignedSkillDirective(assignedSkillNames)}`
 						: baseSystemPrompt
 				const promptInjectionText = promptInjectionBlocks
@@ -571,8 +538,6 @@ export class SubagentRunner {
 					return { status: "failed", error, stats }
 				}
 
-				state.activeWorkflowJustStarted = false
-
 				if (
 					usageState.lastRequest &&
 					this.shouldCompactBeforeNextRequest(usageState.lastRequest.totalTokens, api, providerInfo.model.id)
@@ -584,7 +549,7 @@ export class SubagentRunner {
 					)
 					contextState.conversationHistoryDeletedRange = compactResult.conversationHistoryDeletedRange
 					if (compactResult.didCompact) {
-						this.clearSubagentCurrentStepPromptMarkerForContextCompaction(state)
+						state.lastPromptedStoryTaskKey = undefined
 						Logger.warn("[SubagentRunner] Proactively compacted context before next subagent request.")
 					}
 					// Prevent repeated compaction attempts off the same token sample.
@@ -665,7 +630,7 @@ export class SubagentRunner {
 							requestId = requestId ?? chunk.id
 							break
 						case "context_compacted":
-							this.clearSubagentCurrentStepPromptMarkerForContextCompaction(state)
+							state.lastPromptedStoryTaskKey = undefined
 							break
 					}
 
@@ -795,43 +760,14 @@ export class SubagentRunner {
 						signature: call.signature,
 					}
 					const subagentConfig = this.createSubagentTaskConfig(state)
-					const focusChainEnabled = !!subagentConfig.focusChainSettings.enabled
-					const preToolTaskProgressUpdate = await applyPreToolTaskProgressUpdate({
-						block: toolCallBlock,
-						focusChainEnabled,
-						updateFCListFromToolResponse: subagentConfig.callbacks.updateFCListFromToolResponse,
-					})
 
 					if (toolName === ClineDefaultTool.ATTEMPT) {
-						if (preToolTaskProgressUpdate.skipToolExecution) {
-							pushSubagentToolResultBlock(
-								toolResultBlocks,
-								call,
-								toolName,
-								preToolTaskProgressUpdate.toolResult ?? formatResponse.toolError("Task progress update failed."),
-							)
-							continue
-						}
-
 						const completionResult = toolCallParams.result?.trim()
 						if (!completionResult) {
 							const missingResultError = formatResponse.missingToolParameterError("result")
 							pushSubagentToolResultBlock(toolResultBlocks, call, toolName, missingResultError)
 							continue
 						}
-
-						await applyPostToolTaskProgressUpdate({
-							block: toolCallBlock,
-							focusChainEnabled,
-							skipPostExecutionUpdate: preToolTaskProgressUpdate.skipPostExecutionUpdate,
-							toolContext: {
-								toolName,
-								toolParams: (toolCallParams as Record<string, unknown>) ?? undefined,
-								toolResult: completionResult,
-								toolWasExecuted: true,
-							},
-							updateFCListFromToolResponse: subagentConfig.callbacks.updateFCListFromToolResponse,
-						})
 
 						stats.toolCalls += 1
 						onProgress({ stats: { ...stats } })
@@ -865,28 +801,13 @@ export class SubagentRunner {
 						}
 					}
 
-					const postToolTaskProgressUpdate = await applyPostToolTaskProgressUpdate({
-						block: toolCallBlock,
-						focusChainEnabled,
-						skipPostExecutionUpdate: preToolTaskProgressUpdate.skipPostExecutionUpdate,
-						updateFCListFromToolResponse: subagentConfig.callbacks.updateFCListFromToolResponse,
-					})
-
 					stats.toolCalls += 1
 					onProgress({ stats: { ...stats } })
 
 					const serializedToolResult = serializeToolResult(toolResult)
 					const toolDescription = handler?.getDescription(toolCallBlock) || `[${toolName}]`
 					pushSubagentToolResultBlock(toolResultBlocks, call, toolDescription, serializedToolResult)
-					if (postToolTaskProgressUpdate.feedback) {
-						toolResultBlocks.push({
-							type: "text",
-							text: postToolTaskProgressUpdate.feedback,
-						})
-					}
 				}
-
-				await this.maybeAppendCurrentStepInputPrompt(state, toolResultBlocks)
 
 				conversation.push({
 					role: "user",
@@ -925,6 +846,7 @@ export class SubagentRunner {
 			...this.baseConfig,
 			api: this.apiHandler,
 			coordinator,
+			workflowRuntime: this.baseConfig.workflowRuntime,
 			taskState: state,
 			isSubagentExecution: true,
 			vscodeTerminalExecutionMode: "backgroundExec",
@@ -932,10 +854,8 @@ export class SubagentRunner {
 				...baseCallbacks,
 				say: async () => undefined,
 				ask: async () => ({ response: "yesButtonClicked" as const }),
-				updateFCListFromToolResponse: async (
-					taskProgress: string | undefined,
-					toolContext?: DeterministicPlaceholderToolContext,
-				) => focusChainManager.updateFCListFromToolResponse(taskProgress, toolContext),
+				updateFCListFromToolResponse: async (taskProgress: string | undefined) =>
+					focusChainManager.updateFCListFromToolResponse(taskProgress),
 				sayAndCreateMissingParamError: async (_toolName, paramName) =>
 					formatResponse.toolError(formatResponse.missingToolParameterError(paramName)),
 				removeLastPartialMessageIfExistsWithType: async () => undefined,
@@ -969,44 +889,20 @@ export class SubagentRunner {
 		const skills = params.shouldSendFullPromptAssembly
 			? this.resolvePromptSkills(params.availableSkills, params.configuredSkillNames, params.assignedSkillNames)
 			: []
-
-		const activeWorkflowName = params.state.activePlaceholderWorkflowSource?.name
-		const activeWorkflowPersonaInstructions = params.shouldSendFullPromptAssembly
-			? resolveWorkflowPersonaInstructions(activeWorkflowName)
-			: undefined
-		let activeWorkflowReminder: string | undefined
-
-		if (params.shouldSendFullPromptAssembly && params.state.managedWorkflowRun) {
-			activeWorkflowReminder = buildManagedWorkflowPrompt(params.state.managedWorkflowRun)
-		} else if (params.shouldSendFullPromptAssembly && params.state.activeWorkflowId) {
-			activeWorkflowReminder = await getBmadWorkflowReminder(this.baseConfig.cwd, params.state.activeWorkflowId)
-		}
-
 		const includeMcpHub = this.agent.isMcpExposureEnabled()
-		const activePlaceholderWorkflowPromptContext = await resolveActivePlaceholderWorkflowPromptContext({
-			checklistMarkdown: params.state.currentFocusChainChecklist,
-			source: params.state.activePlaceholderWorkflowSource,
-			stablePlaceholderValues: params.state.activePlaceholderWorkflowStableValues,
-			placeholderValues: params.state.activePlaceholderWorkflowValues,
-		})
-		const activeDeterministicPlaceholderWorkflowEnabled = isDeterministicPlaceholderWorkflowSupported(
-			params.state.activePlaceholderWorkflowSource?.name,
-		)
+		const workflowPromptProjection = await this.baseConfig.workflowRuntime.buildTurnProjection({ taskState: params.state })
 
 		return {
 			providerInfo: params.providerInfo,
 			cwd: this.baseConfig.cwd,
 			ide: params.hostIde,
 			skills,
-			activeWorkflowName,
-			activeWorkflowPersonaInstructions,
-			activeWorkflowReminder,
-			activeWorkflowSupportsPlaceholders: !!params.state.managedWorkflowRun || !!params.state.activePlaceholderWorkflowId,
-			...activePlaceholderWorkflowPromptContext,
-			activeDeterministicPlaceholderWorkflowEnabled,
-			managedWorkflowActive: !!params.state.managedWorkflowRun,
+			activeWorkflowName: params.state.activeWorkflowName,
+			activeWorkflowStepNumber: params.state.activeWorkflowSession?.activeStepNumber,
+			workflowSystemInstructionsBlock: workflowPromptProjection.workflowSystemInstructionsBlock,
+			workflowInputInstructionsBlock: workflowPromptProjection.workflowInputInstructionsBlock,
+			workflowToolSchemaOverride: workflowPromptProjection.workflowToolSchemaOverride,
 			isContinuationTurn: params.shouldUseContinuationPrompt,
-			currentFocusChainChecklist: params.state.currentFocusChainChecklist,
 			focusChainSettings: this.baseConfig.focusChainSettings,
 			browserSettings: this.baseConfig.browserSettings,
 			mcpHub: includeMcpHub ? this.baseConfig.services.mcpHub : undefined,
@@ -1027,149 +923,33 @@ export class SubagentRunner {
 		return shouldSendFullPromptAssembly({
 			isFirstRequest: state.apiRequestCount === 1,
 			hasHumanAuthoredInput: false,
-			activeWorkflowJustStarted: state.activeWorkflowJustStarted,
 			didRespondToPlanAskBySwitchingMode: false,
 			turnsSinceFullPromptRefresh: state.turnsSinceFullPromptRefresh,
 			promptRefreshFrequency: this.getPromptRefreshFrequency(),
 		})
 	}
 
-	private async autoActivateAssignedWorkflow(
-		state: TaskState,
-		assignedSkillNames: string[],
-		workflowEntries: Awaited<ReturnType<typeof resolveAvailableWorkflows>>,
-	): Promise<void> {
-		if (
-			assignedSkillNames.length !== 1 ||
-			state.managedWorkflowRun ||
-			state.activeWorkflowId ||
-			state.activePlaceholderWorkflowId
-		) {
+	private async autoActivateAssignedWorkflow(state: TaskState, assignedSkillNames: string[]): Promise<void> {
+		if (assignedSkillNames.length !== 1) {
 			return
 		}
 
-		const assignedSkill = assignedSkillNames[0]
-		const managedWorkflowDefinition = await getManagedWorkflowDefinition(this.baseConfig.cwd, assignedSkill)
-		if (managedWorkflowDefinition?.workflowId && managedWorkflowDefinition?.slashCommand) {
-			await activateManagedWorkflowInTaskState({
-				cwd: this.baseConfig.cwd,
-				taskState: state,
-				workflowId: managedWorkflowDefinition.workflowId,
-				slashCommand: managedWorkflowDefinition.slashCommand,
-			})
+		if (state.activeWorkflowName || state.activeWorkflowSession) {
 			return
 		}
 
-		const resolvedWorkflow = findResolvedWorkflowByName(workflowEntries, assignedSkill)
+		const resolvedWorkflow = resolveWorkflowByUseSkillName(assignedSkillNames[0])
 		if (!resolvedWorkflow) {
 			return
 		}
 
-		await activatePlaceholderWorkflowInTaskState({
-			cwd: this.baseConfig.cwd,
+		await this.baseConfig.workflowRuntime.activateWorkflow({
 			taskState: state,
 			workflow: resolvedWorkflow,
-			clearActiveWorkflowId: true,
+			parentSession: this.baseConfig.taskState.activeWorkflowSession
+				? structuredClone(this.baseConfig.taskState.activeWorkflowSession)
+				: undefined,
 		})
-		await this.inheritSharedParentPlaceholdersToActivatedWorkflow(state)
-		await this.seedPlaceholderChecklistIfNeeded(state, true)
-		await this.applyInitialDeterministicPlaceholderProgressionIfNeeded(state)
-	}
-
-	private async inheritSharedParentPlaceholdersToActivatedWorkflow(state: TaskState): Promise<void> {
-		const childSource = state.activePlaceholderWorkflowSource
-		if (!childSource) {
-			return
-		}
-
-		const parentPlaceholders = getPlaceholderWorkflowValueMap(
-			this.baseConfig.taskState.activePlaceholderWorkflowStableValues,
-			this.baseConfig.taskState.activePlaceholderWorkflowValues,
-		)
-		if (!parentPlaceholders) {
-			return
-		}
-
-		const childSourceContents =
-			childSource.type === "remote"
-				? childSource.contents
-				: await fs.readFile(childSource.path, "utf8").catch(() => undefined)
-		if (!childSourceContents) {
-			return
-		}
-
-		const referencedKeys = extractWorkflowPlaceholderKeys(childSourceContents)
-		if (referencedKeys.length === 0) {
-			return
-		}
-
-		const childResolvedPlaceholders =
-			getPlaceholderWorkflowValueMap(state.activePlaceholderWorkflowStableValues, state.activePlaceholderWorkflowValues) ??
-			{}
-
-		const inheritedValues: Record<string, string> = {}
-		for (const key of referencedKeys) {
-			if (childResolvedPlaceholders[key] !== undefined) {
-				continue
-			}
-
-			const parentValue = parentPlaceholders[key]
-			if (parentValue === undefined) {
-				continue
-			}
-
-			inheritedValues[key] = parentValue
-		}
-
-		if (Object.keys(inheritedValues).length === 0) {
-			return
-		}
-
-		state.activePlaceholderWorkflowValues = {
-			...(state.activePlaceholderWorkflowValues ?? {}),
-			...inheritedValues,
-		}
-	}
-
-	private async applyInitialDeterministicPlaceholderProgressionIfNeeded(state: TaskState): Promise<void> {
-		if (!state.activePlaceholderWorkflowSource || !state.currentFocusChainChecklist) {
-			return
-		}
-
-		if (!isDeterministicPlaceholderWorkflowSupported(state.activePlaceholderWorkflowSource.name)) {
-			return
-		}
-
-		const focusChainManager = this.getOrCreateSubagentFocusChainManager(state)
-		await focusChainManager.updateFCListFromToolResponse(undefined)
-	}
-
-	private async seedPlaceholderChecklistIfNeeded(state: TaskState, force = false): Promise<void> {
-		if (!state.activePlaceholderWorkflowSource) {
-			return
-		}
-
-		const focusChainManager = this.getOrCreateSubagentFocusChainManager(state)
-		await focusChainManager.refreshPlaceholderWorkflowChecklistProjection(force)
-	}
-
-	private async maybeAppendCurrentStepInputPrompt(state: TaskState, content: ClineUserContent[]): Promise<void> {
-		const prompt = await this.getOrCreateSubagentFocusChainManager(state).consumeCurrentPlaceholderWorkflowStepPromptForInput(
-			{
-				shouldForceStoryTaskPrompt: true,
-			},
-		)
-		if (prompt?.trim()) {
-			content.push({
-				type: "text",
-				text: prompt,
-			})
-		}
-	}
-
-	private clearSubagentCurrentStepPromptMarkerForContextCompaction(state: TaskState): void {
-		state.lastPromptedPlaceholderWorkflowChecklistLabel = undefined
-		state.lastPromptedStoryTaskKey = undefined
 	}
 
 	private async buildSubagentPromptInjectionBlocks(
@@ -1365,7 +1145,7 @@ export class SubagentRunner {
 					)
 					contextState.conversationHistoryDeletedRange = compactResult.conversationHistoryDeletedRange
 					if (compactResult.didCompact) {
-						this.clearSubagentCurrentStepPromptMarkerForContextCompaction(state)
+						state.lastPromptedStoryTaskKey = undefined
 					}
 					if (!compactResult.didCompact || this.shouldAbort() || attempt >= MAX_INITIAL_STREAM_ATTEMPTS) {
 						throw error

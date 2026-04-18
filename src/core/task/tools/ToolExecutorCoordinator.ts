@@ -8,17 +8,12 @@ import { ApplyPatchHandler } from "./handlers/ApplyPatchHandler"
 import { AskFollowupQuestionToolHandler } from "./handlers/AskFollowupQuestionToolHandler"
 import { AttemptCompletionHandler } from "./handlers/AttemptCompletionHandler"
 import { BrowserToolHandler } from "./handlers/BrowserToolHandler"
-import { BuildEpicDeliverySpecToolHandler } from "./handlers/BuildEpicDeliverySpecToolHandler"
-import { BuildEpicsDocumentToolHandler } from "./handlers/BuildEpicsDocumentToolHandler"
-import { BuildReviewDiffOutputToolHandler } from "./handlers/BuildReviewDiffOutputToolHandler"
 import { BuildReviewInputToolHandler } from "./handlers/BuildReviewInputToolHandler"
-import { BuildStoryDocumentToolHandler } from "./handlers/BuildStoryDocumentToolHandler"
-import { BuildTechSpecDocumentToolHandler } from "./handlers/BuildTechSpecDocumentToolHandler"
+import { BuildWorkflowDocumentToolHandler } from "./handlers/BuildWorkflowDocumentToolHandler"
 import { CaptureBrainstormingTopicToolHandler } from "./handlers/CaptureBrainstormingTopicToolHandler"
 import { CodeReviewSpecUpdateToolHandler } from "./handlers/CodeReviewSpecUpdateToolHandler"
 import { CompleteWorkflowItemToolHandler } from "./handlers/CompleteWorkflowItemToolHandler"
 import { CondenseHandler } from "./handlers/CondenseHandler"
-import { ContinueBrainstormingSessionToolHandler } from "./handlers/ContinueBrainstormingSessionToolHandler"
 import { CreateBrainstormingSessionToolHandler } from "./handlers/CreateBrainstormingSessionToolHandler"
 import { ExecuteCommandToolHandler } from "./handlers/ExecuteCommandToolHandler"
 import { GenerateExplanationToolHandler } from "./handlers/GenerateExplanationToolHandler"
@@ -38,7 +33,7 @@ import { SelectBrainstormingSessionToolHandler } from "./handlers/SelectBrainsto
 import { SelectRandomBrainstormingTechniqueToolHandler } from "./handlers/SelectRandomBrainstormingTechniqueToolHandler"
 import { SelectTargetEpicToolHandler } from "./handlers/SelectTargetEpicToolHandler"
 import { SendUserMessageHandler } from "./handlers/SendUserMessageHandler"
-import { SetWorkflowPlaceholdersToolHandler } from "./handlers/SetWorkflowPlaceholdersToolHandler"
+import { SetWorkflowValuesToolHandler } from "./handlers/SetWorkflowValuesToolHandler"
 import { StoryNotesUpdateToolHandler } from "./handlers/StoryNotesUpdateToolHandler"
 import { StoryTaskCompleteToolHandler } from "./handlers/StoryTaskCompleteToolHandler"
 import { StoryTaskReminderToolHandler } from "./handlers/StoryTaskReminderToolHandler"
@@ -134,11 +129,10 @@ export class ToolExecutorCoordinator {
 		[ClineDefaultTool.APPLY_PATCH]: (_v: ToolValidator) => new ApplyPatchHandler(_v),
 		[ClineDefaultTool.GENERATE_EXPLANATION]: (_v: ToolValidator) => new GenerateExplanationToolHandler(),
 		[ClineDefaultTool.USE_SKILL]: (_v: ToolValidator) => new UseSkillToolHandler(),
-		[ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS]: (_v: ToolValidator) => new SetWorkflowPlaceholdersToolHandler(),
-		[ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT]: (_v: ToolValidator) => new BuildReviewDiffOutputToolHandler(),
+		[ClineDefaultTool.SET_WORKFLOW_VALUES]: (_v: ToolValidator) => new SetWorkflowValuesToolHandler(),
 		[ClineDefaultTool.BUILD_REVIEW_INPUT]: (_v: ToolValidator) => new BuildReviewInputToolHandler(),
-		[ClineDefaultTool.BUILD_EPICS_DOCUMENT]: (_v: ToolValidator) => new BuildEpicsDocumentToolHandler(),
-		[ClineDefaultTool.CONTINUE_BRAINSTORMING_SESSION]: (_v: ToolValidator) => new ContinueBrainstormingSessionToolHandler(),
+		[ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT]: (_v: ToolValidator) => new BuildWorkflowDocumentToolHandler(),
+		[ClineDefaultTool.CONTINUE_BRAINSTORMING_SESSION]: (_v: ToolValidator) => undefined,
 		[ClineDefaultTool.CREATE_BRAINSTORMING_SESSION]: (_v: ToolValidator) => new CreateBrainstormingSessionToolHandler(),
 		[ClineDefaultTool.SELECT_BRAINSTORMING_SESSION]: (_v: ToolValidator) => new SelectBrainstormingSessionToolHandler(),
 		[ClineDefaultTool.PERSIST_BRAINSTORMING_APPROACH]: (_v: ToolValidator) => new PersistBrainstormingApproachToolHandler(),
@@ -149,9 +143,6 @@ export class ToolExecutorCoordinator {
 			new RequestBrainstormingTechniqueSuggestionToolHandler(),
 		[ClineDefaultTool.PREPARE_BRAINSTORMING_SESSION]: (_v: ToolValidator) => undefined,
 		[ClineDefaultTool.CAPTURE_BRAINSTORMING_TOPIC]: (_v: ToolValidator) => new CaptureBrainstormingTopicToolHandler(),
-		[ClineDefaultTool.BUILD_EPIC_DELIVERY_SPEC]: (_v: ToolValidator) => new BuildEpicDeliverySpecToolHandler(),
-		[ClineDefaultTool.BUILD_STORY_DOCUMENT]: (_v: ToolValidator) => new BuildStoryDocumentToolHandler(),
-		[ClineDefaultTool.BUILD_TECH_SPEC_DOCUMENT]: (_v: ToolValidator) => new BuildTechSpecDocumentToolHandler(),
 		[ClineDefaultTool.SELECT_TARGET_EPIC]: (_v: ToolValidator) => new SelectTargetEpicToolHandler(),
 		[ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE]: (_v: ToolValidator) => new CodeReviewSpecUpdateToolHandler(),
 		[ClineDefaultTool.STORY_TASK_REMINDER]: (_v: ToolValidator) => new StoryTaskReminderToolHandler(),

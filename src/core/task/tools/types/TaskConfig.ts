@@ -15,8 +15,8 @@ import type { ClineContent } from "@shared/messages/content"
 import type { Mode } from "@shared/storage/types"
 import type { ClineDefaultTool } from "@shared/tools"
 import type { ClineAskResponse } from "@shared/WebviewMessage"
-import type { DeterministicPlaceholderToolContext } from "@/core/task/focus-chain/deterministicPlaceholderProgression"
 import type { FocusChainChecklistUpdateResult } from "@/core/task/focus-chain/types"
+import type { WorkflowRuntime } from "@/core/task/workflow-runtime/WorkflowRuntime"
 import { WorkspaceRootManager } from "@/core/workspace"
 import type { ToolUse } from "../../../assistant-message"
 import type { ContextManager } from "../../../context/context-management/ContextManager"
@@ -66,6 +66,7 @@ export interface TaskConfig {
 	callbacks: TaskCallbacks
 
 	// Tool coordination
+	workflowRuntime: WorkflowRuntime
 	coordinator: ToolExecutorCoordinator
 }
 
@@ -125,10 +126,7 @@ export interface TaskCallbacks {
 
 	doesLatestTaskCompletionHaveNewChanges: () => Promise<boolean>
 
-	updateFCListFromToolResponse: (
-		taskProgress: string | undefined,
-		toolContext?: DeterministicPlaceholderToolContext,
-	) => Promise<FocusChainChecklistUpdateResult>
+	updateFCListFromToolResponse: (taskProgress: string | undefined) => Promise<FocusChainChecklistUpdateResult>
 
 	shouldAutoApproveTool: (toolName: ClineDefaultTool) => boolean | [boolean, boolean]
 	shouldAutoApproveToolWithPath: (toolName: ClineDefaultTool, path?: string) => Promise<boolean>

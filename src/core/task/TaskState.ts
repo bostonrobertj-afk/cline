@@ -2,12 +2,11 @@ import { Anthropic } from "@anthropic-ai/sdk"
 import { AssistantMessageContent } from "@core/assistant-message"
 import { ClineAskResponse } from "@shared/WebviewMessage"
 import type { WorkflowFormSessionState } from "@/core/task/workflow-form/types"
+import type { ActiveWorkflowSession, WorkflowName } from "@/core/task/workflow-runtime/types"
 import type { WorkflowStartCardSessionState } from "@/core/task/workflow-start-card/types"
 import type { WorkflowStepResolutionSessionState } from "@/core/task/workflow-step-resolution/types"
-import type { ActivePlaceholderWorkflowSource } from "@/core/workflows/placeholder-workflow-step-details"
 import type { ThreadDisplayState } from "@/shared/ExtensionMessage"
 import type { ClineDefaultTool } from "@/shared/tools"
-import type { ManagedWorkflowRunState } from "./managed-workflows/types"
 import type {
 	PendingResponseToolFollowup,
 	ResponseToolFailureCause,
@@ -30,36 +29,6 @@ export interface PartialResponseToolPreview {
 	fingerprint: string
 	messageTs?: number
 	status: "streaming" | "completed" | "interrupted"
-}
-
-export type DeterministicPlaceholderWorkflowName =
-	| "code-review.md"
-	| "create-epics.md"
-	| "pi-planning.md"
-	| "create-story.md"
-	| "quick-dev.md"
-	| "quick-spec.md"
-	| "dev-story.md"
-	| "review-adversarial-general.md"
-	| "blind-review.md"
-	| "review-edge-case-hunter.md"
-	| "write-remediation-story.md"
-
-export interface AutoCompletedPlaceholderWorkflowStepNotice {
-	workflowName: DeterministicPlaceholderWorkflowName
-	stepNumber: number
-	checklistLabel: string
-	reason: string
-}
-
-export type CodeReviewLayerCompletionSource = "subagent_report" | "fallback_prompt"
-
-export interface CodeReviewDeterministicProgressState {
-	completedReviewLayers: Partial<Record<"blind_review" | "edge_case_hunter", CodeReviewLayerCompletionSource>>
-}
-
-export interface ActivePlaceholderWorkflowDeterministicState {
-	codeReview?: CodeReviewDeterministicProgressState
 }
 
 export class TaskState {
@@ -149,14 +118,8 @@ export class TaskState {
 
 	// Task Initialization
 	isInitialized = false
-	activeWorkflowId?: string
-	activePlaceholderWorkflowId?: string
-	activePlaceholderWorkflowSource?: ActivePlaceholderWorkflowSource
-	activePlaceholderWorkflowStableValues?: Record<string, string>
-	activePlaceholderWorkflowValues?: Record<string, string>
-	activePlaceholderWorkflowDeterministicState?: ActivePlaceholderWorkflowDeterministicState
-	activePlaceholderWorkflowTaskWriteProofPaths: string[] = []
-	lastPromptedPlaceholderWorkflowChecklistLabel?: string
+	activeWorkflowName?: WorkflowName
+	activeWorkflowSession?: ActiveWorkflowSession
 	activeStoryTaskId?: string
 	activeStorySubtaskIds: string[] = []
 	lastPromptedStoryTaskKey?: string
@@ -165,9 +128,6 @@ export class TaskState {
 	activeWorkflowStepResolutionSession?: WorkflowStepResolutionSessionState
 	suppressedWorkflowStepResolutionDefinitionIds: string[] = []
 	suppressedWorkflowFormResolverIds: string[] = []
-	pendingAutoCompletedPlaceholderWorkflowStepNotices: AutoCompletedPlaceholderWorkflowStepNotice[] = []
-	activeWorkflowJustStarted = false
-	managedWorkflowRun?: ManagedWorkflowRunState
 
 	// Focus Chain / Todo List Management
 	apiRequestCount = 0

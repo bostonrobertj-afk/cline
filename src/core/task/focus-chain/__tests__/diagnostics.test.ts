@@ -22,13 +22,13 @@ describe("focus chain diagnostics", () => {
 	it("emits structured output through the shared logger", () => {
 		logFocusChainDiagnosticEvent("task-123", "focus_chain_decision", {
 			shouldInclude: true,
-			placeholderWorkflowActive: true,
+			workflowActive: true,
 		})
 
 		expect(messages).to.have.length(1)
 		expect(messages[0]).to.contain("[Task task-123] [focus-chain-diagnostics] focus_chain_decision")
 		expect(messages[0]).to.contain('"shouldInclude":true')
-		expect(messages[0]).to.contain('"placeholderWorkflowActive":true')
+		expect(messages[0]).to.contain('"workflowActive":true')
 	})
 
 	it("summarizes focus-chain text without logging the full body", () => {

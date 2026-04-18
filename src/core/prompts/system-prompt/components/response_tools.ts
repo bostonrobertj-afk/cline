@@ -1,4 +1,3 @@
-import { shouldExposeWorkflowProgressRequest } from "@/shared/workflow-progress-request"
 import type { SystemPromptContext } from "../types"
 
 const RESPONSE_TOOL_LINES = {
@@ -19,15 +18,6 @@ function getActModeResponseToolNames(context: SystemPromptContext): ResponseTool
 
 	if (context.yoloModeToggled !== true) {
 		tools.push("ask_followup_question")
-		if (
-			shouldExposeWorkflowProgressRequest({
-				workflowName: context.activePlaceholderWorkflowName,
-				stepNumber: context.activePlaceholderWorkflowStepNumber,
-				yoloModeToggled: context.yoloModeToggled,
-			})
-		) {
-			tools.push("workflow_progress_request")
-		}
 	}
 
 	tools.push("send_user_message")
@@ -39,15 +29,6 @@ function getPlanModeResponseToolNames(context: SystemPromptContext): ResponseToo
 
 	if (context.yoloModeToggled !== true) {
 		tools.push("ask_followup_question")
-		if (
-			shouldExposeWorkflowProgressRequest({
-				workflowName: context.activePlaceholderWorkflowName,
-				stepNumber: context.activePlaceholderWorkflowStepNumber,
-				yoloModeToggled: context.yoloModeToggled,
-			})
-		) {
-			tools.push("workflow_progress_request")
-		}
 	}
 
 	tools.push("send_user_message")
@@ -75,18 +56,24 @@ export function joinToolNames(toolNames: string[]): string {
 }
 
 export function getCurrentModeResponseToolsLine(context: SystemPromptContext): string {
-	const currentModeTools =
-		context.providerInfo.mode === "plan" ? getPlanModeResponseTools(context) : getActModeResponseTools(context)
+	const currentModeTools = formatResponseToolNames(getVisibleResponseToolNames(context))
 	return `- Use ${joinToolNames(currentModeTools)} when responding to the user.`
 }
 
 function getVisibleResponseToolNames(context: SystemPromptContext): ResponseToolName[] {
 	const currentModeToolNames =
 		context.providerInfo.mode === "plan" ? getPlanModeResponseToolNames(context) : getActModeResponseToolNames(context)
-	const orderedToolNames: ResponseToolName[] =
-		context.providerInfo.mode === "plan" ? currentModeToolNames : [...currentModeToolNames, "act_mode_respond"]
 
 	if (context.enableNativeToolCalls === true && context.visibleNativeToolNames) {
+		const orderedToolNames: ResponseToolName[] = [
+			...currentModeToolNames.slice(0, -1),
+			"workflow_progress_request",
+			currentModeToolNames.at(-1)!,
+		]
+		if (context.providerInfo.mode !== "plan") {
+			orderedToolNames.push("act_mode_respond")
+		}
+
 		const visibleToolNames = new Set(context.visibleNativeToolNames)
 		return orderedToolNames.filter((toolName) => visibleToolNames.has(toolName))
 	}

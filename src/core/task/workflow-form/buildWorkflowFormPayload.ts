@@ -1,4 +1,4 @@
-import type { ClineWorkflowForm, WorkflowFormDefinitionPayload, WorkflowFormResolvedPanelPayload } from "@shared/ExtensionMessage"
+import type { WorkflowForm, WorkflowFormDefinitionPayload, WorkflowFormResolvedPanelPayload } from "@shared/ExtensionMessage"
 import type { WorkflowFormSessionState } from "./types"
 
 export function buildWorkflowFormPayload(args: {
@@ -8,10 +8,10 @@ export function buildWorkflowFormPayload(args: {
 	errorMessage?: string
 	successMessage?: string
 	success?: boolean
-}): ClineWorkflowForm {
+}): WorkflowForm {
 	const basePayload = {
 		sessionId: args.session.sessionId,
-		resolverId: args.session.resolverId,
+		workflowFormId: args.session.workflowFormId,
 		title: args.definition.title,
 		toolDictionaryTitle: args.definition.toolDictionaryTitle,
 		toolDictionaryMarkdown: args.definition.toolDictionaryMarkdown,

@@ -29,7 +29,7 @@ export const config = createVariant(ModelFamily.XS)
 	})
 	.template(baseTemplate)
 	.components(
-		SystemPromptSection.AGENT_ROLE,
+		SystemPromptSection.WORKFLOW_SYSTEM_INSTRUCTIONS,
 		SystemPromptSection.TOOL_USE,
 		SystemPromptSection.RULES,
 		SystemPromptSection.ACT_VS_PLAN,
@@ -37,6 +37,7 @@ export const config = createVariant(ModelFamily.XS)
 		SystemPromptSection.EDITING_FILES,
 		SystemPromptSection.OBJECTIVE,
 		SystemPromptSection.SYSTEM_INFO,
+		SystemPromptSection.WORKFLOW_INPUT,
 		SystemPromptSection.USER_INSTRUCTIONS,
 		SystemPromptSection.SKILLS,
 	)
@@ -52,8 +53,8 @@ export const config = createVariant(ModelFamily.XS)
 		ClineDefaultTool.SEND_USER_MESSAGE,
 		ClineDefaultTool.PLAN_MODE,
 		ClineDefaultTool.COMPLETE_WORKFLOW_ITEM,
-		ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
-		ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT,
+		ClineDefaultTool.SET_WORKFLOW_VALUES,
+		ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT,
 		ClineDefaultTool.STORY_TASK_REMINDER,
 		ClineDefaultTool.STORY_TASK_COMPLETE,
 		ClineDefaultTool.STORY_NOTES_UPDATE,
@@ -62,9 +63,6 @@ export const config = createVariant(ModelFamily.XS)
 	)
 	.placeholders({
 		MODEL_FAMILY: ModelFamily.XS,
-	})
-	.overrideComponent(SystemPromptSection.AGENT_ROLE, {
-		template: xsComponentOverrides.AGENT_ROLE,
 	})
 	.overrideComponent(SystemPromptSection.TOOL_USE, {
 		template: xsComponentOverrides.TOOL_USE,

@@ -80,11 +80,10 @@ describe("ResponseToolRuntime", () => {
 	})
 
 	it("keeps workflow-owned deterministic tools registered as non-response tools", () => {
-		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.BUILD_EPICS_DOCUMENT), undefined)
+		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.BUILD_REVIEW_INPUT), undefined)
 		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.SELECT_TARGET_EPIC), undefined)
-		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.BUILD_EPIC_DELIVERY_SPEC), undefined)
-		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.BUILD_STORY_DOCUMENT), undefined)
-		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.BUILD_TECH_SPEC_DOCUMENT), undefined)
+		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.SET_WORKFLOW_VALUES), undefined)
+		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT), undefined)
 		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.CONTINUE_BRAINSTORMING_SESSION), undefined)
 		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.CREATE_BRAINSTORMING_SESSION), undefined)
 		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.SELECT_BRAINSTORMING_SESSION), undefined)

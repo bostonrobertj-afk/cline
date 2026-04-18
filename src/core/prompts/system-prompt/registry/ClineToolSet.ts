@@ -136,14 +136,15 @@ export class ClineToolSet {
 
 	public static getEnabledToolSpecs(variant: PromptVariant, context: SystemPromptContext): ClineToolSpec[] {
 		const registeredTools = ClineToolSet.getEnabledTools(variant, context).map((tool) => tool.config)
+		const builtInTools = context.workflowToolSchemaOverride ?? registeredTools
 		const dynamicSubagentTools = ClineToolSet.getDynamicSubagentToolSpecs(variant, context)
 
 		const includesDynamicSubagents = dynamicSubagentTools.length > 0
-		const filteredRegistered = includesDynamicSubagents
-			? registeredTools.filter((tool) => tool.id !== ClineDefaultTool.USE_SUBAGENTS)
-			: registeredTools
+		const filteredBuiltInTools = includesDynamicSubagents
+			? builtInTools.filter((tool) => tool.id !== ClineDefaultTool.USE_SUBAGENTS)
+			: builtInTools
 
-		return [...filteredRegistered, ...dynamicSubagentTools]
+		return [...filteredBuiltInTools, ...dynamicSubagentTools]
 	}
 
 	/**

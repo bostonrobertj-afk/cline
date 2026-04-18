@@ -1,6 +1,5 @@
 import { SystemPromptSection } from "../templates/placeholders"
 import { getActVsPlanModeSection } from "./act_vs_plan_mode"
-import { getAgentRoleSection } from "./agent_role"
 import { getCapabilitiesSection } from "./capabilities"
 import { getContinuationTurnSection } from "./continuation_turn"
 import { getEditingFilesSection } from "./editing_files"
@@ -10,9 +9,10 @@ import { getObjectiveSection } from "./objective"
 import { getRulesSection } from "./rules"
 import { getSkillsSection } from "./skills"
 import { getSystemInfo } from "./system_info"
-import { getUpdatingTaskProgress } from "./task_progress"
 import { getToolUseSection } from "./tool_use"
 import { getUserInstructions } from "./user_instructions"
+import { getWorkflowInputSection } from "./workflow_input"
+import { getWorkflowSystemInstructionsSection } from "./workflow_system_instructions"
 
 /**
  * Registers all tool variants with the ClineToolSet provider.
@@ -21,7 +21,10 @@ import { getUserInstructions } from "./user_instructions"
  */
 export function getSystemPromptComponents() {
 	return [
-		{ id: SystemPromptSection.AGENT_ROLE, fn: getAgentRoleSection },
+		{
+			id: SystemPromptSection.WORKFLOW_SYSTEM_INSTRUCTIONS,
+			fn: getWorkflowSystemInstructionsSection,
+		},
 		{ id: SystemPromptSection.CONTINUATION_TURN, fn: getContinuationTurnSection },
 		{ id: SystemPromptSection.SYSTEM_INFO, fn: getSystemInfo },
 		{ id: SystemPromptSection.MCP, fn: getMcp },
@@ -49,6 +52,6 @@ export function getSystemPromptComponents() {
 			id: SystemPromptSection.FEEDBACK,
 			fn: getFeedbackSection,
 		},
-		{ id: SystemPromptSection.TASK_PROGRESS, fn: getUpdatingTaskProgress },
+		{ id: SystemPromptSection.WORKFLOW_INPUT, fn: getWorkflowInputSection },
 	]
 }

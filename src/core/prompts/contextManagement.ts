@@ -1,4 +1,4 @@
-export const summarizeTask = (focusChainSettings?: { enabled: boolean }, cwd?: string, isMultiRootEnabled?: boolean) => {
+export const summarizeTask = (cwd?: string, isMultiRootEnabled?: boolean) => {
 	// Build CWD display text
 	const CWD = cwd ? cwd.toPosix() : ""
 
@@ -10,8 +10,6 @@ export const summarizeTask = (focusChainSettings?: { enabled: boolean }, cwd?: s
 	return `<explicit_instructions type="summarize_task">
 The current conversation is rapidly running out of context. Now, your urgent task is to create a comprehensive detailed summary of the conversation so far, paying close attention to the user's explicit requests and your previous actions.
 This summary should be thorough in capturing technical details, code patterns, and architectural decisions that would be essential for continuing development work without losing context.
-
-You have only two options: If you are immediately prepared to call the attempt_completion tool, and have completed all items in your task_progress list, you may call attempt_completion at this time. If you are not prepared to call the attempt_completion tool, and have not completed all items in your task_progress list, you must call the summarize_task tool - in this case you must call the summarize_task tool whether you are in PLAN or ACT mode.
 
 You MUST ONLY respond to this message by using either the attempt_completion tool or the summarize_task tool call. When using the summarize_task tool call, you must include ALL information in the summary required for continuing with the task at hand. This is because you will lose access to all messages other than this summary.
 
@@ -43,17 +41,9 @@ Your summary should include the following sections:
                      Only list files you know will for sure be necessary, rather than speculating. The file paths must be relative to the current working directory ${CWD}.${MULTI_ROOT_HINT}
 10. You should pay special attention to the most recent user message, as it indicates the user's most recent intent.
 
-${
-	focusChainSettings?.enabled
-		? `Updating task progress:
-There is an optional task_progress parameter which you should use to provide an updated checklist to keep the user informed of the latest state of the progress for this task. You should always return the most up to date version of the checklist if there is already an existing checklist. If no task_progress list was included in the previous context, you should NOT create a new task_progress list - do not return a new task_progress list if one does not already exist.`
-		: ""
-}
-
 Usage:
 <summarize_task>
 <context>Your detailed summary</context>
-${focusChainSettings?.enabled ? `<task_progress>task_progress list here</task_progress>` : ""}
 </summarize_task>
 
 Here's an example of how your output should be structured:
@@ -92,16 +82,6 @@ Here's an example of how your output should be structured:
    - [file path 1]
    - [file path 2]
 </context>
-${
-	focusChainSettings?.enabled
-		? `<task_progress>
-- [x] Completed task example
-- [x] Completed task example
-- [ ] Remaining task example
-- [ ] Remaining task example
-</task_progress>`
-		: ""
-}
 </summarize_task>
 </example>
 

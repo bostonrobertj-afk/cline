@@ -1,12 +1,31 @@
 import type { McpPromptResponse } from "@shared/mcp"
 import { expect } from "chai"
-import fs from "fs/promises"
-import os from "os"
-import path from "path"
 import * as sinon from "sinon"
-import { StateManager } from "../../storage/StateManager"
-import { getCanonicalWorkflowConfigPath } from "../../workflows/workflow-placeholders"
-import { formatMcpPromptResponse, McpPromptFetcher, parseSlashCommands } from "../index"
+import type { WorkflowDefinition } from "@/core/task/workflow-runtime/types"
+import * as WorkflowRegistry from "@/core/task/workflow-runtime/WorkflowRegistry"
+import { formatMcpPromptResponse, type McpPromptFetcher, parseSlashCommands } from "../index"
+
+function createResolvedWorkflow(
+	args?: Partial<Pick<WorkflowDefinition, "name" | "slashCommandName" | "useSkillName">>,
+): WorkflowDefinition {
+	return {
+		name: args?.name ?? "quick-spec",
+		slashCommandName: args?.slashCommandName ?? "quick-spec",
+		useSkillName: args?.useSkillName ?? "quick-spec",
+		persona: "engineer",
+		projectSubfolder: "planning",
+		startCard: { markdownBody: "", submitLabel: "Continue" },
+		steps: {
+			"step-1": {
+				id: "step-1",
+				stepNumber: 1,
+				checklistLabel: "Step 1",
+				buildPromptProjection: () => ({}),
+				allowWorkflowProgressRequest: false,
+			},
+		},
+	}
+}
 
 describe("slash-commands", () => {
 	afterEach(() => {
@@ -115,7 +134,7 @@ describe("slash-commands", () => {
 
 		it("should process MCP prompt command in task tag", async () => {
 			const text = "<task>/mcp:test-server:greet</task>"
-			const result = await parseSlashCommands(text, {}, {}, "test-ulid", undefined, false, undefined, mockMcpPromptFetcher)
+			const result = await parseSlashCommands(text, "test-ulid", undefined, undefined, undefined, mockMcpPromptFetcher)
 
 			expect(result.processedText).to.include('<mcp_prompt server="test-server" prompt="greet">')
 			expect(result.processedText).to.include("Hello from MCP!")
@@ -124,7 +143,7 @@ describe("slash-commands", () => {
 
 		it("should process MCP prompt with additional text", async () => {
 			const text = "<task>/mcp:test-server:greet Please expand on this</task>"
-			const result = await parseSlashCommands(text, {}, {}, "test-ulid", undefined, false, undefined, mockMcpPromptFetcher)
+			const result = await parseSlashCommands(text, "test-ulid", undefined, undefined, undefined, mockMcpPromptFetcher)
 
 			expect(result.processedText).to.include('<mcp_prompt server="test-server" prompt="greet">')
 			expect(result.processedText).to.include("Please expand on this")
@@ -141,7 +160,7 @@ describe("slash-commands", () => {
 			}
 
 			const text = "<task>/mcp:server:prompt:with:colons</task>"
-			const result = await parseSlashCommands(text, {}, {}, "test-ulid", undefined, false, undefined, fetcherWithColons)
+			const result = await parseSlashCommands(text, "test-ulid", undefined, undefined, undefined, fetcherWithColons)
 
 			expect(result.processedText).to.include('prompt="prompt:with:colons"')
 			expect(result.processedText).to.include("Colon prompt")
@@ -152,192 +171,18 @@ describe("slash-commands", () => {
 		// through to workflow checking. The core MCP functionality is covered above.
 	})
 
-	describe("parseSlashCommands workflow persona regression", () => {
-		it("still resolves managed workflow aliases to managed workflow activation", async () => {
-			const result = await parseSlashCommands(
-				"<task>/bmad-problem-solving help me untangle this issue</task>",
-				{},
-				{},
-				"test-ulid",
-				undefined,
-				false,
-				undefined,
-				undefined,
-				process.cwd(),
-			)
+	describe("parseSlashCommands shipped workflow activation", () => {
+		it("activates a shipped workflow slash command and strips it from the task text", async () => {
+			sinon.stub(WorkflowRegistry, "resolveWorkflowBySlashCommand").returns(createResolvedWorkflow())
 
-			expect(result.processedText).to.equal("<task> help me untangle this issue</task>")
+			const result = await parseSlashCommands("<task>/quick-spec draft a plan</task>", "test-ulid")
+
+			expect(result.processedText).to.equal("<task> draft a plan</task>")
 			expect(result.needsClinerulesFileCheck).to.equal(false)
 			expect(result.persistentSlashCommandAction).to.deep.equal({
-				type: "activate_managed_workflow",
-				workflowId: "bmad-cis-problem-solving",
-				slashCommand: "bmad-cis-problem-solving",
-			})
-		})
-
-		it("no longer emits persistent activation for slash-prefixed BMAD persona aliases", async () => {
-			const result = await parseSlashCommands(
-				"<task>/bmad-agent-bmm-quick-flow-solo-dev ch how are you today</task>",
-				{},
-				{},
-				"test-ulid",
-				undefined,
-				false,
-				undefined,
-				undefined,
-				"/test/project",
-			)
-
-			expect(result.persistentSlashCommandAction).to.equal(undefined)
-		})
-
-		it("no longer emits persistent activation for bare BMAD persona aliases or /bmad-exit", async () => {
-			const bareAliasResult = await parseSlashCommands(
-				"<task>bmad-agent-bmm-quick-flow-solo-dev CR target is entity-creation-engine.ts</task>",
-				{},
-				{},
-				"test-ulid",
-				undefined,
-				false,
-				undefined,
-				undefined,
-				"/test/project",
-			)
-
-			const exitResult = await parseSlashCommands(
-				"<task>/bmad-exit close it out</task>",
-				{},
-				{},
-				"test-ulid",
-				undefined,
-				false,
-				undefined,
-				undefined,
-				"/test/project",
-			)
-
-			expect(bareAliasResult.persistentSlashCommandAction).to.equal(undefined)
-			expect(exitResult.persistentSlashCommandAction).to.equal(undefined)
-		})
-	})
-
-	describe("parseSlashCommands workflow resolution", () => {
-		it("loads local workflows through the shared resolver", async () => {
-			const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "slash-local-"))
-			const workflowPath = path.join(tempDir, "local-flow.md")
-			await fs.writeFile(workflowPath, "# Local Flow\nDo the local thing.", "utf8")
-			sinon.stub(StateManager, "get").returns({
-				getRemoteConfigSettings: () => ({}),
-				getGlobalStateKey: () => ({}),
-			} as unknown as StateManager)
-
-			const result = await parseSlashCommands(
-				"<task>/local-flow.md continue</task>",
-				{ [workflowPath]: true },
-				{},
-				"test-ulid",
-			)
-
-			expect(result.processedText).to.equal("<task> continue</task>")
-			expect(result.persistentSlashCommandAction).to.deep.equal({
-				type: "activate_placeholder_workflow",
-				workflowId: "local-flow.md",
-				workflowSource: {
-					type: "local",
-					name: "local-flow.md",
-					path: workflowPath,
-				},
-			})
-		})
-
-		it("includes the canonical workflow config path for local workflows", async () => {
-			const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "slash-local-config-"))
-			const workflowPath = path.join(tempDir, ".cline", "skills", "custom-review", "custom-review.md")
-			const configPath = getCanonicalWorkflowConfigPath(tempDir)
-			await fs.mkdir(path.dirname(workflowPath), { recursive: true })
-			await fs.mkdir(path.dirname(configPath), { recursive: true })
-			await fs.writeFile(workflowPath, "# Custom review\nUse {communication_language}.", "utf8")
-			await fs.writeFile(configPath, 'communication_language: "English"\n', "utf8")
-			sinon.stub(StateManager, "get").returns({
-				getRemoteConfigSettings: () => ({}),
-				getGlobalStateKey: () => ({}),
-			} as unknown as StateManager)
-
-			const result = await parseSlashCommands(
-				"<task>/custom-review.md continue</task>",
-				{ [workflowPath]: true },
-				{},
-				"test-ulid",
-				undefined,
-				false,
-				undefined,
-				undefined,
-				tempDir,
-			)
-
-			expect(result.processedText).to.equal("<task> continue</task>")
-			expect(result.persistentSlashCommandAction).to.deep.equal({
-				type: "activate_placeholder_workflow",
-				workflowId: "custom-review.md",
-				workflowSource: {
-					type: "local",
-					name: "custom-review.md",
-					path: workflowPath,
-					configPath,
-				},
-			})
-		})
-
-		it("prefers local workflows over global workflows with the same name", async () => {
-			const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "slash-precedence-"))
-			const localPath = path.join(tempDir, "shared-flow.md")
-			const globalPath = path.join(tempDir, "global-shared", "shared-flow.md")
-			await fs.mkdir(path.dirname(globalPath), { recursive: true })
-			await fs.writeFile(localPath, "local body", "utf8")
-			await fs.writeFile(globalPath, "global body", "utf8")
-			sinon.stub(StateManager, "get").returns({
-				getRemoteConfigSettings: () => ({}),
-				getGlobalStateKey: () => ({}),
-			} as unknown as StateManager)
-
-			const result = await parseSlashCommands(
-				"<task>/shared-flow.md now</task>",
-				{ [localPath]: true },
-				{ [globalPath]: true },
-				"test-ulid",
-			)
-
-			expect(result.processedText).to.equal("<task> now</task>")
-			expect(result.persistentSlashCommandAction).to.deep.equal({
-				type: "activate_placeholder_workflow",
-				workflowId: "shared-flow.md",
-				workflowSource: {
-					type: "local",
-					name: "shared-flow.md",
-					path: localPath,
-				},
-			})
-		})
-
-		it("loads remote workflows through the shared resolver", async () => {
-			sinon.stub(StateManager, "get").returns({
-				getRemoteConfigSettings: () => ({
-					remoteGlobalWorkflows: [{ name: "remote-flow", contents: "remote body", alwaysEnabled: true }],
-				}),
-				getGlobalStateKey: () => ({}),
-			} as unknown as StateManager)
-
-			const result = await parseSlashCommands("<task>/remote-flow please</task>", {}, {}, "test-ulid")
-
-			expect(result.processedText).to.equal("<task> please</task>")
-			expect(result.persistentSlashCommandAction).to.deep.equal({
-				type: "activate_placeholder_workflow",
-				workflowId: "remote-flow",
-				workflowSource: {
-					type: "remote",
-					name: "remote-flow",
-					contents: "remote body",
-				},
+				type: "activate_workflow",
+				workflowName: "quick-spec",
+				invocationSource: "slash_command",
 			})
 		})
 	})

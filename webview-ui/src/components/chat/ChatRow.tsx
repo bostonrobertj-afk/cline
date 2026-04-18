@@ -8,12 +8,12 @@ import {
 	ClineSayAgentFeedback,
 	ClineSayGenerateExplanation,
 	ClineSayTool,
-	ClineWorkflowForm,
-	ClineWorkflowStartCard,
 	ClineWorkflowStepResolutionStatus,
 	COMPLETION_RESULT_CHANGES_FLAG,
+	WorkflowForm,
 	WorkflowFormFieldDefinition,
 	WorkflowFormSubmittedValuePayload,
+	WorkflowStartCard,
 } from "@shared/ExtensionMessage"
 import { BooleanRequest, StringRequest } from "@shared/proto/cline/common"
 import { WorkflowFormAction } from "@shared/proto/cline/task"
@@ -332,7 +332,7 @@ export const ChatRowContent = memo(
 			}
 
 			try {
-				return JSON.parse(message.text) as ClineWorkflowStartCard
+				return JSON.parse(message.text) as WorkflowStartCard
 			} catch (error) {
 				console.error("Failed to parse workflow start card payload:", error)
 				return undefined
@@ -347,7 +347,7 @@ export const ChatRowContent = memo(
 			}
 
 			try {
-				return JSON.parse(message.text) as ClineWorkflowForm
+				return JSON.parse(message.text) as WorkflowForm
 			} catch (error) {
 				console.error("Failed to parse workflow form payload:", error)
 				return undefined
@@ -368,12 +368,18 @@ export const ChatRowContent = memo(
 			}
 		}, [message.say, message.text, message.type])
 		const [workflowStartCardSubmissionPending, setWorkflowStartCardSubmissionPending] = useState(false)
+		const [workflowStartCardProjectMode, setWorkflowStartCardProjectMode] = useState<"new" | "existing">("new")
+		const [workflowStartCardSelectedExistingProject, setWorkflowStartCardSelectedExistingProject] = useState("")
+		const [workflowStartCardNewProjectTitle, setWorkflowStartCardNewProjectTitle] = useState("")
 		const [workflowFormValues, setWorkflowFormValues] = useState<Record<string, unknown>>({})
 		const [workflowFormSubmissionPending, setWorkflowFormSubmissionPending] = useState(false)
 		const [isWorkflowDictionaryOpen, setIsWorkflowDictionaryOpen] = useState(false)
 
 		useEffect(() => {
 			setWorkflowStartCardSubmissionPending(false)
+			setWorkflowStartCardProjectMode(workflowStartCard?.projectMode ?? "new")
+			setWorkflowStartCardSelectedExistingProject(workflowStartCard?.selectedExistingProject ?? "")
+			setWorkflowStartCardNewProjectTitle(workflowStartCard?.newProjectTitle ?? "")
 		}, [workflowStartCard])
 
 		useEffect(() => {
@@ -565,19 +571,30 @@ export const ChatRowContent = memo(
 			}))
 		}, [])
 
-		const handleWorkflowStartCardContinue = useCallback(async () => {
+		const handleWorkflowStartCardSubmit = useCallback(async () => {
 			if (!workflowStartCard || workflowStartCardSubmissionPending) {
 				return
 			}
 
 			setWorkflowStartCardSubmissionPending(true)
 			try {
-				await submitWorkflowStartCard(workflowStartCard)
+				await submitWorkflowStartCard({
+					...workflowStartCard,
+					projectMode: workflowStartCardProjectMode,
+					selectedExistingProject: workflowStartCardSelectedExistingProject,
+					newProjectTitle: workflowStartCardNewProjectTitle,
+				})
 			} catch (error) {
 				console.error("Failed to submit workflow start card:", error)
 				setWorkflowStartCardSubmissionPending(false)
 			}
-		}, [workflowStartCard, workflowStartCardSubmissionPending])
+		}, [
+			workflowStartCard,
+			workflowStartCardNewProjectTitle,
+			workflowStartCardProjectMode,
+			workflowStartCardSelectedExistingProject,
+			workflowStartCardSubmissionPending,
+		])
 
 		const handleWorkflowFormAction = useCallback(
 			async (action: WorkflowFormAction, values?: Record<string, unknown>) => {
@@ -609,6 +626,15 @@ export const ChatRowContent = memo(
 				return <InvisibleSpacer />
 			}
 
+			const workflowStartCardInputClassName =
+				"w-full rounded-xs border border-editor-group-border bg-background px-3 py-2 text-sm text-foreground"
+			const isExistingProjectMode = workflowStartCardProjectMode === "existing"
+			const isWorkflowStartCardSubmitDisabled =
+				workflowStartCardSubmissionPending ||
+				(isExistingProjectMode
+					? workflowStartCardSelectedExistingProject.trim().length === 0
+					: workflowStartCardNewProjectTitle.trim().length === 0)
+
 			return (
 				<div className="border border-editor-group-border rounded-xs bg-code/40 p-3">
 					<div className={HEADER_CLASSNAMES}>
@@ -619,15 +645,61 @@ export const ChatRowContent = memo(
 					<div className="pt-2">
 						<MarkdownRow markdown={workflowStartCard.markdownBody} />
 					</div>
-					<div className="pt-3">
+					<div className="space-y-3 pt-3">
+						<div className="space-y-2">
+							<label className="flex items-start gap-2 text-sm text-foreground">
+								<input
+									checked={workflowStartCardProjectMode === "new"}
+									disabled={workflowStartCardSubmissionPending}
+									name="workflow-start-card-project-mode"
+									onChange={() => setWorkflowStartCardProjectMode("new")}
+									type="radio"
+								/>
+								<span>Create a new project</span>
+							</label>
+							<label className="flex items-start gap-2 text-sm text-foreground">
+								<input
+									checked={isExistingProjectMode}
+									disabled={workflowStartCardSubmissionPending}
+									name="workflow-start-card-project-mode"
+									onChange={() => setWorkflowStartCardProjectMode("existing")}
+									type="radio"
+								/>
+								<span>Use an existing project</span>
+							</label>
+						</div>
+						{isExistingProjectMode ? (
+							<select
+								aria-label="Existing project"
+								className={workflowStartCardInputClassName}
+								disabled={workflowStartCardSubmissionPending}
+								onChange={(event) => setWorkflowStartCardSelectedExistingProject(event.target.value)}
+								value={workflowStartCardSelectedExistingProject}>
+								<option value="">Select an existing project</option>
+								{(workflowStartCard.existingProjectOptions ?? []).map((option) => (
+									<option key={option.value} value={option.value}>
+										{option.label}
+									</option>
+								))}
+							</select>
+						) : (
+							<input
+								aria-label="New project title"
+								className={workflowStartCardInputClassName}
+								disabled={workflowStartCardSubmissionPending}
+								onChange={(event) => setWorkflowStartCardNewProjectTitle(event.target.value)}
+								type="text"
+								value={workflowStartCardNewProjectTitle}
+							/>
+						)}
 						<button
 							className="rounded-xs bg-button-background px-3 py-2 text-sm text-primary-foreground disabled:opacity-50"
-							disabled={workflowStartCardSubmissionPending}
+							disabled={isWorkflowStartCardSubmitDisabled}
 							onClick={() => {
-								void handleWorkflowStartCardContinue()
+								void handleWorkflowStartCardSubmit()
 							}}
 							type="button">
-							{workflowStartCard.ctaLabel}
+							{workflowStartCard.submitLabel}
 						</button>
 					</div>
 				</div>

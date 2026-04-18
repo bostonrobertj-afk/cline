@@ -71,25 +71,6 @@ export const PLACEHOLDER_INDXR_BUNDLE_TOOLS = {
 	INDXR_MAINTENANCE: ["regenerate_index"],
 } as const
 
-export const ACT_MODE_RESPONSE_TOOL_IDS = [
-	ClineDefaultTool.ASK,
-	ClineDefaultTool.SEND_USER_MESSAGE,
-	ClineDefaultTool.ATTEMPT,
-	ClineDefaultTool.ACT_MODE,
-] as const
-
-export const PLAN_MODE_RESPONSE_TOOL_IDS = [
-	ClineDefaultTool.ASK,
-	ClineDefaultTool.SEND_USER_MESSAGE,
-	ClineDefaultTool.PLAN_MODE,
-] as const
-
-export const ALWAYS_PRESERVED_NATIVE_TOOL_IDS = [
-	ClineDefaultTool.NEW_TASK,
-	ClineDefaultTool.BROWSER,
-	ClineDefaultTool.MCP_ACCESS,
-] as const
-
 export const PLACEHOLDER_WORKFLOW_STEP_MATRIX: Record<string, Record<number, readonly PlaceholderToolBundle[]>> = {
 	"advanced-elicitation.md": {
 		1: ["DOC_READ", "PLACEHOLDER_WRITE"],

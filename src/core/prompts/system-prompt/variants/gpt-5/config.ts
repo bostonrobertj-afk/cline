@@ -30,15 +30,15 @@ export const config = createVariant(ModelFamily.GPT_5)
 	})
 	.template(GPT_5_TEMPLATE_OVERRIDES.BASE)
 	.components(
-		SystemPromptSection.AGENT_ROLE,
+		SystemPromptSection.WORKFLOW_SYSTEM_INSTRUCTIONS,
 		SystemPromptSection.TOOL_USE,
-		SystemPromptSection.TASK_PROGRESS,
 		SystemPromptSection.MCP,
 		SystemPromptSection.EDITING_FILES,
 		SystemPromptSection.ACT_VS_PLAN,
 		SystemPromptSection.FEEDBACK,
 		SystemPromptSection.RULES,
 		SystemPromptSection.SYSTEM_INFO,
+		SystemPromptSection.WORKFLOW_INPUT,
 		SystemPromptSection.USER_INSTRUCTIONS,
 		SystemPromptSection.SKILLS,
 	)
@@ -66,8 +66,8 @@ export const config = createVariant(ModelFamily.GPT_5)
 		ClineDefaultTool.GENERATE_EXPLANATION,
 		ClineDefaultTool.USE_SKILL,
 		ClineDefaultTool.COMPLETE_WORKFLOW_ITEM,
-		ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
-		ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT,
+		ClineDefaultTool.SET_WORKFLOW_VALUES,
+		ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT,
 		ClineDefaultTool.STORY_TASK_REMINDER,
 		ClineDefaultTool.STORY_TASK_COMPLETE,
 		ClineDefaultTool.STORY_NOTES_UPDATE,
@@ -78,9 +78,6 @@ export const config = createVariant(ModelFamily.GPT_5)
 		MODEL_FAMILY: ModelFamily.GPT_5,
 	})
 	.config({})
-	.overrideComponent(SystemPromptSection.TASK_PROGRESS, {
-		template: GPT_5_TEMPLATE_OVERRIDES.TASK_PROGRESS,
-	})
 	.overrideComponent(SystemPromptSection.TOOL_USE, {
 		template: GPT_5_TEMPLATE_OVERRIDES.TOOL_USE,
 	})

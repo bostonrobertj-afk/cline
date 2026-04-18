@@ -1,4 +1,4 @@
-import type { ClineMessage } from "@shared/ExtensionMessage"
+import type { ClineMessage, WorkflowStartCard } from "@shared/ExtensionMessage"
 import { render, screen } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest"
 import { ChatRowContent } from "./ChatRow"
@@ -46,7 +46,7 @@ function createWorkflowFormMessage(payloadOverrides?: Partial<Record<string, unk
 		ask: "workflow_form",
 		text: JSON.stringify({
 			sessionId: "workflow-form-session",
-			resolverId: "brainstorming_step_4_choose_approach",
+			workflowFormId: "brainstorming_step_4_choose_approach",
 			title: "Workflow Form V2",
 			toolDictionaryTitle: "Workflow Dictionary",
 			toolDictionaryMarkdown: "## workflow_form",
@@ -68,7 +68,44 @@ function createWorkflowFormMessage(payloadOverrides?: Partial<Record<string, unk
 	}
 }
 
+function createWorkflowStartCardMessage(payloadOverrides?: Partial<WorkflowStartCard>): ClineMessage {
+	const payload: WorkflowStartCard = {
+		sessionId: "workflow-start-card-session",
+		title: "Start New Project",
+		markdownBody: "Choose how to begin.",
+		submitLabel: "Start project",
+		projectMode: "existing",
+		existingProjectOptions: [
+			{ value: "project-alpha", label: "Project Alpha" },
+			{ value: "project-beta", label: "Project Beta" },
+		],
+		selectedExistingProject: "project-beta",
+		newProjectTitle: "Fresh Workspace",
+		...payloadOverrides,
+	}
+
+	return {
+		ts: Date.now(),
+		type: "ask",
+		ask: "workflow_start_card",
+		text: JSON.stringify(payload),
+	}
+}
+
 function renderWorkflowForm(message: ClineMessage) {
+	return render(
+		<ChatRowContent
+			inputValue=""
+			isExpanded={true}
+			isLast={true}
+			message={message}
+			onSetQuote={vi.fn()}
+			onToggleExpand={vi.fn()}
+		/>,
+	)
+}
+
+function renderWorkflowStartCard(message: ClineMessage) {
 	return render(
 		<ChatRowContent
 			inputValue=""
@@ -445,5 +482,35 @@ describe("ChatRow workflow form v2 rendering", () => {
 		expect(screen.getByLabelText("Artifact Picker Field")).toBeInTheDocument()
 		expect(screen.getByText("Rendered markdown content.")).toBeInTheDocument()
 		expect(screen.getByText("Static notice content.")).toBeInTheDocument()
+	})
+})
+
+describe("ChatRow workflow start card rendering", () => {
+	it("renders existing-project workflow start cards from structured option objects", () => {
+		renderWorkflowStartCard(createWorkflowStartCardMessage())
+
+		expect(screen.getByText("Start New Project")).toBeInTheDocument()
+		expect(screen.getByText("Choose how to begin.")).toBeInTheDocument()
+		expect(screen.getByLabelText("Create a new project")).toBeInTheDocument()
+		expect(screen.getByLabelText("Use an existing project")).toBeInTheDocument()
+		expect(screen.getByLabelText("Existing project")).toHaveValue("project-beta")
+		expect(screen.getByRole("option", { name: "Project Alpha" })).toBeInTheDocument()
+		expect(screen.getByRole("option", { name: "Project Beta" })).toBeInTheDocument()
+		expect(screen.getByRole("button", { name: "Start project" })).toBeInTheDocument()
+		expect(screen.queryByLabelText("New project title")).toBeNull()
+	})
+
+	it("renders new-project workflow start cards with the seeded title input", () => {
+		renderWorkflowStartCard(
+			createWorkflowStartCardMessage({
+				projectMode: "new",
+				selectedExistingProject: "",
+				newProjectTitle: "Fresh Workspace",
+			}),
+		)
+
+		expect(screen.getByLabelText("New project title")).toHaveValue("Fresh Workspace")
+		expect(screen.getByRole("button", { name: "Start project" })).toBeInTheDocument()
+		expect(screen.queryByLabelText("Existing project")).toBeNull()
 	})
 })

@@ -8,7 +8,7 @@ import type { ClineDefaultTool } from "@/shared/tools"
 export type WorkflowStepResolutionTriggerSource = "deterministic_workflow_progression"
 
 export type WorkflowStepResolutionSessionOwner = {
-	kind: "placeholder_workflow_step"
+	kind: "workflow_step"
 	workflowName: string
 	stepNumber: number
 }

@@ -87,6 +87,24 @@ This document maps the code changes needed for the `Foundational Build` phase de
   - define exactly these parameters in the fallback schema: required string `artifact_id`, required string `destination_path`, required string `content`, and optional object `workflow_value_writes` with `additionalProperties: { type: "string" }`
   - do not add legacy `contextRequirements` or workflow-name-specific exposure logic here; live exposure is handled by the runtime-owned workflow projection and downstream prompt-tool wiring edits already mapped elsewhere
 
+### `src/core/prompts/system-prompt/components/workflow_system_instructions.ts`
+
+- New file, whole file:
+  - export exactly one component function named `getWorkflowSystemInstructionsSection(variant, context)`
+  - implement this file only as the dedicated carrier for `SystemPromptSection.WORKFLOW_SYSTEM_INSTRUCTIONS`
+  - return `context.workflowSystemInstructionsBlock` when it is a non-empty string, and return `undefined` when that runtime-projected block is absent or empty
+  - do not inject fallback persona text, generic identity text, workflow reminders, placeholder guidance, managed-workflow guidance, or `task_progress` instructions in this file
+  - do not read `activeWorkflowPersonaInstructions`, `activeWorkflowReminder`, `activePlaceholderWorkflowName`, `activePlaceholderWorkflowStepNumber`, `activeDeterministicPlaceholderWorkflowEnabled`, or `managedWorkflowActive`; this file must depend only on the runtime-owned workflow system-instructions block
+
+### `src/core/prompts/system-prompt/components/workflow_input.ts`
+
+- New file, whole file:
+  - export exactly one component function named `getWorkflowInputSection(variant, context)`
+  - implement this file only as the dedicated carrier for `SystemPromptSection.WORKFLOW_INPUT`
+  - return `context.workflowInputInstructionsBlock` when it is a non-empty string, and return `undefined` when that runtime-projected block is absent or empty
+  - do not inject workflow reminders, persona text, placeholder guidance, managed-workflow guidance, or `task_progress` instructions in this file
+  - do not read `activeWorkflowReminder`, `activePlaceholderWorkflowName`, `activePlaceholderWorkflowStepNumber`, `activeDeterministicPlaceholderWorkflowEnabled`, `activeWorkflowSupportsPlaceholders`, or `managedWorkflowActive`; this file must depend only on the runtime-owned workflow input block
+
 ### `src/core/task/tools/handlers/BuildWorkflowDocumentToolHandler.ts`
 
 - New file, whole file:
@@ -172,11 +190,13 @@ This document maps the code changes needed for the `Foundational Build` phase de
 ### `src/core/task/tools/subagent/SubagentRunner.ts`
 
 - Lines `9`-`35`, `469`-`575`, `799`-`833`, `868`-`872`, and `914`-`1173`: rewrite the workflow-facing portion of this file in one pass so `SubagentRunner` reaches the foundational child-execution end state.
-  - remove legacy imports/usages of BMAD reminder/persona lookup, `workflow-activation`, `resolveAvailableWorkflows(...)`, `findResolvedWorkflowByName(...)`, placeholder rendering/helpers, and deterministic-placeholder progression types/helpers
+  - remove legacy imports/usages of BMAD reminder/persona lookup, `workflow-activation`, `resolveAvailableWorkflows(...)`, `findResolvedWorkflowByName(...)`, placeholder rendering/helpers, deterministic-placeholder progression types/helpers, and the pre/post-tool `task_progress` wrapper helpers from `@core/task/focus-chain/updateFromToolResponse`
   - replace workflow skill exposure with `getWorkflowSkillMetadata()` and assigned-workflow resolution with `resolveWorkflowByUseSkillName(...)` from `@/core/task/workflow-runtime/WorkflowRegistry`
   - pass the shared `workflowRuntime` into the child `TaskConfig`, keep the child `TaskState` isolated from the parent task state, and do not allow parent/child workflow-session objects to be shared by reference
   - replace prompt-context assembly, continuation-turn workflow gating, and workflow-start bookkeeping with runtime-projected workflow system/input/tool projection; remove direct `activeWorkflowJustStarted` mutation and placeholder-/managed-workflow prompt-context fields from this file
   - replace auto-activation, placeholder-derived parent/child inheritance, and deterministic-placeholder bootstrap with `WorkflowRuntime` child activation plus definition-declared, copy-only parent-session initialization
+  - delete the pre-tool and post-tool wrapper calls around child tool execution and completion-result handling
+  - stop passing placeholder-era `toolContext` into `updateFCListFromToolResponse`; if that callback survives in this phase, call it with only `taskProgress`
   - delete the placeholder-specific helper methods in this file, including inherited-placeholder transfer, deterministic placeholder bootstrap, placeholder checklist seeding, current-step prompt consumption, and placeholder checklist-label reset logic
 
 ### `src/core/task/bmad-agent-mode.ts`
@@ -217,13 +237,16 @@ This document maps the code changes needed for the `Foundational Build` phase de
 
 ### `src/core/task/tools/backendWorkflowToolContracts.ts`
 
+Status: complete
+
 - Lines `4`-`160`: rewrite `backendWorkflowToolContracts` in one pass so the foundational canonical workflow-tool contract map matches the new shared tool surface.
-  - replace `[ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS]: undefined` with `[ClineDefaultTool.SET_WORKFLOW_VALUES]: { id: ClineDefaultTool.SET_WORKFLOW_VALUES, name: "set_workflow_values", parameters: [{ name: "values", required: true, type: "object", description: "Workflow-value key/value map for the active workflow session.", additionalProperties: { type: "string" } }] }`
+  - change `backendWorkflowToolContracts` from `Record<ClineDefaultTool, BackendWorkflowToolContract | undefined>` to `Partial<Record<ClineDefaultTool, BackendWorkflowToolContract>>` so deleted legacy workflow-helper contracts are removed from the map instead of being retained as `undefined` placeholders
+  - keep exactly these four live contract entries in the map after the rewrite: `SET_WORKFLOW_VALUES`, `BUILD_WORKFLOW_DOCUMENT`, `BUILD_REVIEW_INPUT`, and `CODE_REVIEW_SPEC_UPDATE`
+  - add `[ClineDefaultTool.SET_WORKFLOW_VALUES]: { id: ClineDefaultTool.SET_WORKFLOW_VALUES, name: "set_workflow_values", parameters: [{ name: "values", required: true, type: "object", description: "Workflow-value key/value map for the active workflow session.", additionalProperties: { type: "string" } }] }`
   - add `[ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT]: { id: ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT, name: "build_workflow_document", parameters: [{ name: "artifact_id", required: true, type: "string", description: "Canonical workflow artifact id selected upstream from the active workflow module's document-builder/artifact definition." }, { name: "destination_path", required: true, type: "string", description: "Resolved absolute destination path prepared upstream by WorkflowRuntime." }, { name: "content", required: true, type: "string", description: "Fully resolved markdown content to atomically write to the destination path." }, { name: "workflow_value_writes", required: false, type: "object", description: "Optional workflow-value writeback map to persist after a successful document write.", additionalProperties: { type: "string" } }] }`
-  - set the replaced workflow-specific document tool entries `BUILD_REVIEW_DIFF_OUTPUT`, `BUILD_EPICS_DOCUMENT`, `BUILD_EPIC_DELIVERY_SPEC`, `BUILD_STORY_DOCUMENT`, and `BUILD_TECH_SPEC_DOCUMENT` to `undefined`
-  - set `CONTINUE_BRAINSTORMING_SESSION` to `undefined` so it no longer participates in the foundational canonical workflow-tool surface
-  - leave deferred module-build tools like `BUILD_REVIEW_INPUT`, `CREATE_BRAINSTORMING_SESSION`, `SELECT_BRAINSTORMING_SESSION`, `PERSIST_BRAINSTORMING_APPROACH`, `SELECT_RANDOM_BRAINSTORMING_TECHNIQUE`, `PERSIST_BRAINSTORMING_TECHNIQUE`, `REQUEST_BRAINSTORMING_TECHNIQUE_SUGGESTION`, `CAPTURE_BRAINSTORMING_TOPIC`, and `SELECT_TARGET_EPIC` in place until their own rows retire or replace them
-  - leave `getBackendWorkflowToolContract(...)` and `isBackendWorkflowToolContractTool(...)` in place, but aligned to the rewritten map
+  - delete the legacy helper contract entries for `SET_WORKFLOW_PLACEHOLDERS`, `BUILD_REVIEW_DIFF_OUTPUT`, `BUILD_EPICS_DOCUMENT`, `CONTINUE_BRAINSTORMING_SESSION`, `CREATE_BRAINSTORMING_SESSION`, `SELECT_BRAINSTORMING_SESSION`, `PERSIST_BRAINSTORMING_APPROACH`, `SELECT_RANDOM_BRAINSTORMING_TECHNIQUE`, `PERSIST_BRAINSTORMING_TECHNIQUE`, `REQUEST_BRAINSTORMING_TECHNIQUE_SUGGESTION`, `PREPARE_BRAINSTORMING_SESSION`, `CAPTURE_BRAINSTORMING_TOPIC`, `SELECT_TARGET_EPIC`, `BUILD_EPIC_DELIVERY_SPEC`, `BUILD_STORY_DOCUMENT`, and `BUILD_TECH_SPEC_DOCUMENT`
+  - leave the surviving `BUILD_REVIEW_INPUT` and `CODE_REVIEW_SPEC_UPDATE` contracts unchanged in this phase
+  - leave `getBackendWorkflowToolContract(...)` and `isBackendWorkflowToolContractTool(...)` in place, but align them to the partial map shape
 
 ### `src/core/task/tools/response/ResponseToolRegistry.ts`
 
@@ -309,7 +332,9 @@ This document maps the code changes needed for the `Foundational Build` phase de
 
 ### `src/core/task/tools/types/TaskConfig.ts`
 
-- Lines `1`-`29` and `68`-`70`: update this file in one pass so `TaskConfig` carries the shared workflow runtime contract. Add type import `WorkflowRuntime` from `@/core/task/workflow-runtime/WorkflowRuntime`, and add required field `workflowRuntime: WorkflowRuntime` to `TaskConfig` alongside the existing tool-coordination fields. Do not make the field optional; every constructed `TaskConfig` in the foundational runtime must carry the shared workflow runtime instance.
+- Lines `1`-`29`, `68`-`70`, and `128`-`131`: update this file in one pass so `TaskConfig` carries the shared workflow runtime contract and no longer depends on deterministic-placeholder tool-context types. Add type import `WorkflowRuntime` from `@/core/task/workflow-runtime/WorkflowRuntime`, and add required field `workflowRuntime: WorkflowRuntime` to `TaskConfig` alongside the existing tool-coordination fields. Do not make the field optional; every constructed `TaskConfig` in the foundational runtime must carry the shared workflow runtime instance.
+  - delete the import of `DeterministicPlaceholderToolContext`
+  - rewrite `updateFCListFromToolResponse` so its callback signature is exactly `(taskProgress: string | undefined) => Promise<FocusChainChecklistUpdateResult>`
 
 ### `src/core/task/tools/utils/ToolConstants.ts`
 
@@ -317,7 +342,11 @@ This document maps the code changes needed for the `Foundational Build` phase de
 
 ### `src/core/task/ToolExecutor.ts`
 
-- Lines `1`-`33`, `71`-`143`, and `147`-`219`: update this file in one pass so `ToolExecutor` carries and forwards the shared workflow runtime. Add the `WorkflowRuntime` import, add/store a constructor dependency for the shared `workflowRuntime` instance alongside the other core task services, and include `workflowRuntime: this.workflowRuntime` in the `TaskConfig` returned by `asToolConfig()`. Leave `registerToolHandlers()` as the generic `toolUseNames`-driven registration loop; do not add workflow-specific registration logic to this file.
+- Lines `1`-`33`, `71`-`143`, `147`-`219`, and `702`-`808`: update this file in one pass so `ToolExecutor` carries and forwards the shared workflow runtime and stops using the retired pre/post-tool `task_progress` wrapper seam. Add the `WorkflowRuntime` import, add/store a constructor dependency for the shared `workflowRuntime` instance alongside the other core task services, and include `workflowRuntime: this.workflowRuntime` in the `TaskConfig` returned by `asToolConfig()`. Leave `registerToolHandlers()` as the generic `toolUseNames`-driven registration loop; do not add workflow-specific registration logic to this file.
+  - delete the imports of `applyPreToolTaskProgressUpdate` and `applyPostToolTaskProgressUpdate` from `./focus-chain/updateFromToolResponse`
+  - delete the pre-tool wrapper call before handler execution and the post-tool wrapper call after handler execution
+  - do not build or pass placeholder-era `toolContext` objects from this file
+  - leave the core tool execution flow, PostToolUse hook flow, and tool-result emission unchanged apart from removing that retired wrapper path
 
 ## Shared Workflow UI Contracts
 
@@ -536,7 +565,8 @@ This document maps the code changes needed for the `Foundational Build` phase de
 ### `src/core/prompts/system-prompt/registry/contextualNativeToolFilter.ts`
 
 - Lines `5`-`124`: rewrite this file in one pass so it remains only the generic native-tool filtering seam.
-  - stop importing `ACT_MODE_RESPONSE_TOOL_IDS`, `PLAN_MODE_RESPONSE_TOOL_IDS`, and `ALWAYS_PRESERVED_NATIVE_TOOL_IDS` from `./contextualToolMatrix`; rehome those three generic preservation constants in this file as part of the rewrite
+  - stop importing `ACT_MODE_RESPONSE_TOOL_IDS`, `PLAN_MODE_RESPONSE_TOOL_IDS`, and `ALWAYS_PRESERVED_NATIVE_TOOL_IDS` from `./contextualToolMatrix`
+  - define file-local generic preservation constants in this file named exactly `ACT_MODE_RESPONSE_TOOL_IDS`, `PLAN_MODE_RESPONSE_TOOL_IDS`, and `ALWAYS_PRESERVED_NATIVE_TOOL_IDS`; these constants become the non-legacy home for prompt-mode response-tool preservation and always-preserved native-tool preservation
   - delete imports/usages of `PLACEHOLDER_BUILTIN_BUNDLE_TOOLS`, `PLACEHOLDER_INDXR_BUNDLE_TOOLS`, and `PLACEHOLDER_WORKFLOW_STEP_MATRIX`
   - delete `BuiltInBundleName`, `IndxrBundleName`, `hasWorkflowMatrixRow(...)`, `normalizeWorkflowNameForMatrixLookup(...)`, `isBuiltInBundleName(...)`, and `isIndxrBundleName(...)`
   - keep `canonicalizeMcpToolName(...)`
@@ -882,6 +912,10 @@ This document maps the code changes needed for the `Foundational Build` phase de
 ### `src/core/task/focus-chain/deterministicPlaceholderProgression.ts`
 
 - Lines `1`-`1487`: delete this file during Foundational Build after caller rewiring removes all live imports/usages. Delete exported contracts `DeterministicPlaceholderToolContext`, `DeterministicPlaceholderProgressionResult`, `isDeterministicPlaceholderWorkflowSupported(...)`, and `applyDeterministicPlaceholderProgression(...)`, plus all private placeholder-era workflow-name allowlists, placeholder-value merging, artifact-path resolution, write-proof heuristics, scaffold validation, review-layer fallback logic, checklist mutation, and placeholder deterministic-state mutation in this file. Do not preserve any helper or compatibility shim; replacement behavior belongs in `WorkflowRuntime` plus workflow-module-owned next-action and deterministic-operation definitions.
+
+### `src/core/task/focus-chain/updateFromToolResponse.ts`
+
+- Lines `1`-`56`: delete this file during Foundational Build after caller rewiring removes all live imports/usages. Delete the import of `DeterministicPlaceholderToolContext`, plus `TaskProgressCarrier`, `TaskProgressUpdateOptions`, `PreToolTaskProgressUpdateResult`, `PostToolTaskProgressUpdateResult`, `applyPreToolTaskProgressUpdate(...)`, and `applyPostToolTaskProgressUpdate(...)`. Do not preserve pre-tool or post-tool `task_progress` wrapper behavior or placeholder-era tool-context shims in reduced form; this legacy wrapper seam is removed rather than remapped.
 
 ### `src/core/controller/file/openFocusChainFile.ts`
 

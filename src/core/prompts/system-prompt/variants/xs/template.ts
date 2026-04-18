@@ -1,6 +1,6 @@
 import { SystemPromptSection } from "../../templates/placeholders"
 
-export const baseTemplate = `{{${SystemPromptSection.AGENT_ROLE}}}
+export const baseTemplate = `{{${SystemPromptSection.WORKFLOW_SYSTEM_INSTRUCTIONS}}}
 
 ## {{${SystemPromptSection.RULES}}}
 
@@ -17,5 +17,7 @@ export const baseTemplate = `{{${SystemPromptSection.AGENT_ROLE}}}
 ## {{${SystemPromptSection.OBJECTIVE}}}
 
 ## {{${SystemPromptSection.SYSTEM_INFO}}}
+
+## {{${SystemPromptSection.WORKFLOW_INPUT}}}
 
 ## {{${SystemPromptSection.USER_INSTRUCTIONS}}}`

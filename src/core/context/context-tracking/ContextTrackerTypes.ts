@@ -1,12 +1,7 @@
-import type { ManagedWorkflowRunState } from "@/core/task/managed-workflows/types"
-import type {
-	ActivePlaceholderWorkflowDeterministicState,
-	AutoCompletedPlaceholderWorkflowStepNotice,
-} from "@/core/task/TaskState"
 import type { WorkflowFormSessionState } from "@/core/task/workflow-form/types"
+import type { PersistedWorkflowSession, WorkflowName } from "@/core/task/workflow-runtime/types"
 import type { WorkflowStartCardSessionState } from "@/core/task/workflow-start-card/types"
 import type { WorkflowStepResolutionSessionState } from "@/core/task/workflow-step-resolution/types"
-import type { ActivePlaceholderWorkflowSource } from "@/core/workflows/placeholder-workflow-step-details"
 
 // Type definitions for FileContextTracker
 export interface FileMetadataEntry {
@@ -39,14 +34,8 @@ export interface TaskMetadata {
 	files_in_context: FileMetadataEntry[]
 	model_usage: ModelMetadataEntry[]
 	environment_history: EnvironmentMetadataEntry[]
-	activeWorkflowId?: string
-	activePlaceholderWorkflowId?: string
-	activePlaceholderWorkflowSource?: ActivePlaceholderWorkflowSource
-	activePlaceholderWorkflowStableValues?: Record<string, string>
-	activePlaceholderWorkflowValues?: Record<string, string>
-	activePlaceholderWorkflowDeterministicState?: ActivePlaceholderWorkflowDeterministicState
-	activePlaceholderWorkflowTaskWriteProofPaths?: string[]
-	lastPromptedPlaceholderWorkflowChecklistLabel?: string
+	activeWorkflowName?: WorkflowName
+	activeWorkflowSession?: PersistedWorkflowSession
 	activeStoryTaskId?: string
 	activeStorySubtaskIds?: string[]
 	lastPromptedStoryTaskKey?: string
@@ -55,6 +44,4 @@ export interface TaskMetadata {
 	activeWorkflowStepResolutionSession?: WorkflowStepResolutionSessionState
 	suppressedWorkflowStepResolutionDefinitionIds?: string[]
 	suppressedWorkflowFormResolverIds?: string[]
-	pendingAutoCompletedPlaceholderWorkflowStepNotices?: AutoCompletedPlaceholderWorkflowStepNotice[]
-	managedWorkflowRun?: ManagedWorkflowRunState
 }
