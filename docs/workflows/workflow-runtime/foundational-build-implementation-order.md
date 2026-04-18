@@ -3849,3 +3849,5 @@ Status: complete
         - `newProjectTitle: "Fresh Workspace"`
       - then assert `submitWorkflowStartCard(...)` forwards the same mapped fields
   - do not assert `existingProjectOptions` on the built request; keep it only in the helper payload because `WorkflowStartCardSubmissionRequest` does not carry that field
+
+## Phase 9: Foundation Build Cleanup
