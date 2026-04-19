@@ -4271,4 +4271,5 @@ Status: complete
   - after the edit, this file must contain no `SET_WORKFLOW_PLACEHOLDERS` reference, no `BUILD_REVIEW_DIFF_OUTPUT` reference, no `CAPTURE_BRAINSTORMING_TOPIC` reference, no `PLACEHOLDER_WORKFLOW_START_SET_WORKFLOW_PLACEHOLDERS_RESOLVER_ID` symbol, and no `"Workflow Placeholder Reference"` string
   - do not make any other changes in this file
 
-## Phase 9.2: Post-Build Cleanup
+## Phase 9.2: Post-Build Typecheck Cleanup
+
