@@ -4102,7 +4102,7 @@ Status: complete
 
 ### `src/core/task/tools/ToolExecutorCoordinator.ts`
 
-Status: pending
+Status: complete
 
 - Lines `5`-`15` and `132`-`145`: revise this file in one pass.
   - delete exactly `import { CaptureBrainstormingTopicToolHandler } from "./handlers/CaptureBrainstormingTopicToolHandler"`
@@ -4139,7 +4139,7 @@ Status: complete
 
 ### `src/core/task/workflow-form/dictionaries/buildToolDictionary.ts`
 
-Status: pending
+Status: complete
 
 - Lines `66`-`145`: revise this file in one pass.
   - delete the entire exported object `buildReviewDiffOutputToolDictionaryConfig`
@@ -4162,7 +4162,7 @@ Status: pending
 
 ### `src/core/task/workflow-form/dictionaries/__tests__/buildToolDictionary.test.ts`
 
-Status: pending
+Status: complete
 
 - Lines `1`-`119`: revise this file in one pass.
   - delete the import of `captureBrainstormingTopicToolDictionaryConfig`
@@ -4194,7 +4194,7 @@ Status: pending
 
 ### `src/core/task/workflow-form/__tests__/schema.test.ts`
 
-Status: pending
+Status: complete
 
 - Lines `1`-`157`: revise this file in one pass.
   - delete `resolveWorkflowFormOneOfVariant` from the import list
@@ -4207,7 +4207,7 @@ Status: pending
 
 ### `src/core/task/workflow-form/WorkflowFormRegistry.ts`
 
-Status: pending
+Status: complete
 
 - Lines `8`-`24`, `42`-`87`, `175`-`341`, `393`-`483`, `485`-`580`, `907`-`980`, `1101`-`1149`, and `1237`-`1344`: revise this file in one pass.
   - delete the imports of `buildReviewDiffOutputToolDictionaryConfig`, `buildRuntimeToolDictionaryMarkdownFromConfig`, and `captureBrainstormingTopicToolDictionaryConfig`
@@ -4242,7 +4242,7 @@ Status: pending
 
 ### `src/core/task/workflow-form/__tests__/WorkflowFormRegistry.test.ts`
 
-Status: pending
+Status: complete
 
 - Lines `1`-`571`: revise this file in one pass.
   - delete the imports of `BRAINSTORMING_STEP_3_CAPTURE_TOPIC_RESOLVER_ID` and `CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID`
@@ -4270,3 +4270,5 @@ Status: pending
   - leave the unknown-resolver test unchanged
   - after the edit, this file must contain no `SET_WORKFLOW_PLACEHOLDERS` reference, no `BUILD_REVIEW_DIFF_OUTPUT` reference, no `CAPTURE_BRAINSTORMING_TOPIC` reference, no `PLACEHOLDER_WORKFLOW_START_SET_WORKFLOW_PLACEHOLDERS_RESOLVER_ID` symbol, and no `"Workflow Placeholder Reference"` string
   - do not make any other changes in this file
+
+## Phase 9.2: Post-Build Cleanup

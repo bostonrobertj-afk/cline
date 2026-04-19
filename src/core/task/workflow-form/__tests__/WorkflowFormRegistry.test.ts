@@ -4,14 +4,12 @@ import { describe, it } from "mocha"
 import type { WorkflowFormSessionState } from "../types"
 import {
 	BRAINSTORMING_STEP_2_PREPARE_SESSION_RESOLVER_ID,
-	BRAINSTORMING_STEP_3_CAPTURE_TOPIC_RESOLVER_ID,
 	BRAINSTORMING_STEP_4_CHOOSE_APPROACH_RESOLVER_ID,
 	buildBrainstormingStep2InitialDefinitionPayload,
 	buildBrainstormingStep4DefinitionPayload,
 	buildWorkflowStartDefinitionPayload,
-	CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID,
 	getWorkflowFormResolverDefinition,
-	PLACEHOLDER_WORKFLOW_START_SET_WORKFLOW_PLACEHOLDERS_RESOLVER_ID,
+	WORKFLOW_START_SET_WORKFLOW_VALUES_RESOLVER_ID,
 } from "../WorkflowFormRegistry"
 
 const EMPTY_DEFINITION: WorkflowFormDefinitionPayload = {
@@ -56,15 +54,15 @@ describe("WorkflowFormRegistry", () => {
 		const panel = definition.panels[definition.firstPanelId]
 
 		expect(definition.title).to.equal("Inputs for This Workflow")
-		expect(definition.toolDictionaryTitle).to.equal("Workflow Placeholder Reference")
-		expect(definition.toolDictionaryMarkdown).to.include("## set_workflow_placeholders")
+		expect(definition.toolDictionaryTitle).to.equal("Workflow Value Reference")
+		expect(definition.toolDictionaryMarkdown).to.include("## set_workflow_values")
 		expect(definition.toolDictionaryMarkdown).to.include("### Term Reference")
 		expect(definition.toolDictionaryMarkdown).to.include("`architecture_document`")
 		expect(definition.firstPanelId).to.equal("workflow_start_inputs")
 		expect(panel?.promptMarkdown).to.equal("Provide the following to start the workflow:")
 		expect(panel?.transition).to.deep.equal({
 			type: "deterministic_operation",
-			operationId: "set_workflow_placeholders",
+			operationId: "set_workflow_values",
 			terminal: true,
 		})
 		expect(panel?.fields.map((field) => field.key)).to.deep.equal([
@@ -99,8 +97,8 @@ describe("WorkflowFormRegistry", () => {
 		expect(panel?.fields.find((field) => field.key === "review_input")?.required).to.equal(true)
 	})
 
-	it("serializes workflow-start placeholder submissions into set_workflow_placeholders input", () => {
-		const resolver = getWorkflowFormResolverDefinition(PLACEHOLDER_WORKFLOW_START_SET_WORKFLOW_PLACEHOLDERS_RESOLVER_ID)
+	it("serializes workflow-start value submissions into set_workflow_values input", () => {
+		const resolver = getWorkflowFormResolverDefinition(WORKFLOW_START_SET_WORKFLOW_VALUES_RESOLVER_ID)
 		const definition = buildWorkflowStartDefinitionPayload({
 			workflowName: "review-adversarial-general.md",
 			workflowStartRequirements: {
@@ -122,10 +120,10 @@ describe("WorkflowFormRegistry", () => {
 			},
 		})
 
-		const outcome = resolver.buildOperationRequest(session, "set_workflow_placeholders")
+		const outcome = resolver.buildOperationRequest(session, "set_workflow_values")
 
 		expect(outcome).to.deep.equal({
-			toolName: "set_workflow_placeholders",
+			toolName: "set_workflow_values",
 			toolInput: {
 				values: {
 					review_input: "/tmp/review.md",
@@ -142,7 +140,7 @@ describe("WorkflowFormRegistry", () => {
 	})
 
 	it("classifies workflow-start tool results with the preserved success and failure behavior", () => {
-		const resolver = getWorkflowFormResolverDefinition(PLACEHOLDER_WORKFLOW_START_SET_WORKFLOW_PLACEHOLDERS_RESOLVER_ID)
+		const resolver = getWorkflowFormResolverDefinition(WORKFLOW_START_SET_WORKFLOW_VALUES_RESOLVER_ID)
 		const definition = buildWorkflowStartDefinitionPayload({
 			workflowName: "review-adversarial-general.md",
 			workflowStartRequirements: {
@@ -157,8 +155,8 @@ describe("WorkflowFormRegistry", () => {
 
 		expect(
 			resolver.applyOperationResult(session, {
-				operationId: "set_workflow_placeholders",
-				toolResultText: "Stored 1 workflow placeholder: review_input.",
+				operationId: "set_workflow_values",
+				toolResultText: "Stored 1 workflow value: review_input.",
 			}),
 		).to.deep.equal({
 			succeeded: true,
@@ -166,140 +164,12 @@ describe("WorkflowFormRegistry", () => {
 		})
 
 		const failure = resolver.applyOperationResult(session, {
-			operationId: "set_workflow_placeholders",
-			toolResultText: "Error: Missing required parameter 'values'. Provide at least one placeholder value to store.",
+			operationId: "set_workflow_values",
+			toolResultText: "Error: Missing required parameter 'values'. Provide at least one workflow value to store.",
 		})
 		expect(failure).to.deep.equal({
 			succeeded: false,
-			errorMessage: "Error: Missing required parameter 'values'. Provide at least one placeholder value to store.",
-		})
-	})
-
-	it("builds the Code Review Step 2 V2 definition with the prescribed panel ids and schema-derived source options", () => {
-		const resolver = getWorkflowFormResolverDefinition(CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID)
-		const definition = resolver.buildDefinition(
-			createSession({
-				workflowFormId: resolver.id,
-			}),
-		)
-		const sourceSelectionPanel = definition.panels.source_selection
-		const sourceDetailsPanel = definition.panels.source_details
-
-		expect(definition.title).to.equal("Review Diff Artifact")
-		expect(definition.firstPanelId).to.equal("confirm_resolution")
-		expect(Object.keys(definition.panels)).to.deep.equal(["confirm_resolution", "source_selection", "source_details"])
-		expect(sourceSelectionPanel?.fields[0]?.key).to.equal("source.type")
-		expect(sourceSelectionPanel?.fields[0]?.options?.map((option) => option.value)).to.deep.equal([
-			"commit",
-			"commit_range",
-			"ref_diff",
-			"worktree_head_scoped",
-		])
-		expect(sourceDetailsPanel?.backDestinationPanelId).to.equal("source_selection")
-		expect(sourceDetailsPanel?.backStaleValueKeysToClear).to.deep.equal([
-			"source.commit",
-			"source.base",
-			"source.head",
-			"scoped_paths",
-			"context_lines",
-		])
-		expect(sourceDetailsPanel?.transition).to.deep.equal({
-			type: "deterministic_operation",
-			operationId: "build_review_diff_output",
-			terminal: true,
-		})
-		expect(sourceSelectionPanel?.allowedActions).to.include("retry")
-		expect(sourceDetailsPanel?.allowedActions).to.include("retry")
-		expect(sourceDetailsPanel?.fields.find((field) => field.key === "source.commit")?.visibilityCondition).to.deep.equal({
-			sourceKey: "source.type",
-			operator: "equals",
-			value: "commit",
-		})
-		expect(sourceDetailsPanel?.fields.find((field) => field.key === "source.base")?.visibilityCondition).to.deep.equal({
-			sourceKey: "source.type",
-			operator: "equals",
-			values: ["commit_range", "ref_diff"],
-		})
-		expect(sourceDetailsPanel?.fields.find((field) => field.key === "context_lines")?.allowedValueType).to.equal("integer")
-	})
-
-	it("serializes the Code Review Step 2 diff request from V2 submitted values", () => {
-		const resolver = getWorkflowFormResolverDefinition(CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID)
-		const definition = resolver.buildDefinition(
-			createSession({
-				workflowFormId: resolver.id,
-			}),
-		)
-		const session = createSession({
-			workflowFormId: resolver.id,
-			definitionPayload: definition,
-			currentPanelId: "source_details",
-			values: {
-				"source.type": { valueType: "string", stringValue: "commit_range" },
-				"source.base": { valueType: "string", stringValue: "main" },
-				"source.head": { valueType: "string", stringValue: "feature/review-form" },
-				scoped_paths: {
-					valueType: "string",
-					stringValue: "src/core/task/index.ts\nwebview-ui/src/components/chat",
-				},
-				context_lines: { valueType: "integer", integerValue: 5 },
-			},
-		})
-
-		const outcome = resolver.buildOperationRequest(session, "build_review_diff_output")
-
-		expect(outcome.toolInput).to.deep.equal({
-			source: {
-				type: "commit_range",
-				base: "main",
-				head: "feature/review-form",
-			},
-			scoped_paths: ["src/core/task/index.ts", "webview-ui/src/components/chat"],
-			context_lines: 5,
-		})
-		expect(outcome.toolParams).to.deep.equal({
-			source: JSON.stringify({
-				type: "commit_range",
-				base: "main",
-				head: "feature/review-form",
-			}),
-			scoped_paths: JSON.stringify(["src/core/task/index.ts", "webview-ui/src/components/chat"]),
-			context_lines: "5",
-		})
-	})
-
-	it("preserves the machine-checkable Code Review Step 2 success and failure classification", () => {
-		const resolver = getWorkflowFormResolverDefinition(CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID)
-		const session = createSession({
-			workflowFormId: resolver.id,
-		})
-
-		expect(
-			resolver.applyOperationResult(session, {
-				operationId: "build_review_diff_output",
-				toolResultText: JSON.stringify({
-					persisted: true,
-					diff_available: true,
-					artifact_path: "/tmp/review-input.diff",
-				}),
-			}),
-		).to.deep.equal({
-			succeeded: true,
-			terminalSuccessMessage: "The Step 2 diff artifact is ready.",
-		})
-
-		expect(
-			resolver.applyOperationResult(session, {
-				operationId: "build_review_diff_output",
-				toolResultText: JSON.stringify({
-					persisted: false,
-					diff_available: false,
-					reason: "No Git-backed diff content was available for the requested source and scope.",
-				}),
-			}),
-		).to.deep.equal({
-			succeeded: false,
-			errorMessage: "No Git-backed diff content was available for the requested source and scope.",
+			errorMessage: "Error: Missing required parameter 'values'. Provide at least one workflow value to store.",
 		})
 	})
 
@@ -380,62 +250,6 @@ describe("WorkflowFormRegistry", () => {
 		).to.deep.equal({
 			succeeded: true,
 			terminalSuccessMessage: "The brainstorming session file is ready.",
-		})
-	})
-
-	it("builds the Brainstorming Step 3 V2 definition as a single-panel large-text form", () => {
-		const resolver = getWorkflowFormResolverDefinition(BRAINSTORMING_STEP_3_CAPTURE_TOPIC_RESOLVER_ID)
-		const definition = resolver.buildDefinition(
-			createSession({
-				workflowFormId: resolver.id,
-			}),
-		)
-		const panel = definition.panels[definition.firstPanelId]
-
-		expect(definition.title).to.equal("What topics and/or goals would you like to focus on for this brainstorming session?")
-		expect(definition.toolDictionaryTitle).to.equal("Brainstorming Topic Reference")
-		expect(panel?.promptMarkdown).to.equal("Be as detailed as you can- we'll worry about formatting later!")
-		expect(panel?.fields).to.have.lengthOf(1)
-		expect(panel?.fields[0]).to.include({
-			key: "topic",
-			kind: "large_text",
-			label: "Topic and Goals",
-			required: true,
-			allowedValueType: "string",
-		})
-		expect(panel?.fields[0]?.presentation).to.deep.equal({ textareaSize: "large" })
-		expect(panel?.allowedActions).to.include("retry")
-	})
-
-	it("serializes Brainstorming Step 3 topic text and preserves the approved success contract", () => {
-		const resolver = getWorkflowFormResolverDefinition(BRAINSTORMING_STEP_3_CAPTURE_TOPIC_RESOLVER_ID)
-		const definition = resolver.buildDefinition(
-			createSession({
-				workflowFormId: resolver.id,
-			}),
-		)
-		const session = createSession({
-			workflowFormId: resolver.id,
-			definitionPayload: definition,
-			values: {
-				topic: { valueType: "string", stringValue: "Line one\n\nLine two" },
-			},
-		})
-
-		expect(resolver.buildOperationRequest(session, "capture_brainstorming_topic")).to.deep.equal({
-			toolName: "capture_brainstorming_topic",
-			toolInput: { topic: "Line one\n\nLine two" },
-			toolParams: { topic: "Line one\n\nLine two" },
-		})
-
-		expect(
-			resolver.applyOperationResult(session, {
-				operationId: "capture_brainstorming_topic",
-				toolResultText: '{"persisted":true,"artifact_path":"/tmp/brainstorming.md","topic_captured":true}',
-			}),
-		).to.deep.equal({
-			succeeded: true,
-			terminalSuccessMessage: "The brainstorming session topic is ready.",
 		})
 	})
 

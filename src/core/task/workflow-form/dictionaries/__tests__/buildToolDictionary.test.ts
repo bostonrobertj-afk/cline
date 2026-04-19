@@ -7,7 +7,6 @@ import {
 	buildToolDictionaryMarkdown,
 	buildToolDictionaryMarkdownFromConfig,
 	buildWorkflowStartRuntimeToolDictionary,
-	captureBrainstormingTopicToolDictionaryConfig,
 	TOOL_DICTIONARY_TERM_KEYS,
 	WORKFLOW_FORM_TOOL_DICTIONARY_HEADING,
 } from "../buildToolDictionary"
@@ -23,9 +22,7 @@ describe("buildToolDictionaryMarkdown", () => {
 	it("renders required versus optional parameter status from the schema", () => {
 		const markdown = buildToolDictionaryMarkdown()
 
-		expect(markdown).to.include("- `source` (required, object):")
-		expect(markdown).to.include("- `scoped_paths` (optional, array):")
-		expect(markdown).to.include("- `context_lines` (optional, integer):")
+		expect(markdown).to.include("- `values` (required, object):")
 	})
 
 	it("keeps translation entries for every Phase 1 technical term used in the tool dictionary", () => {
@@ -39,12 +36,12 @@ describe("buildToolDictionaryMarkdown", () => {
 
 	it("renders any configured tool by looking up its schema through the workflow-form contract resolver", () => {
 		const config = {
-			toolName: ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS,
-			heading: "## set_workflow_placeholders",
-			runtimeTitle: "Workflow Placeholder Reference",
-			overviewLines: ["Persist workflow placeholder values."],
+			toolName: ClineDefaultTool.SET_WORKFLOW_VALUES,
+			heading: "## set_workflow_values",
+			runtimeTitle: "Workflow Value Reference",
+			overviewLines: ["Persist workflow values for the active workflow before the first AI turn begins."],
 			parameterDescriptions: {
-				values: "Workflow placeholder key/value map.",
+				values: "Workflow value key/value map. Submit only the values the human actually supplied.",
 			},
 			termKeys: [],
 		}
@@ -52,33 +49,12 @@ describe("buildToolDictionaryMarkdown", () => {
 		const markdown = buildToolDictionaryMarkdownFromConfig(config)
 		const runtimeMarkdown = buildRuntimeToolDictionaryMarkdownFromConfig(config)
 
-		expect(markdown).to.include("## set_workflow_placeholders")
-		expect(markdown).to.include("- `values` (required, object): Workflow placeholder key/value map.")
-		expect(runtimeMarkdown).to.include("## set_workflow_placeholders")
+		expect(markdown).to.include("## set_workflow_values")
+		expect(markdown).to.include(
+			"- `values` (required, object): Workflow value key/value map. Submit only the values the human actually supplied.",
+		)
+		expect(runtimeMarkdown).to.include("## set_workflow_values")
 		expect(runtimeMarkdown).to.not.include("# Workflow UI Surface Tool Dictionary")
-	})
-
-	it("renders the capture_brainstorming_topic parameter row from the workflow-form contract resolver", () => {
-		const markdown = buildRuntimeToolDictionaryMarkdownFromConfig(captureBrainstormingTopicToolDictionaryConfig)
-
-		expect(markdown).to.include("- `topic` (required, string):")
-	})
-
-	it("renders the brainstorming topic runtime tool dictionary", () => {
-		const markdown = buildRuntimeToolDictionaryMarkdownFromConfig(captureBrainstormingTopicToolDictionaryConfig)
-
-		expect(markdown).to.equal(`## capture_brainstorming_topic
-
-This form gathers your input regarding the topic for this brainstorming session and adds it to the brainstorming document before invoking the AI Agent.
-
-### Parameters
-
-- \`topic\` (required, string): The topic and/or goals you provide are added to the brainstorming document before GPT invocation
-
-### Term Reference
-
-- \`topic\`: The main focus area for this brainstorming session. The topic and/or goals you provide are added to the brainstorming document before GPT invocation
-`)
 	})
 
 	it("builds a workflow-start runtime dictionary with contextual term reference rows", () => {
@@ -86,8 +62,8 @@ This form gathers your input regarding the topic for this brainstorming session 
 			fieldKeys: ["review_input", "spec_file"],
 		})
 
-		expect(title).to.equal("Workflow Placeholder Reference")
-		expect(markdown).to.include("## set_workflow_placeholders")
+		expect(title).to.equal("Workflow Value Reference")
+		expect(markdown).to.include("## set_workflow_values")
 		expect(markdown).to.include("- `values` (required, object):")
 		expect(markdown).to.include("### Term Reference")
 		expect(markdown).to.include("`review_input`")
@@ -99,7 +75,7 @@ This form gathers your input regarding the topic for this brainstorming session 
 			fieldKeys: ["unmapped_input"],
 		})
 
-		expect(markdown).to.include("## set_workflow_placeholders")
+		expect(markdown).to.include("## set_workflow_values")
 		expect(markdown).to.include("### Parameters")
 		expect(markdown).to.not.include("### Term Reference")
 	})
@@ -109,8 +85,8 @@ describe("buildRuntimeToolDictionaryMarkdown", () => {
 	it("renders the runtime tool reference without internal workflow-ui-surface framing", () => {
 		const markdown = buildRuntimeToolDictionaryMarkdown()
 
-		expect(markdown).to.include("## build_review_diff_output")
-		expect(markdown).to.include("### Supported Source Variants")
+		expect(markdown).to.include("## set_workflow_values")
+		expect(markdown).to.include("- `values` (required, object):")
 		expect(markdown).to.include("### Parameters")
 		expect(markdown).to.include("### Term Reference")
 		expect(markdown).to.not.include("# Workflow UI Surface Tool Dictionary")

@@ -6,14 +6,13 @@ import {
 	deriveWorkflowFormFieldKind,
 	deriveWorkflowFormOptions,
 	normalizeWorkflowFormSubmittedValue,
-	resolveWorkflowFormOneOfVariant,
 	resolveWorkflowFormSchema,
 	validateWorkflowFormSubmittedValueAgainstSchema,
 } from "../schema"
 
 describe("workflow-form schema helpers", () => {
-	it("resolves set_workflow_placeholders additionalProperties as a string schema", () => {
-		const schema = resolveWorkflowFormSchema(ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS, {
+	it("resolves set_workflow_values additionalProperties as a string schema", () => {
+		const schema = resolveWorkflowFormSchema(ClineDefaultTool.SET_WORKFLOW_VALUES, {
 			parameterName: "values",
 			useAdditionalProperties: true,
 		})
@@ -117,18 +116,6 @@ describe("workflow-form schema helpers", () => {
 			base: "main",
 			head: "feature",
 		})
-	})
-
-	it("resolves build_review_diff_output source variants from oneOf by discriminator", () => {
-		const sourceSchema = resolveWorkflowFormSchema(ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT, {
-			parameterName: "source",
-		})
-		const variant = resolveWorkflowFormOneOfVariant(sourceSchema, "type", "commit_range")
-
-		expect(variant).to.not.equal(undefined)
-		expect(variant?.properties?.type?.const).to.equal("commit_range")
-		expect(variant?.properties?.base?.type).to.equal("string")
-		expect(variant?.properties?.head?.type).to.equal("string")
 	})
 
 	it("validates structured object submissions against required schema properties", () => {
