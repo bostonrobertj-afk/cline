@@ -1,6 +1,5 @@
 import type { ToolUse } from "@core/assistant-message"
 import { formatResponse } from "@core/prompts/responses"
-import { getPlaceholderWorkflowValueMap } from "@core/workflows/placeholder-workflow-rendering"
 import { getWorkspaceBasename } from "@core/workspace"
 import { getReadablePath, isLocatedInWorkspace } from "@utils/path"
 import fs from "fs/promises"
@@ -99,11 +98,10 @@ export class CodeReviewSpecUpdateToolHandler implements IToolHandler, IPartialBl
 	}
 
 	async execute(config: TaskConfig, block: ToolUse): Promise<ToolResponse> {
-		const placeholders =
-			getPlaceholderWorkflowValueMap(
-				config.taskState.activePlaceholderWorkflowStableValues,
-				config.taskState.activePlaceholderWorkflowValues,
-			) ?? {}
+		const placeholders = {
+			...(config.taskState.activePlaceholderWorkflowStableValues ?? {}),
+			...(config.taskState.activePlaceholderWorkflowValues ?? {}),
+		}
 
 		const reviewInputRaw = placeholders.review_input?.trim()
 		const storyPathRaw = placeholders.story_path?.trim()

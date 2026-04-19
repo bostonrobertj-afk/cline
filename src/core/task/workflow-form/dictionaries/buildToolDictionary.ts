@@ -63,70 +63,23 @@ export function isWorkflowFormSystemDictionaryKey(key: string): key is WorkflowF
 	return key in workflowFormSystemDictionary
 }
 
-export const buildReviewDiffOutputToolDictionaryConfig: WorkflowFormToolDictionaryContractConfig = {
-	toolName: ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT,
-	heading: "## build_review_diff_output",
-	runtimeTitle: "Diff Source Reference",
-	overviewLines: [
-		`${workflowFormSystemDictionary.artifact.label}. ${workflowFormSystemDictionary.artifact.medium}`,
-		"",
-		`${workflowFormSystemDictionary.source.label}. ${workflowFormSystemDictionary.source.medium}`,
-		"",
-		"### Supported Source Variants",
-		"",
-		getVariantReferenceLine("commit"),
-		getVariantReferenceLine("commit_range"),
-		getVariantReferenceLine("ref_diff"),
-		getVariantReferenceLine("worktree_head_scoped"),
-	],
+const workflowValueToolDictionaryConfig: WorkflowFormToolDictionaryContractConfig = {
+	toolName: ClineDefaultTool.SET_WORKFLOW_VALUES,
+	heading: "## set_workflow_values",
+	runtimeTitle: "Workflow Value Reference",
+	overviewLines: ["Persist workflow values for the active workflow before the first AI turn begins."],
 	parameterDescriptions: {
-		source: `${workflowFormSystemDictionary.source.label}. ${workflowFormSystemDictionary.source.medium} Supported variants: \`commit\`, \`commit_range\`, \`ref_diff\`, and \`worktree_head_scoped\`.`,
-		scoped_paths: `${workflowFormSystemDictionary.scoped_paths.label}. ${workflowFormSystemDictionary.scoped_paths.medium} Required when the source is \`worktree_head_scoped\`.`,
-		context_lines: `${workflowFormSystemDictionary.context_lines.label}. ${workflowFormSystemDictionary.context_lines.medium} Defaults to 3 when omitted.`,
+		values: "Workflow value key/value map. Submit only the values the human actually supplied.",
 	},
 	termKeys: TOOL_DICTIONARY_TERM_KEYS,
 }
-export const buildReviewInputToolDictionaryConfig: WorkflowFormToolDictionaryContractConfig = {
-	toolName: ClineDefaultTool.BUILD_REVIEW_INPUT,
-	heading: "## build_review_input",
-	runtimeTitle: "Review Input Reference",
-	overviewLines: [
-		"Review Input Artifact. Build and replace the stable review-input artifact at {review_input}.",
-		"",
-		"Workflow-owned Story File. The active workflow must already provide {story_path}; the form does not recollect it from the human.",
-		"",
-		"Workflow-owned Diff Artifact. The stable diff artifact at {diff_output} is resolved automatically and is not recollected from the human.",
-	],
-	parameterDescriptions: {},
-	termKeys: [],
-}
-export const captureBrainstormingTopicToolDictionaryConfig: WorkflowFormToolDictionaryContractConfig = {
-	toolName: ClineDefaultTool.CAPTURE_BRAINSTORMING_TOPIC,
-	heading: "## capture_brainstorming_topic",
-	runtimeTitle: "Brainstorming Topic Reference",
-	overviewLines: [
-		"This form gathers your input regarding the topic for this brainstorming session and adds it to the brainstorming document before invoking the AI Agent.",
-	],
-	parameterDescriptions: {
-		topic: workflowFormSystemDictionary.topic.medium,
-	},
-	termKeys: ["topic"],
-}
-export const WORKFLOW_FORM_TOOL_DICTIONARY_HEADING = buildReviewDiffOutputToolDictionaryConfig.heading
-export const WORKFLOW_FORM_RUNTIME_TOOL_REFERENCE_TITLE = buildReviewDiffOutputToolDictionaryConfig.runtimeTitle
+
+export const WORKFLOW_FORM_TOOL_DICTIONARY_HEADING = workflowValueToolDictionaryConfig.heading
+export const WORKFLOW_FORM_RUNTIME_TOOL_REFERENCE_TITLE = workflowValueToolDictionaryConfig.runtimeTitle
 
 export function buildWorkflowStartRuntimeToolDictionary(args: { fieldKeys: readonly string[] }) {
 	const termKeys = args.fieldKeys.filter(isWorkflowFormSystemDictionaryKey)
-	const config: WorkflowFormToolDictionaryContractConfig = {
-		toolName: ClineDefaultTool.SET_WORKFLOW_VALUES,
-		heading: "## set_workflow_values",
-		runtimeTitle: "Workflow Value Reference",
-		overviewLines: ["Persist workflow values for the active workflow before the first AI turn begins."],
-		parameterDescriptions: {
-			values: "Workflow value key/value map. Submit only the values the human actually supplied.",
-		},
-		termKeys,
-	}
+	const config = { ...workflowValueToolDictionaryConfig, termKeys }
 
 	return {
 		title: config.runtimeTitle,
@@ -152,9 +105,9 @@ export function buildRuntimeToolDictionaryMarkdownFromConfig(config: WorkflowFor
 }
 
 export function buildToolDictionaryMarkdown(): string {
-	return buildToolDictionaryMarkdownFromConfig(buildReviewDiffOutputToolDictionaryConfig)
+	return buildToolDictionaryMarkdownFromConfig(workflowValueToolDictionaryConfig)
 }
 
 export function buildRuntimeToolDictionaryMarkdown(): string {
-	return buildRuntimeToolDictionaryMarkdownFromConfig(buildReviewDiffOutputToolDictionaryConfig)
+	return buildRuntimeToolDictionaryMarkdownFromConfig(workflowValueToolDictionaryConfig)
 }

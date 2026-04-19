@@ -38,7 +38,6 @@ export enum ClineDefaultTool {
 	COMPLETE_WORKFLOW_ITEM = "complete_workflow_item",
 	SET_WORKFLOW_VALUES = "set_workflow_values",
 	BUILD_WORKFLOW_DOCUMENT = "build_workflow_document",
-	BUILD_REVIEW_INPUT = "build_review_input",
 	CONTINUE_BRAINSTORMING_SESSION = "continue_brainstorming_session",
 	CREATE_BRAINSTORMING_SESSION = "create_brainstorming_session",
 	SELECT_BRAINSTORMING_SESSION = "select_brainstorming_session",

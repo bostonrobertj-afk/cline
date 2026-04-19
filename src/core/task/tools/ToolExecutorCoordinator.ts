@@ -8,9 +8,7 @@ import { ApplyPatchHandler } from "./handlers/ApplyPatchHandler"
 import { AskFollowupQuestionToolHandler } from "./handlers/AskFollowupQuestionToolHandler"
 import { AttemptCompletionHandler } from "./handlers/AttemptCompletionHandler"
 import { BrowserToolHandler } from "./handlers/BrowserToolHandler"
-import { BuildReviewInputToolHandler } from "./handlers/BuildReviewInputToolHandler"
 import { BuildWorkflowDocumentToolHandler } from "./handlers/BuildWorkflowDocumentToolHandler"
-import { CaptureBrainstormingTopicToolHandler } from "./handlers/CaptureBrainstormingTopicToolHandler"
 import { CodeReviewSpecUpdateToolHandler } from "./handlers/CodeReviewSpecUpdateToolHandler"
 import { CompleteWorkflowItemToolHandler } from "./handlers/CompleteWorkflowItemToolHandler"
 import { CondenseHandler } from "./handlers/CondenseHandler"
@@ -130,7 +128,6 @@ export class ToolExecutorCoordinator {
 		[ClineDefaultTool.GENERATE_EXPLANATION]: (_v: ToolValidator) => new GenerateExplanationToolHandler(),
 		[ClineDefaultTool.USE_SKILL]: (_v: ToolValidator) => new UseSkillToolHandler(),
 		[ClineDefaultTool.SET_WORKFLOW_VALUES]: (_v: ToolValidator) => new SetWorkflowValuesToolHandler(),
-		[ClineDefaultTool.BUILD_REVIEW_INPUT]: (_v: ToolValidator) => new BuildReviewInputToolHandler(),
 		[ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT]: (_v: ToolValidator) => new BuildWorkflowDocumentToolHandler(),
 		[ClineDefaultTool.CONTINUE_BRAINSTORMING_SESSION]: (_v: ToolValidator) => undefined,
 		[ClineDefaultTool.CREATE_BRAINSTORMING_SESSION]: (_v: ToolValidator) => new CreateBrainstormingSessionToolHandler(),
@@ -142,7 +139,6 @@ export class ToolExecutorCoordinator {
 		[ClineDefaultTool.REQUEST_BRAINSTORMING_TECHNIQUE_SUGGESTION]: (_v: ToolValidator) =>
 			new RequestBrainstormingTechniqueSuggestionToolHandler(),
 		[ClineDefaultTool.PREPARE_BRAINSTORMING_SESSION]: (_v: ToolValidator) => undefined,
-		[ClineDefaultTool.CAPTURE_BRAINSTORMING_TOPIC]: (_v: ToolValidator) => new CaptureBrainstormingTopicToolHandler(),
 		[ClineDefaultTool.SELECT_TARGET_EPIC]: (_v: ToolValidator) => new SelectTargetEpicToolHandler(),
 		[ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE]: (_v: ToolValidator) => new CodeReviewSpecUpdateToolHandler(),
 		[ClineDefaultTool.STORY_TASK_REMINDER]: (_v: ToolValidator) => new StoryTaskReminderToolHandler(),

@@ -7,16 +7,16 @@ import { type WorkflowStepResolutionDefinition, type WorkflowStepResolutionSessi
 import { WorkflowStepResolutionRuntime } from "../WorkflowStepResolutionRuntime"
 
 const createDefinition = (args?: { id?: string; title?: string }): WorkflowStepResolutionDefinition => ({
-	id: args?.id ?? "code_review_step_3_review_input",
-	toolName: ClineDefaultTool.BUILD_REVIEW_INPUT,
+	id: args?.id ?? "quick_spec_step_2_build_tech_spec_document",
+	toolName: ClineDefaultTool.BUILD_TECH_SPEC_DOCUMENT,
 	buildStatusDefinition: () => ({
-		title: args?.title ?? "Review Input Artifact",
+		title: args?.title ?? "Tech Spec Scaffold",
 		pendingLabel: "Preparing workflow documents",
 		successLabel: "Workflow documents ready",
 		failureLabel: "Automatic workflow preparation failed- falling back to manual LLM workflow preparation.",
 	}),
 	buildToolExecutionRequest: () => ({
-		toolName: ClineDefaultTool.BUILD_REVIEW_INPUT,
+		toolName: ClineDefaultTool.BUILD_TECH_SPEC_DOCUMENT,
 		toolInput: {},
 		toolParams: {},
 	}),
@@ -26,18 +26,18 @@ const createDefinition = (args?: { id?: string; title?: string }): WorkflowStepR
 const createRuntime = (definitions?: Record<string, WorkflowStepResolutionDefinition>) =>
 	new WorkflowStepResolutionRuntime(
 		definitions ?? {
-			code_review_step_3_review_input: createDefinition(),
+			quick_spec_step_2_build_tech_spec_document: createDefinition(),
 		},
 	)
 
 const createPendingSession = (args?: Partial<WorkflowStepResolutionSessionState>): WorkflowStepResolutionSessionState => ({
-	sessionId: args?.sessionId ?? "session-code-review-step-3",
-	definitionId: args?.definitionId ?? "code_review_step_3_review_input",
+	sessionId: args?.sessionId ?? "session-quick-spec-step-2",
+	definitionId: args?.definitionId ?? "quick_spec_step_2_build_tech_spec_document",
 	triggerSource: "deterministic_workflow_progression",
 	owner: args?.owner ?? {
 		kind: "workflow_step",
-		workflowName: "code-review",
-		stepNumber: 3,
+		workflowName: "quick-spec",
+		stepNumber: 2,
 	},
 	state: args?.state ?? "pending",
 	lastError: args?.lastError,
@@ -47,21 +47,21 @@ describe("WorkflowStepResolutionRuntime", () => {
 	it("creates a session through runtime.createSession(...)", () => {
 		const runtime = createRuntime()
 		const session = runtime.createSession({
-			definitionId: "code_review_step_3_review_input",
+			definitionId: "quick_spec_step_2_build_tech_spec_document",
 			triggerSource: "deterministic_workflow_progression",
 			owner: {
 				kind: "workflow_step",
-				workflowName: "code-review",
-				stepNumber: 3,
+				workflowName: "quick-spec",
+				stepNumber: 2,
 			},
 		})
 
-		expect(session.definitionId).to.equal("code_review_step_3_review_input")
+		expect(session.definitionId).to.equal("quick_spec_step_2_build_tech_spec_document")
 		expect(session.triggerSource).to.equal("deterministic_workflow_progression")
 		expect(session.owner).to.deep.equal({
 			kind: "workflow_step",
-			workflowName: "code-review",
-			stepNumber: 3,
+			workflowName: "quick-spec",
+			stepNumber: 2,
 		})
 		expect(session.state).to.equal("pending")
 		expect(session.sessionId).to.be.a("string").and.not.empty
@@ -72,15 +72,15 @@ describe("WorkflowStepResolutionRuntime", () => {
 		const payload = runtime.buildPayload(createPendingSession())
 
 		expect(payload).to.deep.equal({
-			sessionId: "session-code-review-step-3",
-			definitionId: "code_review_step_3_review_input",
+			sessionId: "session-quick-spec-step-2",
+			definitionId: "quick_spec_step_2_build_tech_spec_document",
 			owner: {
-				workflowName: "code-review",
-				stepNumber: 3,
+				workflowName: "quick-spec",
+				stepNumber: 2,
 			},
 			state: "pending",
 			definition: {
-				title: "Review Input Artifact",
+				title: "Tech Spec Scaffold",
 				pendingLabel: "Preparing workflow documents",
 				successLabel: "Workflow documents ready",
 				failureLabel: "Automatic workflow preparation failed- falling back to manual LLM workflow preparation.",

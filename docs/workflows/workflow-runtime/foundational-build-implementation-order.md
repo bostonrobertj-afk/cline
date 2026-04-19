@@ -3851,3 +3851,422 @@ Status: complete
   - do not assert `existingProjectOptions` on the built request; keep it only in the helper payload because `WorkflowStartCardSubmissionRequest` does not carry that field
 
 ## Phase 9: Foundation Build Cleanup
+
+### `src/shared/tools.ts`
+
+Status: complete
+
+- Lines `8`-`54`: revise this file in one pass.
+  - in `ClineDefaultTool`, delete exactly `BUILD_REVIEW_INPUT = "build_review_input",`
+  - this enum member currently sits between `BUILD_WORKFLOW_DOCUMENT = "build_workflow_document",` and `CONTINUE_BRAINSTORMING_SESSION = "continue_brainstorming_session",`; after the edit, `BUILD_WORKFLOW_DOCUMENT` must be followed immediately by `CONTINUE_BRAINSTORMING_SESSION`
+  - leave every other enum member unchanged and in its current order
+  - leave `toolUseNames`, `dynamicToolUseNamesByNamespace`, `setDynamicToolUseNames(...)`, `getToolUseNames(...)`, and `READ_ONLY_TOOLS` unchanged
+  - after the edit, this file must contain no `BUILD_REVIEW_INPUT` symbol and no `"build_review_input"` string
+  - do not make any other changes in this file
+
+### `src/core/task/tools/backendWorkflowToolContracts.ts`
+
+Status: complete
+
+- Lines `4`-`67`: revise this file in one pass.
+  - delete the entire contract entry keyed by `ClineDefaultTool.BUILD_REVIEW_INPUT`
+  - delete exactly the nested fields belonging to that entry: `id: ClineDefaultTool.BUILD_REVIEW_INPUT`, `name: "build_review_input"`, and `parameters: []`
+  - leave the `backendWorkflowToolContracts` type exactly as `Partial<Record<ClineDefaultTool, BackendWorkflowToolContract>>`
+  - leave the remaining `SET_WORKFLOW_VALUES`, `BUILD_WORKFLOW_DOCUMENT`, and `CODE_REVIEW_SPEC_UPDATE` contract entries unchanged in shape, content, and order
+  - leave `getBackendWorkflowToolContract(...)` unchanged
+  - leave `isBackendWorkflowToolContractTool(...)` unchanged
+  - after the edit, this file must contain no `build_review_input` string and no `ClineDefaultTool.BUILD_REVIEW_INPUT` reference
+  - do not make any other changes in this file
+
+### `src/core/task/tools/response/ResponseToolRegistry.ts`
+
+Status: complete
+
+- Lines `4`-`113`: revise this file in one pass.
+  - in `RESPONSE_TOOL_METADATA`, delete exactly `[ClineDefaultTool.BUILD_REVIEW_INPUT]: undefined,`
+  - this entry currently sits between `[ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT]: undefined,` and `[ClineDefaultTool.CONTINUE_BRAINSTORMING_SESSION]: undefined,`; after the edit, `BUILD_WORKFLOW_DOCUMENT` must be followed immediately by `CONTINUE_BRAINSTORMING_SESSION`
+  - leave the governed response-tool metadata entries unchanged: `ATTEMPT`, `ASK`, `SEND_USER_MESSAGE`, `WORKFLOW_PROGRESS_REQUEST`, `PLAN_MODE`, and `ACT_MODE`
+  - leave all remaining non-response entries unchanged, including `CODE_REVIEW_SPEC_UPDATE` and the surviving workflow-owned non-response tools that still map to `undefined`
+  - leave `ResponseToolRegistry.get(...)` unchanged
+  - leave `ResponseToolRegistry.isResponseTool(...)` unchanged
+  - after the edit, this file must contain no `ClineDefaultTool.BUILD_REVIEW_INPUT` reference
+  - do not make any other changes in this file
+
+### `src/core/task/tools/response/__tests__/ResponseToolRuntime.test.ts`
+
+Status: complete
+
+- Lines `82`-`94`: revise this file in one pass.
+  - inside the test named `it("keeps workflow-owned deterministic tools registered as non-response tools", ...)`, delete exactly `assert.equal(ResponseToolRegistry.get(ClineDefaultTool.BUILD_REVIEW_INPUT), undefined)`
+  - leave the test name unchanged
+  - leave the remaining assertions in that test unchanged and in their current order: `SELECT_TARGET_EPIC`, `SET_WORKFLOW_VALUES`, `BUILD_WORKFLOW_DOCUMENT`, `CONTINUE_BRAINSTORMING_SESSION`, `CREATE_BRAINSTORMING_SESSION`, `SELECT_BRAINSTORMING_SESSION`, `PERSIST_BRAINSTORMING_APPROACH`, `SELECT_RANDOM_BRAINSTORMING_TECHNIQUE`, `PERSIST_BRAINSTORMING_TECHNIQUE`, and `REQUEST_BRAINSTORMING_TECHNIQUE_SUGGESTION`
+  - leave every other test in this file unchanged
+  - after the edit, this file must contain no `BUILD_REVIEW_INPUT` reference
+  - do not make any other changes in this file
+
+### `src/core/task/tools/autoApprove.ts`
+
+Status: complete
+
+- Lines `42`-`146`: revise this file in one pass.
+  - delete exactly the three `case ClineDefaultTool.BUILD_REVIEW_INPUT:` branches at lines `55`, `88`, and `123`
+  - remove the line `case ClineDefaultTool.BUILD_REVIEW_INPUT:` from the `yoloModeToggled` switch in `shouldAutoApproveTool(...)`
+  - remove the line `case ClineDefaultTool.BUILD_REVIEW_INPUT:` from the `autoApproveAllToggled` switch in `shouldAutoApproveTool(...)`
+  - remove the line `case ClineDefaultTool.BUILD_REVIEW_INPUT:` from the `autoApprovalSettings` switch in `shouldAutoApproveTool(...)`
+  - leave every surrounding case label unchanged, including `BUILD_REVIEW_DIFF_OUTPUT` and `CODE_REVIEW_SPEC_UPDATE`
+  - leave all grouped return values unchanged
+  - leave `shouldAutoApproveToolWithPath(...)` unchanged
+  - after the edit, this file must contain no `ClineDefaultTool.BUILD_REVIEW_INPUT` reference and no `build_review_input` string
+  - do not make any other changes in this file
+
+### `src/core/task/tools/ToolExecutorCoordinator.ts`
+
+Status: complete
+
+- Lines `5`-`15` and `99`-`153`: revise this file in one pass.
+  - delete exactly `import { BuildReviewInputToolHandler } from "./handlers/BuildReviewInputToolHandler"`
+  - delete exactly `[ClineDefaultTool.BUILD_REVIEW_INPUT]: (_v: ToolValidator) => new BuildReviewInputToolHandler(),`
+  - leave every other import unchanged, including `CodeReviewSpecUpdateToolHandler`
+  - leave every other `toolHandlersMap` entry unchanged
+  - after the edit, `[ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT]: (_v: ToolValidator) => new BuildWorkflowDocumentToolHandler(),` must follow immediately after `[ClineDefaultTool.SET_WORKFLOW_VALUES]: (_v: ToolValidator) => new SetWorkflowValuesToolHandler(),`
+  - leave `SharedToolHandler`, `register(...)`, `registerByName(...)`, `has(...)`, `getHandler(...)`, and `execute(...)` unchanged
+  - after the edit, this file must contain no `BuildReviewInputToolHandler` symbol and no `ClineDefaultTool.BUILD_REVIEW_INPUT` reference
+  - do not make any other changes in this file
+
+### `src/core/task/tools/handlers/BuildReviewInputToolHandler.ts`
+
+Status: complete
+
+- Whole file: delete this file in one pass.
+- Do not replace it with a stub, deprecated wrapper, passthrough shim, or local compatibility helper.
+
+### `src/core/task/tools/handlers/buildReviewInputExtraction.ts`
+
+Status: complete
+
+- Whole file: delete this file in one pass.
+- Do not preserve any exported helper, type, or parsing fallback from this file.
+
+### `src/core/task/tools/handlers/__tests__/buildReviewInputExtraction.test.ts`
+
+Status: complete
+
+- Whole file: delete this file in one pass.
+- Do not remap these extraction assertions onto another handler or helper in this step.
+- Do not read or edit any other file in this step.
+
+### `src/core/task/tools/handlers/CodeReviewSpecUpdateToolHandler.ts`
+
+Status: complete
+
+- Lines `1`-`16` and `101`-`126`: revise this file in one pass.
+  - delete exactly `import { getPlaceholderWorkflowValueMap } from "@core/workflows/placeholder-workflow-rendering"`
+  - keep every other import unchanged
+  - replace the existing `const placeholders = getPlaceholderWorkflowValueMap(... ) ?? {}` block with exactly:
+    ```ts
+    const placeholders = {
+    	...(config.taskState.activePlaceholderWorkflowStableValues ?? {}),
+    	...(config.taskState.activePlaceholderWorkflowValues ?? {}),
+    }
+    ```
+  - preserve this merge precedence exactly: stable placeholder values first, active placeholder values second, so active values override stable values on key collision
+  - leave `review_input` and `story_path` lookup semantics unchanged
+  - leave `resolutionBase`, path resolution, approval flow, file-write behavior, write-proof persistence, task-state mutations, and returned result shape unchanged
+  - after the edit, this file must contain no `getPlaceholderWorkflowValueMap` reference and no `@core/workflows/placeholder-workflow-rendering` import
+  - do not make any other changes in this file
+
+### `src/core/task/tools/handlers/__tests__/ManagedWorkflowHandlers.test.ts`
+
+Status: complete
+
+- Lines `19`-`35`, `181`-`285`, and `2287`-`2433`: revise this file in one pass.
+  - delete exactly `import { BuildReviewInputToolHandler } from "../BuildReviewInputToolHandler"`
+  - leave every other import unchanged, including `CodeReviewSpecUpdateToolHandler`
+  - delete the entire helper `async function createReviewInputRepo(options?: { diffTouchesStory?: boolean }) { ... }`
+  - delete exactly these four test blocks:
+    - `it("builds and atomically replaces review-input.md from a story file and matching stable diff artifact", ...)`
+    - `it("returns the structured no-go result when diff_output does not identify recent changes to the story file", ...)`
+    - `it("hard-errors when the provided story file lacks deterministic story structure", ...)`
+    - `it("requires story_path from merged placeholder state", ...)`
+  - leave the existing `CodeReviewSpecUpdateToolHandler` tests unchanged
+  - leave all other surviving handler coverage unchanged
+  - after the edit, this file must contain no `BuildReviewInputToolHandler` symbol and no `build_review_input` string
+  - do not make any other changes in this file
+
+### `src/core/task/workflow-step-resolution/__tests__/WorkflowStepResolutionRuntime.test.ts`
+
+Status: complete
+
+- Lines `9`-`110`: revise this file in one pass.
+  - in `createDefinition(...)`, change the default `id` from `"code_review_step_3_review_input"` to `"quick_spec_step_2_build_tech_spec_document"`
+  - in `createDefinition(...)`, change both `toolName` values from `ClineDefaultTool.BUILD_REVIEW_INPUT` to `ClineDefaultTool.BUILD_TECH_SPEC_DOCUMENT`
+  - in `createDefinition(...)`, change the default status-definition `title` from `"Review Input Artifact"` to `"Tech Spec Scaffold"`
+  - leave `pendingLabel`, `successLabel`, and `failureLabel` unchanged
+  - in `createRuntime(...)`, change the default definitions map key from `code_review_step_3_review_input` to `quick_spec_step_2_build_tech_spec_document`
+  - in `createPendingSession(...)`, change the default `sessionId` from `"session-code-review-step-3"` to `"session-quick-spec-step-2"`
+  - in `createPendingSession(...)`, change the default `definitionId` from `"code_review_step_3_review_input"` to `"quick_spec_step_2_build_tech_spec_document"`
+  - in `createPendingSession(...)`, change the default owner from `workflowName: "code-review", stepNumber: 3` to `workflowName: "quick-spec", stepNumber: 2`
+  - in the `creates a session through runtime.createSession(...)` test, change the input `definitionId` and expected `session.definitionId` to `"quick_spec_step_2_build_tech_spec_document"`
+  - in that same test, change the expected owner to `workflowName: "quick-spec", stepNumber: 2`
+  - in the `builds a payload from createPendingSession()` test, change the expected `sessionId` to `"session-quick-spec-step-2"`
+  - in that same test, change the expected `definitionId` to `"quick_spec_step_2_build_tech_spec_document"`
+  - in that same test, change the expected owner to `workflowName: "quick-spec", stepNumber: 2`
+  - in that same test, change the expected definition `title` to `"Tech Spec Scaffold"`
+  - leave the terminal success and terminal failure tests unchanged
+  - after the edit, this file must contain no `ClineDefaultTool.BUILD_REVIEW_INPUT` reference and no `"code_review_step_3_review_input"` string
+  - do not make any other changes in this file
+
+### `src/core/task/workflow-step-resolution/WorkflowStepResolutionRegistry.ts`
+
+Status: complete
+
+- Whole file: delete this file in one pass.
+- Treat this registry as dead legacy cleanup surface; do not preserve the review-input definition ids, the quick-spec/brainstorming constants, the registry map, or `getWorkflowStepResolutionDefinition(...)` as a compatibility layer.
+
+### `src/core/task/workflow-step-resolution/__tests__/WorkflowStepResolutionRegistry.test.ts`
+
+Status: complete
+
+- Whole file: delete this file in one pass.
+- Do not rehome these assertions into `WorkflowStepResolutionRuntime.test.ts` in this step.
+- Do not read or edit any other file in this step.
+
+### `src/core/task/workflow-step-resolution/WorkflowStepResolutionTriggerRegistry.ts`
+
+Status: complete
+
+- Whole file: delete this file in one pass.
+- Do not preserve the trigger-definition contract, the trigger registry array, `getWorkflowStepResolutionTriggerDefinition(...)`, or any placeholder/write-proof helper logic as a compatibility shim.
+
+### `src/core/task/workflow-step-resolution/__tests__/WorkflowStepResolutionTriggerRegistry.test.ts`
+
+Status: complete
+
+- Whole file: delete this file in one pass.
+- Do not remap these trigger assertions onto `WorkflowRuntime` in this cleanup row.
+- Do not read or edit any other file in this step.
+
+### `src/core/task/workflow-form/dictionaries/buildToolDictionary.ts`
+
+Status: complete
+
+- Lines `66`-`114`: revise this file in one pass.
+  - delete the entire exported object `buildReviewInputToolDictionaryConfig`
+  - delete exactly the block that begins with `export const buildReviewInputToolDictionaryConfig: WorkflowFormToolDictionaryContractConfig = {`
+  - delete that block through its closing `}`
+  - leave `buildReviewDiffOutputToolDictionaryConfig` unchanged
+  - leave `captureBrainstormingTopicToolDictionaryConfig` unchanged
+  - leave `WORKFLOW_FORM_TOOL_DICTIONARY_HEADING`, `WORKFLOW_FORM_RUNTIME_TOOL_REFERENCE_TITLE`, `buildWorkflowStartRuntimeToolDictionary(...)`, `buildToolDictionaryMarkdownFromConfig(...)`, `buildRuntimeToolDictionaryMarkdownFromConfig(...)`, `buildToolDictionaryMarkdown()`, and `buildRuntimeToolDictionaryMarkdown()` unchanged
+  - after the edit, `captureBrainstormingTopicToolDictionaryConfig` must follow immediately after `buildReviewDiffOutputToolDictionaryConfig`
+  - after the edit, this file must contain no `buildReviewInputToolDictionaryConfig` symbol, no `ClineDefaultTool.BUILD_REVIEW_INPUT` reference, and no `"## build_review_input"` string
+  - do not make any other changes in this file
+
+### `src/core/task/workflow-form/WorkflowFormTriggerRegistry.ts`
+
+Status: complete
+
+- Whole file: delete this file in one pass.
+- Do not preserve:
+  - `WorkflowFormWorkflowStepTriggerDefinition`
+  - `WorkflowFormStartCandidate`
+  - `WorkflowFormWorkflowStepCandidate`
+  - `resolveWorkflowFormSlashCommandStartCandidate(...)`
+  - `workflowFormWorkflowStepTriggerRegistry`
+  - `getWorkflowFormWorkflowStepTriggerDefinition(...)`
+  - `resolveWorkflowFormWorkflowStepCandidate(...)`
+- Do not replace the file with a compatibility shim.
+
+### `src/core/task/workflow-form/__tests__/WorkflowFormTriggerRegistry.test.ts`
+
+Status: complete
+
+- Whole file: delete this file in one pass.
+- Do not preserve the parser-only `parseWorkflowStartRequirements(...)` assertions after deleting this suite.
+- Do not read or edit any other file in this step.
+
+### `src/core/task/workflow-form/workflowStartRequirements.ts`
+
+Status: complete
+
+- Whole file: delete this file in one pass after deleting the legacy workflow-form trigger registry and its test suite.
+- Do not preserve the directive prefix constants, parser helper functions, or `parseWorkflowStartRequirements(...)` export.
+
+### `src/core/workflows/brainstormingSessionFiles.ts`
+
+Status: complete
+
+- Whole file: delete this file in one pass after deleting the legacy workflow-form/step-resolution trigger registries that currently import it.
+- Do not preserve session-discovery helpers, path-resolution helpers, template-read helpers, or markdown section helpers from this file as standalone legacy utilities.
+
+## Phase 9 Follow-Up: Capture Topic Import Cleanup
+
+### `src/core/task/tools/ToolExecutorCoordinator.ts`
+
+Status: pending
+
+- Lines `5`-`15` and `132`-`145`: revise this file in one pass.
+  - delete exactly `import { CaptureBrainstormingTopicToolHandler } from "./handlers/CaptureBrainstormingTopicToolHandler"`
+  - delete exactly `[ClineDefaultTool.CAPTURE_BRAINSTORMING_TOPIC]: (_v: ToolValidator) => new CaptureBrainstormingTopicToolHandler(),`
+  - leave every other import unchanged, including `CreateBrainstormingSessionToolHandler`, `SelectBrainstormingSessionToolHandler`, `PersistBrainstormingApproachToolHandler`, `SelectRandomBrainstormingTechniqueToolHandler`, and `RequestBrainstormingTechniqueSuggestionToolHandler`
+  - leave every other `toolHandlersMap` entry unchanged
+  - after the edit, `[ClineDefaultTool.PREPARE_BRAINSTORMING_SESSION]: (_v: ToolValidator) => undefined,` must be followed immediately by `[ClineDefaultTool.SELECT_TARGET_EPIC]: (_v: ToolValidator) => new SelectTargetEpicToolHandler(),`
+  - leave `SharedToolHandler`, `register(...)`, `registerByName(...)`, `has(...)`, `getHandler(...)`, and `execute(...)` unchanged
+  - after the edit, this file must contain no `CaptureBrainstormingTopicToolHandler` symbol and no `ClineDefaultTool.CAPTURE_BRAINSTORMING_TOPIC` reference
+  - do not make any other changes in this file
+
+### `src/core/task/tools/handlers/__tests__/ManagedWorkflowHandlers.test.ts`
+
+Status: complete
+
+- Lines `18`-`25`, `500`-`526`, and `2824`-`3122`: revise this file in one pass.
+  - delete exactly `import { CaptureBrainstormingTopicToolHandler } from "../CaptureBrainstormingTopicToolHandler"`
+  - leave every other import unchanged, including `ContinueBrainstormingSessionToolHandler`, `CreateBrainstormingSessionToolHandler`, `PersistBrainstormingApproachToolHandler`, `PersistBrainstormingTechniqueToolHandler`, `RequestBrainstormingTechniqueSuggestionToolHandler`, and `CodeReviewSpecUpdateToolHandler`
+  - delete the entire helper `async function createCaptureBrainstormingTopicRepo(options?: { outputFileContents?: string; outputFileRelativePath?: string }) { ... }`
+  - delete exactly these seven test blocks:
+    - `it("captures the brainstorming topic, preserves the remaining template headings, and records write proof", ...)`
+    - `it("rejects capture_brainstorming_topic outside brainstorming step 3", ...)`
+    - `it("requires a non-empty topic for capture_brainstorming_topic", ...)`
+    - `it("requires output_file from merged placeholder workflow state for capture_brainstorming_topic", ...)`
+    - `it("fails when the resolved output_file cannot be read for capture_brainstorming_topic", ...)`
+    - `it("fails when the brainstorming artifact lacks the canonical Topic heading", ...)`
+    - `it("replaces the existing Topic section body instead of appending for capture_brainstorming_topic", ...)`
+  - leave the `createBrainstormingWorkflowRepo(...)` helper unchanged
+  - leave all surviving brainstorming-session, brainstorming-approach, brainstorming-technique, and code-review-spec-update coverage unchanged
+  - after the edit, this file must contain no `CaptureBrainstormingTopicToolHandler` symbol and no `capture_brainstorming_topic` string
+  - do not make any other changes in this file
+
+## Phase 9 Follow-Up: Workflow Form Legacy Tool-Contract Cleanup
+
+### `src/core/task/workflow-form/dictionaries/buildToolDictionary.ts`
+
+Status: pending
+
+- Lines `66`-`145`: revise this file in one pass.
+  - delete the entire exported object `buildReviewDiffOutputToolDictionaryConfig`
+  - delete the entire exported object `captureBrainstormingTopicToolDictionaryConfig`
+  - immediately after `isWorkflowFormSystemDictionaryKey(...)`, add one new local constant named `workflowValueToolDictionaryConfig: WorkflowFormToolDictionaryContractConfig` with exactly:
+    - `toolName: ClineDefaultTool.SET_WORKFLOW_VALUES`
+    - `heading: "## set_workflow_values"`
+    - `runtimeTitle: "Workflow Value Reference"`
+    - `overviewLines: ["Persist workflow values for the active workflow before the first AI turn begins."]`
+    - `parameterDescriptions: { values: "Workflow value key/value map. Submit only the values the human actually supplied." }`
+    - `termKeys: TOOL_DICTIONARY_TERM_KEYS`
+  - change `WORKFLOW_FORM_TOOL_DICTIONARY_HEADING` to `workflowValueToolDictionaryConfig.heading`
+  - change `WORKFLOW_FORM_RUNTIME_TOOL_REFERENCE_TITLE` to `workflowValueToolDictionaryConfig.runtimeTitle`
+  - in `buildWorkflowStartRuntimeToolDictionary(...)`, keep the existing `termKeys` filter, but replace the inline config literal with `const config = { ...workflowValueToolDictionaryConfig, termKeys }`
+  - change `buildToolDictionaryMarkdown()` to `return buildToolDictionaryMarkdownFromConfig(workflowValueToolDictionaryConfig)`
+  - change `buildRuntimeToolDictionaryMarkdown()` to `return buildRuntimeToolDictionaryMarkdownFromConfig(workflowValueToolDictionaryConfig)`
+  - leave `WorkflowFormToolDictionaryContractConfig`, `getVariantReferenceLine(...)`, `buildToolDictionaryEntryLines(...)`, `TOOL_DICTIONARY_TERM_KEYS`, `isWorkflowFormSystemDictionaryKey(...)`, `buildToolDictionaryMarkdownFromConfig(...)`, and `buildRuntimeToolDictionaryMarkdownFromConfig(...)` unchanged
+  - after the edit, this file must contain no `ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT` reference, no `ClineDefaultTool.CAPTURE_BRAINSTORMING_TOPIC` reference, no `"## build_review_diff_output"` string, and no `"## capture_brainstorming_topic"` string
+  - do not make any other changes in this file
+
+### `src/core/task/workflow-form/dictionaries/__tests__/buildToolDictionary.test.ts`
+
+Status: pending
+
+- Lines `1`-`119`: revise this file in one pass.
+  - delete the import of `captureBrainstormingTopicToolDictionaryConfig`
+  - keep the import of `ClineDefaultTool`
+  - keep the imports of `buildRuntimeToolDictionaryMarkdown`, `buildRuntimeToolDictionaryMarkdownFromConfig`, `buildToolDictionaryMarkdown`, `buildToolDictionaryMarkdownFromConfig`, `buildWorkflowStartRuntimeToolDictionary`, `TOOL_DICTIONARY_TERM_KEYS`, and `WORKFLOW_FORM_TOOL_DICTIONARY_HEADING`
+  - in the configured-tool lookup test, change the config literal to:
+    - `toolName: ClineDefaultTool.SET_WORKFLOW_VALUES`
+    - `heading: "## set_workflow_values"`
+    - `runtimeTitle: "Workflow Value Reference"`
+    - `overviewLines: ["Persist workflow values for the active workflow before the first AI turn begins."]`
+    - `parameterDescriptions: { values: "Workflow value key/value map. Submit only the values the human actually supplied." }`
+    - `termKeys: []`
+  - in that same test, change the expectations to `## set_workflow_values` and `- \`values\` (required, object): Workflow value key/value map. Submit only the values the human actually supplied.`
+  - delete the entire `it("renders the capture_brainstorming_topic parameter row from the workflow-form contract resolver", ...)` block
+  - delete the entire `it("renders the brainstorming topic runtime tool dictionary", ...)` block
+  - in the workflow-start runtime dictionary test, change the expected title to `"Workflow Value Reference"`
+  - in that same test, change the heading expectation from `## set_workflow_placeholders` to `## set_workflow_values`
+  - in the workflow-start no-mapped-keys test, change the heading expectation from `## set_workflow_placeholders` to `## set_workflow_values`
+  - in the required-vs-optional-parameter-status test, replace the three diff-tool assertions with one assertion for `- \`values\` (required, object):`
+  - in the final runtime dictionary test, replace the `build_review_diff_output` expectations with:
+    - include `## set_workflow_values`
+    - include `- \`values\` (required, object):`
+    - include `### Term Reference`
+    - do not include `# Workflow UI Surface Tool Dictionary`
+    - do not include `Generated from`
+  - leave the phase-1 term-key coverage test unchanged
+  - after the edit, this file must contain no `SET_WORKFLOW_PLACEHOLDERS` reference, no `BUILD_REVIEW_DIFF_OUTPUT` reference, no `CAPTURE_BRAINSTORMING_TOPIC` reference, no `"Workflow Placeholder Reference"` string, and no `"## build_review_diff_output"` string
+  - do not make any other changes in this file
+
+### `src/core/task/workflow-form/__tests__/schema.test.ts`
+
+Status: pending
+
+- Lines `1`-`157`: revise this file in one pass.
+  - delete `resolveWorkflowFormOneOfVariant` from the import list
+  - in the first test, change the description from `resolves set_workflow_placeholders additionalProperties as a string schema` to `resolves set_workflow_values additionalProperties as a string schema`
+  - in that same test, change `ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS` to `ClineDefaultTool.SET_WORKFLOW_VALUES`
+  - delete the entire `it("resolves build_review_diff_output source variants from oneOf by discriminator", ...)` block
+  - leave every remaining normalization, conversion, field-kind, options, and validation test unchanged
+  - after the edit, this file must contain no `SET_WORKFLOW_PLACEHOLDERS` reference, no `BUILD_REVIEW_DIFF_OUTPUT` reference, and no `resolveWorkflowFormOneOfVariant` reference
+  - do not make any other changes in this file
+
+### `src/core/task/workflow-form/WorkflowFormRegistry.ts`
+
+Status: pending
+
+- Lines `8`-`24`, `42`-`87`, `175`-`341`, `393`-`483`, `485`-`580`, `907`-`980`, `1101`-`1149`, and `1237`-`1344`: revise this file in one pass.
+  - delete the imports of `buildReviewDiffOutputToolDictionaryConfig`, `buildRuntimeToolDictionaryMarkdownFromConfig`, and `captureBrainstormingTopicToolDictionaryConfig`
+  - delete the entire import block from `@/shared/capture-brainstorming-topic`
+  - delete `type WorkflowFormSystemDictionaryKey` and `workflowFormSystemDictionary` from the `systemDictionary` import
+  - delete `resolveWorkflowFormOneOfVariant` from the `./schema` import
+  - delete the exports `CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID` and `BRAINSTORMING_STEP_3_CAPTURE_TOPIC_RESOLVER_ID`
+  - replace `PLACEHOLDER_WORKFLOW_START_SET_WORKFLOW_PLACEHOLDERS_RESOLVER_ID` with `WORKFLOW_START_SET_WORKFLOW_VALUES_RESOLVER_ID`
+  - change that constant’s string value from `"placeholder_workflow_start_set_workflow_placeholders"` to `"workflow_start_set_workflow_values"`
+  - delete the constants `BRAINSTORMING_STEP_3_PANEL_ID`, `CONFIRM_RESOLUTION_PANEL_ID`, `SOURCE_SELECTION_PANEL_ID`, `SOURCE_DETAILS_PANEL_ID`, `SOURCE_TYPE_FIELD_KEY`, `SOURCE_COMMIT_FIELD_KEY`, `SOURCE_BASE_FIELD_KEY`, `SOURCE_HEAD_FIELD_KEY`, `SCOPED_PATHS_FIELD_KEY`, and `CONTEXT_LINES_FIELD_KEY`
+  - delete the messages `CODE_REVIEW_SUCCESS_MESSAGE`, `CODE_REVIEW_FAILURE_MESSAGE`, `BRAINSTORMING_STEP_3_SUCCESS_MESSAGE`, and `BRAINSTORMING_STEP_3_FAILURE_MESSAGE`
+  - delete the helper functions `sourceTypeEquals(...)`, `sourceTypeNotEquals(...)`, `getSubmittedIntegerValue(...)`, `parseScopedPathsValue(...)`, `resolveSelectedSourceVariantSchema(...)`, `getSelectedSourceVariantPropertyKeys(...)`, `buildSourceSelectionFieldDefinitions(...)`, and `buildSourceDetailsFieldDefinitions(...)`
+  - rename `humanizeWorkflowPlaceholderKey(...)` to `humanizeWorkflowValueKey(...)`
+  - rename `buildWorkflowStartPlaceholderFieldDefinitions(...)` to `buildWorkflowStartValueFieldDefinitions(...)`
+  - inside that renamed helper, change `toolName: ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS` to `toolName: ClineDefaultTool.SET_WORKFLOW_VALUES`
+  - update the two fallback label/help lookups in that helper to call `humanizeWorkflowValueKey(key)`
+  - in `buildWorkflowStartDefinitionPayload(...)`, call `buildWorkflowStartValueFieldDefinitions(...)`
+  - in that same function, change the terminal transition `operationId` from `ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS` to `ClineDefaultTool.SET_WORKFLOW_VALUES`
+  - delete the entire function `buildCodeReviewDefinitionPayload()`
+  - delete the entire function `buildBrainstormingStep3DefinitionPayload()`
+  - in `buildWorkflowStartOperationRequest(...)`, change `toolName` from `ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS` to `ClineDefaultTool.SET_WORKFLOW_VALUES`
+  - delete the entire functions `buildCodeReviewOperationRequest(...)` and `buildBrainstormingStep3OperationRequest(...)`
+  - delete the entire functions `applyCodeReviewOperationResult(...)` and `applyBrainstormingStep3OperationResult(...)`
+  - in `workflowFormRegistry`, delete the entire entries keyed by `CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID` and `BRAINSTORMING_STEP_3_CAPTURE_TOPIC_RESOLVER_ID`
+  - in `workflowFormRegistry`, replace `[PLACEHOLDER_WORKFLOW_START_SET_WORKFLOW_PLACEHOLDERS_RESOLVER_ID]` with `[WORKFLOW_START_SET_WORKFLOW_VALUES_RESOLVER_ID]`
+  - in that surviving workflow-start registry entry, change the `id` field to `WORKFLOW_START_SET_WORKFLOW_VALUES_RESOLVER_ID`
+  - in that same entry, change both operation-id guards from `ClineDefaultTool.SET_WORKFLOW_PLACEHOLDERS` to `ClineDefaultTool.SET_WORKFLOW_VALUES`
+  - leave `buildBrainstormingStep2InitialDefinitionPayload(...)`, `buildBrainstormingStep4DefinitionPayload(...)`, `buildBrainstormingStep2OperationRequest(...)`, `buildBrainstormingStep4OperationRequest(...)`, `applyWorkflowStartOperationResult(...)`, `applyBrainstormingStep2OperationResult(...)`, `applyBrainstormingStep4OperationResult(...)`, and `getWorkflowFormResolverDefinition(...)` unchanged
+  - after the edit, `workflowFormRegistry` must contain exactly three entries: `BRAINSTORMING_STEP_2_PREPARE_SESSION_RESOLVER_ID`, `BRAINSTORMING_STEP_4_CHOOSE_APPROACH_RESOLVER_ID`, and `WORKFLOW_START_SET_WORKFLOW_VALUES_RESOLVER_ID`
+  - after the edit, this file must contain no `SET_WORKFLOW_PLACEHOLDERS` reference, no `BUILD_REVIEW_DIFF_OUTPUT` reference, no `CAPTURE_BRAINSTORMING_TOPIC` reference, no `placeholder_workflow_start_set_workflow_placeholders` string, and no import from `@/shared/capture-brainstorming-topic`
+  - do not make any other changes in this file
+
+### `src/core/task/workflow-form/__tests__/WorkflowFormRegistry.test.ts`
+
+Status: pending
+
+- Lines `1`-`571`: revise this file in one pass.
+  - delete the imports of `BRAINSTORMING_STEP_3_CAPTURE_TOPIC_RESOLVER_ID` and `CODE_REVIEW_STEP_3_DIFF_SOURCE_RESOLVER_ID`
+  - replace the import `PLACEHOLDER_WORKFLOW_START_SET_WORKFLOW_PLACEHOLDERS_RESOLVER_ID` with `WORKFLOW_START_SET_WORKFLOW_VALUES_RESOLVER_ID`
+  - leave the imports of `BRAINSTORMING_STEP_2_PREPARE_SESSION_RESOLVER_ID`, `BRAINSTORMING_STEP_4_CHOOSE_APPROACH_RESOLVER_ID`, `buildBrainstormingStep2InitialDefinitionPayload`, `buildBrainstormingStep4DefinitionPayload`, `buildWorkflowStartDefinitionPayload`, and `getWorkflowFormResolverDefinition` unchanged
+  - in the first workflow-start definition test, change the expected `toolDictionaryTitle` to `"Workflow Value Reference"`
+  - in that same test, change the heading expectation from `## set_workflow_placeholders` to `## set_workflow_values`
+  - in that same test, change the transition `operationId` expectation from `"set_workflow_placeholders"` to `"set_workflow_values"`
+  - in the workflow-start serialization test, change the resolver lookup to `WORKFLOW_START_SET_WORKFLOW_VALUES_RESOLVER_ID`
+  - in that same test, change `resolver.buildOperationRequest(session, "set_workflow_placeholders")` to `resolver.buildOperationRequest(session, "set_workflow_values")`
+  - in that same test, change the expected `toolName` from `"set_workflow_placeholders"` to `"set_workflow_values"`
+  - in the workflow-start result-classification test, change the resolver lookup to `WORKFLOW_START_SET_WORKFLOW_VALUES_RESOLVER_ID`
+  - in that same test, change the success `operationId` to `"set_workflow_values"` and the success `toolResultText` to `"Stored 1 workflow value: review_input."`
+  - in that same test, change the failure `operationId` to `"set_workflow_values"` and the failure `toolResultText` to `"Error: Missing required parameter 'values'. Provide at least one workflow value to store."`
+  - delete the entire three-test Code Review section:
+    - `it("builds the Code Review Step 2 V2 definition with the prescribed panel ids and schema-derived source options", ...)`
+    - `it("serializes the Code Review Step 2 diff request from V2 submitted values", ...)`
+    - `it("preserves the machine-checkable Code Review Step 2 success and failure classification", ...)`
+  - delete the entire two-test Brainstorming Step 3 section:
+    - `it("builds the Brainstorming Step 3 V2 definition as a single-panel large-text form", ...)`
+    - `it("serializes Brainstorming Step 3 topic text and preserves the approved success contract", ...)`
+  - leave the workflow-start one-of test unchanged
+  - leave the Brainstorming Step 2 tests unchanged
+  - leave the Brainstorming Step 4 tests unchanged
+  - leave the unknown-resolver test unchanged
+  - after the edit, this file must contain no `SET_WORKFLOW_PLACEHOLDERS` reference, no `BUILD_REVIEW_DIFF_OUTPUT` reference, no `CAPTURE_BRAINSTORMING_TOPIC` reference, no `PLACEHOLDER_WORKFLOW_START_SET_WORKFLOW_PLACEHOLDERS_RESOLVER_ID` symbol, and no `"Workflow Placeholder Reference"` string
+  - do not make any other changes in this file

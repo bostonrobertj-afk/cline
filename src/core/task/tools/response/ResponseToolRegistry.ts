@@ -92,7 +92,6 @@ const RESPONSE_TOOL_METADATA: Record<ClineDefaultTool, ResponseToolMetadata | un
 	[ClineDefaultTool.STORY_TESTING_COMPLETE]: undefined,
 	[ClineDefaultTool.SET_WORKFLOW_VALUES]: undefined,
 	[ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT]: undefined,
-	[ClineDefaultTool.BUILD_REVIEW_INPUT]: undefined,
 	[ClineDefaultTool.CONTINUE_BRAINSTORMING_SESSION]: undefined,
 	[ClineDefaultTool.CREATE_BRAINSTORMING_SESSION]: undefined,
 	[ClineDefaultTool.SELECT_BRAINSTORMING_SESSION]: undefined,

@@ -47,11 +47,6 @@ export const backendWorkflowToolContracts: Partial<Record<ClineDefaultTool, Back
 			},
 		],
 	},
-	[ClineDefaultTool.BUILD_REVIEW_INPUT]: {
-		id: ClineDefaultTool.BUILD_REVIEW_INPUT,
-		name: "build_review_input",
-		parameters: [],
-	},
 	[ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE]: {
 		id: ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE,
 		name: "code_review_spec_update",
