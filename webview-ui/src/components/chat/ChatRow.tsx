@@ -13,7 +13,6 @@ import {
 	WorkflowForm,
 	WorkflowFormFieldDefinition,
 	WorkflowFormSubmittedValuePayload,
-	WorkflowStartCard,
 } from "@shared/ExtensionMessage"
 import { BooleanRequest, StringRequest } from "@shared/proto/cline/common"
 import { WorkflowFormAction } from "@shared/proto/cline/task"
@@ -59,7 +58,7 @@ import { findMatchingResourceOrTemplate, getMcpServerDisplayName } from "@/utils
 import CodeAccordian, { cleanPathPrefix } from "../common/CodeAccordian"
 import { CommandOutputContent, CommandOutputRow } from "./CommandOutputRow"
 import { CompletionOutputRow } from "./CompletionOutputRow"
-import { submitWorkflowForm, submitWorkflowStartCard } from "./chat-view/hooks/useMessageHandlers"
+import { submitWorkflowForm } from "./chat-view/hooks/useMessageHandlers"
 import { getActiveAssistantName } from "./chat-view/shared/assistantName"
 import { isPassiveThreadOpen } from "./chat-view/shared/buttonConfig"
 import { DiffEditRow } from "./DiffEditRow"
@@ -325,19 +324,6 @@ export const ChatRowContent = memo(
 				: undefined
 
 		const type = message.type === "ask" ? message.ask : message.say
-		const workflowStartCard = useMemo(() => {
-			const isWorkflowStartCardMessage = message.type === "ask" && message.ask === "workflow_start_card"
-			if (!isWorkflowStartCardMessage || !message.text) {
-				return undefined
-			}
-
-			try {
-				return JSON.parse(message.text) as WorkflowStartCard
-			} catch (error) {
-				console.error("Failed to parse workflow start card payload:", error)
-				return undefined
-			}
-		}, [message.ask, message.text, message.type])
 		const workflowForm = useMemo(() => {
 			const isWorkflowFormMessage =
 				(message.type === "ask" && message.ask === "workflow_form") ||
@@ -367,20 +353,9 @@ export const ChatRowContent = memo(
 				return undefined
 			}
 		}, [message.say, message.text, message.type])
-		const [workflowStartCardSubmissionPending, setWorkflowStartCardSubmissionPending] = useState(false)
-		const [workflowStartCardProjectMode, setWorkflowStartCardProjectMode] = useState<"new" | "existing">("new")
-		const [workflowStartCardSelectedExistingProject, setWorkflowStartCardSelectedExistingProject] = useState("")
-		const [workflowStartCardNewProjectTitle, setWorkflowStartCardNewProjectTitle] = useState("")
 		const [workflowFormValues, setWorkflowFormValues] = useState<Record<string, unknown>>({})
 		const [workflowFormSubmissionPending, setWorkflowFormSubmissionPending] = useState(false)
 		const [isWorkflowDictionaryOpen, setIsWorkflowDictionaryOpen] = useState(false)
-
-		useEffect(() => {
-			setWorkflowStartCardSubmissionPending(false)
-			setWorkflowStartCardProjectMode(workflowStartCard?.projectMode ?? "new")
-			setWorkflowStartCardSelectedExistingProject(workflowStartCard?.selectedExistingProject ?? "")
-			setWorkflowStartCardNewProjectTitle(workflowStartCard?.newProjectTitle ?? "")
-		}, [workflowStartCard])
 
 		useEffect(() => {
 			if (!workflowForm) {
@@ -571,31 +546,6 @@ export const ChatRowContent = memo(
 			}))
 		}, [])
 
-		const handleWorkflowStartCardSubmit = useCallback(async () => {
-			if (!workflowStartCard || workflowStartCardSubmissionPending) {
-				return
-			}
-
-			setWorkflowStartCardSubmissionPending(true)
-			try {
-				await submitWorkflowStartCard({
-					...workflowStartCard,
-					projectMode: workflowStartCardProjectMode,
-					selectedExistingProject: workflowStartCardSelectedExistingProject,
-					newProjectTitle: workflowStartCardNewProjectTitle,
-				})
-			} catch (error) {
-				console.error("Failed to submit workflow start card:", error)
-				setWorkflowStartCardSubmissionPending(false)
-			}
-		}, [
-			workflowStartCard,
-			workflowStartCardNewProjectTitle,
-			workflowStartCardProjectMode,
-			workflowStartCardSelectedExistingProject,
-			workflowStartCardSubmissionPending,
-		])
-
 		const handleWorkflowFormAction = useCallback(
 			async (action: WorkflowFormAction, values?: Record<string, unknown>) => {
 				if (!workflowForm || workflowFormSubmissionPending) {
@@ -620,91 +570,6 @@ export const ChatRowContent = memo(
 
 			setIsWorkflowDictionaryOpen(true)
 		}, [workflowForm])
-
-		const renderWorkflowStartCardContent = () => {
-			if (!workflowStartCard) {
-				return <InvisibleSpacer />
-			}
-
-			const workflowStartCardInputClassName =
-				"w-full rounded-xs border border-editor-group-border bg-background px-3 py-2 text-sm text-foreground"
-			const isExistingProjectMode = workflowStartCardProjectMode === "existing"
-			const isWorkflowStartCardSubmitDisabled =
-				workflowStartCardSubmissionPending ||
-				(isExistingProjectMode
-					? workflowStartCardSelectedExistingProject.trim().length === 0
-					: workflowStartCardNewProjectTitle.trim().length === 0)
-
-			return (
-				<div className="border border-editor-group-border rounded-xs bg-code/40 p-3">
-					<div className={HEADER_CLASSNAMES}>
-						<SettingsIcon className="size-2" />
-						<span className="font-bold">System-owned startup:</span>
-					</div>
-					<div className="text-sm font-semibold">{workflowStartCard.title}</div>
-					<div className="pt-2">
-						<MarkdownRow markdown={workflowStartCard.markdownBody} />
-					</div>
-					<div className="space-y-3 pt-3">
-						<div className="space-y-2">
-							<label className="flex items-start gap-2 text-sm text-foreground">
-								<input
-									checked={workflowStartCardProjectMode === "new"}
-									disabled={workflowStartCardSubmissionPending}
-									name="workflow-start-card-project-mode"
-									onChange={() => setWorkflowStartCardProjectMode("new")}
-									type="radio"
-								/>
-								<span>Create a new project</span>
-							</label>
-							<label className="flex items-start gap-2 text-sm text-foreground">
-								<input
-									checked={isExistingProjectMode}
-									disabled={workflowStartCardSubmissionPending}
-									name="workflow-start-card-project-mode"
-									onChange={() => setWorkflowStartCardProjectMode("existing")}
-									type="radio"
-								/>
-								<span>Use an existing project</span>
-							</label>
-						</div>
-						{isExistingProjectMode ? (
-							<select
-								aria-label="Existing project"
-								className={workflowStartCardInputClassName}
-								disabled={workflowStartCardSubmissionPending}
-								onChange={(event) => setWorkflowStartCardSelectedExistingProject(event.target.value)}
-								value={workflowStartCardSelectedExistingProject}>
-								<option value="">Select an existing project</option>
-								{(workflowStartCard.existingProjectOptions ?? []).map((option) => (
-									<option key={option.value} value={option.value}>
-										{option.label}
-									</option>
-								))}
-							</select>
-						) : (
-							<input
-								aria-label="New project title"
-								className={workflowStartCardInputClassName}
-								disabled={workflowStartCardSubmissionPending}
-								onChange={(event) => setWorkflowStartCardNewProjectTitle(event.target.value)}
-								type="text"
-								value={workflowStartCardNewProjectTitle}
-							/>
-						)}
-						<button
-							className="rounded-xs bg-button-background px-3 py-2 text-sm text-primary-foreground disabled:opacity-50"
-							disabled={isWorkflowStartCardSubmitDisabled}
-							onClick={() => {
-								void handleWorkflowStartCardSubmit()
-							}}
-							type="button">
-							{workflowStartCard.submitLabel}
-						</button>
-					</div>
-				</div>
-			)
-		}
 
 		const renderWorkflowFormContent = () => {
 			if (!workflowForm) {
@@ -1809,8 +1674,6 @@ export const ChatRowContent = memo(
 								</button>
 							</div>
 						)
-					case "task_progress":
-						return <InvisibleSpacer /> // task_progress messages should be displayed in TaskHeader only, not in chat
 					default:
 						return (
 							<div>
@@ -1958,9 +1821,6 @@ export const ChatRowContent = memo(
 								/>
 							</div>
 						)
-					}
-					case "workflow_start_card": {
-						return renderWorkflowStartCardContent()
 					}
 					case "workflow_form": {
 						return renderWorkflowFormContent()

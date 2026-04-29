@@ -233,8 +233,11 @@ describe("UseMcpToolHandler", () => {
 		const handler = new UseMcpToolHandler()
 
 		const result = await handler.execute(config, makeBlock("search_symbols", JSON.stringify({ query: "example" })))
+		const payload: { uri?: unknown; path?: unknown; language?: unknown } = JSON.parse(result as string)
 
-		assert.ok((result as string).includes('{"path":"src/example.ts","language":"typescript"}'))
+		assert.equal(payload.uri, "file://src/example.ts")
+		assert.equal(payload.path, "src/example.ts")
+		assert.equal(payload.language, "typescript")
 		assert.ok(!(result as string).includes("\n  "))
 	})
 })

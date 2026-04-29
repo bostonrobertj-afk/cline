@@ -176,6 +176,16 @@ describe("AskFollowupQuestionToolHandler", () => {
 					resolveAsk = resolve
 				}),
 		)
+		let resolveAgentFeedback: () => void = () => {}
+		const agentFeedbackEmitted = new Promise<void>((resolve) => {
+			resolveAgentFeedback = resolve
+		})
+		callbacks.say.callsFake(async (type: string) => {
+			if (type === "agent_feedback") {
+				resolveAgentFeedback()
+			}
+			return undefined
+		})
 
 		const handler = new AskFollowupQuestionToolHandler()
 		const execution = handler.execute(config, {
@@ -191,8 +201,7 @@ describe("AskFollowupQuestionToolHandler", () => {
 			partial: false,
 		} as any)
 
-		await Promise.resolve()
-		await Promise.resolve()
+		await agentFeedbackEmitted
 
 		sinon.assert.calledOnce(callbacks.ask)
 		sinon.assert.calledOnce(callbacks.say)

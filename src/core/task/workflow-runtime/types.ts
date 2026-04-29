@@ -2,11 +2,11 @@ import type { WorkflowForm, WorkflowFormDefinitionPayload } from "@shared/Extens
 import type { ClineToolSpec } from "@/core/prompts/system-prompt/spec"
 import type { BackendWorkflowToolContract } from "@/core/task/tools/backendWorkflowToolContractTypes"
 import type { WorkflowFormId, WorkflowFormSessionState } from "@/core/task/workflow-form/types"
-import type { WorkflowStartCardSessionState } from "@/core/task/workflow-start-card/types"
+import type { WorkflowArtifactFamily } from "@/core/task/workflow-runtime/artifactFamilies"
 import type {
-	WorkflowStepResolutionDefinition,
 	WorkflowStepResolutionSessionState,
-	WorkflowStepResolutionToolExecutionRequest,
+	WorkflowToolBackedOperationDefinition,
+	WorkflowToolBackedOperationExecutionRequest,
 } from "@/core/task/workflow-step-resolution/types"
 import type { SkillMetadata } from "@/shared/skills"
 
@@ -15,6 +15,7 @@ export type WorkflowValue = string
 export type WorkflowValues = Record<string, WorkflowValue>
 export type WorkflowProjectMode = "new" | "existing"
 export type WorkflowProjectSubfolder = "discovery" | "planning" | "implementation" | "review" | "testing"
+export type WorkflowToolBackedOperationId = string
 
 export interface WorkflowDiscoveryCandidate {
 	value: string
@@ -28,11 +29,37 @@ export interface WorkflowProjectSelectionState {
 }
 
 export interface WorkflowUiSessionState {
-	startCardSession?: WorkflowStartCardSessionState
 	formSession?: WorkflowFormSessionState
 	stepResolutionSession?: WorkflowStepResolutionSessionState
 	suppressedWorkflowFormIds: WorkflowFormId[]
 	suppressedWorkflowStepResolutionDefinitionIds: string[]
+}
+
+export type WorkflowDecisionBranchId = string
+
+export type WorkflowBranchTriggerEvent =
+	| { kind: "session_initialized" }
+	| { kind: "project_selection_completed" }
+	| { kind: "workflow_progress_request_confirmed" }
+	| { kind: "workflow_progress_request_denied" }
+	| { kind: "workflow_form_completed"; workflowFormId: WorkflowFormId }
+	| { kind: "workflow_values_persisted"; changedKeys: readonly string[] }
+	| { kind: "tool_backed_operation_succeeded"; toolBackedOperationId: WorkflowToolBackedOperationId }
+	| {
+			kind: "tool_backed_operation_failed"
+			toolBackedOperationId: WorkflowToolBackedOperationId
+			errorMessage?: string
+	  }
+
+export interface WorkflowBranchFailureState {
+	retryAttemptCount: number
+	terminalErrorMessage?: string
+}
+
+export interface WorkflowBranchContextState {
+	activeBranchId: WorkflowDecisionBranchId
+	lastTriggerEvent?: WorkflowBranchTriggerEvent
+	failureState?: WorkflowBranchFailureState
 }
 
 export interface ActiveWorkflowSession {
@@ -41,19 +68,21 @@ export interface ActiveWorkflowSession {
 	workflowValues: WorkflowValues
 	projectSelection: WorkflowProjectSelectionState
 	ui: WorkflowUiSessionState
+	branchContext: WorkflowBranchContextState
 }
 
 export type PersistedWorkflowSession = ActiveWorkflowSession
 
 export interface WorkflowPromptProjection {
-	workflowSystemInstructionsBlock?: string
-	workflowInputInstructionsBlock?: string
+	fullTurnWorkflowSystemInstructionsBlock?: string
+	fullTurnWorkflowInputInstructionsBlock?: string
+	/**
+	 * Complete module-derived tool schema for the active turn.
+	 * When present, this replaces the default prompt/native tool surface.
+	 */
 	workflowToolSchemaOverride?: readonly ClineToolSpec[]
-}
-
-export interface WorkflowRenderStartCardNextAction {
-	kind: "render_workflow_start_card"
-	startCardSession: WorkflowStartCardSessionState
+	continuationTurnWorkflowSystemInstructionsBlock?: string
+	continuationTurnWorkflowInputInstructionsBlock?: string
 }
 
 export interface WorkflowRenderFormNextAction {
@@ -62,16 +91,20 @@ export interface WorkflowRenderFormNextAction {
 	payload: WorkflowForm
 }
 
-export interface WorkflowRunDeterministicNextAction {
-	kind: "run_deterministic_operation"
-	toolRequest: WorkflowStepResolutionToolExecutionRequest
-	stepResolutionSession?: WorkflowStepResolutionSessionState
-	fallbackDecision?: WorkflowDeterministicFallbackDecision
+export interface WorkflowExecuteToolBackedOperationNextAction {
+	kind: "execute_tool_backed_operation"
+	toolRequest: WorkflowToolBackedOperationExecutionRequest
+	toolBackedOperationSession?: WorkflowStepResolutionSessionState
 }
 
 export interface WorkflowProjectPromptNextAction {
 	kind: "project_prompt"
 	promptProjection: WorkflowPromptProjection
+}
+
+export interface WorkflowTerminalErrorNextAction {
+	kind: "terminal_error"
+	errorMessage: string
 }
 
 export interface WorkflowCompleteNextAction {
@@ -82,36 +115,77 @@ export interface WorkflowNoOpNextAction {
 	kind: "no_op"
 }
 
+export interface WorkflowPersistWorkflowTeardownNextAction {
+	kind: "persist_workflow_teardown"
+}
+
 export type WorkflowNextAction =
-	| WorkflowRenderStartCardNextAction
 	| WorkflowRenderFormNextAction
-	| WorkflowRunDeterministicNextAction
+	| WorkflowExecuteToolBackedOperationNextAction
 	| WorkflowProjectPromptNextAction
+	| WorkflowTerminalErrorNextAction
 	| WorkflowCompleteNextAction
 	| WorkflowNoOpNextAction
+	| WorkflowPersistWorkflowTeardownNextAction
 
 export interface WorkflowPromptBuilderInput {
 	session: ActiveWorkflowSession
 	step: WorkflowStepDefinition
 }
 
-export interface WorkflowSetWorkflowValuesOverrideSelection {
-	contract: BackendWorkflowToolContract
-	buildToolSchemaOverride(input: WorkflowPromptBuilderInput): readonly ClineToolSpec[] | undefined
+export interface WorkflowStepPromptSource {
+	workflowSystemInstructions?: string
+	currentStepInstructions?: string
 }
 
-export interface WorkflowNextActionCondition {
-	id: string
-	matches(session: ActiveWorkflowSession): boolean
+export interface WorkflowDecisionBranchEvaluationInput {
+	session: ActiveWorkflowSession
+	step: WorkflowStepDefinition
+	branchContext: WorkflowBranchContextState
 }
 
-export interface WorkflowNextActionRule {
+export type WorkflowDecisionBranchTrigger =
+	| { kind: "always" }
+	| { kind: "on_event"; eventKind: WorkflowBranchTriggerEvent["kind"] }
+	| {
+			kind: "session_predicate"
+			matches(input: WorkflowDecisionBranchEvaluationInput): boolean
+	  }
+	| {
+			kind: "event_predicate"
+			matches(
+				input: WorkflowDecisionBranchEvaluationInput & {
+					triggerEvent: WorkflowBranchTriggerEvent
+				},
+			): boolean
+	  }
+
+export type WorkflowDecisionAction =
+	| { kind: "render_workflow_form"; workflowFormId: WorkflowFormId }
+	| { kind: "execute_tool_backed_operation"; toolBackedOperationId: WorkflowToolBackedOperationId }
+	| { kind: "build_workflow_document"; documentBuilderId: string }
+	| { kind: "allocate_artifact"; artifactId: string }
+	| { kind: "project_prompt" }
+	| { kind: "terminal_error" }
+	| { kind: "complete_workflow" }
+	| { kind: "no_op" }
+
+export interface WorkflowDecisionBranchRoute {
 	id: string
-	condition: WorkflowNextActionCondition
-	action: WorkflowNextAction["kind"]
-	workflowFormId?: WorkflowFormId
-	stepResolutionDefinitionId?: string
-	documentBuilderId?: string
+	trigger: WorkflowDecisionBranchTrigger
+	action: WorkflowDecisionAction
+	followingBranchId?: WorkflowDecisionBranchId
+	targetStepNumber?: number
+}
+
+export interface WorkflowDecisionBranch {
+	id: WorkflowDecisionBranchId
+	routes: WorkflowDecisionBranchRoute[]
+}
+
+export interface WorkflowDecisionTree {
+	entryBranchId: WorkflowDecisionBranchId
+	branches: Record<WorkflowDecisionBranchId, WorkflowDecisionBranch>
 }
 
 export interface WorkflowCompletionRule {
@@ -124,10 +198,83 @@ export interface WorkflowChildInheritanceRule {
 	childKey: string
 }
 
-export interface WorkflowStartCardDefinition {
-	markdownBody: string
-	submitLabel: string
+export interface WorkflowEntryInformationalPanelDefinition {
+	promptMarkdown: string
 }
+
+export interface WorkflowEntryProjectValueKeys {
+	projectMode: string
+	projectTitle: string
+	projectFolderName: string
+}
+
+export type WorkflowArtifactIntentMode = "new" | "derived"
+
+export interface WorkflowArtifactIdentitySource {
+	kind: "workflow_value"
+	key: string
+}
+
+export interface WorkflowBaseArtifactOutputValueKeys {
+	projectTitle: string
+	projectFolderName: string
+	artifactFamily: string
+	artifactIdentity: string
+	artifactFilename: string
+	artifactRelativePath: string
+	artifactAbsolutePath: string
+}
+
+export interface WorkflowStandaloneArtifactOutputValueKeys extends WorkflowBaseArtifactOutputValueKeys {
+	parentIdentity: undefined
+	targetIdentity: undefined
+}
+
+export interface WorkflowParentedArtifactOutputValueKeys extends WorkflowBaseArtifactOutputValueKeys {
+	parentIdentity: string
+	targetIdentity: undefined
+}
+
+export interface WorkflowTargetedArtifactOutputValueKeys extends WorkflowBaseArtifactOutputValueKeys {
+	parentIdentity: undefined
+	targetIdentity: string
+}
+
+export type WorkflowArtifactOutputValueKeys =
+	| WorkflowStandaloneArtifactOutputValueKeys
+	| WorkflowParentedArtifactOutputValueKeys
+	| WorkflowTargetedArtifactOutputValueKeys
+
+export type WorkflowArtifactDefinition =
+	| {
+			id: string
+			family: WorkflowArtifactFamily.Epic
+			intentMode: "new"
+			parentIdentitySource: undefined
+			targetIdentitySource: undefined
+			outputValueKeys: WorkflowStandaloneArtifactOutputValueKeys
+	  }
+	| {
+			id: string
+			family: WorkflowArtifactFamily.Story | WorkflowArtifactFamily.RemediationStory
+			intentMode: "new"
+			parentIdentitySource: WorkflowArtifactIdentitySource
+			targetIdentitySource: undefined
+			outputValueKeys: WorkflowParentedArtifactOutputValueKeys
+	  }
+	| {
+			id: string
+			family:
+				| WorkflowArtifactFamily.ReviewBlindHunter
+				| WorkflowArtifactFamily.ReviewEdgeCaseHunter
+				| WorkflowArtifactFamily.AdversarialReview
+				| WorkflowArtifactFamily.ReviewInputMarkdown
+				| WorkflowArtifactFamily.ReviewInputDiff
+			intentMode: "derived"
+			parentIdentitySource: undefined
+			targetIdentitySource: WorkflowArtifactIdentitySource
+			outputValueKeys: WorkflowTargetedArtifactOutputValueKeys
+	  }
 
 export interface WorkflowDocumentBuilderDefinition {
 	id: string
@@ -141,13 +288,10 @@ export interface WorkflowStepDefinition {
 	id: `step-${number}`
 	stepNumber: number
 	checklistLabel: string
-	buildPromptProjection(input: WorkflowPromptBuilderInput): WorkflowPromptProjection
-	allowWorkflowProgressRequest: boolean
-	workflowFormId?: WorkflowFormId
-	stepResolutionDefinitionId?: string
-	nextActionRules?: WorkflowNextActionRule[]
+	buildPromptSource(input: WorkflowPromptBuilderInput): WorkflowStepPromptSource
+	buildToolSchema(input: WorkflowPromptBuilderInput): readonly ClineToolSpec[]
+	decisionTree: WorkflowDecisionTree
 	completionRules?: WorkflowCompletionRule[]
-	setWorkflowValuesToolOverride?: WorkflowSetWorkflowValuesOverrideSelection
 	documentBuilderIds?: string[]
 }
 
@@ -157,10 +301,13 @@ export interface WorkflowDefinition {
 	useSkillName: string
 	persona: SkillMetadata["name"] | string
 	projectSubfolder: WorkflowProjectSubfolder
-	startCard: WorkflowStartCardDefinition
+	workflowValueKeys: readonly string[]
+	entryProjectValueKeys: WorkflowEntryProjectValueKeys
+	entryPanel: WorkflowEntryInformationalPanelDefinition
 	steps: Record<WorkflowStepDefinition["id"], WorkflowStepDefinition>
 	workflowForms?: Record<WorkflowFormId, WorkflowFormDefinitionPayload>
-	stepResolutionDefinitions?: Record<string, WorkflowStepResolutionDefinition>
+	toolBackedOperationDefinitions?: Record<WorkflowToolBackedOperationId, WorkflowToolBackedOperationDefinition>
+	artifacts?: Record<string, WorkflowArtifactDefinition>
 	documentBuilders?: Record<string, WorkflowDocumentBuilderDefinition>
 	childInheritance?: WorkflowChildInheritanceRule[]
 }
@@ -188,12 +335,10 @@ export type WorkflowRuntimeErrorCategory =
 	| "validation"
 	| "discovery"
 	| "progression"
-	| "deterministic"
+	| "tool_backed_operation"
 	| "persistence"
 	| "resume"
 	| "teardown"
-
-export type WorkflowDeterministicFallbackDecision = "fallback_to_agent" | "stay_on_step" | "advance_step"
 
 export interface WorkflowDiagnosticEvent {
 	category: WorkflowRuntimeErrorCategory

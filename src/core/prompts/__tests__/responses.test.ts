@@ -1,7 +1,24 @@
 import { expect } from "chai"
 import { describe, it } from "mocha"
 import path from "path"
-import { formatResponse } from "../responses"
+import { formatResponse, isSerializedToolFailureResultText } from "../responses"
+
+describe("isSerializedToolFailureResultText", () => {
+	it("classifies serialized tool denial and error strings as failures", () => {
+		expect(isSerializedToolFailureResultText(formatResponse.toolDenied())).to.equal(true)
+		expect(isSerializedToolFailureResultText(formatResponse.toolError("boom"))).to.equal(true)
+	})
+
+	it("classifies missing, empty, and legacy Error-prefixed text as failures", () => {
+		expect(isSerializedToolFailureResultText(undefined)).to.equal(true)
+		expect(isSerializedToolFailureResultText("")).to.equal(true)
+		expect(isSerializedToolFailureResultText("Error: boom")).to.equal(true)
+	})
+
+	it("does not classify normal success text as a failure", () => {
+		expect(isSerializedToolFailureResultText("ok")).to.equal(false)
+	})
+})
 
 describe("formatResponse user input framing", () => {
 	it("labels the latest human input explicitly", () => {

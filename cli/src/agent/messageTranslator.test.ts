@@ -76,16 +76,6 @@ const VALID_TOOL_KINDS: acp.ToolKind[] = [
 const VALID_TOOL_CALL_STATUSES: acp.ToolCallStatus[] = ["pending", "in_progress", "completed", "failed"]
 
 /**
- * Valid PlanEntryStatus values per ACP schema.
- */
-const VALID_PLAN_ENTRY_STATUSES: acp.PlanEntryStatus[] = ["pending", "in_progress", "completed"]
-
-/**
- * Valid PlanEntryPriority values per ACP schema.
- */
-const VALID_PLAN_ENTRY_PRIORITIES: acp.PlanEntryPriority[] = ["high", "medium", "low"]
-
-/**
  * Valid ContentBlock types per ACP schema.
  */
 const VALID_CONTENT_BLOCK_TYPES = ["text", "image", "audio", "resource_link", "resource"] as const
@@ -145,16 +135,6 @@ function assertValidToolCallUpdate(update: acp.SessionUpdate): void {
 		assertValidToolKind(toolCallUpdate.kind ?? undefined)
 		assertValidToolCallStatus(toolCallUpdate.status ?? undefined)
 	}
-}
-
-/**
- * Assert that a plan entry has valid fields per ACP schema.
- */
-function assertValidPlanEntry(entry: acp.PlanEntry): void {
-	expect(entry.content).toBeDefined()
-	expect(typeof entry.content).toBe("string")
-	expect(VALID_PLAN_ENTRY_STATUSES).toContain(entry.status)
-	expect(VALID_PLAN_ENTRY_PRIORITIES).toContain(entry.priority)
 }
 
 /**
@@ -759,53 +739,6 @@ describe("translateMessage - say messages", () => {
 
 			const chunk = messageChunk as acp.ContentChunk & { sessionUpdate: "agent_message_chunk" }
 			expect((chunk.content as acp.TextContent).text).toBe("\nTask completed successfully!")
-		})
-	})
-
-	describe("task progress messages", () => {
-		it("should translate say:task_progress to plan update", () => {
-			const message = createClineMessage({
-				type: "say",
-				say: "task_progress",
-				text: `- [x] Step 1 completed
-- [ ] Step 2 pending
-- Working on step 3`,
-			})
-
-			const result = translateMessage(message, sessionState)
-
-			const planUpdate = result.updates.find((u) => u.sessionUpdate === "plan")
-			expect(planUpdate).toBeDefined()
-
-			const plan = planUpdate as acp.Plan & { sessionUpdate: "plan" }
-			expect(plan.entries).toHaveLength(3)
-
-			// Validate each entry conforms to schema
-			plan.entries.forEach(assertValidPlanEntry)
-
-			// Check specific entries
-			expect(plan.entries[0].content).toBe("Step 1 completed")
-			expect(plan.entries[0].status).toBe("completed")
-
-			expect(plan.entries[1].content).toBe("Step 2 pending")
-			expect(plan.entries[1].status).toBe("pending")
-
-			expect(plan.entries[2].content).toBe("Working on step 3")
-			expect(plan.entries[2].status).toBe("in_progress")
-		})
-
-		it("should handle empty task progress", () => {
-			const message = createClineMessage({
-				type: "say",
-				say: "task_progress",
-				text: "",
-			})
-
-			const result = translateMessage(message, sessionState)
-
-			// Should not produce a plan update with no entries
-			const planUpdate = result.updates.find((u) => u.sessionUpdate === "plan")
-			expect(planUpdate).toBeUndefined()
 		})
 	})
 

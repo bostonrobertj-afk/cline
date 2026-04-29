@@ -3,7 +3,7 @@ import { PreToolUseHookCancellationError } from "@core/hooks/PreToolUseHookCance
 import { formatResponse } from "@core/prompts/responses"
 import { getWorkspaceBasename } from "@core/workspace"
 import { getReadablePath, isLocatedInWorkspace } from "@utils/path"
-import { fs } from "fs/promises"
+import fs from "fs/promises"
 import path from "path"
 import type { WorkflowValues } from "@/core/task/workflow-runtime/types"
 import { ClineDefaultTool } from "@/shared/tools"
@@ -180,7 +180,7 @@ export class BuildWorkflowDocumentToolHandler implements IToolHandler, IPartialB
 			}
 
 			try {
-				const ToolHookUtils = await import("../utils/ToolHookUtils")
+				const { ToolHookUtils } = await import("../utils/ToolHookUtils")
 				await ToolHookUtils.runPreToolUseIfEnabled(config, block)
 			} catch (error) {
 				if (error instanceof PreToolUseHookCancellationError) {

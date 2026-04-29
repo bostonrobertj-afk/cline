@@ -41,7 +41,6 @@ import {
 } from "@core/storage/disk"
 import type { FocusChainChecklistUpdateResult } from "@core/task/focus-chain/types"
 import { releaseTaskLock } from "@core/task/TaskLockUtils"
-import { WorkflowStepResolutionRuntime } from "@core/task/workflow-step-resolution/WorkflowStepResolutionRuntime"
 import { isMultiRootEnabled } from "@core/workspace/multi-root-utils"
 import { WorkspaceRootManager } from "@core/workspace/WorkspaceRootManager"
 import { buildCheckpointManager, shouldUseMultiRoot } from "@integrations/checkpoints/factory"
@@ -69,11 +68,10 @@ import {
 	ThreadDisplayState,
 	ThreadDisplayStates,
 	type WorkflowForm,
-	type WorkflowStartCard,
 } from "@shared/ExtensionMessage"
 import { HistoryItem } from "@shared/HistoryItem"
 import { DEFAULT_LANGUAGE_SETTINGS, getLanguageKey, LanguageDisplay } from "@shared/Languages"
-import { WorkflowFormSubmissionRequest, WorkflowStartCardSubmissionRequest } from "@shared/proto/cline/task"
+import { WorkflowFormSubmissionRequest } from "@shared/proto/cline/task"
 import { convertClineMessageToProto } from "@shared/proto-conversions/cline-message"
 import type { SkillMetadata } from "@shared/skills"
 import { ClineDefaultTool, READ_ONLY_TOOLS } from "@shared/tools"
@@ -86,12 +84,11 @@ import Mutex from "p-mutex"
 import pWaitFor from "p-wait-for"
 import * as path from "path"
 import { ulid } from "ulid"
+import type { TaskMetadata } from "@/core/context/context-tracking/ContextTrackerTypes"
 import type { SystemPromptContext } from "@/core/prompts/system-prompt"
 import { getSystemPrompt } from "@/core/prompts/system-prompt"
 import type { WorkflowNextAction } from "@/core/task/workflow-runtime/types"
-import { getWorkflowSkillMetadata, resolveWorkflowDefinition } from "@/core/task/workflow-runtime/WorkflowRegistry"
 import { WorkflowRuntime } from "@/core/task/workflow-runtime/WorkflowRuntime"
-import { buildWorkflowStartCardPayload } from "@/core/task/workflow-start-card/buildWorkflowStartCardPayload"
 import { HostProvider } from "@/hosts/host-provider"
 import { FileEditProvider } from "@/integrations/editor/FileEditProvider"
 import {
@@ -126,7 +123,6 @@ import { Controller } from "../controller"
 import { executeHook } from "../hooks/hook-executor"
 import { StateManager } from "../storage/StateManager"
 import { FocusChainManager } from "./focus-chain"
-import { logFocusChainDiagnosticEvent, summarizeFocusChainText, summarizeFocusChainTextBlocks } from "./focus-chain/diagnostics"
 import { MessageStateHandler } from "./message-state"
 import {
 	getNextTurnsSinceFullPromptRefresh,
@@ -145,6 +141,13 @@ import { buildUserMessageContent } from "./utils/buildUserMessageContent"
 import { hasExplicitMentionSyntax, hasUserContentTag } from "./utils/userContentProcessing"
 
 export type ToolResponse = ClineToolResponseContent
+
+const LEGACY_WORKFLOW_METADATA_KEYS = [
+	"activeWorkflowFormSession",
+	"activeWorkflowStepResolutionSession",
+	"suppressedWorkflowStepResolutionDefinitionIds",
+	"suppressedWorkflowFormResolverIds",
+] as const
 
 type TaskParams = {
 	controller: Controller
@@ -171,6 +174,12 @@ type TaskParams = {
 
 export function shouldIncludePersistentPromptContext(taskState: Pick<TaskState, "activeWorkflowName">): boolean {
 	return !!taskState.activeWorkflowName
+}
+
+function removeLegacyWorkflowRuntimeMetadata(metadata: object): void {
+	for (const key of LEGACY_WORKFLOW_METADATA_KEYS) {
+		Reflect.deleteProperty(metadata, key)
+	}
 }
 
 export function appendPromptInjectionBlocksToSystemPrompt(
@@ -602,7 +611,7 @@ export class Task {
 			return undefined
 		}
 
-		if (type === "workflow_form" || type === "workflow_start_card") {
+		if (type === "workflow_form") {
 			return AwaitingUserResponseSubtypes.SYSTEM
 		}
 
@@ -773,21 +782,6 @@ export class Task {
 		this.modelContextTracker = new ModelContextTracker(this.taskId)
 		this.environmentContextTracker = new EnvironmentContextTracker(this.taskId)
 
-		// Initialize focus chain manager only if enabled
-		const focusChainSettings = this.stateManager.getGlobalSettingsKey("focusChainSettings")
-		if (focusChainSettings.enabled) {
-			this.FocusChainManager = new FocusChainManager({
-				taskId: this.taskId,
-				cwd: this.cwd,
-				taskState: this.taskState,
-				mode: this.stateManager.getGlobalSettingsKey("mode"),
-				stateManager: this.stateManager,
-				postStateToWebview: this.postStateToWebview,
-				say: this.say.bind(this),
-				focusChainSettings: focusChainSettings,
-			})
-		}
-
 		// Check for multiroot workspace and warn about checkpoints
 		const isMultiRootWorkspace = this.workspaceManager && this.workspaceManager.getRoots().length > 1
 		const checkpointsEnabled = this.stateManager.getGlobalSettingsKey("enableCheckpointsSetting")
@@ -889,13 +883,6 @@ export class Task {
 		// from Controller.initTask() AFTER the task instance is fully assigned.
 		// This prevents race conditions where hooks run before controller.task is ready.
 
-		// Set up focus chain file watcher (async, runs in background) only if focus chain is enabled
-		if (this.FocusChainManager) {
-			this.FocusChainManager.setupFocusChainFileWatcher().catch((error) => {
-				Logger.error(`[Task ${this.taskId}] Failed to setup focus chain file watcher:`, error)
-			})
-		}
-
 		// initialize telemetry
 
 		// Extract domain of the provider endpoint if using OpenAI Compatible provider
@@ -975,11 +962,12 @@ export class Task {
 			this.cancelBackgroundCommand.bind(this),
 			() => this.checkpointManager?.doesLatestTaskCompletionHaveNewChanges() ?? Promise.resolve(false),
 			async (taskProgress: string | undefined): Promise<FocusChainChecklistUpdateResult> => {
-				if (!this.FocusChainManager) {
+				const focusChainManager = this.getActiveWorkflowFocusChainManager()
+				if (!focusChainManager) {
 					return { accepted: true }
 				}
 
-				return await this.FocusChainManager.updateFCListFromToolResponse(taskProgress)
+				return await focusChainManager.updateFCListFromToolResponse(taskProgress)
 			},
 			this.switchToActModeCallback.bind(this),
 			this.cancelTask,
@@ -989,6 +977,25 @@ export class Task {
 			this.getActiveHookExecution.bind(this),
 			this.runUserPromptSubmitHook.bind(this),
 		)
+	}
+
+	private getActiveWorkflowFocusChainManager(): FocusChainManager | undefined {
+		if (!this.taskState.activeWorkflowName) {
+			this.FocusChainManager?.dispose()
+			this.FocusChainManager = undefined
+			return undefined
+		}
+
+		if (!this.FocusChainManager) {
+			this.FocusChainManager = new FocusChainManager({
+				taskId: this.taskId,
+				taskState: this.taskState,
+				postStateToWebview: this.postStateToWebview,
+				focusChainSettings: this.stateManager.getGlobalSettingsKey("focusChainSettings"),
+			})
+		}
+
+		return this.FocusChainManager
 	}
 
 	// Communicate with webview
@@ -1247,25 +1254,8 @@ export class Task {
 		this.taskState.askResponseFiles = files
 	}
 
-	async handleWorkflowStartCardSubmission(request: WorkflowStartCardSubmissionRequest) {
-		const activeSession = this.taskState.activeWorkflowStartCardSession
-		if (!activeSession) {
-			return
-		}
-
-		if (request.sessionId !== activeSession.sessionId) {
-			return
-		}
-
-		await this.workflowRuntime.submitWorkflowStartCard({
-			taskState: this.taskState,
-			request,
-		})
-		await this.persistWorkflowRuntimeMetadata()
-	}
-
 	async handleWorkflowFormSubmission(request: WorkflowFormSubmissionRequest) {
-		const activeSession = this.taskState.activeWorkflowFormSession
+		const activeSession = this.taskState.activeWorkflowSession?.ui.formSession
 		if (!activeSession) {
 			return
 		}
@@ -1289,72 +1279,11 @@ export class Task {
 			taskMetadata.activeStoryTaskId = this.taskState.activeStoryTaskId
 			taskMetadata.activeStorySubtaskIds = this.taskState.activeStorySubtaskIds
 			taskMetadata.lastPromptedStoryTaskKey = this.taskState.lastPromptedStoryTaskKey
-			taskMetadata.activeWorkflowStartCardSession = this.taskState.activeWorkflowStartCardSession
-			taskMetadata.activeWorkflowFormSession = this.taskState.activeWorkflowFormSession
-			taskMetadata.activeWorkflowStepResolutionSession = this.taskState.activeWorkflowStepResolutionSession
-			taskMetadata.suppressedWorkflowStepResolutionDefinitionIds =
-				this.taskState.suppressedWorkflowStepResolutionDefinitionIds
-			taskMetadata.suppressedWorkflowFormResolverIds = this.taskState.suppressedWorkflowFormResolverIds
+			removeLegacyWorkflowRuntimeMetadata(taskMetadata)
 			await saveTaskMetadata(this.taskId, taskMetadata)
 		} catch {
 			// Non-fatal: prompt/runtime state should continue even if metadata persistence fails.
 		}
-	}
-
-	private async renderWorkflowStartCardMessage(payload: WorkflowStartCard): Promise<void> {
-		const text = JSON.stringify(payload)
-		const nextThreadDisplayState = ThreadDisplayStates.AWAITING_USER_RESPONSE
-		const nextAwaitingSubtype = AwaitingUserResponseSubtypes.SYSTEM
-		const clineMessages = this.messageStateHandler.getClineMessages()
-
-		this.setThreadDisplayState(
-			nextThreadDisplayState,
-			"workflow_start_card_render",
-			{
-				sessionId: payload.sessionId,
-				workflowName: this.taskState.activeWorkflowStartCardSession?.workflowName,
-			},
-			nextAwaitingSubtype,
-		)
-
-		let existingWorkflowStartCardMessageIndex = -1
-		for (let index = clineMessages.length - 1; index >= 0; index--) {
-			const message = clineMessages[index]
-			const isWorkflowStartCardAsk = message.type === "ask" && message.ask === "workflow_start_card"
-			if (!isWorkflowStartCardAsk || !message.text) {
-				continue
-			}
-
-			try {
-				const parsedPayload = JSON.parse(message.text) as WorkflowStartCard
-				if (parsedPayload.sessionId === payload.sessionId) {
-					existingWorkflowStartCardMessageIndex = index
-					break
-				}
-			} catch {}
-		}
-
-		if (existingWorkflowStartCardMessageIndex >= 0) {
-			await this.messageStateHandler.updateClineMessage(existingWorkflowStartCardMessageIndex, {
-				text,
-				partial: false,
-				threadDisplayState: nextThreadDisplayState,
-				awaitingUserResponseSubtype: nextAwaitingSubtype,
-			})
-		} else {
-			const askTs = Date.now()
-			this.taskState.lastMessageTs = askTs
-			await this.messageStateHandler.addToClineMessages({
-				ts: askTs,
-				type: "ask",
-				ask: "workflow_start_card",
-				threadDisplayState: this.threadDisplayState,
-				awaitingUserResponseSubtype: this.awaitingUserResponseSubtype,
-				text,
-			})
-		}
-
-		await this.postStateToWebview()
 	}
 
 	private async renderWorkflowFormMessage(payload: WorkflowForm): Promise<void> {
@@ -1477,31 +1406,28 @@ export class Task {
 				return
 			}
 
+			if (nextAction.kind === "persist_workflow_teardown") {
+				await this.persistWorkflowRuntimeMetadata()
+				return
+			}
+
+			if (nextAction.kind === "terminal_error") {
+				await this.persistWorkflowRuntimeMetadata()
+				await this.say("error", nextAction.errorMessage)
+				return
+			}
+
 			if (nextAction.kind === "complete_workflow") {
 				await this.persistWorkflowRuntimeMetadata()
 				return
 			}
 
-			if (nextAction.kind === "render_workflow_start_card") {
-				await this.persistWorkflowRuntimeMetadata()
-				const payload = buildWorkflowStartCardPayload(nextAction.startCardSession)
-				await this.renderWorkflowStartCardMessage(payload)
-				await pWaitFor(
-					() => this.taskState.activeWorkflowStartCardSession !== nextAction.startCardSession || this.taskState.abort,
-					{ interval: 100 },
-				)
-				if (this.taskState.abort) {
-					return
-				}
-				nextAction = await this.workflowRuntime.resolveNextAction({ taskState: this.taskState })
-				continue
-			}
-
 			if (nextAction.kind === "render_workflow_form") {
 				await this.persistWorkflowRuntimeMetadata()
 				await this.renderWorkflowFormMessage(nextAction.payload)
+				const formSession = nextAction.formSession
 				await pWaitFor(
-					() => this.taskState.activeWorkflowFormSession !== nextAction.formSession || this.taskState.abort,
+					() => this.taskState.activeWorkflowSession?.ui.formSession !== formSession || this.taskState.abort,
 					{
 						interval: 100,
 					},
@@ -1513,29 +1439,33 @@ export class Task {
 				continue
 			}
 
-			if (nextAction.kind === "run_deterministic_operation") {
-				const activeWorkflowName = this.taskState.activeWorkflowName
-				const definition = activeWorkflowName ? resolveWorkflowDefinition(activeWorkflowName) : undefined
-				if (nextAction.stepResolutionSession && definition) {
-					const stepResolutionRuntime = new WorkflowStepResolutionRuntime(definition.stepResolutionDefinitions ?? {})
-					await this.renderWorkflowStepResolutionStatusMessage(
-						stepResolutionRuntime.buildPayload(nextAction.stepResolutionSession),
-					)
+			if (nextAction.kind === "execute_tool_backed_operation") {
+				if (nextAction.toolBackedOperationSession) {
+					const toolBackedOperationStatusPayload = this.workflowRuntime.buildToolBackedOperationStatusPayload({
+						taskState: this.taskState,
+						session: nextAction.toolBackedOperationSession,
+					})
+					if (toolBackedOperationStatusPayload) {
+						await this.renderWorkflowStepResolutionStatusMessage(toolBackedOperationStatusPayload)
+					}
 				}
 
 				const previousUserMessageContentLength = this.taskState.userMessageContent.length
 				await this.toolExecutor.executeTool({
 					type: "tool_use",
 					name: nextAction.toolRequest.toolName,
-					params: nextAction.toolRequest.toolParams as any,
+					params: {
+						...nextAction.toolRequest.toolParams,
+						...nextAction.toolRequest.toolInput,
+					} as any,
 					partial: false,
 					isNativeToolCall: true,
-					call_id: nextAction.stepResolutionSession
-						? `workflow_step_resolution_${nextAction.stepResolutionSession.sessionId}`
-						: `workflow_form_${this.taskId}`,
+					call_id: nextAction.toolBackedOperationSession
+						? `workflow_step_resolution_${nextAction.toolBackedOperationSession.sessionId}`
+						: `workflow_runtime_${this.taskId}`,
 				})
 				const toolResultText = this.getWorkflowFormToolResultText(previousUserMessageContentLength)
-				nextAction = await this.workflowRuntime.handleDeterministicToolResult({
+				nextAction = await this.workflowRuntime.handleToolBackedOperationToolResult({
 					taskState: this.taskState,
 					toolResultText,
 				})
@@ -1748,35 +1678,23 @@ export class Task {
 			return undefined
 		}
 
-		const definition = resolveWorkflowDefinition(action.workflowName)
-		if (!definition) {
+		const previousActiveWorkflowName = this.taskState.activeWorkflowName
+		this.taskState.activeWorkflowName = action.workflowName
+		const nextAction = await this.workflowRuntime.activateWorkflow({
+			taskState: this.taskState,
+			workflowName: action.workflowName,
+		})
+		if (nextAction.kind === "no_op") {
+			this.taskState.activeWorkflowName = previousActiveWorkflowName
 			return undefined
 		}
 
-		const nextAction = await this.workflowRuntime.activateWorkflow({
-			taskState: this.taskState,
-			workflow: definition,
-		})
 		await this.persistWorkflowRuntimeMetadata()
 		return nextAction
 	}
 
 	private async buildPromptSkillScope(enabledSkills: SkillMetadata[]): Promise<SkillMetadata[]> {
 		return enabledSkills
-	}
-
-	private mergePromptSkillEntries(skills: SkillMetadata[], workflows: SkillMetadata[]): SkillMetadata[] {
-		const merged = new Map<string, SkillMetadata>()
-
-		for (const skill of skills) {
-			merged.set(skill.name, skill)
-		}
-
-		for (const workflow of workflows) {
-			merged.set(workflow.name, workflow)
-		}
-
-		return [...merged.values()]
 	}
 
 	private hasHumanAuthoredInput(contentBlocks: ClineContent[]): boolean {
@@ -1836,33 +1754,31 @@ export class Task {
 		return isGPT5ModelFamily(providerInfo.model.id)
 	}
 
-	private async restoreBmadStateFromMetadata(): Promise<void> {
-		try {
-			const metadata = await getTaskMetadata(this.taskId)
-			this.taskState.activeStoryTaskId = metadata.activeStoryTaskId
-			this.taskState.activeStorySubtaskIds = metadata.activeStorySubtaskIds ?? []
-			this.taskState.lastPromptedStoryTaskKey = metadata.lastPromptedStoryTaskKey
-			this.taskState.activeWorkflowName = metadata.activeWorkflowName
-			await this.workflowRuntime.restorePersistedSession({
-				taskState: this.taskState,
-				persistedSession: metadata.activeWorkflowSession,
-			})
-			this.taskState.activeWorkflowStartCardSession =
-				metadata.activeWorkflowStartCardSession as TaskState["activeWorkflowStartCardSession"]
-			this.taskState.activeWorkflowFormSession =
-				metadata.activeWorkflowFormSession as TaskState["activeWorkflowFormSession"]
-			this.taskState.activeWorkflowStepResolutionSession =
-				metadata.activeWorkflowStepResolutionSession as TaskState["activeWorkflowStepResolutionSession"]
-			this.taskState.suppressedWorkflowStepResolutionDefinitionIds =
-				metadata.suppressedWorkflowStepResolutionDefinitionIds ?? []
-			this.taskState.suppressedWorkflowFormResolverIds = metadata.suppressedWorkflowFormResolverIds ?? []
-			if (metadata.activeWorkflowName && !metadata.activeWorkflowSession) {
-				this.taskState.activeWorkflowName = undefined
-				metadata.activeWorkflowName = undefined
-				await saveTaskMetadata(this.taskId, metadata)
-			}
-		} catch {
-			// Non-fatal: tasks without metadata should still resume normally.
+	private restoreActiveStoryPromptStateFromMetadata(metadata: TaskMetadata): void {
+		this.taskState.activeStoryTaskId = metadata.activeStoryTaskId
+		this.taskState.activeStorySubtaskIds = metadata.activeStorySubtaskIds ?? []
+		this.taskState.lastPromptedStoryTaskKey = metadata.lastPromptedStoryTaskKey
+	}
+
+	private async restoreWorkflowRuntimeStateFromMetadata(metadata: TaskMetadata): Promise<void> {
+		this.taskState.activeWorkflowName = metadata.activeWorkflowName
+		const restoreResult = await this.workflowRuntime.restorePersistedSession({
+			taskState: this.taskState,
+			persistedSession: metadata.activeWorkflowSession,
+		})
+		if (restoreResult?.kind === "persist_workflow_teardown") {
+			metadata.activeWorkflowName = undefined
+			metadata.activeWorkflowSession = undefined
+			removeLegacyWorkflowRuntimeMetadata(metadata)
+			await saveTaskMetadata(this.taskId, metadata)
+			return
+		}
+
+		if (metadata.activeWorkflowName && !metadata.activeWorkflowSession) {
+			this.taskState.activeWorkflowName = undefined
+			metadata.activeWorkflowName = undefined
+			removeLegacyWorkflowRuntimeMetadata(metadata)
+			await saveTaskMetadata(this.taskId, metadata)
 		}
 	}
 
@@ -1872,6 +1788,7 @@ export class Task {
 			metadata.activeStoryTaskId = this.taskState.activeStoryTaskId
 			metadata.activeStorySubtaskIds = this.taskState.activeStorySubtaskIds
 			metadata.lastPromptedStoryTaskKey = this.taskState.lastPromptedStoryTaskKey
+			removeLegacyWorkflowRuntimeMetadata(metadata)
 			await saveTaskMetadata(this.taskId, metadata)
 		} catch {
 			// Non-fatal: the in-memory story-task prompt state remains canonical for the active turn.
@@ -2170,7 +2087,13 @@ export class Task {
 		this.taskState.isInitialized = true
 		this.taskState.abort = false // Reset abort flag when resuming task
 		this.taskState.abandoned = false
-		await this.restoreBmadStateFromMetadata()
+		try {
+			const metadata = await getTaskMetadata(this.taskId)
+			this.restoreActiveStoryPromptStateFromMetadata(metadata)
+			await this.restoreWorkflowRuntimeStateFromMetadata(metadata)
+		} catch {
+			// Non-fatal: tasks without metadata should still resume normally.
+		}
 
 		let response: ClineAskResponse
 		let text: string | undefined
@@ -2618,7 +2541,8 @@ export class Task {
 			}
 
 			// PHASE 6: Check for incomplete progress
-			if (this.FocusChainManager) {
+			const focusChainManager = this.taskState.activeWorkflowName ? this.FocusChainManager : undefined
+			if (focusChainManager) {
 				// Extract current model and provider for telemetry
 				const apiConfig = this.stateManager.getApiConfiguration()
 				const currentMode = this.stateManager.getGlobalSettingsKey("mode")
@@ -2627,7 +2551,7 @@ export class Task {
 				) as string
 				const currentModelId = this.api.getModel().id
 
-				this.FocusChainManager.checkIncompleteProgressOnCompletion(currentModelId, currentProvider)
+				focusChainManager.checkIncompleteProgressOnCompletion(currentModelId, currentProvider)
 			}
 
 			// PHASE 7: Clean up resources
@@ -2641,9 +2565,8 @@ export class Task {
 			await this.diffViewProvider.revertChanges()
 			// Clear the notification callback when task is aborted
 			this.mcpHub.clearNotificationCallback()
-			if (this.FocusChainManager) {
-				this.FocusChainManager.dispose()
-			}
+			this.FocusChainManager?.dispose()
+			this.FocusChainManager = undefined
 		} finally {
 			// Release task folder lock
 			if (this.taskLockAcquired) {
@@ -2866,11 +2789,9 @@ export class Task {
 		const shouldUseContinuationPrompt = shouldUseContinuationTurnPrompt({
 			hasHumanAuthoredInput: this.currentRequestHasHumanAuthoredInput,
 			shouldSendFullPromptAssembly,
-			managedWorkflowActive: !!this.taskState.activeWorkflowName,
 		})
 		const useMinimalGptPrompt = this.shouldUseMinimalGptPrompt(providerInfo)
 		const shouldIncludeDynamicPromptContext = shouldSendFullPromptAssembly
-		const shouldIncludeBmadPromptContext = shouldSendFullPromptAssembly
 		const host = await HostProvider.env.getHostVersion({})
 		const ide = host?.platform || "Unknown"
 		const isCliEnvironment = host.clineType === ClineClient.Cli
@@ -2943,9 +2864,7 @@ export class Task {
 			return toggles[skill.path] !== false
 		})
 		const workflowPromptProjection = await this.workflowRuntime.buildTurnProjection({ taskState: this.taskState })
-		const promptSkills = shouldIncludeBmadPromptContext
-			? await this.buildPromptSkillScope(this.mergePromptSkillEntries(availableSkills, getWorkflowSkillMetadata()))
-			: []
+		const promptSkills = shouldSendFullPromptAssembly ? await this.buildPromptSkillScope(availableSkills) : []
 
 		// Snapshot editor tabs so prompt tools can decide whether to include
 		// filetype-specific instructions (e.g. notebooks) without adding bespoke flags.
@@ -2966,9 +2885,13 @@ export class Task {
 			mcpHub: this.mcpHub,
 			activeWorkflowName: this.taskState.activeWorkflowName,
 			activeWorkflowStepNumber: this.taskState.activeWorkflowSession?.activeStepNumber,
-			workflowSystemInstructionsBlock: workflowPromptProjection.workflowSystemInstructionsBlock,
-			workflowInputInstructionsBlock: workflowPromptProjection.workflowInputInstructionsBlock,
+			fullTurnWorkflowSystemInstructionsBlock: workflowPromptProjection.fullTurnWorkflowSystemInstructionsBlock,
+			fullTurnWorkflowInputInstructionsBlock: workflowPromptProjection.fullTurnWorkflowInputInstructionsBlock,
 			workflowToolSchemaOverride: workflowPromptProjection.workflowToolSchemaOverride,
+			continuationTurnWorkflowSystemInstructionsBlock:
+				workflowPromptProjection.continuationTurnWorkflowSystemInstructionsBlock,
+			continuationTurnWorkflowInputInstructionsBlock:
+				workflowPromptProjection.continuationTurnWorkflowInputInstructionsBlock,
 			isContinuationTurn: shouldUseContinuationPrompt,
 			isPromptRefreshTurn: shouldSendFullPromptAssembly,
 			currentFocusChainChecklist: this.taskState.currentFocusChainChecklist,
@@ -3345,6 +3268,11 @@ export class Task {
 				Logger.info(
 					`[Task ${this.taskId}] presentAssistantMessage tool ${block.name} ${toolExecutionOutcome.status} at index ${this.taskState.currentStreamingContentIndex + 1}/${this.taskState.assistantMessageContent.length}; call_id=${block.call_id ?? "none"}; emittedToolResult=${String(toolExecutionOutcome.emittedToolResult)}; userMessageContent blocks=${this.taskState.userMessageContent.length}`,
 				)
+				if (block.name === ClineDefaultTool.SET_WORKFLOW_VALUES && toolExecutionOutcome.status === "executed") {
+					await this.consumeWorkflowNextAction(
+						await this.workflowRuntime.resolveNextAction({ taskState: this.taskState }),
+					)
+				}
 				if (block.call_id) {
 					Session.get().updateToolCall(block.call_id, block.name)
 				}
@@ -3651,11 +3579,7 @@ export class Task {
 		if (shouldCompact) {
 			runtimePromptInjectionBlocks.push({
 				type: "text",
-				text: summarizeTask(
-					this.stateManager.getGlobalSettingsKey("focusChainSettings"),
-					this.cwd,
-					isMultiRootEnabled(this.stateManager),
-				),
+				text: summarizeTask(this.cwd, isMultiRootEnabled(this.stateManager)),
 			})
 		}
 
@@ -4442,7 +4366,6 @@ export class Task {
 
 		// Pre-fetch necessary data to avoid redundant calls within loops
 		const ulid = this.ulid
-		const focusChainSettings = this.stateManager.getGlobalSettingsKey("focusChainSettings")
 		const useNativeToolCalls = this.stateManager.getGlobalStateKey("nativeToolCallEnabled")
 		const providerInfo = this.getCurrentProviderInfo()
 		const cwd = this.cwd
@@ -4465,7 +4388,7 @@ export class Task {
 				processedText,
 				needsClinerulesFileCheck: needsCheck,
 				persistentSlashCommandAction: slashAction,
-			} = await parseSlashCommands(parsedText, ulid, focusChainSettings, useNativeToolCalls, providerInfo, mcpPromptFetcher)
+			} = await parseSlashCommands(parsedText, ulid, useNativeToolCalls, providerInfo, mcpPromptFetcher)
 
 			if (needsCheck) {
 				needsClinerulesFileCheck = true
@@ -4554,82 +4477,6 @@ export class Task {
 		this.currentRequestHasHumanAuthoredInput = requestHasHumanAuthoredInput
 		const shouldSendFullPromptAssembly = this.shouldSendFullPromptAssemblyForCurrentTurn(requestHasHumanAuthoredInput)
 		this.currentRequestShouldSendFullPromptAssembly = shouldSendFullPromptAssembly
-		if (!useCompactPrompt) {
-			const previousActiveStoryTaskId = this.taskState.activeStoryTaskId
-			const previousActiveStorySubtaskIds = [...this.taskState.activeStorySubtaskIds]
-			const previousLastPromptedStoryTaskKey = this.taskState.lastPromptedStoryTaskKey
-			const currentStepInputPrompt = await this.FocusChainManager?.consumeCurrentPlaceholderWorkflowStepPromptForInput({
-				shouldForceStoryTaskPrompt: shouldSendFullPromptAssembly,
-			})
-			if (currentStepInputPrompt?.trim()) {
-				processedUserContent.push({
-					type: "text",
-					text: currentStepInputPrompt,
-				})
-			}
-			const didPromptStateChange =
-				this.taskState.activeStoryTaskId !== previousActiveStoryTaskId ||
-				this.taskState.lastPromptedStoryTaskKey !== previousLastPromptedStoryTaskKey ||
-				this.taskState.activeStorySubtaskIds.length !== previousActiveStorySubtaskIds.length ||
-				this.taskState.activeStorySubtaskIds.some(
-					(subtaskId, index) => subtaskId !== previousActiveStorySubtaskIds[index],
-				)
-			if (didPromptStateChange) {
-				await this.persistActiveStoryTaskPromptState()
-			}
-		}
-
-		logFocusChainDiagnosticEvent(this.taskId, "load_context_snapshot", {
-			providerId: providerInfo.providerId,
-			modelId: providerInfo.model.id,
-			useCompactPrompt,
-			reducedEnvironmentDetails: !includeDetailedEnvironmentDetails,
-			focusChainManagerPresent: !!this.FocusChainManager,
-			activeWorkflowName: this.taskState.activeWorkflowName ?? null,
-			currentFocusChainChecklistPresent: !!this.taskState.currentFocusChainChecklist,
-			currentFocusChainChecklistItemCount: this.taskState.currentFocusChainChecklist
-				? this.taskState.currentFocusChainChecklist.split("\n").filter((line) => line.trim().startsWith("- [")).length
-				: 0,
-			apiRequestCount: this.taskState.apiRequestCount,
-			apiRequestsSinceLastTodoUpdate: this.taskState.apiRequestsSinceLastTodoUpdate,
-		})
-
-		// Add focus chain instructions if needed
-		const focusChainDecision = this.FocusChainManager?.getFocusChainInstructionsDecision()
-		logFocusChainDiagnosticEvent(this.taskId, "focus_chain_decision", {
-			...(focusChainDecision ?? {
-				shouldInclude: false,
-				inPlanMode: false,
-				workflowActive: false,
-				justSwitchedFromPlanMode: false,
-				userUpdatedList: false,
-				reachedReminderInterval: false,
-				isFirstApiRequest: false,
-				hasNoTodoListAfterMultipleRequests: false,
-			}),
-			focusChainManagerPresent: !!this.FocusChainManager,
-			useCompactPrompt,
-		})
-		if (!useCompactPrompt && this.FocusChainManager?.shouldIncludeFocusChainInstructions()) {
-			const focusChainInstructions = await this.FocusChainManager.generateFocusChainInstructions()
-			logFocusChainDiagnosticEvent(this.taskId, "focus_chain_generation", {
-				...summarizeFocusChainText(focusChainInstructions),
-				willAppend: !!focusChainInstructions.trim(),
-			})
-			if (focusChainInstructions.trim()) {
-				promptInjectionBlocks.push({
-					type: "text",
-					text: focusChainInstructions,
-				})
-
-				this.taskState.apiRequestsSinceLastTodoUpdate = 0
-				this.taskState.todoListWasUpdatedByUser = false
-			}
-		}
-
-		logFocusChainDiagnosticEvent(this.taskId, "load_context_final_summary", {
-			...summarizeFocusChainTextBlocks([...processedUserContent, ...promptInjectionBlocks]),
-		})
 
 		return [processedUserContent, promptInjectionBlocks, clinerulesError]
 	}

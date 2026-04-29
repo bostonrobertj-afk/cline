@@ -1014,11 +1014,9 @@ export class Controller {
 		const planActSeparateModelsSetting = this.stateManager.getGlobalSettingsKey("planActSeparateModelsSetting")
 		const enableCheckpointsSetting = this.stateManager.getGlobalSettingsKey("enableCheckpointsSetting")
 		const globalClineRulesToggles = this.stateManager.getGlobalSettingsKey("globalClineRulesToggles")
-		const globalWorkflowToggles = this.stateManager.getGlobalSettingsKey("globalWorkflowToggles")
 		const globalSkillsToggles = this.stateManager.getGlobalSettingsKey("globalSkillsToggles")
 		const localSkillsToggles = this.stateManager.getWorkspaceStateKey("localSkillsToggles")
 		const remoteRulesToggles = this.stateManager.getGlobalStateKey("remoteRulesToggles")
-		const remoteWorkflowToggles = this.stateManager.getGlobalStateKey("remoteWorkflowToggles")
 		const shellIntegrationTimeout = this.stateManager.getGlobalSettingsKey("shellIntegrationTimeout")
 		const terminalReuseEnabled = this.stateManager.getGlobalStateKey("terminalReuseEnabled")
 		const vscodeTerminalExecutionMode = this.stateManager.getGlobalStateKey("vscodeTerminalExecutionMode")
@@ -1042,7 +1040,6 @@ export class Controller {
 		const localWindsurfRulesToggles = this.stateManager.getWorkspaceStateKey("localWindsurfRulesToggles")
 		const localCursorRulesToggles = this.stateManager.getWorkspaceStateKey("localCursorRulesToggles")
 		const localAgentsRulesToggles = this.stateManager.getWorkspaceStateKey("localAgentsRulesToggles")
-		const workflowToggles = this.stateManager.getWorkspaceStateKey("workflowToggles")
 
 		const currentTaskHistoryItem = this.task?.taskId
 			? (taskHistory || []).find((item) => item.id === this.task?.taskId)
@@ -1107,12 +1104,9 @@ export class Controller {
 			localWindsurfRulesToggles: localWindsurfRulesToggles || {},
 			localCursorRulesToggles: localCursorRulesToggles || {},
 			localAgentsRulesToggles: localAgentsRulesToggles || {},
-			localWorkflowToggles: workflowToggles || {},
-			globalWorkflowToggles: globalWorkflowToggles || {},
 			globalSkillsToggles: globalSkillsToggles || {},
 			localSkillsToggles: localSkillsToggles || {},
 			remoteRulesToggles: remoteRulesToggles,
-			remoteWorkflowToggles: remoteWorkflowToggles,
 			shellIntegrationTimeout,
 			terminalReuseEnabled,
 			vscodeTerminalExecutionMode: vscodeTerminalExecutionMode,

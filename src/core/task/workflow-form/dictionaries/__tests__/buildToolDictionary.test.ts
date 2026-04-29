@@ -2,31 +2,39 @@ import { expect } from "chai"
 import { describe, it } from "mocha"
 import { ClineDefaultTool } from "@/shared/tools"
 import {
-	buildRuntimeToolDictionaryMarkdown,
 	buildRuntimeToolDictionaryMarkdownFromConfig,
-	buildToolDictionaryMarkdown,
 	buildToolDictionaryMarkdownFromConfig,
-	buildWorkflowStartRuntimeToolDictionary,
 	TOOL_DICTIONARY_TERM_KEYS,
-	WORKFLOW_FORM_TOOL_DICTIONARY_HEADING,
+	type WorkflowFormToolDictionaryContractConfig,
 } from "../buildToolDictionary"
 import { workflowFormSystemDictionary } from "../systemDictionary"
 
-describe("buildToolDictionaryMarkdown", () => {
-	it("finds the stable build_review_diff_output heading", () => {
-		const markdown = buildToolDictionaryMarkdown()
+const buildWorkflowDocumentDictionaryConfig: WorkflowFormToolDictionaryContractConfig = {
+	toolName: ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT,
+	heading: "## build_workflow_document",
+	runtimeTitle: "Workflow Document Builder Reference",
+	overviewLines: ["Build a workflow-owned markdown artifact from runtime-resolved document content."],
+	parameterDescriptions: {
+		artifact_id: "Canonical workflow artifact id selected by the active workflow module.",
+		destination_path: "Absolute destination path resolved by WorkflowRuntime.",
+		content: "Fully resolved markdown content to write to the destination path.",
+		workflow_value_writes: "Optional workflow-value writeback map to persist after a successful document write.",
+	},
+	termKeys: TOOL_DICTIONARY_TERM_KEYS,
+}
 
-		expect(markdown).to.include(WORKFLOW_FORM_TOOL_DICTIONARY_HEADING)
-	})
+describe("buildToolDictionaryMarkdownFromConfig", () => {
+	it("renders configured build_workflow_document parameter rows from the schema", () => {
+		const markdown = buildToolDictionaryMarkdownFromConfig(buildWorkflowDocumentDictionaryConfig)
 
-	it("renders required versus optional parameter status from the schema", () => {
-		const markdown = buildToolDictionaryMarkdown()
-
-		expect(markdown).to.include("- `values` (required, object):")
+		expect(markdown).to.include("## build_workflow_document")
+		expect(markdown).to.include("- `artifact_id` (required, string):")
+		expect(markdown).to.include("- `destination_path` (required, string):")
+		expect(markdown).to.include("- `content` (required, string):")
 	})
 
 	it("keeps translation entries for every Phase 1 technical term used in the tool dictionary", () => {
-		const markdown = buildToolDictionaryMarkdown()
+		const markdown = buildToolDictionaryMarkdownFromConfig(buildWorkflowDocumentDictionaryConfig)
 
 		for (const key of TOOL_DICTIONARY_TERM_KEYS) {
 			expect(workflowFormSystemDictionary[key]).to.not.equal(undefined)
@@ -35,58 +43,32 @@ describe("buildToolDictionaryMarkdown", () => {
 	})
 
 	it("renders any configured tool by looking up its schema through the workflow-form contract resolver", () => {
-		const config = {
-			toolName: ClineDefaultTool.SET_WORKFLOW_VALUES,
-			heading: "## set_workflow_values",
-			runtimeTitle: "Workflow Value Reference",
-			overviewLines: ["Persist workflow values for the active workflow before the first AI turn begins."],
-			parameterDescriptions: {
-				values: "Workflow value key/value map. Submit only the values the human actually supplied.",
-			},
+		const markdown = buildToolDictionaryMarkdownFromConfig({
+			...buildWorkflowDocumentDictionaryConfig,
 			termKeys: [],
-		}
+		})
+		const runtimeMarkdown = buildRuntimeToolDictionaryMarkdownFromConfig({
+			...buildWorkflowDocumentDictionaryConfig,
+			termKeys: [],
+		})
 
-		const markdown = buildToolDictionaryMarkdownFromConfig(config)
-		const runtimeMarkdown = buildRuntimeToolDictionaryMarkdownFromConfig(config)
-
-		expect(markdown).to.include("## set_workflow_values")
+		expect(markdown).to.include("## build_workflow_document")
 		expect(markdown).to.include(
-			"- `values` (required, object): Workflow value key/value map. Submit only the values the human actually supplied.",
+			"- `artifact_id` (required, string): Canonical workflow artifact id selected by the active workflow module.",
 		)
-		expect(runtimeMarkdown).to.include("## set_workflow_values")
+		expect(runtimeMarkdown).to.include("## build_workflow_document")
 		expect(runtimeMarkdown).to.not.include("# Workflow UI Surface Tool Dictionary")
-	})
-
-	it("builds a workflow-start runtime dictionary with contextual term reference rows", () => {
-		const { title, markdown } = buildWorkflowStartRuntimeToolDictionary({
-			fieldKeys: ["review_input", "spec_file"],
-		})
-
-		expect(title).to.equal("Workflow Value Reference")
-		expect(markdown).to.include("## set_workflow_values")
-		expect(markdown).to.include("- `values` (required, object):")
-		expect(markdown).to.include("### Term Reference")
-		expect(markdown).to.include("`review_input`")
-		expect(markdown).to.include("`spec_file`")
-	})
-
-	it("omits the workflow-start term reference section when no mapped keys exist", () => {
-		const { markdown } = buildWorkflowStartRuntimeToolDictionary({
-			fieldKeys: ["unmapped_input"],
-		})
-
-		expect(markdown).to.include("## set_workflow_values")
-		expect(markdown).to.include("### Parameters")
-		expect(markdown).to.not.include("### Term Reference")
 	})
 })
 
-describe("buildRuntimeToolDictionaryMarkdown", () => {
+describe("buildRuntimeToolDictionaryMarkdownFromConfig", () => {
 	it("renders the runtime tool reference without internal workflow-ui-surface framing", () => {
-		const markdown = buildRuntimeToolDictionaryMarkdown()
+		const markdown = buildRuntimeToolDictionaryMarkdownFromConfig(buildWorkflowDocumentDictionaryConfig)
 
-		expect(markdown).to.include("## set_workflow_values")
-		expect(markdown).to.include("- `values` (required, object):")
+		expect(markdown).to.include("## build_workflow_document")
+		expect(markdown).to.include("- `artifact_id` (required, string):")
+		expect(markdown).to.include("- `destination_path` (required, string):")
+		expect(markdown).to.include("- `content` (required, string):")
 		expect(markdown).to.include("### Parameters")
 		expect(markdown).to.include("### Term Reference")
 		expect(markdown).to.not.include("# Workflow UI Surface Tool Dictionary")

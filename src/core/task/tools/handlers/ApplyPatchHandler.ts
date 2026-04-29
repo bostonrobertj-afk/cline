@@ -8,7 +8,6 @@ import type { ClineSayTool } from "@shared/ExtensionMessage"
 import { fileExistsAtPath } from "@utils/fs"
 import { getReadablePath, isLocatedInWorkspace } from "@utils/path"
 import { applyPatch } from "diff"
-import { recordAndPersistPlaceholderWorkflowWriteProof } from "@/core/task/focus-chain/placeholderWorkflowWriteProofs"
 import { telemetryService } from "@/services/telemetry"
 import { BASH_WRAPPERS, DiffError, PATCH_MARKERS, type Patch, PatchActionType, type PatchChunk } from "@/shared/Patch"
 import { preserveEscaping } from "@/shared/string"
@@ -342,13 +341,6 @@ export class ApplyPatchHandler implements IFullyManagedTool {
 				// Invalidate file read cache for all changed files so re-reads get fresh content
 				const absolutePath = resolvePath(config.cwd, pathToTrack)
 				config.taskState.fileReadCache.delete(absolutePath.toLowerCase())
-				if (applyResults[pathToTrack] && applyResults[pathToTrack].deleted !== true) {
-					await recordAndPersistPlaceholderWorkflowWriteProof({
-						taskId: config.taskId,
-						taskState: config.taskState,
-						filePath: absolutePath,
-					})
-				}
 				// Also invalidate old path for move operations
 				if (change.type === PatchActionType.UPDATE && change.movePath) {
 					config.taskState.fileReadCache.delete(resolvePath(config.cwd, changedFilePath).toLowerCase())

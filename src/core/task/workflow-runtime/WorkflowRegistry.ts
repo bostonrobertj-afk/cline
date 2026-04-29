@@ -1,5 +1,4 @@
 import type { WorkflowDefinition, WorkflowName } from "@/core/task/workflow-runtime/types"
-import type { SkillMetadata } from "@/shared/skills"
 
 const shippedWorkflowDefinitions: WorkflowDefinition[] = []
 
@@ -31,14 +30,5 @@ export function getShippedWorkflowSlashCommands() {
 	return shippedWorkflowDefinitions.map((definition) => ({
 		name: definition.slashCommandName,
 		description: `Shipped workflow: ${definition.name}`,
-	}))
-}
-
-export function getWorkflowSkillMetadata(): SkillMetadata[] {
-	return shippedWorkflowDefinitions.map((definition) => ({
-		name: definition.useSkillName,
-		description: `Shipped workflow: ${definition.name}`,
-		path: `shipped-workflow://${definition.name}`,
-		source: "global",
 	}))
 }

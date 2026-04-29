@@ -53,7 +53,6 @@ const ChatView = ({ isHidden, showAnnouncement, hideAnnouncement, showHistoryVie
 		mode,
 		userInfo,
 		currentFocusChainChecklist,
-		focusChainSettings,
 		hooksEnabled,
 		threadDisplayState,
 		awaitingUserResponseSubtype,
@@ -315,24 +314,8 @@ const ChatView = ({ isHidden, showAnnouncement, hideAnnouncement, showHistoryVie
 	}, [modifiedMessages])
 
 	const lastProgressMessageText = useMemo(() => {
-		if (!focusChainSettings.enabled) {
-			return undefined
-		}
-
-		// First check if we have a current focus chain list from the extension state
-		if (currentFocusChainChecklist) {
-			return currentFocusChainChecklist
-		}
-
-		// Fall back to the last task_progress message if no state focus chain list
-		const lastProgressMessage = [...modifiedMessages].reverse().find((message) => message.say === "task_progress")
-		return lastProgressMessage?.text
-	}, [focusChainSettings.enabled, modifiedMessages, currentFocusChainChecklist])
-
-	const showFocusChainPlaceholder = useMemo(() => {
-		// Show placeholder whenever focus chain is enabled and no checklist exists yet.
-		return focusChainSettings.enabled && !lastProgressMessageText
-	}, [focusChainSettings.enabled, lastProgressMessageText])
+		return currentFocusChainChecklist ?? undefined
+	}, [currentFocusChainChecklist])
 
 	const groupedMessages = useMemo(() => {
 		return groupLowStakesTools(groupMessages(visibleMessages))
@@ -360,7 +343,6 @@ const ChatView = ({ isHidden, showAnnouncement, hideAnnouncement, showHistoryVie
 							supportsPromptCache: selectedModelInfo.supportsPromptCache,
 							supportsImages: selectedModelInfo.supportsImages || false,
 						}}
-						showFocusChainPlaceholder={showFocusChainPlaceholder}
 						task={task}
 					/>
 				) : (

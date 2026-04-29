@@ -18,7 +18,6 @@ export const SUBAGENT_DEFAULT_ALLOWED_TOOLS: ClineDefaultTool[] = [
 	ClineDefaultTool.SEARCH,
 	ClineDefaultTool.LIST_CODE_DEF,
 	ClineDefaultTool.BASH,
-	ClineDefaultTool.USE_SKILL,
 	ClineDefaultTool.ATTEMPT,
 ]
 const SUBAGENT_MCP_TOOLS: ClineDefaultTool[] = [ClineDefaultTool.MCP_USE, ClineDefaultTool.MCP_ACCESS, ClineDefaultTool.MCP_DOCS]
@@ -96,7 +95,12 @@ export class SubagentBuilder {
 	}
 
 	buildNativeTools(context: SystemPromptContext) {
-		const family = PromptRegistry.getInstance().getModelFamily(context)
+		const promptRegistry = PromptRegistry.getInstance()
+		const family = promptRegistry.getModelFamily(context)
+		if (context.workflowToolSchemaOverride !== undefined) {
+			return ClineToolSet.getNativeTools(promptRegistry.getVariant(context), context)
+		}
+
 		const toolSets = ClineToolSet.getToolsForVariantWithFallback(family, this.allowedTools)
 		const mcpExposureEnabled = this.isSubagentMcpExposureEnabled()
 		const filteredToolSpecs = toolSets

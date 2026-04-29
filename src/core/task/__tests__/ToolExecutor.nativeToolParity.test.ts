@@ -49,6 +49,7 @@ function createExecutor() {
 		{} as any,
 		{} as any,
 		stateManager,
+		{} as any,
 		process.cwd(),
 		"task-native-parity",
 		"ulid-native-parity",
@@ -69,8 +70,7 @@ function createExecutor() {
 		sinon.stub().resolves(),
 		sinon.stub().resolves(undefined),
 		sinon.stub().resolves(undefined),
-		sinon.stub().resolves(undefined),
-		sinon.stub().resolves(),
+		sinon.stub().resolves({}),
 	)
 
 	const coordinator = (executor as any).coordinator

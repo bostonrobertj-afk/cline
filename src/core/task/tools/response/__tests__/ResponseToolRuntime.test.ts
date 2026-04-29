@@ -80,16 +80,8 @@ describe("ResponseToolRuntime", () => {
 	})
 
 	it("keeps workflow-owned deterministic tools registered as non-response tools", () => {
-		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.SELECT_TARGET_EPIC), undefined)
 		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.SET_WORKFLOW_VALUES), undefined)
 		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT), undefined)
-		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.CONTINUE_BRAINSTORMING_SESSION), undefined)
-		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.CREATE_BRAINSTORMING_SESSION), undefined)
-		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.SELECT_BRAINSTORMING_SESSION), undefined)
-		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.PERSIST_BRAINSTORMING_APPROACH), undefined)
-		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.SELECT_RANDOM_BRAINSTORMING_TECHNIQUE), undefined)
-		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.PERSIST_BRAINSTORMING_TECHNIQUE), undefined)
-		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.REQUEST_BRAINSTORMING_TECHNIQUE_SUGGESTION), undefined)
 	})
 
 	it("registers post-turn thread display states for governed response tools", () => {
@@ -152,6 +144,20 @@ describe("ResponseToolRuntime", () => {
 			{
 				message: "Missing value for required parameter 'question'.",
 				cause: "missing_parameter",
+			},
+		)
+	})
+
+	it("classifies unrecognized formatted tool errors as generic tool errors", () => {
+		const runtime = new ResponseToolRuntime()
+
+		assert.deepEqual(
+			runtime.classifyFailureResult(
+				"The tool execution failed with the following error:\n<error>\nUnrecognized response-tool failure.\n</error>",
+			),
+			{
+				message: "Unrecognized response-tool failure.",
+				cause: "tool_error",
 			},
 		)
 	})

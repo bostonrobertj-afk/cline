@@ -14,7 +14,7 @@ The primary goals are:
 - establish one canonical workflow runtime and one canonical workflow identity flag, `activeWorkflowName`
 - retire the managed workflow capability and the placeholder-workflow ownership model
 - move workflow step ownership out of focus chain and into workflow runtime session state
-- preserve specialist capabilities such as prompt assembly, tool execution, workflow forms, and start cards while moving workflow-specific orchestration into the workflow runtime
+- preserve specialist capabilities such as prompt assembly, tool execution, and workflow forms while moving workflow-specific orchestration into the workflow runtime
 
 The highest-priority quality goals for this architecture are:
 
@@ -45,7 +45,7 @@ The architecture is constrained by the following discovery decisions and existin
 - Focus chain becomes a workflow-only downstream surface and no longer owns active-step state.
 - `task_progress` is retired.
 - The system prompt architecture remains responsible for final prompt assembly.
-- Existing specialist capabilities such as workflow forms, start cards, and tool execution should remain external specialist capabilities rather than being inlined into the workflow runtime.
+- Existing specialist capabilities such as workflow forms and tool execution should remain external specialist capabilities rather than being inlined into the workflow runtime.
 - The architecture document must remain faithful to existing discovery and must not introduce new implementation-level decisions that have not yet been made.
 
 ## 3. Context and Scope
@@ -66,8 +66,7 @@ This architecture covers:
 - lifecycle orchestration across turns
 - workflow prompting projection into the system prompt architecture
 - workflow tool-surface projection into contextual tool gating
-- workflow form orchestration
-- workflow start-card orchestration
+- workflow form orchestration, including the mandatory shared pre-workflow entry form
 - deterministic step-resolution orchestration
 - progression, completion, teardown, persistence, and resume
 - subagent-local workflow sessions
@@ -99,7 +98,7 @@ This architecture does not redesign:
 - the final requirements or action-plan-level implementation sequence
 - the internal implementation details of the generic tool executor
 - the internal implementation details of the generic system prompt builder
-- the generic UI rendering internals of the workflow start-card or workflow form surfaces
+- the generic UI rendering internals of the workflow form surface
 - migration of any shipped workflow outside the in-scope workflow set listed in Section 3.2
 
 ### 3.4 External Interfaces and Neighboring Systems
@@ -112,10 +111,8 @@ The workflow runtime interacts with the following neighboring systems:
   Consumes runtime-projected workflow prompt data and workflow-owned tool schema, then performs final system prompt assembly.
 - Focus chain capability
   Receives workflow step/checklist projection from runtime state and reflects it in UI and prompts.
-- Workflow start-card capability
-  Receives workflow-specific start-card configuration and payloads from the runtime.
 - Workflow form capability
-  Receives workflow-specific per-panel payloads and returns user input/results back to runtime orchestration.
+  Receives the shared mandatory pre-workflow entry form for user-facing main-agent workflow invocations and any workflow-specific per-panel payloads, then returns user input/results back to runtime orchestration.
 - Normal tool execution path
   Executes deterministic operations requested by the runtime.
 - Persistence layer
@@ -123,7 +120,7 @@ The workflow runtime interacts with the following neighboring systems:
 - Subagent execution
   Hosts child workflow sessions when a subagent is explicitly assigned a workflow through `useSkill`.
 - Webview/UI surfaces
-  Render workflow-specific downstream projections such as focus chain, workflow forms, and start cards.
+  Render workflow-specific downstream projections such as focus chain and workflow forms.
 
 ## 4. Solution Strategy
 
@@ -135,10 +132,10 @@ The solution strategy is to replace the current document-owned workflow model fo
 The shared workflow runtime owns lifecycle and orchestration:
 
 - activation entrypoint
-- pre-workflow project bootstrap gate
+- mandatory shared pre-workflow entry workflow form for user-facing main-agent workflow invocations
 - workflow session creation and mutation
 - workflow value mutation and validation
-- shared artifact identity and numbering policy
+- shared artifact-family registry, artifact allocation/create capability, canonical naming, numbering, and path resolution
 - current-step resolution from session state
 - orchestration across turns
 - dispatch to specialist capabilities
@@ -152,10 +149,10 @@ Each workflow-specific module owns workflow definition and workflow-owned conten
 - step graph and transition rules
 - per-step prompt content
 - workflow-level tool defaults and per-step native tool schema
-- start-card and workflow-form definitions
+- workflow-entry informational panel content and workflow-form definitions
 - deterministic step-resolution definitions
 - completion and teardown rules
-- workflow-owned artifact/document builders
+- artifact intent declarations and workflow-owned content builders; modules do not own canonical artifact filename patterns, numbering scopes, or discovery patterns
 - workflow-owned value rules, including explicit child-session inheritance rules where needed
 - references to workflow-specific evaluators or handlers
 
@@ -185,7 +182,7 @@ The workflow runtime slice is composed of the following major building blocks:
 5. Workflow Value Mutation Seam
    Canonical runtime-owned seam for persisting workflow values into the active session from backend logic or AI-callable tool paths.
 6. Runtime Projection Adapters
-   Translate workflow session state into downstream prompt, focus-chain, form, and start-card payloads.
+   Translate workflow session state into downstream prompt, focus-chain, and workflow-form payloads.
 7. Specialist Capabilities
    Existing external capabilities that the runtime orchestrates rather than absorbs.
 
@@ -203,10 +200,11 @@ Responsibilities:
 
 Responsibilities:
 
-- run the shared pre-workflow gate before workflow-specific step orchestration begins
-- obtain or resolve project identity for the active workflow session
-- drive the shared pre-workflow project-selection flow before workflow-specific step orchestration begins:
-  - present a `new` versus `existing` project choice
+- run the mandatory shared pre-workflow entry workflow form before workflow-specific step orchestration begins for user-facing main-agent workflow invocations
+- obtain or resolve project identity for the active main-agent workflow session through that shared entry workflow form
+- drive the shared two-panel pre-workflow entry flow before workflow-specific step orchestration begins for main-agent workflow invocations:
+  - the first panel is informational only and carries the workflow-specific informational content that legacy workflow start cards used to carry
+  - the second panel presents a `new` versus `existing` project choice
   - if `existing` is chosen, project choices are derived from the per-project folder names beneath the visible project output root
   - if `new` is chosen, collect a user-provided project title
 - ensure the per-project folder exists and that these canonical project subfolders exist within that project folder before workflow-specific artifact-producing steps can run:
@@ -245,7 +243,7 @@ Responsibilities:
 - declare step graph and transition rules
 - declare per-step prompt content
 - declare workflow-level and per-step native tool schema
-- declare workflow start-card and form configuration
+- declare workflow-entry informational panel content and workflow-form configuration
 - declare deterministic step-resolution rules
 - declare workflow-owned artifact/document builders
 - declare expected workflow values and any explicit child-session inheritance rules
@@ -266,8 +264,8 @@ Responsibilities:
 
 - build prompt-context payloads for the prompt architecture
 - build focus-chain projection from session state
+- build the mandatory shared pre-workflow entry workflow-form payload
 - build workflow-form payloads for the active step
-- build start-card payloads at workflow start
 
 #### Specialist Capabilities
 
@@ -275,7 +273,6 @@ These remain external and runtime-driven:
 
 - system prompt builder
 - generic tool executor
-- workflow start-card renderer
 - workflow form renderer/runner
 - focus chain renderer
 
@@ -304,8 +301,9 @@ Exact filenames beyond this level are deferred to requirements and implementatio
 3. `task/index.ts` invokes the workflow runtime activation entrypoint.
 4. Workflow runtime resolves the workflow definition from the shipped workflow registry.
 5. Workflow runtime creates or resumes the workflow session.
-6. Workflow runtime runs the shared pre-workflow gate to obtain or resolve project identity:
-   - present a `new` versus `existing` project choice
+6. Workflow runtime runs the mandatory shared pre-workflow entry workflow form before workflow-specific step orchestration begins:
+   - the first panel is informational only and carries the workflow-specific informational content that legacy workflow start cards used to carry
+   - the second panel obtains or resolves project identity by presenting a `new` versus `existing` project choice
    - if `existing` is chosen, populate the selection choices from the per-project folder names beneath the visible project output root
    - if `new` is chosen, collect a user-provided project title
 7. Workflow runtime normalizes the chosen or provided project identity, ensures the per-project folder exists, and ensures these canonical project subfolders within that project folder are ready:
@@ -315,7 +313,7 @@ Exact filenames beyond this level are deferred to requirements and implementatio
    - `review`
    - `testing`
 8. Workflow runtime initializes active-step state and marks the workflow as just started.
-9. Workflow runtime projects downstream state for prompts, focus chain, tools, and any workflow start UI.
+9. Workflow runtime projects downstream state for prompts, focus chain, tools, and any active workflow-form UI.
 
 ### 6.2 Scenario: Normal Turn Orchestration
 
@@ -333,12 +331,13 @@ Exact filenames beyond this level are deferred to requirements and implementatio
 1. Workflow runtime determines that the active step requires workflow-form interaction.
 2. Workflow runtime builds the per-panel payload for the active step using workflow-module configuration.
 3. Workflow form capability renders the payload and captures user input.
-4. Workflow runtime receives the result and decides the next workflow action.
-5. If deterministic operations are required, workflow runtime invokes them through the normal tool path.
-6. Workflow runtime applies the result to workflow session state and either:
+4. Workflow runtime receives the result and applies any declared durable form values through the workflow-value persistence seam.
+5. Workflow runtime performs any runtime-owned deterministic procedures needed to evaluate workflow/session state and re-enters canonical next-action evaluation.
+6. If the selected next action is a tool-backed deterministic operation, workflow runtime invokes that one operation through the normal tool path.
+7. Workflow runtime applies the result to workflow session state and either:
    - keeps the workflow on the same step
    - advances the step
-   - falls back to the model-driven path
+   - if a tool-backed deterministic operation failed, executes the retry procedure defined for the active workflow and step, and if that retry fails, surfaces a final user-visible error
 
 ### 6.3a Scenario: Workflow Value Persistence
 
@@ -352,10 +351,12 @@ Exact filenames beyond this level are deferred to requirements and implementatio
 
 1. Workflow runtime determines that the current step has a deterministic resolution path.
 2. Workflow runtime checks that deterministic progression is permitted for the current step.
-3. Workflow runtime invokes the normal tool path for the relevant deterministic operation.
-4. Workflow runtime interprets the result using workflow-module configuration.
-5. On success, workflow runtime updates session state and active-step state.
-6. On failure, workflow runtime follows the workflow-defined fallback path.
+3. Workflow runtime executes any direct runtime-owned deterministic procedures needed to evaluate state, resolve workflow values, build runtime-owned payload inputs, or decide whether a tool-backed operation is required.
+4. If resolution selects a tool-backed deterministic operation, workflow runtime invokes the normal tool path for that one operation.
+5. Workflow runtime interprets the direct runtime result or tool-backed result using workflow-module configuration.
+6. On success, workflow runtime updates session state and active-step state.
+7. On failure, workflow runtime executes the retry procedure defined for the active workflow and step.
+8. If that retry fails, workflow runtime surfaces a final user-visible error.
 
 ### 6.5 Scenario: AI-Initiated Progression Request
 
@@ -380,11 +381,12 @@ Exact filenames beyond this level are deferred to requirements and implementatio
 1. A subagent is created.
 2. The subagent runner creates a child execution context but does not become a separate workflow orchestrator.
 3. If the subagent is assigned a workflow through `useSkill`, the shared workflow runtime activates that workflow in the child session only.
-4. The workflow module may declare specific workflow values that should be initialized in the child session from values already present in the parent session.
-5. Workflow runtime copies only those explicitly declared inherited values into the child session during activation.
-6. The child session gets its own workflow identity, session state, workflow values, active step, prompt projection, tool gating, and completion lifecycle.
-7. After activation, parent and child workflow values are isolated mutable state unless a higher-level coordination behavior explicitly synchronizes them.
-8. The parent workflow session remains unchanged by child-session mutations.
+4. The child session copies project selection from the parent workflow session during activation rather than rendering the mandatory shared pre-workflow entry form.
+5. The workflow module may declare specific workflow values that should be initialized in the child session from values already present in the parent session.
+6. Workflow runtime copies only those explicitly declared inherited values into the child session during activation.
+7. The child session gets its own workflow identity, session state, workflow values, active step, prompt projection, tool gating, and completion lifecycle.
+8. After activation, parent and child workflow values are isolated mutable state unless a higher-level coordination behavior explicitly synchronizes them.
+9. The parent workflow session remains unchanged by child-session mutations.
 
 ### 6.8 Scenario: Concurrent Parent and Child Workflow Sessions
 
@@ -394,7 +396,7 @@ Exact filenames beyond this level are deferred to requirements and implementatio
 4. Prompt projection, tool schema, active step, progression, and teardown are computed per execution context rather than globally.
 5. State mutation in one workflow session does not overwrite another workflow session.
 
-### 6.9 Error and Fallback Behavior
+### 6.9 Error and Retry Behavior
 
 Important error behavior in this architecture:
 
@@ -403,7 +405,7 @@ Important error behavior in this architecture:
 - completion handlers may fail
 - resume may fail due to invalid or stale workflow session state
 
-In all cases, the workflow runtime is the owner of fallback decisioning. Specialist capabilities report results, but workflow runtime decides whether to retry, remain on step, fall back to model-driven execution, or teardown.
+For deterministic workflow failures, workflow runtime owns retry and final error handling. Specialist capabilities report results, but workflow runtime executes the workflow-defined retry procedure and, if retry fails, surfaces the final user-visible error.
 
 ## 7. Deployment View
 
@@ -414,7 +416,7 @@ The workflow runtime lives inside the extension backend/runtime process alongsid
 - extension backend / task runtime
   Hosts `task/index.ts`, workflow runtime, workflow registry, workflow modules, prompt projection, and orchestration logic.
 - webview/UI layer
-  Renders downstream workflow surfaces such as start cards, workflow forms, and focus chain.
+  Renders downstream workflow surfaces such as workflow forms and focus chain.
 - local persistence layer
   Stores workflow session state needed for safe resume.
 
@@ -441,7 +443,7 @@ Several existing systems become downstream consumers:
 
 - focus chain reflects runtime-owned step state
 - system prompt consumes runtime-owned workflow prompt data
-- workflow forms and start cards consume runtime-owned payloads
+- workflow forms consume runtime-owned payloads
 
 ### 8.3 Code-Owned Workflow Content
 
@@ -482,6 +484,7 @@ That means:
 
 - workflow runtime decides when to invoke a workflow form
 - workflow form capability still renders/runs the form surface
+- workflow runtime executes direct runtime-owned deterministic procedures inside `WorkflowRuntime` or shared runtime-owned seams
 - workflow runtime decides when deterministic tool execution should happen
 - the normal tool path still executes the tool
 
@@ -502,6 +505,7 @@ Workflow sessions are execution-context-local, but they are all owned by the sam
 - parent and child sessions are separate
 - the subagent runner is only a caller/bootstrap seam for child execution contexts, not a distinct workflow orchestrator
 - assigned child workflows are activated only in child state
+- child workflow activation copies parent project selection as activation context and does not render the mandatory shared pre-workflow entry form
 - child-session workflow values may be initialized from parent-session values only through workflow-module-declared inheritance rules
 - parent and child sessions do not share one mutable workflow-value map
 - parent workflow identity and state are not overwritten by child workflow activation
@@ -509,11 +513,13 @@ Workflow sessions are execution-context-local, but they are all owned by the sam
 
 ### 8.9 Workflow-Owned Artifact Builders
 
-Workflow-emitted markdown artifacts remain output artifacts, but their template/source ownership moves into runtime code. Workflow modules own coded artifact definitions and builders rather than markdown template files as runtime dependencies.
+Workflow-emitted text artifacts remain output artifacts, but their template/source ownership moves into runtime code. Workflow modules own artifact intent declarations and content builders rather than markdown template files as runtime dependencies.
 
 Each shipped workflow has one canonical designated project subfolder, and workflow runtime uses that designation when resolving the workflow's artifact destinations inside the selected project folder.
 
 Workflow runtime owns the shared artifact identity and numbering policy used to connect related workflow outputs inside a project.
+
+Workflow runtime also owns the typed artifact-family convention registry used for canonical artifact families. That registry defines allocation mode, parent or target requirements, filename pattern, file extension, numbering scope, and discovery pattern. Workflow modules may reference artifact-family identifiers from that registry, but modules do not own canonical artifact filename patterns, numbering scopes, extensions, or discovery patterns.
 
 That numbering policy must carry forward across related artifact families, for example:
 
@@ -522,6 +528,16 @@ That numbering policy must carry forward across related artifact families, for e
 - epic delivery specs assign canonical story numbers within an epic
 - story documents consume the composite epic/story identifiers
 - remediation stories extend the same identifier lineage rather than inventing a new naming scheme
+- QA/review artifacts inherit the selected story or remediation-story target identity rather than allocating a review-specific number
+
+Workflow runtime owns artifact allocation and derivation:
+
+- allocated artifact families receive the next canonical number in the correct scope
+- derived artifact families inherit the selected parent or target identity
+- runtime produces the canonical artifact filename, project-relative path, and absolute path
+- runtime creates the empty artifact file before reporting allocation success
+- runtime persists project context, artifact family, artifact identity, artifact filename, artifact relative path, artifact absolute path, and parent or target identity into workflow session values where applicable
+- document builders consume runtime-resolved artifact destination paths and remain content builders rather than artifact identity, filename, or project-folder allocators
 
 Workflow runtime also owns canonical normalization of user-provided project titles into filesystem-safe project identity.
 
@@ -651,9 +667,10 @@ Rationale:
 
 Rationale:
 
-- related workflow outputs depend on a shared numbering lineage across epics, delivery specs, stories, and remediation stories
-- distributing numbering logic across workflow modules would recreate drift and fragmented methodology
-- one runtime-owned numbering policy provides a single canonical identity chain for related artifacts inside a project
+- related workflow outputs depend on a shared numbering lineage across epics, delivery specs, stories, remediation stories, and QA/review artifacts
+- QA/review outputs must inherit the selected target story or remediation-story identity rather than create a separate review numbering scheme
+- distributing numbering, filename, extension, or discovery-pattern logic across workflow modules would recreate drift and fragmented methodology
+- one runtime-owned numbering policy and typed artifact-family convention registry provide a single canonical identity chain for related artifacts inside a project
 
 ### AD-12: Workflow runtime normalizes project titles into filesystem-safe identity
 

@@ -7,6 +7,29 @@ import { ClineIgnoreController, LOCK_TEXT_SYMBOL } from "../ignore/ClineIgnoreCo
 const CONTEXT_WINDOW_WARNING_THRESHOLD_PERCENT = 50
 const INLINE_FINAL_FILE_CONTENT_MAX_CHARS = 2000
 const PATCH_SUMMARY_MAX_CHARS = 1400
+const TOOL_DENIED_RESPONSE_TEXT = "The user denied this operation."
+const TOOL_ERROR_RESPONSE_OPENING_TEXT = "The tool execution failed with the following error:\n<error>\n"
+const TOOL_ERROR_RESPONSE_CLOSING_TEXT = "\n</error>"
+
+export function isSerializedToolFailureResultText(toolResultText: string | undefined): boolean {
+	const trimmedResultText = toolResultText?.trim()
+	if (trimmedResultText === undefined || trimmedResultText.length === 0) {
+		return true
+	}
+
+	if (trimmedResultText.startsWith("Error:")) {
+		return true
+	}
+
+	if (trimmedResultText === TOOL_DENIED_RESPONSE_TEXT) {
+		return true
+	}
+
+	return (
+		trimmedResultText.startsWith(TOOL_ERROR_RESPONSE_OPENING_TEXT) &&
+		trimmedResultText.endsWith(TOOL_ERROR_RESPONSE_CLOSING_TEXT)
+	)
+}
 
 interface SavedFileReferenceOptions {
 	autoFormattingApplied?: boolean
@@ -201,9 +224,9 @@ export const formatResponse = {
 	condense: () =>
 		`The user has accepted the condensed conversation summary you generated. This summary covers important details of the historical conversation with the user which has been truncated.\n<explicit_instructions type="condense_response">It's crucial that you respond by ONLY asking the user what you should work on next. You should NOT take any initiative or make any assumptions about continuing with work. For example you should NOT suggest file changes or attempt to read any files.\nWhen asking the user what you should work on next, you can reference information in the summary which was just generated. However, you should NOT reference information outside of what's contained in the summary for this response. Keep this response CONCISE.</explicit_instructions>`,
 
-	toolDenied: () => `The user denied this operation.`,
+	toolDenied: () => TOOL_DENIED_RESPONSE_TEXT,
 
-	toolError: (error?: string) => `The tool execution failed with the following error:\n<error>\n${error}\n</error>`,
+	toolError: (error?: string) => `${TOOL_ERROR_RESPONSE_OPENING_TEXT}${error}${TOOL_ERROR_RESPONSE_CLOSING_TEXT}`,
 
 	compactedToolResultNotice: (toolName: string) =>
 		`[NOTE] The older ${toolName} output was removed to save context window space. Re-run ${toolName} if you need the full result again.]`,

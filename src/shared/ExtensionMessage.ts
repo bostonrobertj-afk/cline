@@ -94,12 +94,9 @@ export interface ExtensionState {
 	distinctId: string
 	globalClineRulesToggles: ClineRulesToggles
 	localClineRulesToggles: ClineRulesToggles
-	localWorkflowToggles: ClineRulesToggles
-	globalWorkflowToggles: ClineRulesToggles
 	localCursorRulesToggles: ClineRulesToggles
 	localWindsurfRulesToggles: ClineRulesToggles
 	remoteRulesToggles?: ClineRulesToggles
-	remoteWorkflowToggles?: ClineRulesToggles
 	localAgentsRulesToggles: ClineRulesToggles
 	mcpResponsesCollapsed?: boolean
 	strictPlanModeEnabled?: boolean
@@ -176,7 +173,6 @@ export type ClineAsk =
 	| "report_bug"
 	| "use_subagents"
 	| "workflow_form"
-	| "workflow_start_card"
 
 export type ClineSay =
 	| "task"
@@ -211,7 +207,6 @@ export type ClineSay =
 	| "load_mcp_documentation"
 	| "generate_explanation"
 	| "info" // Added for general informational messages like retry status
-	| "task_progress"
 	| "hook_status"
 	| "hook_output_stream"
 	| "subagent"
@@ -465,8 +460,27 @@ export interface WorkflowFormConditionalFieldOverrideDefinition {
 	contentMarkdown?: string
 }
 
+export type WorkflowFormSelectorDiscoveryRoot =
+	| {
+			kind: "project_output_root"
+	  }
+	| {
+			kind: "selected_project_root"
+	  }
+
+export interface WorkflowFormSelectorDiscoveryConfig {
+	root: WorkflowFormSelectorDiscoveryRoot
+	entryType: "file" | "directory" | "any"
+	targetPathSegments?: string[]
+	namingPattern?: string
+	labelTemplate?: string
+	immediateChildrenOnly: boolean
+	sort: "alpha_asc" | "alpha_desc"
+}
+
 export interface WorkflowFormFieldDefinition {
 	key: string
+	workflowValueKey?: string
 	kind: WorkflowFormFieldKind
 	label: string
 	helpText?: string
@@ -491,6 +505,7 @@ export interface WorkflowFormFieldDefinition {
 	valueSchema?: WorkflowFormJsonSchema
 	contentMarkdown?: string
 	presentation?: WorkflowFormFieldPresentation
+	selectorDiscovery?: WorkflowFormSelectorDiscoveryConfig
 }
 
 export type WorkflowFormTransitionDefinition =
@@ -506,26 +521,12 @@ export type WorkflowFormTransitionDefinition =
 			branches: Array<{
 				matchValue: WorkflowFormComparableValue
 				nextPanelId?: string
-				operationId?: string
 				terminal?: boolean
 				staleValueKeysToClear?: string[]
 				staleDataKeysToClear?: string[]
 			}>
 			defaultNextPanelId?: string
-			defaultOperationId?: string
 			defaultTerminal?: boolean
-	  }
-	| {
-			type: "deterministic_operation"
-			operationId: string
-			nextPanelId?: string
-			terminal?: boolean
-			resultDataKey?: string
-			rebuildDefinitionAfterSuccess?: boolean
-			recomputeDestinationAfterSuccess?: boolean
-			successMessage?: string
-			staleValueKeysToClear?: string[]
-			staleDataKeysToClear?: string[]
 	  }
 
 export interface WorkflowFormPanelDefinition {
@@ -592,17 +593,6 @@ export interface ClineWorkflowStepResolutionStatus {
 	owner: WorkflowStepResolutionStatusOwner
 	state: WorkflowStepResolutionStatusState
 	definition: WorkflowStepResolutionStatusDefinition
-}
-
-export interface WorkflowStartCard {
-	sessionId: string
-	title: string
-	markdownBody: string
-	submitLabel: string
-	projectMode?: "new" | "existing"
-	existingProjectOptions: Array<{ value: string; label: string }>
-	selectedExistingProject?: string
-	newProjectTitle?: string
 }
 
 export interface ClineApiReqInfo {

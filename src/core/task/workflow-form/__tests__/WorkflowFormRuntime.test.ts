@@ -49,8 +49,17 @@ function createSubmitRequest(args: {
 	})
 }
 
+function createTerminalTransition(): WorkflowFormPanelDefinition["transition"] {
+	return {
+		type: "conditional",
+		conditionSourceKey: "__terminal__",
+		branches: [],
+		defaultTerminal: true,
+	}
+}
+
 describe("WorkflowFormRuntime", () => {
-	it("creates a V2 session and builds the first panel payload", () => {
+	it("creates a V2 session without runtime-owned panel payload assembly", () => {
 		const runtime = createRuntime()
 		const definitionPayload = createDefinition({
 			firstPanelId: "intro",
@@ -61,25 +70,19 @@ describe("WorkflowFormRuntime", () => {
 					promptMarkdown: "Start here.",
 					fields: [],
 					allowedActions: ["submit"],
-					transition: {
-						type: "deterministic_operation",
-						operationId: "persist_intro",
-						terminal: true,
-					},
+					transition: createTerminalTransition(),
 				},
 			},
 		})
 
 		const session = createSession({ runtime, definitionPayload })
-		const payload = runtime.buildPayload(session)
 
 		expect(session.definitionVersion).to.equal(2)
 		expect(session.firstPanelId).to.equal("intro")
 		expect(session.currentPanelId).to.equal("intro")
 		expect(session.values).to.deep.equal({})
 		expect(session.data).to.deep.equal({})
-		expect(payload.renderState).to.equal("panel")
-		expect(payload.panel?.panelId).to.equal("intro")
+		expect(session.failure).to.equal(undefined)
 	})
 
 	it("rejects stale panel mismatches", () => {
@@ -95,11 +98,7 @@ describe("WorkflowFormRuntime", () => {
 						promptMarkdown: "Start here.",
 						fields: [],
 						allowedActions: ["submit"],
-						transition: {
-							type: "deterministic_operation",
-							operationId: "persist_intro",
-							terminal: true,
-						},
+						transition: createTerminalTransition(),
 					},
 				},
 			}),
@@ -148,11 +147,7 @@ describe("WorkflowFormRuntime", () => {
 						promptMarkdown: "Add more detail.",
 						fields: [],
 						allowedActions: ["submit", "back"],
-						transition: {
-							type: "deterministic_operation",
-							operationId: "persist_details",
-							terminal: true,
-						},
+						transition: createTerminalTransition(),
 					},
 				},
 			}),
@@ -178,7 +173,7 @@ describe("WorkflowFormRuntime", () => {
 		}
 
 		expect(outcome.session.currentPanelId).to.equal("details")
-		expect(outcome.payload.panel?.panelId).to.equal("details")
+		expect("payload" in outcome).to.equal(false)
 		expect(outcome.session.values.plan).to.deep.equal({
 			valueType: "string",
 			stringValue: "rollout",
@@ -225,11 +220,7 @@ describe("WorkflowFormRuntime", () => {
 						promptMarkdown: "Left branch.",
 						fields: [],
 						allowedActions: ["submit", "back"],
-						transition: {
-							type: "deterministic_operation",
-							operationId: "persist_left",
-							terminal: true,
-						},
+						transition: createTerminalTransition(),
 					},
 					right_panel: {
 						panelId: "right_panel",
@@ -237,11 +228,7 @@ describe("WorkflowFormRuntime", () => {
 						promptMarkdown: "Right branch.",
 						fields: [],
 						allowedActions: ["submit", "back"],
-						transition: {
-							type: "deterministic_operation",
-							operationId: "persist_right",
-							terminal: true,
-						},
+						transition: createTerminalTransition(),
 					},
 				},
 			}),
@@ -267,10 +254,10 @@ describe("WorkflowFormRuntime", () => {
 		}
 
 		expect(outcome.session.currentPanelId).to.equal("right_panel")
-		expect(outcome.payload.panel?.panelId).to.equal("right_panel")
+		expect("payload" in outcome).to.equal(false)
 	})
 
-	it("returns deterministic-operation outcomes with the declared operation metadata", () => {
+	it("navigates sequentially without producing operation tool requests", () => {
 		const runtime = createRuntime()
 		const session = createSession({
 			runtime,
@@ -292,10 +279,8 @@ describe("WorkflowFormRuntime", () => {
 						],
 						allowedActions: ["submit"],
 						transition: {
-							type: "deterministic_operation",
-							operationId: "load_preview",
+							type: "sequential",
 							nextPanelId: "preview_result",
-							terminal: false,
 						},
 					},
 					preview_result: {
@@ -304,11 +289,7 @@ describe("WorkflowFormRuntime", () => {
 						promptMarkdown: "Preview ready.",
 						fields: [],
 						allowedActions: ["submit", "back"],
-						transition: {
-							type: "deterministic_operation",
-							operationId: "persist_preview",
-							terminal: true,
-						},
+						transition: createTerminalTransition(),
 					},
 				},
 			}),
@@ -328,14 +309,12 @@ describe("WorkflowFormRuntime", () => {
 			}),
 		)
 
-		expect(outcome.kind).to.equal("invoke_deterministic_operation")
-		if (outcome.kind !== "invoke_deterministic_operation") {
-			throw new Error(`Expected invoke_deterministic_operation, received ${outcome.kind}.`)
+		expect(outcome.kind).to.equal("render_form")
+		if (outcome.kind !== "render_form") {
+			throw new Error(`Expected render_form, received ${outcome.kind}.`)
 		}
 
-		expect(outcome.operationId).to.equal("load_preview")
-		expect(outcome.nextPanelId).to.equal("preview_result")
-		expect(outcome.terminal).to.equal(false)
+		expect(outcome.session.currentPanelId).to.equal("preview_result")
 	})
 
 	it("supports back navigation and clears backStaleValueKeysToClear", () => {
@@ -384,11 +363,7 @@ describe("WorkflowFormRuntime", () => {
 						allowedActions: ["submit", "back"],
 						backDestinationPanelId: "source",
 						backStaleValueKeysToClear: ["source.detail"],
-						transition: {
-							type: "deterministic_operation",
-							operationId: "persist_details",
-							terminal: true,
-						},
+						transition: createTerminalTransition(),
 					},
 				},
 			}),
@@ -480,11 +455,7 @@ describe("WorkflowFormRuntime", () => {
 							},
 						],
 						allowedActions: ["submit", "back", "retry"],
-						transition: {
-							type: "deterministic_operation",
-							operationId: "persist_details",
-							terminal: true,
-						},
+						transition: createTerminalTransition(),
 					},
 				},
 			}),
@@ -557,11 +528,7 @@ describe("WorkflowFormRuntime", () => {
 							},
 						],
 						allowedActions: ["submit", "retry"],
-						transition: {
-							type: "deterministic_operation",
-							operationId: "persist",
-							terminal: true,
-						},
+						transition: createTerminalTransition(),
 					},
 				},
 			}),
@@ -584,8 +551,7 @@ describe("WorkflowFormRuntime", () => {
 			panelId: "details",
 			errorMessage: 'Field "required_field" is required.',
 		})
-		expect(outcome.payload.renderState).to.equal("failure")
-		expect(outcome.payload.panel?.panelId).to.equal("details")
+		expect("payload" in outcome).to.equal(false)
 	})
 
 	it("verifies value normalization for numeric and checkbox-group submissions", () => {
@@ -621,10 +587,8 @@ describe("WorkflowFormRuntime", () => {
 						],
 						allowedActions: ["submit"],
 						transition: {
-							type: "deterministic_operation",
-							operationId: "persist",
+							type: "sequential",
 							nextPanelId: "done",
-							terminal: false,
 						},
 					},
 					done: {
@@ -633,11 +597,7 @@ describe("WorkflowFormRuntime", () => {
 						promptMarkdown: "Finished.",
 						fields: [],
 						allowedActions: ["submit", "back"],
-						transition: {
-							type: "deterministic_operation",
-							operationId: "persist_done",
-							terminal: true,
-						},
+						transition: createTerminalTransition(),
 					},
 				},
 			}),
@@ -665,9 +625,9 @@ describe("WorkflowFormRuntime", () => {
 			}),
 		)
 
-		expect(outcome.kind).to.equal("invoke_deterministic_operation")
-		if (outcome.kind !== "invoke_deterministic_operation") {
-			throw new Error(`Expected invoke_deterministic_operation, received ${outcome.kind}.`)
+		expect(outcome.kind).to.equal("render_form")
+		if (outcome.kind !== "render_form") {
+			throw new Error(`Expected render_form, received ${outcome.kind}.`)
 		}
 
 		expect(outcome.session.values.count).to.deep.equal({
@@ -679,7 +639,7 @@ describe("WorkflowFormRuntime", () => {
 		expect(JSON.stringify(outcome.session.values.tags)).to.contain("beta")
 	})
 
-	it("verifies buildSuccessPayload returns a success payload with the provided success message", () => {
+	it("does not expose legacy payload-builder methods on the generic runtime surface", () => {
 		const runtime = createRuntime()
 		const session: WorkflowFormSessionState = createSession({
 			runtime,
@@ -692,20 +652,15 @@ describe("WorkflowFormRuntime", () => {
 						promptMarkdown: "Confirm the save.",
 						fields: [],
 						allowedActions: ["submit"],
-						transition: {
-							type: "deterministic_operation",
-							operationId: "persist_confirmation",
-							terminal: true,
-						},
+						transition: createTerminalTransition(),
 					},
 				},
 			}),
 		})
 
-		const payload = runtime.buildSuccessPayload(session, "Saved successfully.")
-
-		expect(payload.renderState).to.equal("success")
-		expect(payload.successMessage).to.equal("Saved successfully.")
-		expect(payload.panel).to.equal(undefined)
+		expect("buildFailurePayload" in runtime).to.equal(false)
+		expect("buildSuccessPayload" in runtime).to.equal(false)
+		expect("buildPayload" in runtime).to.equal(false)
+		expect(session.currentPanelId).to.equal("confirmation")
 	})
 })

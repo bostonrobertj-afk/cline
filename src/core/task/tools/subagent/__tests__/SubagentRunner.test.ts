@@ -2,24 +2,20 @@ import { strict as assert } from "node:assert"
 import * as coreApi from "@core/api"
 import * as skills from "@core/context/instructions/user-instructions/skills"
 import { PromptRegistry } from "@core/prompts/system-prompt"
+import type { ClineToolSpec } from "@core/prompts/system-prompt/spec"
 import type { TaskConfig } from "@core/task/tools/types/TaskConfig"
-import fs from "fs/promises"
 import { afterEach, describe, it } from "mocha"
-import os from "os"
-import path from "path"
 import sinon from "sinon"
-import type { WorkflowDefinition } from "@/core/task/workflow-runtime/types"
+import type { ActiveWorkflowSession, WorkflowDecisionTree, WorkflowDefinition } from "@/core/task/workflow-runtime/types"
 import * as WorkflowRegistry from "@/core/task/workflow-runtime/WorkflowRegistry"
 import { WorkflowRuntime } from "@/core/task/workflow-runtime/WorkflowRuntime"
 import { HostProvider } from "@/hosts/host-provider"
+import { ModelFamily } from "@/shared/prompts"
 import { ApiFormat } from "@/shared/proto/cline/models"
 import { Logger } from "@/shared/services/Logger"
-import { ClineDefaultTool } from "@/shared/tools"
-import * as disk from "../../../../storage/disk"
-import { FocusChainManager } from "../../../focus-chain"
-import { getFocusChainFilePath } from "../../../focus-chain/file-utils"
+import { ClineDefaultTool, type ClineTool } from "@/shared/tools"
 import { TaskState } from "../../../TaskState"
-import { SubagentBuilder } from "../SubagentBuilder"
+import { SUBAGENT_DEFAULT_ALLOWED_TOOLS, SubagentBuilder } from "../SubagentBuilder"
 import { SubagentRunner } from "../SubagentRunner"
 
 type PromptContextArgs = {
@@ -38,9 +34,11 @@ type PromptContextResult = {
 	mcpHub?: unknown
 	activeWorkflowName?: string
 	activeWorkflowStepNumber?: number
-	workflowSystemInstructionsBlock?: string
-	workflowInputInstructionsBlock?: string
-	workflowToolSchemaOverride?: readonly unknown[]
+	fullTurnWorkflowSystemInstructionsBlock?: string
+	fullTurnWorkflowInputInstructionsBlock?: string
+	workflowToolSchemaOverride?: readonly ClineToolSpec[]
+	continuationTurnWorkflowSystemInstructionsBlock?: string
+	continuationTurnWorkflowInputInstructionsBlock?: string
 	skills?: Array<{ name: string }>
 	isContinuationTurn?: boolean
 	enableNativeToolCalls?: boolean
@@ -61,9 +59,10 @@ const autoActivateAssignedWorkflow = Reflect.get(SubagentRunner.prototype, "auto
 	state: TaskState,
 	assignedSkillNames: string[],
 ) => Promise<void>
-
-function getSubagentFocusChainStorageKey(runner: SubagentRunner): string {
-	return Reflect.get(runner, "subagentFocusChainStorageKey") as string
+const ENTRY_PROJECT_VALUE_KEYS = {
+	projectMode: "entry_project_mode",
+	projectTitle: "entry_project_title",
+	projectFolderName: "entry_project_folder_name",
 }
 
 function initializeHostProvider() {
@@ -87,6 +86,28 @@ function initializeHostProvider() {
 		"",
 		"",
 	)
+}
+
+function isSubagentToolResultMessage(
+	message: unknown,
+): message is { role: string; content: readonly { type?: string; content?: string }[] } {
+	if (typeof message !== "object" || message === null) {
+		return false
+	}
+	if (!("role" in message) || typeof message.role !== "string") {
+		return false
+	}
+	if (!("content" in message) || !Array.isArray(message.content)) {
+		return false
+	}
+	return message.content.every((block) => {
+		if (typeof block !== "object" || block === null) {
+			return false
+		}
+		const hasValidType = !("type" in block) || typeof block.type === "string"
+		const hasValidContent = !("content" in block) || typeof block.content === "string"
+		return hasValidType && hasValidContent
+	})
 }
 
 function createTaskConfig(nativeToolCallEnabled: boolean, promptRefreshFrequency = 5): TaskConfig {
@@ -183,6 +204,20 @@ function createTaskConfig(nativeToolCallEnabled: boolean, promptRefreshFrequency
 					}
 				}
 
+				if (toolName === ClineDefaultTool.SET_WORKFLOW_VALUES) {
+					return {
+						execute: sinon.stub().resolves("workflow values persisted"),
+						getDescription: sinon.stub().returns("set_workflow_values"),
+					}
+				}
+
+				if (toolName === ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT) {
+					return {
+						execute: sinon.stub().resolves("workflow artifact created"),
+						getDescription: sinon.stub().returns("create_workflow_artifact"),
+					}
+				}
+
 				return undefined
 			}),
 		},
@@ -194,22 +229,39 @@ function createResolvedWorkflow(args?: {
 	useSkillName?: string
 	stepOneChecklistLabel?: string
 	stepTwoChecklistLabel?: string
-	workflowSystemInstructionsBlock?: string
-	workflowInputInstructionsBlock?: string
-	workflowToolSchemaOverride?: readonly unknown[]
+	workflowSystemInstructions?: string
+	currentStepInstructions?: string
+	workflowToolSchemaOverride?: readonly ClineToolSpec[]
+	workflowValueKeys?: readonly string[]
 	childInheritance?: WorkflowDefinition["childInheritance"]
 }): WorkflowDefinition {
+	const createProjectPromptDecisionTree = (): WorkflowDecisionTree => ({
+		entryBranchId: "project-prompt",
+		branches: {
+			"project-prompt": {
+				id: "project-prompt",
+				routes: [
+					{
+						id: "project-prompt-route",
+						trigger: { kind: "always" },
+						action: { kind: "project_prompt" },
+					},
+				],
+			},
+		},
+	})
+
 	const steps: WorkflowDefinition["steps"] = {
 		"step-1": {
 			id: "step-1",
 			stepNumber: 1,
 			checklistLabel: args?.stepOneChecklistLabel ?? "Step 1: Gather Context",
-			buildPromptProjection: () => ({
-				workflowSystemInstructionsBlock: args?.workflowSystemInstructionsBlock,
-				workflowInputInstructionsBlock: args?.workflowInputInstructionsBlock,
-				workflowToolSchemaOverride: args?.workflowToolSchemaOverride as any,
+			buildPromptSource: () => ({
+				workflowSystemInstructions: args?.workflowSystemInstructions,
+				currentStepInstructions: args?.currentStepInstructions,
 			}),
-			allowWorkflowProgressRequest: false,
+			buildToolSchema: () => args?.workflowToolSchemaOverride ?? [],
+			decisionTree: createProjectPromptDecisionTree(),
 		},
 	}
 	if (args?.stepTwoChecklistLabel) {
@@ -217,12 +269,12 @@ function createResolvedWorkflow(args?: {
 			id: "step-2",
 			stepNumber: 2,
 			checklistLabel: args.stepTwoChecklistLabel,
-			buildPromptProjection: () => ({
-				workflowSystemInstructionsBlock: args?.workflowSystemInstructionsBlock,
-				workflowInputInstructionsBlock: args?.workflowInputInstructionsBlock,
-				workflowToolSchemaOverride: args?.workflowToolSchemaOverride as any,
+			buildPromptSource: () => ({
+				workflowSystemInstructions: args?.workflowSystemInstructions,
+				currentStepInstructions: args?.currentStepInstructions,
 			}),
-			allowWorkflowProgressRequest: false,
+			buildToolSchema: () => args?.workflowToolSchemaOverride ?? [],
+			decisionTree: createProjectPromptDecisionTree(),
 		}
 	}
 	return {
@@ -231,10 +283,18 @@ function createResolvedWorkflow(args?: {
 		useSkillName: args?.useSkillName ?? "review-workflow",
 		persona: "engineer",
 		projectSubfolder: "review",
-		startCard: { markdownBody: "", submitLabel: "Continue" },
+		workflowValueKeys: [...Object.values(ENTRY_PROJECT_VALUE_KEYS), ...(args?.workflowValueKeys ?? [])],
+		entryProjectValueKeys: ENTRY_PROJECT_VALUE_KEYS,
+		entryPanel: { promptMarkdown: "Start this workflow" },
 		childInheritance: args?.childInheritance,
 		steps,
 	}
+}
+
+function stubResolvedWorkflowByName(workflow: WorkflowDefinition): void {
+	sinon
+		.stub(WorkflowRegistry, "resolveWorkflowDefinition")
+		.callsFake((workflowName: string) => (workflowName === workflow.name ? workflow : undefined))
 }
 
 type StubApiOptions = {
@@ -255,24 +315,6 @@ function stubApiHandler(createMessage: sinon.SinonStub, options?: StubApiOptions
 		}),
 		createMessage,
 	} as never)
-}
-
-function createFocusChainManager(taskState: TaskState, taskId = "task-1") {
-	return new FocusChainManager({
-		taskId,
-		cwd: "/tmp",
-		taskState,
-		mode: "act",
-		stateManager: {
-			getGlobalSettingsKey: sinon.stub().returns("act"),
-		} as any,
-		postStateToWebview: sinon.stub().resolves(),
-		say: sinon.stub().resolves(undefined),
-		focusChainSettings: {
-			enabled: true,
-			remindClineInterval: 6,
-		} as any,
-	})
 }
 
 describe("SubagentRunner", () => {
@@ -411,6 +453,344 @@ describe("SubagentRunner", () => {
 		assert.equal(buildSystemPromptStub.called, true)
 	})
 
+	it("sends prompt-registry native tools instead of pre-prompt projected native tools", async () => {
+		const prePromptNativeTools: ClineTool[] = [
+			{
+				name: "pre_prompt_static_tool",
+				description: "Static subagent tool",
+				input_schema: { type: "object", properties: {} },
+			},
+		]
+		const registryNativeTools: ClineTool[] = [
+			{
+				name: "registry_projected_tool",
+				description: "Prompt registry projected tool",
+				input_schema: { type: "object", properties: {} },
+			},
+		]
+		const createMessage = sinon.stub().callsFake(async function* (
+			_systemPrompt: string,
+			_conversation: unknown[],
+			nativeTools?: ClineTool[],
+		) {
+			assert.equal(nativeTools, registryNativeTools)
+			assert.notEqual(nativeTools, prePromptNativeTools)
+			yield {
+				type: "tool_calls",
+				tool_call: {
+					function: {
+						id: "toolu_subagent_complete_registry_native_tools",
+						name: ClineDefaultTool.ATTEMPT,
+						arguments: JSON.stringify({ result: "done" }),
+					},
+				},
+			}
+		})
+
+		const promptRegistry = PromptRegistry.getInstance()
+		sinon.stub(promptRegistry, "get").callsFake(async () => {
+			promptRegistry.nativeTools = registryNativeTools
+			return "system prompt"
+		})
+		sinon.stub(SubagentBuilder.prototype, "buildNativeTools").returns(prePromptNativeTools)
+		sinon.stub(skills, "discoverSkills").resolves([])
+		sinon.stub(skills, "getAvailableSkills").returns([])
+		stubApiHandler(createMessage)
+		initializeHostProvider()
+
+		const runner = new SubagentRunner(createTaskConfig(true))
+		const result = await runner.run("Use projected native tools", () => {})
+
+		assert.equal(result.status, "completed")
+		assert.equal(result.result, "done")
+		assert.equal(createMessage.callCount, 1)
+	})
+
+	it("sends child workflow-projected native tools instead of the static subagent native list", async () => {
+		const workflowToolSchemaOverride: readonly ClineToolSpec[] = [
+			{
+				variant: ModelFamily.GPT_5,
+				id: ClineDefaultTool.SET_WORKFLOW_VALUES,
+				name: ClineDefaultTool.SET_WORKFLOW_VALUES,
+				description: "Persist workflow-owned values.",
+				parameters: [],
+			},
+		]
+		const staticSubagentNativeTools: ClineTool[] = [
+			{
+				name: ClineDefaultTool.LIST_FILES,
+				description: "Static subagent list files tool",
+				input_schema: { type: "object", properties: {} },
+			},
+		]
+		const workflowProjectedNativeTools: ClineTool[] = [
+			{
+				name: ClineDefaultTool.SET_WORKFLOW_VALUES,
+				description: "Workflow-projected value persistence tool",
+				input_schema: { type: "object", properties: {} },
+			},
+		]
+		const createMessage = sinon.stub().callsFake(async function* (
+			_systemPrompt: string,
+			_conversation: unknown[],
+			nativeTools?: ClineTool[],
+		) {
+			assert.equal(nativeTools, workflowProjectedNativeTools)
+			assert.notEqual(nativeTools, staticSubagentNativeTools)
+			yield {
+				type: "tool_calls",
+				tool_call: {
+					function: {
+						id: "toolu_subagent_complete_child_workflow_native_tools",
+						name: ClineDefaultTool.ATTEMPT,
+						arguments: JSON.stringify({ result: "done" }),
+					},
+				},
+			}
+		})
+
+		const workflow = createResolvedWorkflow({
+			name: "review-workflow",
+			useSkillName: "review-workflow",
+			workflowToolSchemaOverride,
+		})
+		sinon.stub(WorkflowRegistry, "resolveWorkflowByUseSkillName").returns(workflow)
+		stubResolvedWorkflowByName(workflow)
+		const config = createTaskConfig(true)
+		config.taskState.activeWorkflowName = "parent-workflow"
+		config.taskState.activeWorkflowSession = {
+			workflowName: "parent-workflow",
+			activeStepNumber: 1,
+			workflowValues: {},
+			projectSelection: { projectMode: "existing", projectTitle: "Parent Project", projectFolderName: "parent-project" },
+			ui: {
+				formSession: undefined,
+				stepResolutionSession: undefined,
+				suppressedWorkflowFormIds: [],
+				suppressedWorkflowStepResolutionDefinitionIds: [],
+			},
+			branchContext: {
+				activeBranchId: "project-prompt",
+			},
+		}
+		const promptRegistry = PromptRegistry.getInstance()
+		sinon.stub(promptRegistry, "get").callsFake(async (context) => {
+			assert.equal(context.activeWorkflowName, "review-workflow")
+			assert.deepEqual(context.workflowToolSchemaOverride, workflowToolSchemaOverride)
+			promptRegistry.nativeTools = workflowProjectedNativeTools
+			return "system prompt"
+		})
+		sinon.stub(SubagentBuilder.prototype, "buildNativeTools").returns(staticSubagentNativeTools)
+		sinon.stub(SubagentBuilder.prototype, "getConfiguredSkills").returns(undefined)
+		sinon.stub(skills, "discoverSkills").resolves([])
+		sinon.stub(skills, "getAvailableSkills").returns([])
+		stubApiHandler(createMessage)
+		initializeHostProvider()
+
+		const runner = new SubagentRunner(config)
+		const result = await runner.run("Skill: use_skill('review-workflow')", () => {})
+
+		assert.equal(result.status, "completed")
+		assert.equal(result.result, "done")
+		assert.equal(createMessage.callCount, 1)
+	})
+
+	it("executes child workflow-projected tools that are outside the static subagent default allowed tools", async () => {
+		assert.equal(SUBAGENT_DEFAULT_ALLOWED_TOOLS.includes(ClineDefaultTool.SET_WORKFLOW_VALUES), false)
+
+		const workflowToolSchemaOverride = [
+			{
+				variant: ModelFamily.GPT_5,
+				id: ClineDefaultTool.SET_WORKFLOW_VALUES,
+				name: ClineDefaultTool.SET_WORKFLOW_VALUES,
+				description: "Persist workflow-owned values.",
+				parameters: [],
+			},
+		] as const satisfies readonly ClineToolSpec[]
+		const workflowProjectedNativeTools: ClineTool[] = [
+			{
+				name: ClineDefaultTool.SET_WORKFLOW_VALUES,
+				description: "Workflow-projected value persistence tool",
+				input_schema: { type: "object", properties: {} },
+			},
+		]
+		const createMessage = sinon.stub()
+		createMessage.onFirstCall().callsFake(async function* () {
+			yield {
+				type: "tool_calls",
+				tool_call: {
+					function: {
+						id: "toolu_subagent_set_workflow_values_1",
+						name: ClineDefaultTool.SET_WORKFLOW_VALUES,
+						arguments: JSON.stringify({ value_key: "ready", value: "true" }),
+					},
+				},
+			}
+		})
+		createMessage.onSecondCall().callsFake(async function* (_systemPrompt: string, conversation: unknown[]) {
+			const userMessage = conversation[2]
+			assert.ok(isSubagentToolResultMessage(userMessage))
+			assert.equal(userMessage.role, "user")
+			const toolResultText = userMessage.content.find((block) => block.type === "tool_result")?.content ?? ""
+			assert.match(toolResultText, /workflow values persisted/)
+			assert.doesNotMatch(toolResultText, /not available inside subagent runs/)
+
+			yield {
+				type: "tool_calls",
+				tool_call: {
+					function: {
+						id: "toolu_subagent_set_workflow_values_complete_1",
+						name: ClineDefaultTool.ATTEMPT,
+						arguments: JSON.stringify({ result: "done" }),
+					},
+				},
+			}
+		})
+
+		const workflow = createResolvedWorkflow({
+			name: "review-workflow",
+			useSkillName: "review-workflow",
+			workflowToolSchemaOverride,
+		})
+		sinon.stub(WorkflowRegistry, "resolveWorkflowByUseSkillName").returns(workflow)
+		stubResolvedWorkflowByName(workflow)
+		const config = createTaskConfig(true)
+		config.taskState.activeWorkflowName = "parent-workflow"
+		config.taskState.activeWorkflowSession = {
+			workflowName: "parent-workflow",
+			activeStepNumber: 1,
+			workflowValues: {},
+			projectSelection: { projectMode: "existing", projectTitle: "Parent Project", projectFolderName: "parent-project" },
+			ui: {
+				formSession: undefined,
+				stepResolutionSession: undefined,
+				suppressedWorkflowFormIds: [],
+				suppressedWorkflowStepResolutionDefinitionIds: [],
+			},
+			branchContext: {
+				activeBranchId: "project-prompt",
+			},
+		}
+		const promptRegistry = PromptRegistry.getInstance()
+		sinon.stub(promptRegistry, "get").callsFake(async (context) => {
+			assert.equal(context.activeWorkflowName, "review-workflow")
+			assert.deepEqual(context.workflowToolSchemaOverride, workflowToolSchemaOverride)
+			promptRegistry.nativeTools = workflowProjectedNativeTools
+			return "system prompt"
+		})
+		sinon.stub(SubagentBuilder.prototype, "buildNativeTools").returns(workflowProjectedNativeTools)
+		sinon.stub(SubagentBuilder.prototype, "getConfiguredSkills").returns(undefined)
+		sinon.stub(skills, "discoverSkills").resolves([])
+		sinon.stub(skills, "getAvailableSkills").returns([])
+		stubApiHandler(createMessage)
+		initializeHostProvider()
+
+		const runner = new SubagentRunner(config)
+		const result = await runner.run("Skill: use_skill('review-workflow')", () => {})
+
+		assert.equal(result.status, "completed")
+		assert.equal(result.result, "done")
+		assert.equal(createMessage.callCount, 2)
+	})
+
+	it("executes child workflow-projected create_workflow_artifact outside the static subagent default allowed tools", async () => {
+		assert.equal(SUBAGENT_DEFAULT_ALLOWED_TOOLS.includes(ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT), false)
+
+		const workflowToolSchemaOverride = [
+			{
+				variant: ModelFamily.GPT_5,
+				id: ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT,
+				name: ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT,
+				description: "Create a workflow artifact.",
+				parameters: [],
+			},
+		] as const satisfies readonly ClineToolSpec[]
+		const workflowProjectedNativeTools: ClineTool[] = [
+			{
+				name: ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT,
+				description: "Workflow-projected artifact creation tool",
+				input_schema: { type: "object", properties: {} },
+			},
+		]
+		const createMessage = sinon.stub()
+		createMessage.onFirstCall().callsFake(async function* () {
+			yield {
+				type: "tool_calls",
+				tool_call: {
+					function: {
+						id: "toolu_subagent_create_workflow_artifact_1",
+						name: ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT,
+						arguments: JSON.stringify({ artifact_id: "review_input" }),
+					},
+				},
+			}
+		})
+		createMessage.onSecondCall().callsFake(async function* (_systemPrompt: string, conversation: unknown[]) {
+			const userMessage = conversation[2]
+			assert.ok(isSubagentToolResultMessage(userMessage))
+			assert.equal(userMessage.role, "user")
+			const toolResultText = userMessage.content.find((block) => block.type === "tool_result")?.content ?? ""
+			assert.match(toolResultText, /workflow artifact created/)
+			assert.doesNotMatch(toolResultText, /not available inside subagent runs/)
+
+			yield {
+				type: "tool_calls",
+				tool_call: {
+					function: {
+						id: "toolu_subagent_create_workflow_artifact_complete_1",
+						name: ClineDefaultTool.ATTEMPT,
+						arguments: JSON.stringify({ result: "done" }),
+					},
+				},
+			}
+		})
+
+		const workflow = createResolvedWorkflow({
+			name: "review-workflow",
+			useSkillName: "review-workflow",
+			workflowToolSchemaOverride,
+		})
+		sinon.stub(WorkflowRegistry, "resolveWorkflowByUseSkillName").returns(workflow)
+		stubResolvedWorkflowByName(workflow)
+		const config = createTaskConfig(true)
+		config.taskState.activeWorkflowName = "parent-workflow"
+		config.taskState.activeWorkflowSession = {
+			workflowName: "parent-workflow",
+			activeStepNumber: 1,
+			workflowValues: {},
+			projectSelection: { projectMode: "existing", projectTitle: "Parent Project", projectFolderName: "parent-project" },
+			ui: {
+				formSession: undefined,
+				stepResolutionSession: undefined,
+				suppressedWorkflowFormIds: [],
+				suppressedWorkflowStepResolutionDefinitionIds: [],
+			},
+			branchContext: {
+				activeBranchId: "project-prompt",
+			},
+		}
+		const promptRegistry = PromptRegistry.getInstance()
+		sinon.stub(promptRegistry, "get").callsFake(async (context) => {
+			assert.equal(context.activeWorkflowName, "review-workflow")
+			assert.deepEqual(context.workflowToolSchemaOverride, workflowToolSchemaOverride)
+			promptRegistry.nativeTools = workflowProjectedNativeTools
+			return "system prompt"
+		})
+		sinon.stub(SubagentBuilder.prototype, "buildNativeTools").returns(workflowProjectedNativeTools)
+		sinon.stub(SubagentBuilder.prototype, "getConfiguredSkills").returns(undefined)
+		sinon.stub(skills, "discoverSkills").resolves([])
+		sinon.stub(skills, "getAvailableSkills").returns([])
+		stubApiHandler(createMessage)
+		initializeHostProvider()
+
+		const runner = new SubagentRunner(config)
+		const result = await runner.run("Skill: use_skill('review-workflow')", () => {})
+
+		assert.equal(result.status, "completed")
+		assert.equal(result.result, "done")
+		assert.equal(createMessage.callCount, 2)
+	})
+
 	it("emits native tool_use blocks with matching tool_result tool_use_id across turns", async () => {
 		const createMessage = sinon.stub()
 		createMessage.onFirstCall().callsFake(async function* () {
@@ -468,6 +848,159 @@ describe("SubagentRunner", () => {
 
 		const runner = new SubagentRunner(createTaskConfig(true))
 		const result = await runner.run("List files", () => {})
+
+		assert.equal(result.status, "completed")
+		assert.equal(result.result, "done")
+		assert.equal(createMessage.callCount, 2)
+	})
+
+	it("rejects subagent-emitted use_skill through allowed-tools filtering", async () => {
+		const createMessage = sinon.stub()
+		createMessage.onFirstCall().callsFake(async function* () {
+			yield {
+				type: "tool_calls",
+				tool_call: {
+					function: {
+						id: "toolu_subagent_use_skill_1",
+						name: ClineDefaultTool.USE_SKILL,
+						arguments: JSON.stringify({ skill_name: "review-workflow" }),
+					},
+				},
+			}
+		})
+		createMessage.onSecondCall().callsFake(async function* (_systemPrompt: string, conversation: unknown[]) {
+			const userMessage = conversation[2] as { role: string; content: Array<{ type?: string; content?: string }> }
+			assert.equal(userMessage.role, "user")
+			const toolResultText = userMessage.content.find((block) => block.type === "tool_result")?.content ?? ""
+			assert.match(toolResultText, /Tool 'use_skill' is not available inside subagent runs\./)
+
+			yield {
+				type: "tool_calls",
+				tool_call: {
+					function: {
+						id: "toolu_subagent_use_skill_complete_1",
+						name: ClineDefaultTool.ATTEMPT,
+						arguments: JSON.stringify({ result: "done" }),
+					},
+				},
+			}
+		})
+
+		const nativeTools: ClineTool[] = [
+			{
+				name: ClineDefaultTool.LIST_FILES,
+				description: "List files",
+				input_schema: { type: "object", properties: {} },
+			},
+		]
+		const promptRegistry = PromptRegistry.getInstance()
+		sinon.stub(promptRegistry, "get").callsFake(async () => {
+			promptRegistry.nativeTools = nativeTools
+			return "system prompt"
+		})
+		sinon.stub(SubagentBuilder.prototype, "buildNativeTools").returns(nativeTools)
+		sinon.stub(skills, "discoverSkills").resolves([])
+		sinon.stub(skills, "getAvailableSkills").returns([])
+		stubApiHandler(createMessage)
+		initializeHostProvider()
+
+		const runner = new SubagentRunner(createTaskConfig(true))
+		const result = await runner.run("Run assigned work", () => {})
+
+		assert.equal(result.status, "completed")
+		assert.equal(result.result, "done")
+		assert.equal(createMessage.callCount, 2)
+	})
+
+	it("rejects subagent-emitted use_skill even when a child workflow projects it", async () => {
+		const workflowToolSchemaOverride: readonly ClineToolSpec[] = [
+			{
+				variant: ModelFamily.GPT_5,
+				id: ClineDefaultTool.USE_SKILL,
+				name: ClineDefaultTool.USE_SKILL,
+				description: "Load a skill.",
+				parameters: [],
+			},
+		]
+		const workflowProjectedNativeTools: ClineTool[] = [
+			{
+				name: ClineDefaultTool.USE_SKILL,
+				description: "Workflow-projected use_skill tool",
+				input_schema: { type: "object", properties: {} },
+			},
+		]
+		const createMessage = sinon.stub()
+		createMessage.onFirstCall().callsFake(async function* () {
+			yield {
+				type: "tool_calls",
+				tool_call: {
+					function: {
+						id: "toolu_subagent_workflow_use_skill_1",
+						name: ClineDefaultTool.USE_SKILL,
+						arguments: JSON.stringify({ skill_name: "another-workflow" }),
+					},
+				},
+			}
+		})
+		createMessage.onSecondCall().callsFake(async function* (_systemPrompt: string, conversation: unknown[]) {
+			const userMessage = conversation[2]
+			assert.ok(isSubagentToolResultMessage(userMessage))
+			assert.equal(userMessage.role, "user")
+			const toolResultText = userMessage.content.find((block) => block.type === "tool_result")?.content ?? ""
+			assert.match(toolResultText, /Tool 'use_skill' is not available inside subagent runs\./)
+
+			yield {
+				type: "tool_calls",
+				tool_call: {
+					function: {
+						id: "toolu_subagent_workflow_use_skill_complete_1",
+						name: ClineDefaultTool.ATTEMPT,
+						arguments: JSON.stringify({ result: "done" }),
+					},
+				},
+			}
+		})
+
+		const workflow = createResolvedWorkflow({
+			name: "review-workflow",
+			useSkillName: "review-workflow",
+			workflowToolSchemaOverride,
+		})
+		sinon.stub(WorkflowRegistry, "resolveWorkflowByUseSkillName").returns(workflow)
+		stubResolvedWorkflowByName(workflow)
+		const config = createTaskConfig(true)
+		config.taskState.activeWorkflowName = "parent-workflow"
+		config.taskState.activeWorkflowSession = {
+			workflowName: "parent-workflow",
+			activeStepNumber: 1,
+			workflowValues: {},
+			projectSelection: { projectMode: "existing", projectTitle: "Parent Project", projectFolderName: "parent-project" },
+			ui: {
+				formSession: undefined,
+				stepResolutionSession: undefined,
+				suppressedWorkflowFormIds: [],
+				suppressedWorkflowStepResolutionDefinitionIds: [],
+			},
+			branchContext: {
+				activeBranchId: "project-prompt",
+			},
+		}
+		const promptRegistry = PromptRegistry.getInstance()
+		sinon.stub(promptRegistry, "get").callsFake(async (context) => {
+			assert.equal(context.activeWorkflowName, "review-workflow")
+			assert.deepEqual(context.workflowToolSchemaOverride, workflowToolSchemaOverride)
+			promptRegistry.nativeTools = workflowProjectedNativeTools
+			return "system prompt"
+		})
+		sinon.stub(SubagentBuilder.prototype, "buildNativeTools").returns(workflowProjectedNativeTools)
+		sinon.stub(SubagentBuilder.prototype, "getConfiguredSkills").returns(undefined)
+		sinon.stub(skills, "discoverSkills").resolves([])
+		sinon.stub(skills, "getAvailableSkills").returns([])
+		stubApiHandler(createMessage)
+		initializeHostProvider()
+
+		const runner = new SubagentRunner(config)
+		const result = await runner.run("Skill: use_skill('review-workflow')", () => {})
 
 		assert.equal(result.status, "completed")
 		assert.equal(result.result, "done")
@@ -970,22 +1503,34 @@ describe("SubagentRunner", () => {
 	})
 
 	it("projects foundational workflow runtime fields into subagent prompt context", async () => {
-		const workflowToolSchemaOverride = [{ id: ClineDefaultTool.SET_WORKFLOW_VALUES }] as const
+		const workflowToolSchemaOverride = [
+			{
+				variant: ModelFamily.GPT_5,
+				id: ClineDefaultTool.SET_WORKFLOW_VALUES,
+				name: "set_workflow_values",
+				description: "Persist workflow-owned values.",
+				parameters: [],
+			},
+		] as const satisfies readonly ClineToolSpec[]
 		const config = createTaskConfig(false)
 		const runner = new SubagentRunner(config)
 		const state = new TaskState()
+		const workflow = createResolvedWorkflow({
+			name: "review-workflow",
+			useSkillName: "review-workflow",
+			workflowSystemInstructions: "SYSTEM BLOCK",
+			currentStepInstructions: "INPUT BLOCK",
+			workflowToolSchemaOverride,
+		})
+		stubResolvedWorkflowByName(workflow)
 
 		await config.workflowRuntime.activateWorkflow({
 			taskState: state,
-			workflow: createResolvedWorkflow({
-				name: "review-workflow",
-				useSkillName: "review-workflow",
-				workflowSystemInstructionsBlock: "SYSTEM BLOCK",
-				workflowInputInstructionsBlock: "INPUT BLOCK",
-				workflowToolSchemaOverride,
-			}),
+			workflowName: workflow.name,
 		})
+		const buildTurnProjectionSpy = sinon.spy(config.workflowRuntime, "buildTurnProjection")
 
+		state.apiRequestCount = 1
 		const context = await buildPromptContext.call(runner, {
 			state,
 			hostIde: "TestIde",
@@ -998,33 +1543,71 @@ describe("SubagentRunner", () => {
 			shouldUseContinuationPrompt: false,
 		})
 
+		assert.equal(buildTurnProjectionSpy.callCount, 1)
 		assert.equal(context.activeWorkflowName, "review-workflow")
 		assert.equal(context.activeWorkflowStepNumber, 1)
-		assert.equal(context.workflowSystemInstructionsBlock, "SYSTEM BLOCK")
-		assert.equal(context.workflowInputInstructionsBlock, "INPUT BLOCK")
-		assert.equal(context.workflowToolSchemaOverride, workflowToolSchemaOverride)
+		assert.equal(
+			context.fullTurnWorkflowSystemInstructionsBlock,
+			"## WORKFLOW\nWorkflow: review-workflow\n\n## WORKFLOW PERSONA\nengineer\n\n## WORKFLOW STEPS\n- [ ] Step 1: Gather Context\n\n## WORKFLOW INSTRUCTIONS\nSYSTEM BLOCK",
+		)
+		assert.equal(
+			context.fullTurnWorkflowInputInstructionsBlock,
+			"## CURRENT STEP\nStep 1: Step 1: Gather Context\n\nINPUT BLOCK",
+		)
+		assert.equal(
+			context.continuationTurnWorkflowSystemInstructionsBlock,
+			"## WORKFLOW\nWorkflow: review-workflow\n\n## WORKFLOW STEPS\n- [ ] Step 1: Gather Context\n\n## WORKFLOW INSTRUCTIONS\nSYSTEM BLOCK",
+		)
+		assert.equal(
+			context.continuationTurnWorkflowInputInstructionsBlock,
+			"## WORKFLOW CONTINUATION\nContinue working on step 1: Step 1: Gather Context.",
+		)
+		assert.deepEqual(context.workflowToolSchemaOverride, workflowToolSchemaOverride)
 		assert.deepEqual(context.skills, [])
 		assert.equal(context.isContinuationTurn, false)
 		assert.equal(context.enableNativeToolCalls, false)
 		assert.equal(context.enableParallelToolCalling, false)
 		assert.equal(context.isSubagentRun, true)
+
+		state.apiRequestCount = 2
+		const refreshContext = await buildPromptContext.call(runner, {
+			state,
+			hostIde: "TestIde",
+			providerInfo: { providerId: "openai", model: { id: "gpt-5" }, mode: "act" },
+			availableSkills: [],
+			configuredSkillNames: undefined,
+			assignedSkillNames: [],
+			nativeToolCallsRequested: false,
+			shouldSendFullPromptAssembly: true,
+			shouldUseContinuationPrompt: false,
+		})
+
+		assert.equal(
+			refreshContext.fullTurnWorkflowSystemInstructionsBlock,
+			"## WORKFLOW\nWorkflow: review-workflow\n\n## WORKFLOW STEPS\n- [ ] Step 1: Gather Context\n\n## WORKFLOW INSTRUCTIONS\nSYSTEM BLOCK",
+		)
+		assert.equal(buildTurnProjectionSpy.callCount, 2)
+		assert.equal(refreshContext.fullTurnWorkflowSystemInstructionsBlock?.includes("## WORKFLOW PERSONA"), false)
 	})
 
 	it("suppresses prompt skills on internal turns while preserving workflow runtime projection", async () => {
 		const config = createTaskConfig(false)
 		const runner = new SubagentRunner(config)
 		const state = new TaskState()
+		const workflow = createResolvedWorkflow({
+			name: "review-workflow",
+			useSkillName: "review-workflow",
+			workflowSystemInstructions: "SYSTEM BLOCK",
+			currentStepInstructions: "INPUT BLOCK",
+		})
+		stubResolvedWorkflowByName(workflow)
 
 		await config.workflowRuntime.activateWorkflow({
 			taskState: state,
-			workflow: createResolvedWorkflow({
-				name: "review-workflow",
-				useSkillName: "review-workflow",
-				workflowSystemInstructionsBlock: "SYSTEM BLOCK",
-				workflowInputInstructionsBlock: "INPUT BLOCK",
-			}),
+			workflowName: workflow.name,
 		})
 
+		state.apiRequestCount = 1
 		const context = await buildPromptContext.call(runner, {
 			state,
 			hostIde: "TestIde",
@@ -1040,8 +1623,22 @@ describe("SubagentRunner", () => {
 		assert.deepEqual(context.skills, [])
 		assert.equal(context.activeWorkflowName, "review-workflow")
 		assert.equal(context.activeWorkflowStepNumber, 1)
-		assert.equal(context.workflowSystemInstructionsBlock, "SYSTEM BLOCK")
-		assert.equal(context.workflowInputInstructionsBlock, "INPUT BLOCK")
+		assert.equal(
+			context.fullTurnWorkflowSystemInstructionsBlock,
+			"## WORKFLOW\nWorkflow: review-workflow\n\n## WORKFLOW PERSONA\nengineer\n\n## WORKFLOW STEPS\n- [ ] Step 1: Gather Context\n\n## WORKFLOW INSTRUCTIONS\nSYSTEM BLOCK",
+		)
+		assert.equal(
+			context.fullTurnWorkflowInputInstructionsBlock,
+			"## CURRENT STEP\nStep 1: Step 1: Gather Context\n\nINPUT BLOCK",
+		)
+		assert.equal(
+			context.continuationTurnWorkflowSystemInstructionsBlock,
+			"## WORKFLOW\nWorkflow: review-workflow\n\n## WORKFLOW STEPS\n- [ ] Step 1: Gather Context\n\n## WORKFLOW INSTRUCTIONS\nSYSTEM BLOCK",
+		)
+		assert.equal(
+			context.continuationTurnWorkflowInputInstructionsBlock,
+			"## WORKFLOW CONTINUATION\nContinue working on step 1: Step 1: Gather Context.",
+		)
 		assert.equal(context.isContinuationTurn, true)
 		assert.equal(context.isSubagentRun, true)
 	})
@@ -1060,20 +1657,26 @@ describe("SubagentRunner", () => {
 			}
 		})
 
-		sinon.stub(WorkflowRegistry, "resolveWorkflowByUseSkillName").returns(
-			createResolvedWorkflow({
-				name: "review-workflow",
-				useSkillName: "review-workflow",
-				workflowSystemInstructionsBlock: "SYSTEM BLOCK",
-				workflowInputInstructionsBlock: "INPUT BLOCK",
-			}),
-		)
+		const workflow = createResolvedWorkflow({
+			name: "review-workflow",
+			useSkillName: "review-workflow",
+			workflowSystemInstructions: "SYSTEM BLOCK",
+			currentStepInstructions: "INPUT BLOCK",
+		})
+		sinon.stub(WorkflowRegistry, "resolveWorkflowByUseSkillName").returns(workflow)
+		stubResolvedWorkflowByName(workflow)
 		const promptRegistry = PromptRegistry.getInstance()
 		sinon.stub(promptRegistry, "get").callsFake(async (context) => {
 			assert.equal(context.activeWorkflowName, "review-workflow")
 			assert.equal(context.activeWorkflowStepNumber, 1)
-			assert.equal(context.workflowSystemInstructionsBlock, "SYSTEM BLOCK")
-			assert.equal(context.workflowInputInstructionsBlock, "INPUT BLOCK")
+			assert.equal(
+				context.fullTurnWorkflowSystemInstructionsBlock,
+				"## WORKFLOW\nWorkflow: review-workflow\n\n## WORKFLOW PERSONA\nengineer\n\n## WORKFLOW STEPS\n- [ ] Step 1: Gather Context\n\n## WORKFLOW INSTRUCTIONS\nSYSTEM BLOCK",
+			)
+			assert.equal(
+				context.fullTurnWorkflowInputInstructionsBlock,
+				"## CURRENT STEP\nStep 1: Step 1: Gather Context\n\nINPUT BLOCK",
+			)
 			assert.equal(context.isSubagentRun, true)
 			promptRegistry.nativeTools = undefined
 			return "system prompt"
@@ -1084,47 +1687,63 @@ describe("SubagentRunner", () => {
 		stubApiHandler(createMessage)
 		initializeHostProvider()
 
-		const runner = new SubagentRunner(createTaskConfig(false))
+		const config = createTaskConfig(false)
+		const activateWorkflowSpy = sinon.spy(config.workflowRuntime, "activateWorkflow")
+		const runner = new SubagentRunner(config)
 		const result = await runner.run("Skill: use_skill('review-workflow')", () => {})
 
 		assert.equal(result.status, "completed")
 		assert.equal(createMessage.callCount, 1)
+		sinon.assert.calledOnce(activateWorkflowSpy)
+		assert.equal(activateWorkflowSpy.firstCall.args[0].workflowName, "review-workflow")
 	})
 
 	it("leaves the parent workflow state unchanged while inheriting declared values into the child workflow session", async () => {
 		const config = createTaskConfig(false)
 		config.taskState.activeWorkflowName = "parent-workflow"
-		config.taskState.activeWorkflowSession = {
+		const parentWorkflowSession: ActiveWorkflowSession = {
 			workflowName: "parent-workflow",
 			activeStepNumber: 1,
 			workflowValues: { review_input: "/tmp/review-input.md", ignored_parent: "drop" },
-			projectSelection: { projectMode: "new", projectTitle: "", projectFolderName: "" },
+			projectSelection: { projectMode: "existing", projectTitle: "Parent Project", projectFolderName: "parent-project" },
 			ui: {
-				startCardSession: undefined,
 				formSession: undefined,
 				stepResolutionSession: undefined,
 				suppressedWorkflowFormIds: [],
 				suppressedWorkflowStepResolutionDefinitionIds: [],
 			},
-		} as any
+			branchContext: {
+				activeBranchId: "project-prompt",
+			},
+		}
+		config.taskState.activeWorkflowSession = parentWorkflowSession
 		config.taskState.currentFocusChainChecklist = "- [ ] Parent Step"
 
 		const runner = new SubagentRunner(config)
 		const state = new TaskState()
-		sinon.stub(WorkflowRegistry, "resolveWorkflowByUseSkillName").returns(
-			createResolvedWorkflow({
-				name: "child-workflow",
-				useSkillName: "child-workflow",
-				childInheritance: [{ parentKey: "review_input", childKey: "review_input" }],
-			}),
-		)
+		const workflow = createResolvedWorkflow({
+			name: "child-workflow",
+			useSkillName: "child-workflow",
+			workflowValueKeys: ["review_input"],
+			childInheritance: [{ parentKey: "review_input", childKey: "review_input" }],
+		})
+		sinon.stub(WorkflowRegistry, "resolveWorkflowByUseSkillName").returns(workflow)
+		stubResolvedWorkflowByName(workflow)
+		const activateWorkflowSpy = sinon.spy(config.workflowRuntime, "activateWorkflow")
 
 		await autoActivateAssignedWorkflow.call(runner, state, ["child-workflow"])
+		const activationResult = await activateWorkflowSpy.returnValues[0]
 
 		assert.equal(state.activeWorkflowName, "child-workflow")
 		assert.deepEqual(state.activeWorkflowSession?.workflowValues, { review_input: "/tmp/review-input.md" })
+		assert.deepEqual(state.activeWorkflowSession?.projectSelection, parentWorkflowSession.projectSelection)
+		assert.notEqual(state.activeWorkflowSession?.projectSelection, parentWorkflowSession.projectSelection)
+		assert.equal(state.activeWorkflowSession?.ui.formSession, undefined)
+		assert.equal(activationResult.kind, "project_prompt")
 		state.activeWorkflowSession!.workflowValues.review_input = "/tmp/child-mutated.md"
+		state.activeWorkflowSession!.projectSelection.projectTitle = "Child Project"
 		assert.equal(config.taskState.activeWorkflowSession?.workflowValues.review_input, "/tmp/review-input.md")
+		assert.equal(config.taskState.activeWorkflowSession?.projectSelection.projectTitle, "Parent Project")
 		assert.equal(config.taskState.activeWorkflowName, "parent-workflow")
 		assert.equal(config.taskState.currentFocusChainChecklist, "- [ ] Parent Step")
 	})
@@ -1133,19 +1752,22 @@ describe("SubagentRunner", () => {
 		const runner = new SubagentRunner(createTaskConfig(false))
 		const state = new TaskState()
 		state.activeWorkflowName = "existing-workflow"
-		state.activeWorkflowSession = {
+		const existingWorkflowSession: ActiveWorkflowSession = {
 			workflowName: "existing-workflow",
 			activeStepNumber: 1,
 			workflowValues: {},
 			projectSelection: { projectMode: "new", projectTitle: "", projectFolderName: "" },
 			ui: {
-				startCardSession: undefined,
 				formSession: undefined,
 				stepResolutionSession: undefined,
 				suppressedWorkflowFormIds: [],
 				suppressedWorkflowStepResolutionDefinitionIds: [],
 			},
-		} as any
+			branchContext: {
+				activeBranchId: "project-prompt",
+			},
+		}
+		state.activeWorkflowSession = existingWorkflowSession
 
 		const resolveWorkflowByUseSkillNameStub = sinon.stub(WorkflowRegistry, "resolveWorkflowByUseSkillName")
 
@@ -1155,80 +1777,19 @@ describe("SubagentRunner", () => {
 		assert.equal(state.activeWorkflowName, "existing-workflow")
 	})
 
-	it("routes subagent task_progress updates to subagent-local focus chain storage instead of the parent callback", async () => {
-		const sandbox = sinon.createSandbox()
-		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "subagent-focus-chain-update-"))
-		try {
-			sandbox.stub(disk, "ensureTaskDirectoryExists").resolves(tempDir)
-			const config = createTaskConfig(false)
-			config.taskState.currentFocusChainChecklist = "- [ ] Parent Step"
-			const parentManager = createFocusChainManager(config.taskState, config.taskId)
-			await parentManager.updateFCListFromToolResponse(config.taskState.currentFocusChainChecklist)
+	it("accepts subagent focus-chain callback updates without calling the parent callback", async () => {
+		const config = createTaskConfig(false)
+		config.taskState.currentFocusChainChecklist = "- [ ] Parent Step"
+		const runner = new SubagentRunner(config)
+		const subagentState = new TaskState()
+		const subagentConfig = createSubagentTaskConfig.call(runner, subagentState)
 
-			const runner = new SubagentRunner(config)
-			const subagentState = new TaskState()
-			const subagentConfig = createSubagentTaskConfig.call(runner, subagentState)
+		const result = await subagentConfig.callbacks.updateFCListFromToolResponse("- [ ] Child Step")
+		const parentUpdate = config.callbacks.updateFCListFromToolResponse
 
-			const result = await subagentConfig.callbacks.updateFCListFromToolResponse("- [ ] Child Step")
-
-			assert.equal(result.accepted, true)
-			sinon.assert.notCalled(config.callbacks.updateFCListFromToolResponse as sinon.SinonStub)
-			assert.equal(subagentState.currentFocusChainChecklist, "- [ ] Child Step")
-
-			const parentFilePath = getFocusChainFilePath(tempDir, config.taskId)
-			const parentContent = await fs.readFile(parentFilePath, "utf8")
-			assert.match(parentContent, /Parent Step/)
-			assert.doesNotMatch(parentContent, /Child Step/)
-
-			const subagentStorageKey = getSubagentFocusChainStorageKey(runner)
-			const subagentFilePath = getFocusChainFilePath(tempDir, config.taskId, {
-				key: subagentStorageKey,
-				scope: "subagent",
-			})
-			const subagentContent = await fs.readFile(subagentFilePath, "utf8")
-			assert.match(subagentContent, /Child Step/)
-			assert.doesNotMatch(subagentContent, /Parent Step/)
-		} finally {
-			sandbox.restore()
-			await fs.rm(tempDir, { recursive: true, force: true })
-		}
-	})
-
-	it("uses distinct subagent-local focus-chain storage keys across multiple subagent runs", async () => {
-		const sandbox = sinon.createSandbox()
-		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "subagent-focus-chain-multi-"))
-		try {
-			sandbox.stub(disk, "ensureTaskDirectoryExists").resolves(tempDir)
-			const config = createTaskConfig(false)
-			const runnerOne = new SubagentRunner(config)
-			const runnerTwo = new SubagentRunner(config)
-			const stateOne = new TaskState()
-			const stateTwo = new TaskState()
-			const subagentConfigOne = createSubagentTaskConfig.call(runnerOne, stateOne)
-			const subagentConfigTwo = createSubagentTaskConfig.call(runnerTwo, stateTwo)
-
-			await subagentConfigOne.callbacks.updateFCListFromToolResponse("- [ ] Alpha Step")
-			await subagentConfigTwo.callbacks.updateFCListFromToolResponse("- [ ] Beta Step")
-
-			const storageKeyOne = getSubagentFocusChainStorageKey(runnerOne)
-			const storageKeyTwo = getSubagentFocusChainStorageKey(runnerTwo)
-			assert.notEqual(storageKeyOne, storageKeyTwo)
-
-			const subagentFileOne = getFocusChainFilePath(tempDir, config.taskId, {
-				key: storageKeyOne,
-				scope: "subagent",
-			})
-			const subagentFileTwo = getFocusChainFilePath(tempDir, config.taskId, {
-				key: storageKeyTwo,
-				scope: "subagent",
-			})
-			assert.notEqual(subagentFileOne, subagentFileTwo)
-			assert.match(await fs.readFile(subagentFileOne, "utf8"), /Alpha Step/)
-			assert.match(await fs.readFile(subagentFileTwo, "utf8"), /Beta Step/)
-		} finally {
-			sandbox.restore()
-			await fs.rm(tempDir, { recursive: true, force: true })
-		}
+		assert.deepEqual(result, { accepted: true })
+		assert.equal("callCount" in parentUpdate ? parentUpdate.callCount : undefined, 0)
+		assert.equal(config.taskState.currentFocusChainChecklist, "- [ ] Parent Step")
 	})
 
 	it("narrows visible skills from an explicit use_skill assignment in the delegated prompt", async () => {
@@ -1324,7 +1885,10 @@ describe("SubagentRunner", () => {
 		assert.equal(createMessage.callCount, 1)
 		const systemPrompt = createMessage.firstCall.args[0] as string
 		assert.match(systemPrompt, /Assigned Workflow Activation/)
+		assert.match(systemPrompt, /Use only the assigned workflow skill named above\./)
 		assert.match(systemPrompt, /review-helper/)
+		assert.doesNotMatch(systemPrompt, /call `use_skill`/)
+		assert.doesNotMatch(systemPrompt, /Do not manually search for workflow files unless `use_skill` fails\./)
 	})
 
 	it("logs a warning when a configured skill is not available", async () => {

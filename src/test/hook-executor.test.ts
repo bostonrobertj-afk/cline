@@ -10,7 +10,10 @@ import { executeHook } from "../core/hooks/hook-executor"
 import { StateManager } from "../core/storage/StateManager"
 import { MessageStateHandler } from "../core/task/message-state"
 import { TaskState } from "../core/task/TaskState"
+import { HostProvider } from "../hosts/host-provider"
+import { getTelemetryService, resetTelemetryService } from "../services/telemetry"
 import { ClineMessage } from "../shared/ExtensionMessage"
+import { setVscodeHostProviderMock } from "./host-provider-test-utils"
 
 /**
  * Unit tests for the hook-executor module
@@ -68,12 +71,37 @@ setTimeout(() => {
 		// Reset the hook discovery cache before each test
 		// This ensures tests get a fresh cache and can discover newly created hooks
 		HookDiscoveryCache.resetForTesting()
+		resetTelemetryService()
 
 		// Create temporary directory for test hooks
 		baseTempDir = await fs.mkdtemp(path.join(os.tmpdir(), "hook-test-"))
 		// Create .clinerules/hooks subdirectory structure
 		tempDir = path.join(baseTempDir, ".clinerules", "hooks")
+		const extensionDir = path.join(baseTempDir, "extension")
+		const globalStorageDir = path.join(baseTempDir, "global-storage")
 		await fs.mkdir(tempDir, { recursive: true })
+		await fs.mkdir(extensionDir, { recursive: true })
+		await fs.mkdir(globalStorageDir, { recursive: true })
+
+		setVscodeHostProviderMock({
+			extensionFsPath: extensionDir,
+			globalStorageFsPath: globalStorageDir,
+			hostBridgeClient: {
+				workspaceClient: {},
+				envClient: {
+					debugLog: async () => {},
+					getHostVersion: async () => ({
+						clineVersion: "1.0.0",
+						platform: "darwin",
+						clineType: "vscode",
+					}),
+				},
+				windowClient: {},
+				diffClient: {},
+			} as any,
+		})
+		await getTelemetryService()
+
 		testHandler = createTestHandler()
 		mockMessages = []
 
@@ -99,6 +127,8 @@ setTimeout(() => {
 
 		// Restore StateManager stub
 		stateManagerStub.restore()
+		resetTelemetryService()
+		HostProvider.reset()
 	})
 
 	describe("Basic Hook Execution", () => {

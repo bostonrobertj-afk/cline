@@ -1,11 +1,10 @@
-import type { ClineMessage, WorkflowStartCard } from "@shared/ExtensionMessage"
+import type { ClineMessage } from "@shared/ExtensionMessage"
 import { render, screen } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest"
 import { ChatRowContent } from "./ChatRow"
 
-const { mockSubmitWorkflowForm, mockSubmitWorkflowStartCard, mockThreadDisplayState } = vi.hoisted(() => ({
+const { mockSubmitWorkflowForm, mockThreadDisplayState } = vi.hoisted(() => ({
 	mockSubmitWorkflowForm: vi.fn().mockResolvedValue(undefined),
-	mockSubmitWorkflowStartCard: vi.fn().mockResolvedValue(undefined),
 	mockThreadDisplayState: { value: "awaiting_user_response" as string | null },
 }))
 
@@ -30,7 +29,6 @@ vi.mock("@/services/grpc-client", async (importOriginal) => {
 		...actual,
 		TaskServiceClient: {
 			submitWorkflowForm: mockSubmitWorkflowForm,
-			submitWorkflowStartCard: mockSubmitWorkflowStartCard,
 		},
 		UiServiceClient: {
 			openUrl: vi.fn(),
@@ -68,44 +66,7 @@ function createWorkflowFormMessage(payloadOverrides?: Partial<Record<string, unk
 	}
 }
 
-function createWorkflowStartCardMessage(payloadOverrides?: Partial<WorkflowStartCard>): ClineMessage {
-	const payload: WorkflowStartCard = {
-		sessionId: "workflow-start-card-session",
-		title: "Start New Project",
-		markdownBody: "Choose how to begin.",
-		submitLabel: "Start project",
-		projectMode: "existing",
-		existingProjectOptions: [
-			{ value: "project-alpha", label: "Project Alpha" },
-			{ value: "project-beta", label: "Project Beta" },
-		],
-		selectedExistingProject: "project-beta",
-		newProjectTitle: "Fresh Workspace",
-		...payloadOverrides,
-	}
-
-	return {
-		ts: Date.now(),
-		type: "ask",
-		ask: "workflow_start_card",
-		text: JSON.stringify(payload),
-	}
-}
-
 function renderWorkflowForm(message: ClineMessage) {
-	return render(
-		<ChatRowContent
-			inputValue=""
-			isExpanded={true}
-			isLast={true}
-			message={message}
-			onSetQuote={vi.fn()}
-			onToggleExpand={vi.fn()}
-		/>,
-	)
-}
-
-function renderWorkflowStartCard(message: ClineMessage) {
 	return render(
 		<ChatRowContent
 			inputValue=""
@@ -485,32 +446,83 @@ describe("ChatRow workflow form v2 rendering", () => {
 	})
 })
 
-describe("ChatRow workflow start card rendering", () => {
-	it("renders existing-project workflow start cards from structured option objects", () => {
-		renderWorkflowStartCard(createWorkflowStartCardMessage())
-
-		expect(screen.getByText("Start New Project")).toBeInTheDocument()
-		expect(screen.getByText("Choose how to begin.")).toBeInTheDocument()
-		expect(screen.getByLabelText("Create a new project")).toBeInTheDocument()
-		expect(screen.getByLabelText("Use an existing project")).toBeInTheDocument()
-		expect(screen.getByLabelText("Existing project")).toHaveValue("project-beta")
-		expect(screen.getByRole("option", { name: "Project Alpha" })).toBeInTheDocument()
-		expect(screen.getByRole("option", { name: "Project Beta" })).toBeInTheDocument()
-		expect(screen.getByRole("button", { name: "Start project" })).toBeInTheDocument()
-		expect(screen.queryByLabelText("New project title")).toBeNull()
-	})
-
-	it("renders new-project workflow start cards with the seeded title input", () => {
-		renderWorkflowStartCard(
-			createWorkflowStartCardMessage({
-				projectMode: "new",
-				selectedExistingProject: "",
-				newProjectTitle: "Fresh Workspace",
+describe("ChatRow shared entry workflow form rendering", () => {
+	it("renders the informational first panel of the shared entry workflow form", () => {
+		renderWorkflowForm(
+			createWorkflowFormMessage({
+				title: "Welcome to the Planning Workflow!",
+				panel: {
+					panelId: "__workflow_runtime_entry_info__",
+					title: "Workflow Overview",
+					promptMarkdown: "Planning workflow overview content.",
+					fields: [],
+					allowedActions: ["submit"],
+					actionLabels: {
+						submit: "Continue",
+					},
+				},
 			}),
 		)
 
-		expect(screen.getByLabelText("New project title")).toHaveValue("Fresh Workspace")
-		expect(screen.getByRole("button", { name: "Start project" })).toBeInTheDocument()
-		expect(screen.queryByLabelText("Existing project")).toBeNull()
+		expect(screen.getByText("Welcome to the Planning Workflow!")).toBeInTheDocument()
+		expect(screen.getByText("Workflow Overview")).toBeInTheDocument()
+		expect(screen.getByText("Planning workflow overview content.")).toBeInTheDocument()
+		expect(screen.getByRole("button", { name: "Continue" })).toBeInTheDocument()
+	})
+
+	it("renders the project-selection second panel of the shared entry workflow form", () => {
+		renderWorkflowForm(
+			createWorkflowFormMessage({
+				title: "Welcome to the Planning Workflow!",
+				panel: {
+					panelId: "__workflow_runtime_entry_project_selection__",
+					title: "Project Selection",
+					promptMarkdown: "Choose whether to start a new project or continue with an existing project.",
+					fields: [
+						{
+							key: "__workflow_runtime_project_mode__",
+							kind: "radio_group",
+							label: "Project mode",
+							required: true,
+							options: [
+								{ value: "new", label: "New Project" },
+								{ value: "existing", label: "Existing Project" },
+							],
+						},
+						{
+							key: "__workflow_runtime_existing_project__",
+							kind: "dropdown",
+							label: "Existing project",
+							required: true,
+							options: [
+								{ value: "project-alpha", label: "Project Alpha" },
+								{ value: "project-beta", label: "Project Beta" },
+							],
+						},
+					],
+					allowedActions: ["submit", "back"],
+					actionLabels: {
+						submit: "Start Workflow",
+						back: "Back",
+					},
+				},
+				values: {
+					__workflow_runtime_project_mode__: { valueType: "string", stringValue: "existing" },
+					__workflow_runtime_existing_project__: { valueType: "string", stringValue: "project-beta" },
+				},
+			}),
+		)
+
+		expect(screen.getByText("Project Selection")).toBeInTheDocument()
+		expect(
+			screen.getByText("Choose whether to start a new project or continue with an existing project."),
+		).toBeInTheDocument()
+		expect(screen.getByLabelText("New Project")).toBeInTheDocument()
+		expect(screen.getByLabelText("Existing Project")).toBeInTheDocument()
+		expect(screen.getByLabelText("Existing project")).toHaveValue("project-beta")
+		expect(screen.getByRole("option", { name: "Project Alpha" })).toBeInTheDocument()
+		expect(screen.getByRole("option", { name: "Project Beta" })).toBeInTheDocument()
+		expect(screen.getByRole("button", { name: "Start Workflow" })).toBeInTheDocument()
+		expect(screen.getByRole("button", { name: "Back" })).toBeInTheDocument()
 	})
 })

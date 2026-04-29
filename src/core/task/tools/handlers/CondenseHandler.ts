@@ -1,6 +1,6 @@
 import type { ToolUse } from "@core/assistant-message"
 import { formatResponse } from "@core/prompts/responses"
-import { ensureTaskDirectoryExists, getTaskMetadata, saveTaskMetadata } from "@core/storage/disk"
+import { ensureTaskDirectoryExists } from "@core/storage/disk"
 import { processFilesIntoText } from "@integrations/misc/extract-text"
 import { showSystemNotification } from "@integrations/notifications"
 import { ClineAsk } from "@shared/ExtensionMessage"
@@ -67,16 +67,6 @@ export class CondenseHandler implements IToolHandler, IPartialBlockHandler {
 			config.taskState.conversationHistoryDeletedRange,
 			keepStrategy,
 		)
-		if (config.taskState.lastPromptedPlaceholderWorkflowChecklistLabel !== undefined) {
-			config.taskState.lastPromptedPlaceholderWorkflowChecklistLabel = undefined
-			try {
-				const metadata = await getTaskMetadata(config.taskId)
-				metadata.lastPromptedPlaceholderWorkflowChecklistLabel = undefined
-				await saveTaskMetadata(config.taskId, metadata)
-			} catch {
-				// Non-fatal: the in-memory marker remains canonical for the active turn.
-			}
-		}
 		await config.messageState.saveClineMessagesAndUpdateHistory()
 		await config.services.contextManager.triggerApplyStandardContextTruncationNoticeChange(
 			Date.now(),

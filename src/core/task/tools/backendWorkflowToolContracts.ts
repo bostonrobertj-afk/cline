@@ -47,6 +47,18 @@ export const backendWorkflowToolContracts: Partial<Record<ClineDefaultTool, Back
 			},
 		],
 	},
+	[ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT]: {
+		id: ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT,
+		name: "create_workflow_artifact",
+		parameters: [
+			{
+				name: "artifact_id",
+				required: true,
+				type: "string",
+				description: "Workflow artifact definition id to allocate and create through WorkflowRuntime.",
+			},
+		],
+	},
 	[ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE]: {
 		id: ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE,
 		name: "code_review_spec_update",

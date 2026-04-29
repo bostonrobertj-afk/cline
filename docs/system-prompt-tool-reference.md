@@ -2,7 +2,7 @@
 
 This document is a runtime-oriented reference for the tool surface that the system prompt can expose today.
 
-It is intended to reduce file-hopping during prompt audits, contextual-tool-matrix reviews, and workflow enablement work.
+It is intended to reduce file-hopping during prompt audits and workflow enablement work.
 
 It summarizes the current tool inventory defined in:
 
@@ -15,7 +15,7 @@ It summarizes the current tool inventory defined in:
 ## Scope Notes
 
 - This document covers tools that are registered through the system-prompt tool layer.
-- Not every registered tool is visible in every turn. Visibility depends on provider, mode, workflow context, MCP availability, and contextual filtering.
+- Not every registered tool is visible in every turn. Visibility depends on provider, mode, MCP availability, and runtime-projected workflow tool schemas.
 - Some shared tool ids in [src/shared/tools.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/shared/tools.ts) are not prompt-defined tools and should not be treated as part of the normal prompt tool catalog.
 - Dynamic MCP-native tools are real runtime tools even though they are not implemented one-file-per-tool under `tools/`.
 
@@ -31,8 +31,6 @@ These are the tools currently registered from [init.ts](/Users/robertboston/Docu
 | `ask_followup_question` | Response | Ask the user a concise question, optionally with choices, and end the current turn. | Hidden in YOLO mode. |
 | `attempt_completion` | Response | Present the final result of completed work to the user and end the current turn. | End-of-task response tool. |
 | `browser_action` | Browser | Interact with the Puppeteer-controlled browser one action at a time. | Browser automation and screenshots. |
-| `build_review_diff_output` | Workflow-specific | Build and replace the stable review diff artifact at `{diff_output}` from a supported Git-backed source. | Used by `code-review` workflow. |
-| `complete_workflow_item` | Managed workflow | Mark the current backend-managed workflow item complete. | Managed-workflow-only tool. |
 | `execute_command` | Execution | Execute a CLI command in the current working directory. | Shared enum id is `BASH`. |
 | `focus_chain` | Internal | Placeholder/dependency tool used to support focus-chain behavior. | Not a practical agent-facing operational tool. |
 | `generate_explanation` | Hidden | Open a multi-file diff view and generate inline AI explanations of changes between Git refs. | Currently disabled from agent-visible schema. |
@@ -46,35 +44,20 @@ These are the tools currently registered from [init.ts](/Users/robertboston/Docu
 | `replace_in_file` | Editing | Make targeted in-file edits using SEARCH/REPLACE blocks. | Good for localized modifications. |
 | `search_files` | Search | Run a regex search across files in a directory and return context-rich matches. | Raw-text discovery tool. |
 | `send_user_message` | Response | Send a normal direct message to the user. | Available in ACT and PLAN mode. |
-| `set_workflow_placeholders` | Workflow-specific | Persist dynamic placeholder values discovered during the active workflow. | Used by managed and placeholder workflows that support placeholders. |
-| `story_notes_update` | Workflow-specific | Append one entry to `## Completion Notes List` or `## File List` in the workflow-owned story file at `{story_path}`. | Story-state mutation tool. |
-| `story_task_complete` | Workflow-specific | Mark the addressed story task or subtask complete in the workflow-owned story file at `{story_path}`. | Used in story-task execution loops. |
-| `story_task_reminder` | Workflow-specific | Resend the current first incomplete story task and its subtasks from the workflow-owned story file at `{story_path}`. | Story-task reminder tool. |
-| `story_testing_complete` | Workflow-specific | Mark the workflow-owned story file at `{story_path}` ready for review by setting `Status: review`. | Story completion status tool. |
 | `use_subagents` | Orchestration | Run focused in-process subagents in parallel for exploration or research. | Hidden during subagent runs and when subagents are disabled. |
 | `use_mcp_tool` | MCP | Invoke a tool exposed by a connected MCP server by server name, tool name, and arguments. | Gateway tool for non-native MCP usage. |
-| `use_skill` | Workflow/skill activation | Load and activate a skill, workflow, or managed workflow by name. | Primary workflow and skill routing tool. |
+| `use_skill` | Workflow/skill activation | Load and activate a skill or workflow by name. | Primary workflow and skill routing tool. |
 | `web_fetch` | Web | Fetch a URL and analyze the page content with a prompt. | Only available for the `cline` provider when web tools are enabled. |
 | `web_search` | Web | Perform a web search and return relevant results, optionally filtering domains. | Only available for the `cline` provider when web tools are enabled. |
-| `workflow_progress_request` | Workflow-specific response | Ask the runtime-owned Yes/No workflow advancement question for supported placeholder-workflow steps. | Context-gated to supported workflow/step and hidden in YOLO mode. |
 | `write_to_file` | Editing | Create or overwrite a file with provided content, creating directories as needed. | Whole-file write tool. |
 
-## Prompt-Defined Tool Families Added By Recent Workflow Enablement
+## Workflow Runtime Tool Projection
 
-These are the prompt-exposed workflow tools that remain easy to miss in older audits:
+Workflow modules may project a complete per-turn native tool schema through `WorkflowRuntime`. That runtime-projected schema is authoritative for workflow-specific visibility on the active turn and is separate from the static prompt-tool registration list above.
 
-- workflow input and placeholder tools
-  - `build_review_diff_output`
-  - `set_workflow_placeholders`
-- workflow progression / runtime-owned advancement request
-  - `workflow_progress_request`
-- workflow-owned story-state mutation tools
-  - `story_notes_update`
-  - `story_task_complete`
-  - `story_task_reminder`
-  - `story_testing_complete`
-- managed-workflow completion surface
-  - `complete_workflow_item`
+- `set_workflow_values` is visible only when supplied by the active workflow module's complete per-turn schema.
+- `workflow_progress_request` is visible only when supplied by the active workflow module's complete per-turn schema.
+- `create_workflow_artifact` is visible only when supplied by the active workflow module's complete per-turn schema.
 
 ## Shared Tool Ids That Are Not Part Of The Normal Prompt Tool Catalog
 
@@ -82,23 +65,10 @@ The shared enum in [src/shared/tools.ts](/Users/robertboston/Documents/Cline%20E
 
 Important current cases:
 
-- `build_review_input`
-- `build_tech_spec_document`
-- `capture_brainstorming_topic`
-- `continue_brainstorming_session`
-- `create_brainstorming_session`
-- `select_brainstorming_session`
-- `persist_brainstorming_approach`
-- `select_random_brainstorming_technique`
-- `persist_brainstorming_technique`
-- `request_brainstorming_technique_suggestion`
-- `select_target_epic`
-- `build_epic_delivery_spec`
-- `build_story_document`
-- `build_epics_document`
-- `code_review_spec_update`
-  - backend-only workflow automation tools owned by the runtime contract registry in `src/core/task/tools`
-  - not exposed through the normal AI prompt tool catalog
+- `set_workflow_values`
+- `workflow_progress_request`
+- `create_workflow_artifact`
+  - workflow-module-projected tool ids, not static prompt-tool catalog entries
 - `condense`
 - `summarize_task`
 - `report_bug`
@@ -175,16 +145,13 @@ These notes matter because “tool exists in source” is not the same thing as 
 - `generate_plan_output` is PLAN-mode-only.
 - `act_mode_respond` is ACT-mode-only.
 - `ask_followup_question` is hidden in YOLO mode.
-- `workflow_progress_request` is exposed only for workflows and steps in [src/shared/workflow-progress-request.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/shared/workflow-progress-request.ts), and is also hidden in YOLO mode.
 - `use_subagents` is hidden when subagents are disabled and during subagent runs.
-- `complete_workflow_item` is managed-workflow-only.
-- `set_workflow_placeholders` is available only when a managed workflow is active or the active workflow supports placeholders.
 - `web_search` and `web_fetch` require the `cline` provider plus web tools enabled.
 - `access_mcp_resource` and `use_mcp_tool` require MCP availability.
 - `load_mcp_documentation` is currently disabled from agent-visible schema.
 - `generate_explanation` is currently disabled from agent-visible schema.
 - `focus_chain` is an internal placeholder or dependency tool, not a practical agent-facing operational tool.
-- contextual native-tool filtering can still remove otherwise-registered tools from the visible surface for the active placeholder workflow step
+- workflow-module-projected schemas replace the visible native tool surface for the active workflow turn.
 
 ## Response Tool Summary
 
@@ -195,25 +162,23 @@ The response tools defined through the prompt layer are:
 - `ask_followup_question`
 - `generate_plan_output`
 - `act_mode_respond`
-- `workflow_progress_request`
 
 Current mode-oriented intent:
 
 - ACT mode: `attempt_completion`, `send_user_message`, and usually `ask_followup_question`; native OpenAI ACT mode may also expose `act_mode_respond`
 - PLAN mode: `generate_plan_output`, `send_user_message`, and usually `ask_followup_question`
-- supported placeholder-workflow steps may also expose `workflow_progress_request`
+- workflow turns may expose module-projected response tools through the active workflow schema
 
 The exact visible subset in a given turn should always be derived from the actual prompt build and filtering context for that turn.
 
 ## Suggested Audit Usage
 
-When manually reviewing workflow-step rows in [contextualToolMatrix.ts](/Users/robertboston/Documents/Cline%20Extension/cline/src/core/prompts/system-prompt/registry/contextualToolMatrix.ts):
+When manually reviewing workflow-module tool schemas:
 
-1. Read the workflow step text in `/Users/robertboston/Documents/Cline/Workflows/`.
+1. Read the product-owned workflow module definition.
 2. Use this document to confirm which tools are truly prompt-defined today.
 3. Check whether a candidate tool is:
    - prompt-defined and context-gated
    - dynamic MCP-native
-   - internal-only and therefore not matrix-relevant
-4. Map the step’s required actions to existing matrix bundles.
-5. If a required prompt-defined tool exists but is not representable by the current bundle model, record a bundle-model gap explicitly.
+   - runtime-projected by the active workflow module
+   - internal-only and therefore not model-facing

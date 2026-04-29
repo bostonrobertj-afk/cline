@@ -6,7 +6,6 @@ export interface RequestTokenEstimate {
 	estimatedTotal: number
 	systemPrompt: number
 	systemSections: {
-		managedWorkflow: number
 		skills: number
 		toolUse: number
 	}
@@ -39,11 +38,6 @@ function extractSection(prompt: string, header: string): string {
 	const escapedHeader = header.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 	const match = prompt.match(new RegExp(`(?:^|\\n)${escapedHeader}\\n\\n([\\s\\S]*?)(?:\\n====|$)`))
 	return match?.[1]?.trim() ?? ""
-}
-
-function extractManagedWorkflow(prompt: string): string {
-	const matches = prompt.match(/<active_bmad_workflow[\s\S]*?<\/active_bmad_workflow>/g)
-	return matches?.join("\n") ?? ""
 }
 
 function stringifyUnknown(value: unknown): string {
@@ -137,7 +131,6 @@ export function estimateRequestTokenUsage(systemPrompt: string, messages: ClineS
 	const systemPromptTokens = estimateTextTokens(systemPrompt)
 	const skillsTokens = estimateTextTokens(extractSection(systemPrompt, "SKILLS"))
 	const toolUseTokens = estimateTextTokens(extractSection(systemPrompt, "TOOL USE"))
-	const managedWorkflowTokens = estimateTextTokens(extractManagedWorkflow(systemPrompt))
 
 	const historyTotal = messages.reduce((sum, message) => sum + estimateMessageTokens(message), 0)
 	const lastHumanUserIndex = [...messages].reverse().findIndex((message) => hasHumanFacingUserContent(message))
@@ -151,7 +144,6 @@ export function estimateRequestTokenUsage(systemPrompt: string, messages: ClineS
 		estimatedTotal: systemPromptTokens + historyTotal,
 		systemPrompt: systemPromptTokens,
 		systemSections: {
-			managedWorkflow: managedWorkflowTokens,
 			skills: skillsTokens,
 			toolUse: toolUseTokens,
 		},

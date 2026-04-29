@@ -6,12 +6,7 @@ import type { TaskConfig } from "../types/TaskConfig"
 export type ResponseToolTurnBehavior = "continue" | "end_turn"
 export type ResponseToolFollowupRoute = "tool_result" | "normal_user_turn"
 export const RESPONSE_TOOL_SUCCESS_MESSAGE = "[Message displayed.]"
-export type ResponseToolFailureCause =
-	| "missing_parameter"
-	| "user_denied"
-	| "managed_workflow_incomplete"
-	| "double_check_required"
-	| "tool_error"
+export type ResponseToolFailureCause = "missing_parameter" | "user_denied" | "double_check_required" | "tool_error"
 
 export interface ResponseToolMetadata {
 	toolName: ClineDefaultTool

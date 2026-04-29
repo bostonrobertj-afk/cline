@@ -4,12 +4,7 @@ import { ChatCompletionTool as OpenAITool } from "openai/resources/chat/completi
 import { FunctionTool as OpenAIResponseFunctionTool, Tool as OpenAIResponseTool } from "openai/resources/responses/responses"
 import { ModelFamily } from "@/shared/prompts"
 import type { ClineDefaultTool } from "@/shared/tools"
-import {
-	hasUsableIndxrExplorationContext,
-	isDevStoryImplementationStep,
-	isDirectMaterialReviewStep,
-	replacePromptPlaceholders as replaceMcpPromptPlaceholders,
-} from "./components/mcp"
+import { hasUsableIndxrExplorationContext, replacePromptPlaceholders as replaceMcpPromptPlaceholders } from "./components/mcp"
 import { MULTI_ROOT_HINT } from "./constants"
 import type { SystemPromptContext } from "./types"
 
@@ -479,61 +474,25 @@ function getNativeToolDescription(tool: ClineToolSpec, context: SystemPromptCont
 			return "Present a concrete plan when the task is in PLAN MODE."
 		case "send_user_message":
 			return "Send a direct user-visible message when specialized response tools are not the right fit."
-		case "workflow_progress_request":
-			return "Ask whether the user is ready to move to the next supported workflow step. The runtime owns the Yes/No prompt, and the Yes branch advances the focus chain before the next request is built."
-		case "set_workflow_placeholders":
-			return 'Persist dynamic placeholder values discovered during the active workflow. Call as {"values":{"story_path":"docs/story.md","project_context":"docs/project-context.md"}}. Stable config-backed placeholders like output_folder come from .cline/workflow-config.yaml.'
-		case "build_review_diff_output":
-			return "Build and atomically replace {diff_output} from an explicit Git-backed source. Use for code-review diff artifact construction, not for arbitrary file writes."
 		case "use_skill":
 			return "Activate a skill by exact name when the request matches an available skill."
 		case "use_mcp_tool":
-			if (isDevStoryImplementationStep(context)) {
-				return "Use a connected MCP tool only after direct reads of story-named or cited files and narrow built-in search fail to reveal the implementation seam."
-			}
-			if (isDirectMaterialReviewStep(context)) {
-				return "Use a connected MCP tool only after inspecting the supplied diff, review input, or directly changed code. Use it for targeted discovery or source reads on directly changed or directly referenced code, and broaden structural traversal only when a concrete unresolved question remains after direct inspection."
-			}
 			return hasUsableIndxrExplorationContext(context)
 				? "Use a connected MCP tool. When Indxr is available, default to its exploration tools first for code exploration, symbol lookup, file understanding, dependency tracing, and targeted source reads. After you have narrowed the task to one concrete file, prefer one full raw read only when the file is at or below 800 lines and 65536 bytes; otherwise prefer symbol-targeted or explicit line-range source reads."
 				: firstSentence(resolved)
 		case "search_files":
-			if (isDevStoryImplementationStep(context)) {
-				return "Use only after direct reads of story-named or cited files fail to reveal the implementation seam, or when exact raw-text regex search is specifically required."
-			}
-			if (isDirectMaterialReviewStep(context)) {
-				return "Use only after inspecting the supplied diff, review input, or directly changed code, or when exact raw-text regex search is specifically required."
-			}
 			return hasUsableIndxrExplorationContext(context)
 				? "Use only for exact raw-text regex search when Indxr is unavailable, insufficient, or regex search is specifically required."
 				: firstSentence(resolved)
 		case "list_code_definition_names":
-			if (isDevStoryImplementationStep(context)) {
-				return "Use only after direct reads of story-named or cited files fail to reveal the implementation seam and you need a built-in top-level definition pass."
-			}
-			if (isDirectMaterialReviewStep(context)) {
-				return "Use only after direct inspection of the changed or directly referenced file reveals a concrete need for a built-in top-level definition pass."
-			}
 			return hasUsableIndxrExplorationContext(context)
 				? "Use only when Indxr is unavailable or insufficient and you specifically need a built-in top-level definition pass."
 				: firstSentence(resolved)
 		case "read_file":
-			if (isDevStoryImplementationStep(context)) {
-				return "For this implementation step, prefer direct reads of story-named or cited files before MCP exploration. Use read_file when you need the exact full raw contents of one concrete file at or below 800 lines and 65536 bytes."
-			}
-			if (isDirectMaterialReviewStep(context)) {
-				return "Start with directly changed or directly referenced files. Use read_file when you need the exact full raw contents of one concrete file at or below 800 lines and 65536 bytes to confirm a review finding."
-			}
 			return hasUsableIndxrExplorationContext(context)
 				? "Use Indxr first for discovery, summaries, symbol lookup, dependency tracing, and targeted source reads. Once the task is narrowed to one concrete file, use read_file when exact full raw file contents are required for a file at or below 800 lines and 65536 bytes, or when Indxr is insufficient."
 				: firstSentence(resolved)
 		case "read_file_range":
-			if (isDevStoryImplementationStep(context)) {
-				return "Use this for targeted line-based inspection in a directly relevant file, or when a concrete file exceeds the full-read limit."
-			}
-			if (isDirectMaterialReviewStep(context)) {
-				return "Use this for targeted line-based inspection in directly changed or directly referenced code, or when a concrete file exceeds the full-read limit."
-			}
 			return hasUsableIndxrExplorationContext(context)
 				? "Use only when exact raw line-based inspection is required after Indxr has already narrowed the target, when the file exceeds the full-read limit, or when Indxr is insufficient."
 				: firstSentence(resolved)
@@ -550,25 +509,6 @@ function getNativeToolParameterDescription(
 	const resolved = replacePromptPlaceholders(resolveInstruction(param.instruction, context), context)
 	if (!shouldCompactNativeToolSchema(context)) {
 		return resolved
-	}
-
-	if (param.name === "task_progress") {
-		return "Top-level tool parameter, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
-	}
-
-	if (tool.name === "set_workflow_placeholders" && param.name === "values") {
-		return 'Object map of placeholder keys to strings. Call the tool as {"values": {...}}. Not arrays of {name,value} or {key,value}.'
-	}
-
-	if (tool.name === "build_review_diff_output") {
-		switch (param.name) {
-			case "source":
-				return 'Required source object. Supported shape: {"type":"commit","commit":"<ref>"} | {"type":"commit_range","base":"<ref>","head":"<ref>"} | {"type":"ref_diff","base":"<ref>","head":"<ref>"} | {"type":"worktree_head_scoped"}.'
-			case "scoped_paths":
-				return 'Optional repository-relative path array. Required for {"type":"worktree_head_scoped"}.'
-			case "context_lines":
-				return "Optional unified diff context line count. Defaults to 3."
-		}
 	}
 
 	if (tool.name === "apply_patch" && param.name === "input") {

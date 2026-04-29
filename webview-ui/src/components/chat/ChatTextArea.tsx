@@ -212,18 +212,8 @@ const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 		},
 		ref,
 	) => {
-		const {
-			mode,
-			apiConfiguration,
-			openRouterModels,
-			platform,
-			localWorkflowToggles,
-			globalWorkflowToggles,
-			remoteWorkflowToggles,
-			remoteConfigSettings,
-			navigateToSettingsModelPicker,
-			mcpServers,
-		} = useExtensionState()
+		const { mode, apiConfiguration, openRouterModels, platform, navigateToSettingsModelPicker, mcpServers } =
+			useExtensionState()
 		const [isTextAreaFocused, setIsTextAreaFocused] = useState(false)
 		const [isDraggingOver, setIsDraggingOver] = useState(false)
 		const [gitCommits, setGitCommits] = useState<GitCommit[]>([])
@@ -282,7 +272,7 @@ const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 			return () => {
 				isCancelled = true
 			}
-		}, [localWorkflowToggles, globalWorkflowToggles, remoteWorkflowToggles, remoteConfigSettings])
+		}, [])
 
 		// Fetch git commits when Git is selected or when typing a hash
 		useEffect(() => {
@@ -496,16 +486,7 @@ const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 						event.preventDefault()
 						setSelectedSlashCommandsIndex((prevIndex) => {
 							const direction = event.key === "ArrowUp" ? -1 : 1
-							// Get commands with workflow toggles
-							const allCommands = getMatchingSlashCommands(
-								slashCommandsQuery,
-								localWorkflowToggles,
-								globalWorkflowToggles,
-								remoteWorkflowToggles,
-								remoteConfigSettings?.remoteGlobalWorkflows,
-								mcpServers,
-								availableSlashCommands,
-							)
+							const allCommands = getMatchingSlashCommands(slashCommandsQuery, mcpServers, availableSlashCommands)
 
 							if (allCommands.length === 0) {
 								return prevIndex
@@ -523,15 +504,7 @@ const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 
 					if ((event.key === "Enter" || event.key === "Tab") && selectedSlashCommandsIndex !== -1) {
 						event.preventDefault()
-						const commands = getMatchingSlashCommands(
-							slashCommandsQuery,
-							localWorkflowToggles,
-							globalWorkflowToggles,
-							remoteWorkflowToggles,
-							remoteConfigSettings?.remoteGlobalWorkflows,
-							mcpServers,
-							availableSlashCommands,
-						)
+						const commands = getMatchingSlashCommands(slashCommandsQuery, mcpServers, availableSlashCommands)
 						if (commands.length > 0) {
 							handleSlashCommandsSelect(commands[selectedSlashCommandsIndex])
 						}
@@ -983,15 +956,7 @@ const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 
 				// Extract just the command name (without the slash)
 				const commandName = command.substring(1)
-				const isValidCommand = validateSlashCommand(
-					commandName,
-					localWorkflowToggles,
-					globalWorkflowToggles,
-					remoteWorkflowToggles,
-					remoteConfigSettings?.remoteGlobalWorkflows,
-					mcpServers,
-					availableSlashCommands,
-				)
+				const isValidCommand = validateSlashCommand(commandName, mcpServers, availableSlashCommands)
 
 				if (isValidCommand) {
 					hasHighlightedSlashCommand = true
@@ -1004,14 +969,7 @@ const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 			highlightLayerRef.current.innerHTML = processedText
 			highlightLayerRef.current.scrollTop = textAreaRef.current.scrollTop
 			highlightLayerRef.current.scrollLeft = textAreaRef.current.scrollLeft
-		}, [
-			availableSlashCommands,
-			localWorkflowToggles,
-			globalWorkflowToggles,
-			remoteWorkflowToggles,
-			remoteConfigSettings,
-			mcpServers,
-		])
+		}, [availableSlashCommands, mcpServers])
 
 		useLayoutEffect(() => {
 			updateHighlights()
@@ -1400,14 +1358,10 @@ const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 						<div ref={slashCommandsMenuContainerRef}>
 							<SlashCommandMenu
 								availableCommands={availableSlashCommands}
-								globalWorkflowToggles={globalWorkflowToggles}
-								localWorkflowToggles={localWorkflowToggles}
 								mcpServers={mcpServers}
 								onMouseDown={handleMenuMouseDown}
 								onSelect={handleSlashCommandsSelect}
 								query={slashCommandsQuery}
-								remoteWorkflows={remoteConfigSettings?.remoteGlobalWorkflows}
-								remoteWorkflowToggles={remoteWorkflowToggles}
 								selectedIndex={selectedSlashCommandsIndex}
 								setSelectedIndex={setSelectedSlashCommandsIndex}
 							/>

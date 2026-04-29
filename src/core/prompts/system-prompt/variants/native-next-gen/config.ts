@@ -46,7 +46,6 @@ export const config = createVariant(ModelFamily.NATIVE_NEXT_GEN)
 	)
 	.tools(
 		ClineDefaultTool.ASK,
-		ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST,
 		ClineDefaultTool.BASH,
 		ClineDefaultTool.FILE_READ,
 		ClineDefaultTool.FILE_NEW,
@@ -65,13 +64,6 @@ export const config = createVariant(ModelFamily.NATIVE_NEXT_GEN)
 		ClineDefaultTool.TODO,
 		ClineDefaultTool.GENERATE_EXPLANATION,
 		ClineDefaultTool.USE_SKILL,
-		ClineDefaultTool.COMPLETE_WORKFLOW_ITEM,
-		ClineDefaultTool.SET_WORKFLOW_VALUES,
-		ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT,
-		ClineDefaultTool.STORY_TASK_REMINDER,
-		ClineDefaultTool.STORY_TASK_COMPLETE,
-		ClineDefaultTool.STORY_NOTES_UPDATE,
-		ClineDefaultTool.STORY_TESTING_COMPLETE,
 		ClineDefaultTool.USE_SUBAGENTS,
 	)
 	.placeholders({

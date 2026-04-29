@@ -1,7 +1,4 @@
-import type { WorkflowFormSessionState } from "@/core/task/workflow-form/types"
 import type { PersistedWorkflowSession, WorkflowName } from "@/core/task/workflow-runtime/types"
-import type { WorkflowStartCardSessionState } from "@/core/task/workflow-start-card/types"
-import type { WorkflowStepResolutionSessionState } from "@/core/task/workflow-step-resolution/types"
 
 // Type definitions for FileContextTracker
 export interface FileMetadataEntry {
@@ -39,9 +36,4 @@ export interface TaskMetadata {
 	activeStoryTaskId?: string
 	activeStorySubtaskIds?: string[]
 	lastPromptedStoryTaskKey?: string
-	activeWorkflowStartCardSession?: WorkflowStartCardSessionState
-	activeWorkflowFormSession?: WorkflowFormSessionState
-	activeWorkflowStepResolutionSession?: WorkflowStepResolutionSessionState
-	suppressedWorkflowStepResolutionDefinitionIds?: string[]
-	suppressedWorkflowFormResolverIds?: string[]
 }

@@ -48,7 +48,6 @@ export const config = createVariant(ModelFamily.TRINITY)
 		ClineDefaultTool.MCP_USE,
 		ClineDefaultTool.MCP_ACCESS,
 		ClineDefaultTool.ASK,
-		ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST,
 		ClineDefaultTool.ATTEMPT,
 		ClineDefaultTool.SEND_USER_MESSAGE,
 		ClineDefaultTool.PLAN_MODE,
@@ -56,13 +55,6 @@ export const config = createVariant(ModelFamily.TRINITY)
 		ClineDefaultTool.TODO,
 		ClineDefaultTool.GENERATE_EXPLANATION,
 		ClineDefaultTool.USE_SKILL,
-		ClineDefaultTool.COMPLETE_WORKFLOW_ITEM,
-		ClineDefaultTool.SET_WORKFLOW_VALUES,
-		ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT,
-		ClineDefaultTool.STORY_TASK_REMINDER,
-		ClineDefaultTool.STORY_TASK_COMPLETE,
-		ClineDefaultTool.STORY_NOTES_UPDATE,
-		ClineDefaultTool.STORY_TESTING_COMPLETE,
 		ClineDefaultTool.USE_SUBAGENTS,
 	)
 	.placeholders({

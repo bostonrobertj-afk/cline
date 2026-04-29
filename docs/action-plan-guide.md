@@ -90,6 +90,8 @@ Include this exact frontmatter at the top of every action plan document:
    - Ensure that your changes do not leave behind obsolete code/imports, commented-out experiments, dead branches, or outdated patterns related to prior failed attempts.
    - Consider related/downstream modules that may now contain redundant or inconsistent code as a result of your change.
    - De-crufting should be treated as part of the fix: either perform it in your changes, or clearly specify what should be removed/refactored and where.
+- When deleting or retiring a domain concept, delete its named gates, helper methods, variables, and tests rather than repointing them at another surviving concept.
+
 
 7. Practice Good Code Hygiene by avoiding common bad habits:
     - "any" typing
@@ -108,8 +110,14 @@ Include this exact frontmatter at the top of every action plan document:
     - not using generics to abstract duplicated code
     - not using type narrowing
     - not explicitly defining generics parameters
+    - semantic aliasing, where a variable/function/type with an old domain meaning is reassigned to a new generic or unrelated concept instead of being deleted
+    - stale domain naming after behavior migration; names must describe the current approved responsibility, not the historical source of the code
+    - compatibility remaps that preserve retired concepts by pointing them at surviving generic behavior unless the upstream requirements explicitly approve that remap
+    - boolean aliases whose name does not exactly match the condition they represent; use the existing boolean directly or introduce a correctly named concept only if the architecture requires it
+    - retaining obsolete gates/seams/flags after their original behavior is removed
+
 8. Do not introduce architecture in the action plan that is not prescribed in an upstream document.
-    - If there is an architecture or requirements document, the action plan must not introduce additional architecture beyond the scope of what those documents prescribe. 
+    - If there is an architecture or requirements document, the action plan must not introduce additional architecture beyond the scope of what those documents prescribe. There is no such thing as inferred architecture. If something is not explicitly prescribed, it is not prescribed at all.
     - If you determine that additional or different architecture is necessary while authoring the action plan, you must stop and inform the user so that the appropriate revisions can be made to upstream documents first.
 
 If at any point you cannot satisfy one or more of these rules (for example, due to missing context or constraints in the existing architecture), you MUST:

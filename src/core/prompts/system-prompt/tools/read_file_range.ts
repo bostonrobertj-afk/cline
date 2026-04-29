@@ -1,7 +1,6 @@
 import { ModelFamily } from "@/shared/prompts"
 import { ClineDefaultTool } from "@/shared/tools"
 import type { ClineToolSpec } from "../spec"
-import { TASK_PROGRESS_PARAMETER } from "../types"
 
 const id = ClineDefaultTool.FILE_READ_RANGE
 
@@ -29,7 +28,6 @@ const parameters: ClineToolSpec["parameters"] = [
 		instruction: "The last line to include, using 1-based line numbers. Must be greater than or equal to start_line.",
 		usage: "40",
 	},
-	TASK_PROGRESS_PARAMETER,
 ]
 
 const generic: ClineToolSpec = {

@@ -2,9 +2,12 @@ import { strict as assert } from "node:assert"
 import * as api from "@core/api"
 import { PromptRegistry } from "@core/prompts/system-prompt"
 import { ClineToolSet } from "@core/prompts/system-prompt/registry/ClineToolSet"
+import type { ClineToolSpec } from "@core/prompts/system-prompt/spec"
+import type { PromptVariant, SystemPromptContext } from "@core/prompts/system-prompt/types"
 import type { TaskConfig } from "@core/task/tools/types/TaskConfig"
 import { afterEach, describe, it } from "mocha"
 import sinon from "sinon"
+import { ModelFamily } from "@/shared/prompts"
 import { ClineDefaultTool } from "@/shared/tools"
 import { AgentConfigLoader } from "../AgentConfigLoader"
 import { SUBAGENT_DEFAULT_ALLOWED_TOOLS, SUBAGENT_SYSTEM_SUFFIX, SubagentBuilder } from "../SubagentBuilder"
@@ -174,6 +177,78 @@ describe("SubagentBuilder", () => {
 		assert.equal(getToolsStub.callCount, 1)
 		assert.equal(getConverterStub.callCount, 1)
 		assert.deepEqual(result, [{ converted: ClineDefaultTool.LIST_FILES }])
+	})
+
+	it("uses workflow tool schema override without subagent allowed-tool filtering", () => {
+		sinon.stub(AgentConfigLoader, "getInstance").returns({
+			getCachedConfig: () => ({
+				name: "workflow-agent",
+				description: "workflow projection",
+				tools: [ClineDefaultTool.LIST_FILES],
+				systemPrompt: "workflow prompt",
+			}),
+		} as unknown as AgentConfigLoader)
+		sinon.stub(api, "buildApiHandler").returns({ getModel: sinon.stub(), createMessage: sinon.stub() } as never)
+		const promptRegistry = PromptRegistry.getInstance()
+		sinon.stub(promptRegistry, "getModelFamily").returns(ModelFamily.GENERIC)
+		const variant: PromptVariant = {
+			id: "generic",
+			version: 1,
+			tags: [],
+			labels: { use_native_tools: 1 },
+			family: ModelFamily.GENERIC,
+			description: "test native variant",
+			matcher: () => true,
+			config: {},
+			baseTemplate: "",
+			componentOrder: [],
+			componentOverrides: {},
+			placeholders: {},
+			tools: [],
+		}
+		sinon.stub(promptRegistry, "getVariant").returns(variant)
+		const getToolsStub = sinon.stub(ClineToolSet, "getToolsForVariantWithFallback")
+		const workflowTool: ClineToolSpec = {
+			variant: ModelFamily.GENERIC,
+			id: ClineDefaultTool.FILE_NEW,
+			name: ClineDefaultTool.FILE_NEW,
+			description: "Write a workflow-projected file.",
+			parameters: [
+				{
+					name: "path",
+					required: true,
+					instruction: "Destination path.",
+				},
+			],
+		}
+		const context: SystemPromptContext = {
+			ide: "VS Code",
+			enableNativeToolCalls: true,
+			providerInfo: {
+				providerId: "openai",
+				mode: "act",
+				model: {
+					id: "workflow-native-model",
+					info: { supportsPromptCache: false },
+				},
+			},
+			workflowToolSchemaOverride: [workflowTool],
+		}
+
+		const builder = new SubagentBuilder(createTaskConfig("act", "openai"), "workflow-agent")
+		const result = builder.buildNativeTools(context)
+		const toolNames = (result ?? []).flatMap((tool) => {
+			if ("function" in tool && typeof tool.function?.name === "string") {
+				return [tool.function.name]
+			}
+			if ("name" in tool && typeof tool.name === "string") {
+				return [tool.name]
+			}
+			return []
+		})
+
+		assert.deepEqual(toolNames, [ClineDefaultTool.FILE_NEW])
+		assert.equal(getToolsStub.callCount, 0)
 	})
 
 	it("suppresses MCP native tools when subagent MCP auto-approval is disabled", () => {

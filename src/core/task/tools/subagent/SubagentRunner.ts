@@ -6,7 +6,6 @@ import { discoverSkills, getAvailableSkills } from "@core/context/instructions/u
 import { formatResponse } from "@core/prompts/responses"
 import { PromptRegistry } from "@core/prompts/system-prompt"
 import type { SystemPromptContext } from "@core/prompts/system-prompt/types"
-import { FocusChainManager } from "@core/task/focus-chain"
 import {
 	getNextTurnsSinceFullPromptRefresh,
 	normalizePromptRefreshFrequency,
@@ -19,11 +18,10 @@ import type { ClineMessageModelInfo } from "@shared/messages/metrics"
 import { Logger } from "@shared/services/Logger"
 import type { SkillMetadata } from "@shared/skills"
 import { ClineDefaultTool, ClineTool } from "@shared/tools"
-import { ulid } from "ulid"
 import { ContextManager } from "@/core/context/context-management/ContextManager"
 import { checkContextWindowExceededError } from "@/core/context/context-management/context-error-handling"
 import { getContextWindowInfo } from "@/core/context/context-management/context-window-utils"
-import { getWorkflowSkillMetadata, resolveWorkflowByUseSkillName } from "@/core/task/workflow-runtime/WorkflowRegistry"
+import { resolveWorkflowByUseSkillName } from "@/core/task/workflow-runtime/WorkflowRegistry"
 import { HostRegistryInfo } from "@/registry"
 import { ClineError, ClineErrorType } from "@/services/error"
 import { ApiFormat } from "@/shared/proto/cline/models"
@@ -243,9 +241,7 @@ function buildAssignedSkillDirective(assignedSkillNames: string[]): string {
 This subagent has been assigned the following workflow skill${assignedSkillNames.length === 1 ? "" : "s"}:
 ${skillList}
 
-Before you read project files, search the repo, or analyze code, call \`use_skill\` with the exact assigned skill name.
-Do not substitute a different skill.
-Do not manually search for workflow files unless \`use_skill\` fails.
+Use only the assigned workflow skill named above.
 Once the assigned workflow is active, follow its injected instructions instead of the default research-subagent behavior.`
 }
 
@@ -301,9 +297,6 @@ export class SubagentRunner {
 	private abortRequested = false
 	private activeCommandExecutions = 0
 	private abortingCommands = false
-	private subagentFocusChainStorageKey?: string
-	private subagentFocusChainManager?: FocusChainManager
-	private subagentFocusChainState?: TaskState
 
 	constructor(
 		private baseConfig: TaskConfig,
@@ -339,37 +332,13 @@ export class SubagentRunner {
 		return this.abortRequested || this.baseConfig.taskState.abort
 	}
 
-	private ensureSubagentFocusChainStorageKey(): string {
-		if (!this.subagentFocusChainStorageKey) {
-			this.subagentFocusChainStorageKey = `subagent-${ulid()}`
+	private buildAllowedToolNamesForTurn(context: SystemPromptContext): Set<ClineDefaultTool> {
+		const allowedToolNames = new Set<ClineDefaultTool>(this.allowedTools)
+		for (const toolSpec of context.workflowToolSchemaOverride ?? []) {
+			allowedToolNames.add(toolSpec.id)
 		}
-
-		return this.subagentFocusChainStorageKey
-	}
-
-	private getOrCreateSubagentFocusChainManager(state: TaskState): FocusChainManager {
-		if (!this.subagentFocusChainManager || this.subagentFocusChainState !== state) {
-			const storageKey = this.ensureSubagentFocusChainStorageKey()
-			this.subagentFocusChainManager = new FocusChainManager({
-				taskId: this.baseConfig.taskId,
-				focusChainStorageTaskId: this.baseConfig.taskId,
-				focusChainStorageIdentity: {
-					key: storageKey,
-					scope: "subagent",
-				},
-				focusChainDocumentLabel: `Subagent ${storageKey}`,
-				cwd: this.baseConfig.cwd,
-				taskState: state,
-				mode: this.baseConfig.mode,
-				stateManager: this.baseConfig.services.stateManager,
-				postStateToWebview: async () => undefined,
-				say: async () => undefined,
-				focusChainSettings: this.baseConfig.focusChainSettings,
-			})
-			this.subagentFocusChainState = state
-		}
-
-		return this.subagentFocusChainManager
+		allowedToolNames.delete(ClineDefaultTool.USE_SKILL)
+		return allowedToolNames
 	}
 
 	private async getWorkspaceMetadataEnvironmentBlock(): Promise<string | null> {
@@ -397,11 +366,7 @@ export class SubagentRunner {
 
 	async run(prompt: string, onProgress: (update: SubagentProgressUpdate) => void): Promise<SubagentRunResult> {
 		this.abortRequested = false
-		this.subagentFocusChainStorageKey = undefined
-		this.subagentFocusChainManager = undefined
-		this.subagentFocusChainState = undefined
 		const state = new TaskState()
-		this.getOrCreateSubagentFocusChainManager(state)
 		let emptyAssistantResponseRetries = 0
 		const contextState: SubagentContextState = {}
 		const contextManager = new ContextManager()
@@ -450,7 +415,7 @@ export class SubagentRunner {
 
 			const host = HostRegistryInfo.get()
 			const discoveredSkills = await discoverSkills(this.baseConfig.cwd)
-			const availableSkills = this.mergePromptSkillEntries(getAvailableSkills(discoveredSkills), getWorkflowSkillMetadata())
+			const availableSkills = getAvailableSkills(discoveredSkills)
 			const configuredSkillNames = this.agent.getConfiguredSkills()
 			const assignedSkillNames = extractAssignedSkillNames(prompt)
 			await this.autoActivateAssignedWorkflow(state, assignedSkillNames)
@@ -514,12 +479,13 @@ export class SubagentRunner {
 					shouldSendFullPromptAssembly,
 					shouldUseContinuationPrompt,
 				})
-				const candidateNativeTools = this.agent.buildNativeTools(context)
-				const visibleNativeToolNames = getVisibleNativeToolNames(candidateNativeTools)
+				const allowedToolNamesForTurn = this.buildAllowedToolNamesForTurn(context)
+				const projectedNativeTools = this.agent.buildNativeTools(context)
+				const visibleNativeToolNames = getVisibleNativeToolNames(projectedNativeTools)
 				const promptContext = { ...context, visibleNativeToolNames }
 				const generatedSystemPrompt = await promptRegistry.get(promptContext)
 				const useNativeToolCalls = !!promptRegistry.nativeTools?.length
-				const nativeTools = useNativeToolCalls ? candidateNativeTools : undefined
+				const nativeTools = useNativeToolCalls ? promptRegistry.nativeTools : undefined
 				const baseSystemPrompt = this.agent.buildSystemPrompt(generatedSystemPrompt, promptContext)
 				const systemPrompt =
 					assignedSkillNames.length > 0 && !state.activeWorkflowName
@@ -775,7 +741,7 @@ export class SubagentRunner {
 						return { status: "completed", result: completionResult, stats }
 					}
 
-					if (!this.allowedTools.includes(toolName)) {
+					if (!allowedToolNamesForTurn.has(toolName)) {
 						const deniedResult = formatResponse.toolError(`Tool '${toolName}' is not available inside subagent runs.`)
 						pushSubagentToolResultBlock(toolResultBlocks, call, toolName, deniedResult)
 						continue
@@ -836,7 +802,6 @@ export class SubagentRunner {
 		const baseCallbacks = this.baseConfig.callbacks
 		const coordinator = new ToolExecutorCoordinator()
 		const validator = new ToolValidator(this.baseConfig.services.clineIgnoreController)
-		const focusChainManager = this.getOrCreateSubagentFocusChainManager(state)
 
 		for (const tool of this.allowedTools) {
 			coordinator.registerByName(tool, validator)
@@ -854,8 +819,7 @@ export class SubagentRunner {
 				...baseCallbacks,
 				say: async () => undefined,
 				ask: async () => ({ response: "yesButtonClicked" as const }),
-				updateFCListFromToolResponse: async (taskProgress: string | undefined) =>
-					focusChainManager.updateFCListFromToolResponse(taskProgress),
+				updateFCListFromToolResponse: async () => ({ accepted: true }),
 				sayAndCreateMissingParamError: async (_toolName, paramName) =>
 					formatResponse.toolError(formatResponse.missingToolParameterError(paramName)),
 				removeLastPartialMessageIfExistsWithType: async () => undefined,
@@ -899,9 +863,13 @@ export class SubagentRunner {
 			skills,
 			activeWorkflowName: params.state.activeWorkflowName,
 			activeWorkflowStepNumber: params.state.activeWorkflowSession?.activeStepNumber,
-			workflowSystemInstructionsBlock: workflowPromptProjection.workflowSystemInstructionsBlock,
-			workflowInputInstructionsBlock: workflowPromptProjection.workflowInputInstructionsBlock,
+			fullTurnWorkflowSystemInstructionsBlock: workflowPromptProjection.fullTurnWorkflowSystemInstructionsBlock,
+			fullTurnWorkflowInputInstructionsBlock: workflowPromptProjection.fullTurnWorkflowInputInstructionsBlock,
 			workflowToolSchemaOverride: workflowPromptProjection.workflowToolSchemaOverride,
+			continuationTurnWorkflowSystemInstructionsBlock:
+				workflowPromptProjection.continuationTurnWorkflowSystemInstructionsBlock,
+			continuationTurnWorkflowInputInstructionsBlock:
+				workflowPromptProjection.continuationTurnWorkflowInputInstructionsBlock,
 			isContinuationTurn: params.shouldUseContinuationPrompt,
 			focusChainSettings: this.baseConfig.focusChainSettings,
 			browserSettings: this.baseConfig.browserSettings,
@@ -943,48 +911,28 @@ export class SubagentRunner {
 			return
 		}
 
-		await this.baseConfig.workflowRuntime.activateWorkflow({
+		const previousActiveWorkflowName = state.activeWorkflowName
+		state.activeWorkflowName = resolvedWorkflow.name
+		const nextAction = await this.baseConfig.workflowRuntime.activateWorkflow({
 			taskState: state,
-			workflow: resolvedWorkflow,
+			workflowName: resolvedWorkflow.name,
 			parentSession: this.baseConfig.taskState.activeWorkflowSession
 				? structuredClone(this.baseConfig.taskState.activeWorkflowSession)
 				: undefined,
 		})
+		if (nextAction.kind === "no_op") {
+			state.activeWorkflowName = previousActiveWorkflowName
+		}
 	}
 
 	private async buildSubagentPromptInjectionBlocks(
 		state: TaskState,
 		shouldSendFullPromptAssembly: boolean,
 	): Promise<ClineTextContentBlock[]> {
-		const additions: ClineTextContentBlock[] = []
+		void state
+		void shouldSendFullPromptAssembly
 
-		const focusChainManager = this.getOrCreateSubagentFocusChainManager(state)
-		if (focusChainManager.shouldIncludeFocusChainInstructions()) {
-			const focusChainInstructions = await focusChainManager.generateFocusChainInstructions()
-			if (focusChainInstructions.trim()) {
-				additions.push(toTextContentBlock(focusChainInstructions))
-				state.apiRequestsSinceLastTodoUpdate = 0
-				state.todoListWasUpdatedByUser = false
-			}
-		}
-
-		return additions
-	}
-
-	private mergePromptSkillEntries(skills: SkillMetadata[], workflows: SkillMetadata[]): SkillMetadata[] {
-		const merged = new Map<string, SkillMetadata>()
-
-		for (const skill of skills) {
-			merged.set(skill.name, skill)
-		}
-
-		for (const workflow of workflows) {
-			if (!merged.has(workflow.name)) {
-				merged.set(workflow.name, workflow)
-			}
-		}
-
-		return [...merged.values()]
+		return []
 	}
 
 	private resolvePromptSkills(

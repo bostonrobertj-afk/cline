@@ -6,8 +6,6 @@ import { apply_patch_variants } from "./apply_patch"
 import { ask_followup_question_variants } from "./ask_followup_question"
 import { attempt_completion_variants } from "./attempt_completion"
 import { browser_action_variants } from "./browser_action"
-import { build_workflow_document_variants } from "./build_workflow_document"
-import { complete_workflow_item_variants } from "./complete_workflow_item"
 import { execute_command_variants } from "./execute_command"
 import { focus_chain_variants } from "./focus_chain"
 import { generate_explanation_variants } from "./generate_explanation"
@@ -21,17 +19,11 @@ import { read_file_range_variants } from "./read_file_range"
 import { replace_in_file_variants } from "./replace_in_file"
 import { search_files_variants } from "./search_files"
 import { send_user_message_variants } from "./send_user_message"
-import { set_workflow_values_variants } from "./set_workflow_values"
-import { story_notes_update_variants } from "./story_notes_update"
-import { story_task_complete_variants } from "./story_task_complete"
-import { story_task_reminder_variants } from "./story_task_reminder"
-import { story_testing_complete_variants } from "./story_testing_complete"
 import { subagent_variants } from "./subagent"
 import { use_mcp_tool_variants } from "./use_mcp_tool"
 import { use_skill_variants } from "./use_skill"
 import { web_fetch_variants } from "./web_fetch"
 import { web_search_variants } from "./web_search"
-import { workflow_progress_request_variants } from "./workflow_progress_request"
 import { write_to_file_variants } from "./write_to_file"
 
 /**
@@ -47,8 +39,6 @@ export function registerClineToolSets(): void {
 		...ask_followup_question_variants,
 		...attempt_completion_variants,
 		...browser_action_variants,
-		...build_workflow_document_variants,
-		...complete_workflow_item_variants,
 		...execute_command_variants,
 		...focus_chain_variants,
 		...generate_explanation_variants,
@@ -62,12 +52,6 @@ export function registerClineToolSets(): void {
 		...replace_in_file_variants,
 		...search_files_variants,
 		...send_user_message_variants,
-		...workflow_progress_request_variants,
-		...set_workflow_values_variants,
-		...story_notes_update_variants,
-		...story_task_complete_variants,
-		...story_task_reminder_variants,
-		...story_testing_complete_variants,
 		...subagent_variants,
 		...use_mcp_tool_variants,
 		...use_skill_variants,

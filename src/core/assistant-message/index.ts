@@ -46,7 +46,6 @@ export const toolParamNames = [
 	"api_request_output",
 	"additional_context",
 	"needs_more_exploration",
-	"task_progress",
 	"output_file",
 	"selected_approach",
 	"technique_name",

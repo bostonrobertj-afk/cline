@@ -580,20 +580,20 @@ describe("OpenAiNativeHandler", () => {
 					type: "function_call",
 					id: "fc_test_123",
 					call_id: "call_test_123",
-					name: "complete_workflow_item",
+					name: "read_file",
 					arguments: "",
 				},
 			},
 			{
 				type: "response.function_call_arguments.delta",
 				item_id: "fc_test_123",
-				delta: '{"item_id":"step-1"}',
+				delta: '{"path":"README.md"}',
 			},
 			{
 				type: "response.function_call_arguments.done",
 				item_id: "fc_test_123",
-				name: "complete_workflow_item",
-				arguments: '{"item_id":"step-1"}',
+				name: "read_file",
+				arguments: '{"path":"README.md"}',
 			},
 			{
 				type: "response.output_item.done",
@@ -601,8 +601,8 @@ describe("OpenAiNativeHandler", () => {
 					type: "function_call",
 					id: "fc_test_123",
 					call_id: "call_test_123",
-					name: "complete_workflow_item",
-					arguments: '{"item_id":"step-1"}',
+					name: "read_file",
+					arguments: '{"path":"README.md"}',
 				},
 			},
 		] as any[])
@@ -616,7 +616,7 @@ describe("OpenAiNativeHandler", () => {
 
 		toolCallChunks.should.have.length(1)
 		toolCallChunks[0].tool_call.call_id.should.equal("call_test_123")
-		toolCallChunks[0].tool_call.function.name.should.equal("complete_workflow_item")
-		toolCallChunks[0].tool_call.function.arguments.should.equal('{"item_id":"step-1"}')
+		toolCallChunks[0].tool_call.function.name.should.equal("read_file")
+		toolCallChunks[0].tool_call.function.arguments.should.equal('{"path":"README.md"}')
 	})
 })

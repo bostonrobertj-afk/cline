@@ -35,6 +35,11 @@ export class UseSkillToolHandler implements IToolHandler, IPartialBlockHandler {
 			return `Error: Missing required parameter 'skill_name'. Please provide the name of the skill to activate.`
 		}
 
+		if (config.isSubagentExecution === true) {
+			config.taskState.consecutiveMistakeCount++
+			return "Error: use_skill is not available inside subagent runs."
+		}
+
 		const resolvedWorkflow = resolveWorkflowByUseSkillName(skillName)
 		const resolvedSkillName = resolvedWorkflow?.useSkillName ?? skillName
 
@@ -49,11 +54,14 @@ export class UseSkillToolHandler implements IToolHandler, IPartialBlockHandler {
 		}
 
 		if (resolvedWorkflow) {
+			const previousActiveWorkflowName = config.taskState.activeWorkflowName
+			config.taskState.activeWorkflowName = resolvedWorkflow.name
 			const nextAction = await config.workflowRuntime.activateWorkflow({
 				taskState: config.taskState,
-				workflow: resolvedWorkflow,
+				workflowName: resolvedWorkflow.name,
 			})
 			if (nextAction.kind === "no_op") {
+				config.taskState.activeWorkflowName = previousActiveWorkflowName
 				return `Error: Workflow "${skillName}" could not be activated.`
 			}
 

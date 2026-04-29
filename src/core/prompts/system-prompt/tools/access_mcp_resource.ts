@@ -2,7 +2,6 @@ import { ModelFamily } from "@/shared/prompts"
 import { ClineDefaultTool } from "@/shared/tools"
 import { hasConnectedMcpResources } from "../components/mcp"
 import type { ClineToolSpec } from "../spec"
-import { TASK_PROGRESS_PARAMETER } from "../types"
 
 /**
  * ## access_mcp_resource
@@ -10,14 +9,10 @@ Description: Request to access a resource provided by a connected MCP server. Re
 Parameters:
 - server_name: (required) The name of the MCP server providing the resource
 - uri: (required) The URI identifying the specific resource to access
-- task_progress: (optional) A checklist showing task progress after this tool use is completed. (See 'Updating Task Progress' section for more details)
 Usage:
 <access_mcp_resource>
 <server_name>server name here</server_name>
 <uri>resource URI here</uri>
-<task_progress>
-Checklist here (optional)
-</task_progress>
 </access_mcp_resource>
  */
 
@@ -41,7 +36,6 @@ const generic: ClineToolSpec = {
 			instruction: "The URI identifying the specific resource to access",
 			usage: "resource URI here",
 		},
-		TASK_PROGRESS_PARAMETER,
 	],
 }
 
@@ -65,7 +59,6 @@ const NATIVE_GPT_5: ClineToolSpec = {
 			instruction: "The URI identifying the specific resource to access",
 			usage: "resource URI here",
 		},
-		TASK_PROGRESS_PARAMETER,
 	],
 }
 

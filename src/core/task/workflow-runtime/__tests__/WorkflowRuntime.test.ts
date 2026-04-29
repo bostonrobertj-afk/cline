@@ -1,27 +1,51 @@
 import type { WorkflowFormDefinitionPayload, WorkflowFormPanelDefinition } from "@shared/ExtensionMessage"
-import {
-	WorkflowFormAction,
-	WorkflowFormSubmissionRequest,
-	WorkflowStartCardAction,
-	type WorkflowStartCardProjectMode,
-	type WorkflowStartCardSubmissionRequest,
-} from "@shared/proto/cline/task"
+import { WorkflowFormAction, WorkflowFormSubmissionRequest } from "@shared/proto/cline/task"
 import { expect } from "chai"
-import { access, mkdtemp, rm } from "fs/promises"
+import { access, mkdtemp, readFile, rm, writeFile } from "fs/promises"
 import { afterEach, beforeEach, describe, it } from "mocha"
 import { tmpdir } from "os"
 import { join } from "path"
 import * as sinon from "sinon"
+import { formatResponse } from "@/core/prompts/responses"
 import type { ClineToolSpec } from "@/core/prompts/system-prompt/spec"
 import { TaskState } from "@/core/task/TaskState"
-import type { WorkflowStepResolutionDefinition } from "@/core/task/workflow-step-resolution/types"
+import type { WorkflowToolBackedOperationDefinition } from "@/core/task/workflow-step-resolution/types"
+import { ModelFamily } from "@/shared/prompts"
 import { ClineDefaultTool } from "@/shared/tools"
+import { WorkflowArtifactFamily } from "../artifactFamilies"
 import * as WorkflowDiscovery from "../discovery"
-import type { ActiveWorkflowSession, WorkflowDefinition, WorkflowStepDefinition, WorkflowValues } from "../types"
+import type {
+	ActiveWorkflowSession,
+	WorkflowDecisionAction,
+	WorkflowDecisionTree,
+	WorkflowDefinition,
+	WorkflowDiscoveryRequest,
+	WorkflowEntryProjectValueKeys,
+	WorkflowNextAction,
+	WorkflowStepDefinition,
+	WorkflowValues,
+} from "../types"
 import * as WorkflowRegistry from "../WorkflowRegistry"
 import { WorkflowRuntime } from "../WorkflowRuntime"
 
 describe("WorkflowRuntime", () => {
+	const LEGACY_WORKFLOW_MIRROR_KEYS = [
+		"activeWorkflowFormSession",
+		"activeWorkflowStepResolutionSession",
+		"suppressedWorkflowFormResolverIds",
+		"suppressedWorkflowStepResolutionDefinitionIds",
+	] as const
+	const ENTRY_INFO_PANEL_ID = "__workflow_runtime_entry_info__"
+	const ENTRY_PROJECT_SELECTION_PANEL_ID = "__workflow_runtime_entry_project_selection__"
+	const ENTRY_PROJECT_MODE_FIELD_KEY = "__workflow_runtime_project_mode__"
+	const ENTRY_EXISTING_PROJECT_FIELD_KEY = "__workflow_runtime_existing_project__"
+	const ENTRY_NEW_PROJECT_TITLE_FIELD_KEY = "__workflow_runtime_new_project_title__"
+	const DEFAULT_ENTRY_PROJECT_VALUE_KEYS: WorkflowEntryProjectValueKeys = {
+		projectMode: "entry_project_mode",
+		projectTitle: "entry_project_title",
+		projectFolderName: "entry_project_folder_name",
+	}
+
 	let sandbox: sinon.SinonSandbox
 	let cwd: string
 	let runtime: WorkflowRuntime
@@ -43,72 +67,416 @@ describe("WorkflowRuntime", () => {
 		await rm(cwd, { recursive: true, force: true })
 	})
 
+	function createPromptSource() {
+		return {
+			workflowSystemInstructions: "system",
+			currentStepInstructions: "input",
+		}
+	}
+
+	function createProjectPromptDecisionTree(args?: {
+		entryBranchId?: string
+		followingBranchId?: string
+		targetStepNumber?: number
+	}): WorkflowDecisionTree {
+		const entryBranchId = args?.entryBranchId ?? "project-prompt"
+		const followingBranchId = args?.followingBranchId
+
+		return {
+			entryBranchId,
+			branches: {
+				[entryBranchId]: {
+					id: entryBranchId,
+					routes: [
+						{
+							id: `${entryBranchId}-route`,
+							trigger: { kind: "always" },
+							action: { kind: "project_prompt" },
+							followingBranchId,
+							targetStepNumber: args?.targetStepNumber,
+						},
+					],
+				},
+				...(followingBranchId
+					? {
+							[followingBranchId]: {
+								id: followingBranchId,
+								routes: [
+									{
+										id: `${followingBranchId}-route`,
+										trigger: { kind: "always" },
+										action: { kind: "project_prompt" },
+									},
+								],
+							},
+						}
+					: {}),
+			},
+		}
+	}
+
+	function createWorkflowFormDecisionTree(args: {
+		workflowFormId: string
+		completionAction?: WorkflowDecisionAction
+		completionTargetStepNumber?: number
+	}): WorkflowDecisionTree {
+		const completionBranchId = "after-form-complete"
+
+		return {
+			entryBranchId: "show-form",
+			branches: {
+				"show-form": {
+					id: "show-form",
+					routes: [
+						{
+							id: "render-form",
+							trigger: { kind: "always" },
+							action: {
+								kind: "render_workflow_form",
+								workflowFormId: args.workflowFormId,
+							},
+							followingBranchId: "await-form-completion",
+						},
+					],
+				},
+				"await-form-completion": {
+					id: "await-form-completion",
+					routes: [
+						{
+							id: "form-completed-event",
+							trigger: {
+								kind: "event_predicate",
+								matches: ({ triggerEvent }) =>
+									triggerEvent.kind === "workflow_form_completed" &&
+									triggerEvent.workflowFormId === args.workflowFormId,
+							},
+							action: args.completionAction ?? { kind: "project_prompt" },
+							targetStepNumber: args.completionTargetStepNumber,
+							followingBranchId: args.completionTargetStepNumber === undefined ? completionBranchId : undefined,
+						},
+						{
+							id: "form-completed-session",
+							trigger: {
+								kind: "session_predicate",
+								matches: ({ session }) => session.ui.suppressedWorkflowFormIds.includes(args.workflowFormId),
+							},
+							action: args.completionAction ?? { kind: "project_prompt" },
+							targetStepNumber: args.completionTargetStepNumber,
+							followingBranchId: args.completionTargetStepNumber === undefined ? completionBranchId : undefined,
+						},
+					],
+				},
+				...(args.completionTargetStepNumber === undefined
+					? {
+							[completionBranchId]: {
+								id: completionBranchId,
+								routes: [
+									{
+										id: "after-form-project-prompt",
+										trigger: { kind: "always" },
+										action: { kind: "project_prompt" },
+									},
+								],
+							},
+						}
+					: {}),
+			},
+		}
+	}
+
+	function createToolBackedOperationDecisionTree(args: {
+		toolBackedOperationId: string
+		startAction?: WorkflowDecisionAction
+		successAction?: WorkflowDecisionAction
+		successTargetStepNumber?: number
+		failureAction?: WorkflowDecisionAction
+		failureTargetStepNumber?: number
+	}): WorkflowDecisionTree {
+		const successBranchId = "after-step-resolution-success"
+		const failureBranchId = "after-step-resolution-failure"
+
+		return {
+			entryBranchId: "run-step-resolution",
+			branches: {
+				"run-step-resolution": {
+					id: "run-step-resolution",
+					routes: [
+						{
+							id: "start-step-resolution",
+							trigger: { kind: "always" },
+							action: args.startAction ?? {
+								kind: "execute_tool_backed_operation",
+								toolBackedOperationId: args.toolBackedOperationId,
+							},
+							followingBranchId: "await-step-resolution",
+						},
+					],
+				},
+				"await-step-resolution": {
+					id: "await-step-resolution",
+					routes: [
+						{
+							id: "step-resolution-succeeded",
+							trigger: {
+								kind: "event_predicate",
+								matches: ({ triggerEvent }) =>
+									triggerEvent.kind === "tool_backed_operation_succeeded" &&
+									triggerEvent.toolBackedOperationId === args.toolBackedOperationId,
+							},
+							action: args.successAction ?? { kind: "project_prompt" },
+							targetStepNumber: args.successTargetStepNumber,
+							followingBranchId: args.successTargetStepNumber === undefined ? successBranchId : undefined,
+						},
+						{
+							id: "step-resolution-failed",
+							trigger: {
+								kind: "event_predicate",
+								matches: ({ triggerEvent }) =>
+									triggerEvent.kind === "tool_backed_operation_failed" &&
+									triggerEvent.toolBackedOperationId === args.toolBackedOperationId,
+							},
+							action: args.failureAction ?? { kind: "project_prompt" },
+							targetStepNumber: args.failureTargetStepNumber,
+							followingBranchId: args.failureTargetStepNumber === undefined ? failureBranchId : undefined,
+						},
+					],
+				},
+				...(args.successTargetStepNumber === undefined
+					? {
+							[successBranchId]: {
+								id: successBranchId,
+								routes: [
+									{
+										id: "after-step-resolution-success-route",
+										trigger: { kind: "always" },
+										action: { kind: "project_prompt" },
+									},
+								],
+							},
+						}
+					: {}),
+				...(args.failureTargetStepNumber === undefined
+					? {
+							[failureBranchId]: {
+								id: failureBranchId,
+								routes: [
+									{
+										id: "after-step-resolution-failure-route",
+										trigger: { kind: "always" },
+										action: { kind: "project_prompt" },
+									},
+								],
+							},
+						}
+					: {}),
+			},
+		}
+	}
+
+	function createWorkflowProgressDecisionTree(args?: {
+		approvedTargetStepNumber?: number
+		deniedFollowingBranchId?: string
+	}): WorkflowDecisionTree {
+		const deniedFollowingBranchId = args?.deniedFollowingBranchId ?? "progress-denied"
+
+		return {
+			entryBranchId: "project-prompt-entry",
+			branches: {
+				"project-prompt-entry": {
+					id: "project-prompt-entry",
+					routes: [
+						{
+							id: "show-project-prompt",
+							trigger: { kind: "always" },
+							action: { kind: "project_prompt" },
+							followingBranchId: "await-progress-decision",
+						},
+					],
+				},
+				"await-progress-decision": {
+					id: "await-progress-decision",
+					routes: [
+						{
+							id: "progress-approved",
+							trigger: { kind: "on_event", eventKind: "workflow_progress_request_confirmed" },
+							action: { kind: "project_prompt" },
+							targetStepNumber: args?.approvedTargetStepNumber,
+						},
+						{
+							id: "progress-denied",
+							trigger: { kind: "on_event", eventKind: "workflow_progress_request_denied" },
+							action: { kind: "project_prompt" },
+							followingBranchId: deniedFollowingBranchId,
+						},
+						{
+							id: "stay-on-step",
+							trigger: { kind: "always" },
+							action: { kind: "project_prompt" },
+						},
+					],
+				},
+				[deniedFollowingBranchId]: {
+					id: deniedFollowingBranchId,
+					routes: [
+						{
+							id: "progress-denied-blocked",
+							trigger: { kind: "session_predicate", matches: () => false },
+							action: { kind: "no_op" },
+						},
+					],
+				},
+			},
+		}
+	}
+
+	function createWorkflowValuesPersistedDecisionTree(args?: { action?: WorkflowDecisionAction }): WorkflowDecisionTree {
+		return {
+			entryBranchId: "project-prompt-entry",
+			branches: {
+				"project-prompt-entry": {
+					id: "project-prompt-entry",
+					routes: [
+						{
+							id: "show-project-prompt",
+							trigger: { kind: "always" },
+							action: { kind: "project_prompt" },
+							followingBranchId: "await-workflow-values",
+						},
+					],
+				},
+				"await-workflow-values": {
+					id: "await-workflow-values",
+					routes: [
+						{
+							id: "workflow-values-persisted",
+							trigger: { kind: "on_event", eventKind: "workflow_values_persisted" },
+							action: args?.action ?? { kind: "project_prompt" },
+						},
+					],
+				},
+			},
+		}
+	}
+
+	function createArtifactAllocationDecisionTree(artifactId: string): WorkflowDecisionTree {
+		return {
+			entryBranchId: "allocate-artifact",
+			branches: {
+				"allocate-artifact": {
+					id: "allocate-artifact",
+					routes: [
+						{
+							id: "allocate-artifact-route",
+							trigger: { kind: "always" },
+							action: {
+								kind: "allocate_artifact",
+								artifactId,
+							},
+							followingBranchId: "await-artifact-allocation",
+						},
+					],
+				},
+				"await-artifact-allocation": {
+					id: "await-artifact-allocation",
+					routes: [
+						{
+							id: "artifact-allocation-succeeded",
+							trigger: {
+								kind: "event_predicate",
+								matches: ({ triggerEvent }) =>
+									triggerEvent.kind === "tool_backed_operation_succeeded" &&
+									triggerEvent.toolBackedOperationId === artifactId,
+							},
+							action: { kind: "project_prompt" },
+						},
+						{
+							id: "artifact-allocation-failed",
+							trigger: {
+								kind: "event_predicate",
+								matches: ({ triggerEvent }) =>
+									triggerEvent.kind === "tool_backed_operation_failed" &&
+									triggerEvent.toolBackedOperationId === artifactId,
+							},
+							action: { kind: "terminal_error" },
+						},
+					],
+				},
+			},
+		}
+	}
+
+	function createStepDefinition(args: {
+		stepNumber: number
+		checklistLabel?: string
+		decisionTree?: WorkflowDecisionTree
+		completionRules?: WorkflowStepDefinition["completionRules"]
+		toolSchema?: readonly ClineToolSpec[]
+		documentBuilderIds?: string[]
+	}): WorkflowStepDefinition {
+		return {
+			id: `step-${args.stepNumber}` as WorkflowStepDefinition["id"],
+			stepNumber: args.stepNumber,
+			checklistLabel: args.checklistLabel ?? `Step ${args.stepNumber}`,
+			buildPromptSource: () => createPromptSource(),
+			buildToolSchema: () => args.toolSchema ?? [],
+			decisionTree: args.decisionTree ?? createProjectPromptDecisionTree(),
+			completionRules: args.completionRules,
+			documentBuilderIds: args.documentBuilderIds,
+		}
+	}
+
 	function createWorkflowDefinition(args?: {
 		name?: string
+		workflowValueKeys?: readonly string[]
+		entryProjectValueKeys?: WorkflowEntryProjectValueKeys
+		includeEntryProjectValueKeysInWorkflowValueKeys?: boolean
 		workflowForms?: Record<string, WorkflowFormDefinitionPayload>
-		stepResolutionDefinitions?: Record<string, WorkflowStepResolutionDefinition>
+		toolBackedOperationDefinitions?: Record<string, WorkflowToolBackedOperationDefinition>
 		steps?: WorkflowDefinition["steps"]
 		childInheritance?: WorkflowDefinition["childInheritance"]
+		artifacts?: WorkflowDefinition["artifacts"]
+		documentBuilders?: WorkflowDefinition["documentBuilders"]
 	}): WorkflowDefinition {
 		const defaultSteps: Record<string, WorkflowStepDefinition> = {
-			"step-1": {
-				id: "step-1",
-				stepNumber: 1,
-				checklistLabel: "Step 1",
-				allowWorkflowProgressRequest: true,
-				buildPromptProjection: () => ({
-					workflowSystemInstructionsBlock: "system",
-					workflowInputInstructionsBlock: "input",
-				}),
-			} as WorkflowStepDefinition,
-			"step-2": {
-				id: "step-2",
-				stepNumber: 2,
-				checklistLabel: "Step 2",
-				allowWorkflowProgressRequest: true,
-				buildPromptProjection: () => ({
-					workflowSystemInstructionsBlock: "system",
-					workflowInputInstructionsBlock: "input",
-				}),
-			} as WorkflowStepDefinition,
+			"step-1": createStepDefinition({ stepNumber: 1 }),
+			"step-2": createStepDefinition({ stepNumber: 2 }),
 		}
+		const entryProjectValueKeys = args?.entryProjectValueKeys ?? DEFAULT_ENTRY_PROJECT_VALUE_KEYS
+		const workflowValueKeys = [
+			...(args?.includeEntryProjectValueKeysInWorkflowValueKeys === false ? [] : Object.values(entryProjectValueKeys)),
+			...(args?.workflowValueKeys ?? []),
+		]
 
 		return {
 			name: args?.name ?? "workflow-runtime-test",
 			slashCommandName: "workflow-runtime-test",
 			useSkillName: "workflow-runtime-test",
 			persona: "Workflow runtime persona",
-			projectSubfolder: ".",
-			startCard: {
-				markdownBody: "Start this workflow",
-				submitLabel: "Start workflow",
+			projectSubfolder: "planning",
+			workflowValueKeys,
+			entryProjectValueKeys,
+			entryPanel: {
+				promptMarkdown: "Start this workflow",
 			},
 			steps: args?.steps ?? defaultSteps,
 			workflowForms: args?.workflowForms ?? {},
-			stepResolutionDefinitions: args?.stepResolutionDefinitions ?? {},
+			toolBackedOperationDefinitions: args?.toolBackedOperationDefinitions ?? {},
+			artifacts: args?.artifacts,
+			documentBuilders: args?.documentBuilders,
 			childInheritance: args?.childInheritance,
-		} as WorkflowDefinition
+		}
 	}
 
 	function registerResolvedWorkflow(workflow: WorkflowDefinition) {
 		resolveWorkflowDefinitionStub.callsFake((workflowName: string) => (workflowName === workflow.name ? workflow : undefined))
 	}
 
-	function createStartCardSubmitRequest(args: {
-		sessionId: string
-		projectMode: "new" | "existing"
-		selectedExistingProject?: string
-		newProjectTitle?: string
-		action?: WorkflowStartCardAction
-	}): WorkflowStartCardSubmissionRequest {
-		return {
-			metadata: undefined,
-			sessionId: args.sessionId,
-			action: args.action ?? WorkflowStartCardAction.WORKFLOW_START_CARD_ACTION_SUBMIT,
-			projectMode: args.projectMode as unknown as WorkflowStartCardProjectMode,
-			selectedExistingProject: args.selectedExistingProject ?? "",
-			newProjectTitle: args.newProjectTitle ?? "",
-		} as WorkflowStartCardSubmissionRequest
+	async function activateWorkflow(state: TaskState, workflow: WorkflowDefinition): Promise<WorkflowNextAction> {
+		registerResolvedWorkflow(workflow)
+		return runtime.activateWorkflow({
+			taskState: state,
+			workflowName: workflow.name,
+		})
 	}
 
 	function createFormSubmitRequest(args: {
@@ -125,12 +493,17 @@ describe("WorkflowRuntime", () => {
 		})
 	}
 
-	function createWorkflowFormDefinitionPayload(args?: {
-		deterministic?: boolean
-		nextPanelId?: string
-		terminal?: boolean
-	}): WorkflowFormDefinitionPayload {
-		const nextPanelId = args?.nextPanelId ?? "panel-3"
+	function createTerminalTransition(): WorkflowFormPanelDefinition["transition"] {
+		return {
+			type: "conditional",
+			conditionSourceKey: "__terminal__",
+			branches: [],
+			defaultTerminal: true,
+		}
+	}
+
+	function createWorkflowFormDefinitionPayload(args?: { nextPanelId?: string }): WorkflowFormDefinitionPayload {
+		const nextPanelId = args?.nextPanelId
 		const panels: Record<string, WorkflowFormPanelDefinition> = {
 			"panel-1": {
 				panelId: "panel-1",
@@ -146,33 +519,23 @@ describe("WorkflowRuntime", () => {
 				promptMarkdown: "Panel 2 prompt",
 				fields: [],
 				allowedActions: ["submit"],
-				transition: args?.deterministic
+				transition: nextPanelId
 					? {
-							type: "deterministic_operation",
-							operationId: "persist_form",
+							type: "sequential",
 							nextPanelId,
-							terminal: args.terminal ?? false,
 						}
-					: {
-							type: "deterministic_operation",
-							operationId: "persist_form",
-							terminal: true,
-						},
+					: createTerminalTransition(),
 			},
 		}
 
-		if (args?.deterministic) {
+		if (nextPanelId) {
 			panels[nextPanelId] = {
 				panelId: nextPanelId,
 				title: "Panel 3",
 				promptMarkdown: "Panel 3 prompt",
 				fields: [],
 				allowedActions: ["submit"],
-				transition: {
-					type: "deterministic_operation",
-					operationId: "persist_form",
-					terminal: true,
-				},
+				transition: createTerminalTransition(),
 			}
 		}
 
@@ -186,13 +549,14 @@ describe("WorkflowRuntime", () => {
 		} as WorkflowFormDefinitionPayload
 	}
 
-	function createStepResolutionDefinition(args?: {
+	function createToolBackedOperationDefinition(args?: {
 		fallbackToAgent?: boolean
 		shouldSucceed?: boolean
-	}): WorkflowStepResolutionDefinition {
+		toolName?: ClineDefaultTool
+	}): WorkflowToolBackedOperationDefinition {
 		return {
 			id: "step-resolution-1",
-			toolName: ClineDefaultTool.SET_WORKFLOW_VALUES,
+			toolName: args?.toolName ?? ClineDefaultTool.GENERATE_EXPLANATION,
 			buildStatusDefinition: () => ({
 				title: "Step Resolution",
 				pendingLabel: "Pending",
@@ -200,7 +564,7 @@ describe("WorkflowRuntime", () => {
 				failureLabel: "Failure",
 			}),
 			buildToolExecutionRequest: () => ({
-				toolName: ClineDefaultTool.SET_WORKFLOW_VALUES,
+				toolName: args?.toolName ?? ClineDefaultTool.GENERATE_EXPLANATION,
 				toolInput: {},
 				toolParams: {},
 			}),
@@ -215,28 +579,19 @@ describe("WorkflowRuntime", () => {
 
 				return { succeeded: true }
 			},
-		} as WorkflowStepResolutionDefinition
+		}
 	}
 
-	function createAllowedValueWriteOverride(args?: { allowedKeys: string[] }) {
-		return {
-			contract: {} as never,
-			buildToolSchemaOverride: (_input: {
-				session: ActiveWorkflowSession
-				step: WorkflowStepDefinition
-			}): readonly ClineToolSpec[] | undefined => [
-				{
-					id: ClineDefaultTool.SET_WORKFLOW_VALUES,
-					parameters: [
-						{
-							name: "values",
-							type: "object",
-							properties: Object.fromEntries((args?.allowedKeys ?? []).map((key) => [key, { type: "string" }])),
-						},
-					],
-				},
-			],
-		}
+	function createWorkflowProgressRequestToolSchema(): readonly ClineToolSpec[] {
+		return [
+			{
+				variant: ModelFamily.GPT_5,
+				id: ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST,
+				name: "workflow_progress_request",
+				description: "Ask the user to confirm whether the current workflow step is ready to advance.",
+				parameters: [],
+			},
+		]
 	}
 
 	function setDiscoveredProjects(projectNames: string[]) {
@@ -248,44 +603,192 @@ describe("WorkflowRuntime", () => {
 		)
 	}
 
-	async function submitNewProjectSelection(state: TaskState, newProjectTitle: string) {
-		const sessionId = (state.activeWorkflowStartCardSession as any)?.sessionId
-		expect(sessionId).to.be.a("string").and.not.equal("")
-
-		return runtime.submitWorkflowStartCard({
-			taskState: state,
-			request: createStartCardSubmitRequest({
-				sessionId,
-				projectMode: "new",
-				newProjectTitle,
-			}),
-		})
+	function expectNoLegacyWorkflowMirrors(state: TaskState): void {
+		for (const key of LEGACY_WORKFLOW_MIRROR_KEYS) {
+			expect(Reflect.has(state, key), `${key} should not exist on TaskState`).to.equal(false)
+		}
 	}
 
-	async function submitExistingProjectSelection(state: TaskState, selectedExistingProject: string) {
-		const sessionId = (state.activeWorkflowStartCardSession as any)?.sessionId
-		expect(sessionId).to.be.a("string").and.not.equal("")
+	function getActiveWorkflowSession(state: TaskState): ActiveWorkflowSession {
+		const activeSession = state.activeWorkflowSession
+		expect(activeSession).to.not.equal(undefined)
+		if (!activeSession) {
+			throw new Error("Expected an active workflow session.")
+		}
 
-		return runtime.submitWorkflowStartCard({
-			taskState: state,
-			request: createStartCardSubmitRequest({
-				sessionId,
+		return activeSession
+	}
+
+	function getActiveFormSession(state: TaskState): NonNullable<ActiveWorkflowSession["ui"]["formSession"]> {
+		const formSession = getActiveWorkflowSession(state).ui.formSession
+		expect(formSession).to.not.equal(undefined)
+		if (!formSession) {
+			throw new Error("Expected an active workflow form session.")
+		}
+
+		return formSession
+	}
+
+	function createParentWorkflowSession(args?: { projectTitle?: string; projectFolderName?: string }): ActiveWorkflowSession {
+		return {
+			workflowName: "parent-workflow",
+			activeStepNumber: 1,
+			workflowValues: {},
+			projectSelection: {
 				projectMode: "existing",
-				selectedExistingProject,
-			}),
-		})
+				projectTitle: args?.projectTitle ?? "Parent Project",
+				projectFolderName: args?.projectFolderName ?? "parent-project",
+			},
+			ui: {
+				formSession: undefined,
+				stepResolutionSession: undefined,
+				suppressedWorkflowFormIds: [],
+				suppressedWorkflowStepResolutionDefinitionIds: [],
+			},
+			branchContext: {
+				activeBranchId: "parent-branch",
+			},
+		}
 	}
 
-	async function submitActiveWorkflowFormPanel(state: TaskState) {
-		const activeFormSession = state.activeWorkflowFormSession as any
-		expect(activeFormSession?.sessionId).to.be.a("string").and.not.equal("")
-		expect(activeFormSession?.panelId).to.be.a("string").and.not.equal("")
+	function createStandaloneArtifactOutputValueKeys(prefix: string) {
+		return {
+			projectTitle: `${prefix}_project_title`,
+			projectFolderName: `${prefix}_project_folder`,
+			artifactFamily: `${prefix}_artifact_family`,
+			artifactIdentity: `${prefix}_artifact_identity`,
+			artifactFilename: `${prefix}_artifact_filename`,
+			artifactRelativePath: `${prefix}_artifact_relative_path`,
+			artifactAbsolutePath: `${prefix}_artifact_absolute_path`,
+			parentIdentity: undefined,
+			targetIdentity: undefined,
+		}
+	}
+
+	function createParentedArtifactOutputValueKeys(prefix: string) {
+		return {
+			projectTitle: `${prefix}_project_title`,
+			projectFolderName: `${prefix}_project_folder`,
+			artifactFamily: `${prefix}_artifact_family`,
+			artifactIdentity: `${prefix}_artifact_identity`,
+			artifactFilename: `${prefix}_artifact_filename`,
+			artifactRelativePath: `${prefix}_artifact_relative_path`,
+			artifactAbsolutePath: `${prefix}_artifact_absolute_path`,
+			parentIdentity: `${prefix}_parent_identity`,
+			targetIdentity: undefined,
+		}
+	}
+
+	function createTargetedArtifactOutputValueKeys(prefix: string) {
+		return {
+			projectTitle: `${prefix}_project_title`,
+			projectFolderName: `${prefix}_project_folder`,
+			artifactFamily: `${prefix}_artifact_family`,
+			artifactIdentity: `${prefix}_artifact_identity`,
+			artifactFilename: `${prefix}_artifact_filename`,
+			artifactRelativePath: `${prefix}_artifact_relative_path`,
+			artifactAbsolutePath: `${prefix}_artifact_absolute_path`,
+			parentIdentity: undefined,
+			targetIdentity: `${prefix}_target_identity`,
+		}
+	}
+
+	function collectArtifactOutputWorkflowValueKeys(
+		...outputValueKeys: Array<
+			| ReturnType<typeof createStandaloneArtifactOutputValueKeys>
+			| ReturnType<typeof createParentedArtifactOutputValueKeys>
+			| ReturnType<typeof createTargetedArtifactOutputValueKeys>
+		>
+	): string[] {
+		return outputValueKeys
+			.flatMap((entry) => Object.values(entry))
+			.filter((value): value is string => typeof value === "string")
+	}
+
+	async function advanceToEntryProjectSelectionPanel(state: TaskState) {
+		const activeFormSession = getActiveFormSession(state)
+		if (activeFormSession.currentPanelId === ENTRY_PROJECT_SELECTION_PANEL_ID) {
+			const nextAction = await runtime.resolveNextAction({ taskState: state })
+			expect(nextAction.kind).to.equal("render_workflow_form")
+			if (nextAction.kind !== "render_workflow_form") {
+				throw new Error(`Expected render_workflow_form, received ${nextAction.kind}.`)
+			}
+			return nextAction
+		}
+
+		const nextAction = await runtime.submitWorkflowForm({
+			taskState: state,
+			request: createFormSubmitRequest({
+				sessionId: activeFormSession.sessionId,
+				panelId: activeFormSession.currentPanelId,
+			}),
+		})
+
+		expect(nextAction.kind).to.equal("render_workflow_form")
+		if (nextAction.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${nextAction.kind}.`)
+		}
+
+		expect(nextAction.payload.panel?.panelId).to.equal(ENTRY_PROJECT_SELECTION_PANEL_ID)
+		return nextAction
+	}
+
+	async function submitNewProjectSelection(state: TaskState, newProjectTitle: string) {
+		await advanceToEntryProjectSelectionPanel(state)
+		const activeFormSession = getActiveFormSession(state)
 
 		return runtime.submitWorkflowForm({
 			taskState: state,
 			request: createFormSubmitRequest({
 				sessionId: activeFormSession.sessionId,
-				panelId: activeFormSession.panelId,
+				panelId: activeFormSession.currentPanelId,
+				fields: [
+					{
+						key: ENTRY_PROJECT_MODE_FIELD_KEY,
+						value: { stringValue: "new" },
+					},
+					{
+						key: ENTRY_NEW_PROJECT_TITLE_FIELD_KEY,
+						value: { stringValue: newProjectTitle },
+					},
+				],
+			}),
+		})
+	}
+
+	async function submitExistingProjectSelection(state: TaskState, selectedExistingProject: string) {
+		await advanceToEntryProjectSelectionPanel(state)
+		const activeFormSession = getActiveFormSession(state)
+
+		return runtime.submitWorkflowForm({
+			taskState: state,
+			request: createFormSubmitRequest({
+				sessionId: activeFormSession.sessionId,
+				panelId: activeFormSession.currentPanelId,
+				fields: [
+					{
+						key: ENTRY_PROJECT_MODE_FIELD_KEY,
+						value: { stringValue: "existing" },
+					},
+					{
+						key: ENTRY_EXISTING_PROJECT_FIELD_KEY,
+						value: { stringValue: selectedExistingProject },
+					},
+				],
+			}),
+		})
+	}
+
+	async function submitActiveWorkflowFormPanel(state: TaskState) {
+		const activeFormSession = getActiveFormSession(state)
+		expect(activeFormSession.sessionId).to.be.a("string").and.not.equal("")
+		expect(activeFormSession.currentPanelId).to.be.a("string").and.not.equal("")
+
+		return runtime.submitWorkflowForm({
+			taskState: state,
+			request: createFormSubmitRequest({
+				sessionId: activeFormSession.sessionId,
+				panelId: activeFormSession.currentPanelId,
 			}),
 		})
 	}
@@ -293,427 +796,1517 @@ describe("WorkflowRuntime", () => {
 	it("activates a valid workflow and initializes runtime-owned state", async () => {
 		const workflow = createWorkflowDefinition()
 
-		;(taskState as any).activeWorkflowName = "stale-workflow"
-		;(taskState as any).activeWorkflowSession = { stale: true }
-		;(taskState as any).activeWorkflowStartCardSession = { sessionId: "stale-start-card" }
-		;(taskState as any).activeWorkflowFormSession = { sessionId: "stale-form" }
-		;(taskState as any).activeWorkflowStepResolutionSession = { id: "stale-step-resolution" }
-		;(taskState as any).suppressedWorkflowFormResolverIds = ["stale-form-id"]
-		;(taskState as any).suppressedWorkflowStepResolutionDefinitionIds = ["stale-step-resolution-id"]
-		;(taskState as any).currentFocusChainChecklist = [{ label: "stale" }]
+		taskState.activeWorkflowName = "stale-workflow"
+		taskState.activeWorkflowSession = {
+			workflowName: "stale-workflow",
+			activeStepNumber: 99,
+			workflowValues: {},
+			projectSelection: {
+				projectMode: "new",
+				projectTitle: "Stale Project",
+				projectFolderName: "stale-project",
+			},
+			ui: {
+				formSession: undefined,
+				stepResolutionSession: undefined,
+				suppressedWorkflowFormIds: ["stale-form-id"],
+				suppressedWorkflowStepResolutionDefinitionIds: ["stale-step-resolution-id"],
+			},
+			branchContext: {
+				activeBranchId: "stale-branch",
+			},
+		}
+		taskState.currentFocusChainChecklist = "stale checklist"
+		expectNoLegacyWorkflowMirrors(taskState)
 
-		const result = await runtime.activateWorkflow({ taskState, workflow })
+		const result = await activateWorkflow(taskState, workflow)
+		const activeSession = getActiveWorkflowSession(taskState)
 
-		expect(result.kind).to.equal("render_workflow_start_card")
+		expect(result.kind).to.equal("render_workflow_form")
+		if (result.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${result.kind}.`)
+		}
 		expect(taskState.activeWorkflowName).to.equal(workflow.name)
-		expect(taskState.activeWorkflowSession).to.exist
-		expect(taskState.activeWorkflowStartCardSession).to.exist
-		expect(taskState.activeWorkflowStartCardSession).to.not.deep.equal({ sessionId: "stale-start-card" })
-		expect(taskState.activeWorkflowFormSession).to.be.undefined
-		expect(taskState.activeWorkflowStepResolutionSession).to.be.undefined
-		expect(taskState.suppressedWorkflowFormResolverIds).to.deep.equal([])
-		expect(taskState.suppressedWorkflowStepResolutionDefinitionIds).to.deep.equal([])
-		expect(taskState.currentFocusChainChecklist).to.be.an("array").with.length(2)
+		expectNoLegacyWorkflowMirrors(taskState)
+		expect(activeSession.workflowName).to.equal(workflow.name)
+		expect(activeSession.ui.formSession).to.exist
+		expect(activeSession.ui.stepResolutionSession).to.be.undefined
+		expect(activeSession.ui.suppressedWorkflowFormIds).to.deep.equal([])
+		expect(activeSession.ui.suppressedWorkflowStepResolutionDefinitionIds).to.deep.equal([])
+		expect(result.payload.panel?.panelId).to.equal(ENTRY_INFO_PANEL_ID)
+		expect(taskState.currentFocusChainChecklist).to.equal("- [ ] Step 1\n- [ ] Step 2")
+	})
+
+	it("copies complete parent project selection into child workflow activation without rendering entry form", async () => {
+		const workflow = createWorkflowDefinition()
+		registerResolvedWorkflow(workflow)
+		const parentSession = createParentWorkflowSession()
+		const childState = new TaskState()
+
+		const result = await runtime.activateWorkflow({
+			taskState: childState,
+			workflowName: workflow.name,
+			parentSession,
+		})
+		const childSession = getActiveWorkflowSession(childState)
+
+		expect(result.kind).to.equal("project_prompt")
+		expect(childSession.projectSelection).to.deep.equal(parentSession.projectSelection)
+		expect(childSession.projectSelection).to.not.equal(parentSession.projectSelection)
+		childSession.projectSelection.projectTitle = "Child Project"
+		expect(parentSession.projectSelection.projectTitle).to.equal("Parent Project")
+	})
+
+	it("no-ops child workflow activation without mutating state when parent project selection is incomplete", async () => {
+		const workflow = createWorkflowDefinition()
+		registerResolvedWorkflow(workflow)
+		const incompleteParentSessions = [
+			createParentWorkflowSession({ projectTitle: "" }),
+			createParentWorkflowSession({ projectFolderName: "" }),
+		]
+
+		for (const parentSession of incompleteParentSessions) {
+			const childState = new TaskState()
+
+			const result = await runtime.activateWorkflow({
+				taskState: childState,
+				workflowName: workflow.name,
+				parentSession,
+			})
+
+			expect(result).to.deep.equal({ kind: "no_op" })
+			expect(childState.activeWorkflowName).to.be.undefined
+			expect(childState.activeWorkflowSession).to.be.undefined
+		}
 	})
 
 	it("returns no_op and leaves task state unchanged for workflows with no steps", async () => {
 		const invalidWorkflow = createWorkflowDefinition({
 			steps: {} as WorkflowDefinition["steps"],
 		})
-		const existingSession = { id: "session-1" }
-		const existingStartCardSession = { sessionId: "start-card-1" }
-		const existingFormSession = { sessionId: "form-1" }
-		const existingStepResolutionSession = { id: "step-resolution-1" }
-		const existingChecklist = [{ label: "existing" }]
+		const existingSession: ActiveWorkflowSession = {
+			workflowName: "existing-workflow",
+			activeStepNumber: 1,
+			workflowValues: {},
+			projectSelection: {
+				projectMode: "new",
+				projectTitle: "Existing Project",
+				projectFolderName: "existing-project",
+			},
+			ui: {
+				formSession: undefined,
+				stepResolutionSession: undefined,
+				suppressedWorkflowFormIds: ["existing-form-id"],
+				suppressedWorkflowStepResolutionDefinitionIds: ["existing-step-id"],
+			},
+			branchContext: {
+				activeBranchId: "existing-branch",
+			},
+		}
+		const existingChecklist = "existing checklist"
 
-		;(taskState as any).activeWorkflowName = "existing-workflow"
-		;(taskState as any).activeWorkflowSession = existingSession
-		;(taskState as any).activeWorkflowStartCardSession = existingStartCardSession
-		;(taskState as any).activeWorkflowFormSession = existingFormSession
-		;(taskState as any).activeWorkflowStepResolutionSession = existingStepResolutionSession
-		;(taskState as any).suppressedWorkflowFormResolverIds = ["existing-form-id"]
-		;(taskState as any).suppressedWorkflowStepResolutionDefinitionIds = ["existing-step-id"]
-		;(taskState as any).currentFocusChainChecklist = existingChecklist
+		taskState.activeWorkflowName = "existing-workflow"
+		taskState.activeWorkflowSession = existingSession
+		taskState.currentFocusChainChecklist = existingChecklist
+		expectNoLegacyWorkflowMirrors(taskState)
 
-		const result = await runtime.activateWorkflow({ taskState, workflow: invalidWorkflow })
+		const result = await activateWorkflow(taskState, invalidWorkflow)
 
 		expect(result).to.deep.equal({ kind: "no_op" })
 		expect(taskState.activeWorkflowName).to.equal("existing-workflow")
 		expect(taskState.activeWorkflowSession).to.equal(existingSession)
-		expect(taskState.activeWorkflowStartCardSession).to.equal(existingStartCardSession)
-		expect(taskState.activeWorkflowFormSession).to.equal(existingFormSession)
-		expect(taskState.activeWorkflowStepResolutionSession).to.equal(existingStepResolutionSession)
-		expect(taskState.suppressedWorkflowFormResolverIds).to.deep.equal(["existing-form-id"])
-		expect(taskState.suppressedWorkflowStepResolutionDefinitionIds).to.deep.equal(["existing-step-id"])
+		expectNoLegacyWorkflowMirrors(taskState)
 		expect(taskState.currentFocusChainChecklist).to.equal(existingChecklist)
 	})
 
-	it("renders start-card project selection and handles new, existing, and invalid submissions", async () => {
+	it("rejects invalid workflow value inventories and references before activation", async () => {
+		const outputFileKeys = createStandaloneArtifactOutputValueKeys("output_file")
+		const invalidWorkflows = [
+			createWorkflowDefinition({ workflowValueKeys: [""] }),
+			createWorkflowDefinition({ workflowValueKeys: [" alpha"] }),
+			createWorkflowDefinition({ workflowValueKeys: ["alpha", "alpha"] }),
+			createWorkflowDefinition({
+				workflowValueKeys: collectArtifactOutputWorkflowValueKeys(outputFileKeys),
+				artifacts: {
+					output_file: {
+						id: "output_file",
+						family: WorkflowArtifactFamily.Epic,
+						intentMode: "new",
+						parentIdentitySource: undefined,
+						targetIdentitySource: undefined,
+						outputValueKeys: outputFileKeys,
+					},
+				},
+				documentBuilders: {
+					"build-spec": {
+						id: "build-spec",
+						artifactId: "output_file",
+						toolContract: {} as never,
+						buildContent: () => "# Resolved spec",
+						workflowValueWrites: {
+							missing_key: "ready",
+						},
+					},
+				},
+			}),
+			createWorkflowDefinition({
+				workflowValueKeys: ["declared_key"],
+				childInheritance: [{ parentKey: "parent_key", childKey: "missing_child_key" }],
+			}),
+		]
+
+		for (const invalidWorkflow of invalidWorkflows) {
+			const invalidState = new TaskState()
+			const result = await activateWorkflow(invalidState, invalidWorkflow)
+
+			expect(result).to.deep.equal({ kind: "no_op" })
+			expect(invalidState.activeWorkflowName).to.be.undefined
+			expect(invalidState.activeWorkflowSession).to.be.undefined
+		}
+	})
+
+	it("rejects invalid entry project and workflow-form value destinations before activation", async () => {
+		const createFormWithWorkflowValueKey = (workflowValueKey: string): WorkflowFormDefinitionPayload => ({
+			definitionVersion: 2,
+			title: "Invalid Value Destination Form",
+			toolDictionaryTitle: "Invalid Value Destination Tools",
+			toolDictionaryMarkdown: "Invalid destination help",
+			firstPanelId: "details",
+			panels: {
+				details: {
+					panelId: "details",
+					title: "Details",
+					promptMarkdown: "Capture details.",
+					fields: [
+						{
+							key: "summary",
+							workflowValueKey,
+							kind: "small_text",
+							label: "Summary",
+							required: true,
+							allowedValueType: "string",
+						},
+					],
+					allowedActions: ["submit"],
+					transition: createTerminalTransition(),
+				},
+			},
+		})
+		const invalidWorkflows = [
+			createWorkflowDefinition({
+				entryProjectValueKeys: {
+					...DEFAULT_ENTRY_PROJECT_VALUE_KEYS,
+					projectMode: "",
+				},
+				includeEntryProjectValueKeysInWorkflowValueKeys: false,
+			}),
+			createWorkflowDefinition({
+				entryProjectValueKeys: {
+					...DEFAULT_ENTRY_PROJECT_VALUE_KEYS,
+					projectMode: " entry_project_mode",
+				},
+				includeEntryProjectValueKeysInWorkflowValueKeys: false,
+			}),
+			createWorkflowDefinition({
+				entryProjectValueKeys: {
+					...DEFAULT_ENTRY_PROJECT_VALUE_KEYS,
+					projectMode: "missing_entry_project_mode",
+				},
+				includeEntryProjectValueKeysInWorkflowValueKeys: false,
+				workflowValueKeys: [
+					DEFAULT_ENTRY_PROJECT_VALUE_KEYS.projectTitle,
+					DEFAULT_ENTRY_PROJECT_VALUE_KEYS.projectFolderName,
+				],
+			}),
+			createWorkflowDefinition({
+				workflowValueKeys: ["summary"],
+				workflowForms: {
+					invalid_form: createFormWithWorkflowValueKey(""),
+				},
+			}),
+			createWorkflowDefinition({
+				workflowValueKeys: ["summary"],
+				workflowForms: {
+					invalid_form: createFormWithWorkflowValueKey(" summary"),
+				},
+			}),
+			createWorkflowDefinition({
+				workflowValueKeys: ["summary"],
+				workflowForms: {
+					invalid_form: createFormWithWorkflowValueKey("missing_summary"),
+				},
+			}),
+		]
+
+		for (const invalidWorkflow of invalidWorkflows) {
+			const invalidState = new TaskState()
+			const result = await activateWorkflow(invalidState, invalidWorkflow)
+
+			expect(result).to.deep.equal({ kind: "no_op" })
+			expect(invalidState.activeWorkflowName).to.be.undefined
+			expect(invalidState.activeWorkflowSession).to.be.undefined
+		}
+	})
+
+	it("rejects document builders that reference missing artifacts or declare module-owned path keys", async () => {
+		const outputFileKeys = createStandaloneArtifactOutputValueKeys("output_file")
+		const validArtifactDefinition = {
+			id: "output_file",
+			family: WorkflowArtifactFamily.Epic,
+			intentMode: "new",
+			parentIdentitySource: undefined,
+			targetIdentitySource: undefined,
+			outputValueKeys: outputFileKeys,
+		} satisfies NonNullable<WorkflowDefinition["artifacts"]>[string]
+		const pollutedDocumentBuilder = {
+			id: "build-spec",
+			artifactId: "output_file",
+			artifactAbsolutePathWorkflowValueKey: "module_chosen_absolute_path",
+			toolContract: {} as never,
+			buildContent: () => "# Resolved spec",
+		} as unknown as NonNullable<WorkflowDefinition["documentBuilders"]>[string]
+		const invalidWorkflows = [
+			createWorkflowDefinition({
+				workflowValueKeys: collectArtifactOutputWorkflowValueKeys(outputFileKeys),
+				documentBuilders: {
+					"build-spec": {
+						id: "build-spec",
+						artifactId: "missing_output_file",
+						toolContract: {} as never,
+						buildContent: () => "# Resolved spec",
+					},
+				},
+			}),
+			createWorkflowDefinition({
+				workflowValueKeys: ["module_chosen_absolute_path", ...collectArtifactOutputWorkflowValueKeys(outputFileKeys)],
+				artifacts: {
+					output_file: validArtifactDefinition,
+				},
+				documentBuilders: {
+					"build-spec": pollutedDocumentBuilder,
+				},
+			}),
+		]
+
+		for (const invalidWorkflow of invalidWorkflows) {
+			const invalidState = new TaskState()
+			const result = await activateWorkflow(invalidState, invalidWorkflow)
+
+			expect(result).to.deep.equal({ kind: "no_op" })
+			expect(invalidState.activeWorkflowName).to.be.undefined
+			expect(invalidState.activeWorkflowSession).to.be.undefined
+		}
+	})
+
+	it("rejects runtime-owned tools in generic tool-backed operation definitions", async () => {
+		const forbiddenToolNames = [
+			ClineDefaultTool.SET_WORKFLOW_VALUES,
+			ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT,
+			ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT,
+			ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST,
+		]
+
+		for (const forbiddenToolName of forbiddenToolNames) {
+			const invalidState = new TaskState()
+			const result = await activateWorkflow(
+				invalidState,
+				createWorkflowDefinition({
+					name: `forbidden-tool-${forbiddenToolName}`,
+					toolBackedOperationDefinitions: {
+						forbidden: createToolBackedOperationDefinition({ toolName: forbiddenToolName }),
+					},
+				}),
+			)
+
+			expect(result).to.deep.equal({ kind: "no_op" })
+			expect(invalidState.activeWorkflowName).to.be.undefined
+			expect(invalidState.activeWorkflowSession).to.be.undefined
+		}
+	})
+
+	it("rejects document builders reached through generic tool-backed operation actions", async () => {
+		const outputFileKeys = createStandaloneArtifactOutputValueKeys("output_file")
+		const invalidState = new TaskState()
+		const result = await activateWorkflow(
+			invalidState,
+			createWorkflowDefinition({
+				workflowValueKeys: collectArtifactOutputWorkflowValueKeys(outputFileKeys),
+				artifacts: {
+					output_file: {
+						id: "output_file",
+						family: WorkflowArtifactFamily.Epic,
+						intentMode: "new",
+						parentIdentitySource: undefined,
+						targetIdentitySource: undefined,
+						outputValueKeys: outputFileKeys,
+					},
+				},
+				documentBuilders: {
+					"build-spec": {
+						id: "build-spec",
+						artifactId: "output_file",
+						toolContract: {} as never,
+						buildContent: () => "# Resolved spec",
+					},
+				},
+				steps: {
+					"step-1": createStepDefinition({
+						stepNumber: 1,
+						documentBuilderIds: ["build-spec"],
+						decisionTree: createToolBackedOperationDecisionTree({
+							toolBackedOperationId: "build-spec",
+						}),
+					}),
+				},
+			}),
+		)
+
+		expect(result).to.deep.equal({ kind: "no_op" })
+		expect(invalidState.activeWorkflowName).to.be.undefined
+		expect(invalidState.activeWorkflowSession).to.be.undefined
+	})
+
+	it("requires teardown persistence for invalid resolve paths while preserving true no-active-workflow no_op", async () => {
+		const noActiveWorkflowResult = await runtime.resolveNextAction({ taskState: new TaskState() })
+		expect(noActiveWorkflowResult).to.deep.equal({ kind: "no_op" })
+
+		const missingDefinitionState = new TaskState()
+		missingDefinitionState.activeWorkflowName = "missing-workflow"
+		missingDefinitionState.activeWorkflowSession = createParentWorkflowSession()
+		missingDefinitionState.currentFocusChainChecklist = "stale checklist"
+		resolveWorkflowDefinitionStub.returns(undefined)
+		const missingDefinitionResult = await runtime.resolveNextAction({ taskState: missingDefinitionState })
+
+		expect(missingDefinitionResult).to.deep.equal({ kind: "persist_workflow_teardown" })
+		expect(missingDefinitionState.activeWorkflowName).to.be.undefined
+		expect(missingDefinitionState.activeWorkflowSession).to.be.undefined
+		expect(missingDefinitionState.currentFocusChainChecklist).to.equal(null)
+
+		const invalidDefinition = createWorkflowDefinition({
+			name: "invalid-resolve-workflow",
+			steps: {} as WorkflowDefinition["steps"],
+		})
+		const invalidDefinitionState = new TaskState()
+		invalidDefinitionState.activeWorkflowName = invalidDefinition.name
+		invalidDefinitionState.activeWorkflowSession = createParentWorkflowSession()
+		invalidDefinitionState.currentFocusChainChecklist = "stale checklist"
+		registerResolvedWorkflow(invalidDefinition)
+		const invalidDefinitionResult = await runtime.resolveNextAction({ taskState: invalidDefinitionState })
+
+		expect(invalidDefinitionResult).to.deep.equal({ kind: "persist_workflow_teardown" })
+		expect(invalidDefinitionState.activeWorkflowName).to.be.undefined
+		expect(invalidDefinitionState.activeWorkflowSession).to.be.undefined
+		expect(invalidDefinitionState.currentFocusChainChecklist).to.equal(null)
+
+		const workflow = createWorkflowDefinition({ name: "missing-step-resolve-workflow" })
+		const missingStepState = new TaskState()
+		const missingStepSession = createParentWorkflowSession()
+		missingStepSession.workflowName = workflow.name
+		missingStepSession.activeStepNumber = 999
+		missingStepSession.branchContext = { activeBranchId: "project-prompt" }
+		missingStepState.activeWorkflowName = workflow.name
+		missingStepState.activeWorkflowSession = missingStepSession
+		missingStepState.currentFocusChainChecklist = "stale checklist"
+		registerResolvedWorkflow(workflow)
+		const missingStepResult = await runtime.resolveNextAction({ taskState: missingStepState })
+
+		expect(missingStepResult).to.deep.equal({ kind: "persist_workflow_teardown" })
+		expect(missingStepState.activeWorkflowName).to.be.undefined
+		expect(missingStepState.activeWorkflowSession).to.be.undefined
+		expect(missingStepState.currentFocusChainChecklist).to.equal(null)
+
+		const invalidBranchWorkflow = createWorkflowDefinition({ name: "missing-branch-live-resolve-workflow" })
+		const invalidBranchState = new TaskState()
+		const invalidBranchSession = createParentWorkflowSession()
+		invalidBranchSession.workflowName = invalidBranchWorkflow.name
+		invalidBranchSession.branchContext = { activeBranchId: "missing-branch" }
+		invalidBranchState.activeWorkflowName = invalidBranchWorkflow.name
+		invalidBranchState.activeWorkflowSession = invalidBranchSession
+		invalidBranchState.currentFocusChainChecklist = "stale checklist"
+		registerResolvedWorkflow(invalidBranchWorkflow)
+		const invalidBranchResult = await runtime.resolveNextAction({ taskState: invalidBranchState })
+
+		expect(invalidBranchResult).to.deep.equal({ kind: "persist_workflow_teardown" })
+		expect(invalidBranchState.activeWorkflowName).to.be.undefined
+		expect(invalidBranchState.activeWorkflowSession).to.be.undefined
+		expect(invalidBranchState.currentFocusChainChecklist).to.equal(null)
+	})
+
+	it("rejects module-owned artifact families and artifact naming conventions before activation", async () => {
+		const outputValueKeys = createStandaloneArtifactOutputValueKeys("artifact")
+		const workflowValueKeys = collectArtifactOutputWorkflowValueKeys(outputValueKeys)
+		const baseArtifactDefinition = {
+			id: "output_file",
+			family: WorkflowArtifactFamily.Epic,
+			intentMode: "new",
+			parentIdentitySource: undefined,
+			targetIdentitySource: undefined,
+			outputValueKeys,
+		} satisfies NonNullable<WorkflowDefinition["artifacts"]>[string]
+		const invalidArtifactDefinitions = [
+			{
+				...baseArtifactDefinition,
+				family: "module_owned_family" as WorkflowArtifactFamily,
+			},
+			{
+				...baseArtifactDefinition,
+				filenamePattern: "Module-{N}.md",
+			},
+			{
+				...baseArtifactDefinition,
+				fileExtension: ".module",
+			},
+			{
+				...baseArtifactDefinition,
+				numberingScope: "module_scope",
+			},
+			{
+				...baseArtifactDefinition,
+				discoveryPattern: /^Module-(\d+)\.md$/,
+			},
+		].map((artifactDefinition) => artifactDefinition as unknown as NonNullable<WorkflowDefinition["artifacts"]>[string])
+
+		for (const artifactDefinition of invalidArtifactDefinitions) {
+			const invalidState = new TaskState()
+			const result = await activateWorkflow(
+				invalidState,
+				createWorkflowDefinition({
+					workflowValueKeys,
+					artifacts: {
+						output_file: artifactDefinition,
+					},
+				}),
+			)
+
+			expect(result).to.deep.equal({ kind: "no_op" })
+			expect(invalidState.activeWorkflowName).to.be.undefined
+			expect(invalidState.activeWorkflowSession).to.be.undefined
+		}
+	})
+
+	it("renders the shared two-panel entry workflow form and handles new, existing, and invalid submissions", async () => {
 		const workflow = createWorkflowDefinition()
 		registerResolvedWorkflow(workflow)
 		setDiscoveredProjects(["Existing Alpha", "Existing Beta"])
 
-		await runtime.activateWorkflow({ taskState, workflow })
-		const startCardAction = await runtime.resolveNextAction({ taskState })
+		const entryInfoAction = await activateWorkflow(taskState, workflow)
+		expect(entryInfoAction.kind).to.equal("render_workflow_form")
+		if (entryInfoAction.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${entryInfoAction.kind}.`)
+		}
+		expect(entryInfoAction.payload.panel?.panelId).to.equal(ENTRY_INFO_PANEL_ID)
+		expect(entryInfoAction.payload.panel?.fields).to.deep.equal([])
 
-		expect(startCardAction.kind).to.equal("render_workflow_start_card")
-		expect((taskState.activeWorkflowStartCardSession as any)?.existingProjectOptions).to.deep.equal([
-			{ value: "Existing Alpha", label: "Existing Alpha" },
-			{ value: "Existing Beta", label: "Existing Beta" },
+		const projectSelectionAction = await advanceToEntryProjectSelectionPanel(taskState)
+		expect(projectSelectionAction.payload.panel?.panelId).to.equal(ENTRY_PROJECT_SELECTION_PANEL_ID)
+		expect(projectSelectionAction.payload.panel?.fields.map((field) => field.key)).to.deep.equal([
+			ENTRY_PROJECT_MODE_FIELD_KEY,
 		])
 
 		const newSubmissionResult = await submitNewProjectSelection(taskState, "  Launch Plan  ")
-		const newProjectSelection = (taskState.activeWorkflowSession as any)?.projectSelection
+		const newProjectSelection = getActiveWorkflowSession(taskState).projectSelection
 		const newProjectFolderName = newProjectSelection?.projectFolderName
 
 		expect(newSubmissionResult.kind).to.equal("project_prompt")
 		expect(newProjectSelection?.projectTitle).to.equal("Launch Plan")
 		expect(newProjectFolderName).to.equal("launch-plan")
-		expect(taskState.activeWorkflowStartCardSession).to.be.undefined
+		expect(getActiveWorkflowSession(taskState).workflowValues).to.deep.include({
+			[DEFAULT_ENTRY_PROJECT_VALUE_KEYS.projectMode]: "new",
+			[DEFAULT_ENTRY_PROJECT_VALUE_KEYS.projectTitle]: "Launch Plan",
+			[DEFAULT_ENTRY_PROJECT_VALUE_KEYS.projectFolderName]: "launch-plan",
+		})
+		expect(getActiveWorkflowSession(taskState).ui.formSession).to.be.undefined
 
 		for (const subfolderName of ["discovery", "planning", "implementation", "review", "testing"]) {
 			await access(join(cwd, newProjectFolderName, subfolderName))
 		}
 
 		const existingTaskState = new TaskState()
-		await runtime.activateWorkflow({ taskState: existingTaskState, workflow })
-		await runtime.resolveNextAction({ taskState: existingTaskState })
+		await activateWorkflow(existingTaskState, workflow)
 		const existingSubmissionResult = await submitExistingProjectSelection(existingTaskState, "Existing Beta")
-		const existingProjectSelection = (existingTaskState.activeWorkflowSession as any)?.projectSelection
+		const existingProjectSelection = getActiveWorkflowSession(existingTaskState).projectSelection
 
 		expect(existingSubmissionResult.kind).to.equal("project_prompt")
 		expect(existingProjectSelection).to.deep.include({
 			projectTitle: "Existing Beta",
 			projectFolderName: "Existing Beta",
 		})
+		expect(getActiveWorkflowSession(existingTaskState).workflowValues).to.deep.include({
+			[DEFAULT_ENTRY_PROJECT_VALUE_KEYS.projectMode]: "existing",
+			[DEFAULT_ENTRY_PROJECT_VALUE_KEYS.projectTitle]: "Existing Beta",
+			[DEFAULT_ENTRY_PROJECT_VALUE_KEYS.projectFolderName]: "Existing Beta",
+		})
 
 		const invalidSessionTaskState = new TaskState()
-		await runtime.activateWorkflow({ taskState: invalidSessionTaskState, workflow })
-		await runtime.resolveNextAction({ taskState: invalidSessionTaskState })
-		const invalidSessionResult = await runtime.submitWorkflowStartCard({
+		await activateWorkflow(invalidSessionTaskState, workflow)
+		await advanceToEntryProjectSelectionPanel(invalidSessionTaskState)
+		const invalidSessionResult = await runtime.submitWorkflowForm({
 			taskState: invalidSessionTaskState,
-			request: createStartCardSubmitRequest({
+			request: createFormSubmitRequest({
 				sessionId: "wrong-session-id",
-				projectMode: "new",
-				newProjectTitle: "Ignored",
+				panelId: ENTRY_PROJECT_SELECTION_PANEL_ID,
+				fields: [
+					{
+						key: ENTRY_PROJECT_MODE_FIELD_KEY,
+						value: { stringValue: "new" },
+					},
+					{
+						key: ENTRY_NEW_PROJECT_TITLE_FIELD_KEY,
+						value: { stringValue: "Ignored" },
+					},
+				],
 			}),
 		})
-		const invalidActionResult = await runtime.submitWorkflowStartCard({
+		const invalidExistingProjectResult = await runtime.submitWorkflowForm({
 			taskState: invalidSessionTaskState,
-			request: createStartCardSubmitRequest({
-				sessionId: (invalidSessionTaskState.activeWorkflowStartCardSession as any).sessionId,
-				projectMode: "new",
-				newProjectTitle: "Ignored",
-				action: 999 as WorkflowStartCardAction,
+			request: createFormSubmitRequest({
+				sessionId: getActiveFormSession(invalidSessionTaskState).sessionId,
+				panelId: ENTRY_PROJECT_SELECTION_PANEL_ID,
+				fields: [
+					{
+						key: ENTRY_PROJECT_MODE_FIELD_KEY,
+						value: { stringValue: "existing" },
+					},
+					{
+						key: ENTRY_EXISTING_PROJECT_FIELD_KEY,
+						value: { stringValue: "Missing Project" },
+					},
+				],
 			}),
 		})
 
 		expect(invalidSessionResult).to.deep.equal({ kind: "no_op" })
-		expect(invalidActionResult).to.deep.equal({ kind: "no_op" })
+		expect(invalidExistingProjectResult.kind).to.equal("render_workflow_form")
+		if (invalidExistingProjectResult.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${invalidExistingProjectResult.kind}.`)
+		}
+		expect(invalidExistingProjectResult.payload.renderState).to.equal("failure")
+		expect(invalidExistingProjectResult.payload.errorMessage).to.equal(
+			"Select an existing project from the discovered project list.",
+		)
 
 		const emptySlugTaskState = new TaskState()
-		await runtime.activateWorkflow({ taskState: emptySlugTaskState, workflow })
-		await runtime.resolveNextAction({ taskState: emptySlugTaskState })
-		const emptySlugResult = await runtime.submitWorkflowStartCard({
-			taskState: emptySlugTaskState,
-			request: createStartCardSubmitRequest({
-				sessionId: (emptySlugTaskState.activeWorkflowStartCardSession as any).sessionId,
-				projectMode: "new",
-				newProjectTitle: "!!!",
-			}),
-		})
+		await activateWorkflow(emptySlugTaskState, workflow)
+		const emptySlugResult = await submitNewProjectSelection(emptySlugTaskState, "!!!")
 
-		expect(emptySlugResult).to.deep.equal({ kind: "no_op" })
+		expect(emptySlugResult.kind).to.equal("render_workflow_form")
+		if (emptySlugResult.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${emptySlugResult.kind}.`)
+		}
+		expect(emptySlugResult.payload.renderState).to.equal("failure")
+		expect(emptySlugResult.payload.errorMessage).to.equal(
+			"Provide a project title that can be normalized into a folder name.",
+		)
 	})
 
 	it("returns project_prompt projections once project selection is satisfied", async () => {
 		const workflow = createWorkflowDefinition()
 
-		await runtime.activateWorkflow({ taskState, workflow })
-		await runtime.resolveNextAction({ taskState })
+		await activateWorkflow(taskState, workflow)
+		taskState.apiRequestCount = 1
 		await submitNewProjectSelection(taskState, "Projection Project")
 
 		const nextAction = await runtime.resolveNextAction({ taskState })
-		const turnProjection = await runtime.buildTurnProjection({ taskState })
+		const firstTurnProjection = await runtime.buildTurnProjection({ taskState })
+		taskState.apiRequestCount = 2
+		const refreshTurnProjection = await runtime.buildTurnProjection({ taskState })
 		const emptyProjection = await runtime.buildTurnProjection({ taskState: new TaskState() })
 
 		expect(nextAction.kind).to.equal("project_prompt")
-		expect(turnProjection).to.deep.equal({
-			workflowSystemInstructionsBlock: "system",
-			workflowInputInstructionsBlock: "input",
+		expect(firstTurnProjection).to.deep.equal({
+			fullTurnWorkflowSystemInstructionsBlock:
+				"## WORKFLOW\nWorkflow: workflow-runtime-test\n\n## WORKFLOW PERSONA\nWorkflow runtime persona\n\n## WORKFLOW STEPS\n- [ ] Step 1\n- [ ] Step 2\n\n## WORKFLOW INSTRUCTIONS\nsystem",
+			fullTurnWorkflowInputInstructionsBlock: "## CURRENT STEP\nStep 1: Step 1\n\ninput",
+			workflowToolSchemaOverride: [],
+			continuationTurnWorkflowSystemInstructionsBlock:
+				"## WORKFLOW\nWorkflow: workflow-runtime-test\n\n## WORKFLOW STEPS\n- [ ] Step 1\n- [ ] Step 2\n\n## WORKFLOW INSTRUCTIONS\nsystem",
+			continuationTurnWorkflowInputInstructionsBlock: "## WORKFLOW CONTINUATION\nContinue working on step 1: Step 1.",
 		})
+		expect(refreshTurnProjection.fullTurnWorkflowSystemInstructionsBlock).to.equal(
+			"## WORKFLOW\nWorkflow: workflow-runtime-test\n\n## WORKFLOW STEPS\n- [ ] Step 1\n- [ ] Step 2\n\n## WORKFLOW INSTRUCTIONS\nsystem",
+		)
+		expect(refreshTurnProjection.fullTurnWorkflowSystemInstructionsBlock).to.not.include("## WORKFLOW PERSONA")
+		expect(refreshTurnProjection.fullTurnWorkflowInputInstructionsBlock).to.equal(
+			firstTurnProjection.fullTurnWorkflowInputInstructionsBlock,
+		)
+		expect(refreshTurnProjection.workflowToolSchemaOverride).to.deep.equal(firstTurnProjection.workflowToolSchemaOverride)
+		expect(refreshTurnProjection.continuationTurnWorkflowSystemInstructionsBlock).to.equal(
+			firstTurnProjection.continuationTurnWorkflowSystemInstructionsBlock,
+		)
+		expect(refreshTurnProjection.continuationTurnWorkflowInputInstructionsBlock).to.equal(
+			firstTurnProjection.continuationTurnWorkflowInputInstructionsBlock,
+		)
 		expect(emptyProjection).to.deep.equal({})
 	})
 
-	it("renders workflow forms, persists pending deterministic form state, and handles form outcomes", async () => {
-		const terminalFormId = "form-terminal"
-		const terminalWorkflow = createWorkflowDefinition({
+	it("builds runtime-owned workflow-form payloads and persists selector submissions through workflow values", async () => {
+		const workflowFormId = "selector-form"
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: [
+				"existing_project_value",
+				"selected_folder_value",
+				"selected_file_value",
+				"selected_artifact_value",
+			],
 			workflowForms: {
-				[terminalFormId]: createWorkflowFormDefinitionPayload(),
+				[workflowFormId]: {
+					definitionVersion: 2,
+					title: "Selector Form",
+					toolDictionaryTitle: "Selector Tools",
+					toolDictionaryMarkdown: "Selector tool help",
+					firstPanelId: "selectors",
+					panels: {
+						selectors: {
+							panelId: "selectors",
+							title: "Selector Inputs",
+							promptMarkdown: "Choose existing runtime-owned values.",
+							fields: [
+								{
+									key: "existing_project_choice",
+									workflowValueKey: "existing_project_value",
+									kind: "dropdown",
+									label: "Existing Project",
+									required: true,
+									allowedValueType: "string",
+									options: [],
+									selectorDiscovery: {
+										root: {
+											kind: "project_output_root",
+										},
+										entryType: "directory",
+										immediateChildrenOnly: true,
+										sort: "alpha_asc",
+									},
+									valueSchema: { type: "string" },
+								},
+								{
+									key: "selected_folder",
+									workflowValueKey: "selected_folder_value",
+									kind: "directory_path",
+									label: "Folder",
+									required: true,
+									allowedValueType: "string",
+									selectorDiscovery: {
+										root: {
+											kind: "selected_project_root",
+										},
+										entryType: "directory",
+										immediateChildrenOnly: true,
+										sort: "alpha_asc",
+									},
+									valueSchema: { type: "string" },
+								},
+								{
+									key: "selected_file",
+									workflowValueKey: "selected_file_value",
+									kind: "file_path",
+									label: "File",
+									required: true,
+									allowedValueType: "string",
+									selectorDiscovery: {
+										root: {
+											kind: "selected_project_root",
+										},
+										entryType: "file",
+										targetPathSegments: ["planning"],
+										immediateChildrenOnly: true,
+										sort: "alpha_asc",
+									},
+									valueSchema: { type: "string" },
+								},
+								{
+									key: "selected_artifact",
+									workflowValueKey: "selected_artifact_value",
+									kind: "artifact_picker",
+									label: "Artifact",
+									required: true,
+									allowedValueType: "string",
+									selectorDiscovery: {
+										root: {
+											kind: "selected_project_root",
+										},
+										entryType: "file",
+										targetPathSegments: ["planning"],
+										immediateChildrenOnly: true,
+										sort: "alpha_asc",
+									},
+									valueSchema: { type: "string" },
+								},
+							],
+							allowedActions: ["submit"],
+							transition: createTerminalTransition(),
+						},
+					},
+				},
 			},
 			steps: {
-				"step-1": {
-					id: "step-1",
+				"step-1": createStepDefinition({
 					stepNumber: 1,
-					checklistLabel: "Step 1",
-					allowWorkflowProgressRequest: true,
-					workflowFormId: terminalFormId,
-					buildPromptProjection: () => ({
-						workflowSystemInstructionsBlock: "system",
-						workflowInputInstructionsBlock: "input",
+					decisionTree: createWorkflowFormDecisionTree({
+						workflowFormId,
 					}),
-				} as WorkflowStepDefinition,
-				"step-2": {
-					id: "step-2",
-					stepNumber: 2,
-					checklistLabel: "Step 2",
-					allowWorkflowProgressRequest: true,
-					buildPromptProjection: () => ({
-						workflowSystemInstructionsBlock: "system",
-						workflowInputInstructionsBlock: "input",
-					}),
-				} as WorkflowStepDefinition,
+				}),
+				"step-2": createStepDefinition({ stepNumber: 2 }),
 			},
 		})
 
-		await runtime.activateWorkflow({ taskState, workflow: terminalWorkflow })
+		discoverWorkflowCandidatesStub.callsFake((request: WorkflowDiscoveryRequest) => {
+			if (request.entryType === "directory" && request.targetPathSegments === undefined) {
+				return Promise.resolve([{ value: "Existing Alpha", label: "Existing Alpha" }])
+			}
+
+			if (
+				request.entryType === "directory" &&
+				request.targetPathSegments?.length === 1 &&
+				request.targetPathSegments[0] === "selector-project"
+			) {
+				return Promise.resolve([{ value: "planning", label: "planning" }])
+			}
+
+			if (
+				request.entryType === "file" &&
+				request.targetPathSegments?.length === 2 &&
+				request.targetPathSegments[0] === "selector-project" &&
+				request.targetPathSegments[1] === "planning"
+			) {
+				return Promise.resolve([
+					{ value: "notes.md", label: "notes.md" },
+					{ value: "artifact.md", label: "artifact.md" },
+				])
+			}
+
+			return Promise.resolve([])
+		})
+
+		await activateWorkflow(taskState, workflow)
 		await runtime.resolveNextAction({ taskState })
-		await submitNewProjectSelection(taskState, "Form Terminal Project")
-		const initialFormAction = await runtime.resolveNextAction({ taskState })
+		const renderFormAction = await submitNewProjectSelection(taskState, "Selector Project")
 
-		expect(initialFormAction.kind).to.equal("render_workflow_form")
+		expect(renderFormAction.kind).to.equal("render_workflow_form")
+		if (renderFormAction.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${renderFormAction.kind}.`)
+		}
 
-		await submitActiveWorkflowFormPanel(taskState)
-		expect((taskState.activeWorkflowFormSession as any)?.panelId).to.equal("panel-2")
+		expect(renderFormAction.payload.panel?.panelId).to.equal("selectors")
+		expect(
+			renderFormAction.payload.panel?.fields.find((field) => field.key === "existing_project_choice")?.options,
+		).to.deep.equal([{ value: "Existing Alpha", label: "Existing Alpha" }])
+		expect(renderFormAction.payload.panel?.fields.find((field) => field.key === "selected_folder")?.options).to.deep.equal([
+			{ value: "planning", label: "planning" },
+		])
+		expect(renderFormAction.payload.panel?.fields.find((field) => field.key === "selected_file")?.options).to.deep.equal([
+			{ value: "notes.md", label: "notes.md" },
+			{ value: "artifact.md", label: "artifact.md" },
+		])
+		expect(renderFormAction.payload.panel?.fields.find((field) => field.key === "selected_artifact")?.options).to.deep.equal([
+			{ value: "notes.md", label: "notes.md" },
+			{ value: "artifact.md", label: "artifact.md" },
+		])
 
-		await submitActiveWorkflowFormPanel(taskState)
-		const terminalPendingAction = await runtime.resolveNextAction({ taskState })
-		const terminalSuccessResult = await runtime.handleDeterministicToolResult({
+		const submitted = await runtime.submitWorkflowForm({
 			taskState,
-			toolResultText: "ok",
+			request: createFormSubmitRequest({
+				sessionId: renderFormAction.formSession.sessionId,
+				panelId: renderFormAction.formSession.currentPanelId,
+				fields: [
+					{
+						key: "existing_project_choice",
+						value: { stringValue: "Existing Alpha" },
+					},
+					{
+						key: "selected_folder",
+						value: { stringValue: "planning" },
+					},
+					{
+						key: "selected_file",
+						value: { stringValue: "notes.md" },
+					},
+					{
+						key: "selected_artifact",
+						value: { stringValue: "artifact.md" },
+					},
+				],
+			}),
 		})
 
-		expect(terminalPendingAction.kind).to.equal("run_deterministic_operation")
-		expect(taskState.suppressedWorkflowFormResolverIds).to.deep.equal([terminalFormId])
-		expect(terminalSuccessResult.kind).to.equal("project_prompt")
-
-		const deterministicFormId = "form-deterministic"
-		const deterministicWorkflow = createWorkflowDefinition({
-			workflowForms: {
-				[deterministicFormId]: createWorkflowFormDefinitionPayload({ deterministic: true }),
-			},
-			steps: {
-				"step-1": {
-					id: "step-1",
-					stepNumber: 1,
-					checklistLabel: "Step 1",
-					allowWorkflowProgressRequest: true,
-					workflowFormId: deterministicFormId,
-					buildPromptProjection: () => ({
-						workflowSystemInstructionsBlock: "system",
-						workflowInputInstructionsBlock: "input",
-					}),
-				} as WorkflowStepDefinition,
-				"step-2": {
-					id: "step-2",
-					stepNumber: 2,
-					checklistLabel: "Step 2",
-					allowWorkflowProgressRequest: true,
-					buildPromptProjection: () => ({
-						workflowSystemInstructionsBlock: "system",
-						workflowInputInstructionsBlock: "input",
-					}),
-				} as WorkflowStepDefinition,
-			},
+		expect(submitted.kind).to.equal("project_prompt")
+		expect(getActiveWorkflowSession(taskState).workflowValues).to.deep.include({
+			existing_project_value: "Existing Alpha",
+			selected_folder_value: "planning",
+			selected_file_value: "notes.md",
+			selected_artifact_value: "artifact.md",
 		})
-
-		const falsyRestoreState = new TaskState()
-		await runtime.activateWorkflow({ taskState: falsyRestoreState, workflow: deterministicWorkflow })
-		await runtime.resolveNextAction({ taskState: falsyRestoreState })
-		await submitNewProjectSelection(falsyRestoreState, "Falsy Restore Project")
-		await runtime.resolveNextAction({ taskState: falsyRestoreState })
-		await submitActiveWorkflowFormPanel(falsyRestoreState)
-		await submitActiveWorkflowFormPanel(falsyRestoreState)
-		expect((await runtime.resolveNextAction({ taskState: falsyRestoreState })).kind).to.equal("run_deterministic_operation")
-
-		await runtime.handleDeterministicToolResult({ taskState: falsyRestoreState })
-
-		expect((await runtime.resolveNextAction({ taskState: falsyRestoreState })).kind).to.equal("render_workflow_form")
-		expect((falsyRestoreState.activeWorkflowFormSession as any)?.panelId).to.equal("panel-2")
-
-		const errorRestoreState = new TaskState()
-		await runtime.activateWorkflow({ taskState: errorRestoreState, workflow: deterministicWorkflow })
-		await runtime.resolveNextAction({ taskState: errorRestoreState })
-		await submitNewProjectSelection(errorRestoreState, "Error Restore Project")
-		await runtime.resolveNextAction({ taskState: errorRestoreState })
-		await submitActiveWorkflowFormPanel(errorRestoreState)
-		await submitActiveWorkflowFormPanel(errorRestoreState)
-		expect((await runtime.resolveNextAction({ taskState: errorRestoreState })).kind).to.equal("run_deterministic_operation")
-
-		await runtime.handleDeterministicToolResult({
-			taskState: errorRestoreState,
-			toolResultText: "Error: failure",
-		})
-
-		expect((await runtime.resolveNextAction({ taskState: errorRestoreState })).kind).to.equal("render_workflow_form")
-		expect((errorRestoreState.activeWorkflowFormSession as any)?.panelId).to.equal("panel-2")
-
-		const nextPanelState = new TaskState()
-		await runtime.activateWorkflow({ taskState: nextPanelState, workflow: deterministicWorkflow })
-		await runtime.resolveNextAction({ taskState: nextPanelState })
-		await submitNewProjectSelection(nextPanelState, "Next Panel Project")
-		await runtime.resolveNextAction({ taskState: nextPanelState })
-		await submitActiveWorkflowFormPanel(nextPanelState)
-		await submitActiveWorkflowFormPanel(nextPanelState)
-		expect((await runtime.resolveNextAction({ taskState: nextPanelState })).kind).to.equal("run_deterministic_operation")
-
-		await runtime.handleDeterministicToolResult({
-			taskState: nextPanelState,
-			toolResultText: "ok",
-		})
-
-		expect((nextPanelState.activeWorkflowFormSession as any)?.panelId).to.equal("panel-3")
-		expect((await runtime.resolveNextAction({ taskState: nextPanelState })).kind).to.equal("render_workflow_form")
 	})
 
-	it("runs deterministic step-resolution definitions and handles success and failure outcomes", async () => {
-		const successWorkflow = createWorkflowDefinition({
-			stepResolutionDefinitions: {
-				"step-resolution-1": createStepResolutionDefinition(),
+	it("keeps workflow-form field keys form-local unless workflowValueKey is declared", async () => {
+		const workflowFormId = "form-local-field-form"
+		const fieldKey = "local_summary"
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: [fieldKey],
+			workflowForms: {
+				[workflowFormId]: {
+					definitionVersion: 2,
+					title: "Form Local Field Form",
+					toolDictionaryTitle: "Form Local Field Tools",
+					toolDictionaryMarkdown: "Form local field help",
+					firstPanelId: "details",
+					panels: {
+						details: {
+							panelId: "details",
+							title: "Details",
+							promptMarkdown: "Capture local details.",
+							fields: [
+								{
+									key: fieldKey,
+									kind: "small_text",
+									label: "Local summary",
+									required: true,
+									allowedValueType: "string",
+								},
+							],
+							allowedActions: ["submit"],
+							transition: createTerminalTransition(),
+						},
+					},
+				},
 			},
 			steps: {
-				"step-1": {
-					id: "step-1",
+				"step-1": createStepDefinition({
 					stepNumber: 1,
-					checklistLabel: "Step 1",
-					allowWorkflowProgressRequest: true,
-					stepResolutionDefinitionId: "step-resolution-1",
-					buildPromptProjection: () => ({
-						workflowSystemInstructionsBlock: "system",
-						workflowInputInstructionsBlock: "input",
+					decisionTree: createWorkflowFormDecisionTree({
+						workflowFormId,
 					}),
-				} as WorkflowStepDefinition,
-				"step-2": {
-					id: "step-2",
-					stepNumber: 2,
-					checklistLabel: "Step 2",
-					allowWorkflowProgressRequest: true,
-					buildPromptProjection: () => ({
-						workflowSystemInstructionsBlock: "system",
-						workflowInputInstructionsBlock: "input",
-					}),
-				} as WorkflowStepDefinition,
+				}),
 			},
 		})
 
-		await runtime.activateWorkflow({ taskState, workflow: successWorkflow })
+		await activateWorkflow(taskState, workflow)
+		await runtime.resolveNextAction({ taskState })
+		const renderFormAction = await submitNewProjectSelection(taskState, "Form Local Project")
+		expect(renderFormAction.kind).to.equal("render_workflow_form")
+		if (renderFormAction.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${renderFormAction.kind}.`)
+		}
+
+		const nextAction = await runtime.submitWorkflowForm({
+			taskState,
+			request: createFormSubmitRequest({
+				sessionId: renderFormAction.formSession.sessionId,
+				panelId: renderFormAction.formSession.currentPanelId,
+				fields: [
+					{
+						key: fieldKey,
+						value: { stringValue: "Local only" },
+					},
+				],
+			}),
+		})
+
+		expect(nextAction.kind).to.equal("project_prompt")
+		expect(getActiveWorkflowSession(taskState).workflowValues).to.not.have.property(fieldKey)
+	})
+
+	it("passes module selector namingPattern into candidate discovery and filters through the discovery seam", async () => {
+		const workflowFormId = "naming-pattern-selector-form"
+		const fieldKey = "selected_story"
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: [fieldKey],
+			workflowForms: {
+				[workflowFormId]: {
+					definitionVersion: 2,
+					title: "Naming Pattern Selector Form",
+					toolDictionaryTitle: "Naming Pattern Selector Tools",
+					toolDictionaryMarkdown: "Naming pattern selector help",
+					firstPanelId: "selectors",
+					panels: {
+						selectors: {
+							panelId: "selectors",
+							title: "Selector Inputs",
+							promptMarkdown: "Choose a discovered story.",
+							fields: [
+								{
+									key: fieldKey,
+									kind: "file_path",
+									label: "Story",
+									required: true,
+									allowedValueType: "string",
+									selectorDiscovery: {
+										root: {
+											kind: "selected_project_root",
+										},
+										entryType: "file",
+										targetPathSegments: ["stories"],
+										namingPattern: "^story-.+\\.md$",
+										immediateChildrenOnly: true,
+										sort: "alpha_asc",
+									},
+									valueSchema: { type: "string" },
+								},
+							],
+							allowedActions: ["submit"],
+							transition: createTerminalTransition(),
+						},
+					},
+				},
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createWorkflowFormDecisionTree({
+						workflowFormId,
+					}),
+				}),
+			},
+		})
+		let observedNamingPattern: RegExp | undefined
+
+		discoverWorkflowCandidatesStub.callsFake((request: WorkflowDiscoveryRequest) => {
+			if (
+				request.entryType === "file" &&
+				request.targetPathSegments?.length === 2 &&
+				request.targetPathSegments[0] === "pattern-project" &&
+				request.targetPathSegments[1] === "stories"
+			) {
+				observedNamingPattern = request.namingPattern
+				const entries = ["story-alpha.md", "notes.md"].filter((entryName) => {
+					const namingPattern = request.namingPattern
+					if (namingPattern === undefined) {
+						return true
+					}
+
+					namingPattern.lastIndex = 0
+					return namingPattern.test(entryName)
+				})
+
+				return Promise.resolve(
+					entries.map((entryName) => ({
+						value: entryName,
+						label: request.buildLabel === undefined ? entryName : request.buildLabel(entryName),
+					})),
+				)
+			}
+
+			return Promise.resolve([])
+		})
+
+		await activateWorkflow(taskState, workflow)
+		await runtime.resolveNextAction({ taskState })
+		const renderFormAction = await submitNewProjectSelection(taskState, "Pattern Project")
+
+		expect(renderFormAction.kind).to.equal("render_workflow_form")
+		if (renderFormAction.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${renderFormAction.kind}.`)
+		}
+		expect(observedNamingPattern).to.not.equal(undefined)
+		if (observedNamingPattern === undefined) {
+			throw new Error("Expected namingPattern to be passed to discovery.")
+		}
+
+		expect(observedNamingPattern.test("story-alpha.md")).to.equal(true)
+		observedNamingPattern.lastIndex = 0
+		expect(observedNamingPattern.test("notes.md")).to.equal(false)
+		expect(renderFormAction.payload.panel?.fields.find((field) => field.key === fieldKey)?.options).to.deep.equal([
+			{ value: "story-alpha.md", label: "story-alpha.md" },
+		])
+	})
+
+	it("applies module selector labelTemplate while preserving canonical option values", async () => {
+		const workflowFormId = "label-template-selector-form"
+		const fieldKey = "selected_artifact"
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: [fieldKey],
+			workflowForms: {
+				[workflowFormId]: {
+					definitionVersion: 2,
+					title: "Label Template Selector Form",
+					toolDictionaryTitle: "Label Template Selector Tools",
+					toolDictionaryMarkdown: "Label template selector help",
+					firstPanelId: "selectors",
+					panels: {
+						selectors: {
+							panelId: "selectors",
+							title: "Selector Inputs",
+							promptMarkdown: "Choose a discovered artifact.",
+							fields: [
+								{
+									key: fieldKey,
+									kind: "artifact_picker",
+									label: "Artifact",
+									required: true,
+									allowedValueType: "string",
+									selectorDiscovery: {
+										root: {
+											kind: "selected_project_root",
+										},
+										entryType: "file",
+										targetPathSegments: ["artifacts"],
+										labelTemplate: "Artifact: {entryName}",
+										immediateChildrenOnly: true,
+										sort: "alpha_asc",
+									},
+									valueSchema: { type: "string" },
+								},
+							],
+							allowedActions: ["submit"],
+							transition: createTerminalTransition(),
+						},
+					},
+				},
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createWorkflowFormDecisionTree({
+						workflowFormId,
+					}),
+				}),
+			},
+		})
+
+		discoverWorkflowCandidatesStub.callsFake((request: WorkflowDiscoveryRequest) => {
+			if (
+				request.entryType === "file" &&
+				request.targetPathSegments?.length === 2 &&
+				request.targetPathSegments[0] === "template-project" &&
+				request.targetPathSegments[1] === "artifacts"
+			) {
+				return Promise.resolve(
+					["brief.md"].map((entryName) => ({
+						value: entryName,
+						label: request.buildLabel === undefined ? entryName : request.buildLabel(entryName),
+					})),
+				)
+			}
+
+			return Promise.resolve([])
+		})
+
+		await activateWorkflow(taskState, workflow)
+		await runtime.resolveNextAction({ taskState })
+		const renderFormAction = await submitNewProjectSelection(taskState, "Template Project")
+
+		expect(renderFormAction.kind).to.equal("render_workflow_form")
+		if (renderFormAction.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${renderFormAction.kind}.`)
+		}
+		expect(renderFormAction.payload.panel?.fields.find((field) => field.key === fieldKey)?.options).to.deep.equal([
+			{ value: "brief.md", label: "Artifact: brief.md" },
+		])
+	})
+
+	it("routes serialized denied and errored tool-backed operation tool results through tool_backed_operation_failed", async () => {
+		const failureCases = [
+			{
+				toolResultText: formatResponse.toolDenied(),
+				expectedErrorMessage: formatResponse.toolDenied(),
+			},
+			{
+				toolResultText: formatResponse.toolError("boom"),
+				expectedErrorMessage: formatResponse.toolError("boom"),
+			},
+		]
+
+		for (const failureCase of failureCases) {
+			const failureState = new TaskState()
+			const workflow = createWorkflowDefinition({
+				name: `serialized-tool-backed operation-failure-${failureCases.indexOf(failureCase)}`,
+				toolBackedOperationDefinitions: {
+					"step-resolution-1": createToolBackedOperationDefinition(),
+				},
+				steps: {
+					"step-1": createStepDefinition({
+						stepNumber: 1,
+						decisionTree: createToolBackedOperationDecisionTree({
+							toolBackedOperationId: "step-resolution-1",
+						}),
+					}),
+				},
+			})
+
+			await activateWorkflow(failureState, workflow)
+			await runtime.resolveNextAction({ taskState: failureState })
+			await submitNewProjectSelection(failureState, `Serialized Failure ${failureCases.indexOf(failureCase)}`)
+			expect((await runtime.resolveNextAction({ taskState: failureState })).kind).to.equal("execute_tool_backed_operation")
+
+			const result = await runtime.handleToolBackedOperationToolResult({
+				taskState: failureState,
+				toolResultText: failureCase.toolResultText,
+			})
+			const activeSession = getActiveWorkflowSession(failureState)
+
+			expect(result.kind).to.equal("project_prompt")
+			expect(activeSession.branchContext.activeBranchId).to.equal("after-step-resolution-failure")
+			expect(activeSession.branchContext.failureState).to.deep.equal({
+				retryAttemptCount: 1,
+				terminalErrorMessage: failureCase.expectedErrorMessage,
+			})
+			expect(activeSession.ui.suppressedWorkflowStepResolutionDefinitionIds).to.deep.equal(["step-resolution-1"])
+			expect(activeSession.activeStepNumber).to.equal(1)
+		}
+	})
+
+	it("runs tool-backed operation routes with explicit target-step progression and failure context", async () => {
+		const successWorkflow = createWorkflowDefinition({
+			toolBackedOperationDefinitions: {
+				"step-resolution-1": createToolBackedOperationDefinition(),
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createToolBackedOperationDecisionTree({
+						toolBackedOperationId: "step-resolution-1",
+						successTargetStepNumber: 3,
+					}),
+				}),
+				"step-2": createStepDefinition({ stepNumber: 2 }),
+				"step-3": createStepDefinition({ stepNumber: 3, checklistLabel: "Step 3" }),
+			},
+		})
+
+		await activateWorkflow(taskState, successWorkflow)
 		await runtime.resolveNextAction({ taskState })
 		await submitNewProjectSelection(taskState, "Step Resolution Project")
-		const deterministicAction = await runtime.resolveNextAction({ taskState })
-		const successResult = await runtime.handleDeterministicToolResult({
+		const toolBackedOperation = await runtime.resolveNextAction({ taskState })
+		const successResult = await runtime.handleToolBackedOperationToolResult({
 			taskState,
 			toolResultText: "ok",
 		})
 
-		expect(deterministicAction.kind).to.equal("run_deterministic_operation")
-		expect((taskState.activeWorkflowSession as any)?.activeStepNumber).to.equal(2)
-		expect(taskState.suppressedWorkflowStepResolutionDefinitionIds).to.deep.equal(["step-resolution-1"])
+		expect(toolBackedOperation.kind).to.equal("execute_tool_backed_operation")
+		if (toolBackedOperation.kind !== "execute_tool_backed_operation") {
+			throw new Error(`Expected execute_tool_backed_operation, received ${toolBackedOperation.kind}.`)
+		}
+		expect(toolBackedOperation.toolBackedOperationSession).to.not.equal(undefined)
+		if (!toolBackedOperation.toolBackedOperationSession) {
+			throw new Error("Expected a runtime-owned tool-backed operation session.")
+		}
+		expect(toolBackedOperation.toolBackedOperationSession.definitionId).to.equal("step-resolution-1")
+		expect(toolBackedOperation.toolBackedOperationSession.triggerSource).to.equal("execute_tool_backed_operation")
+		expect(toolBackedOperation.toolBackedOperationSession.owner).to.deep.equal({
+			kind: "workflow_step",
+			workflowName: successWorkflow.name,
+			stepNumber: 1,
+		})
+		expect(toolBackedOperation.toolBackedOperationSession.state).to.equal("pending")
+		expect(toolBackedOperation.toolBackedOperationSession.sessionId).to.be.a("string").and.not.equal("")
+		expect(
+			runtime.buildToolBackedOperationStatusPayload({
+				taskState,
+				session: toolBackedOperation.toolBackedOperationSession,
+			}),
+		).to.deep.equal({
+			sessionId: toolBackedOperation.toolBackedOperationSession.sessionId,
+			definitionId: "step-resolution-1",
+			owner: {
+				workflowName: successWorkflow.name,
+				stepNumber: 1,
+			},
+			state: "pending",
+			definition: {
+				title: "Step Resolution",
+				pendingLabel: "Pending",
+				successLabel: "Success",
+				failureLabel: "Failure",
+			},
+		})
+		expect(getActiveWorkflowSession(taskState).activeStepNumber).to.equal(3)
+		expect(getActiveWorkflowSession(taskState).ui.suppressedWorkflowStepResolutionDefinitionIds).to.deep.equal([])
 		expect(successResult.kind).to.equal("project_prompt")
-
-		const fallbackWorkflow = createWorkflowDefinition({
-			stepResolutionDefinitions: {
-				"step-resolution-1": createStepResolutionDefinition({
-					shouldSucceed: false,
-					fallbackToAgent: true,
-				}),
-			},
-			steps: {
-				"step-1": {
-					id: "step-1",
-					stepNumber: 1,
-					checklistLabel: "Step 1",
-					allowWorkflowProgressRequest: true,
-					stepResolutionDefinitionId: "step-resolution-1",
-					buildPromptProjection: () => ({
-						workflowSystemInstructionsBlock: "system",
-						workflowInputInstructionsBlock: "input",
-					}),
-				} as WorkflowStepDefinition,
-				"step-2": {
-					id: "step-2",
-					stepNumber: 2,
-					checklistLabel: "Step 2",
-					allowWorkflowProgressRequest: true,
-					buildPromptProjection: () => ({
-						workflowSystemInstructionsBlock: "system",
-						workflowInputInstructionsBlock: "input",
-					}),
-				} as WorkflowStepDefinition,
-			},
-		})
-		const fallbackState = new TaskState()
-		await runtime.activateWorkflow({ taskState: fallbackState, workflow: fallbackWorkflow })
-		await runtime.resolveNextAction({ taskState: fallbackState })
-		await submitNewProjectSelection(fallbackState, "Fallback Project")
-		expect((await runtime.resolveNextAction({ taskState: fallbackState })).kind).to.equal("run_deterministic_operation")
-		const fallbackResult = await runtime.handleDeterministicToolResult({
-			taskState: fallbackState,
-			toolResultText: "ok",
-		})
-
-		expect((fallbackState.activeWorkflowSession as any)?.activeStepNumber).to.equal(1)
-		expect(fallbackState.suppressedWorkflowStepResolutionDefinitionIds).to.deep.equal(["step-resolution-1"])
-		expect(fallbackResult.kind).to.equal("project_prompt")
+		expect(getActiveWorkflowSession(taskState).branchContext.activeBranchId).to.equal("project-prompt")
 
 		const failureWorkflow = createWorkflowDefinition({
-			stepResolutionDefinitions: {
-				"step-resolution-1": createStepResolutionDefinition({
+			toolBackedOperationDefinitions: {
+				"step-resolution-1": createToolBackedOperationDefinition({
 					shouldSucceed: false,
 				}),
 			},
 			steps: {
-				"step-1": {
-					id: "step-1",
+				"step-1": createStepDefinition({
 					stepNumber: 1,
-					checklistLabel: "Step 1",
-					allowWorkflowProgressRequest: true,
-					stepResolutionDefinitionId: "step-resolution-1",
-					buildPromptProjection: () => ({
-						workflowSystemInstructionsBlock: "system",
-						workflowInputInstructionsBlock: "input",
+					decisionTree: createToolBackedOperationDecisionTree({
+						toolBackedOperationId: "step-resolution-1",
 					}),
-				} as WorkflowStepDefinition,
-				"step-2": {
-					id: "step-2",
-					stepNumber: 2,
-					checklistLabel: "Step 2",
-					allowWorkflowProgressRequest: true,
-					buildPromptProjection: () => ({
-						workflowSystemInstructionsBlock: "system",
-						workflowInputInstructionsBlock: "input",
-					}),
-				} as WorkflowStepDefinition,
+				}),
+				"step-2": createStepDefinition({ stepNumber: 2 }),
 			},
 		})
 		const failureState = new TaskState()
-		await runtime.activateWorkflow({ taskState: failureState, workflow: failureWorkflow })
+		await activateWorkflow(failureState, failureWorkflow)
 		await runtime.resolveNextAction({ taskState: failureState })
 		await submitNewProjectSelection(failureState, "Failure Project")
-		expect((await runtime.resolveNextAction({ taskState: failureState })).kind).to.equal("run_deterministic_operation")
-		const failureResult = await runtime.handleDeterministicToolResult({
+		expect((await runtime.resolveNextAction({ taskState: failureState })).kind).to.equal("execute_tool_backed_operation")
+		const failureResult = await runtime.handleToolBackedOperationToolResult({
 			taskState: failureState,
 			toolResultText: "ok",
 		})
 
-		expect((failureState.activeWorkflowSession as any)?.activeStepNumber).to.equal(1)
-		expect(failureState.suppressedWorkflowStepResolutionDefinitionIds).to.deep.equal(["step-resolution-1"])
+		expect(getActiveWorkflowSession(failureState).activeStepNumber).to.equal(1)
+		expect(getActiveWorkflowSession(failureState).ui.suppressedWorkflowStepResolutionDefinitionIds).to.deep.equal([
+			"step-resolution-1",
+		])
+		expect(getActiveWorkflowSession(failureState).branchContext.failureState).to.deep.equal({
+			retryAttemptCount: 1,
+			terminalErrorMessage: "failure",
+		})
+		expect(getActiveWorkflowSession(failureState).branchContext.activeBranchId).to.equal("after-step-resolution-failure")
 		expect(failureResult.kind).to.equal("project_prompt")
 	})
 
-	it("gates workflow progress requests on project selection and active-step settings", async () => {
-		const allowedWorkflow = createWorkflowDefinition()
+	it("retries tool-backed operations only when the matched failure branch prescribes another execute_tool_backed_operation", async () => {
+		const retryWorkflow = createWorkflowDefinition({
+			toolBackedOperationDefinitions: {
+				"step-resolution-1": createToolBackedOperationDefinition({
+					shouldSucceed: false,
+				}),
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createToolBackedOperationDecisionTree({
+						toolBackedOperationId: "step-resolution-1",
+						failureAction: {
+							kind: "execute_tool_backed_operation",
+							toolBackedOperationId: "step-resolution-1",
+						},
+					}),
+				}),
+				"step-2": createStepDefinition({ stepNumber: 2 }),
+			},
+		})
 
-		await runtime.activateWorkflow({ taskState, workflow: allowedWorkflow })
+		const retryState = new TaskState()
+		await activateWorkflow(retryState, retryWorkflow)
+		await runtime.resolveNextAction({ taskState: retryState })
+		await submitNewProjectSelection(retryState, "Retry Project")
+		expect((await runtime.resolveNextAction({ taskState: retryState })).kind).to.equal("execute_tool_backed_operation")
+
+		const retryResult = await runtime.handleToolBackedOperationToolResult({
+			taskState: retryState,
+			toolResultText: "ok",
+		})
+
+		expect(retryResult.kind).to.equal("execute_tool_backed_operation")
+		expect(getActiveWorkflowSession(retryState).branchContext.failureState).to.deep.equal({
+			retryAttemptCount: 1,
+			terminalErrorMessage: "failure",
+		})
+	})
+
+	it("executes explicit terminal-error failure branches without silently downgrading to project_prompt", async () => {
+		const terminalFailureWorkflow = createWorkflowDefinition({
+			toolBackedOperationDefinitions: {
+				"step-resolution-1": createToolBackedOperationDefinition({
+					shouldSucceed: false,
+				}),
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createToolBackedOperationDecisionTree({
+						toolBackedOperationId: "step-resolution-1",
+						failureAction: { kind: "terminal_error" },
+					}),
+				}),
+				"step-2": createStepDefinition({ stepNumber: 2 }),
+			},
+		})
+
+		const terminalFailureState = new TaskState()
+		await activateWorkflow(terminalFailureState, terminalFailureWorkflow)
+		await runtime.resolveNextAction({ taskState: terminalFailureState })
+		await submitNewProjectSelection(terminalFailureState, "Terminal Failure Project")
+		expect((await runtime.resolveNextAction({ taskState: terminalFailureState })).kind).to.equal(
+			"execute_tool_backed_operation",
+		)
+
+		const terminalFailureResult = await runtime.handleToolBackedOperationToolResult({
+			taskState: terminalFailureState,
+			toolResultText: "ok",
+		})
+
+		expect(terminalFailureResult).to.deep.equal({
+			kind: "terminal_error",
+			errorMessage: "failure",
+		})
+		expect(getActiveWorkflowSession(terminalFailureState).branchContext.activeBranchId).to.equal(
+			"after-step-resolution-failure",
+		)
+		expect(getActiveWorkflowSession(terminalFailureState).branchContext.lastTriggerEvent).to.equal(undefined)
+		expect(getActiveWorkflowSession(terminalFailureState).branchContext.failureState).to.deep.equal({
+			retryAttemptCount: 1,
+			terminalErrorMessage: "failure",
+		})
+	})
+
+	it("fails closed with terminal_error when tool-backed operation failure has no matching failure branch", async () => {
+		const unmatchedFailureWorkflow = createWorkflowDefinition({
+			toolBackedOperationDefinitions: {
+				"step-resolution-1": createToolBackedOperationDefinition({
+					shouldSucceed: false,
+				}),
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: {
+						entryBranchId: "run-step-resolution",
+						branches: {
+							"run-step-resolution": {
+								id: "run-step-resolution",
+								routes: [
+									{
+										id: "start-step-resolution",
+										trigger: { kind: "always" },
+										action: {
+											kind: "execute_tool_backed_operation",
+											toolBackedOperationId: "step-resolution-1",
+										},
+										followingBranchId: "await-step-resolution",
+									},
+								],
+							},
+							"await-step-resolution": {
+								id: "await-step-resolution",
+								routes: [
+									{
+										id: "step-resolution-succeeded",
+										trigger: {
+											kind: "event_predicate",
+											matches: ({ triggerEvent }) =>
+												triggerEvent.kind === "tool_backed_operation_succeeded" &&
+												triggerEvent.toolBackedOperationId === "step-resolution-1",
+										},
+										action: { kind: "project_prompt" },
+										followingBranchId: "after-step-resolution-success",
+									},
+								],
+							},
+							"after-step-resolution-success": {
+								id: "after-step-resolution-success",
+								routes: [
+									{
+										id: "after-step-resolution-success-route",
+										trigger: { kind: "always" },
+										action: { kind: "project_prompt" },
+									},
+								],
+							},
+						},
+					},
+				}),
+				"step-2": createStepDefinition({ stepNumber: 2 }),
+			},
+		})
+
+		const unmatchedFailureState = new TaskState()
+		await activateWorkflow(unmatchedFailureState, unmatchedFailureWorkflow)
+		await runtime.resolveNextAction({ taskState: unmatchedFailureState })
+		await submitNewProjectSelection(unmatchedFailureState, "Unmatched Failure Project")
+		expect((await runtime.resolveNextAction({ taskState: unmatchedFailureState })).kind).to.equal(
+			"execute_tool_backed_operation",
+		)
+
+		const unmatchedFailureResult = await runtime.handleToolBackedOperationToolResult({
+			taskState: unmatchedFailureState,
+			toolResultText: "ok",
+		})
+
+		expect(unmatchedFailureResult).to.deep.equal({
+			kind: "terminal_error",
+			errorMessage: "failure",
+		})
+		expect(getActiveWorkflowSession(unmatchedFailureState).branchContext.activeBranchId).to.equal("await-step-resolution")
+		expect(getActiveWorkflowSession(unmatchedFailureState).branchContext.lastTriggerEvent).to.deep.equal({
+			kind: "tool_backed_operation_failed",
+			toolBackedOperationId: "step-resolution-1",
+			errorMessage: "failure",
+		})
+		expect(getActiveWorkflowSession(unmatchedFailureState).branchContext.failureState).to.deep.equal({
+			retryAttemptCount: 1,
+			terminalErrorMessage: "failure",
+		})
+	})
+
+	it("persists document-builder tool-backed operation failure context and re-evaluates the same failure branch", async () => {
+		const outputFileKeys = createStandaloneArtifactOutputValueKeys("output_file")
+		const documentBuilderWorkflow = createWorkflowDefinition({
+			workflowValueKeys: collectArtifactOutputWorkflowValueKeys(outputFileKeys),
+			artifacts: {
+				output_file: {
+					id: "output_file",
+					family: WorkflowArtifactFamily.Epic,
+					intentMode: "new",
+					parentIdentitySource: undefined,
+					targetIdentitySource: undefined,
+					outputValueKeys: outputFileKeys,
+				},
+			},
+			documentBuilders: {
+				"build-spec": {
+					id: "build-spec",
+					artifactId: "output_file",
+					toolContract: {} as never,
+					buildContent: () => "# Resolved spec",
+				},
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createToolBackedOperationDecisionTree({
+						toolBackedOperationId: "build-spec",
+						startAction: { kind: "build_workflow_document", documentBuilderId: "build-spec" },
+						failureAction: { kind: "no_op" },
+					}),
+					documentBuilderIds: ["build-spec"],
+				}),
+				"step-2": createStepDefinition({ stepNumber: 2 }),
+			},
+		})
+
+		const documentBuilderFailureState = new TaskState()
+		await activateWorkflow(documentBuilderFailureState, documentBuilderWorkflow)
+		getActiveWorkflowSession(documentBuilderFailureState).workflowValues[outputFileKeys.artifactAbsolutePath] = join(
+			cwd,
+			"builder-failure-project",
+			"planning",
+			"Epic-1.md",
+		)
+		await runtime.resolveNextAction({ taskState: documentBuilderFailureState })
+		expect((await submitNewProjectSelection(documentBuilderFailureState, "Builder Failure Project")).kind).to.equal(
+			"execute_tool_backed_operation",
+		)
+
+		const failureResult = await runtime.handleToolBackedOperationToolResult({
+			taskState: documentBuilderFailureState,
+			toolResultText: "Error: write failed",
+		})
+
+		expect(failureResult.kind).to.equal("project_prompt")
+		expect(getActiveWorkflowSession(documentBuilderFailureState).branchContext.failureState).to.deep.equal({
+			retryAttemptCount: 1,
+			terminalErrorMessage: "Error: write failed",
+		})
+		expect(getActiveWorkflowSession(documentBuilderFailureState).branchContext.activeBranchId).to.equal(
+			"after-step-resolution-failure",
+		)
+	})
+
+	it("gates workflow progress requests through branch context, re-validation, and explicit target steps", async () => {
+		const progressWorkflow = createWorkflowDefinition({
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createWorkflowProgressDecisionTree({
+						approvedTargetStepNumber: 3,
+					}),
+					toolSchema: createWorkflowProgressRequestToolSchema(),
+				}),
+				"step-2": createStepDefinition({ stepNumber: 2 }),
+				"step-3": createStepDefinition({ stepNumber: 3, checklistLabel: "Step 3" }),
+			},
+		})
+
+		await activateWorkflow(taskState, progressWorkflow)
 
 		expect(runtime.isWorkflowProgressRequestAllowed({ taskState })).to.equal(false)
 
@@ -721,90 +2314,75 @@ describe("WorkflowRuntime", () => {
 		await submitNewProjectSelection(taskState, "Allowed Progress Project")
 
 		expect(runtime.isWorkflowProgressRequestAllowed({ taskState })).to.equal(true)
+		expect((await runtime.buildTurnProjection({ taskState })).workflowToolSchemaOverride?.map((tool) => tool.id)).to.include(
+			ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST,
+		)
+		expect(getActiveWorkflowSession(taskState).branchContext.activeBranchId).to.equal("await-progress-decision")
 
-		const disallowedWorkflow = createWorkflowDefinition({
-			steps: {
-				"step-1": {
-					id: "step-1",
-					stepNumber: 1,
-					checklistLabel: "Step 1",
-					allowWorkflowProgressRequest: false,
-					buildPromptProjection: () => ({
-						workflowSystemInstructionsBlock: "system",
-						workflowInputInstructionsBlock: "input",
-					}),
-				} as WorkflowStepDefinition,
-				"step-2": {
-					id: "step-2",
-					stepNumber: 2,
-					checklistLabel: "Step 2",
-					allowWorkflowProgressRequest: true,
-					buildPromptProjection: () => ({
-						workflowSystemInstructionsBlock: "system",
-						workflowInputInstructionsBlock: "input",
-					}),
-				} as WorkflowStepDefinition,
-			},
-		})
-		const disallowedState = new TaskState()
-		await runtime.activateWorkflow({ taskState: disallowedState, workflow: disallowedWorkflow })
-		await runtime.resolveNextAction({ taskState: disallowedState })
-		await submitNewProjectSelection(disallowedState, "Disallowed Progress Project")
-
-		expect(runtime.isWorkflowProgressRequestAllowed({ taskState: disallowedState })).to.equal(false)
-
-		const rejectedProgress = await runtime.submitWorkflowProgressRequest({
+		const deniedProgress = await runtime.submitWorkflowProgressRequest({
 			taskState,
 			approved: false,
 		})
 
-		expect(rejectedProgress).to.deep.equal({ kind: "no_op" })
+		expect(deniedProgress.kind).to.equal("project_prompt")
+		expect(getActiveWorkflowSession(taskState).branchContext.activeBranchId).to.equal("progress-denied")
+		expect(runtime.isWorkflowProgressRequestAllowed({ taskState })).to.equal(false)
 
-		;(taskState as any).suppressedWorkflowFormResolverIds = ["form-1"]
-		;(taskState as any).suppressedWorkflowStepResolutionDefinitionIds = ["step-resolution-1"]
+		const revalidationState = new TaskState()
+		await activateWorkflow(revalidationState, progressWorkflow)
+		await runtime.resolveNextAction({ taskState: revalidationState })
+		await submitNewProjectSelection(revalidationState, "Revalidation Project")
+		expect(runtime.isWorkflowProgressRequestAllowed({ taskState: revalidationState })).to.equal(true)
 
-		const approvedProgress = await runtime.submitWorkflowProgressRequest({
-			taskState,
+		const revalidationSession = getActiveWorkflowSession(revalidationState)
+		revalidationSession.branchContext.activeBranchId = "progress-denied"
+
+		const revalidatedProgress = await runtime.submitWorkflowProgressRequest({
+			taskState: revalidationState,
 			approved: true,
 		})
 
-		expect((taskState.activeWorkflowSession as any)?.activeStepNumber).to.equal(2)
-		expect(taskState.suppressedWorkflowFormResolverIds).to.deep.equal([])
-		expect(taskState.suppressedWorkflowStepResolutionDefinitionIds).to.deep.equal([])
+		expect(revalidatedProgress).to.deep.equal({ kind: "no_op" })
+		expect(revalidationSession.activeStepNumber).to.equal(1)
+
+		const approvedState = new TaskState()
+		await activateWorkflow(approvedState, progressWorkflow)
+		await runtime.resolveNextAction({ taskState: approvedState })
+		await submitNewProjectSelection(approvedState, "Approved Progress Project")
+
+		const approvedSession = getActiveWorkflowSession(approvedState)
+		approvedSession.ui.suppressedWorkflowFormIds = ["form-1"]
+		approvedSession.ui.suppressedWorkflowStepResolutionDefinitionIds = ["step-resolution-1"]
+
+		const approvedProgress = await runtime.submitWorkflowProgressRequest({
+			taskState: approvedState,
+			approved: true,
+		})
+
 		expect(approvedProgress.kind).to.equal("project_prompt")
+		expect(approvedSession.activeStepNumber).to.equal(3)
+		expect(approvedSession.ui.suppressedWorkflowFormIds).to.deep.equal([])
+		expect(approvedSession.ui.suppressedWorkflowStepResolutionDefinitionIds).to.deep.equal([])
 	})
 
-	it("applies workflow value writes only for allowed keys and trims stored values", async () => {
+	it("applies workflow value writes only for inventory keys and trims stored values", async () => {
+		const stepOne = createStepDefinition({ stepNumber: 1 })
+		let buildToolSchemaCallCount = 0
+		stepOne.buildToolSchema = () => {
+			buildToolSchemaCallCount += 1
+			return []
+		}
 		const writableWorkflow = createWorkflowDefinition({
+			workflowValueKeys: ["alpha", "beta"],
 			steps: {
-				"step-1": {
-					id: "step-1",
-					stepNumber: 1,
-					checklistLabel: "Step 1",
-					allowWorkflowProgressRequest: true,
-					setWorkflowValuesToolOverride: createAllowedValueWriteOverride({
-						allowedKeys: ["alpha", "beta"],
-					}),
-					buildPromptProjection: () => ({
-						workflowSystemInstructionsBlock: "system",
-						workflowInputInstructionsBlock: "input",
-					}),
-				} as WorkflowStepDefinition,
-				"step-2": {
-					id: "step-2",
-					stepNumber: 2,
-					checklistLabel: "Step 2",
-					allowWorkflowProgressRequest: true,
-					buildPromptProjection: () => ({
-						workflowSystemInstructionsBlock: "system",
-						workflowInputInstructionsBlock: "input",
-					}),
-				} as WorkflowStepDefinition,
+				"step-1": stepOne,
+				"step-2": createStepDefinition({ stepNumber: 2 }),
 			},
 		})
-		await runtime.activateWorkflow({ taskState, workflow: writableWorkflow })
+		await activateWorkflow(taskState, writableWorkflow)
 		await runtime.resolveNextAction({ taskState })
 		await submitNewProjectSelection(taskState, "Writable Project")
+		buildToolSchemaCallCount = 0
 
 		const attemptedValues: WorkflowValues = {
 			alpha: "  one  ",
@@ -821,15 +2399,16 @@ describe("WorkflowRuntime", () => {
 			},
 		})
 
-		expect((taskState.activeWorkflowSession as any)?.workflowValues).to.deep.include({ alpha: "one" })
-		expect((firstWrite as any).changedValues).to.deep.equal({ alpha: "one" })
-		expect((firstWrite as any).unchangedValues).to.deep.equal({ gamma: "no" })
-		expect((secondWrite as any).changedValues).to.deep.equal({})
-		expect((secondWrite as any).unchangedValues).to.deep.equal({ alpha: "one" })
+		expect(getActiveWorkflowSession(taskState).workflowValues).to.deep.include({ alpha: "one" })
+		expect(firstWrite.changedValues).to.deep.equal({ alpha: "one" })
+		expect(firstWrite.unchangedValues).to.deep.equal({ gamma: "no" })
+		expect(secondWrite.changedValues).to.deep.equal({})
+		expect(secondWrite.unchangedValues).to.deep.equal({ alpha: "one" })
+		expect(buildToolSchemaCallCount).to.equal(0)
 
 		const noOverrideState = new TaskState()
 		const noOverrideWorkflow = createWorkflowDefinition()
-		await runtime.activateWorkflow({ taskState: noOverrideState, workflow: noOverrideWorkflow })
+		await activateWorkflow(noOverrideState, noOverrideWorkflow)
 		await runtime.resolveNextAction({ taskState: noOverrideState })
 		await submitNewProjectSelection(noOverrideState, "No Override Project")
 		const noOverrideWrite = await runtime.applyWorkflowValueWrites({
@@ -839,25 +2418,759 @@ describe("WorkflowRuntime", () => {
 			},
 		})
 
-		expect((noOverrideWrite as any).changedValues).to.deep.equal({})
-		expect((noOverrideWrite as any).unchangedValues).to.deep.equal({ alpha: "blocked" })
-		expect((noOverrideState.activeWorkflowSession as any)?.workflowValues ?? {}).to.not.have.property("alpha")
+		expect(noOverrideWrite.changedValues).to.deep.equal({})
+		expect(noOverrideWrite.unchangedValues).to.deep.equal({ alpha: "blocked" })
+		expect(getActiveWorkflowSession(noOverrideState).workflowValues).to.not.have.property("alpha")
+	})
+
+	it("persists declared workflow-form value destinations before emitting a tool-backed operation request", async () => {
+		const workflowFormId = "value-destination-form"
+		const operationDefinitionId = "after-form-operation"
+		let capturedWorkflowValues: WorkflowValues | undefined
+		const operationDefinition: WorkflowToolBackedOperationDefinition = {
+			id: operationDefinitionId,
+			toolName: ClineDefaultTool.GENERATE_EXPLANATION,
+			buildStatusDefinition: () => ({
+				title: "After Form",
+				pendingLabel: "Pending",
+				successLabel: "Success",
+				failureLabel: "Failure",
+			}),
+			buildToolExecutionRequest: ({ activeWorkflowSession }) => {
+				capturedWorkflowValues = { ...activeWorkflowSession.workflowValues }
+				return {
+					toolName: ClineDefaultTool.GENERATE_EXPLANATION,
+					toolInput: {
+						summary: activeWorkflowSession.workflowValues.summary,
+					},
+					toolParams: {},
+				}
+			},
+			evaluateToolExecutionResult: () => ({ succeeded: true }),
+		}
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: ["summary"],
+			workflowForms: {
+				[workflowFormId]: {
+					definitionVersion: 2,
+					title: "Value Destination Form",
+					toolDictionaryTitle: "Value Destination Tools",
+					toolDictionaryMarkdown: "Value destination help",
+					firstPanelId: "details",
+					panels: {
+						details: {
+							panelId: "details",
+							title: "Details",
+							promptMarkdown: "Capture details.",
+							fields: [
+								{
+									key: "summary_field",
+									workflowValueKey: "summary",
+									kind: "small_text",
+									label: "Summary",
+									required: true,
+									allowedValueType: "string",
+								},
+							],
+							allowedActions: ["submit"],
+							transition: createTerminalTransition(),
+						},
+					},
+				},
+			},
+			toolBackedOperationDefinitions: {
+				[operationDefinitionId]: operationDefinition,
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createWorkflowFormDecisionTree({
+						workflowFormId,
+						completionAction: {
+							kind: "execute_tool_backed_operation",
+							toolBackedOperationId: operationDefinitionId,
+						},
+					}),
+				}),
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		await runtime.resolveNextAction({ taskState })
+		const renderFormAction = await submitNewProjectSelection(taskState, "Value Destination Project")
+		expect(renderFormAction.kind).to.equal("render_workflow_form")
+		if (renderFormAction.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${renderFormAction.kind}.`)
+		}
+
+		const nextAction = await runtime.submitWorkflowForm({
+			taskState,
+			request: createFormSubmitRequest({
+				sessionId: renderFormAction.formSession.sessionId,
+				panelId: renderFormAction.formSession.currentPanelId,
+				fields: [
+					{
+						key: "summary_field",
+						value: { stringValue: "  Captured summary  " },
+					},
+				],
+			}),
+		})
+		const activeSession = getActiveWorkflowSession(taskState)
+
+		expect(nextAction.kind).to.equal("execute_tool_backed_operation")
+		if (nextAction.kind !== "execute_tool_backed_operation") {
+			throw new Error(`Expected execute_tool_backed_operation, received ${nextAction.kind}.`)
+		}
+		expect(nextAction.toolBackedOperationSession?.definitionId).to.equal(operationDefinitionId)
+		expect(nextAction.toolRequest.toolInput).to.deep.equal({ summary: "Captured summary" })
+		expect(capturedWorkflowValues).to.deep.include({ summary: "Captured summary" })
+		expect(activeSession.workflowValues).to.deep.include({ summary: "Captured summary" })
+		expect(activeSession.ui.suppressedWorkflowFormIds).to.deep.equal([workflowFormId])
+	})
+
+	it("routes changed workflow value writes through workflow_values_persisted on_event branches", async () => {
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: ["alpha"],
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createWorkflowValuesPersistedDecisionTree(),
+				}),
+				"step-2": createStepDefinition({ stepNumber: 2 }),
+			},
+		})
+		await activateWorkflow(taskState, workflow)
+		await runtime.resolveNextAction({ taskState })
+		await submitNewProjectSelection(taskState, "Workflow Values Project")
+
+		const writeResult = await runtime.applyWorkflowValueWrites({
+			taskState,
+			values: {
+				alpha: " ready ",
+			},
+		})
+		const activeSession = getActiveWorkflowSession(taskState)
+
+		expect(writeResult.changedValues).to.deep.equal({ alpha: "ready" })
+		expect(writeResult.unchangedValues).to.deep.equal({})
+		expect(activeSession.branchContext.lastTriggerEvent).to.deep.equal({
+			kind: "workflow_values_persisted",
+			changedKeys: ["alpha"],
+		})
+
+		const nextAction = await runtime.resolveNextAction({ taskState })
+
+		expect(nextAction.kind).to.equal("project_prompt")
+		expect(activeSession.branchContext.lastTriggerEvent).to.equal(undefined)
+	})
+
+	it("does not record workflow_values_persisted when the active branch has no matching route", async () => {
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: ["alpha"],
+		})
+		await activateWorkflow(taskState, workflow)
+		await runtime.resolveNextAction({ taskState })
+		await submitNewProjectSelection(taskState, "No Workflow Values Route Project")
+
+		const activeSession = getActiveWorkflowSession(taskState)
+		activeSession.branchContext.lastTriggerEvent = {
+			kind: "workflow_progress_request_denied",
+		}
+
+		const writeResult = await runtime.applyWorkflowValueWrites({
+			taskState,
+			values: {
+				alpha: " persisted ",
+			},
+		})
+
+		expect(writeResult.changedValues).to.deep.equal({ alpha: "persisted" })
+		expect(writeResult.unchangedValues).to.deep.equal({})
+		expect(activeSession.branchContext.lastTriggerEvent).to.deep.equal({
+			kind: "workflow_progress_request_denied",
+		})
+	})
+
+	it("allocates and creates epic, story, remediation-story, and review artifacts with persisted output values", async () => {
+		discoverWorkflowCandidatesStub.restore()
+		const epicKeys = createStandaloneArtifactOutputValueKeys("epic")
+		const storyKeys = createParentedArtifactOutputValueKeys("story")
+		const remediationStoryKeys = createParentedArtifactOutputValueKeys("remediation_story")
+		const blindReviewKeys = createTargetedArtifactOutputValueKeys("blind_review")
+		const edgeCaseReviewKeys = createTargetedArtifactOutputValueKeys("edge_case_review")
+		const adversarialReviewKeys = createTargetedArtifactOutputValueKeys("adversarial_review")
+		const reviewInputMarkdownKeys = createTargetedArtifactOutputValueKeys("review_input_markdown")
+		const reviewInputDiffKeys = createTargetedArtifactOutputValueKeys("review_input_diff")
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: collectArtifactOutputWorkflowValueKeys(
+				epicKeys,
+				storyKeys,
+				remediationStoryKeys,
+				blindReviewKeys,
+				edgeCaseReviewKeys,
+				adversarialReviewKeys,
+				reviewInputMarkdownKeys,
+				reviewInputDiffKeys,
+			),
+			artifacts: {
+				epic_doc: {
+					id: "epic_doc",
+					family: WorkflowArtifactFamily.Epic,
+					intentMode: "new",
+					parentIdentitySource: undefined,
+					targetIdentitySource: undefined,
+					outputValueKeys: epicKeys,
+				},
+				story_doc: {
+					id: "story_doc",
+					family: WorkflowArtifactFamily.Story,
+					intentMode: "new",
+					parentIdentitySource: {
+						kind: "workflow_value",
+						key: epicKeys.artifactIdentity,
+					},
+					targetIdentitySource: undefined,
+					outputValueKeys: storyKeys,
+				},
+				remediation_story_doc: {
+					id: "remediation_story_doc",
+					family: WorkflowArtifactFamily.RemediationStory,
+					intentMode: "new",
+					parentIdentitySource: {
+						kind: "workflow_value",
+						key: storyKeys.artifactIdentity,
+					},
+					targetIdentitySource: undefined,
+					outputValueKeys: remediationStoryKeys,
+				},
+				blind_review_doc: {
+					id: "blind_review_doc",
+					family: WorkflowArtifactFamily.ReviewBlindHunter,
+					intentMode: "derived",
+					parentIdentitySource: undefined,
+					targetIdentitySource: {
+						kind: "workflow_value",
+						key: remediationStoryKeys.artifactIdentity,
+					},
+					outputValueKeys: blindReviewKeys,
+				},
+				edge_case_review_doc: {
+					id: "edge_case_review_doc",
+					family: WorkflowArtifactFamily.ReviewEdgeCaseHunter,
+					intentMode: "derived",
+					parentIdentitySource: undefined,
+					targetIdentitySource: {
+						kind: "workflow_value",
+						key: remediationStoryKeys.artifactIdentity,
+					},
+					outputValueKeys: edgeCaseReviewKeys,
+				},
+				adversarial_review_doc: {
+					id: "adversarial_review_doc",
+					family: WorkflowArtifactFamily.AdversarialReview,
+					intentMode: "derived",
+					parentIdentitySource: undefined,
+					targetIdentitySource: {
+						kind: "workflow_value",
+						key: remediationStoryKeys.artifactIdentity,
+					},
+					outputValueKeys: adversarialReviewKeys,
+				},
+				review_input_markdown_doc: {
+					id: "review_input_markdown_doc",
+					family: WorkflowArtifactFamily.ReviewInputMarkdown,
+					intentMode: "derived",
+					parentIdentitySource: undefined,
+					targetIdentitySource: {
+						kind: "workflow_value",
+						key: remediationStoryKeys.artifactIdentity,
+					},
+					outputValueKeys: reviewInputMarkdownKeys,
+				},
+				review_input_diff_doc: {
+					id: "review_input_diff_doc",
+					family: WorkflowArtifactFamily.ReviewInputDiff,
+					intentMode: "derived",
+					parentIdentitySource: undefined,
+					targetIdentitySource: {
+						kind: "workflow_value",
+						key: remediationStoryKeys.artifactIdentity,
+					},
+					outputValueKeys: reviewInputDiffKeys,
+				},
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		await runtime.resolveNextAction({ taskState })
+		await submitNewProjectSelection(taskState, "Artifact Allocation Project")
+
+		const epicResult = await runtime.createWorkflowArtifact({
+			taskState,
+			artifactId: "epic_doc",
+			expectedArtifactAbsolutePath: undefined,
+		})
+		const storyResult = await runtime.createWorkflowArtifact({
+			taskState,
+			artifactId: "story_doc",
+			expectedArtifactAbsolutePath: undefined,
+		})
+		const remediationStoryResult = await runtime.createWorkflowArtifact({
+			taskState,
+			artifactId: "remediation_story_doc",
+			expectedArtifactAbsolutePath: undefined,
+		})
+		const reviewResult = await runtime.createWorkflowArtifact({
+			taskState,
+			artifactId: "blind_review_doc",
+			expectedArtifactAbsolutePath: undefined,
+		})
+		const edgeCaseReviewResult = await runtime.createWorkflowArtifact({
+			taskState,
+			artifactId: "edge_case_review_doc",
+			expectedArtifactAbsolutePath: undefined,
+		})
+		const adversarialReviewResult = await runtime.createWorkflowArtifact({
+			taskState,
+			artifactId: "adversarial_review_doc",
+			expectedArtifactAbsolutePath: undefined,
+		})
+		const reviewInputMarkdownResult = await runtime.createWorkflowArtifact({
+			taskState,
+			artifactId: "review_input_markdown_doc",
+			expectedArtifactAbsolutePath: undefined,
+		})
+		const reviewInputDiffResult = await runtime.createWorkflowArtifact({
+			taskState,
+			artifactId: "review_input_diff_doc",
+			expectedArtifactAbsolutePath: undefined,
+		})
+
+		expect(epicResult).to.deep.include({
+			artifactIdentity: "1",
+			artifactFilename: "Epic-1.md",
+			artifactRelativePath: join("planning", "Epic-1.md"),
+			artifactAbsolutePath: join(cwd, "artifact-allocation-project", "planning", "Epic-1.md"),
+			parentIdentity: undefined,
+			targetIdentity: undefined,
+		})
+		expect(storyResult).to.deep.include({
+			artifactIdentity: "1.1",
+			artifactFilename: "Story-1-1.md",
+			artifactRelativePath: join("planning", "Story-1-1.md"),
+			artifactAbsolutePath: join(cwd, "artifact-allocation-project", "planning", "Story-1-1.md"),
+			parentIdentity: "1",
+			targetIdentity: undefined,
+		})
+		expect(remediationStoryResult).to.deep.include({
+			artifactIdentity: "1.1.1",
+			artifactFilename: "Remediation-story-1-1-1.md",
+			artifactRelativePath: join("planning", "Remediation-story-1-1-1.md"),
+			artifactAbsolutePath: join(cwd, "artifact-allocation-project", "planning", "Remediation-story-1-1-1.md"),
+			parentIdentity: "1.1",
+			targetIdentity: undefined,
+		})
+		expect(reviewResult).to.deep.include({
+			artifactIdentity: "1.1.1",
+			artifactFilename: "Review-blind-hunter-1-1-1.md",
+			artifactRelativePath: join("planning", "Review-blind-hunter-1-1-1.md"),
+			artifactAbsolutePath: join(cwd, "artifact-allocation-project", "planning", "Review-blind-hunter-1-1-1.md"),
+			parentIdentity: undefined,
+			targetIdentity: "1.1.1",
+		})
+		expect(edgeCaseReviewResult).to.deep.include({
+			artifactIdentity: "1.1.1",
+			artifactFilename: "Review-edge-case-hunter-1-1-1.md",
+			artifactRelativePath: join("planning", "Review-edge-case-hunter-1-1-1.md"),
+			artifactAbsolutePath: join(cwd, "artifact-allocation-project", "planning", "Review-edge-case-hunter-1-1-1.md"),
+			parentIdentity: undefined,
+			targetIdentity: "1.1.1",
+		})
+		expect(adversarialReviewResult).to.deep.include({
+			artifactIdentity: "1.1.1",
+			artifactFilename: "Adversarial-review-1-1-1.md",
+			artifactRelativePath: join("planning", "Adversarial-review-1-1-1.md"),
+			artifactAbsolutePath: join(cwd, "artifact-allocation-project", "planning", "Adversarial-review-1-1-1.md"),
+			parentIdentity: undefined,
+			targetIdentity: "1.1.1",
+		})
+		expect(reviewInputMarkdownResult).to.deep.include({
+			artifactIdentity: "1.1.1",
+			artifactFilename: "Review-input-1-1-1.md",
+			artifactRelativePath: join("planning", "Review-input-1-1-1.md"),
+			artifactAbsolutePath: join(cwd, "artifact-allocation-project", "planning", "Review-input-1-1-1.md"),
+			parentIdentity: undefined,
+			targetIdentity: "1.1.1",
+		})
+		expect(reviewInputDiffResult).to.deep.include({
+			artifactIdentity: "1.1.1",
+			artifactFilename: "Review-input-1-1-1.diff",
+			artifactRelativePath: join("planning", "Review-input-1-1-1.diff"),
+			artifactAbsolutePath: join(cwd, "artifact-allocation-project", "planning", "Review-input-1-1-1.diff"),
+			parentIdentity: undefined,
+			targetIdentity: "1.1.1",
+		})
+
+		await access(epicResult.artifactAbsolutePath)
+		await access(storyResult.artifactAbsolutePath)
+		await access(remediationStoryResult.artifactAbsolutePath)
+		await access(reviewResult.artifactAbsolutePath)
+		await access(edgeCaseReviewResult.artifactAbsolutePath)
+		await access(adversarialReviewResult.artifactAbsolutePath)
+		await access(reviewInputMarkdownResult.artifactAbsolutePath)
+		await access(reviewInputDiffResult.artifactAbsolutePath)
+		expect(await readFile(epicResult.artifactAbsolutePath, "utf8")).to.equal("")
+		expect(await readFile(reviewInputDiffResult.artifactAbsolutePath, "utf8")).to.equal("")
+
+		expect(getActiveWorkflowSession(taskState).workflowValues).to.deep.include({
+			[epicKeys.projectTitle]: "Artifact Allocation Project",
+			[epicKeys.projectFolderName]: "artifact-allocation-project",
+			[epicKeys.artifactFamily]: WorkflowArtifactFamily.Epic,
+			[epicKeys.artifactIdentity]: "1",
+			[epicKeys.artifactFilename]: "Epic-1.md",
+			[epicKeys.artifactRelativePath]: join("planning", "Epic-1.md"),
+			[epicKeys.artifactAbsolutePath]: join(cwd, "artifact-allocation-project", "planning", "Epic-1.md"),
+			[storyKeys.artifactIdentity]: "1.1",
+			[storyKeys.parentIdentity]: "1",
+			[remediationStoryKeys.artifactIdentity]: "1.1.1",
+			[remediationStoryKeys.parentIdentity]: "1.1",
+			[blindReviewKeys.artifactIdentity]: "1.1.1",
+			[blindReviewKeys.targetIdentity]: "1.1.1",
+			[blindReviewKeys.artifactFilename]: "Review-blind-hunter-1-1-1.md",
+			[edgeCaseReviewKeys.artifactFilename]: "Review-edge-case-hunter-1-1-1.md",
+			[adversarialReviewKeys.artifactFilename]: "Adversarial-review-1-1-1.md",
+			[reviewInputMarkdownKeys.artifactFilename]: "Review-input-1-1-1.md",
+			[reviewInputDiffKeys.artifactFilename]: "Review-input-1-1-1.diff",
+		})
+	})
+
+	it("ignores non-matching files for numbering and does not use collision suffixing as canonical numbering", async () => {
+		discoverWorkflowCandidatesStub.restore()
+		const epicKeys = createStandaloneArtifactOutputValueKeys("epic")
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: collectArtifactOutputWorkflowValueKeys(epicKeys),
+			artifacts: {
+				epic_doc: {
+					id: "epic_doc",
+					family: WorkflowArtifactFamily.Epic,
+					intentMode: "new",
+					parentIdentitySource: undefined,
+					targetIdentitySource: undefined,
+					outputValueKeys: epicKeys,
+				},
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		await runtime.resolveNextAction({ taskState })
+		await submitNewProjectSelection(taskState, "Convention Numbering Project")
+
+		const planningFolder = join(cwd, "convention-numbering-project", "planning")
+		await writeFile(join(planningFolder, "Epic-1.md"), "existing", "utf8")
+		await writeFile(join(planningFolder, "Epic-999-draft.md"), "ignored", "utf8")
+		await writeFile(join(planningFolder, "Story-9-9.md"), "ignored", "utf8")
+
+		const epicResult = await runtime.createWorkflowArtifact({
+			taskState,
+			artifactId: "epic_doc",
+			expectedArtifactAbsolutePath: undefined,
+		})
+
+		expect(epicResult.artifactIdentity).to.equal("2")
+		expect(epicResult.artifactFilename).to.equal("Epic-2.md")
+		expect(epicResult.artifactAbsolutePath).to.equal(join(planningFolder, "Epic-2.md"))
+		await access(join(planningFolder, "Epic-2.md"))
+	})
+
+	it("routes missing parent or target artifact identities through tool-backed operation failure handling", async () => {
+		const missingIdentityCases = [
+			{
+				artifactId: "story_doc",
+				sourceKey: "selected_epic_identity",
+				sourceValue: "99",
+				outputKeys: createParentedArtifactOutputValueKeys("story"),
+				artifactDefinition: {
+					id: "story_doc",
+					family: WorkflowArtifactFamily.Story,
+					intentMode: "new",
+					parentIdentitySource: {
+						kind: "workflow_value",
+						key: "selected_epic_identity",
+					},
+					targetIdentitySource: undefined,
+					outputValueKeys: createParentedArtifactOutputValueKeys("story"),
+				} satisfies NonNullable<WorkflowDefinition["artifacts"]>[string],
+			},
+			{
+				artifactId: "review_doc",
+				sourceKey: "selected_review_target",
+				sourceValue: "1.1",
+				outputKeys: createTargetedArtifactOutputValueKeys("review"),
+				artifactDefinition: {
+					id: "review_doc",
+					family: WorkflowArtifactFamily.AdversarialReview,
+					intentMode: "derived",
+					parentIdentitySource: undefined,
+					targetIdentitySource: {
+						kind: "workflow_value",
+						key: "selected_review_target",
+					},
+					outputValueKeys: createTargetedArtifactOutputValueKeys("review"),
+				} satisfies NonNullable<WorkflowDefinition["artifacts"]>[string],
+			},
+		]
+
+		for (const missingIdentityCase of missingIdentityCases) {
+			const missingIdentityState = new TaskState()
+			const workflow = createWorkflowDefinition({
+				name: `missing-${missingIdentityCase.artifactId}`,
+				workflowValueKeys: [
+					missingIdentityCase.sourceKey,
+					...collectArtifactOutputWorkflowValueKeys(missingIdentityCase.outputKeys),
+				],
+				artifacts: {
+					[missingIdentityCase.artifactId]: missingIdentityCase.artifactDefinition,
+				},
+				steps: {
+					"step-1": createStepDefinition({
+						stepNumber: 1,
+						decisionTree: createArtifactAllocationDecisionTree(missingIdentityCase.artifactId),
+					}),
+				},
+			})
+			await activateWorkflow(missingIdentityState, workflow)
+			await runtime.resolveNextAction({ taskState: missingIdentityState })
+			await submitNewProjectSelection(missingIdentityState, `Missing ${missingIdentityCase.artifactId}`)
+			getActiveWorkflowSession(missingIdentityState).workflowValues[missingIdentityCase.sourceKey] =
+				missingIdentityCase.sourceValue
+
+			const allocationAction = await runtime.resolveNextAction({ taskState: missingIdentityState })
+			expect(allocationAction.kind).to.equal("execute_tool_backed_operation")
+
+			const failureResult = await runtime.handleToolBackedOperationToolResult({
+				taskState: missingIdentityState,
+				toolResultText: "Error: required artifact identity was not found",
+			})
+
+			expect(failureResult.kind).to.equal("terminal_error")
+			if (failureResult.kind !== "terminal_error") {
+				throw new Error(`Expected terminal_error, received ${failureResult.kind}.`)
+			}
+			expect(failureResult.errorMessage).to.equal("Error: required artifact identity was not found")
+		}
+	})
+
+	it("routes serialized denied and errored artifact-allocation tool results through tool_backed_operation_failed", async () => {
+		const failureCases = [formatResponse.toolDenied(), formatResponse.toolError("boom")]
+
+		for (const [failureCaseIndex, toolResultText] of failureCases.entries()) {
+			const outputFileKeys = createStandaloneArtifactOutputValueKeys(`serialized_artifact_${failureCaseIndex}`)
+			const failureState = new TaskState()
+			const workflow = createWorkflowDefinition({
+				name: `serialized-artifact-allocation-failure-${failureCaseIndex}`,
+				workflowValueKeys: collectArtifactOutputWorkflowValueKeys(outputFileKeys),
+				artifacts: {
+					output_file: {
+						id: "output_file",
+						family: WorkflowArtifactFamily.Epic,
+						intentMode: "new",
+						parentIdentitySource: undefined,
+						targetIdentitySource: undefined,
+						outputValueKeys: outputFileKeys,
+					},
+				},
+				steps: {
+					"step-1": createStepDefinition({
+						stepNumber: 1,
+						decisionTree: createArtifactAllocationDecisionTree("output_file"),
+					}),
+				},
+			})
+
+			await activateWorkflow(failureState, workflow)
+			await runtime.resolveNextAction({ taskState: failureState })
+			await submitNewProjectSelection(failureState, `Serialized Artifact Failure ${failureCaseIndex}`)
+			expect((await runtime.resolveNextAction({ taskState: failureState })).kind).to.equal("execute_tool_backed_operation")
+
+			const result = await runtime.handleToolBackedOperationToolResult({
+				taskState: failureState,
+				toolResultText,
+			})
+			const activeSession = getActiveWorkflowSession(failureState)
+
+			expect(result.kind).to.equal("terminal_error")
+			if (result.kind !== "terminal_error") {
+				throw new Error(`Expected terminal_error, received ${result.kind}.`)
+			}
+			expect(result.errorMessage).to.equal(toolResultText)
+			expect(activeSession.branchContext.failureState).to.deep.equal({
+				retryAttemptCount: 1,
+				terminalErrorMessage: toolResultText,
+			})
+			for (const artifactOutputValueKey of collectArtifactOutputWorkflowValueKeys(outputFileKeys)) {
+				expect(activeSession.workflowValues).to.not.have.property(artifactOutputValueKey)
+			}
+		}
+	})
+
+	it("builds build_workflow_document tool-backed operations from step-approved document builders", async () => {
+		const allocatedArtifactAbsolutePath = join(cwd, "builder-project", "planning", "Epic-1.md")
+		const moduleChosenAbsolutePath = join(cwd, "builder-project", "planning", "Module-chosen.md")
+		const outputFileKeys = createStandaloneArtifactOutputValueKeys("output_file")
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: [
+				"spec_doc",
+				"module_chosen_absolute_path",
+				...collectArtifactOutputWorkflowValueKeys(outputFileKeys),
+			],
+			artifacts: {
+				output_file: {
+					id: "output_file",
+					family: WorkflowArtifactFamily.Epic,
+					intentMode: "new",
+					parentIdentitySource: undefined,
+					targetIdentitySource: undefined,
+					outputValueKeys: outputFileKeys,
+				},
+			},
+			documentBuilders: {
+				"build-spec": {
+					id: "build-spec",
+					artifactId: "output_file",
+					toolContract: {} as never,
+					buildContent: () => "# Resolved spec",
+					workflowValueWrites: {
+						spec_doc: "ready",
+					},
+				},
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createToolBackedOperationDecisionTree({
+						toolBackedOperationId: "build-spec",
+						startAction: { kind: "build_workflow_document", documentBuilderId: "build-spec" },
+					}),
+					documentBuilderIds: ["build-spec"],
+				}),
+				"step-2": createStepDefinition({ stepNumber: 2 }),
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		getActiveWorkflowSession(taskState).workflowValues[outputFileKeys.artifactAbsolutePath] = allocatedArtifactAbsolutePath
+		getActiveWorkflowSession(taskState).workflowValues.module_chosen_absolute_path = moduleChosenAbsolutePath
+		await runtime.resolveNextAction({ taskState })
+		const toolBackedOperation = await submitNewProjectSelection(taskState, "Builder Project")
+
+		expect(toolBackedOperation.kind).to.equal("execute_tool_backed_operation")
+		if (toolBackedOperation.kind !== "execute_tool_backed_operation") {
+			throw new Error(`Expected execute_tool_backed_operation, received ${toolBackedOperation.kind}.`)
+		}
+
+		expect(toolBackedOperation.toolBackedOperationSession).to.be.undefined
+		expect(toolBackedOperation.toolRequest.toolName).to.equal(ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT)
+		expect(toolBackedOperation.toolRequest.toolParams).to.deep.equal({
+			artifact_id: "output_file",
+			destination_path: allocatedArtifactAbsolutePath,
+			content: "# Resolved spec",
+		})
+		expect(toolBackedOperation.toolRequest.toolInput).to.deep.equal({
+			workflow_value_writes: {
+				spec_doc: "ready",
+			},
+		})
+	})
+
+	it("routes serialized denied and errored document-builder tool results through tool_backed_operation_failed", async () => {
+		const failureCases = [formatResponse.toolDenied(), formatResponse.toolError("boom")]
+
+		for (const [failureCaseIndex, toolResultText] of failureCases.entries()) {
+			const outputFileKeys = createStandaloneArtifactOutputValueKeys(`serialized_document_${failureCaseIndex}`)
+			const allocatedArtifactAbsolutePath = join(
+				cwd,
+				`serialized-builder-project-${failureCaseIndex}`,
+				"planning",
+				"Epic-1.md",
+			)
+			const failureState = new TaskState()
+			const workflow = createWorkflowDefinition({
+				name: `serialized-document-builder-failure-${failureCaseIndex}`,
+				workflowValueKeys: collectArtifactOutputWorkflowValueKeys(outputFileKeys),
+				artifacts: {
+					output_file: {
+						id: "output_file",
+						family: WorkflowArtifactFamily.Epic,
+						intentMode: "new",
+						parentIdentitySource: undefined,
+						targetIdentitySource: undefined,
+						outputValueKeys: outputFileKeys,
+					},
+				},
+				documentBuilders: {
+					"build-spec": {
+						id: "build-spec",
+						artifactId: "output_file",
+						toolContract: {} as never,
+						buildContent: () => "# Resolved spec",
+					},
+				},
+				steps: {
+					"step-1": createStepDefinition({
+						stepNumber: 1,
+						decisionTree: createToolBackedOperationDecisionTree({
+							toolBackedOperationId: "build-spec",
+							startAction: { kind: "build_workflow_document", documentBuilderId: "build-spec" },
+						}),
+						documentBuilderIds: ["build-spec"],
+					}),
+				},
+			})
+
+			await activateWorkflow(failureState, workflow)
+			getActiveWorkflowSession(failureState).workflowValues[outputFileKeys.artifactAbsolutePath] =
+				allocatedArtifactAbsolutePath
+			await runtime.resolveNextAction({ taskState: failureState })
+			const toolBackedOperation = await submitNewProjectSelection(
+				failureState,
+				`Serialized Builder Failure ${failureCaseIndex}`,
+			)
+			expect(toolBackedOperation.kind).to.equal("execute_tool_backed_operation")
+
+			const result = await runtime.handleToolBackedOperationToolResult({
+				taskState: failureState,
+				toolResultText,
+			})
+			const activeSession = getActiveWorkflowSession(failureState)
+
+			expect(result.kind).to.equal("project_prompt")
+			expect(activeSession.branchContext.activeBranchId).to.equal("after-step-resolution-failure")
+			expect(activeSession.branchContext.failureState).to.deep.equal({
+				retryAttemptCount: 1,
+				terminalErrorMessage: toolResultText,
+			})
+		}
 	})
 
 	it("deep-clones persisted sessions and restores only valid persisted workflow state", async () => {
 		const workflow = createWorkflowDefinition()
 		registerResolvedWorkflow(workflow)
 
-		await runtime.activateWorkflow({ taskState, workflow })
+		await activateWorkflow(taskState, workflow)
 		await runtime.resolveNextAction({ taskState })
 		await submitNewProjectSelection(taskState, "Persisted Project")
 
 		const persistedSession = runtime.getPersistedSession({ taskState })
+		expect(persistedSession).to.not.equal(undefined)
+		if (!persistedSession) {
+			throw new Error("Expected a persisted workflow session.")
+		}
 		expect(persistedSession).to.deep.equal(taskState.activeWorkflowSession)
 		expect(persistedSession).to.not.equal(taskState.activeWorkflowSession)
 
-		;(persistedSession as any).projectSelection.projectTitle = "Mutated Persisted Title"
-		expect((taskState.activeWorkflowSession as any)?.projectSelection?.projectTitle).to.equal("Persisted Project")
+		persistedSession.projectSelection.projectTitle = "Mutated Persisted Title"
+		expect(getActiveWorkflowSession(taskState).projectSelection.projectTitle).to.equal("Persisted Project")
 
 		const undefinedRestore = await runtime.restorePersistedSession({
 			taskState: new TaskState(),
@@ -867,31 +3180,83 @@ describe("WorkflowRuntime", () => {
 		expect(undefinedRestore).to.be.undefined
 
 		const missingWorkflowState = new TaskState()
+		missingWorkflowState.activeWorkflowName = "stale"
+		missingWorkflowState.activeWorkflowSession = createParentWorkflowSession()
+		missingWorkflowState.currentFocusChainChecklist = "stale checklist"
 		resolveWorkflowDefinitionStub.returns(undefined)
 		const missingWorkflowRestore = await runtime.restorePersistedSession({
 			taskState: missingWorkflowState,
 			persistedSession,
 		})
 
-		expect(missingWorkflowRestore).to.be.undefined
+		expect(missingWorkflowRestore).to.deep.equal({ kind: "persist_workflow_teardown" })
 		expect(missingWorkflowState.activeWorkflowName).to.be.undefined
 		expect(missingWorkflowState.activeWorkflowSession).to.be.undefined
+		expect(missingWorkflowState.currentFocusChainChecklist).to.equal(null)
+
+		const invalidDefinitionState = new TaskState()
+		invalidDefinitionState.activeWorkflowName = "stale"
+		invalidDefinitionState.activeWorkflowSession = createParentWorkflowSession()
+		invalidDefinitionState.currentFocusChainChecklist = "stale checklist"
+		const invalidDefinition = createWorkflowDefinition({ name: workflow.name, steps: {} as WorkflowDefinition["steps"] })
+		registerResolvedWorkflow(invalidDefinition)
+		const invalidDefinitionRestore = await runtime.restorePersistedSession({
+			taskState: invalidDefinitionState,
+			persistedSession,
+		})
+
+		expect(invalidDefinitionRestore).to.deep.equal({ kind: "persist_workflow_teardown" })
+		expect(invalidDefinitionState.activeWorkflowName).to.be.undefined
+		expect(invalidDefinitionState.activeWorkflowSession).to.be.undefined
+		expect(invalidDefinitionState.currentFocusChainChecklist).to.equal(null)
 
 		registerResolvedWorkflow(workflow)
-		const invalidStepSession = runtime.getPersistedSession({ taskState }) as ActiveWorkflowSession
-		;(invalidStepSession as any).activeStepNumber = 999
+		const invalidStepSession = runtime.getPersistedSession({ taskState })
+		expect(invalidStepSession).to.not.equal(undefined)
+		if (!invalidStepSession) {
+			throw new Error("Expected an invalid-step persisted workflow session.")
+		}
+		invalidStepSession.activeStepNumber = 999
 		const invalidStepState = new TaskState()
+		invalidStepState.activeWorkflowName = "stale"
+		invalidStepState.activeWorkflowSession = createParentWorkflowSession()
+		invalidStepState.currentFocusChainChecklist = "stale checklist"
 		const invalidStepRestore = await runtime.restorePersistedSession({
 			taskState: invalidStepState,
 			persistedSession: invalidStepSession,
 		})
 
-		expect(invalidStepRestore).to.be.undefined
+		expect(invalidStepRestore).to.deep.equal({ kind: "persist_workflow_teardown" })
 		expect(invalidStepState.activeWorkflowName).to.be.undefined
 		expect(invalidStepState.activeWorkflowSession).to.be.undefined
+		expect(invalidStepState.currentFocusChainChecklist).to.equal(null)
+
+		const invalidBranchSession = runtime.getPersistedSession({ taskState })
+		expect(invalidBranchSession).to.not.equal(undefined)
+		if (!invalidBranchSession) {
+			throw new Error("Expected an invalid-branch persisted workflow session.")
+		}
+		invalidBranchSession.branchContext.activeBranchId = "missing-branch"
+		const invalidBranchState = new TaskState()
+		invalidBranchState.activeWorkflowName = "stale"
+		invalidBranchState.activeWorkflowSession = createParentWorkflowSession()
+		invalidBranchState.currentFocusChainChecklist = "stale checklist"
+		const invalidBranchRestore = await runtime.restorePersistedSession({
+			taskState: invalidBranchState,
+			persistedSession: invalidBranchSession,
+		})
+
+		expect(invalidBranchRestore).to.deep.equal({ kind: "persist_workflow_teardown" })
+		expect(invalidBranchState.activeWorkflowName).to.be.undefined
+		expect(invalidBranchState.activeWorkflowSession).to.be.undefined
+		expect(invalidBranchState.currentFocusChainChecklist).to.equal(null)
 
 		registerResolvedWorkflow(workflow)
-		const validPersistedSession = runtime.getPersistedSession({ taskState }) as ActiveWorkflowSession
+		const validPersistedSession = runtime.getPersistedSession({ taskState })
+		expect(validPersistedSession).to.not.equal(undefined)
+		if (!validPersistedSession) {
+			throw new Error("Expected a valid persisted workflow session.")
+		}
 		const restoredState = new TaskState()
 		const restored = await runtime.restorePersistedSession({
 			taskState: restoredState,
@@ -903,105 +3268,89 @@ describe("WorkflowRuntime", () => {
 		expect(restoredState.activeWorkflowSession).to.deep.equal(validPersistedSession)
 	})
 
+	it("restores downstream workflow ui from the canonical session without legacy task-state mirrors", async () => {
+		const workflowFormId = "form-restore"
+		const workflow = createWorkflowDefinition({
+			workflowForms: {
+				[workflowFormId]: createWorkflowFormDefinitionPayload(),
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createWorkflowFormDecisionTree({
+						workflowFormId,
+					}),
+				}),
+				"step-2": createStepDefinition({ stepNumber: 2 }),
+			},
+		})
+
+		registerResolvedWorkflow(workflow)
+		const sourceState = new TaskState()
+		await activateWorkflow(sourceState, workflow)
+		await runtime.resolveNextAction({ taskState: sourceState })
+		await submitNewProjectSelection(sourceState, "Restored Form Project")
+		await runtime.resolveNextAction({ taskState: sourceState })
+		await submitActiveWorkflowFormPanel(sourceState)
+
+		const persistedSession = runtime.getPersistedSession({ taskState: sourceState })
+		expect(persistedSession).to.not.equal(undefined)
+		if (!persistedSession) {
+			throw new Error("Expected a persisted workflow session for restore.")
+		}
+
+		const restoredState = new TaskState()
+		const restored = await runtime.restorePersistedSession({
+			taskState: restoredState,
+			persistedSession,
+		})
+
+		expectNoLegacyWorkflowMirrors(sourceState)
+		expectNoLegacyWorkflowMirrors(restoredState)
+		expect(getActiveFormSession(sourceState).currentPanelId).to.equal("panel-2")
+		expect(getActiveFormSession(restoredState).currentPanelId).to.equal("panel-2")
+		expect(restored?.kind).to.equal("render_workflow_form")
+		if (restored?.kind === "render_workflow_form") {
+			expect(restored.formSession.currentPanelId).to.equal("panel-2")
+		}
+	})
+
 	it("completes workflows when completion rules pass and tears down all runtime-owned state", async () => {
 		const completionWorkflow = createWorkflowDefinition({
 			steps: {
-				"step-1": {
-					id: "step-1",
+				"step-1": createStepDefinition({
 					stepNumber: 1,
-					checklistLabel: "Step 1",
-					allowWorkflowProgressRequest: true,
 					completionRules: [
 						{
 							id: "complete-now",
 							isComplete: (_session: ActiveWorkflowSession) => true,
 						},
 					],
-					buildPromptProjection: () => ({
-						workflowSystemInstructionsBlock: "system",
-						workflowInputInstructionsBlock: "input",
-					}),
-				} as WorkflowStepDefinition,
-				"step-2": {
-					id: "step-2",
-					stepNumber: 2,
-					checklistLabel: "Step 2",
-					allowWorkflowProgressRequest: true,
-					buildPromptProjection: () => ({
-						workflowSystemInstructionsBlock: "system",
-						workflowInputInstructionsBlock: "input",
-					}),
-				} as WorkflowStepDefinition,
+				}),
+				"step-2": createStepDefinition({ stepNumber: 2 }),
 			},
 		})
 
-		await runtime.activateWorkflow({ taskState, workflow: completionWorkflow })
+		await activateWorkflow(taskState, completionWorkflow)
 		await runtime.resolveNextAction({ taskState })
-		await submitNewProjectSelection(taskState, "Completion Project")
-		const completionResult = await runtime.resolveNextAction({ taskState })
+		const completionResult = await submitNewProjectSelection(taskState, "Completion Project")
 
 		expect(completionResult.kind).to.equal("complete_workflow")
+		expect(taskState.activeWorkflowName).to.equal(undefined)
+		expect(taskState.activeWorkflowSession).to.equal(undefined)
 
 		const teardownState = new TaskState()
-		await runtime.activateWorkflow({ taskState: teardownState, workflow: createWorkflowDefinition() })
-		;(teardownState as any).activeWorkflowFormSession = { sessionId: "form-session" }
-		;(teardownState as any).activeWorkflowStepResolutionSession = { id: "step-resolution-session" }
-		;(teardownState as any).suppressedWorkflowFormResolverIds = ["form-1"]
-		;(teardownState as any).suppressedWorkflowStepResolutionDefinitionIds = ["step-resolution-1"]
-		;(teardownState as any).currentFocusChainChecklist = [{ label: "checklist" }]
+		await activateWorkflow(teardownState, createWorkflowDefinition())
+		const teardownSession = getActiveWorkflowSession(teardownState)
+		teardownSession.ui.suppressedWorkflowFormIds = ["form-1"]
+		teardownSession.ui.suppressedWorkflowStepResolutionDefinitionIds = ["step-resolution-1"]
+		teardownState.currentFocusChainChecklist = "checklist"
 
 		await runtime.teardownWorkflow({ taskState: teardownState })
 
 		expect(teardownState.activeWorkflowName).to.be.undefined
 		expect(teardownState.activeWorkflowSession).to.be.undefined
-		expect(teardownState.activeWorkflowStartCardSession).to.be.undefined
-		expect(teardownState.activeWorkflowFormSession).to.be.undefined
-		expect(teardownState.activeWorkflowStepResolutionSession).to.be.undefined
-		expect(teardownState.suppressedWorkflowFormResolverIds).to.deep.equal([])
-		expect(teardownState.suppressedWorkflowStepResolutionDefinitionIds).to.deep.equal([])
-		expect(teardownState.currentFocusChainChecklist).to.be.undefined
-
-		const pendingFormWorkflow = createWorkflowDefinition({
-			workflowForms: {
-				"form-1": createWorkflowFormDefinitionPayload({ deterministic: true }),
-			},
-			steps: {
-				"step-1": {
-					id: "step-1",
-					stepNumber: 1,
-					checklistLabel: "Step 1",
-					allowWorkflowProgressRequest: true,
-					workflowFormId: "form-1",
-					buildPromptProjection: () => ({
-						workflowSystemInstructionsBlock: "system",
-						workflowInputInstructionsBlock: "input",
-					}),
-				} as WorkflowStepDefinition,
-				"step-2": {
-					id: "step-2",
-					stepNumber: 2,
-					checklistLabel: "Step 2",
-					allowWorkflowProgressRequest: true,
-					buildPromptProjection: () => ({
-						workflowSystemInstructionsBlock: "system",
-						workflowInputInstructionsBlock: "input",
-					}),
-				} as WorkflowStepDefinition,
-			},
-		})
-		const pendingFormState = new TaskState()
-		await runtime.activateWorkflow({ taskState: pendingFormState, workflow: pendingFormWorkflow })
-		await runtime.resolveNextAction({ taskState: pendingFormState })
-		await submitNewProjectSelection(pendingFormState, "Pending Form Project")
-		await runtime.resolveNextAction({ taskState: pendingFormState })
-		await submitActiveWorkflowFormPanel(pendingFormState)
-		await submitActiveWorkflowFormPanel(pendingFormState)
-		expect((await runtime.resolveNextAction({ taskState: pendingFormState })).kind).to.equal("run_deterministic_operation")
-
-		await runtime.teardownWorkflow({ taskState: pendingFormState })
-
-		expect(await runtime.resolveNextAction({ taskState: pendingFormState })).to.deep.equal({
-			kind: "no_op",
-		})
+		expectNoLegacyWorkflowMirrors(teardownState)
+		expect(teardownState.currentFocusChainChecklist).to.equal(null)
 	})
 })

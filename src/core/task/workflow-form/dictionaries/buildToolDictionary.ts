@@ -63,30 +63,6 @@ export function isWorkflowFormSystemDictionaryKey(key: string): key is WorkflowF
 	return key in workflowFormSystemDictionary
 }
 
-const workflowValueToolDictionaryConfig: WorkflowFormToolDictionaryContractConfig = {
-	toolName: ClineDefaultTool.SET_WORKFLOW_VALUES,
-	heading: "## set_workflow_values",
-	runtimeTitle: "Workflow Value Reference",
-	overviewLines: ["Persist workflow values for the active workflow before the first AI turn begins."],
-	parameterDescriptions: {
-		values: "Workflow value key/value map. Submit only the values the human actually supplied.",
-	},
-	termKeys: TOOL_DICTIONARY_TERM_KEYS,
-}
-
-export const WORKFLOW_FORM_TOOL_DICTIONARY_HEADING = workflowValueToolDictionaryConfig.heading
-export const WORKFLOW_FORM_RUNTIME_TOOL_REFERENCE_TITLE = workflowValueToolDictionaryConfig.runtimeTitle
-
-export function buildWorkflowStartRuntimeToolDictionary(args: { fieldKeys: readonly string[] }) {
-	const termKeys = args.fieldKeys.filter(isWorkflowFormSystemDictionaryKey)
-	const config = { ...workflowValueToolDictionaryConfig, termKeys }
-
-	return {
-		title: config.runtimeTitle,
-		markdown: buildRuntimeToolDictionaryMarkdownFromConfig(config),
-	}
-}
-
 export function buildToolDictionaryMarkdownFromConfig(config: WorkflowFormToolDictionaryContractConfig): string {
 	const tool = resolveWorkflowFormToolContract(config.toolName)
 	const lines = [
@@ -102,12 +78,4 @@ export function buildToolDictionaryMarkdownFromConfig(config: WorkflowFormToolDi
 
 export function buildRuntimeToolDictionaryMarkdownFromConfig(config: WorkflowFormToolDictionaryContractConfig): string {
 	return `${buildToolDictionaryEntryLines(config, resolveWorkflowFormToolContract(config.toolName)).join("\n").trimEnd()}\n`
-}
-
-export function buildToolDictionaryMarkdown(): string {
-	return buildToolDictionaryMarkdownFromConfig(workflowValueToolDictionaryConfig)
-}
-
-export function buildRuntimeToolDictionaryMarkdown(): string {
-	return buildRuntimeToolDictionaryMarkdownFromConfig(workflowValueToolDictionaryConfig)
 }

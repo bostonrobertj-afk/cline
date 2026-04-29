@@ -1,3 +1,5 @@
+import os from "os"
+import path from "path"
 import {
 	CommentReviewControllerCreator,
 	DiffViewProviderCreator,
@@ -27,6 +29,8 @@ export function setVscodeHostProviderMock(options?: {
 	extensionFsPath?: string
 	globalStorageFsPath?: string
 }) {
+	const tempRoot = path.join(os.tmpdir(), "cline-test-host-provider")
+
 	HostProvider.reset()
 	HostProvider.initialize(
 		options?.webviewProviderCreator ?? ((() => {}) as WebviewProviderCreator),
@@ -37,7 +41,7 @@ export function setVscodeHostProviderMock(options?: {
 		options?.logToChannel ?? ((_: string) => {}),
 		options?.getCallbackUri ?? (async (path: string) => `http://example.com:1234${path}`),
 		options?.getBinaryLocation ?? (async (n: string) => `/mock/path/to/binary/${n}`),
-		options?.extensionFsPath ?? "/mock/path/to/extension",
-		options?.globalStorageFsPath ?? "/mock/path/to/globalstorage",
+		options?.extensionFsPath ?? path.join(tempRoot, "extension"),
+		options?.globalStorageFsPath ?? path.join(tempRoot, "global-storage"),
 	)
 }

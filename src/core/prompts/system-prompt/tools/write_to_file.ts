@@ -1,7 +1,6 @@
 import { ModelFamily } from "@/shared/prompts"
 import { ClineDefaultTool } from "@/shared/tools"
 import type { ClineToolSpec } from "../spec"
-import { TASK_PROGRESS_PARAMETER } from "../types"
 
 /**
  * ## write_to_file
@@ -9,16 +8,12 @@ Description: Request to write content to a file at the specified path. If the fi
 Parameters:
 - path: (required) The path of the file to write to (relative to the current working directory ${cwd.toPosix()})
 - content: (required) The content to write to the file. ALWAYS provide the COMPLETE intended content of the file, without any truncation or omissions. You MUST include ALL parts of the file, even if they haven't been modified.
-${focusChainSettings.enabled ? `- task_progress: (optional) A checklist showing task progress after this tool use is completed. (See 'Updating Task Progress' section for more details)` : "" }
 Usage:
 <write_to_file>
 <path>File path here</path>
 <content>
 Your file content here
 </content>
-${focusChainSettings.enabled ? `<task_progress>
-Checklist here (optional)
-</task_progress>` : "" }
 </write_to_file>
  */
 
@@ -44,7 +39,6 @@ const GENERIC: ClineToolSpec = {
 				"The content to write to the file. ALWAYS provide the COMPLETE intended content of the file, without any truncation or omissions. You MUST include ALL parts of the file, even if they haven't been modified.",
 			usage: "Your file content here",
 		},
-		TASK_PROGRESS_PARAMETER,
 	],
 }
 
@@ -66,7 +60,6 @@ const NATIVE_NEXT_GEN: ClineToolSpec = {
 			instruction:
 				"After providing the path so a file can be created, then use this to provide the content to write to the file.",
 		},
-		TASK_PROGRESS_PARAMETER,
 	],
 }
 

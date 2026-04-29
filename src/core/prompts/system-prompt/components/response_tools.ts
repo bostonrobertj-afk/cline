@@ -3,8 +3,6 @@ import type { SystemPromptContext } from "../types"
 const RESPONSE_TOOL_LINES = {
 	attempt_completion: "- `attempt_completion`: Use once at the end of each workflow",
 	ask_followup_question: "- `ask_followup_question`: Use to ask a question + present options for user to select",
-	workflow_progress_request:
-		"- `workflow_progress_request`: Use when the active workflow step is complete and you need the runtime-owned Yes/No confirmation before advancing",
 	send_user_message: "- `send_user_message`: Use by default to send messages to the user",
 	act_mode_respond:
 		"- `act_mode_respond`: Use to send a brief ACT MODE progress update and intentionally wait for the user's next reply",
@@ -65,11 +63,7 @@ function getVisibleResponseToolNames(context: SystemPromptContext): ResponseTool
 		context.providerInfo.mode === "plan" ? getPlanModeResponseToolNames(context) : getActModeResponseToolNames(context)
 
 	if (context.enableNativeToolCalls === true && context.visibleNativeToolNames) {
-		const orderedToolNames: ResponseToolName[] = [
-			...currentModeToolNames.slice(0, -1),
-			"workflow_progress_request",
-			currentModeToolNames.at(-1)!,
-		]
+		const orderedToolNames: ResponseToolName[] = [...currentModeToolNames.slice(0, -1), currentModeToolNames.at(-1)!]
 		if (context.providerInfo.mode !== "plan") {
 			orderedToolNames.push("act_mode_respond")
 		}

@@ -1,8 +1,7 @@
 import { ModelFamily } from "@/shared/prompts"
 import { ClineDefaultTool } from "@/shared/tools"
-import { isGptOssModelFamily, isGPT5ModelFamily } from "@/utils/model-utils"
+import { isGPT5ModelFamily, isGptOssModelFamily } from "@/utils/model-utils"
 import type { ClineToolSpec } from "../spec"
-import { TASK_PROGRESS_PARAMETER } from "../types"
 
 // {
 //     "name": "apply_patch",
@@ -89,7 +88,6 @@ const NATIVE_GPT_5: ClineToolSpec = {
 			required: true,
 			instruction: "The apply_patch command that you wish to execute.",
 		},
-		TASK_PROGRESS_PARAMETER,
 	],
 }
 

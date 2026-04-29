@@ -153,9 +153,6 @@ export class ResponseToolRuntime {
 		if (message.includes("Missing value for required parameter")) {
 			return "missing_parameter"
 		}
-		if (message.includes("Managed workflow")) {
-			return "managed_workflow_incomplete"
-		}
 		if (message.includes("Before completing, re-verify your work")) {
 			return "double_check_required"
 		}

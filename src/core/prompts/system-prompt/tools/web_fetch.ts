@@ -1,7 +1,6 @@
 import { ModelFamily } from "@/shared/prompts"
 import { ClineDefaultTool } from "@/shared/tools"
 import type { ClineToolSpec } from "../spec"
-import { TASK_PROGRESS_PARAMETER } from "../types"
 
 const GENERIC: ClineToolSpec = {
 	variant: ModelFamily.GENERIC,
@@ -30,7 +29,6 @@ const GENERIC: ClineToolSpec = {
 			instruction: "The prompt to use for analyzing the webpage content",
 			usage: "Summarize the main points and key takeaways",
 		},
-		TASK_PROGRESS_PARAMETER,
 	],
 }
 
@@ -52,7 +50,6 @@ const NATIVE_NEXT_GEN: ClineToolSpec = {
 			required: true,
 			instruction: "Prompt for analyzing the webpage content",
 		},
-		TASK_PROGRESS_PARAMETER,
 	],
 }
 

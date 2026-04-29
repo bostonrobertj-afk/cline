@@ -11,6 +11,7 @@ function createConfig() {
 	const taskState = new TaskState()
 	const callbacks = {
 		say: sinon.stub().resolves(undefined),
+		clearPartialResponseToolPreview: sinon.stub().resolves(false),
 		updateFCListFromToolResponse: sinon.stub().resolves(),
 		sayAndCreateMissingParamError: sinon.stub().resolves("missing"),
 	}
@@ -33,18 +34,21 @@ describe("ActModeRespondHandler", () => {
 		const { config, callbacks } = createConfig()
 		const handler = new ActModeRespondHandler()
 
-		const result = await handler.execute(config, {
-			type: "tool_use",
+		const block = {
+			type: "tool_use" as const,
 			name: ClineDefaultTool.ACT_MODE,
 			params: {
 				response: "Reviewing the findings file now.",
 			},
 			partial: false,
-		})
+		}
+		const result = await handler.execute(config, block)
 
 		assert.equal(result, RESPONSE_TOOL_SUCCESS_MESSAGE)
+		sinon.assert.calledOnceWithExactly(callbacks.clearPartialResponseToolPreview, block)
 		sinon.assert.calledOnce(callbacks.say)
 		sinon.assert.calledWithExactly(callbacks.say, "text", "Reviewing the findings file now.", undefined, undefined, false)
+		sinon.assert.callOrder(callbacks.clearPartialResponseToolPreview, callbacks.say)
 		assert.equal(config.taskState.responseToolTurnShouldEnd, true)
 		assert.equal(config.taskState.responseToolTurnCompletedBy, ClineDefaultTool.ACT_MODE)
 	})
@@ -73,18 +77,21 @@ describe("ActModeRespondHandler", () => {
 		taskState.lastToolName = ""
 		const handler = new ActModeRespondHandler()
 
-		const result = await handler.execute(config, {
-			type: "tool_use",
+		const block = {
+			type: "tool_use" as const,
 			name: ClineDefaultTool.ACT_MODE,
 			params: {
 				response: "Starting the next turn's work.",
 			},
 			partial: false,
-		})
+		}
+		const result = await handler.execute(config, block)
 
 		assert.equal(result, RESPONSE_TOOL_SUCCESS_MESSAGE)
+		sinon.assert.calledOnceWithExactly(callbacks.clearPartialResponseToolPreview, block)
 		sinon.assert.calledOnce(callbacks.say)
 		sinon.assert.calledWithExactly(callbacks.say, "text", "Starting the next turn's work.", undefined, undefined, false)
+		sinon.assert.callOrder(callbacks.clearPartialResponseToolPreview, callbacks.say)
 		assert.equal(config.taskState.responseToolTurnShouldEnd, true)
 		assert.equal(config.taskState.responseToolTurnCompletedBy, ClineDefaultTool.ACT_MODE)
 	})

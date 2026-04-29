@@ -1,4 +1,3 @@
-import * as writeProofs from "@core/task/focus-chain/placeholderWorkflowWriteProofs"
 import { expect } from "chai"
 import fs from "fs/promises"
 import { describe, it } from "mocha"
@@ -47,8 +46,21 @@ function createConfig(storyPath: string): {
 } {
 	initializeHostProvider(path.dirname(storyPath))
 	const taskState = new TaskState()
-	taskState.activePlaceholderWorkflowValues = {
-		story_path: storyPath,
+	taskState.activeWorkflowName = "dev-story.md"
+	taskState.activeWorkflowSession = {
+		workflowName: "dev-story.md",
+		activeStepNumber: 2,
+		workflowValues: { story_path: storyPath },
+		projectSelection: { projectMode: "new", projectTitle: "", projectFolderName: "" },
+		ui: {
+			formSession: undefined,
+			stepResolutionSession: undefined,
+			suppressedWorkflowFormIds: [],
+			suppressedWorkflowStepResolutionDefinitionIds: [],
+		},
+		branchContext: {
+			activeBranchId: "story-tools",
+		},
 	}
 	taskState.fileReadCache.set(storyPath.toLowerCase(), {
 		readCount: 1,
@@ -188,7 +200,6 @@ Status: ready-for-dev
 		)
 
 		try {
-			sandbox.stub(writeProofs, "recordAndPersistPlaceholderWorkflowWriteProof").resolves()
 			const { config, say, ask, shouldAutoApproveToolWithPath } = createConfig(storyPath)
 			const handler = new StoryTaskCompleteToolHandler()
 			const result = await handler.execute(
@@ -242,7 +253,6 @@ Status: ready-for-dev
 		)
 
 		try {
-			sandbox.stub(writeProofs, "recordAndPersistPlaceholderWorkflowWriteProof").resolves()
 			const { config, say, ask } = createConfig(storyPath)
 			const handler = new StoryTaskCompleteToolHandler()
 			const result = await handler.execute(
@@ -291,7 +301,6 @@ Status: ready-for-dev
 		)
 
 		try {
-			sandbox.stub(writeProofs, "recordAndPersistPlaceholderWorkflowWriteProof").resolves()
 			const { config, say, ask, shouldAutoApproveToolWithPath } = createConfig(storyPath)
 			const handler = new StoryNotesUpdateToolHandler()
 			const result = await handler.execute(
@@ -342,7 +351,6 @@ Status: ready-for-dev
 		)
 
 		try {
-			sandbox.stub(writeProofs, "recordAndPersistPlaceholderWorkflowWriteProof").resolves()
 			const { config } = createConfig(storyPath)
 			const handler = new StoryNotesUpdateToolHandler()
 			const result = await handler.execute(
@@ -390,7 +398,6 @@ Status: ready-for-dev
 		)
 
 		try {
-			sandbox.stub(writeProofs, "recordAndPersistPlaceholderWorkflowWriteProof").resolves()
 			const { config, say, ask, shouldAutoApproveToolWithPath } = createConfig(storyPath)
 			const handler = new StoryTestingCompleteToolHandler()
 			const result = await handler.execute(config, createStoryToolBlock("story_testing_complete"))
@@ -430,7 +437,6 @@ Status: ready-for-dev
 		await fs.writeFile(storyPath, storyMarkdown, "utf8")
 
 		try {
-			sandbox.stub(writeProofs, "recordAndPersistPlaceholderWorkflowWriteProof").resolves()
 			const readFileStub = sandbox.stub(fs, "readFile")
 			readFileStub.onCall(0).resolves(storyMarkdown)
 			readFileStub.onCall(1).resolves(storyMarkdown)

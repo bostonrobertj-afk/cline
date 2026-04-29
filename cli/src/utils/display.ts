@@ -277,9 +277,6 @@ function formatSayMessage(message: ClineMessage, prefix: string, verbose: boolea
 		case "hook_status":
 			return `${prefix} ${style.dim("Hook:")} ${message.text || ""}`
 
-		case "task_progress":
-			return `${prefix} ${style.info("Progress:")} ${message.text || ""}`
-
 		default:
 			return verbose ? `${prefix} [SAY:${say}] ${message.text || ""}` : ""
 	}

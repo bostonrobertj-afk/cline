@@ -34,7 +34,6 @@ Params: path.
 *Example:*
 <read_file>
 <path>File path here</path>
-<task_progress>Checklist here (optional)</task_progress>
 </read_file>
 
 **write_to_file** — Create/overwrite file. You should only use this when editing a new file.
@@ -43,7 +42,6 @@ Params: path, content (complete).
 <write_to_file>
 <path>File path here</path>
 <content>Your file content here</content>
-<task_progress>Checklist here (optional)</task_progress>
 </write_to_file>
 
 **replace_in_file** — Targeted edits to perform on existing files. You should use replace_in_file when editing a file that already exists.
@@ -60,7 +58,6 @@ Important information on "diff" parameter: (required) One or more SEARCH/REPLACE
 <replace_in_file>
 <path>File path here</path>
 <diff>Search and replace blocks here</diff>
-<task_progress>Checklist here (optional)</task_progress>
 </replace_in_file>
 
 **search_files** — Regex search to perform.
@@ -70,7 +67,6 @@ Params: path, regex, file_pattern (optional).
 <path>Directory path here</path>
 <regex>Your regex pattern here</regex>
 <file_pattern>file pattern here (optional)</file_pattern>
-<task_progress>Checklist here (optional)</task_progress>
 </search_files>
 
 **list_files** — List directory contents.
@@ -79,7 +75,6 @@ Params: path, recursive (optional).
 <list_files>
 <path>Directory path here</path>
 <recursive>true or false (optional)</recursive>
-<task_progress>Checklist here (optional)</task_progress>
 </list_files>
 Key: Rely on returned tool results instead of using list_files to “confirm” writes.
 
@@ -123,7 +118,6 @@ Params: result, command (optional demonstration of completed work).
 <attempt_completion>
 <result>Your final result description here</result>
 <command>Your command here (optional)</command>
-<task_progress>Checklist here (required if you used task_progress in previous tool uses)</task_progress>
 </attempt_completion>
 **Gate:** Ask yourself inside <reasoning> whether all prior tool uses were user-confirmed. If not, do **not** call.
 
@@ -141,7 +135,6 @@ Include options/trade-offs when helpful, ask if plan matches, then add the exact
 <generate_plan_output>
 <response>Your response here</response>
 <needs_more_exploration>true or false (optional, but you MUST set to true if in <response> you need to read files or use other exploration tools)</needs_more_exploration>
-<task_progress>Checklist here (If you have presented the user with concrete steps or requirements, you can optionally include a todo list outlining these steps.)</task_progress>
 </generate_plan_output>`
 }
 

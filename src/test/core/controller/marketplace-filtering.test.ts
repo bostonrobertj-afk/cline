@@ -4,6 +4,9 @@ import { Controller } from "@core/controller"
 import type { McpMarketplaceItem } from "@shared/mcp"
 import type { RemoteConfig } from "@shared/remote-config/schema"
 import axios from "axios"
+import fs from "fs/promises"
+import os from "os"
+import path from "path"
 import * as sinon from "sinon"
 import { ClineEndpoint, ClineEnv } from "@/config"
 import { HostProvider } from "@/hosts/host-provider"
@@ -19,11 +22,16 @@ describe("Controller Marketplace Filtering", () => {
 	let mockStateManager: any
 	let axiosGetStub: sinon.SinonStub
 	let hostProviderInitialized = false
+	let testTempDir: string
+	let extensionDir: string
+	let globalStorageDir: string
 
 	// Initialize ClineEndpoint before tests run (required for ClineEnv.config() to work)
 	before(async () => {
 		if (!ClineEndpoint.isInitialized()) {
-			await ClineEndpoint.initialize("/test/extension")
+			const endpointExtensionDir = path.join(os.tmpdir(), "cline-marketplace-filtering-extension")
+			await fs.mkdir(endpointExtensionDir, { recursive: true })
+			await ClineEndpoint.initialize(endpointExtensionDir)
 		}
 	})
 
@@ -85,35 +93,39 @@ describe("Controller Marketplace Filtering", () => {
 	]
 
 	beforeEach(async () => {
-		// Initialize HostProvider if not already done
-		if (!HostProvider.isInitialized()) {
-			const mockHostBridge: any = {
-				workspaceClient: {},
-				envClient: {
-					getHostVersion: sinon.stub().resolves({
-						clineVersion: "1.0.0",
-						platform: "darwin",
-						clineType: "vscode",
-					}),
-				},
-				windowClient: {},
-				diffClient: {},
-			}
+		testTempDir = await fs.mkdtemp(path.join(os.tmpdir(), "marketplace-filtering-"))
+		extensionDir = path.join(testTempDir, "extension")
+		globalStorageDir = path.join(testTempDir, "global-storage")
+		await fs.mkdir(extensionDir, { recursive: true })
+		await fs.mkdir(globalStorageDir, { recursive: true })
 
-			HostProvider.initialize(
-				() => null as any, // createWebviewProvider
-				() => null as any, // createDiffViewProvider
-				() => null as any, // createCommentReviewController
-				() => null as any, // createTerminalManager
-				mockHostBridge,
-				() => {}, // logToChannel
-				async (path: string) => `http://localhost${path}`, // getCallbackUrl
-				async () => "", // getBinaryLocation
-				"/test/extension", // extensionFsPath
-				"/test/storage", // globalStorageFsPath
-			)
-			hostProviderInitialized = true
+		const mockHostBridge: any = {
+			workspaceClient: {},
+			envClient: {
+				getHostVersion: sinon.stub().resolves({
+					clineVersion: "1.0.0",
+					platform: "darwin",
+					clineType: "vscode",
+				}),
+			},
+			windowClient: {},
+			diffClient: {},
 		}
+
+		HostProvider.reset()
+		HostProvider.initialize(
+			() => null as any, // createWebviewProvider
+			() => null as any, // createDiffViewProvider
+			() => null as any, // createCommentReviewController
+			() => null as any, // createTerminalManager
+			mockHostBridge,
+			() => {}, // logToChannel
+			async (path: string) => `http://localhost${path}`, // getCallbackUrl
+			async () => "", // getBinaryLocation
+			extensionDir, // extensionFsPath
+			globalStorageDir, // globalStorageFsPath
+		)
+		hostProviderInitialized = true
 
 		// Initialize HostRegistryInfo before creating Controller
 		await require("@/registry").HostRegistryInfo.init()
@@ -134,9 +146,9 @@ describe("Controller Marketplace Filtering", () => {
 				delete: sinon.stub().resolves(),
 			},
 			subscriptions: [],
-			extensionPath: "/test/path",
-			globalStoragePath: "/test/storage",
-			globalStorageUri: { fsPath: "/test/storage" },
+			extensionPath: extensionDir,
+			globalStoragePath: globalStorageDir,
+			globalStorageUri: { fsPath: globalStorageDir },
 		}
 
 		// Mock StateManager
@@ -164,7 +176,8 @@ describe("Controller Marketplace Filtering", () => {
 		controller = new Controller(mockContext)
 	})
 
-	afterEach(() => {
+	afterEach(async () => {
+		await controller?.mcpHub?.dispose()
 		stateManagerStub.restore()
 		axiosGetStub.restore()
 
@@ -172,6 +185,10 @@ describe("Controller Marketplace Filtering", () => {
 		if (hostProviderInitialized) {
 			HostProvider.reset()
 			hostProviderInitialized = false
+		}
+
+		if (testTempDir) {
+			await fs.rm(testTempDir, { recursive: true, force: true })
 		}
 	})
 

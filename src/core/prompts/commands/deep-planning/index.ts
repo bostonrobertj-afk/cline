@@ -4,21 +4,13 @@ import { getDeepPlanningRegistry } from "./registry"
 import { generateGemini3Template } from "./variants/gemini3"
 import { generateGPT51Template } from "./variants/gpt51"
 
-const focusChainIntro: string = `**Task Progress Parameter:**
-When creating the new task, include the current task_progress checklist as concise Markdown list items inside the tool call.`
-
 /**
  * Generates the deep-planning slash command response with model-family-aware variant selection
- * @param focusChainSettings Optional focus chain settings to include in the prompt
  * @param providerInfo Optional API provider info for model family detection
  * @param enableNativeToolCalls Optional flag to determine if native tool calling is enabled
  * @returns The deep-planning prompt string with appropriate variant and focus chain settings applied
  */
-export function getDeepPlanningPrompt(
-	focusChainSettings?: { enabled: boolean },
-	providerInfo?: ApiProviderInfo,
-	enableNativeToolCalls?: boolean,
-): string {
+export function getDeepPlanningPrompt(providerInfo?: ApiProviderInfo, enableNativeToolCalls?: boolean): string {
 	// Create context for variant selection
 	const context: SystemPromptContext = {
 		providerInfo: providerInfo || ({} as ApiProviderInfo),
@@ -29,17 +21,15 @@ export function getDeepPlanningPrompt(
 	const registry = getDeepPlanningRegistry()
 	const variant = registry.get(context)
 	const newTaskInstructions = generateNewTaskInstructions(enableNativeToolCalls ?? false)
-	const focusChainParam = focusChainSettings?.enabled ? focusChainIntro : ""
 
 	// For variants with extensive focus chain prompting, generate template with focus chain flag
 	let template: string
 	if (variant.id === "gpt-51") {
-		template = generateGPT51Template(focusChainSettings?.enabled ?? false, enableNativeToolCalls ?? false)
+		template = generateGPT51Template(enableNativeToolCalls ?? false)
 	} else if (variant.id === "gemini-3") {
-		template = generateGemini3Template(focusChainSettings?.enabled ?? false, enableNativeToolCalls ?? false)
+		template = generateGemini3Template(enableNativeToolCalls ?? false)
 	} else {
 		template = variant.template
-		template = template.replace("{{FOCUS_CHAIN_PARAM}}", focusChainParam)
 		template = template.replace("{{NEW_TASK_INSTRUCTIONS}}", newTaskInstructions)
 	}
 
@@ -68,8 +58,8 @@ When you are ready to create the implementation task, you must call the new_task
 \`\`\`
 
 The context parameter should include all five sections as described above.`
-	} else {
-		return `
+	}
+	return `
 **new_task Tool Definition:**
 
 When you are ready to create the implementation task, you must call the new_task tool with the following structure:
@@ -81,7 +71,6 @@ When you are ready to create the implementation task, you must call the new_task
 \`\`\`
 
 The context parameter should include all five sections as described above.`
-	}
 }
 
 // Export types for external use

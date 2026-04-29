@@ -1,7 +1,6 @@
 import { ModelFamily } from "@/shared/prompts"
 import { ClineDefaultTool } from "@/shared/tools"
 import type { ClineToolSpec } from "../spec"
-import { TASK_PROGRESS_PARAMETER } from "../types"
 
 const id = ClineDefaultTool.FILE_READ
 
@@ -18,7 +17,6 @@ const generic: ClineToolSpec = {
 			instruction: `The path of the file to read (relative to the current working directory {{CWD}}){{MULTI_ROOT_HINT}}`,
 			usage: "File path here",
 		},
-		TASK_PROGRESS_PARAMETER,
 	],
 }
 
@@ -35,7 +33,6 @@ const NATIVE_GPT_5: ClineToolSpec = {
 			instruction: `The path of the file to read (relative to the current working directory {{CWD}}){{MULTI_ROOT_HINT}}`,
 			usage: "File path here",
 		},
-		TASK_PROGRESS_PARAMETER,
 	],
 }
 

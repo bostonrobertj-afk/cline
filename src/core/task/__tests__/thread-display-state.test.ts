@@ -84,28 +84,28 @@ describe("thread display state contract", () => {
 		}
 	})
 
-	it("round-trips workflow_start_card asks as system awaiting-user-response messages", () => {
+	it("round-trips workflow_form asks as system awaiting-user-response messages", () => {
 		const message: ClineMessage = {
 			ts: 790,
 			type: "ask",
-			ask: "workflow_start_card",
+			ask: "workflow_form",
 			threadDisplayState: ThreadDisplayStates.AWAITING_USER_RESPONSE,
 			awaitingUserResponseSubtype: AwaitingUserResponseSubtypes.SYSTEM,
 			text: JSON.stringify({
-				sessionId: "start-card-session",
-				title: "Welcome to the Quick Spec Workflow!",
-				markdownBody: "Body",
-				ctaLabel: "Get Started",
+				sessionId: "workflow-form-session",
+				workflowFormId: "__workflow_runtime_entry_form__",
+				title: "Workflow Form V2",
+				renderState: "panel",
 			}),
 		}
 
 		const protoMessage = convertClineMessageToProto(message)
-		assert.equal(protoMessage.ask, ProtoClineAsk.WORKFLOW_START_CARD)
+		assert.equal(protoMessage.ask, ProtoClineAsk.WORKFLOW_FORM)
 		assert.equal(protoMessage.threadDisplayState, ProtoThreadDisplayState.AWAITING_USER_RESPONSE)
 		assert.equal(protoMessage.awaitingUserResponseSubtype, ProtoAwaitingUserResponseSubtype.SYSTEM)
 
 		const roundTripped = convertProtoToClineMessage(protoMessage)
-		assert.equal(roundTripped.ask, "workflow_start_card")
+		assert.equal(roundTripped.ask, "workflow_form")
 		assert.equal(roundTripped.threadDisplayState, ThreadDisplayStates.AWAITING_USER_RESPONSE)
 		assert.equal(roundTripped.awaitingUserResponseSubtype, AwaitingUserResponseSubtypes.SYSTEM)
 	})

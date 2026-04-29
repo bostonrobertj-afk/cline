@@ -102,7 +102,7 @@ const RuleRow: React.FC<{
 
 	const handleEditClick = () => {
 		// For remote rules, use the special remote:// URI format
-		const filePath = isRemote ? `${REMOTE_URI_SCHEME}${ruleType === "workflow" ? "workflow" : "rule"}/${rulePath}` : rulePath
+		const filePath = isRemote ? `${REMOTE_URI_SCHEME}rule/${rulePath}` : rulePath
 		FileServiceClient.openFile(StringRequest.create({ value: filePath })).catch((err) =>
 			console.error("Failed to open file:", err),
 		)

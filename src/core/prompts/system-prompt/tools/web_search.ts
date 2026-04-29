@@ -1,7 +1,6 @@
 import { ModelFamily } from "@/shared/prompts"
 import { ClineDefaultTool } from "@/shared/tools"
 import type { ClineToolSpec } from "../spec"
-import { TASK_PROGRESS_PARAMETER } from "../types"
 
 const GENERIC: ClineToolSpec = {
 	variant: ModelFamily.GENERIC,
@@ -36,7 +35,6 @@ const GENERIC: ClineToolSpec = {
 			instruction: "JSON array of domains to exclude from results",
 			usage: '["ads.com", "spam.com"]',
 		},
-		TASK_PROGRESS_PARAMETER,
 	],
 }
 
@@ -63,7 +61,6 @@ const NATIVE_NEXT_GEN: ClineToolSpec = {
 			required: false,
 			instruction: "JSON array of domains to exclude from results",
 		},
-		TASK_PROGRESS_PARAMETER,
 	],
 }
 

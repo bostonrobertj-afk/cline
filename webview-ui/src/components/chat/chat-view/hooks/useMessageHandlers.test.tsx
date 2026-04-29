@@ -1,26 +1,19 @@
-import type { WorkflowForm, WorkflowStartCard } from "@shared/ExtensionMessage"
-import { WorkflowFormAction, WorkflowStartCardAction, WorkflowStartCardProjectMode } from "@shared/proto/cline/task"
+import type { WorkflowForm } from "@shared/ExtensionMessage"
+import { WorkflowFormAction } from "@shared/proto/cline/task"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-const { mockSubmitWorkflowForm, mockSubmitWorkflowStartCard } = vi.hoisted(() => ({
+const { mockSubmitWorkflowForm } = vi.hoisted(() => ({
 	mockSubmitWorkflowForm: vi.fn().mockResolvedValue(undefined),
-	mockSubmitWorkflowStartCard: vi.fn().mockResolvedValue(undefined),
 }))
 
 vi.mock("@/services/grpc-client", () => ({
 	SlashServiceClient: {},
 	TaskServiceClient: {
 		submitWorkflowForm: mockSubmitWorkflowForm,
-		submitWorkflowStartCard: mockSubmitWorkflowStartCard,
 	},
 }))
 
-import {
-	buildWorkflowFormSubmissionRequest,
-	buildWorkflowStartCardSubmissionRequest,
-	submitWorkflowForm,
-	submitWorkflowStartCard,
-} from "./useMessageHandlers"
+import { buildWorkflowFormSubmissionRequest, submitWorkflowForm } from "./useMessageHandlers"
 
 function createWorkflowForm(fields: NonNullable<WorkflowForm["panel"]>["fields"]): WorkflowForm {
 	return {
@@ -38,23 +31,6 @@ function createWorkflowForm(fields: NonNullable<WorkflowForm["panel"]>["fields"]
 			allowedActions: ["submit", "back", "cancel"],
 		},
 		values: {},
-	}
-}
-
-function createWorkflowStartCard(payloadOverrides?: Partial<WorkflowStartCard>): WorkflowStartCard {
-	return {
-		sessionId: "start-card-session",
-		title: "Workflow Start",
-		markdownBody: "Start card body",
-		submitLabel: "Start project",
-		projectMode: "existing",
-		existingProjectOptions: [
-			{ value: "existing-a", label: "Existing Project A" },
-			{ value: "existing-b", label: "Existing Project B" },
-		],
-		selectedExistingProject: "existing-b",
-		newProjectTitle: "New Workspace",
-		...payloadOverrides,
 	}
 }
 
@@ -268,55 +244,177 @@ describe("useMessageHandlers workflow form submit builders", () => {
 		})
 	})
 
-	it("builds and submits existing-project workflow start-card requests", async () => {
-		const startCard = createWorkflowStartCard()
-		const request = buildWorkflowStartCardSubmissionRequest(startCard)
+	it("builds and submits shared entry workflow-form requests for existing-project selection", async () => {
+		const entryWorkflowForm: WorkflowForm = {
+			...createWorkflowForm([
+				{
+					key: "__workflow_runtime_project_mode__",
+					kind: "radio_group",
+					label: "Project mode",
+					required: true,
+					options: [
+						{ value: "new", label: "New Project" },
+						{ value: "existing", label: "Existing Project" },
+					],
+				},
+				{
+					key: "__workflow_runtime_existing_project__",
+					kind: "dropdown",
+					label: "Existing project",
+					required: true,
+					options: [
+						{ value: "existing-a", label: "Existing Project A" },
+						{ value: "existing-b", label: "Existing Project B" },
+					],
+				},
+			]),
+			title: "Welcome to the Planning Workflow!",
+			panel: {
+				panelId: "__workflow_runtime_entry_project_selection__",
+				title: "Project Selection",
+				promptMarkdown: "Choose whether to start a new project or continue with an existing project.",
+				fields: [
+					{
+						key: "__workflow_runtime_project_mode__",
+						kind: "radio_group",
+						label: "Project mode",
+						required: true,
+						options: [
+							{ value: "new", label: "New Project" },
+							{ value: "existing", label: "Existing Project" },
+						],
+					},
+					{
+						key: "__workflow_runtime_existing_project__",
+						kind: "dropdown",
+						label: "Existing project",
+						required: true,
+						options: [
+							{ value: "existing-a", label: "Existing Project A" },
+							{ value: "existing-b", label: "Existing Project B" },
+						],
+					},
+				],
+				allowedActions: ["submit", "back"],
+			},
+			values: {},
+		}
 
-		expect(request).toMatchObject({
-			sessionId: "start-card-session",
-			action: WorkflowStartCardAction.WORKFLOW_START_CARD_ACTION_SUBMIT,
-			projectMode: WorkflowStartCardProjectMode.WORKFLOW_START_CARD_PROJECT_MODE_EXISTING,
-			selectedExistingProject: "existing-b",
-			newProjectTitle: "New Workspace",
+		const request = buildWorkflowFormSubmissionRequest(entryWorkflowForm, WorkflowFormAction.SUBMIT, {
+			__workflow_runtime_project_mode__: "existing",
+			__workflow_runtime_existing_project__: "existing-b",
 		})
 
-		await submitWorkflowStartCard(startCard)
+		expect(request).toMatchObject({
+			sessionId: "workflow-form-session",
+			panelId: "__workflow_runtime_entry_project_selection__",
+			action: WorkflowFormAction.SUBMIT,
+			fields: [
+				{
+					key: "__workflow_runtime_project_mode__",
+					value: {
+						stringValue: "existing",
+					},
+				},
+				{
+					key: "__workflow_runtime_existing_project__",
+					value: {
+						stringValue: "existing-b",
+					},
+				},
+			],
+		})
 
-		expect(mockSubmitWorkflowStartCard).toHaveBeenCalledTimes(1)
-		expect(mockSubmitWorkflowStartCard.mock.calls[0]?.[0]).toMatchObject({
-			sessionId: "start-card-session",
-			action: WorkflowStartCardAction.WORKFLOW_START_CARD_ACTION_SUBMIT,
-			projectMode: WorkflowStartCardProjectMode.WORKFLOW_START_CARD_PROJECT_MODE_EXISTING,
-			selectedExistingProject: "existing-b",
-			newProjectTitle: "New Workspace",
+		await submitWorkflowForm(entryWorkflowForm, WorkflowFormAction.SUBMIT, {
+			__workflow_runtime_project_mode__: "existing",
+			__workflow_runtime_existing_project__: "existing-b",
+		})
+
+		expect(mockSubmitWorkflowForm).toHaveBeenCalledTimes(1)
+		expect(mockSubmitWorkflowForm.mock.calls[0]?.[0]).toMatchObject({
+			panelId: "__workflow_runtime_entry_project_selection__",
+			action: WorkflowFormAction.SUBMIT,
 		})
 	})
 
-	it("builds and submits new-project workflow start-card requests", async () => {
-		const startCard = createWorkflowStartCard({
-			projectMode: "new",
-			selectedExistingProject: "",
-			newProjectTitle: "Fresh Workspace",
+	it("builds and submits shared entry workflow-form requests for new-project selection", async () => {
+		const entryWorkflowForm: WorkflowForm = {
+			...createWorkflowForm([
+				{
+					key: "__workflow_runtime_project_mode__",
+					kind: "radio_group",
+					label: "Project mode",
+					required: true,
+					options: [
+						{ value: "new", label: "New Project" },
+						{ value: "existing", label: "Existing Project" },
+					],
+				},
+				{
+					key: "__workflow_runtime_new_project_title__",
+					kind: "small_text",
+					label: "Project title",
+					required: true,
+				},
+			]),
+			panel: {
+				panelId: "__workflow_runtime_entry_project_selection__",
+				title: "Project Selection",
+				promptMarkdown: "Choose whether to start a new project or continue with an existing project.",
+				fields: [
+					{
+						key: "__workflow_runtime_project_mode__",
+						kind: "radio_group",
+						label: "Project mode",
+						required: true,
+						options: [
+							{ value: "new", label: "New Project" },
+							{ value: "existing", label: "Existing Project" },
+						],
+					},
+					{
+						key: "__workflow_runtime_new_project_title__",
+						kind: "small_text",
+						label: "Project title",
+						required: true,
+					},
+				],
+				allowedActions: ["submit", "back"],
+			},
+		}
+
+		const request = buildWorkflowFormSubmissionRequest(entryWorkflowForm, WorkflowFormAction.SUBMIT, {
+			__workflow_runtime_project_mode__: "new",
+			__workflow_runtime_new_project_title__: "Fresh Workspace",
 		})
-		const request = buildWorkflowStartCardSubmissionRequest(startCard)
 
 		expect(request).toMatchObject({
-			sessionId: "start-card-session",
-			action: WorkflowStartCardAction.WORKFLOW_START_CARD_ACTION_SUBMIT,
-			projectMode: WorkflowStartCardProjectMode.WORKFLOW_START_CARD_PROJECT_MODE_NEW,
-			selectedExistingProject: "",
-			newProjectTitle: "Fresh Workspace",
+			panelId: "__workflow_runtime_entry_project_selection__",
+			fields: [
+				{
+					key: "__workflow_runtime_project_mode__",
+					value: {
+						stringValue: "new",
+					},
+				},
+				{
+					key: "__workflow_runtime_new_project_title__",
+					value: {
+						stringValue: "Fresh Workspace",
+					},
+				},
+			],
 		})
 
-		await submitWorkflowStartCard(startCard)
+		await submitWorkflowForm(entryWorkflowForm, WorkflowFormAction.SUBMIT, {
+			__workflow_runtime_project_mode__: "new",
+			__workflow_runtime_new_project_title__: "Fresh Workspace",
+		})
 
-		expect(mockSubmitWorkflowStartCard).toHaveBeenCalledTimes(1)
-		expect(mockSubmitWorkflowStartCard.mock.calls[0]?.[0]).toMatchObject({
-			sessionId: "start-card-session",
-			action: WorkflowStartCardAction.WORKFLOW_START_CARD_ACTION_SUBMIT,
-			projectMode: WorkflowStartCardProjectMode.WORKFLOW_START_CARD_PROJECT_MODE_NEW,
-			selectedExistingProject: "",
-			newProjectTitle: "Fresh Workspace",
+		expect(mockSubmitWorkflowForm).toHaveBeenCalledTimes(1)
+		expect(mockSubmitWorkflowForm.mock.calls[0]?.[0]).toMatchObject({
+			panelId: "__workflow_runtime_entry_project_selection__",
+			action: WorkflowFormAction.SUBMIT,
 		})
 	})
 })

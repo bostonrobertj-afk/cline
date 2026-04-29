@@ -25,10 +25,9 @@ export function createGemini3Variant(): DeepPlanningVariant {
 
 /**
  * Generates the deep-planning template with shell-specific commands
- * @param focusChainEnabled Whether focus chain (task_progress) is enabled for this task
  * @param enableNativeToolCalls Whether native tool calling is enabled
  */
-export function generateGemini3Template(focusChainEnabled: boolean, enableNativeToolCalls: boolean): string {
+export function generateGemini3Template(enableNativeToolCalls: boolean): string {
 	const detectedShell = getShell()
 
 	let isPowerShell = false
@@ -47,7 +46,6 @@ Your task is to create a comprehensive implementation plan before writing any co
 4. Create Implementation Plan Document
 5. Create new_task for Implementation Phase
 
-${focusChainEnabled ? `Track these five steps in task_progress with a concise Markdown checklist.` : ""}
 Your behavior should be methodical and thorough - take time to understand the codebase completely before making any recommendations. The quality of your investigation and use of targeted reads/searches directly impacts the success of the implementation.
 
 <IMPORTANT>
@@ -178,13 +176,12 @@ Details of new packages, version changes, and integration requirements.
 Single sentence describing the implementation sequence.
 
 Numbered steps showing the logical order of changes to minimize conflicts and ensure successful integration.
-${focusChainEnabled ? "Include the current task_progress checklist." : ""}
 
 </example_implementation_plan>
 
 ## STEP 5: Create Implementation new_task
 
-Use the new_task command to create a task for implementing the plan. ${focusChainEnabled ? "Include the current task_progress checklist if focus-chain is enabled." : ""}
+Use the new_task command to create a task for implementing the plan.
 
 ### Task Creation Requirements
 
@@ -192,16 +189,9 @@ Use the new_task command to create a task for implementing the plan. ${focusChai
 **Standalone Product:**
 Your new task should be self-contained and reference the plan document rather than requiring additional codebase investigation. Include these specific instructions in the task description:
 
-${
-	focusChainEnabled
-		? `**Task Progress:**
-Include the current task_progress checklist as plain Markdown list items (not XML-wrapped) when creating the new task.
-
 **Markdown Implementation Plan Path:**
 You also MUST include the path to the markdown file you have created in your new task prompt. You should do this as follows:
-  Refer to @path/to/file/markdown.md for a complete breakdown of the task requirements and steps. You should periodically read this file again.`
-		: ""
-}
+  Refer to @path/to/file/markdown.md for a complete breakdown of the task requirements and steps. You should periodically read this file again.
 </IMPORTANT>
 
 ${

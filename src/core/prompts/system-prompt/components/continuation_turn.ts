@@ -34,12 +34,12 @@ export async function getContinuationTurnSection(
 		lines.push(`- ${indxrGuidance}`)
 	}
 
-	const workflowSystemBlock = context.workflowSystemInstructionsBlock
+	const workflowSystemBlock = context.continuationTurnWorkflowSystemInstructionsBlock
 	if (typeof workflowSystemBlock === "string" && workflowSystemBlock.trim().length > 0) {
 		lines.push("", workflowSystemBlock)
 	}
 
-	const workflowInputBlock = context.workflowInputInstructionsBlock
+	const workflowInputBlock = context.continuationTurnWorkflowInputInstructionsBlock
 	if (typeof workflowInputBlock === "string" && workflowInputBlock.trim().length > 0) {
 		lines.push("", workflowInputBlock)
 	}

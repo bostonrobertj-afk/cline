@@ -6,7 +6,6 @@ import { ApiProviderInfo } from "@/core/api"
 import type { McpHub } from "@/services/mcp/McpHub"
 import type { BrowserSettings } from "@/shared/BrowserSettings"
 import type { FocusChainSettings } from "@/shared/FocusChainSettings"
-import { FOCUS_CHAIN_COMPLETE_NEXT_STEP_SENTINEL } from "@/shared/focus-chain-utils"
 import { ModelFamily } from "@/shared/prompts"
 import type { SkillMetadata } from "@/shared/skills"
 import { ClineDefaultTool } from "@/shared/tools"
@@ -104,9 +103,15 @@ export interface SystemPromptContext {
 	readonly mcpHub?: McpHub
 	readonly activeWorkflowName?: string
 	readonly activeWorkflowStepNumber?: number
-	readonly workflowSystemInstructionsBlock?: string
-	readonly workflowInputInstructionsBlock?: string
+	readonly fullTurnWorkflowSystemInstructionsBlock?: string
+	readonly fullTurnWorkflowInputInstructionsBlock?: string
+	/**
+	 * Complete runtime-projected tool schema for the current workflow turn.
+	 * When present, it is the authoritative prompt/native tool surface.
+	 */
 	readonly workflowToolSchemaOverride?: readonly ClineToolSpec[]
+	readonly continuationTurnWorkflowSystemInstructionsBlock?: string
+	readonly continuationTurnWorkflowInputInstructionsBlock?: string
 	readonly isContinuationTurn?: boolean
 	readonly isPromptRefreshTurn?: boolean
 	readonly currentFocusChainChecklist?: string | null
@@ -272,17 +277,6 @@ export interface VariantSchema {
 	readonly required: readonly string[]
 	readonly optional: readonly string[]
 	readonly validation: Record<string, (value: unknown) => boolean>
-}
-
-/**
- * Common parameter shared between tools for tracking task progress
- */
-export const TASK_PROGRESS_PARAMETER = {
-	name: "task_progress",
-	required: false,
-	instruction: `Use as a top-level parameter on the next tool call, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use \`${FOCUS_CHAIN_COMPLETE_NEXT_STEP_SENTINEL}\` to complete the next incomplete step.`,
-	usage: "Checklist here (optional)",
-	dependencies: [ClineDefaultTool.TODO],
 }
 
 export const AGENT_FEEDBACK_PROMPT_GUIDANCE =

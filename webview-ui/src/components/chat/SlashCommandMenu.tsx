@@ -12,10 +12,6 @@ interface SlashCommandMenuProps {
 	onMouseDown: () => void
 	query: string
 	availableCommands?: SlashCommand[]
-	localWorkflowToggles?: Record<string, boolean>
-	globalWorkflowToggles?: Record<string, boolean>
-	remoteWorkflowToggles?: Record<string, boolean>
-	remoteWorkflows?: any[]
 	mcpServers?: McpServer[]
 }
 
@@ -26,24 +22,12 @@ const SlashCommandMenu: React.FC<SlashCommandMenuProps> = ({
 	onMouseDown,
 	query,
 	availableCommands,
-	localWorkflowToggles = {},
-	globalWorkflowToggles = {},
-	remoteWorkflowToggles,
-	remoteWorkflows,
 	mcpServers = [],
 }) => {
 	const menuRef = useRef<HTMLDivElement>(null)
 
 	// Filter commands based on query
-	const filteredCommands = getMatchingSlashCommands(
-		query,
-		localWorkflowToggles,
-		globalWorkflowToggles,
-		remoteWorkflowToggles,
-		remoteWorkflows,
-		mcpServers,
-		availableCommands,
-	)
+	const filteredCommands = getMatchingSlashCommands(query, mcpServers, availableCommands)
 	const defaultCommands = filteredCommands.filter((cmd) => cmd.section === "default" || !cmd.section)
 	const workflowCommands = filteredCommands.filter((cmd) => cmd.section === "custom")
 	const mcpCommands = filteredCommands.filter((cmd) => cmd.section === "mcp")

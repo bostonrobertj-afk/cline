@@ -1,12 +1,10 @@
 import type {
-	WorkflowForm,
 	WorkflowFormAllowedValueType,
 	WorkflowFormConditionDefinition,
 	WorkflowFormDefinitionPayload,
 	WorkflowFormFieldDefinition,
 	WorkflowFormFieldKind,
 	WorkflowFormPanelDefinition,
-	WorkflowFormResolvedPanelPayload,
 	WorkflowFormSubmittedValuePayload,
 	WorkflowFormTransitionDefinition,
 } from "@shared/ExtensionMessage"
@@ -16,7 +14,6 @@ import {
 	type WorkflowFormSubmissionRequest,
 } from "@shared/proto/cline/task"
 import { randomUUID } from "crypto"
-import { buildWorkflowFormPayload } from "./buildWorkflowFormPayload"
 import { normalizeWorkflowFormSubmittedValue, validateWorkflowFormSubmittedValueAgainstSchema } from "./schema"
 import type {
 	WorkflowFormRuntimeCreateSessionOptions,
@@ -495,20 +492,6 @@ function applyFieldResetRules(
 	}
 }
 
-function buildResolvedPanelPayload(
-	panel: WorkflowFormPanelDefinition,
-	session: Pick<WorkflowFormSessionState, "values" | "data">,
-): WorkflowFormResolvedPanelPayload {
-	return {
-		panelId: panel.panelId,
-		title: panel.title,
-		promptMarkdown: panel.promptMarkdown,
-		fields: resolvePanelFields(panel, session),
-		allowedActions: panel.allowedActions,
-		actionLabels: panel.actionLabels,
-	}
-}
-
 function clearDeclaredKeys(
 	values: WorkflowFormSessionValues,
 	data: WorkflowFormSessionData,
@@ -537,7 +520,6 @@ function resolveTransitionOutcome(
 	session: Pick<WorkflowFormSessionState, "values" | "data">,
 ): {
 	nextPanelId?: string
-	operationId?: string
 	terminal?: boolean
 	staleValueKeysToClear?: string[]
 	staleDataKeysToClear?: string[]
@@ -549,28 +531,18 @@ function resolveTransitionOutcome(
 				staleValueKeysToClear: transition.staleValueKeysToClear,
 				staleDataKeysToClear: transition.staleDataKeysToClear,
 			}
-		case "deterministic_operation":
-			return {
-				nextPanelId: transition.nextPanelId,
-				operationId: transition.operationId,
-				terminal: transition.terminal,
-				staleValueKeysToClear: transition.staleValueKeysToClear,
-				staleDataKeysToClear: transition.staleDataKeysToClear,
-			}
 		case "conditional": {
 			const sourceValue = resolveComparableSourceValue(session, transition.conditionSourceKey)
 			const branch = transition.branches.find((entry) => sourceValue === entry.matchValue)
 			if (!branch) {
 				return {
 					nextPanelId: transition.defaultNextPanelId,
-					operationId: transition.defaultOperationId,
 					terminal: transition.defaultTerminal,
 				}
 			}
 
 			return {
 				nextPanelId: branch.nextPanelId,
-				operationId: branch.operationId,
 				terminal: branch.terminal,
 				staleValueKeysToClear: branch.staleValueKeysToClear,
 				staleDataKeysToClear: branch.staleDataKeysToClear,
@@ -623,43 +595,6 @@ export class WorkflowFormRuntime {
 			values: {},
 			data: {},
 		}
-	}
-
-	buildPayload(session: WorkflowFormSessionState): WorkflowForm {
-		const panelId = session.failure?.panelId ?? session.currentPanelId
-		const panel = this.getPanel(session.definitionPayload, panelId)
-
-		return buildWorkflowFormPayload({
-			session,
-			definition: session.definitionPayload,
-			panel: buildResolvedPanelPayload(panel, session),
-			errorMessage: session.failure?.errorMessage,
-		})
-	}
-
-	buildFailurePayload(session: WorkflowFormSessionState, errorMessage: string, panelId?: string): WorkflowForm {
-		const resolvedPanelId = panelId ?? session.failure?.panelId ?? session.currentPanelId
-		const panel = this.getPanel(session.definitionPayload, resolvedPanelId)
-
-		return buildWorkflowFormPayload({
-			session,
-			definition: session.definitionPayload,
-			panel: buildResolvedPanelPayload(panel, session),
-			errorMessage,
-		})
-	}
-
-	buildRetryPayload(session: WorkflowFormSessionState, errorMessage: string): WorkflowForm {
-		return this.buildFailurePayload(session, errorMessage)
-	}
-
-	buildSuccessPayload(session: WorkflowFormSessionState, successMessage: string): WorkflowForm {
-		return buildWorkflowFormPayload({
-			session,
-			definition: session.definitionPayload,
-			success: true,
-			successMessage,
-		})
 	}
 
 	handleSubmission(session: WorkflowFormSessionState, request: WorkflowFormSubmissionRequest): WorkflowFormRuntimeOutcome {
@@ -758,28 +693,24 @@ export class WorkflowFormRuntime {
 			return {
 				kind: "render_form",
 				session: nextSession,
-				payload: this.buildPayload(nextSession),
 			}
 		}
 		if (request.action === WorkflowFormAction.CANCEL && !allowedActions.has("cancel")) {
 			return {
 				kind: "render_form",
 				session: nextSession,
-				payload: this.buildPayload(nextSession),
 			}
 		}
 		if (request.action === WorkflowFormAction.BACK && !allowedActions.has("back")) {
 			return {
 				kind: "render_form",
 				session: nextSession,
-				payload: this.buildPayload(nextSession),
 			}
 		}
 		if (request.action === WorkflowFormAction.RETRY && (!session.failure || !allowedActions.has("retry"))) {
 			return {
 				kind: "render_form",
 				session: nextSession,
-				payload: this.buildPayload(nextSession),
 			}
 		}
 
@@ -795,7 +726,6 @@ export class WorkflowFormRuntime {
 			return {
 				kind: "render_form",
 				session: nextSession,
-				payload: this.buildPayload(nextSession),
 			}
 		}
 
@@ -812,18 +742,18 @@ export class WorkflowFormRuntime {
 			data: clearedAfterTransition.data,
 		}
 
-		if (transitionOutcome.operationId) {
+		if (transitionOutcome.terminal === true) {
 			return {
-				kind: "invoke_deterministic_operation",
+				kind: "complete_success",
 				session: nextSession,
-				operationId: transitionOutcome.operationId,
-				nextPanelId: transitionOutcome.nextPanelId,
-				terminal: transitionOutcome.terminal,
+				successMessage: "",
 			}
 		}
 
 		if (!transitionOutcome.nextPanelId) {
-			throw new Error(`Workflow form panel "${activePanel.panelId}" did not resolve to a next panel or operation.`)
+			throw new Error(
+				`Workflow form panel "${activePanel.panelId}" did not resolve to a next panel or terminal completion.`,
+			)
 		}
 
 		const transitionedSession: WorkflowFormSessionState = {
@@ -834,7 +764,6 @@ export class WorkflowFormRuntime {
 		return {
 			kind: "render_form",
 			session: transitionedSession,
-			payload: this.buildPayload(transitionedSession),
 		}
 	}
 
@@ -843,7 +772,6 @@ export class WorkflowFormRuntime {
 			return {
 				kind: "render_form",
 				session,
-				payload: this.buildPayload(session),
 			}
 		}
 
@@ -868,7 +796,6 @@ export class WorkflowFormRuntime {
 		return {
 			kind: "render_form",
 			session: nextSession,
-			payload: this.buildPayload(nextSession),
 		}
 	}
 
@@ -887,7 +814,6 @@ export class WorkflowFormRuntime {
 		return {
 			kind: "render_form",
 			session: nextSession,
-			payload: this.buildPayload(nextSession),
 		}
 	}
 
@@ -903,7 +829,6 @@ export class WorkflowFormRuntime {
 		return {
 			kind: "render_form",
 			session: failureSession,
-			payload: this.buildFailurePayload(failureSession, errorMessage, panelId),
 		}
 	}
 
@@ -970,14 +895,6 @@ export class WorkflowFormRuntime {
 		transition: WorkflowFormTransitionDefinition,
 	): void {
 		if (transition.type === "sequential" && !definition.panels[transition.nextPanelId]) {
-			throw new Error(`Workflow form definition references a nonexistent destination panel: ${transition.nextPanelId}`)
-		}
-
-		if (
-			transition.type === "deterministic_operation" &&
-			transition.nextPanelId &&
-			!definition.panels[transition.nextPanelId]
-		) {
 			throw new Error(`Workflow form definition references a nonexistent destination panel: ${transition.nextPanelId}`)
 		}
 

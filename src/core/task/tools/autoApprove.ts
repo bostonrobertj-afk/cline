@@ -51,14 +51,8 @@ export class AutoApprove {
 				case ClineDefaultTool.FILE_NEW:
 				case ClineDefaultTool.FILE_EDIT:
 				case ClineDefaultTool.APPLY_PATCH:
-				case ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT:
-				case ClineDefaultTool.BUILD_EPICS_DOCUMENT:
-				case ClineDefaultTool.SELECT_TARGET_EPIC:
-				case ClineDefaultTool.CAPTURE_BRAINSTORMING_TOPIC:
-				case ClineDefaultTool.BUILD_EPIC_DELIVERY_SPEC:
-				case ClineDefaultTool.BUILD_STORY_DOCUMENT:
-				case ClineDefaultTool.BUILD_TECH_SPEC_DOCUMENT:
-				case ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE:
+				case ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT:
+				case ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT:
 				case ClineDefaultTool.BASH:
 				case ClineDefaultTool.USE_SUBAGENTS:
 					return [true, true]
@@ -83,14 +77,8 @@ export class AutoApprove {
 				case ClineDefaultTool.FILE_NEW:
 				case ClineDefaultTool.FILE_EDIT:
 				case ClineDefaultTool.APPLY_PATCH:
-				case ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT:
-				case ClineDefaultTool.BUILD_EPICS_DOCUMENT:
-				case ClineDefaultTool.SELECT_TARGET_EPIC:
-				case ClineDefaultTool.CAPTURE_BRAINSTORMING_TOPIC:
-				case ClineDefaultTool.BUILD_EPIC_DELIVERY_SPEC:
-				case ClineDefaultTool.BUILD_STORY_DOCUMENT:
-				case ClineDefaultTool.BUILD_TECH_SPEC_DOCUMENT:
-				case ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE:
+				case ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT:
+				case ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT:
 				case ClineDefaultTool.BASH:
 				case ClineDefaultTool.USE_SUBAGENTS:
 					return [true, true]
@@ -117,14 +105,8 @@ export class AutoApprove {
 			case ClineDefaultTool.FILE_NEW:
 			case ClineDefaultTool.FILE_EDIT:
 			case ClineDefaultTool.APPLY_PATCH:
-			case ClineDefaultTool.BUILD_REVIEW_DIFF_OUTPUT:
-			case ClineDefaultTool.BUILD_EPICS_DOCUMENT:
-			case ClineDefaultTool.SELECT_TARGET_EPIC:
-			case ClineDefaultTool.CAPTURE_BRAINSTORMING_TOPIC:
-			case ClineDefaultTool.BUILD_EPIC_DELIVERY_SPEC:
-			case ClineDefaultTool.BUILD_STORY_DOCUMENT:
-			case ClineDefaultTool.BUILD_TECH_SPEC_DOCUMENT:
-			case ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE:
+			case ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT:
+			case ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT:
 				return [autoApprovalSettings.actions.editFiles, autoApprovalSettings.actions.editFilesExternally ?? false]
 			case ClineDefaultTool.BASH:
 				return [

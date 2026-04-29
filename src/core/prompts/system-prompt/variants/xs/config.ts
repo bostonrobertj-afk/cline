@@ -48,17 +48,9 @@ export const config = createVariant(ModelFamily.XS)
 		ClineDefaultTool.FILE_EDIT,
 		ClineDefaultTool.SEARCH,
 		ClineDefaultTool.ASK,
-		ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST,
 		ClineDefaultTool.ATTEMPT,
 		ClineDefaultTool.SEND_USER_MESSAGE,
 		ClineDefaultTool.PLAN_MODE,
-		ClineDefaultTool.COMPLETE_WORKFLOW_ITEM,
-		ClineDefaultTool.SET_WORKFLOW_VALUES,
-		ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT,
-		ClineDefaultTool.STORY_TASK_REMINDER,
-		ClineDefaultTool.STORY_TASK_COMPLETE,
-		ClineDefaultTool.STORY_NOTES_UPDATE,
-		ClineDefaultTool.STORY_TESTING_COMPLETE,
 		ClineDefaultTool.USE_SUBAGENTS,
 	)
 	.placeholders({

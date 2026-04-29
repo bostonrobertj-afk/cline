@@ -13,11 +13,7 @@ Use attempt_completion.
 SKILLS
 
 Installed skills and workflow activations available on this turn: bmad-code-review
-====
-
-<active_bmad_workflow workflow_id="bmad-code-review" managed="true" phase_id="step-01">
-Current active step: Gather context
-</active_bmad_workflow>`
+====`
 
 		const messages = [
 			{ role: "user", content: "Review this change set." },
@@ -37,7 +33,6 @@ Current active step: Gather context
 		estimate.systemPrompt.should.be.greaterThan(0)
 		estimate.systemSections.toolUse.should.be.greaterThan(0)
 		estimate.systemSections.skills.should.be.greaterThan(0)
-		estimate.systemSections.managedWorkflow.should.be.greaterThan(0)
 		estimate.history.total.should.be.greaterThan(0)
 		estimate.history.currentUserInput.should.be.greaterThan(0)
 		estimate.history.toolOutputs.should.be.greaterThan(0)

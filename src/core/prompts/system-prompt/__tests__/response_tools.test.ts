@@ -51,7 +51,7 @@ describe("response tools prompt helpers", () => {
 		expect(responseToolsSection).to.not.contain("- `workflow_progress_request`:")
 	})
 
-	it("includes workflow_progress_request in ACT response tools only when native visibility includes it", () => {
+	it("omits workflow_progress_request from ACT response tools even when native visibility includes it", () => {
 		const context = makeContext({
 			enableNativeToolCalls: true,
 			visibleNativeToolNames: [
@@ -62,10 +62,8 @@ describe("response tools prompt helpers", () => {
 			],
 		})
 
-		expect(getCurrentModeResponseToolsLine(context)).to.contain("`workflow_progress_request`")
-		expect(getResponseToolsSection(context)).to.contain(
-			"- `workflow_progress_request`: Use when the active workflow step is complete and you need the runtime-owned Yes/No confirmation before advancing",
-		)
+		expect(getCurrentModeResponseToolsLine(context)).to.not.contain("`workflow_progress_request`")
+		expect(getResponseToolsSection(context)).to.not.contain("`workflow_progress_request`")
 	})
 
 	it("omits workflow_progress_request from ACT response tools when native visibility excludes it", () => {
@@ -78,7 +76,7 @@ describe("response tools prompt helpers", () => {
 		expect(getResponseToolsSection(context)).to.not.contain("`workflow_progress_request`")
 	})
 
-	it("includes workflow_progress_request in PLAN response tools only when native visibility includes it", () => {
+	it("omits workflow_progress_request from PLAN response tools even when native visibility includes it", () => {
 		const context = makeContext({
 			providerInfo: { ...makeContext().providerInfo, mode: "plan" },
 			enableNativeToolCalls: true,
@@ -90,11 +88,9 @@ describe("response tools prompt helpers", () => {
 			],
 		})
 
-		expect(getCurrentModeResponseToolsLine(context)).to.contain("`workflow_progress_request`")
+		expect(getCurrentModeResponseToolsLine(context)).to.not.contain("`workflow_progress_request`")
 		expect(getCurrentModeResponseToolsLine(context)).to.not.contain("`act_mode_respond`")
-		expect(getResponseToolsSection(context)).to.contain(
-			"- `workflow_progress_request`: Use when the active workflow step is complete and you need the runtime-owned Yes/No confirmation before advancing",
-		)
+		expect(getResponseToolsSection(context)).to.not.contain("`workflow_progress_request`")
 	})
 
 	it("mentions act_mode_respond only when it is visible in native ACT mode", () => {

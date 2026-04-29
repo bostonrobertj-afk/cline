@@ -178,7 +178,7 @@ Numbered steps showing the logical order of changes to minimize conflicts and en
 
 ## STEP 4: Create Implementation Task
 
-Use the new_task command to create a task for implementing the plan. The task must include a <task_progress> list that breaks down the implementation into trackable steps.
+Use the new_task command to create a task for implementing the plan.
 
 ### Task Creation Requirements
 
@@ -244,30 +244,15 @@ sed -n '/\\[Implementation Order\\]/,$p' implementation_plan.md | cat
 }
 
 
-**Task Progress Format:**
-<IMPORTANT>
-You absolutely must include the task_progress contents in context when creating the new task. When providing it, do not wrap it in XML tags- instead provide it like this:
-
-
-task_progress Items:
-- [ ] Step 1: Brief description of first implementation step
-- [ ] Step 2: Brief description of second implementation step  
-- [ ] Step 3: Brief description of third implementation step
-- [ ] Step N: Brief description of final implementation step
-
-
 You also MUST include the path to the markdown file you have created in your new task prompt. You should do this as follows:
 
 Refer to @path/to/file/markdown.md for a complete breakdown of the task requirements and steps. You should periodically read this file again.
-
-{{FOCUS_CHAIN_PARAM}}
 
 {{NEW_TASK_INSTRUCTIONS}}
 
 ### Mode Switching
 
 When creating the new task, request a switch to "act mode" if you are currently in "plan mode". This ensures the implementation agent operates in execution mode rather than planning mode.
-</IMPORTANT>
 
 ## Quality Standards
 

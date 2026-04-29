@@ -1,7 +1,6 @@
 import { ModelFamily } from "@/shared/prompts"
 import { ClineDefaultTool } from "@/shared/tools"
 import type { ClineToolSpec } from "../spec"
-import { TASK_PROGRESS_PARAMETER } from "../types"
 
 const id = ClineDefaultTool.LIST_CODE_DEF
 
@@ -18,7 +17,6 @@ const generic: ClineToolSpec = {
 			instruction: `The path of a directory (not a file) relative to the current working directory {{CWD}}{{MULTI_ROOT_HINT}}. Lists definitions across all source files in that directory. To inspect a single file, use read_file instead.`,
 			usage: "Directory path here",
 		},
-		TASK_PROGRESS_PARAMETER,
 	],
 }
 
@@ -34,7 +32,6 @@ const NATIVE_GPT_5: ClineToolSpec = {
 			required: true,
 			instruction: `The path of a directory (not a file) relative to the current working directory {{CWD}}{{MULTI_ROOT_HINT}}. Lists definitions across all source files in that directory. To inspect a single file, use read_file instead.`,
 		},
-		TASK_PROGRESS_PARAMETER,
 	],
 }
 

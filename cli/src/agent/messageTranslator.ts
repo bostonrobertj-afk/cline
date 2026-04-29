@@ -322,11 +322,6 @@ function translateSayMessage(
 			// The ACP client already knows what they typed
 			break
 
-		case "task_progress":
-			// Task progress → plan update
-			updates.push(...translateTaskProgressMessage(message))
-			break
-
 		case "hook_status":
 			// Format hook status as a human-readable message
 			if (message.text) {
@@ -869,71 +864,6 @@ function translateMcpMessage(message: ClineMessage, sessionState: AcpSessionStat
 	}
 
 	return updates
-}
-
-/**
- * Translate task progress (focus chain/todos) to ACP plan update.
- */
-function translateTaskProgressMessage(message: ClineMessage): acp.SessionUpdate[] {
-	const updates: acp.SessionUpdate[] = []
-
-	if (!message.text) return updates
-
-	// Parse the markdown checklist format
-	const entries = parseTaskProgressToEntries(message.text)
-
-	if (entries.length > 0) {
-		updates.push({
-			sessionUpdate: "plan",
-			entries,
-		})
-	}
-
-	return updates
-}
-
-/**
- * Parse markdown checklist format into ACP plan entries.
- *
- * Example input:
- * - [x] Completed task
- * - [ ] Pending task
- * - Currently working on this
- */
-function parseTaskProgressToEntries(text: string): acp.PlanEntry[] {
-	const entries: acp.PlanEntry[] = []
-	const lines = text.split("\n")
-
-	for (const line of lines) {
-		const trimmed = line.trim()
-		if (!trimmed) continue
-
-		// Match markdown checklist items
-		const checkboxMatch = trimmed.match(/^-\s*\[([ xX])\]\s*(.+)$/)
-		if (checkboxMatch) {
-			const isCompleted = checkboxMatch[1].toLowerCase() === "x"
-			const content = checkboxMatch[2].trim()
-
-			entries.push({
-				content,
-				status: isCompleted ? "completed" : "pending",
-				priority: "medium",
-			})
-			continue
-		}
-
-		// Match plain list items (treated as in_progress or pending)
-		const listMatch = trimmed.match(/^-\s+(.+)$/)
-		if (listMatch) {
-			entries.push({
-				content: listMatch[1].trim(),
-				status: "in_progress",
-				priority: "medium",
-			})
-		}
-	}
-
-	return entries
 }
 
 /**

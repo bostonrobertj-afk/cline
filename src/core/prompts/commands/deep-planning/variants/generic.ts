@@ -163,7 +163,7 @@ Numbered steps showing the logical order of changes to minimize conflicts and en
 
 ## STEP 4: Create Implementation Task
 
-Use the new_task command to create a task for implementing the plan. If focus-chain is enabled, include the current task_progress checklist.
+Use the new_task command to create a task for implementing the plan.
 
 ### Task Creation Requirements
 
@@ -227,23 +227,15 @@ sed -n '/\\[Implementation Order\\]/,$p' implementation_plan.md | cat
 }
 
 
-**Task Progress:**
-<IMPORTANT>
-If focus-chain is enabled, include the current task_progress checklist as plain Markdown list items (not XML-wrapped) when creating the new task.
-
-
 You also MUST include the path to the markdown file you have created in your new task prompt. You should do this as follows:
 
 Refer to @path/to/file/markdown.md for a complete breakdown of the task requirements and steps. You should periodically read this file again.
-
-{{FOCUS_CHAIN_PARAM}}
 
 {{NEW_TASK_INSTRUCTIONS}}
 
 ### Mode Switching
 
 When creating the new task, request a switch to "act mode" if you are currently in "plan mode". This ensures the implementation agent operates in execution mode rather than planning mode.
-</IMPORTANT>
 
 ## Quality Standards
 

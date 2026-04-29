@@ -5,6 +5,12 @@ import type { WorkflowDefinition } from "@/core/task/workflow-runtime/types"
 import * as WorkflowRegistry from "@/core/task/workflow-runtime/WorkflowRegistry"
 import { formatMcpPromptResponse, type McpPromptFetcher, parseSlashCommands } from "../index"
 
+const ENTRY_PROJECT_VALUE_KEYS = {
+	projectMode: "entry_project_mode",
+	projectTitle: "entry_project_title",
+	projectFolderName: "entry_project_folder_name",
+}
+
 function createResolvedWorkflow(
 	args?: Partial<Pick<WorkflowDefinition, "name" | "slashCommandName" | "useSkillName">>,
 ): WorkflowDefinition {
@@ -14,14 +20,33 @@ function createResolvedWorkflow(
 		useSkillName: args?.useSkillName ?? "quick-spec",
 		persona: "engineer",
 		projectSubfolder: "planning",
-		startCard: { markdownBody: "", submitLabel: "Continue" },
+		workflowValueKeys: Object.values(ENTRY_PROJECT_VALUE_KEYS),
+		entryProjectValueKeys: ENTRY_PROJECT_VALUE_KEYS,
+		entryPanel: { promptMarkdown: "Entry panel" },
 		steps: {
 			"step-1": {
 				id: "step-1",
 				stepNumber: 1,
 				checklistLabel: "Step 1",
-				buildPromptProjection: () => ({}),
-				allowWorkflowProgressRequest: false,
+				buildPromptSource: () => ({
+					currentStepInstructions: "Step 1",
+				}),
+				buildToolSchema: () => [],
+				decisionTree: {
+					entryBranchId: "entry",
+					branches: {
+						entry: {
+							id: "entry",
+							routes: [
+								{
+									id: "entry-route",
+									trigger: { kind: "always" },
+									action: { kind: "project_prompt" },
+								},
+							],
+						},
+					},
+				},
 			},
 		},
 	}
@@ -134,7 +159,7 @@ describe("slash-commands", () => {
 
 		it("should process MCP prompt command in task tag", async () => {
 			const text = "<task>/mcp:test-server:greet</task>"
-			const result = await parseSlashCommands(text, "test-ulid", undefined, undefined, undefined, mockMcpPromptFetcher)
+			const result = await parseSlashCommands(text, "test-ulid", undefined, undefined, mockMcpPromptFetcher)
 
 			expect(result.processedText).to.include('<mcp_prompt server="test-server" prompt="greet">')
 			expect(result.processedText).to.include("Hello from MCP!")
@@ -143,7 +168,7 @@ describe("slash-commands", () => {
 
 		it("should process MCP prompt with additional text", async () => {
 			const text = "<task>/mcp:test-server:greet Please expand on this</task>"
-			const result = await parseSlashCommands(text, "test-ulid", undefined, undefined, undefined, mockMcpPromptFetcher)
+			const result = await parseSlashCommands(text, "test-ulid", undefined, undefined, mockMcpPromptFetcher)
 
 			expect(result.processedText).to.include('<mcp_prompt server="test-server" prompt="greet">')
 			expect(result.processedText).to.include("Please expand on this")
@@ -160,7 +185,7 @@ describe("slash-commands", () => {
 			}
 
 			const text = "<task>/mcp:server:prompt:with:colons</task>"
-			const result = await parseSlashCommands(text, "test-ulid", undefined, undefined, undefined, fetcherWithColons)
+			const result = await parseSlashCommands(text, "test-ulid", undefined, undefined, fetcherWithColons)
 
 			expect(result.processedText).to.include('prompt="prompt:with:colons"')
 			expect(result.processedText).to.include("Colon prompt")

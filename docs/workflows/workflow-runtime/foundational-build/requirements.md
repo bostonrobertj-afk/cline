@@ -1,0 +1,237 @@
+# Workflow Runtime Foundational Build Requirements
+
+This document is a phase-focused extract of [requirements.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/workflows/workflow-runtime/requirements.md). It copies the global requirements and the requirements currently scoped to Foundational Build so foundational implementation work can use one focused reference.
+
+Module Build requirements, Cleanup requirements, External Interface Requirements, and Non-Functional / Other Requirements remain in the source requirements document.
+
+## Functional Requirements Relevant to Foundational Build
+
+#### Global Requirements: Activation and Identity
+
+- `FR-1`: The system must detect in-scope workflow invocation through slash command and `useSkill` entrypoints in `task/index.ts`.
+- `FR-2`: The system must set `activeWorkflowName` when a workflow is activated.
+- `FR-3`: `activeWorkflowName` must be the canonical answer to whether a workflow is active and which workflow is active.
+- `FR-4`: The system must retire parallel workflow-identity carriers used by the current runtime, including placeholder-workflow identity fields and managed-workflow identity state.
+- `FR-5`: `WorkflowRuntime` must resolve the active workflow definition from the product-owned registry of in-scope workflows for this initiative, using `activeWorkflowName` as the canonical workflow identity, rather than relying on user-authored workflow discovery.
+- `FR-5a`: The system must support explicit `useSkill` activation of in-scope shipped workflows by resolving the requested skill name through the shipped workflow-definition registry when `use_skill` is otherwise available to the model or is exposed by an active workflow module; shipped workflows must not force default non-workflow `use_skill` exposure and must not be automatically listed in the main-agent or subagent prompt `SKILLS` discovery surface.
+- `FR-5b`: The canonical seam for shipped-workflow `useSkill` activation lookup must be `resolveWorkflowByUseSkillName(...)`.
+- `FR-5c`: `resolveWorkflowByUseSkillName(...)` must resolve shipped workflows from runtime workflow definitions and their workflow-module-owned `useSkillName` identity fields, rather than from legacy resolved-workflow entry shapes or prompt-visible `SkillMetadata` projection.
+- `FR-5d`: Local, global, remote, and managed workflow-source discovery must not participate in shipped-workflow `useSkill` activation lookup.
+- `FR-5e`: The legacy helper `createWorkflowSkillMetadata(...)` must be retired with no replacement prompt-visible workflow skill metadata projection.
+- `FR-5f`: Main-agent `useSkill` execution paths must resolve shipped workflow names through the product-owned workflow registry lookup whenever `use_skill` is invoked, without injecting shipped workflow metadata into prompt-visible skill discovery by default and without requiring default non-workflow `use_skill` tool exposure when no ordinary skills are available.
+- `FR-5g`: Subagents must not directly execute `use_skill`. A child workflow session may be activated only by parent-assigned subagent workflow configuration, and that assigned workflow activation must resolve shipped workflow names through the product-owned workflow registry lookup.
+
+#### Foundational Build Requirements: Workflow Runtime Ownership
+
+- `FR-6`: The system must introduce a shared workflow runtime that is invoked by `task/index.ts` whenever a workflow is active.
+- `FR-7`: The workflow runtime must create and own workflow session state for each execution context in which a workflow is active.
+- `FR-8`: The workflow runtime must own active-step state.
+- `FR-9`: The workflow runtime must own progression evaluation, advancement, completion detection, teardown, persistence, and resume for active workflow sessions.
+- `FR-10`: The workflow runtime must define and enforce canonical workflow session mutation rules.
+- `FR-10a`: The workflow runtime must define and enforce one canonical mutation surface for workflow-owned values.
+- `FR-10b`: Backend-owned deterministic logic and AI-callable workflow-value persistence must both write to the same canonical workflow value carrier inside workflow session state.
+- `FR-10c`: The canonical carrier for workflow-owned values must live inside workflow session state rather than in separate mirrored task-state fields.
+- `FR-10c1`: Each workflow module must declare the canonical inventory of workflow-value keys supported by that workflow; `WorkflowRuntime.applyWorkflowValueWrites(...)` must reject or no-op any write for a key not present in the active workflow definition's inventory.
+- `FR-10d`: For user-facing main-agent workflow invocations, the workflow runtime must run one mandatory shared pre-workflow entry `WorkflowForm` before workflow-specific step orchestration begins.
+- `FR-10d1`: The mandatory shared pre-workflow entry `WorkflowForm` must run for every user-facing main-agent workflow invocation in the target architecture.
+- `FR-10d2`: Child/subagent workflow activation must not render the mandatory shared pre-workflow entry `WorkflowForm`; child workflow sessions must initialize project identity by copying the parent workflow session's project selection during activation, and activation must no-op if that parent project selection is unavailable or incomplete.
+- `FR-10e`: The first panel of that mandatory shared pre-workflow entry `WorkflowForm` must be informational only and must carry the workflow-specific informational content that legacy workflow start cards used to carry.
+- `FR-10f`: The second panel of that mandatory shared pre-workflow entry `WorkflowForm` must obtain or resolve project identity for the active workflow session by presenting a `new` versus `existing` project choice.
+- `FR-10g`: If `existing` is chosen, the system must derive the available project choices by calling `fs.readdir(<visible project output root>, { withFileTypes: true })`, filtering to immediate child directory `Dirent`s only, and mapping each surviving folder basename to a project choice.
+- `FR-10g1`: The second panel of the mandatory shared pre-workflow entry `WorkflowForm` must treat that `fs.readdir(..., { withFileTypes: true })` plus `Dirent` filtering flow as its canonical filesystem-discovery method rather than glob-driven discovery, hidden registries, or workflow-specific discovery tooling.
+- `FR-10g2`: The second panel of the mandatory shared pre-workflow entry `WorkflowForm` must consume the same shared runtime-owned discovery/list-builder seam used by workflow-form selection flows so existing-project selection and in-workflow existing-artifact selection follow one canonical methodology.
+- `FR-10h`: If `new` is chosen, the system must collect a user-provided project title.
+- `FR-10i`: The workflow runtime must normalize user-provided project titles into filesystem-safe project identity.
+- `FR-10j`: The workflow runtime must preserve the user-provided project title as human-facing project text while using the normalized filesystem-safe identity for folder creation and path resolution.
+- `FR-10k`: The workflow runtime must ensure the per-project folder exists before workflow-specific artifact-producing steps can run.
+- `FR-10l`: The workflow runtime must ensure these canonical project subfolders exist within each per-project folder before workflow-specific artifact-producing steps can run:
+  - `discovery`
+  - `planning`
+  - `implementation`
+  - `review`
+  - `testing`
+
+#### Global Requirements: Workflow Module Contracts Relevant to Foundational Build
+
+- `FR-16`: Each workflow module must define a per-step next-action decision tree that expresses workflow progression and other runtime-owned branch behavior. That decision tree must let the module declare branch triggers, following branch targets, and any explicit step-transition target reached by a satisfied branch. Supported branch triggers must be workflow-module-declared, runtime-observable outcomes and state conditions, including but not limited to deterministic success, deterministic failure, `workflow_progress_request` confirm, `workflow_progress_request` deny, workflow-form or other UI selections, workflow-value persistence or resolution, artifact/file creation or update, document/content-state assertions, and final report delivery outcomes.
+- `FR-16a`: Deterministic workflow behavior is not synonymous with tool execution. Runtime-owned deterministic procedures include workflow-state evaluation, filesystem discovery/list building, workflow-form option population, workflow-value persistence, artifact identity/path derivation, completion detection, teardown, and next-action re-evaluation.
+- `FR-16b`: Runtime-owned deterministic procedures must execute inside `WorkflowRuntime` or shared runtime-owned seams, not be modeled as tool calls solely to fit the next-action engine.
+- `FR-16c`: Tool-backed deterministic operations are the subset of deterministic behavior that must use the normal tool execution path because they perform tool-governed work such as file creation/update/delete, document generation, artifact creation, subagent dispatch, or other actions subject to existing tool approval, policy, or execution controls.
+- `FR-16d`: A single next-action evaluation may perform runtime-owned deterministic procedures needed to evaluate state, then select at most one externally visible next action or one tool-backed deterministic operation.
+- `FR-20b`: `WorkflowRuntime` must own the shared hierarchical artifact identity and numbering policy used to connect related workflow outputs inside a project.
+- `FR-20b1`: Canonical numbered artifact identities must use dotted numeric form in runtime/session/user-facing identity: epic `1`, story `1.1`, remediation story `1.1.1`.
+- `FR-20b2`: Filesystem-safe artifact filename forms must use hyphenated identity segments and these canonical filename patterns: `Epic-{E}.md`, `Story-{E}-{S}.md`, `Remediation-story-{E}-{S}-{R}.md`, `Review-blind-hunter-{target}.md`, `Review-edge-case-hunter-{target}.md`, `Adversarial-review-{target}.md`, `Review-input-{target}.md`, and `Review-input-{target}.diff`, where `{target}` is the hyphenated identity of the selected story or remediation-story target.
+- `FR-20b3`: Runtime must allocate epic numbers project-wide by discovering existing convention-matching epic artifacts.
+- `FR-20b4`: Runtime must allocate story numbers within the selected parent epic.
+- `FR-20b5`: Runtime must allocate remediation-story numbers within the selected parent story.
+- `FR-20b6`: QA/review artifacts must inherit the selected target story or remediation-story identity exactly, must use that inherited identity in the canonical filename, and must not allocate or increment any review-specific number.
+- `FR-20b6a`: Review artifact creation must fail through the runtime tool-backed operation result path when no convention-matching `Story-{E}-{S}.md` or `Remediation-story-{E}-{S}-{R}.md` target artifact is selected.
+- `FR-20b7`: Workflow modules may declare artifact family, parent/target requirements, and artifact type, but must not compute, increment, parse, or format canonical artifact numbers themselves.
+- `FR-20b8`: Runtime numbering must be based on convention-driven filesystem discovery, not a hidden artifact registry.
+- `FR-20b9`: Collision suffixing must remain a write-safety fallback and must not be treated as canonical artifact numbering.
+- `FR-20c`: The shared numbering policy must carry forward across epic, epic-delivery-spec, story, remediation-story, and QA/review artifact families.
+- `FR-20f`: The workflow runtime must derive shared document-generation tool inputs from the active workflow module and runtime-owned workflow state. Workflow modules may provide template/builder selection, formatting rules, and source content inputs, but runtime-owned artifact allocation must provide canonical output identity, filename, project-relative path, and absolute destination path.
+- `FR-20i`: `WorkflowRuntime` must provide a shared artifact allocation/create capability invoked through runtime next-action evaluation when a workflow module declares that an artifact must be created or derived.
+- `FR-20i1`: The shared artifact allocation/create capability must use one canonical tool/capability id, `create_workflow_artifact`, rather than separate AI-facing and backend-only tools.
+- `FR-20i2`: `create_workflow_artifact` must be invokable by `WorkflowRuntime` deterministic next-action evaluation when a workflow module declares artifact creation or derivation.
+- `FR-20i3`: `create_workflow_artifact` must also be callable by the AI agent when, and only when, the active workflow module includes it in that turn's complete runtime-projected workflow tool schema.
+- `FR-20i4`: `create_workflow_artifact` must not have static default/global prompt or native-tool exposure.
+- `FR-20i5`: `create_workflow_artifact` execution must support both native and non-native tool-call paths when exposed through the active workflow's existing runtime-projected tool schema; execution authorization must not depend on native-only call shape or runtime-issued call-id prefixes.
+- `FR-20i6`: `create_workflow_artifact` must validate active workflow/session state and artifact parameters, then delegate artifact identity, numbering, path resolution, empty-file creation, and workflow-value persistence to `WorkflowRuntime`.
+- `FR-20i7`: Because `create_workflow_artifact` creates a file, it must use the existing file-write approval, auto-approval, hook, and workspace/path policy seams before file creation.
+- `FR-20j`: Workflow modules must declare artifact intent only, including artifact family, new-versus-derived artifact mode, parent or target identity source, and workflow-value keys that should receive allocation outputs.
+- `FR-20j1`: Parent or target identity sources for artifact allocation may come only from runtime-owned workflow session values, workflow-form selections persisted through the workflow-value seam, or deterministic runtime outputs persisted through the workflow-value seam.
+- `FR-20j2`: Before allocating a dependent artifact, runtime must validate that the declared parent or target identity resolves to a convention-matching artifact in the selected project; failure must route through the runtime tool-backed operation result path.
+- `FR-20j3`: `WorkflowRuntime` must own a typed artifact-family registry for canonical workflow artifact families; that registry must define each family's allocation mode, parent or target requirements, filename pattern, file extension, numbering scope, and discovery pattern.
+- `FR-20j4`: Workflow modules may reference runtime-owned artifact-family identifiers from that registry, but must not define or override canonical artifact-family filename patterns, extensions, numbering scopes, or discovery patterns.
+- `FR-20k`: Workflow modules must not prescribe canonical artifact filenames, increment artifact numbers, or compute canonical artifact paths.
+- `FR-20l`: The artifact allocation/create capability must resolve the active project, allocate or derive the canonical artifact identity, produce the canonical filename, project-relative path, and absolute path, and persist those outputs into workflow session values.
+- `FR-20m`: Persisted artifact outputs must include project context sufficient for prompt and tool clarity, including project title, project filesystem identity or folder, artifact family, artifact identity, artifact filename, artifact relative path, artifact absolute path, and parent or target identity when applicable.
+- `FR-20n`: The artifact allocation/create capability must create the empty artifact file at the resolved canonical path before reporting success.
+- `FR-20o`: Artifact allocation/create failures must be represented as runtime tool-backed operation results and re-enter canonical next-action evaluation rather than being handled by module-specific ad hoc logic.
+- `FR-20p`: The shared `build_workflow_document` capability must remain a content writer only; it must consume a runtime-resolved destination path and must not allocate artifact identity, compute canonical filenames, or choose project folders.
+
+#### Foundational Build Requirements: Step Resolution and Progression
+
+- `FR-22`: The workflow runtime must resolve the current active step from workflow session state rather than from focus chain markdown or checklist state.
+- `FR-23`: Focus chain must no longer act as the canonical owner of active workflow step.
+- `FR-24`: The system must treat focus chain as a downstream consumer that reflects runtime-owned workflow step and status.
+- `FR-24a`: Focus-chain lifecycle must be workflow-scoped, not task-global.
+- `FR-24b`: Task execution must not instantiate `FocusChainManager` from global focus-chain settings when no runtime workflow session is active.
+- `FR-24c`: When no runtime workflow session is active, task execution must not route through focus-chain refresh, prompt-instruction, checklist-update, or completion-protection paths.
+- `FR-24d`: Child/subagent execution contexts must not instantiate or use `FocusChainManager`; child workflow prompt projection must come from `WorkflowRuntime.buildTurnProjection(...)`, and child workflow state must remain in the child runtime workflow session.
+- `FR-25`: The system must support model-driven progression requests through `workflow_progress_request` only when the workflow runtime indicates that mechanism is permitted for the active step.
+- `FR-26`: A user approval returned through the `workflow_progress_request` flow must not progress a workflow directly; it must be handed to the workflow runtime for validation and canonical state mutation.
+- `FR-27`: The system must retire `task_progress` as a workflow progression mechanism.
+- `FR-28`: The system must retire direct AI tools whose purpose is to progress focus chain independently of workflow runtime state.
+- `FR-29`: The workflow runtime must evaluate the active workflow state and determine the canonical next action for the current turn.
+- `FR-29a`: The canonical next-action evaluation must be a unified runtime-owned capability rather than separate subsystem-specific trigger mechanisms.
+- `FR-29b`: Workflow modules must define the tree-structured branch rules, branch conditions, and following branch targets that inform next-action evaluation for their workflows. `WorkflowRuntime` must evaluate that module-owned decision tree from the active branch context and runtime state rather than treating next-action rules as an unstructured first-match ordered array.
+- `FR-29c`: The canonical next action may include rendering the mandatory shared pre-workflow entry `WorkflowForm`, rendering an active-step workflow form, invoking a deterministic operation, allowing normal model-driven progression, emitting completion behavior, or taking no workflow-specific action.
+- `FR-29c1`: Each canonical next-action evaluation must select at most one immediate runtime action.
+- `FR-29c2`: If the selected immediate action is tool-backed, it must resolve to exactly one tool execution request. A single next-action rule or decision action must not bundle, fan out, or require multiple tool calls before result evaluation.
+- `FR-29c3`: Workflows that require multiple tool-backed operations must model them as a sequence of next-action evaluations. Each tool result must be interpreted and applied to workflow session state before the decision tree is re-evaluated to select any later tool-backed operation.
+- `FR-29c4`: Runtime next-action evaluation must distinguish dedicated runtime-owned operation actions from generic module-owned tool-backed operations. Runtime-owned capabilities with dedicated seams, including artifact allocation/create, workflow document building, workflow-value persistence, and workflow progress requests, must not be routed through generic module-owned tool-backed operation definitions.
+- `FR-29c5`: Generic module-owned tool-backed operation definitions may be used only for one-tool deterministic work that does not already have a dedicated runtime-owned seam.
+- `FR-29d`: Workflow-form interruption logic must not remain a separate canonical trigger subsystem outside `WorkflowRuntime`.
+- `FR-29e`: Deterministic step-resolution logic must not remain a separate canonical trigger subsystem outside `WorkflowRuntime`.
+- `FR-29f`: Whenever `WorkflowRuntime` must identify existing projects, folders, files, or artifacts for the mandatory shared pre-workflow entry `WorkflowForm`, active-step workflow-form behavior, deterministic-step behavior, or other runtime-owned next-action evaluation, it must call one shared runtime-owned discovery/list-builder seam. That seam must use `fs.readdir(<target directory>, { withFileTypes: true })` plus `Dirent` filtering as its canonical enumeration primitive and must return a normalized candidate array for user selection or runtime evaluation.
+- `FR-29f1`: The shared discovery/list-builder seam must accept typed discovery parameters, including target-directory resolution, entry-type filtering, immediate-child filtering, naming-convention matching, and deterministic sorting rules.
+- `FR-29f2`: The shared discovery/list-builder seam must return normalized selection candidates that separate display text from canonical value so the same seam can support both project selection and workflow-specific artifact selection.
+- `FR-29g`: Workflow modules may declare what must be discovered, which filters and naming conventions apply, how candidates should be labeled, how they should be sorted, and which workflow-value key should receive the selected canonical value, but they must not introduce workflow-specific filesystem-scanning tools or workflow-specific enumeration helpers.
+- `FR-30`: The system must retire `WorkflowStepResolutionRegistry` as a separate canonical owner of workflow step-resolution behavior.
+
+#### Foundational Build Requirements: Prompting and Native Tool Exposure
+
+- `FR-31`: The workflow runtime must assemble exactly three workflow-owned per-turn prompt/tool outputs for the active turn: a workflow instructions block for system instructions, a workflow instructions block for input, and any workflow-specific native tool schema override.
+- `FR-31a`: The workflow runtime must support both a full-turn variant and a continuation-turn variant for the system-instructions workflow block and for the input workflow block.
+- `FR-31b`: No workflow-specific prompt content may be projected through any prompt carrier other than the runtime-owned workflow instructions block for system instructions and the runtime-owned workflow instructions block for input.
+- `FR-32`: The system prompt architecture must remain the final assembler of the full system prompt.
+- `FR-33`: Workflow modules must own the actual workflow-specific and step-specific prompt strings.
+- `FR-33a`: Workflow modules are the sole source of workflow-specific and step-specific prompt content used to build the runtime-owned workflow instructions blocks.
+- `FR-34`: For each turn, the workflow runtime must build the workflow instructions blocks from workflow-module prompting plus runtime-owned workflow/session state.
+- `FR-34a`: The system-instructions workflow block must include the current workflow step list with `[x]` / `[ ]` indicators in both the full-turn and continuation-turn variants.
+- `FR-34b`: The system-instructions workflow block must include a workflow persona section only when the workflow is active on the task's first API request, defined by `TaskState.apiRequestCount === 1`. Workflows are expected to be user-invoked in fresh task threads, so persona projection is task-first-turn gated rather than separately tracking a workflow-first-turn flag.
+- `FR-34c`: The input workflow block full-turn variant must include a `Current Step` section containing the active step prompting from the workflow module.
+- `FR-34d`: The input workflow block continuation-turn variant must omit the `Current Step` section.
+- `FR-35`: The workflow runtime must project the complete workflow-owned native tool schema that applies on the current turn from the active workflow module.
+- `FR-35a`: `set_workflow_values` is the canonical workflow-value persistence tool name/capability only when a workflow module exposes workflow-value writes for the active turn.
+- `FR-35b`: `set_workflow_values` must not have a static shared fallback prompt/native schema.
+- `FR-35c`: The model may see `set_workflow_values` only when the active workflow module includes it in that turn's complete module-derived tool schema.
+- `FR-35d`: Workflow modules own the schema shape for any exposed `set_workflow_values` entry.
+- `FR-35e`: A module-provided `set_workflow_values` schema must expose only workflow-value keys from the workflow's canonical workflow-value inventory and only the subset the workflow module chooses to make AI-writable for the active step.
+- `FR-35e1`: When the active workflow module includes `set_workflow_values` in the current step schema, that schema is the authoritative module-owned definition of which inventory keys are model-visible for that turn.
+- `FR-35e2`: Module-owned native tool schema correctness is a module-build responsibility. Foundational runtime projection must consume the complete tool schema returned by the active workflow step and must not rewrite, filter, or validate arbitrary module-owned native tool schema contents during turn projection.
+- `FR-35f`: If the active workflow module does not include `set_workflow_values` in the current turn's complete tool schema, the system prompt architecture must not expose `set_workflow_values` for that turn.
+- `FR-35g`: Regardless of the module-provided schema shown to the model, execution of `set_workflow_values` must write through the canonical workflow-runtime workflow-value mutation seam into the active workflow session only.
+- `FR-35g1`: `WorkflowRuntime.applyWorkflowValueWrites(...)` must validate every requested workflow-value key against the active workflow definition's canonical workflow-value inventory before persisting it.
+- `FR-35g2`: Runtime persistence authorization is based on the active workflow definition's canonical workflow-value inventory; the active step's `set_workflow_values` schema controls model-visible exposure for that turn, not the runtime persistence allowlist.
+- `FR-35h`: `set_workflow_values` must not read from or write to placeholder-era workflow state, managed-workflow state, `.cline/workflow-config.yaml`, or similar legacy workflow surfaces.
+- `FR-36`: The system prompt architecture must assemble exactly one workflow instructions section in system instructions and exactly one workflow instructions section in input by consuming the runtime-owned full-turn or continuation-turn workflow blocks for the current turn, and must consume any runtime-projected workflow-specific native tool schema override for that turn.
+- `FR-37`: The architecture must retire workflow-specific reliance on contextual tool gating as the canonical owner of workflow tool exposure behavior.
+- `FR-38`: Workflow reminder behavior from the current system must be retired or migrated into the workflow-runtime-to-system-prompt architecture described above.
+
+#### Foundational Build Requirements: Workflow Forms and Deterministic Operations
+
+- `FR-39`: When unified next-action evaluation selects workflow-form rendering, including the mandatory shared pre-workflow entry `WorkflowForm`, the workflow runtime must build the per-panel workflow form payload using workflow-module configuration plus runtime-owned entry-flow state.
+- `FR-39a`: The shared workflow-form message contract currently named `ClineWorkflowForm` in `src/shared/ExtensionMessage.ts` must be renamed to `WorkflowForm`.
+- `FR-39b`: The `ClineWorkflowForm` to `WorkflowForm` rename must be implemented end to end across every producing and consuming layer, and no compatibility alias may remain unless explicitly approved.
+- `FR-39c`: The shared workflow-form payload contract must use workflow-form terminology rather than resolver terminology for workflow-form identity fields.
+- `FR-39d`: Any workflow-form shared-contract rename or field-shape change must be applied consistently across the shared message contract, runtime payload builders, task/runtime callers, UI consumers, and test coverage in the same migration sequence.
+- `FR-39e`: The renamed shared `WorkflowForm` payload contract must carry workflow-form identity in a field named `workflowFormId`.
+- `FR-39f`: When a workflow form submission includes any value that must survive beyond form-local state, drive later next-action evaluation, or populate a later deterministic/tool-backed operation, `WorkflowRuntime` must persist the normalized submitted value through the workflow-value persistence seam defined in `FR-35a` through `FR-35h`.
+- `FR-39g`: Workflow form field keys are form-local by default. A submitted form value becomes a durable workflow session value only when the workflow module declares an explicit destination workflow-value key for that field.
+- `FR-39h`: Any workflow-value destination key used by a workflow form field must be present in the active workflow definition's canonical workflow-value inventory, and persistence must be applied through `WorkflowRuntime.applyWorkflowValueWrites(...)`.
+- `FR-39i`: Runtime-populated selection controls, including project, folder, file, and artifact selectors, follow the same form-value persistence rule as user-entered fields. Their additional requirement is only that choices must be populated through the shared discovery/list-builder seam defined in `FR-29f` through `FR-29g`.
+- `FR-39j`: Tool-backed deterministic operations that depend on workflow form input must build their payload from persisted workflow values or other runtime-owned session state after canonical next-action re-evaluation, not directly from raw form submission payloads or implicit form operation mappings.
+- `FR-39k`: Workflow form transition definitions must not declare operation ids, tool ids, or implicit tool mappings. Workflow forms may collect, validate, navigate, complete, and persist declared durable values, but any later tool-backed operation must be selected by canonical next-action evaluation after form result handling completes.
+- `FR-40`: Rendering of the mandatory shared pre-workflow entry `WorkflowForm`, rendering of any active-step workflow form, and all user input capture must remain in the workflow form capability.
+- `FR-41`: The workflow runtime must consume workflow form results as one possible next-action input and then re-evaluate the canonical next action.
+- `FR-42`: When a workflow-form path requires a tool-backed deterministic operation, the workflow runtime must invoke exactly one such operation through the normal tool execution path for that next-action evaluation.
+- `FR-42a`: Shared document generation for workflow-owned text artifacts is a deterministic operation class and must use the shared document-generation tool defined in `FR-20d` through `FR-20h` rather than workflow-specific document-build tools. `WorkflowRuntime` must translate workflow-module document-builder definitions into tool requests for that shared document-generation tool and invoke those requests through the normal tool execution path.
+- `FR-43`: The workflow runtime must interpret deterministic results by applying the result to workflow session state and then re-evaluating the active step's module-owned next-action decision tree. On success, it must follow the module-defined success branch, including any explicit step-transition target prescribed by that branch. On failure, it must preserve failure state long enough for the module-defined failure branch to evaluate, then execute any retry branch or terminal error branch prescribed there rather than substituting ad hoc runtime-owned success/failure branching logic.
+- `FR-44`: The system must retire `WorkflowFormRuntime` as the canonical owner of per-panel workflow form payload construction.
+- `FR-44a`: Generic workflow-form engine behavior may remain in the workflow form capability/runtime layer, including workflow-form session mechanics, submitted-value normalization, submitted-value validation, generic panel navigation, and shared workflow-form message-shape formatting.
+- `FR-44b`: Shared pre-workflow entry `WorkflowForm` selection, workflow-specific workflow-form definition ownership, active-step workflow-form selection, per-panel payload construction, workflow-form result interpretation, and next-action orchestration must move to `WorkflowRuntime`.
+- `FR-45`: The workflow-specific execution currently handled through `executeWorkflowFormOperationAndSync` must move out of `task/index.ts` and into the workflow runtime.
+
+#### Foundational Build Requirements: Completion, Teardown, Persistence, and Resume
+
+- `FR-46`: The workflow runtime must evaluate completion rules after relevant workflow session mutations.
+- `FR-48`: The workflow runtime must teardown the canonical workflow session when completion or other terminal teardown conditions are reached.
+- `FR-49`: Prompt state, focus chain state, workflow-form state, entry-form state, and other workflow-related downstream surfaces must clear as a projection of workflow teardown.
+- `FR-49a`: Workflow-owned values must clear as a consequence of workflow session teardown because those values are stored inside the workflow session.
+- `FR-50`: The workflow runtime must own the minimum persisted workflow session state needed to resume safely and reconstruct active workflow state.
+- `FR-51`: The system must retire fragmented workflow persistence ownership across placeholder-workflow fields, capability-specific workflow session blobs, and managed-workflow state.
+- `FR-52`: On resume, the workflow runtime must restore workflow identity, active step, relevant progression state, and any still-relevant workflow-owned UI or deterministic state.
+- `FR-52a`: When `WorkflowRuntime` tears down an active workflow session for any reason, including completion, terminal error, invalid workflow definition, invalid active step, invalid branch state, stale persisted session state, or failed resume validation, the cleared workflow state must be persisted to task metadata before workflow execution continues.
+- `FR-52b`: Invalid or stale persisted workflow session metadata must fail closed on resume: `WorkflowRuntime` must reject the session, clear workflow identity, workflow session state, workflow-owned values, workflow-form state, entry-form state, focus-chain projection state, and other workflow-owned downstream projections, and the task metadata persistence layer must save that cleared state.
+- `FR-52c`: A `no_op` next action must not be used as the only observable result of a workflow teardown that changed in-memory workflow state. Teardown that changes workflow state must produce an explicit runtime outcome or equivalent persistence signal that causes task metadata to be saved.
+- `FR-52d`: Task-level persistence remains responsible for writing task metadata, but it must honor `WorkflowRuntime` teardown and restore-rejection outcomes by removing stale workflow metadata from disk rather than leaving invalid workflow sessions available for later resume attempts.
+
+#### Foundational Build Requirements: Shared Document Generation and Product-Owned Workflow Content
+
+- `FR-53`: The target architecture must eliminate runtime reliance on BMAD documents, placeholder workflow documents, YAML workflow config files, and similar user-accessible workflow assets as canonical sources of workflow behavior.
+- `FR-55`: Workflow-emitted document templates must be represented as code-owned builders or coded template definitions rather than markdown files used as runtime dependencies.
+- `FR-55a`: Code-owned document templates or builders used for workflow-owned text artifact generation must be consumable through the shared document-generation tool contract rather than through workflow-specific bespoke tool handlers.
+- `FR-56`: Workflow-associated persona activation must be supported through product-owned runtime code and prompt architecture integration rather than BMAD file lookups.
+- `FR-57a`: The system must treat the workflow-to-persona-to-project-subfolder mapping in Section 2.7 as the canonical in-scope workflow mapping for this initiative.
+- `FR-57b`: Workflow artifact and project discovery must remain convention-driven filesystem behavior rather than hidden registry behavior.
+- `FR-57c`: The workflow runtime must rediscover projects and workflow artifacts from on-disk folder placement and naming conventions rather than from a hidden project or artifact registry.
+- `FR-57d`: The workflow runtime must not rely on a hidden project or artifact registry to recover identity when user-visible names change.
+- `FR-57e`: Workflow automation is guaranteed only for artifacts that continue to match the documented naming and placement conventions.
+- `FR-57f`: If a user renames a project folder or artifact so it no longer matches the documented convention, downstream workflows may no longer recognize it, and the system must treat that outcome as user-managed document hygiene rather than runtime data corruption.
+
+#### Global Requirements: Legacy Migration Governance
+
+- `FR-57g`: No legacy workflow-related file, field, helper, registry, tool contract, prompt-context field, or runtime state surface may be retained, renamed, remapped, or compatibility-aliased by default during this migration.
+- `FR-57h`: Every legacy workflow-related surface that may be retired, updated, migrated, explicitly preserved, or explicitly left in place must appear in the legacy workflow migration matrix below and receive an explicit approved disposition before implementation planning or code migration for that surface proceeds.
+- `FR-57i`: Any legacy workflow-related surface not explicitly approved in the legacy workflow migration matrix for preservation, migration, or leave-in-place treatment must be deleted once its replacement behavior lands.
+- `FR-57j`: The legacy workflow migration matrix below is a global migration-control artifact and the authoritative disposition inventory for legacy workflow-related surfaces across Foundational Build, Module Builds, and Cleanup.
+- `FR-57k`: No action plan in any phase may modify, preserve, migrate, delete, or leave in place a legacy workflow-related surface in a manner that conflicts with that surface's approved migration-matrix disposition.
+- `FR-57l`: Workflow-specific tools or helpers that exist only to enumerate convention-driven existing folders or artifacts must be retired in favor of the shared runtime-owned filesystem-enumeration seam required by `FR-10g` through `FR-10g1` and `FR-29f` through `FR-29g`.
+- Foundational cleanup must remove retired managed-workflow wording from model-facing prompt/tool descriptions, including the `use_skill` tool description, while preserving the approved `useSkill` activation seam for skills and runtime-owned workflows.
+- Foundational cleanup must remove managed-workflow-specific response-tool failure classifications, including `managed_workflow_incomplete`, rather than remapping them to runtime-owned workflow errors.
+
+The authoritative legacy workflow migration matrix remains in [requirements.md](/Users/robertboston/Documents/Cline%20Extension/cline/docs/workflows/workflow-runtime/requirements.md) because it is a shared control artifact for Foundational Build, Module Builds, and Cleanup rather than a foundational-only requirements block.
+
+#### Global Requirements: Subagent Workflow Sessions
+
+- `FR-58`: The shared workflow runtime must support concurrent workflow sessions across main-agent and child execution contexts.
+- `FR-59`: When a subagent is assigned a workflow by the parent execution context, the workflow runtime must activate that workflow only in the child execution context.
+- `FR-60`: A child workflow session must have its own `activeWorkflowName`, workflow session state, active step, prompt projection, native tool schema projection, progression, completion, and teardown state.
+- `FR-61`: Parent workflow state must remain unchanged by child workflow activation unless explicitly coordinated by a higher-level application behavior outside this runtime scope.
+- `FR-62`: The subagent runner must not become a separate workflow orchestrator; it remains the caller/bootstrap seam for child execution contexts.
+- `FR-62a`: A child workflow session may initialize selected workflow values from the parent workflow session only when the active child workflow definition explicitly declares those inheritance rules.
+- `FR-62b`: Parent-to-child workflow-value inheritance must be copy-based initialization, not shared mutable state.
+- `FR-62c`: The system must support same-key inheritance semantics where a child workflow value is initialized from the parent session value for that same key when the workflow definition explicitly declares that mapping.
+- `FR-62d`: The system must not introduce a dedicated locking, serialization, or anti-collision subsystem for same-project parent/subagent workflow activity as part of this initiative.
+- `FR-62e`: Child workflow project selection is copied from the parent workflow session as runtime activation context, not through the workflow-value inheritance map and not through a child-rendered workflow form.
+- `FR-62f`: The subagent runner must reject direct subagent-emitted `use_skill` tool calls; subagent workflow activation must happen before the child agent turn through parent-owned assignment/bootstrap.
+
+#### Global Requirements: Validation, Diagnostics, and Error Handling
+
+- `FR-63`: The workflow runtime must validate workflow definitions before using them for orchestration.
+- `FR-63a`: Foundational workflow-definition validation must cover runtime-owned structural contracts and workflow-value inventory references used by runtime-owned operations; it must not treat module-owned native tool schema contents as a foundational runtime validation source during prompt/tool projection.
+- `FR-64`: The workflow runtime must provide shared error handling for activation, projection, deterministic operations, progression, completion, teardown, persistence, and resume paths.
+- `FR-65`: When deterministic resolution fails, the workflow runtime must execute the retry branch defined by the active workflow and step in the module-owned next-action decision tree. If that retry path reaches terminal failure, the workflow runtime must execute the module-defined final user-visible error branch and surface that final error message to the user.

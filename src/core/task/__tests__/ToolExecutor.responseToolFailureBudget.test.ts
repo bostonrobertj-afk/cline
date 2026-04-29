@@ -51,6 +51,7 @@ function createExecutor() {
 		{} as any,
 		{} as any,
 		stateManager,
+		{} as any,
 		process.cwd(),
 		"task-1",
 		"ulid-1",
@@ -71,8 +72,7 @@ function createExecutor() {
 		sinon.stub().resolves(),
 		sinon.stub().resolves(undefined),
 		sinon.stub().resolves(undefined),
-		sinon.stub().resolves(undefined),
-		sinon.stub().resolves(),
+		sinon.stub().resolves({}),
 	)
 
 	const coordinator = (executor as any).coordinator

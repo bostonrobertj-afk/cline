@@ -1,7 +1,7 @@
 import { ModelFamily } from "@/shared/prompts"
 import { ClineDefaultTool } from "@/shared/tools"
 import type { ClineToolSpec } from "../spec"
-import { SystemPromptContext, TASK_PROGRESS_PARAMETER } from "../types"
+import { SystemPromptContext } from "../types"
 
 const id = ClineDefaultTool.FILE_EDIT
 
@@ -79,7 +79,6 @@ const generic: ClineToolSpec = {
 			instruction: diffInstruction,
 			usage: "Search and replace blocks here",
 		},
-		TASK_PROGRESS_PARAMETER,
 	],
 }
 
@@ -100,7 +99,6 @@ const NATIVE_NEXT_GEN: ClineToolSpec = {
 			required: true,
 			instruction: diffInstruction,
 		},
-		TASK_PROGRESS_PARAMETER,
 	],
 }
 

@@ -40,7 +40,6 @@ function convertClineAskToProtoEnum(ask: AppClineAsk | undefined): ClineAsk | un
 		report_bug: ClineAsk.REPORT_BUG,
 		use_subagents: ClineAsk.USE_SUBAGENTS,
 		workflow_form: ClineAsk.WORKFLOW_FORM,
-		workflow_start_card: ClineAsk.WORKFLOW_START_CARD,
 	}
 
 	const result = mapping[ask]
@@ -75,7 +74,6 @@ function convertProtoEnumToClineAsk(ask: ClineAsk): AppClineAsk | undefined {
 		[ClineAsk.REPORT_BUG]: "report_bug",
 		[ClineAsk.USE_SUBAGENTS]: "use_subagents",
 		[ClineAsk.WORKFLOW_FORM]: "workflow_form",
-		[ClineAsk.WORKFLOW_START_CARD]: "workflow_start_card",
 	}
 
 	return mapping[ask]
@@ -211,7 +209,6 @@ function convertClineSayToProtoEnum(say: AppClineSay | undefined): ClineSay | un
 		checkpoint_created: ClineSay.CHECKPOINT_CREATED,
 		load_mcp_documentation: ClineSay.LOAD_MCP_DOCUMENTATION,
 		info: ClineSay.INFO,
-		task_progress: ClineSay.TASK_PROGRESS,
 		error_retry: ClineSay.ERROR_RETRY,
 		hook_status: ClineSay.HOOK_STATUS,
 		hook_output_stream: ClineSay.HOOK_OUTPUT_STREAM,
@@ -235,7 +232,7 @@ function convertProtoEnumToClineSay(say: ClineSay): AppClineSay | undefined {
 		return undefined
 	}
 
-	const mapping: Record<Exclude<ClineSay, ClineSay.UNRECOGNIZED>, AppClineSay> = {
+	const mapping: Partial<Record<Exclude<ClineSay, ClineSay.UNRECOGNIZED>, AppClineSay>> = {
 		[ClineSay.TASK]: "task",
 		[ClineSay.ERROR]: "error",
 		[ClineSay.API_REQ_STARTED]: "api_req_started",
@@ -265,7 +262,6 @@ function convertProtoEnumToClineSay(say: ClineSay): AppClineSay | undefined {
 		[ClineSay.CHECKPOINT_CREATED]: "checkpoint_created",
 		[ClineSay.LOAD_MCP_DOCUMENTATION]: "load_mcp_documentation",
 		[ClineSay.INFO]: "info",
-		[ClineSay.TASK_PROGRESS]: "task_progress",
 		[ClineSay.ERROR_RETRY]: "error_retry",
 		[ClineSay.GENERATE_EXPLANATION]: "generate_explanation",
 		[ClineSay.HOOK_STATUS]: "hook_status",

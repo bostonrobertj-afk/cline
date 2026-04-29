@@ -29,10 +29,6 @@
         "path": {
           "type": "STRING",
           "description": "The path of the file to read (relative to the current working directory /test/project)"
-        },
-        "task_progress": {
-          "type": "STRING",
-          "description": "Use as a top-level parameter on the next tool call, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
         }
       },
       "required": [
@@ -53,10 +49,6 @@
         "content": {
           "type": "STRING",
           "description": "The content to write to the file. ALWAYS provide the COMPLETE intended content of the file, without any truncation or omissions. You MUST include ALL parts of the file, even if they haven't been modified."
-        },
-        "task_progress": {
-          "type": "STRING",
-          "description": "Use as a top-level parameter on the next tool call, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
         }
       },
       "required": [
@@ -78,10 +70,6 @@
         "diff": {
           "type": "STRING",
           "description": "One or more SEARCH/REPLACE blocks following this exact format:\n  ```\n  ------- SEARCH\n  [exact content to find]\n  =======\n  [new content to replace with]\n  +++++++ REPLACE\n  ```\n  Critical rules:\n  1. SEARCH content must match the associated file section to find EXACTLY:\n     * Match character-for-character including whitespace, indentation, line endings\n     * Include all comments, docstrings, etc.\n  2. SEARCH/REPLACE blocks will ONLY replace the first match occurrence.\n     * Including multiple unique SEARCH/REPLACE blocks if you need to make multiple changes.\n     * Include *just* enough lines in each SEARCH section to uniquely match each set of lines that need to change.\n     * When using multiple SEARCH/REPLACE blocks, list them in the order they appear in the file.\n  3. Keep SEARCH/REPLACE blocks concise:\n     * Break large SEARCH/REPLACE blocks into a series of smaller blocks that each change a small portion of the file.\n     * Include just the changing lines, and a few surrounding lines if needed for uniqueness.\n     * Do not include long runs of unchanging lines in SEARCH/REPLACE blocks.\n     * Each line must be complete. Never truncate lines mid-way through as this can cause matching failures.\n  4. Special operations:\n     * To move code: Use two SEARCH/REPLACE blocks (one to delete from original + one to insert at new location)\n     * To delete code: Use empty REPLACE section"
-        },
-        "task_progress": {
-          "type": "STRING",
-          "description": "Use as a top-level parameter on the next tool call, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
         }
       },
       "required": [
@@ -107,10 +95,6 @@
         "file_pattern": {
           "type": "STRING",
           "description": "Glob pattern to filter files (e.g., '*.ts' for TypeScript files). If not provided, it will search all files (*)."
-        },
-        "task_progress": {
-          "type": "STRING",
-          "description": "Use as a top-level parameter on the next tool call, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
         }
       },
       "required": [
@@ -132,10 +116,6 @@
         "recursive": {
           "type": "BOOLEAN",
           "description": "Whether to list files recursively. Use true for recursive listing, false or omit for top-level only."
-        },
-        "task_progress": {
-          "type": "STRING",
-          "description": "Use as a top-level parameter on the next tool call, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
         }
       },
       "required": [
@@ -152,10 +132,6 @@
         "path": {
           "type": "STRING",
           "description": "The path of a directory (not a file) relative to the current working directory /test/project. Lists definitions across all source files in that directory. To inspect a single file, use read_file instead."
-        },
-        "task_progress": {
-          "type": "STRING",
-          "description": "Use as a top-level parameter on the next tool call, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
         }
       },
       "required": [
@@ -208,10 +184,6 @@
         "arguments": {
           "type": "STRING",
           "description": "A JSON object containing the tool's input parameters, following the tool's input schema"
-        },
-        "task_progress": {
-          "type": "STRING",
-          "description": "Use as a top-level parameter on the next tool call, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
         }
       },
       "required": [
@@ -247,10 +219,6 @@
           "required": [
             "message"
           ]
-        },
-        "task_progress": {
-          "type": "STRING",
-          "description": "Use as a top-level parameter on the next tool call, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
         }
       },
       "required": [
@@ -271,23 +239,6 @@
         "command": {
           "type": "STRING",
           "description": "A CLI command to execute to show a live demo of the result to the user. For example, use `open index.html` to display a created html website, or `open localhost:3000` to display a locally running development server. But DO NOT use commands like `echo` or `cat` that merely print text. This command should be valid for the current operating system. Ensure the command is properly formatted and does not contain any harmful instructions"
-        },
-        "agent_feedback": {
-          "type": "OBJECT",
-          "description": "Optional object for real-time agent feedback when you encounter a meaningful blocker, material ambiguity, or unstable behavior that affects correctness or progress.",
-          "properties": {
-            "message": {
-              "type": "STRING",
-              "description": "Optional object for real-time agent feedback when you encounter a meaningful blocker, material ambiguity, or unstable behavior that affects correctness or progress."
-            }
-          },
-          "required": [
-            "message"
-          ]
-        },
-        "task_progress": {
-          "type": "STRING",
-          "description": "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool."
         }
       },
       "required": [
@@ -317,10 +268,6 @@
           "required": [
             "message"
           ]
-        },
-        "task_progress": {
-          "type": "STRING",
-          "description": "Use as a top-level parameter on the next tool call, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
         }
       },
       "required": [
@@ -353,125 +300,11 @@
         "response": {
           "type": "STRING",
           "description": "The message to provide to the user. This should explain what you're about to do, your current progress, or your reasoning. The response should be brief and conversational in tone, aiming to keep the user informed without overwhelming them with details."
-        },
-        "task_progress": {
-          "type": "STRING",
-          "description": "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool."
         }
       },
       "required": [
         "response"
       ]
-    }
-  },
-  {
-    "name": "build_review_diff_output",
-    "description": "Build and replace the stable review diff artifact at {diff_output} from an explicit Git-backed source. Use this for code-review workflow Step 3 when the diff source is a supported commit, commit range, ref diff, or HEAD-scoped worktree diff. Do not use set_workflow_placeholders for diff_output; it is stable in .cline/workflow-config.yaml.",
-    "parameters": {
-      "type": "OBJECT",
-      "properties": {
-        "source": {
-          "type": "OBJECT",
-          "description": "Required source object. Supported shape: {\"type\":\"commit\",\"commit\":\"<ref>\"} | {\"type\":\"commit_range\",\"base\":\"<ref>\",\"head\":\"<ref>\"} | {\"type\":\"ref_diff\",\"base\":\"<ref>\",\"head\":\"<ref>\"} | {\"type\":\"worktree_head_scoped\"}.",
-          "properties": {
-            "type": {
-              "type": "STRING",
-              "description": "Required source object. Supported shape: {\"type\":\"commit\",\"commit\":\"<ref>\"} | {\"type\":\"commit_range\",\"base\":\"<ref>\",\"head\":\"<ref>\"} | {\"type\":\"ref_diff\",\"base\":\"<ref>\",\"head\":\"<ref>\"} | {\"type\":\"worktree_head_scoped\"}.",
-              "enum": [
-                "commit",
-                "commit_range",
-                "ref_diff",
-                "worktree_head_scoped"
-              ]
-            },
-            "commit": {
-              "type": "STRING",
-              "description": "Required source object. Supported shape: {\"type\":\"commit\",\"commit\":\"<ref>\"} | {\"type\":\"commit_range\",\"base\":\"<ref>\",\"head\":\"<ref>\"} | {\"type\":\"ref_diff\",\"base\":\"<ref>\",\"head\":\"<ref>\"} | {\"type\":\"worktree_head_scoped\"}."
-            },
-            "base": {
-              "type": "STRING",
-              "description": "Required source object. Supported shape: {\"type\":\"commit\",\"commit\":\"<ref>\"} | {\"type\":\"commit_range\",\"base\":\"<ref>\",\"head\":\"<ref>\"} | {\"type\":\"ref_diff\",\"base\":\"<ref>\",\"head\":\"<ref>\"} | {\"type\":\"worktree_head_scoped\"}."
-            },
-            "head": {
-              "type": "STRING",
-              "description": "Required source object. Supported shape: {\"type\":\"commit\",\"commit\":\"<ref>\"} | {\"type\":\"commit_range\",\"base\":\"<ref>\",\"head\":\"<ref>\"} | {\"type\":\"ref_diff\",\"base\":\"<ref>\",\"head\":\"<ref>\"} | {\"type\":\"worktree_head_scoped\"}."
-            }
-          },
-          "required": [
-            "type"
-          ]
-        },
-        "scoped_paths": {
-          "type": "STRING",
-          "description": "Optional array of repository-relative paths to scope the diff. Required for {\"type\":\"worktree_head_scoped\"}. Optional for the other source types."
-        },
-        "context_lines": {
-          "type": "NUMBER",
-          "description": "Optional unified diff context line count. Defaults to 3."
-        }
-      },
-      "required": [
-        "source"
-      ]
-    }
-  },
-  {
-    "name": "story_task_reminder",
-    "description": "Resend the current first incomplete story task and its subtasks from the workflow-owned story file at {story_path}. Resolve the story path from workflow state.",
-    "parameters": {
-      "type": "OBJECT",
-      "properties": {},
-      "required": []
-    }
-  },
-  {
-    "name": "story_task_complete",
-    "description": "Mark the addressed story task or subtask complete in the workflow-owned story file at {story_path}. Resolve the story path from workflow state.",
-    "parameters": {
-      "type": "OBJECT",
-      "properties": {
-        "storyTaskId": {
-          "type": "STRING",
-          "description": "The 1-based top-level task ordinal copied from the injected current task block."
-        },
-        "storySubtaskId": {
-          "type": "STRING",
-          "description": "The optional 1-based subtask ordinal under that parent task, copied from the injected current task block."
-        }
-      },
-      "required": [
-        "storyTaskId"
-      ]
-    }
-  },
-  {
-    "name": "story_notes_update",
-    "description": "Append one new entry to ## Completion Notes List or ## File List in the workflow-owned story file at {story_path}. Resolve the story path from workflow state.",
-    "parameters": {
-      "type": "OBJECT",
-      "properties": {
-        "section": {
-          "type": "STRING",
-          "description": "The exact target section name; Allowed values: \"Completion Notes List\" and \"File List\"."
-        },
-        "entry": {
-          "type": "STRING",
-          "description": "One new entry to append verbatim under the selected section heading."
-        }
-      },
-      "required": [
-        "section",
-        "entry"
-      ]
-    }
-  },
-  {
-    "name": "story_testing_complete",
-    "description": "Mark the workflow-owned story file at {story_path} ready for review by setting Status: review. Resolve the story path from workflow state.",
-    "parameters": {
-      "type": "OBJECT",
-      "properties": {},
-      "required": []
     }
   },
   {

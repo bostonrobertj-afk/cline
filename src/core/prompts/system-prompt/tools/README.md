@@ -93,8 +93,6 @@ The following prompt-defined tool variant arrays are currently registered from `
 - `ask_followup_question`
 - `attempt_completion`
 - `browser_action`
-- `build_review_diff_output`
-- `complete_workflow_item`
 - `execute_command`
 - `focus_chain`
 - `generate_explanation`
@@ -108,17 +106,11 @@ The following prompt-defined tool variant arrays are currently registered from `
 - `replace_in_file`
 - `search_files`
 - `send_user_message`
-- `set_workflow_placeholders`
-- `story_notes_update`
-- `story_task_complete`
-- `story_task_reminder`
-- `story_testing_complete`
 - `subagent`
 - `use_mcp_tool`
 - `use_skill`
 - `web_fetch`
 - `web_search`
-- `workflow_progress_request`
 - `write_to_file`
 
 ## Adding New Tools
@@ -136,3 +128,4 @@ The following prompt-defined tool variant arrays are currently registered from `
 - `init.ts` is the source of truth for prompt-defined tool registration in this directory
 - Dynamic MCP-native tools and dynamic subagent-native tools are added elsewhere at runtime and are not represented one-file-per-tool under `tools/`
 - All tool variants are collected and registered in a single function call
+- Workflow-module-owned tool schemas are projected by `WorkflowRuntime` for the active turn and are not represented as static tool files here.

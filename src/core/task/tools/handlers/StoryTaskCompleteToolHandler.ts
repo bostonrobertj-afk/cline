@@ -3,7 +3,6 @@ import { formatResponse } from "@core/prompts/responses"
 import { getReadablePath, isLocatedInWorkspace } from "@utils/path"
 import fs from "fs/promises"
 import path from "path"
-import { recordAndPersistPlaceholderWorkflowWriteProof } from "@/core/task/focus-chain/placeholderWorkflowWriteProofs"
 import { completeStoryChecklistItem, resolveActiveStoryPath } from "@/core/task/story-tools/storyTaskDocument"
 import { ClineDefaultTool } from "@/shared/tools"
 import type { ToolResponse } from "../../index"
@@ -35,8 +34,7 @@ export function resolveStoryPathFromTaskState(
 ): { storyPath: string; readablePath: string } | { errorMessage: string } {
 	const resolvedStoryPath = resolveActiveStoryPath({
 		cwd: config.cwd,
-		stablePlaceholderValues: config.taskState.activePlaceholderWorkflowStableValues,
-		placeholderValues: config.taskState.activePlaceholderWorkflowValues,
+		workflowValues: config.taskState.activeWorkflowSession?.workflowValues,
 	})
 	if (!resolvedStoryPath.ok) {
 		return { errorMessage: resolvedStoryPath.message }
@@ -81,11 +79,6 @@ export async function finalizeSuccessfulStoryWrite(args: {
 	storyPath: string
 	completeMessage: string
 }): Promise<void> {
-	await recordAndPersistPlaceholderWorkflowWriteProof({
-		taskId: args.config.taskId,
-		taskState: args.config.taskState,
-		filePath: args.storyPath,
-	})
 	args.config.taskState.fileReadCache.delete(args.storyPath.toLowerCase())
 	args.config.taskState.didEditFile = true
 	args.config.taskState.consecutiveMistakeCount = 0

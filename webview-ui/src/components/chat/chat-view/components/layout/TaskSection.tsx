@@ -19,7 +19,6 @@ interface TaskSectionProps {
 	}
 	messageHandlers: MessageHandlers
 	lastProgressMessageText?: string
-	showFocusChainPlaceholder?: boolean
 }
 
 /**
@@ -33,7 +32,6 @@ export const TaskSection: React.FC<TaskSectionProps> = ({
 	selectedModelInfo,
 	messageHandlers,
 	lastProgressMessageText,
-	showFocusChainPlaceholder,
 }) => {
 	return (
 		<TaskHeader
@@ -44,7 +42,6 @@ export const TaskSection: React.FC<TaskSectionProps> = ({
 			lastProgressMessageText={lastProgressMessageText}
 			onClose={messageHandlers.handleTaskCloseButtonClick}
 			onSendMessage={messageHandlers.handleSendMessage}
-			showFocusChainPlaceholder={showFocusChainPlaceholder}
 			task={task}
 			tokensIn={apiMetrics.totalTokensIn}
 			tokensOut={apiMetrics.totalTokensOut}

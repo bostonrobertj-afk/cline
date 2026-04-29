@@ -214,16 +214,12 @@ const NewRuleRow: React.FC<NewRuleRowProps> = ({ isGlobal, ruleType, existingHoo
 								onChange={(e) => setFilename(e.target.value)}
 								placeholder={
 									isExpanded
-										? ruleType === "workflow"
-											? "workflow-name (.md, .txt, or no extension)"
-											: ruleType === "skill"
-												? "skill-name (letters, numbers, dashes, underscores)"
-												: "rule-name (.md, .txt, or no extension)"
-										: ruleType === "workflow"
-											? "New workflow file..."
-											: ruleType === "skill"
-												? "New skill..."
-												: "New rule file..."
+										? ruleType === "skill"
+											? "skill-name (letters, numbers, dashes, underscores)"
+											: "rule-name (.md, .txt, or no extension)"
+										: ruleType === "skill"
+											? "New skill..."
+											: "New rule file..."
 								}
 								ref={inputRef}
 								type="text"
@@ -236,11 +232,9 @@ const NewRuleRow: React.FC<NewRuleRowProps> = ({ isGlobal, ruleType, existingHoo
 										? ruleType === "skill"
 											? "Create skill"
 											: "Create file"
-										: ruleType === "workflow"
-											? "New workflow file..."
-											: ruleType === "skill"
-												? "New skill..."
-												: "New rule file..."
+										: ruleType === "skill"
+											? "New skill..."
+											: "New rule file..."
 								}
 								className="mx-0.5"
 								onClick={(e) => {

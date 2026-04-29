@@ -37,10 +37,6 @@
           "path": {
             "type": "string",
             "description": "The path of the file to read (relative to the current working directory /test/project)"
-          },
-          "task_progress": {
-            "type": "string",
-            "description": "Top-level tool parameter, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
           }
         },
         "required": [
@@ -70,10 +66,6 @@
           "end_line": {
             "type": "integer",
             "description": "The last line to include, using 1-based line numbers."
-          },
-          "task_progress": {
-            "type": "string",
-            "description": "Top-level tool parameter, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
           }
         },
         "required": [
@@ -97,10 +89,6 @@
           "input": {
             "type": "string",
             "description": "Complete `apply_patch` command to execute."
-          },
-          "task_progress": {
-            "type": "string",
-            "description": "Top-level tool parameter, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
           }
         },
         "required": [
@@ -130,10 +118,6 @@
           "file_pattern": {
             "type": "string",
             "description": "Glob pattern to filter files (e.g., '*.ts' for TypeScript files)."
-          },
-          "task_progress": {
-            "type": "string",
-            "description": "Top-level tool parameter, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
           }
         },
         "required": [
@@ -160,10 +144,6 @@
           "recursive": {
             "type": "boolean",
             "description": "Whether to list files recursively."
-          },
-          "task_progress": {
-            "type": "string",
-            "description": "Top-level tool parameter, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
           }
         },
         "required": [
@@ -185,10 +165,6 @@
           "path": {
             "type": "string",
             "description": "The path of a directory (not a file) relative to the current working directory /test/project."
-          },
-          "task_progress": {
-            "type": "string",
-            "description": "Top-level tool parameter, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
           }
         },
         "required": [
@@ -261,10 +237,6 @@
               "message"
             ],
             "additionalProperties": false
-          },
-          "task_progress": {
-            "type": "string",
-            "description": "Top-level tool parameter, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
           }
         },
         "required": [
@@ -291,24 +263,6 @@
           "command": {
             "type": "string",
             "description": "An actionable terminal command that is non-verbose that allows user to review the result of your work."
-          },
-          "agent_feedback": {
-            "type": "object",
-            "description": "Optional object for real-time agent feedback when you encounter a meaningful blocker, material ambiguity, or unstable behavior that affects correctness or progress.",
-            "properties": {
-              "message": {
-                "type": "string",
-                "description": "Concise description of the blocker, ambiguity, instability, or confusing scenario."
-              }
-            },
-            "required": [
-              "message"
-            ],
-            "additionalProperties": false
-          },
-          "task_progress": {
-            "type": "string",
-            "description": "Top-level tool parameter, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
           }
         },
         "required": [
@@ -344,223 +298,11 @@
               "message"
             ],
             "additionalProperties": false
-          },
-          "task_progress": {
-            "type": "string",
-            "description": "Top-level tool parameter, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step."
           }
         },
         "required": [
           "message"
         ],
-        "additionalProperties": false
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "build_review_diff_output",
-      "description": "Build and atomically replace {diff_output} from an explicit Git-backed source. Use for code-review diff artifact construction, not for arbitrary file writes.",
-      "strict": false,
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "source": {
-            "type": "object",
-            "description": "Required source object. Supported shape: {\"type\":\"commit\",\"commit\":\"<ref>\"} | {\"type\":\"commit_range\",\"base\":\"<ref>\",\"head\":\"<ref>\"} | {\"type\":\"ref_diff\",\"base\":\"<ref>\",\"head\":\"<ref>\"} | {\"type\":\"worktree_head_scoped\"}.",
-            "properties": {
-              "type": {
-                "type": "string",
-                "enum": [
-                  "commit",
-                  "commit_range",
-                  "ref_diff",
-                  "worktree_head_scoped"
-                ]
-              },
-              "commit": {
-                "type": "string"
-              },
-              "base": {
-                "type": "string"
-              },
-              "head": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "type"
-            ],
-            "oneOf": [
-              {
-                "type": "object",
-                "properties": {
-                  "type": {
-                    "type": "string",
-                    "const": "commit"
-                  },
-                  "commit": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "type",
-                  "commit"
-                ]
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "type": {
-                    "type": "string",
-                    "const": "commit_range"
-                  },
-                  "base": {
-                    "type": "string"
-                  },
-                  "head": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "type",
-                  "base",
-                  "head"
-                ]
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "type": {
-                    "type": "string",
-                    "const": "ref_diff"
-                  },
-                  "base": {
-                    "type": "string"
-                  },
-                  "head": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "type",
-                  "base",
-                  "head"
-                ]
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "type": {
-                    "type": "string",
-                    "const": "worktree_head_scoped"
-                  }
-                },
-                "required": [
-                  "type"
-                ]
-              }
-            ]
-          },
-          "scoped_paths": {
-            "type": "array",
-            "description": "Optional repository-relative path array. Required for {\"type\":\"worktree_head_scoped\"}.",
-            "items": {
-              "type": "string"
-            }
-          },
-          "context_lines": {
-            "type": "integer",
-            "description": "Optional unified diff context line count. Defaults to 3."
-          }
-        },
-        "required": [
-          "source"
-        ],
-        "additionalProperties": false
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "story_task_reminder",
-      "description": "Resend the current first incomplete story task and its subtasks from the workflow-owned story file at {story_path}.",
-      "strict": false,
-      "parameters": {
-        "type": "object",
-        "properties": {},
-        "required": [],
-        "additionalProperties": false
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "story_task_complete",
-      "description": "Mark the addressed story task or subtask complete in the workflow-owned story file at {story_path}.",
-      "strict": false,
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "storyTaskId": {
-            "type": "string",
-            "description": "The 1-based top-level task ordinal copied from the injected current task block."
-          },
-          "storySubtaskId": {
-            "type": "string",
-            "description": "The optional 1-based subtask ordinal under that parent task, copied from the injected current task block."
-          }
-        },
-        "required": [
-          "storyTaskId"
-        ],
-        "additionalProperties": false
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "story_notes_update",
-      "description": "Append one new entry to ## Completion Notes List or ## File List in the workflow-owned story file at {story_path}.",
-      "strict": false,
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "section": {
-            "type": "string",
-            "description": "The exact target section name; Allowed values: \"Completion Notes List\" and \"File List\".",
-            "enum": [
-              "Completion Notes List",
-              "File List"
-            ]
-          },
-          "entry": {
-            "type": "string",
-            "description": "One new entry to append verbatim under the selected section heading."
-          }
-        },
-        "required": [
-          "section",
-          "entry"
-        ],
-        "additionalProperties": false
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "story_testing_complete",
-      "description": "Mark the workflow-owned story file at {story_path} ready for review by setting Status: review.",
-      "strict": false,
-      "parameters": {
-        "type": "object",
-        "properties": {},
-        "required": [],
         "additionalProperties": false
       }
     }

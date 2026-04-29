@@ -39,9 +39,12 @@ export class WorkflowProgressRequestToolHandler implements IToolHandler, IPartia
 			)
 		}
 
-		if (!config.workflowRuntime.isWorkflowProgressRequestAllowed({ taskState: config.taskState })) {
+		const progressRequestAllowed = config.workflowRuntime.isWorkflowProgressRequestAllowed({
+			taskState: config.taskState,
+		})
+		if (!progressRequestAllowed) {
 			return formatResponse.toolError(
-				"workflow_progress_request can only be used when the active workflow step allows progression approval.",
+				"workflow_progress_request can only be used when the active workflow state currently exposes a progress-approval path.",
 			)
 		}
 

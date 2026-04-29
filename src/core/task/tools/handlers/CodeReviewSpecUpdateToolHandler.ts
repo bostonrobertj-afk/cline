@@ -4,7 +4,6 @@ import { getWorkspaceBasename } from "@core/workspace"
 import { getReadablePath, isLocatedInWorkspace } from "@utils/path"
 import fs from "fs/promises"
 import path from "path"
-import { recordAndPersistPlaceholderWorkflowWriteProof } from "@/core/task/focus-chain/placeholderWorkflowWriteProofs"
 import { ClineDefaultTool } from "@/shared/tools"
 import type { ToolResponse } from "../../index"
 import { showNotificationForApproval } from "../../utils"
@@ -98,28 +97,24 @@ export class CodeReviewSpecUpdateToolHandler implements IToolHandler, IPartialBl
 	}
 
 	async execute(config: TaskConfig, block: ToolUse): Promise<ToolResponse> {
-		const placeholders = {
-			...(config.taskState.activePlaceholderWorkflowStableValues ?? {}),
-			...(config.taskState.activePlaceholderWorkflowValues ?? {}),
-		}
+		const workflowValues = config.taskState.activeWorkflowSession?.workflowValues ?? {}
 
-		const reviewInputRaw = placeholders.review_input?.trim()
-		const storyPathRaw = placeholders.story_path?.trim()
+		const reviewInputRaw = workflowValues.review_input?.trim()
+		const storyPathRaw = workflowValues.story_path?.trim()
 
 		if (!reviewInputRaw) {
-			return formatResponse.toolError(
-				"Could not resolve workflow placeholder 'review_input' from the active placeholder workflow state.",
-			)
+			return formatResponse.toolError("Could not resolve workflow value 'review_input' from the active workflow values.")
 		}
 
 		if (!storyPathRaw) {
-			return formatResponse.toolError(
-				"Could not resolve workflow placeholder 'story_path' from the active placeholder workflow state.",
-			)
+			return formatResponse.toolError("Could not resolve workflow value 'story_path' from the active workflow values.")
 		}
 
 		const resolutionBase =
-			placeholders.cwd?.trim() || placeholders.project_root?.trim() || placeholders["project-root"]?.trim() || config.cwd
+			workflowValues.cwd?.trim() ||
+			workflowValues.project_root?.trim() ||
+			workflowValues["project-root"]?.trim() ||
+			config.cwd
 		const reviewInputPath = path.isAbsolute(reviewInputRaw) ? reviewInputRaw : path.resolve(resolutionBase, reviewInputRaw)
 		const storyFilePath = path.isAbsolute(storyPathRaw) ? storyPathRaw : path.resolve(resolutionBase, storyPathRaw)
 
@@ -183,12 +178,6 @@ export class CodeReviewSpecUpdateToolHandler implements IToolHandler, IPartialBl
 				specFileContent: mergeResult.updatedSpecFileMarkdown,
 				reviewInputPath,
 				reviewInputContent: mergeResult.clearedReviewInputMarkdown,
-			})
-
-			await recordAndPersistPlaceholderWorkflowWriteProof({
-				taskId: config.taskId,
-				taskState: config.taskState,
-				filePath: storyFilePath,
 			})
 			config.taskState.didEditFile = true
 			config.taskState.fileReadCache.delete(storyFilePath.toLowerCase())

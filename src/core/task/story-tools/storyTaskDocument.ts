@@ -137,24 +137,20 @@ function ensureCheckedChecklistLine(line: string): string {
 
 export function resolveActiveStoryPath(args: {
 	cwd: string
-	stablePlaceholderValues?: Record<string, string>
-	placeholderValues?: Record<string, string>
+	workflowValues?: Record<string, string>
 }): { ok: true; storyPath: string } | { ok: false; message: string } {
-	const placeholders = {
-		...(args.stablePlaceholderValues ?? {}),
-		...(args.placeholderValues ?? {}),
-	}
-	const storyPathRaw = placeholders.story_path?.trim()
+	const workflowValues = args.workflowValues ?? {}
+	const storyPathRaw = workflowValues.story_path?.trim()
 
 	if (!storyPathRaw) {
 		return {
 			ok: false,
-			message: "Could not resolve workflow placeholder 'story_path' from the active placeholder workflow state.",
+			message: "Could not resolve workflow value 'story_path' from the active workflow values.",
 		}
 	}
 
 	const resolutionBase =
-		placeholders.cwd?.trim() || placeholders.project_root?.trim() || placeholders["project-root"]?.trim() || args.cwd
+		workflowValues.cwd?.trim() || workflowValues.project_root?.trim() || workflowValues["project-root"]?.trim() || args.cwd
 
 	return {
 		ok: true,

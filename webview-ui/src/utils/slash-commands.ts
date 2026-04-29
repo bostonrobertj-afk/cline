@@ -7,88 +7,12 @@ export type { SlashCommand }
 export const DEFAULT_SLASH_COMMANDS: SlashCommand[] =
 	PLATFORM_CONFIG.type === PlatformType.VSCODE ? [...BASE_SLASH_COMMANDS, ...VSCODE_ONLY_COMMANDS] : BASE_SLASH_COMMANDS
 
-function getDiscoverableSlashCommands(
-	localWorkflowToggles: Record<string, boolean>,
-	globalWorkflowToggles: Record<string, boolean>,
-	remoteWorkflowToggles?: Record<string, boolean>,
-	remoteWorkflows?: any[],
-	availableCommands?: SlashCommand[],
-): SlashCommand[] {
+function getDiscoverableSlashCommands(availableCommands?: SlashCommand[]): SlashCommand[] {
 	if (availableCommands && availableCommands.length > 0) {
 		return availableCommands
 	}
 
-	const workflowCommands = getWorkflowCommands(
-		localWorkflowToggles,
-		globalWorkflowToggles,
-		remoteWorkflowToggles,
-		remoteWorkflows,
-	)
-
-	return [...DEFAULT_SLASH_COMMANDS, ...workflowCommands]
-}
-
-export function getWorkflowCommands(
-	localWorkflowToggles: Record<string, boolean>,
-	globalWorkflowToggles: Record<string, boolean>,
-	remoteWorkflowToggles?: Record<string, boolean>,
-	remoteWorkflows?: any[],
-): SlashCommand[] {
-	const { workflows: localWorkflows, nameSet: localWorkflowNames } = Object.entries(localWorkflowToggles)
-		.filter(([_, enabled]) => enabled)
-		.reduce(
-			(acc, [filePath, _]) => {
-				const fileName = filePath.replace(/^.*[/\\]/, "")
-
-				// Add to array of workflows
-				acc.workflows.push({
-					name: fileName,
-					section: "custom",
-				} as SlashCommand)
-
-				// Add to set of names
-				acc.nameSet.add(fileName)
-
-				return acc
-			},
-			{ workflows: [] as SlashCommand[], nameSet: new Set<string>() },
-		)
-
-	const globalWorkflows = Object.entries(globalWorkflowToggles)
-		.filter(([_, enabled]) => enabled)
-		.flatMap(([filePath, _]) => {
-			const fileName = filePath.replace(/^.*[/\\]/, "")
-
-			// skip if a local workflow with the same name exists
-			if (localWorkflowNames.has(fileName)) {
-				return []
-			}
-
-			return [
-				{
-					name: fileName,
-					section: "custom",
-				},
-			] as SlashCommand[]
-		})
-
-	// Add remote workflows that are enabled
-	const remoteWorkflowCommands: SlashCommand[] = []
-	if (remoteWorkflows && remoteWorkflowToggles) {
-		for (const workflow of remoteWorkflows) {
-			// Include if alwaysEnabled or if toggle is not explicitly false
-			const enabled = workflow.alwaysEnabled || remoteWorkflowToggles[workflow.name] !== false
-			if (enabled) {
-				remoteWorkflowCommands.push({
-					name: workflow.name,
-					section: "custom",
-				})
-			}
-		}
-	}
-
-	const workflows = [...localWorkflows, ...globalWorkflows, ...remoteWorkflowCommands]
-	return workflows
+	return DEFAULT_SLASH_COMMANDS
 }
 
 /**
@@ -197,24 +121,11 @@ export function shouldShowSlashCommandsMenu(text: string, cursorPosition: number
  */
 export function getMatchingSlashCommands(
 	query: string,
-	localWorkflowToggles: Record<string, boolean> = {},
-	globalWorkflowToggles: Record<string, boolean> = {},
-	remoteWorkflowToggles?: Record<string, boolean>,
-	remoteWorkflows?: any[],
 	mcpServers: McpServer[] = [],
 	availableCommands?: SlashCommand[],
 ): SlashCommand[] {
 	const mcpPromptCommands = getMcpPromptCommands(mcpServers)
-	const allCommands = [
-		...getDiscoverableSlashCommands(
-			localWorkflowToggles,
-			globalWorkflowToggles,
-			remoteWorkflowToggles,
-			remoteWorkflows,
-			availableCommands,
-		),
-		...mcpPromptCommands,
-	]
+	const allCommands = [...getDiscoverableSlashCommands(availableCommands), ...mcpPromptCommands]
 
 	if (!query) {
 		return allCommands
@@ -253,10 +164,6 @@ export function insertSlashCommand(
  */
 export function validateSlashCommand(
 	command: string,
-	localWorkflowToggles: Record<string, boolean> = {},
-	globalWorkflowToggles: Record<string, boolean> = {},
-	remoteWorkflowToggles?: Record<string, boolean>,
-	remoteWorkflows?: any[],
 	mcpServers: McpServer[] = [],
 	availableCommands?: SlashCommand[],
 ): "full" | "partial" | null {
@@ -265,16 +172,7 @@ export function validateSlashCommand(
 	}
 
 	const mcpPromptCommands = getMcpPromptCommands(mcpServers)
-	const allCommands = [
-		...getDiscoverableSlashCommands(
-			localWorkflowToggles,
-			globalWorkflowToggles,
-			remoteWorkflowToggles,
-			remoteWorkflows,
-			availableCommands,
-		),
-		...mcpPromptCommands,
-	]
+	const allCommands = [...getDiscoverableSlashCommands(availableCommands), ...mcpPromptCommands]
 
 	// case insensitive matching
 	const exactMatch = allCommands.some((cmd) => cmd.name.toLowerCase() === command.toLowerCase())
