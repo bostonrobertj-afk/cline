@@ -24,9 +24,10 @@ import { expect } from "chai"
 import type { McpHub } from "@/services/mcp/McpHub"
 import type { McpServer } from "@/shared/mcp"
 import { ModelFamily } from "@/shared/prompts"
-import type { ClineTool } from "@/shared/tools"
+import { ClineDefaultTool, type ClineTool } from "@/shared/tools"
 import { isGPT5ModelFamily } from "@/utils/model-utils"
 import { getSystemPrompt, PromptRegistry } from "../index"
+import type { ClineToolSpec } from "../spec"
 import type { SystemPromptContext } from "../types"
 import { AGENT_FEEDBACK_PROMPT_GUIDANCE } from "../types"
 
@@ -185,43 +186,6 @@ function normalizePromptSnapshotSurface(content: string): string {
 			inResponseToolsSection = false
 		}
 
-		if (line.includes("When a step sets a placeholder value, use `set_workflow_placeholders`.")) {
-			continue
-		}
-
-		if (
-			line === "When switching domains or task_progress steps, you may want to provide a brief preamble explaining:" ||
-			line === "When switching domains or major phases of work, you may want to provide a brief preamble explaining:"
-		) {
-			normalizedLines.push(
-				"When switching domains or major phases of work, you may want to provide a brief preamble explaining:",
-			)
-			continue
-		}
-
-		if (
-			line ===
-				'Format: "Now that we have [very brief summary of last task_progress items that was completed], I will use [ToolName] to [specific action/goal]"' ||
-			line ===
-				'Format: "Now that we have [very brief summary of the last completed phase], I will use [ToolName] to [specific action/goal]"'
-		) {
-			normalizedLines.push(
-				'Format: "Now that we have [very brief summary of the last completed phase], I will use [ToolName] to [specific action/goal]"',
-			)
-			continue
-		}
-
-		if (
-			line === "- Use `__COMPLETE_NEXT_STEP__` as the `task_progress` value to complete the next incomplete step." ||
-			line ===
-				'- When you complete the next step, use the next relevant `send_user_message` tool call to briefly tell the user what you finished and include `task_progress: "__COMPLETE_NEXT_STEP__"` on that same tool call.'
-		) {
-			normalizedLines.push(
-				"- Use `__COMPLETE_NEXT_STEP__` as the `task_progress` value to complete the next incomplete step.",
-			)
-			continue
-		}
-
 		if (line.startsWith("- ") && !line.includes("`") && !line.startsWith("- [")) {
 			normalizedLines.push("- <GUIDANCE>")
 			continue
@@ -355,6 +319,94 @@ const baseContext: SystemPromptContext = {
 	enableNativeToolCalls: false,
 }
 
+const genericWorkflowOverrideToolSpecs: ClineToolSpec[] = [
+	{
+		variant: ModelFamily.NATIVE_GPT_5_1,
+		id: ClineDefaultTool.ATTEMPT,
+		name: "attempt_completion",
+		description: "Attempt completion override",
+	},
+	{
+		variant: ModelFamily.NATIVE_GPT_5_1,
+		id: ClineDefaultTool.ASK,
+		name: "ask_followup_question",
+		description: "Ask follow-up override",
+	},
+	{
+		variant: ModelFamily.NATIVE_GPT_5_1,
+		id: ClineDefaultTool.SEND_USER_MESSAGE,
+		name: "send_user_message",
+		description: "Send user message override",
+	},
+	{
+		variant: ModelFamily.NATIVE_GPT_5_1,
+		id: ClineDefaultTool.APPLY_PATCH,
+		name: "apply_patch",
+		description: "Apply patch override",
+	},
+	{
+		variant: ModelFamily.NATIVE_GPT_5_1,
+		id: ClineDefaultTool.FILE_READ,
+		name: "read_file",
+		description: "Read file override",
+	},
+	{
+		variant: ModelFamily.NATIVE_GPT_5_1,
+		id: ClineDefaultTool.MCP_USE,
+		name: "indxr-10mcp0search_relevant",
+		description: "workspace-index: Search relevant code",
+	},
+	{
+		variant: ModelFamily.NATIVE_GPT_5_1,
+		id: ClineDefaultTool.MCP_USE,
+		name: "indxr-10mcp0get_file_summary",
+		description: "workspace-index: Summarize file",
+	},
+]
+
+const workflowProgressOnlyToolSpecs: ClineToolSpec[] = [
+	{
+		variant: ModelFamily.NATIVE_GPT_5_1,
+		id: ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST,
+		name: "workflow_progress_request",
+		description: "Ask the user to confirm whether the current workflow step is ready to advance.",
+	},
+]
+
+const createWorkflowArtifactNativeOnlyToolSpecs: ClineToolSpec[] = [
+	{
+		variant: ModelFamily.NATIVE_GPT_5_1,
+		id: ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT,
+		name: "create_workflow_artifact",
+		description: "Create a runtime-allocated workflow artifact.",
+		parameters: [
+			{
+				name: "artifact_id",
+				required: true,
+				instruction: "Workflow artifact definition id to create.",
+				description: "Workflow artifact definition id to create.",
+			},
+		],
+	},
+]
+
+const createWorkflowArtifactGenericToolSpecs: ClineToolSpec[] = [
+	{
+		variant: ModelFamily.GENERIC,
+		id: ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT,
+		name: "create_workflow_artifact",
+		description: "Create a runtime-allocated workflow artifact.",
+		parameters: [
+			{
+				name: "artifact_id",
+				required: true,
+				instruction: "Workflow artifact definition id to create.",
+				description: "Workflow artifact definition id to create.",
+			},
+		],
+	},
+]
+
 const getNativeToolEntry = (tool: ClineTool): NativeToolEntry => {
 	if ("type" in tool && tool.type === "function") {
 		return {
@@ -377,12 +429,6 @@ const getNativeToolEntries = (tools: ClineTool[] | undefined): NativeToolEntry[]
 
 const getNativeToolNames = (tools: ClineTool[] | undefined): string[] =>
 	getNativeToolEntries(tools).flatMap((tool) => (tool.name ? [tool.name] : []))
-
-const getNativeFunctionTool = (tools: ClineTool[] | undefined, name: string) =>
-	getNativeToolEntries(tools).find((tool) => tool.name === name)
-
-const getNativeFunctionDescription = (tools: ClineTool[] | undefined, name: string): string =>
-	getNativeFunctionTool(tools, name)?.description ?? ""
 
 const isNativeToolsFamily = (family: ModelFamily) =>
 	[ModelFamily.NATIVE_NEXT_GEN, ModelFamily.NATIVE_GPT_5, ModelFamily.NATIVE_GPT_5_1, ModelFamily.GEMINI_3].includes(family)
@@ -469,7 +515,8 @@ describe("Prompt System Integration Tests", () => {
 						const toolNames = getNativeToolNames(tools)
 						expect(toolNames).to.not.include("focus_chain")
 						expect(JSON.stringify(tools)).to.not.include('"focus_chain"')
-						expect(toolNames).to.include("build_review_diff_output")
+						expect(toolNames).to.not.include("build_workflow_document")
+						expect(toolNames).to.not.include("create_workflow_artifact")
 						const snapshotName = `${providerId}_${family.replace(/[^a-zA-Z0-9]/g, "_")}.tools.snap`
 						await assertSnapshot(snapshotName, JSON.stringify(tools, null, 2))
 					})
@@ -490,13 +537,15 @@ describe("Prompt System Integration Tests", () => {
 								expect(tools).to.be.an("array").that.is.not.empty
 								const toolNames = getNativeToolNames(tools)
 								expect(toolNames).to.not.include("focus_chain")
-								expect(toolNames).to.include("build_review_diff_output")
+								expect(toolNames).to.not.include("build_workflow_document")
+								expect(toolNames).to.not.include("create_workflow_artifact")
 							} else {
 								expect(tools).to.be.undefined
 							}
 
 							expect(systemPrompt).to.be.a("string").with.length.greaterThan(100)
 							expect(systemPrompt).to.not.include("{{TOOL_USE_SECTION}}")
+							expect(systemPrompt).to.not.include("create_workflow_artifact")
 
 							const snapshotName = `${providerId}_${modelId.replace(/[^a-zA-Z0-9]/g, "_")}-${contextName}.snap`
 							await assertNormalizedSnapshot(snapshotName, systemPrompt, normalizePromptSnapshotSurface)
@@ -578,8 +627,6 @@ describe("Prompt System Integration Tests", () => {
 					mcpHub: makeMcpHub([makeIndxrServer()]),
 					isContinuationTurn: true,
 					currentFocusChainChecklist: "- Review diff\n- Update tests",
-					activeWorkflowSupportsPlaceholders: false,
-					managedWorkflowActive: false,
 				},
 				"fast",
 				async ({ systemPrompt }) => {
@@ -587,10 +634,7 @@ describe("Prompt System Integration Tests", () => {
 					expect(systemPrompt).to.not.include("TOOL USE")
 					expect(systemPrompt).to.not.include("RULES")
 					expect(systemPrompt).to.not.include("CAPABILITIES")
-					expect(systemPrompt).to.include("CURRENT TASK LIST")
-					expect(systemPrompt).to.include("```text")
-					expect(systemPrompt).to.include("Review diff")
-					expect(systemPrompt).to.include("Update tests")
+					expect(systemPrompt).to.not.include("CURRENT TASK LIST")
 					expect(systemPrompt).to.include("`search_relevant`")
 					expectResponseToolNames(systemPrompt, [
 						"`attempt_completion`",
@@ -601,392 +645,49 @@ describe("Prompt System Integration Tests", () => {
 			)
 		})
 
-		it("uses direct-material-first Indxr guidance in continuation prompts for review-edge-case-hunter step 2", async function () {
+		it("omits workflow_progress_request from generic native GPT-5.1 continuation response guidance even when visible", async function () {
 			await runPromptTest(
 				this,
 				{
 					...baseContext,
-					providerInfo: { ...mockProviderInfo, mode: "act" },
-					mcpHub: makeMcpHub([makeIndxrServer()]),
+					providerInfo: makeProviderInfo("gpt-5-1", "openai"),
 					isContinuationTurn: true,
-					currentFocusChainChecklist: "- Inspect changed file",
-					activeWorkflowSupportsPlaceholders: true,
-					managedWorkflowActive: false,
-					activePlaceholderWorkflowName: "review-edge-case-hunter.md",
-					activePlaceholderWorkflowStepNumber: 2,
+					enableNativeToolCalls: true,
+					visibleNativeToolNames: [
+						"attempt_completion",
+						"ask_followup_question",
+						"workflow_progress_request",
+						"send_user_message",
+					],
 				},
-				"fast",
-				async ({ systemPrompt }) => {
-					expect(systemPrompt).to.include("primary review boundary")
-					expect(systemPrompt).to.include("`search_relevant`")
-					expect(systemPrompt).to.not.include(
-						"before built-in `search_files`, `list_code_definition_names`, `read_file`, or `read_file_range` whenever feasible",
-					)
-				},
-			)
-		})
-
-		it("generates a PLAN-mode continuation prompt with multi-root and placeholder workflow", async function () {
-			await runPromptTest(
-				this,
-				{
-					...baseContext,
-					providerInfo: { ...mockProviderInfo, mode: "plan" },
-					isContinuationTurn: true,
-					isMultiRootEnabled: true,
-					currentFocusChainChecklist: "- Inspect task state\n- Apply patch",
-					activeWorkflowSupportsPlaceholders: true,
-					activePlaceholderWorkflowName: "code-review.md",
-					activePlaceholderWorkflowStepNumber: 1,
-					managedWorkflowActive: false,
-				},
-				"fast",
+				"gpt-5-1",
 				async ({ systemPrompt }) => {
 					expect(systemPrompt).to.include("CONTINUATION TURN")
-					expect(systemPrompt).to.not.include("TOOL USE")
-					expect(systemPrompt).to.not.include("RULES")
-					expect(systemPrompt).to.not.include("CAPABILITIES")
-					expect(systemPrompt).to.not.include("CURRENT TASK LIST")
-					expect(systemPrompt).to.not.include("Inspect task state")
-					expect(systemPrompt).to.not.include("Apply patch")
-					expect(systemPrompt).to.include("task_progress")
-					expect(systemPrompt).to.include("__COMPLETE_NEXT_STEP__")
-					expectResponseToolNames(systemPrompt, [
-						"`generate_plan_output`",
-						"`ask_followup_question`",
-						"`send_user_message`",
-					])
-				},
-			)
-		})
-
-		it("generates a continuation prompt for create-prd step 3 with workflow_progress_request guidance", async function () {
-			await runPromptTest(
-				this,
-				{
-					...baseContext,
-					providerInfo: { ...mockProviderInfo, mode: "act" },
-					isContinuationTurn: true,
-					currentFocusChainChecklist: "- [ ] Step 3: Discover and classify the project",
-					activeWorkflowSupportsPlaceholders: true,
-					managedWorkflowActive: false,
-					activePlaceholderWorkflowName: "create-prd.md",
-					activePlaceholderWorkflowStepNumber: 3,
-				},
-				"fast",
-				async ({ systemPrompt }) => {
-					expect(systemPrompt).to.include("workflow_progress_request")
-					expect(systemPrompt).to.include("Do not include `task_progress`")
-					expect(systemPrompt).to.include(
-						"runtime-owned `Yes` branch completes the next checklist step before the next model request is built",
-					)
-					expect(systemPrompt).to.not.include(
-						"use `send_user_message` tool call to briefly tell the user what step you are completing",
-					)
-				},
-			)
-		})
-
-		it("generates a continuation prompt for create-epics step 3 with workflow_progress_request guidance", async function () {
-			await runPromptTest(
-				this,
-				{
-					...baseContext,
-					providerInfo: { ...mockProviderInfo, mode: "act" },
-					isContinuationTurn: true,
-					currentFocusChainChecklist: "- [ ] Step 3: Define the Epics",
-					activeWorkflowSupportsPlaceholders: true,
-					managedWorkflowActive: false,
-					activePlaceholderWorkflowName: "create-epics.md",
-					activePlaceholderWorkflowStepNumber: 3,
-				},
-				"fast",
-				async ({ systemPrompt }) => {
-					expect(systemPrompt).to.include("workflow_progress_request")
-					expect(systemPrompt).to.include("Do not include `task_progress`")
-					expect(systemPrompt).to.include(
-						"runtime-owned `Yes` branch completes the next checklist step before the next model request is built",
-					)
-					expect(systemPrompt).to.not.include(
-						"use `send_user_message` tool call to briefly tell the user what step you are completing",
-					)
-				},
-			)
-		})
-
-		it("generates a continuation prompt for pi-planning step 4 with workflow_progress_request guidance", async function () {
-			await runPromptTest(
-				this,
-				{
-					...baseContext,
-					providerInfo: { ...mockProviderInfo, mode: "act" },
-					isContinuationTurn: true,
-					activeWorkflowSupportsPlaceholders: true,
-					managedWorkflowActive: false,
-					activePlaceholderWorkflowName: "pi-planning.md",
-					activePlaceholderWorkflowStepNumber: 4,
-					currentFocusChainChecklist: "- [ ] Step 4: Align on planning expectations",
-				},
-				"fast",
-				async ({ systemPrompt }) => {
-					expect(systemPrompt).to.include("workflow_progress_request")
-					expect(systemPrompt).to.include("Do not include `task_progress`")
-					expect(systemPrompt).to.include(
-						"runtime-owned `Yes` branch completes the next checklist step before the next model request is built",
-					)
-					expect(systemPrompt).to.not.include(
-						"Once you correctly complete the current step, the next step's details will be shown automatically.",
-					)
-					expect(systemPrompt).to.not.include(
-						"use `send_user_message` tool call to briefly tell the user what step you are completing",
-					)
-					expect(systemPrompt).to.include("`workflow_progress_request`")
-				},
-			)
-		})
-
-		it("generates a continuation prompt for pi-planning step 5 with workflow_progress_request guidance", async function () {
-			await runPromptTest(
-				this,
-				{
-					...baseContext,
-					providerInfo: { ...mockProviderInfo, mode: "act" },
-					isContinuationTurn: true,
-					activeWorkflowSupportsPlaceholders: true,
-					managedWorkflowActive: false,
-					activePlaceholderWorkflowName: "pi-planning.md",
-					activePlaceholderWorkflowStepNumber: 5,
-					currentFocusChainChecklist: "- [ ] Step 5: Refine stories in the delivery spec",
-				},
-				"fast",
-				async ({ systemPrompt }) => {
-					expect(systemPrompt).to.include("workflow_progress_request")
-					expect(systemPrompt).to.include("Do not include `task_progress`")
-					expect(systemPrompt).to.include(
-						"runtime-owned `Yes` branch completes the next checklist step before the next model request is built",
-					)
-					expect(systemPrompt).to.not.include(
-						"Once you correctly complete the current step, the next step's details will be shown automatically.",
-					)
-					expect(systemPrompt).to.not.include(
-						"use `send_user_message` tool call to briefly tell the user what step you are completing",
-					)
-					expect(systemPrompt).to.include("`workflow_progress_request`")
-				},
-			)
-		})
-
-		it("generates a continuation prompt for create-story step 3 with workflow_progress_request guidance", async function () {
-			await runPromptTest(
-				this,
-				{
-					...baseContext,
-					providerInfo: { ...mockProviderInfo, mode: "act" },
-					isContinuationTurn: true,
-					activeWorkflowSupportsPlaceholders: true,
-					managedWorkflowActive: false,
-					activePlaceholderWorkflowName: "create-story.md",
-					activePlaceholderWorkflowStepNumber: 3,
-					currentFocusChainChecklist: "- [ ] Step 3: Draft the story narrative",
-				},
-				"fast",
-				async ({ systemPrompt }) => {
-					expect(systemPrompt).to.include("workflow_progress_request")
-					expect(systemPrompt).to.include("Do not include `task_progress`")
-					expect(systemPrompt).to.include(
-						"runtime-owned `Yes` branch completes the next checklist step before the next model request is built",
-					)
-					expect(systemPrompt).to.not.include(
-						"Once you correctly complete the current step, the next step's details will be shown automatically.",
-					)
-					expect(systemPrompt).to.not.include(
-						"use `send_user_message` tool call to briefly tell the user what step you are completing",
-					)
-					expect(systemPrompt).to.include("`workflow_progress_request`")
-				},
-			)
-		})
-
-		it("generates a continuation prompt for create-story step 4 with workflow_progress_request guidance", async function () {
-			await runPromptTest(
-				this,
-				{
-					...baseContext,
-					providerInfo: { ...mockProviderInfo, mode: "act" },
-					isContinuationTurn: true,
-					activeWorkflowSupportsPlaceholders: true,
-					managedWorkflowActive: false,
-					activePlaceholderWorkflowName: "create-story.md",
-					activePlaceholderWorkflowStepNumber: 4,
-					currentFocusChainChecklist: "- [ ] Step 4: Refine implementation tasks",
-				},
-				"fast",
-				async ({ systemPrompt }) => {
-					expect(systemPrompt).to.include("workflow_progress_request")
-					expect(systemPrompt).to.include("Do not include `task_progress`")
-					expect(systemPrompt).to.include(
-						"runtime-owned `Yes` branch completes the next checklist step before the next model request is built",
-					)
-					expect(systemPrompt).to.not.include(
-						"Once you correctly complete the current step, the next step's details will be shown automatically.",
-					)
-					expect(systemPrompt).to.not.include(
-						"use `send_user_message` tool call to briefly tell the user what step you are completing",
-					)
-					expect(systemPrompt).to.include("`workflow_progress_request`")
-				},
-			)
-		})
-
-		it("does not generate workflow_progress_request guidance for create-story step 5", async function () {
-			await runPromptTest(
-				this,
-				{
-					...baseContext,
-					providerInfo: { ...mockProviderInfo, mode: "act" },
-					isContinuationTurn: true,
-					activeWorkflowSupportsPlaceholders: true,
-					managedWorkflowActive: false,
-					activePlaceholderWorkflowName: "create-story.md",
-					activePlaceholderWorkflowStepNumber: 5,
-					currentFocusChainChecklist: "- [ ] Step 5: Finalize the story document",
-				},
-				"fast",
-				async ({ systemPrompt }) => {
 					expect(systemPrompt).to.not.include("workflow_progress_request")
-					expect(systemPrompt).to.not.include("Do not include `task_progress`")
+					expect(systemPrompt).to.include("attempt_completion")
+					expect(systemPrompt).to.include("ask_followup_question")
+					expect(systemPrompt).to.include("send_user_message")
 				},
 			)
 		})
 
-		it("generates a continuation prompt for quick-dev step 2 with workflow_progress_request guidance", async function () {
+		it("omits workflow_progress_request in generic native GPT-5.1 continuation prompts when it is not visible", async function () {
 			await runPromptTest(
 				this,
 				{
 					...baseContext,
-					providerInfo: { ...mockProviderInfo, mode: "act" },
+					providerInfo: makeProviderInfo("gpt-5-1", "openai"),
 					isContinuationTurn: true,
-					activeWorkflowSupportsPlaceholders: true,
-					managedWorkflowActive: false,
-					activePlaceholderWorkflowName: "quick-dev.md",
-					activePlaceholderWorkflowStepNumber: 2,
-					currentFocusChainChecklist: "- [ ] Step 2: Review the spec with the user",
+					enableNativeToolCalls: true,
+					visibleNativeToolNames: ["attempt_completion", "ask_followup_question", "send_user_message"],
 				},
-				"fast",
+				"gpt-5-1",
 				async ({ systemPrompt }) => {
-					expect(systemPrompt).to.include("workflow_progress_request")
-					expect(systemPrompt).to.include("Do not include `task_progress`")
-					expect(systemPrompt).to.include(
-						"runtime-owned `Yes` branch completes the next checklist step before the next model request is built",
-					)
-				},
-			)
-		})
-
-		it("does not generate workflow_progress_request guidance for quick-dev step 3", async function () {
-			await runPromptTest(
-				this,
-				{
-					...baseContext,
-					providerInfo: { ...mockProviderInfo, mode: "act" },
-					isContinuationTurn: true,
-					activeWorkflowSupportsPlaceholders: true,
-					managedWorkflowActive: false,
-					activePlaceholderWorkflowName: "quick-dev.md",
-					activePlaceholderWorkflowStepNumber: 3,
-					currentFocusChainChecklist: "- [ ] Step 3: Execute the planned work",
-				},
-				"fast",
-				async ({ systemPrompt }) => {
+					expect(systemPrompt).to.include("CONTINUATION TURN")
 					expect(systemPrompt).to.not.include("workflow_progress_request")
-					expect(systemPrompt).to.not.include("Do not include `task_progress`")
-				},
-			)
-		})
-
-		it("does not generate workflow_progress_request guidance for quick-dev step 4", async function () {
-			await runPromptTest(
-				this,
-				{
-					...baseContext,
-					providerInfo: { ...mockProviderInfo, mode: "act" },
-					isContinuationTurn: true,
-					activeWorkflowSupportsPlaceholders: true,
-					managedWorkflowActive: false,
-					activePlaceholderWorkflowName: "quick-dev.md",
-					activePlaceholderWorkflowStepNumber: 4,
-					currentFocusChainChecklist: "- [ ] Step 4: Commit the work",
-				},
-				"fast",
-				async ({ systemPrompt }) => {
-					expect(systemPrompt).to.not.include("workflow_progress_request")
-					expect(systemPrompt).to.not.include("Do not include `task_progress`")
-				},
-			)
-		})
-
-		it("does not generate workflow_progress_request guidance for quick-dev step 5", async function () {
-			await runPromptTest(
-				this,
-				{
-					...baseContext,
-					providerInfo: { ...mockProviderInfo, mode: "act" },
-					isContinuationTurn: true,
-					activeWorkflowSupportsPlaceholders: true,
-					managedWorkflowActive: false,
-					activePlaceholderWorkflowName: "quick-dev.md",
-					activePlaceholderWorkflowStepNumber: 5,
-					currentFocusChainChecklist: "- [ ] Step 5: Close out with the user",
-				},
-				"fast",
-				async ({ systemPrompt }) => {
-					expect(systemPrompt).to.not.include("workflow_progress_request")
-					expect(systemPrompt).to.not.include("Do not include `task_progress`")
-				},
-			)
-		})
-
-		it("generates a continuation prompt for quick-spec step 3 with workflow_progress_request guidance", async function () {
-			await runPromptTest(
-				this,
-				{
-					...baseContext,
-					providerInfo: { ...mockProviderInfo, mode: "act" },
-					isContinuationTurn: true,
-					activeWorkflowSupportsPlaceholders: true,
-					managedWorkflowActive: false,
-					activePlaceholderWorkflowName: "quick-spec.md",
-					activePlaceholderWorkflowStepNumber: 3,
-					currentFocusChainChecklist: "- [ ] Step 3: Identify the Objective",
-				},
-				"fast",
-				async ({ systemPrompt }) => {
-					expect(systemPrompt).to.include("workflow_progress_request")
-					expect(systemPrompt).to.include("Do not include `task_progress`")
-					expect(systemPrompt).to.include(
-						"runtime-owned `Yes` branch completes the next checklist step before the next model request is built",
-					)
-				},
-			)
-		})
-
-		it("does not generate workflow_progress_request guidance for quick-spec step 10", async function () {
-			await runPromptTest(
-				this,
-				{
-					...baseContext,
-					providerInfo: { ...mockProviderInfo, mode: "act" },
-					isContinuationTurn: true,
-					activeWorkflowSupportsPlaceholders: true,
-					managedWorkflowActive: false,
-					activePlaceholderWorkflowName: "quick-spec.md",
-					activePlaceholderWorkflowStepNumber: 10,
-					currentFocusChainChecklist: "- [ ] Step 10: Final Review & Closeuout",
-				},
-				"fast",
-				async ({ systemPrompt }) => {
-					expect(systemPrompt).to.not.include("workflow_progress_request")
-					expect(systemPrompt).to.not.include("Do not include `task_progress`")
+					expect(systemPrompt).to.include("attempt_completion")
+					expect(systemPrompt).to.include("ask_followup_question")
+					expect(systemPrompt).to.include("send_user_message")
 				},
 			)
 		})
@@ -996,7 +697,6 @@ describe("Prompt System Integration Tests", () => {
 		const featureTests = [
 			{ name: "browser-specific content when browser is enabled", context: { supportsBrowserUse: true }, check: "browser" },
 			{ name: "MCP content when MCP servers are present", context: {}, check: "MCP" },
-			{ name: "TODO content when focus chain is enabled", context: {}, check: "TODO" },
 			{ name: "user instructions when provided", context: {}, check: "USER'S CUSTOM INSTRUCTIONS" },
 		]
 
@@ -1020,7 +720,7 @@ describe("Prompt System Integration Tests", () => {
 				"gpt-5-codex",
 				async ({ systemPrompt }) => {
 					expect(systemPrompt).to.include("TOOL USE")
-					expect(systemPrompt).to.include("task_progress")
+					expect(systemPrompt).to.not.include("task_progress")
 					expect(systemPrompt).to.include("RESPONSE TOOLS")
 					expectResponseToolNames(
 						systemPrompt,
@@ -1082,94 +782,7 @@ describe("Prompt System Integration Tests", () => {
 			expect(systemPrompt).to.not.include("`get_file_summary`")
 		})
 
-		it("omits Indxr-aware MCP guidance for code-review step 3 when connected Indxr tools are fully filtered out of the native schema", async function () {
-			await runPromptTest(
-				this,
-				{
-					...baseContext,
-					mcpHub: makeMcpHub([makeIndxrServer()]),
-					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
-					enableNativeToolCalls: true,
-					useMinimalGptPrompt: true,
-					activeWorkflowSupportsPlaceholders: true,
-					managedWorkflowActive: false,
-					activePlaceholderWorkflowName: "code-review.md",
-					activePlaceholderWorkflowStepNumber: 3,
-				},
-				"gpt-5.4-2026-03-05",
-				async ({ systemPrompt }) => {
-					expect(systemPrompt).to.not.include("Indxr-Aware Exploration")
-					expect(systemPrompt).to.not.include("`search_relevant`")
-					expect(systemPrompt).to.not.include("`get_file_summary`")
-				},
-			)
-		})
-
-		it("omits Indxr-aware MCP guidance for dev-story step 2 when the matrix removes all Indxr tools", async function () {
-			await runPromptTest(
-				this,
-				{
-					...baseContext,
-					mcpHub: makeMcpHub([makeIndxrServer()]),
-					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
-					enableNativeToolCalls: true,
-					useMinimalGptPrompt: true,
-					activeWorkflowSupportsPlaceholders: true,
-					managedWorkflowActive: false,
-					activePlaceholderWorkflowName: "dev-story.md",
-					activePlaceholderWorkflowStepNumber: 2,
-				},
-				"gpt-5.4-2026-03-05",
-				async ({ systemPrompt, tools }) => {
-					expect(systemPrompt).to.not.include("Indxr-Aware Exploration")
-					expect(systemPrompt).to.not.include("`search_relevant`")
-					expect(systemPrompt).to.not.include("`get_file_summary`")
-
-					const nativeToolNames = getNativeToolNames(tools)
-					expect(nativeToolNames).to.include("read_file")
-					expect(nativeToolNames).to.include("read_file_range")
-					expect(nativeToolNames).to.include("search_files")
-					expect(nativeToolNames).to.include("apply_patch")
-					expect(nativeToolNames).to.include("execute_command")
-					expect(nativeToolNames).to.include("story_task_reminder")
-					expect(nativeToolNames).to.include("story_task_complete")
-					expect(nativeToolNames).to.include("story_notes_update")
-					expect(nativeToolNames.some((name) => name.startsWith("indxr-"))).to.equal(false)
-				},
-			)
-		})
-
-		it("keeps Indxr-aware MCP guidance visible for dev-story step 3 while exposing validation tools", async function () {
-			await runPromptTest(
-				this,
-				{
-					...baseContext,
-					mcpHub: makeMcpHub([makeIndxrServer()]),
-					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
-					enableNativeToolCalls: true,
-					useMinimalGptPrompt: true,
-					activeWorkflowSupportsPlaceholders: true,
-					managedWorkflowActive: false,
-					activePlaceholderWorkflowName: "dev-story.md",
-					activePlaceholderWorkflowStepNumber: 3,
-				},
-				"gpt-5.4-2026-03-05",
-				async ({ systemPrompt, tools }) => {
-					expect(systemPrompt).to.include("Indxr-Aware Exploration")
-					expect(systemPrompt).to.include("`search_relevant`")
-					expect(systemPrompt).to.include("`get_file_summary`")
-
-					const nativeToolNames = getNativeToolNames(tools)
-					expect(nativeToolNames).to.include("story_notes_update")
-					expect(nativeToolNames).to.include("story_testing_complete")
-					expect(nativeToolNames).to.not.include("story_task_reminder")
-					expect(nativeToolNames).to.not.include("story_task_complete")
-					expect(nativeToolNames.some((name) => name.startsWith("indxr-"))).to.equal(true)
-				},
-			)
-		})
-
-		it("names only the visible subset of Indxr tools in native MCP guidance", async function () {
+		it("filters native tools through a generic workflow override schema in native GPT-5.1 prompts", async function () {
 			await runPromptTest(
 				this,
 				{
@@ -1187,29 +800,129 @@ describe("Prompt System Integration Tests", () => {
 									description: "Summarize file",
 									inputSchema: { type: "object", properties: {} },
 								},
+								{
+									name: "lookup_symbol",
+									description: "Lookup symbol",
+									inputSchema: { type: "object", properties: {} },
+								},
 							],
 						}),
 					]),
-					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
+					providerInfo: makeProviderInfo("gpt-5-1", "openai"),
 					enableNativeToolCalls: true,
 					useMinimalGptPrompt: true,
-					activeWorkflowSupportsPlaceholders: true,
-					managedWorkflowActive: false,
-					activePlaceholderWorkflowName: "review-edge-case-hunter.md",
-					activePlaceholderWorkflowStepNumber: 2,
+					workflowToolSchemaOverride: genericWorkflowOverrideToolSpecs,
 				},
-				"gpt-5.4-2026-03-05",
+				"gpt-5-1",
+				async ({ tools }) => {
+					const nativeToolNames = getNativeToolNames(tools)
+
+					expect(nativeToolNames).to.deep.equal([
+						"attempt_completion",
+						"ask_followup_question",
+						"send_user_message",
+						"apply_patch",
+						"read_file",
+						"indxr-10mcp0search_relevant",
+						"indxr-10mcp0get_file_summary",
+					])
+					expect(nativeToolNames).to.not.include("access_mcp_resource")
+					expect(nativeToolNames).to.not.include("indxr-10mcp0lookup_symbol")
+					expect(nativeToolNames).to.not.include("workflow_progress_request")
+					expect(nativeToolNames).to.not.include("search_files")
+					expect(nativeToolNames).to.not.include("build_review_input")
+					expect(nativeToolNames).to.not.include("generate_plan_output")
+				},
+			)
+		})
+
+		it("uses the workflow-projected schema as the exact native tool surface", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: makeProviderInfo("gpt-5-1", "openai"),
+					enableNativeToolCalls: true,
+					useMinimalGptPrompt: true,
+					workflowToolSchemaOverride: workflowProgressOnlyToolSpecs,
+				},
+				"gpt-5-1",
+				async ({ tools }) => {
+					expect(getNativeToolNames(tools)).to.deep.equal(["workflow_progress_request"])
+				},
+			)
+		})
+
+		it("projects create_workflow_artifact only through workflow override schemas", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: makeProviderInfo("gpt-5-1", "openai"),
+					enableNativeToolCalls: true,
+					useMinimalGptPrompt: true,
+					workflowToolSchemaOverride: createWorkflowArtifactNativeOnlyToolSpecs,
+				},
+				"gpt-5-1",
+				async ({ tools }) => {
+					expect(getNativeToolNames(tools)).to.deep.equal(["create_workflow_artifact"])
+				},
+			)
+
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: makeProviderInfo("gpt-3", "openai"),
+					enableNativeToolCalls: false,
+					workflowToolSchemaOverride: createWorkflowArtifactGenericToolSpecs,
+				},
+				"gpt-3",
+				async ({ systemPrompt, tools }) => {
+					expect(tools).to.be.undefined
+					expect(systemPrompt).to.include("create_workflow_artifact")
+					expect(systemPrompt).to.include("artifact_id")
+				},
+			)
+		})
+
+		it("shows only the generic visible Indxr guidance exposed by a workflow override schema in native GPT-5.1 prompts", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					mcpHub: makeMcpHub([
+						makeIndxrServer({
+							tools: [
+								{
+									name: "search_relevant",
+									description: "Search relevant code",
+									inputSchema: { type: "object", properties: {} },
+								},
+								{
+									name: "get_file_summary",
+									description: "Summarize file",
+									inputSchema: { type: "object", properties: {} },
+								},
+								{
+									name: "lookup_symbol",
+									description: "Lookup symbol",
+									inputSchema: { type: "object", properties: {} },
+								},
+							],
+						}),
+					]),
+					providerInfo: makeProviderInfo("gpt-5-1", "openai"),
+					enableNativeToolCalls: true,
+					useMinimalGptPrompt: true,
+					workflowToolSchemaOverride: genericWorkflowOverrideToolSpecs,
+				},
+				"gpt-5-1",
 				async ({ systemPrompt }) => {
-					expect(systemPrompt).to.include("Indxr-Aware Exploration")
-					expect(systemPrompt).to.include("primary review boundary")
-					expect(systemPrompt).to.include("`search_relevant`")
-					expect(systemPrompt).to.include("`get_file_summary`")
-					expect(systemPrompt).to.not.include("`lookup_symbol`")
-					expect(systemPrompt).to.not.include("`read_source`")
-					expect(systemPrompt).to.not.include("`get_public_api`")
-					expect(systemPrompt).to.not.include(
-						"before built-in `search_files`, `list_code_definition_names`, `read_file`, or `read_file_range` whenever feasible",
-					)
+					expect(systemPrompt).to.not.include("Indxr-Aware Exploration")
+					expect(systemPrompt).to.not.include("search_relevant")
+					expect(systemPrompt).to.not.include("get_file_summary")
+					expect(systemPrompt).to.not.include("lookup_symbol")
 				},
 			)
 		})
@@ -1359,65 +1072,7 @@ describe("Prompt System Integration Tests", () => {
 				},
 			)
 		})
-
-		it("omits the extra set_workflow_placeholders reminder line across the covered prompt variants", async function () {
-			const guidanceSnippet = "When a step sets a placeholder value, use `set_workflow_placeholders`."
-			const validTaskProgressSnippets = [
-				"The user has triggered a workflow with a prebuilt checklist.",
-				"Use `task_progress` only as a checklist parameter on the next tool call, not a standalone tool.",
-			]
-
-			const cases = [
-				{
-					name: "GPT-5",
-					context: {
-						providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
-						enableNativeToolCalls: false,
-					},
-				},
-				{
-					name: "Native GPT-5.1",
-					context: {
-						providerInfo: makeProviderInfo("gpt-5-1", "openai"),
-						enableNativeToolCalls: true,
-					},
-				},
-				{
-					name: "Native GPT-5",
-					context: {
-						providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
-						enableNativeToolCalls: true,
-					},
-				},
-				{
-					name: "Native Next Gen",
-					context: {
-						providerInfo: makeProviderInfo("claude-sonnet-4", "cline"),
-						enableNativeToolCalls: true,
-					},
-				},
-			] as const
-
-			for (const testCase of cases) {
-				await runPromptTest(
-					this,
-					{
-						...baseContext,
-						...testCase.context,
-						activeWorkflowSupportsPlaceholders: true,
-						managedWorkflowActive: false,
-					},
-					testCase.name,
-					async ({ systemPrompt }) => {
-						expect(systemPrompt).to.not.include(guidanceSnippet)
-						expect(validTaskProgressSnippets.some((snippet) => systemPrompt.includes(snippet))).to.equal(true)
-						expect(systemPrompt).to.not.include("managed workflow step")
-					},
-				)
-			}
-		})
-
-		it("filters native tools for code-review step 2", async function () {
+		it("renders first-turn runtime-projected workflow persona, system, and input blocks in GPT-5.4 OpenAI full prompts", async function () {
 			await runPromptTest(
 				this,
 				{
@@ -1425,850 +1080,40 @@ describe("Prompt System Integration Tests", () => {
 					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
 					enableNativeToolCalls: true,
 					useMinimalGptPrompt: true,
-					activeWorkflowSupportsPlaceholders: true,
-					managedWorkflowActive: false,
-					activePlaceholderWorkflowName: "code-review.md",
-					activePlaceholderWorkflowStepNumber: 2,
-					mcpHub: makeMcpHub([
-						makeConnectedServer(),
-						makeIndxrServer({
-							tools: [
-								{
-									name: "search_relevant",
-									description: "Search relevant code",
-									inputSchema: { type: "object", properties: {} },
-								},
-								{
-									name: "get_file_summary",
-									description: "Summarize file",
-									inputSchema: { type: "object", properties: {} },
-								},
-								{
-									name: "lookup_symbol",
-									description: "Lookup symbol",
-									inputSchema: { type: "object", properties: {} },
-								},
-							],
-						}),
-					]),
-				},
-				"gpt-5.4-2026-03-05",
-				async ({ tools }) => {
-					const nativeToolNames = getNativeToolNames(tools)
-
-					expect(nativeToolNames).to.include.members([
-						"build_review_diff_output",
-						"execute_command",
-						"list_files",
-						"search_files",
-						"read_file",
-						"read_file_range",
-						"apply_patch",
-						"attempt_completion",
-					])
-					expect(nativeToolNames).to.not.include("set_workflow_placeholders")
-					expect(nativeToolNames).to.not.include("generate_plan_output")
-					expect(nativeToolNames.some((name) => name.includes("search_relevant"))).to.equal(true)
-					expect(nativeToolNames.some((name) => name.includes("get_file_summary"))).to.equal(true)
-					expect(nativeToolNames.some((name) => name.includes("lookup_symbol"))).to.equal(true)
-				},
-			)
-		})
-
-		it("filters native tools for code-review step 3", async function () {
-			await runPromptTest(
-				this,
-				{
-					...baseContext,
-					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
-					enableNativeToolCalls: true,
-					useMinimalGptPrompt: true,
-					activeWorkflowSupportsPlaceholders: true,
-					managedWorkflowActive: false,
-					activePlaceholderWorkflowName: "code-review.md",
-					activePlaceholderWorkflowStepNumber: 3,
-					mcpHub: makeMcpHub([
-						makeConnectedServer(),
-						makeIndxrServer({
-							tools: [
-								{
-									name: "search_relevant",
-									description: "Search relevant code",
-									inputSchema: { type: "object", properties: {} },
-								},
-								{
-									name: "get_file_summary",
-									description: "Summarize file",
-									inputSchema: { type: "object", properties: {} },
-								},
-								{
-									name: "lookup_symbol",
-									description: "Lookup symbol",
-									inputSchema: { type: "object", properties: {} },
-								},
-							],
-						}),
-					]),
-				},
-				"gpt-5.4-2026-03-05",
-				async ({ tools }) => {
-					const nativeToolNames = getNativeToolNames(tools)
-
-					expect(nativeToolNames).to.include.members([
-						"set_workflow_placeholders",
-						"list_files",
-						"search_files",
-						"read_file",
-						"read_file_range",
-						"apply_patch",
-						"attempt_completion",
-					])
-					expect(nativeToolNames).to.not.include("build_review_diff_output")
-					expect(nativeToolNames).to.not.include("build_review_input")
-					expect(nativeToolNames).to.not.include("execute_command")
-					expect(nativeToolNames.some((name) => name.includes("search_relevant"))).to.equal(false)
-					expect(nativeToolNames.some((name) => name.includes("get_file_summary"))).to.equal(false)
-					expect(nativeToolNames.some((name) => name.includes("lookup_symbol"))).to.equal(false)
-				},
-			)
-		})
-
-		it("filters native tools for create-epics step 2", async function () {
-			await runPromptTest(
-				this,
-				{
-					...baseContext,
-					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
-					enableNativeToolCalls: true,
-					useMinimalGptPrompt: true,
-					activeWorkflowSupportsPlaceholders: true,
-					managedWorkflowActive: false,
-					activePlaceholderWorkflowName: "create-epics.md",
-					activePlaceholderWorkflowStepNumber: 2,
-				},
-				"gpt-5.4-2026-03-05",
-				async ({ tools }) => {
-					const nativeToolNames = getNativeToolNames(tools)
-
-					expect(nativeToolNames).to.include.members([
-						"list_files",
-						"search_files",
-						"read_file",
-						"read_file_range",
-						"apply_patch",
-						"attempt_completion",
-					])
-					expect(nativeToolNames).to.not.include("set_workflow_placeholders")
-					expect(nativeToolNames).to.not.include("execute_command")
-					expect(nativeToolNames).to.not.include("generate_plan_output")
-					expect(nativeToolNames.some((name) => name.startsWith("indxr-"))).to.equal(false)
-				},
-			)
-		})
-
-		it("filters native tools for pi-planning step 2", async function () {
-			await runPromptTest(
-				this,
-				{
-					...baseContext,
-					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
-					enableNativeToolCalls: true,
-					useMinimalGptPrompt: true,
-					activeWorkflowSupportsPlaceholders: true,
-					managedWorkflowActive: false,
-					activePlaceholderWorkflowName: "pi-planning.md",
-					activePlaceholderWorkflowStepNumber: 2,
-				},
-				"gpt-5.4-2026-03-05",
-				async ({ tools }) => {
-					const nativeToolNames = getNativeToolNames(tools)
-
-					expect(nativeToolNames).to.include("attempt_completion")
-					expect(nativeToolNames).to.not.include("select_target_epic")
-					expect(nativeToolNames).to.not.include("set_workflow_placeholders")
-					expect(nativeToolNames).to.not.include("read_file")
-					expect(nativeToolNames).to.not.include("execute_command")
-					expect(nativeToolNames).to.not.include("generate_plan_output")
-				},
-			)
-		})
-
-		it("filters native tools for brainstorming step 3", async function () {
-			await runPromptTest(
-				this,
-				{
-					...baseContext,
-					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
-					enableNativeToolCalls: true,
-					useMinimalGptPrompt: true,
-					activeWorkflowSupportsPlaceholders: true,
-					managedWorkflowActive: false,
-					activePlaceholderWorkflowName: "brainstorming.md",
-					activePlaceholderWorkflowStepNumber: 3,
-				},
-				"gpt-5.4-2026-03-05",
-				async ({ tools }) => {
-					const nativeToolNames = getNativeToolNames(tools)
-
-					expect(nativeToolNames).to.not.include("capture_brainstorming_topic")
-				},
-			)
-
-			await runPromptTest(
-				this,
-				{
-					...baseContext,
-					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
-					enableNativeToolCalls: true,
-					useMinimalGptPrompt: true,
-					activeWorkflowSupportsPlaceholders: true,
-					managedWorkflowActive: false,
-					activePlaceholderWorkflowName: "brainstorming.md",
-					activePlaceholderWorkflowStepNumber: 2,
-				},
-				"gpt-5.4-2026-03-05",
-				async ({ tools }) => {
-					const nativeToolNames = getNativeToolNames(tools)
-
-					expect(nativeToolNames).to.not.include("capture_brainstorming_topic")
-				},
-			)
-		})
-
-		it("filters native tools for pi-planning step 3", async function () {
-			await runPromptTest(
-				this,
-				{
-					...baseContext,
-					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
-					enableNativeToolCalls: true,
-					useMinimalGptPrompt: true,
-					activeWorkflowSupportsPlaceholders: true,
-					managedWorkflowActive: false,
-					activePlaceholderWorkflowName: "pi-planning.md",
-					activePlaceholderWorkflowStepNumber: 3,
-				},
-				"gpt-5.4-2026-03-05",
-				async ({ tools }) => {
-					const nativeToolNames = getNativeToolNames(tools)
-
-					expect(nativeToolNames).to.include("attempt_completion")
-					expect(nativeToolNames).to.not.include("build_epic_delivery_spec")
-					expect(nativeToolNames).to.not.include("set_workflow_placeholders")
-					expect(nativeToolNames).to.not.include("read_file")
-					expect(nativeToolNames).to.not.include("execute_command")
-					expect(nativeToolNames).to.not.include("generate_plan_output")
-				},
-			)
-		})
-
-		it("filters native tools for pi-planning step 4", async function () {
-			await runPromptTest(
-				this,
-				{
-					...baseContext,
-					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
-					enableNativeToolCalls: true,
-					useMinimalGptPrompt: true,
-					activeWorkflowSupportsPlaceholders: true,
-					managedWorkflowActive: false,
-					activePlaceholderWorkflowName: "pi-planning.md",
-					activePlaceholderWorkflowStepNumber: 4,
-				},
-				"gpt-5.4-2026-03-05",
-				async ({ tools }) => {
-					const nativeToolNames = getNativeToolNames(tools)
-
-					expect(nativeToolNames).to.include.members([
-						"workflow_progress_request",
-						"attempt_completion",
-						"ask_followup_question",
-						"send_user_message",
-					])
-					expect(nativeToolNames).to.not.include("list_files")
-					expect(nativeToolNames).to.not.include("search_files")
-					expect(nativeToolNames).to.not.include("read_file")
-					expect(nativeToolNames).to.not.include("read_file_range")
-					expect(nativeToolNames).to.not.include("apply_patch")
-					expect(nativeToolNames).to.not.include("write_to_file")
-					expect(nativeToolNames).to.not.include("set_workflow_placeholders")
-					expect(nativeToolNames).to.not.include("execute_command")
-					expect(nativeToolNames).to.not.include("generate_plan_output")
-				},
-			)
-		})
-
-		it("filters native tools for pi-planning step 5", async function () {
-			await runPromptTest(
-				this,
-				{
-					...baseContext,
-					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
-					enableNativeToolCalls: true,
-					useMinimalGptPrompt: true,
-					activeWorkflowSupportsPlaceholders: true,
-					managedWorkflowActive: false,
-					activePlaceholderWorkflowName: "pi-planning.md",
-					activePlaceholderWorkflowStepNumber: 5,
-				},
-				"gpt-5.4-2026-03-05",
-				async ({ tools }) => {
-					const nativeToolNames = getNativeToolNames(tools)
-
-					expect(nativeToolNames).to.include.members([
-						"workflow_progress_request",
-						"attempt_completion",
-						"ask_followup_question",
-						"send_user_message",
-						"list_files",
-						"search_files",
-						"read_file",
-						"read_file_range",
-						"apply_patch",
-					])
-					expect(nativeToolNames).to.not.include("set_workflow_placeholders")
-					expect(nativeToolNames).to.not.include("execute_command")
-					expect(nativeToolNames).to.not.include("generate_plan_output")
-				},
-			)
-		})
-
-		it("filters native tools for create-epics step 3", async function () {
-			await runPromptTest(
-				this,
-				{
-					...baseContext,
-					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
-					enableNativeToolCalls: true,
-					useMinimalGptPrompt: true,
-					activeWorkflowSupportsPlaceholders: true,
-					managedWorkflowActive: false,
-					activePlaceholderWorkflowName: "create-epics.md",
-					activePlaceholderWorkflowStepNumber: 3,
-				},
-				"gpt-5.4-2026-03-05",
-				async ({ tools }) => {
-					const nativeToolNames = getNativeToolNames(tools)
-
-					expect(nativeToolNames).to.include.members([
-						"workflow_progress_request",
-						"attempt_completion",
-						"ask_followup_question",
-						"send_user_message",
-						"list_files",
-						"read_file",
-						"read_file_range",
-						"search_files",
-					])
-					expect(nativeToolNames).to.not.include("set_workflow_placeholders")
-					expect(nativeToolNames).to.not.include("generate_plan_output")
-					expect(nativeToolNames).to.not.include("execute_command")
-				},
-			)
-		})
-
-		it("filters native tools for create-story step 2", async function () {
-			await runPromptTest(
-				this,
-				{
-					...baseContext,
-					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
-					enableNativeToolCalls: true,
-					useMinimalGptPrompt: true,
-					activeWorkflowSupportsPlaceholders: true,
-					managedWorkflowActive: false,
-					activePlaceholderWorkflowName: "create-story.md",
-					activePlaceholderWorkflowStepNumber: 2,
-				},
-				"gpt-5.4-2026-03-05",
-				async ({ tools }) => {
-					const nativeToolNames = getNativeToolNames(tools)
-
-					expect(nativeToolNames).to.include("attempt_completion")
-					expect(nativeToolNames).to.not.include("build_story_document")
-					expect(nativeToolNames).to.not.include("set_workflow_placeholders")
-					expect(nativeToolNames).to.not.include("read_file")
-					expect(nativeToolNames).to.not.include("search_files")
-					expect(nativeToolNames).to.not.include("execute_command")
-					expect(nativeToolNames).to.not.include("generate_plan_output")
-				},
-			)
-		})
-
-		it("filters native tools for quick-dev step 1", async function () {
-			await runPromptTest(
-				this,
-				{
-					...baseContext,
-					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
-					enableNativeToolCalls: true,
-					useMinimalGptPrompt: true,
-					activeWorkflowSupportsPlaceholders: true,
-					managedWorkflowActive: false,
-					activePlaceholderWorkflowName: "quick-dev.md",
-					activePlaceholderWorkflowStepNumber: 1,
-				},
-				"gpt-5.4-2026-03-05",
-				async ({ tools }) => {
-					const nativeToolNames = getNativeToolNames(tools)
-
-					expect(nativeToolNames).to.include.members(["set_workflow_placeholders", "attempt_completion"])
-					expect(nativeToolNames).to.not.include("read_file")
-					expect(nativeToolNames).to.not.include("apply_patch")
-					expect(nativeToolNames).to.not.include("execute_command")
-					expect(nativeToolNames).to.not.include("workflow_progress_request")
-				},
-			)
-		})
-
-		it("filters native tools for quick-dev step 2", async function () {
-			await runPromptTest(
-				this,
-				{
-					...baseContext,
-					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
-					enableNativeToolCalls: true,
-					useMinimalGptPrompt: true,
-					activeWorkflowSupportsPlaceholders: true,
-					managedWorkflowActive: false,
-					activePlaceholderWorkflowName: "quick-dev.md",
-					activePlaceholderWorkflowStepNumber: 2,
-				},
-				"gpt-5.4-2026-03-05",
-				async ({ tools }) => {
-					const nativeToolNames = getNativeToolNames(tools)
-
-					expect(nativeToolNames).to.include.members([
-						"read_file",
-						"read_file_range",
-						"search_files",
-						"apply_patch",
-						"workflow_progress_request",
-						"attempt_completion",
-					])
-					expect(nativeToolNames).to.not.include("execute_command")
-					expect(nativeToolNames).to.not.include("set_workflow_placeholders")
-					expect(nativeToolNames).to.not.include("list_code_definition_names")
-				},
-			)
-		})
-
-		it("filters native tools for quick-dev step 3", async function () {
-			await runPromptTest(
-				this,
-				{
-					...baseContext,
-					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
-					enableNativeToolCalls: true,
-					useMinimalGptPrompt: true,
-					mcpHub: makeMcpHub([makeIndxrServer()]),
-					activeWorkflowSupportsPlaceholders: true,
-					managedWorkflowActive: false,
-					activePlaceholderWorkflowName: "quick-dev.md",
-					activePlaceholderWorkflowStepNumber: 3,
-				},
-				"gpt-5.4-2026-03-05",
-				async ({ tools }) => {
-					const nativeToolNames = getNativeToolNames(tools)
-
-					expect(nativeToolNames).to.include.members([
-						"read_file",
-						"read_file_range",
-						"search_files",
-						"list_code_definition_names",
-						"apply_patch",
-						"execute_command",
-						"attempt_completion",
-					])
-					expect(nativeToolNames).to.not.include("workflow_progress_request")
-					expect(nativeToolNames).to.not.include("set_workflow_placeholders")
-					expect(nativeToolNames.some((toolName) => toolName.startsWith("indxr-"))).to.equal(true)
-				},
-			)
-		})
-
-		it("filters native tools for quick-dev step 4", async function () {
-			await runPromptTest(
-				this,
-				{
-					...baseContext,
-					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
-					enableNativeToolCalls: true,
-					useMinimalGptPrompt: true,
-					activeWorkflowSupportsPlaceholders: true,
-					managedWorkflowActive: false,
-					activePlaceholderWorkflowName: "quick-dev.md",
-					activePlaceholderWorkflowStepNumber: 4,
-				},
-				"gpt-5.4-2026-03-05",
-				async ({ tools }) => {
-					const nativeToolNames = getNativeToolNames(tools)
-
-					expect(nativeToolNames).to.include.members(["execute_command", "attempt_completion"])
-					expect(nativeToolNames).to.not.include("read_file")
-					expect(nativeToolNames).to.not.include("apply_patch")
-					expect(nativeToolNames).to.not.include("workflow_progress_request")
-					expect(nativeToolNames).to.not.include("set_workflow_placeholders")
-				},
-			)
-		})
-
-		it("filters native tools for quick-dev step 5", async function () {
-			await runPromptTest(
-				this,
-				{
-					...baseContext,
-					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
-					enableNativeToolCalls: true,
-					useMinimalGptPrompt: true,
-					activeWorkflowSupportsPlaceholders: true,
-					managedWorkflowActive: false,
-					activePlaceholderWorkflowName: "quick-dev.md",
-					activePlaceholderWorkflowStepNumber: 5,
-				},
-				"gpt-5.4-2026-03-05",
-				async ({ tools }) => {
-					const nativeToolNames = getNativeToolNames(tools)
-
-					expect(nativeToolNames).to.not.include("execute_command")
-					expect(nativeToolNames).to.not.include("read_file")
-					expect(nativeToolNames).to.not.include("apply_patch")
-					expect(nativeToolNames).to.not.include("workflow_progress_request")
-					expect(nativeToolNames).to.not.include("set_workflow_placeholders")
-				},
-			)
-		})
-
-		it("filters native tools for quick-spec step 2", async function () {
-			await runPromptTest(
-				this,
-				{
-					...baseContext,
-					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
-					enableNativeToolCalls: true,
-					useMinimalGptPrompt: true,
-					activeWorkflowSupportsPlaceholders: true,
-					managedWorkflowActive: false,
-					activePlaceholderWorkflowName: "quick-spec.md",
-					activePlaceholderWorkflowStepNumber: 2,
-				},
-				"gpt-5.4-2026-03-05",
-				async ({ tools }) => {
-					const nativeToolNames = getNativeToolNames(tools)
-
-					expect(nativeToolNames).to.include("attempt_completion")
-					expect(nativeToolNames).to.not.include("build_tech_spec_document")
-					expect(nativeToolNames).to.not.include("set_workflow_placeholders")
-					expect(nativeToolNames).to.not.include("read_file")
-					expect(nativeToolNames).to.not.include("search_files")
-					expect(nativeToolNames).to.not.include("execute_command")
-					expect(nativeToolNames).to.not.include("generate_plan_output")
-				},
-			)
-		})
-
-		it("filters native tools for create-story step 3", async function () {
-			await runPromptTest(
-				this,
-				{
-					...baseContext,
-					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
-					enableNativeToolCalls: true,
-					useMinimalGptPrompt: true,
-					activeWorkflowSupportsPlaceholders: true,
-					managedWorkflowActive: false,
-					activePlaceholderWorkflowName: "create-story.md",
-					activePlaceholderWorkflowStepNumber: 3,
-				},
-				"gpt-5.4-2026-03-05",
-				async ({ tools }) => {
-					const nativeToolNames = getNativeToolNames(tools)
-
-					expect(nativeToolNames).to.include.members([
-						"workflow_progress_request",
-						"attempt_completion",
-						"ask_followup_question",
-						"send_user_message",
-						"list_files",
-						"search_files",
-						"read_file",
-						"read_file_range",
-						"list_code_definition_names",
-						"apply_patch",
-					])
-					expect(nativeToolNames).to.not.include("use_subagents")
-					expect(nativeToolNames).to.not.include("set_workflow_placeholders")
-					expect(nativeToolNames).to.not.include("web_search")
-					expect(nativeToolNames).to.not.include("execute_command")
-					expect(nativeToolNames).to.not.include("generate_plan_output")
-				},
-			)
-		})
-
-		it("filters native tools for create-story step 4", async function () {
-			await runPromptTest(
-				this,
-				{
-					...baseContext,
-					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
-					enableNativeToolCalls: true,
-					useMinimalGptPrompt: true,
-					activeWorkflowSupportsPlaceholders: true,
-					managedWorkflowActive: false,
-					activePlaceholderWorkflowName: "create-story.md",
-					activePlaceholderWorkflowStepNumber: 4,
-				},
-				"gpt-5.4-2026-03-05",
-				async ({ tools }) => {
-					const nativeToolNames = getNativeToolNames(tools)
-
-					expect(nativeToolNames).to.include.members([
-						"workflow_progress_request",
-						"attempt_completion",
-						"ask_followup_question",
-						"send_user_message",
-						"list_files",
-						"search_files",
-						"read_file",
-						"read_file_range",
-						"list_code_definition_names",
-						"apply_patch",
-						"use_subagents",
-					])
-					expect(nativeToolNames).to.not.include("set_workflow_placeholders")
-					expect(nativeToolNames).to.not.include("web_search")
-					expect(nativeToolNames).to.not.include("execute_command")
-					expect(nativeToolNames).to.not.include("generate_plan_output")
-				},
-			)
-		})
-
-		it("filters native tools for create-story step 5", async function () {
-			await runPromptTest(
-				this,
-				{
-					...baseContext,
-					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
-					enableNativeToolCalls: true,
-					useMinimalGptPrompt: true,
-					activeWorkflowSupportsPlaceholders: true,
-					managedWorkflowActive: false,
-					activePlaceholderWorkflowName: "create-story.md",
-					activePlaceholderWorkflowStepNumber: 5,
-				},
-				"gpt-5.4-2026-03-05",
-				async ({ tools }) => {
-					const nativeToolNames = getNativeToolNames(tools)
-
-					expect(nativeToolNames).to.include.members([
-						"attempt_completion",
-						"ask_followup_question",
-						"send_user_message",
-						"list_files",
-						"search_files",
-						"read_file",
-						"read_file_range",
-						"apply_patch",
-					])
-					expect(nativeToolNames).to.not.include("workflow_progress_request")
-					expect(nativeToolNames).to.not.include("list_code_definition_names")
-					expect(nativeToolNames).to.not.include("use_subagents")
-					expect(nativeToolNames).to.not.include("set_workflow_placeholders")
-					expect(nativeToolNames).to.not.include("web_search")
-					expect(nativeToolNames).to.not.include("execute_command")
-					expect(nativeToolNames).to.not.include("generate_plan_output")
-				},
-			)
-		})
-
-		it("filters native tools for create-prd step 3", async function () {
-			await runPromptTest(
-				this,
-				{
-					...baseContext,
-					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
-					enableNativeToolCalls: true,
-					useMinimalGptPrompt: true,
-					activeWorkflowSupportsPlaceholders: true,
-					managedWorkflowActive: false,
-					activePlaceholderWorkflowName: "create-prd.md",
-					activePlaceholderWorkflowStepNumber: 3,
-				},
-				"gpt-5.4-2026-03-05",
-				async ({ tools }) => {
-					const nativeToolNames = getNativeToolNames(tools)
-
-					expect(nativeToolNames).to.include.members([
-						"workflow_progress_request",
-						"attempt_completion",
-						"ask_followup_question",
-						"send_user_message",
-						"apply_patch",
-					])
-					expect(nativeToolNames).to.not.include("read_file")
-					expect(nativeToolNames).to.not.include("read_file_range")
-					expect(nativeToolNames).to.not.include("search_files")
-					expect(nativeToolNames).to.not.include("generate_plan_output")
-				},
-			)
-		})
-
-		for (const { modelId, stepNumber, snapshotName } of [
-			{
-				modelId: "gpt-5-codex",
-				stepNumber: 2,
-				snapshotName: "openai_gpt_5_native_code_review_step_2.tools.snap",
-			},
-			{
-				modelId: "gpt-5-1",
-				stepNumber: 2,
-				snapshotName: "openai_gpt_5_1_native_code_review_step_2.tools.snap",
-			},
-			{
-				modelId: "gpt-5-codex",
-				stepNumber: 3,
-				snapshotName: "openai_gpt_5_native_code_review_step_3.tools.snap",
-			},
-			{
-				modelId: "gpt-5-1",
-				stepNumber: 3,
-				snapshotName: "openai_gpt_5_1_native_code_review_step_3.tools.snap",
-			},
-		]) {
-			it(`preserves the native bounded-read tool descriptions for code-review step ${stepNumber} on ${modelId}`, async function () {
-				await runPromptTest(
-					this,
-					{
-						...baseContext,
-						providerInfo: makeProviderInfo(modelId, "openai"),
-						enableNativeToolCalls: true,
-						useMinimalGptPrompt: true,
-						activeWorkflowSupportsPlaceholders: true,
-						managedWorkflowActive: false,
-						activePlaceholderWorkflowName: "code-review.md",
-						activePlaceholderWorkflowStepNumber: stepNumber,
-						mcpHub: makeMcpHub([
-							makeConnectedServer(),
-							makeIndxrServer({
-								tools: [
-									{
-										name: "search_relevant",
-										description: "Search relevant code",
-										inputSchema: { type: "object", properties: {} },
-									},
-									{
-										name: "get_file_summary",
-										description: "Summarize file",
-										inputSchema: { type: "object", properties: {} },
-									},
-									{
-										name: "lookup_symbol",
-										description: "Lookup symbol",
-										inputSchema: { type: "object", properties: {} },
-									},
-								],
-							}),
-						]),
-					},
-					modelId,
-					async ({ tools }) => {
-						const nativeTools = tools
-						const nativeToolNames = getNativeToolNames(nativeTools)
-						const readFileDescription = getNativeFunctionDescription(nativeTools, "read_file")
-						const readFileRangeDescription = getNativeFunctionDescription(nativeTools, "read_file_range")
-
-						if (stepNumber === 2) {
-							expect(nativeToolNames.some((name) => name.includes("search_relevant"))).to.equal(true)
-							expect(readFileDescription).to.include("800 lines and 65536 bytes")
-							expect(readFileDescription).to.be.a("string").and.not.empty
-							expect(readFileRangeDescription).to.be.a("string").and.not.empty
-						} else {
-							expect(nativeToolNames.some((name) => name.includes("search_relevant"))).to.equal(false)
-							expect(readFileDescription).to.equal("Request to read the contents of a file at the specified path.")
-							expect(readFileRangeDescription).to.equal(
-								"Request to read only a specific 1-based line range from a text file.",
-							)
-						}
-
-						await assertSnapshot(snapshotName, JSON.stringify(nativeTools, null, 2))
-					},
-				)
-			})
-		}
-
-		it("filters native tools for a code-read placeholder step and retains only allowed prefixed Indxr tools", async function () {
-			await runPromptTest(
-				this,
-				{
-					...baseContext,
-					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
-					enableNativeToolCalls: true,
-					useMinimalGptPrompt: true,
-					activeWorkflowSupportsPlaceholders: true,
-					managedWorkflowActive: false,
-					activePlaceholderWorkflowName: "review-edge-case-hunter.md",
-					activePlaceholderWorkflowStepNumber: 2,
-					mcpHub: makeMcpHub([
-						makeConnectedServer(),
-						makeIndxrServer({
-							tools: [
-								{
-									name: "search_relevant",
-									description: "Search relevant code",
-									inputSchema: { type: "object", properties: {} },
-								},
-								{
-									name: "get_file_summary",
-									description: "Summarize file",
-									inputSchema: { type: "object", properties: {} },
-								},
-								{
-									name: "lookup_symbol",
-									description: "Lookup symbol",
-									inputSchema: { type: "object", properties: {} },
-								},
-								{
-									name: "get_callers",
-									description: "Get callers",
-									inputSchema: { type: "object", properties: {} },
-								},
-							],
-						}),
-					]),
-				},
-				"gpt-5.4-2026-03-05",
-				async ({ tools }) => {
-					const nativeToolNames = getNativeToolNames(tools)
-
-					expect(nativeToolNames).to.include.members(["indxr-10mcp0search_relevant", "indxr-10mcp0get_file_summary"])
-					expect(nativeToolNames).to.not.include("indxr-10mcp0lookup_symbol")
-					expect(nativeToolNames).to.not.include("indxr-10mcp0get_callers")
-					expect(nativeToolNames).to.not.include("12345670mcp0test_tool")
-					expect(nativeToolNames).to.not.include("build_review_diff_output")
-					expect(nativeToolNames).to.not.include("set_workflow_placeholders")
-				},
-			)
-		})
-
-		it("renders runtime-projected workflow system and input blocks in GPT-5.4 OpenAI full prompts", async function () {
-			await runPromptTest(
-				this,
-				{
-					...baseContext,
-					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
-					enableNativeToolCalls: true,
-					useMinimalGptPrompt: true,
-					activeWorkflowName: "review-workflow",
-					workflowSystemInstructionsBlock: "## WORKFLOW IDENTITY\nRole: Review Workflow",
-					workflowInputInstructionsBlock: "# CURRENT WORKFLOW STEP\nStep 1: Gather Context",
+					fullTurnWorkflowSystemInstructionsBlock:
+						"## WORKFLOW\nWorkflow: review-workflow\n\n## WORKFLOW PERSONA\nReview Workflow\n\n## WORKFLOW INSTRUCTIONS\nReview carefully",
+					fullTurnWorkflowInputInstructionsBlock: "# CURRENT WORKFLOW STEP\nStep 1: Gather Context",
 				},
 				"gpt-5.4-2026-03-05",
 				async ({ systemPrompt }) => {
-					expect(systemPrompt).to.include("## WORKFLOW IDENTITY\nRole: Review Workflow")
+					expect(systemPrompt).to.include("## WORKFLOW PERSONA\nReview Workflow")
+					expect(systemPrompt).to.include("## WORKFLOW INSTRUCTIONS\nReview carefully")
 					expect(systemPrompt).to.include("# CURRENT WORKFLOW STEP\nStep 1: Gather Context")
 					expect(systemPrompt).to.not.include("<agent")
 					expect(systemPrompt).to.not.include("<persona")
 					expect(systemPrompt).to.not.include("Active BMAD agent persona")
+				},
+			)
+		})
+
+		it("omits workflow persona on later full-turn refresh projections", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
+					enableNativeToolCalls: true,
+					useMinimalGptPrompt: true,
+					fullTurnWorkflowSystemInstructionsBlock:
+						"## WORKFLOW\nWorkflow: review-workflow\n\n## WORKFLOW INSTRUCTIONS\nReview carefully",
+					fullTurnWorkflowInputInstructionsBlock: "# CURRENT WORKFLOW STEP\nStep 1: Gather Context",
+				},
+				"gpt-5.4-2026-03-05",
+				async ({ systemPrompt }) => {
+					expect(systemPrompt).to.include("## WORKFLOW\nWorkflow: review-workflow")
+					expect(systemPrompt).to.include("## WORKFLOW INSTRUCTIONS\nReview carefully")
+					expect(systemPrompt).to.not.include("## WORKFLOW PERSONA")
+					expect(systemPrompt).to.not.include("Role: Review Workflow")
 				},
 			)
 		})
@@ -2282,15 +1127,18 @@ describe("Prompt System Integration Tests", () => {
 					enableNativeToolCalls: true,
 					useMinimalGptPrompt: true,
 					isContinuationTurn: true,
-					activeWorkflowName: "review-workflow",
-					workflowSystemInstructionsBlock: "## WORKFLOW IDENTITY\nRole: Review Workflow",
-					workflowInputInstructionsBlock: "# CURRENT WORKFLOW STEP\nStep 1: Gather Context",
+					fullTurnWorkflowSystemInstructionsBlock: "## FULL WORKFLOW IDENTITY\nRole: Review Workflow",
+					fullTurnWorkflowInputInstructionsBlock: "# FULL CURRENT WORKFLOW STEP\nStep 1: Gather Context",
+					continuationTurnWorkflowSystemInstructionsBlock: "## WORKFLOW CONTINUATION IDENTITY\nRole: Review Workflow",
+					continuationTurnWorkflowInputInstructionsBlock: "# WORKFLOW CONTINUATION\nStep 1 in progress",
 				},
 				"gpt-5.4-2026-03-05",
 				async ({ systemPrompt }) => {
 					expect(systemPrompt).to.include("CONTINUATION TURN")
-					expect(systemPrompt).to.include("## WORKFLOW IDENTITY\nRole: Review Workflow")
-					expect(systemPrompt).to.include("# CURRENT WORKFLOW STEP\nStep 1: Gather Context")
+					expect(systemPrompt).to.include("## WORKFLOW CONTINUATION IDENTITY\nRole: Review Workflow")
+					expect(systemPrompt).to.include("# WORKFLOW CONTINUATION\nStep 1 in progress")
+					expect(systemPrompt).to.not.include("## FULL WORKFLOW IDENTITY")
+					expect(systemPrompt).to.not.include("# FULL CURRENT WORKFLOW STEP")
 				},
 			)
 		})
@@ -2304,14 +1152,13 @@ describe("Prompt System Integration Tests", () => {
 					enableNativeToolCalls: true,
 					useMinimalGptPrompt: true,
 					isContinuationTurn: true,
-					activeWorkflowName: "review-workflow",
-					workflowSystemInstructionsBlock: undefined,
-					workflowInputInstructionsBlock: "# CURRENT WORKFLOW STEP\nStep 2: Review",
+					continuationTurnWorkflowSystemInstructionsBlock: undefined,
+					continuationTurnWorkflowInputInstructionsBlock: "# WORKFLOW CONTINUATION\nStep 2: Review",
 				},
 				"gpt-5.4-2026-03-05",
 				async ({ systemPrompt }) => {
 					expect(systemPrompt).to.include("CONTINUATION TURN")
-					expect(systemPrompt).to.include("# CURRENT WORKFLOW STEP")
+					expect(systemPrompt).to.include("# WORKFLOW CONTINUATION")
 					expect(systemPrompt).to.include("Step 2: Review")
 					expect(systemPrompt).to.not.include("## WORKFLOW IDENTITY")
 				},
@@ -2327,9 +1174,8 @@ describe("Prompt System Integration Tests", () => {
 					enableNativeToolCalls: true,
 					useMinimalGptPrompt: true,
 					isContinuationTurn: true,
-					activeWorkflowName: "review-workflow",
-					workflowSystemInstructionsBlock: "## WORKFLOW IDENTITY\nRole: Review Workflow",
-					workflowInputInstructionsBlock: undefined,
+					continuationTurnWorkflowSystemInstructionsBlock: "## WORKFLOW IDENTITY\nRole: Review Workflow",
+					continuationTurnWorkflowInputInstructionsBlock: undefined,
 				},
 				"gpt-5.4-2026-03-05",
 				async ({ systemPrompt }) => {
@@ -2341,7 +1187,7 @@ describe("Prompt System Integration Tests", () => {
 			)
 		})
 
-		it("lists managed BMAD workflows but excludes BMAD persona entries in non-agent prompts", async function () {
+		it("omits the disabled skills section in non-agent prompts even when skills are provided", async function () {
 			await runPromptTest(
 				this,
 				{
@@ -2351,27 +1197,15 @@ describe("Prompt System Integration Tests", () => {
 					useMinimalGptPrompt: true,
 					skills: [
 						{
-							name: "bmad-code-review",
-							description: "Managed workflow: bmad-code-review",
-							path: "managed-workflow://bmad-code-review",
-							source: "project",
-						},
-						{
-							name: "create-pull-request",
-							description: "Create a pull request",
-							path: "/skills/create-pull-request/SKILL.md",
+							name: "generic-skill",
+							description: "Generic skill",
+							path: "/skills/generic-skill/SKILL.md",
 							source: "global",
 						},
 						{
-							name: "address-pr-comments.md",
-							description: "Workspace workflow: address-pr-comments.md",
-							path: "/project/.clinerules/workflows/address-pr-comments.md",
-							source: "project",
-						},
-						{
-							name: "bmad-dev",
-							description: "BMAD Developer persona",
-							path: "/skills/bmad-dev/SKILL.md",
+							name: "generic-persona",
+							description: "Generic persona",
+							path: "/skills/generic-persona/SKILL.md",
 							source: "project",
 						},
 					],
@@ -2380,7 +1214,7 @@ describe("Prompt System Integration Tests", () => {
 				async ({ systemPrompt }) => {
 					expect(systemPrompt).to.not.include("Installed skills and workflow activations available on this turn")
 					expect(systemPrompt).to.not.include("\nSKILLS\n")
-					expect(systemPrompt).to.not.include("bmad-dev")
+					expect(systemPrompt).to.not.include("generic-persona")
 				},
 			)
 		})

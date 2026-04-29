@@ -1,7 +1,8 @@
 import { strict as assert } from "node:assert"
 import { afterEach, describe, it } from "mocha"
 import sinon from "sinon"
-import { FOCUS_CHAIN_COMPLETE_NEXT_STEP_SENTINEL } from "@/shared/focus-chain-utils"
+import type { ToolUse } from "@/core/assistant-message"
+import type { ClineMessage } from "@/shared/ExtensionMessage"
 import { ClineDefaultTool } from "@/shared/tools"
 import { WORKFLOW_PROGRESS_REQUEST_OPTIONS, WORKFLOW_PROGRESS_REQUEST_QUESTION } from "@/shared/workflow-progress-request"
 import { formatResponse } from "../../../../prompts/responses"
@@ -12,13 +13,15 @@ import { WorkflowProgressRequestToolHandler } from "../WorkflowProgressRequestTo
 
 function createConfig(options?: {
 	askResult?: { text?: string; images?: string[]; files?: string[] }
-	lastFollowupMessage?: any
+	lastFollowupMessage?: ClineMessage
 }) {
 	const taskState = new TaskState()
-	const clineMessages = options?.lastFollowupMessage ? [options.lastFollowupMessage] : []
+	const clineMessages: ClineMessage[] = options?.lastFollowupMessage ? [options.lastFollowupMessage] : []
+	const sayStub = sinon.stub().resolves(undefined)
+	const askStub = sinon.stub().resolves(options?.askResult ?? { text: "Yes" })
 	const callbacks = {
-		say: sinon.stub().resolves(undefined),
-		ask: sinon.stub().resolves(options?.askResult ?? { text: "Yes" }),
+		say: sayStub,
+		ask: askStub,
 		saveCheckpoint: sinon.stub().resolves(),
 		sayAndCreateMissingParamError: sinon.stub().resolves("missing"),
 		removeLastPartialMessageIfExistsWithType: sinon.stub().resolves(),
@@ -41,6 +44,8 @@ function createConfig(options?: {
 	}
 
 	const saveClineMessagesAndUpdateHistory = sinon.stub().resolves()
+	const isWorkflowProgressRequestAllowedStub = sinon.stub().returns(true)
+	const submitWorkflowProgressRequestStub = sinon.stub().resolves({ kind: "project_prompt", promptProjection: {} })
 
 	const config = {
 		taskId: "task-1",
@@ -86,12 +91,29 @@ function createConfig(options?: {
 			},
 		},
 		callbacks,
+		workflowRuntime: {
+			isWorkflowProgressRequestAllowed: isWorkflowProgressRequestAllowedStub,
+			submitWorkflowProgressRequest: submitWorkflowProgressRequestStub,
+		},
 		coordinator: {
 			getHandler: sinon.stub(),
 		},
 	} as unknown as TaskConfig
 
-	return { config, callbacks }
+	return {
+		config,
+		stubs: {
+			ask: askStub,
+			say: sayStub,
+			isWorkflowProgressRequestAllowed: isWorkflowProgressRequestAllowedStub,
+			submitWorkflowProgressRequest: submitWorkflowProgressRequestStub,
+			saveClineMessagesAndUpdateHistory,
+		},
+	}
+}
+
+function createWorkflowProgressRequestToolUse(): ToolUse {
+	return { type: "tool_use", name: ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST, params: {}, partial: false }
 }
 
 describe("WorkflowProgressRequestToolHandler", () => {
@@ -100,24 +122,23 @@ describe("WorkflowProgressRequestToolHandler", () => {
 	})
 
 	it("queues selected Yes responses after completing the next workflow step", async () => {
-		const lastFollowupMessage = { ask: "followup", text: "{}" }
-		const { config, callbacks } = createConfig({
+		const lastFollowupMessage: ClineMessage = { ts: 1, type: "ask", ask: "followup", text: "{}" }
+		const { config, stubs } = createConfig({
 			askResult: { text: "Yes" },
 			lastFollowupMessage,
 		})
-		config.taskState.activePlaceholderWorkflowSource = { name: "create-epics.md" } as any
-		config.taskState.currentFocusChainChecklist = "- [ ] Step 3: Discover and classify the project"
 		const handler = new WorkflowProgressRequestToolHandler()
 
-		const result = await handler.execute(config, {
-			type: "tool_use",
-			name: "workflow_progress_request",
-			params: {},
-			partial: false,
-		} as any)
+		const result = await handler.execute(config, createWorkflowProgressRequestToolUse())
 
 		assert.equal(result, RESPONSE_TOOL_SUCCESS_MESSAGE)
-		sinon.assert.calledOnceWithExactly(callbacks.updateFCListFromToolResponse, FOCUS_CHAIN_COMPLETE_NEXT_STEP_SENTINEL)
+		sinon.assert.calledOnceWithExactly(stubs.isWorkflowProgressRequestAllowed, {
+			taskState: config.taskState,
+		})
+		sinon.assert.calledOnceWithExactly(stubs.submitWorkflowProgressRequest, {
+			taskState: config.taskState,
+			approved: true,
+		})
 		assert.deepEqual(config.taskState.pendingResponseToolFollowup, {
 			toolName: ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST,
 			route: "normal_user_turn",
@@ -133,24 +154,23 @@ describe("WorkflowProgressRequestToolHandler", () => {
 	})
 
 	it("queues selected No responses without advancing the workflow", async () => {
-		const lastFollowupMessage = { ask: "followup", text: "{}" }
-		const { config, callbacks } = createConfig({
+		const lastFollowupMessage: ClineMessage = { ts: 2, type: "ask", ask: "followup", text: "{}" }
+		const { config, stubs } = createConfig({
 			askResult: { text: "No" },
 			lastFollowupMessage,
 		})
-		config.taskState.activePlaceholderWorkflowSource = { name: "create-prd.md" } as any
-		config.taskState.currentFocusChainChecklist = "- [ ] Step 3: Discover and classify the project"
 		const handler = new WorkflowProgressRequestToolHandler()
 
-		const result = await handler.execute(config, {
-			type: "tool_use",
-			name: "workflow_progress_request",
-			params: {},
-			partial: false,
-		} as any)
+		const result = await handler.execute(config, createWorkflowProgressRequestToolUse())
 
 		assert.equal(result, RESPONSE_TOOL_SUCCESS_MESSAGE)
-		sinon.assert.notCalled(callbacks.updateFCListFromToolResponse)
+		sinon.assert.calledOnceWithExactly(stubs.isWorkflowProgressRequestAllowed, {
+			taskState: config.taskState,
+		})
+		sinon.assert.calledOnceWithExactly(stubs.submitWorkflowProgressRequest, {
+			taskState: config.taskState,
+			approved: false,
+		})
 		assert.deepEqual(config.taskState.pendingResponseToolFollowup, {
 			toolName: ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST,
 			route: "normal_user_turn",
@@ -160,118 +180,43 @@ describe("WorkflowProgressRequestToolHandler", () => {
 		})
 	})
 
-	it("queues selected Yes responses for pi-planning after completing step 4", async () => {
-		const { config, callbacks } = createConfig({
+	it("returns a tool error when workflow progress request does not advance the active workflow step", async () => {
+		const { config, stubs } = createConfig({
 			askResult: { text: "Yes" },
 		})
-		config.taskState.activePlaceholderWorkflowSource = { name: "pi-planning.md" } as any
-		config.taskState.currentFocusChainChecklist = "- [ ] Step 4: Set Expectations"
+		stubs.submitWorkflowProgressRequest.resolves({ kind: "no_op" })
 		const handler = new WorkflowProgressRequestToolHandler()
 
-		const result = await handler.execute(config, {
-			type: "tool_use",
-			name: "workflow_progress_request",
-			params: {},
-			partial: false,
-		} as any)
+		const result = await handler.execute(config, createWorkflowProgressRequestToolUse())
 
-		assert.equal(result, RESPONSE_TOOL_SUCCESS_MESSAGE)
-		sinon.assert.calledOnceWithExactly(callbacks.updateFCListFromToolResponse, FOCUS_CHAIN_COMPLETE_NEXT_STEP_SENTINEL)
-		assert.deepEqual(config.taskState.pendingResponseToolFollowup, {
-			toolName: ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST,
-			route: "normal_user_turn",
-			text: "Yes",
-			images: undefined,
-			files: undefined,
+		sinon.assert.calledOnceWithExactly(stubs.isWorkflowProgressRequestAllowed, {
+			taskState: config.taskState,
 		})
-	})
-
-	it("queues selected No responses for pi-planning step 5 without advancing the workflow", async () => {
-		const { config, callbacks } = createConfig({
-			askResult: { text: "No" },
+		sinon.assert.calledOnceWithExactly(stubs.submitWorkflowProgressRequest, {
+			taskState: config.taskState,
+			approved: true,
 		})
-		config.taskState.activePlaceholderWorkflowSource = { name: "pi-planning.md" } as any
-		config.taskState.currentFocusChainChecklist = "- [ ] Step 5: Build User Stories"
-		const handler = new WorkflowProgressRequestToolHandler()
-
-		const result = await handler.execute(config, {
-			type: "tool_use",
-			name: "workflow_progress_request",
-			params: {},
-			partial: false,
-		} as any)
-
-		assert.equal(result, RESPONSE_TOOL_SUCCESS_MESSAGE)
-		sinon.assert.notCalled(callbacks.updateFCListFromToolResponse)
-		assert.deepEqual(config.taskState.pendingResponseToolFollowup, {
-			toolName: ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST,
-			route: "normal_user_turn",
-			text: "No",
-			images: undefined,
-			files: undefined,
-		})
-	})
-
-	it("returns a tool error when checklist advancement is rejected", async () => {
-		const { config, callbacks } = createConfig({
-			askResult: { text: "Yes" },
-		})
-		config.taskState.activePlaceholderWorkflowSource = { name: "create-prd.md" } as any
-		config.taskState.currentFocusChainChecklist = "- [ ] Step 3: Discover and classify the project"
-		;(callbacks.updateFCListFromToolResponse as sinon.SinonStub).resolves({
-			accepted: false,
-			feedback: "Workflow progress already advanced once in this assistant turn.",
-		})
-		const handler = new WorkflowProgressRequestToolHandler()
-
-		const result = await handler.execute(config, {
-			type: "tool_use",
-			name: "workflow_progress_request",
-			params: {},
-			partial: false,
-		} as any)
-
-		assert.equal(result, formatResponse.toolError("Workflow progress already advanced once in this assistant turn."))
+		assert.equal(result, formatResponse.toolError("workflow_progress_request could not advance the active workflow step."))
 		assert.equal(config.taskState.pendingResponseToolFollowup, undefined)
 	})
 
-	it("returns a tool error when the active workflow is not supported", async () => {
-		const { config } = createConfig()
-		config.taskState.activePlaceholderWorkflowSource = { name: "brainstorming.md" } as any
+	it("returns a tool error when runtime validation says no progress-approval path is available", async () => {
+		const { config, stubs } = createConfig()
+		stubs.isWorkflowProgressRequestAllowed.returns(false)
 		const handler = new WorkflowProgressRequestToolHandler()
 
-		const result = await handler.execute(config, {
-			type: "tool_use",
-			name: "workflow_progress_request",
-			params: {},
-			partial: false,
-		} as any)
+		const result = await handler.execute(config, createWorkflowProgressRequestToolUse())
 
 		assert.equal(
 			result,
 			formatResponse.toolError(
-				"workflow_progress_request can only be used during an active supported placeholder workflow step.",
+				"workflow_progress_request can only be used when the active workflow state currently exposes a progress-approval path.",
 			),
 		)
-	})
-
-	it("returns a tool error when no active checklist is available", async () => {
-		const { config } = createConfig()
-		config.taskState.activePlaceholderWorkflowSource = { name: "create-epics.md" } as any
-		const handler = new WorkflowProgressRequestToolHandler()
-
-		const result = await handler.execute(config, {
-			type: "tool_use",
-			name: "workflow_progress_request",
-			params: {},
-			partial: false,
-		} as any)
-
-		assert.equal(
-			result,
-			formatResponse.toolError(
-				"workflow_progress_request requires an active placeholder-workflow focus chain checklist before it can advance the workflow.",
-			),
-		)
+		sinon.assert.calledOnceWithExactly(stubs.isWorkflowProgressRequestAllowed, {
+			taskState: config.taskState,
+		})
+		sinon.assert.notCalled(stubs.ask)
+		sinon.assert.notCalled(stubs.submitWorkflowProgressRequest)
 	})
 })

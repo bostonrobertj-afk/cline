@@ -17,22 +17,13 @@ import {
 import type { ClineToolSpec } from "../spec"
 import { toolSpecFunctionDeclarations, toolSpecFunctionDefinition, toolSpecInputSchema } from "../spec"
 import { access_mcp_resource_variants } from "../tools/access_mcp_resource"
-import { act_mode_respond_variants } from "../tools/act_mode_respond"
 import { ask_followup_question_variants } from "../tools/ask_followup_question"
-import { attempt_completion_variants } from "../tools/attempt_completion"
-import { build_review_diff_output_variants } from "../tools/build_review_diff_output"
-import { generate_plan_output_variants } from "../tools/generate_plan_output"
 import { list_code_definition_names_variants } from "../tools/list_code_definition_names"
 import { read_file_variants } from "../tools/read_file"
 import { read_file_range_variants } from "../tools/read_file_range"
 import { search_files_variants } from "../tools/search_files"
 import { send_user_message_variants } from "../tools/send_user_message"
-import { set_workflow_placeholders_variants } from "../tools/set_workflow_placeholders"
-import { story_notes_update_variants } from "../tools/story_notes_update"
-import { story_task_complete_variants } from "../tools/story_task_complete"
 import { use_mcp_tool_variants } from "../tools/use_mcp_tool"
-import { workflow_progress_request_variants } from "../tools/workflow_progress_request"
-import { write_to_file_variants } from "../tools/write_to_file"
 import type { SystemPromptContext } from "../types"
 
 type JsonSchemaProperty = {
@@ -325,243 +316,10 @@ describe("Gemini and Anthropic parameter descriptions match", () => {
 })
 
 describe("workflow placeholder tool gating", () => {
-	it("enables set_workflow_placeholders for active non-managed workflows", () => {
-		const tool = set_workflow_placeholders_variants[0]
-		expect(
-			tool.contextRequirements?.({
-				...mockContext,
-				activeWorkflowSupportsPlaceholders: true,
-			}),
-		).to.equal(true)
-	})
-
-	it("keeps build_review_diff_output globally available without workflow gating", () => {
-		const tool = build_review_diff_output_variants[0]
-		expect(tool.contextRequirements).to.equal(undefined)
-	})
-
-	it("gates workflow_progress_request to create-prd steps 3 through 14, create-story steps 3 and 4, quick-dev step 2, quick-spec steps 3 through 9, create-epics step 3, and pi-planning steps 4 and 5", () => {
-		const tool = workflow_progress_request_variants[0]
-
-		expect(
-			tool.contextRequirements?.({
-				...mockContext,
-				activePlaceholderWorkflowName: "create-prd.md",
-				activePlaceholderWorkflowStepNumber: 3,
-			}),
-		).to.equal(true)
-		expect(
-			tool.contextRequirements?.({
-				...mockContext,
-				activePlaceholderWorkflowName: "create-prd.md",
-				activePlaceholderWorkflowStepNumber: 2,
-			}),
-		).to.equal(false)
-		expect(
-			tool.contextRequirements?.({
-				...mockContext,
-				activePlaceholderWorkflowName: "create-story.md",
-				activePlaceholderWorkflowStepNumber: 3,
-			}),
-		).to.equal(true)
-		expect(
-			tool.contextRequirements?.({
-				...mockContext,
-				activePlaceholderWorkflowName: "create-story.md",
-				activePlaceholderWorkflowStepNumber: 4,
-			}),
-		).to.equal(true)
-		expect(
-			tool.contextRequirements?.({
-				...mockContext,
-				activePlaceholderWorkflowName: "create-story.md",
-				activePlaceholderWorkflowStepNumber: 5,
-			}),
-		).to.equal(false)
-		expect(
-			tool.contextRequirements?.({
-				...mockContext,
-				activePlaceholderWorkflowName: "quick-dev.md",
-				activePlaceholderWorkflowStepNumber: 2,
-			}),
-		).to.equal(true)
-		expect(
-			tool.contextRequirements?.({
-				...mockContext,
-				activePlaceholderWorkflowName: "quick-dev.md",
-				activePlaceholderWorkflowStepNumber: 1,
-			}),
-		).to.equal(false)
-		expect(
-			tool.contextRequirements?.({
-				...mockContext,
-				activePlaceholderWorkflowName: "quick-dev.md",
-				activePlaceholderWorkflowStepNumber: 3,
-			}),
-		).to.equal(false)
-		expect(
-			tool.contextRequirements?.({
-				...mockContext,
-				activePlaceholderWorkflowName: "quick-dev.md",
-				activePlaceholderWorkflowStepNumber: 4,
-			}),
-		).to.equal(false)
-		expect(
-			tool.contextRequirements?.({
-				...mockContext,
-				activePlaceholderWorkflowName: "quick-dev.md",
-				activePlaceholderWorkflowStepNumber: 5,
-			}),
-		).to.equal(false)
-		expect(
-			tool.contextRequirements?.({
-				...mockContext,
-				activePlaceholderWorkflowName: "quick-spec.md",
-				activePlaceholderWorkflowStepNumber: 3,
-			}),
-		).to.equal(true)
-		expect(
-			tool.contextRequirements?.({
-				...mockContext,
-				activePlaceholderWorkflowName: "quick-spec.md",
-				activePlaceholderWorkflowStepNumber: 9,
-			}),
-		).to.equal(true)
-		expect(
-			tool.contextRequirements?.({
-				...mockContext,
-				activePlaceholderWorkflowName: "quick-spec.md",
-				activePlaceholderWorkflowStepNumber: 2,
-			}),
-		).to.equal(false)
-		expect(
-			tool.contextRequirements?.({
-				...mockContext,
-				activePlaceholderWorkflowName: "quick-spec.md",
-				activePlaceholderWorkflowStepNumber: 10,
-			}),
-		).to.equal(false)
-		expect(
-			tool.contextRequirements?.({
-				...mockContext,
-				activePlaceholderWorkflowName: "create-epics.md",
-				activePlaceholderWorkflowStepNumber: 3,
-			}),
-		).to.equal(true)
-		expect(
-			tool.contextRequirements?.({
-				...mockContext,
-				activePlaceholderWorkflowName: "create-epics.md",
-				activePlaceholderWorkflowStepNumber: 2,
-			}),
-		).to.equal(false)
-		expect(
-			tool.contextRequirements?.({
-				...mockContext,
-				activePlaceholderWorkflowName: "pi-planning.md",
-				activePlaceholderWorkflowStepNumber: 4,
-			}),
-		).to.equal(true)
-		expect(
-			tool.contextRequirements?.({
-				...mockContext,
-				activePlaceholderWorkflowName: "pi-planning.md",
-				activePlaceholderWorkflowStepNumber: 5,
-			}),
-		).to.equal(true)
-		expect(
-			tool.contextRequirements?.({
-				...mockContext,
-				activePlaceholderWorkflowName: "pi-planning.md",
-				activePlaceholderWorkflowStepNumber: 3,
-			}),
-		).to.equal(false)
-	})
-
-	it("encodes build_review_diff_output source variants as machine-readable schema", () => {
-		const tool = build_review_diff_output_variants[0]
-		const source = tool.parameters?.find((parameter) => parameter.name === "source")
-
-		expect(source?.properties?.type?.enum).to.deep.equal(["commit", "commit_range", "ref_diff", "worktree_head_scoped"])
-		expect(source?.oneOf).to.have.length(4)
-	})
-
-	it("omits task_progress from supported deterministic placeholder workflow native schemas", () => {
+	it("omits task_progress from send_user_message native schemas for normal non-deterministic contexts", () => {
 		const context: SystemPromptContext = {
 			...mockContext,
 			enableNativeToolCalls: true,
-			activeWorkflowSupportsPlaceholders: true,
-			activeDeterministicPlaceholderWorkflowEnabled: true,
-			providerInfo: {
-				providerId: "openai",
-				model: { id: "gpt-5.4-2026-03-05", info: { supportsPromptCache: false } },
-				mode: "act",
-			},
-		}
-
-		const writeToFile = toolSpecFunctionDefinition(write_to_file_variants[1], context)
-		const attemptCompletion = toolSpecFunctionDefinition(attempt_completion_variants[3], context)
-		const actModeRespond = toolSpecFunctionDefinition(act_mode_respond_variants[0], context)
-		const generatePlanOutput = toolSpecFunctionDefinition(generate_plan_output_variants[1], context)
-
-		expect(getOpenAIProperties(writeToFile).task_progress).to.equal(undefined)
-		expect(getOpenAIProperties(attemptCompletion).task_progress).to.equal(undefined)
-		expect(getOpenAIProperties(actModeRespond).task_progress).to.equal(undefined)
-		expect(getOpenAIProperties(generatePlanOutput).task_progress).to.equal(undefined)
-	})
-
-	it("includes task_progress in send_user_message native schemas for normal non-deterministic contexts", () => {
-		const context: SystemPromptContext = {
-			...mockContext,
-			enableNativeToolCalls: true,
-			providerInfo: {
-				providerId: "openai",
-				model: { id: "gpt-5.4-2026-03-05", info: { supportsPromptCache: false } },
-				mode: "act",
-			},
-		}
-
-		const sendUserMessage = toolSpecFunctionDefinition(
-			getVariantTool(send_user_message_variants, ModelFamily.NATIVE_GPT_5),
-			context,
-		)
-
-		expect(getOpenAIProperties(sendUserMessage).task_progress).to.not.equal(undefined)
-	})
-
-	it("exposes agent_feedback on the four supported response tool schemas", () => {
-		const context: SystemPromptContext = {
-			...mockContext,
-			enableNativeToolCalls: true,
-			providerInfo: {
-				providerId: "openai",
-				model: { id: "gpt-5.4-2026-03-05", info: { supportsPromptCache: false } },
-				mode: "act",
-			},
-		}
-
-		const tools = [
-			toolSpecFunctionDefinition(getVariantTool(send_user_message_variants, ModelFamily.NATIVE_GPT_5), context),
-			toolSpecFunctionDefinition(getVariantTool(ask_followup_question_variants, ModelFamily.NATIVE_GPT_5), context),
-			toolSpecFunctionDefinition(getVariantTool(attempt_completion_variants, ModelFamily.NATIVE_GPT_5), context),
-			toolSpecFunctionDefinition(getVariantTool(generate_plan_output_variants, ModelFamily.NATIVE_GPT_5), context),
-		]
-
-		for (const tool of tools) {
-			const agentFeedback = getOpenAIProperties(tool).agent_feedback
-			expect(agentFeedback).to.exist
-			expect(agentFeedback.type).to.equal("object")
-			expect(agentFeedback.properties?.message).to.exist
-			expect(agentFeedback.required).to.include("message")
-		}
-	})
-
-	it("omits task_progress from send_user_message native schemas for supported deterministic placeholder workflows", () => {
-		const context: SystemPromptContext = {
-			...mockContext,
-			enableNativeToolCalls: true,
-			activeWorkflowSupportsPlaceholders: true,
-			activeDeterministicPlaceholderWorkflowEnabled: true,
 			providerInfo: {
 				providerId: "openai",
 				model: { id: "gpt-5.4-2026-03-05", info: { supportsPromptCache: false } },
@@ -575,6 +333,31 @@ describe("workflow placeholder tool gating", () => {
 		)
 
 		expect(getOpenAIProperties(sendUserMessage).task_progress).to.equal(undefined)
+	})
+
+	it("exposes agent_feedback on supported user-response tool schemas", () => {
+		const context: SystemPromptContext = {
+			...mockContext,
+			enableNativeToolCalls: true,
+			providerInfo: {
+				providerId: "openai",
+				model: { id: "gpt-5.4-2026-03-05", info: { supportsPromptCache: false } },
+				mode: "act",
+			},
+		}
+
+		const tools = [
+			toolSpecFunctionDefinition(getVariantTool(send_user_message_variants, ModelFamily.NATIVE_GPT_5), context),
+			toolSpecFunctionDefinition(getVariantTool(ask_followup_question_variants, ModelFamily.NATIVE_GPT_5), context),
+		]
+
+		for (const tool of tools) {
+			const agentFeedback = getOpenAIProperties(tool).agent_feedback
+			expect(agentFeedback).to.exist
+			expect(agentFeedback.type).to.equal("object")
+			expect(agentFeedback.properties?.message).to.exist
+			expect(agentFeedback.required).to.include("message")
+		}
 	})
 
 	it("omits access_mcp_resource native schemas when connected servers expose no resources or resource templates", () => {
@@ -666,7 +449,7 @@ describe("native tool placeholder replacement", () => {
 		}
 	})
 
-	it("compacts native GPT tool descriptions and task_progress parameter text in minimal GPT mode", () => {
+	it("compacts native GPT tool descriptions without task_progress in minimal GPT mode", () => {
 		const context: SystemPromptContext = {
 			...mockContext,
 			enableNativeToolCalls: true,
@@ -687,12 +470,6 @@ describe("native tool placeholder replacement", () => {
 					required: true,
 					instruction: "The apply_patch command that you wish to execute.",
 				},
-				{
-					name: "task_progress",
-					required: false,
-					instruction:
-						"A checklist showing task progress after this tool use is completed. The task_progress parameter must be included as a separate parameter inside of the parent tool call.",
-				},
 			],
 		})
 
@@ -703,9 +480,7 @@ describe("native tool placeholder replacement", () => {
 			"Apply a V4A patch by passing the complete `apply_patch` command in `input` with `*** Begin Patch` and `*** End Patch`.",
 		)
 		expect(openAIProperties.input?.description).to.equal("Complete `apply_patch` command to execute.")
-		expect(openAIProperties.task_progress?.description).to.equal(
-			"Top-level tool parameter, not a standalone tool. Pass a full Markdown checklist to create the task list. After a checklist exists, use `__COMPLETE_NEXT_STEP__` to complete the next incomplete step.",
-		)
+		expect(openAIProperties.task_progress).to.equal(undefined)
 	})
 
 	it("keeps native compact exploration tool descriptions unchanged when Indxr is absent", () => {
@@ -773,194 +548,6 @@ describe("native tool placeholder replacement", () => {
 		expect(getOpenAIFunctionTool(mcpTool).description).to.equal(
 			"Use a connected MCP tool. When Indxr is available, default to its exploration tools first for code exploration, symbol lookup, file understanding, dependency tracing, and targeted source reads. After you have narrowed the task to one concrete file, prefer one full raw read only when the file is at or below 800 lines and 65536 bytes; otherwise prefer symbol-targeted or explicit line-range source reads.",
 		)
-	})
-
-	it("uses direct-material-first compact exploration descriptions for review-edge-case-hunter step 2", () => {
-		const context: SystemPromptContext = {
-			...indxrContext,
-			enableNativeToolCalls: true,
-			useMinimalGptPrompt: true,
-			activePlaceholderWorkflowName: "review-edge-case-hunter.md",
-			activePlaceholderWorkflowStepNumber: 2,
-			visibleNativeToolNames: ["search_relevant", "get_file_summary"],
-			providerInfo: {
-				providerId: "openai",
-				model: { id: "gpt-5.4-2026-03-05", info: { supportsPromptCache: false } },
-				mode: "act",
-			},
-		}
-
-		const searchTool = toolSpecFunctionDefinition(search_files_variants[1], context)
-		const defsTool = toolSpecFunctionDefinition(list_code_definition_names_variants[1], context)
-		const readTool = toolSpecFunctionDefinition(read_file_variants[1], context)
-		const rangeTool = toolSpecFunctionDefinition(read_file_range_variants[1], context)
-		const mcpTool = toolSpecFunctionDefinition(use_mcp_tool_variants[0], context)
-
-		expect(getOpenAIFunctionTool(searchTool).description).to.equal(
-			"Use only after inspecting the supplied diff, review input, or directly changed code, or when exact raw-text regex search is specifically required.",
-		)
-		expect(getOpenAIFunctionTool(defsTool).description).to.equal(
-			"Use only after direct inspection of the changed or directly referenced file reveals a concrete need for a built-in top-level definition pass.",
-		)
-		expect(getOpenAIFunctionTool(readTool).description).to.equal(
-			"Start with directly changed or directly referenced files. Use read_file when you need the exact full raw contents of one concrete file at or below 800 lines and 65536 bytes to confirm a review finding.",
-		)
-		expect(getOpenAIFunctionTool(rangeTool).description).to.equal(
-			"Use this for targeted line-based inspection in directly changed or directly referenced code, or when a concrete file exceeds the full-read limit.",
-		)
-		expect(getOpenAIFunctionTool(mcpTool).description).to.equal(
-			"Use a connected MCP tool only after inspecting the supplied diff, review input, or directly changed code. Use it for targeted discovery or source reads on directly changed or directly referenced code, and broaden structural traversal only when a concrete unresolved question remains after direct inspection.",
-		)
-	})
-
-	it("uses file-first compact exploration descriptions for dev-story step 2", () => {
-		const context: SystemPromptContext = {
-			...indxrContext,
-			enableNativeToolCalls: true,
-			useMinimalGptPrompt: true,
-			activePlaceholderWorkflowName: "dev-story.md",
-			activePlaceholderWorkflowStepNumber: 2,
-			visibleNativeToolNames: ["search_relevant", "get_file_summary"],
-			providerInfo: {
-				providerId: "openai",
-				model: { id: "gpt-5.4-2026-03-05", info: { supportsPromptCache: false } },
-				mode: "act",
-			},
-		}
-
-		const searchTool = toolSpecFunctionDefinition(search_files_variants[1], context)
-		const defsTool = toolSpecFunctionDefinition(list_code_definition_names_variants[1], context)
-		const readTool = toolSpecFunctionDefinition(read_file_variants[1], context)
-		const rangeTool = toolSpecFunctionDefinition(read_file_range_variants[1], context)
-		const mcpTool = toolSpecFunctionDefinition(use_mcp_tool_variants[0], context)
-
-		expect(getOpenAIFunctionTool(searchTool).description).to.equal(
-			"Use only after direct reads of story-named or cited files fail to reveal the implementation seam, or when exact raw-text regex search is specifically required.",
-		)
-		expect(getOpenAIFunctionTool(defsTool).description).to.equal(
-			"Use only after direct reads of story-named or cited files fail to reveal the implementation seam and you need a built-in top-level definition pass.",
-		)
-		expect(getOpenAIFunctionTool(readTool).description).to.equal(
-			"For this implementation step, prefer direct reads of story-named or cited files before MCP exploration. Use read_file when you need the exact full raw contents of one concrete file at or below 800 lines and 65536 bytes.",
-		)
-		expect(getOpenAIFunctionTool(rangeTool).description).to.equal(
-			"Use this for targeted line-based inspection in a directly relevant file, or when a concrete file exceeds the full-read limit.",
-		)
-		expect(getOpenAIFunctionTool(mcpTool).description).to.equal(
-			"Use a connected MCP tool only after direct reads of story-named or cited files and narrow built-in search fail to reveal the implementation seam.",
-		)
-	})
-
-	it("compacts native set_workflow_placeholders.values to an object map description", () => {
-		const context: SystemPromptContext = {
-			...mockContext,
-			enableNativeToolCalls: true,
-			useMinimalGptPrompt: true,
-			providerInfo: {
-				providerId: "openai",
-				model: { id: "gpt-5.4-2026-03-05", info: { supportsPromptCache: false } },
-				mode: "act",
-			},
-		}
-		const tool = makeTool({
-			name: "set_workflow_placeholders",
-			description:
-				'Persist dynamic placeholder values discovered during the active workflow. Use the wrapper shape {"values":{"story_path":"docs/story.md","project_context":"docs/project-context.md"}}. Do not use this for stable config-backed placeholders like output_folder; those come from .cline/workflow-config.yaml.',
-			parameters: [
-				{
-					name: "values",
-					required: true,
-					type: "object",
-					instruction:
-						'Object map of placeholder keys to string values. Call the tool as {"values": {...}}. Not arrays of {name,value} or {key,value}.',
-					additionalProperties: { type: "string" },
-				},
-			],
-		})
-
-		const openAI = toolSpecFunctionDefinition(tool, context)
-		const openAIProperties = getOpenAIProperties(openAI)
-
-		expect(openAIProperties.values?.description).to.equal(
-			'Object map of placeholder keys to strings. Call the tool as {"values": {...}}. Not arrays of {name,value} or {key,value}.',
-		)
-		expect(getOpenAIFunctionTool(openAI).description).to.equal(
-			'Persist dynamic placeholder values discovered during the active workflow. Call as {"values":{"story_path":"docs/story.md","project_context":"docs/project-context.md"}}. Stable config-backed placeholders like output_folder come from .cline/workflow-config.yaml.',
-		)
-	})
-
-	it("describes dev-story task completion and notes-update parameters with the locked runtime ids and section values", () => {
-		const context: SystemPromptContext = {
-			...mockContext,
-			enableNativeToolCalls: true,
-			useMinimalGptPrompt: true,
-			providerInfo: {
-				providerId: "openai",
-				model: { id: "gpt-5.4-2026-03-05", info: { supportsPromptCache: false } },
-				mode: "act",
-			},
-		}
-
-		const completeTool = toolSpecFunctionDefinition(story_task_complete_variants[0], context)
-		const notesTool = toolSpecFunctionDefinition(story_notes_update_variants[0], context)
-		const completeProperties = getOpenAIProperties(completeTool)
-		const notesProperties = getOpenAIProperties(notesTool)
-
-		expect(completeProperties.storyTaskId?.description).to.contain("1-based top-level task ordinal")
-		expect(completeProperties.storyTaskId?.description).to.contain("copied from the injected current task block")
-		expect(completeProperties.storySubtaskId?.description).to.contain("optional 1-based subtask ordinal")
-		expect(completeProperties.storySubtaskId?.description).to.contain("under that parent task")
-		expect(notesProperties.section?.enum).to.deep.equal(["Completion Notes List", "File List"])
-		expect(notesProperties.section?.description).to.contain("Allowed values")
-	})
-
-	it("compacts native build_review_diff_output descriptions and parameter text", () => {
-		const context: SystemPromptContext = {
-			...mockContext,
-			enableNativeToolCalls: true,
-			useMinimalGptPrompt: true,
-			providerInfo: {
-				providerId: "openai",
-				model: { id: "gpt-5.4-2026-03-05", info: { supportsPromptCache: false } },
-				mode: "act",
-			},
-		}
-
-		const openAI = toolSpecFunctionDefinition(build_review_diff_output_variants[0], context)
-		const openAIProperties = getOpenAIProperties(openAI)
-
-		expect(getOpenAIFunctionTool(openAI).description).to.equal(
-			"Build and atomically replace {diff_output} from an explicit Git-backed source. Use for code-review diff artifact construction, not for arbitrary file writes.",
-		)
-		expect(openAIProperties.source?.description).to.equal(
-			'Required source object. Supported shape: {"type":"commit","commit":"<ref>"} | {"type":"commit_range","base":"<ref>","head":"<ref>"} | {"type":"ref_diff","base":"<ref>","head":"<ref>"} | {"type":"worktree_head_scoped"}.',
-		)
-		expect(openAIProperties.scoped_paths?.description).to.equal(
-			'Optional repository-relative path array. Required for {"type":"worktree_head_scoped"}.',
-		)
-		expect(openAIProperties.context_lines?.description).to.equal("Optional unified diff context line count. Defaults to 3.")
-	})
-
-	it("compacts native workflow_progress_request descriptions with no parameters", () => {
-		const context: SystemPromptContext = {
-			...mockContext,
-			enableNativeToolCalls: true,
-			useMinimalGptPrompt: true,
-			providerInfo: {
-				providerId: "openai",
-				model: { id: "gpt-5.4-2026-03-05", info: { supportsPromptCache: false } },
-				mode: "act",
-			},
-			activePlaceholderWorkflowName: "create-prd.md",
-			activePlaceholderWorkflowStepNumber: 3,
-		}
-
-		const openAI = toolSpecFunctionDefinition(workflow_progress_request_variants[0], context)
-
-		expect(getOpenAIFunctionTool(openAI).description).to.equal(
-			"Ask whether the user is ready to move to the next supported workflow step. The runtime owns the Yes/No prompt, and the Yes branch advances the focus chain before the next request is built.",
-		)
-		expect(Object.keys(getOpenAIProperties(openAI))).to.deep.equal([])
 	})
 
 	it("preserves integer types for read_file_range line parameters", () => {

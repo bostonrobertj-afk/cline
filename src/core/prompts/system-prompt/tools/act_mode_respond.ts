@@ -12,11 +12,9 @@ Use this tool when you want to:
 - Keep the user informed of your progress
 Parameters:
 - response: (required) The message to provide to the user. This should explain what you're about to do, your current progress, or your reasoning. (You MUST use the response parameter, do not simply place the response text directly within <act_mode_respond> tags.)
-- task_progress: (optional) A checklist showing task progress after this tool use is completed. (See 'Updating Task Progress' section for more details)
 Usage:
 <act_mode_respond>
 <response>Your message here</response>
-<task_progress>Checklist here (optional)</task_progress>
 </act_mode_respond>
  */
 
@@ -33,12 +31,6 @@ const NATIVE_GPT_5: ClineToolSpec = {
 			required: true,
 			instruction: `The message to provide to the user. This should explain what you're about to do, your current progress, or your reasoning. The response should be brief and conversational in tone, aiming to keep the user informed without overwhelming them with details.`,
 			usage: "Your message here",
-		},
-		{
-			name: "task_progress",
-			required: false,
-			instruction: "Markdown checklist as a top-level parameter on a tool call. Not a standalone tool.",
-			contextRequirements: (context) => context.activeDeterministicPlaceholderWorkflowEnabled !== true,
 		},
 	],
 }
