@@ -4909,6 +4909,349 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentBuilder.test.ts`
 
+## Phase 41 - Authoritative Child Workflow Tool Projection
+
+Pause for QA review after completing Phase 41 before commit.
+
+[x] Task 75. Split static subagent prompt suffix from active child-workflow prompt suffix.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentBuilder.ts`
+
+[x] Subtask 75.1. In `src/core/task/tools/subagent/SubagentBuilder.ts`, add an exported `SUBAGENT_WORKFLOW_SYSTEM_SUFFIX` constant immediately after `SUBAGENT_SYSTEM_SUFFIX`; its text must preserve subagent identity and `attempt_completion` completion framing, must include the sentence `Use only the tools exposed for the current workflow turn.`, and must not include `You can read files, list directories, search for patterns, list code definitions, and run commands.` or `Only use execute_command for readonly operations like ls, grep, git log, git diff, gh, etc.`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentBuilder.ts`
+
+[x] Subtask 75.2. In `src/core/task/tools/subagent/SubagentBuilder.ts`, add a private `buildSubagentSystemSuffix(context?: SystemPromptContext): string` method. It must return `SUBAGENT_WORKFLOW_SYSTEM_SUFFIX` when `context !== undefined && context.workflowToolSchemaOverride !== undefined`; otherwise it must return `SUBAGENT_SYSTEM_SUFFIX`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentBuilder.ts`
+
+[x] Subtask 75.3. In `src/core/task/tools/subagent/SubagentBuilder.ts`, update `buildSystemPrompt(...)` so it appends `this.buildSubagentSystemSuffix(context)` instead of appending `SUBAGENT_SYSTEM_SUFFIX` directly.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentBuilder.ts`
+
+[x] Task 76. Make child workflow tool availability authoritative in `SubagentRunner`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentRunner.ts`
+
+[x] Subtask 76.1. In `src/core/task/tools/subagent/SubagentRunner.ts`, rewrite `buildAllowedToolNamesForTurn(context)` so `context.workflowToolSchemaOverride !== undefined` creates the set only from `context.workflowToolSchemaOverride.map((toolSpec) => toolSpec.id)`, and `context.workflowToolSchemaOverride === undefined` creates the set from `this.allowedTools`; after the set is created, always delete `ClineDefaultTool.USE_SKILL`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentRunner.ts`
+
+[x] Subtask 76.2. In `src/core/task/tools/subagent/SubagentRunner.ts`, change `createSubagentTaskConfig(...)` to accept a third parameter named `allowedToolNamesForTurn?: ReadonlySet<ClineDefaultTool>` and register coordinator handlers from `allowedToolNamesForTurn ?? new Set<ClineDefaultTool>(this.allowedTools)`; do not iterate directly over `this.allowedTools` when `allowedToolNamesForTurn` is provided.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentRunner.ts`
+
+[x] Subtask 76.3. In `src/core/task/tools/subagent/SubagentRunner.ts`, update the model-authored tool execution loop so the `createSubagentTaskConfig(state, workflowNextActions)` call passes the already-computed `allowedToolNamesForTurn` as the third argument.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentRunner.ts`
+
+[x] Subtask 76.4. In `src/core/task/tools/subagent/SubagentRunner.ts`, update `executeChildWorkflowToolBackedOperation(...)` so it constructs `const workflowOperationToolNames = new Set<ClineDefaultTool>([toolName])` and passes that set as the third argument to `createSubagentTaskConfig(...)`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentRunner.ts`
+
+[x] Subtask 76.5. In `src/core/task/tools/subagent/SubagentRunner.ts`, delete `ensureChildCoordinatorHasTool(...)` and delete the call to it from `executeChildWorkflowToolBackedOperation(...)`; runtime operation tool registration must happen only through the `workflowOperationToolNames` set prescribed in Subtask 76.4.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentRunner.ts`
+
+[x] Task 77. Add subagent runner regression coverage for authoritative child workflow tools.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+
+[x] Subtask 77.1. In `src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`, update the typed private `createSubagentTaskConfig` helper declaration so it accepts the optional third `ReadonlySet<ClineDefaultTool>` parameter added in Subtask 76.2.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+
+[x] Subtask 77.2. In `src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`, add a test for an active child workflow with `workflowToolSchemaOverride` defined that captures the first `systemPrompt` passed to `createMessage(...)` and asserts it does not contain `You can read files, list directories, search for patterns, list code definitions, and run commands.` and does not contain `Only use execute_command for readonly operations like ls, grep, git log, git diff, gh, etc.`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+
+[x] Subtask 77.3. In `src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`, add a test where an active child workflow projects only `ClineDefaultTool.SET_WORKFLOW_VALUES`, the child model first calls `ClineDefaultTool.LIST_FILES`, and the resulting tool result contains `Tool 'list_files' is not available inside subagent runs.`; the same test must prove the static `LIST_FILES` handler result is not returned.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+
+[x] Subtask 77.4. In `src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`, update the existing child workflow-projected tool execution tests so they still prove `SET_WORKFLOW_VALUES` and `CREATE_WORKFLOW_ARTIFACT` execute when those tools are present in `workflowToolSchemaOverride`, even though they are absent from `SUBAGENT_DEFAULT_ALLOWED_TOOLS`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+
+[x] Subtask 77.5. In `src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`, keep the existing child workflow `USE_SKILL` rejection coverage and update it if needed so it proves `ClineDefaultTool.USE_SKILL` remains unavailable even when present in `workflowToolSchemaOverride`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+
+[x] Task 78. Add subagent builder regression coverage for workflow-safe prompt suffix selection.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentBuilder.test.ts`
+
+[x] Subtask 78.1. In `src/core/task/tools/subagent/__tests__/SubagentBuilder.test.ts`, import `SUBAGENT_WORKFLOW_SYSTEM_SUFFIX` from `../SubagentBuilder`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentBuilder.test.ts`
+
+[x] Subtask 78.2. In `src/core/task/tools/subagent/__tests__/SubagentBuilder.test.ts`, add a test that calls `buildSystemPrompt("generated prompt", context)` with `context.workflowToolSchemaOverride` defined as an empty array and asserts the result equals `generated prompt${SUBAGENT_WORKFLOW_SYSTEM_SUFFIX}`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentBuilder.test.ts`
+
+[x] Subtask 78.3. In `src/core/task/tools/subagent/__tests__/SubagentBuilder.test.ts`, extend the test added in Subtask 78.2 to assert the workflow-suffix prompt does not contain `You can read files, list directories, search for patterns, list code definitions, and run commands.` and does not contain `Only use execute_command for readonly operations like ls, grep, git log, git diff, gh, etc.`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentBuilder.test.ts`
+
+[x] Subtask 78.4. In `src/core/task/tools/subagent/__tests__/SubagentBuilder.test.ts`, preserve the existing non-workflow `SUBAGENT_SYSTEM_SUFFIX` assertions so normal subagent runs without `workflowToolSchemaOverride` still receive the static subagent capability suffix.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentBuilder.test.ts`
+
+[x] Task 79. Validate authoritative child workflow tool projection.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentRunner.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentBuilder.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentBuilder.test.ts`
+
+[x] Subtask 79.1. Run `rg "ensureChildCoordinatorHasTool" src/core/task/tools/subagent/SubagentRunner.ts`; it must return no matches.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentRunner.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentBuilder.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentBuilder.test.ts`
+
+[x] Subtask 79.2. Run `rg "const allowedToolNames = new Set<ClineDefaultTool>\\(this.allowedTools\\)" src/core/task/tools/subagent/SubagentRunner.ts`; it must return no matches.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentRunner.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentBuilder.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentBuilder.test.ts`
+
+[x] Subtask 79.3. Run `npm run test:unit -- src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts src/core/task/tools/subagent/__tests__/SubagentBuilder.test.ts`, `npm run check-types`, and `npm run lint`; all must pass before Phase 41 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentRunner.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentBuilder.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentBuilder.test.ts`
+
+## Phase 42 - Module-Authored Terminal Error Messages
+
+Pause for QA review after completing Phase 42 before commit.
+
+[x] Task 80. Add module-authored terminal error messages to workflow decision actions.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+
+[x] Subtask 80.1. In `src/core/task/workflow-runtime/types.ts`, change the `WorkflowDecisionAction` union member `{ kind: "terminal_error" }` to `{ kind: "terminal_error"; errorMessage: string }`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+
+[x] Task 81. Route module-authored terminal error messages through runtime next-action resolution.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 81.1. In `buildNextActionFromDecisionTreeAction(...)`, change the `case "terminal_error"` branch to call `buildTerminalErrorNextAction({ taskState, errorMessage: action.errorMessage })`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 81.2. In `validateWorkflowDefinition(...)`, update the `case "terminal_error"` branch so it rejects `route.action.errorMessage.trim().length === 0` with error message `Workflow step ${step.id} route ${route.id} terminal_error errorMessage must not be empty.`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Task 82. Update workflow-runtime tests for module-authored terminal error messages.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 82.1. In `WorkflowRuntime.test.ts`, update every module decision-tree terminal-error action from `{ kind: "terminal_error" }` to include a non-empty `errorMessage`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 82.2. In the explicit terminal-error failure-branch test, assert the returned `WorkflowNextAction.errorMessage` equals the module-authored terminal action message, not the prior tool failure text.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 82.3. Preserve the unmatched failure-branch test expectation that runtime fail-closed terminal errors still use prior failure text when no module terminal-error route matched.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 82.4. Add definition-validation coverage proving terminal-error actions with `errorMessage: ""` and `errorMessage: "   "` are rejected before activation.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Task 83. Validate Phase 42.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 83.1. Run `rg "\\{ kind: \"terminal_error\" \\}" src/core/task/workflow-runtime src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`; it must return no bare module decision-action matches.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 83.2. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, `npm run check-types`, and `npm run lint`; all must pass before Phase 42 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+## Phase 43 - Active-Step Selector Submission Validation
+
+Pause for QA review after completing Phase 43 before commit.
+
+Do not add submission-time rediscovery. The rendered form session must store the selector options shown to the user, and submission validation must use that stored rendered option set.
+
+[ ] Task 84. Prevent rendered selector-option writes from mutating shared workflow definitions.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
+
+[ ] Subtask 84.1. In `WorkflowFormRuntime.createSession(...)`, change the returned `definitionPayload` assignment from the input object to `structuredClone(options.definitionPayload)`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
+
+[ ] Task 85. Persist rendered active-panel selector options into the live form session.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[ ] Subtask 85.1. In `WorkflowRuntime.ts`, add a private helper named `storeResolvedWorkflowFormPanelFields(...)` that accepts `session: WorkflowFormSessionState`, `panelId: string`, and `fields: WorkflowFormFieldDefinition[]`; the helper must update `session.definitionPayload.panels[panelId].fields` by replacing only fields whose keys appear in the resolved `fields` array, preserving all other panel properties and unrendered fields.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[ ] Subtask 85.2. In `buildWorkflowFormRenderPayload(...)`, immediately after `resolvedPanel` is built and before `buildWorkflowFormPayload(...)` is called, call `storeResolvedWorkflowFormPanelFields(...)` with the current `session`, `panelId`, and `resolvedPanel.fields`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[ ] Task 86. Prevent failed form submissions from persisting durable workflow values.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[ ] Subtask 86.1. In `submitWorkflowForm(...)`, inside the `case "render_form"` branch, call `persistWorkflowFormValues(...)` only when `outcome.session.failure === undefined`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[ ] Task 87. Enforce selectorDiscovery submitted values against stored rendered options.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
+
+[ ] Subtask 87.1. In `WorkflowFormRuntime.ts`, add a local helper near `validateSelectionRules(...)` named `requiresDeclaredOptionMatch(field: WorkflowFormFieldDefinition): boolean` that returns `field.selectorDiscovery !== undefined`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
+
+[ ] Subtask 87.2. In `validateSelectionRules(...)`, update the single-selection `dropdown` / `radio_group` branch so selectorDiscovery fields return `allowedOptionValues.has(value.stringValue ?? "")`; preserve the existing empty-options freeform behavior only when `field.selectorDiscovery === undefined`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
+
+[ ] Subtask 87.3. In `validateSelectionRules(...)`, update the multi-selection `dropdown` / `radio_group` branch so selectorDiscovery fields reject every submitted selection that is not in `allowedOptionValues`, including when `allowedOptionValues.size === 0`; preserve existing non-selector behavior.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
+
+[ ] Subtask 87.4. In `validateSelectionRules(...)`, update the `multi_select` / `checkbox_group` branch so selectorDiscovery fields reject every submitted selection that is not in `allowedOptionValues`, including when `allowedOptionValues.size === 0`; preserve existing non-selector behavior.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
+
+[ ] Subtask 87.5. In `validateSelectionRules(...)`, add explicit handling for `file_path`, `directory_path`, and `artifact_picker`: when `selectorDiscovery` is defined, require a string submitted value whose `stringValue` exists in `allowedOptionValues`; when `selectorDiscovery` is undefined, preserve existing freeform behavior.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
+
+[ ] Task 88. Add workflow-runtime selector validation coverage.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 88.1. In the existing selector form test, assert `renderFormAction.formSession.definitionPayload.panels.selectors.fields` contains the rendered discovered `options` for `existing_project_choice`, `selected_folder`, `selected_file`, and `selected_artifact`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 88.2. Add a workflow-runtime test that submits a value not present in the rendered options for each selector field kind already covered by the selector form fixture: `dropdown`, `directory_path`, `file_path`, and `artifact_picker`; each case must use a fresh `TaskState`, return `render_workflow_form` with a failure payload, and leave the destination workflow value key absent from `activeWorkflowSession.workflowValues`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 88.3. In the test from Subtask 88.2, after initial render and before submit, change the discovery stub so the submitted fake value would appear in a new discovery result; assert the fake value still fails because validation uses the rendered session options rather than submission-time rediscovery.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Task 89. Add workflow-form runtime selectorDiscovery unit coverage.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`
+
+[ ] Subtask 89.1. In `WorkflowFormRuntime.test.ts`, add a test proving a selectorDiscovery `dropdown` with `options: []` rejects a submitted string value.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`
+
+[ ] Subtask 89.2. In `WorkflowFormRuntime.test.ts`, add a table-driven test proving selectorDiscovery `file_path`, `directory_path`, and `artifact_picker` fields reject submitted string values that are not present in `options`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`
+
+[ ] Task 90. Validate Phase 43.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 90.1. Run `rg "definitionPayload: options.definitionPayload" src/core/task/workflow-form/WorkflowFormRuntime.ts`; it must return no matches.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
+
+[ ] Subtask 90.2. Run `npm run test:unit -- src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, `npm run check-types`, and `npm run lint`; all must pass before Phase 43 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
 ## Validation
 
 After all implementation tasks are complete, run these commands from `/Users/robertboston/Documents/Cline Extension/cline`:
@@ -4960,6 +5303,9 @@ Validation expectations:
 - Phase 38 QA must verify every non-`no_op` `WorkflowNextAction` returned by `WorkflowRuntime.restorePersistedSession(...)` is routed into `consumeWorkflowNextAction(...)`, while `persist_workflow_teardown` continues to persist cleared metadata directly and `undefined`/`no_op` restore results remain non-consuming.
 - Phase 39 QA must verify parent-authored subagent workflow assignment markers are stripped before the child prompt, invalid marker-present assignments fail before the first child model request, no `Assigned Workflow Activation` fallback remains, and assignment marker names do not filter child prompt skill exposure.
 - Phase 40 QA must verify `rg "as any|as unknown as|: any|any\\[\\]" src/core/task/tools/subagent` returns no matches, and that subagent runner/builder tests use typed fixtures instead of forced casts.
+- Phase 41 QA must verify active child workflow turns use `workflowToolSchemaOverride` as the authoritative model-authored tool surface, static subagent tools are rejected when not projected, workflow-projected tools outside `SUBAGENT_DEFAULT_ALLOWED_TOOLS` still execute, `use_skill` remains rejected, and active child workflow system prompts do not advertise static file/search/command capabilities.
+- Phase 42 QA must verify module-authored `terminal_error` decision actions require a non-empty `errorMessage`, runtime terminal next actions surface that module-authored message, and runtime fail-closed terminal errors without a matched module terminal route still preserve fallback failure text behavior.
+- Phase 43 QA must verify active-step selectorDiscovery fields validate submitted values against the rendered options stored in the live form session, failed form submissions do not persist durable workflow values, freeform file/directory fields without selectorDiscovery remain allowed, and no submission-time rediscovery is introduced.
 - `check-types` must pass without reintroducing removed workflow mirror fields, deterministic-step-resolution types, statically exposed workflow-only tool schemas, or legacy `createWorkflowSkillMetadata(...)` references.
 - `lint` must pass without leaving dead imports, compatibility shims, or deleted legacy-surface references behind.
 - Phase 7 QA must verify `applyWorkflowValueWrites(...)` no longer derives authorization from active-step `set_workflow_values` schema visibility and instead uses only `WorkflowDefinition.workflowValueKeys`.

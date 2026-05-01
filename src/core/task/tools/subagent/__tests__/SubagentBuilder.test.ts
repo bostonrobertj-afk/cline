@@ -16,6 +16,7 @@ import { ClineDefaultTool } from "@/shared/tools"
 import {
 	SUBAGENT_DEFAULT_ALLOWED_TOOLS,
 	SUBAGENT_SYSTEM_SUFFIX,
+	SUBAGENT_WORKFLOW_SYSTEM_SUFFIX,
 	SubagentBuilder,
 	type SubagentBuilderConfig,
 	type SubagentBuilderConfigSource,
@@ -126,6 +127,31 @@ describe("SubagentBuilder", () => {
 		assert.deepEqual(builder.getAllowedTools(), SUBAGENT_DEFAULT_ALLOWED_TOOLS)
 		const prompt = builder.buildSystemPrompt("generated prompt")
 		assert.equal(prompt, `generated prompt${SUBAGENT_SYSTEM_SUFFIX}`)
+	})
+
+	it("uses workflow suffix without static subagent capabilities when workflow tools are projected", () => {
+		const configSource = createConfigSource(() => undefined)
+
+		sinon.stub(api, "buildApiHandler").returns({ getModel: sinon.stub(), createMessage: sinon.stub() } as never)
+		const builder = new SubagentBuilder(createTaskConfig("act", "anthropic"), undefined, configSource)
+		const prompt = builder.buildSystemPrompt(
+			"generated prompt",
+			createSystemPromptContext({
+				workflowToolSchemaOverride: [],
+			}),
+		)
+
+		assert.equal(prompt, `generated prompt${SUBAGENT_WORKFLOW_SYSTEM_SUFFIX}`)
+		assert.equal(
+			prompt.includes(
+				"You can read files, list directories, search for patterns, list code definitions, and run commands.",
+			),
+			false,
+		)
+		assert.equal(
+			prompt.includes("Only use execute_command for readonly operations like ls, grep, git log, git diff, gh, etc."),
+			false,
+		)
 	})
 
 	it("applies plan-mode openrouter model override fields", () => {

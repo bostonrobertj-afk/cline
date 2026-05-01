@@ -2391,7 +2391,7 @@ export class WorkflowRuntime {
 				}
 			}
 			case "terminal_error":
-				return await this.buildTerminalErrorNextAction({ taskState })
+				return await this.buildTerminalErrorNextAction({ taskState, errorMessage: action.errorMessage })
 			case "no_op":
 				return { kind: "no_op" }
 			case "complete_workflow":
@@ -3502,7 +3502,15 @@ export class WorkflowRuntime {
 							}
 							break
 						case "project_prompt":
+							break
 						case "terminal_error":
+							if (route.action.errorMessage.trim().length === 0) {
+								return {
+									valid: false,
+									errorMessage: `Workflow step ${step.id} route ${route.id} terminal_error errorMessage must not be empty.`,
+								}
+							}
+							break
 						case "complete_workflow":
 						case "no_op":
 							break

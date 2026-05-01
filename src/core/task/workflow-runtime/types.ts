@@ -169,7 +169,7 @@ export type WorkflowDecisionAction =
 	| { kind: "build_workflow_document"; documentBuilderId: string }
 	| { kind: "allocate_artifact"; artifactId: string }
 	| { kind: "project_prompt" }
-	| { kind: "terminal_error" }
+	| { kind: "terminal_error"; errorMessage: string }
 	| { kind: "complete_workflow" }
 	| { kind: "no_op" }
 

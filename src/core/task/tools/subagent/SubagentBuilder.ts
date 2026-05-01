@@ -37,6 +37,13 @@ Do not run commands that modify files or system state.
 When you have a comprehensive answer, call the attempt_completion tool.
 The attempt_completion result field is sent directly to the main agent, so put your full final findings there.`
 
+export const SUBAGENT_WORKFLOW_SYSTEM_SUFFIX = `\n\n# Subagent Execution Mode
+You are running as a subagent.
+You must execute exactly as you've been instructed, and limit your scope to the tasks assigned to you.
+Use only the tools exposed for the current workflow turn.
+When you have a comprehensive answer, call the attempt_completion tool.
+The attempt_completion result field is sent directly to the main agent, so put your full final findings there.`
+
 export class SubagentBuilder {
 	private readonly agentConfig: AgentConfig = {}
 	private readonly allowedTools: ClineDefaultTool[]
@@ -85,7 +92,15 @@ export class SubagentBuilder {
 	buildSystemPrompt(generatedSystemPrompt: string, context?: SystemPromptContext): string {
 		const configuredSystemPrompt = this.agentConfig?.systemPrompt?.trim()
 		const systemPrompt = configuredSystemPrompt || generatedSystemPrompt
-		return `${systemPrompt}${this.buildAgentIdentitySystemPrefix()}${SUBAGENT_SYSTEM_SUFFIX}${this.buildConditionalMcpGuidance(context)}`
+		return `${systemPrompt}${this.buildAgentIdentitySystemPrefix()}${this.buildSubagentSystemSuffix(context)}${this.buildConditionalMcpGuidance(context)}`
+	}
+
+	private buildSubagentSystemSuffix(context?: SystemPromptContext): string {
+		if (context !== undefined && context.workflowToolSchemaOverride !== undefined) {
+			return SUBAGENT_WORKFLOW_SYSTEM_SUFFIX
+		}
+
+		return SUBAGENT_SYSTEM_SUFFIX
 	}
 
 	private buildConditionalMcpGuidance(context?: SystemPromptContext): string {

@@ -108,6 +108,8 @@ describe("WorkflowRuntime", () => {
 		}
 	}
 
+	const ARTIFACT_ALLOCATION_TERMINAL_ERROR_MESSAGE = "Artifact allocation failed."
+
 	function createProjectPromptDecisionTree(args?: {
 		entryBranchId?: string
 		followingBranchId?: string
@@ -421,7 +423,10 @@ describe("WorkflowRuntime", () => {
 									triggerEvent.kind === "tool_backed_operation_failed" &&
 									triggerEvent.toolBackedOperationId === artifactId,
 							},
-							action: { kind: "terminal_error" },
+							action: {
+								kind: "terminal_error",
+								errorMessage: ARTIFACT_ALLOCATION_TERMINAL_ERROR_MESSAGE,
+							},
 						},
 					],
 				},
@@ -1143,6 +1148,44 @@ describe("WorkflowRuntime", () => {
 		for (const invalidWorkflow of invalidWorkflows) {
 			const invalidState = new TaskState()
 			const result = await activateWorkflow(invalidState, invalidWorkflow)
+
+			expect(result).to.deep.equal({ kind: "no_op" })
+			expect(invalidState.activeWorkflowName).to.be.undefined
+			expect(invalidState.activeWorkflowSession).to.be.undefined
+		}
+	})
+
+	it("rejects terminal-error decision actions with empty messages before activation", async () => {
+		const invalidErrorMessages = ["", "   "]
+
+		for (const [caseIndex, errorMessage] of invalidErrorMessages.entries()) {
+			const invalidState = new TaskState()
+			const result = await activateWorkflow(
+				invalidState,
+				createWorkflowDefinition({
+					name: `invalid-terminal-error-message-${caseIndex}`,
+					steps: {
+						"step-1": createStepDefinition({
+							stepNumber: 1,
+							decisionTree: {
+								entryBranchId: "terminal-error-entry",
+								branches: {
+									"terminal-error-entry": {
+										id: "terminal-error-entry",
+										routes: [
+											{
+												id: "terminal-error-route",
+												trigger: { kind: "always" },
+												action: { kind: "terminal_error", errorMessage },
+											},
+										],
+									},
+								},
+							},
+						}),
+					},
+				}),
+			)
 
 			expect(result).to.deep.equal({ kind: "no_op" })
 			expect(invalidState.activeWorkflowName).to.be.undefined
@@ -2269,6 +2312,7 @@ describe("WorkflowRuntime", () => {
 	})
 
 	it("executes explicit terminal-error failure branches without silently downgrading to project_prompt", async () => {
+		const terminalFailureMessage = "Module-authored terminal failure."
 		const terminalFailureWorkflow = createWorkflowDefinition({
 			toolBackedOperationDefinitions: {
 				"step-resolution-1": createToolBackedOperationDefinition({
@@ -2280,7 +2324,7 @@ describe("WorkflowRuntime", () => {
 					stepNumber: 1,
 					decisionTree: createToolBackedOperationDecisionTree({
 						toolBackedOperationId: "step-resolution-1",
-						failureAction: { kind: "terminal_error" },
+						failureAction: { kind: "terminal_error", errorMessage: terminalFailureMessage },
 					}),
 				}),
 				"step-2": createStepDefinition({ stepNumber: 2 }),
@@ -2302,7 +2346,7 @@ describe("WorkflowRuntime", () => {
 
 		expect(terminalFailureResult).to.deep.equal({
 			kind: "terminal_error",
-			errorMessage: "failure",
+			errorMessage: terminalFailureMessage,
 		})
 		expectWorkflowStateCleared(terminalFailureState)
 	})
@@ -4195,7 +4239,7 @@ describe("WorkflowRuntime", () => {
 			if (failureResult.kind !== "terminal_error") {
 				throw new Error(`Expected terminal_error, received ${failureResult.kind}.`)
 			}
-			expect(failureResult.errorMessage).to.equal("Error: required artifact identity was not found")
+			expect(failureResult.errorMessage).to.equal(ARTIFACT_ALLOCATION_TERMINAL_ERROR_MESSAGE)
 			expectWorkflowStateCleared(missingIdentityState)
 		}
 	})
@@ -4241,7 +4285,7 @@ describe("WorkflowRuntime", () => {
 			if (result.kind !== "terminal_error") {
 				throw new Error(`Expected terminal_error, received ${result.kind}.`)
 			}
-			expect(result.errorMessage).to.equal(toolResultText)
+			expect(result.errorMessage).to.equal(ARTIFACT_ALLOCATION_TERMINAL_ERROR_MESSAGE)
 			expectWorkflowStateCleared(failureState)
 		}
 	})

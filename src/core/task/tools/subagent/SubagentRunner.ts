@@ -383,23 +383,14 @@ export class SubagentRunner {
 		await consumer.consume(nextAction)
 	}
 
-	private ensureChildCoordinatorHasTool(config: TaskConfig, toolName: ClineDefaultTool): void {
-		if (config.coordinator.has(toolName)) {
-			return
-		}
-
-		const validator = new ToolValidator(this.baseConfig.services.clineIgnoreController)
-		config.coordinator.registerByName(toolName, validator)
-	}
-
 	private async executeChildWorkflowToolBackedOperation(
 		state: TaskState,
 		workflowAction: Extract<WorkflowNextAction, { kind: "execute_tool_backed_operation" }>,
 	): Promise<string> {
 		const workflowNextActions: WorkflowNextAction[] = []
-		const subagentConfig = this.createSubagentTaskConfig(state, workflowNextActions)
 		const toolName = workflowAction.toolRequest.toolName
-		this.ensureChildCoordinatorHasTool(subagentConfig, toolName)
+		const workflowOperationToolNames = new Set<ClineDefaultTool>([toolName])
+		const subagentConfig = this.createSubagentTaskConfig(state, workflowNextActions, workflowOperationToolNames)
 		const toolParams: Partial<Record<string, string>> = {
 			...workflowAction.toolRequest.toolParams,
 			...toToolUseParams(workflowAction.toolRequest.toolInput),
@@ -428,10 +419,10 @@ export class SubagentRunner {
 	}
 
 	private buildAllowedToolNamesForTurn(context: SystemPromptContext): Set<ClineDefaultTool> {
-		const allowedToolNames = new Set<ClineDefaultTool>(this.allowedTools)
-		for (const toolSpec of context.workflowToolSchemaOverride ?? []) {
-			allowedToolNames.add(toolSpec.id)
-		}
+		const allowedToolNames =
+			context.workflowToolSchemaOverride !== undefined
+				? new Set<ClineDefaultTool>(context.workflowToolSchemaOverride.map((toolSpec) => toolSpec.id))
+				: new Set<ClineDefaultTool>(this.allowedTools)
 		allowedToolNames.delete(ClineDefaultTool.USE_SKILL)
 		return allowedToolNames
 	}
@@ -821,7 +812,7 @@ export class SubagentRunner {
 						signature: call.signature,
 					}
 					const workflowNextActions: WorkflowNextAction[] = []
-					const subagentConfig = this.createSubagentTaskConfig(state, workflowNextActions)
+					const subagentConfig = this.createSubagentTaskConfig(state, workflowNextActions, allowedToolNamesForTurn)
 
 					if (toolName === ClineDefaultTool.ATTEMPT) {
 						const completionResult = toolCallParams.result?.trim()
@@ -897,12 +888,17 @@ export class SubagentRunner {
 		}
 	}
 
-	private createSubagentTaskConfig(state: TaskState, workflowNextActions: WorkflowNextAction[] = []): TaskConfig {
+	private createSubagentTaskConfig(
+		state: TaskState,
+		workflowNextActions: WorkflowNextAction[] = [],
+		allowedToolNamesForTurn?: ReadonlySet<ClineDefaultTool>,
+	): TaskConfig {
 		const baseCallbacks = this.baseConfig.callbacks
 		const coordinator = new ToolExecutorCoordinator()
 		const validator = new ToolValidator(this.baseConfig.services.clineIgnoreController)
+		const coordinatorToolNames = allowedToolNamesForTurn ?? new Set<ClineDefaultTool>(this.allowedTools)
 
-		for (const tool of this.allowedTools) {
+		for (const tool of coordinatorToolNames) {
 			coordinator.registerByName(tool, validator)
 		}
 

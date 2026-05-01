@@ -74,6 +74,7 @@ const createSubagentTaskConfig = Reflect.get(SubagentRunner.prototype, "createSu
 	this: SubagentRunner,
 	state: TaskState,
 	workflowNextActions?: WorkflowNextAction[],
+	allowedToolNamesForTurn?: ReadonlySet<ClineDefaultTool>,
 ) => TaskConfig
 const buildPromptContext = Reflect.get(SubagentRunner.prototype, "buildPromptContext") as (
 	this: SubagentRunner,
@@ -708,6 +709,175 @@ describe("SubagentRunner", () => {
 		assert.equal(result.status, "completed")
 		assert.equal(result.result, "done")
 		assert.equal(createMessage.callCount, 1)
+	})
+
+	it("does not advertise static file/search/command capabilities in active child workflow prompts", async () => {
+		const workflowToolSchemaOverride: readonly ClineToolSpec[] = [
+			{
+				variant: ModelFamily.GPT_5,
+				id: ClineDefaultTool.SET_WORKFLOW_VALUES,
+				name: ClineDefaultTool.SET_WORKFLOW_VALUES,
+				description: "Persist workflow-owned values.",
+				parameters: [],
+			},
+		]
+		const workflowProjectedNativeTools: ClineTool[] = [createNativeTool(ClineDefaultTool.SET_WORKFLOW_VALUES)]
+		let capturedSystemPrompt = ""
+		const createMessage = sinon.stub().callsFake(async function* (systemPrompt: string) {
+			capturedSystemPrompt = systemPrompt
+			yield {
+				type: "tool_calls",
+				tool_call: {
+					function: {
+						id: "toolu_subagent_workflow_prompt_complete_1",
+						name: ClineDefaultTool.ATTEMPT,
+						arguments: JSON.stringify({ result: "done" }),
+					},
+				},
+			}
+		})
+
+		const workflow = createResolvedWorkflow({
+			name: "review-workflow",
+			useSkillName: "review-workflow",
+			workflowToolSchemaOverride,
+		})
+		sinon.stub(WorkflowRegistry, "resolveWorkflowByUseSkillName").returns(workflow)
+		stubResolvedWorkflowByName(workflow)
+		const config = createTaskConfig(true)
+		config.taskState.activeWorkflowName = "parent-workflow"
+		config.taskState.activeWorkflowSession = {
+			activeStepNumber: 1,
+			workflowValues: {},
+			projectSelection: { projectMode: "existing", projectTitle: "Parent Project", projectFolderName: "parent-project" },
+			ui: {
+				formSession: undefined,
+				stepResolutionSession: undefined,
+				suppressedWorkflowFormIds: [],
+				suppressedWorkflowStepResolutionDefinitionIds: [],
+			},
+			branchContext: {
+				activeBranchId: "project-prompt",
+			},
+		}
+		const promptRegistry = PromptRegistry.getInstance()
+		sinon.stub(promptRegistry, "get").callsFake(async () => {
+			promptRegistry.nativeTools = workflowProjectedNativeTools
+			return "system prompt"
+		})
+		sinon.stub(SubagentBuilder.prototype, "buildNativeTools").returns(workflowProjectedNativeTools)
+		sinon.stub(SubagentBuilder.prototype, "getConfiguredSkills").returns(undefined)
+		sinon.stub(skills, "discoverSkills").resolves([])
+		sinon.stub(skills, "getAvailableSkills").returns([])
+		stubApiHandler(createMessage)
+		initializeHostProvider()
+
+		const runner = new SubagentRunner(config)
+		const result = await runner.run("Skill: use_skill('review-workflow')", () => {})
+
+		assert.equal(result.status, "completed")
+		assert.equal(result.result, "done")
+		assert.equal(createMessage.callCount, 1)
+		assert.equal(
+			capturedSystemPrompt.includes(
+				"You can read files, list directories, search for patterns, list code definitions, and run commands.",
+			),
+			false,
+		)
+		assert.equal(
+			capturedSystemPrompt.includes(
+				"Only use execute_command for readonly operations like ls, grep, git log, git diff, gh, etc.",
+			),
+			false,
+		)
+		assert.match(capturedSystemPrompt, /Use only the tools exposed for the current workflow turn\./)
+	})
+
+	it("rejects static subagent tools when an active child workflow does not project them", async () => {
+		const workflowToolSchemaOverride: readonly ClineToolSpec[] = [
+			{
+				variant: ModelFamily.GPT_5,
+				id: ClineDefaultTool.SET_WORKFLOW_VALUES,
+				name: ClineDefaultTool.SET_WORKFLOW_VALUES,
+				description: "Persist workflow-owned values.",
+				parameters: [],
+			},
+		]
+		const workflowProjectedNativeTools: ClineTool[] = [createNativeTool(ClineDefaultTool.SET_WORKFLOW_VALUES)]
+		const createMessage = sinon.stub()
+		createMessage.onFirstCall().callsFake(async function* () {
+			yield {
+				type: "tool_calls",
+				tool_call: {
+					function: {
+						id: "toolu_subagent_unprojected_list_files_1",
+						name: ClineDefaultTool.LIST_FILES,
+						arguments: JSON.stringify({ path: ".", recursive: false }),
+					},
+				},
+			}
+		})
+		createMessage.onSecondCall().callsFake(async function* (_systemPrompt: string, conversation: unknown[]) {
+			const userMessage = conversation[2]
+			assert.ok(isSubagentToolResultMessage(userMessage))
+			assert.equal(userMessage.role, "user")
+			const toolResultText = userMessage.content.find((block) => block.type === "tool_result")?.content ?? ""
+			assert.match(toolResultText, /Tool 'list_files' is not available inside subagent runs\./)
+			assert.equal(toolResultText.includes("ok"), false)
+
+			yield {
+				type: "tool_calls",
+				tool_call: {
+					function: {
+						id: "toolu_subagent_unprojected_list_files_complete_1",
+						name: ClineDefaultTool.ATTEMPT,
+						arguments: JSON.stringify({ result: "done" }),
+					},
+				},
+			}
+		})
+
+		const workflow = createResolvedWorkflow({
+			name: "review-workflow",
+			useSkillName: "review-workflow",
+			workflowToolSchemaOverride,
+		})
+		sinon.stub(WorkflowRegistry, "resolveWorkflowByUseSkillName").returns(workflow)
+		stubResolvedWorkflowByName(workflow)
+		const config = createTaskConfig(true)
+		config.taskState.activeWorkflowName = "parent-workflow"
+		config.taskState.activeWorkflowSession = {
+			activeStepNumber: 1,
+			workflowValues: {},
+			projectSelection: { projectMode: "existing", projectTitle: "Parent Project", projectFolderName: "parent-project" },
+			ui: {
+				formSession: undefined,
+				stepResolutionSession: undefined,
+				suppressedWorkflowFormIds: [],
+				suppressedWorkflowStepResolutionDefinitionIds: [],
+			},
+			branchContext: {
+				activeBranchId: "project-prompt",
+			},
+		}
+		const promptRegistry = PromptRegistry.getInstance()
+		sinon.stub(promptRegistry, "get").callsFake(async () => {
+			promptRegistry.nativeTools = workflowProjectedNativeTools
+			return "system prompt"
+		})
+		sinon.stub(SubagentBuilder.prototype, "buildNativeTools").returns(workflowProjectedNativeTools)
+		sinon.stub(SubagentBuilder.prototype, "getConfiguredSkills").returns(undefined)
+		sinon.stub(skills, "discoverSkills").resolves([])
+		sinon.stub(skills, "getAvailableSkills").returns([])
+		stubApiHandler(createMessage)
+		initializeHostProvider()
+
+		const runner = new SubagentRunner(config)
+		const result = await runner.run("Skill: use_skill('review-workflow')", () => {})
+
+		assert.equal(result.status, "completed")
+		assert.equal(result.result, "done")
+		assert.equal(createMessage.callCount, 2)
 	})
 
 	it("executes child workflow-projected tools that are outside the static subagent default allowed tools", async () => {

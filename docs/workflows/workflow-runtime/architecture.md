@@ -247,7 +247,7 @@ Responsibilities:
 - declare deterministic step-resolution rules
 - declare workflow-owned artifact/document builders
 - declare expected workflow values and any explicit child-session inheritance rules
-- declare completion rules and workflow-specific handlers
+- declare completion rules; any workflow-specific follow-up work must be modeled as normal workflow steps, decision actions, document builders, or tool-backed operations before completion
 
 #### Workflow Value Mutation Seam
 
@@ -377,8 +377,8 @@ Exact filenames beyond this level are deferred to requirements and implementatio
 ### 6.6 Scenario: Completion and Teardown
 
 1. Workflow runtime evaluates workflow completion rules after a step mutation.
-2. If completion criteria are satisfied, workflow runtime executes any workflow-specific completion handling.
-3. Workflow runtime tears down the canonical workflow session.
+2. If completion criteria are satisfied, workflow runtime treats completion as a terminal condition; no workflow-specific completion handler runs at this point.
+3. Workflow runtime performs workflow-agnostic teardown of the canonical workflow session.
 4. Because workflow-owned values live inside that session, teardown clears workflow values by clearing the workflow session rather than by clearing separate mirrored state.
 5. Downstream prompt, focus-chain, UI, and persisted workflow state are cleared as projections of that teardown.
 
@@ -413,7 +413,7 @@ Important error behavior in this architecture:
 
 - deterministic workflow paths may fail
 - workflow forms may fail to collect or apply required data
-- completion handlers may fail
+- completion detection or teardown may fail
 - resume may fail due to invalid or stale workflow session state
 
 For deterministic workflow failures, workflow runtime owns retry and final error handling. Specialist capabilities report results, but workflow runtime executes the workflow-defined retry procedure and, if retry fails, surfaces the final user-visible error.
