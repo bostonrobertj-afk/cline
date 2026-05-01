@@ -372,17 +372,24 @@ function validateSelectionRules(
 	value: WorkflowFormSubmittedValuePayload | undefined,
 ): boolean {
 	const allowedOptionValues = new Set((field.options ?? []).map((option) => option.value))
+	const mustMatchDeclaredOption = requiresDeclaredOptionMatch(field)
 
 	if (field.kind === "dropdown" || field.kind === "radio_group") {
 		if ((field.selectionCardinality ?? "single") === "single") {
 			if (!value || value.valueType !== "string") {
 				return field.required !== true
 			}
+			if (mustMatchDeclaredOption) {
+				return allowedOptionValues.has(value.stringValue ?? "")
+			}
 			return allowedOptionValues.size === 0 || allowedOptionValues.has(value.stringValue ?? "")
 		}
 
 		const selections = getStringArrayValues(value)
-		if (allowedOptionValues.size > 0 && selections.some((selection) => !allowedOptionValues.has(selection))) {
+		if (
+			(mustMatchDeclaredOption || allowedOptionValues.size > 0) &&
+			selections.some((selection) => !allowedOptionValues.has(selection))
+		) {
 			return false
 		}
 
@@ -395,7 +402,10 @@ function validateSelectionRules(
 
 	if (field.kind === "multi_select" || field.kind === "checkbox_group") {
 		const selections = getStringArrayValues(value)
-		if (allowedOptionValues.size > 0 && selections.some((selection) => !allowedOptionValues.has(selection))) {
+		if (
+			(mustMatchDeclaredOption || allowedOptionValues.size > 0) &&
+			selections.some((selection) => !allowedOptionValues.has(selection))
+		) {
 			return false
 		}
 
@@ -410,7 +420,21 @@ function validateSelectionRules(
 		return selections.length > 0 || field.required !== true
 	}
 
+	if (
+		(field.kind === "file_path" || field.kind === "directory_path" || field.kind === "artifact_picker") &&
+		mustMatchDeclaredOption
+	) {
+		if (!value || value.valueType !== "string") {
+			return field.required !== true
+		}
+		return allowedOptionValues.has(value.stringValue ?? "")
+	}
+
 	return true
+}
+
+function requiresDeclaredOptionMatch(field: WorkflowFormFieldDefinition): boolean {
+	return field.selectorDiscovery !== undefined
 }
 
 function hasRenderableValue(value: WorkflowFormSubmittedValuePayload | undefined): boolean {
@@ -589,7 +613,7 @@ export class WorkflowFormRuntime {
 			sessionId: randomUUID(),
 			workflowFormId: options.workflowFormId,
 			definitionVersion: 2,
-			definitionPayload: options.definitionPayload,
+			definitionPayload: structuredClone(options.definitionPayload),
 			firstPanelId: options.definitionPayload.firstPanelId,
 			currentPanelId: options.definitionPayload.firstPanelId,
 			values: {},

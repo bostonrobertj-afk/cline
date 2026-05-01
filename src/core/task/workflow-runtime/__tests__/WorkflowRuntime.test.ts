@@ -868,13 +868,30 @@ describe("WorkflowRuntime", () => {
 
 	async function submitExistingProjectSelection(state: TaskState, selectedExistingProject: string) {
 		await advanceToEntryProjectSelectionPanel(state)
-		const activeFormSession = getActiveFormSession(state)
+		const modeSelectionSession = getActiveFormSession(state)
+		const existingSelectorAction = await runtime.submitWorkflowForm({
+			taskState: state,
+			request: createFormSubmitRequest({
+				sessionId: modeSelectionSession.sessionId,
+				panelId: modeSelectionSession.currentPanelId,
+				fields: [
+					{
+						key: ENTRY_PROJECT_MODE_FIELD_KEY,
+						value: { stringValue: "existing" },
+					},
+				],
+			}),
+		})
+		expect(existingSelectorAction.kind).to.equal("render_workflow_form")
+		if (existingSelectorAction.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${existingSelectorAction.kind}.`)
+		}
 
 		return runtime.submitWorkflowForm({
 			taskState: state,
 			request: createFormSubmitRequest({
-				sessionId: activeFormSession.sessionId,
-				panelId: activeFormSession.currentPanelId,
+				sessionId: existingSelectorAction.formSession.sessionId,
+				panelId: existingSelectorAction.formSession.currentPanelId,
 				fields: [
 					{
 						key: ENTRY_PROJECT_MODE_FIELD_KEY,
@@ -1539,7 +1556,7 @@ describe("WorkflowRuntime", () => {
 		}
 		expect(invalidExistingProjectResult.payload.renderState).to.equal("failure")
 		expect(invalidExistingProjectResult.payload.errorMessage).to.equal(
-			"Select an existing project from the discovered project list.",
+			`Field "${ENTRY_EXISTING_PROJECT_FIELD_KEY}" does not satisfy the declared selection rules.`,
 		)
 
 		const emptySlugTaskState = new TaskState()
@@ -1806,21 +1823,37 @@ describe("WorkflowRuntime", () => {
 			expect(request.workspacePathPolicy).to.equal(workspacePathPolicy)
 		}
 
+		const expectedExistingProjectOptions = [{ value: "Existing Alpha", label: "Existing Alpha" }]
+		const expectedFolderOptions = [{ value: "planning", label: "planning" }]
+		const expectedFileOptions = [
+			{ value: "notes.md", label: "notes.md" },
+			{ value: "artifact.md", label: "artifact.md" },
+		]
+		const renderedSessionFields = renderFormAction.formSession.definitionPayload.panels.selectors.fields
+
 		expect(renderFormAction.payload.panel?.panelId).to.equal("selectors")
 		expect(
 			renderFormAction.payload.panel?.fields.find((field) => field.key === "existing_project_choice")?.options,
-		).to.deep.equal([{ value: "Existing Alpha", label: "Existing Alpha" }])
-		expect(renderFormAction.payload.panel?.fields.find((field) => field.key === "selected_folder")?.options).to.deep.equal([
-			{ value: "planning", label: "planning" },
-		])
-		expect(renderFormAction.payload.panel?.fields.find((field) => field.key === "selected_file")?.options).to.deep.equal([
-			{ value: "notes.md", label: "notes.md" },
-			{ value: "artifact.md", label: "artifact.md" },
-		])
+		).to.deep.equal(expectedExistingProjectOptions)
+		expect(renderFormAction.payload.panel?.fields.find((field) => field.key === "selected_folder")?.options).to.deep.equal(
+			expectedFolderOptions,
+		)
+		expect(renderFormAction.payload.panel?.fields.find((field) => field.key === "selected_file")?.options).to.deep.equal(
+			expectedFileOptions,
+		)
 		expect(renderFormAction.payload.panel?.fields.find((field) => field.key === "selected_artifact")?.options).to.deep.equal([
-			{ value: "notes.md", label: "notes.md" },
-			{ value: "artifact.md", label: "artifact.md" },
+			...expectedFileOptions,
 		])
+		expect(renderedSessionFields.find((field) => field.key === "existing_project_choice")?.options).to.deep.equal(
+			expectedExistingProjectOptions,
+		)
+		expect(renderedSessionFields.find((field) => field.key === "selected_folder")?.options).to.deep.equal(
+			expectedFolderOptions,
+		)
+		expect(renderedSessionFields.find((field) => field.key === "selected_file")?.options).to.deep.equal(expectedFileOptions)
+		expect(renderedSessionFields.find((field) => field.key === "selected_artifact")?.options).to.deep.equal(
+			expectedFileOptions,
+		)
 
 		const submitted = await runtime.submitWorkflowForm({
 			taskState,
@@ -1855,6 +1888,224 @@ describe("WorkflowRuntime", () => {
 			selected_file_value: "notes.md",
 			selected_artifact_value: "artifact.md",
 		})
+	})
+
+	it("rejects selector submissions absent from the rendered form session options", async () => {
+		const workflowFormId = "selector-validation-form"
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: [
+				"existing_project_value",
+				"selected_folder_value",
+				"selected_file_value",
+				"selected_artifact_value",
+			],
+			workflowForms: {
+				[workflowFormId]: {
+					definitionVersion: 2,
+					title: "Selector Validation Form",
+					toolDictionaryTitle: "Selector Validation Tools",
+					toolDictionaryMarkdown: "Selector validation help",
+					firstPanelId: "selectors",
+					panels: {
+						selectors: {
+							panelId: "selectors",
+							title: "Selector Inputs",
+							promptMarkdown: "Choose existing runtime-owned values.",
+							fields: [
+								{
+									key: "existing_project_choice",
+									workflowValueKey: "existing_project_value",
+									kind: "dropdown",
+									label: "Existing Project",
+									required: true,
+									allowedValueType: "string",
+									options: [],
+									selectorDiscovery: {
+										root: {
+											kind: "project_output_root",
+										},
+										entryType: "directory",
+										immediateChildrenOnly: true,
+										sort: "alpha_asc",
+									},
+									valueSchema: { type: "string" },
+								},
+								{
+									key: "selected_folder",
+									workflowValueKey: "selected_folder_value",
+									kind: "directory_path",
+									label: "Folder",
+									required: true,
+									allowedValueType: "string",
+									selectorDiscovery: {
+										root: {
+											kind: "selected_project_root",
+										},
+										entryType: "directory",
+										immediateChildrenOnly: true,
+										sort: "alpha_asc",
+									},
+									valueSchema: { type: "string" },
+								},
+								{
+									key: "selected_file",
+									workflowValueKey: "selected_file_value",
+									kind: "file_path",
+									label: "File",
+									required: true,
+									allowedValueType: "string",
+									selectorDiscovery: {
+										root: {
+											kind: "selected_project_root",
+										},
+										entryType: "file",
+										targetPathSegments: ["planning"],
+										immediateChildrenOnly: true,
+										sort: "alpha_asc",
+									},
+									valueSchema: { type: "string" },
+								},
+								{
+									key: "selected_artifact",
+									workflowValueKey: "selected_artifact_value",
+									kind: "artifact_picker",
+									label: "Artifact",
+									required: true,
+									allowedValueType: "string",
+									selectorDiscovery: {
+										root: {
+											kind: "selected_project_root",
+										},
+										entryType: "file",
+										targetPathSegments: ["planning"],
+										immediateChildrenOnly: true,
+										sort: "alpha_asc",
+									},
+									valueSchema: { type: "string" },
+								},
+							],
+							allowedActions: ["submit"],
+							transition: createTerminalTransition(),
+						},
+					},
+				},
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createWorkflowFormDecisionTree({
+						workflowFormId,
+					}),
+				}),
+				"step-2": createStepDefinition({ stepNumber: 2 }),
+			},
+		})
+		const configureSelectorDiscovery = (fakeOption?: { fieldKey: string; value: string }) => {
+			discoverWorkflowCandidatesStub.callsFake((request: WorkflowDiscoveryRequest) => {
+				const includeFake = (fieldKey: string, options: Array<{ value: string; label: string }>) =>
+					fakeOption?.fieldKey === fieldKey
+						? [...options, { value: fakeOption.value, label: fakeOption.value }]
+						: options
+
+				if (request.entryType === "directory" && request.targetPathSegments === undefined) {
+					return Promise.resolve(
+						includeFake("existing_project_choice", [{ value: "Existing Alpha", label: "Existing Alpha" }]),
+					)
+				}
+
+				if (request.entryType === "directory" && request.targetPathSegments?.length === 1) {
+					return Promise.resolve(includeFake("selected_folder", [{ value: "planning", label: "planning" }]))
+				}
+
+				if (
+					request.entryType === "file" &&
+					request.targetPathSegments?.length === 2 &&
+					request.targetPathSegments[1] === "planning"
+				) {
+					const options = [
+						{ value: "notes.md", label: "notes.md" },
+						{ value: "artifact.md", label: "artifact.md" },
+					]
+					return Promise.resolve(includeFake(fakeOption?.fieldKey ?? "", options))
+				}
+
+				return Promise.resolve([])
+			})
+		}
+
+		for (const invalidCase of [
+			{
+				fieldKey: "existing_project_choice",
+				workflowValueKey: "existing_project_value",
+				fakeValue: "Fake Project",
+			},
+			{
+				fieldKey: "selected_folder",
+				workflowValueKey: "selected_folder_value",
+				fakeValue: "fake-folder",
+			},
+			{
+				fieldKey: "selected_file",
+				workflowValueKey: "selected_file_value",
+				fakeValue: "fake-notes.md",
+			},
+			{
+				fieldKey: "selected_artifact",
+				workflowValueKey: "selected_artifact_value",
+				fakeValue: "fake-artifact.md",
+			},
+		]) {
+			const caseTaskState = new TaskState()
+			configureSelectorDiscovery()
+
+			await activateWorkflow(caseTaskState, workflow)
+			await runtime.resolveNextAction({ taskState: caseTaskState })
+			const renderFormAction = await submitNewProjectSelection(
+				caseTaskState,
+				`${invalidCase.fieldKey} Selector Validation Project`,
+			)
+			expect(renderFormAction.kind).to.equal("render_workflow_form")
+			if (renderFormAction.kind !== "render_workflow_form") {
+				throw new Error(`Expected render_workflow_form, received ${renderFormAction.kind}.`)
+			}
+
+			const renderedOptions =
+				renderFormAction.formSession.definitionPayload.panels.selectors.fields.find(
+					(field) => field.key === invalidCase.fieldKey,
+				)?.options ?? []
+			expect(renderedOptions.some((option) => option.value === invalidCase.fakeValue)).to.equal(false)
+
+			configureSelectorDiscovery({ fieldKey: invalidCase.fieldKey, value: invalidCase.fakeValue })
+
+			const submittedValues: Record<string, string> = {
+				existing_project_choice: "Existing Alpha",
+				selected_folder: "planning",
+				selected_file: "notes.md",
+				selected_artifact: "artifact.md",
+				[invalidCase.fieldKey]: invalidCase.fakeValue,
+			}
+			const submitted = await runtime.submitWorkflowForm({
+				taskState: caseTaskState,
+				request: createFormSubmitRequest({
+					sessionId: renderFormAction.formSession.sessionId,
+					panelId: renderFormAction.formSession.currentPanelId,
+					fields: Object.entries(submittedValues).map(([key, stringValue]) => ({
+						key,
+						value: { stringValue },
+					})),
+				}),
+			})
+
+			expect(submitted.kind).to.equal("render_workflow_form")
+			if (submitted.kind !== "render_workflow_form") {
+				throw new Error(`Expected render_workflow_form, received ${submitted.kind}.`)
+			}
+			expect(submitted.payload.renderState).to.equal("failure")
+			expect(submitted.payload.errorMessage).to.equal(
+				`Field "${invalidCase.fieldKey}" does not satisfy the declared selection rules.`,
+			)
+			expect(getActiveWorkflowSession(caseTaskState).workflowValues).to.not.have.property(invalidCase.workflowValueKey)
+		}
 	})
 
 	it("keeps workflow-form field keys form-local unless workflowValueKey is declared", async () => {

@@ -5131,107 +5131,107 @@ Pause for QA review after completing Phase 43 before commit.
 
 Do not add submission-time rediscovery. The rendered form session must store the selector options shown to the user, and submission validation must use that stored rendered option set.
 
-[ ] Task 84. Prevent rendered selector-option writes from mutating shared workflow definitions.
+[x] Task 84. Prevent rendered selector-option writes from mutating shared workflow definitions.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
 
-[ ] Subtask 84.1. In `WorkflowFormRuntime.createSession(...)`, change the returned `definitionPayload` assignment from the input object to `structuredClone(options.definitionPayload)`.
+[x] Subtask 84.1. In `WorkflowFormRuntime.createSession(...)`, change the returned `definitionPayload` assignment from the input object to `structuredClone(options.definitionPayload)`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
 
-[ ] Task 85. Persist rendered active-panel selector options into the live form session.
+[x] Task 85. Persist rendered active-panel selector options into the live form session.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 85.1. In `WorkflowRuntime.ts`, add a private helper named `storeResolvedWorkflowFormPanelFields(...)` that accepts `session: WorkflowFormSessionState`, `panelId: string`, and `fields: WorkflowFormFieldDefinition[]`; the helper must update `session.definitionPayload.panels[panelId].fields` by replacing only fields whose keys appear in the resolved `fields` array, preserving all other panel properties and unrendered fields.
+[x] Subtask 85.1. In `WorkflowRuntime.ts`, add a private helper named `storeResolvedWorkflowFormPanelFields(...)` that accepts `session: WorkflowFormSessionState`, `panelId: string`, and `fields: WorkflowFormFieldDefinition[]`; the helper must update `session.definitionPayload.panels[panelId].fields` by replacing only fields whose keys appear in the resolved `fields` array, preserving all other panel properties and unrendered fields.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 85.2. In `buildWorkflowFormRenderPayload(...)`, immediately after `resolvedPanel` is built and before `buildWorkflowFormPayload(...)` is called, call `storeResolvedWorkflowFormPanelFields(...)` with the current `session`, `panelId`, and `resolvedPanel.fields`.
+[x] Subtask 85.2. In `buildWorkflowFormRenderPayload(...)`, immediately after `resolvedPanel` is built and before `buildWorkflowFormPayload(...)` is called, call `storeResolvedWorkflowFormPanelFields(...)` with the current `session`, `panelId`, and `resolvedPanel.fields`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Task 86. Prevent failed form submissions from persisting durable workflow values.
+[x] Task 86. Prevent failed form submissions from persisting durable workflow values.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 86.1. In `submitWorkflowForm(...)`, inside the `case "render_form"` branch, call `persistWorkflowFormValues(...)` only when `outcome.session.failure === undefined`.
+[x] Subtask 86.1. In `submitWorkflowForm(...)`, inside the `case "render_form"` branch, call `persistWorkflowFormValues(...)` only when `outcome.session.failure === undefined`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Task 87. Enforce selectorDiscovery submitted values against stored rendered options.
+[x] Task 87. Enforce selectorDiscovery submitted values against stored rendered options.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
 
-[ ] Subtask 87.1. In `WorkflowFormRuntime.ts`, add a local helper near `validateSelectionRules(...)` named `requiresDeclaredOptionMatch(field: WorkflowFormFieldDefinition): boolean` that returns `field.selectorDiscovery !== undefined`.
+[x] Subtask 87.1. In `WorkflowFormRuntime.ts`, add a local helper near `validateSelectionRules(...)` named `requiresDeclaredOptionMatch(field: WorkflowFormFieldDefinition): boolean` that returns `field.selectorDiscovery !== undefined`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
 
-[ ] Subtask 87.2. In `validateSelectionRules(...)`, update the single-selection `dropdown` / `radio_group` branch so selectorDiscovery fields return `allowedOptionValues.has(value.stringValue ?? "")`; preserve the existing empty-options freeform behavior only when `field.selectorDiscovery === undefined`.
+[x] Subtask 87.2. In `validateSelectionRules(...)`, update the single-selection `dropdown` / `radio_group` branch so selectorDiscovery fields return `allowedOptionValues.has(value.stringValue ?? "")`; preserve the existing empty-options freeform behavior only when `field.selectorDiscovery === undefined`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
 
-[ ] Subtask 87.3. In `validateSelectionRules(...)`, update the multi-selection `dropdown` / `radio_group` branch so selectorDiscovery fields reject every submitted selection that is not in `allowedOptionValues`, including when `allowedOptionValues.size === 0`; preserve existing non-selector behavior.
+[x] Subtask 87.3. In `validateSelectionRules(...)`, update the multi-selection `dropdown` / `radio_group` branch so selectorDiscovery fields reject every submitted selection that is not in `allowedOptionValues`, including when `allowedOptionValues.size === 0`; preserve existing non-selector behavior.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
 
-[ ] Subtask 87.4. In `validateSelectionRules(...)`, update the `multi_select` / `checkbox_group` branch so selectorDiscovery fields reject every submitted selection that is not in `allowedOptionValues`, including when `allowedOptionValues.size === 0`; preserve existing non-selector behavior.
+[x] Subtask 87.4. In `validateSelectionRules(...)`, update the `multi_select` / `checkbox_group` branch so selectorDiscovery fields reject every submitted selection that is not in `allowedOptionValues`, including when `allowedOptionValues.size === 0`; preserve existing non-selector behavior.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
 
-[ ] Subtask 87.5. In `validateSelectionRules(...)`, add explicit handling for `file_path`, `directory_path`, and `artifact_picker`: when `selectorDiscovery` is defined, require a string submitted value whose `stringValue` exists in `allowedOptionValues`; when `selectorDiscovery` is undefined, preserve existing freeform behavior.
+[x] Subtask 87.5. In `validateSelectionRules(...)`, add explicit handling for `file_path`, `directory_path`, and `artifact_picker`: when `selectorDiscovery` is defined, require a string submitted value whose `stringValue` exists in `allowedOptionValues`; when `selectorDiscovery` is undefined, preserve existing freeform behavior.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
 
-[ ] Task 88. Add workflow-runtime selector validation coverage.
+[x] Task 88. Add workflow-runtime selector validation coverage.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 88.1. In the existing selector form test, assert `renderFormAction.formSession.definitionPayload.panels.selectors.fields` contains the rendered discovered `options` for `existing_project_choice`, `selected_folder`, `selected_file`, and `selected_artifact`.
+[x] Subtask 88.1. In the existing selector form test, assert `renderFormAction.formSession.definitionPayload.panels.selectors.fields` contains the rendered discovered `options` for `existing_project_choice`, `selected_folder`, `selected_file`, and `selected_artifact`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 88.2. Add a workflow-runtime test that submits a value not present in the rendered options for each selector field kind already covered by the selector form fixture: `dropdown`, `directory_path`, `file_path`, and `artifact_picker`; each case must use a fresh `TaskState`, return `render_workflow_form` with a failure payload, and leave the destination workflow value key absent from `activeWorkflowSession.workflowValues`.
+[x] Subtask 88.2. Add a workflow-runtime test that submits a value not present in the rendered options for each selector field kind already covered by the selector form fixture: `dropdown`, `directory_path`, `file_path`, and `artifact_picker`; each case must use a fresh `TaskState`, return `render_workflow_form` with a failure payload, and leave the destination workflow value key absent from `activeWorkflowSession.workflowValues`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 88.3. In the test from Subtask 88.2, after initial render and before submit, change the discovery stub so the submitted fake value would appear in a new discovery result; assert the fake value still fails because validation uses the rendered session options rather than submission-time rediscovery.
+[x] Subtask 88.3. In the test from Subtask 88.2, after initial render and before submit, change the discovery stub so the submitted fake value would appear in a new discovery result; assert the fake value still fails because validation uses the rendered session options rather than submission-time rediscovery.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Task 89. Add workflow-form runtime selectorDiscovery unit coverage.
+[x] Task 89. Add workflow-form runtime selectorDiscovery unit coverage.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`
 
-[ ] Subtask 89.1. In `WorkflowFormRuntime.test.ts`, add a test proving a selectorDiscovery `dropdown` with `options: []` rejects a submitted string value.
+[x] Subtask 89.1. In `WorkflowFormRuntime.test.ts`, add a test proving a selectorDiscovery `dropdown` with `options: []` rejects a submitted string value.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`
 
-[ ] Subtask 89.2. In `WorkflowFormRuntime.test.ts`, add a table-driven test proving selectorDiscovery `file_path`, `directory_path`, and `artifact_picker` fields reject submitted string values that are not present in `options`.
+[x] Subtask 89.2. In `WorkflowFormRuntime.test.ts`, add a table-driven test proving selectorDiscovery `file_path`, `directory_path`, and `artifact_picker` fields reject submitted string values that are not present in `options`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`
 
-[ ] Task 90. Validate Phase 43.
+[x] Task 90. Validate Phase 43.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
@@ -5239,12 +5239,12 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 90.1. Run `rg "definitionPayload: options.definitionPayload" src/core/task/workflow-form/WorkflowFormRuntime.ts`; it must return no matches.
+[x] Subtask 90.1. Run `rg "definitionPayload: options.definitionPayload" src/core/task/workflow-form/WorkflowFormRuntime.ts`; it must return no matches.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
 
-[ ] Subtask 90.2. Run `npm run test:unit -- src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, `npm run check-types`, and `npm run lint`; all must pass before Phase 43 is marked complete.
+[x] Subtask 90.2. Run `npm run test:unit -- src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, `npm run check-types`, and `npm run lint`; all must pass before Phase 43 is marked complete.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`

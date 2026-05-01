@@ -1,4 +1,4 @@
-import type { WorkflowFormDefinitionPayload, WorkflowFormPanelDefinition } from "@shared/ExtensionMessage"
+import type { WorkflowFormDefinitionPayload, WorkflowFormFieldKind, WorkflowFormPanelDefinition } from "@shared/ExtensionMessage"
 import { WorkflowFormAction, WorkflowFormSubmissionRequest } from "@shared/proto/cline/task"
 import { expect } from "chai"
 import { describe, it } from "mocha"
@@ -553,6 +553,132 @@ describe("WorkflowFormRuntime", () => {
 		})
 		expect("payload" in outcome).to.equal(false)
 	})
+
+	it("rejects selectorDiscovery dropdown submissions when rendered options are empty", () => {
+		const runtime = createRuntime()
+		const session = createSession({
+			runtime,
+			definitionPayload: createDefinition({
+				firstPanelId: "selectors",
+				panels: {
+					selectors: {
+						panelId: "selectors",
+						title: "Selectors",
+						promptMarkdown: "Choose a discovered value.",
+						fields: [
+							{
+								key: "project",
+								kind: "dropdown",
+								label: "Project",
+								required: true,
+								allowedValueType: "string",
+								options: [],
+								selectorDiscovery: {
+									root: {
+										kind: "project_output_root",
+									},
+									entryType: "directory",
+									immediateChildrenOnly: true,
+									sort: "alpha_asc",
+								},
+							},
+						],
+						allowedActions: ["submit"],
+						transition: createTerminalTransition(),
+					},
+				},
+			}),
+		})
+
+		const outcome = runtime.handleSubmission(
+			session,
+			createSubmitRequest({
+				sessionId: session.sessionId,
+				panelId: "selectors",
+				fields: [
+					{
+						key: "project",
+						value: { stringValue: "ghost-project" },
+					},
+				],
+			}),
+		)
+
+		expect(outcome.kind).to.equal("render_form")
+		if (outcome.kind !== "render_form") {
+			throw new Error(`Expected render_form, received ${outcome.kind}.`)
+		}
+		expect(outcome.session.failure).to.deep.equal({
+			panelId: "selectors",
+			errorMessage: 'Field "project" does not satisfy the declared selection rules.',
+		})
+	})
+
+	for (const selectorCase of [
+		{ kind: "file_path", key: "selected_file", submittedValue: "missing.md" },
+		{ kind: "directory_path", key: "selected_folder", submittedValue: "missing-folder" },
+		{ kind: "artifact_picker", key: "selected_artifact", submittedValue: "missing-artifact.md" },
+	] satisfies Array<{ kind: WorkflowFormFieldKind; key: string; submittedValue: string }>) {
+		it(`rejects selectorDiscovery ${selectorCase.kind} submissions outside rendered options`, () => {
+			const runtime = createRuntime()
+			const session = createSession({
+				runtime,
+				definitionPayload: createDefinition({
+					firstPanelId: "selectors",
+					panels: {
+						selectors: {
+							panelId: "selectors",
+							title: "Selectors",
+							promptMarkdown: "Choose a discovered path.",
+							fields: [
+								{
+									key: selectorCase.key,
+									kind: selectorCase.kind,
+									label: "Selector",
+									required: true,
+									allowedValueType: "string",
+									options: [{ value: "allowed.md", label: "allowed.md" }],
+									selectorDiscovery: {
+										root: {
+											kind: "selected_project_root",
+										},
+										entryType: "file",
+										immediateChildrenOnly: true,
+										sort: "alpha_asc",
+									},
+								},
+							],
+							allowedActions: ["submit"],
+							transition: createTerminalTransition(),
+						},
+					},
+				}),
+			})
+
+			const outcome = runtime.handleSubmission(
+				session,
+				createSubmitRequest({
+					sessionId: session.sessionId,
+					panelId: "selectors",
+					fields: [
+						{
+							key: selectorCase.key,
+							value: { stringValue: selectorCase.submittedValue },
+						},
+					],
+				}),
+			)
+
+			expect(outcome.kind).to.equal("render_form")
+			if (outcome.kind !== "render_form") {
+				throw new Error(`Expected render_form, received ${outcome.kind}.`)
+			}
+			expect(outcome.session.failure).to.deep.equal({
+				panelId: "selectors",
+				errorMessage: `Field "${selectorCase.key}" does not satisfy the declared selection rules.`,
+			})
+		})
+	}
 
 	it("verifies value normalization for numeric and checkbox-group submissions", () => {
 		const runtime = createRuntime()

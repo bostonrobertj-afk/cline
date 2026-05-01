@@ -294,10 +294,12 @@ export class WorkflowRuntime {
 
 		switch (outcome.kind) {
 			case "render_form": {
-				await this.persistWorkflowFormValues({
-					taskState,
-					formSession: outcome.session,
-				})
+				if (outcome.session.failure === undefined) {
+					await this.persistWorkflowFormValues({
+						taskState,
+						formSession: outcome.session,
+					})
+				}
 				session.ui.formSession = outcome.session
 				const definition = this.getActiveWorkflowDefinition(taskState)
 				if (!definition) {
@@ -1843,6 +1845,7 @@ export class WorkflowRuntime {
 			session,
 			panel,
 		})
+		this.storeResolvedWorkflowFormPanelFields(session, panelId, resolvedPanel.fields)
 
 		return buildWorkflowFormPayload({
 			session,
@@ -1850,6 +1853,23 @@ export class WorkflowRuntime {
 			panel: resolvedPanel,
 			errorMessage: session.failure?.errorMessage,
 		})
+	}
+
+	private storeResolvedWorkflowFormPanelFields(
+		session: WorkflowFormSessionState,
+		panelId: string,
+		fields: WorkflowFormFieldDefinition[],
+	): void {
+		const panel = session.definitionPayload.panels[panelId]
+		if (!panel) {
+			throw new Error(`Workflow form definition references an unknown panel: ${panelId}`)
+		}
+
+		const resolvedFieldsByKey = new Map(fields.map((field) => [field.key, field]))
+		session.definitionPayload.panels[panelId] = {
+			...panel,
+			fields: panel.fields.map((field) => resolvedFieldsByKey.get(field.key) ?? field),
+		}
 	}
 
 	private getWorkflowFormPanel(definition: WorkflowFormDefinitionPayload, panelId: string): WorkflowFormPanelDefinition {
