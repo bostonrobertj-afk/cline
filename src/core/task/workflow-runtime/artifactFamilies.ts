@@ -1,5 +1,7 @@
 export enum WorkflowArtifactFamily {
-	Epic = "epic",
+	Epics = "epics",
+	EpicsIndex = "epics_index",
+	EpicDeliverySpec = "epic_delivery_spec",
 	Story = "story",
 	RemediationStory = "remediation_story",
 	ReviewBlindHunter = "review_blind_hunter",
@@ -9,36 +11,114 @@ export enum WorkflowArtifactFamily {
 	ReviewInputDiff = "review_input_diff",
 }
 
-export type WorkflowArtifactAllocationMode = "new_numbered" | "derived_from_target"
-export type WorkflowArtifactIdentityRequirement = "none" | "parent_epic" | "parent_story" | "target_story_or_remediation_story"
-export type WorkflowArtifactNumberingScope = "project" | "parent_epic" | "parent_story" | "target_identity"
+export type WorkflowArtifactAllocationMode =
+	| "singleton_project"
+	| "derived_from_epic_index"
+	| "new_numbered"
+	| "derived_from_target"
+export type WorkflowArtifactIdentityRequirement =
+	| "none"
+	| "epic_index"
+	| "parent_epic_delivery_spec"
+	| "parent_story"
+	| "target_story_or_remediation_story"
+export type WorkflowArtifactNumberingScope =
+	| "project_singleton"
+	| "epic_index"
+	| "parent_epic"
+	| "parent_story"
+	| "target_identity"
+export type WorkflowArtifactFileExtension = ".md" | ".json" | ".diff"
+export type WorkflowArtifactContentKind = "markdown" | "structured_json_index" | "diff"
 
-export interface WorkflowArtifactFamilyDefinition {
+interface WorkflowArtifactFamilyDefinitionBase {
 	family: WorkflowArtifactFamily
-	allocationMode: WorkflowArtifactAllocationMode
-	identityRequirement: WorkflowArtifactIdentityRequirement
 	filenamePattern: string
-	fileExtension: ".md" | ".diff"
-	numberingScope: WorkflowArtifactNumberingScope
+	fileExtension: WorkflowArtifactFileExtension
+	contentKind: WorkflowArtifactContentKind
 	discoveryPattern: RegExp
 }
 
+export interface WorkflowSingletonProjectArtifactFamilyDefinition extends WorkflowArtifactFamilyDefinitionBase {
+	family: WorkflowArtifactFamily.Epics | WorkflowArtifactFamily.EpicsIndex
+	allocationMode: "singleton_project"
+	identityRequirement: "none"
+	numberingScope: "project_singleton"
+	singletonIdentity: "epics" | "epics_index"
+}
+
+export interface WorkflowEpicIndexDerivedArtifactFamilyDefinition extends WorkflowArtifactFamilyDefinitionBase {
+	family: WorkflowArtifactFamily.EpicDeliverySpec
+	allocationMode: "derived_from_epic_index"
+	identityRequirement: "epic_index"
+	numberingScope: "epic_index"
+}
+
+export interface WorkflowNewNumberedArtifactFamilyDefinition extends WorkflowArtifactFamilyDefinitionBase {
+	family: WorkflowArtifactFamily.Story | WorkflowArtifactFamily.RemediationStory
+	allocationMode: "new_numbered"
+	identityRequirement: "parent_epic_delivery_spec" | "parent_story"
+	numberingScope: "parent_epic" | "parent_story"
+}
+
+export interface WorkflowTargetDerivedArtifactFamilyDefinition extends WorkflowArtifactFamilyDefinitionBase {
+	family:
+		| WorkflowArtifactFamily.ReviewBlindHunter
+		| WorkflowArtifactFamily.ReviewEdgeCaseHunter
+		| WorkflowArtifactFamily.AdversarialReview
+		| WorkflowArtifactFamily.ReviewInputMarkdown
+		| WorkflowArtifactFamily.ReviewInputDiff
+	allocationMode: "derived_from_target"
+	identityRequirement: "target_story_or_remediation_story"
+	numberingScope: "target_identity"
+}
+
+export type WorkflowArtifactFamilyDefinition =
+	| WorkflowSingletonProjectArtifactFamilyDefinition
+	| WorkflowEpicIndexDerivedArtifactFamilyDefinition
+	| WorkflowNewNumberedArtifactFamilyDefinition
+	| WorkflowTargetDerivedArtifactFamilyDefinition
+
 export const WORKFLOW_ARTIFACT_FAMILY_REGISTRY: Readonly<Record<WorkflowArtifactFamily, WorkflowArtifactFamilyDefinition>> = {
-	[WorkflowArtifactFamily.Epic]: {
-		family: WorkflowArtifactFamily.Epic,
-		allocationMode: "new_numbered",
+	[WorkflowArtifactFamily.Epics]: {
+		family: WorkflowArtifactFamily.Epics,
+		allocationMode: "singleton_project",
 		identityRequirement: "none",
-		filenamePattern: "Epic-{E}.md",
+		filenamePattern: "Epics.md",
 		fileExtension: ".md",
-		numberingScope: "project",
-		discoveryPattern: /^Epic-(\d+)\.md$/,
+		contentKind: "markdown",
+		numberingScope: "project_singleton",
+		singletonIdentity: "epics",
+		discoveryPattern: /^Epics\.md$/,
+	},
+	[WorkflowArtifactFamily.EpicsIndex]: {
+		family: WorkflowArtifactFamily.EpicsIndex,
+		allocationMode: "singleton_project",
+		identityRequirement: "none",
+		filenamePattern: "Epics.index.json",
+		fileExtension: ".json",
+		contentKind: "structured_json_index",
+		numberingScope: "project_singleton",
+		singletonIdentity: "epics_index",
+		discoveryPattern: /^Epics\.index\.json$/,
+	},
+	[WorkflowArtifactFamily.EpicDeliverySpec]: {
+		family: WorkflowArtifactFamily.EpicDeliverySpec,
+		allocationMode: "derived_from_epic_index",
+		identityRequirement: "epic_index",
+		filenamePattern: "Epic-{E}-delivery-spec.md",
+		fileExtension: ".md",
+		contentKind: "markdown",
+		numberingScope: "epic_index",
+		discoveryPattern: /^Epic-(\d+)-delivery-spec\.md$/,
 	},
 	[WorkflowArtifactFamily.Story]: {
 		family: WorkflowArtifactFamily.Story,
 		allocationMode: "new_numbered",
-		identityRequirement: "parent_epic",
+		identityRequirement: "parent_epic_delivery_spec",
 		filenamePattern: "Story-{E}-{S}.md",
 		fileExtension: ".md",
+		contentKind: "markdown",
 		numberingScope: "parent_epic",
 		discoveryPattern: /^Story-(\d+)-(\d+)\.md$/,
 	},
@@ -48,6 +128,7 @@ export const WORKFLOW_ARTIFACT_FAMILY_REGISTRY: Readonly<Record<WorkflowArtifact
 		identityRequirement: "parent_story",
 		filenamePattern: "Remediation-story-{E}-{S}-{R}.md",
 		fileExtension: ".md",
+		contentKind: "markdown",
 		numberingScope: "parent_story",
 		discoveryPattern: /^Remediation-story-(\d+)-(\d+)-(\d+)\.md$/,
 	},
@@ -57,6 +138,7 @@ export const WORKFLOW_ARTIFACT_FAMILY_REGISTRY: Readonly<Record<WorkflowArtifact
 		identityRequirement: "target_story_or_remediation_story",
 		filenamePattern: "Review-blind-hunter-{target}.md",
 		fileExtension: ".md",
+		contentKind: "markdown",
 		numberingScope: "target_identity",
 		discoveryPattern: /^Review-blind-hunter-(\d+-\d+(?:-\d+)?)\.md$/,
 	},
@@ -66,6 +148,7 @@ export const WORKFLOW_ARTIFACT_FAMILY_REGISTRY: Readonly<Record<WorkflowArtifact
 		identityRequirement: "target_story_or_remediation_story",
 		filenamePattern: "Review-edge-case-hunter-{target}.md",
 		fileExtension: ".md",
+		contentKind: "markdown",
 		numberingScope: "target_identity",
 		discoveryPattern: /^Review-edge-case-hunter-(\d+-\d+(?:-\d+)?)\.md$/,
 	},
@@ -75,6 +158,7 @@ export const WORKFLOW_ARTIFACT_FAMILY_REGISTRY: Readonly<Record<WorkflowArtifact
 		identityRequirement: "target_story_or_remediation_story",
 		filenamePattern: "Adversarial-review-{target}.md",
 		fileExtension: ".md",
+		contentKind: "markdown",
 		numberingScope: "target_identity",
 		discoveryPattern: /^Adversarial-review-(\d+-\d+(?:-\d+)?)\.md$/,
 	},
@@ -84,6 +168,7 @@ export const WORKFLOW_ARTIFACT_FAMILY_REGISTRY: Readonly<Record<WorkflowArtifact
 		identityRequirement: "target_story_or_remediation_story",
 		filenamePattern: "Review-input-{target}.md",
 		fileExtension: ".md",
+		contentKind: "markdown",
 		numberingScope: "target_identity",
 		discoveryPattern: /^Review-input-(\d+-\d+(?:-\d+)?)\.md$/,
 	},
@@ -93,6 +178,7 @@ export const WORKFLOW_ARTIFACT_FAMILY_REGISTRY: Readonly<Record<WorkflowArtifact
 		identityRequirement: "target_story_or_remediation_story",
 		filenamePattern: "Review-input-{target}.diff",
 		fileExtension: ".diff",
+		contentKind: "diff",
 		numberingScope: "target_identity",
 		discoveryPattern: /^Review-input-(\d+-\d+(?:-\d+)?)\.diff$/,
 	},

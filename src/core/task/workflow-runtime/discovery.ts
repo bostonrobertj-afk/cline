@@ -63,10 +63,15 @@ function compareCandidates(
 export async function discoverWorkflowCandidates(request: WorkflowDiscoveryRequest): Promise<WorkflowDiscoveryCandidate[]> {
 	const resolvedTargetDirectory = resolveTargetDirectory(request)
 
+	if (!request.workspacePathPolicy.validateAccess(resolvedTargetDirectory)) {
+		throw new Error(`Workflow discovery target directory is blocked by workspace path policy: ${resolvedTargetDirectory}`)
+	}
+
 	try {
 		const entries = await fs.readdir(resolvedTargetDirectory, { withFileTypes: true })
 
 		return entries
+			.filter((entry) => request.workspacePathPolicy.validateAccess(path.join(resolvedTargetDirectory, entry.name)))
 			.filter((entry) => matchesEntryType(entry, request.entryType))
 			.filter((entry) => matchesImmediateChildrenOnly(entry.name, request.immediateChildrenOnly))
 			.filter((entry) => matchesNamingPattern(entry.name, request.namingPattern))

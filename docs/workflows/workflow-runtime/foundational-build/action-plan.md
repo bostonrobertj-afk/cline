@@ -52,6 +52,10 @@ This plan also covers the foundational runtime-owned artifact allocation/create 
 - Runtime-owned artifact allocation introduces a backend-only workflow execution tool and canonical filename registry. Treat those canonical names as product-owned runtime conventions, not module configuration; do not add static prompt/native exposure, and do not preserve the old `relativePathPattern` artifact model in parallel.
 - The current runtime still contains stale branch-action naming around tool-backed workflow operation execution. That naming must not survive as a separate workflow concept: direct runtime-owned deterministic procedures must stay inside `WorkflowRuntime` or shared runtime-owned seams, and only tool-governed work may flow through the normal tool execution path.
 - Invalid or stale workflow resume and invalid runtime resolve paths can currently clear in-memory workflow state without guaranteeing persisted metadata cleanup. Phase 25 must make teardown persistence explicit; do not solve this by persisting every `no_op`.
+- Current workflow-value persistence is string-only and silently drops workflow-form array/object submissions. Phase 27 must align runtime storage, form persistence, workflow tool parsing, and string-only consumers with `FR-35i` through `FR-35m` and `FR-39l` through `FR-39m`; it must also handle model-authored JSON-string tool parameters and prevent nested workflow-form array/object normalization from dropping malformed entries before durable persistence.
+- Runtime workflow filesystem access still bypasses the workspace path-policy seam in discovery, artifact creation, and entry project folder creation. Phase 28 enforced handler-level checks only; Phase 29 wires the existing `ClineIgnoreController.validateAccess(...)` seam into `WorkflowRuntime` and runtime discovery before runtime-owned `readdir`, `mkdir`, or `writeFile`.
+- `ActiveWorkflowSession` still carries `workflowName`, and resume still resolves/restores from `persistedSession.workflowName`. Phase 30 must remove workflow identity from the workflow session shape so `activeWorkflowName` remains the only canonical active workflow identity carrier required by `FR-3`, `FR-4`, and architecture AD-3. Do not remove legitimate workflow definition, activation-argument, registry-resolution, or diagnostic uses of `workflowName`.
+- Workflow activation and workflow-state-mutating tool paths still drop returned workflow next actions outside the slash-command path. Phase 31 must make next-action consumption a shared runtime-adjacent seam used by slash activation, main-agent workflow `use_skill`, workflow progress requests, workflow value writes, and parent-assigned child workflow activation. `SubagentRunner` may call this seam with a child adapter, but it must not become a second workflow orchestrator.
 
 ## Tasks / Subtasks
 
@@ -161,6 +165,7 @@ Pause for QA review before moving to Phase 3.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflowValues.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/WorkflowProgressRequestToolHandler.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
@@ -3494,6 +3499,1011 @@ Allowed files:
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/WorkflowProgressRequestToolHandler.test.ts`
 
+## Phase 27 - Typed Workflow Values And Durable Form Persistence
+
+Pause for QA review after completing Phase 27 before commit.
+
+[x] Task 40. Implement JSON-safe workflow-value persistence across the runtime, workflow forms, and workflow tool handlers.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/SetWorkflowValuesToolHandler.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/BuildWorkflowDocumentToolHandler.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/SetWorkflowValuesToolHandler.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/BuildWorkflowDocumentToolHandler.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/backendWorkflowToolContractTypes.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/backendWorkflowToolContracts.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/shared/ExtensionMessage.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/schema.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/schema.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/story-tools/storyTaskDocument.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/CodeReviewSpecUpdateToolHandler.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 40.1. In `src/core/task/workflow-runtime/types.ts`, replace `export type WorkflowValue = string` with a recursive JSON-safe workflow-value type that supports `string`, `number`, `boolean`, arrays of workflow values, and object maps whose property values are workflow values. Keep `export type WorkflowValues = Record<string, WorkflowValue>` unchanged except for consuming the widened `WorkflowValue` alias.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+
+[x] Subtask 40.2. Add `src/core/task/workflow-runtime/workflowValues.ts` exporting these exact helpers: `isWorkflowValue(value: unknown): value is WorkflowValue` validates recursive JSON-safe workflow values; `areWorkflowValuesEqual(left: WorkflowValue | undefined, right: WorkflowValue): boolean` compares JSON-safe values with deterministic deep equality; `readRequiredStringWorkflowValue(args: { workflowValues: WorkflowValues; key: string; context: string }): string` returns a trimmed non-empty string workflow value or throws a clear error naming the key and context; and `stringifyWorkflowValueForPrompt(value: WorkflowValue): string` renders strings as-is, numbers and booleans with `String(value)`, and arrays/objects as stable JSON with deterministic object-key ordering. Import `WorkflowValue` and `WorkflowValues` as type-only imports from `./types`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflowValues.ts`
+
+[x] Subtask 40.2a. In `src/core/task/workflow-runtime/types.ts`, add `renderWorkflowValue(value: WorkflowValue): string` to `WorkflowPromptBuilderInput` so workflow-module prompt builders receive the runtime-owned deterministic workflow-value renderer instead of implementing their own value rendering.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+
+[x] Subtask 40.2b. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, import `stringifyWorkflowValueForPrompt` from `./workflowValues`, update `buildTurnProjection(...)` so it builds one `WorkflowPromptBuilderInput` object shaped as `{ session, step: activeStep, renderWorkflowValue: stringifyWorkflowValueForPrompt }`, then passes that object to both `activeStep.buildPromptSource(...)` and `activeStep.buildToolSchema(...)`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 40.3. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, import `areWorkflowValuesEqual` and `isWorkflowValue` from `./workflowValues`, then revise `applyWorkflowValueWrites(...)` so it no longer calls `.trim()` on each raw workflow value, rejects any value that fails `isWorkflowValue(...)`, compares existing and incoming values with `areWorkflowValuesEqual(...)`, preserves changed values with their original JSON-safe type and shape, and keeps authorization based only on the active workflow definition's `workflowValueKeys`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 40.4. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, replace `convertWorkflowFormSubmittedValueToWorkflowValue(...)` so its return type is exactly `{ ok: true; value: WorkflowValue } | { ok: false; errorMessage: string }` rather than `string | undefined`; successful results must carry a `WorkflowValue` converted from `string`, `boolean`, `integer`, `number`, `array`, or `object` submitted values, and failed results must carry an error message naming the unsupported or malformed submitted value type.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 40.5. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, update `collectWorkflowValueWritesFromFormSession(...)` so every field with a declared `workflowValueKey` either writes the successfully converted `WorkflowValue` into the returned `WorkflowValues` map or throws `new Error(conversion.errorMessage)` when `convertWorkflowFormSubmittedValueToWorkflowValue(...)` returns `{ ok: false, ... }`; do not silently continue when a declared durable form value cannot be normalized.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 40.6. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, import `readRequiredStringWorkflowValue` from `./workflowValues`, then replace artifact identity and artifact destination reads that currently call `.trim()` directly on `session.workflowValues[...]` with `readRequiredStringWorkflowValue({ workflowValues: session.workflowValues, key: ..., context: ... })`; the updated context text must clearly identify whether the value is needed for artifact identity or artifact destination resolution.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 40.7. In `src/core/task/tools/handlers/SetWorkflowValuesToolHandler.ts`, update `readWorkflowValues(...)` so the `values` parameter accepts either a non-empty object map or a JSON string that parses to a non-empty object map, rejects malformed JSON, array roots, null roots, empty objects, and non-JSON-safe property values, validates every parsed value with `isWorkflowValue(...)`, and preserves the original JSON-safe value type and shape before passing values to `WorkflowRuntime.applyWorkflowValueWrites(...)`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/SetWorkflowValuesToolHandler.ts`
+
+[x] Subtask 40.7a. Add `src/core/task/tools/handlers/__tests__/SetWorkflowValuesToolHandler.test.ts` with coverage proving `set_workflow_values` persists JSON-safe string, number, boolean, array, and object values when `values` is supplied as a JSON string, still persists the same values when `values` is supplied as an object, and rejects malformed JSON, array-root JSON, empty-object JSON, and non-JSON-safe property values before calling `WorkflowRuntime.applyWorkflowValueWrites(...)`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/SetWorkflowValuesToolHandler.test.ts`
+
+[x] Subtask 40.8. In `src/core/task/tools/handlers/BuildWorkflowDocumentToolHandler.ts`, update `parseRequest(...)` so optional `workflow_value_writes` accepts either a non-empty object map or a JSON string that parses to a non-empty object map, rejects malformed JSON, array roots, null roots, empty objects, and non-JSON-safe property values, validates every parsed value with `isWorkflowValue(...)`, preserves the original JSON-safe value type and shape before calling `WorkflowRuntime.applyWorkflowValueWrites(...)`, and keeps the invalid-parameter error text aligned to JSON-safe workflow values rather than string-only values.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/BuildWorkflowDocumentToolHandler.ts`
+
+[x] Subtask 40.8a. In `src/core/task/tools/backendWorkflowToolContractTypes.ts`, add `"number"` to the `BackendWorkflowToolSchemaNode.type` union so backend workflow tool contracts can represent the JSON-safe workflow-value number type.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/backendWorkflowToolContractTypes.ts`
+
+[x] Subtask 40.8b. In `src/shared/ExtensionMessage.ts`, add `"number"` to `WorkflowFormJsonSchemaType` so workflow-form JSON schemas can represent backend workflow tool contract number values.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/shared/ExtensionMessage.ts`
+
+[x] Subtask 40.8c. In `src/core/task/workflow-form/schema.ts`, update `deriveWorkflowFormFieldKind(...)` so schema type `"number"` returns `"number"`, and update `validateToolInputAgainstWorkflowFormSchema(...)` so schema type `"number"` accepts only finite JavaScript numbers.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/schema.ts`
+
+[x] Subtask 40.8d. In `src/core/task/workflow-form/__tests__/schema.test.ts`, replace the string-only `set_workflow_values` additionalProperties assertion with coverage proving the workflow-value additionalProperties schema accepts JSON-safe workflow values, including string, number, boolean, array, and object values.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/schema.test.ts`
+
+[x] Subtask 40.8e. In `src/core/task/workflow-form/schema.ts`, replace the lossy nested array/object branches in `normalizeWorkflowFormSubmittedValue(...)` so malformed nested values throw explicit errors instead of being dropped by `.filter(...)`; array normalization must throw when any nested entry cannot be normalized, and object normalization must throw when any entry key is blank after trimming or any nested entry value cannot be normalized.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/schema.ts`
+
+[x] Subtask 40.8f. In `src/core/task/workflow-form/__tests__/schema.test.ts`, add coverage proving `normalizeWorkflowFormSubmittedValue(...)` throws for malformed nested array entries and malformed nested object entry values instead of returning truncated arrays or objects.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/schema.test.ts`
+
+[x] Subtask 40.8g. In `src/core/task/tools/handlers/__tests__/BuildWorkflowDocumentToolHandler.test.ts`, add coverage proving `build_workflow_document` applies JSON-safe workflow value writes when `workflow_value_writes` is supplied as a JSON string, still applies the same values when `workflow_value_writes` is supplied as an object, and rejects malformed JSON, array-root JSON, empty-object JSON, and non-JSON-safe property values before calling `WorkflowRuntime.applyWorkflowValueWrites(...)`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/BuildWorkflowDocumentToolHandler.test.ts`
+
+[x] Subtask 40.9. In `src/core/task/tools/backendWorkflowToolContracts.ts`, replace the string-only `additionalProperties: { type: "string" }` schema for `set_workflow_values.values` and `build_workflow_document.workflow_value_writes` with a recursive JSON-safe schema node that allows strings, numbers, booleans, arrays, and objects whose values are workflow values.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/backendWorkflowToolContracts.ts`
+
+[x] Subtask 40.10. In `src/core/task/story-tools/storyTaskDocument.ts`, import `WorkflowValues` from `@/core/task/workflow-runtime/types`, update `resolveActiveStoryPath(...)` so it accepts `workflowValues?: WorkflowValues`, and replace every direct optional `.trim()` call on workflow values with explicit string checks: `story_path` must be `typeof value === "string"` and non-empty after trimming or the function must return the existing missing-`story_path` error; `cwd`, `project_root`, and `project-root` may contribute to `resolutionBase` only when their stored workflow value is a string.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/story-tools/storyTaskDocument.ts`
+
+[x] Subtask 40.11. In `src/core/task/tools/handlers/CodeReviewSpecUpdateToolHandler.ts`, replace every direct optional `.trim()` call on workflow values with explicit string checks: `review_input` and `story_path` must be `typeof value === "string"` and non-empty after trimming or the handler must return the existing missing-`review_input` and missing-`story_path` error messages; `cwd`, `project_root`, and `project-root` may contribute to `resolutionBase` only when their stored workflow value is a string.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/CodeReviewSpecUpdateToolHandler.ts`
+
+[x] Subtask 40.12. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving active-step workflow-form submissions persist declared durable string, number, boolean, array, and object values through `workflowValueKey` destinations; assert arrays and objects are stored as typed values rather than stringified JSON.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 40.13. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving `applyWorkflowValueWrites(...)` treats an unchanged typed array or object as unchanged through deterministic deep equality and records a changed value when any nested JSON-safe value differs.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 40.14. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add or update coverage proving malformed top-level values, malformed nested array entries, and malformed nested object entry values with declared `workflowValueKey` destinations fail explicitly and do not persist missing, skipped, or truncated workflow values.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 40.15. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving string-only runtime consumers reject non-string workflow values clearly when artifact identity or artifact destination resolution requires a string workflow value.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Task 41. Unblock repository validation for the workflow progress request handler test.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/WorkflowProgressRequestToolHandler.test.ts`
+
+[x] Subtask 41.1. In `src/core/task/tools/handlers/__tests__/WorkflowProgressRequestToolHandler.test.ts`, before each `JSON.parse(lastFollowupMessage.text)` assertion, add an explicit string guard that throws a test error if `lastFollowupMessage.text` is not a string, then parse the guarded string variable. Do not use type assertions.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/WorkflowProgressRequestToolHandler.test.ts`
+
+[x] Subtask 41.2. In `src/core/task/tools/handlers/__tests__/WorkflowProgressRequestToolHandler.test.ts`, replace the `as unknown as TaskConfig` test config assertion with a typed `TaskConfig` object or the existing `validateTaskConfig(config)` test helper pattern used by sibling handler tests. Do not introduce replacement type assertions.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/WorkflowProgressRequestToolHandler.test.ts`
+
+## Phase 28 - Workflow File Path Policy Enforcement
+
+Pause for QA review after completing Phase 28 before commit.
+
+[x] Task 42. Enforce the existing `ToolValidator.checkClineIgnorePath(...)` seam for workflow file-writing tools before approval, hooks, reads, or writes.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/ToolExecutorCoordinator.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/CreateWorkflowArtifactToolHandler.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/BuildWorkflowDocumentToolHandler.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/CreateWorkflowArtifactToolHandler.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/BuildWorkflowDocumentToolHandler.test.ts`
+
+[x] Subtask 42.1. In `src/core/task/tools/ToolExecutorCoordinator.ts`, change the `BUILD_WORKFLOW_DOCUMENT` handler factory to pass `v` into `new BuildWorkflowDocumentToolHandler(v)`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/ToolExecutorCoordinator.ts`
+
+[x] Subtask 42.2. In `src/core/task/tools/ToolExecutorCoordinator.ts`, change the `CREATE_WORKFLOW_ARTIFACT` handler factory to pass `v` into `new CreateWorkflowArtifactToolHandler(v)`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/ToolExecutorCoordinator.ts`
+
+[x] Subtask 42.3. In `src/core/task/tools/handlers/CreateWorkflowArtifactToolHandler.ts`, import `ToolValidator` as a type and add `constructor(private readonly validator: ToolValidator) {}` to the handler class.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/CreateWorkflowArtifactToolHandler.ts`
+
+[x] Subtask 42.4. In `src/core/task/tools/handlers/CreateWorkflowArtifactToolHandler.ts`, immediately after `prepareWorkflowArtifactCreation(...)` returns and before building approval text, auto-approval, notification, hooks, or `createWorkflowArtifact(...)`, call `this.validator.checkClineIgnorePath(preparedArtifact.artifactAbsolutePath)` and return `formatResponse.toolError(formatResponse.clineIgnoreError(preparedArtifact.artifactAbsolutePath))` on denial.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/CreateWorkflowArtifactToolHandler.ts`
+
+[x] Subtask 42.5. In `src/core/task/tools/handlers/BuildWorkflowDocumentToolHandler.ts`, import `ToolValidator` as a type and add `constructor(private readonly validator: ToolValidator) {}` to the handler class.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/BuildWorkflowDocumentToolHandler.ts`
+
+[x] Subtask 42.6. In `src/core/task/tools/handlers/BuildWorkflowDocumentToolHandler.ts`, immediately after destructuring `destinationPath` from the parsed request and before `fs.readFile(...)`, approval, hooks, or `atomicReplaceTextFile(...)`, call `this.validator.checkClineIgnorePath(destinationPath)` and return `formatResponse.toolError(formatResponse.clineIgnoreError(destinationPath))` on denial.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/BuildWorkflowDocumentToolHandler.ts`
+
+[x] Subtask 42.7. In `src/core/task/tools/handlers/__tests__/CreateWorkflowArtifactToolHandler.test.ts`, update existing handler construction to pass a real `ToolValidator` built from `ClineIgnoreController`; do not use `any`, `as any`, or replacement type assertions.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/CreateWorkflowArtifactToolHandler.test.ts`
+
+[x] Subtask 42.8. In `src/core/task/tools/handlers/__tests__/CreateWorkflowArtifactToolHandler.test.ts`, add coverage proving a `.clineignore`-blocked artifact path returns a clineignore tool error before approval, hooks, or `WorkflowRuntime.createWorkflowArtifact(...)`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/CreateWorkflowArtifactToolHandler.test.ts`
+
+[x] Subtask 42.9. Add `src/core/task/tools/handlers/__tests__/BuildWorkflowDocumentToolHandler.test.ts` with coverage proving a `.clineignore`-blocked destination path returns a clineignore tool error before file read, approval, hooks, or write.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/BuildWorkflowDocumentToolHandler.test.ts`
+
+## Phase 29 - Runtime Workspace Path Policy Enforcement
+
+Pause for QA review after completing Phase 29 before commit.
+
+[x] Task 43. Add runtime-level workspace path-policy wiring.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/discovery.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
+
+[x] Subtask 43.1. In `src/core/task/workflow-runtime/types.ts`, add `WorkflowWorkspacePathPolicy` with `validateAccess(filePath: string): boolean`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+
+[x] Subtask 43.2. In `src/core/task/workflow-runtime/types.ts`, add required `workspacePathPolicy: WorkflowWorkspacePathPolicy` to `WorkflowDiscoveryRequest`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+
+[x] Subtask 43.3. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, require `workspacePathPolicy: WorkflowWorkspacePathPolicy` in the constructor and store it as a private readonly field.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 43.4. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, add one private helper that throws when `this.workspacePathPolicy.validateAccess(path)` returns `false`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 43.5. In `src/core/task/workflow-runtime/discovery.ts`, validate the resolved target directory before `fs.readdir(...)`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/discovery.ts`
+
+[x] Subtask 43.6. In `src/core/task/workflow-runtime/discovery.ts`, filter discovered entries through `request.workspacePathPolicy.validateAccess(path.join(resolvedTargetDirectory, entry.name))` before mapping candidates.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/discovery.ts`
+
+[x] Subtask 43.7. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, pass `this.workspacePathPolicy` into existing-project discovery.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 43.8. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, pass `this.workspacePathPolicy` into workflow-form selector discovery.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 43.9. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, pass `this.workspacePathPolicy` into artifact discovery.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 43.10. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, validate `dirname(allocation.artifactAbsolutePath)` before artifact `mkdir`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 43.11. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, validate `allocation.artifactAbsolutePath` before artifact `writeFile`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 43.12. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, validate the entry project root before project-root `mkdir`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 43.13. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, validate each canonical project subfolder before subfolder `mkdir`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 43.14. In `src/core/task/index.ts`, construct `WorkflowRuntime` with `workspacePathPolicy: this.clineIgnoreController`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
+
+[x] Task 44. Add path-policy test coverage and constructor fallout fixes.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/discovery.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/CreateWorkflowArtifactToolHandler.test.ts`
+
+[x] Subtask 44.1. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, update every `new WorkflowRuntime(...)` construction to pass an explicit typed allow-all or denial-specific `workspacePathPolicy`; do not use type assertions.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 44.2. In `src/core/task/__tests__/workflow-runtime-metadata.test.ts`, update every `new WorkflowRuntime(...)` construction to pass an explicit typed allow-all `workspacePathPolicy`; do not use type assertions.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
+
+[x] Subtask 44.3. In `src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`, update every `new WorkflowRuntime(...)` construction to pass an explicit typed allow-all `workspacePathPolicy`; do not use type assertions.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+
+[x] Subtask 44.4. In `src/core/task/tools/handlers/__tests__/CreateWorkflowArtifactToolHandler.test.ts`, update every `new WorkflowRuntime(...)` construction to pass an explicit typed allow-all or denial-specific `workspacePathPolicy`; do not use type assertions.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/CreateWorkflowArtifactToolHandler.test.ts`
+
+[x] Subtask 44.5. In `src/core/task/workflow-runtime/__tests__/discovery.test.ts`, add discovery coverage proving denied target directories fail before `ENOENT` fallback.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/discovery.test.ts`
+
+[x] Subtask 44.6. In `src/core/task/workflow-runtime/__tests__/discovery.test.ts`, add discovery coverage proving denied child entries are filtered out of returned candidates.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/discovery.test.ts`
+
+[x] Subtask 44.7. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add runtime coverage proving artifact parent-directory denial prevents directory creation.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 44.8. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add runtime coverage proving artifact file-path denial prevents file creation.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 44.9. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add runtime coverage proving entry project-root denial prevents project folder creation.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 44.10. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add runtime coverage proving canonical project-subfolder denial prevents that subfolder creation.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 44.11. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving `WorkflowRuntime` passes its constructor-supplied `workspacePathPolicy` into existing-project discovery.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 44.12. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving `WorkflowRuntime` passes its constructor-supplied `workspacePathPolicy` into workflow-form selector discovery.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 44.13. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving `WorkflowRuntime` passes its constructor-supplied `workspacePathPolicy` into artifact discovery.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+## Phase 30 - Remove Parallel Workflow Session Identity Carrier
+
+Pause for QA review after completing Phase 30 before commit.
+
+[x] Task 45. Remove workflow identity from active and persisted workflow session state.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 45.1. In `src/core/task/workflow-runtime/types.ts`, remove the `workflowName: WorkflowName` member from `ActiveWorkflowSession`; keep `export type PersistedWorkflowSession = ActiveWorkflowSession` so persisted sessions no longer carry workflow identity through the session object.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+
+[x] Subtask 45.2. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, remove the `workflowName: workflow.name` property from the `taskState.activeWorkflowSession = { ... }` object created by `activateWorkflow(...)`; keep `taskState.activeWorkflowName = workflow.name` as the canonical active workflow identity assignment.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 45.3. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, add one private helper named `cloneWorkflowSession(session: ActiveWorkflowSession): ActiveWorkflowSession` that returns a newly constructed object containing only `activeStepNumber`, `workflowValues`, `projectSelection`, `ui`, and `branchContext`; each nested object must be cloned with `structuredClone(...)`, and the helper must not spread or clone the whole session object.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 45.4. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, update `getPersistedSession(...)` to return `this.cloneWorkflowSession(args.taskState.activeWorkflowSession)` when an active session exists, instead of directly returning `structuredClone(args.taskState.activeWorkflowSession)`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 45.5. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, update `restorePersistedSession(...)` so a present `persistedSession` with `taskState.activeWorkflowName === undefined` returns `await this.teardownWorkflowAndRequirePersistence({ taskState })` before workflow definition resolution.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 45.6. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, update `restorePersistedSession(...)` so workflow definition resolution calls `resolveWorkflowDefinition(taskState.activeWorkflowName)` instead of `resolveWorkflowDefinition(persistedSession.workflowName)`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 45.7. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, remove the assignment `taskState.activeWorkflowName = persistedSession.workflowName` from `restorePersistedSession(...)`; do not replace it with any assignment from the persisted session.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 45.8. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, update `restorePersistedSession(...)` so restored session state is assigned with `taskState.activeWorkflowSession = this.cloneWorkflowSession(persistedSession)` instead of `structuredClone(persistedSession)`, preventing legacy persisted `workflowName` properties from being retained or re-persisted.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Task 46. Update tests for canonical workflow identity ownership.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/CreateWorkflowArtifactToolHandler.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/DevStoryStoryTools.test.ts`
+
+[x] Subtask 46.1. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, remove `workflowName` from every `ActiveWorkflowSession` and `PersistedWorkflowSession` fixture object; keep workflow identity assertions on `taskState.activeWorkflowName`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 46.2. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, replace the active-session assertion `expect(activeSession.workflowName).to.equal(workflow.name)` with an assertion against `taskState.activeWorkflowName`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 46.3. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, update the valid restore coverage so `restoredState.activeWorkflowName` is set to `workflow.name` before calling `restorePersistedSession(...)`; assert that restore keeps `restoredState.activeWorkflowName === workflow.name` and that `restoredState.activeWorkflowSession` deep-equals the sanitized persisted session.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 46.4. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add restore coverage that builds a legacy persisted session object by adding an extra `workflowName` property to a valid persisted session through `Object.assign(...)`; restore it with `taskState.activeWorkflowName = workflow.name`, assert the result is valid, and assert neither the restored active session nor `runtime.getPersistedSession(...)` has an own `workflowName` property.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 46.5. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add restore coverage proving a present persisted session with `taskState.activeWorkflowName === undefined` returns `persist_workflow_teardown` and clears `activeWorkflowName`, `activeWorkflowSession`, and `currentFocusChainChecklist`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 46.6. In `src/core/task/__tests__/workflow-runtime-metadata.test.ts`, update `createPersistedSession(...)` so it no longer accepts a `workflowName` argument and no longer writes `workflowName` into the returned `PersistedWorkflowSession`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
+
+[x] Subtask 46.7. In `src/core/task/__tests__/workflow-runtime-metadata.test.ts`, update the `persists explicit teardown next actions and keeps true no_op actions non-persisting` test to set `metadata.activeWorkflowName` separately and call `createPersistedSession()` without a workflow-name argument.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
+
+[x] Subtask 46.8. In `src/core/task/__tests__/workflow-runtime-metadata.test.ts`, add metadata restore coverage proving metadata with `activeWorkflowSession` present and `activeWorkflowName === undefined` is saved back with both workflow metadata fields cleared.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
+
+[x] Subtask 46.9. In `src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`, remove `workflowName` from every `ActiveWorkflowSession` fixture object; keep workflow assignment and activation assertions on `activeWorkflowName` or `activateWorkflow(...)` arguments.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+
+[x] Subtask 46.10. In `src/core/task/tools/handlers/__tests__/CreateWorkflowArtifactToolHandler.test.ts`, remove `workflowName: workflow.name` from the `createActiveWorkflowSession(...)` fixture.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/CreateWorkflowArtifactToolHandler.test.ts`
+
+[x] Subtask 46.11. In `src/core/task/tools/handlers/__tests__/DevStoryStoryTools.test.ts`, remove `workflowName: "dev-story.md"` from the `taskState.activeWorkflowSession` fixture while keeping `taskState.activeWorkflowName = "dev-story.md"`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/DevStoryStoryTools.test.ts`
+
+## Phase 31 - Shared Workflow Next-Action Consumption
+
+Pause for QA review after completing Phase 31 before commit.
+
+[x] Task 47. Extract shared workflow next-action consumption from the main `Task` class.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowNextActionConsumer.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
+
+[x] Subtask 47.1. Add `src/core/task/workflow-runtime/WorkflowNextActionConsumer.ts` exporting a `WorkflowNextActionConsumer` class plus typed adapter/result interfaces that cover: abort checks, workflow metadata persistence, workflow form rendering, workflow form completion waiting, workflow step-resolution status rendering, terminal-error reporting, and tool-backed operation execution result capture.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowNextActionConsumer.ts`
+
+[x] Subtask 47.2. In `src/core/task/workflow-runtime/WorkflowNextActionConsumer.ts`, move the loop semantics currently inside `Task.consumeWorkflowNextAction(...)` into `WorkflowNextActionConsumer.consume(...)`: `no_op` returns without persistence, `project_prompt` persists workflow metadata then returns, `persist_workflow_teardown` persists then returns, `terminal_error` persists then reports the error, `complete_workflow` persists then returns, `render_workflow_form` persists/renders/waits/re-resolves through the adapter, and `execute_tool_backed_operation` renders status, calls the adapter to execute the requested tool-backed operation, calls `WorkflowRuntime.handleToolBackedOperationToolResult(...)`, persists metadata, and continues.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowNextActionConsumer.ts`
+
+[x] Subtask 47.3. In `src/core/task/index.ts`, replace the body of the private `consumeWorkflowNextAction(...)` method with construction of a main-task adapter for `WorkflowNextActionConsumer` and a single call to `consumer.consume(nextAction)`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
+
+[x] Subtask 47.4. In `src/core/task/index.ts`, remove the `as any` assertion from the workflow tool-backed operation `ToolUse.params` construction by building a typed `Record<string, string>` from `nextAction.toolRequest.toolParams` and `nextAction.toolRequest.toolInput` before passing it to `toolExecutor.executeTool(...)`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
+
+[x] Task 48. Add a typed returned-next-action carrier to normal tool execution.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/ToolExecutor.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/types/TaskConfig.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/utils/ToolConstants.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/UseSkillToolHandler.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/WorkflowProgressRequestToolHandler.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/SetWorkflowValuesToolHandler.ts`
+
+[x] Subtask 48.1. In `src/core/task/ToolExecutor.ts`, extend `ToolExecutionOutcome` with `workflowNextActions: WorkflowNextAction[]`, and update every `ToolExecutionOutcome` return path in `ToolExecutor` to include either the collected array or an empty array.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/ToolExecutor.ts`
+
+[x] Subtask 48.2. In `src/core/task/tools/types/TaskConfig.ts`, add a required `queueWorkflowNextAction: (nextAction: WorkflowNextAction) => void` callback to `TaskCallbacks`; import `WorkflowNextAction` from the workflow-runtime types instead of widening the callback parameter.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/types/TaskConfig.ts`
+
+[x] Subtask 48.3. In `src/core/task/tools/utils/ToolConstants.ts`, add `queueWorkflowNextAction` to `TASK_CALLBACKS_KEYS` so runtime `TaskConfig` validation requires the callback for every tool handler config.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/utils/ToolConstants.ts`
+
+[x] Subtask 48.4. In `src/core/task/ToolExecutor.ts`, create a new local `WorkflowNextAction[]` buffer for each complete tool execution, pass a callback that pushes into that buffer through `asToolConfig(...)`, and return that buffer on the final `ToolExecutionOutcome` after the tool result has been emitted.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/ToolExecutor.ts`
+
+[x] Subtask 48.5. In `src/core/task/tools/handlers/UseSkillToolHandler.ts`, after successful workflow activation and before returning the success tool result, call `config.callbacks.queueWorkflowNextAction(nextAction)` for the non-`no_op` activation result; keep the existing rollback only for `no_op` activation.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/UseSkillToolHandler.ts`
+
+[x] Subtask 48.6. In `src/core/task/tools/handlers/WorkflowProgressRequestToolHandler.ts`, after `submitWorkflowProgressRequest(...)` returns a non-`no_op` next action, call `config.callbacks.queueWorkflowNextAction(nextAction)`; keep the existing "Yes plus `no_op`" error path unchanged.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/WorkflowProgressRequestToolHandler.ts`
+
+[x] Subtask 48.7. In `src/core/task/tools/handlers/SetWorkflowValuesToolHandler.ts`, after successful `applyWorkflowValueWrites(...)` with at least one changed key, resolve the next workflow action with `config.workflowRuntime.resolveNextAction({ taskState: config.taskState })` and call `config.callbacks.queueWorkflowNextAction(nextAction)` when the resolved action is not `no_op`; do not queue anything for unchanged writes.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/SetWorkflowValuesToolHandler.ts`
+
+[x] Subtask 48.8. In `src/core/task/index.ts`, after `toolExecutor.executeTool(block)` returns an executed outcome, consume every returned `workflowNextActions` entry through `consumeWorkflowNextAction(...)`; then delete the existing `set_workflow_values`-only post-tool re-entry block so workflow-state-mutating tools use one shared returned-action path.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
+
+[x] Task 49. Wire child workflow activation and child workflow-state-mutating tools into shared next-action consumption.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentRunner.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowNextActionConsumer.ts`
+
+[x] Subtask 49.1. In `src/core/task/tools/subagent/SubagentRunner.ts`, add a private child-workflow next-action consumer helper that constructs `WorkflowNextActionConsumer` with the child `TaskState`; this helper must be the only child runtime next-action consumption entry point.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentRunner.ts`
+
+[x] Subtask 49.2. In `src/core/task/tools/subagent/SubagentRunner.ts`, update `autoActivateAssignedWorkflow(...)` so a successful non-`no_op` activation result is passed into the child-workflow next-action consumer before the first child model request is assembled.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentRunner.ts`
+
+[x] Subtask 49.2a. In `src/core/task/tools/subagent/SubagentRunner.ts`, update `autoActivateAssignedWorkflow(...)` so child workflow activation returns before resolving or activating the assigned workflow when `this.baseConfig.taskState.activeWorkflowSession` is missing, or when the parent session `projectSelection.projectTitle.trim()` or `projectSelection.projectFolderName.trim()` is empty. This guard must leave the child `TaskState.activeWorkflowName` and `TaskState.activeWorkflowSession` unchanged, must not call `WorkflowRuntime.activateWorkflow(...)`, and must not rely on `WorkflowRuntime.activateWorkflow(...)` returning a `render_workflow_form` action for child workflows.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentRunner.ts`
+
+[x] Subtask 49.3. In `src/core/task/tools/subagent/SubagentRunner.ts`, update `createSubagentTaskConfig(...)` to accept a `WorkflowNextAction[]` buffer and provide a `queueWorkflowNextAction(...)` callback that pushes into that buffer.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentRunner.ts`
+
+[x] Subtask 49.4. In `src/core/task/tools/subagent/SubagentRunner.ts`, after each child tool handler result is serialized and added to `toolResultBlocks`, consume every queued workflow next action through the child-workflow next-action consumer before continuing to the next child model turn.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentRunner.ts`
+
+[x] Subtask 49.5. In `src/core/task/tools/subagent/SubagentRunner.ts`, implement the child adapter's `render_workflow_form` handling as an explicit failure with the message `Child workflow configuration is invalid: subagent workflows cannot render workflow forms.`; do not silently return, do not render UI, and do not add a subagent-local form path.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentRunner.ts`
+
+[x] Subtask 49.6. In `src/core/task/tools/subagent/SubagentRunner.ts`, implement the child adapter's `execute_tool_backed_operation` path through the same child handler execution path used for model-authored subagent tool calls: build a `ToolUse` from `nextAction.toolRequest`, ensure the requested tool name is registered on the child coordinator even when it is workflow-projected rather than statically allowed, get the handler from the child coordinator, execute it with a child `TaskConfig`, serialize the returned tool result, and return that serialized text to `WorkflowNextActionConsumer` for `WorkflowRuntime.handleToolBackedOperationToolResult(...)`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentRunner.ts`
+
+[x] Subtask 49.7. In `src/core/task/tools/subagent/SubagentRunner.ts`, implement the child adapter's `terminal_error` handling by throwing an `Error` with the workflow error message so the existing subagent failure path reports the failure; implement `complete_workflow`, `persist_workflow_teardown`, `project_prompt`, and `no_op` with no UI work and child-state-only metadata handling.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentRunner.ts`
+
+[x] Task 50. Add focused coverage for shared next-action consumption and returned-action queueing.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/ToolExecutor.nativeToolParity.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/ToolExecutor.responseToolFailureBudget.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/UseSkillToolHandler.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/WorkflowProgressRequestToolHandler.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/SetWorkflowValuesToolHandler.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/BuildWorkflowDocumentToolHandler.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+
+[x] Subtask 50.1. Add `src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts` proving the shared consumer preserves the main action loop behavior for `no_op`, `project_prompt`, `persist_workflow_teardown`, `terminal_error`, `complete_workflow`, `render_workflow_form`, and `execute_tool_backed_operation`; the `project_prompt` case must assert metadata persistence before returning so non-slash activation is durable.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts`
+
+[x] Subtask 50.1a. In `src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts`, type every Sinon stub returned by `createAdapter()` with the exact argument and return signatures declared on `TestWorkflowNextActionConsumerAdapter`; use `sinon.stub<[], boolean>()`, `sinon.stub<[], Promise<void>>()`, `sinon.stub<[WorkflowForm], Promise<void>>()`, `sinon.stub<[WorkflowFormSessionState], Promise<void>>()`, `sinon.stub<[ClineWorkflowStepResolutionStatus], Promise<void>>()`, `sinon.stub<[string], Promise<void>>()`, and `sinon.stub<[Extract<WorkflowNextAction, { kind: "execute_tool_backed_operation" }>], Promise<{ toolResultText: string | undefined }>>()` as appropriate. Do not use `as any`, `as unknown as`, or broad type assertions to satisfy the test interface.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts`
+
+[x] Subtask 50.2. In `src/core/task/tools/handlers/__tests__/UseSkillToolHandler.test.ts`, add coverage proving successful workflow `use_skill` activation queues the returned non-`no_op` next action and that `no_op` activation still rolls back `activeWorkflowName` without queueing an action.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/UseSkillToolHandler.test.ts`
+
+[x] Subtask 50.3. In `src/core/task/tools/handlers/__tests__/WorkflowProgressRequestToolHandler.test.ts`, add coverage proving confirmed and denied workflow progress requests queue the returned non-`no_op` next action, while the existing confirmed-plus-`no_op` path still returns the current tool error.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/WorkflowProgressRequestToolHandler.test.ts`
+
+[x] Subtask 50.4. In `src/core/task/tools/handlers/__tests__/SetWorkflowValuesToolHandler.test.ts`, add coverage proving changed workflow values resolve and queue the next action, while unchanged workflow values do not queue a next action.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/SetWorkflowValuesToolHandler.test.ts`
+
+[x] Subtask 50.5. In `src/core/task/tools/handlers/__tests__/BuildWorkflowDocumentToolHandler.test.ts`, update the shared test `TaskConfig` fixture to include a no-op `queueWorkflowNextAction` callback so `validateTaskConfig(config)` continues to prove the complete required callback contract.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/BuildWorkflowDocumentToolHandler.test.ts`
+
+[x] Subtask 50.6. In `src/core/task/__tests__/ToolExecutor.nativeToolParity.test.ts` and `src/core/task/__tests__/ToolExecutor.responseToolFailureBudget.test.ts`, update outcome assertions so every executed, skipped, rejected, streaming, and not-handled `ToolExecutionOutcome` includes a typed `workflowNextActions` array.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/ToolExecutor.nativeToolParity.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/ToolExecutor.responseToolFailureBudget.test.ts`
+
+[x] Subtask 50.7. In `src/core/task/__tests__/workflow-runtime-metadata.test.ts`, add task-level coverage proving `presentAssistantMessage(...)` consumes workflow next actions returned from tool execution and no longer has a `set_workflow_values`-only workflow re-entry path.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
+
+[x] Subtask 50.8. In `src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`, add coverage proving parent-assigned child workflow activation consumes the activation next action before the first child prompt projection.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+
+[x] Subtask 50.8a. In `src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`, update the existing `auto-activates an explicitly assigned shipped workflow before the first subagent turn` test fixture so the parent `config.taskState` has `activeWorkflowName` set and has a complete `activeWorkflowSession.projectSelection` before constructing `SubagentRunner`; the fixture must use a complete parent project selection because child workflow activation copies project identity from the parent session and must not render the mandatory entry workflow form.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+
+[x] Subtask 50.8b. In `src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`, add coverage for `autoActivateAssignedWorkflow(...)` proving missing parent `activeWorkflowSession` and incomplete parent `projectSelection` both return without activating a child workflow; assert `WorkflowRuntime.activateWorkflow(...)` is not called and the child `TaskState` remains without `activeWorkflowName` and `activeWorkflowSession`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+
+[x] Subtask 50.9. In `src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`, add coverage proving a child workflow next action of `render_workflow_form` fails clearly with `Child workflow configuration is invalid: subagent workflows cannot render workflow forms.`
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+
+[x] Subtask 50.10. In `src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`, add coverage proving a child workflow `execute_tool_backed_operation` executes through the child handler path, feeds the serialized result back into `WorkflowRuntime.handleToolBackedOperationToolResult(...)`, and continues consuming the resulting next action.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+
+[x] Subtask 50.10a. In `src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`, update the `ToolExecutorCoordinator.prototype.getHandler` stub used by the child workflow `execute_tool_backed_operation` test so each returned handler object uses a concrete `ClineDefaultTool` enum member for `name`; return the `CREATE_WORKFLOW_ARTIFACT` handler only when `toolName === ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT`, return the `LIST_FILES` handler only when `toolName === ClineDefaultTool.LIST_FILES`, and return `undefined` for every other string. Do not assign raw `toolName: string` to `IToolHandler.name`, and do not use type assertions to force compatibility.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+
+[x] Subtask 50.10b. In `src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`, import `DEFAULT_AUTO_APPROVAL_SETTINGS`, `DEFAULT_BROWSER_SETTINGS`, and `DEFAULT_FOCUS_CHAIN_SETTINGS` from their shared settings modules so the shared `createTaskConfig(...)` fixture can use real typed defaults instead of partial object literals.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+
+[x] Subtask 50.10c. In `src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`, update `createTaskConfig(...)` so `autoApprovalSettings`, `browserSettings`, and `focusChainSettings` are complete typed values based on the shared defaults; preserve the existing test overrides for `executeSafeCommands`, `executeAllCommands`, `useMcp`, and `enableNotifications`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+
+[x] Subtask 50.10d. In `src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`, replace the generic `stateManager.getGlobalSettingsKey.callsFake(...)` and `stateManager.getWorkspaceStateKey.returns(undefined)` fixture setup with typed Sinon `withArgs(...).returns(...)` setup for the exact keys used by the test fixture; `getWorkspaceStateKey(...)` must return `{}` because local state keys return `ClineRulesToggles`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+
+[x] Subtask 50.10e. In `src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`, update the shared `createTaskConfig(...)` fixture's `coordinator.getHandler(...)` handler doubles so each returned object includes the required concrete `name` member for `LIST_FILES`, `SET_WORKFLOW_VALUES`, and `CREATE_WORKFLOW_ARTIFACT`; remove the stale top-level `context: {}` fixture property because `TaskConfig` does not define it; then remove `as unknown as TaskConfig`. Do not use `as any`, `as unknown as`, or broad type assertions to satisfy `TaskConfig` or `IToolHandler`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+
+[x] Subtask 50.10f. In `src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`, update the `does not reuse the parent ask callback inside subagent task configs` test so it calls the existing typed `createSubagentTaskConfig.call(runner, new TaskState())` helper instead of `(runner as any).createSubagentTaskConfig(new TaskState()) as TaskConfig`; do not use `as any`, `as unknown as`, or broad type assertions to access the private helper.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+
+[x] Task 51. Remove stale one-off workflow next-action paths introduced before the shared consumer.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/UseSkillToolHandler.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/WorkflowProgressRequestToolHandler.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/SetWorkflowValuesToolHandler.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentRunner.ts`
+
+[x] Subtask 51.1. In `src/core/task/index.ts`, remove any direct post-tool workflow re-entry branch that keys off only `ClineDefaultTool.SET_WORKFLOW_VALUES`; workflow re-entry must be driven only by returned `workflowNextActions`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
+
+[x] Subtask 51.2. In `src/core/task/tools/handlers/UseSkillToolHandler.ts`, ensure the workflow activation result is not ignored after the `no_op` check; the only allowed handling is queueing the non-`no_op` result through `config.callbacks.queueWorkflowNextAction(nextAction)`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/UseSkillToolHandler.ts`
+
+[x] Subtask 51.3. In `src/core/task/tools/subagent/SubagentRunner.ts`, ensure `autoActivateAssignedWorkflow(...)` does not stop after checking `nextAction.kind === "no_op"`; the only allowed handling for successful activation is child next-action consumption through the shared consumer helper.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentRunner.ts`
+
+## Phase 32 - Canonical Artifact Families For Epics Index And Epic Delivery Specs
+
+[x] Task 52. Update the runtime-owned artifact-family registry and artifact definition type contract for singleton project artifacts, epics index artifacts, and epic delivery specs.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/artifactFamilies.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+
+[x] Subtask 52.1. In `src/core/task/workflow-runtime/artifactFamilies.ts`, replace the `WorkflowArtifactFamily.Epic` enum member with `WorkflowArtifactFamily.Epics`, `WorkflowArtifactFamily.EpicsIndex`, and `WorkflowArtifactFamily.EpicDeliverySpec`; retain the existing `Story`, `RemediationStory`, `ReviewBlindHunter`, `ReviewEdgeCaseHunter`, `AdversarialReview`, `ReviewInputMarkdown`, and `ReviewInputDiff` members.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/artifactFamilies.ts`
+
+[x] Subtask 52.2. In `src/core/task/workflow-runtime/artifactFamilies.ts`, extend `WorkflowArtifactAllocationMode`, `WorkflowArtifactIdentityRequirement`, `WorkflowArtifactNumberingScope`, and `WorkflowArtifactFamilyDefinition` so the registry can model `singleton_project`, `derived_from_epic_index`, `new_numbered`, and `derived_from_target` families, `.json` extensions, stable singleton identities, and structured sidecar/index behavior without optional-property ambiguity.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/artifactFamilies.ts`
+
+[x] Subtask 52.3. In `src/core/task/workflow-runtime/artifactFamilies.ts`, replace the old `Epic-{E}.md` registry entry with registry entries for `Epics.md`, `Epics.index.json`, and `Epic-{E}-delivery-spec.md`; `Epics.md` and `Epics.index.json` must be project-level singleton families with stable non-numbered identities, and `Epic-{E}-delivery-spec.md` must be a derived family whose discovery pattern is `^Epic-(\d+)-delivery-spec\.md$`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/artifactFamilies.ts`
+
+[x] Subtask 52.4. In `src/core/task/workflow-runtime/types.ts`, update `WorkflowArtifactDefinition` so singleton project artifacts support only `WorkflowArtifactFamily.Epics` and `WorkflowArtifactFamily.EpicsIndex` with no parent or target identity source, epic delivery specs support only `WorkflowArtifactFamily.EpicDeliverySpec` with no module-provided numeric identity source, stories require a parent epic-delivery-spec identity source, remediation stories require a parent story identity source, and review/input artifacts require a target story or remediation-story identity source.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+
+[x] Task 53. Update `WorkflowRuntime` artifact allocation, derivation, parsing, and validation to remove the retired `Epic-{E}.md` contract.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 53.1. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, remove `allocateNextEpicIdentity(...)` and every switch branch or helper path that treats `WorkflowArtifactFamily.Epic` or `Epic-{E}.md` as a canonical artifact family.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 53.2. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, implement singleton project artifact resolution for `Epics.md` and `Epics.index.json` so the runtime uses the registry-owned singleton identity, fixed filename, project-relative path, absolute path, and existing workflow-value persistence path without allocating or parsing a dotted numeric identity.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 53.3. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, add path-policy-protected loading and validation for `Epics.index.json`; the runtime must validate the concrete index file path through `assertWorkspacePathAllowed(...)` before reading it, parse it as JSON, reject malformed content explicitly, and must not parse `Epics.md` markdown content for epic identities.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 53.4. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, implement `Epic-{E}-delivery-spec.md` derivation by reading the structured epic identities from `Epics.index.json`, discovering existing `Epic-{E}-delivery-spec.md` files through the shared artifact discovery seam, selecting the first indexed epic identity without a matching delivery spec, and failing through the existing tool-backed operation failure path when no eligible indexed epic remains.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 53.5. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, update story parent validation so `Story-{E}-{S}.md` allocation requires an existing convention-matching `Epic-{E}-delivery-spec.md` for the selected parent epic identity; it must not validate stories against `Epics.index.json` alone or against retired `Epic-{E}.md` files.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 53.6. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, update artifact filename identity parsing and normalization so `Epic-{E}-delivery-spec.md` resolves to dotted identity `{E}`, `Story-{E}-{S}.md`, `Remediation-story-{E}-{S}-{R}.md`, and review/input artifact parsing continue to work, and `Epic-{E}.md` is no longer accepted as a canonical artifact identity input.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Task 54. Update runtime and handler tests for singleton artifacts, epics index derivation, and epic delivery spec dependencies.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/CreateWorkflowArtifactToolHandler.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/BuildWorkflowDocumentToolHandler.test.ts`
+
+[x] Subtask 54.1. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, replace artifact-allocation fixtures and assertions that use `WorkflowArtifactFamily.Epic` or `Epic-1.md` with fixtures for `WorkflowArtifactFamily.Epics`, `WorkflowArtifactFamily.EpicsIndex`, and `WorkflowArtifactFamily.EpicDeliverySpec`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 54.2. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving singleton `Epics.md` and `Epics.index.json` artifact creation persists stable non-numbered artifact identities, canonical filenames, project-relative paths, absolute paths, and workflow values without allocating dotted numeric identities.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 54.3. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving `Epic-{E}-delivery-spec.md` allocation reads `Epics.index.json`, ignores `Epics.md` markdown content for identity selection, skips indexed epic identities that already have matching delivery spec files, and chooses the first indexed epic identity without a matching delivery spec.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 54.4. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving story allocation validates the selected parent epic identity against existing `Epic-{E}-delivery-spec.md` files and fails when only `Epics.index.json` or a retired `Epic-{E}.md` file exists.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 54.5. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving malformed, missing, or path-policy-denied `Epics.index.json` causes epic-delivery-spec allocation to fail explicitly before file creation and without falling back to `Epics.md` markdown parsing.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 54.6. In `src/core/task/tools/handlers/__tests__/CreateWorkflowArtifactToolHandler.test.ts`, replace `Epic-1.md` handler expectations and `.clineignore` fixtures with either singleton `Epics.md` or derived `Epic-1-delivery-spec.md` expectations, matching the artifact family used by each test.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/CreateWorkflowArtifactToolHandler.test.ts`
+
+[x] Subtask 54.7. In `src/core/task/tools/handlers/__tests__/BuildWorkflowDocumentToolHandler.test.ts`, replace generic write-path fixtures that use retired `Epic-1.md` paths with a surviving canonical workflow artifact path such as `Epic-1-delivery-spec.md`, `Story-1-1.md`, or `Epics.md`, preserving each test's original path-policy or document-writer assertion.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/BuildWorkflowDocumentToolHandler.test.ts`
+
+## Phase 33 - Workflow Form Submission Next-Action Handoff
+
+Pause for QA review after completing Phase 33 before commit.
+
+[ ] Task 55. Update the canonical next-action consumer so workflow-form waits receive the submitted next action instead of re-resolving independently.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowNextActionConsumer.ts`
+
+[ ] Subtask 55.1. In `src/core/task/workflow-runtime/WorkflowNextActionConsumer.ts`, change `WorkflowNextActionConsumerAdapter.waitForWorkflowFormCompletion(...)` to return `Promise<WorkflowNextAction | undefined>` instead of `Promise<void>`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowNextActionConsumer.ts`
+
+[ ] Subtask 55.2. In `src/core/task/workflow-runtime/WorkflowNextActionConsumer.ts`, update the `render_workflow_form` case so it stores the action returned by `waitForWorkflowFormCompletion(...)`; after the abort check, return if that action is `undefined`, otherwise assign it to `currentAction` and continue the loop. Remove the `workflowRuntime.resolveNextAction(...)` call from this case.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowNextActionConsumer.ts`
+
+[ ] Task 56. Route task-level workflow-form submissions into the live workflow-form wait when present, and consume directly only when no live wait exists.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
+
+[ ] Subtask 56.1. In `src/core/task/index.ts`, add a private `workflowFormSubmissionNextActionResolvers` map on `Task`, keyed by workflow form `sessionId`, whose values resolve `WorkflowNextAction | undefined`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
+
+[ ] Subtask 56.2. In `src/core/task/index.ts`, add a private `waitForWorkflowFormSubmissionNextAction(...)` helper that registers a resolver for the active form session, resolves with the submitted `WorkflowNextAction` when `handleWorkflowFormSubmission(...)` provides it, and cleans up the resolver if the task aborts or the active form session changes without a submitted action.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
+
+[ ] Subtask 56.3. In `src/core/task/index.ts`, update the `consumeWorkflowNextAction(...)` adapter so `waitForWorkflowFormCompletion(...)` calls `waitForWorkflowFormSubmissionNextAction(...)` and returns its `WorkflowNextAction | undefined` result.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
+
+[ ] Subtask 56.4. In `src/core/task/index.ts`, update `handleWorkflowFormSubmission(...)` to capture the `WorkflowNextAction` returned by `workflowRuntime.submitWorkflowForm(...)`; if a resolver exists for the submitted session, resolve it and return without directly consuming; if no resolver exists, pass the returned action to `consumeWorkflowNextAction(...)`. Remove the submit-and-persist-only path.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
+
+[ ] Task 57. Add regression coverage for workflow-form submission handoff and no double-consumption.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
+
+[ ] Subtask 57.1. In `src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts`, update the adapter test type and fixture so `waitForWorkflowFormCompletion(...)` returns `WorkflowNextAction | undefined`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts`
+
+[ ] Subtask 57.2. In `src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts`, update the render-form test to prove the consumer uses the action returned by `waitForWorkflowFormCompletion(...)` and does not call `WorkflowRuntime.resolveNextAction(...)` after the wait.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts`
+
+[ ] Subtask 57.3. In `src/core/task/__tests__/workflow-runtime-metadata.test.ts`, add task-level coverage proving `handleWorkflowFormSubmission(...)` passes the returned `WorkflowNextAction` to the pending workflow-form wait resolver when one exists, rather than dropping it or directly double-consuming it.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
+
+[ ] Subtask 57.4. In `src/core/task/__tests__/workflow-runtime-metadata.test.ts`, add task-level coverage proving `handleWorkflowFormSubmission(...)` consumes the returned `WorkflowNextAction` when no pending workflow-form wait resolver exists.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
+
+## Phase 34 - Fail-Closed Restore Validation For Persisted Workflow UI State
+
+Pause for QA review after completing Phase 34 before commit.
+
+[ ] Task 58. Add restore-time validation for persisted workflow session shape before `WorkflowRuntime` accepts metadata state.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/schema.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[ ] Subtask 58.1. In `src/core/task/workflow-form/schema.ts`, add an exported recursive guard for `WorkflowFormSubmittedValuePayload` near `normalizeWorkflowFormSubmittedValue(...)`; it must validate exactly one typed value, finite numeric values, valid array entries, non-empty object entry keys, and valid nested object values.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/schema.ts`
+
+[ ] Subtask 58.2. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, import the new workflow-form submitted-value guard.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[ ] Subtask 58.3. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, add private restore-validation helpers near `cloneWorkflowSession(...)` for plain-record checks, string-array checks, workflow-value record validation using existing `isWorkflowValue(...)`, project-selection validation, branch-failure-state validation, and branch-trigger-event validation.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[ ] Subtask 58.4. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, add a private helper that validates and normalizes persisted `formSession` against the current workflow definition and active step: `workflowFormId` must exist, `currentPanelId` must exist in the current form definition, persisted form values must be valid submitted-value payloads, persisted value keys must correspond to current form field keys, and the active branch must have a continuation route for that form. The normalized restored form session must use the current definition payload, not the persisted definition payload.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[ ] Subtask 58.5. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, add a private helper that validates persisted `stepResolutionSession` against the current workflow definition and active step: `definitionId` must exist, `triggerSource` must equal `execute_tool_backed_operation`, `state` must equal `pending`, owner workflow/step must match the active workflow and active step, and the active branch must have a continuation route for that operation.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[ ] Subtask 58.6. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, add a private `validatePersistedWorkflowSessionForRestore(...)` helper that treats the persisted value as untrusted, validates base session shape, validates `ui` suppression arrays against current workflow form/tool-backed operation ids, calls the form/session helpers, and returns a normalized `PersistedWorkflowSession` or `undefined`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[ ] Subtask 58.7. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, change `restorePersistedSession(...)` so it calls `validatePersistedWorkflowSessionForRestore(...)` before reading `activeStepNumber`, `branchContext.activeBranchId`, `ui.formSession`, or `ui.stepResolutionSession`; invalid results must return `teardownWorkflowAndRequirePersistence(...)`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[ ] Task 59. Add regression coverage for fail-closed restore validation.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 59.1. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving malformed persisted session shape fails closed with `persist_workflow_teardown` and does not throw.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 59.2. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving invalid `workflowValues`, invalid `projectSelection`, invalid suppression arrays, and stale suppression ids fail closed.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 59.3. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving stale `formSession` form ids, stale current panel ids, malformed submitted values, and form sessions without an active-branch continuation route fail closed.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 59.4. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, update or extend the existing valid form restore test to prove the restored form session uses the current workflow definition payload and still returns `render_workflow_form`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 59.5. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving stale `stepResolutionSession` definition ids, owner mismatches, non-pending state, and missing continuation routes fail closed.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 59.6. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving a valid restored pending step-resolution session returns `execute_tool_backed_operation`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
 ## Validation
 
 After all implementation tasks are complete, run these commands from `/Users/robertboston/Documents/Cline Extension/cline`:
@@ -3509,14 +4519,29 @@ npm run test:unit -- src/core/task/tools/handlers/__tests__/CreateWorkflowArtifa
 npm run test:unit -- src/core/slash-commands/__tests__/index.test.ts
 npm run test:unit -- src/core/task/workflow-form/__tests__/*.ts
 npm run test:unit -- src/core/task/__tests__/workflow-runtime-metadata.test.ts
+npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts src/core/task/__tests__/workflow-runtime-metadata.test.ts
 npm run test:unit -- src/core/task/tools/handlers/__tests__/WorkflowProgressRequestToolHandler.test.ts src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts
 npm run test:unit -- src/core/task/focus-chain/__tests__/*.ts
 npm run test:unit -- src/core/prompts/system-prompt/__tests__/*.ts
 npm run test:unit -- src/core/task/tools/handlers/__tests__/CreateWorkflowArtifactToolHandler.test.ts src/core/prompts/system-prompt/__tests__/integration.test.ts src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts
+npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/tools/handlers/__tests__/WorkflowProgressRequestToolHandler.test.ts
+npm run test:unit -- src/core/task/tools/handlers/__tests__/CreateWorkflowArtifactToolHandler.test.ts src/core/task/tools/handlers/__tests__/BuildWorkflowDocumentToolHandler.test.ts
+npm run test:unit -- src/core/task/tools/handlers/__tests__/SetWorkflowValuesToolHandler.test.ts src/core/task/tools/handlers/__tests__/BuildWorkflowDocumentToolHandler.test.ts
+npm run test:unit -- src/core/task/workflow-form/__tests__/schema.test.ts src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts
+npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/workflow-runtime/__tests__/discovery.test.ts
+npm run test:unit -- src/core/task/__tests__/workflow-runtime-metadata.test.ts src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts src/core/task/tools/handlers/__tests__/CreateWorkflowArtifactToolHandler.test.ts
+npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/__tests__/workflow-runtime-metadata.test.ts src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts src/core/task/tools/handlers/__tests__/CreateWorkflowArtifactToolHandler.test.ts src/core/task/tools/handlers/__tests__/DevStoryStoryTools.test.ts
+npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts src/core/task/__tests__/workflow-runtime-metadata.test.ts src/core/task/tools/handlers/__tests__/UseSkillToolHandler.test.ts src/core/task/tools/handlers/__tests__/WorkflowProgressRequestToolHandler.test.ts src/core/task/tools/handlers/__tests__/SetWorkflowValuesToolHandler.test.ts src/core/task/tools/handlers/__tests__/BuildWorkflowDocumentToolHandler.test.ts src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts
+npm run test:unit -- src/core/task/__tests__/ToolExecutor.nativeToolParity.test.ts src/core/task/__tests__/ToolExecutor.responseToolFailureBudget.test.ts
 ```
 
 Validation expectations:
 - `test` must pass so precommit and phase-by-phase QA can run without stale repository-wide compile blockers from prior phases.
+- Phase 31 QA must verify `WorkflowNextActionConsumer.test.ts` and `SubagentRunner.test.ts` use typed test doubles rather than `any`, raw string handler names, or type assertions to satisfy workflow next-action consumer and tool-handler contracts.
+- Phase 31 QA must specifically verify the shared `createTaskConfig(...)` fixture in `SubagentRunner.test.ts` no longer uses `as unknown as TaskConfig`, and that its `coordinator.getHandler(...)` handler doubles include concrete `name: ClineDefaultTool.X` members.
+- Phase 31 QA must verify `SubagentRunner.test.ts` has no remaining `as any`, `as unknown as`, or `as TaskConfig` assertions in tests added or modified for Phase 31.
+- Phase 31 QA must verify `SubagentRunner.autoActivateAssignedWorkflow(...)` guards missing or incomplete parent project context before workflow activation, and the tests cover both missing parent session and incomplete project selection.
+- Phase 34 QA must verify `restorePersistedSession(...)` fails closed before accepting malformed persisted session shape, stale workflow-form UI state, stale tool-backed operation state, or stale suppression ids, and valid restored form/tool-backed operation sessions continue to resume through the canonical next-action path.
 - `check-types` must pass without reintroducing removed workflow mirror fields, deterministic-step-resolution types, statically exposed workflow-only tool schemas, or legacy `createWorkflowSkillMetadata(...)` references.
 - `lint` must pass without leaving dead imports, compatibility shims, or deleted legacy-surface references behind.
 - Phase 7 QA must verify `applyWorkflowValueWrites(...)` no longer derives authorization from active-step `set_workflow_values` schema visibility and instead uses only `WorkflowDefinition.workflowValueKeys`.
@@ -3551,9 +4576,36 @@ Validation expectations:
 - Task-level workflow metadata tests must prove `persist_workflow_teardown` persists cleared workflow metadata, invalid persisted sessions are not retried after cleanup, and true `no_op` remains non-persisting.
 - `rg "as any" src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts` must return no matches.
 - `rg "getNativeFunctionDescription" src/core/prompts/system-prompt/__tests__/integration.test.ts` must return no matches.
-- `rg ": any|as any" src/core/task/tools/handlers/__tests__/WorkflowProgressRequestToolHandler.test.ts` must return no matches.
+- `rg "as unknown as|as TaskConfig|: any|as any" src/core/task/tools/handlers/__tests__/WorkflowProgressRequestToolHandler.test.ts` must return no matches.
 - `npx biome check src/core/prompts/system-prompt/__tests__/integration.test.ts src/core/task/tools/handlers/__tests__/WorkflowProgressRequestToolHandler.test.ts --no-errors-on-unmatched --files-ignore-unknown=true` must pass.
+- Workflow-runtime tests must prove workflow values preserve JSON-safe string, number, boolean, array, and object values through form persistence and `applyWorkflowValueWrites(...)`; arrays and objects must not be stringified for storage.
+- Workflow-runtime tests must prove malformed form submissions with declared `workflowValueKey` destinations fail explicitly and do not silently skip, drop, or truncate nested array/object values before persistence.
+- Set-workflow-values handler tests must prove model-authored JSON-string `values` payloads and object `values` payloads both persist JSON-safe string, number, boolean, array, and object values through `WorkflowRuntime.applyWorkflowValueWrites(...)`.
+- Build-workflow-document handler tests must prove JSON-string `workflow_value_writes` payloads and object `workflow_value_writes` payloads both preserve JSON-safe value type and shape before calling `WorkflowRuntime.applyWorkflowValueWrites(...)`.
+- Workflow-form schema tests must prove nested malformed array/object form values throw explicit errors instead of being filtered out of normalized submitted values.
+- Workflow-runtime tests must prove string-only runtime consumers fail clearly when artifact identity or artifact destination workflow values are not non-empty strings.
+- `rg "isWorkflowValue" src/core/task/workflow-runtime/WorkflowRuntime.ts src/core/task/tools/handlers/SetWorkflowValuesToolHandler.ts src/core/task/tools/handlers/BuildWorkflowDocumentToolHandler.ts src/core/task/workflow-runtime/workflowValues.ts` must show imports/usages from the shared `workflowValues.ts` helper rather than duplicate local JSON-safe workflow-value validators.
+- `rg "property values are strings|whose property values are strings" src/core/task/tools/handlers/SetWorkflowValuesToolHandler.ts src/core/task/tools/handlers/BuildWorkflowDocumentToolHandler.ts src/core/task/tools/backendWorkflowToolContracts.ts` must return no matches.
+- `rg "const trimmedValue = rawValue\\.trim\\(\\)|rawValue\\.trim\\(\\)|workflowValues\\.[a-zA-Z0-9_-]+\\?\\.trim\\(\\)|session\\.workflowValues\\[[^\\]]+\\]\\?\\.trim\\(\\)" src/core/task/workflow-runtime/WorkflowRuntime.ts src/core/task/story-tools/storyTaskDocument.ts src/core/task/tools/handlers/CodeReviewSpecUpdateToolHandler.ts` must return no matches.
+- `rg "checkClineIgnorePath" src/core/task/tools/handlers/CreateWorkflowArtifactToolHandler.ts src/core/task/tools/handlers/BuildWorkflowDocumentToolHandler.ts` must show both workflow file-writing handlers enforce path policy before approval, hooks, reads, or writes.
+- `rg "new BuildWorkflowDocumentToolHandler\\(\\)|new CreateWorkflowArtifactToolHandler\\(\\)" src/core/task/tools src/core/task/tools/handlers/__tests__` must return no matches.
+- `rg "new WorkflowRuntime\\(\\{ cwd: [^,}]+ \\}\\)" src/core/task src/core/task/tools` must return no matches.
+- `rg "workspacePathPolicy\\?:" src/core/task/workflow-runtime` must return no matches.
 - `rg -U "await this\\.teardownWorkflow\\(\\{ taskState \\}\\)[\\s\\S]{0,120}return \\{ kind: \"no_op\" \\}|await this\\.teardownWorkflow\\(\\{ taskState \\}\\)[\\s\\S]{0,120}return undefined" src/core/task/workflow-runtime/WorkflowRuntime.ts` must return no matches.
+- `rg "workflowName: WorkflowName" src/core/task/workflow-runtime/types.ts` must return no matches.
+- `rg "persistedSession\\.workflowName|taskState\\.activeWorkflowName = persistedSession\\.workflowName|workflowName: workflow\\.name" src/core/task/workflow-runtime/WorkflowRuntime.ts` must return no matches.
+- `rg "workflowName:" src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/__tests__/workflow-runtime-metadata.test.ts src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts src/core/task/tools/handlers/__tests__/CreateWorkflowArtifactToolHandler.test.ts src/core/task/tools/handlers/__tests__/DevStoryStoryTools.test.ts` must return no `ActiveWorkflowSession` or `PersistedWorkflowSession` fixture properties; legitimate `WorkflowDefinition`, registry stub, and activation-argument uses may remain.
+- Workflow-runtime tests must prove `TaskState.activeWorkflowName` is the only canonical active workflow identity used for restore, valid restore keeps that value unchanged, missing `activeWorkflowName` with a present persisted session tears down with persistence required, and legacy extra `workflowName` properties on persisted session objects are stripped before active-session restore and before re-persistence.
+- Shared next-action consumer tests must prove the loop behavior formerly owned by `Task.consumeWorkflowNextAction(...)` is preserved for main-task actions, persists `project_prompt` actions for durable non-slash activation, and is reusable by child workflow adapters.
+- Use-skill handler tests must prove main-agent workflow `use_skill` queues the successful activation next action instead of dropping it.
+- Workflow progress request tests must prove the next action returned from `submitWorkflowProgressRequest(...)` is queued for post-tool consumption.
+- Set-workflow-values tests must prove changed workflow values queue next-action re-evaluation and unchanged values do not.
+- Task-level tests must prove `presentAssistantMessage(...)` consumes returned workflow next actions from `ToolExecutionOutcome.workflowNextActions` and no longer special-cases only `set_workflow_values`.
+- Subagent tests must prove parent-assigned workflow activation consumes its returned next action, child workflows reject `render_workflow_form` clearly, and child workflow `execute_tool_backed_operation` executes through the child tool handler path before re-entering workflow next-action evaluation.
+- `rg "if \\(block\\.name === ClineDefaultTool\\.SET_WORKFLOW_VALUES" src/core/task/index.ts` must return no matches.
+- `rg "const nextAction = await config\\.workflowRuntime\\.activateWorkflow" src/core/task/tools/handlers/UseSkillToolHandler.ts` must show the successful non-`no_op` result is passed to `config.callbacks.queueWorkflowNextAction(nextAction)`.
+- `rg "const nextAction = await this\\.baseConfig\\.workflowRuntime\\.activateWorkflow" src/core/task/tools/subagent/SubagentRunner.ts` must show the successful non-`no_op` result is passed to the child workflow next-action consumer helper.
+- `rg "workflowNextActions" src/core/task/ToolExecutor.ts src/core/task/tools/types/TaskConfig.ts src/core/task/tools/utils/ToolConstants.ts src/core/task/index.ts` must show a typed execution-outcome array, a required callback, runtime validation, and post-tool consumption.
 - `rg "Before you read project files, search the repo, or analyze code, call \`use_skill\`" src/core/task/tools/subagent` must return no matches.
 - Subagent tests must prove workflows assigned to subagents activate through parent-owned assignment, not direct subagent `use_skill`.
 - `rg "task_progress" src/core/assistant-message src/shared webview-ui/src/components/chat cli/src` must return no matches.
@@ -3566,7 +4618,7 @@ Validation expectations:
 - Workflow-runtime tests must prove successful workflow-value writes can emit `workflow_values_persisted` and drive next-action route evaluation.
 - `rg "STORY_TASK_REMINDER|STORY_TASK_COMPLETE|STORY_NOTES_UPDATE|STORY_TESTING_COMPLETE" src/core/prompts/system-prompt/variants src/core/prompts/system-prompt/tools src/core/prompts/system-prompt/__tests__/spec.test.ts docs/system-prompt-tool-reference.md` must return no matches.
 - `rg "story_task_reminder|story_task_complete|story_notes_update|story_testing_complete" src/core/prompts/system-prompt/variants src/core/prompts/system-prompt/tools src/core/prompts/system-prompt/__tests__/__snapshots__ docs/system-prompt-tool-reference.md` must return no matches.
-- Workflow-runtime tests must prove artifact allocation creates and persists canonical outputs for `Epic-{E}.md`, `Story-{E}-{S}.md`, `Remediation-story-{E}-{S}-{R}.md`, `Review-blind-hunter-{target}.md`, `Review-edge-case-hunter-{target}.md`, `Adversarial-review-{target}.md`, `Review-input-{target}.md`, and `Review-input-{target}.diff`.
+- Workflow-runtime tests must prove artifact allocation creates and persists canonical outputs for `Epics.md`, `Epics.index.json`, `Epic-{E}-delivery-spec.md`, `Story-{E}-{S}.md`, `Remediation-story-{E}-{S}-{R}.md`, `Review-blind-hunter-{target}.md`, `Review-edge-case-hunter-{target}.md`, `Adversarial-review-{target}.md`, `Review-input-{target}.md`, and `Review-input-{target}.diff`.
 - Workflow-runtime tests must prove review artifacts inherit the selected story or remediation-story target identity exactly and fail through tool-backed operation failure handling when the selected target does not resolve to a convention-matching artifact in the active project.
 - Workflow-runtime tests must prove document builders consume a previously allocated artifact absolute path and that `build_workflow_document` remains a content writer rather than an artifact identity, filename, or project-folder allocator.
 - Workflow-runtime tests must prove workflow form field keys are form-local by default, durable form values persist only through explicit `workflowValueKey` destinations, and runtime-populated project/folder/file/artifact selectors use that same destination-key path as typed user-entered fields.

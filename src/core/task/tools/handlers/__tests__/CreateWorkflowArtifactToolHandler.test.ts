@@ -1,19 +1,28 @@
 import type { ToolUse } from "@core/assistant-message"
 import { expect } from "chai"
-import { access, mkdtemp, readFile, rm } from "fs/promises"
+import { access, mkdtemp, readFile, rm, writeFile } from "fs/promises"
 import { afterEach, beforeEach, describe, it } from "mocha"
 import { tmpdir } from "os"
 import path from "path"
 import sinon from "sinon"
+import { ClineIgnoreController } from "@/core/ignore/ClineIgnoreController"
+import { formatResponse } from "@/core/prompts/responses"
 import { TaskState } from "@/core/task/TaskState"
 import { WorkflowArtifactFamily } from "@/core/task/workflow-runtime/artifactFamilies"
-import type { ActiveWorkflowSession, WorkflowDefinition, WorkflowStepDefinition } from "@/core/task/workflow-runtime/types"
+import type {
+	ActiveWorkflowSession,
+	WorkflowDefinition,
+	WorkflowStepDefinition,
+	WorkflowWorkspacePathPolicy,
+} from "@/core/task/workflow-runtime/types"
 import * as WorkflowRegistry from "@/core/task/workflow-runtime/WorkflowRegistry"
 import type { WorkflowArtifactAllocationOutput } from "@/core/task/workflow-runtime/WorkflowRuntime"
 import { WorkflowRuntime } from "@/core/task/workflow-runtime/WorkflowRuntime"
 import { ClineDefaultTool } from "@/shared/tools"
 import * as pathUtils from "@/utils/path"
+import { ToolValidator } from "../../ToolValidator"
 import type { TaskConfig } from "../../types/TaskConfig"
+import { ToolHookUtils } from "../../utils/ToolHookUtils"
 import { CreateWorkflowArtifactToolHandler } from "../CreateWorkflowArtifactToolHandler"
 
 const ENTRY_PROJECT_VALUE_KEYS = {
@@ -36,27 +45,37 @@ function createArtifactBlock(overrides?: Partial<Pick<ToolUse, "partial" | "isNa
 }
 
 function createAllocation(cwd: string): WorkflowArtifactAllocationOutput {
-	const artifactAbsolutePath = path.join(cwd, "project-one", "planning", "Epic-1.md")
+	const artifactAbsolutePath = path.join(cwd, "project-one", "planning", "Epics.md")
 	return {
 		artifactId: "epic_doc",
 		projectTitle: "Project One",
 		projectFolderName: "project-one",
-		artifactFamily: "epic",
-		artifactIdentity: "1",
-		artifactFilename: "Epic-1.md",
-		artifactRelativePath: path.join("planning", "Epic-1.md"),
+		artifactFamily: "epics",
+		artifactIdentity: "epics",
+		artifactFilename: "Epics.md",
+		artifactRelativePath: path.join("planning", "Epics.md"),
 		artifactAbsolutePath,
 		parentIdentity: undefined,
 		targetIdentity: undefined,
 		workflowValueWrites: {
 			artifact_project_title: "Project One",
 			artifact_project_folder: "project-one",
-			artifact_family: "epic",
-			artifact_identity: "1",
-			artifact_filename: "Epic-1.md",
-			artifact_relative_path: path.join("planning", "Epic-1.md"),
+			artifact_family: "epics",
+			artifact_identity: "epics",
+			artifact_filename: "Epics.md",
+			artifact_relative_path: path.join("planning", "Epics.md"),
 			artifact_absolute_path: artifactAbsolutePath,
 		},
+	}
+}
+
+function createToolValidator(cwd: string): ToolValidator {
+	return new ToolValidator(new ClineIgnoreController(cwd))
+}
+
+function createAllowAllWorkspacePathPolicy(): WorkflowWorkspacePathPolicy {
+	return {
+		validateAccess: () => true,
 	}
 }
 
@@ -246,7 +265,7 @@ function createRealArtifactWorkflow(): WorkflowDefinition {
 		artifacts: {
 			epic_doc: {
 				id: "epic_doc",
-				family: WorkflowArtifactFamily.Epic,
+				family: WorkflowArtifactFamily.Epics,
 				intentMode: "new",
 				parentIdentitySource: undefined,
 				targetIdentitySource: undefined,
@@ -260,7 +279,6 @@ function createRealArtifactWorkflow(): WorkflowDefinition {
 
 function createActiveWorkflowSession(workflow: WorkflowDefinition): ActiveWorkflowSession {
 	return {
-		workflowName: workflow.name,
 		activeStepNumber: 1,
 		workflowValues: {},
 		projectSelection: {
@@ -294,7 +312,7 @@ describe("CreateWorkflowArtifactToolHandler", () => {
 
 	it("rejects partial blocks before runtime allocation", async () => {
 		const { config, stubs } = createConfig()
-		const handler = new CreateWorkflowArtifactToolHandler()
+		const handler = new CreateWorkflowArtifactToolHandler(createToolValidator(config.cwd))
 
 		const result = await handler.execute(config, createArtifactBlock({ partial: true }))
 
@@ -305,7 +323,7 @@ describe("CreateWorkflowArtifactToolHandler", () => {
 
 	it("executes non-native model-authored calls when workflow state is valid", async () => {
 		const { config, stubs, allocation } = createConfig()
-		const handler = new CreateWorkflowArtifactToolHandler()
+		const handler = new CreateWorkflowArtifactToolHandler(createToolValidator(config.cwd))
 
 		const result = await handler.execute(config, createArtifactBlock({ isNativeToolCall: false }))
 
@@ -330,7 +348,7 @@ describe("CreateWorkflowArtifactToolHandler", () => {
 
 	it("does not authorize artifact creation by workflow call-id prefix", async () => {
 		const { config, stubs, allocation } = createConfig()
-		const handler = new CreateWorkflowArtifactToolHandler()
+		const handler = new CreateWorkflowArtifactToolHandler(createToolValidator(config.cwd))
 
 		const result = await handler.execute(config, createArtifactBlock({ call_id: "model_call_1" }))
 
@@ -355,7 +373,7 @@ describe("CreateWorkflowArtifactToolHandler", () => {
 
 	it("rejects missing or blank artifact ids before runtime allocation", async () => {
 		const { config, stubs } = createConfig()
-		const handler = new CreateWorkflowArtifactToolHandler()
+		const handler = new CreateWorkflowArtifactToolHandler(createToolValidator(config.cwd))
 		const block = createArtifactBlock()
 		Object.assign(block.params, {
 			artifact_id: " ",
@@ -370,7 +388,7 @@ describe("CreateWorkflowArtifactToolHandler", () => {
 
 	it("applies path approval before delegating creation and returns artifact output JSON", async () => {
 		const { config, stubs, allocation } = createConfig()
-		const handler = new CreateWorkflowArtifactToolHandler()
+		const handler = new CreateWorkflowArtifactToolHandler(createToolValidator(config.cwd))
 
 		const result = await handler.execute(config, createArtifactBlock())
 
@@ -397,14 +415,41 @@ describe("CreateWorkflowArtifactToolHandler", () => {
 		expect(parsedResult).to.deep.include({
 			created: true,
 			artifact_id: "epic_doc",
-			artifact_family: "epic",
-			artifact_identity: "1",
-			artifact_filename: "Epic-1.md",
-			artifact_relative_path: path.join("planning", "Epic-1.md"),
+			artifact_family: "epics",
+			artifact_identity: "epics",
+			artifact_filename: "Epics.md",
+			artifact_relative_path: path.join("planning", "Epics.md"),
 			artifact_absolute_path: allocation.artifactAbsolutePath,
 		})
 		expect(parsedResult.persisted_artifact_output_values).to.deep.equal(allocation.workflowValueWrites)
 		expect(config.taskState.didEditFile).to.equal(true)
+	})
+
+	it("returns a clineignore tool error before approval, hooks, or artifact creation for blocked paths", async () => {
+		const tmpCwd = await mkdtemp(path.join(tmpdir(), "create-workflow-artifact-clineignore-test-"))
+		const clineIgnoreController = new ClineIgnoreController(tmpCwd)
+		try {
+			await writeFile(path.join(tmpCwd, ".clineignore"), "project-one/planning/Epics.md\n", "utf8")
+			await clineIgnoreController.initialize()
+			const { config, stubs, allocation } = createConfig({ cwd: tmpCwd })
+			const hookStub = sandbox.stub(ToolHookUtils, "runPreToolUseIfEnabled").resolves(true)
+			const handler = new CreateWorkflowArtifactToolHandler(new ToolValidator(clineIgnoreController))
+
+			const result = await handler.execute(config, createArtifactBlock())
+
+			expect(result).to.equal(formatResponse.toolError(formatResponse.clineIgnoreError(allocation.artifactAbsolutePath)))
+			sinon.assert.calledOnceWithExactly(stubs.prepareWorkflowArtifactCreation, {
+				taskState: config.taskState,
+				artifactId: "epic_doc",
+			})
+			sinon.assert.notCalled(stubs.shouldAutoApproveToolWithPath)
+			sinon.assert.notCalled(stubs.ask)
+			sinon.assert.notCalled(hookStub)
+			sinon.assert.notCalled(stubs.createWorkflowArtifact)
+		} finally {
+			await clineIgnoreController.dispose()
+			await rm(tmpCwd, { recursive: true, force: true })
+		}
 	})
 
 	it("creates an empty artifact file through the real workflow runtime", async () => {
@@ -417,13 +462,16 @@ describe("CreateWorkflowArtifactToolHandler", () => {
 			const taskState = new TaskState()
 			taskState.activeWorkflowName = workflow.name
 			taskState.activeWorkflowSession = createActiveWorkflowSession(workflow)
-			const runtime = new WorkflowRuntime({ cwd: tmpCwd })
+			const runtime = new WorkflowRuntime({
+				cwd: tmpCwd,
+				workspacePathPolicy: createAllowAllWorkspacePathPolicy(),
+			})
 			const { config } = createConfig({
 				cwd: tmpCwd,
 				taskState,
 				workflowRuntime: runtime,
 			})
-			const handler = new CreateWorkflowArtifactToolHandler()
+			const handler = new CreateWorkflowArtifactToolHandler(createToolValidator(config.cwd))
 
 			const result = await handler.execute(config, createArtifactBlock())
 
@@ -433,7 +481,7 @@ describe("CreateWorkflowArtifactToolHandler", () => {
 			}
 			const parsedResult = JSON.parse(result)
 			const artifactAbsolutePath = parsedResult.artifact_absolute_path
-			expect(artifactAbsolutePath).to.equal(path.join(tmpCwd, "real-artifact-project", "planning", "Epic-1.md"))
+			expect(artifactAbsolutePath).to.equal(path.join(tmpCwd, "real-artifact-project", "planning", "Epics.md"))
 			await access(artifactAbsolutePath)
 			expect(await readFile(artifactAbsolutePath, "utf8")).to.equal("")
 			expect(parsedResult.persisted_artifact_output_values.epic_artifact_absolute_path).to.equal(artifactAbsolutePath)

@@ -1,6 +1,7 @@
 import type { ToolUse } from "@core/assistant-message"
 import { formatResponse } from "@core/prompts/responses"
 import type { WorkflowValues } from "@/core/task/workflow-runtime/types"
+import { isWorkflowValue } from "@/core/task/workflow-runtime/workflowValues"
 import { ClineDefaultTool } from "@/shared/tools"
 import type { ToolResponse } from "../../index"
 import type { IPartialBlockHandler, IToolHandler } from "../ToolExecutorCoordinator"
@@ -8,7 +9,38 @@ import type { TaskConfig } from "../types/TaskConfig"
 import type { StronglyTypedUIHelpers } from "../types/UIHelpers"
 
 function readWorkflowValues(block: ToolUse): WorkflowValues | undefined {
-	const rawValues = (block.params as Record<string, unknown>).values
+	const rawValues = Object.entries(block.params).find(([key]) => key === "values")?.[1]
+	const parsedValues = parseWorkflowValuesObject(rawValues)
+
+	if (parsedValues === undefined) {
+		return undefined
+	}
+
+	const entries = Object.entries(parsedValues)
+	if (entries.length === 0) {
+		return undefined
+	}
+
+	const workflowValues: WorkflowValues = {}
+	for (const [key, value] of entries) {
+		if (!isWorkflowValue(value)) {
+			return undefined
+		}
+		workflowValues[key] = value
+	}
+
+	return workflowValues
+}
+
+function parseWorkflowValuesObject(rawValues: unknown): object | undefined {
+	if (typeof rawValues === "string") {
+		try {
+			const parsedValue = JSON.parse(rawValues)
+			return parseWorkflowValuesObject(parsedValue)
+		} catch {
+			return undefined
+		}
+	}
 
 	if (rawValues === null || Array.isArray(rawValues) || typeof rawValues !== "object") {
 		return undefined
@@ -19,18 +51,7 @@ function readWorkflowValues(block: ToolUse): WorkflowValues | undefined {
 		return undefined
 	}
 
-	const entries = Object.entries(rawValues)
-	if (entries.length === 0) {
-		return undefined
-	}
-
-	for (const [, value] of entries) {
-		if (typeof value !== "string") {
-			return undefined
-		}
-	}
-
-	return Object.fromEntries(entries) as WorkflowValues
+	return rawValues
 }
 
 export class SetWorkflowValuesToolHandler implements IToolHandler, IPartialBlockHandler {
@@ -62,7 +83,7 @@ export class SetWorkflowValuesToolHandler implements IToolHandler, IPartialBlock
 		if (values === undefined) {
 			config.taskState.consecutiveMistakeCount++
 			return formatResponse.toolError(
-				"Missing required parameter 'values'. Provide a non-empty object whose property values are strings.",
+				"Missing required parameter 'values'. Provide a non-empty object whose property values are JSON-safe workflow values.",
 			)
 		}
 
@@ -94,6 +115,11 @@ export class SetWorkflowValuesToolHandler implements IToolHandler, IPartialBlock
 				return formatResponse.toolResult(
 					`No workflow values changed. Existing stored values already matched the requested values: ${unchangedSummary}. Do not call set_workflow_values again unless one of those values changes.`,
 				)
+			}
+
+			const nextAction = await config.workflowRuntime.resolveNextAction({ taskState: config.taskState })
+			if (nextAction.kind !== "no_op") {
+				config.callbacks.queueWorkflowNextAction(nextAction)
 			}
 
 			const unchangedSuffix = unchangedKeys.length > 0 ? ` Unchanged existing values: ${unchangedKeys.join(", ")}.` : ""

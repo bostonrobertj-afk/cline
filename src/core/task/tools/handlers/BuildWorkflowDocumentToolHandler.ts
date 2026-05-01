@@ -6,11 +6,13 @@ import { getReadablePath, isLocatedInWorkspace } from "@utils/path"
 import fs from "fs/promises"
 import path from "path"
 import type { WorkflowValues } from "@/core/task/workflow-runtime/types"
+import { isWorkflowValue } from "@/core/task/workflow-runtime/workflowValues"
 import { ClineDefaultTool } from "@/shared/tools"
 import type { ToolResponse } from "../../index"
 import { showNotificationForApproval } from "../../utils"
 import { getBackendWorkflowToolContract } from "../backendWorkflowToolContracts"
 import type { IPartialBlockHandler, IToolHandler } from "../ToolExecutorCoordinator"
+import type { ToolValidator } from "../ToolValidator"
 import type { TaskConfig } from "../types/TaskConfig"
 import type { StronglyTypedUIHelpers } from "../types/UIHelpers"
 import { ToolResultUtils } from "../utils/ToolResultUtils"
@@ -18,14 +20,9 @@ import { ToolResultUtils } from "../utils/ToolResultUtils"
 function parseRequest(
 	block: ToolUse,
 ): { artifactId: string; destinationPath: string; content: string; workflowValueWrites?: WorkflowValues } | undefined {
-	const params = block.params as Record<string, unknown> | undefined
-	if (!params || typeof params !== "object" || Array.isArray(params)) {
-		return undefined
-	}
-
-	const artifactId = params.artifact_id
-	const destinationPath = params.destination_path
-	const content = params.content
+	const artifactId = Object.entries(block.params).find(([key]) => key === "artifact_id")?.[1]
+	const destinationPath = Object.entries(block.params).find(([key]) => key === "destination_path")?.[1]
+	const content = Object.entries(block.params).find(([key]) => key === "content")?.[1]
 
 	if (
 		typeof artifactId !== "string" ||
@@ -38,33 +35,57 @@ function parseRequest(
 		return undefined
 	}
 
-	const workflowValueWritesRaw = params.workflow_value_writes
+	const workflowValueWritesRaw = Object.entries(block.params).find(([key]) => key === "workflow_value_writes")?.[1]
 	if (workflowValueWritesRaw === undefined) {
 		return { artifactId, destinationPath, content }
 	}
 
-	if (
-		workflowValueWritesRaw === null ||
-		Array.isArray(workflowValueWritesRaw) ||
-		Object.prototype.toString.call(workflowValueWritesRaw) !== "[object Object]" ||
-		(Object.getPrototypeOf(workflowValueWritesRaw) !== Object.prototype &&
-			Object.getPrototypeOf(workflowValueWritesRaw) !== null)
-	) {
+	const parsedWorkflowValueWrites = parseWorkflowValueWritesObject(workflowValueWritesRaw)
+	if (parsedWorkflowValueWrites === undefined) {
 		return undefined
 	}
 
-	for (const value of Object.values(workflowValueWritesRaw)) {
-		if (typeof value !== "string") {
+	const entries = Object.entries(parsedWorkflowValueWrites)
+	if (entries.length === 0) {
+		return undefined
+	}
+
+	const workflowValueWrites: WorkflowValues = {}
+	for (const [key, value] of entries) {
+		if (!isWorkflowValue(value)) {
 			return undefined
 		}
+		workflowValueWrites[key] = value
 	}
 
 	return {
 		artifactId,
 		destinationPath,
 		content,
-		workflowValueWrites: workflowValueWritesRaw as WorkflowValues,
+		workflowValueWrites,
 	}
+}
+
+function parseWorkflowValueWritesObject(rawValue: unknown): object | undefined {
+	if (typeof rawValue === "string") {
+		try {
+			const parsedValue = JSON.parse(rawValue)
+			return parseWorkflowValueWritesObject(parsedValue)
+		} catch {
+			return undefined
+		}
+	}
+
+	if (rawValue === null || Array.isArray(rawValue) || typeof rawValue !== "object") {
+		return undefined
+	}
+
+	const prototype = Object.getPrototypeOf(rawValue)
+	if (prototype !== Object.prototype && prototype !== null) {
+		return undefined
+	}
+
+	return rawValue
 }
 
 async function atomicReplaceTextFile(filePath: string, content: string): Promise<void> {
@@ -89,6 +110,8 @@ async function atomicReplaceTextFile(filePath: string, content: string): Promise
 
 export class BuildWorkflowDocumentToolHandler implements IToolHandler, IPartialBlockHandler {
 	readonly name = ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT
+
+	constructor(private readonly validator: ToolValidator) {}
 
 	getDescription(block: ToolUse): string {
 		const request = parseRequest(block)
@@ -132,11 +155,15 @@ export class BuildWorkflowDocumentToolHandler implements IToolHandler, IPartialB
 			if (!request) {
 				config.taskState.consecutiveMistakeCount += 1
 				return formatResponse.toolError(
-					"Missing required parameters. Provide non-empty string values for 'artifact_id', 'destination_path', and 'content'. Optional 'workflow_value_writes' must be an object whose property values are strings.",
+					"Missing required parameters. Provide non-empty string values for 'artifact_id', 'destination_path', and 'content'. Optional 'workflow_value_writes' must be a non-empty object or JSON string whose property values are JSON-safe workflow values.",
 				)
 			}
 
 			const { artifactId, destinationPath, content, workflowValueWrites } = request
+			const accessValidation = this.validator.checkClineIgnorePath(destinationPath)
+			if (!accessValidation.ok) {
+				return formatResponse.toolError(formatResponse.clineIgnoreError(destinationPath))
+			}
 
 			let priorContent: string | undefined
 			try {

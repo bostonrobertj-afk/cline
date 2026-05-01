@@ -65,6 +65,7 @@ export class UseSkillToolHandler implements IToolHandler, IPartialBlockHandler {
 				return `Error: Workflow "${skillName}" could not be activated.`
 			}
 
+			config.callbacks.queueWorkflowNextAction(nextAction)
 			config.taskState.consecutiveMistakeCount = 0
 
 			telemetryService.safeCapture(

@@ -1,5 +1,29 @@
 import { ClineDefaultTool } from "@/shared/tools"
-import type { BackendWorkflowToolContract } from "./backendWorkflowToolContractTypes"
+import type { BackendWorkflowToolContract, BackendWorkflowToolSchemaNode } from "./backendWorkflowToolContractTypes"
+
+const WORKFLOW_VALUE_SCHEMA_MAX_DEPTH = 8
+
+function createWorkflowValueSchema(depth: number): BackendWorkflowToolSchemaNode {
+	const scalarSchemas: BackendWorkflowToolSchemaNode[] = [{ type: "string" }, { type: "number" }, { type: "boolean" }]
+
+	if (depth >= WORKFLOW_VALUE_SCHEMA_MAX_DEPTH) {
+		return {
+			type: "object",
+			oneOf: scalarSchemas,
+		}
+	}
+
+	return {
+		type: "object",
+		oneOf: [
+			...scalarSchemas,
+			{ type: "array", items: createWorkflowValueSchema(depth + 1) },
+			{ type: "object", additionalProperties: createWorkflowValueSchema(depth + 1) },
+		],
+	}
+}
+
+const workflowValueSchema = createWorkflowValueSchema(0)
 
 export const backendWorkflowToolContracts: Partial<Record<ClineDefaultTool, BackendWorkflowToolContract>> = {
 	[ClineDefaultTool.SET_WORKFLOW_VALUES]: {
@@ -11,7 +35,7 @@ export const backendWorkflowToolContracts: Partial<Record<ClineDefaultTool, Back
 				required: true,
 				type: "object",
 				description: "Workflow-value key/value map for the active workflow session.",
-				additionalProperties: { type: "string" },
+				additionalProperties: workflowValueSchema,
 			},
 		],
 	},
@@ -43,7 +67,7 @@ export const backendWorkflowToolContracts: Partial<Record<ClineDefaultTool, Back
 				required: false,
 				type: "object",
 				description: "Optional workflow-value writeback map to persist after a successful document write.",
-				additionalProperties: { type: "string" },
+				additionalProperties: workflowValueSchema,
 			},
 		],
 	},
@@ -71,5 +95,5 @@ export function getBackendWorkflowToolContract(toolName: ClineDefaultTool): Back
 }
 
 export function isBackendWorkflowToolContractTool(toolName: ClineDefaultTool): boolean {
-	return !!getBackendWorkflowToolContract(toolName)
+	return getBackendWorkflowToolContract(toolName) !== undefined
 }

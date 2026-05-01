@@ -64,6 +64,7 @@ export const TASK_CALLBACKS_KEYS = [
 	"executeCommandTool",
 	"doesLatestTaskCompletionHaveNewChanges",
 	"updateFCListFromToolResponse",
+	"queueWorkflowNextAction",
 	"shouldAutoApproveToolWithPath",
 	"postStateToWebview",
 	"reinitExistingTaskFromId",

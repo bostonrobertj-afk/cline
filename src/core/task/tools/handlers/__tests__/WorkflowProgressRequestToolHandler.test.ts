@@ -8,7 +8,7 @@ import { WORKFLOW_PROGRESS_REQUEST_OPTIONS, WORKFLOW_PROGRESS_REQUEST_QUESTION }
 import { formatResponse } from "../../../../prompts/responses"
 import { TaskState } from "../../../TaskState"
 import { RESPONSE_TOOL_SUCCESS_MESSAGE } from "../../response/types"
-import type { TaskConfig } from "../../types/TaskConfig"
+import { validateTaskConfig } from "../../types/TaskConfig"
 import { WorkflowProgressRequestToolHandler } from "../WorkflowProgressRequestToolHandler"
 
 function createConfig(options?: {
@@ -19,16 +19,20 @@ function createConfig(options?: {
 	const clineMessages: ClineMessage[] = options?.lastFollowupMessage ? [options.lastFollowupMessage] : []
 	const sayStub = sinon.stub().resolves(undefined)
 	const askStub = sinon.stub().resolves(options?.askResult ?? { text: "Yes" })
+	const queueWorkflowNextActionStub = sinon.stub()
 	const callbacks = {
 		say: sayStub,
 		ask: askStub,
 		saveCheckpoint: sinon.stub().resolves(),
 		sayAndCreateMissingParamError: sinon.stub().resolves("missing"),
 		removeLastPartialMessageIfExistsWithType: sinon.stub().resolves(),
+		upsertPartialResponseToolSayPreview: sinon.stub().resolves(false),
+		clearPartialResponseToolPreview: sinon.stub().resolves(false),
 		executeCommandTool: sinon.stub().resolves([false, "ok"]),
 		cancelRunningCommandTool: sinon.stub().resolves(false),
 		doesLatestTaskCompletionHaveNewChanges: sinon.stub().resolves(false),
 		updateFCListFromToolResponse: sinon.stub().resolves({ accepted: true }),
+		queueWorkflowNextAction: queueWorkflowNextActionStub,
 		shouldAutoApproveTool: sinon.stub().returns([false, false]),
 		shouldAutoApproveToolWithPath: sinon.stub().resolves(false),
 		postStateToWebview: sinon.stub().resolves(),
@@ -77,6 +81,14 @@ function createConfig(options?: {
 		browserSettings: {},
 		focusChainSettings: {},
 		services: {
+			mcpHub: {},
+			browserSession: {},
+			urlContentFetcher: {},
+			diffViewProvider: {},
+			fileContextTracker: {},
+			clineIgnoreController: {},
+			commandPermissionController: {},
+			contextManager: {},
 			stateManager: {
 				getGlobalSettingsKey: (key: string) => {
 					if (key === "mode") return "act"
@@ -98,7 +110,8 @@ function createConfig(options?: {
 		coordinator: {
 			getHandler: sinon.stub(),
 		},
-	} as unknown as TaskConfig
+	}
+	validateTaskConfig(config)
 
 	return {
 		config,
@@ -108,6 +121,7 @@ function createConfig(options?: {
 			isWorkflowProgressRequestAllowed: isWorkflowProgressRequestAllowedStub,
 			submitWorkflowProgressRequest: submitWorkflowProgressRequestStub,
 			saveClineMessagesAndUpdateHistory,
+			queueWorkflowNextAction: queueWorkflowNextActionStub,
 		},
 	}
 }
@@ -139,6 +153,7 @@ describe("WorkflowProgressRequestToolHandler", () => {
 			taskState: config.taskState,
 			approved: true,
 		})
+		sinon.assert.calledOnceWithExactly(stubs.queueWorkflowNextAction, { kind: "project_prompt", promptProjection: {} })
 		assert.deepEqual(config.taskState.pendingResponseToolFollowup, {
 			toolName: ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST,
 			route: "normal_user_turn",
@@ -146,7 +161,11 @@ describe("WorkflowProgressRequestToolHandler", () => {
 			images: undefined,
 			files: undefined,
 		})
-		assert.deepEqual(JSON.parse(lastFollowupMessage.text), {
+		const lastFollowupText = lastFollowupMessage.text
+		if (typeof lastFollowupText !== "string") {
+			throw new Error("Expected workflow progress followup message text to be a string.")
+		}
+		assert.deepEqual(JSON.parse(lastFollowupText), {
 			question: WORKFLOW_PROGRESS_REQUEST_QUESTION,
 			options: [...WORKFLOW_PROGRESS_REQUEST_OPTIONS],
 			selected: "Yes",
@@ -171,6 +190,7 @@ describe("WorkflowProgressRequestToolHandler", () => {
 			taskState: config.taskState,
 			approved: false,
 		})
+		sinon.assert.calledOnceWithExactly(stubs.queueWorkflowNextAction, { kind: "project_prompt", promptProjection: {} })
 		assert.deepEqual(config.taskState.pendingResponseToolFollowup, {
 			toolName: ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST,
 			route: "normal_user_turn",
@@ -198,6 +218,7 @@ describe("WorkflowProgressRequestToolHandler", () => {
 		})
 		assert.equal(result, formatResponse.toolError("workflow_progress_request could not advance the active workflow step."))
 		assert.equal(config.taskState.pendingResponseToolFollowup, undefined)
+		sinon.assert.notCalled(stubs.queueWorkflowNextAction)
 	})
 
 	it("returns a tool error when runtime validation says no progress-approval path is available", async () => {

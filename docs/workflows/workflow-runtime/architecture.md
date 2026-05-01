@@ -314,6 +314,7 @@ Exact filenames beyond this level are deferred to requirements and implementatio
    - `testing`
 8. Workflow runtime initializes active-step state and marks the workflow as just started.
 9. Workflow runtime projects downstream state for prompts, focus chain, tools, and any active workflow-form UI.
+10. The activation caller routes the returned `WorkflowNextAction` into the shared next-action consumer for the same execution context before workflow execution continues. Tool-based activation paths may record the tool result first, but they must not drop, privately consume, or re-resolve around the returned activation action.
 
 ### 6.2 Scenario: Normal Turn Orchestration
 
@@ -344,8 +345,12 @@ Exact filenames beyond this level are deferred to requirements and implementatio
 1. A workflow turn discovers or computes one or more workflow values.
 2. The values may come from backend-owned deterministic logic or from an AI-callable workflow-value persistence tool.
 3. Workflow runtime validates that the write is allowed for the active workflow session.
-4. Workflow runtime writes the values into the active session's canonical workflow value map.
-5. Downstream prompt, artifact-path, form, and focus-chain projections consume those values from workflow session state.
+4. Workflow runtime writes the values into the active session's canonical workflow value map while preserving each value's JSON-safe type and shape.
+5. Workflow runtime compares workflow values with deterministic equality for JSON-safe values, not by string-only comparison.
+6. Downstream prompt, artifact-path, form, and focus-chain projections consume those values from workflow session state.
+7. Prompt builders that insert workflow values into instruction text render those values deterministically: strings as-is, numbers and booleans through `String(value)`, and arrays and objects as stable JSON.
+8. Tool payload builders consume the typed workflow values directly when the target tool supports that shape; any runtime or tool code that requires a string workflow value must validate a non-empty string before use and fail clearly otherwise.
+9. When workflow-value persistence returns a next action, the tool or backend path carries that action to the shared next-action consumer after its normal result is recorded.
 
 ### 6.4 Scenario: Deterministic Step Resolution
 
@@ -366,7 +371,8 @@ Exact filenames beyond this level are deferred to requirements and implementatio
 4. The runtime receives the user’s answer through the existing tool flow.
 5. The workflow runtime validates that the requested progression mechanism is allowed for the active step.
 6. The workflow runtime updates the canonical active-step state if progression is valid.
-7. Focus chain updates only as a downstream reflection of the step change.
+7. The progression result is returned as a workflow next action and consumed through the shared next-action consumer rather than through a local tool-specific branch.
+8. Focus chain updates only as a downstream reflection of the step change.
 
 ### 6.6 Scenario: Completion and Teardown
 
@@ -387,6 +393,11 @@ Exact filenames beyond this level are deferred to requirements and implementatio
 7. The child session gets its own workflow identity, session state, workflow values, active step, prompt projection, tool gating, and completion lifecycle.
 8. After activation, parent and child workflow values are isolated mutable state unless a higher-level coordination behavior explicitly synchronizes them.
 9. The parent workflow session remains unchanged by child-session mutations.
+10. The child activation next action is consumed in the child execution context before the first child prompt assembly.
+11. Child workflows do not render workflow forms. A child next action that requests workflow-form rendering is an invalid child workflow configuration and fails clearly.
+12. Child workflow tool-backed operations execute through the same child tool-handler path used for model-authored child tools, including workflow-projected tool availability, then feed the result back into the shared runtime and continue next-action consumption.
+
+Parent-owned subagent workflow assignment may be represented in the parent-authored subagent prompt only through explicit assignment markers: `use_skill("workflow-name")`, `use_skill('workflow-name')`, `skill_name = "workflow-name"`, or `skill_name = 'workflow-name'`. These markers are bootstrap metadata consumed before the child turn, not child-authored `use_skill` tool calls.
 
 ### 6.8 Scenario: Concurrent Parent and Child Workflow Sessions
 
@@ -459,6 +470,8 @@ This removes the need for placeholder substitution as a first-class runtime conc
 
 Workflow-owned values remain a first-class concept, but they are session-owned runtime state rather than placeholder-system state.
 
+Workflow-owned values are typed JSON-safe session data, not a string-only placeholder map. Prompt-builder functions may render those values into final workflow instructions, but that rendering is local to prompt construction and must not reintroduce a generic placeholder subsystem or leave unresolved placeholder markers in the workflow prompt contract.
+
 ### 8.4 Workflow-Owned Tool Exposure
 
 Workflow modules own the workflow-level and per-step native tool schema.
@@ -487,6 +500,30 @@ That means:
 - workflow runtime executes direct runtime-owned deterministic procedures inside `WorkflowRuntime` or shared runtime-owned seams
 - workflow runtime decides when deterministic tool execution should happen
 - the normal tool path still executes the tool
+
+### 8.6a Runtime Workspace Path Policy
+
+Runtime-owned deterministic filesystem procedures are subject to the same workspace path-policy as normal tool execution.
+
+`Task` owns the initialized `ClineIgnoreController` for the execution context and passes it into `WorkflowRuntime` through a narrow runtime dependency. `WorkflowRuntime` must not instantiate its own independent path-policy controller and must not depend on tool-handler-only classes such as `ToolValidator`.
+
+`WorkflowRuntime` and shared runtime discovery helpers must use that runtime path-policy dependency before runtime-owned filesystem access:
+
+- discovery validates the target directory before `readdir`
+- discovery filters discovered child entries through path policy before exposing candidates
+- artifact creation validates the artifact parent directory before `mkdir`
+- artifact creation validates the artifact file path before `writeFile`
+- entry project setup validates the project root and each canonical subfolder before `mkdir`
+
+Handler-level path-policy checks remain required for tool boundaries, but they do not replace runtime-level checks for runtime-owned discovery, allocation, or filesystem creation.
+
+### 8.6b Shared Next-Action Consumption
+
+Returned workflow next actions are the canonical continuation of workflow execution. Activation, workflow value persistence, workflow progress requests, workflow-form submission, and tool-backed operation result handling must route their returned next action into one shared consumer.
+
+`Task` and `SubagentRunner` may provide context-specific adapters, but they must not interpret workflow branches independently.
+
+The consumer persists workflow metadata for model-driven handoff actions, renders workflow forms only in main-task contexts, rejects workflow-form rendering in child contexts, executes tool-backed operations through the normal tool path for that context, feeds tool results back into `WorkflowRuntime`, and continues evaluation until control is handed back, completed, or failed.
 
 ### 8.7 Persistence and Resume
 
@@ -520,6 +557,22 @@ Each shipped workflow has one canonical designated project subfolder, and workfl
 Workflow runtime owns the shared artifact identity and numbering policy used to connect related workflow outputs inside a project.
 
 Workflow runtime also owns the typed artifact-family convention registry used for canonical artifact families. That registry defines allocation mode, parent or target requirements, filename pattern, file extension, numbering scope, and discovery pattern. Workflow modules may reference artifact-family identifiers from that registry, but modules do not own canonical artifact filename patterns, numbering scopes, extensions, or discovery patterns.
+
+Artifact identity is not always numeric. Numbered lineage artifacts use dotted numeric identities. Singleton project artifacts use stable registry-owned string identities.
+
+`Epics.index.json` is the structured epic inventory sidecar for `Epics.md`. It uses this schema: `{ "version": 1, "epics": [{ "identity": "1", "title": "..." }] }`. `identity` is a positive numeric string, `title` is a non-empty string, and the index does not contain story, remediation-story, or review data.
+
+The canonical artifact dependency chain is:
+
+```text
+Epics.md + Epics.index.json
+  -> Epic-{E}-delivery-spec.md
+      -> Story-{E}-{S}.md
+          -> Remediation-story-{E}-{S}-{R}.md
+          -> review/input artifacts
+```
+
+Stories validate against the selected `Epic-{E}-delivery-spec.md`; `Epics.index.json` alone is not sufficient proof that story artifacts may be allocated for that epic.
 
 That numbering policy must carry forward across related artifact families, for example:
 

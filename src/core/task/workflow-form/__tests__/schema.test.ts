@@ -11,13 +11,34 @@ import {
 } from "../schema"
 
 describe("workflow-form schema helpers", () => {
-	it("resolves set_workflow_values additionalProperties as a string schema", () => {
+	it("validates set_workflow_values additionalProperties as JSON-safe workflow values", () => {
 		const schema = resolveWorkflowFormSchema(ClineDefaultTool.SET_WORKFLOW_VALUES, {
 			parameterName: "values",
 			useAdditionalProperties: true,
 		})
+		const submittedValues = [
+			normalizeWorkflowFormSubmittedValue({ stringValue: "ready" }),
+			normalizeWorkflowFormSubmittedValue({ numberValue: 3.14 }),
+			normalizeWorkflowFormSubmittedValue({ booleanValue: true }),
+			normalizeWorkflowFormSubmittedValue({
+				arrayValue: {
+					values: [{ stringValue: "alpha" }, { numberValue: 2.5 }, { booleanValue: false }],
+				},
+			}),
+			normalizeWorkflowFormSubmittedValue({
+				objectValue: {
+					entries: [
+						{ key: "title", value: { stringValue: "Draft" } },
+						{ key: "score", value: { numberValue: 1.5 } },
+						{ key: "published", value: { booleanValue: false } },
+					],
+				},
+			}),
+		]
 
-		expect(schema).to.deep.equal({ type: "string" })
+		for (const submittedValue of submittedValues) {
+			expect(validateWorkflowFormSubmittedValueAgainstSchema(submittedValue, schema)).to.equal(true)
+		}
 	})
 
 	it("derives dropdown field kind and options from enum string schemas", () => {
@@ -116,6 +137,34 @@ describe("workflow-form schema helpers", () => {
 			base: "main",
 			head: "feature",
 		})
+	})
+
+	it("throws for malformed nested array entries instead of returning truncated arrays", () => {
+		expect(() =>
+			normalizeWorkflowFormSubmittedValue({
+				arrayValue: {
+					values: [{ stringValue: "kept" }, {}],
+				},
+			}),
+		).to.throw("Workflow form submission values must contain exactly one typed value.")
+	})
+
+	it("throws for malformed nested object entries instead of returning truncated objects", () => {
+		expect(() =>
+			normalizeWorkflowFormSubmittedValue({
+				objectValue: {
+					entries: [{ key: "missing_value", value: undefined }],
+				},
+			}),
+		).to.throw("Malformed workflow form submitted value: object entry value is missing.")
+
+		expect(() =>
+			normalizeWorkflowFormSubmittedValue({
+				objectValue: {
+					entries: [{ key: "   ", value: { stringValue: "invalid" } }],
+				},
+			}),
+		).to.throw("Malformed workflow form submitted value: object entry key is empty.")
 	})
 
 	it("validates structured object submissions against required schema properties", () => {

@@ -1,7 +1,7 @@
 import type { ClineDefaultTool } from "@/shared/tools"
 
 export type BackendWorkflowToolSchemaNode = {
-	type?: "string" | "boolean" | "integer" | "array" | "object"
+	type?: "string" | "boolean" | "integer" | "number" | "array" | "object"
 	enum?: unknown
 	const?: string | number | boolean
 	items?: BackendWorkflowToolSchemaNode

@@ -48,7 +48,6 @@ function createConfig(storyPath: string): {
 	const taskState = new TaskState()
 	taskState.activeWorkflowName = "dev-story.md"
 	taskState.activeWorkflowSession = {
-		workflowName: "dev-story.md",
 		activeStepNumber: 2,
 		workflowValues: { story_path: storyPath },
 		projectSelection: { projectMode: "new", projectTitle: "", projectFolderName: "" },

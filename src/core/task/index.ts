@@ -88,6 +88,7 @@ import type { TaskMetadata } from "@/core/context/context-tracking/ContextTracke
 import type { SystemPromptContext } from "@/core/prompts/system-prompt"
 import { getSystemPrompt } from "@/core/prompts/system-prompt"
 import type { WorkflowNextAction } from "@/core/task/workflow-runtime/types"
+import { WorkflowNextActionConsumer } from "@/core/task/workflow-runtime/WorkflowNextActionConsumer"
 import { WorkflowRuntime } from "@/core/task/workflow-runtime/WorkflowRuntime"
 import { HostProvider } from "@/hosts/host-provider"
 import { FileEditProvider } from "@/integrations/editor/FileEditProvider"
@@ -738,7 +739,7 @@ export class Task {
 		this.contextManager = new ContextManager()
 		this.streamHandler = new StreamResponseHandler()
 		this.cwd = cwd
-		this.workflowRuntime = new WorkflowRuntime({ cwd: this.cwd })
+		this.workflowRuntime = new WorkflowRuntime({ cwd: this.cwd, workspacePathPolicy: this.clineIgnoreController })
 		this.stateManager = stateManager
 		this.workspaceManager = workspaceManager
 
@@ -1397,81 +1398,50 @@ export class Task {
 	}
 
 	private async consumeWorkflowNextAction(nextAction?: WorkflowNextAction): Promise<void> {
-		if (!nextAction) {
-			return
-		}
-
-		while (this.taskState.abort !== true) {
-			if (nextAction.kind === "no_op" || nextAction.kind === "project_prompt") {
-				return
-			}
-
-			if (nextAction.kind === "persist_workflow_teardown") {
-				await this.persistWorkflowRuntimeMetadata()
-				return
-			}
-
-			if (nextAction.kind === "terminal_error") {
-				await this.persistWorkflowRuntimeMetadata()
-				await this.say("error", nextAction.errorMessage)
-				return
-			}
-
-			if (nextAction.kind === "complete_workflow") {
-				await this.persistWorkflowRuntimeMetadata()
-				return
-			}
-
-			if (nextAction.kind === "render_workflow_form") {
-				await this.persistWorkflowRuntimeMetadata()
-				await this.renderWorkflowFormMessage(nextAction.payload)
-				const formSession = nextAction.formSession
-				await pWaitFor(
-					() => this.taskState.activeWorkflowSession?.ui.formSession !== formSession || this.taskState.abort,
-					{
-						interval: 100,
-					},
-				)
-				if (this.taskState.abort) {
-					return
-				}
-				nextAction = await this.workflowRuntime.resolveNextAction({ taskState: this.taskState })
-				continue
-			}
-
-			if (nextAction.kind === "execute_tool_backed_operation") {
-				if (nextAction.toolBackedOperationSession) {
-					const toolBackedOperationStatusPayload = this.workflowRuntime.buildToolBackedOperationStatusPayload({
-						taskState: this.taskState,
-						session: nextAction.toolBackedOperationSession,
-					})
-					if (toolBackedOperationStatusPayload) {
-						await this.renderWorkflowStepResolutionStatusMessage(toolBackedOperationStatusPayload)
+		const consumer = new WorkflowNextActionConsumer({
+			taskState: this.taskState,
+			workflowRuntime: this.workflowRuntime,
+			adapter: {
+				shouldAbort: () => this.taskState.abort === true,
+				persistWorkflowRuntimeMetadata: () => this.persistWorkflowRuntimeMetadata(),
+				renderWorkflowForm: (payload) => this.renderWorkflowFormMessage(payload),
+				waitForWorkflowFormCompletion: async (formSession) => {
+					await pWaitFor(
+						() => this.taskState.activeWorkflowSession?.ui.formSession !== formSession || this.taskState.abort,
+						{
+							interval: 100,
+						},
+					)
+				},
+				renderWorkflowStepResolutionStatus: (payload) => this.renderWorkflowStepResolutionStatusMessage(payload),
+				reportTerminalError: async (errorMessage) => {
+					await this.say("error", errorMessage)
+				},
+				executeToolBackedOperation: async (workflowAction) => {
+					const previousUserMessageContentLength = this.taskState.userMessageContent.length
+					const toolParams: Record<string, string> = { ...workflowAction.toolRequest.toolParams }
+					for (const [key, value] of Object.entries(workflowAction.toolRequest.toolInput)) {
+						const serializedValue = typeof value === "string" ? value : JSON.stringify(value)
+						toolParams[key] = serializedValue === undefined ? String(value) : serializedValue
 					}
-				}
+					await this.toolExecutor.executeTool({
+						type: "tool_use",
+						name: workflowAction.toolRequest.toolName,
+						params: toolParams,
+						partial: false,
+						isNativeToolCall: true,
+						call_id: workflowAction.toolBackedOperationSession
+							? `workflow_step_resolution_${workflowAction.toolBackedOperationSession.sessionId}`
+							: `workflow_runtime_${this.taskId}`,
+					})
+					return {
+						toolResultText: this.getWorkflowFormToolResultText(previousUserMessageContentLength),
+					}
+				},
+			},
+		})
 
-				const previousUserMessageContentLength = this.taskState.userMessageContent.length
-				await this.toolExecutor.executeTool({
-					type: "tool_use",
-					name: nextAction.toolRequest.toolName,
-					params: {
-						...nextAction.toolRequest.toolParams,
-						...nextAction.toolRequest.toolInput,
-					} as any,
-					partial: false,
-					isNativeToolCall: true,
-					call_id: nextAction.toolBackedOperationSession
-						? `workflow_step_resolution_${nextAction.toolBackedOperationSession.sessionId}`
-						: `workflow_runtime_${this.taskId}`,
-				})
-				const toolResultText = this.getWorkflowFormToolResultText(previousUserMessageContentLength)
-				nextAction = await this.workflowRuntime.handleToolBackedOperationToolResult({
-					taskState: this.taskState,
-					toolResultText,
-				})
-				await this.persistWorkflowRuntimeMetadata()
-			}
-		}
+		await consumer.consume(nextAction)
 	}
 
 	private getWorkflowFormToolResultText(previousUserMessageContentLength: number): string | undefined {
@@ -3268,10 +3238,10 @@ export class Task {
 				Logger.info(
 					`[Task ${this.taskId}] presentAssistantMessage tool ${block.name} ${toolExecutionOutcome.status} at index ${this.taskState.currentStreamingContentIndex + 1}/${this.taskState.assistantMessageContent.length}; call_id=${block.call_id ?? "none"}; emittedToolResult=${String(toolExecutionOutcome.emittedToolResult)}; userMessageContent blocks=${this.taskState.userMessageContent.length}`,
 				)
-				if (block.name === ClineDefaultTool.SET_WORKFLOW_VALUES && toolExecutionOutcome.status === "executed") {
-					await this.consumeWorkflowNextAction(
-						await this.workflowRuntime.resolveNextAction({ taskState: this.taskState }),
-					)
+				if (toolExecutionOutcome.status === "executed") {
+					for (const returnedNextAction of toolExecutionOutcome.workflowNextActions) {
+						await this.consumeWorkflowNextAction(returnedNextAction)
+					}
 				}
 				if (block.call_id) {
 					Session.get().updateToolCall(block.call_id, block.name)

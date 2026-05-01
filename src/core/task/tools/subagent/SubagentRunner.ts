@@ -21,6 +21,8 @@ import { ClineDefaultTool, ClineTool } from "@shared/tools"
 import { ContextManager } from "@/core/context/context-management/ContextManager"
 import { checkContextWindowExceededError } from "@/core/context/context-management/context-error-handling"
 import { getContextWindowInfo } from "@/core/context/context-management/context-window-utils"
+import type { WorkflowNextAction } from "@/core/task/workflow-runtime/types"
+import { WorkflowNextActionConsumer } from "@/core/task/workflow-runtime/WorkflowNextActionConsumer"
 import { resolveWorkflowByUseSkillName } from "@/core/task/workflow-runtime/WorkflowRegistry"
 import { HostRegistryInfo } from "@/registry"
 import { ClineError, ClineErrorType } from "@/services/error"
@@ -36,6 +38,8 @@ import { SubagentBuilder } from "./SubagentBuilder"
 const MAX_EMPTY_ASSISTANT_RETRIES = 3
 const MAX_INITIAL_STREAM_ATTEMPTS = 3
 const INITIAL_STREAM_RETRY_BASE_DELAY_MS = 2_000
+const CHILD_WORKFLOW_FORM_ERROR_MESSAGE =
+	"Child workflow configuration is invalid: subagent workflows cannot render workflow forms."
 
 export type SubagentRunStatus = "completed" | "failed"
 
@@ -330,6 +334,76 @@ export class SubagentRunner {
 
 	private shouldAbort(): boolean {
 		return this.abortRequested || this.baseConfig.taskState.abort
+	}
+
+	private async consumeChildWorkflowNextAction(state: TaskState, nextAction: WorkflowNextAction | undefined): Promise<void> {
+		const consumer = new WorkflowNextActionConsumer({
+			taskState: state,
+			workflowRuntime: this.baseConfig.workflowRuntime,
+			adapter: {
+				shouldAbort: () => this.shouldAbort() || state.abort === true,
+				persistWorkflowRuntimeMetadata: async () => undefined,
+				renderWorkflowForm: async () => {
+					throw new Error(CHILD_WORKFLOW_FORM_ERROR_MESSAGE)
+				},
+				waitForWorkflowFormCompletion: async () => {
+					throw new Error(CHILD_WORKFLOW_FORM_ERROR_MESSAGE)
+				},
+				renderWorkflowStepResolutionStatus: async () => undefined,
+				reportTerminalError: async (errorMessage) => {
+					throw new Error(errorMessage)
+				},
+				executeToolBackedOperation: async (workflowAction) => ({
+					toolResultText: await this.executeChildWorkflowToolBackedOperation(state, workflowAction),
+				}),
+			},
+		})
+
+		await consumer.consume(nextAction)
+	}
+
+	private ensureChildCoordinatorHasTool(config: TaskConfig, toolName: ClineDefaultTool): void {
+		if (config.coordinator.has(toolName)) {
+			return
+		}
+
+		const validator = new ToolValidator(this.baseConfig.services.clineIgnoreController)
+		config.coordinator.registerByName(toolName, validator)
+	}
+
+	private async executeChildWorkflowToolBackedOperation(
+		state: TaskState,
+		workflowAction: Extract<WorkflowNextAction, { kind: "execute_tool_backed_operation" }>,
+	): Promise<string> {
+		const workflowNextActions: WorkflowNextAction[] = []
+		const subagentConfig = this.createSubagentTaskConfig(state, workflowNextActions)
+		const toolName = workflowAction.toolRequest.toolName
+		this.ensureChildCoordinatorHasTool(subagentConfig, toolName)
+		const toolParams: Partial<Record<string, string>> = {
+			...workflowAction.toolRequest.toolParams,
+			...toToolUseParams(workflowAction.toolRequest.toolInput),
+		}
+		const toolCallBlock: ToolUse = {
+			type: "tool_use",
+			name: toolName,
+			params: toolParams,
+			partial: false,
+			isNativeToolCall: true,
+			call_id: workflowAction.toolBackedOperationSession
+				? `workflow_step_resolution_${workflowAction.toolBackedOperationSession.sessionId}`
+				: `workflow_runtime_subagent_${Date.now()}`,
+		}
+
+		const handler = subagentConfig.coordinator.getHandler(toolName)
+		if (!handler) {
+			return serializeToolResult(formatResponse.toolError(`No handler registered for tool '${toolName}'.`))
+		}
+
+		try {
+			return serializeToolResult(await handler.execute(subagentConfig, toolCallBlock))
+		} catch (error) {
+			return serializeToolResult(formatResponse.toolError((error as Error).message))
+		}
 	}
 
 	private buildAllowedToolNamesForTurn(context: SystemPromptContext): Set<ClineDefaultTool> {
@@ -725,7 +799,8 @@ export class SubagentRunner {
 						call_id: call.call_id || call.toolUseId,
 						signature: call.signature,
 					}
-					const subagentConfig = this.createSubagentTaskConfig(state)
+					const workflowNextActions: WorkflowNextAction[] = []
+					const subagentConfig = this.createSubagentTaskConfig(state, workflowNextActions)
 
 					if (toolName === ClineDefaultTool.ATTEMPT) {
 						const completionResult = toolCallParams.result?.trim()
@@ -773,6 +848,9 @@ export class SubagentRunner {
 					const serializedToolResult = serializeToolResult(toolResult)
 					const toolDescription = handler?.getDescription(toolCallBlock) || `[${toolName}]`
 					pushSubagentToolResultBlock(toolResultBlocks, call, toolDescription, serializedToolResult)
+					for (const queuedNextAction of workflowNextActions) {
+						await this.consumeChildWorkflowNextAction(state, queuedNextAction)
+					}
 				}
 
 				conversation.push({
@@ -798,7 +876,7 @@ export class SubagentRunner {
 		}
 	}
 
-	private createSubagentTaskConfig(state: TaskState): TaskConfig {
+	private createSubagentTaskConfig(state: TaskState, workflowNextActions: WorkflowNextAction[] = []): TaskConfig {
 		const baseCallbacks = this.baseConfig.callbacks
 		const coordinator = new ToolExecutorCoordinator()
 		const validator = new ToolValidator(this.baseConfig.services.clineIgnoreController)
@@ -820,6 +898,9 @@ export class SubagentRunner {
 				say: async () => undefined,
 				ask: async () => ({ response: "yesButtonClicked" as const }),
 				updateFCListFromToolResponse: async () => ({ accepted: true }),
+				queueWorkflowNextAction: (nextAction) => {
+					workflowNextActions.push(nextAction)
+				},
 				sayAndCreateMissingParamError: async (_toolName, paramName) =>
 					formatResponse.toolError(formatResponse.missingToolParameterError(paramName)),
 				removeLastPartialMessageIfExistsWithType: async () => undefined,
@@ -906,6 +987,15 @@ export class SubagentRunner {
 			return
 		}
 
+		const parentSession = this.baseConfig.taskState.activeWorkflowSession
+		if (
+			!parentSession ||
+			parentSession.projectSelection.projectTitle.trim() === "" ||
+			parentSession.projectSelection.projectFolderName.trim() === ""
+		) {
+			return
+		}
+
 		const resolvedWorkflow = resolveWorkflowByUseSkillName(assignedSkillNames[0])
 		if (!resolvedWorkflow) {
 			return
@@ -916,13 +1006,14 @@ export class SubagentRunner {
 		const nextAction = await this.baseConfig.workflowRuntime.activateWorkflow({
 			taskState: state,
 			workflowName: resolvedWorkflow.name,
-			parentSession: this.baseConfig.taskState.activeWorkflowSession
-				? structuredClone(this.baseConfig.taskState.activeWorkflowSession)
-				: undefined,
+			parentSession: structuredClone(parentSession),
 		})
 		if (nextAction.kind === "no_op") {
 			state.activeWorkflowName = previousActiveWorkflowName
+			return
 		}
+
+		await this.consumeChildWorkflowNextAction(state, nextAction)
 	}
 
 	private async buildSubagentPromptInjectionBlocks(

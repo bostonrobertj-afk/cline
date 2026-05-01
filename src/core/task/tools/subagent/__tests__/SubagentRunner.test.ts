@@ -1,20 +1,44 @@
 import { strict as assert } from "node:assert"
 import * as coreApi from "@core/api"
+import type { ToolUse } from "@core/assistant-message"
+import { ContextManager } from "@core/context/context-management/ContextManager"
+import { FileContextTracker } from "@core/context/context-tracking/FileContextTracker"
 import * as skills from "@core/context/instructions/user-instructions/skills"
+import { ClineIgnoreController } from "@core/ignore/ClineIgnoreController"
+import { CommandPermissionController } from "@core/permissions"
 import { PromptRegistry } from "@core/prompts/system-prompt"
 import type { ClineToolSpec } from "@core/prompts/system-prompt/spec"
+import { StateManager } from "@core/storage/StateManager"
 import type { TaskConfig } from "@core/task/tools/types/TaskConfig"
+import { DiffViewProvider } from "@integrations/editor/DiffViewProvider"
+import { BrowserSession } from "@services/browser/BrowserSession"
+import { UrlContentFetcher } from "@services/browser/UrlContentFetcher"
+import { McpHub } from "@services/mcp/McpHub"
 import { afterEach, describe, it } from "mocha"
 import sinon from "sinon"
-import type { ActiveWorkflowSession, WorkflowDecisionTree, WorkflowDefinition } from "@/core/task/workflow-runtime/types"
+import type {
+	ActiveWorkflowSession,
+	WorkflowDecisionTree,
+	WorkflowDefinition,
+	WorkflowNextAction,
+	WorkflowWorkspacePathPolicy,
+} from "@/core/task/workflow-runtime/types"
+import { WorkflowNextActionConsumer } from "@/core/task/workflow-runtime/WorkflowNextActionConsumer"
 import * as WorkflowRegistry from "@/core/task/workflow-runtime/WorkflowRegistry"
 import { WorkflowRuntime } from "@/core/task/workflow-runtime/WorkflowRuntime"
 import { HostProvider } from "@/hosts/host-provider"
+import { DEFAULT_AUTO_APPROVAL_SETTINGS } from "@/shared/AutoApprovalSettings"
+import { DEFAULT_BROWSER_SETTINGS } from "@/shared/BrowserSettings"
+import { DEFAULT_FOCUS_CHAIN_SETTINGS } from "@/shared/FocusChainSettings"
 import { ModelFamily } from "@/shared/prompts"
 import { ApiFormat } from "@/shared/proto/cline/models"
 import { Logger } from "@/shared/services/Logger"
 import { ClineDefaultTool, type ClineTool } from "@/shared/tools"
+import type { ToolResponse } from "../../../index"
+import { MessageStateHandler } from "../../../message-state"
 import { TaskState } from "../../../TaskState"
+import { AutoApprove } from "../../autoApprove"
+import { type IToolHandler, ToolExecutorCoordinator } from "../../ToolExecutorCoordinator"
 import { SUBAGENT_DEFAULT_ALLOWED_TOOLS, SubagentBuilder } from "../SubagentBuilder"
 import { SubagentRunner } from "../SubagentRunner"
 
@@ -49,6 +73,7 @@ type PromptContextResult = {
 const createSubagentTaskConfig = Reflect.get(SubagentRunner.prototype, "createSubagentTaskConfig") as (
 	this: SubagentRunner,
 	state: TaskState,
+	workflowNextActions?: WorkflowNextAction[],
 ) => TaskConfig
 const buildPromptContext = Reflect.get(SubagentRunner.prototype, "buildPromptContext") as (
 	this: SubagentRunner,
@@ -58,6 +83,11 @@ const autoActivateAssignedWorkflow = Reflect.get(SubagentRunner.prototype, "auto
 	this: SubagentRunner,
 	state: TaskState,
 	assignedSkillNames: string[],
+) => Promise<void>
+const consumeChildWorkflowNextAction = Reflect.get(SubagentRunner.prototype, "consumeChildWorkflowNextAction") as (
+	this: SubagentRunner,
+	state: TaskState,
+	nextAction: WorkflowNextAction | undefined,
 ) => Promise<void>
 const ENTRY_PROJECT_VALUE_KEYS = {
 	projectMode: "entry_project_mode",
@@ -110,11 +140,98 @@ function isSubagentToolResultMessage(
 	})
 }
 
+function createAllowAllWorkspacePathPolicy(): WorkflowWorkspacePathPolicy {
+	return {
+		validateAccess: () => true,
+	}
+}
+
+class TestDiffViewProvider extends DiffViewProvider {
+	protected async openDiffEditor(): Promise<void> {}
+
+	protected async scrollEditorToLine(_line: number): Promise<void> {}
+
+	protected async scrollAnimation(_startLine: number, _endLine: number): Promise<void> {}
+
+	protected async truncateDocument(_lineNumber: number): Promise<void> {}
+
+	protected async getDocumentLineCount(): Promise<number> {
+		return 0
+	}
+
+	protected async getDocumentText(): Promise<string | undefined> {
+		return undefined
+	}
+
+	protected async saveDocument(): Promise<boolean> {
+		return true
+	}
+
+	protected async closeAllDiffViews(): Promise<void> {}
+
+	protected async resetDiffView(): Promise<void> {}
+
+	async replaceText(
+		_content: string,
+		_rangeToReplace: { startLine: number; endLine: number },
+		_currentLine: number | undefined,
+	): Promise<void> {}
+}
+
+function createToolHandler(name: ClineDefaultTool, response: string, description: string): IToolHandler {
+	return {
+		name,
+		execute: sinon.stub<[TaskConfig, ToolUse], Promise<ToolResponse>>().resolves(response),
+		getDescription: sinon.stub<[ToolUse], string>().returns(description),
+	}
+}
+
 function createTaskConfig(nativeToolCallEnabled: boolean, promptRefreshFrequency = 5): TaskConfig {
 	const autoApprovalSettings = {
+		...DEFAULT_AUTO_APPROVAL_SETTINGS,
 		enableNotifications: false,
-		actions: { executeSafeCommands: false, executeAllCommands: false, useMcp: false },
+		actions: {
+			...DEFAULT_AUTO_APPROVAL_SETTINGS.actions,
+			executeSafeCommands: false,
+			executeAllCommands: false,
+			useMcp: false,
+		},
 	}
+	const browserSettings = {
+		...DEFAULT_BROWSER_SETTINGS,
+		viewport: { ...DEFAULT_BROWSER_SETTINGS.viewport },
+	}
+	const focusChainSettings = { ...DEFAULT_FOCUS_CHAIN_SETTINGS }
+	const taskState = new TaskState()
+	const stateManager = sinon.createStubInstance(StateManager)
+	stateManager.getWorkspaceStateKey.withArgs("localClineRulesToggles").returns({})
+	stateManager.getWorkspaceStateKey.withArgs("localCursorRulesToggles").returns({})
+	stateManager.getWorkspaceStateKey.withArgs("localWindsurfRulesToggles").returns({})
+	stateManager.getWorkspaceStateKey.withArgs("localAgentsRulesToggles").returns({})
+	stateManager.getWorkspaceStateKey.withArgs("localSkillsToggles").returns({})
+	stateManager.getGlobalSettingsKey.withArgs("mode").returns("act")
+	stateManager.getGlobalSettingsKey.withArgs("customPrompt").returns(undefined)
+	stateManager.getGlobalSettingsKey.withArgs("promptRefreshFrequency").returns(promptRefreshFrequency)
+	stateManager.getGlobalSettingsKey.withArgs("autoApprovalSettings").returns(autoApprovalSettings)
+	stateManager.getGlobalSettingsKey.withArgs("useAutoCondense").returns(false)
+	stateManager.getGlobalStateKey.callsFake((key) => (key === "nativeToolCallEnabled" ? nativeToolCallEnabled : undefined))
+	stateManager.getRemoteConfigSettings.returns({})
+	stateManager.getApiConfiguration.returns({
+		actModeApiProvider: "anthropic",
+		planModeApiProvider: "anthropic",
+	})
+
+	const autoApprover = sinon.createStubInstance(AutoApprove)
+	autoApprover.shouldAutoApproveTool.returns([false, false])
+
+	const coordinator = new ToolExecutorCoordinator()
+	coordinator.register(createToolHandler(ClineDefaultTool.LIST_FILES, "ok", "list_files"))
+	coordinator.register(
+		createToolHandler(ClineDefaultTool.SET_WORKFLOW_VALUES, "workflow values persisted", "set_workflow_values"),
+	)
+	coordinator.register(
+		createToolHandler(ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT, "workflow artifact created", "create_workflow_artifact"),
+	)
 
 	return {
 		taskId: "task-1",
@@ -127,10 +244,17 @@ function createTaskConfig(nativeToolCallEnabled: boolean, promptRefreshFrequency
 		vscodeTerminalExecutionMode: "backgroundExec",
 		enableParallelToolCalling: false,
 		isSubagentExecution: false,
-		context: {},
-		taskState: new TaskState(),
-		messageState: {},
-		workflowRuntime: new WorkflowRuntime({ cwd: "/tmp" }),
+		taskState,
+		messageState: new MessageStateHandler({
+			taskId: "task-1",
+			ulid: "ulid-1",
+			updateTaskHistory: async () => [],
+			taskState,
+		}),
+		workflowRuntime: new WorkflowRuntime({
+			cwd: "/tmp",
+			workspacePathPolicy: createAllowAllWorkspacePathPolicy(),
+		}),
 		api: {
 			getModel: () => ({
 				id: "anthropic/claude-sonnet-4.5",
@@ -143,45 +267,33 @@ function createTaskConfig(nativeToolCallEnabled: boolean, promptRefreshFrequency
 			createMessage: sinon.stub().callsFake(async function* () {}),
 		},
 		services: {
-			stateManager: {
-				getWorkspaceStateKey: () => undefined,
-				getGlobalSettingsKey: (key: string) => {
-					if (key === "mode") {
-						return "act"
-					}
-					if (key === "customPrompt") {
-						return undefined
-					}
-					if (key === "promptRefreshFrequency") {
-						return promptRefreshFrequency
-					}
-					if (key === "autoApprovalSettings") {
-						return autoApprovalSettings
-					}
-					return undefined
-				},
-				getGlobalStateKey: (key: string) => (key === "nativeToolCallEnabled" ? nativeToolCallEnabled : undefined),
-				getRemoteConfigSettings: () => undefined,
-				getApiConfiguration: () => ({
-					actModeApiProvider: "anthropic",
-					planModeApiProvider: "anthropic",
-				}),
-			},
+			mcpHub: sinon.createStubInstance(McpHub),
+			browserSession: sinon.createStubInstance(BrowserSession),
+			urlContentFetcher: sinon.createStubInstance(UrlContentFetcher),
+			diffViewProvider: new TestDiffViewProvider(),
+			fileContextTracker: sinon.createStubInstance(FileContextTracker),
+			clineIgnoreController: sinon.createStubInstance(ClineIgnoreController),
+			commandPermissionController: sinon.createStubInstance(CommandPermissionController),
+			contextManager: new ContextManager(),
+			stateManager,
 		},
-		browserSettings: {},
-		focusChainSettings: {},
+		browserSettings,
+		focusChainSettings,
 		autoApprovalSettings,
-		autoApprover: { shouldAutoApproveTool: sinon.stub().returns([false, false]) },
+		autoApprover,
 		callbacks: {
 			say: sinon.stub().resolves(undefined),
 			ask: sinon.stub().resolves({ response: "yesButtonClicked" }),
 			saveCheckpoint: sinon.stub().resolves(),
 			sayAndCreateMissingParamError: sinon.stub().resolves("missing"),
 			removeLastPartialMessageIfExistsWithType: sinon.stub().resolves(),
+			upsertPartialResponseToolSayPreview: sinon.stub().resolves(false),
+			clearPartialResponseToolPreview: sinon.stub().resolves(false),
 			executeCommandTool: sinon.stub().resolves([false, "ok"]),
 			cancelRunningCommandTool: sinon.stub().resolves(false),
 			doesLatestTaskCompletionHaveNewChanges: sinon.stub().resolves(false),
 			updateFCListFromToolResponse: sinon.stub().resolves({ accepted: true }),
+			queueWorkflowNextAction: sinon.stub(),
 			shouldAutoApproveTool: sinon.stub().returns([true, true]),
 			shouldAutoApproveToolWithPath: sinon.stub().resolves(false),
 			postStateToWebview: sinon.stub().resolves(),
@@ -195,33 +307,8 @@ function createTaskConfig(nativeToolCallEnabled: boolean, promptRefreshFrequency
 			getActiveHookExecution: sinon.stub().resolves(undefined),
 			runUserPromptSubmitHook: sinon.stub().resolves({}),
 		},
-		coordinator: {
-			getHandler: sinon.stub().callsFake((toolName: ClineDefaultTool) => {
-				if (toolName === ClineDefaultTool.LIST_FILES) {
-					return {
-						execute: sinon.stub().resolves("ok"),
-						getDescription: sinon.stub().returns("list_files"),
-					}
-				}
-
-				if (toolName === ClineDefaultTool.SET_WORKFLOW_VALUES) {
-					return {
-						execute: sinon.stub().resolves("workflow values persisted"),
-						getDescription: sinon.stub().returns("set_workflow_values"),
-					}
-				}
-
-				if (toolName === ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT) {
-					return {
-						execute: sinon.stub().resolves("workflow artifact created"),
-						getDescription: sinon.stub().returns("create_workflow_artifact"),
-					}
-				}
-
-				return undefined
-			}),
-		},
-	} as unknown as TaskConfig
+		coordinator,
+	}
 }
 
 function createResolvedWorkflow(args?: {
@@ -327,7 +414,7 @@ describe("SubagentRunner", () => {
 		const config = createTaskConfig(true)
 		const parentAsk = config.callbacks.ask as sinon.SinonStub
 		const runner = new SubagentRunner(config)
-		const subagentConfig = (runner as any).createSubagentTaskConfig(new TaskState()) as TaskConfig
+		const subagentConfig = createSubagentTaskConfig.call(runner, new TaskState())
 
 		const result = await subagentConfig.callbacks.ask("tool", "test prompt", false)
 
@@ -559,7 +646,6 @@ describe("SubagentRunner", () => {
 		const config = createTaskConfig(true)
 		config.taskState.activeWorkflowName = "parent-workflow"
 		config.taskState.activeWorkflowSession = {
-			workflowName: "parent-workflow",
 			activeStepNumber: 1,
 			workflowValues: {},
 			projectSelection: { projectMode: "existing", projectTitle: "Parent Project", projectFolderName: "parent-project" },
@@ -657,7 +743,6 @@ describe("SubagentRunner", () => {
 		const config = createTaskConfig(true)
 		config.taskState.activeWorkflowName = "parent-workflow"
 		config.taskState.activeWorkflowSession = {
-			workflowName: "parent-workflow",
 			activeStepNumber: 1,
 			workflowValues: {},
 			projectSelection: { projectMode: "existing", projectTitle: "Parent Project", projectFolderName: "parent-project" },
@@ -755,7 +840,6 @@ describe("SubagentRunner", () => {
 		const config = createTaskConfig(true)
 		config.taskState.activeWorkflowName = "parent-workflow"
 		config.taskState.activeWorkflowSession = {
-			workflowName: "parent-workflow",
 			activeStepNumber: 1,
 			workflowValues: {},
 			projectSelection: { projectMode: "existing", projectTitle: "Parent Project", projectFolderName: "parent-project" },
@@ -971,7 +1055,6 @@ describe("SubagentRunner", () => {
 		const config = createTaskConfig(true)
 		config.taskState.activeWorkflowName = "parent-workflow"
 		config.taskState.activeWorkflowSession = {
-			workflowName: "parent-workflow",
 			activeStepNumber: 1,
 			workflowValues: {},
 			projectSelection: { projectMode: "existing", projectTitle: "Parent Project", projectFolderName: "parent-project" },
@@ -1665,8 +1748,9 @@ describe("SubagentRunner", () => {
 		})
 		sinon.stub(WorkflowRegistry, "resolveWorkflowByUseSkillName").returns(workflow)
 		stubResolvedWorkflowByName(workflow)
+		const consumeNextActionSpy = sinon.spy(WorkflowNextActionConsumer.prototype, "consume")
 		const promptRegistry = PromptRegistry.getInstance()
-		sinon.stub(promptRegistry, "get").callsFake(async (context) => {
+		const promptRegistryGetStub = sinon.stub(promptRegistry, "get").callsFake(async (context) => {
 			assert.equal(context.activeWorkflowName, "review-workflow")
 			assert.equal(context.activeWorkflowStepNumber, 1)
 			assert.equal(
@@ -1688,6 +1772,25 @@ describe("SubagentRunner", () => {
 		initializeHostProvider()
 
 		const config = createTaskConfig(false)
+		config.taskState.activeWorkflowName = "parent-workflow"
+		config.taskState.activeWorkflowSession = {
+			activeStepNumber: 1,
+			workflowValues: {},
+			projectSelection: {
+				projectMode: "existing",
+				projectTitle: "Parent Project",
+				projectFolderName: "parent-project",
+			},
+			ui: {
+				formSession: undefined,
+				stepResolutionSession: undefined,
+				suppressedWorkflowFormIds: [],
+				suppressedWorkflowStepResolutionDefinitionIds: [],
+			},
+			branchContext: {
+				activeBranchId: "project-prompt",
+			},
+		}
 		const activateWorkflowSpy = sinon.spy(config.workflowRuntime, "activateWorkflow")
 		const runner = new SubagentRunner(config)
 		const result = await runner.run("Skill: use_skill('review-workflow')", () => {})
@@ -1695,14 +1798,237 @@ describe("SubagentRunner", () => {
 		assert.equal(result.status, "completed")
 		assert.equal(createMessage.callCount, 1)
 		sinon.assert.calledOnce(activateWorkflowSpy)
+		sinon.assert.calledOnce(consumeNextActionSpy)
+		sinon.assert.callOrder(consumeNextActionSpy, promptRegistryGetStub)
 		assert.equal(activateWorkflowSpy.firstCall.args[0].workflowName, "review-workflow")
+	})
+
+	it("does not auto-activate an assigned child workflow without a complete parent project selection", async () => {
+		const workflow = createResolvedWorkflow({
+			name: "review-workflow",
+			useSkillName: "review-workflow",
+		})
+		const resolveWorkflowByUseSkillNameStub = sinon.stub(WorkflowRegistry, "resolveWorkflowByUseSkillName").returns(workflow)
+		const parentSessionCases: Array<{
+			name: string
+			parentSession: ActiveWorkflowSession | undefined
+		}> = [
+			{
+				name: "missing parent session",
+				parentSession: undefined,
+			},
+			{
+				name: "blank parent project title",
+				parentSession: {
+					activeStepNumber: 1,
+					workflowValues: {},
+					projectSelection: {
+						projectMode: "existing",
+						projectTitle: " ",
+						projectFolderName: "parent-project",
+					},
+					ui: {
+						formSession: undefined,
+						stepResolutionSession: undefined,
+						suppressedWorkflowFormIds: [],
+						suppressedWorkflowStepResolutionDefinitionIds: [],
+					},
+					branchContext: {
+						activeBranchId: "project-prompt",
+					},
+				},
+			},
+			{
+				name: "blank parent project folder",
+				parentSession: {
+					activeStepNumber: 1,
+					workflowValues: {},
+					projectSelection: {
+						projectMode: "existing",
+						projectTitle: "Parent Project",
+						projectFolderName: " ",
+					},
+					ui: {
+						formSession: undefined,
+						stepResolutionSession: undefined,
+						suppressedWorkflowFormIds: [],
+						suppressedWorkflowStepResolutionDefinitionIds: [],
+					},
+					branchContext: {
+						activeBranchId: "project-prompt",
+					},
+				},
+			},
+		]
+
+		for (const parentSessionCase of parentSessionCases) {
+			const config = createTaskConfig(false)
+			config.taskState.activeWorkflowName = "parent-workflow"
+			config.taskState.activeWorkflowSession = parentSessionCase.parentSession
+			const activateWorkflowSpy = sinon.spy(config.workflowRuntime, "activateWorkflow")
+			const runner = new SubagentRunner(config)
+			const childState = new TaskState()
+
+			await autoActivateAssignedWorkflow.call(runner, childState, ["review-workflow"])
+
+			assert.equal(childState.activeWorkflowName, undefined, parentSessionCase.name)
+			assert.equal(childState.activeWorkflowSession, undefined, parentSessionCase.name)
+			sinon.assert.notCalled(activateWorkflowSpy)
+		}
+		sinon.assert.notCalled(resolveWorkflowByUseSkillNameStub)
+	})
+
+	it("fails clearly when a child workflow attempts to render a workflow form", async () => {
+		const workflow = createResolvedWorkflow({
+			name: "review-workflow",
+			useSkillName: "review-workflow",
+		})
+		const firstStep = workflow.steps["step-1"]
+		firstStep.decisionTree = {
+			entryBranchId: "render-form",
+			branches: {
+				"render-form": {
+					id: "render-form",
+					routes: [
+						{
+							id: "render-form-route",
+							trigger: { kind: "always" },
+							action: { kind: "render_workflow_form", workflowFormId: "child-form" },
+						},
+					],
+				},
+			},
+		}
+		workflow.workflowForms = {
+			"child-form": {
+				definitionVersion: 1,
+				title: "Child Form",
+				toolDictionaryTitle: "Tools",
+				toolDictionaryMarkdown: "",
+				firstPanelId: "panel-1",
+				panels: {
+					"panel-1": {
+						panelId: "panel-1",
+						title: "Panel",
+						promptMarkdown: "Collect child input.",
+						fields: [],
+						allowedActions: [],
+						transition: {
+							type: "conditional",
+							conditionSourceKey: "done",
+							branches: [],
+							defaultTerminal: true,
+						},
+					},
+				},
+			},
+		}
+		sinon.stub(WorkflowRegistry, "resolveWorkflowByUseSkillName").returns(workflow)
+		stubResolvedWorkflowByName(workflow)
+		sinon.stub(skills, "discoverSkills").resolves([])
+		sinon.stub(skills, "getAvailableSkills").returns([])
+		const createMessage = sinon.stub()
+		stubApiHandler(createMessage)
+		initializeHostProvider()
+		const config = createTaskConfig(false)
+		config.taskState.activeWorkflowSession = {
+			activeStepNumber: 1,
+			workflowValues: {},
+			projectSelection: { projectMode: "existing", projectTitle: "Parent Project", projectFolderName: "parent-project" },
+			ui: {
+				formSession: undefined,
+				stepResolutionSession: undefined,
+				suppressedWorkflowFormIds: [],
+				suppressedWorkflowStepResolutionDefinitionIds: [],
+			},
+			branchContext: {
+				activeBranchId: "project-prompt",
+			},
+		}
+
+		const runner = new SubagentRunner(config)
+		const result = await runner.run("Skill: use_skill('review-workflow')", () => {})
+
+		assert.equal(result.status, "failed")
+		assert.equal(result.error, "Child workflow configuration is invalid: subagent workflows cannot render workflow forms.")
+		sinon.assert.notCalled(createMessage)
+	})
+
+	it("executes child workflow tool-backed operations through the child handler path and continues consumption", async () => {
+		const config = createTaskConfig(false)
+		const runner = new SubagentRunner(config)
+		const state = new TaskState()
+		const handlerExecute = sinon.stub<[TaskConfig, ToolUse], Promise<ToolResponse>>()
+		handlerExecute.onFirstCall().resolves("created artifact")
+		handlerExecute.onSecondCall().resolves("listed files")
+		const registerByNameSpy = sinon.spy(ToolExecutorCoordinator.prototype, "registerByName")
+		sinon.stub(ToolExecutorCoordinator.prototype, "has").returns(false)
+		const createWorkflowArtifactHandler: IToolHandler = {
+			name: ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT,
+			execute: handlerExecute,
+			getDescription: () => `[${ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT}]`,
+		}
+		const listFilesHandler: IToolHandler = {
+			name: ClineDefaultTool.LIST_FILES,
+			execute: handlerExecute,
+			getDescription: () => `[${ClineDefaultTool.LIST_FILES}]`,
+		}
+		sinon.stub(ToolExecutorCoordinator.prototype, "getHandler").callsFake((toolName: string) => {
+			if (toolName === ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT) {
+				return createWorkflowArtifactHandler
+			}
+
+			if (toolName === ClineDefaultTool.LIST_FILES) {
+				return listFilesHandler
+			}
+
+			return undefined
+		})
+		const handleToolBackedOperationToolResult = sinon.stub(config.workflowRuntime, "handleToolBackedOperationToolResult")
+		handleToolBackedOperationToolResult.onFirstCall().resolves({
+			kind: "execute_tool_backed_operation",
+			toolRequest: {
+				toolName: ClineDefaultTool.LIST_FILES,
+				toolParams: {
+					path: ".",
+				},
+				toolInput: {},
+			},
+		})
+		handleToolBackedOperationToolResult.onSecondCall().resolves({ kind: "no_op" })
+
+		await consumeChildWorkflowNextAction.call(runner, state, {
+			kind: "execute_tool_backed_operation",
+			toolRequest: {
+				toolName: ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT,
+				toolParams: {
+					artifact_id: "review_input",
+				},
+				toolInput: {},
+			},
+		})
+
+		sinon.assert.calledWith(registerByNameSpy, ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT, sinon.match.object)
+		sinon.assert.calledTwice(handlerExecute)
+		assert.equal(handlerExecute.firstCall.args[0].isSubagentExecution, true)
+		assert.equal(handlerExecute.firstCall.args[1].name, ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT)
+		assert.deepEqual(handlerExecute.firstCall.args[1].params, { artifact_id: "review_input" })
+		assert.equal(handlerExecute.secondCall.args[1].name, ClineDefaultTool.LIST_FILES)
+		sinon.assert.calledTwice(handleToolBackedOperationToolResult)
+		assert.deepEqual(handleToolBackedOperationToolResult.firstCall.args[0], {
+			taskState: state,
+			toolResultText: "created artifact",
+		})
+		assert.deepEqual(handleToolBackedOperationToolResult.secondCall.args[0], {
+			taskState: state,
+			toolResultText: "listed files",
+		})
 	})
 
 	it("leaves the parent workflow state unchanged while inheriting declared values into the child workflow session", async () => {
 		const config = createTaskConfig(false)
 		config.taskState.activeWorkflowName = "parent-workflow"
 		const parentWorkflowSession: ActiveWorkflowSession = {
-			workflowName: "parent-workflow",
 			activeStepNumber: 1,
 			workflowValues: { review_input: "/tmp/review-input.md", ignored_parent: "drop" },
 			projectSelection: { projectMode: "existing", projectTitle: "Parent Project", projectFolderName: "parent-project" },
@@ -1753,7 +2079,6 @@ describe("SubagentRunner", () => {
 		const state = new TaskState()
 		state.activeWorkflowName = "existing-workflow"
 		const existingWorkflowSession: ActiveWorkflowSession = {
-			workflowName: "existing-workflow",
 			activeStepNumber: 1,
 			workflowValues: {},
 			projectSelection: { projectMode: "new", projectTitle: "", projectFolderName: "" },

@@ -8,6 +8,7 @@ import type { ToolResponse } from "../../index"
 import { showNotificationForApproval } from "../../utils"
 import { getBackendWorkflowToolContract } from "../backendWorkflowToolContracts"
 import type { IToolHandler } from "../ToolExecutorCoordinator"
+import type { ToolValidator } from "../ToolValidator"
 import type { TaskConfig } from "../types/TaskConfig"
 import { ToolResultUtils } from "../utils/ToolResultUtils"
 
@@ -23,6 +24,8 @@ function readArtifactId(block: ToolUse): string | undefined {
 
 export class CreateWorkflowArtifactToolHandler implements IToolHandler {
 	readonly name = ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT
+
+	constructor(private readonly validator: ToolValidator) {}
 
 	getDescription(block: ToolUse): string {
 		const artifactId = readArtifactId(block)
@@ -54,6 +57,11 @@ export class CreateWorkflowArtifactToolHandler implements IToolHandler {
 				taskState: config.taskState,
 				artifactId,
 			})
+			const accessValidation = this.validator.checkClineIgnorePath(preparedArtifact.artifactAbsolutePath)
+			if (!accessValidation.ok) {
+				return formatResponse.toolError(formatResponse.clineIgnoreError(preparedArtifact.artifactAbsolutePath))
+			}
+
 			const completeMessage = JSON.stringify({
 				tool: "createWorkflowArtifact",
 				artifactId,

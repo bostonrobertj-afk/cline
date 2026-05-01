@@ -111,6 +111,7 @@ describe("ToolExecutor native tool parity", () => {
 		assert.deepEqual(outcome, {
 			status: "rejected",
 			emittedToolResult: false,
+			workflowNextActions: [],
 		})
 		assert.equal(taskState.nativeToolCallIdsSkipped.has("call_denied"), true)
 		assert.equal(taskState.nativeToolCallIdsBreakingPreviousResponseChain.has("call_denied"), true)
@@ -134,6 +135,7 @@ describe("ToolExecutor native tool parity", () => {
 		assert.deepEqual(outcome, {
 			status: "executed",
 			emittedToolResult: true,
+			workflowNextActions: [],
 		})
 		assert.equal(taskState.nativeToolCallIdsExecuted.has("call_read_file"), true)
 		assert.equal(taskState.nativeToolCallIdsWithResults.has("call_read_file"), true)

@@ -11,7 +11,7 @@ import type {
 import type { SkillMetadata } from "@/shared/skills"
 
 export type WorkflowName = string
-export type WorkflowValue = string
+export type WorkflowValue = string | number | boolean | WorkflowValue[] | { [key: string]: WorkflowValue }
 export type WorkflowValues = Record<string, WorkflowValue>
 export type WorkflowProjectMode = "new" | "existing"
 export type WorkflowProjectSubfolder = "discovery" | "planning" | "implementation" | "review" | "testing"
@@ -20,6 +20,10 @@ export type WorkflowToolBackedOperationId = string
 export interface WorkflowDiscoveryCandidate {
 	value: string
 	label: string
+}
+
+export interface WorkflowWorkspacePathPolicy {
+	validateAccess(filePath: string): boolean
 }
 
 export interface WorkflowProjectSelectionState {
@@ -63,7 +67,6 @@ export interface WorkflowBranchContextState {
 }
 
 export interface ActiveWorkflowSession {
-	workflowName: WorkflowName
 	activeStepNumber: number
 	workflowValues: WorkflowValues
 	projectSelection: WorkflowProjectSelectionState
@@ -131,6 +134,7 @@ export type WorkflowNextAction =
 export interface WorkflowPromptBuilderInput {
 	session: ActiveWorkflowSession
 	step: WorkflowStepDefinition
+	renderWorkflowValue(value: WorkflowValue): string
 }
 
 export interface WorkflowStepPromptSource {
@@ -248,7 +252,7 @@ export type WorkflowArtifactOutputValueKeys =
 export type WorkflowArtifactDefinition =
 	| {
 			id: string
-			family: WorkflowArtifactFamily.Epic
+			family: WorkflowArtifactFamily.Epics | WorkflowArtifactFamily.EpicsIndex
 			intentMode: "new"
 			parentIdentitySource: undefined
 			targetIdentitySource: undefined
@@ -256,7 +260,23 @@ export type WorkflowArtifactDefinition =
 	  }
 	| {
 			id: string
-			family: WorkflowArtifactFamily.Story | WorkflowArtifactFamily.RemediationStory
+			family: WorkflowArtifactFamily.EpicDeliverySpec
+			intentMode: "new"
+			parentIdentitySource: undefined
+			targetIdentitySource: undefined
+			outputValueKeys: WorkflowStandaloneArtifactOutputValueKeys
+	  }
+	| {
+			id: string
+			family: WorkflowArtifactFamily.Story
+			intentMode: "new"
+			parentIdentitySource: WorkflowArtifactIdentitySource
+			targetIdentitySource: undefined
+			outputValueKeys: WorkflowParentedArtifactOutputValueKeys
+	  }
+	| {
+			id: string
+			family: WorkflowArtifactFamily.RemediationStory
 			intentMode: "new"
 			parentIdentitySource: WorkflowArtifactIdentitySource
 			targetIdentitySource: undefined
@@ -314,6 +334,7 @@ export interface WorkflowDefinition {
 
 export interface WorkflowDiscoveryRequest {
 	baseDirectory: string
+	workspacePathPolicy: WorkflowWorkspacePathPolicy
 	targetPathSegments?: string[]
 	entryType: "file" | "directory" | "any"
 	immediateChildrenOnly: boolean

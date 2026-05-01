@@ -1,7 +1,7 @@
 import type { WorkflowFormDefinitionPayload, WorkflowFormPanelDefinition } from "@shared/ExtensionMessage"
-import { WorkflowFormAction, WorkflowFormSubmissionRequest } from "@shared/proto/cline/task"
+import { WorkflowFormAction, WorkflowFormSubmissionRequest, type WorkflowFormValue } from "@shared/proto/cline/task"
 import { expect } from "chai"
-import { access, mkdtemp, readFile, rm, writeFile } from "fs/promises"
+import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "fs/promises"
 import { afterEach, beforeEach, describe, it } from "mocha"
 import { tmpdir } from "os"
 import { join } from "path"
@@ -24,6 +24,7 @@ import type {
 	WorkflowNextAction,
 	WorkflowStepDefinition,
 	WorkflowValues,
+	WorkflowWorkspacePathPolicy,
 } from "../types"
 import * as WorkflowRegistry from "../WorkflowRegistry"
 import { WorkflowRuntime } from "../WorkflowRuntime"
@@ -48,6 +49,7 @@ describe("WorkflowRuntime", () => {
 
 	let sandbox: sinon.SinonSandbox
 	let cwd: string
+	let workspacePathPolicy: WorkflowWorkspacePathPolicy
 	let runtime: WorkflowRuntime
 	let taskState: TaskState
 	let discoverWorkflowCandidatesStub: sinon.SinonStub
@@ -56,7 +58,8 @@ describe("WorkflowRuntime", () => {
 	beforeEach(async () => {
 		sandbox = sinon.createSandbox()
 		cwd = await mkdtemp(join(tmpdir(), "workflow-runtime-test-"))
-		runtime = new WorkflowRuntime({ cwd })
+		workspacePathPolicy = createAllowAllWorkspacePathPolicy()
+		runtime = new WorkflowRuntime({ cwd, workspacePathPolicy })
 		taskState = new TaskState()
 		discoverWorkflowCandidatesStub = sandbox.stub(WorkflowDiscovery, "discoverWorkflowCandidates").resolves([])
 		resolveWorkflowDefinitionStub = sandbox.stub(WorkflowRegistry, "resolveWorkflowDefinition").returns(undefined)
@@ -71,6 +74,21 @@ describe("WorkflowRuntime", () => {
 		return {
 			workflowSystemInstructions: "system",
 			currentStepInstructions: "input",
+		}
+	}
+
+	function createAllowAllWorkspacePathPolicy(): WorkflowWorkspacePathPolicy {
+		return {
+			validateAccess: () => true,
+		}
+	}
+
+	async function pathExists(filePath: string): Promise<boolean> {
+		try {
+			await access(filePath)
+			return true
+		} catch {
+			return false
 		}
 	}
 
@@ -631,7 +649,6 @@ describe("WorkflowRuntime", () => {
 
 	function createParentWorkflowSession(args?: { projectTitle?: string; projectFolderName?: string }): ActiveWorkflowSession {
 		return {
-			workflowName: "parent-workflow",
 			activeStepNumber: 1,
 			workflowValues: {},
 			projectSelection: {
@@ -703,6 +720,30 @@ describe("WorkflowRuntime", () => {
 		return outputValueKeys
 			.flatMap((entry) => Object.values(entry))
 			.filter((value): value is string => typeof value === "string")
+	}
+
+	function createEpicsArtifactWorkflow(args?: { artifactId?: string; outputValuePrefix?: string }): {
+		workflow: WorkflowDefinition
+		artifactId: string
+		outputValueKeys: ReturnType<typeof createStandaloneArtifactOutputValueKeys>
+	} {
+		const artifactId = args?.artifactId ?? "epics_doc"
+		const outputValueKeys = createStandaloneArtifactOutputValueKeys(args?.outputValuePrefix ?? "epics_policy")
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: collectArtifactOutputWorkflowValueKeys(outputValueKeys),
+			artifacts: {
+				[artifactId]: {
+					id: artifactId,
+					family: WorkflowArtifactFamily.Epics,
+					intentMode: "new",
+					parentIdentitySource: undefined,
+					targetIdentitySource: undefined,
+					outputValueKeys,
+				},
+			},
+		})
+
+		return { workflow, artifactId, outputValueKeys }
 	}
 
 	async function advanceToEntryProjectSelectionPanel(state: TaskState) {
@@ -798,7 +839,6 @@ describe("WorkflowRuntime", () => {
 
 		taskState.activeWorkflowName = "stale-workflow"
 		taskState.activeWorkflowSession = {
-			workflowName: "stale-workflow",
 			activeStepNumber: 99,
 			workflowValues: {},
 			projectSelection: {
@@ -826,9 +866,8 @@ describe("WorkflowRuntime", () => {
 		if (result.kind !== "render_workflow_form") {
 			throw new Error(`Expected render_workflow_form, received ${result.kind}.`)
 		}
-		expect(taskState.activeWorkflowName).to.equal(workflow.name)
 		expectNoLegacyWorkflowMirrors(taskState)
-		expect(activeSession.workflowName).to.equal(workflow.name)
+		expect(taskState.activeWorkflowName).to.equal(workflow.name)
 		expect(activeSession.ui.formSession).to.exist
 		expect(activeSession.ui.stepResolutionSession).to.be.undefined
 		expect(activeSession.ui.suppressedWorkflowFormIds).to.deep.equal([])
@@ -885,7 +924,6 @@ describe("WorkflowRuntime", () => {
 			steps: {} as WorkflowDefinition["steps"],
 		})
 		const existingSession: ActiveWorkflowSession = {
-			workflowName: "existing-workflow",
 			activeStepNumber: 1,
 			workflowValues: {},
 			projectSelection: {
@@ -930,7 +968,7 @@ describe("WorkflowRuntime", () => {
 				artifacts: {
 					output_file: {
 						id: "output_file",
-						family: WorkflowArtifactFamily.Epic,
+						family: WorkflowArtifactFamily.Epics,
 						intentMode: "new",
 						parentIdentitySource: undefined,
 						targetIdentitySource: undefined,
@@ -1052,7 +1090,7 @@ describe("WorkflowRuntime", () => {
 		const outputFileKeys = createStandaloneArtifactOutputValueKeys("output_file")
 		const validArtifactDefinition = {
 			id: "output_file",
-			family: WorkflowArtifactFamily.Epic,
+			family: WorkflowArtifactFamily.Epics,
 			intentMode: "new",
 			parentIdentitySource: undefined,
 			targetIdentitySource: undefined,
@@ -1134,7 +1172,7 @@ describe("WorkflowRuntime", () => {
 				artifacts: {
 					output_file: {
 						id: "output_file",
-						family: WorkflowArtifactFamily.Epic,
+						family: WorkflowArtifactFamily.Epics,
 						intentMode: "new",
 						parentIdentitySource: undefined,
 						targetIdentitySource: undefined,
@@ -1201,7 +1239,6 @@ describe("WorkflowRuntime", () => {
 		const workflow = createWorkflowDefinition({ name: "missing-step-resolve-workflow" })
 		const missingStepState = new TaskState()
 		const missingStepSession = createParentWorkflowSession()
-		missingStepSession.workflowName = workflow.name
 		missingStepSession.activeStepNumber = 999
 		missingStepSession.branchContext = { activeBranchId: "project-prompt" }
 		missingStepState.activeWorkflowName = workflow.name
@@ -1218,7 +1255,6 @@ describe("WorkflowRuntime", () => {
 		const invalidBranchWorkflow = createWorkflowDefinition({ name: "missing-branch-live-resolve-workflow" })
 		const invalidBranchState = new TaskState()
 		const invalidBranchSession = createParentWorkflowSession()
-		invalidBranchSession.workflowName = invalidBranchWorkflow.name
 		invalidBranchSession.branchContext = { activeBranchId: "missing-branch" }
 		invalidBranchState.activeWorkflowName = invalidBranchWorkflow.name
 		invalidBranchState.activeWorkflowSession = invalidBranchSession
@@ -1237,7 +1273,7 @@ describe("WorkflowRuntime", () => {
 		const workflowValueKeys = collectArtifactOutputWorkflowValueKeys(outputValueKeys)
 		const baseArtifactDefinition = {
 			id: "output_file",
-			family: WorkflowArtifactFamily.Epic,
+			family: WorkflowArtifactFamily.Epics,
 			intentMode: "new",
 			parentIdentitySource: undefined,
 			targetIdentitySource: undefined,
@@ -1336,6 +1372,20 @@ describe("WorkflowRuntime", () => {
 			[DEFAULT_ENTRY_PROJECT_VALUE_KEYS.projectTitle]: "Existing Beta",
 			[DEFAULT_ENTRY_PROJECT_VALUE_KEYS.projectFolderName]: "Existing Beta",
 		})
+		const existingProjectDiscoveryRequest = discoverWorkflowCandidatesStub
+			.getCalls()
+			.map((call) => call.args[0])
+			.find(
+				(request: WorkflowDiscoveryRequest) =>
+					request.baseDirectory === cwd &&
+					request.entryType === "directory" &&
+					request.targetPathSegments === undefined,
+			)
+		expect(existingProjectDiscoveryRequest).to.not.equal(undefined)
+		if (existingProjectDiscoveryRequest === undefined) {
+			throw new Error("Expected existing-project discovery to run.")
+		}
+		expect(existingProjectDiscoveryRequest.workspacePathPolicy).to.equal(workspacePathPolicy)
 
 		const invalidSessionTaskState = new TaskState()
 		await activateWorkflow(invalidSessionTaskState, workflow)
@@ -1397,6 +1447,59 @@ describe("WorkflowRuntime", () => {
 		expect(emptySlugResult.payload.errorMessage).to.equal(
 			"Provide a project title that can be normalized into a folder name.",
 		)
+	})
+
+	it("blocks entry project setup before creating a denied project root", async () => {
+		const projectRoot = join(cwd, "denied-root-project")
+		runtime = new WorkflowRuntime({
+			cwd,
+			workspacePathPolicy: {
+				validateAccess: (filePath) => filePath !== projectRoot,
+			},
+		})
+		const workflow = createWorkflowDefinition()
+		await activateWorkflow(taskState, workflow)
+
+		let capturedError: unknown
+		try {
+			await submitNewProjectSelection(taskState, "Denied Root Project")
+		} catch (error) {
+			capturedError = error
+		}
+
+		expect(capturedError).to.be.instanceOf(Error)
+		if (!(capturedError instanceof Error)) {
+			throw new Error("Expected project-root policy denial to throw.")
+		}
+		expect(capturedError.message).to.equal(`Workflow runtime path is blocked by workspace path policy: ${projectRoot}`)
+		expect(await pathExists(projectRoot)).to.equal(false)
+	})
+
+	it("blocks entry project setup before creating a denied canonical subfolder", async () => {
+		const projectRoot = join(cwd, "denied-subfolder-project")
+		const deniedSubfolder = join(projectRoot, "review")
+		runtime = new WorkflowRuntime({
+			cwd,
+			workspacePathPolicy: {
+				validateAccess: (filePath) => filePath !== deniedSubfolder,
+			},
+		})
+		const workflow = createWorkflowDefinition()
+		await activateWorkflow(taskState, workflow)
+
+		let capturedError: unknown
+		try {
+			await submitNewProjectSelection(taskState, "Denied Subfolder Project")
+		} catch (error) {
+			capturedError = error
+		}
+
+		expect(capturedError).to.be.instanceOf(Error)
+		if (!(capturedError instanceof Error)) {
+			throw new Error("Expected project-subfolder policy denial to throw.")
+		}
+		expect(capturedError.message).to.equal(`Workflow runtime path is blocked by workspace path policy: ${deniedSubfolder}`)
+		expect(await pathExists(deniedSubfolder)).to.equal(false)
 	})
 
 	it("returns project_prompt projections once project selection is satisfied", async () => {
@@ -1585,6 +1688,15 @@ describe("WorkflowRuntime", () => {
 		expect(renderFormAction.kind).to.equal("render_workflow_form")
 		if (renderFormAction.kind !== "render_workflow_form") {
 			throw new Error(`Expected render_workflow_form, received ${renderFormAction.kind}.`)
+		}
+
+		const selectorDiscoveryRequests = discoverWorkflowCandidatesStub
+			.getCalls()
+			.map((call) => call.args[0])
+			.filter((request: WorkflowDiscoveryRequest) => request.baseDirectory === cwd)
+		expect(selectorDiscoveryRequests.length).to.be.greaterThan(0)
+		for (const request of selectorDiscoveryRequests) {
+			expect(request.workspacePathPolicy).to.equal(workspacePathPolicy)
 		}
 
 		expect(renderFormAction.payload.panel?.panelId).to.equal("selectors")
@@ -2234,7 +2346,7 @@ describe("WorkflowRuntime", () => {
 			artifacts: {
 				output_file: {
 					id: "output_file",
-					family: WorkflowArtifactFamily.Epic,
+					family: WorkflowArtifactFamily.Epics,
 					intentMode: "new",
 					parentIdentitySource: undefined,
 					targetIdentitySource: undefined,
@@ -2269,7 +2381,7 @@ describe("WorkflowRuntime", () => {
 			cwd,
 			"builder-failure-project",
 			"planning",
-			"Epic-1.md",
+			"Epics.md",
 		)
 		await runtime.resolveNextAction({ taskState: documentBuilderFailureState })
 		expect((await submitNewProjectSelection(documentBuilderFailureState, "Builder Failure Project")).kind).to.equal(
@@ -2365,7 +2477,7 @@ describe("WorkflowRuntime", () => {
 		expect(approvedSession.ui.suppressedWorkflowStepResolutionDefinitionIds).to.deep.equal([])
 	})
 
-	it("applies workflow value writes only for inventory keys and trims stored values", async () => {
+	it("applies workflow value writes only for inventory keys without consulting generated tool schemas", async () => {
 		const stepOne = createStepDefinition({ stepNumber: 1 })
 		let buildToolSchemaCallCount = 0
 		stepOne.buildToolSchema = () => {
@@ -2395,15 +2507,15 @@ describe("WorkflowRuntime", () => {
 		const secondWrite = await runtime.applyWorkflowValueWrites({
 			taskState,
 			values: {
-				alpha: " one ",
+				alpha: "  one  ",
 			},
 		})
 
-		expect(getActiveWorkflowSession(taskState).workflowValues).to.deep.include({ alpha: "one" })
-		expect(firstWrite.changedValues).to.deep.equal({ alpha: "one" })
-		expect(firstWrite.unchangedValues).to.deep.equal({ gamma: "no" })
+		expect(getActiveWorkflowSession(taskState).workflowValues).to.deep.include({ alpha: "  one  " })
+		expect(firstWrite.changedValues).to.deep.equal({ alpha: "  one  " })
+		expect(firstWrite.unchangedValues).to.deep.equal({ gamma: "  no  " })
 		expect(secondWrite.changedValues).to.deep.equal({})
-		expect(secondWrite.unchangedValues).to.deep.equal({ alpha: "one" })
+		expect(secondWrite.unchangedValues).to.deep.equal({ alpha: "  one  " })
 		expect(buildToolSchemaCallCount).to.equal(0)
 
 		const noOverrideState = new TaskState()
@@ -2419,8 +2531,69 @@ describe("WorkflowRuntime", () => {
 		})
 
 		expect(noOverrideWrite.changedValues).to.deep.equal({})
-		expect(noOverrideWrite.unchangedValues).to.deep.equal({ alpha: "blocked" })
+		expect(noOverrideWrite.unchangedValues).to.deep.equal({ alpha: "  blocked  " })
 		expect(getActiveWorkflowSession(noOverrideState).workflowValues).to.not.have.property("alpha")
+	})
+
+	it("uses deterministic deep equality for typed workflow value writes", async () => {
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: ["typed_array", "typed_object"],
+		})
+		await activateWorkflow(taskState, workflow)
+		await runtime.resolveNextAction({ taskState })
+		await submitNewProjectSelection(taskState, "Typed Writes Project")
+
+		const initialValues: WorkflowValues = {
+			typed_array: ["alpha", { nested: true }],
+			typed_object: {
+				outer: { count: 1 },
+				order: ["first", "second"],
+			},
+		}
+		const firstWrite = await runtime.applyWorkflowValueWrites({
+			taskState,
+			values: initialValues,
+		})
+		const unchangedWrite = await runtime.applyWorkflowValueWrites({
+			taskState,
+			values: {
+				typed_array: ["alpha", { nested: true }],
+				typed_object: {
+					order: ["first", "second"],
+					outer: { count: 1 },
+				},
+			},
+		})
+		const changedWrite = await runtime.applyWorkflowValueWrites({
+			taskState,
+			values: {
+				typed_array: ["alpha", { nested: false }],
+				typed_object: {
+					outer: { count: 2 },
+					order: ["first", "second"],
+				},
+			},
+		})
+
+		expect(firstWrite.changedValues).to.deep.equal(initialValues)
+		expect(firstWrite.unchangedValues).to.deep.equal({})
+		expect(unchangedWrite.changedValues).to.deep.equal({})
+		expect(unchangedWrite.unchangedValues).to.deep.equal({
+			typed_array: ["alpha", { nested: true }],
+			typed_object: {
+				order: ["first", "second"],
+				outer: { count: 1 },
+			},
+		})
+		expect(changedWrite.changedValues).to.deep.equal({
+			typed_array: ["alpha", { nested: false }],
+			typed_object: {
+				outer: { count: 2 },
+				order: ["first", "second"],
+			},
+		})
+		expect(changedWrite.unchangedValues).to.deep.equal({})
+		expect(getActiveWorkflowSession(taskState).workflowValues).to.deep.include(changedWrite.changedValues)
 	})
 
 	it("persists declared workflow-form value destinations before emitting a tool-backed operation request", async () => {
@@ -2511,7 +2684,7 @@ describe("WorkflowRuntime", () => {
 				fields: [
 					{
 						key: "summary_field",
-						value: { stringValue: "  Captured summary  " },
+						value: { stringValue: "Captured summary" },
 					},
 				],
 			}),
@@ -2527,6 +2700,393 @@ describe("WorkflowRuntime", () => {
 		expect(capturedWorkflowValues).to.deep.include({ summary: "Captured summary" })
 		expect(activeSession.workflowValues).to.deep.include({ summary: "Captured summary" })
 		expect(activeSession.ui.suppressedWorkflowFormIds).to.deep.equal([workflowFormId])
+	})
+
+	it("persists typed workflow-form value destinations as JSON-safe workflow values", async () => {
+		const workflowFormId = "typed-value-destination-form"
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: ["durable_string", "durable_number", "durable_boolean", "durable_array", "durable_object"],
+			workflowForms: {
+				[workflowFormId]: {
+					definitionVersion: 2,
+					title: "Typed Value Destination Form",
+					toolDictionaryTitle: "Typed Value Destination Tools",
+					toolDictionaryMarkdown: "Typed value destination help",
+					firstPanelId: "details",
+					panels: {
+						details: {
+							panelId: "details",
+							title: "Details",
+							promptMarkdown: "Capture typed details.",
+							fields: [
+								{
+									key: "string_field",
+									workflowValueKey: "durable_string",
+									kind: "small_text",
+									label: "String",
+									required: true,
+									allowedValueType: "string",
+								},
+								{
+									key: "number_field",
+									workflowValueKey: "durable_number",
+									kind: "number",
+									label: "Number",
+									required: true,
+									allowedValueType: "number",
+								},
+								{
+									key: "boolean_field",
+									workflowValueKey: "durable_boolean",
+									kind: "boolean",
+									label: "Boolean",
+									required: true,
+									allowedValueType: "boolean",
+								},
+								{
+									key: "array_field",
+									workflowValueKey: "durable_array",
+									kind: "large_text",
+									label: "Array",
+									required: true,
+									allowedValueType: "array",
+								},
+								{
+									key: "object_field",
+									workflowValueKey: "durable_object",
+									kind: "large_text",
+									label: "Object",
+									required: true,
+									allowedValueType: "object",
+								},
+							],
+							allowedActions: ["submit"],
+							transition: createTerminalTransition(),
+						},
+					},
+				},
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createWorkflowFormDecisionTree({ workflowFormId }),
+				}),
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		await runtime.resolveNextAction({ taskState })
+		const renderFormAction = await submitNewProjectSelection(taskState, "Typed Value Destination Project")
+		expect(renderFormAction.kind).to.equal("render_workflow_form")
+		if (renderFormAction.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${renderFormAction.kind}.`)
+		}
+
+		const nextAction = await runtime.submitWorkflowForm({
+			taskState,
+			request: createFormSubmitRequest({
+				sessionId: renderFormAction.formSession.sessionId,
+				panelId: renderFormAction.formSession.currentPanelId,
+				fields: [
+					{ key: "string_field", value: { stringValue: "typed text" } },
+					{ key: "number_field", value: { numberValue: 3.14 } },
+					{ key: "boolean_field", value: { booleanValue: true } },
+					{
+						key: "array_field",
+						value: {
+							arrayValue: {
+								values: [{ stringValue: "alpha" }, { integerValue: 2 }, { booleanValue: false }],
+							},
+						},
+					},
+					{
+						key: "object_field",
+						value: {
+							objectValue: {
+								entries: [
+									{ key: "title", value: { stringValue: "Draft" } },
+									{ key: "count", value: { integerValue: 7 } },
+									{
+										key: "nested",
+										value: {
+											arrayValue: {
+												values: [{ stringValue: "one" }, { booleanValue: true }],
+											},
+										},
+									},
+								],
+							},
+						},
+					},
+				],
+			}),
+		})
+		const activeSession = getActiveWorkflowSession(taskState)
+
+		expect(nextAction.kind).to.equal("project_prompt")
+		expect(activeSession.workflowValues.durable_string).to.equal("typed text")
+		expect(activeSession.workflowValues.durable_number).to.equal(3.14)
+		expect(activeSession.workflowValues.durable_boolean).to.equal(true)
+		expect(activeSession.workflowValues.durable_array).to.deep.equal(["alpha", 2, false])
+		expect(activeSession.workflowValues.durable_array).to.not.equal(JSON.stringify(["alpha", 2, false]))
+		expect(activeSession.workflowValues.durable_object).to.deep.equal({
+			title: "Draft",
+			count: 7,
+			nested: ["one", true],
+		})
+		expect(activeSession.workflowValues.durable_object).to.not.equal(
+			JSON.stringify({
+				title: "Draft",
+				count: 7,
+				nested: ["one", true],
+			}),
+		)
+	})
+
+	it("fails explicitly when malformed workflow-form value destinations cannot be persisted", async () => {
+		const createArrayValueWithMissingNestedEntry = () => {
+			const values = [{ stringValue: "kept" }]
+			Object.assign(values, { 1: undefined })
+			return {
+				arrayValue: {
+					values,
+				},
+			}
+		}
+		const malformedCases: {
+			name: string
+			workflowValueKey: string
+			fieldKind: "small_text" | "large_text"
+			allowedValueType: "string" | "array" | "object"
+			createSubmittedValue: () => WorkflowFormValue
+			expectedMessage: string
+		}[] = [
+			{
+				name: "top-level",
+				workflowValueKey: "durable_top_level",
+				fieldKind: "small_text",
+				allowedValueType: "string",
+				createSubmittedValue: () => ({}),
+				expectedMessage: "Workflow form submission values must contain exactly one typed value.",
+			},
+			{
+				name: "nested-array",
+				workflowValueKey: "durable_array",
+				fieldKind: "large_text",
+				allowedValueType: "array",
+				createSubmittedValue: createArrayValueWithMissingNestedEntry,
+				expectedMessage: "Malformed workflow form submitted value: array entry is missing.",
+			},
+			{
+				name: "nested-object-value",
+				workflowValueKey: "durable_object_value",
+				fieldKind: "large_text",
+				allowedValueType: "object",
+				createSubmittedValue: () => ({
+					objectValue: {
+						entries: [{ key: "missing_value", value: undefined }],
+					},
+				}),
+				expectedMessage: "Malformed workflow form submitted value: object entry value is missing.",
+			},
+			{
+				name: "nested-object-key",
+				workflowValueKey: "durable_object_key",
+				fieldKind: "large_text",
+				allowedValueType: "object",
+				createSubmittedValue: () => ({
+					objectValue: {
+						entries: [{ key: "   ", value: { stringValue: "invalid" } }],
+					},
+				}),
+				expectedMessage: "Malformed workflow form submitted value: object entry key is empty.",
+			},
+		]
+
+		for (const malformedCase of malformedCases) {
+			const caseTaskState = new TaskState()
+			const fieldKey = `${malformedCase.name}_field`
+			const workflowFormId = `${malformedCase.name}-malformed-value-destination-form`
+			const workflow = createWorkflowDefinition({
+				name: `${malformedCase.name}-malformed-value-destination-workflow`,
+				workflowValueKeys: [malformedCase.workflowValueKey],
+				workflowForms: {
+					[workflowFormId]: {
+						definitionVersion: 2,
+						title: "Malformed Value Destination Form",
+						toolDictionaryTitle: "Malformed Value Destination Tools",
+						toolDictionaryMarkdown: "Malformed value destination help",
+						firstPanelId: "details",
+						panels: {
+							details: {
+								panelId: "details",
+								title: "Details",
+								promptMarkdown: "Capture malformed details.",
+								fields: [
+									{
+										key: fieldKey,
+										workflowValueKey: malformedCase.workflowValueKey,
+										kind: malformedCase.fieldKind,
+										label: "Value",
+										required: true,
+										allowedValueType: malformedCase.allowedValueType,
+									},
+								],
+								allowedActions: ["submit"],
+								transition: createTerminalTransition(),
+							},
+						},
+					},
+				},
+				steps: {
+					"step-1": createStepDefinition({
+						stepNumber: 1,
+						decisionTree: createWorkflowFormDecisionTree({ workflowFormId }),
+					}),
+				},
+			})
+
+			await activateWorkflow(caseTaskState, workflow)
+			await runtime.resolveNextAction({ taskState: caseTaskState })
+			const renderFormAction = await submitNewProjectSelection(
+				caseTaskState,
+				`${malformedCase.name} Malformed Value Destination Project`,
+			)
+			expect(renderFormAction.kind).to.equal("render_workflow_form")
+			if (renderFormAction.kind !== "render_workflow_form") {
+				throw new Error(`Expected render_workflow_form, received ${renderFormAction.kind}.`)
+			}
+
+			let capturedError: unknown
+			try {
+				await runtime.submitWorkflowForm({
+					taskState: caseTaskState,
+					request: {
+						metadata: undefined,
+						sessionId: renderFormAction.formSession.sessionId,
+						panelId: renderFormAction.formSession.currentPanelId,
+						action: WorkflowFormAction.SUBMIT,
+						fields: [
+							{
+								key: fieldKey,
+								value: malformedCase.createSubmittedValue(),
+							},
+						],
+					},
+				})
+			} catch (error) {
+				capturedError = error
+			}
+
+			expect(capturedError).to.be.instanceOf(Error)
+			if (!(capturedError instanceof Error)) {
+				throw new Error("Expected malformed workflow-form persistence to throw.")
+			}
+			expect(capturedError.message).to.equal(malformedCase.expectedMessage)
+			expect(getActiveWorkflowSession(caseTaskState).workflowValues).to.not.have.property(malformedCase.workflowValueKey)
+		}
+	})
+
+	it("rejects non-string workflow values required for artifact identity and destination resolution", async () => {
+		const parentIdentityKey = "selected_epic_identity"
+		const storyKeys = createParentedArtifactOutputValueKeys("identity_guard_story")
+		const identityWorkflow = createWorkflowDefinition({
+			name: "non-string-artifact-identity-workflow",
+			workflowValueKeys: [parentIdentityKey, ...collectArtifactOutputWorkflowValueKeys(storyKeys)],
+			artifacts: {
+				story_doc: {
+					id: "story_doc",
+					family: WorkflowArtifactFamily.Story,
+					intentMode: "new",
+					parentIdentitySource: {
+						kind: "workflow_value",
+						key: parentIdentityKey,
+					},
+					targetIdentitySource: undefined,
+					outputValueKeys: storyKeys,
+				},
+			},
+		})
+		const identityState = new TaskState()
+		await activateWorkflow(identityState, identityWorkflow)
+		await runtime.resolveNextAction({ taskState: identityState })
+		await submitNewProjectSelection(identityState, "Identity Guard Project")
+		getActiveWorkflowSession(identityState).workflowValues[parentIdentityKey] = { nested: "not a string" }
+
+		let identityError: unknown
+		try {
+			await runtime.prepareWorkflowArtifactCreation({
+				taskState: identityState,
+				artifactId: "story_doc",
+			})
+		} catch (error) {
+			identityError = error
+		}
+
+		expect(identityError).to.be.instanceOf(Error)
+		if (!(identityError instanceof Error)) {
+			throw new Error("Expected artifact identity resolution to reject a non-string workflow value.")
+		}
+		expect(identityError.message).to.equal(
+			`Workflow value ${parentIdentityKey} must be a non-empty string for artifact identity resolution for workflow artifact story_doc.`,
+		)
+
+		const outputFileKeys = createStandaloneArtifactOutputValueKeys("destination_guard_file")
+		const destinationWorkflow = createWorkflowDefinition({
+			name: "non-string-artifact-destination-workflow",
+			workflowValueKeys: collectArtifactOutputWorkflowValueKeys(outputFileKeys),
+			artifacts: {
+				output_file: {
+					id: "output_file",
+					family: WorkflowArtifactFamily.Epics,
+					intentMode: "new",
+					parentIdentitySource: undefined,
+					targetIdentitySource: undefined,
+					outputValueKeys: outputFileKeys,
+				},
+			},
+			documentBuilders: {
+				"build-spec": {
+					id: "build-spec",
+					artifactId: "output_file",
+					toolContract: {
+						id: ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT,
+						name: "build_workflow_document",
+						parameters: [],
+					},
+					buildContent: () => "# Resolved spec",
+				},
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createToolBackedOperationDecisionTree({
+						toolBackedOperationId: "build-spec",
+						startAction: { kind: "build_workflow_document", documentBuilderId: "build-spec" },
+					}),
+					documentBuilderIds: ["build-spec"],
+				}),
+			},
+		})
+		const destinationState = new TaskState()
+		await activateWorkflow(destinationState, destinationWorkflow)
+		getActiveWorkflowSession(destinationState).workflowValues[outputFileKeys.artifactAbsolutePath] = ["not", "a path"]
+		await runtime.resolveNextAction({ taskState: destinationState })
+
+		let destinationError: unknown
+		try {
+			await submitNewProjectSelection(destinationState, "Destination Guard Project")
+		} catch (error) {
+			destinationError = error
+		}
+
+		expect(destinationError).to.be.instanceOf(Error)
+		if (!(destinationError instanceof Error)) {
+			throw new Error("Expected artifact destination resolution to reject a non-string workflow value.")
+		}
+		expect(destinationError.message).to.equal(
+			`Workflow value ${outputFileKeys.artifactAbsolutePath} must be a non-empty string for artifact destination resolution for document builder build-spec.`,
+		)
 	})
 
 	it("routes changed workflow value writes through workflow_values_persisted on_event branches", async () => {
@@ -2552,7 +3112,7 @@ describe("WorkflowRuntime", () => {
 		})
 		const activeSession = getActiveWorkflowSession(taskState)
 
-		expect(writeResult.changedValues).to.deep.equal({ alpha: "ready" })
+		expect(writeResult.changedValues).to.deep.equal({ alpha: " ready " })
 		expect(writeResult.unchangedValues).to.deep.equal({})
 		expect(activeSession.branchContext.lastTriggerEvent).to.deep.equal({
 			kind: "workflow_values_persisted",
@@ -2585,16 +3145,151 @@ describe("WorkflowRuntime", () => {
 			},
 		})
 
-		expect(writeResult.changedValues).to.deep.equal({ alpha: "persisted" })
+		expect(writeResult.changedValues).to.deep.equal({ alpha: " persisted " })
 		expect(writeResult.unchangedValues).to.deep.equal({})
 		expect(activeSession.branchContext.lastTriggerEvent).to.deep.equal({
 			kind: "workflow_progress_request_denied",
 		})
 	})
 
-	it("allocates and creates epic, story, remediation-story, and review artifacts with persisted output values", async () => {
+	it("blocks artifact creation before creating a denied artifact parent directory", async () => {
+		const projectFolderName = "artifact-parent-policy-project"
+		const artifactParentDirectory = join(cwd, projectFolderName, "planning")
+		runtime = new WorkflowRuntime({
+			cwd,
+			workspacePathPolicy: {
+				validateAccess: (filePath) => filePath !== artifactParentDirectory,
+			},
+		})
+		const { workflow, artifactId } = createEpicsArtifactWorkflow({ outputValuePrefix: "parent_policy_epics" })
+
+		await activateWorkflow(taskState, workflow)
+		const session = getActiveWorkflowSession(taskState)
+		session.projectSelection = {
+			projectMode: "new",
+			projectTitle: "Artifact Parent Policy Project",
+			projectFolderName,
+		}
+
+		let capturedError: unknown
+		try {
+			await runtime.createWorkflowArtifact({
+				taskState,
+				artifactId,
+				expectedArtifactAbsolutePath: undefined,
+			})
+		} catch (error) {
+			capturedError = error
+		}
+
+		expect(capturedError).to.be.instanceOf(Error)
+		if (!(capturedError instanceof Error)) {
+			throw new Error("Expected artifact parent-directory policy denial to throw.")
+		}
+		expect(capturedError.message).to.equal(
+			`Workflow runtime path is blocked by workspace path policy: ${artifactParentDirectory}`,
+		)
+		expect(await pathExists(artifactParentDirectory)).to.equal(false)
+	})
+
+	it("blocks artifact creation before writing a denied artifact file path", async () => {
+		const projectFolderName = "artifact-file-policy-project"
+		const artifactAbsolutePath = join(cwd, projectFolderName, "planning", "Epics.md")
+		runtime = new WorkflowRuntime({
+			cwd,
+			workspacePathPolicy: {
+				validateAccess: (filePath) => filePath !== artifactAbsolutePath,
+			},
+		})
+		const { workflow, artifactId } = createEpicsArtifactWorkflow({ outputValuePrefix: "file_policy_epics" })
+
+		await activateWorkflow(taskState, workflow)
+		const session = getActiveWorkflowSession(taskState)
+		session.projectSelection = {
+			projectMode: "new",
+			projectTitle: "Artifact File Policy Project",
+			projectFolderName,
+		}
+
+		let capturedError: unknown
+		try {
+			await runtime.createWorkflowArtifact({
+				taskState,
+				artifactId,
+				expectedArtifactAbsolutePath: undefined,
+			})
+		} catch (error) {
+			capturedError = error
+		}
+
+		expect(capturedError).to.be.instanceOf(Error)
+		if (!(capturedError instanceof Error)) {
+			throw new Error("Expected artifact file-path policy denial to throw.")
+		}
+		expect(capturedError.message).to.equal(
+			`Workflow runtime path is blocked by workspace path policy: ${artifactAbsolutePath}`,
+		)
+		expect(await pathExists(artifactAbsolutePath)).to.equal(false)
+	})
+
+	it("passes constructor workspace path policy into artifact discovery", async () => {
+		const projectFolderName = "artifact-discovery-policy-project"
+		const deliverySpecKeys = createStandaloneArtifactOutputValueKeys("discovery_policy_delivery_spec")
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: collectArtifactOutputWorkflowValueKeys(deliverySpecKeys),
+			artifacts: {
+				delivery_spec_doc: {
+					id: "delivery_spec_doc",
+					family: WorkflowArtifactFamily.EpicDeliverySpec,
+					intentMode: "new",
+					parentIdentitySource: undefined,
+					targetIdentitySource: undefined,
+					outputValueKeys: deliverySpecKeys,
+				},
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		const session = getActiveWorkflowSession(taskState)
+		session.projectSelection = {
+			projectMode: "new",
+			projectTitle: "Artifact Discovery Policy Project",
+			projectFolderName,
+		}
+		const planningFolder = join(cwd, projectFolderName, "planning")
+		await mkdir(planningFolder, { recursive: true })
+		await writeFile(
+			join(planningFolder, "Epics.index.json"),
+			'{"version":1,"epics":[{"identity":"1","title":"One"}]}',
+			"utf8",
+		)
+
+		await runtime.prepareWorkflowArtifactCreation({
+			taskState,
+			artifactId: "delivery_spec_doc",
+		})
+
+		const artifactDiscoveryRequest = discoverWorkflowCandidatesStub
+			.getCalls()
+			.map((call) => call.args[0])
+			.find(
+				(request: WorkflowDiscoveryRequest) =>
+					request.baseDirectory === cwd &&
+					request.entryType === "file" &&
+					request.targetPathSegments?.[0] === projectFolderName,
+			)
+		expect(artifactDiscoveryRequest).to.not.equal(undefined)
+		if (artifactDiscoveryRequest === undefined) {
+			throw new Error("Expected artifact discovery to run.")
+		}
+		expect(artifactDiscoveryRequest.workspacePathPolicy).to.equal(workspacePathPolicy)
+	})
+
+	it("allocates and creates canonical workflow artifacts with persisted output values", async () => {
 		discoverWorkflowCandidatesStub.restore()
-		const epicKeys = createStandaloneArtifactOutputValueKeys("epic")
+		const epicsKeys = createStandaloneArtifactOutputValueKeys("epics")
+		const epicsIndexKeys = createStandaloneArtifactOutputValueKeys("epics_index")
+		const deliverySpecKeys = createStandaloneArtifactOutputValueKeys("epic_delivery_spec")
 		const storyKeys = createParentedArtifactOutputValueKeys("story")
 		const remediationStoryKeys = createParentedArtifactOutputValueKeys("remediation_story")
 		const blindReviewKeys = createTargetedArtifactOutputValueKeys("blind_review")
@@ -2604,7 +3299,9 @@ describe("WorkflowRuntime", () => {
 		const reviewInputDiffKeys = createTargetedArtifactOutputValueKeys("review_input_diff")
 		const workflow = createWorkflowDefinition({
 			workflowValueKeys: collectArtifactOutputWorkflowValueKeys(
-				epicKeys,
+				epicsKeys,
+				epicsIndexKeys,
+				deliverySpecKeys,
 				storyKeys,
 				remediationStoryKeys,
 				blindReviewKeys,
@@ -2614,13 +3311,29 @@ describe("WorkflowRuntime", () => {
 				reviewInputDiffKeys,
 			),
 			artifacts: {
-				epic_doc: {
-					id: "epic_doc",
-					family: WorkflowArtifactFamily.Epic,
+				epics_doc: {
+					id: "epics_doc",
+					family: WorkflowArtifactFamily.Epics,
 					intentMode: "new",
 					parentIdentitySource: undefined,
 					targetIdentitySource: undefined,
-					outputValueKeys: epicKeys,
+					outputValueKeys: epicsKeys,
+				},
+				epics_index_doc: {
+					id: "epics_index_doc",
+					family: WorkflowArtifactFamily.EpicsIndex,
+					intentMode: "new",
+					parentIdentitySource: undefined,
+					targetIdentitySource: undefined,
+					outputValueKeys: epicsIndexKeys,
+				},
+				epic_delivery_spec_doc: {
+					id: "epic_delivery_spec_doc",
+					family: WorkflowArtifactFamily.EpicDeliverySpec,
+					intentMode: "new",
+					parentIdentitySource: undefined,
+					targetIdentitySource: undefined,
+					outputValueKeys: deliverySpecKeys,
 				},
 				story_doc: {
 					id: "story_doc",
@@ -2628,7 +3341,7 @@ describe("WorkflowRuntime", () => {
 					intentMode: "new",
 					parentIdentitySource: {
 						kind: "workflow_value",
-						key: epicKeys.artifactIdentity,
+						key: deliverySpecKeys.artifactIdentity,
 					},
 					targetIdentitySource: undefined,
 					outputValueKeys: storyKeys,
@@ -2706,9 +3419,24 @@ describe("WorkflowRuntime", () => {
 		await runtime.resolveNextAction({ taskState })
 		await submitNewProjectSelection(taskState, "Artifact Allocation Project")
 
-		const epicResult = await runtime.createWorkflowArtifact({
+		const epicsResult = await runtime.createWorkflowArtifact({
 			taskState,
-			artifactId: "epic_doc",
+			artifactId: "epics_doc",
+			expectedArtifactAbsolutePath: undefined,
+		})
+		const epicsIndexResult = await runtime.createWorkflowArtifact({
+			taskState,
+			artifactId: "epics_index_doc",
+			expectedArtifactAbsolutePath: undefined,
+		})
+		await writeFile(
+			epicsIndexResult.artifactAbsolutePath,
+			JSON.stringify({ version: 1, epics: [{ identity: "1", title: "Foundation" }] }),
+			"utf8",
+		)
+		const deliverySpecResult = await runtime.createWorkflowArtifact({
+			taskState,
+			artifactId: "epic_delivery_spec_doc",
 			expectedArtifactAbsolutePath: undefined,
 		})
 		const storyResult = await runtime.createWorkflowArtifact({
@@ -2747,11 +3475,27 @@ describe("WorkflowRuntime", () => {
 			expectedArtifactAbsolutePath: undefined,
 		})
 
-		expect(epicResult).to.deep.include({
+		expect(epicsResult).to.deep.include({
+			artifactIdentity: "epics",
+			artifactFilename: "Epics.md",
+			artifactRelativePath: join("planning", "Epics.md"),
+			artifactAbsolutePath: join(cwd, "artifact-allocation-project", "planning", "Epics.md"),
+			parentIdentity: undefined,
+			targetIdentity: undefined,
+		})
+		expect(epicsIndexResult).to.deep.include({
+			artifactIdentity: "epics_index",
+			artifactFilename: "Epics.index.json",
+			artifactRelativePath: join("planning", "Epics.index.json"),
+			artifactAbsolutePath: join(cwd, "artifact-allocation-project", "planning", "Epics.index.json"),
+			parentIdentity: undefined,
+			targetIdentity: undefined,
+		})
+		expect(deliverySpecResult).to.deep.include({
 			artifactIdentity: "1",
-			artifactFilename: "Epic-1.md",
-			artifactRelativePath: join("planning", "Epic-1.md"),
-			artifactAbsolutePath: join(cwd, "artifact-allocation-project", "planning", "Epic-1.md"),
+			artifactFilename: "Epic-1-delivery-spec.md",
+			artifactRelativePath: join("planning", "Epic-1-delivery-spec.md"),
+			artifactAbsolutePath: join(cwd, "artifact-allocation-project", "planning", "Epic-1-delivery-spec.md"),
 			parentIdentity: undefined,
 			targetIdentity: undefined,
 		})
@@ -2812,7 +3556,9 @@ describe("WorkflowRuntime", () => {
 			targetIdentity: "1.1.1",
 		})
 
-		await access(epicResult.artifactAbsolutePath)
+		await access(epicsResult.artifactAbsolutePath)
+		await access(epicsIndexResult.artifactAbsolutePath)
+		await access(deliverySpecResult.artifactAbsolutePath)
 		await access(storyResult.artifactAbsolutePath)
 		await access(remediationStoryResult.artifactAbsolutePath)
 		await access(reviewResult.artifactAbsolutePath)
@@ -2820,17 +3566,33 @@ describe("WorkflowRuntime", () => {
 		await access(adversarialReviewResult.artifactAbsolutePath)
 		await access(reviewInputMarkdownResult.artifactAbsolutePath)
 		await access(reviewInputDiffResult.artifactAbsolutePath)
-		expect(await readFile(epicResult.artifactAbsolutePath, "utf8")).to.equal("")
+		expect(await readFile(epicsResult.artifactAbsolutePath, "utf8")).to.equal("")
+		expect(await readFile(deliverySpecResult.artifactAbsolutePath, "utf8")).to.equal("")
 		expect(await readFile(reviewInputDiffResult.artifactAbsolutePath, "utf8")).to.equal("")
 
 		expect(getActiveWorkflowSession(taskState).workflowValues).to.deep.include({
-			[epicKeys.projectTitle]: "Artifact Allocation Project",
-			[epicKeys.projectFolderName]: "artifact-allocation-project",
-			[epicKeys.artifactFamily]: WorkflowArtifactFamily.Epic,
-			[epicKeys.artifactIdentity]: "1",
-			[epicKeys.artifactFilename]: "Epic-1.md",
-			[epicKeys.artifactRelativePath]: join("planning", "Epic-1.md"),
-			[epicKeys.artifactAbsolutePath]: join(cwd, "artifact-allocation-project", "planning", "Epic-1.md"),
+			[epicsKeys.projectTitle]: "Artifact Allocation Project",
+			[epicsKeys.projectFolderName]: "artifact-allocation-project",
+			[epicsKeys.artifactFamily]: WorkflowArtifactFamily.Epics,
+			[epicsKeys.artifactIdentity]: "epics",
+			[epicsKeys.artifactFilename]: "Epics.md",
+			[epicsKeys.artifactRelativePath]: join("planning", "Epics.md"),
+			[epicsKeys.artifactAbsolutePath]: join(cwd, "artifact-allocation-project", "planning", "Epics.md"),
+			[epicsIndexKeys.artifactFamily]: WorkflowArtifactFamily.EpicsIndex,
+			[epicsIndexKeys.artifactIdentity]: "epics_index",
+			[epicsIndexKeys.artifactFilename]: "Epics.index.json",
+			[epicsIndexKeys.artifactRelativePath]: join("planning", "Epics.index.json"),
+			[epicsIndexKeys.artifactAbsolutePath]: join(cwd, "artifact-allocation-project", "planning", "Epics.index.json"),
+			[deliverySpecKeys.artifactFamily]: WorkflowArtifactFamily.EpicDeliverySpec,
+			[deliverySpecKeys.artifactIdentity]: "1",
+			[deliverySpecKeys.artifactFilename]: "Epic-1-delivery-spec.md",
+			[deliverySpecKeys.artifactRelativePath]: join("planning", "Epic-1-delivery-spec.md"),
+			[deliverySpecKeys.artifactAbsolutePath]: join(
+				cwd,
+				"artifact-allocation-project",
+				"planning",
+				"Epic-1-delivery-spec.md",
+			),
 			[storyKeys.artifactIdentity]: "1.1",
 			[storyKeys.parentIdentity]: "1",
 			[remediationStoryKeys.artifactIdentity]: "1.1.1",
@@ -2845,19 +3607,19 @@ describe("WorkflowRuntime", () => {
 		})
 	})
 
-	it("ignores non-matching files for numbering and does not use collision suffixing as canonical numbering", async () => {
+	it("derives epic delivery specs from Epics.index.json and skips existing delivery specs", async () => {
 		discoverWorkflowCandidatesStub.restore()
-		const epicKeys = createStandaloneArtifactOutputValueKeys("epic")
+		const deliverySpecKeys = createStandaloneArtifactOutputValueKeys("delivery_spec")
 		const workflow = createWorkflowDefinition({
-			workflowValueKeys: collectArtifactOutputWorkflowValueKeys(epicKeys),
+			workflowValueKeys: collectArtifactOutputWorkflowValueKeys(deliverySpecKeys),
 			artifacts: {
-				epic_doc: {
-					id: "epic_doc",
-					family: WorkflowArtifactFamily.Epic,
+				delivery_spec_doc: {
+					id: "delivery_spec_doc",
+					family: WorkflowArtifactFamily.EpicDeliverySpec,
 					intentMode: "new",
 					parentIdentitySource: undefined,
 					targetIdentitySource: undefined,
-					outputValueKeys: epicKeys,
+					outputValueKeys: deliverySpecKeys,
 				},
 			},
 		})
@@ -2867,20 +3629,209 @@ describe("WorkflowRuntime", () => {
 		await submitNewProjectSelection(taskState, "Convention Numbering Project")
 
 		const planningFolder = join(cwd, "convention-numbering-project", "planning")
-		await writeFile(join(planningFolder, "Epic-1.md"), "existing", "utf8")
+		await writeFile(join(planningFolder, "Epics.md"), "# Epic 1 from markdown only\n", "utf8")
+		await writeFile(
+			join(planningFolder, "Epics.index.json"),
+			JSON.stringify({
+				version: 1,
+				epics: [
+					{ identity: "2", title: "Indexed Two" },
+					{ identity: "10", title: "Indexed Ten" },
+				],
+			}),
+			"utf8",
+		)
+		await writeFile(join(planningFolder, "Epic-2-delivery-spec.md"), "existing", "utf8")
 		await writeFile(join(planningFolder, "Epic-999-draft.md"), "ignored", "utf8")
+		await writeFile(join(planningFolder, "Epic-1.md"), "retired", "utf8")
 		await writeFile(join(planningFolder, "Story-9-9.md"), "ignored", "utf8")
 
-		const epicResult = await runtime.createWorkflowArtifact({
+		const deliverySpecResult = await runtime.createWorkflowArtifact({
 			taskState,
-			artifactId: "epic_doc",
+			artifactId: "delivery_spec_doc",
 			expectedArtifactAbsolutePath: undefined,
 		})
 
-		expect(epicResult.artifactIdentity).to.equal("2")
-		expect(epicResult.artifactFilename).to.equal("Epic-2.md")
-		expect(epicResult.artifactAbsolutePath).to.equal(join(planningFolder, "Epic-2.md"))
-		await access(join(planningFolder, "Epic-2.md"))
+		expect(deliverySpecResult.artifactIdentity).to.equal("10")
+		expect(deliverySpecResult.artifactFilename).to.equal("Epic-10-delivery-spec.md")
+		expect(deliverySpecResult.artifactAbsolutePath).to.equal(join(planningFolder, "Epic-10-delivery-spec.md"))
+		await access(join(planningFolder, "Epic-10-delivery-spec.md"))
+	})
+
+	it("validates story allocation against existing epic delivery specs", async () => {
+		discoverWorkflowCandidatesStub.restore()
+		const parentIdentityKey = "selected_epic_identity"
+		const storyKeys = createParentedArtifactOutputValueKeys("story_parent_validation")
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: [parentIdentityKey, ...collectArtifactOutputWorkflowValueKeys(storyKeys)],
+			artifacts: {
+				story_doc: {
+					id: "story_doc",
+					family: WorkflowArtifactFamily.Story,
+					intentMode: "new",
+					parentIdentitySource: {
+						kind: "workflow_value",
+						key: parentIdentityKey,
+					},
+					targetIdentitySource: undefined,
+					outputValueKeys: storyKeys,
+				},
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		await runtime.resolveNextAction({ taskState })
+		await submitNewProjectSelection(taskState, "Story Parent Validation Project")
+		const planningFolder = join(cwd, "story-parent-validation-project", "planning")
+		await writeFile(
+			join(planningFolder, "Epics.index.json"),
+			'{"version":1,"epics":[{"identity":"1","title":"One"}]}',
+			"utf8",
+		)
+		await writeFile(join(planningFolder, "Epic-1.md"), "retired", "utf8")
+		getActiveWorkflowSession(taskState).workflowValues[parentIdentityKey] = "1"
+
+		let missingDeliverySpecError: unknown
+		try {
+			await runtime.prepareWorkflowArtifactCreation({
+				taskState,
+				artifactId: "story_doc",
+			})
+		} catch (error) {
+			missingDeliverySpecError = error
+		}
+
+		expect(missingDeliverySpecError).to.be.instanceOf(Error)
+		if (!(missingDeliverySpecError instanceof Error)) {
+			throw new Error("Expected story allocation without a delivery spec to throw.")
+		}
+		expect(missingDeliverySpecError.message).to.equal(
+			"Cannot allocate workflow artifact story_doc because required artifact identity 1 was not found in the selected project.",
+		)
+		expect(await pathExists(join(planningFolder, "Story-1-1.md"))).to.equal(false)
+
+		await writeFile(join(planningFolder, "Epic-1-delivery-spec.md"), "delivery spec", "utf8")
+		const storyResult = await runtime.prepareWorkflowArtifactCreation({
+			taskState,
+			artifactId: "story_doc",
+		})
+
+		expect(storyResult).to.deep.include({
+			artifactIdentity: "1.1",
+			artifactFilename: "Story-1-1.md",
+			parentIdentity: "1",
+		})
+	})
+
+	it("fails epic delivery spec allocation for missing, malformed, or path-policy-denied Epics.index.json", async () => {
+		discoverWorkflowCandidatesStub.restore()
+
+		async function createDeliverySpecCase(args: {
+			projectTitle: string
+			indexText?: string
+			workspacePathPolicy?: WorkflowWorkspacePathPolicy
+		}): Promise<{ state: TaskState; planningFolder: string; epicsIndexPath: string; deliverySpecPath: string }> {
+			runtime = new WorkflowRuntime({
+				cwd,
+				workspacePathPolicy: args.workspacePathPolicy ?? createAllowAllWorkspacePathPolicy(),
+			})
+			const state = new TaskState()
+			const deliverySpecKeys = createStandaloneArtifactOutputValueKeys(
+				args.projectTitle.toLowerCase().replace(/[^a-z0-9]+/g, "_"),
+			)
+			const workflow = createWorkflowDefinition({
+				name: `${deliverySpecKeys.artifactIdentity}_workflow`,
+				workflowValueKeys: collectArtifactOutputWorkflowValueKeys(deliverySpecKeys),
+				artifacts: {
+					delivery_spec_doc: {
+						id: "delivery_spec_doc",
+						family: WorkflowArtifactFamily.EpicDeliverySpec,
+						intentMode: "new",
+						parentIdentitySource: undefined,
+						targetIdentitySource: undefined,
+						outputValueKeys: deliverySpecKeys,
+					},
+				},
+			})
+
+			await activateWorkflow(state, workflow)
+			await runtime.resolveNextAction({ taskState: state })
+			await submitNewProjectSelection(state, args.projectTitle)
+			const planningFolder = join(cwd, getActiveWorkflowSession(state).projectSelection.projectFolderName, "planning")
+			const epicsIndexPath = join(planningFolder, "Epics.index.json")
+			const deliverySpecPath = join(planningFolder, "Epic-1-delivery-spec.md")
+			await writeFile(join(planningFolder, "Epics.md"), "# Epic 1 from markdown only\n", "utf8")
+			if (args.indexText !== undefined) {
+				await writeFile(epicsIndexPath, args.indexText, "utf8")
+			}
+
+			return { state, planningFolder, epicsIndexPath, deliverySpecPath }
+		}
+
+		const missingCase = await createDeliverySpecCase({ projectTitle: "Missing Index Project" })
+		let missingError: unknown
+		try {
+			await runtime.createWorkflowArtifact({
+				taskState: missingCase.state,
+				artifactId: "delivery_spec_doc",
+				expectedArtifactAbsolutePath: undefined,
+			})
+		} catch (error) {
+			missingError = error
+		}
+		expect(missingError).to.be.instanceOf(Error)
+		if (!(missingError instanceof Error)) {
+			throw new Error("Expected missing Epics.index.json to throw.")
+		}
+		expect(missingError.message).to.contain("Epics.index.json could not be read")
+		expect(await pathExists(missingCase.deliverySpecPath)).to.equal(false)
+
+		const malformedCase = await createDeliverySpecCase({
+			projectTitle: "Malformed Index Project",
+			indexText: "{",
+		})
+		let malformedError: unknown
+		try {
+			await runtime.createWorkflowArtifact({
+				taskState: malformedCase.state,
+				artifactId: "delivery_spec_doc",
+				expectedArtifactAbsolutePath: undefined,
+			})
+		} catch (error) {
+			malformedError = error
+		}
+		expect(malformedError).to.be.instanceOf(Error)
+		if (!(malformedError instanceof Error)) {
+			throw new Error("Expected malformed Epics.index.json to throw.")
+		}
+		expect(malformedError.message).to.contain("Epics.index.json is malformed JSON")
+		expect(await pathExists(malformedCase.deliverySpecPath)).to.equal(false)
+
+		const deniedProjectFolderName = "denied-index-project"
+		const deniedIndexPath = join(cwd, deniedProjectFolderName, "planning", "Epics.index.json")
+		const deniedCase = await createDeliverySpecCase({
+			projectTitle: "Denied Index Project",
+			indexText: '{"version":1,"epics":[{"identity":"1","title":"One"}]}',
+			workspacePathPolicy: {
+				validateAccess: (filePath) => filePath !== deniedIndexPath,
+			},
+		})
+		let deniedError: unknown
+		try {
+			await runtime.createWorkflowArtifact({
+				taskState: deniedCase.state,
+				artifactId: "delivery_spec_doc",
+				expectedArtifactAbsolutePath: undefined,
+			})
+		} catch (error) {
+			deniedError = error
+		}
+		expect(deniedError).to.be.instanceOf(Error)
+		if (!(deniedError instanceof Error)) {
+			throw new Error("Expected path-policy-denied Epics.index.json to throw.")
+		}
+		expect(deniedError.message).to.equal(`Workflow runtime path is blocked by workspace path policy: ${deniedIndexPath}`)
+		expect(await pathExists(deniedCase.deliverySpecPath)).to.equal(false)
 	})
 
 	it("routes missing parent or target artifact identities through tool-backed operation failure handling", async () => {
@@ -2973,7 +3924,7 @@ describe("WorkflowRuntime", () => {
 				artifacts: {
 					output_file: {
 						id: "output_file",
-						family: WorkflowArtifactFamily.Epic,
+						family: WorkflowArtifactFamily.Epics,
 						intentMode: "new",
 						parentIdentitySource: undefined,
 						targetIdentitySource: undefined,
@@ -3015,7 +3966,7 @@ describe("WorkflowRuntime", () => {
 	})
 
 	it("builds build_workflow_document tool-backed operations from step-approved document builders", async () => {
-		const allocatedArtifactAbsolutePath = join(cwd, "builder-project", "planning", "Epic-1.md")
+		const allocatedArtifactAbsolutePath = join(cwd, "builder-project", "planning", "Epics.md")
 		const moduleChosenAbsolutePath = join(cwd, "builder-project", "planning", "Module-chosen.md")
 		const outputFileKeys = createStandaloneArtifactOutputValueKeys("output_file")
 		const workflow = createWorkflowDefinition({
@@ -3027,7 +3978,7 @@ describe("WorkflowRuntime", () => {
 			artifacts: {
 				output_file: {
 					id: "output_file",
-					family: WorkflowArtifactFamily.Epic,
+					family: WorkflowArtifactFamily.Epics,
 					intentMode: "new",
 					parentIdentitySource: undefined,
 					targetIdentitySource: undefined,
@@ -3092,7 +4043,7 @@ describe("WorkflowRuntime", () => {
 				cwd,
 				`serialized-builder-project-${failureCaseIndex}`,
 				"planning",
-				"Epic-1.md",
+				"Epics.md",
 			)
 			const failureState = new TaskState()
 			const workflow = createWorkflowDefinition({
@@ -3101,7 +4052,7 @@ describe("WorkflowRuntime", () => {
 				artifacts: {
 					output_file: {
 						id: "output_file",
-						family: WorkflowArtifactFamily.Epic,
+						family: WorkflowArtifactFamily.Epics,
 						intentMode: "new",
 						parentIdentitySource: undefined,
 						targetIdentitySource: undefined,
@@ -3179,6 +4130,19 @@ describe("WorkflowRuntime", () => {
 
 		expect(undefinedRestore).to.be.undefined
 
+		const missingActiveWorkflowNameState = new TaskState()
+		missingActiveWorkflowNameState.activeWorkflowSession = createParentWorkflowSession()
+		missingActiveWorkflowNameState.currentFocusChainChecklist = "stale checklist"
+		const missingActiveWorkflowNameRestore = await runtime.restorePersistedSession({
+			taskState: missingActiveWorkflowNameState,
+			persistedSession,
+		})
+
+		expect(missingActiveWorkflowNameRestore).to.deep.equal({ kind: "persist_workflow_teardown" })
+		expect(missingActiveWorkflowNameState.activeWorkflowName).to.be.undefined
+		expect(missingActiveWorkflowNameState.activeWorkflowSession).to.be.undefined
+		expect(missingActiveWorkflowNameState.currentFocusChainChecklist).to.equal(null)
+
 		const missingWorkflowState = new TaskState()
 		missingWorkflowState.activeWorkflowName = "stale"
 		missingWorkflowState.activeWorkflowSession = createParentWorkflowSession()
@@ -3195,7 +4159,7 @@ describe("WorkflowRuntime", () => {
 		expect(missingWorkflowState.currentFocusChainChecklist).to.equal(null)
 
 		const invalidDefinitionState = new TaskState()
-		invalidDefinitionState.activeWorkflowName = "stale"
+		invalidDefinitionState.activeWorkflowName = workflow.name
 		invalidDefinitionState.activeWorkflowSession = createParentWorkflowSession()
 		invalidDefinitionState.currentFocusChainChecklist = "stale checklist"
 		const invalidDefinition = createWorkflowDefinition({ name: workflow.name, steps: {} as WorkflowDefinition["steps"] })
@@ -3218,7 +4182,7 @@ describe("WorkflowRuntime", () => {
 		}
 		invalidStepSession.activeStepNumber = 999
 		const invalidStepState = new TaskState()
-		invalidStepState.activeWorkflowName = "stale"
+		invalidStepState.activeWorkflowName = workflow.name
 		invalidStepState.activeWorkflowSession = createParentWorkflowSession()
 		invalidStepState.currentFocusChainChecklist = "stale checklist"
 		const invalidStepRestore = await runtime.restorePersistedSession({
@@ -3238,7 +4202,7 @@ describe("WorkflowRuntime", () => {
 		}
 		invalidBranchSession.branchContext.activeBranchId = "missing-branch"
 		const invalidBranchState = new TaskState()
-		invalidBranchState.activeWorkflowName = "stale"
+		invalidBranchState.activeWorkflowName = workflow.name
 		invalidBranchState.activeWorkflowSession = createParentWorkflowSession()
 		invalidBranchState.currentFocusChainChecklist = "stale checklist"
 		const invalidBranchRestore = await runtime.restorePersistedSession({
@@ -3258,6 +4222,7 @@ describe("WorkflowRuntime", () => {
 			throw new Error("Expected a valid persisted workflow session.")
 		}
 		const restoredState = new TaskState()
+		restoredState.activeWorkflowName = workflow.name
 		const restored = await runtime.restorePersistedSession({
 			taskState: restoredState,
 			persistedSession: validPersistedSession,
@@ -3266,6 +4231,21 @@ describe("WorkflowRuntime", () => {
 		expect(restored?.kind).to.equal("project_prompt")
 		expect(restoredState.activeWorkflowName).to.equal(workflow.name)
 		expect(restoredState.activeWorkflowSession).to.deep.equal(validPersistedSession)
+
+		const legacyPersistedSession = Object.assign({}, validPersistedSession, { workflowName: workflow.name })
+		const legacyRestoredState = new TaskState()
+		legacyRestoredState.activeWorkflowName = workflow.name
+		const legacyRestored = await runtime.restorePersistedSession({
+			taskState: legacyRestoredState,
+			persistedSession: legacyPersistedSession,
+		})
+
+		expect(legacyRestored?.kind).to.equal("project_prompt")
+		expect(legacyRestoredState.activeWorkflowName).to.equal(workflow.name)
+		expect(Object.hasOwn(legacyRestoredState.activeWorkflowSession, "workflowName")).to.equal(false)
+		const repersistedSession = runtime.getPersistedSession({ taskState: legacyRestoredState })
+		expect(repersistedSession).to.not.equal(undefined)
+		expect(Object.hasOwn(repersistedSession, "workflowName")).to.equal(false)
 	})
 
 	it("restores downstream workflow ui from the canonical session without legacy task-state mirrors", async () => {
@@ -3300,6 +4280,7 @@ describe("WorkflowRuntime", () => {
 		}
 
 		const restoredState = new TaskState()
+		restoredState.activeWorkflowName = workflow.name
 		const restored = await runtime.restorePersistedSession({
 			taskState: restoredState,
 			persistedSession,

@@ -10,7 +10,7 @@ import type {
 } from "@shared/ExtensionMessage"
 import { WorkflowFormAction, type WorkflowFormSubmissionRequest } from "@shared/proto/cline/task"
 import { randomUUID } from "crypto"
-import { mkdir, writeFile } from "fs/promises"
+import { mkdir, readFile, writeFile } from "fs/promises"
 import { dirname, join } from "path"
 import { isSerializedToolFailureResultText } from "@/core/prompts/responses"
 import type { TaskState } from "@/core/task/TaskState"
@@ -44,11 +44,20 @@ import type {
 	WorkflowNextAction,
 	WorkflowProjectSelectionState,
 	WorkflowProjectSubfolder,
+	WorkflowPromptBuilderInput,
 	WorkflowPromptProjection,
 	WorkflowStepDefinition,
 	WorkflowValidationResult,
+	WorkflowValue,
 	WorkflowValues,
+	WorkflowWorkspacePathPolicy,
 } from "./types"
+import {
+	areWorkflowValuesEqual,
+	isWorkflowValue,
+	readRequiredStringWorkflowValue,
+	stringifyWorkflowValueForPrompt,
+} from "./workflowValues"
 
 const WORKFLOW_PROJECT_SUBFOLDERS: readonly WorkflowProjectSubfolder[] = [
 	"discovery",
@@ -96,12 +105,30 @@ interface ParsedWorkflowArtifactIdentity {
 	remediationStoryNumber: number | undefined
 }
 
+interface WorkflowEpicsIndexEntry {
+	identity: string
+	title: string
+}
+
+interface WorkflowEpicsIndex {
+	version: 1
+	epics: WorkflowEpicsIndexEntry[]
+}
+
 export class WorkflowRuntime {
 	private readonly cwd: string
+	private readonly workspacePathPolicy: WorkflowWorkspacePathPolicy
 	private readonly workflowFormRuntime = new WorkflowFormRuntime()
 
-	constructor(args: { cwd: string }) {
+	constructor(args: { cwd: string; workspacePathPolicy: WorkflowWorkspacePathPolicy }) {
 		this.cwd = args.cwd
+		this.workspacePathPolicy = args.workspacePathPolicy
+	}
+
+	private assertWorkspacePathAllowed(filePath: string): void {
+		if (!this.workspacePathPolicy.validateAccess(filePath)) {
+			throw new Error(`Workflow runtime path is blocked by workspace path policy: ${filePath}`)
+		}
 	}
 
 	async activateWorkflow(args: {
@@ -156,7 +183,6 @@ export class WorkflowRuntime {
 
 		taskState.activeWorkflowName = workflow.name
 		taskState.activeWorkflowSession = {
-			workflowName: workflow.name,
 			activeStepNumber: firstStepNumber,
 			workflowValues,
 			projectSelection,
@@ -472,26 +498,28 @@ export class WorkflowRuntime {
 		const unchangedValues: WorkflowValues = {}
 
 		for (const [key, rawValue] of Object.entries(values)) {
-			const trimmedValue = rawValue.trim()
+			if (!isWorkflowValue(rawValue)) {
+				throw new Error(`Workflow value ${key} must be a JSON-safe workflow value.`)
+			}
 
 			if (!allowedKeys.has(key)) {
-				unchangedValues[key] = trimmedValue
+				unchangedValues[key] = rawValue
 				continue
 			}
 
 			const currentValue = session?.workflowValues[key]
-			if (currentValue === trimmedValue) {
-				unchangedValues[key] = trimmedValue
+			if (areWorkflowValuesEqual(currentValue, rawValue)) {
+				unchangedValues[key] = rawValue
 				continue
 			}
 
 			if (!session) {
-				unchangedValues[key] = trimmedValue
+				unchangedValues[key] = rawValue
 				continue
 			}
 
-			session.workflowValues[key] = trimmedValue
-			changedValues[key] = trimmedValue
+			session.workflowValues[key] = rawValue
+			changedValues[key] = rawValue
 		}
 
 		const changedKeys = Object.keys(changedValues)
@@ -590,7 +618,10 @@ export class WorkflowRuntime {
 			throw new Error("Workflow artifact allocation changed before file creation.")
 		}
 
-		await mkdir(dirname(allocation.artifactAbsolutePath), { recursive: true })
+		const artifactParentDirectory = dirname(allocation.artifactAbsolutePath)
+		this.assertWorkspacePathAllowed(artifactParentDirectory)
+		await mkdir(artifactParentDirectory, { recursive: true })
+		this.assertWorkspacePathAllowed(allocation.artifactAbsolutePath)
 		await writeFile(allocation.artifactAbsolutePath, "", { encoding: "utf8", flag: "wx" })
 
 		const workflowValueWriteResult = await this.applyWorkflowValueWrites({
@@ -622,12 +653,14 @@ export class WorkflowRuntime {
 			return {}
 		}
 
-		const promptSource = activeStep.buildPromptSource({ session, step: activeStep })
-		const workflowStepList = this.buildWorkflowStepChecklist(definition, session)
-		const workflowToolSchemaOverride = activeStep.buildToolSchema({
+		const promptBuilderInput: WorkflowPromptBuilderInput = {
 			session,
 			step: activeStep,
-		})
+			renderWorkflowValue: stringifyWorkflowValueForPrompt,
+		}
+		const promptSource = activeStep.buildPromptSource(promptBuilderInput)
+		const workflowStepList = this.buildWorkflowStepChecklist(definition, session)
+		const workflowToolSchemaOverride = activeStep.buildToolSchema(promptBuilderInput)
 
 		return {
 			fullTurnWorkflowSystemInstructionsBlock: this.joinPromptSections([
@@ -672,8 +705,18 @@ export class WorkflowRuntime {
 		)
 	}
 
+	private cloneWorkflowSession(session: ActiveWorkflowSession): ActiveWorkflowSession {
+		return {
+			activeStepNumber: session.activeStepNumber,
+			workflowValues: structuredClone(session.workflowValues),
+			projectSelection: structuredClone(session.projectSelection),
+			ui: structuredClone(session.ui),
+			branchContext: structuredClone(session.branchContext),
+		}
+	}
+
 	getPersistedSession(args: { taskState: TaskState }): PersistedWorkflowSession | undefined {
-		return args.taskState.activeWorkflowSession ? structuredClone(args.taskState.activeWorkflowSession) : undefined
+		return args.taskState.activeWorkflowSession ? this.cloneWorkflowSession(args.taskState.activeWorkflowSession) : undefined
 	}
 
 	async restorePersistedSession(args: {
@@ -685,7 +728,11 @@ export class WorkflowRuntime {
 			return undefined
 		}
 
-		const definition = resolveWorkflowDefinition(persistedSession.workflowName)
+		if (taskState.activeWorkflowName === undefined) {
+			return await this.teardownWorkflowAndRequirePersistence({ taskState })
+		}
+
+		const definition = resolveWorkflowDefinition(taskState.activeWorkflowName)
 		if (!definition) {
 			return this.teardownWorkflowAndRequirePersistence({ taskState })
 		}
@@ -704,8 +751,7 @@ export class WorkflowRuntime {
 			return this.teardownWorkflowAndRequirePersistence({ taskState })
 		}
 
-		taskState.activeWorkflowName = persistedSession.workflowName
-		taskState.activeWorkflowSession = structuredClone(persistedSession)
+		taskState.activeWorkflowSession = this.cloneWorkflowSession(persistedSession)
 		this.refreshCurrentFocusChainChecklist(taskState)
 
 		return this.resolveNextAction({ taskState })
@@ -782,23 +828,97 @@ export class WorkflowRuntime {
 
 	private convertWorkflowFormSubmittedValueToWorkflowValue(
 		value: WorkflowFormSubmittedValuePayload | undefined,
-	): string | undefined {
+	): { ok: true; value: WorkflowValue } | { ok: false; errorMessage: string } {
 		if (!value) {
-			return undefined
+			return {
+				ok: false,
+				errorMessage: "Malformed workflow form submitted value: missing submitted value.",
+			}
 		}
 
 		switch (value.valueType) {
 			case "string":
-				return value.stringValue
+				if (value.stringValue === undefined) {
+					return {
+						ok: false,
+						errorMessage: "Malformed workflow form submitted value: string value is missing.",
+					}
+				}
+				return { ok: true, value: value.stringValue }
 			case "boolean":
-				return value.booleanValue === undefined ? undefined : String(value.booleanValue)
+				if (value.booleanValue === undefined) {
+					return {
+						ok: false,
+						errorMessage: "Malformed workflow form submitted value: boolean value is missing.",
+					}
+				}
+				return { ok: true, value: value.booleanValue }
 			case "integer":
-				return value.integerValue === undefined ? undefined : String(value.integerValue)
+				if (value.integerValue === undefined || !Number.isInteger(value.integerValue)) {
+					return {
+						ok: false,
+						errorMessage: "Malformed workflow form submitted value: integer value is missing or invalid.",
+					}
+				}
+				return { ok: true, value: value.integerValue }
 			case "number":
-				return value.numberValue === undefined ? undefined : String(value.numberValue)
-			case "array":
-			case "object":
-				return undefined
+				if (value.numberValue === undefined || !Number.isFinite(value.numberValue)) {
+					return {
+						ok: false,
+						errorMessage: "Malformed workflow form submitted value: number value is missing or invalid.",
+					}
+				}
+				return { ok: true, value: value.numberValue }
+			case "array": {
+				if (value.arrayValue === undefined) {
+					return {
+						ok: false,
+						errorMessage: "Malformed workflow form submitted value: array value is missing.",
+					}
+				}
+
+				const arrayValue: WorkflowValue[] = []
+				for (const entry of value.arrayValue) {
+					const convertedEntry = this.convertWorkflowFormSubmittedValueToWorkflowValue(entry)
+					if (!convertedEntry.ok) {
+						return convertedEntry
+					}
+					arrayValue.push(convertedEntry.value)
+				}
+
+				return { ok: true, value: arrayValue }
+			}
+			case "object": {
+				if (value.objectValue === undefined) {
+					return {
+						ok: false,
+						errorMessage: "Malformed workflow form submitted value: object value is missing.",
+					}
+				}
+
+				const objectValue: { [key: string]: WorkflowValue } = {}
+				for (const entry of value.objectValue) {
+					if (entry.key.trim() === "") {
+						return {
+							ok: false,
+							errorMessage: "Malformed workflow form submitted value: object entry key is empty.",
+						}
+					}
+
+					const convertedEntry = this.convertWorkflowFormSubmittedValueToWorkflowValue(entry.value)
+					if (!convertedEntry.ok) {
+						return convertedEntry
+					}
+					objectValue[entry.key] = convertedEntry.value
+				}
+
+				return { ok: true, value: objectValue }
+			}
+			default:
+				return {
+					ok: false,
+					errorMessage: `Unsupported workflow form submitted value type: ${String(value.valueType)}.`,
+				}
 		}
 	}
 
@@ -814,16 +934,12 @@ export class WorkflowRuntime {
 				}
 
 				const submittedValue = formSession.values[field.key]
-				if (!submittedValue) {
-					continue
+				const conversion = this.convertWorkflowFormSubmittedValueToWorkflowValue(submittedValue)
+				if (!conversion.ok) {
+					throw new Error(conversion.errorMessage)
 				}
 
-				const workflowValue = this.convertWorkflowFormSubmittedValueToWorkflowValue(submittedValue)
-				if (workflowValue === undefined) {
-					continue
-				}
-
-				workflowValueWrites[field.workflowValueKey] = workflowValue
+				workflowValueWrites[field.workflowValueKey] = conversion.value
 			}
 		}
 
@@ -1024,6 +1140,7 @@ export class WorkflowRuntime {
 
 			const existingProjectOptions = await discoverWorkflowCandidates({
 				baseDirectory: this.cwd,
+				workspacePathPolicy: this.workspacePathPolicy,
 				entryType: "directory",
 				immediateChildrenOnly: true,
 				sort: "alpha_asc",
@@ -1384,6 +1501,7 @@ export class WorkflowRuntime {
 
 		return discoverWorkflowCandidates({
 			baseDirectory: this.cwd,
+			workspacePathPolicy: this.workspacePathPolicy,
 			targetPathSegments,
 			namingPattern,
 			entryType: discoveryConfig.entryType,
@@ -1906,6 +2024,7 @@ export class WorkflowRuntime {
 		for (const subfolder of subfolders) {
 			const candidates = await discoverWorkflowCandidates({
 				baseDirectory: this.cwd,
+				workspacePathPolicy: this.workspacePathPolicy,
 				targetPathSegments: [projectFolderName, subfolder],
 				entryType: "file",
 				immediateChildrenOnly: true,
@@ -1926,9 +2045,21 @@ export class WorkflowRuntime {
 		familyDefinition: WorkflowArtifactFamilyDefinition
 	}): Promise<WorkflowArtifactIdentityResolution> {
 		switch (args.artifactDefinition.family) {
-			case WorkflowArtifactFamily.Epic:
+			case WorkflowArtifactFamily.Epics:
+			case WorkflowArtifactFamily.EpicsIndex: {
+				if (args.familyDefinition.allocationMode !== "singleton_project") {
+					throw new Error(`Workflow artifact ${args.artifactDefinition.id} requires a singleton project family.`)
+				}
+
 				return {
-					artifactIdentity: await this.allocateNextEpicIdentity(args),
+					artifactIdentity: args.familyDefinition.singletonIdentity,
+					parentIdentity: undefined,
+					targetIdentity: undefined,
+				}
+			}
+			case WorkflowArtifactFamily.EpicDeliverySpec:
+				return {
+					artifactIdentity: await this.deriveNextEpicDeliverySpecIdentity(args),
 					parentIdentity: undefined,
 					targetIdentity: undefined,
 				}
@@ -1947,7 +2078,7 @@ export class WorkflowRuntime {
 				await this.requireExistingWorkflowArtifactIdentity({
 					workflow: args.workflow,
 					session: args.session,
-					family: WorkflowArtifactFamily.Epic,
+					family: WorkflowArtifactFamily.EpicDeliverySpec,
 					identity: parentIdentity,
 					artifactId: args.artifactDefinition.id,
 				})
@@ -2052,23 +2183,155 @@ export class WorkflowRuntime {
 		})
 	}
 
-	private async allocateNextEpicIdentity(args: {
+	private async deriveNextEpicDeliverySpecIdentity(args: {
 		workflow: WorkflowDefinition
 		session: ActiveWorkflowSession
-		familyDefinition: WorkflowArtifactFamilyDefinition
+		artifactDefinition: WorkflowArtifactDefinition
 	}): Promise<string> {
+		const epicsIndex = await this.loadEpicsIndex({
+			workflow: args.workflow,
+			session: args.session,
+			artifactId: args.artifactDefinition.id,
+		})
+		if (epicsIndex.epics.length === 0) {
+			throw new Error(
+				`Cannot allocate workflow artifact ${args.artifactDefinition.id} because Epics.index.json does not contain any indexed epics.`,
+			)
+		}
+
+		const familyDefinition = WORKFLOW_ARTIFACT_FAMILY_REGISTRY[WorkflowArtifactFamily.EpicDeliverySpec]
 		const discoveredFilenames = await this.discoverWorkflowArtifactFilenames({
 			workflow: args.workflow,
 			session: args.session,
-			familyDefinition: args.familyDefinition,
+			familyDefinition,
 			searchProjectWide: true,
 		})
-		const existingEpicNumbers = discoveredFilenames
-			.map((filename) => this.parseWorkflowArtifactFilenameIdentity(args.familyDefinition, filename))
-			.filter((identity): identity is ParsedWorkflowArtifactIdentity => identity !== undefined)
-			.map((identity) => identity.epicNumber)
+		const existingDeliverySpecIdentities = new Set(
+			discoveredFilenames
+				.map((filename) => this.parseWorkflowArtifactFilenameIdentity(familyDefinition, filename))
+				.filter((identity): identity is ParsedWorkflowArtifactIdentity => identity !== undefined)
+				.map((identity) => identity.artifactIdentity),
+		)
+		const nextIndexedEpic = [...epicsIndex.epics]
+			.sort((left, right) => Number.parseInt(left.identity, 10) - Number.parseInt(right.identity, 10))
+			.find((epic) => !existingDeliverySpecIdentities.has(epic.identity))
 
-		return String(this.getNextPositiveInteger(existingEpicNumbers))
+		if (!nextIndexedEpic) {
+			throw new Error(
+				`Cannot allocate workflow artifact ${args.artifactDefinition.id} because every indexed epic already has a delivery spec.`,
+			)
+		}
+
+		return nextIndexedEpic.identity
+	}
+
+	private async loadEpicsIndex(args: {
+		workflow: WorkflowDefinition
+		session: ActiveWorkflowSession
+		artifactId: string
+	}): Promise<WorkflowEpicsIndex> {
+		const epicsIndexPath = join(
+			this.resolveWorkflowProjectOutputFolder(args.session),
+			args.workflow.projectSubfolder,
+			"Epics.index.json",
+		)
+		this.assertWorkspacePathAllowed(epicsIndexPath)
+
+		let epicsIndexText: string
+		try {
+			epicsIndexText = await readFile(epicsIndexPath, "utf8")
+		} catch (error) {
+			const errorMessage = error instanceof Error ? ` ${error.message}` : ""
+			throw new Error(
+				`Cannot allocate workflow artifact ${args.artifactId} because Epics.index.json could not be read.${errorMessage}`,
+			)
+		}
+
+		return this.parseEpicsIndexJson({ artifactId: args.artifactId, epicsIndexText })
+	}
+
+	private parseEpicsIndexJson(args: { artifactId: string; epicsIndexText: string }): WorkflowEpicsIndex {
+		let parsedIndex: unknown
+		try {
+			parsedIndex = JSON.parse(args.epicsIndexText)
+		} catch (error) {
+			const errorMessage = error instanceof Error ? ` ${error.message}` : ""
+			throw new Error(
+				`Cannot allocate workflow artifact ${args.artifactId} because Epics.index.json is malformed JSON.${errorMessage}`,
+			)
+		}
+
+		if (!this.isRecord(parsedIndex)) {
+			throw new Error(
+				`Cannot allocate workflow artifact ${args.artifactId} because Epics.index.json must be a JSON object.`,
+			)
+		}
+
+		this.assertOnlyEpicsIndexKeys({
+			artifactId: args.artifactId,
+			record: parsedIndex,
+			allowedKeys: ["version", "epics"],
+			context: "Epics.index.json",
+		})
+
+		if (parsedIndex.version !== 1) {
+			throw new Error(`Cannot allocate workflow artifact ${args.artifactId} because Epics.index.json version must be 1.`)
+		}
+
+		const epicsValue = parsedIndex.epics
+		if (!this.isUnknownArray(epicsValue)) {
+			throw new Error(
+				`Cannot allocate workflow artifact ${args.artifactId} because Epics.index.json epics must be an array.`,
+			)
+		}
+
+		const epics = epicsValue.map((entry, index) => {
+			if (!this.isRecord(entry)) {
+				throw new Error(
+					`Cannot allocate workflow artifact ${args.artifactId} because Epics.index.json epics[${index}] must be an object.`,
+				)
+			}
+
+			this.assertOnlyEpicsIndexKeys({
+				artifactId: args.artifactId,
+				record: entry,
+				allowedKeys: ["identity", "title"],
+				context: `Epics.index.json epics[${index}]`,
+			})
+
+			const identity = entry.identity
+			if (typeof identity !== "string" || !/^[1-9]\d*$/.test(identity)) {
+				throw new Error(
+					`Cannot allocate workflow artifact ${args.artifactId} because Epics.index.json epics[${index}].identity must be a positive numeric string.`,
+				)
+			}
+
+			const title = entry.title
+			if (typeof title !== "string" || title.trim() === "") {
+				throw new Error(
+					`Cannot allocate workflow artifact ${args.artifactId} because Epics.index.json epics[${index}].title must be a non-empty string.`,
+				)
+			}
+
+			return { identity, title }
+		})
+
+		return { version: 1, epics }
+	}
+
+	private assertOnlyEpicsIndexKeys(args: {
+		artifactId: string
+		record: Record<string, unknown>
+		allowedKeys: readonly string[]
+		context: string
+	}): void {
+		for (const key of Object.keys(args.record)) {
+			if (!args.allowedKeys.includes(key)) {
+				throw new Error(
+					`Cannot allocate workflow artifact ${args.artifactId} because ${args.context} contains unsupported key ${key}.`,
+				)
+			}
+		}
 	}
 
 	private async allocateNextStoryIdentity(args: {
@@ -2170,7 +2433,10 @@ export class WorkflowRuntime {
 		}
 
 		switch (familyDefinition.family) {
-			case WorkflowArtifactFamily.Epic:
+			case WorkflowArtifactFamily.Epics:
+			case WorkflowArtifactFamily.EpicsIndex:
+				return undefined
+			case WorkflowArtifactFamily.EpicDeliverySpec:
 				return this.parseDottedWorkflowArtifactIdentity(match[1])
 			case WorkflowArtifactFamily.Story:
 				return this.parseDottedWorkflowArtifactIdentity(`${match[1]}.${match[2]}`)
@@ -2187,9 +2453,9 @@ export class WorkflowRuntime {
 
 	private normalizeWorkflowArtifactIdentityInput(rawIdentity: string): string {
 		const trimmedIdentity = rawIdentity.trim()
-		const epicMatch = /^Epic-(\d+)\.md$/.exec(trimmedIdentity)
-		if (epicMatch) {
-			return epicMatch[1]
+		const epicDeliverySpecMatch = /^Epic-(\d+)-delivery-spec\.md$/.exec(trimmedIdentity)
+		if (epicDeliverySpecMatch) {
+			return epicDeliverySpecMatch[1]
 		}
 
 		const storyMatch = /^Story-(\d+)-(\d+)\.md$/.exec(trimmedIdentity)
@@ -2244,14 +2510,11 @@ export class WorkflowRuntime {
 		artifactId: string
 		sourceKey: string
 	}): string {
-		const identity = args.session.workflowValues[args.sourceKey]?.trim()
-		if (!identity) {
-			throw new Error(
-				`Cannot allocate workflow artifact ${args.artifactId} because workflow value ${args.sourceKey} is missing.`,
-			)
-		}
-
-		return identity
+		return readRequiredStringWorkflowValue({
+			workflowValues: args.session.workflowValues,
+			key: args.sourceKey,
+			context: `artifact identity resolution for workflow artifact ${args.artifactId}`,
+		})
 	}
 
 	private buildWorkflowArtifactFilename(args: {
@@ -2457,10 +2720,11 @@ export class WorkflowRuntime {
 			return undefined
 		}
 
-		const destinationPath = args.session.workflowValues[artifactDefinition.outputValueKeys.artifactAbsolutePath]?.trim()
-		if (!destinationPath) {
-			return undefined
-		}
+		const destinationPath = readRequiredStringWorkflowValue({
+			workflowValues: args.session.workflowValues,
+			key: artifactDefinition.outputValueKeys.artifactAbsolutePath,
+			context: `artifact destination resolution for document builder ${args.documentBuilderId}`,
+		})
 
 		const content = await documentBuilder.buildContent(args.session)
 
@@ -2779,7 +3043,15 @@ export class WorkflowRuntime {
 			}
 		}
 
-		for (const forbiddenKey of ["filenamePattern", "fileExtension", "extension", "numberingScope", "discoveryPattern"]) {
+		for (const forbiddenKey of [
+			"filenamePattern",
+			"fileExtension",
+			"extension",
+			"contentKind",
+			"numberingScope",
+			"singletonIdentity",
+			"discoveryPattern",
+		]) {
 			if (forbiddenKey in artifactRecord) {
 				return {
 					valid: false,
@@ -2807,7 +3079,12 @@ export class WorkflowRuntime {
 			return outputValueKeyValidation
 		}
 
-		if (familyDefinition.allocationMode === "new_numbered" && args.artifactDefinition.intentMode !== "new") {
+		if (
+			(familyDefinition.allocationMode === "singleton_project" ||
+				familyDefinition.allocationMode === "derived_from_epic_index" ||
+				familyDefinition.allocationMode === "new_numbered") &&
+			args.artifactDefinition.intentMode !== "new"
+		) {
 			return {
 				valid: false,
 				errorMessage: `Workflow artifact ${args.artifactId} must declare new artifact intent.`,
@@ -2823,6 +3100,7 @@ export class WorkflowRuntime {
 
 		switch (familyDefinition.identityRequirement) {
 			case "none":
+			case "epic_index":
 				if (
 					args.artifactDefinition.parentIdentitySource !== undefined ||
 					args.artifactDefinition.targetIdentitySource !== undefined
@@ -2833,7 +3111,7 @@ export class WorkflowRuntime {
 					}
 				}
 				break
-			case "parent_epic":
+			case "parent_epic_delivery_spec":
 			case "parent_story": {
 				if (args.artifactDefinition.targetIdentitySource !== undefined) {
 					return {
@@ -2956,6 +3234,7 @@ export class WorkflowRuntime {
 
 		switch (args.familyDefinition.identityRequirement) {
 			case "none":
+			case "epic_index":
 				if (args.outputValueKeys.parentIdentity !== undefined || args.outputValueKeys.targetIdentity !== undefined) {
 					return {
 						valid: false,
@@ -2963,7 +3242,7 @@ export class WorkflowRuntime {
 					}
 				}
 				break
-			case "parent_epic":
+			case "parent_epic_delivery_spec":
 			case "parent_story": {
 				const parentOutputKeyValidation = this.validateWorkflowArtifactOutputKey({
 					artifactId: args.artifactId,
@@ -3047,12 +3326,22 @@ export class WorkflowRuntime {
 		return typeof value === "object" && value !== null
 	}
 
+	private isUnknownArray(value: unknown): value is unknown[] {
+		return Array.isArray(value)
+	}
+
 	private async ensureProjectFoldersExist(session: ActiveWorkflowSession): Promise<void> {
 		const projectRoot = join(this.cwd, session.projectSelection.projectFolderName)
+		this.assertWorkspacePathAllowed(projectRoot)
+		const projectSubfolderPaths = WORKFLOW_PROJECT_SUBFOLDERS.map((subfolderName) => join(projectRoot, subfolderName))
+		for (const projectSubfolderPath of projectSubfolderPaths) {
+			this.assertWorkspacePathAllowed(projectSubfolderPath)
+		}
+
 		await mkdir(projectRoot, { recursive: true })
 
-		for (const subfolderName of ["discovery", "planning", "implementation", "review", "testing"]) {
-			await mkdir(join(projectRoot, subfolderName), { recursive: true })
+		for (const projectSubfolderPath of projectSubfolderPaths) {
+			await mkdir(projectSubfolderPath, { recursive: true })
 		}
 	}
 

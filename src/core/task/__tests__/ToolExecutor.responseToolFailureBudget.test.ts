@@ -98,7 +98,7 @@ describe("ToolExecutor response tool failure budget", () => {
 			formatResponse.toolError("Missing value for required parameter 'question'. Please retry with complete response."),
 		)
 
-		await executor.executeTool({
+		const outcome = await executor.executeTool({
 			type: "tool_use",
 			name: ClineDefaultTool.ASK,
 			params: {
@@ -108,6 +108,7 @@ describe("ToolExecutor response tool failure budget", () => {
 		} as any)
 
 		assert.equal(taskState.responseToolFailureCount, 2)
+		assert.deepEqual(outcome.workflowNextActions, [])
 		sinon.assert.calledWithMatch(
 			say,
 			"error",
@@ -123,7 +124,7 @@ describe("ToolExecutor response tool failure budget", () => {
 		taskState.recordResponseToolFailure(ClineDefaultTool.ASK, "Missing first parameter", "missing_parameter")
 		executeStub.resolves("missing again")
 
-		await executor.executeTool({
+		const outcome = await executor.executeTool({
 			type: "tool_use",
 			name: ClineDefaultTool.ASK,
 			params: {
@@ -135,6 +136,7 @@ describe("ToolExecutor response tool failure budget", () => {
 		sinon.assert.calledOnce(executeStub)
 		sinon.assert.notCalled(say)
 		assert.equal(taskState.responseToolFailureCount, 1)
+		assert.deepEqual(outcome.workflowNextActions, [])
 	})
 
 	it("blocks further governed response-tool attempts after the retry budget is exhausted", async () => {
@@ -142,7 +144,7 @@ describe("ToolExecutor response tool failure budget", () => {
 		taskState.recordResponseToolFailure(ClineDefaultTool.ASK, "first", "missing_parameter")
 		taskState.recordResponseToolFailure(ClineDefaultTool.ASK, "second", "missing_parameter")
 
-		await executor.executeTool({
+		const outcome = await executor.executeTool({
 			type: "tool_use",
 			name: ClineDefaultTool.ASK,
 			params: {
@@ -152,6 +154,7 @@ describe("ToolExecutor response tool failure budget", () => {
 		} as any)
 
 		sinon.assert.notCalled(executeStub)
+		assert.deepEqual(outcome.workflowNextActions, [])
 		assert.equal(taskState.userMessageContent.length, 1)
 		assert.match(String((taskState.userMessageContent[0] as { text?: string }).text), /retry budget/)
 	})
@@ -166,7 +169,7 @@ describe("ToolExecutor response tool failure budget", () => {
 			),
 		)
 
-		await executor.executeTool({
+		const outcome = await executor.executeTool({
 			type: "tool_use",
 			name: ClineDefaultTool.PLAN_MODE,
 			params: {
@@ -177,5 +180,6 @@ describe("ToolExecutor response tool failure budget", () => {
 		} as any)
 
 		sinon.assert.calledOnce(executeStub)
+		assert.deepEqual(outcome.workflowNextActions, [])
 	})
 })

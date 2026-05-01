@@ -143,6 +143,7 @@ export function deriveWorkflowFormFieldKind(schema: WorkflowFormJsonSchema): Wor
 		case "boolean":
 			return "boolean"
 		case "integer":
+		case "number":
 			return "number"
 		case "array":
 			return schema.items?.type === "string" ? "multi_select" : "large_text"
@@ -233,30 +234,42 @@ export function normalizeWorkflowFormSubmittedValue(
 	}
 
 	if (value.arrayValue) {
+		const arrayValue: WorkflowFormSubmittedValuePayload[] = []
+		for (const entry of value.arrayValue.values) {
+			const normalizedEntry = normalizeWorkflowFormSubmittedValue(entry)
+			if (normalizedEntry === undefined) {
+				throw new Error("Malformed workflow form submitted value: array entry is missing.")
+			}
+			arrayValue.push(normalizedEntry)
+		}
+
 		return {
 			valueType: "array",
-			arrayValue: value.arrayValue.values
-				.map((entry) => normalizeWorkflowFormSubmittedValue(entry))
-				.filter((entry): entry is WorkflowFormSubmittedValuePayload => entry !== undefined),
+			arrayValue,
 		}
 	}
 
 	if (value.objectValue) {
+		const objectValue: WorkflowFormSubmittedValueObjectEntry[] = []
+		for (const entry of value.objectValue.entries) {
+			if (entry.key.trim() === "") {
+				throw new Error("Malformed workflow form submitted value: object entry key is empty.")
+			}
+
+			const normalizedEntryValue = normalizeWorkflowFormSubmittedValue(entry.value)
+			if (normalizedEntryValue === undefined) {
+				throw new Error("Malformed workflow form submitted value: object entry value is missing.")
+			}
+
+			objectValue.push({
+				key: entry.key,
+				value: normalizedEntryValue,
+			})
+		}
+
 		return {
 			valueType: "object",
-			objectValue: value.objectValue.entries
-				.map((entry): WorkflowFormSubmittedValueObjectEntry | undefined => {
-					const normalized = normalizeWorkflowFormSubmittedValue(entry.value)
-					if (!normalized) {
-						return undefined
-					}
-
-					return {
-						key: entry.key,
-						value: normalized,
-					}
-				})
-				.filter((entry): entry is WorkflowFormSubmittedValueObjectEntry => entry !== undefined),
+			objectValue,
 		}
 	}
 
@@ -306,6 +319,8 @@ function validateToolInputAgainstWorkflowFormSchema(value: unknown, schema: Work
 			return typeof value === "string"
 		case "integer":
 			return Number.isInteger(value)
+		case "number":
+			return typeof value === "number" && Number.isFinite(value)
 		case "boolean":
 			return typeof value === "boolean"
 		case "array":
@@ -313,7 +328,8 @@ function validateToolInputAgainstWorkflowFormSchema(value: unknown, schema: Work
 				return false
 			}
 
-			return schema.items ? value.every((entry) => validateToolInputAgainstWorkflowFormSchema(entry, schema.items!)) : true
+			const itemSchema = schema.items
+			return itemSchema ? value.every((entry) => validateToolInputAgainstWorkflowFormSchema(entry, itemSchema)) : true
 		case "object": {
 			if (!value || typeof value !== "object" || Array.isArray(value)) {
 				return false

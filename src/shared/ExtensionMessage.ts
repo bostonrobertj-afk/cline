@@ -404,7 +404,7 @@ export interface WorkflowFormOptionDefinition {
 	description?: string
 }
 
-export type WorkflowFormJsonSchemaType = "string" | "integer" | "boolean" | "array" | "object"
+export type WorkflowFormJsonSchemaType = "string" | "integer" | "number" | "boolean" | "array" | "object"
 
 export interface WorkflowFormJsonSchema {
 	type: WorkflowFormJsonSchemaType

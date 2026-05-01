@@ -78,6 +78,9 @@ export class WorkflowProgressRequestToolHandler implements IToolHandler, IPartia
 			if (text === "Yes" && nextAction.kind === "no_op") {
 				return formatResponse.toolError("workflow_progress_request could not advance the active workflow step.")
 			}
+			if (nextAction.kind !== "no_op") {
+				config.callbacks.queueWorkflowNextAction(nextAction)
+			}
 		} else {
 			await config.callbacks.say("user_feedback", text ?? "", images, followupFiles)
 		}

@@ -99,22 +99,31 @@ export class CodeReviewSpecUpdateToolHandler implements IToolHandler, IPartialBl
 	async execute(config: TaskConfig, block: ToolUse): Promise<ToolResponse> {
 		const workflowValues = config.taskState.activeWorkflowSession?.workflowValues ?? {}
 
-		const reviewInputRaw = workflowValues.review_input?.trim()
-		const storyPathRaw = workflowValues.story_path?.trim()
+		const reviewInputValue = workflowValues.review_input
+		const storyPathValue = workflowValues.story_path
 
-		if (!reviewInputRaw) {
+		if (typeof reviewInputValue !== "string") {
 			return formatResponse.toolError("Could not resolve workflow value 'review_input' from the active workflow values.")
 		}
 
-		if (!storyPathRaw) {
+		const reviewInputRaw = reviewInputValue.trim()
+		if (reviewInputRaw === "") {
+			return formatResponse.toolError("Could not resolve workflow value 'review_input' from the active workflow values.")
+		}
+
+		if (typeof storyPathValue !== "string") {
 			return formatResponse.toolError("Could not resolve workflow value 'story_path' from the active workflow values.")
 		}
 
-		const resolutionBase =
-			workflowValues.cwd?.trim() ||
-			workflowValues.project_root?.trim() ||
-			workflowValues["project-root"]?.trim() ||
-			config.cwd
+		const storyPathRaw = storyPathValue.trim()
+		if (storyPathRaw === "") {
+			return formatResponse.toolError("Could not resolve workflow value 'story_path' from the active workflow values.")
+		}
+
+		const workflowResolutionBase = [workflowValues.cwd, workflowValues.project_root, workflowValues["project-root"]]
+			.map((value) => (typeof value === "string" ? value.trim() : ""))
+			.find((value) => value !== "")
+		const resolutionBase = workflowResolutionBase ?? config.cwd
 		const reviewInputPath = path.isAbsolute(reviewInputRaw) ? reviewInputRaw : path.resolve(resolutionBase, reviewInputRaw)
 		const storyFilePath = path.isAbsolute(storyPathRaw) ? storyPathRaw : path.resolve(resolutionBase, storyPathRaw)
 

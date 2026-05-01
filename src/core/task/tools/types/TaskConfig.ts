@@ -16,6 +16,7 @@ import type { Mode } from "@shared/storage/types"
 import type { ClineDefaultTool } from "@shared/tools"
 import type { ClineAskResponse } from "@shared/WebviewMessage"
 import type { FocusChainChecklistUpdateResult } from "@/core/task/focus-chain/types"
+import type { WorkflowNextAction } from "@/core/task/workflow-runtime/types"
 import type { WorkflowRuntime } from "@/core/task/workflow-runtime/WorkflowRuntime"
 import { WorkspaceRootManager } from "@/core/workspace"
 import type { ToolUse } from "../../../assistant-message"
@@ -127,6 +128,7 @@ export interface TaskCallbacks {
 	doesLatestTaskCompletionHaveNewChanges: () => Promise<boolean>
 
 	updateFCListFromToolResponse: (taskProgress: string | undefined) => Promise<FocusChainChecklistUpdateResult>
+	queueWorkflowNextAction: (nextAction: WorkflowNextAction) => void
 
 	shouldAutoApproveTool: (toolName: ClineDefaultTool) => boolean | [boolean, boolean]
 	shouldAutoApproveToolWithPath: (toolName: ClineDefaultTool, path?: string) => Promise<boolean>

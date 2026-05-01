@@ -5,13 +5,17 @@ import type { TaskMetadata } from "@/core/context/context-tracking/ContextTracke
 import * as disk from "@/core/storage/disk"
 import { Task } from "@/core/task"
 import { TaskState } from "@/core/task/TaskState"
-import type { PersistedWorkflowSession } from "@/core/task/workflow-runtime/types"
+import type {
+	PersistedWorkflowSession,
+	WorkflowNextAction,
+	WorkflowWorkspacePathPolicy,
+} from "@/core/task/workflow-runtime/types"
 import * as WorkflowRegistry from "@/core/task/workflow-runtime/WorkflowRegistry"
 import { WorkflowRuntime } from "@/core/task/workflow-runtime/WorkflowRuntime"
+import { ClineDefaultTool } from "@/shared/tools"
 
-function createPersistedSession(workflowName = "missing-workflow"): PersistedWorkflowSession {
+function createPersistedSession(): PersistedWorkflowSession {
 	return {
-		workflowName,
 		activeStepNumber: 1,
 		workflowValues: {},
 		projectSelection: {
@@ -39,11 +43,20 @@ function createMetadata(): TaskMetadata {
 	}
 }
 
-function createTaskHarness(taskState = new TaskState()): object {
+function createAllowAllWorkspacePathPolicy(): WorkflowWorkspacePathPolicy {
+	return {
+		validateAccess: () => true,
+	}
+}
+
+function createTaskHarness(
+	taskState = new TaskState(),
+	workflowRuntime = new WorkflowRuntime({ cwd: "/tmp", workspacePathPolicy: createAllowAllWorkspacePathPolicy() }),
+): object {
 	const task = Object.create(Task.prototype)
 	Reflect.set(task, "taskId", "task-1")
 	Reflect.set(task, "taskState", taskState)
-	Reflect.set(task, "workflowRuntime", new WorkflowRuntime({ cwd: "/tmp" }))
+	Reflect.set(task, "workflowRuntime", workflowRuntime)
 	return task
 }
 
@@ -84,10 +97,25 @@ describe("workflow runtime metadata persistence", () => {
 		expect(saveMetadata.firstCall.args[1].activeWorkflowSession).to.equal(undefined)
 	})
 
+	it("persists cleared workflow metadata when persisted sessions are missing canonical workflow identity", async () => {
+		const metadata = createMetadata()
+		metadata.activeWorkflowSession = createPersistedSession()
+		const saveMetadata = sandbox.stub(disk, "saveTaskMetadata").resolves()
+
+		await callTaskMethod(createTaskHarness(), "restoreWorkflowRuntimeStateFromMetadata", metadata)
+
+		sinon.assert.calledOnce(saveMetadata)
+		expect(metadata.activeWorkflowName).to.equal(undefined)
+		expect(metadata.activeWorkflowSession).to.equal(undefined)
+		expect(saveMetadata.firstCall.args[0]).to.equal("task-1")
+		expect(saveMetadata.firstCall.args[1].activeWorkflowName).to.equal(undefined)
+		expect(saveMetadata.firstCall.args[1].activeWorkflowSession).to.equal(undefined)
+	})
+
 	it("persists explicit teardown next actions and keeps true no_op actions non-persisting", async () => {
 		const metadata = createMetadata()
 		metadata.activeWorkflowName = "workflow-runtime-test"
-		metadata.activeWorkflowSession = createPersistedSession("workflow-runtime-test")
+		metadata.activeWorkflowSession = createPersistedSession()
 		const getMetadata = sandbox.stub(disk, "getTaskMetadata").resolves(metadata)
 		const saveMetadata = sandbox.stub(disk, "saveTaskMetadata").resolves()
 		const task = createTaskHarness()
@@ -106,5 +134,69 @@ describe("workflow runtime metadata persistence", () => {
 
 		sinon.assert.notCalled(getMetadata)
 		sinon.assert.notCalled(saveMetadata)
+	})
+
+	it("consumes workflow next actions returned from normal tool execution", async () => {
+		const taskState = new TaskState()
+		const returnedNextAction: WorkflowNextAction = { kind: "project_prompt", promptProjection: {} }
+		taskState.assistantMessageContent = [
+			{
+				type: "tool_use",
+				name: ClineDefaultTool.FILE_READ,
+				params: { path: "README.md" },
+				partial: false,
+			},
+		]
+		taskState.didCompleteReadingStream = true
+		const executeTool = sandbox.stub().resolves({
+			status: "executed",
+			emittedToolResult: true,
+			workflowNextActions: [returnedNextAction],
+		})
+		const consumeWorkflowNextAction = sandbox.stub().resolves()
+		const task = createTaskHarness(taskState)
+		Reflect.set(task, "toolExecutor", { executeTool })
+		Reflect.set(task, "consumeWorkflowNextAction", consumeWorkflowNextAction)
+		Reflect.set(task, "isParallelToolCallingEnabled", () => true)
+
+		await callTaskMethod(task, "presentAssistantMessage")
+
+		sinon.assert.calledOnce(executeTool)
+		expect(executeTool.firstCall.args[0]).to.deep.equal(taskState.assistantMessageContent[0])
+		sinon.assert.calledOnceWithExactly(consumeWorkflowNextAction, returnedNextAction)
+	})
+
+	it("does not re-enter workflow runtime only because set_workflow_values executed", async () => {
+		const taskState = new TaskState()
+		taskState.assistantMessageContent = [
+			{
+				type: "tool_use",
+				name: ClineDefaultTool.SET_WORKFLOW_VALUES,
+				params: {},
+				partial: false,
+			},
+		]
+		taskState.didCompleteReadingStream = true
+		const workflowRuntime = new WorkflowRuntime({
+			cwd: "/tmp",
+			workspacePathPolicy: createAllowAllWorkspacePathPolicy(),
+		})
+		const resolveNextAction = sandbox.stub(workflowRuntime, "resolveNextAction").resolves({ kind: "no_op" })
+		const executeTool = sandbox.stub().resolves({
+			status: "executed",
+			emittedToolResult: true,
+			workflowNextActions: [],
+		})
+		const consumeWorkflowNextAction = sandbox.stub().resolves()
+		const task = createTaskHarness(taskState, workflowRuntime)
+		Reflect.set(task, "toolExecutor", { executeTool })
+		Reflect.set(task, "consumeWorkflowNextAction", consumeWorkflowNextAction)
+		Reflect.set(task, "isParallelToolCallingEnabled", () => true)
+
+		await callTaskMethod(task, "presentAssistantMessage")
+
+		sinon.assert.calledOnce(executeTool)
+		sinon.assert.notCalled(resolveNextAction)
+		sinon.assert.notCalled(consumeWorkflowNextAction)
 	})
 })

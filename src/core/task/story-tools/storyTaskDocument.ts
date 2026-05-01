@@ -1,4 +1,5 @@
 import path from "path"
+import type { WorkflowValues } from "@/core/task/workflow-runtime/types"
 
 export type StoryNotesSectionHeading = "## Completion Notes List" | "## File List"
 
@@ -137,20 +138,30 @@ function ensureCheckedChecklistLine(line: string): string {
 
 export function resolveActiveStoryPath(args: {
 	cwd: string
-	workflowValues?: Record<string, string>
+	workflowValues?: WorkflowValues
 }): { ok: true; storyPath: string } | { ok: false; message: string } {
 	const workflowValues = args.workflowValues ?? {}
-	const storyPathRaw = workflowValues.story_path?.trim()
+	const storyPathValue = workflowValues.story_path
 
-	if (!storyPathRaw) {
+	if (typeof storyPathValue !== "string") {
 		return {
 			ok: false,
 			message: "Could not resolve workflow value 'story_path' from the active workflow values.",
 		}
 	}
 
-	const resolutionBase =
-		workflowValues.cwd?.trim() || workflowValues.project_root?.trim() || workflowValues["project-root"]?.trim() || args.cwd
+	const storyPathRaw = storyPathValue.trim()
+	if (storyPathRaw === "") {
+		return {
+			ok: false,
+			message: "Could not resolve workflow value 'story_path' from the active workflow values.",
+		}
+	}
+
+	const workflowResolutionBase = [workflowValues.cwd, workflowValues.project_root, workflowValues["project-root"]]
+		.map((value) => (typeof value === "string" ? value.trim() : ""))
+		.find((value) => value !== "")
+	const resolutionBase = workflowResolutionBase ?? args.cwd
 
 	return {
 		ok: true,
