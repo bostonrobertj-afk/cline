@@ -756,8 +756,8 @@ This matrix is the approval inventory for legacy workflow surfaces touched by th
 - `FR-61`: Parent workflow state must remain unchanged by child workflow activation unless explicitly coordinated by a higher-level application behavior outside this runtime scope.
 - `FR-62`: The subagent runner must not become a separate workflow orchestrator; it remains the caller/bootstrap seam for child execution contexts.
 - `FR-62a`: A child workflow session may initialize selected workflow values from the parent workflow session only when the active child workflow definition explicitly declares those inheritance rules.
-- `FR-62b`: Parent-to-child workflow-value inheritance must be copy-based initialization, not shared mutable state.
-- `FR-62c`: The system must support same-key inheritance semantics where a child workflow value is initialized from the parent session value for that same key when the workflow definition explicitly declares that mapping.
+- `FR-62b`: Parent-to-child workflow-value inheritance must initialize only the child session's workflow-value map and must never replace, alias, or mutate the parent session's workflow-value map. For the foundational build, inherited object/array values are permitted only as read-only shared context or as values that parent and child are not expected to mutate independently; workflow modules must not declare object/array inheritance for values that require independent parent/child mutation isolation.
+- `FR-62c`: The system must support same-key inheritance semantics where a child workflow value is initialized from the parent session value for that same key when the workflow definition explicitly declares that mapping. Same-key inheritance is initialization only and must not imply ongoing synchronization between parent and child values.
 - `FR-62d`: The system must not introduce a dedicated locking, serialization, or anti-collision subsystem for same-project parent/subagent workflow activity as part of this initiative.
 - `FR-62e`: Child workflow project selection is copied from the parent workflow session as runtime activation context, not through the workflow-value inheritance map and not through a child-rendered workflow form.
 - `FR-62f`: The subagent runner must reject direct subagent-emitted `use_skill` tool calls; subagent workflow activation must happen before the child agent turn through parent-owned assignment/bootstrap.
@@ -833,7 +833,7 @@ This matrix is the approval inventory for legacy workflow surfaces touched by th
 ### 5.3 Security Requirements
 
 - `NFR-8`: Workflow state and workflow-owned projections must remain scoped to their execution context so that child workflow activation does not leak or overwrite parent workflow state.
-- `NFR-8a`: Explicit parent-to-child workflow-value inheritance must copy only workflow-definition-approved values and must not create implicit broad inheritance of all matching keys.
+- `NFR-8a`: Explicit parent-to-child workflow-value inheritance must initialize only workflow-definition-approved values and must not create implicit broad inheritance of all matching keys or ongoing parent/child value synchronization.
 - `NFR-9`: Product-owned in-scope workflows must be resolved from trusted runtime code rather than from user-authored workflow assets.
 - `NFR-10`: Workflow orchestration must continue to execute tool-backed operations through the existing generic tool-execution controls, including tool registration/execution gating, strict-plan-mode restrictions, approval and auto-approve handling, hooks where applicable, and existing workspace/path boundary checks. File-accessing workflow tools and runtime-invoked workflow capabilities must not bypass those controls through bespoke workflow-specific execution paths.
 

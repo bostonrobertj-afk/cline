@@ -391,7 +391,7 @@ Exact filenames beyond this level are deferred to requirements and implementatio
 5. The workflow module may declare specific workflow values that should be initialized in the child session from values already present in the parent session.
 6. Workflow runtime copies only those explicitly declared inherited values into the child session during activation.
 7. The child session gets its own workflow identity, session state, workflow values, active step, prompt projection, tool gating, and completion lifecycle.
-8. After activation, parent and child workflow values are isolated mutable state unless a higher-level coordination behavior explicitly synchronizes them.
+8. After activation, parent and child workflow-value maps are separate. Inherited object/array values are treated as read-only shared context unless a later runtime hardening phase adds deep-copy inheritance.
 9. The parent workflow session remains unchanged by child-session mutations.
 10. The child activation next action is consumed in the child execution context before the first child prompt assembly.
 11. Child workflows do not render workflow forms. A child next action that requests workflow-form rendering is an invalid child workflow configuration and fails clearly.
@@ -548,7 +548,7 @@ Workflow sessions are execution-context-local, but they are all owned by the sam
 - assignment marker names do not filter child prompt skills; child prompt skills come from configured subagent skills or normal available-skill discovery, while workflow instructions/tools come only from successful runtime activation
 - child workflow activation copies parent project selection as activation context and does not render the mandatory shared pre-workflow entry form
 - child-session workflow values may be initialized from parent-session values only through workflow-module-declared inheritance rules
-- parent and child sessions do not share one mutable workflow-value map
+- parent and child sessions use separate workflow-value maps; inherited object/array values are not for independently mutated parent/child state in the foundational build
 - parent workflow identity and state are not overwritten by child workflow activation
 - the shared runtime may orchestrate multiple parent/child workflow sessions simultaneously
 
@@ -712,13 +712,13 @@ Rationale:
 - backend-owned writes and AI-callable writes must target the same state surface to avoid split ownership
 - teardown is safest when clearing the workflow session also clears workflow-owned values
 
-### AD-10: Child-session workflow-value inheritance is explicit and copy-based
+### AD-10: Child-session workflow-value inheritance is explicit initialization
 
 Rationale:
 
 - some child workflows need selected parent values to initialize correctly
 - automatic inheritance of all matching keys would create hidden coupling
-- copy-based initialization preserves parent/child isolation while still supporting same-key inheritance where explicitly declared
+- explicit initialization preserves parent/child map ownership while supporting same-key inheritance where explicitly declared; object/array inheritance is reserved for read-only shared context unless deep-copy inheritance is added later
 
 ### AD-11: Workflow runtime owns hierarchical artifact identity and numbering
 
