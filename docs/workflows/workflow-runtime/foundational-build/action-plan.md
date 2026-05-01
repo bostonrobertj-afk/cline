@@ -4358,68 +4358,73 @@ Allowed files:
 
 Pause for QA review after completing Phase 33 before commit.
 
-[ ] Task 55. Update the canonical next-action consumer so workflow-form waits receive the submitted next action instead of re-resolving independently.
+[x] Task 55. Update the canonical next-action consumer so workflow-form waits receive the submitted next action instead of re-resolving independently.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowNextActionConsumer.ts`
 
-[ ] Subtask 55.1. In `src/core/task/workflow-runtime/WorkflowNextActionConsumer.ts`, change `WorkflowNextActionConsumerAdapter.waitForWorkflowFormCompletion(...)` to return `Promise<WorkflowNextAction | undefined>` instead of `Promise<void>`.
+[x] Subtask 55.1. In `src/core/task/workflow-runtime/WorkflowNextActionConsumer.ts`, change `WorkflowNextActionConsumerAdapter.waitForWorkflowFormCompletion(...)` to return `Promise<WorkflowNextAction | undefined>` instead of `Promise<void>`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowNextActionConsumer.ts`
 
-[ ] Subtask 55.2. In `src/core/task/workflow-runtime/WorkflowNextActionConsumer.ts`, update the `render_workflow_form` case so it stores the action returned by `waitForWorkflowFormCompletion(...)`; after the abort check, return if that action is `undefined`, otherwise assign it to `currentAction` and continue the loop. Remove the `workflowRuntime.resolveNextAction(...)` call from this case.
+[x] Subtask 55.2. In `src/core/task/workflow-runtime/WorkflowNextActionConsumer.ts`, update the `render_workflow_form` case so it stores the action returned by `waitForWorkflowFormCompletion(...)`; after the abort check, return if that action is `undefined`, otherwise assign it to `currentAction` and continue the loop. Remove the `workflowRuntime.resolveNextAction(...)` call from this case.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowNextActionConsumer.ts`
 
-[ ] Task 56. Route task-level workflow-form submissions into the live workflow-form wait when present, and consume directly only when no live wait exists.
+[x] Task 56. Route task-level workflow-form submissions into the live workflow-form wait when present, and consume directly only when no live wait exists.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
 
-[ ] Subtask 56.1. In `src/core/task/index.ts`, add a private `workflowFormSubmissionNextActionResolvers` map on `Task`, keyed by workflow form `sessionId`, whose values resolve `WorkflowNextAction | undefined`.
+[x] Subtask 56.1. In `src/core/task/index.ts`, add a private `workflowFormSubmissionNextActionResolvers` map on `Task`, keyed by workflow form `sessionId`, whose values resolve `WorkflowNextAction | undefined`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
 
-[ ] Subtask 56.2. In `src/core/task/index.ts`, add a private `waitForWorkflowFormSubmissionNextAction(...)` helper that registers a resolver for the active form session, resolves with the submitted `WorkflowNextAction` when `handleWorkflowFormSubmission(...)` provides it, and cleans up the resolver if the task aborts or the active form session changes without a submitted action.
+[x] Subtask 56.2. In `src/core/task/index.ts`, update `waitForWorkflowFormSubmissionNextAction(...)` so the pending resolver for `formSession.sessionId` remains registered until either `handleWorkflowFormSubmission(...)` resolves it with the submitted `WorkflowNextAction` or `taskState.abort === true`; do not remove or resolve the pending resolver merely because `activeWorkflowSession.ui.formSession` changes while submission processing may be in flight. Keep the existing `finally` cleanup after resolver completion or abort.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
 
-[ ] Subtask 56.3. In `src/core/task/index.ts`, update the `consumeWorkflowNextAction(...)` adapter so `waitForWorkflowFormCompletion(...)` calls `waitForWorkflowFormSubmissionNextAction(...)` and returns its `WorkflowNextAction | undefined` result.
+[x] Subtask 56.3. In `src/core/task/index.ts`, update the `consumeWorkflowNextAction(...)` adapter so `waitForWorkflowFormCompletion(...)` calls `waitForWorkflowFormSubmissionNextAction(...)` and returns its `WorkflowNextAction | undefined` result.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
 
-[ ] Subtask 56.4. In `src/core/task/index.ts`, update `handleWorkflowFormSubmission(...)` to capture the `WorkflowNextAction` returned by `workflowRuntime.submitWorkflowForm(...)`; if a resolver exists for the submitted session, resolve it and return without directly consuming; if no resolver exists, pass the returned action to `consumeWorkflowNextAction(...)`. Remove the submit-and-persist-only path.
+[x] Subtask 56.4. In `src/core/task/index.ts`, update `handleWorkflowFormSubmission(...)` to capture the `WorkflowNextAction` returned by `workflowRuntime.submitWorkflowForm(...)`; if a resolver exists for the submitted session, resolve it and return without directly consuming; if no resolver exists, pass the returned action to `consumeWorkflowNextAction(...)`. Remove the submit-and-persist-only path.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
 
-[ ] Task 57. Add regression coverage for workflow-form submission handoff and no double-consumption.
+[x] Task 57. Add regression coverage for workflow-form submission handoff and no double-consumption.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
 
-[ ] Subtask 57.1. In `src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts`, update the adapter test type and fixture so `waitForWorkflowFormCompletion(...)` returns `WorkflowNextAction | undefined`.
+[x] Subtask 57.1. In `src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts`, update the adapter test type and fixture so `waitForWorkflowFormCompletion(...)` returns `WorkflowNextAction | undefined`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts`
 
-[ ] Subtask 57.2. In `src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts`, update the render-form test to prove the consumer uses the action returned by `waitForWorkflowFormCompletion(...)` and does not call `WorkflowRuntime.resolveNextAction(...)` after the wait.
+[x] Subtask 57.2. In `src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts`, update the render-form test to prove the consumer uses the action returned by `waitForWorkflowFormCompletion(...)` and does not call `WorkflowRuntime.resolveNextAction(...)` after the wait.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts`
 
-[ ] Subtask 57.3. In `src/core/task/__tests__/workflow-runtime-metadata.test.ts`, add task-level coverage proving `handleWorkflowFormSubmission(...)` passes the returned `WorkflowNextAction` to the pending workflow-form wait resolver when one exists, rather than dropping it or directly double-consuming it.
+[x] Subtask 57.3. In `src/core/task/__tests__/workflow-runtime-metadata.test.ts`, add task-level coverage proving `handleWorkflowFormSubmission(...)` passes the returned `WorkflowNextAction` to the pending workflow-form wait resolver when one exists, rather than dropping it or directly double-consuming it.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
 
-[ ] Subtask 57.4. In `src/core/task/__tests__/workflow-runtime-metadata.test.ts`, add task-level coverage proving `handleWorkflowFormSubmission(...)` consumes the returned `WorkflowNextAction` when no pending workflow-form wait resolver exists.
+[x] Subtask 57.3a. In `src/core/task/__tests__/workflow-runtime-metadata.test.ts`, add coverage proving a live workflow-form wait resolver still receives the `WorkflowNextAction` returned by `handleWorkflowFormSubmission(...)` when `workflowRuntime.submitWorkflowForm(...)` mutates `taskState.activeWorkflowSession.ui.formSession` before returning; assert direct `consumeWorkflowNextAction(...)` is not called.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
+
+[x] Subtask 57.4. In `src/core/task/__tests__/workflow-runtime-metadata.test.ts`, add task-level coverage proving `handleWorkflowFormSubmission(...)` consumes the returned `WorkflowNextAction` when no pending workflow-form wait resolver exists.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
@@ -4428,78 +4433,225 @@ Allowed files:
 
 Pause for QA review after completing Phase 34 before commit.
 
-[ ] Task 58. Add restore-time validation for persisted workflow session shape before `WorkflowRuntime` accepts metadata state.
+[x] Task 58. Add restore-time validation for persisted workflow session shape before `WorkflowRuntime` accepts metadata state.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/schema.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 58.1. In `src/core/task/workflow-form/schema.ts`, add an exported recursive guard for `WorkflowFormSubmittedValuePayload` near `normalizeWorkflowFormSubmittedValue(...)`; it must validate exactly one typed value, finite numeric values, valid array entries, non-empty object entry keys, and valid nested object values.
+[x] Subtask 58.1. In `src/core/task/workflow-form/schema.ts`, add an exported recursive guard for `WorkflowFormSubmittedValuePayload` near `normalizeWorkflowFormSubmittedValue(...)`; it must validate exactly one typed value, finite numeric values, valid array entries, non-empty object entry keys, and valid nested object values.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/schema.ts`
 
-[ ] Subtask 58.2. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, import the new workflow-form submitted-value guard.
+[x] Subtask 58.2. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, import the new workflow-form submitted-value guard.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 58.3. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, add private restore-validation helpers near `cloneWorkflowSession(...)` for plain-record checks, string-array checks, workflow-value record validation using existing `isWorkflowValue(...)`, project-selection validation, branch-failure-state validation, and branch-trigger-event validation.
+[x] Subtask 58.3. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, add private restore-validation helpers near `cloneWorkflowSession(...)` for plain-record checks, string-array checks, workflow-value record validation using existing `isWorkflowValue(...)`, project-selection validation, branch-failure-state validation, and branch-trigger-event validation.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 58.4. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, add a private helper that validates and normalizes persisted `formSession` against the current workflow definition and active step: `workflowFormId` must exist, `currentPanelId` must exist in the current form definition, persisted form values must be valid submitted-value payloads, persisted value keys must correspond to current form field keys, and the active branch must have a continuation route for that form. The normalized restored form session must use the current definition payload, not the persisted definition payload.
+[x] Subtask 58.4. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, update `validateAndNormalizePersistedFormSessionForRestore(...)` so it supports both runtime-owned mandatory entry form sessions and module-owned active-step form sessions. If `persistedFormSession.workflowFormId === WORKFLOW_ENTRY_FORM_ID`, rebuild the definition payload with `buildWorkflowEntryFormDefinition(definition)`, require `projectSelection.projectTitle === ""` or `projectSelection.projectFolderName === ""`, validate `currentPanelId`, submitted values, and field keys against that rebuilt entry-form definition, normalize the restored session to that rebuilt definition payload, and do not require a decision-tree continuation route. For every non-entry form, preserve the existing module-owned form behavior: require `definition.workflowForms[workflowFormId]`, require a valid current panel, validate submitted values and field keys, normalize to the current definition payload, and require an active-branch continuation route for that form.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 58.5. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, add a private helper that validates persisted `stepResolutionSession` against the current workflow definition and active step: `definitionId` must exist, `triggerSource` must equal `execute_tool_backed_operation`, `state` must equal `pending`, owner workflow/step must match the active workflow and active step, and the active branch must have a continuation route for that operation.
+[x] Subtask 58.5. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, add a private helper that validates persisted `stepResolutionSession` against the current workflow definition and active step: `definitionId` must exist, `triggerSource` must equal `execute_tool_backed_operation`, `state` must equal `pending`, owner workflow/step must match the active workflow and active step, and the active branch must have a continuation route for that operation.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 58.6. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, add a private `validatePersistedWorkflowSessionForRestore(...)` helper that treats the persisted value as untrusted, validates base session shape, validates `ui` suppression arrays against current workflow form/tool-backed operation ids, calls the form/session helpers, and returns a normalized `PersistedWorkflowSession` or `undefined`.
+[x] Subtask 58.6. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, add a private `validatePersistedWorkflowSessionForRestore(...)` helper that treats the persisted value as untrusted, validates base session shape, validates `ui` suppression arrays against current workflow form/tool-backed operation ids, calls the form/session helpers, and returns a normalized `PersistedWorkflowSession` or `undefined`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 58.7. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, change `restorePersistedSession(...)` so it calls `validatePersistedWorkflowSessionForRestore(...)` before reading `activeStepNumber`, `branchContext.activeBranchId`, `ui.formSession`, or `ui.stepResolutionSession`; invalid results must return `teardownWorkflowAndRequirePersistence(...)`.
+[x] Subtask 58.7. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, change `restorePersistedSession(...)` so it calls `validatePersistedWorkflowSessionForRestore(...)` before reading `activeStepNumber`, `branchContext.activeBranchId`, `ui.formSession`, or `ui.stepResolutionSession`; invalid results must return `teardownWorkflowAndRequirePersistence(...)`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Task 59. Add regression coverage for fail-closed restore validation.
+[x] Task 59. Add regression coverage for fail-closed restore validation.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 59.1. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving malformed persisted session shape fails closed with `persist_workflow_teardown` and does not throw.
+[x] Subtask 59.1. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving malformed persisted session shape fails closed with `persist_workflow_teardown` and does not throw.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 59.2. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving invalid `workflowValues`, invalid `projectSelection`, invalid suppression arrays, and stale suppression ids fail closed.
+[x] Subtask 59.2. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving invalid `workflowValues`, invalid `projectSelection`, invalid suppression arrays, and stale suppression ids fail closed.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 59.3. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving stale `formSession` form ids, stale current panel ids, malformed submitted values, and form sessions without an active-branch continuation route fail closed.
+[x] Subtask 59.3. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving stale `formSession` form ids, stale current panel ids, malformed submitted values, and form sessions without an active-branch continuation route fail closed.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 59.4. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, update or extend the existing valid form restore test to prove the restored form session uses the current workflow definition payload and still returns `render_workflow_form`.
+[x] Subtask 59.4. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, update or extend the existing valid form restore test to prove the restored form session uses the current workflow definition payload and still returns `render_workflow_form`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 59.5. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving stale `stepResolutionSession` definition ids, owner mismatches, non-pending state, and missing continuation routes fail closed.
+[x] Subtask 59.4a. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving a valid persisted mandatory entry `WorkflowForm` session restores and returns `render_workflow_form`; the restored entry form must use the runtime-rebuilt entry form definition payload, must not require the form id to exist in `workflow.workflowForms`, and must fail closed when project selection is already complete.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 59.6. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving a valid restored pending step-resolution session returns `execute_tool_backed_operation`.
+[x] Subtask 59.5. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving stale `stepResolutionSession` definition ids, owner mismatches, non-pending state, and missing continuation routes fail closed.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 59.6. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving a valid restored pending step-resolution session returns `execute_tool_backed_operation`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+## Phase 35 - Terminal Error Workflow Teardown
+
+Pause for QA review after completing Phase 35 before commit.
+
+[x] Task 60. Make terminal workflow errors teardown workflow state before the next-action consumer persists metadata.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 60.1. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, change `buildTerminalErrorNextAction(...)` to normalize the terminal error message before teardown, call `await this.teardownWorkflow({ taskState: args.taskState })`, and then return `{ kind: "terminal_error", errorMessage: normalizedErrorMessage }`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 60.2. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, change `buildTerminalErrorNextAction(...)` from a synchronous helper to an async helper returning `Promise<WorkflowNextAction>`, and update its caller in the `terminal_error` decision-action case to `return await this.buildTerminalErrorNextAction({ taskState })`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Task 61. Update terminal-error regression coverage to assert workflow teardown.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts`
+
+[x] Subtask 61.1. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, update the explicit terminal-error failure-branch test so it still asserts the returned `terminal_error` message and now asserts `activeWorkflowName`, `activeWorkflowSession`, and `currentFocusChainChecklist` are cleared after the runtime emits the terminal error; remove assertions that inspect `branchContext` after terminal error.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 61.2. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, update the unmatched tool-backed operation failure terminal-error test so it still asserts the returned `terminal_error` message and now asserts `activeWorkflowName`, `activeWorkflowSession`, and `currentFocusChainChecklist` are cleared after the runtime emits the terminal error; remove assertions that inspect `branchContext` after terminal error.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 61.3. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, update any document-builder or artifact-allocation terminal-error assertions so terminal errors clear `activeWorkflowName`, `activeWorkflowSession`, and `currentFocusChainChecklist`; do not retain post-terminal assertions against `session.branchContext.failureState`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 61.4. In `src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts`, keep the terminal-error consumer test focused on consumer behavior only: it must assert metadata persistence and error reporting for a `terminal_error` action, and it must not assert runtime teardown because teardown is owned by `WorkflowRuntime`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts`
+
+## Phase 36 - Workflow Form Durable Value Persistence Scope
+
+Pause for QA review after completing Phase 36 before commit.
+
+[x] Task 62. Scope workflow-form durable value persistence to submitted session values.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 62.1. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, replace `collectWorkflowValueWritesFromFormSession(...)` so it no longer converts every `workflowValueKey` field from every panel. The method must first build a field-key to workflow-value-key lookup from `formSession.definitionPayload.panels`, then iterate only `Object.entries(formSession.values)`. For each submitted field value, skip it when no `workflowValueKey` exists for that field key, convert it when a destination exists, throw on failed conversion, and write the converted value to `workflowValueWrites[workflowValueKey]`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 62.2. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, preserve `persistWorkflowFormValues(...)` as the only caller of `applyWorkflowValueWrites(...)` for workflow-form durable values; do not add a second persistence path and do not change `convertWorkflowFormSubmittedValueToWorkflowValue(...)` to treat `undefined` as valid.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Task 63. Add regression coverage for multi-panel workflow-form durable value persistence.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 63.1. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add a workflow-form test with two panels where panel one and panel two each contain a submitted input field with a declared `workflowValueKey`; submitting panel one must return the next `render_workflow_form` action, persist only panel one's durable workflow value, and not throw because panel two's durable field has not been submitted.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 63.2. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, extend the same multi-panel workflow-form test so submitting panel two persists panel two's durable workflow value while preserving panel one's persisted workflow value.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 63.3. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, verify the existing malformed submitted durable-value test still fails explicitly for a submitted field with `workflowValueKey`; do not weaken malformed submitted value handling to make unsubmitted panel fields pass.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+## Phase 37 - Module Decision-Tree Predicate Contract Cleanup
+
+Pause for QA review after completing Phase 37 before commit.
+
+[x] Task 64. Remove the non-emitted `session_initialized` branch event from the module-visible trigger contract.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 64.1. In `src/core/task/workflow-runtime/types.ts`, remove `{ kind: "session_initialized" }` from the `WorkflowBranchTriggerEvent` union.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+
+[x] Subtask 64.2. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, remove the `session_initialized` case from `isWorkflowBranchTriggerEvent(...)` so restored persisted trigger events with that kind fail restore validation.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 64.3. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add restore-validation coverage proving a persisted `branchContext.lastTriggerEvent` with kind `session_initialized` fails closed with workflow teardown persistence.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Task 65. Restrict module decision-tree predicate input to documented decision inputs only.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 65.1. In `src/core/task/workflow-runtime/types.ts`, replace `WorkflowDecisionBranchEvaluationInput` so it no longer exposes `session` or `branchContext`; it must expose only `activeBranchId: WorkflowDecisionBranchId`, `workflowValues: WorkflowValues`, and `step: WorkflowStepDefinition`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+
+[x] Subtask 65.2. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, update `buildDecisionTreeEvaluationInput(...)` to return only `activeBranchId`, `workflowValues`, and `step` from the active session and step.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 65.3. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, update the `createWorkflowFormDecisionTree(...)` test helper to remove the `form-completed-session` route that reads `session.ui.suppressedWorkflowFormIds`; form completion tests must rely on the existing `workflow_form_completed` event route instead.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 65.4. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving a `session_predicate` receives `activeBranchId`, `workflowValues`, and `step`, and does not receive `session`, `ui`, `branchContext`, `suppressedWorkflowFormIds`, or `suppressedWorkflowStepResolutionDefinitionIds`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 65.5. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving an `event_predicate` receives the sanitized decision input plus `triggerEvent`, and still does not receive `session`, `ui`, `branchContext`, or suppression arrays.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
@@ -4532,16 +4684,24 @@ npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.te
 npm run test:unit -- src/core/task/__tests__/workflow-runtime-metadata.test.ts src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts src/core/task/tools/handlers/__tests__/CreateWorkflowArtifactToolHandler.test.ts
 npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/__tests__/workflow-runtime-metadata.test.ts src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts src/core/task/tools/handlers/__tests__/CreateWorkflowArtifactToolHandler.test.ts src/core/task/tools/handlers/__tests__/DevStoryStoryTools.test.ts
 npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts src/core/task/__tests__/workflow-runtime-metadata.test.ts src/core/task/tools/handlers/__tests__/UseSkillToolHandler.test.ts src/core/task/tools/handlers/__tests__/WorkflowProgressRequestToolHandler.test.ts src/core/task/tools/handlers/__tests__/SetWorkflowValuesToolHandler.test.ts src/core/task/tools/handlers/__tests__/BuildWorkflowDocumentToolHandler.test.ts src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts
+npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts
+npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts
 npm run test:unit -- src/core/task/__tests__/ToolExecutor.nativeToolParity.test.ts src/core/task/__tests__/ToolExecutor.responseToolFailureBudget.test.ts
 ```
 
 Validation expectations:
 - `test` must pass so precommit and phase-by-phase QA can run without stale repository-wide compile blockers from prior phases.
+- Phase 33 QA must verify workflow-form wait resolvers are not removed merely because `activeWorkflowSession.ui.formSession` changes during submission processing; direct consumption is allowed only when no resolver existed for the submitted session.
 - Phase 31 QA must verify `WorkflowNextActionConsumer.test.ts` and `SubagentRunner.test.ts` use typed test doubles rather than `any`, raw string handler names, or type assertions to satisfy workflow next-action consumer and tool-handler contracts.
 - Phase 31 QA must specifically verify the shared `createTaskConfig(...)` fixture in `SubagentRunner.test.ts` no longer uses `as unknown as TaskConfig`, and that its `coordinator.getHandler(...)` handler doubles include concrete `name: ClineDefaultTool.X` members.
 - Phase 31 QA must verify `SubagentRunner.test.ts` has no remaining `as any`, `as unknown as`, or `as TaskConfig` assertions in tests added or modified for Phase 31.
 - Phase 31 QA must verify `SubagentRunner.autoActivateAssignedWorkflow(...)` guards missing or incomplete parent project context before workflow activation, and the tests cover both missing parent session and incomplete project selection.
 - Phase 34 QA must verify `restorePersistedSession(...)` fails closed before accepting malformed persisted session shape, stale workflow-form UI state, stale tool-backed operation state, or stale suppression ids, and valid restored form/tool-backed operation sessions continue to resume through the canonical next-action path.
+- Phase 34 QA must verify valid persisted mandatory entry `WorkflowForm` sessions restore through the runtime-owned entry-form path, while stale module-owned workflow forms still fail closed.
+- Phase 35 QA must verify every runtime path that returns `terminal_error` has already cleared `activeWorkflowName`, `activeWorkflowSession`, and workflow-owned focus-chain projection before the next-action consumer persists metadata.
+- Phase 36 QA must verify workflow-form durable value persistence iterates submitted session values, not every field in every panel; unsubmitted durable fields must not fail intermediate `render_form` transitions, while malformed submitted durable values must still fail explicitly.
+- Phase 37 QA must verify module decision-tree predicates cannot access full `ActiveWorkflowSession`, runtime-owned UI state, `branchContext`, or suppression arrays; predicates may access only `activeBranchId`, `workflowValues`, `step`, and `triggerEvent` for event predicates.
+- Phase 37 QA must verify `session_initialized` is absent from runtime workflow trigger types and restore validation, and `rg "session_initialized" src/core/task/workflow-runtime` returns no matches.
 - `check-types` must pass without reintroducing removed workflow mirror fields, deterministic-step-resolution types, statically exposed workflow-only tool schemas, or legacy `createWorkflowSkillMetadata(...)` references.
 - `lint` must pass without leaving dead imports, compatibility shims, or deleted legacy-surface references behind.
 - Phase 7 QA must verify `applyWorkflowValueWrites(...)` no longer derives authorization from active-step `set_workflow_values` schema visibility and instead uses only `WorkflowDefinition.workflowValueKeys`.

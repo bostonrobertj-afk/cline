@@ -87,6 +87,7 @@ import { ulid } from "ulid"
 import type { TaskMetadata } from "@/core/context/context-tracking/ContextTrackerTypes"
 import type { SystemPromptContext } from "@/core/prompts/system-prompt"
 import { getSystemPrompt } from "@/core/prompts/system-prompt"
+import type { WorkflowFormSessionState } from "@/core/task/workflow-form/types"
 import type { WorkflowNextAction } from "@/core/task/workflow-runtime/types"
 import { WorkflowNextActionConsumer } from "@/core/task/workflow-runtime/WorkflowNextActionConsumer"
 import { WorkflowRuntime } from "@/core/task/workflow-runtime/WorkflowRuntime"
@@ -679,6 +680,7 @@ export class Task {
 	private currentRequestHasHumanAuthoredInput = false
 	private currentRequestShouldSendFullPromptAssembly = true
 	private currentRequestPromptInjectionBlocks: ClineTextContentBlock[] = []
+	private workflowFormSubmissionNextActionResolvers = new Map<string, (nextAction: WorkflowNextAction | undefined) => void>()
 
 	constructor(params: TaskParams) {
 		const {
@@ -1265,11 +1267,52 @@ export class Task {
 			return
 		}
 
-		await this.workflowRuntime.submitWorkflowForm({
+		const nextAction = await this.workflowRuntime.submitWorkflowForm({
 			taskState: this.taskState,
 			request,
 		})
 		await this.persistWorkflowRuntimeMetadata()
+
+		const resolver = this.workflowFormSubmissionNextActionResolvers.get(request.sessionId)
+		if (resolver !== undefined) {
+			resolver(nextAction)
+			return
+		}
+
+		await this.consumeWorkflowNextAction(nextAction)
+	}
+
+	private async waitForWorkflowFormSubmissionNextAction(
+		formSession: WorkflowFormSessionState,
+	): Promise<WorkflowNextAction | undefined> {
+		const activeFormSession = this.taskState.activeWorkflowSession?.ui.formSession
+		if (activeFormSession?.sessionId !== formSession.sessionId) {
+			return undefined
+		}
+
+		let resolveSubmittedNextAction: (nextAction: WorkflowNextAction | undefined) => void = () => undefined
+		const submittedNextActionPromise = new Promise<WorkflowNextAction | undefined>((resolve) => {
+			resolveSubmittedNextAction = resolve
+		})
+		const resolver = (nextAction: WorkflowNextAction | undefined): void => {
+			resolveSubmittedNextAction(nextAction)
+		}
+		this.workflowFormSubmissionNextActionResolvers.set(formSession.sessionId, resolver)
+
+		let stopWaitingForAbort = false
+		try {
+			return await Promise.race([
+				submittedNextActionPromise,
+				pWaitFor(() => this.taskState.abort === true || stopWaitingForAbort, {
+					interval: 100,
+				}).then(() => undefined),
+			])
+		} finally {
+			stopWaitingForAbort = true
+			if (this.workflowFormSubmissionNextActionResolvers.get(formSession.sessionId) === resolver) {
+				this.workflowFormSubmissionNextActionResolvers.delete(formSession.sessionId)
+			}
+		}
 	}
 
 	private async persistWorkflowRuntimeMetadata() {
@@ -1405,14 +1448,7 @@ export class Task {
 				shouldAbort: () => this.taskState.abort === true,
 				persistWorkflowRuntimeMetadata: () => this.persistWorkflowRuntimeMetadata(),
 				renderWorkflowForm: (payload) => this.renderWorkflowFormMessage(payload),
-				waitForWorkflowFormCompletion: async (formSession) => {
-					await pWaitFor(
-						() => this.taskState.activeWorkflowSession?.ui.formSession !== formSession || this.taskState.abort,
-						{
-							interval: 100,
-						},
-					)
-				},
+				waitForWorkflowFormCompletion: (formSession) => this.waitForWorkflowFormSubmissionNextAction(formSession),
 				renderWorkflowStepResolutionStatus: (payload) => this.renderWorkflowStepResolutionStatusMessage(payload),
 				reportTerminalError: async (errorMessage) => {
 					await this.say("error", errorMessage)

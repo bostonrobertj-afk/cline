@@ -102,7 +102,7 @@ interface TestWorkflowNextActionConsumerAdapter extends WorkflowNextActionConsum
 	shouldAbort: sinon.SinonStub<[], boolean>
 	persistWorkflowRuntimeMetadata: sinon.SinonStub<[], Promise<void>>
 	renderWorkflowForm: sinon.SinonStub<[WorkflowForm], Promise<void>>
-	waitForWorkflowFormCompletion: sinon.SinonStub<[WorkflowFormSessionState], Promise<void>>
+	waitForWorkflowFormCompletion: sinon.SinonStub<[WorkflowFormSessionState], Promise<WorkflowNextAction | undefined>>
 	renderWorkflowStepResolutionStatus: sinon.SinonStub<[ClineWorkflowStepResolutionStatus], Promise<void>>
 	reportTerminalError: sinon.SinonStub<[string], Promise<void>>
 	executeToolBackedOperation: sinon.SinonStub<
@@ -116,7 +116,9 @@ function createAdapter(): TestWorkflowNextActionConsumerAdapter {
 		shouldAbort: sinon.stub<[], boolean>().returns(false),
 		persistWorkflowRuntimeMetadata: sinon.stub<[], Promise<void>>().resolves(),
 		renderWorkflowForm: sinon.stub<[WorkflowForm], Promise<void>>().resolves(),
-		waitForWorkflowFormCompletion: sinon.stub<[WorkflowFormSessionState], Promise<void>>().resolves(),
+		waitForWorkflowFormCompletion: sinon
+			.stub<[WorkflowFormSessionState], Promise<WorkflowNextAction | undefined>>()
+			.resolves(undefined),
 		renderWorkflowStepResolutionStatus: sinon.stub<[ClineWorkflowStepResolutionStatus], Promise<void>>().resolves(),
 		reportTerminalError: sinon.stub<[string], Promise<void>>().resolves(),
 		executeToolBackedOperation: sinon
@@ -173,13 +175,19 @@ describe("WorkflowNextActionConsumer", () => {
 	it("persists and reports terminal errors", async () => {
 		await consumer.consume({ kind: "terminal_error", errorMessage: "Workflow failed." })
 
+		sinon.assert.calledOnce(adapter.persistWorkflowRuntimeMetadata)
 		sinon.assert.callOrder(adapter.persistWorkflowRuntimeMetadata, adapter.reportTerminalError)
 		sinon.assert.calledOnceWithExactly(adapter.reportTerminalError, "Workflow failed.")
 	})
 
-	it("renders workflow forms, waits for completion, and re-resolves the next action", async () => {
+	it("renders workflow forms, waits for submitted next action, and consumes it", async () => {
 		const formSession = createFormSession()
 		const formPayload = createFormPayload(formSession)
+		const submittedNextAction: WorkflowNextAction = {
+			kind: "terminal_error",
+			errorMessage: "Submitted workflow action failed.",
+		}
+		adapter.waitForWorkflowFormCompletion.resolves(submittedNextAction)
 		const resolveNextAction = sandbox.stub(runtime, "resolveNextAction").resolves({ kind: "no_op" })
 
 		await consumer.consume({
@@ -188,10 +196,11 @@ describe("WorkflowNextActionConsumer", () => {
 			payload: formPayload,
 		})
 
-		sinon.assert.calledOnce(adapter.persistWorkflowRuntimeMetadata)
+		sinon.assert.calledTwice(adapter.persistWorkflowRuntimeMetadata)
 		sinon.assert.calledOnceWithExactly(adapter.renderWorkflowForm, formPayload)
 		sinon.assert.calledOnceWithExactly(adapter.waitForWorkflowFormCompletion, formSession)
-		sinon.assert.calledOnceWithExactly(resolveNextAction, { taskState })
+		sinon.assert.notCalled(resolveNextAction)
+		sinon.assert.calledOnceWithExactly(adapter.reportTerminalError, "Submitted workflow action failed.")
 	})
 
 	it("executes tool-backed operations, feeds results back to runtime, persists, and continues", async () => {

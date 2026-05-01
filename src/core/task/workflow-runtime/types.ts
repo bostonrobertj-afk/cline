@@ -42,7 +42,6 @@ export interface WorkflowUiSessionState {
 export type WorkflowDecisionBranchId = string
 
 export type WorkflowBranchTriggerEvent =
-	| { kind: "session_initialized" }
 	| { kind: "project_selection_completed" }
 	| { kind: "workflow_progress_request_confirmed" }
 	| { kind: "workflow_progress_request_denied" }
@@ -143,9 +142,9 @@ export interface WorkflowStepPromptSource {
 }
 
 export interface WorkflowDecisionBranchEvaluationInput {
-	session: ActiveWorkflowSession
+	activeBranchId: WorkflowDecisionBranchId
+	workflowValues: WorkflowValues
 	step: WorkflowStepDefinition
-	branchContext: WorkflowBranchContextState
 }
 
 export type WorkflowDecisionBranchTrigger =

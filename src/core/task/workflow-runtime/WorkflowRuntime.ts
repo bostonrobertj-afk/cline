@@ -15,7 +15,12 @@ import { dirname, join } from "path"
 import { isSerializedToolFailureResultText } from "@/core/prompts/responses"
 import type { TaskState } from "@/core/task/TaskState"
 import { buildWorkflowFormPayload } from "@/core/task/workflow-form/buildWorkflowFormPayload"
-import type { WorkflowFormRuntimeOutcome, WorkflowFormSessionState } from "@/core/task/workflow-form/types"
+import { isWorkflowFormSubmittedValuePayload } from "@/core/task/workflow-form/schema"
+import type {
+	WorkflowFormRuntimeOutcome,
+	WorkflowFormSessionData,
+	WorkflowFormSessionState,
+} from "@/core/task/workflow-form/types"
 import { WorkflowFormRuntime } from "@/core/task/workflow-form/WorkflowFormRuntime"
 import {
 	WORKFLOW_ARTIFACT_FAMILY_REGISTRY,
@@ -36,6 +41,7 @@ import type {
 	WorkflowArtifactDefinition,
 	WorkflowArtifactOutputValueKeys,
 	WorkflowBranchContextState,
+	WorkflowBranchFailureState,
 	WorkflowBranchTriggerEvent,
 	WorkflowDecisionAction,
 	WorkflowDecisionBranchEvaluationInput,
@@ -248,7 +254,7 @@ export class WorkflowRuntime {
 		})
 		if (!matchingDecisionTreeRoute) {
 			if (pendingTriggerEvent?.kind === "tool_backed_operation_failed") {
-				return this.buildTerminalErrorNextAction({
+				return await this.buildTerminalErrorNextAction({
 					taskState,
 					errorMessage: pendingTriggerEvent.errorMessage,
 				})
@@ -287,13 +293,27 @@ export class WorkflowRuntime {
 		}
 
 		switch (outcome.kind) {
-			case "render_form":
+			case "render_form": {
 				await this.persistWorkflowFormValues({
 					taskState,
 					formSession: outcome.session,
 				})
 				session.ui.formSession = outcome.session
-				return this.resolveNextAction({ taskState })
+				const definition = this.getActiveWorkflowDefinition(taskState)
+				if (!definition) {
+					return this.teardownWorkflowAndRequirePersistence({ taskState })
+				}
+
+				return {
+					kind: "render_workflow_form",
+					formSession: outcome.session,
+					payload: await this.buildWorkflowFormRenderPayload({
+						taskState,
+						workflow: definition,
+						session: outcome.session,
+					}),
+				}
+			}
 			case "complete_success":
 				await this.persistWorkflowFormValues({
 					taskState,
@@ -715,6 +735,460 @@ export class WorkflowRuntime {
 		}
 	}
 
+	private isPlainRecord(value: unknown): value is Record<string, unknown> {
+		return typeof value === "object" && value !== null && Array.isArray(value) === false
+	}
+
+	private isStringArray(value: unknown): value is string[] {
+		return Array.isArray(value) && value.every((entry) => typeof entry === "string")
+	}
+
+	private isWorkflowValueRecord(value: unknown): value is WorkflowValues {
+		if (this.isPlainRecord(value) === false) {
+			return false
+		}
+
+		return Object.values(value).every((entry) => isWorkflowValue(entry))
+	}
+
+	private isWorkflowProjectSelectionState(value: unknown): value is WorkflowProjectSelectionState {
+		if (this.isPlainRecord(value) === false) {
+			return false
+		}
+
+		return (
+			(value.projectMode === "new" || value.projectMode === "existing") &&
+			typeof value.projectTitle === "string" &&
+			typeof value.projectFolderName === "string"
+		)
+	}
+
+	private isWorkflowBranchFailureState(value: unknown): value is WorkflowBranchFailureState {
+		if (this.isPlainRecord(value) === false) {
+			return false
+		}
+
+		const retryAttemptCount = value.retryAttemptCount
+		const terminalErrorMessageIsValid =
+			value.terminalErrorMessage === undefined || typeof value.terminalErrorMessage === "string"
+		return (
+			typeof retryAttemptCount === "number" &&
+			Number.isInteger(retryAttemptCount) &&
+			retryAttemptCount >= 0 &&
+			terminalErrorMessageIsValid
+		)
+	}
+
+	private isWorkflowBranchTriggerEvent(value: unknown): value is WorkflowBranchTriggerEvent {
+		if (this.isPlainRecord(value) === false) {
+			return false
+		}
+
+		switch (value.kind) {
+			case "project_selection_completed":
+			case "workflow_progress_request_confirmed":
+			case "workflow_progress_request_denied":
+				return true
+			case "workflow_form_completed":
+				return typeof value.workflowFormId === "string" && value.workflowFormId.trim() !== ""
+			case "workflow_values_persisted":
+				return this.isStringArray(value.changedKeys)
+			case "tool_backed_operation_succeeded":
+				return typeof value.toolBackedOperationId === "string" && value.toolBackedOperationId.trim() !== ""
+			case "tool_backed_operation_failed":
+				return (
+					typeof value.toolBackedOperationId === "string" &&
+					value.toolBackedOperationId.trim() !== "" &&
+					(value.errorMessage === undefined || typeof value.errorMessage === "string")
+				)
+			default:
+				return false
+		}
+	}
+
+	private isWorkflowFormSessionData(value: unknown): value is WorkflowFormSessionData {
+		if (this.isPlainRecord(value) === false) {
+			return false
+		}
+
+		return Object.values(value).every(
+			(entry) =>
+				entry === undefined ||
+				typeof entry === "string" ||
+				typeof entry === "number" ||
+				typeof entry === "boolean" ||
+				Array.isArray(entry) ||
+				this.isPlainRecord(entry),
+		)
+	}
+
+	private validateAndNormalizePersistedFormSessionForRestore(args: {
+		persistedFormSession: unknown
+		definition: WorkflowDefinition
+		activeStep: WorkflowStepDefinition
+		activeBranchId: string
+		projectSelection: WorkflowProjectSelectionState
+	}): WorkflowFormSessionState | undefined {
+		const { persistedFormSession, definition, activeStep, activeBranchId, projectSelection } = args
+		if (this.isPlainRecord(persistedFormSession) === false) {
+			return undefined
+		}
+
+		const sessionId = persistedFormSession.sessionId
+		if (typeof sessionId !== "string" || sessionId.trim() === "") {
+			return undefined
+		}
+
+		const workflowFormId = persistedFormSession.workflowFormId
+		if (typeof workflowFormId !== "string" || workflowFormId.trim() === "") {
+			return undefined
+		}
+
+		let definitionPayload: WorkflowFormDefinitionPayload
+		if (workflowFormId === WORKFLOW_ENTRY_FORM_ID) {
+			if (projectSelection.projectTitle !== "" && projectSelection.projectFolderName !== "") {
+				return undefined
+			}
+
+			definitionPayload = this.buildWorkflowEntryFormDefinition(definition)
+		} else {
+			const workflowFormDefinitionPayload = definition.workflowForms?.[workflowFormId]
+			if (workflowFormDefinitionPayload === undefined) {
+				return undefined
+			}
+
+			const continuationRoute = this.findContinuationSourceRoute({
+				step: activeStep,
+				activeBranchId,
+				matches: (route) =>
+					route.action.kind === "render_workflow_form" && route.action.workflowFormId === workflowFormId,
+			})
+			if (continuationRoute === undefined) {
+				return undefined
+			}
+
+			definitionPayload = workflowFormDefinitionPayload
+		}
+
+		const currentPanelId = persistedFormSession.currentPanelId
+		if (typeof currentPanelId !== "string" || definitionPayload.panels[currentPanelId] === undefined) {
+			return undefined
+		}
+
+		if (this.isPlainRecord(persistedFormSession.values) === false) {
+			return undefined
+		}
+
+		const currentFieldKeys = new Set<string>()
+		for (const panel of Object.values(definitionPayload.panels)) {
+			for (const field of panel.fields) {
+				currentFieldKeys.add(field.key)
+			}
+		}
+
+		const values: WorkflowFormSessionState["values"] = {}
+		for (const [key, value] of Object.entries(persistedFormSession.values)) {
+			if (currentFieldKeys.has(key) === false) {
+				return undefined
+			}
+
+			if (isWorkflowFormSubmittedValuePayload(value) === false) {
+				return undefined
+			}
+
+			values[key] = structuredClone(value)
+		}
+
+		if (this.isWorkflowFormSessionData(persistedFormSession.data) === false) {
+			return undefined
+		}
+
+		const normalizedSession: WorkflowFormSessionState = {
+			sessionId,
+			workflowFormId,
+			definitionVersion: definitionPayload.definitionVersion,
+			definitionPayload,
+			firstPanelId: definitionPayload.firstPanelId,
+			currentPanelId,
+			values,
+			data: structuredClone(persistedFormSession.data),
+		}
+
+		const failure = persistedFormSession.failure
+		if (failure !== undefined) {
+			if (this.isPlainRecord(failure) === false) {
+				return undefined
+			}
+
+			const failurePanelId = failure.panelId
+			const failureErrorMessage = failure.errorMessage
+			if (
+				typeof failurePanelId !== "string" ||
+				definitionPayload.panels[failurePanelId] === undefined ||
+				typeof failureErrorMessage !== "string"
+			) {
+				return undefined
+			}
+
+			normalizedSession.failure = {
+				panelId: failurePanelId,
+				errorMessage: failureErrorMessage,
+			}
+		}
+
+		return normalizedSession
+	}
+
+	private validateAndNormalizePersistedStepResolutionSessionForRestore(args: {
+		persistedStepResolutionSession: unknown
+		definition: WorkflowDefinition
+		activeStep: WorkflowStepDefinition
+		activeBranchId: string
+		activeWorkflowName: string
+	}): WorkflowStepResolutionSessionState | undefined {
+		const { persistedStepResolutionSession, definition, activeStep, activeBranchId, activeWorkflowName } = args
+		if (this.isPlainRecord(persistedStepResolutionSession) === false) {
+			return undefined
+		}
+
+		if (
+			typeof persistedStepResolutionSession.sessionId !== "string" ||
+			persistedStepResolutionSession.sessionId.trim() === ""
+		) {
+			return undefined
+		}
+
+		if (
+			typeof persistedStepResolutionSession.definitionId !== "string" ||
+			persistedStepResolutionSession.definitionId.trim() === "" ||
+			definition.toolBackedOperationDefinitions?.[persistedStepResolutionSession.definitionId] === undefined
+		) {
+			return undefined
+		}
+
+		if (persistedStepResolutionSession.triggerSource !== "execute_tool_backed_operation") {
+			return undefined
+		}
+
+		if (persistedStepResolutionSession.state !== "pending") {
+			return undefined
+		}
+
+		if (this.isPlainRecord(persistedStepResolutionSession.owner) === false) {
+			return undefined
+		}
+
+		if (
+			persistedStepResolutionSession.owner.kind !== "workflow_step" ||
+			persistedStepResolutionSession.owner.workflowName !== activeWorkflowName ||
+			persistedStepResolutionSession.owner.stepNumber !== activeStep.stepNumber
+		) {
+			return undefined
+		}
+
+		if (
+			persistedStepResolutionSession.lastError !== undefined &&
+			typeof persistedStepResolutionSession.lastError !== "string"
+		) {
+			return undefined
+		}
+
+		const continuationRoute = this.findContinuationSourceRoute({
+			step: activeStep,
+			activeBranchId,
+			matches: (route) =>
+				route.action.kind === "execute_tool_backed_operation" &&
+				route.action.toolBackedOperationId === persistedStepResolutionSession.definitionId,
+		})
+		if (continuationRoute === undefined) {
+			return undefined
+		}
+
+		const normalizedSession: WorkflowStepResolutionSessionState = {
+			sessionId: persistedStepResolutionSession.sessionId,
+			definitionId: persistedStepResolutionSession.definitionId,
+			triggerSource: "execute_tool_backed_operation",
+			owner: {
+				kind: "workflow_step",
+				workflowName: activeWorkflowName,
+				stepNumber: activeStep.stepNumber,
+			},
+			state: "pending",
+		}
+
+		if (persistedStepResolutionSession.lastError !== undefined) {
+			normalizedSession.lastError = persistedStepResolutionSession.lastError
+		}
+
+		return normalizedSession
+	}
+
+	private isWorkflowBranchTriggerEventCompatibleWithDefinition(
+		definition: WorkflowDefinition,
+		triggerEvent: WorkflowBranchTriggerEvent,
+	): boolean {
+		switch (triggerEvent.kind) {
+			case "workflow_form_completed":
+				return definition.workflowForms?.[triggerEvent.workflowFormId] !== undefined
+			case "workflow_values_persisted":
+				return triggerEvent.changedKeys.every((key) => definition.workflowValueKeys.includes(key))
+			case "tool_backed_operation_succeeded":
+				return definition.toolBackedOperationDefinitions?.[triggerEvent.toolBackedOperationId] !== undefined
+			case "tool_backed_operation_failed":
+				return definition.toolBackedOperationDefinitions?.[triggerEvent.toolBackedOperationId] !== undefined
+			default:
+				return true
+		}
+	}
+
+	private validatePersistedWorkflowSessionForRestore(args: {
+		persistedSession: unknown
+		definition: WorkflowDefinition
+		activeWorkflowName: string
+	}): PersistedWorkflowSession | undefined {
+		const { persistedSession, definition, activeWorkflowName } = args
+		if (this.isPlainRecord(persistedSession) === false) {
+			return undefined
+		}
+
+		const activeStepNumber = persistedSession.activeStepNumber
+		if (typeof activeStepNumber !== "number" || Number.isInteger(activeStepNumber) === false) {
+			return undefined
+		}
+
+		const activeStep = definition.steps[`step-${activeStepNumber}`]
+		if (activeStep === undefined) {
+			return undefined
+		}
+
+		if (this.isWorkflowValueRecord(persistedSession.workflowValues) === false) {
+			return undefined
+		}
+
+		if (this.isWorkflowProjectSelectionState(persistedSession.projectSelection) === false) {
+			return undefined
+		}
+
+		if (this.isPlainRecord(persistedSession.branchContext) === false) {
+			return undefined
+		}
+
+		if (
+			typeof persistedSession.branchContext.activeBranchId !== "string" ||
+			activeStep.decisionTree.branches[persistedSession.branchContext.activeBranchId] === undefined
+		) {
+			return undefined
+		}
+
+		const branchContext: WorkflowBranchContextState = {
+			activeBranchId: persistedSession.branchContext.activeBranchId,
+		}
+
+		if (persistedSession.branchContext.lastTriggerEvent !== undefined) {
+			if (this.isWorkflowBranchTriggerEvent(persistedSession.branchContext.lastTriggerEvent) === false) {
+				return undefined
+			}
+
+			if (
+				this.isWorkflowBranchTriggerEventCompatibleWithDefinition(
+					definition,
+					persistedSession.branchContext.lastTriggerEvent,
+				) === false
+			) {
+				return undefined
+			}
+
+			branchContext.lastTriggerEvent = structuredClone(persistedSession.branchContext.lastTriggerEvent)
+		}
+
+		if (persistedSession.branchContext.failureState !== undefined) {
+			if (this.isWorkflowBranchFailureState(persistedSession.branchContext.failureState) === false) {
+				return undefined
+			}
+
+			branchContext.failureState = structuredClone(persistedSession.branchContext.failureState)
+		}
+
+		if (this.isPlainRecord(persistedSession.ui) === false) {
+			return undefined
+		}
+
+		if (this.isStringArray(persistedSession.ui.suppressedWorkflowFormIds) === false) {
+			return undefined
+		}
+
+		const workflowFormIds = new Set(Object.keys(definition.workflowForms ?? {}))
+		if (
+			persistedSession.ui.suppressedWorkflowFormIds.some((workflowFormId) => workflowFormIds.has(workflowFormId) === false)
+		) {
+			return undefined
+		}
+
+		if (this.isStringArray(persistedSession.ui.suppressedWorkflowStepResolutionDefinitionIds) === false) {
+			return undefined
+		}
+
+		const toolBackedOperationIds = new Set(Object.keys(definition.toolBackedOperationDefinitions ?? {}))
+		if (
+			persistedSession.ui.suppressedWorkflowStepResolutionDefinitionIds.some(
+				(definitionId) => toolBackedOperationIds.has(definitionId) === false,
+			)
+		) {
+			return undefined
+		}
+
+		if (persistedSession.ui.formSession !== undefined && persistedSession.ui.stepResolutionSession !== undefined) {
+			return undefined
+		}
+
+		let formSession: WorkflowFormSessionState | undefined
+		if (persistedSession.ui.formSession !== undefined) {
+			formSession = this.validateAndNormalizePersistedFormSessionForRestore({
+				persistedFormSession: persistedSession.ui.formSession,
+				definition,
+				activeStep,
+				activeBranchId: branchContext.activeBranchId,
+				projectSelection: persistedSession.projectSelection,
+			})
+			if (formSession === undefined) {
+				return undefined
+			}
+		}
+
+		let stepResolutionSession: WorkflowStepResolutionSessionState | undefined
+		if (persistedSession.ui.stepResolutionSession !== undefined) {
+			stepResolutionSession = this.validateAndNormalizePersistedStepResolutionSessionForRestore({
+				persistedStepResolutionSession: persistedSession.ui.stepResolutionSession,
+				definition,
+				activeStep,
+				activeBranchId: branchContext.activeBranchId,
+				activeWorkflowName,
+			})
+			if (stepResolutionSession === undefined) {
+				return undefined
+			}
+		}
+
+		return {
+			activeStepNumber,
+			workflowValues: structuredClone(persistedSession.workflowValues),
+			projectSelection: {
+				projectMode: persistedSession.projectSelection.projectMode,
+				projectTitle: persistedSession.projectSelection.projectTitle,
+				projectFolderName: persistedSession.projectSelection.projectFolderName,
+			},
+			ui: {
+				formSession,
+				stepResolutionSession,
+				suppressedWorkflowFormIds: [...persistedSession.ui.suppressedWorkflowFormIds],
+				suppressedWorkflowStepResolutionDefinitionIds: [
+					...persistedSession.ui.suppressedWorkflowStepResolutionDefinitionIds,
+				],
+			},
+			branchContext,
+		}
+	}
+
 	getPersistedSession(args: { taskState: TaskState }): PersistedWorkflowSession | undefined {
 		return args.taskState.activeWorkflowSession ? this.cloneWorkflowSession(args.taskState.activeWorkflowSession) : undefined
 	}
@@ -728,11 +1202,12 @@ export class WorkflowRuntime {
 			return undefined
 		}
 
-		if (taskState.activeWorkflowName === undefined) {
+		const activeWorkflowName = taskState.activeWorkflowName
+		if (activeWorkflowName === undefined) {
 			return await this.teardownWorkflowAndRequirePersistence({ taskState })
 		}
 
-		const definition = resolveWorkflowDefinition(taskState.activeWorkflowName)
+		const definition = resolveWorkflowDefinition(activeWorkflowName)
 		if (!definition) {
 			return this.teardownWorkflowAndRequirePersistence({ taskState })
 		}
@@ -742,16 +1217,16 @@ export class WorkflowRuntime {
 			return this.teardownWorkflowAndRequirePersistence({ taskState })
 		}
 
-		const activeStep = this.getActiveStepDefinition(definition, persistedSession)
-		if (!activeStep) {
+		const validatedPersistedSession = this.validatePersistedWorkflowSessionForRestore({
+			persistedSession,
+			definition,
+			activeWorkflowName,
+		})
+		if (validatedPersistedSession === undefined) {
 			return this.teardownWorkflowAndRequirePersistence({ taskState })
 		}
 
-		if (activeStep.decisionTree.branches[persistedSession.branchContext.activeBranchId] === undefined) {
-			return this.teardownWorkflowAndRequirePersistence({ taskState })
-		}
-
-		taskState.activeWorkflowSession = this.cloneWorkflowSession(persistedSession)
+		taskState.activeWorkflowSession = this.cloneWorkflowSession(validatedPersistedSession)
 		this.refreshCurrentFocusChainChecklist(taskState)
 
 		return this.resolveNextAction({ taskState })
@@ -926,6 +1401,7 @@ export class WorkflowRuntime {
 		formSession: Pick<WorkflowFormSessionState, "definitionPayload" | "values">,
 	): WorkflowValues {
 		const workflowValueWrites: WorkflowValues = {}
+		const workflowValueKeyByFieldKey: Record<string, string> = {}
 
 		for (const panel of Object.values(formSession.definitionPayload.panels)) {
 			for (const field of panel.fields) {
@@ -933,14 +1409,22 @@ export class WorkflowRuntime {
 					continue
 				}
 
-				const submittedValue = formSession.values[field.key]
-				const conversion = this.convertWorkflowFormSubmittedValueToWorkflowValue(submittedValue)
-				if (!conversion.ok) {
-					throw new Error(conversion.errorMessage)
-				}
-
-				workflowValueWrites[field.workflowValueKey] = conversion.value
+				workflowValueKeyByFieldKey[field.key] = field.workflowValueKey
 			}
+		}
+
+		for (const [fieldKey, submittedValue] of Object.entries(formSession.values)) {
+			const workflowValueKey = workflowValueKeyByFieldKey[fieldKey]
+			if (workflowValueKey === undefined) {
+				continue
+			}
+
+			const conversion = this.convertWorkflowFormSubmittedValueToWorkflowValue(submittedValue)
+			if (!conversion.ok) {
+				throw new Error(conversion.errorMessage)
+			}
+
+			workflowValueWrites[workflowValueKey] = conversion.value
 		}
 
 		return workflowValueWrites
@@ -1516,9 +2000,9 @@ export class WorkflowRuntime {
 		step: WorkflowStepDefinition,
 	): WorkflowDecisionBranchEvaluationInput {
 		return {
-			session,
+			activeBranchId: session.branchContext.activeBranchId,
+			workflowValues: session.workflowValues,
 			step,
-			branchContext: session.branchContext,
 		}
 	}
 
@@ -1907,7 +2391,7 @@ export class WorkflowRuntime {
 				}
 			}
 			case "terminal_error":
-				return this.buildTerminalErrorNextAction({ taskState })
+				return await this.buildTerminalErrorNextAction({ taskState })
 			case "no_op":
 				return { kind: "no_op" }
 			case "complete_workflow":
@@ -2642,7 +3126,10 @@ export class WorkflowRuntime {
 		return nonEmptySections.length > 0 ? nonEmptySections.join("\n\n") : undefined
 	}
 
-	private buildTerminalErrorNextAction(args: { taskState: TaskState; errorMessage?: string }): WorkflowNextAction {
+	private async buildTerminalErrorNextAction(args: {
+		taskState: TaskState
+		errorMessage?: string
+	}): Promise<WorkflowNextAction> {
 		const session = args.taskState.activeWorkflowSession
 		if (!session) {
 			return { kind: "no_op" }
@@ -2652,10 +3139,7 @@ export class WorkflowRuntime {
 			args.errorMessage ?? session.branchContext.failureState?.terminalErrorMessage,
 		)
 
-		session.branchContext.failureState = {
-			retryAttemptCount: session.branchContext.failureState?.retryAttemptCount ?? 0,
-			terminalErrorMessage: normalizedErrorMessage,
-		}
+		await this.teardownWorkflow({ taskState: args.taskState })
 
 		return {
 			kind: "terminal_error",

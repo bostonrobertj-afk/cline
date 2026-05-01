@@ -16,6 +16,7 @@ import { WorkflowArtifactFamily } from "../artifactFamilies"
 import * as WorkflowDiscovery from "../discovery"
 import type {
 	ActiveWorkflowSession,
+	PersistedWorkflowSession,
 	WorkflowDecisionAction,
 	WorkflowDecisionTree,
 	WorkflowDefinition,
@@ -29,6 +30,20 @@ import type {
 import * as WorkflowRegistry from "../WorkflowRegistry"
 import { WorkflowRuntime } from "../WorkflowRuntime"
 
+type ObservedDecisionPredicateInput = {
+	activeBranchId: string
+	projectTitleValue: unknown
+	stepNumber: number
+	keys: string[]
+	hasSession: boolean
+	hasUi: boolean
+	hasBranchContext: boolean
+	hasSuppressedWorkflowFormIds: boolean
+	hasSuppressedWorkflowStepResolutionDefinitionIds: boolean
+	hasTriggerEvent: boolean
+	triggerEventKind?: string
+}
+
 describe("WorkflowRuntime", () => {
 	const LEGACY_WORKFLOW_MIRROR_KEYS = [
 		"activeWorkflowFormSession",
@@ -36,6 +51,7 @@ describe("WorkflowRuntime", () => {
 		"suppressedWorkflowFormResolverIds",
 		"suppressedWorkflowStepResolutionDefinitionIds",
 	] as const
+	const ENTRY_FORM_ID = "__workflow_runtime_entry_form__"
 	const ENTRY_INFO_PANEL_ID = "__workflow_runtime_entry_info__"
 	const ENTRY_PROJECT_SELECTION_PANEL_ID = "__workflow_runtime_entry_project_selection__"
 	const ENTRY_PROJECT_MODE_FIELD_KEY = "__workflow_runtime_project_mode__"
@@ -167,16 +183,6 @@ describe("WorkflowRuntime", () => {
 								matches: ({ triggerEvent }) =>
 									triggerEvent.kind === "workflow_form_completed" &&
 									triggerEvent.workflowFormId === args.workflowFormId,
-							},
-							action: args.completionAction ?? { kind: "project_prompt" },
-							targetStepNumber: args.completionTargetStepNumber,
-							followingBranchId: args.completionTargetStepNumber === undefined ? completionBranchId : undefined,
-						},
-						{
-							id: "form-completed-session",
-							trigger: {
-								kind: "session_predicate",
-								matches: ({ session }) => session.ui.suppressedWorkflowFormIds.includes(args.workflowFormId),
 							},
 							action: args.completionAction ?? { kind: "project_prompt" },
 							targetStepNumber: args.completionTargetStepNumber,
@@ -637,6 +643,12 @@ describe("WorkflowRuntime", () => {
 		return activeSession
 	}
 
+	function expectWorkflowStateCleared(state: TaskState): void {
+		expect(state.activeWorkflowName).to.be.undefined
+		expect(state.activeWorkflowSession).to.be.undefined
+		expect(state.currentFocusChainChecklist).to.equal(null)
+	}
+
 	function getActiveFormSession(state: TaskState): NonNullable<ActiveWorkflowSession["ui"]["formSession"]> {
 		const formSession = getActiveWorkflowSession(state).ui.formSession
 		expect(formSession).to.not.equal(undefined)
@@ -666,6 +678,58 @@ describe("WorkflowRuntime", () => {
 				activeBranchId: "parent-branch",
 			},
 		}
+	}
+
+	async function createRestorablePersistedSession(workflow: WorkflowDefinition): Promise<PersistedWorkflowSession> {
+		const sourceState = new TaskState()
+		await activateWorkflow(sourceState, workflow)
+		await runtime.resolveNextAction({ taskState: sourceState })
+		await submitNewProjectSelection(sourceState, "Restorable Project")
+		const persistedSession = runtime.getPersistedSession({ taskState: sourceState })
+		if (persistedSession === undefined) {
+			throw new Error("Expected a restorable persisted workflow session.")
+		}
+
+		return persistedSession
+	}
+
+	async function createRestorableStepResolutionSession(workflow: WorkflowDefinition): Promise<PersistedWorkflowSession> {
+		const sourceState = new TaskState()
+		await activateWorkflow(sourceState, workflow)
+		await runtime.resolveNextAction({ taskState: sourceState })
+		const nextAction = await submitNewProjectSelection(sourceState, "Restorable Operation Project")
+		if (nextAction.kind !== "execute_tool_backed_operation") {
+			const resolvedNextAction = await runtime.resolveNextAction({ taskState: sourceState })
+			expect(resolvedNextAction.kind).to.equal("execute_tool_backed_operation")
+		}
+
+		const persistedSession = runtime.getPersistedSession({ taskState: sourceState })
+		if (persistedSession === undefined || persistedSession.ui.stepResolutionSession === undefined) {
+			throw new Error("Expected a restorable step-resolution session.")
+		}
+
+		return persistedSession
+	}
+
+	async function expectPersistedRestoreFailsClosed(
+		workflow: WorkflowDefinition,
+		persistedSession: PersistedWorkflowSession,
+	): Promise<void> {
+		registerResolvedWorkflow(workflow)
+		const restoredState = new TaskState()
+		restoredState.activeWorkflowName = workflow.name
+		restoredState.activeWorkflowSession = createParentWorkflowSession()
+		restoredState.currentFocusChainChecklist = "stale checklist"
+
+		const result = await runtime.restorePersistedSession({
+			taskState: restoredState,
+			persistedSession,
+		})
+
+		expect(result).to.deep.equal({ kind: "persist_workflow_teardown" })
+		expect(restoredState.activeWorkflowName).to.be.undefined
+		expect(restoredState.activeWorkflowSession).to.be.undefined
+		expect(restoredState.currentFocusChainChecklist).to.equal(null)
 	}
 
 	function createStandaloneArtifactOutputValueKeys(prefix: string) {
@@ -2240,14 +2304,7 @@ describe("WorkflowRuntime", () => {
 			kind: "terminal_error",
 			errorMessage: "failure",
 		})
-		expect(getActiveWorkflowSession(terminalFailureState).branchContext.activeBranchId).to.equal(
-			"after-step-resolution-failure",
-		)
-		expect(getActiveWorkflowSession(terminalFailureState).branchContext.lastTriggerEvent).to.equal(undefined)
-		expect(getActiveWorkflowSession(terminalFailureState).branchContext.failureState).to.deep.equal({
-			retryAttemptCount: 1,
-			terminalErrorMessage: "failure",
-		})
+		expectWorkflowStateCleared(terminalFailureState)
 	})
 
 	it("fails closed with terminal_error when tool-backed operation failure has no matching failure branch", async () => {
@@ -2327,16 +2384,7 @@ describe("WorkflowRuntime", () => {
 			kind: "terminal_error",
 			errorMessage: "failure",
 		})
-		expect(getActiveWorkflowSession(unmatchedFailureState).branchContext.activeBranchId).to.equal("await-step-resolution")
-		expect(getActiveWorkflowSession(unmatchedFailureState).branchContext.lastTriggerEvent).to.deep.equal({
-			kind: "tool_backed_operation_failed",
-			toolBackedOperationId: "step-resolution-1",
-			errorMessage: "failure",
-		})
-		expect(getActiveWorkflowSession(unmatchedFailureState).branchContext.failureState).to.deep.equal({
-			retryAttemptCount: 1,
-			terminalErrorMessage: "failure",
-		})
+		expectWorkflowStateCleared(unmatchedFailureState)
 	})
 
 	it("persists document-builder tool-backed operation failure context and re-evaluates the same failure branch", async () => {
@@ -2475,6 +2523,138 @@ describe("WorkflowRuntime", () => {
 		expect(approvedSession.activeStepNumber).to.equal(3)
 		expect(approvedSession.ui.suppressedWorkflowFormIds).to.deep.equal([])
 		expect(approvedSession.ui.suppressedWorkflowStepResolutionDefinitionIds).to.deep.equal([])
+	})
+
+	it("passes only documented decision inputs to session predicates", async () => {
+		let observedInput: ObservedDecisionPredicateInput | undefined
+		const workflow = createWorkflowDefinition({
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: {
+						entryBranchId: "session-predicate-entry",
+						branches: {
+							"session-predicate-entry": {
+								id: "session-predicate-entry",
+								routes: [
+									{
+										id: "session-predicate-route",
+										trigger: {
+											kind: "session_predicate",
+											matches: (input) => {
+												observedInput = {
+													activeBranchId: input.activeBranchId,
+													projectTitleValue:
+														input.workflowValues[DEFAULT_ENTRY_PROJECT_VALUE_KEYS.projectTitle],
+													stepNumber: input.step.stepNumber,
+													keys: Object.keys(input).sort(),
+													hasSession: Reflect.has(input, "session"),
+													hasUi: Reflect.has(input, "ui"),
+													hasBranchContext: Reflect.has(input, "branchContext"),
+													hasSuppressedWorkflowFormIds: Reflect.has(input, "suppressedWorkflowFormIds"),
+													hasSuppressedWorkflowStepResolutionDefinitionIds: Reflect.has(
+														input,
+														"suppressedWorkflowStepResolutionDefinitionIds",
+													),
+													hasTriggerEvent: Reflect.has(input, "triggerEvent"),
+												}
+
+												return true
+											},
+										},
+										action: { kind: "project_prompt" },
+									},
+								],
+							},
+						},
+					},
+				}),
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		const result = await submitNewProjectSelection(taskState, "Session Predicate Project")
+
+		expect(result.kind).to.equal("project_prompt")
+		expect(observedInput).to.deep.equal({
+			activeBranchId: "session-predicate-entry",
+			projectTitleValue: "Session Predicate Project",
+			stepNumber: 1,
+			keys: ["activeBranchId", "step", "workflowValues"],
+			hasSession: false,
+			hasUi: false,
+			hasBranchContext: false,
+			hasSuppressedWorkflowFormIds: false,
+			hasSuppressedWorkflowStepResolutionDefinitionIds: false,
+			hasTriggerEvent: false,
+		})
+	})
+
+	it("passes sanitized decision inputs and trigger events to event predicates", async () => {
+		let observedInput: ObservedDecisionPredicateInput | undefined
+		const workflow = createWorkflowDefinition({
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: {
+						entryBranchId: "event-predicate-entry",
+						branches: {
+							"event-predicate-entry": {
+								id: "event-predicate-entry",
+								routes: [
+									{
+										id: "event-predicate-route",
+										trigger: {
+											kind: "event_predicate",
+											matches: (input) => {
+												observedInput = {
+													activeBranchId: input.activeBranchId,
+													projectTitleValue:
+														input.workflowValues[DEFAULT_ENTRY_PROJECT_VALUE_KEYS.projectTitle],
+													stepNumber: input.step.stepNumber,
+													keys: Object.keys(input).sort(),
+													hasSession: Reflect.has(input, "session"),
+													hasUi: Reflect.has(input, "ui"),
+													hasBranchContext: Reflect.has(input, "branchContext"),
+													hasSuppressedWorkflowFormIds: Reflect.has(input, "suppressedWorkflowFormIds"),
+													hasSuppressedWorkflowStepResolutionDefinitionIds: Reflect.has(
+														input,
+														"suppressedWorkflowStepResolutionDefinitionIds",
+													),
+													hasTriggerEvent: Reflect.has(input, "triggerEvent"),
+													triggerEventKind: input.triggerEvent.kind,
+												}
+
+												return input.triggerEvent.kind === "project_selection_completed"
+											},
+										},
+										action: { kind: "project_prompt" },
+									},
+								],
+							},
+						},
+					},
+				}),
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		const result = await submitNewProjectSelection(taskState, "Event Predicate Project")
+
+		expect(result.kind).to.equal("project_prompt")
+		expect(observedInput).to.deep.equal({
+			activeBranchId: "event-predicate-entry",
+			projectTitleValue: "Event Predicate Project",
+			stepNumber: 1,
+			keys: ["activeBranchId", "step", "triggerEvent", "workflowValues"],
+			hasSession: false,
+			hasUi: false,
+			hasBranchContext: false,
+			hasSuppressedWorkflowFormIds: false,
+			hasSuppressedWorkflowStepResolutionDefinitionIds: false,
+			hasTriggerEvent: true,
+			triggerEventKind: "project_selection_completed",
+		})
 	})
 
 	it("applies workflow value writes only for inventory keys without consulting generated tool schemas", async () => {
@@ -2841,6 +3021,113 @@ describe("WorkflowRuntime", () => {
 				nested: ["one", true],
 			}),
 		)
+	})
+
+	it("persists multi-panel workflow-form durable values only after their fields are submitted", async () => {
+		const workflowFormId = "multi-panel-durable-values-form"
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: ["panel_one_value", "panel_two_value"],
+			workflowForms: {
+				[workflowFormId]: {
+					definitionVersion: 2,
+					title: "Multi-panel Durable Values Form",
+					toolDictionaryTitle: "Multi-panel Durable Values Tools",
+					toolDictionaryMarkdown: "Multi-panel durable value help",
+					firstPanelId: "panel-1",
+					panels: {
+						"panel-1": {
+							panelId: "panel-1",
+							title: "Panel 1",
+							promptMarkdown: "Capture the first durable value.",
+							fields: [
+								{
+									key: "panel_one_field",
+									workflowValueKey: "panel_one_value",
+									kind: "small_text",
+									label: "Panel One Value",
+									required: true,
+									allowedValueType: "string",
+								},
+							],
+							allowedActions: ["submit"],
+							transition: { type: "sequential", nextPanelId: "panel-2" },
+						},
+						"panel-2": {
+							panelId: "panel-2",
+							title: "Panel 2",
+							promptMarkdown: "Capture the second durable value.",
+							fields: [
+								{
+									key: "panel_two_field",
+									workflowValueKey: "panel_two_value",
+									kind: "small_text",
+									label: "Panel Two Value",
+									required: true,
+									allowedValueType: "string",
+								},
+							],
+							allowedActions: ["submit"],
+							transition: createTerminalTransition(),
+						},
+					},
+				},
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createWorkflowFormDecisionTree({ workflowFormId }),
+				}),
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		await runtime.resolveNextAction({ taskState })
+		const renderFormAction = await submitNewProjectSelection(taskState, "Multi-panel Durable Values Project")
+		expect(renderFormAction.kind).to.equal("render_workflow_form")
+		if (renderFormAction.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${renderFormAction.kind}.`)
+		}
+
+		const panelTwoAction = await runtime.submitWorkflowForm({
+			taskState,
+			request: createFormSubmitRequest({
+				sessionId: renderFormAction.formSession.sessionId,
+				panelId: renderFormAction.formSession.currentPanelId,
+				fields: [
+					{
+						key: "panel_one_field",
+						value: { stringValue: "panel one durable" },
+					},
+				],
+			}),
+		})
+		const activeSession = getActiveWorkflowSession(taskState)
+
+		expect(panelTwoAction.kind).to.equal("render_workflow_form")
+		if (panelTwoAction.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${panelTwoAction.kind}.`)
+		}
+		expect(panelTwoAction.formSession.currentPanelId).to.equal("panel-2")
+		expect(activeSession.workflowValues.panel_one_value).to.equal("panel one durable")
+		expect(activeSession.workflowValues).to.not.have.property("panel_two_value")
+
+		const completedAction = await runtime.submitWorkflowForm({
+			taskState,
+			request: createFormSubmitRequest({
+				sessionId: panelTwoAction.formSession.sessionId,
+				panelId: panelTwoAction.formSession.currentPanelId,
+				fields: [
+					{
+						key: "panel_two_field",
+						value: { stringValue: "panel two durable" },
+					},
+				],
+			}),
+		})
+
+		expect(completedAction.kind).to.equal("project_prompt")
+		expect(activeSession.workflowValues.panel_one_value).to.equal("panel one durable")
+		expect(activeSession.workflowValues.panel_two_value).to.equal("panel two durable")
 	})
 
 	it("fails explicitly when malformed workflow-form value destinations cannot be persisted", async () => {
@@ -3909,6 +4196,7 @@ describe("WorkflowRuntime", () => {
 				throw new Error(`Expected terminal_error, received ${failureResult.kind}.`)
 			}
 			expect(failureResult.errorMessage).to.equal("Error: required artifact identity was not found")
+			expectWorkflowStateCleared(missingIdentityState)
 		}
 	})
 
@@ -3948,20 +4236,13 @@ describe("WorkflowRuntime", () => {
 				taskState: failureState,
 				toolResultText,
 			})
-			const activeSession = getActiveWorkflowSession(failureState)
 
 			expect(result.kind).to.equal("terminal_error")
 			if (result.kind !== "terminal_error") {
 				throw new Error(`Expected terminal_error, received ${result.kind}.`)
 			}
 			expect(result.errorMessage).to.equal(toolResultText)
-			expect(activeSession.branchContext.failureState).to.deep.equal({
-				retryAttemptCount: 1,
-				terminalErrorMessage: toolResultText,
-			})
-			for (const artifactOutputValueKey of collectArtifactOutputWorkflowValueKeys(outputFileKeys)) {
-				expect(activeSession.workflowValues).to.not.have.property(artifactOutputValueKey)
-			}
+			expectWorkflowStateCleared(failureState)
 		}
 	})
 
@@ -4242,10 +4523,199 @@ describe("WorkflowRuntime", () => {
 
 		expect(legacyRestored?.kind).to.equal("project_prompt")
 		expect(legacyRestoredState.activeWorkflowName).to.equal(workflow.name)
-		expect(Object.hasOwn(legacyRestoredState.activeWorkflowSession, "workflowName")).to.equal(false)
+		const legacyRestoredSession = legacyRestoredState.activeWorkflowSession
+		expect(legacyRestoredSession).to.not.equal(undefined)
+		if (legacyRestoredSession === undefined) {
+			throw new Error("Expected a restored workflow session.")
+		}
+		expect(Object.hasOwn(legacyRestoredSession, "workflowName")).to.equal(false)
 		const repersistedSession = runtime.getPersistedSession({ taskState: legacyRestoredState })
 		expect(repersistedSession).to.not.equal(undefined)
+		if (repersistedSession === undefined) {
+			throw new Error("Expected a re-persisted workflow session.")
+		}
 		expect(Object.hasOwn(repersistedSession, "workflowName")).to.equal(false)
+	})
+
+	it("fails closed without throwing when persisted workflow session shape is malformed", async () => {
+		const workflow = createWorkflowDefinition()
+		const persistedSession = await createRestorablePersistedSession(workflow)
+		const malformedCases: Array<{
+			name: string
+			mutate(session: PersistedWorkflowSession): void
+		}> = [
+			{
+				name: "missing ui",
+				mutate: (session) => {
+					Reflect.deleteProperty(session, "ui")
+				},
+			},
+			{
+				name: "invalid branch context",
+				mutate: (session) => {
+					Reflect.set(session, "branchContext", "not-branch-context")
+				},
+			},
+			{
+				name: "invalid active step number",
+				mutate: (session) => {
+					Reflect.set(session, "activeStepNumber", "step-1")
+				},
+			},
+		]
+
+		for (const malformedCase of malformedCases) {
+			const malformedSession = structuredClone(persistedSession)
+			malformedCase.mutate(malformedSession)
+
+			await expectPersistedRestoreFailsClosed(workflow, malformedSession)
+		}
+	})
+
+	it("fails closed with teardown persistence when restored branch trigger event is retired session init event", async () => {
+		const workflow = createWorkflowDefinition()
+		const persistedSession = await createRestorablePersistedSession(workflow)
+		const staleEventKind = ["session", "initialized"].join("_")
+		Reflect.set(persistedSession.branchContext, "lastTriggerEvent", {
+			kind: staleEventKind,
+		})
+
+		await expectPersistedRestoreFailsClosed(workflow, persistedSession)
+	})
+
+	it("fails closed for invalid restored workflow values, project selection, and ui suppression state", async () => {
+		const workflow = createWorkflowDefinition()
+		const persistedSession = await createRestorablePersistedSession(workflow)
+		const malformedCases: Array<{
+			name: string
+			mutate(session: PersistedWorkflowSession): void
+		}> = [
+			{
+				name: "invalid workflow values",
+				mutate: (session) => {
+					Reflect.set(session.workflowValues, "bad_value", undefined)
+				},
+			},
+			{
+				name: "invalid project selection",
+				mutate: (session) => {
+					Reflect.set(session.projectSelection, "projectMode", "archived")
+				},
+			},
+			{
+				name: "invalid form suppression array",
+				mutate: (session) => {
+					Reflect.set(session.ui, "suppressedWorkflowFormIds", "not-an-array")
+				},
+			},
+			{
+				name: "stale form suppression id",
+				mutate: (session) => {
+					session.ui.suppressedWorkflowFormIds = ["missing-form"]
+				},
+			},
+			{
+				name: "stale step-resolution suppression id",
+				mutate: (session) => {
+					session.ui.suppressedWorkflowStepResolutionDefinitionIds = ["missing-operation"]
+				},
+			},
+		]
+
+		for (const malformedCase of malformedCases) {
+			const malformedSession = structuredClone(persistedSession)
+			malformedCase.mutate(malformedSession)
+
+			await expectPersistedRestoreFailsClosed(workflow, malformedSession)
+		}
+	})
+
+	it("fails closed for stale or malformed restored workflow form sessions", async () => {
+		const workflowFormId = "form-restore-validation"
+		const formDefinition = createWorkflowFormDefinitionPayload()
+		formDefinition.panels["panel-2"].fields = [
+			{
+				key: "approval",
+				kind: "small_text",
+				label: "Approval",
+				required: false,
+			},
+		]
+		const workflow = createWorkflowDefinition({
+			workflowForms: {
+				[workflowFormId]: formDefinition,
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createWorkflowFormDecisionTree({
+						workflowFormId,
+					}),
+				}),
+				"step-2": createStepDefinition({ stepNumber: 2 }),
+			},
+		})
+
+		registerResolvedWorkflow(workflow)
+		const sourceState = new TaskState()
+		await activateWorkflow(sourceState, workflow)
+		await runtime.resolveNextAction({ taskState: sourceState })
+		await submitNewProjectSelection(sourceState, "Malformed Form Restore Project")
+		await runtime.resolveNextAction({ taskState: sourceState })
+		await submitActiveWorkflowFormPanel(sourceState)
+		const persistedSession = runtime.getPersistedSession({ taskState: sourceState })
+		if (persistedSession === undefined) {
+			throw new Error("Expected a persisted form session.")
+		}
+
+		const malformedCases: Array<{
+			name: string
+			mutate(session: PersistedWorkflowSession): void
+		}> = [
+			{
+				name: "stale form id",
+				mutate: (session) => {
+					if (session.ui.formSession === undefined) {
+						throw new Error("Expected a form session.")
+					}
+					session.ui.formSession.workflowFormId = "missing-form"
+				},
+			},
+			{
+				name: "stale current panel id",
+				mutate: (session) => {
+					if (session.ui.formSession === undefined) {
+						throw new Error("Expected a form session.")
+					}
+					session.ui.formSession.currentPanelId = "missing-panel"
+				},
+			},
+			{
+				name: "malformed submitted value",
+				mutate: (session) => {
+					if (session.ui.formSession === undefined) {
+						throw new Error("Expected a form session.")
+					}
+					Reflect.set(session.ui.formSession.values, "approval", {
+						valueType: "string",
+						booleanValue: true,
+					})
+				},
+			},
+			{
+				name: "missing active branch continuation route",
+				mutate: (session) => {
+					session.branchContext.activeBranchId = "after-form-complete"
+				},
+			},
+		]
+
+		for (const malformedCase of malformedCases) {
+			const malformedSession = structuredClone(persistedSession)
+			malformedCase.mutate(malformedSession)
+
+			await expectPersistedRestoreFailsClosed(workflow, malformedSession)
+		}
 	})
 
 	it("restores downstream workflow ui from the canonical session without legacy task-state mirrors", async () => {
@@ -4278,6 +4748,13 @@ describe("WorkflowRuntime", () => {
 		if (!persistedSession) {
 			throw new Error("Expected a persisted workflow session for restore.")
 		}
+		if (persistedSession.ui.formSession === undefined) {
+			throw new Error("Expected a persisted workflow form session for restore.")
+		}
+		persistedSession.ui.formSession.definitionPayload = {
+			...persistedSession.ui.formSession.definitionPayload,
+			title: "Stale Persisted Workflow Form",
+		}
 
 		const restoredState = new TaskState()
 		restoredState.activeWorkflowName = workflow.name
@@ -4290,10 +4767,167 @@ describe("WorkflowRuntime", () => {
 		expectNoLegacyWorkflowMirrors(restoredState)
 		expect(getActiveFormSession(sourceState).currentPanelId).to.equal("panel-2")
 		expect(getActiveFormSession(restoredState).currentPanelId).to.equal("panel-2")
+		expect(getActiveFormSession(restoredState).definitionPayload.title).to.equal("Workflow Form")
 		expect(restored?.kind).to.equal("render_workflow_form")
 		if (restored?.kind === "render_workflow_form") {
 			expect(restored.formSession.currentPanelId).to.equal("panel-2")
+			expect(restored.formSession.definitionPayload.title).to.equal("Workflow Form")
 		}
+	})
+
+	it("restores valid mandatory entry form sessions through the runtime-owned entry path", async () => {
+		const workflow = createWorkflowDefinition({
+			workflowForms: {},
+		})
+		registerResolvedWorkflow(workflow)
+		const sourceState = new TaskState()
+		const entryAction = await activateWorkflow(sourceState, workflow)
+
+		expect(entryAction.kind).to.equal("render_workflow_form")
+		if (entryAction.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${entryAction.kind}.`)
+		}
+		expect(entryAction.formSession.workflowFormId).to.equal(ENTRY_FORM_ID)
+		expect(workflow.workflowForms?.[ENTRY_FORM_ID]).to.equal(undefined)
+		const expectedDefinitionPayload = structuredClone(entryAction.formSession.definitionPayload)
+
+		const persistedSession = runtime.getPersistedSession({ taskState: sourceState })
+		expect(persistedSession).to.not.equal(undefined)
+		if (persistedSession === undefined) {
+			throw new Error("Expected a persisted mandatory entry form session.")
+		}
+
+		const persistedFormSession = persistedSession.ui.formSession
+		expect(persistedFormSession).to.not.equal(undefined)
+		if (persistedFormSession === undefined) {
+			throw new Error("Expected a persisted mandatory entry form session.")
+		}
+		persistedFormSession.definitionPayload = {
+			...persistedFormSession.definitionPayload,
+			title: "Stale Persisted Entry Form",
+		}
+
+		const restoredState = new TaskState()
+		restoredState.activeWorkflowName = workflow.name
+		const restored = await runtime.restorePersistedSession({
+			taskState: restoredState,
+			persistedSession,
+		})
+
+		expect(restored?.kind).to.equal("render_workflow_form")
+		if (restored?.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${restored?.kind ?? "undefined"}.`)
+		}
+		expect(restored.formSession.workflowFormId).to.equal(ENTRY_FORM_ID)
+		expect(restored.formSession.definitionPayload).to.deep.equal(expectedDefinitionPayload)
+		expect(restored.formSession.definitionPayload.title).to.not.equal("Stale Persisted Entry Form")
+		expect(restored.payload.panel?.panelId).to.equal(ENTRY_INFO_PANEL_ID)
+		expect(getActiveFormSession(restoredState).definitionPayload).to.deep.equal(expectedDefinitionPayload)
+
+		const completedProjectSelectionSession = structuredClone(persistedSession)
+		completedProjectSelectionSession.projectSelection = {
+			projectMode: "new",
+			projectTitle: "Already Complete",
+			projectFolderName: "already-complete",
+		}
+
+		await expectPersistedRestoreFailsClosed(workflow, completedProjectSelectionSession)
+	})
+
+	it("fails closed for stale or malformed restored step-resolution sessions", async () => {
+		const toolBackedOperationId = "step-resolution-1"
+		const workflow = createWorkflowDefinition({
+			toolBackedOperationDefinitions: {
+				[toolBackedOperationId]: createToolBackedOperationDefinition(),
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createToolBackedOperationDecisionTree({
+						toolBackedOperationId,
+					}),
+				}),
+			},
+		})
+		const persistedSession = await createRestorableStepResolutionSession(workflow)
+		const malformedCases: Array<{
+			name: string
+			mutate(session: PersistedWorkflowSession): void
+		}> = [
+			{
+				name: "stale operation definition id",
+				mutate: (session) => {
+					if (session.ui.stepResolutionSession === undefined) {
+						throw new Error("Expected a step-resolution session.")
+					}
+					session.ui.stepResolutionSession.definitionId = "missing-operation"
+				},
+			},
+			{
+				name: "owner workflow mismatch",
+				mutate: (session) => {
+					if (session.ui.stepResolutionSession === undefined) {
+						throw new Error("Expected a step-resolution session.")
+					}
+					session.ui.stepResolutionSession.owner.workflowName = "other-workflow"
+				},
+			},
+			{
+				name: "non-pending state",
+				mutate: (session) => {
+					if (session.ui.stepResolutionSession === undefined) {
+						throw new Error("Expected a step-resolution session.")
+					}
+					session.ui.stepResolutionSession.state = "success"
+				},
+			},
+			{
+				name: "missing active branch continuation route",
+				mutate: (session) => {
+					session.branchContext.activeBranchId = "after-step-resolution-success"
+				},
+			},
+		]
+
+		for (const malformedCase of malformedCases) {
+			const malformedSession = structuredClone(persistedSession)
+			malformedCase.mutate(malformedSession)
+
+			await expectPersistedRestoreFailsClosed(workflow, malformedSession)
+		}
+	})
+
+	it("restores valid pending step-resolution sessions through execute_tool_backed_operation", async () => {
+		const toolBackedOperationId = "step-resolution-1"
+		const workflow = createWorkflowDefinition({
+			toolBackedOperationDefinitions: {
+				[toolBackedOperationId]: createToolBackedOperationDefinition(),
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createToolBackedOperationDecisionTree({
+						toolBackedOperationId,
+					}),
+				}),
+			},
+		})
+		const persistedSession = await createRestorableStepResolutionSession(workflow)
+		registerResolvedWorkflow(workflow)
+		const restoredState = new TaskState()
+		restoredState.activeWorkflowName = workflow.name
+
+		const restored = await runtime.restorePersistedSession({
+			taskState: restoredState,
+			persistedSession,
+		})
+
+		expect(restored?.kind).to.equal("execute_tool_backed_operation")
+		if (restored?.kind !== "execute_tool_backed_operation") {
+			throw new Error(`Expected execute_tool_backed_operation, received ${restored?.kind ?? "undefined"}.`)
+		}
+		expect(restored.toolBackedOperationSession?.definitionId).to.equal(toolBackedOperationId)
+		expect(restoredState.activeWorkflowSession?.ui.stepResolutionSession?.definitionId).to.equal(toolBackedOperationId)
 	})
 
 	it("completes workflows when completion rules pass and tears down all runtime-owned state", async () => {

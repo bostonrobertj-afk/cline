@@ -194,6 +194,68 @@ function hasSingleTypedValue(value: WorkflowFormValue): boolean {
 	)
 }
 
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && Array.isArray(value) === false
+}
+
+export function isWorkflowFormSubmittedValuePayload(value: unknown): value is WorkflowFormSubmittedValuePayload {
+	if (isPlainRecord(value) === false) {
+		return false
+	}
+
+	let typedValueCount = 0
+	if (value.stringValue !== undefined) {
+		typedValueCount += 1
+	}
+	if (value.booleanValue !== undefined) {
+		typedValueCount += 1
+	}
+	if (value.integerValue !== undefined) {
+		typedValueCount += 1
+	}
+	if (value.numberValue !== undefined) {
+		typedValueCount += 1
+	}
+	if (value.arrayValue !== undefined) {
+		typedValueCount += 1
+	}
+	if (value.objectValue !== undefined) {
+		typedValueCount += 1
+	}
+
+	if (typedValueCount !== 1) {
+		return false
+	}
+
+	switch (value.valueType) {
+		case "string":
+			return typeof value.stringValue === "string"
+		case "boolean":
+			return typeof value.booleanValue === "boolean"
+		case "integer":
+			return Number.isInteger(value.integerValue)
+		case "number":
+			return typeof value.numberValue === "number" && Number.isFinite(value.numberValue)
+		case "array":
+			return (
+				Array.isArray(value.arrayValue) && value.arrayValue.every((entry) => isWorkflowFormSubmittedValuePayload(entry))
+			)
+		case "object":
+			return (
+				Array.isArray(value.objectValue) &&
+				value.objectValue.every(
+					(entry) =>
+						isPlainRecord(entry) &&
+						typeof entry.key === "string" &&
+						entry.key.trim() !== "" &&
+						isWorkflowFormSubmittedValuePayload(entry.value),
+				)
+			)
+		default:
+			return false
+	}
+}
+
 export function normalizeWorkflowFormSubmittedValue(
 	value: WorkflowFormValue | undefined,
 ): WorkflowFormSubmittedValuePayload | undefined {

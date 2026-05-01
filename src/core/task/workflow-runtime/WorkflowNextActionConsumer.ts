@@ -12,7 +12,7 @@ export interface WorkflowNextActionConsumerAdapter {
 	shouldAbort(): boolean
 	persistWorkflowRuntimeMetadata(): Promise<void>
 	renderWorkflowForm(payload: WorkflowForm): Promise<void>
-	waitForWorkflowFormCompletion(formSession: WorkflowFormSessionState): Promise<void>
+	waitForWorkflowFormCompletion(formSession: WorkflowFormSessionState): Promise<WorkflowNextAction | undefined>
 	renderWorkflowStepResolutionStatus(payload: ClineWorkflowStepResolutionStatus): Promise<void>
 	reportTerminalError(errorMessage: string): Promise<void>
 	executeToolBackedOperation(
@@ -63,11 +63,14 @@ export class WorkflowNextActionConsumer {
 				case "render_workflow_form":
 					await this.adapter.persistWorkflowRuntimeMetadata()
 					await this.adapter.renderWorkflowForm(currentAction.payload)
-					await this.adapter.waitForWorkflowFormCompletion(currentAction.formSession)
+					const submittedNextAction = await this.adapter.waitForWorkflowFormCompletion(currentAction.formSession)
 					if (this.adapter.shouldAbort()) {
 						return
 					}
-					currentAction = await this.workflowRuntime.resolveNextAction({ taskState: this.taskState })
+					if (submittedNextAction === undefined) {
+						return
+					}
+					currentAction = submittedNextAction
 					break
 				case "execute_tool_backed_operation": {
 					if (currentAction.toolBackedOperationSession) {
