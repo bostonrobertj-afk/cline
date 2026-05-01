@@ -13,7 +13,13 @@ import {
 	shouldUseContinuationTurnPrompt,
 } from "@core/task/prompt-refresh"
 import { StreamResponseHandler } from "@core/task/StreamResponseHandler"
-import { ClineAssistantToolUseBlock, ClineStorageMessage, ClineTextContentBlock, ClineUserContent } from "@shared/messages"
+import {
+	ClineAssistantContent,
+	ClineAssistantToolUseBlock,
+	ClineStorageMessage,
+	ClineTextContentBlock,
+	ClineUserContent,
+} from "@shared/messages"
 import type { ClineMessageModelInfo } from "@shared/messages/metrics"
 import { Logger } from "@shared/services/Logger"
 import type { SkillMetadata } from "@shared/skills"
@@ -97,6 +103,13 @@ interface SubagentToolCall {
 interface SubagentContextState {
 	conversationHistoryDeletedRange?: [number, number]
 }
+
+interface AssignedSkillMarkerExtraction {
+	assignedSkillNames: string[]
+	sanitizedPrompt: string
+}
+
+type AssignedWorkflowActivationResult = { kind: "no_assignment" } | { kind: "activated" } | { kind: "failed"; error: string }
 
 function getVisibleNativeToolNames(nativeTools: ClineTool[] | undefined): string[] {
 	return (nativeTools ?? []).flatMap((tool) => {
@@ -228,25 +241,28 @@ function resolveToolUseId(call: { id?: string; call_id?: string; name?: string }
 	return fallbackId
 }
 
-function extractAssignedSkillNames(prompt: string): string[] {
-	const explicitCalls = Array.from(prompt.matchAll(/use_skill\(\s*['"]([^'"\n]+)['"]\s*\)/g)).map((match) => match[1])
-	const explicitParams = Array.from(prompt.matchAll(/skill_name\s*=\s*['"]([^'"\n]+)['"]/g)).map((match) => match[1])
-	return Array.from(new Set([...explicitCalls, ...explicitParams].map((name) => name.trim()).filter(Boolean)))
-}
+function extractAssignedSkillMarkers(prompt: string): AssignedSkillMarkerExtraction {
+	const assignedSkillNames: string[] = []
+	const markerPatterns = [/use_skill\(\s*['"]([^'"\n]+)['"]\s*\)/g, /skill_name\s*=\s*['"]([^'"\n]+)['"]/g]
+	let sanitizedPrompt = prompt
 
-function buildAssignedSkillDirective(assignedSkillNames: string[]): string {
-	if (assignedSkillNames.length === 0) {
-		return ""
+	for (const markerPattern of markerPatterns) {
+		sanitizedPrompt = sanitizedPrompt.replace(markerPattern, (_marker, skillName: string) => {
+			const trimmedSkillName = skillName.trim()
+			if (trimmedSkillName.length > 0 && !assignedSkillNames.includes(trimmedSkillName)) {
+				assignedSkillNames.push(trimmedSkillName)
+			}
+			return ""
+		})
 	}
 
-	const skillList = assignedSkillNames.map((skill) => `- ${skill}`).join("\n")
-
-	return `\n\n# Assigned Workflow Activation
-This subagent has been assigned the following workflow skill${assignedSkillNames.length === 1 ? "" : "s"}:
-${skillList}
-
-Use only the assigned workflow skill named above.
-Once the assigned workflow is active, follow its injected instructions instead of the default research-subagent behavior.`
+	return {
+		assignedSkillNames,
+		sanitizedPrompt: sanitizedPrompt
+			.replace(/[ \t]+\n/g, "\n")
+			.replace(/[ \t]{2,}/g, " ")
+			.trim(),
+	}
 }
 
 function toAssistantToolUseBlock(call: SubagentToolCall): ClineAssistantToolUseBlock {
@@ -276,7 +292,12 @@ function parseNonNativeToolCalls(assistantText: string): SubagentToolCall[] {
 		}))
 }
 
-function pushSubagentToolResultBlock(toolResultBlocks: any[], call: SubagentToolCall, label: string, content: string): void {
+function pushSubagentToolResultBlock(
+	toolResultBlocks: ClineUserContent[],
+	call: SubagentToolCall,
+	label: string,
+	content: string,
+): void {
 	if (call.isNativeToolCall) {
 		toolResultBlocks.push({
 			type: "tool_result",
@@ -491,8 +512,13 @@ export class SubagentRunner {
 			const discoveredSkills = await discoverSkills(this.baseConfig.cwd)
 			const availableSkills = getAvailableSkills(discoveredSkills)
 			const configuredSkillNames = this.agent.getConfiguredSkills()
-			const assignedSkillNames = extractAssignedSkillNames(prompt)
-			await this.autoActivateAssignedWorkflow(state, assignedSkillNames)
+			const { assignedSkillNames, sanitizedPrompt } = extractAssignedSkillMarkers(prompt)
+			const assignedWorkflowActivationResult = await this.autoActivateAssignedWorkflow(state, assignedSkillNames)
+			if (assignedWorkflowActivationResult.kind === "failed") {
+				const error = assignedWorkflowActivationResult.error
+				onProgress({ status: "failed", error, stats })
+				return { status: "failed", error, stats }
+			}
 			const promptRegistry = PromptRegistry.getInstance()
 			const workspaceMetadataEnvironmentBlock = await this.getWorkspaceMetadataEnvironmentBlock()
 
@@ -506,7 +532,7 @@ export class SubagentRunner {
 			const initialUserContent: ClineUserContent[] = [
 				{
 					type: "text",
-					text: prompt,
+					text: sanitizedPrompt,
 				} as ClineTextContentBlock,
 				// Server-side task loop checks require workspace metadata to be present in the
 				// initial user message of subagent runs.
@@ -548,7 +574,6 @@ export class SubagentRunner {
 					providerInfo,
 					availableSkills,
 					configuredSkillNames,
-					assignedSkillNames,
 					nativeToolCallsRequested,
 					shouldSendFullPromptAssembly,
 					shouldUseContinuationPrompt,
@@ -561,16 +586,12 @@ export class SubagentRunner {
 				const useNativeToolCalls = !!promptRegistry.nativeTools?.length
 				const nativeTools = useNativeToolCalls ? promptRegistry.nativeTools : undefined
 				const baseSystemPrompt = this.agent.buildSystemPrompt(generatedSystemPrompt, promptContext)
-				const systemPrompt =
-					assignedSkillNames.length > 0 && !state.activeWorkflowName
-						? `${baseSystemPrompt}${buildAssignedSkillDirective(assignedSkillNames)}`
-						: baseSystemPrompt
 				const promptInjectionText = promptInjectionBlocks
 					.map((block) => block.text)
 					.join("\n\n")
 					.trim()
 				const effectiveSystemPrompt =
-					promptInjectionText.length > 0 ? `${systemPrompt}\n\n${promptInjectionText}` : systemPrompt
+					promptInjectionText.length > 0 ? `${baseSystemPrompt}\n\n${promptInjectionText}` : baseSystemPrompt
 
 				if (useNativeToolCalls && (!nativeTools || nativeTools.length === 0)) {
 					const error = "Subagent tool requires native tool calling support."
@@ -727,7 +748,7 @@ export class SubagentRunner {
 					)
 					finalizedToolCalls = fallbackNonNativeToolCalls
 				}
-				const assistantContent = [] as any[]
+				const assistantContent: ClineAssistantContent[] = []
 				if (assistantText.trim().length > 0) {
 					assistantContent.push({
 						type: "text",
@@ -926,13 +947,12 @@ export class SubagentRunner {
 		providerInfo: SystemPromptContext["providerInfo"]
 		availableSkills: SkillMetadata[]
 		configuredSkillNames?: string[]
-		assignedSkillNames: string[]
 		nativeToolCallsRequested: boolean
 		shouldSendFullPromptAssembly: boolean
 		shouldUseContinuationPrompt: boolean
 	}): Promise<SystemPromptContext> {
 		const skills = params.shouldSendFullPromptAssembly
-			? this.resolvePromptSkills(params.availableSkills, params.configuredSkillNames, params.assignedSkillNames)
+			? this.resolvePromptSkills(params.availableSkills, params.configuredSkillNames)
 			: []
 		const includeMcpHub = this.agent.isMcpExposureEnabled()
 		const workflowPromptProjection = await this.baseConfig.workflowRuntime.buildTurnProjection({ taskState: params.state })
@@ -978,13 +998,28 @@ export class SubagentRunner {
 		})
 	}
 
-	private async autoActivateAssignedWorkflow(state: TaskState, assignedSkillNames: string[]): Promise<void> {
-		if (assignedSkillNames.length !== 1) {
-			return
+	private async autoActivateAssignedWorkflow(
+		state: TaskState,
+		assignedSkillNames: string[],
+	): Promise<AssignedWorkflowActivationResult> {
+		if (assignedSkillNames.length === 0) {
+			return { kind: "no_assignment" }
+		}
+
+		if (assignedSkillNames.length > 1) {
+			return {
+				kind: "failed",
+				error: "Subagent workflow assignment is invalid: multiple distinct workflow assignment markers were provided.",
+			}
 		}
 
 		if (state.activeWorkflowName || state.activeWorkflowSession) {
-			return
+			return { kind: "no_assignment" }
+		}
+
+		const assignedSkillName = assignedSkillNames[0]
+		if (assignedSkillName === undefined) {
+			return { kind: "no_assignment" }
 		}
 
 		const parentSession = this.baseConfig.taskState.activeWorkflowSession
@@ -993,15 +1028,22 @@ export class SubagentRunner {
 			parentSession.projectSelection.projectTitle.trim() === "" ||
 			parentSession.projectSelection.projectFolderName.trim() === ""
 		) {
-			return
+			return {
+				kind: "failed",
+				error: "Subagent workflow assignment failed: parent workflow project selection is required before activating a child workflow.",
+			}
 		}
 
-		const resolvedWorkflow = resolveWorkflowByUseSkillName(assignedSkillNames[0])
+		const resolvedWorkflow = resolveWorkflowByUseSkillName(assignedSkillName)
 		if (!resolvedWorkflow) {
-			return
+			return {
+				kind: "failed",
+				error: `Subagent workflow assignment failed: workflow assignment marker '${assignedSkillName}' could not be resolved.`,
+			}
 		}
 
 		const previousActiveWorkflowName = state.activeWorkflowName
+		const previousActiveWorkflowSession = state.activeWorkflowSession
 		state.activeWorkflowName = resolvedWorkflow.name
 		const nextAction = await this.baseConfig.workflowRuntime.activateWorkflow({
 			taskState: state,
@@ -1010,10 +1052,15 @@ export class SubagentRunner {
 		})
 		if (nextAction.kind === "no_op") {
 			state.activeWorkflowName = previousActiveWorkflowName
-			return
+			state.activeWorkflowSession = previousActiveWorkflowSession
+			return {
+				kind: "failed",
+				error: `Subagent workflow assignment failed: workflow '${resolvedWorkflow.name}' could not be activated.`,
+			}
 		}
 
 		await this.consumeChildWorkflowNextAction(state, nextAction)
+		return { kind: "activated" }
 	}
 
 	private async buildSubagentPromptInjectionBlocks(
@@ -1026,27 +1073,16 @@ export class SubagentRunner {
 		return []
 	}
 
-	private resolvePromptSkills(
-		availableSkills: SkillMetadata[],
-		configuredSkillNames: string[] | undefined,
-		assignedSkillNames: string[],
-	): SkillMetadata[] {
-		const preferredSkillNames =
-			assignedSkillNames.length > 0
-				? assignedSkillNames
-				: configuredSkillNames && configuredSkillNames.length > 0
-					? configuredSkillNames
-					: undefined
-
-		if (!preferredSkillNames) {
+	private resolvePromptSkills(availableSkills: SkillMetadata[], configuredSkillNames: string[] | undefined): SkillMetadata[] {
+		if (!configuredSkillNames || configuredSkillNames.length === 0) {
 			return availableSkills
 		}
 
-		return preferredSkillNames
+		return configuredSkillNames
 			.map((skillName) => {
 				const skill = availableSkills.find((candidate) => candidate.name === skillName)
 				if (!skill) {
-					Logger.warn(`[SubagentRunner] Configured or assigned skill '${skillName}' not found for subagent run.`)
+					Logger.warn(`[SubagentRunner] Configured skill '${skillName}' not found for subagent run.`)
 				}
 				return skill
 			})

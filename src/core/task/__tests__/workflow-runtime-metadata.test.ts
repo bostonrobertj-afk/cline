@@ -146,15 +146,81 @@ describe("workflow runtime metadata persistence", () => {
 		metadata.activeWorkflowSession = createPersistedSession()
 		const saveMetadata = sandbox.stub(disk, "saveTaskMetadata").resolves()
 		sandbox.stub(WorkflowRegistry, "resolveWorkflowDefinition").returns(undefined)
+		const task = createTaskHarness()
+		const consumeWorkflowNextAction = sandbox.stub().resolves()
+		Reflect.set(task, "consumeWorkflowNextAction", consumeWorkflowNextAction)
 
-		await callTaskMethod(createTaskHarness(), "restoreWorkflowRuntimeStateFromMetadata", metadata)
+		await callTaskMethod(task, "restoreWorkflowRuntimeStateFromMetadata", metadata)
 
 		sinon.assert.calledOnce(saveMetadata)
+		sinon.assert.notCalled(consumeWorkflowNextAction)
 		expect(metadata.activeWorkflowName).to.equal(undefined)
 		expect(metadata.activeWorkflowSession).to.equal(undefined)
 		expect(saveMetadata.firstCall.args[0]).to.equal("task-1")
 		expect(saveMetadata.firstCall.args[1].activeWorkflowName).to.equal(undefined)
 		expect(saveMetadata.firstCall.args[1].activeWorkflowSession).to.equal(undefined)
+	})
+
+	it("consumes non-no_op workflow next actions returned while restoring persisted sessions", async () => {
+		const metadata = createMetadata()
+		metadata.activeWorkflowName = "workflow-runtime-test"
+		metadata.activeWorkflowSession = createPersistedSession()
+		const nextAction: WorkflowNextAction = { kind: "project_prompt", promptProjection: {} }
+		const workflowRuntime = new WorkflowRuntime({
+			cwd: "/tmp",
+			workspacePathPolicy: createAllowAllWorkspacePathPolicy(),
+		})
+		const restorePersistedSession = sandbox.stub(workflowRuntime, "restorePersistedSession").resolves(nextAction)
+		const task = createTaskHarness(new TaskState(), workflowRuntime)
+		const consumeWorkflowNextAction = sandbox.stub().resolves()
+		Reflect.set(task, "consumeWorkflowNextAction", consumeWorkflowNextAction)
+		const saveMetadata = sandbox.stub(disk, "saveTaskMetadata").resolves()
+
+		await callTaskMethod(task, "restoreWorkflowRuntimeStateFromMetadata", metadata)
+
+		sinon.assert.calledOnceWithExactly(restorePersistedSession, {
+			taskState: Reflect.get(task, "taskState"),
+			persistedSession: metadata.activeWorkflowSession,
+		})
+		sinon.assert.calledOnceWithExactly(consumeWorkflowNextAction, nextAction)
+		sinon.assert.notCalled(saveMetadata)
+	})
+
+	it("does not consume undefined or no_op restore results", async () => {
+		const saveMetadata = sandbox.stub(disk, "saveTaskMetadata").resolves()
+		const restoreResultCases: Array<{
+			name: string
+			restoreResult: WorkflowNextAction | undefined
+		}> = [
+			{
+				name: "undefined",
+				restoreResult: undefined,
+			},
+			{
+				name: "no_op",
+				restoreResult: { kind: "no_op" },
+			},
+		]
+
+		for (const restoreResultCase of restoreResultCases) {
+			const metadata = createMetadata()
+			metadata.activeWorkflowName = "workflow-runtime-test"
+			metadata.activeWorkflowSession = createPersistedSession()
+			const workflowRuntime = new WorkflowRuntime({
+				cwd: "/tmp",
+				workspacePathPolicy: createAllowAllWorkspacePathPolicy(),
+			})
+			sandbox.stub(workflowRuntime, "restorePersistedSession").resolves(restoreResultCase.restoreResult)
+			const task = createTaskHarness(new TaskState(), workflowRuntime)
+			const consumeWorkflowNextAction = sandbox.stub().resolves()
+			Reflect.set(task, "consumeWorkflowNextAction", consumeWorkflowNextAction)
+
+			await callTaskMethod(task, "restoreWorkflowRuntimeStateFromMetadata", metadata)
+
+			sinon.assert.notCalled(consumeWorkflowNextAction)
+			sinon.assert.notCalled(saveMetadata)
+			saveMetadata.resetHistory()
+		}
 	})
 
 	it("persists cleared workflow metadata when persisted sessions are missing canonical workflow identity", async () => {

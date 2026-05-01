@@ -14,6 +14,7 @@ import { DiffViewProvider } from "@integrations/editor/DiffViewProvider"
 import { BrowserSession } from "@services/browser/BrowserSession"
 import { UrlContentFetcher } from "@services/browser/UrlContentFetcher"
 import { McpHub } from "@services/mcp/McpHub"
+import type { ClineStorageMessage } from "@shared/messages"
 import { afterEach, describe, it } from "mocha"
 import sinon from "sinon"
 import type {
@@ -48,7 +49,6 @@ type PromptContextArgs = {
 	providerInfo: { providerId: string; model: { id: string }; mode: string }
 	availableSkills: unknown[]
 	configuredSkillNames: string[] | undefined
-	assignedSkillNames: string[]
 	nativeToolCallsRequested: boolean
 	shouldSendFullPromptAssembly: boolean
 	shouldUseContinuationPrompt: boolean
@@ -89,6 +89,16 @@ const consumeChildWorkflowNextAction = Reflect.get(SubagentRunner.prototype, "co
 	state: TaskState,
 	nextAction: WorkflowNextAction | undefined,
 ) => Promise<void>
+type ShouldCompactBeforeNextRequest = (
+	this: SubagentRunner,
+	requestTotalTokens: number,
+	api: ReturnType<typeof coreApi.buildApiHandler>,
+	modelId: string,
+) => boolean
+const shouldCompactBeforeNextRequest: ShouldCompactBeforeNextRequest = Reflect.get(
+	SubagentRunner.prototype,
+	"shouldCompactBeforeNextRequest",
+)
 const ENTRY_PROJECT_VALUE_KEYS = {
 	projectMode: "entry_project_mode",
 	projectTitle: "entry_project_title",
@@ -140,6 +150,31 @@ function isSubagentToolResultMessage(
 	})
 }
 
+function getInitialUserText(conversation: unknown): string {
+	if (!Array.isArray(conversation)) {
+		return ""
+	}
+	const initialMessage = conversation[0]
+	if (typeof initialMessage !== "object" || initialMessage === null || !("content" in initialMessage)) {
+		return ""
+	}
+	const content = initialMessage.content
+	if (!Array.isArray(content)) {
+		return ""
+	}
+	return content
+		.flatMap((block): string[] => {
+			if (typeof block !== "object" || block === null || !("type" in block) || block.type !== "text") {
+				return []
+			}
+			if (!("text" in block) || typeof block.text !== "string") {
+				return []
+			}
+			return [block.text]
+		})
+		.join("\n")
+}
+
 function createAllowAllWorkspacePathPolicy(): WorkflowWorkspacePathPolicy {
 	return {
 		validateAccess: () => true,
@@ -186,7 +221,27 @@ function createToolHandler(name: ClineDefaultTool, response: string, description
 	}
 }
 
-function createTaskConfig(nativeToolCallEnabled: boolean, promptRefreshFrequency = 5): TaskConfig {
+function createNativeTool(name: string): ClineTool {
+	return {
+		type: "function",
+		function: {
+			name,
+			description: `${name} native tool`,
+			parameters: {
+				type: "object",
+				properties: {},
+			},
+		},
+	}
+}
+
+type TestTaskConfig = TaskConfig & {
+	services: TaskConfig["services"] & {
+		mcpHub: sinon.SinonStubbedInstance<McpHub>
+	}
+}
+
+function createTaskConfig(nativeToolCallEnabled: boolean, promptRefreshFrequency = 5): TestTaskConfig {
 	const autoApprovalSettings = {
 		...DEFAULT_AUTO_APPROVAL_SETTINGS,
 		enableNotifications: false,
@@ -425,13 +480,12 @@ describe("SubagentRunner", () => {
 
 	it("omits mcpHub from subagent prompt context when MCP auto-approval is disabled", async () => {
 		const runner = new SubagentRunner(createTaskConfig(false))
-		const context = await (runner as any).buildPromptContext({
+		const context = await buildPromptContext.call(runner, {
 			state: new TaskState(),
 			hostIde: "TestIde",
 			providerInfo: { providerId: "openai", model: { id: "gpt-5" }, mode: "act" },
 			availableSkills: [],
 			configuredSkillNames: undefined,
-			assignedSkillNames: [],
 			nativeToolCallsRequested: false,
 			shouldSendFullPromptAssembly: true,
 			shouldUseContinuationPrompt: false,
@@ -443,16 +497,15 @@ describe("SubagentRunner", () => {
 	it("passes mcpHub into subagent prompt context when MCP auto-approval is enabled", async () => {
 		const config = createTaskConfig(false)
 		config.autoApprovalSettings.actions.useMcp = true
-		config.services.mcpHub = { getServers: () => [] } as any
+		config.services.mcpHub.getServers.returns([])
 
 		const runner = new SubagentRunner(config)
-		const context = await (runner as any).buildPromptContext({
+		const context = await buildPromptContext.call(runner, {
 			state: new TaskState(),
 			hostIde: "TestIde",
 			providerInfo: { providerId: "openai", model: { id: "gpt-5" }, mode: "act" },
 			availableSkills: [],
 			configuredSkillNames: undefined,
-			assignedSkillNames: [],
 			nativeToolCallsRequested: false,
 			shouldSendFullPromptAssembly: true,
 			shouldUseContinuationPrompt: false,
@@ -464,14 +517,14 @@ describe("SubagentRunner", () => {
 	it("passes the constructed prompt context into subagent system-prompt assembly", async () => {
 		const config = createTaskConfig(false)
 		config.autoApprovalSettings.actions.useMcp = true
-		config.services.mcpHub = { getServers: () => [] } as any
+		config.services.mcpHub.getServers.returns([])
 
 		const buildSystemPromptStub = sinon.stub(SubagentBuilder.prototype, "buildSystemPrompt").callsFake((prompt, context) => {
 			assert.equal(prompt, "system prompt")
 			assert.equal(context?.mcpHub, config.services.mcpHub)
 			return "system prompt"
 		})
-		sinon.stub(SubagentBuilder.prototype, "buildNativeTools").returns([] as any)
+		sinon.stub(SubagentBuilder.prototype, "buildNativeTools").returns([])
 		sinon.stub(SubagentBuilder.prototype, "getConfiguredSkills").returns(undefined)
 		sinon.stub(PromptRegistry.getInstance(), "get").resolves("system prompt")
 		sinon.stub(skills, "discoverSkills").resolves([])
@@ -501,7 +554,7 @@ describe("SubagentRunner", () => {
 	it("passes visibleNativeToolNames into prompt registry assembly and subagent system-prompt assembly", async () => {
 		const config = createTaskConfig(false)
 		config.autoApprovalSettings.actions.useMcp = true
-		config.services.mcpHub = { getServers: () => [] } as any
+		config.services.mcpHub.getServers.returns([])
 		const visibleNativeToolNames = ["indxr-10mcp0search_relevant", "search_files"]
 
 		const buildSystemPromptStub = sinon.stub(SubagentBuilder.prototype, "buildSystemPrompt").callsFake((prompt, context) => {
@@ -509,7 +562,7 @@ describe("SubagentRunner", () => {
 			assert.deepEqual(context?.visibleNativeToolNames, visibleNativeToolNames)
 			return "system prompt"
 		})
-		sinon.stub(SubagentBuilder.prototype, "buildNativeTools").returns(visibleNativeToolNames.map((name) => ({ name })) as any)
+		sinon.stub(SubagentBuilder.prototype, "buildNativeTools").returns(visibleNativeToolNames.map(createNativeTool))
 		sinon.stub(SubagentBuilder.prototype, "getConfiguredSkills").returns(undefined)
 		const promptRegistryGetStub = sinon.stub(PromptRegistry.getInstance(), "get").callsFake(async (context) => {
 			assert.deepEqual(context.visibleNativeToolNames, visibleNativeToolNames)
@@ -541,20 +594,8 @@ describe("SubagentRunner", () => {
 	})
 
 	it("sends prompt-registry native tools instead of pre-prompt projected native tools", async () => {
-		const prePromptNativeTools: ClineTool[] = [
-			{
-				name: "pre_prompt_static_tool",
-				description: "Static subagent tool",
-				input_schema: { type: "object", properties: {} },
-			},
-		]
-		const registryNativeTools: ClineTool[] = [
-			{
-				name: "registry_projected_tool",
-				description: "Prompt registry projected tool",
-				input_schema: { type: "object", properties: {} },
-			},
-		]
+		const prePromptNativeTools: ClineTool[] = [createNativeTool("pre_prompt_static_tool")]
+		const registryNativeTools: ClineTool[] = [createNativeTool("registry_projected_tool")]
 		const createMessage = sinon.stub().callsFake(async function* (
 			_systemPrompt: string,
 			_conversation: unknown[],
@@ -603,20 +644,8 @@ describe("SubagentRunner", () => {
 				parameters: [],
 			},
 		]
-		const staticSubagentNativeTools: ClineTool[] = [
-			{
-				name: ClineDefaultTool.LIST_FILES,
-				description: "Static subagent list files tool",
-				input_schema: { type: "object", properties: {} },
-			},
-		]
-		const workflowProjectedNativeTools: ClineTool[] = [
-			{
-				name: ClineDefaultTool.SET_WORKFLOW_VALUES,
-				description: "Workflow-projected value persistence tool",
-				input_schema: { type: "object", properties: {} },
-			},
-		]
+		const staticSubagentNativeTools: ClineTool[] = [createNativeTool(ClineDefaultTool.LIST_FILES)]
+		const workflowProjectedNativeTools: ClineTool[] = [createNativeTool(ClineDefaultTool.SET_WORKFLOW_VALUES)]
 		const createMessage = sinon.stub().callsFake(async function* (
 			_systemPrompt: string,
 			_conversation: unknown[],
@@ -693,13 +722,7 @@ describe("SubagentRunner", () => {
 				parameters: [],
 			},
 		] as const satisfies readonly ClineToolSpec[]
-		const workflowProjectedNativeTools: ClineTool[] = [
-			{
-				name: ClineDefaultTool.SET_WORKFLOW_VALUES,
-				description: "Workflow-projected value persistence tool",
-				input_schema: { type: "object", properties: {} },
-			},
-		]
+		const workflowProjectedNativeTools: ClineTool[] = [createNativeTool(ClineDefaultTool.SET_WORKFLOW_VALUES)]
 		const createMessage = sinon.stub()
 		createMessage.onFirstCall().callsFake(async function* () {
 			yield {
@@ -790,13 +813,7 @@ describe("SubagentRunner", () => {
 				parameters: [],
 			},
 		] as const satisfies readonly ClineToolSpec[]
-		const workflowProjectedNativeTools: ClineTool[] = [
-			{
-				name: ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT,
-				description: "Workflow-projected artifact creation tool",
-				input_schema: { type: "object", properties: {} },
-			},
-		]
+		const workflowProjectedNativeTools: ClineTool[] = [createNativeTool(ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT)]
 		const createMessage = sinon.stub()
 		createMessage.onFirstCall().callsFake(async function* () {
 			yield {
@@ -921,10 +938,10 @@ describe("SubagentRunner", () => {
 
 		const promptRegistry = PromptRegistry.getInstance()
 		sinon.stub(promptRegistry, "get").callsFake(async () => {
-			promptRegistry.nativeTools = [{ name: "list_files" } as any]
+			promptRegistry.nativeTools = [createNativeTool("list_files")]
 			return "system prompt"
 		})
-		sinon.stub(SubagentBuilder.prototype, "buildNativeTools").returns([{ name: "list_files" }] as any)
+		sinon.stub(SubagentBuilder.prototype, "buildNativeTools").returns([createNativeTool("list_files")])
 		sinon.stub(skills, "discoverSkills").resolves([])
 		sinon.stub(skills, "getAvailableSkills").returns([])
 		stubApiHandler(createMessage)
@@ -970,13 +987,7 @@ describe("SubagentRunner", () => {
 			}
 		})
 
-		const nativeTools: ClineTool[] = [
-			{
-				name: ClineDefaultTool.LIST_FILES,
-				description: "List files",
-				input_schema: { type: "object", properties: {} },
-			},
-		]
+		const nativeTools: ClineTool[] = [createNativeTool(ClineDefaultTool.LIST_FILES)]
 		const promptRegistry = PromptRegistry.getInstance()
 		sinon.stub(promptRegistry, "get").callsFake(async () => {
 			promptRegistry.nativeTools = nativeTools
@@ -1006,13 +1017,7 @@ describe("SubagentRunner", () => {
 				parameters: [],
 			},
 		]
-		const workflowProjectedNativeTools: ClineTool[] = [
-			{
-				name: ClineDefaultTool.USE_SKILL,
-				description: "Workflow-projected use_skill tool",
-				input_schema: { type: "object", properties: {} },
-			},
-		]
+		const workflowProjectedNativeTools: ClineTool[] = [createNativeTool(ClineDefaultTool.USE_SKILL)]
 		const createMessage = sinon.stub()
 		createMessage.onFirstCall().callsFake(async function* () {
 			yield {
@@ -1116,7 +1121,7 @@ describe("SubagentRunner", () => {
 				outputTokens: 5,
 			}
 		})
-		createMessage.onSecondCall().callsFake(async function* (_systemPrompt: string, conversation: any[]) {
+		createMessage.onSecondCall().callsFake(async function* (_systemPrompt: string, conversation: ClineStorageMessage[]) {
 			const assistantMessage = conversation[1]
 			assert.equal(assistantMessage.role, "assistant")
 			assert.equal(assistantMessage.id, "resp_subagent_native_1")
@@ -1188,7 +1193,7 @@ describe("SubagentRunner", () => {
 				id: "resp_subagent_openai_1",
 			}
 		})
-		createMessage.onSecondCall().callsFake(async function* (_systemPrompt: string, conversation: any[]) {
+		createMessage.onSecondCall().callsFake(async function* (_systemPrompt: string, conversation: ClineStorageMessage[]) {
 			const assistantMessage = conversation[1]
 			assert.equal(assistantMessage.role, "assistant")
 			assert.equal(assistantMessage.id, "resp_subagent_openai_1")
@@ -1272,28 +1277,33 @@ describe("SubagentRunner", () => {
 
 		const promptRegistry = PromptRegistry.getInstance()
 		sinon.stub(promptRegistry, "get").callsFake(async () => {
-			promptRegistry.nativeTools = [{ name: "list_files" } as any]
+			promptRegistry.nativeTools = [createNativeTool("list_files")]
 			return "system prompt"
 		})
-		sinon.stub(SubagentBuilder.prototype, "buildNativeTools").returns([{ name: "list_files" }] as any)
+		sinon.stub(SubagentBuilder.prototype, "buildNativeTools").returns([createNativeTool("list_files")])
 		sinon.stub(skills, "discoverSkills").resolves([])
 		sinon.stub(skills, "getAvailableSkills").returns([])
 		stubApiHandler(createMessage)
 		initializeHostProvider()
 
 		const runner = new SubagentRunner(createTaskConfig(true))
-		const shouldCompactStub = sinon.stub(runner as any, "shouldCompactBeforeNextRequest").callsFake((...args: unknown[]) => {
-			const [previousRequestTotalTokens] = args
+		const shouldCompactSpy = sinon.spy(function (
+			this: SubagentRunner,
+			previousRequestTotalTokens: number,
+			api: ReturnType<typeof coreApi.buildApiHandler>,
+			modelId: string,
+		): boolean {
 			assert.equal(previousRequestTotalTokens, 23)
-			return false
+			return shouldCompactBeforeNextRequest.call(this, previousRequestTotalTokens, api, modelId)
 		})
+		Reflect.set(runner, "shouldCompactBeforeNextRequest", shouldCompactSpy)
 
 		const result = await runner.run("List files", () => {})
 
 		assert.equal(result.status, "completed")
 		assert.equal(result.result, "done")
 		assert.equal(createMessage.callCount, 2)
-		assert.equal(shouldCompactStub.callCount, 1)
+		assert.equal(shouldCompactSpy.callCount, 1)
 	})
 
 	it("falls back to non-native result blocks if structured tool calls appear while native mode is disabled", async () => {
@@ -1489,10 +1499,10 @@ describe("SubagentRunner", () => {
 
 		const promptRegistry = PromptRegistry.getInstance()
 		sinon.stub(promptRegistry, "get").callsFake(async () => {
-			promptRegistry.nativeTools = [{ name: "list_files" } as any]
+			promptRegistry.nativeTools = [createNativeTool("list_files")]
 			return "system prompt"
 		})
-		sinon.stub(SubagentBuilder.prototype, "buildNativeTools").returns([{ name: "list_files" }] as any)
+		sinon.stub(SubagentBuilder.prototype, "buildNativeTools").returns([createNativeTool("list_files")])
 		sinon.stub(skills, "discoverSkills").resolves([])
 		sinon.stub(skills, "getAvailableSkills").returns([])
 		stubApiHandler(createMessage)
@@ -1620,7 +1630,6 @@ describe("SubagentRunner", () => {
 			providerInfo: { providerId: "openai", model: { id: "gpt-5" }, mode: "act" },
 			availableSkills: [],
 			configuredSkillNames: undefined,
-			assignedSkillNames: [],
 			nativeToolCallsRequested: false,
 			shouldSendFullPromptAssembly: true,
 			shouldUseContinuationPrompt: false,
@@ -1659,7 +1668,6 @@ describe("SubagentRunner", () => {
 			providerInfo: { providerId: "openai", model: { id: "gpt-5" }, mode: "act" },
 			availableSkills: [],
 			configuredSkillNames: undefined,
-			assignedSkillNames: [],
 			nativeToolCallsRequested: false,
 			shouldSendFullPromptAssembly: true,
 			shouldUseContinuationPrompt: false,
@@ -1697,7 +1705,6 @@ describe("SubagentRunner", () => {
 			providerInfo: { providerId: "openai", model: { id: "gpt-5" }, mode: "act" },
 			availableSkills: [{ name: "alpha-skill", description: "Alpha", path: "/skills/alpha/SKILL.md", source: "project" }],
 			configuredSkillNames: undefined,
-			assignedSkillNames: [],
 			nativeToolCallsRequested: false,
 			shouldSendFullPromptAssembly: false,
 			shouldUseContinuationPrompt: true,
@@ -1727,7 +1734,11 @@ describe("SubagentRunner", () => {
 	})
 
 	it("auto-activates an explicitly assigned shipped workflow before the first subagent turn", async () => {
-		const createMessage = sinon.stub().callsFake(async function* () {
+		const createMessage = sinon.stub().callsFake(async function* (_systemPrompt: string, conversation: unknown) {
+			const initialUserText = getInitialUserText(conversation)
+			assert.doesNotMatch(initialUserText, /use_skill/)
+			assert.doesNotMatch(initialUserText, /skill_name/)
+			assert.doesNotMatch(initialUserText, /review-workflow/)
 			yield {
 				type: "tool_calls",
 				tool_call: {
@@ -1793,7 +1804,10 @@ describe("SubagentRunner", () => {
 		}
 		const activateWorkflowSpy = sinon.spy(config.workflowRuntime, "activateWorkflow")
 		const runner = new SubagentRunner(config)
-		const result = await runner.run("Skill: use_skill('review-workflow')", () => {})
+		const result = await runner.run(
+			`Review the bundle. use_skill('review-workflow') skill_name = "review-workflow" Continue after activation.`,
+			() => {},
+		)
 
 		assert.equal(result.status, "completed")
 		assert.equal(createMessage.callCount, 1)
@@ -1803,12 +1817,18 @@ describe("SubagentRunner", () => {
 		assert.equal(activateWorkflowSpy.firstCall.args[0].workflowName, "review-workflow")
 	})
 
-	it("does not auto-activate an assigned child workflow without a complete parent project selection", async () => {
+	it("fails marker-present runs without complete parent project selection before the first child model request", async () => {
+		const createMessage = sinon.stub()
 		const workflow = createResolvedWorkflow({
 			name: "review-workflow",
 			useSkillName: "review-workflow",
 		})
 		const resolveWorkflowByUseSkillNameStub = sinon.stub(WorkflowRegistry, "resolveWorkflowByUseSkillName").returns(workflow)
+		sinon.stub(SubagentBuilder.prototype, "getConfiguredSkills").returns(undefined)
+		sinon.stub(skills, "discoverSkills").resolves([])
+		sinon.stub(skills, "getAvailableSkills").returns([])
+		stubApiHandler(createMessage)
+		initializeHostProvider()
 		const parentSessionCases: Array<{
 			name: string
 			parentSession: ActiveWorkflowSession | undefined
@@ -1867,13 +1887,21 @@ describe("SubagentRunner", () => {
 			config.taskState.activeWorkflowSession = parentSessionCase.parentSession
 			const activateWorkflowSpy = sinon.spy(config.workflowRuntime, "activateWorkflow")
 			const runner = new SubagentRunner(config)
-			const childState = new TaskState()
+			const onProgress = sinon.stub()
 
-			await autoActivateAssignedWorkflow.call(runner, childState, ["review-workflow"])
+			const result = await runner.run("Skill: use_skill('review-workflow')", onProgress)
 
-			assert.equal(childState.activeWorkflowName, undefined, parentSessionCase.name)
-			assert.equal(childState.activeWorkflowSession, undefined, parentSessionCase.name)
+			assert.equal(result.status, "failed", parentSessionCase.name)
+			assert.match(result.error ?? "", /parent workflow project selection is required/, parentSessionCase.name)
+			sinon.assert.calledWith(
+				onProgress,
+				sinon.match({
+					status: "failed",
+					error: sinon.match(/parent workflow project selection is required/),
+				}),
+			)
 			sinon.assert.notCalled(activateWorkflowSpy)
+			sinon.assert.notCalled(createMessage)
 		}
 		sinon.assert.notCalled(resolveWorkflowByUseSkillNameStub)
 	})
@@ -2117,7 +2145,7 @@ describe("SubagentRunner", () => {
 		assert.equal(config.taskState.currentFocusChainChecklist, "- [ ] Parent Step")
 	})
 
-	it("narrows visible skills from an explicit use_skill assignment in the delegated prompt", async () => {
+	it("does not narrow visible skills from an explicit use_skill assignment in the delegated prompt", async () => {
 		const createMessage = sinon.stub().callsFake(async function* () {
 			yield {
 				type: "tool_calls",
@@ -2136,7 +2164,7 @@ describe("SubagentRunner", () => {
 			assert.ok(context.skills)
 			assert.deepEqual(
 				context.skills.map((skill) => skill.name),
-				["bmad-review-edge-case-hunter"],
+				["bmad-review-edge-case-hunter", "bmad-review-adversarial-general"],
 			)
 			promptRegistry.nativeTools = undefined
 			return "system prompt"
@@ -2157,12 +2185,34 @@ describe("SubagentRunner", () => {
 				source: "project",
 			},
 		])
+		const workflow = createResolvedWorkflow({
+			name: "review-workflow",
+			useSkillName: "review-workflow",
+		})
+		sinon.stub(WorkflowRegistry, "resolveWorkflowByUseSkillName").returns(workflow)
+		stubResolvedWorkflowByName(workflow)
 		stubApiHandler(createMessage)
 		initializeHostProvider()
 
-		const runner = new SubagentRunner(createTaskConfig(false))
+		const config = createTaskConfig(false)
+		config.taskState.activeWorkflowName = "parent-workflow"
+		config.taskState.activeWorkflowSession = {
+			activeStepNumber: 1,
+			workflowValues: {},
+			projectSelection: { projectMode: "existing", projectTitle: "Parent Project", projectFolderName: "parent-project" },
+			ui: {
+				formSession: undefined,
+				stepResolutionSession: undefined,
+				suppressedWorkflowFormIds: [],
+				suppressedWorkflowStepResolutionDefinitionIds: [],
+			},
+			branchContext: {
+				activeBranchId: "project-prompt",
+			},
+		}
+		const runner = new SubagentRunner(config)
 		const result = await runner.run(
-			`Edge case review. Skill: use_skill('bmad-review-edge-case-hunter'). Review only the provided bundle.`,
+			`Edge case review. Skill: use_skill('review-workflow'). Review only the provided bundle.`,
 			() => {},
 		)
 
@@ -2170,25 +2220,8 @@ describe("SubagentRunner", () => {
 		assert.equal(createMessage.callCount, 1)
 	})
 
-	it("falls back to the assigned-skill directive when the assigned skill is not a workflow", async () => {
-		const createMessage = sinon.stub().callsFake(async function* (_systemPrompt: string) {
-			yield {
-				type: "tool_calls",
-				tool_call: {
-					function: {
-						id: "toolu_subagent_nonworkflow_1",
-						name: ClineDefaultTool.ATTEMPT,
-						arguments: JSON.stringify({ result: "done" }),
-					},
-				},
-			}
-		})
-
-		const promptRegistry = PromptRegistry.getInstance()
-		sinon.stub(promptRegistry, "get").callsFake(async () => {
-			promptRegistry.nativeTools = undefined
-			return "system prompt"
-		})
+	it("fails unresolved assignment markers without calling the child model or emitting a fallback directive", async () => {
+		const createMessage = sinon.stub()
 		sinon.stub(SubagentBuilder.prototype, "getConfiguredSkills").returns(undefined)
 		sinon.stub(skills, "discoverSkills").resolves([])
 		sinon.stub(skills, "getAvailableSkills").returns([
@@ -2203,17 +2236,62 @@ describe("SubagentRunner", () => {
 		stubApiHandler(createMessage)
 		initializeHostProvider()
 
-		const runner = new SubagentRunner(createTaskConfig(false))
-		const result = await runner.run(`Skill: use_skill('review-helper')`, () => {})
+		const config = createTaskConfig(false)
+		config.taskState.activeWorkflowName = "parent-workflow"
+		config.taskState.activeWorkflowSession = {
+			activeStepNumber: 1,
+			workflowValues: {},
+			projectSelection: { projectMode: "existing", projectTitle: "Parent Project", projectFolderName: "parent-project" },
+			ui: {
+				formSession: undefined,
+				stepResolutionSession: undefined,
+				suppressedWorkflowFormIds: [],
+				suppressedWorkflowStepResolutionDefinitionIds: [],
+			},
+			branchContext: {
+				activeBranchId: "project-prompt",
+			},
+		}
+		const onProgress = sinon.stub()
+		const runner = new SubagentRunner(config)
+		const result = await runner.run(`Skill: use_skill('review-helper')`, onProgress)
 
-		assert.equal(result.status, "completed")
-		assert.equal(createMessage.callCount, 1)
-		const systemPrompt = createMessage.firstCall.args[0] as string
-		assert.match(systemPrompt, /Assigned Workflow Activation/)
-		assert.match(systemPrompt, /Use only the assigned workflow skill named above\./)
-		assert.match(systemPrompt, /review-helper/)
-		assert.doesNotMatch(systemPrompt, /call `use_skill`/)
-		assert.doesNotMatch(systemPrompt, /Do not manually search for workflow files unless `use_skill` fails\./)
+		assert.equal(result.status, "failed")
+		assert.match(result.error ?? "", /workflow assignment marker 'review-helper' could not be resolved/)
+		const removedFallbackHeading = ["Assigned", "Workflow", "Activation"].join(" ")
+		assert.doesNotMatch(result.error ?? "", new RegExp(removedFallbackHeading))
+		sinon.assert.calledWith(
+			onProgress,
+			sinon.match({
+				status: "failed",
+				error: sinon.match(/workflow assignment marker 'review-helper' could not be resolved/),
+			}),
+		)
+		sinon.assert.notCalled(createMessage)
+	})
+
+	it("fails multiple distinct assignment markers before calling the child model", async () => {
+		const createMessage = sinon.stub()
+		sinon.stub(SubagentBuilder.prototype, "getConfiguredSkills").returns(undefined)
+		sinon.stub(skills, "discoverSkills").resolves([])
+		sinon.stub(skills, "getAvailableSkills").returns([])
+		stubApiHandler(createMessage)
+		initializeHostProvider()
+
+		const onProgress = sinon.stub()
+		const runner = new SubagentRunner(createTaskConfig(false))
+		const result = await runner.run(`use_skill('review-workflow') and skill_name = "other-workflow"`, onProgress)
+
+		assert.equal(result.status, "failed")
+		assert.match(result.error ?? "", /multiple distinct workflow assignment markers/)
+		sinon.assert.calledWith(
+			onProgress,
+			sinon.match({
+				status: "failed",
+				error: sinon.match(/multiple distinct workflow assignment markers/),
+			}),
+		)
+		sinon.assert.notCalled(createMessage)
 	})
 
 	it("logs a warning when a configured skill is not available", async () => {
@@ -2254,10 +2332,7 @@ describe("SubagentRunner", () => {
 
 		assert.equal(result.status, "completed")
 		assert.equal(createMessage.callCount, 1)
-		sinon.assert.calledWith(
-			warnStub,
-			"[SubagentRunner] Configured or assigned skill 'missing-skill' not found for subagent run.",
-		)
+		sinon.assert.calledWith(warnStub, "[SubagentRunner] Configured skill 'missing-skill' not found for subagent run.")
 	})
 
 	it("includes workspace metadata only in the initial user message", async () => {
@@ -2311,10 +2386,10 @@ describe("SubagentRunner", () => {
 
 		const promptRegistry = PromptRegistry.getInstance()
 		sinon.stub(promptRegistry, "get").callsFake(async () => {
-			promptRegistry.nativeTools = [{ name: "list_files" } as any]
+			promptRegistry.nativeTools = [createNativeTool("list_files")]
 			return "system prompt"
 		})
-		sinon.stub(SubagentBuilder.prototype, "buildNativeTools").returns([{ name: "list_files" }] as any)
+		sinon.stub(SubagentBuilder.prototype, "buildNativeTools").returns([createNativeTool("list_files")])
 		sinon.stub(skills, "discoverSkills").resolves([])
 		sinon.stub(skills, "getAvailableSkills").returns([])
 		stubApiHandler(createMessage)

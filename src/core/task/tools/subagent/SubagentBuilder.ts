@@ -11,6 +11,12 @@ import type { AgentBaseConfig } from "./AgentConfigLoader"
 import { AgentConfigLoader } from "./AgentConfigLoader"
 
 export type AgentConfig = Partial<AgentBaseConfig>
+export type SubagentBuilderConfigSource = Pick<AgentConfigLoader, "getCachedConfig">
+export type SubagentBuilderConfig = Pick<TaskConfig, "ulid"> & {
+	services: {
+		stateManager: Pick<TaskConfig["services"]["stateManager"], "getGlobalSettingsKey" | "getApiConfiguration">
+	}
+}
 
 export const SUBAGENT_DEFAULT_ALLOWED_TOOLS: ClineDefaultTool[] = [
 	ClineDefaultTool.FILE_READ,
@@ -37,10 +43,11 @@ export class SubagentBuilder {
 	private readonly apiHandler: ReturnType<typeof buildApiHandler>
 
 	constructor(
-		private readonly baseConfig: TaskConfig,
+		private readonly baseConfig: SubagentBuilderConfig,
 		subagentName?: string,
+		configSource: SubagentBuilderConfigSource = AgentConfigLoader.getInstance(),
 	) {
-		const subagentConfig = AgentConfigLoader.getInstance().getCachedConfig(subagentName)
+		const subagentConfig = configSource.getCachedConfig(subagentName)
 		this.agentConfig = subagentConfig ?? {}
 		this.allowedTools = this.resolveAllowedTools(this.agentConfig.tools)
 

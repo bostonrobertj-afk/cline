@@ -542,6 +542,10 @@ Workflow sessions are execution-context-local, but they are all owned by the sam
 - parent and child sessions are separate
 - the subagent runner is only a caller/bootstrap seam for child execution contexts, not a distinct workflow orchestrator
 - assigned child workflows are activated only in child state
+- parent-authored workflow assignment markers are bootstrap metadata consumed by `SubagentRunner`; those marker snippets are removed before the first child model request
+- when a workflow assignment marker is present but cannot be honored, the subagent run fails before the first child model request and reports the cause when available
+- failed workflow assignment must not be converted into child-visible fallback instructions, prompt-visible skill assignment conventions, or child-authored `use_skill` behavior
+- assignment marker names do not filter child prompt skills; child prompt skills come from configured subagent skills or normal available-skill discovery, while workflow instructions/tools come only from successful runtime activation
 - child workflow activation copies parent project selection as activation context and does not render the mandatory shared pre-workflow entry form
 - child-session workflow values may be initialized from parent-session values only through workflow-module-declared inheritance rules
 - parent and child sessions do not share one mutable workflow-value map

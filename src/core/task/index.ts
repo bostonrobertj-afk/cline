@@ -1780,6 +1780,11 @@ export class Task {
 			return
 		}
 
+		if (restoreResult !== undefined && restoreResult.kind !== "no_op") {
+			await this.consumeWorkflowNextAction(restoreResult)
+			return
+		}
+
 		if (metadata.activeWorkflowName && !metadata.activeWorkflowSession) {
 			this.taskState.activeWorkflowName = undefined
 			metadata.activeWorkflowName = undefined

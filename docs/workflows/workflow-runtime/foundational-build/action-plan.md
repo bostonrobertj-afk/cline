@@ -4656,6 +4656,259 @@ Allowed files:
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
+## Phase 38 - Restore Returned Next-Action Consumption
+
+Pause for QA review after completing Phase 38 before commit.
+
+[x] Task 66. Route restored workflow next actions through the canonical task next-action consumer.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
+
+[x] Subtask 66.1. In `src/core/task/index.ts`, update `restoreWorkflowRuntimeStateFromMetadata(...)` so the existing `persist_workflow_teardown` branch remains unchanged and returns immediately after saving cleared metadata.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
+
+[x] Subtask 66.2. In `src/core/task/index.ts`, immediately after the existing `persist_workflow_teardown` branch in `restoreWorkflowRuntimeStateFromMetadata(...)`, add a branch that checks `restoreResult !== undefined && restoreResult.kind !== "no_op"`, calls `await this.consumeWorkflowNextAction(restoreResult)`, and returns immediately after consumption.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
+
+[x] Subtask 66.3. In `src/core/task/index.ts`, preserve the existing fallback branch for `metadata.activeWorkflowName && !metadata.activeWorkflowSession` after restored-action consumption handling; do not move it before `persist_workflow_teardown` cleanup or before non-`no_op` restored-action consumption.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
+
+[x] Task 67. Add task-level metadata restore coverage for restored next-action consumption.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
+
+[x] Subtask 67.1. In `src/core/task/__tests__/workflow-runtime-metadata.test.ts`, add a test proving `restoreWorkflowRuntimeStateFromMetadata(...)` passes a non-`no_op` action returned from `workflowRuntime.restorePersistedSession(...)` into `consumeWorkflowNextAction(...)`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
+
+[x] Subtask 67.2. In `src/core/task/__tests__/workflow-runtime-metadata.test.ts`, add or update coverage proving a `persist_workflow_teardown` restore result still clears `metadata.activeWorkflowName`, clears `metadata.activeWorkflowSession`, saves task metadata, and is not routed into `consumeWorkflowNextAction(...)`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
+
+[x] Subtask 67.3. In `src/core/task/__tests__/workflow-runtime-metadata.test.ts`, add or update coverage proving `undefined` and `{ kind: "no_op" }` restore results are not routed into `consumeWorkflowNextAction(...)`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
+
+## Phase 39 - Subagent Workflow Assignment Marker Consumption
+
+Pause for QA review after completing Phase 39 before commit.
+
+[x] Task 68. Consume and strip parent-authored subagent workflow assignment markers before child prompt construction.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentRunner.ts`
+
+[x] Subtask 68.1. In `src/core/task/tools/subagent/SubagentRunner.ts`, replace `extractAssignedSkillNames(prompt: string): string[]` with a typed helper that returns `{ assignedSkillNames: string[]; sanitizedPrompt: string }`; it must extract the same unique trimmed marker names from explicit `use_skill(...)` and `skill_name = ...` markers and remove those marker snippets from `sanitizedPrompt`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentRunner.ts`
+
+[x] Subtask 68.2. In `src/core/task/tools/subagent/SubagentRunner.ts`, update `run(...)` to use `sanitizedPrompt` for the initial child user message instead of the original `prompt`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentRunner.ts`
+
+[x] Subtask 68.3. In `src/core/task/tools/subagent/SubagentRunner.ts`, delete `buildAssignedSkillDirective(...)` and remove the system-prompt branch that appends `Assigned Workflow Activation`; `systemPrompt` must be built from `baseSystemPrompt` plus existing prompt-injection text only.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentRunner.ts`
+
+[x] Task 69. Fail subagent runs when parent-authored workflow assignment markers cannot be honored.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentRunner.ts`
+
+[x] Subtask 69.1. In `src/core/task/tools/subagent/SubagentRunner.ts`, add a typed activation-result union for assigned workflow activation with explicit `no_assignment`, `activated`, and `failed` variants.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentRunner.ts`
+
+[x] Subtask 69.2. In `src/core/task/tools/subagent/SubagentRunner.ts`, change `autoActivateAssignedWorkflow(...)` to return the typed activation result; zero markers must return `no_assignment`, and multiple distinct markers must return `failed` with a clear error message.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentRunner.ts`
+
+[x] Subtask 69.3. In `src/core/task/tools/subagent/SubagentRunner.ts`, change `autoActivateAssignedWorkflow(...)` so missing parent session, blank parent project title, or blank parent project folder returns `failed` before workflow registry resolution.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentRunner.ts`
+
+[x] Subtask 69.4. In `src/core/task/tools/subagent/SubagentRunner.ts`, change unresolved workflow markers to return `failed` with a clear error message and no child workflow state mutation.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentRunner.ts`
+
+[x] Subtask 69.5. In `src/core/task/tools/subagent/SubagentRunner.ts`, change activation that returns `no_op` to restore the previous child workflow identity and return `failed`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentRunner.ts`
+
+[x] Subtask 69.6. In `src/core/task/tools/subagent/SubagentRunner.ts`, update `run(...)` so a `failed` assigned-workflow activation result calls `onProgress({ status: "failed", error, stats })`, returns `{ status: "failed", error, stats }`, and does not construct or send the first child model request.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentRunner.ts`
+
+[x] Task 70. Stop assignment markers from controlling child prompt skill exposure and update regression coverage.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentRunner.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+
+[x] Subtask 70.1. In `src/core/task/tools/subagent/SubagentRunner.ts`, remove `assignedSkillNames` from `buildPromptContext(...)` parameters and call sites.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentRunner.ts`
+
+[x] Subtask 70.2. In `src/core/task/tools/subagent/SubagentRunner.ts`, update `resolvePromptSkills(...)` so it uses only `configuredSkillNames` when provided and otherwise returns `availableSkills`; it must not accept or use assignment marker names.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentRunner.ts`
+
+[x] Subtask 70.3. In `src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`, update the successful assigned-workflow activation test to assert the first child user message does not contain `use_skill`, `skill_name`, or the assigned workflow marker text.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+
+[x] Subtask 70.4. In `src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`, replace the assigned-skill narrowing test with coverage proving assignment markers do not narrow `context.skills`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+
+[x] Subtask 70.5. In `src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`, replace the fallback assigned-skill directive test with coverage proving an unresolvable assignment marker returns failed status, reports an error, does not call the child model, and does not emit `Assigned Workflow Activation`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+
+[x] Subtask 70.6. In `src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`, add coverage proving multiple distinct assignment markers return failed status and do not call the child model.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+
+[x] Subtask 70.7. In `src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`, update incomplete parent project-context coverage so marker-present runs fail before the first child model request.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+
+## Phase 40 - Subagent Unsafe Cast Cleanup
+
+Pause for QA review after completing Phase 40 before commit.
+
+[x] Task 71. Replace production unsafe `any` usage in `SubagentRunner`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentRunner.ts`
+
+[x] Subtask 71.1. In `src/core/task/tools/subagent/SubagentRunner.ts`, change `pushSubagentToolResultBlock(toolResultBlocks: any[], ...)` so `toolResultBlocks` is typed as `ClineUserContent[]`; do not use `any`, `as any`, or replacement type assertions.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentRunner.ts`
+
+[x] Subtask 71.2. In `src/core/task/tools/subagent/SubagentRunner.ts`, import `ClineAssistantContent` from `@shared/messages` and replace `const assistantContent = [] as any[]` with `const assistantContent: ClineAssistantContent[] = []`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentRunner.ts`
+
+[x] Task 72. Replace unsafe casts in `SubagentRunner.test.ts` with typed test helpers.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+
+[x] Subtask 72.1. In `src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`, add a typed `createNativeTool(name: string): ClineTool` helper that returns an OpenAI-compatible tool object with `type: "function"` and `function: { name, description, parameters }`; use it anywhere the test needs a `ClineTool`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+
+[x] Subtask 72.2. In `src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`, replace every `[{ name: "list_files" } as any]`, `[] as any`, and `visibleNativeToolNames.map((name) => ({ name })) as any` native-tool fixture with `ClineTool[]` values built by `createNativeTool(...)`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+
+[x] Subtask 72.3. In `src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`, replace direct `config.services.mcpHub = { getServers: () => [] } as any` assignments by configuring the existing `sinon.createStubInstance(McpHub)` returned from `createTaskConfig(...)`; the fixture must expose a typed way to set `getServers.returns(...)`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+
+[x] Subtask 72.4. In `src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`, replace `conversation: any[]` callback parameters with `conversation: ClineStorageMessage[]`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+
+[x] Subtask 72.5. In `src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`, replace `sinon.stub(runner as any, "shouldCompactBeforeNextRequest")` with a typed `Reflect.get(SubagentRunner.prototype, "shouldCompactBeforeNextRequest")` helper matching the private method signature, following the existing private-helper pattern in the file.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+
+[x] Task 73. Add typed `SubagentBuilder` seams so builder tests do not force partial objects through runtime types.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentBuilder.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentBuilder.test.ts`
+
+[x] Subtask 73.1. In `src/core/task/tools/subagent/SubagentBuilder.ts`, add a typed constructor dependency for config lookup, such as `Pick<AgentConfigLoader, "getCachedConfig">`, defaulting to `AgentConfigLoader.getInstance()`; use that dependency instead of calling `AgentConfigLoader.getInstance()` directly inside the constructor.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentBuilder.ts`
+
+[x] Subtask 73.2. In `src/core/task/tools/subagent/SubagentBuilder.ts`, change the constructor's `baseConfig` parameter type to a named narrow type containing only the `TaskConfig` members actually used by `SubagentBuilder`: `ulid` and `services.stateManager`; full `TaskConfig` callers must remain assignable without adapters.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentBuilder.ts`
+
+[x] Subtask 73.3. In `src/core/task/tools/subagent/__tests__/SubagentBuilder.test.ts`, replace `createTaskConfig(...)` so it returns the new typed narrow builder config directly; remove `as unknown as TaskConfig`. The fixture's `provider` parameter must be typed as `ApiProvider` imported from `@/shared/api`, and the object returned by `stateManager.getApiConfiguration.returns(...)` must assign that `ApiProvider` value to `actModeApiProvider` and `planModeApiProvider`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentBuilder.test.ts`
+
+[x] Subtask 73.4. In `src/core/task/tools/subagent/__tests__/SubagentBuilder.test.ts`, replace every fake `AgentConfigLoader` object cast with `as unknown as AgentConfigLoader` by passing the typed constructor config-source dependency added in Subtask 73.1.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentBuilder.test.ts`
+
+[x] Subtask 73.5. In `src/core/task/tools/subagent/__tests__/SubagentBuilder.test.ts`, replace all `mcpHub: {} as any` and MCP server object `as any` fixtures with typed `McpHub` stubs and typed `McpServer[]` values.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentBuilder.test.ts`
+
+[x] Subtask 73.6. In `src/core/task/tools/subagent/__tests__/SubagentBuilder.test.ts`, replace assignments to `(taskConfig.services.stateManager.getGlobalSettingsKey as any)` with typed Sinon stubs configured through the builder config fixture. The fixture must import `DEFAULT_AUTO_APPROVAL_SETTINGS` from `@/shared/AutoApprovalSettings` and configure `stateManager.getGlobalSettingsKey.withArgs("autoApprovalSettings").returns(...)` with a complete `AutoApprovalSettings` object built by spreading `DEFAULT_AUTO_APPROVAL_SETTINGS`, spreading `DEFAULT_AUTO_APPROVAL_SETTINGS.actions`, and overriding only `actions.useMcp`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentBuilder.test.ts`
+
+[x] Task 74. Validate subagent unsafe-cast cleanup.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentRunner.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentBuilder.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentBuilder.test.ts`
+
+[x] Subtask 74.1. Run `rg "as any|as unknown as|: any|any\\[\\]" src/core/task/tools/subagent`; it must return no matches.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentRunner.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentBuilder.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentBuilder.test.ts`
+
+[x] Subtask 74.2. Run `npm run test:unit -- src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts src/core/task/tools/subagent/__tests__/SubagentBuilder.test.ts`, `npm run check-types`, and `npm run lint`; all must pass before Phase 40 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentRunner.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentBuilder.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentBuilder.test.ts`
+
 ## Validation
 
 After all implementation tasks are complete, run these commands from `/Users/robertboston/Documents/Cline Extension/cline`:
@@ -4686,6 +4939,8 @@ npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.te
 npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts src/core/task/__tests__/workflow-runtime-metadata.test.ts src/core/task/tools/handlers/__tests__/UseSkillToolHandler.test.ts src/core/task/tools/handlers/__tests__/WorkflowProgressRequestToolHandler.test.ts src/core/task/tools/handlers/__tests__/SetWorkflowValuesToolHandler.test.ts src/core/task/tools/handlers/__tests__/BuildWorkflowDocumentToolHandler.test.ts src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts
 npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts
 npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts
+npm run test:unit -- src/core/task/__tests__/workflow-runtime-metadata.test.ts
+npm run test:unit -- src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts
 npm run test:unit -- src/core/task/__tests__/ToolExecutor.nativeToolParity.test.ts src/core/task/__tests__/ToolExecutor.responseToolFailureBudget.test.ts
 ```
 
@@ -4702,6 +4957,9 @@ Validation expectations:
 - Phase 36 QA must verify workflow-form durable value persistence iterates submitted session values, not every field in every panel; unsubmitted durable fields must not fail intermediate `render_form` transitions, while malformed submitted durable values must still fail explicitly.
 - Phase 37 QA must verify module decision-tree predicates cannot access full `ActiveWorkflowSession`, runtime-owned UI state, `branchContext`, or suppression arrays; predicates may access only `activeBranchId`, `workflowValues`, `step`, and `triggerEvent` for event predicates.
 - Phase 37 QA must verify `session_initialized` is absent from runtime workflow trigger types and restore validation, and `rg "session_initialized" src/core/task/workflow-runtime` returns no matches.
+- Phase 38 QA must verify every non-`no_op` `WorkflowNextAction` returned by `WorkflowRuntime.restorePersistedSession(...)` is routed into `consumeWorkflowNextAction(...)`, while `persist_workflow_teardown` continues to persist cleared metadata directly and `undefined`/`no_op` restore results remain non-consuming.
+- Phase 39 QA must verify parent-authored subagent workflow assignment markers are stripped before the child prompt, invalid marker-present assignments fail before the first child model request, no `Assigned Workflow Activation` fallback remains, and assignment marker names do not filter child prompt skill exposure.
+- Phase 40 QA must verify `rg "as any|as unknown as|: any|any\\[\\]" src/core/task/tools/subagent` returns no matches, and that subagent runner/builder tests use typed fixtures instead of forced casts.
 - `check-types` must pass without reintroducing removed workflow mirror fields, deterministic-step-resolution types, statically exposed workflow-only tool schemas, or legacy `createWorkflowSkillMetadata(...)` references.
 - `lint` must pass without leaving dead imports, compatibility shims, or deleted legacy-surface references behind.
 - Phase 7 QA must verify `applyWorkflowValueWrites(...)` no longer derives authorization from active-step `set_workflow_values` schema visibility and instead uses only `WorkflowDefinition.workflowValueKeys`.

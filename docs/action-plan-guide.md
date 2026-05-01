@@ -60,6 +60,7 @@ Include this exact frontmatter at the top of every action plan document:
 - Subtasks must prescribe exact line-level revisions with target file indicated.
 - Subtasks must never prescribe more than ONE required revision
 - Each task & subtasks should have clearly defined allowed files for the prescribed edit.
+- You must not leave decision space to the agent who will implement the action plan. As the action plan author, it is your job to review runtime code, identify the complete and correct necessary revisions, and prescribe those revisions clearly within the action plan. This includes test fixtures associated with any runtime code that is being revised, removed, or added.
 
 *** Before turning a necessary revision into a task or subtask, you MUST: ***
 1. Verify solution quality and standards

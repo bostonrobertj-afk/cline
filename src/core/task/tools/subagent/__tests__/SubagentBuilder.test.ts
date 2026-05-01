@@ -4,43 +4,78 @@ import { PromptRegistry } from "@core/prompts/system-prompt"
 import { ClineToolSet } from "@core/prompts/system-prompt/registry/ClineToolSet"
 import type { ClineToolSpec } from "@core/prompts/system-prompt/spec"
 import type { PromptVariant, SystemPromptContext } from "@core/prompts/system-prompt/types"
-import type { TaskConfig } from "@core/task/tools/types/TaskConfig"
+import { StateManager } from "@core/storage/StateManager"
+import { McpHub } from "@services/mcp/McpHub"
 import { afterEach, describe, it } from "mocha"
 import sinon from "sinon"
+import { DEFAULT_AUTO_APPROVAL_SETTINGS } from "@/shared/AutoApprovalSettings"
+import type { ApiProvider } from "@/shared/api"
+import type { McpServer } from "@/shared/mcp"
 import { ModelFamily } from "@/shared/prompts"
 import { ClineDefaultTool } from "@/shared/tools"
-import { AgentConfigLoader } from "../AgentConfigLoader"
-import { SUBAGENT_DEFAULT_ALLOWED_TOOLS, SUBAGENT_SYSTEM_SUFFIX, SubagentBuilder } from "../SubagentBuilder"
+import {
+	SUBAGENT_DEFAULT_ALLOWED_TOOLS,
+	SUBAGENT_SYSTEM_SUFFIX,
+	SubagentBuilder,
+	type SubagentBuilderConfig,
+	type SubagentBuilderConfigSource,
+} from "../SubagentBuilder"
 
-function createTaskConfig(mode: "act" | "plan", provider: string): TaskConfig {
+type TestBuilderConfig = SubagentBuilderConfig & {
+	services: {
+		stateManager: sinon.SinonStubbedInstance<StateManager>
+	}
+}
+
+function createTaskConfig(mode: "act" | "plan", provider: ApiProvider, useMcp = false): TestBuilderConfig {
+	const stateManager = sinon.createStubInstance(StateManager)
+	stateManager.getGlobalSettingsKey.withArgs("mode").returns(mode)
+	stateManager.getGlobalSettingsKey.withArgs("autoApprovalSettings").returns({
+		...DEFAULT_AUTO_APPROVAL_SETTINGS,
+		actions: {
+			...DEFAULT_AUTO_APPROVAL_SETTINGS.actions,
+			useMcp,
+		},
+	})
+	stateManager.getApiConfiguration.returns({
+		actModeApiProvider: provider,
+		planModeApiProvider: provider,
+		actModeApiModelId: "act-default",
+		planModeApiModelId: "plan-default",
+		actModeOpenAiModelId: "openai-act-default",
+		planModeOpenRouterModelId: "openrouter-plan-default",
+	})
 	return {
 		ulid: "ulid-123",
 		services: {
-			stateManager: {
-				getGlobalSettingsKey: (key: string) => {
-					if (key === "mode") {
-						return mode
-					}
-					if (key === "autoApprovalSettings") {
-						return {
-							actions: {
-								useMcp: false,
-							},
-						}
-					}
-					return undefined
-				},
-				getApiConfiguration: () => ({
-					actModeApiProvider: provider,
-					planModeApiProvider: provider,
-					actModeApiModelId: "act-default",
-					planModeApiModelId: "plan-default",
-					actModeOpenAiModelId: "openai-act-default",
-					planModeOpenRouterModelId: "openrouter-plan-default",
-				}),
+			stateManager,
+		},
+	}
+}
+
+function createConfigSource(getCachedConfig: SubagentBuilderConfigSource["getCachedConfig"]): SubagentBuilderConfigSource {
+	return { getCachedConfig }
+}
+
+function createMcpHub(servers: McpServer[]): sinon.SinonStubbedInstance<McpHub> {
+	const mcpHub = sinon.createStubInstance(McpHub)
+	mcpHub.getServers.returns(servers)
+	return mcpHub
+}
+
+function createSystemPromptContext(overrides: Partial<SystemPromptContext> = {}): SystemPromptContext {
+	return {
+		ide: "VS Code",
+		providerInfo: {
+			providerId: "openai",
+			mode: "act",
+			model: {
+				id: "m1",
+				info: { supportsPromptCache: false },
 			},
 		},
-	} as unknown as TaskConfig
+		...overrides,
+	}
 }
 
 describe("SubagentBuilder", () => {
@@ -49,23 +84,22 @@ describe("SubagentBuilder", () => {
 	})
 
 	it("uses cached config by subagent name and applies act-mode provider model override", () => {
-		sinon.stub(AgentConfigLoader, "getInstance").returns({
-			getCachedConfig: (subagentName?: string) =>
-				subagentName === "cached-agent"
-					? {
-							name: "cached-agent",
-							description: "cached description",
-							tools: [ClineDefaultTool.LIST_FILES],
-							modelId: "gpt-5",
-							systemPrompt: "cached system prompt",
-						}
-					: undefined,
-		} as unknown as AgentConfigLoader)
+		const configSource = createConfigSource((subagentName?: string) =>
+			subagentName === "cached-agent"
+				? {
+						name: "cached-agent",
+						description: "cached description",
+						tools: [ClineDefaultTool.LIST_FILES],
+						modelId: "gpt-5",
+						systemPrompt: "cached system prompt",
+					}
+				: undefined,
+		)
 
 		const fakeHandler = { getModel: sinon.stub(), createMessage: sinon.stub() }
 		const buildApiHandlerStub = sinon.stub(api, "buildApiHandler").returns(fakeHandler as never)
 
-		const builder = new SubagentBuilder(createTaskConfig("act", "openai"), "cached-agent")
+		const builder = new SubagentBuilder(createTaskConfig("act", "openai"), "cached-agent", configSource)
 
 		assert.equal(buildApiHandlerStub.callCount, 1)
 		const [effectiveApiConfig, selectedMode] = buildApiHandlerStub.firstCall.args
@@ -84,12 +118,10 @@ describe("SubagentBuilder", () => {
 	})
 
 	it("uses defaults when no cached config is provided", () => {
-		sinon.stub(AgentConfigLoader, "getInstance").returns({
-			getCachedConfig: () => undefined,
-		} as unknown as AgentConfigLoader)
+		const configSource = createConfigSource(() => undefined)
 
 		sinon.stub(api, "buildApiHandler").returns({ getModel: sinon.stub(), createMessage: sinon.stub() } as never)
-		const builder = new SubagentBuilder(createTaskConfig("act", "anthropic"))
+		const builder = new SubagentBuilder(createTaskConfig("act", "anthropic"), undefined, configSource)
 
 		assert.deepEqual(builder.getAllowedTools(), SUBAGENT_DEFAULT_ALLOWED_TOOLS)
 		const prompt = builder.buildSystemPrompt("generated prompt")
@@ -97,25 +129,24 @@ describe("SubagentBuilder", () => {
 	})
 
 	it("applies plan-mode openrouter model override fields", () => {
-		sinon.stub(AgentConfigLoader, "getInstance").returns({
-			getCachedConfig: (subagentName?: string) =>
-				subagentName === "openrouter-agent"
-					? {
-							name: "openrouter-agent",
-							description: "openrouter plan agent",
-							tools: [ClineDefaultTool.FILE_READ],
-							modelId: "openrouter/custom-model",
-							systemPrompt: "plan system",
-						}
-					: undefined,
-		} as unknown as AgentConfigLoader)
+		const configSource = createConfigSource((subagentName?: string) =>
+			subagentName === "openrouter-agent"
+				? {
+						name: "openrouter-agent",
+						description: "openrouter plan agent",
+						tools: [ClineDefaultTool.FILE_READ],
+						modelId: "openrouter/custom-model",
+						systemPrompt: "plan system",
+					}
+				: undefined,
+		)
 
 		const buildApiHandlerStub = sinon.stub(api, "buildApiHandler").returns({
 			getModel: sinon.stub(),
 			createMessage: sinon.stub(),
 		} as never)
 
-		new SubagentBuilder(createTaskConfig("plan", "openrouter"), "openrouter-agent")
+		new SubagentBuilder(createTaskConfig("plan", "openrouter"), "openrouter-agent", configSource)
 
 		const [effectiveApiConfig, selectedMode] = buildApiHandlerStub.firstCall.args
 		assert.equal(selectedMode, "plan")
@@ -125,18 +156,17 @@ describe("SubagentBuilder", () => {
 	})
 
 	it("builds native tools by filtering allowed ids and context requirements then converting", () => {
-		sinon.stub(AgentConfigLoader, "getInstance").returns({
-			getCachedConfig: (subagentName?: string) =>
-				subagentName === "tools-agent"
-					? {
-							name: "tools-agent",
-							description: "tool-limited",
-							tools: [ClineDefaultTool.LIST_FILES],
-							modelId: "sonnet",
-							systemPrompt: "tool prompt",
-						}
-					: undefined,
-		} as unknown as AgentConfigLoader)
+		const configSource = createConfigSource((subagentName?: string) =>
+			subagentName === "tools-agent"
+				? {
+						name: "tools-agent",
+						description: "tool-limited",
+						tools: [ClineDefaultTool.LIST_FILES],
+						modelId: "sonnet",
+						systemPrompt: "tool prompt",
+					}
+				: undefined,
+		)
 		sinon.stub(api, "buildApiHandler").returns({ getModel: sinon.stub(), createMessage: sinon.stub() } as never)
 
 		const getModelFamilyStub = sinon.stub(PromptRegistry.getInstance(), "getModelFamily").returns("test-family" as never)
@@ -163,7 +193,7 @@ describe("SubagentBuilder", () => {
 		const converter = sinon.stub().callsFake((tool: { id: string }) => ({ converted: tool.id }))
 		const getConverterStub = sinon.stub(ClineToolSet, "getNativeConverter").returns(converter as never)
 
-		const builder = new SubagentBuilder(createTaskConfig("act", "anthropic"), "tools-agent")
+		const builder = new SubagentBuilder(createTaskConfig("act", "anthropic"), "tools-agent", configSource)
 
 		const context = {
 			providerInfo: {
@@ -180,14 +210,12 @@ describe("SubagentBuilder", () => {
 	})
 
 	it("uses workflow tool schema override without subagent allowed-tool filtering", () => {
-		sinon.stub(AgentConfigLoader, "getInstance").returns({
-			getCachedConfig: () => ({
-				name: "workflow-agent",
-				description: "workflow projection",
-				tools: [ClineDefaultTool.LIST_FILES],
-				systemPrompt: "workflow prompt",
-			}),
-		} as unknown as AgentConfigLoader)
+		const configSource = createConfigSource(() => ({
+			name: "workflow-agent",
+			description: "workflow projection",
+			tools: [ClineDefaultTool.LIST_FILES],
+			systemPrompt: "workflow prompt",
+		}))
 		sinon.stub(api, "buildApiHandler").returns({ getModel: sinon.stub(), createMessage: sinon.stub() } as never)
 		const promptRegistry = PromptRegistry.getInstance()
 		sinon.stub(promptRegistry, "getModelFamily").returns(ModelFamily.GENERIC)
@@ -235,7 +263,7 @@ describe("SubagentBuilder", () => {
 			workflowToolSchemaOverride: [workflowTool],
 		}
 
-		const builder = new SubagentBuilder(createTaskConfig("act", "openai"), "workflow-agent")
+		const builder = new SubagentBuilder(createTaskConfig("act", "openai"), "workflow-agent", configSource)
 		const result = builder.buildNativeTools(context)
 		const toolNames = (result ?? []).flatMap((tool) => {
 			if ("function" in tool && typeof tool.function?.name === "string") {
@@ -252,14 +280,12 @@ describe("SubagentBuilder", () => {
 	})
 
 	it("suppresses MCP native tools when subagent MCP auto-approval is disabled", () => {
-		sinon.stub(AgentConfigLoader, "getInstance").returns({
-			getCachedConfig: () => ({
-				name: "mcp-agent",
-				description: "mcp aware",
-				tools: [ClineDefaultTool.MCP_USE, ClineDefaultTool.MCP_DOCS],
-				systemPrompt: "prompt",
-			}),
-		} as unknown as AgentConfigLoader)
+		const configSource = createConfigSource(() => ({
+			name: "mcp-agent",
+			description: "mcp aware",
+			tools: [ClineDefaultTool.MCP_USE, ClineDefaultTool.MCP_DOCS],
+			systemPrompt: "prompt",
+		}))
 		sinon.stub(api, "buildApiHandler").returns({ getModel: sinon.stub(), createMessage: sinon.stub() } as never)
 		sinon.stub(PromptRegistry.getInstance(), "getModelFamily").returns("test-family" as never)
 		sinon
@@ -271,25 +297,20 @@ describe("SubagentBuilder", () => {
 		const converter = sinon.stub().callsFake((tool: { id: string }) => ({ converted: tool.id }))
 		sinon.stub(ClineToolSet, "getNativeConverter").returns(converter as never)
 
-		const builder = new SubagentBuilder(createTaskConfig("act", "openai"), "mcp-agent")
-		const result = builder.buildNativeTools({
-			providerInfo: { providerId: "openai", model: { id: "m1" } },
-			mcpHub: {} as any,
-		} as never)
+		const builder = new SubagentBuilder(createTaskConfig("act", "openai"), "mcp-agent", configSource)
+		const result = builder.buildNativeTools(createSystemPromptContext({ mcpHub: createMcpHub([]) }))
 
 		assert.deepEqual(result, [])
 		assert.equal(builder.isMcpExposureEnabled(), false)
 	})
 
 	it("includes MCP native tools when subagent MCP auto-approval is enabled", () => {
-		sinon.stub(AgentConfigLoader, "getInstance").returns({
-			getCachedConfig: () => ({
-				name: "mcp-agent",
-				description: "mcp aware",
-				tools: [ClineDefaultTool.MCP_USE, ClineDefaultTool.MCP_DOCS],
-				systemPrompt: "prompt",
-			}),
-		} as unknown as AgentConfigLoader)
+		const configSource = createConfigSource(() => ({
+			name: "mcp-agent",
+			description: "mcp aware",
+			tools: [ClineDefaultTool.MCP_USE, ClineDefaultTool.MCP_DOCS],
+			systemPrompt: "prompt",
+		}))
 		sinon.stub(api, "buildApiHandler").returns({ getModel: sinon.stub(), createMessage: sinon.stub() } as never)
 		sinon.stub(PromptRegistry.getInstance(), "getModelFamily").returns("test-family" as never)
 		sinon
@@ -301,104 +322,79 @@ describe("SubagentBuilder", () => {
 		const converter = sinon.stub().callsFake((tool: { id: string }) => ({ converted: tool.id }))
 		sinon.stub(ClineToolSet, "getNativeConverter").returns(converter as never)
 
-		const taskConfig = createTaskConfig("act", "openai")
-		;(taskConfig.services.stateManager.getGlobalSettingsKey as any) = (key: string) => {
-			if (key === "mode") return "act"
-			if (key === "autoApprovalSettings") {
-				return { actions: { useMcp: true } }
-			}
-			return undefined
-		}
-
-		const builder = new SubagentBuilder(taskConfig, "mcp-agent")
-		const result = builder.buildNativeTools({
-			providerInfo: { providerId: "openai", model: { id: "m1" } },
-			mcpHub: {} as any,
-		} as never)
+		const taskConfig = createTaskConfig("act", "openai", true)
+		const builder = new SubagentBuilder(taskConfig, "mcp-agent", configSource)
+		const result = builder.buildNativeTools(createSystemPromptContext({ mcpHub: createMcpHub([]) }))
 
 		assert.deepEqual(result, [{ converted: ClineDefaultTool.MCP_USE }, { converted: ClineDefaultTool.MCP_DOCS }])
 		assert.equal(builder.isMcpExposureEnabled(), true)
 	})
 
 	it("omits subagent-specific Indxr guidance when native tool visibility excludes Indxr tools", () => {
-		sinon.stub(AgentConfigLoader, "getInstance").returns({
-			getCachedConfig: () => undefined,
-		} as unknown as AgentConfigLoader)
+		const configSource = createConfigSource(() => undefined)
 		sinon.stub(api, "buildApiHandler").returns({ getModel: sinon.stub(), createMessage: sinon.stub() } as never)
 
-		const taskConfig = createTaskConfig("act", "openai")
-		;(taskConfig.services.stateManager.getGlobalSettingsKey as any) = (key: string) => {
-			if (key === "mode") return "act"
-			if (key === "autoApprovalSettings") {
-				return { actions: { useMcp: true } }
-			}
-			return undefined
-		}
+		const taskConfig = createTaskConfig("act", "openai", true)
 
-		const builder = new SubagentBuilder(taskConfig)
-		const prompt = builder.buildSystemPrompt("generated", {
-			enableNativeToolCalls: true,
-			visibleNativeToolNames: ["search_files", "read_file"],
-			mcpHub: {
-				getServers: () => [
+		const mcpServers: McpServer[] = [
+			{
+				name: "workspace-index",
+				status: "connected",
+				config: '{"command":"indxr"}',
+				tools: [
 					{
-						name: "workspace-index",
-						status: "connected",
-						config: '{"command":"indxr"}',
-						tools: [
-							{
-								name: "search_relevant",
-								description: "Search relevant",
-								inputSchema: { type: "object", properties: {} },
-							},
-							{ name: "get_file_summary", description: "Summary", inputSchema: { type: "object", properties: {} } },
-						],
+						name: "search_relevant",
+						description: "Search relevant",
+						inputSchema: { type: "object", properties: {} },
 					},
+					{ name: "get_file_summary", description: "Summary", inputSchema: { type: "object", properties: {} } },
 				],
-			} as any,
-		} as never)
+			},
+		]
+		const builder = new SubagentBuilder(taskConfig, undefined, configSource)
+		const prompt = builder.buildSystemPrompt(
+			"generated",
+			createSystemPromptContext({
+				enableNativeToolCalls: true,
+				visibleNativeToolNames: ["search_files", "read_file"],
+				mcpHub: createMcpHub(mcpServers),
+			}),
+		)
 
 		assert.doesNotMatch(prompt, /# Indxr-Aware Exploration/)
 	})
 
 	it("mentions only the visible subset of Indxr tools in subagent-specific native guidance", () => {
-		sinon.stub(AgentConfigLoader, "getInstance").returns({
-			getCachedConfig: () => undefined,
-		} as unknown as AgentConfigLoader)
+		const configSource = createConfigSource(() => undefined)
 		sinon.stub(api, "buildApiHandler").returns({ getModel: sinon.stub(), createMessage: sinon.stub() } as never)
 
-		const taskConfig = createTaskConfig("act", "openai")
-		;(taskConfig.services.stateManager.getGlobalSettingsKey as any) = (key: string) => {
-			if (key === "mode") return "act"
-			if (key === "autoApprovalSettings") {
-				return { actions: { useMcp: true } }
-			}
-			return undefined
-		}
+		const taskConfig = createTaskConfig("act", "openai", true)
 
-		const builder = new SubagentBuilder(taskConfig)
-		const prompt = builder.buildSystemPrompt("generated", {
-			enableNativeToolCalls: true,
-			visibleNativeToolNames: ["indxr-10mcp0search_relevant", "indxr-10mcp0get_file_summary", "search_files"],
-			mcpHub: {
-				getServers: () => [
+		const mcpServers: McpServer[] = [
+			{
+				name: "workspace-index",
+				status: "connected",
+				config: '{"command":"indxr"}',
+				tools: [
 					{
-						name: "workspace-index",
-						status: "connected",
-						config: '{"command":"indxr"}',
-						tools: [
-							{
-								name: "search_relevant",
-								description: "Search relevant",
-								inputSchema: { type: "object", properties: {} },
-							},
-							{ name: "get_file_summary", description: "Summary", inputSchema: { type: "object", properties: {} } },
-							{ name: "lookup_symbol", description: "Lookup", inputSchema: { type: "object", properties: {} } },
-						],
+						name: "search_relevant",
+						description: "Search relevant",
+						inputSchema: { type: "object", properties: {} },
 					},
+					{ name: "get_file_summary", description: "Summary", inputSchema: { type: "object", properties: {} } },
+					{ name: "lookup_symbol", description: "Lookup", inputSchema: { type: "object", properties: {} } },
 				],
-			} as any,
-		} as never)
+			},
+		]
+		const builder = new SubagentBuilder(taskConfig, undefined, configSource)
+		const prompt = builder.buildSystemPrompt(
+			"generated",
+			createSystemPromptContext({
+				enableNativeToolCalls: true,
+				visibleNativeToolNames: ["indxr-10mcp0search_relevant", "indxr-10mcp0get_file_summary", "search_files"],
+				mcpHub: createMcpHub(mcpServers),
+			}),
+		)
 
 		assert.match(prompt, /# Indxr-Aware Exploration/)
 		assert.match(prompt, /`search_relevant`/)
