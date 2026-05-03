@@ -20,8 +20,7 @@ export interface WorkflowToolBackedOperationExecutionRequest {
 	toolParams: Record<string, string>
 }
 
-export interface WorkflowToolBackedOperationDefinition {
-	id: string
+export interface WorkflowToolBackedActionInstruction {
 	toolName: ClineDefaultTool
 	buildStatusDefinition(session: WorkflowStepResolutionSessionState): WorkflowStepResolutionStatusDefinition
 	buildToolExecutionRequest(args: {
@@ -34,9 +33,14 @@ export interface WorkflowToolBackedOperationDefinition {
 	): WorkflowToolBackedOperationEvaluationResult
 }
 
+export interface WorkflowStepResolutionSourceRoute {
+	branchId: string
+	routeId: string
+}
+
 export interface WorkflowStepResolutionSessionState {
 	sessionId: string
-	definitionId: string
+	sourceRoute: WorkflowStepResolutionSourceRoute
 	triggerSource: WorkflowStepResolutionTriggerSource
 	owner: WorkflowStepResolutionSessionOwner
 	state: WorkflowStepResolutionStatusState

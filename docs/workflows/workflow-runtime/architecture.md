@@ -240,7 +240,7 @@ Responsibilities:
 
 - declare workflow metadata
 - declare the canonical project subfolder designation for the workflow
-- declare step graph and transition rules
+- declare step graph and transition behavior through per-step next-action decision trees whose satisfied routes select exactly one decision action
 - declare per-step prompt content
 - declare workflow-level and per-step native tool schema
 - declare workflow-entry informational panel content and workflow-form configuration
@@ -364,6 +364,8 @@ Exact filenames beyond this level are deferred to requirements and implementatio
 7. On failure, workflow runtime executes the retry procedure defined for the active workflow and step.
 8. If that retry fails, workflow runtime surfaces a final user-visible error.
 
+If the selected decision action is a step transition, workflow runtime mutates the active step, evaluates completion rules against the resulting workflow state, persists required workflow metadata, and re-enters canonical next-action evaluation from the newly active step. The previous step's selected route must not also execute a second action after the transition.
+
 ### 6.5 Scenario: AI-Initiated Progression Request
 
 1. The active step allows `workflow_progress_request`.
@@ -377,7 +379,7 @@ Exact filenames beyond this level are deferred to requirements and implementatio
 
 ### 6.6 Scenario: Completion and Teardown
 
-1. Workflow runtime evaluates workflow completion rules after a step mutation.
+1. Workflow runtime evaluates workflow completion rules after relevant workflow session mutations, including active-step mutation caused by a step-transition decision action.
 2. If completion criteria are satisfied, workflow runtime treats completion as a terminal condition; no workflow-specific completion handler runs at this point.
 3. Workflow runtime performs workflow-agnostic teardown of the canonical workflow session.
 4. Because workflow-owned values live inside that session, teardown clears workflow values by clearing the workflow session rather than by clearing separate mirrored state.

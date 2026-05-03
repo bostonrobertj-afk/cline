@@ -589,7 +589,7 @@ export interface WorkflowStepResolutionStatusOwner {
 
 export interface ClineWorkflowStepResolutionStatus {
 	sessionId: string
-	definitionId: string
+	sourceRoute: { branchId: string; routeId: string }
 	owner: WorkflowStepResolutionStatusOwner
 	state: WorkflowStepResolutionStatusState
 	definition: WorkflowStepResolutionStatusDefinition

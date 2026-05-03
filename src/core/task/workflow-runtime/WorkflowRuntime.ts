@@ -32,7 +32,7 @@ import { resolveWorkflowDefinition } from "@/core/task/workflow-runtime/Workflow
 import { buildWorkflowStepResolutionStatusPayload } from "@/core/task/workflow-step-resolution/buildWorkflowStepResolutionStatusPayload"
 import type {
 	WorkflowStepResolutionSessionState,
-	WorkflowToolBackedOperationExecutionRequest,
+	WorkflowStepResolutionSourceRoute,
 } from "@/core/task/workflow-step-resolution/types"
 import { ClineDefaultTool } from "@/shared/tools"
 import type {
@@ -121,6 +121,17 @@ interface WorkflowEpicsIndex {
 	epics: WorkflowEpicsIndexEntry[]
 }
 
+interface WorkflowResolvedDecisionTreeRoute {
+	route: WorkflowDecisionBranchRoute
+	sourceRoute: WorkflowStepResolutionSourceRoute
+	nextActiveBranchId: string
+}
+
+interface WorkflowContinuationSourceRoute {
+	route: WorkflowDecisionBranchRoute
+	sourceRoute: WorkflowStepResolutionSourceRoute
+}
+
 export class WorkflowRuntime {
 	private readonly cwd: string
 	private readonly workspacePathPolicy: WorkflowWorkspacePathPolicy
@@ -196,7 +207,7 @@ export class WorkflowRuntime {
 				formSession: undefined,
 				stepResolutionSession: undefined,
 				suppressedWorkflowFormIds: [],
-				suppressedWorkflowStepResolutionDefinitionIds: [],
+				suppressedWorkflowStepResolutionRoutes: [],
 			},
 			branchContext: this.createInitialBranchContext(firstStep),
 		}
@@ -267,6 +278,7 @@ export class WorkflowRuntime {
 			taskState,
 			definition,
 			route: matchingDecisionTreeRoute.route,
+			sourceRoute: matchingDecisionTreeRoute.sourceRoute,
 			nextActiveBranchId: matchingDecisionTreeRoute.nextActiveBranchId,
 		})
 	}
@@ -346,81 +358,81 @@ export class WorkflowRuntime {
 		if (session.ui.stepResolutionSession) {
 			const definition = this.getActiveWorkflowDefinition(taskState)
 			const stepResolutionSession = session.ui.stepResolutionSession
-			const toolBackedOperationDefinition = definition?.toolBackedOperationDefinitions?.[stepResolutionSession.definitionId]
-			if (!definition || !toolBackedOperationDefinition) {
+			const activeStep = definition ? this.getActiveStepDefinition(definition, session) : undefined
+			const sourceRoute = activeStep
+				? this.getWorkflowDecisionRouteBySource({
+						step: activeStep,
+						sourceRoute: stepResolutionSession.sourceRoute,
+					})
+				: undefined
+			if (!definition || !sourceRoute || sourceRoute.action.kind !== "execute_tool_backed_operation") {
 				return { kind: "no_op" }
 			}
 
 			if (isSerializedToolFailureResultText(toolResultText)) {
 				session.ui.stepResolutionSession = undefined
-				if (!session.ui.suppressedWorkflowStepResolutionDefinitionIds.includes(stepResolutionSession.definitionId)) {
-					session.ui.suppressedWorkflowStepResolutionDefinitionIds.push(stepResolutionSession.definitionId)
-				}
+				this.rememberSuppressedWorkflowStepResolutionRoute(session, stepResolutionSession.sourceRoute)
 				return this.completeToolBackedOperationFailure({
 					taskState,
-					toolBackedOperationId: stepResolutionSession.definitionId,
+					sourceRoute: stepResolutionSession.sourceRoute,
 					errorMessage: toolResultText,
 				})
 			}
 
-			const evaluation = toolBackedOperationDefinition.evaluateToolExecutionResult(stepResolutionSession, {
+			const evaluation = sourceRoute.action.instruction.evaluateToolExecutionResult(stepResolutionSession, {
 				toolResultText,
 			})
 
 			if (evaluation.succeeded) {
 				session.ui.stepResolutionSession = undefined
-				if (!session.ui.suppressedWorkflowStepResolutionDefinitionIds.includes(stepResolutionSession.definitionId)) {
-					session.ui.suppressedWorkflowStepResolutionDefinitionIds.push(stepResolutionSession.definitionId)
-				}
+				this.rememberSuppressedWorkflowStepResolutionRoute(session, stepResolutionSession.sourceRoute)
 				return this.completeToolBackedOperationSuccess({
 					taskState,
-					toolBackedOperationId: stepResolutionSession.definitionId,
+					sourceRoute: stepResolutionSession.sourceRoute,
 				})
 			}
 
 			session.ui.stepResolutionSession = undefined
-			if (!session.ui.suppressedWorkflowStepResolutionDefinitionIds.includes(stepResolutionSession.definitionId)) {
-				session.ui.suppressedWorkflowStepResolutionDefinitionIds.push(stepResolutionSession.definitionId)
-			}
+			this.rememberSuppressedWorkflowStepResolutionRoute(session, stepResolutionSession.sourceRoute)
 			return this.completeToolBackedOperationFailure({
 				taskState,
-				toolBackedOperationId: stepResolutionSession.definitionId,
+				sourceRoute: stepResolutionSession.sourceRoute,
 				errorMessage: evaluation.errorMessage,
 			})
 		}
 
-		const pendingArtifactAllocationId = this.findPendingArtifactAllocationId({ taskState })
-		if (pendingArtifactAllocationId) {
+		const pendingArtifactAllocationSourceRoute = this.findPendingArtifactAllocationSourceRoute({ taskState })
+		if (pendingArtifactAllocationSourceRoute) {
 			if (isSerializedToolFailureResultText(toolResultText)) {
 				return this.completeToolBackedOperationFailure({
 					taskState,
-					toolBackedOperationId: pendingArtifactAllocationId,
+					sourceRoute: pendingArtifactAllocationSourceRoute,
 					errorMessage: toolResultText,
 				})
 			}
 
 			return this.completeToolBackedOperationSuccess({
 				taskState,
-				toolBackedOperationId: pendingArtifactAllocationId,
+				sourceRoute: pendingArtifactAllocationSourceRoute,
 			})
 		}
 
-		const pendingDocumentBuilderId = this.findPendingDocumentBuilderId({ taskState })
-		if (!pendingDocumentBuilderId) {
+		const pendingDocumentBuildSourceRoute = this.findPendingDocumentBuildSourceRoute({ taskState })
+		if (!pendingDocumentBuildSourceRoute) {
 			return { kind: "no_op" }
 		}
 
 		if (isSerializedToolFailureResultText(toolResultText)) {
 			return this.completeToolBackedOperationFailure({
 				taskState,
-				toolBackedOperationId: pendingDocumentBuilderId,
+				sourceRoute: pendingDocumentBuildSourceRoute,
 				errorMessage: toolResultText,
 			})
 		}
 
 		return this.completeToolBackedOperationSuccess({
 			taskState,
-			toolBackedOperationId: pendingDocumentBuilderId,
+			sourceRoute: pendingDocumentBuildSourceRoute,
 		})
 	}
 
@@ -716,14 +728,21 @@ export class WorkflowRuntime {
 		session: WorkflowStepResolutionSessionState
 	}): ClineWorkflowStepResolutionStatus | undefined {
 		const definition = this.getActiveWorkflowDefinition(args.taskState)
-		const toolBackedOperationDefinition = definition?.toolBackedOperationDefinitions?.[args.session.definitionId]
-		if (!toolBackedOperationDefinition) {
+		const session = args.taskState.activeWorkflowSession
+		const activeStep = definition && session ? this.getActiveStepDefinition(definition, session) : undefined
+		const sourceRoute = activeStep
+			? this.getWorkflowDecisionRouteBySource({
+					step: activeStep,
+					sourceRoute: args.session.sourceRoute,
+				})
+			: undefined
+		if (!sourceRoute || sourceRoute.action.kind !== "execute_tool_backed_operation") {
 			return undefined
 		}
 
 		return buildWorkflowStepResolutionStatusPayload(
 			args.session,
-			toolBackedOperationDefinition.buildStatusDefinition(args.session),
+			sourceRoute.action.instruction.buildStatusDefinition(args.session),
 		)
 	}
 
@@ -743,6 +762,23 @@ export class WorkflowRuntime {
 
 	private isStringArray(value: unknown): value is string[] {
 		return Array.isArray(value) && value.every((entry) => typeof entry === "string")
+	}
+
+	private isWorkflowStepResolutionSourceRoute(value: unknown): value is WorkflowStepResolutionSourceRoute {
+		if (this.isPlainRecord(value) === false) {
+			return false
+		}
+
+		return (
+			typeof value.branchId === "string" &&
+			value.branchId.trim() !== "" &&
+			typeof value.routeId === "string" &&
+			value.routeId.trim() !== ""
+		)
+	}
+
+	private isWorkflowStepResolutionSourceRouteArray(value: unknown): value is WorkflowStepResolutionSourceRoute[] {
+		return Array.isArray(value) && value.every((entry) => this.isWorkflowStepResolutionSourceRoute(entry))
 	}
 
 	private isRestorableWorkflowValueRecord(value: unknown, definition: WorkflowDefinition): value is WorkflowValues {
@@ -797,11 +833,10 @@ export class WorkflowRuntime {
 			case "workflow_values_persisted":
 				return this.isStringArray(value.changedKeys)
 			case "tool_backed_operation_succeeded":
-				return typeof value.toolBackedOperationId === "string" && value.toolBackedOperationId.trim() !== ""
+				return this.isWorkflowStepResolutionSourceRoute(value.sourceRoute)
 			case "tool_backed_operation_failed":
 				return (
-					typeof value.toolBackedOperationId === "string" &&
-					value.toolBackedOperationId.trim() !== "" &&
+					this.isWorkflowStepResolutionSourceRoute(value.sourceRoute) &&
 					(value.errorMessage === undefined || typeof value.errorMessage === "string")
 				)
 			default:
@@ -863,7 +898,7 @@ export class WorkflowRuntime {
 			const continuationRoute = this.findContinuationSourceRoute({
 				step: activeStep,
 				activeBranchId,
-				matches: (route) =>
+				matches: ({ route }) =>
 					route.action.kind === "render_workflow_form" && route.action.workflowFormId === workflowFormId,
 			})
 			if (continuationRoute === undefined) {
@@ -944,12 +979,11 @@ export class WorkflowRuntime {
 
 	private validateAndNormalizePersistedStepResolutionSessionForRestore(args: {
 		persistedStepResolutionSession: unknown
-		definition: WorkflowDefinition
 		activeStep: WorkflowStepDefinition
 		activeBranchId: string
 		activeWorkflowName: string
 	}): WorkflowStepResolutionSessionState | undefined {
-		const { persistedStepResolutionSession, definition, activeStep, activeBranchId, activeWorkflowName } = args
+		const { persistedStepResolutionSession, activeStep, activeBranchId, activeWorkflowName } = args
 		if (this.isPlainRecord(persistedStepResolutionSession) === false) {
 			return undefined
 		}
@@ -961,11 +995,7 @@ export class WorkflowRuntime {
 			return undefined
 		}
 
-		if (
-			typeof persistedStepResolutionSession.definitionId !== "string" ||
-			persistedStepResolutionSession.definitionId.trim() === "" ||
-			definition.toolBackedOperationDefinitions?.[persistedStepResolutionSession.definitionId] === undefined
-		) {
+		if (this.isWorkflowStepResolutionSourceRoute(persistedStepResolutionSession.sourceRoute) === false) {
 			return undefined
 		}
 
@@ -996,20 +1026,24 @@ export class WorkflowRuntime {
 			return undefined
 		}
 
-		const continuationRoute = this.findContinuationSourceRoute({
+		const sourceRoute = this.getWorkflowDecisionRouteBySource({
 			step: activeStep,
-			activeBranchId,
-			matches: (route) =>
-				route.action.kind === "execute_tool_backed_operation" &&
-				route.action.toolBackedOperationId === persistedStepResolutionSession.definitionId,
+			sourceRoute: persistedStepResolutionSession.sourceRoute,
 		})
-		if (continuationRoute === undefined) {
+		if (
+			sourceRoute === undefined ||
+			sourceRoute.action.kind !== "execute_tool_backed_operation" ||
+			sourceRoute.followingBranchId !== activeBranchId
+		) {
 			return undefined
 		}
 
 		const normalizedSession: WorkflowStepResolutionSessionState = {
 			sessionId: persistedStepResolutionSession.sessionId,
-			definitionId: persistedStepResolutionSession.definitionId,
+			sourceRoute: {
+				branchId: persistedStepResolutionSession.sourceRoute.branchId,
+				routeId: persistedStepResolutionSession.sourceRoute.routeId,
+			},
 			triggerSource: "execute_tool_backed_operation",
 			owner: {
 				kind: "workflow_step",
@@ -1028,6 +1062,7 @@ export class WorkflowRuntime {
 
 	private isWorkflowBranchTriggerEventCompatibleWithDefinition(
 		definition: WorkflowDefinition,
+		activeStep: WorkflowStepDefinition,
 		triggerEvent: WorkflowBranchTriggerEvent,
 	): boolean {
 		switch (triggerEvent.kind) {
@@ -1036,9 +1071,18 @@ export class WorkflowRuntime {
 			case "workflow_values_persisted":
 				return triggerEvent.changedKeys.every((key) => definition.workflowValueKeys.includes(key))
 			case "tool_backed_operation_succeeded":
-				return definition.toolBackedOperationDefinitions?.[triggerEvent.toolBackedOperationId] !== undefined
-			case "tool_backed_operation_failed":
-				return definition.toolBackedOperationDefinitions?.[triggerEvent.toolBackedOperationId] !== undefined
+			case "tool_backed_operation_failed": {
+				const sourceRoute = this.getWorkflowDecisionRouteBySource({
+					step: activeStep,
+					sourceRoute: triggerEvent.sourceRoute,
+				})
+				return (
+					sourceRoute !== undefined &&
+					(sourceRoute.action.kind === "execute_tool_backed_operation" ||
+						sourceRoute.action.kind === "allocate_artifact" ||
+						sourceRoute.action.kind === "build_workflow_document")
+				)
+			}
 			default:
 				return true
 		}
@@ -1095,6 +1139,7 @@ export class WorkflowRuntime {
 			if (
 				this.isWorkflowBranchTriggerEventCompatibleWithDefinition(
 					definition,
+					activeStep,
 					persistedSession.branchContext.lastTriggerEvent,
 				) === false
 			) {
@@ -1127,15 +1172,15 @@ export class WorkflowRuntime {
 			return undefined
 		}
 
-		if (this.isStringArray(persistedSession.ui.suppressedWorkflowStepResolutionDefinitionIds) === false) {
+		if (this.isWorkflowStepResolutionSourceRouteArray(persistedSession.ui.suppressedWorkflowStepResolutionRoutes) === false) {
 			return undefined
 		}
 
-		const toolBackedOperationIds = new Set(Object.keys(definition.toolBackedOperationDefinitions ?? {}))
 		if (
-			persistedSession.ui.suppressedWorkflowStepResolutionDefinitionIds.some(
-				(definitionId) => toolBackedOperationIds.has(definitionId) === false,
-			)
+			persistedSession.ui.suppressedWorkflowStepResolutionRoutes.some((sourceRoute) => {
+				const route = this.getWorkflowDecisionRouteBySource({ step: activeStep, sourceRoute })
+				return route === undefined || route.action.kind !== "execute_tool_backed_operation"
+			})
 		) {
 			return undefined
 		}
@@ -1162,7 +1207,6 @@ export class WorkflowRuntime {
 		if (persistedSession.ui.stepResolutionSession !== undefined) {
 			stepResolutionSession = this.validateAndNormalizePersistedStepResolutionSessionForRestore({
 				persistedStepResolutionSession: persistedSession.ui.stepResolutionSession,
-				definition,
 				activeStep,
 				activeBranchId: branchContext.activeBranchId,
 				activeWorkflowName,
@@ -1184,9 +1228,12 @@ export class WorkflowRuntime {
 				formSession,
 				stepResolutionSession,
 				suppressedWorkflowFormIds: [...persistedSession.ui.suppressedWorkflowFormIds],
-				suppressedWorkflowStepResolutionDefinitionIds: [
-					...persistedSession.ui.suppressedWorkflowStepResolutionDefinitionIds,
-				],
+				suppressedWorkflowStepResolutionRoutes: persistedSession.ui.suppressedWorkflowStepResolutionRoutes.map(
+					(sourceRoute) => ({
+						branchId: sourceRoute.branchId,
+						routeId: sourceRoute.routeId,
+					}),
+				),
 			},
 			branchContext,
 		}
@@ -2060,12 +2107,7 @@ export class WorkflowRuntime {
 		session: ActiveWorkflowSession
 		step: WorkflowStepDefinition
 		triggerEvent?: WorkflowBranchTriggerEvent
-	}):
-		| {
-				route: WorkflowDecisionBranchRoute
-				nextActiveBranchId: string
-		  }
-		| undefined {
+	}): WorkflowResolvedDecisionTreeRoute | undefined {
 		const { session, step, taskState } = args
 		const triggerEvent = args.triggerEvent ?? session.branchContext.lastTriggerEvent
 		const initialBranch =
@@ -2117,6 +2159,10 @@ export class WorkflowRuntime {
 
 			return {
 				route: matchedRoute,
+				sourceRoute: {
+					branchId: currentBranch.id,
+					routeId: matchedRoute.id,
+				},
 				nextActiveBranchId,
 			}
 		}
@@ -2166,12 +2212,7 @@ export class WorkflowRuntime {
 		taskState: TaskState
 		step: WorkflowStepDefinition
 		activeBranchId: string
-	}):
-		| {
-				route: WorkflowDecisionBranchRoute
-				nextActiveBranchId: string
-		  }
-		| undefined {
+	}): WorkflowResolvedDecisionTreeRoute | undefined {
 		const { taskState, step, activeBranchId } = args
 		const session = taskState.activeWorkflowSession
 		if (!session) {
@@ -2183,13 +2224,14 @@ export class WorkflowRuntime {
 			const continuationRoute = this.findContinuationSourceRoute({
 				step,
 				activeBranchId,
-				matches: (route) =>
+				matches: ({ route }) =>
 					route.action.kind === "render_workflow_form" &&
 					route.action.workflowFormId === activeFormSession.workflowFormId,
 			})
 			if (continuationRoute) {
 				return {
-					route: continuationRoute,
+					route: continuationRoute.route,
+					sourceRoute: continuationRoute.sourceRoute,
 					nextActiveBranchId: activeBranchId,
 				}
 			}
@@ -2200,13 +2242,14 @@ export class WorkflowRuntime {
 			const continuationRoute = this.findContinuationSourceRoute({
 				step,
 				activeBranchId,
-				matches: (route) =>
+				matches: ({ route, sourceRoute }) =>
 					route.action.kind === "execute_tool_backed_operation" &&
-					route.action.toolBackedOperationId === activeStepResolutionSession.definitionId,
+					this.areWorkflowStepResolutionSourceRoutesEqual(sourceRoute, activeStepResolutionSession.sourceRoute),
 			})
 			if (continuationRoute) {
 				return {
-					route: continuationRoute,
+					route: continuationRoute.route,
+					sourceRoute: continuationRoute.sourceRoute,
 					nextActiveBranchId: activeBranchId,
 				}
 			}
@@ -2215,11 +2258,12 @@ export class WorkflowRuntime {
 		const artifactAllocationContinuationRoute = this.findContinuationSourceRoute({
 			step,
 			activeBranchId,
-			matches: (route) => route.action.kind === "allocate_artifact",
+			matches: ({ route }) => route.action.kind === "allocate_artifact",
 		})
 		if (artifactAllocationContinuationRoute) {
 			return {
-				route: artifactAllocationContinuationRoute,
+				route: artifactAllocationContinuationRoute.route,
+				sourceRoute: artifactAllocationContinuationRoute.sourceRoute,
 				nextActiveBranchId: activeBranchId,
 			}
 		}
@@ -2230,16 +2274,24 @@ export class WorkflowRuntime {
 	private findContinuationSourceRoute(args: {
 		step: WorkflowStepDefinition
 		activeBranchId: string
-		matches(route: WorkflowDecisionBranchRoute): boolean
-	}): WorkflowDecisionBranchRoute | undefined {
+		matches(sourceRoute: WorkflowContinuationSourceRoute): boolean
+	}): WorkflowContinuationSourceRoute | undefined {
 		for (const branch of Object.values(args.step.decisionTree.branches)) {
 			for (const route of branch.routes) {
 				if (route.followingBranchId !== args.activeBranchId) {
 					continue
 				}
 
-				if (args.matches(route)) {
-					return route
+				const continuationSourceRoute = {
+					route,
+					sourceRoute: {
+						branchId: branch.id,
+						routeId: route.id,
+					},
+				}
+
+				if (args.matches(continuationSourceRoute)) {
+					return continuationSourceRoute
 				}
 			}
 		}
@@ -2273,7 +2325,7 @@ export class WorkflowRuntime {
 		session.ui.formSession = undefined
 		session.ui.stepResolutionSession = undefined
 		session.ui.suppressedWorkflowFormIds = []
-		session.ui.suppressedWorkflowStepResolutionDefinitionIds = []
+		session.ui.suppressedWorkflowStepResolutionRoutes = []
 		session.branchContext = {
 			activeBranchId: nextBranchId,
 		}
@@ -2286,8 +2338,9 @@ export class WorkflowRuntime {
 		taskState: TaskState
 		definition: WorkflowDefinition
 		action: WorkflowDecisionAction
+		sourceRoute: WorkflowStepResolutionSourceRoute
 	}): Promise<WorkflowNextAction> {
-		const { taskState, definition, action } = args
+		const { taskState, definition, action, sourceRoute } = args
 		const session = taskState.activeWorkflowSession
 		if (!session) {
 			return { kind: "no_op" }
@@ -2336,55 +2389,77 @@ export class WorkflowRuntime {
 					return { kind: "no_op" }
 				}
 
-				const toolBackedOperationDefinition = definition.toolBackedOperationDefinitions?.[action.toolBackedOperationId]
-				if (toolBackedOperationDefinition) {
-					const stepResolutionSession =
-						session.ui.stepResolutionSession?.definitionId === action.toolBackedOperationId
-							? session.ui.stepResolutionSession
-							: this.createToolBackedOperationSession({
-									definitionId: action.toolBackedOperationId,
-									triggerSource: "execute_tool_backed_operation",
-									owner: {
-										kind: "workflow_step",
-										workflowName: definition.name,
-										stepNumber: activeStep.stepNumber,
-									},
-								})
-					const toolRequest = toolBackedOperationDefinition.buildToolExecutionRequest({
-						toolBackedOperationSession: stepResolutionSession,
-						activeWorkflowSession: session,
+				const stepResolutionSession =
+					session.ui.stepResolutionSession &&
+					this.areWorkflowStepResolutionSourceRoutesEqual(session.ui.stepResolutionSession.sourceRoute, sourceRoute)
+						? session.ui.stepResolutionSession
+						: this.createToolBackedOperationSession({
+								sourceRoute,
+								triggerSource: "execute_tool_backed_operation",
+								owner: {
+									kind: "workflow_step",
+									workflowName: definition.name,
+									stepNumber: activeStep.stepNumber,
+								},
+							})
+				const toolRequest = action.instruction.buildToolExecutionRequest({
+					toolBackedOperationSession: stepResolutionSession,
+					activeWorkflowSession: session,
+				})
+				if (toolRequest.toolName !== action.instruction.toolName) {
+					const builtRequestToolOwnership = this.isRuntimeOwnedWorkflowTool(toolRequest.toolName)
+						? "runtime-owned "
+						: ""
+					return this.buildTerminalErrorNextAction({
+						taskState,
+						errorMessage: `Invalid workflow configuration: tool-backed action route ${sourceRoute.branchId}/${sourceRoute.routeId} declared tool ${action.instruction.toolName} but built request for ${builtRequestToolOwnership}tool ${toolRequest.toolName}.`,
 					})
-					session.ui.stepResolutionSession = stepResolutionSession
-
-					return {
-						kind: "execute_tool_backed_operation",
-						toolRequest,
-						toolBackedOperationSession: stepResolutionSession,
-					}
 				}
 
-				return { kind: "no_op" }
+				if (this.isRuntimeOwnedWorkflowTool(toolRequest.toolName)) {
+					return this.buildTerminalErrorNextAction({
+						taskState,
+						errorMessage: `Invalid workflow configuration: tool-backed action route ${sourceRoute.branchId}/${sourceRoute.routeId} built request for runtime-owned tool ${toolRequest.toolName}.`,
+					})
+				}
+
+				session.ui.stepResolutionSession = stepResolutionSession
+
+				return {
+					kind: "execute_tool_backed_operation",
+					toolRequest,
+					toolBackedOperationSession: stepResolutionSession,
+				}
 			}
 			case "build_workflow_document": {
-				const activeStep = this.getActiveStepDefinition(definition, session)
-				if (!activeStep || !(activeStep.documentBuilderIds ?? []).includes(action.documentBuilderId)) {
+				const artifactDefinition = definition.artifacts?.[action.instruction.artifactId]
+				if (!artifactDefinition) {
 					return { kind: "no_op" }
 				}
 
-				const toolRequest = await this.buildDocumentBuilderToolRequest({
-					taskState,
-					workflow: definition,
-					session,
-					documentBuilderId: action.documentBuilderId,
+				const destinationPath = readRequiredStringWorkflowValue({
+					workflowValues: session.workflowValues,
+					key: artifactDefinition.outputValueKeys.artifactAbsolutePath,
+					context: `artifact destination resolution for workflow document build route ${sourceRoute.branchId}/${sourceRoute.routeId}`,
 				})
-				if (!toolRequest) {
-					return { kind: "no_op" }
-				}
+				const content = await action.instruction.buildContent(session)
 
 				session.ui.stepResolutionSession = undefined
 				return {
 					kind: "execute_tool_backed_operation",
-					toolRequest,
+					toolRequest: {
+						toolName: ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT,
+						toolInput: action.instruction.workflowValueWrites
+							? {
+									workflow_value_writes: action.instruction.workflowValueWrites,
+								}
+							: {},
+						toolParams: {
+							artifact_id: action.instruction.artifactId,
+							destination_path: destinationPath,
+							content,
+						},
+					},
 				}
 			}
 			case "allocate_artifact": {
@@ -2425,9 +2500,10 @@ export class WorkflowRuntime {
 		taskState: TaskState
 		definition: WorkflowDefinition
 		route: WorkflowDecisionBranchRoute
+		sourceRoute: WorkflowStepResolutionSourceRoute
 		nextActiveBranchId: string
 	}): Promise<WorkflowNextAction> {
-		const { taskState, definition, route, nextActiveBranchId } = args
+		const { taskState, definition, route, sourceRoute, nextActiveBranchId } = args
 		const session = taskState.activeWorkflowSession
 		if (!session) {
 			return { kind: "no_op" }
@@ -2453,6 +2529,7 @@ export class WorkflowRuntime {
 			taskState,
 			definition,
 			action: route.action,
+			sourceRoute,
 		})
 	}
 
@@ -3061,37 +3138,40 @@ export class WorkflowRuntime {
 		return workflowValueWrites
 	}
 
-	private findPendingDocumentBuilderId(args: { taskState: TaskState }): string | undefined {
-		const session = args.taskState.activeWorkflowSession
-		if (!session) {
-			return undefined
-		}
-
-		const definition = this.getActiveWorkflowDefinition(args.taskState)
-		if (!definition) {
-			return undefined
-		}
-
-		const activeStep = this.getActiveStepDefinition(definition, session)
-		if (!activeStep) {
-			return undefined
-		}
-
-		const continuationRoute = this.findContinuationSourceRoute({
-			step: activeStep,
-			activeBranchId: session.branchContext.activeBranchId,
-			matches: (route) =>
-				route.action.kind === "build_workflow_document" &&
-				(activeStep.documentBuilderIds ?? []).includes(route.action.documentBuilderId),
-		})
-		if (!continuationRoute || continuationRoute.action.kind !== "build_workflow_document") {
-			return undefined
-		}
-
-		return continuationRoute.action.documentBuilderId
+	private areWorkflowStepResolutionSourceRoutesEqual(
+		left: WorkflowStepResolutionSourceRoute,
+		right: WorkflowStepResolutionSourceRoute,
+	): boolean {
+		return left.branchId === right.branchId && left.routeId === right.routeId
 	}
 
-	private findPendingArtifactAllocationId(args: { taskState: TaskState }): string | undefined {
+	private getWorkflowDecisionRouteBySource(args: {
+		step: WorkflowStepDefinition
+		sourceRoute: WorkflowStepResolutionSourceRoute
+	}): WorkflowDecisionBranchRoute | undefined {
+		const branch = args.step.decisionTree.branches[args.sourceRoute.branchId]
+		return branch?.routes.find((route) => route.id === args.sourceRoute.routeId)
+	}
+
+	private rememberSuppressedWorkflowStepResolutionRoute(
+		session: ActiveWorkflowSession,
+		sourceRoute: WorkflowStepResolutionSourceRoute,
+	): void {
+		if (
+			session.ui.suppressedWorkflowStepResolutionRoutes.some((suppressedRoute) =>
+				this.areWorkflowStepResolutionSourceRoutesEqual(suppressedRoute, sourceRoute),
+			)
+		) {
+			return
+		}
+
+		session.ui.suppressedWorkflowStepResolutionRoutes.push({
+			branchId: sourceRoute.branchId,
+			routeId: sourceRoute.routeId,
+		})
+	}
+
+	private findPendingDocumentBuildSourceRoute(args: { taskState: TaskState }): WorkflowStepResolutionSourceRoute | undefined {
 		const session = args.taskState.activeWorkflowSession
 		if (!session) {
 			return undefined
@@ -3110,24 +3190,57 @@ export class WorkflowRuntime {
 		const continuationRoute = this.findContinuationSourceRoute({
 			step: activeStep,
 			activeBranchId: session.branchContext.activeBranchId,
-			matches: (route) =>
-				route.action.kind === "allocate_artifact" && definition.artifacts?.[route.action.artifactId] !== undefined,
+			matches: ({ route }) => route.action.kind === "build_workflow_document",
 		})
-		if (!continuationRoute || continuationRoute.action.kind !== "allocate_artifact") {
+		if (!continuationRoute || continuationRoute.route.action.kind !== "build_workflow_document") {
 			return undefined
 		}
 
-		return continuationRoute.action.artifactId
+		return continuationRoute.sourceRoute
+	}
+
+	private findPendingArtifactAllocationSourceRoute(args: {
+		taskState: TaskState
+	}): WorkflowStepResolutionSourceRoute | undefined {
+		const session = args.taskState.activeWorkflowSession
+		if (!session) {
+			return undefined
+		}
+
+		const definition = this.getActiveWorkflowDefinition(args.taskState)
+		if (!definition) {
+			return undefined
+		}
+
+		const activeStep = this.getActiveStepDefinition(definition, session)
+		if (!activeStep) {
+			return undefined
+		}
+
+		const continuationRoute = this.findContinuationSourceRoute({
+			step: activeStep,
+			activeBranchId: session.branchContext.activeBranchId,
+			matches: ({ route }) =>
+				route.action.kind === "allocate_artifact" && definition.artifacts?.[route.action.artifactId] !== undefined,
+		})
+		if (!continuationRoute || continuationRoute.route.action.kind !== "allocate_artifact") {
+			return undefined
+		}
+
+		return continuationRoute.sourceRoute
 	}
 
 	private createToolBackedOperationSession(args: {
-		definitionId: string
+		sourceRoute: WorkflowStepResolutionSourceRoute
 		triggerSource: WorkflowStepResolutionSessionState["triggerSource"]
 		owner: WorkflowStepResolutionSessionState["owner"]
 	}): WorkflowStepResolutionSessionState {
 		return {
 			sessionId: randomUUID(),
-			definitionId: args.definitionId,
+			sourceRoute: {
+				branchId: args.sourceRoute.branchId,
+				routeId: args.sourceRoute.routeId,
+			},
 			triggerSource: args.triggerSource,
 			owner: args.owner,
 			state: "pending",
@@ -3137,6 +3250,18 @@ export class WorkflowRuntime {
 	private normalizeToolBackedOperationFailureMessage(errorMessage: string | undefined): string {
 		const trimmedMessage = errorMessage?.trim()
 		return trimmedMessage && trimmedMessage.length > 0 ? trimmedMessage : "Tool-backed operation failed."
+	}
+
+	private isRuntimeOwnedWorkflowTool(toolName: string): boolean {
+		switch (toolName) {
+			case ClineDefaultTool.SET_WORKFLOW_VALUES:
+			case ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT:
+			case ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT:
+			case ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST:
+				return true
+			default:
+				return false
+		}
 	}
 
 	private joinPromptSections(sections: Array<string | undefined>): string | undefined {
@@ -3170,7 +3295,7 @@ export class WorkflowRuntime {
 
 	private async completeToolBackedOperationSuccess(args: {
 		taskState: TaskState
-		toolBackedOperationId: string
+		sourceRoute: WorkflowStepResolutionSourceRoute
 	}): Promise<WorkflowNextAction> {
 		const session = args.taskState.activeWorkflowSession
 		if (!session) {
@@ -3179,7 +3304,10 @@ export class WorkflowRuntime {
 
 		session.branchContext.lastTriggerEvent = {
 			kind: "tool_backed_operation_succeeded",
-			toolBackedOperationId: args.toolBackedOperationId,
+			sourceRoute: {
+				branchId: args.sourceRoute.branchId,
+				routeId: args.sourceRoute.routeId,
+			},
 		}
 		session.branchContext.failureState = undefined
 		return this.resolveNextAction({ taskState: args.taskState })
@@ -3187,7 +3315,7 @@ export class WorkflowRuntime {
 
 	private async completeToolBackedOperationFailure(args: {
 		taskState: TaskState
-		toolBackedOperationId: string
+		sourceRoute: WorkflowStepResolutionSourceRoute
 		errorMessage?: string
 	}): Promise<WorkflowNextAction> {
 		const session = args.taskState.activeWorkflowSession
@@ -3199,7 +3327,10 @@ export class WorkflowRuntime {
 		const previousRetryAttemptCount = session.branchContext.failureState?.retryAttemptCount ?? 0
 		session.branchContext.lastTriggerEvent = {
 			kind: "tool_backed_operation_failed",
-			toolBackedOperationId: args.toolBackedOperationId,
+			sourceRoute: {
+				branchId: args.sourceRoute.branchId,
+				routeId: args.sourceRoute.routeId,
+			},
 			errorMessage: normalizedErrorMessage,
 		}
 		session.branchContext.failureState = {
@@ -3207,45 +3338,6 @@ export class WorkflowRuntime {
 			terminalErrorMessage: normalizedErrorMessage,
 		}
 		return this.resolveNextAction({ taskState: args.taskState })
-	}
-
-	private async buildDocumentBuilderToolRequest(args: {
-		taskState: TaskState
-		workflow: WorkflowDefinition
-		session: ActiveWorkflowSession
-		documentBuilderId: string
-	}): Promise<WorkflowToolBackedOperationExecutionRequest | undefined> {
-		const documentBuilder = args.workflow.documentBuilders?.[args.documentBuilderId]
-		if (!documentBuilder) {
-			return undefined
-		}
-
-		const artifactDefinition = args.workflow.artifacts?.[documentBuilder.artifactId]
-		if (!artifactDefinition) {
-			return undefined
-		}
-
-		const destinationPath = readRequiredStringWorkflowValue({
-			workflowValues: args.session.workflowValues,
-			key: artifactDefinition.outputValueKeys.artifactAbsolutePath,
-			context: `artifact destination resolution for document builder ${args.documentBuilderId}`,
-		})
-
-		const content = await documentBuilder.buildContent(args.session)
-
-		return {
-			toolName: ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT,
-			toolInput: documentBuilder.workflowValueWrites
-				? {
-						workflow_value_writes: documentBuilder.workflowValueWrites,
-					}
-				: {},
-			toolParams: {
-				artifact_id: documentBuilder.artifactId,
-				destination_path: destinationPath,
-				content,
-			},
-		}
 	}
 
 	private validateWorkflowDefinition(workflow: WorkflowDefinition): WorkflowValidationResult {
@@ -3329,15 +3421,7 @@ export class WorkflowRuntime {
 
 		const seenStepNumbers = new Set<number>()
 		const workflowForms = workflow.workflowForms ?? {}
-		const toolBackedOperationDefinitions = workflow.toolBackedOperationDefinitions ?? {}
 		const artifacts = workflow.artifacts ?? {}
-		const documentBuilders = workflow.documentBuilders ?? {}
-		const runtimeOwnedToolNames = new Set<ClineDefaultTool>([
-			ClineDefaultTool.SET_WORKFLOW_VALUES,
-			ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT,
-			ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT,
-			ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST,
-		])
 
 		for (const [workflowFormId, workflowForm] of Object.entries(workflowForms)) {
 			for (const panel of Object.values(workflowForm.panels)) {
@@ -3378,41 +3462,6 @@ export class WorkflowRuntime {
 			}
 		}
 
-		for (const [documentBuilderId, documentBuilder] of Object.entries(documentBuilders)) {
-			if (Object.hasOwn(documentBuilder, "artifactAbsolutePathWorkflowValueKey")) {
-				return {
-					valid: false,
-					errorMessage: `Workflow documentBuilder ${documentBuilderId} must not declare artifactAbsolutePathWorkflowValueKey.`,
-				}
-			}
-
-			const artifactDefinition = artifacts[documentBuilder.artifactId]
-			if (artifactDefinition === undefined) {
-				return {
-					valid: false,
-					errorMessage: `Workflow documentBuilder ${documentBuilderId} references missing artifactId ${documentBuilder.artifactId}.`,
-				}
-			}
-
-			for (const workflowValueWriteKey of Object.keys(documentBuilder.workflowValueWrites ?? {})) {
-				if (!workflowValueKeys.has(workflowValueWriteKey)) {
-					return {
-						valid: false,
-						errorMessage: `Workflow documentBuilder ${documentBuilderId} writes undeclared workflow value key ${workflowValueWriteKey}.`,
-					}
-				}
-			}
-		}
-
-		for (const [operationDefinitionId, operationDefinition] of Object.entries(toolBackedOperationDefinitions)) {
-			if (runtimeOwnedToolNames.has(operationDefinition.toolName)) {
-				return {
-					valid: false,
-					errorMessage: `Workflow toolBackedOperationDefinitions entry ${operationDefinitionId} must not use runtime-owned tool ${operationDefinition.toolName}.`,
-				}
-			}
-		}
-
 		for (const inheritanceRule of workflow.childInheritance ?? []) {
 			if (!workflowValueKeys.has(inheritanceRule.childKey)) {
 				return {
@@ -3435,15 +3484,6 @@ export class WorkflowRuntime {
 				return { valid: false, errorMessage: `Workflow stepNumber ${step.stepNumber} is duplicated.` }
 			}
 			seenStepNumbers.add(step.stepNumber)
-
-			for (const documentBuilderId of step.documentBuilderIds ?? []) {
-				if (!documentBuilders[documentBuilderId]) {
-					return {
-						valid: false,
-						errorMessage: `Workflow step ${step.id} references missing documentBuilderId ${documentBuilderId}.`,
-					}
-				}
-			}
 
 			const entryBranch = step.decisionTree.branches[step.decisionTree.entryBranchId]
 			if (!entryBranch) {
@@ -3496,24 +3536,90 @@ export class WorkflowRuntime {
 							}
 							break
 						case "execute_tool_backed_operation":
-							if (toolBackedOperationDefinitions[route.action.toolBackedOperationId] !== undefined) {
-								break
-							}
-							return {
-								valid: false,
-								errorMessage: `Workflow step ${step.id} route ${route.id} references missing toolBackedOperationId ${route.action.toolBackedOperationId}.`,
-							}
-						case "build_workflow_document":
 							if (
-								(step.documentBuilderIds ?? []).includes(route.action.documentBuilderId) &&
-								documentBuilders[route.action.documentBuilderId] !== undefined
+								typeof route.action.instruction.toolName !== "string" ||
+								route.action.instruction.toolName.trim() === ""
 							) {
-								break
+								return {
+									valid: false,
+									errorMessage: `Workflow step ${step.id} route ${route.id} inline tool-backed action toolName must not be empty.`,
+								}
 							}
-							return {
-								valid: false,
-								errorMessage: `Workflow step ${step.id} route ${route.id} references missing documentBuilderId ${route.action.documentBuilderId}.`,
+							if (this.isRuntimeOwnedWorkflowTool(route.action.instruction.toolName)) {
+								return {
+									valid: false,
+									errorMessage: `Workflow step ${step.id} route ${route.id} inline tool-backed action must not use runtime-owned tool ${route.action.instruction.toolName}.`,
+								}
 							}
+							if (
+								typeof route.action.instruction.buildStatusDefinition !== "function" ||
+								typeof route.action.instruction.buildToolExecutionRequest !== "function" ||
+								typeof route.action.instruction.evaluateToolExecutionResult !== "function"
+							) {
+								return {
+									valid: false,
+									errorMessage: `Workflow step ${step.id} route ${route.id} inline tool-backed action must declare all instruction functions.`,
+								}
+							}
+							break
+						case "build_workflow_document":
+							if (typeof route.action.instruction.artifactId !== "string") {
+								return {
+									valid: false,
+									errorMessage: `Workflow step ${step.id} route ${route.id} document build action artifactId must be a string.`,
+								}
+							}
+							if (route.action.instruction.artifactId.trim() === "") {
+								return {
+									valid: false,
+									errorMessage: `Workflow step ${step.id} route ${route.id} document build action artifactId must not be empty.`,
+								}
+							}
+							if (artifacts[route.action.instruction.artifactId] === undefined) {
+								return {
+									valid: false,
+									errorMessage: `Workflow step ${step.id} route ${route.id} document build action references missing artifactId ${route.action.instruction.artifactId}.`,
+								}
+							}
+							if (route.action.instruction.toolContract.id !== ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT) {
+								return {
+									valid: false,
+									errorMessage: `Workflow step ${step.id} route ${route.id} document build action must use build_workflow_document tool contract.`,
+								}
+							}
+							if (
+								typeof route.action.instruction.toolContract.name !== "string" ||
+								route.action.instruction.toolContract.name.trim() === "" ||
+								Array.isArray(route.action.instruction.toolContract.parameters) === false
+							) {
+								return {
+									valid: false,
+									errorMessage: `Workflow step ${step.id} route ${route.id} document build action has an invalid tool contract.`,
+								}
+							}
+							if (typeof route.action.instruction.buildContent !== "function") {
+								return {
+									valid: false,
+									errorMessage: `Workflow step ${step.id} route ${route.id} document build action buildContent must be a function.`,
+								}
+							}
+							for (const [workflowValueWriteKey, workflowValueWriteValue] of Object.entries(
+								route.action.instruction.workflowValueWrites ?? {},
+							)) {
+								if (!workflowValueKeys.has(workflowValueWriteKey)) {
+									return {
+										valid: false,
+										errorMessage: `Workflow step ${step.id} route ${route.id} document build action writes undeclared workflow value key ${workflowValueWriteKey}.`,
+									}
+								}
+								if (!isWorkflowValue(workflowValueWriteValue)) {
+									return {
+										valid: false,
+										errorMessage: `Workflow step ${step.id} route ${route.id} document build action writes invalid workflow value key ${workflowValueWriteKey}.`,
+									}
+								}
+							}
+							break
 						case "allocate_artifact":
 							if (artifacts[route.action.artifactId] === undefined) {
 								return {

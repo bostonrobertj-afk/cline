@@ -69,7 +69,10 @@ function createFormPayload(formSession: WorkflowFormSessionState): WorkflowForm 
 function createToolBackedOperationSession(): WorkflowStepResolutionSessionState {
 	return {
 		sessionId: "operation-session-1",
-		definitionId: "operation-1",
+		sourceRoute: {
+			branchId: "branch-1",
+			routeId: "route-1",
+		},
 		triggerSource: "execute_tool_backed_operation",
 		owner: {
 			kind: "workflow_step",
@@ -83,7 +86,10 @@ function createToolBackedOperationSession(): WorkflowStepResolutionSessionState 
 function createStatusPayload(session: WorkflowStepResolutionSessionState): ClineWorkflowStepResolutionStatus {
 	return {
 		sessionId: session.sessionId,
-		definitionId: session.definitionId,
+		sourceRoute: {
+			branchId: session.sourceRoute.branchId,
+			routeId: session.sourceRoute.routeId,
+		},
 		owner: {
 			workflowName: "workflow-runtime-test",
 			stepNumber: 1,

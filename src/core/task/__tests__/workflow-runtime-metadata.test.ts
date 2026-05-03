@@ -29,7 +29,7 @@ function createPersistedSession(): PersistedWorkflowSession {
 			formSession: undefined,
 			stepResolutionSession: undefined,
 			suppressedWorkflowFormIds: [],
-			suppressedWorkflowStepResolutionDefinitionIds: [],
+			suppressedWorkflowStepResolutionRoutes: [],
 		},
 		branchContext: {
 			activeBranchId: "project-prompt",

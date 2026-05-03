@@ -5,7 +5,8 @@ import type { WorkflowFormId, WorkflowFormSessionState } from "@/core/task/workf
 import type { WorkflowArtifactFamily } from "@/core/task/workflow-runtime/artifactFamilies"
 import type {
 	WorkflowStepResolutionSessionState,
-	WorkflowToolBackedOperationDefinition,
+	WorkflowStepResolutionSourceRoute,
+	WorkflowToolBackedActionInstruction,
 	WorkflowToolBackedOperationExecutionRequest,
 } from "@/core/task/workflow-step-resolution/types"
 import type { SkillMetadata } from "@/shared/skills"
@@ -15,7 +16,6 @@ export type WorkflowValue = string | number | boolean | WorkflowValue[] | { [key
 export type WorkflowValues = Record<string, WorkflowValue>
 export type WorkflowProjectMode = "new" | "existing"
 export type WorkflowProjectSubfolder = "discovery" | "planning" | "implementation" | "review" | "testing"
-export type WorkflowToolBackedOperationId = string
 
 export interface WorkflowDiscoveryCandidate {
 	value: string
@@ -36,7 +36,7 @@ export interface WorkflowUiSessionState {
 	formSession?: WorkflowFormSessionState
 	stepResolutionSession?: WorkflowStepResolutionSessionState
 	suppressedWorkflowFormIds: WorkflowFormId[]
-	suppressedWorkflowStepResolutionDefinitionIds: string[]
+	suppressedWorkflowStepResolutionRoutes: WorkflowStepResolutionSourceRoute[]
 }
 
 export type WorkflowDecisionBranchId = string
@@ -47,10 +47,10 @@ export type WorkflowBranchTriggerEvent =
 	| { kind: "workflow_progress_request_denied" }
 	| { kind: "workflow_form_completed"; workflowFormId: WorkflowFormId }
 	| { kind: "workflow_values_persisted"; changedKeys: readonly string[] }
-	| { kind: "tool_backed_operation_succeeded"; toolBackedOperationId: WorkflowToolBackedOperationId }
+	| { kind: "tool_backed_operation_succeeded"; sourceRoute: WorkflowStepResolutionSourceRoute }
 	| {
 			kind: "tool_backed_operation_failed"
-			toolBackedOperationId: WorkflowToolBackedOperationId
+			sourceRoute: WorkflowStepResolutionSourceRoute
 			errorMessage?: string
 	  }
 
@@ -165,8 +165,8 @@ export type WorkflowDecisionBranchTrigger =
 
 export type WorkflowDecisionAction =
 	| { kind: "render_workflow_form"; workflowFormId: WorkflowFormId }
-	| { kind: "execute_tool_backed_operation"; toolBackedOperationId: WorkflowToolBackedOperationId }
-	| { kind: "build_workflow_document"; documentBuilderId: string }
+	| { kind: "execute_tool_backed_operation"; instruction: WorkflowToolBackedActionInstruction }
+	| { kind: "build_workflow_document"; instruction: WorkflowDocumentBuildActionInstruction }
 	| { kind: "allocate_artifact"; artifactId: string }
 	| { kind: "project_prompt" }
 	| { kind: "terminal_error"; errorMessage: string }
@@ -189,6 +189,13 @@ export interface WorkflowDecisionBranch {
 export interface WorkflowDecisionTree {
 	entryBranchId: WorkflowDecisionBranchId
 	branches: Record<WorkflowDecisionBranchId, WorkflowDecisionBranch>
+}
+
+export interface WorkflowDocumentBuildActionInstruction {
+	artifactId: string
+	toolContract: BackendWorkflowToolContract
+	buildContent(session: ActiveWorkflowSession): string | Promise<string>
+	workflowValueWrites?: WorkflowValues
 }
 
 export interface WorkflowCompletionRule {
@@ -295,14 +302,6 @@ export type WorkflowArtifactDefinition =
 			outputValueKeys: WorkflowTargetedArtifactOutputValueKeys
 	  }
 
-export interface WorkflowDocumentBuilderDefinition {
-	id: string
-	artifactId: string
-	toolContract: BackendWorkflowToolContract
-	buildContent(session: ActiveWorkflowSession): string | Promise<string>
-	workflowValueWrites?: WorkflowValues
-}
-
 export interface WorkflowStepDefinition {
 	id: `step-${number}`
 	stepNumber: number
@@ -311,7 +310,6 @@ export interface WorkflowStepDefinition {
 	buildToolSchema(input: WorkflowPromptBuilderInput): readonly ClineToolSpec[]
 	decisionTree: WorkflowDecisionTree
 	completionRules?: WorkflowCompletionRule[]
-	documentBuilderIds?: string[]
 }
 
 export interface WorkflowDefinition {
@@ -325,9 +323,7 @@ export interface WorkflowDefinition {
 	entryPanel: WorkflowEntryInformationalPanelDefinition
 	steps: Record<WorkflowStepDefinition["id"], WorkflowStepDefinition>
 	workflowForms?: Record<WorkflowFormId, WorkflowFormDefinitionPayload>
-	toolBackedOperationDefinitions?: Record<WorkflowToolBackedOperationId, WorkflowToolBackedOperationDefinition>
 	artifacts?: Record<string, WorkflowArtifactDefinition>
-	documentBuilders?: Record<string, WorkflowDocumentBuilderDefinition>
 	childInheritance?: WorkflowChildInheritanceRule[]
 }
 

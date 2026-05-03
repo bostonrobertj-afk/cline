@@ -7,7 +7,10 @@ export function buildWorkflowStepResolutionStatusPayload(
 ): ClineWorkflowStepResolutionStatus {
 	return {
 		sessionId: session.sessionId,
-		definitionId: session.definitionId,
+		sourceRoute: {
+			branchId: session.sourceRoute.branchId,
+			routeId: session.sourceRoute.routeId,
+		},
 		owner: {
 			workflowName: session.owner.workflowName,
 			stepNumber: session.owner.stepNumber,

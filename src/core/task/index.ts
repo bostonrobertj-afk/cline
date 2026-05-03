@@ -147,7 +147,7 @@ export type ToolResponse = ClineToolResponseContent
 const LEGACY_WORKFLOW_METADATA_KEYS = [
 	"activeWorkflowFormSession",
 	"activeWorkflowStepResolutionSession",
-	"suppressedWorkflowStepResolutionDefinitionIds",
+	"suppressedWorkflowStepResolutionRoutes",
 	"suppressedWorkflowFormResolverIds",
 ] as const
 
@@ -1395,7 +1395,7 @@ export class Task {
 			ThreadDisplayStates.ACTIVE_RUN,
 			"workflow_step_resolution_status_render",
 			{
-				definitionId: payload.definitionId,
+				sourceRoute: payload.sourceRoute,
 				state: payload.state,
 			},
 			undefined,

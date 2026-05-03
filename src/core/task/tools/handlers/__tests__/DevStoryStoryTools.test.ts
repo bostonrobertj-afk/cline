@@ -55,7 +55,7 @@ function createConfig(storyPath: string): {
 			formSession: undefined,
 			stepResolutionSession: undefined,
 			suppressedWorkflowFormIds: [],
-			suppressedWorkflowStepResolutionDefinitionIds: [],
+			suppressedWorkflowStepResolutionRoutes: [],
 		},
 		branchContext: {
 			activeBranchId: "story-tools",

@@ -261,7 +261,6 @@ function createRealArtifactWorkflow(): WorkflowDefinition {
 			"step-1": createWorkflowStepDefinition(),
 		},
 		workflowForms: {},
-		toolBackedOperationDefinitions: {},
 		artifacts: {
 			epic_doc: {
 				id: "epic_doc",
@@ -272,7 +271,6 @@ function createRealArtifactWorkflow(): WorkflowDefinition {
 				outputValueKeys: artifactOutputKeys,
 			},
 		},
-		documentBuilders: {},
 		childInheritance: [],
 	}
 }
@@ -290,7 +288,7 @@ function createActiveWorkflowSession(workflow: WorkflowDefinition): ActiveWorkfl
 			formSession: undefined,
 			stepResolutionSession: undefined,
 			suppressedWorkflowFormIds: [],
-			suppressedWorkflowStepResolutionDefinitionIds: [],
+			suppressedWorkflowStepResolutionRoutes: [],
 		},
 		branchContext: {
 			activeBranchId: "project-prompt",

@@ -5363,131 +5363,146 @@ Allowed files:
 
 Pause for QA review after completing Phase 46 before commit.
 
-[ ] Task 98. Replace detached workflow operation/document-builder contracts with action-owned instruction types.
+[x] Task 98. Replace detached workflow operation/document-builder contracts with action-owned instruction types.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-step-resolution/types.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/shared/ExtensionMessage.ts`
 
-[ ] Subtask 98.1. In `src/core/task/workflow-step-resolution/types.ts`, delete `WorkflowToolBackedOperationDefinition` and replace it with `WorkflowToolBackedActionInstruction`; the new interface must contain `toolName`, `buildStatusDefinition(...)`, `buildToolExecutionRequest(...)`, and `evaluateToolExecutionResult(...)`, preserving the current function signatures except that the type name must describe an action-owned instruction, not a registry definition.
+[x] Subtask 98.1. In `src/core/task/workflow-step-resolution/types.ts`, delete `WorkflowToolBackedOperationDefinition` and replace it with `WorkflowToolBackedActionInstruction`; the new interface must contain `toolName`, `buildStatusDefinition(...)`, `buildToolExecutionRequest(...)`, and `evaluateToolExecutionResult(...)`, preserving the current function signatures except that the type name must describe an action-owned instruction, not a registry definition.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-step-resolution/types.ts`
 
-[ ] Subtask 98.2. In `src/core/task/workflow-step-resolution/types.ts`, replace `WorkflowStepResolutionSessionState.definitionId` with `sourceRoute: { branchId: string; routeId: string }`; do not retain `definitionId` as an alias or compatibility field.
+[x] Subtask 98.2. In `src/core/task/workflow-step-resolution/types.ts`, replace `WorkflowStepResolutionSessionState.definitionId` with `sourceRoute: { branchId: string; routeId: string }`; do not retain `definitionId` as an alias or compatibility field.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-step-resolution/types.ts`
 
-[ ] Subtask 98.3. In `src/core/task/workflow-runtime/types.ts`, replace `WorkflowDecisionAction` variants `{ kind: "execute_tool_backed_operation"; toolBackedOperationId: ... }` and `{ kind: "build_workflow_document"; documentBuilderId: string }` with action-owned variants: `{ kind: "execute_tool_backed_operation"; instruction: WorkflowToolBackedActionInstruction }` and `{ kind: "build_workflow_document"; instruction: WorkflowDocumentBuildActionInstruction }`.
+[x] Subtask 98.3. In `src/core/task/workflow-runtime/types.ts`, replace `WorkflowDecisionAction` variants `{ kind: "execute_tool_backed_operation"; toolBackedOperationId: ... }` and `{ kind: "build_workflow_document"; documentBuilderId: string }` with action-owned variants: `{ kind: "execute_tool_backed_operation"; instruction: WorkflowToolBackedActionInstruction }` and `{ kind: "build_workflow_document"; instruction: WorkflowDocumentBuildActionInstruction }`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 
-[ ] Subtask 98.4. In `src/core/task/workflow-runtime/types.ts`, add `WorkflowDocumentBuildActionInstruction` with `artifactId`, `toolContract`, `buildContent(session)`, and optional `workflowValueWrites`; this type must be used only inside the `build_workflow_document` decision action.
+[x] Subtask 98.4. In `src/core/task/workflow-runtime/types.ts`, add `WorkflowDocumentBuildActionInstruction` with `artifactId`, `toolContract`, `buildContent(session)`, and optional `workflowValueWrites`; this type must be used only inside the `build_workflow_document` decision action.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 
-[ ] Subtask 98.5. In `src/core/task/workflow-runtime/types.ts`, delete `WorkflowToolBackedOperationId`, `WorkflowDocumentBuilderDefinition`, `WorkflowStepDefinition.documentBuilderIds`, `WorkflowDefinition.toolBackedOperationDefinitions`, and `WorkflowDefinition.documentBuilders`; do not replace them with compatibility aliases.
+[x] Subtask 98.5. In `src/core/task/workflow-runtime/types.ts`, delete `WorkflowToolBackedOperationId`, `WorkflowDocumentBuilderDefinition`, `WorkflowStepDefinition.documentBuilderIds`, `WorkflowDefinition.toolBackedOperationDefinitions`, and `WorkflowDefinition.documentBuilders`; do not replace them with compatibility aliases.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 
-[ ] Subtask 98.6. In `src/core/task/workflow-runtime/types.ts`, rename `suppressedWorkflowStepResolutionDefinitionIds` to `suppressedWorkflowStepResolutionRoutes` and make it an array of `{ branchId: string; routeId: string }`.
+[x] Subtask 98.6. In `src/core/task/workflow-runtime/types.ts`, rename `suppressedWorkflowStepResolutionDefinitionIds` to `suppressedWorkflowStepResolutionRoutes` and make it an array of `{ branchId: string; routeId: string }`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 
-[ ] Subtask 98.7. In `src/shared/ExtensionMessage.ts`, replace `ClineWorkflowStepResolutionStatus.definitionId` with `sourceRoute: { branchId: string; routeId: string }`.
+[x] Subtask 98.7. In `src/shared/ExtensionMessage.ts`, replace `ClineWorkflowStepResolutionStatus.definitionId` with `sourceRoute: { branchId: string; routeId: string }`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/shared/ExtensionMessage.ts`
 
-[ ] Task 99. Update `WorkflowRuntime` to execute and resume action-owned instructions.
+[x] Task 99. Update `WorkflowRuntime` to execute and resume action-owned instructions.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-step-resolution/buildWorkflowStepResolutionStatusPayload.ts`
 
-[ ] Subtask 99.1. In `WorkflowRuntime.ts`, update `buildNextActionFromDecisionTreeAction(...)` so it receives the selected route source `{ branchId, routeId }` in addition to the action.
+[x] Subtask 99.1. In `WorkflowRuntime.ts`, update `buildNextActionFromDecisionTreeAction(...)` so it receives the selected route source `{ branchId, routeId }` in addition to the action.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 99.2. In `WorkflowRuntime.ts`, update the `execute_tool_backed_operation` case to use `action.instruction` directly, create or reuse a `stepResolutionSession` keyed by `sourceRoute`, and call `action.instruction.buildToolExecutionRequest(...)`.
+[x] Subtask 99.2. In `WorkflowRuntime.ts`, update the `execute_tool_backed_operation` case to use `action.instruction` directly, create or reuse a `stepResolutionSession` keyed by `sourceRoute`, and call `action.instruction.buildToolExecutionRequest(...)`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 99.3. In `WorkflowRuntime.ts`, update the `build_workflow_document` case to use `action.instruction` directly, resolve the destination path from `instruction.artifactId`, call `instruction.buildContent(session)`, and build the `BUILD_WORKFLOW_DOCUMENT` tool request without looking up `workflow.documentBuilders`.
+[x] Subtask 99.3. In `WorkflowRuntime.ts`, update the `build_workflow_document` case to use `action.instruction` directly, resolve the destination path from `instruction.artifactId`, call `instruction.buildContent(session)`, and build the `BUILD_WORKFLOW_DOCUMENT` tool request without looking up `workflow.documentBuilders`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 99.4. In `WorkflowRuntime.ts`, delete `buildDocumentBuilderToolRequest(...)` and `findPendingDocumentBuilderId(...)`; their behavior must be folded into action-owned route handling.
+[x] Subtask 99.4. In `WorkflowRuntime.ts`, delete `buildDocumentBuilderToolRequest(...)` and `findPendingDocumentBuilderId(...)`; their behavior must be folded into action-owned route handling.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 99.5. In `WorkflowRuntime.ts`, update `handleToolBackedOperationToolResult(...)` so pending step-resolution results resolve the original route/action from `stepResolutionSession.sourceRoute` and call `route.action.instruction.evaluateToolExecutionResult(...)`.
+[x] Subtask 99.5. In `WorkflowRuntime.ts`, update `handleToolBackedOperationToolResult(...)` so pending step-resolution results resolve the original route/action from `stepResolutionSession.sourceRoute` and call `route.action.instruction.evaluateToolExecutionResult(...)`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 99.6. In `WorkflowRuntime.ts`, replace `completeToolBackedOperationSuccess(...)` and `completeToolBackedOperationFailure(...)` arguments and trigger events so they carry `sourceRoute` instead of `toolBackedOperationId`.
+[x] Subtask 99.6. In `WorkflowRuntime.ts`, replace `completeToolBackedOperationSuccess(...)` and `completeToolBackedOperationFailure(...)` arguments and trigger events so they carry `sourceRoute` instead of `toolBackedOperationId`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 99.7. In `WorkflowRuntime.ts`, update restore validation for `stepResolutionSession` to require `sourceRoute.branchId` and `sourceRoute.routeId`, verify that route exists on the active step, and verify that the route action is `execute_tool_backed_operation`.
+[x] Subtask 99.7. In `WorkflowRuntime.ts`, update restore validation for `stepResolutionSession` to require `sourceRoute.branchId` and `sourceRoute.routeId`, verify that route exists on the active step, and verify that the route action is `execute_tool_backed_operation`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 99.8. In `WorkflowRuntime.ts`, update suppressed step-resolution validation to validate `suppressedWorkflowStepResolutionRoutes` against actual active workflow routes rather than operation definition ids.
+[x] Subtask 99.7a. In `WorkflowRuntime.ts`, update every `findContinuationSourceRoute(...)` caller to use the new `matches({ route, sourceRoute })` callback shape; specifically update persisted workflow-form restore continuation matching so it reads `route.action.kind` from the destructured `route` value.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 99.9. In `WorkflowRuntime.ts`, update definition validation so generic `execute_tool_backed_operation` actions validate their inline `instruction.toolName` and reject runtime-owned tools; remove validation of `toolBackedOperationDefinitions`.
+[x] Subtask 99.8. In `WorkflowRuntime.ts`, update suppressed step-resolution validation to validate `suppressedWorkflowStepResolutionRoutes` against actual active workflow routes rather than operation definition ids.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 99.10. In `WorkflowRuntime.ts`, update definition validation so `build_workflow_document` actions validate `instruction.artifactId`, `instruction.toolContract`, `instruction.buildContent`, and declared `workflowValueWrites`; remove validation of `documentBuilders` and `documentBuilderIds`.
+[x] Subtask 99.9. In `WorkflowRuntime.ts`, update definition validation so generic `execute_tool_backed_operation` actions validate their inline `instruction.toolName` and reject runtime-owned tools; remove validation of `toolBackedOperationDefinitions`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 99.11. In `buildWorkflowStepResolutionStatusPayload.ts`, emit `sourceRoute` from the session instead of `definitionId`.
+[x] Subtask 99.9a. In `WorkflowRuntime.ts`, in the `execute_tool_backed_operation` action path, after `action.instruction.buildToolExecutionRequest(...)` returns `toolRequest` and before returning an `execute_tool_backed_operation` next action, validate that `toolRequest.toolName === action.instruction.toolName`; if not, fail clearly as invalid workflow configuration and do not execute the returned tool request.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 99.9b. In `WorkflowRuntime.ts`, in the same post-build request validation path, reject any returned `toolRequest.toolName` that is runtime-owned under the same runtime-owned tool set used by definition validation; do not execute runtime-owned tools through generic `execute_tool_backed_operation`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 99.10. In `WorkflowRuntime.ts`, update definition validation so `build_workflow_document` actions validate `instruction.artifactId`, `instruction.toolContract`, `instruction.buildContent`, and declared `workflowValueWrites`; remove validation of `documentBuilders` and `documentBuilderIds`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 99.11. In `buildWorkflowStepResolutionStatusPayload.ts`, emit `sourceRoute` from the session instead of `definitionId`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-step-resolution/buildWorkflowStepResolutionStatusPayload.ts`
 
-[ ] Task 100. Update task/webview-facing status and metadata references.
+[x] Task 100. Update task/webview-facing status and metadata references.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/webview-ui/src/components/chat/ChatRow.tsx`
 
-[ ] Subtask 100.1. In `src/core/task/index.ts`, replace metadata key `suppressedWorkflowStepResolutionDefinitionIds` with `suppressedWorkflowStepResolutionRoutes`.
+[x] Subtask 100.1. In `src/core/task/index.ts`, replace metadata key `suppressedWorkflowStepResolutionDefinitionIds` with `suppressedWorkflowStepResolutionRoutes`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
 
-[ ] Subtask 100.2. In `src/core/task/index.ts`, update `renderWorkflowStepResolutionStatusMessage(...)` logging/state metadata to use `payload.sourceRoute` instead of `payload.definitionId`.
+[x] Subtask 100.2. In `src/core/task/index.ts`, update `renderWorkflowStepResolutionStatusMessage(...)` logging/state metadata to use `payload.sourceRoute` instead of `payload.definitionId`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
 
-[ ] Subtask 100.3. In `webview-ui/src/components/chat/ChatRow.tsx`, update `ClineWorkflowStepResolutionStatus` parsing/rendering references so the component compiles with `sourceRoute` and contains no `definitionId` reference.
+[x] Subtask 100.3. In `webview-ui/src/components/chat/ChatRow.tsx`, update `ClineWorkflowStepResolutionStatus` parsing/rendering references so the component compiles with `sourceRoute` and contains no `definitionId` reference.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/webview-ui/src/components/chat/ChatRow.tsx`
 
-[ ] Task 101. Update runtime and integration tests for action-owned instructions.
+[x] Task 101. Update runtime and integration tests for action-owned instructions.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
@@ -5497,72 +5512,82 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/CreateWorkflowArtifactToolHandler.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/DevStoryStoryTools.test.ts`
 
-[ ] Subtask 101.1. In `WorkflowRuntime.test.ts`, remove `WorkflowToolBackedOperationDefinition` imports, `toolBackedOperationDefinitions` fixtures, `documentBuilders` fixtures, and `documentBuilderIds` fixtures.
+[x] Subtask 101.1. In `WorkflowRuntime.test.ts`, remove `WorkflowToolBackedOperationDefinition` imports, `toolBackedOperationDefinitions` fixtures, `documentBuilders` fixtures, and `documentBuilderIds` fixtures.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 101.2. In `WorkflowRuntime.test.ts`, replace generic tool-backed operation fixtures with inline `execute_tool_backed_operation` action instructions on the relevant route actions.
+[x] Subtask 101.2. In `WorkflowRuntime.test.ts`, replace generic tool-backed operation fixtures with inline `execute_tool_backed_operation` action instructions on the relevant route actions.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 101.3. In `WorkflowRuntime.test.ts`, replace document-builder catalog fixtures with inline `build_workflow_document` action instructions on the relevant route actions.
+[x] Subtask 101.3. In `WorkflowRuntime.test.ts`, replace document-builder catalog fixtures with inline `build_workflow_document` action instructions on the relevant route actions.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 101.4. In `WorkflowRuntime.test.ts`, replace all `stepResolutionSession.definitionId` assertions and mutations with `stepResolutionSession.sourceRoute` assertions and mutations.
+[x] Subtask 101.4. In `WorkflowRuntime.test.ts`, replace all `stepResolutionSession.definitionId` assertions and mutations with `stepResolutionSession.sourceRoute` assertions and mutations.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 101.4a. In `WorkflowRuntime.test.ts`, replace all `suppressedWorkflowStepResolutionDefinitionIds` fixtures, mutations, and assertions with `suppressedWorkflowStepResolutionRoutes`; update restore UI-suppression cases to use `{ branchId: string; routeId: string }` route identity values that either resolve to an existing active-step route or intentionally fail closed when stale.
+[x] Subtask 101.4a. In `WorkflowRuntime.test.ts`, replace all `suppressedWorkflowStepResolutionDefinitionIds` fixtures, mutations, and assertions with `suppressedWorkflowStepResolutionRoutes`; update restore UI-suppression cases to use `{ branchId: string; routeId: string }` route identity values that either resolve to an existing active-step route or intentionally fail closed when stale.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 101.5. In `WorkflowRuntime.test.ts`, add validation coverage proving workflow definitions fail when `execute_tool_backed_operation` actions attempt to use runtime-owned tools through inline instructions.
+[x] Subtask 101.4b. In `WorkflowRuntime.test.ts`, update tool-backed operation status-payload assertions so `buildToolBackedOperationStatusPayload(...)` is asserted before `handleToolBackedOperationToolResult(...)` mutates branch or step state; do not assert pending source-route status after the workflow has transitioned away from the step that owns that source route.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 101.6. In `WorkflowRuntime.test.ts`, add validation coverage proving workflow definitions fail when a `build_workflow_document` action references a missing `artifactId` through its inline instruction.
+[x] Subtask 101.5. In `WorkflowRuntime.test.ts`, add validation coverage proving workflow definitions fail when `execute_tool_backed_operation` actions attempt to use runtime-owned tools through inline instructions.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 101.7. In `WorkflowRuntime.test.ts`, add restore coverage proving valid pending step-resolution state restores by source route and stale source route state fails closed.
+[x] Subtask 101.5a. In `WorkflowRuntime.test.ts`, add regression coverage where an inline generic instruction declares an allowed `instruction.toolName` but `buildToolExecutionRequest(...)` returns a runtime-owned `toolRequest.toolName`; assert runtime does not return an executable `execute_tool_backed_operation` for that request and fails clearly.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 101.8. In `WorkflowNextActionConsumer.test.ts`, replace test `definitionId` status/session fixtures with `sourceRoute`.
+[x] Subtask 101.6. In `WorkflowRuntime.test.ts`, add validation coverage proving workflow definitions fail when a `build_workflow_document` action references a missing `artifactId` through its inline instruction.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 101.7. In `WorkflowRuntime.test.ts`, add restore coverage proving valid pending step-resolution state restores by source route and stale source route state fails closed.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 101.8. In `WorkflowNextActionConsumer.test.ts`, replace test `definitionId` status/session fixtures with `sourceRoute`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts`
 
-[ ] Subtask 101.9. In `workflow-runtime-metadata.test.ts`, replace `suppressedWorkflowStepResolutionDefinitionIds` fixtures/assertions with `suppressedWorkflowStepResolutionRoutes`.
+[x] Subtask 101.9. In `workflow-runtime-metadata.test.ts`, replace `suppressedWorkflowStepResolutionDefinitionIds` fixtures/assertions with `suppressedWorkflowStepResolutionRoutes`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
 
-[ ] Subtask 101.10. In `SubagentRunner.test.ts`, replace `suppressedWorkflowStepResolutionDefinitionIds` fixtures/assertions with `suppressedWorkflowStepResolutionRoutes`.
+[x] Subtask 101.10. In `SubagentRunner.test.ts`, replace `suppressedWorkflowStepResolutionDefinitionIds` fixtures/assertions with `suppressedWorkflowStepResolutionRoutes`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
 
-[ ] Subtask 101.11. In `CreateWorkflowArtifactToolHandler.test.ts`, remove empty `toolBackedOperationDefinitions` and `documentBuilders` fixture fields.
+[x] Subtask 101.11. In `CreateWorkflowArtifactToolHandler.test.ts`, remove empty `toolBackedOperationDefinitions` and `documentBuilders` fixture fields.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/CreateWorkflowArtifactToolHandler.test.ts`
 
-[ ] Subtask 101.12. In `DevStoryStoryTools.test.ts`, replace `suppressedWorkflowStepResolutionDefinitionIds` fixtures/assertions with `suppressedWorkflowStepResolutionRoutes`.
+[x] Subtask 101.12. In `DevStoryStoryTools.test.ts`, replace `suppressedWorkflowStepResolutionDefinitionIds` fixtures/assertions with `suppressedWorkflowStepResolutionRoutes`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/DevStoryStoryTools.test.ts`
 
-[ ] Task 102. Validate Phase 46.
+[x] Task 102. Validate Phase 46.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
@@ -5579,7 +5604,7 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/CreateWorkflowArtifactToolHandler.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/DevStoryStoryTools.test.ts`
 
-[ ] Subtask 102.1. Run `rg "toolBackedOperationDefinitions|documentBuilders|documentBuilderIds|WorkflowDocumentBuilderDefinition|WorkflowToolBackedOperationDefinition|WorkflowToolBackedOperationId|toolBackedOperationId|definitionId|suppressedWorkflowStepResolutionDefinitionIds" src/core/task src/shared/ExtensionMessage.ts webview-ui/src/components/chat/ChatRow.tsx`; it must return no matches.
+[x] Subtask 102.1. Run `rg "toolBackedOperationDefinitions|documentBuilders|documentBuilderIds|WorkflowDocumentBuilderDefinition|WorkflowToolBackedOperationDefinition|WorkflowToolBackedOperationId|toolBackedOperationId|definitionId|suppressedWorkflowStepResolutionDefinitionIds" src/core/task src/shared/ExtensionMessage.ts webview-ui/src/components/chat/ChatRow.tsx`; it must return no matches.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
@@ -5590,7 +5615,7 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/webview-ui/src/components/chat/ChatRow.tsx`
 
-[ ] Subtask 102.2. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts src/core/task/__tests__/workflow-runtime-metadata.test.ts src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts src/core/task/tools/handlers/__tests__/CreateWorkflowArtifactToolHandler.test.ts src/core/task/tools/handlers/__tests__/DevStoryStoryTools.test.ts`; it must pass.
+[x] Subtask 102.2. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts src/core/task/__tests__/workflow-runtime-metadata.test.ts src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts src/core/task/tools/handlers/__tests__/CreateWorkflowArtifactToolHandler.test.ts src/core/task/tools/handlers/__tests__/DevStoryStoryTools.test.ts`; it must pass.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
@@ -5600,7 +5625,7 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/CreateWorkflowArtifactToolHandler.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/DevStoryStoryTools.test.ts`
 
-[ ] Subtask 102.3. Run `npm run check-types` and `npm run lint`; both must pass before Phase 46 is marked complete.
+[x] Subtask 102.3. Run `npm run check-types` and `npm run lint`; both must pass before Phase 46 is marked complete.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
@@ -5610,6 +5635,173 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/shared/ExtensionMessage.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/webview-ui/src/components/chat/ChatRow.tsx`
+
+## Phase 47 - Step Transition Decision Actions
+
+Pause for QA review after completing Phase 47 before commit.
+
+### Phase 47 Scope
+
+Replace route-level active-step transition metadata with an explicit `transition_step` `WorkflowDecisionAction`. A selected route must choose exactly one action. If that action transitions the active step, runtime must mutate the active step, evaluate completion through canonical `resolveNextAction(...)`, and continue from the newly active step.
+
+### Phase 47 Scope Boundary
+
+This phase must not redesign same-step branch traversal, remove `followingBranchId`, add workflow graph-cycle validation, or change workflow prompt/tool projection behavior except where required by `transition_step` re-entry.
+
+### Phase 47 Known Issues / Risks / Technical Debt
+
+This phase does not add whole-graph cycle detection for workflow modules that author infinite transition loops. Such loops are module misconfiguration and are outside this foundational correction.
+
+[ ] Task 103. Replace route-level step-transition typing with an explicit decision action.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+
+[ ] Subtask 103.1. In `types.ts`, immediately before `WorkflowDecisionAction`, add `WorkflowStepTransitionTarget` as an explicit union with `{ kind: "entry_branch"; stepNumber: number }` and `{ kind: "named_branch"; stepNumber: number; branchId: WorkflowDecisionBranchId }`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+
+[ ] Subtask 103.2. In `WorkflowDecisionAction`, add `{ kind: "transition_step"; target: WorkflowStepTransitionTarget }`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+
+[ ] Subtask 103.3. In `WorkflowDecisionBranchRoute`, delete `targetStepNumber?: number`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+
+[ ] Task 104. Update `WorkflowRuntime` to execute step transitions only through `transition_step`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[ ] Subtask 104.1. In the `./types` import list, add `WorkflowStepTransitionTarget`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[ ] Subtask 104.2. In `resolveDecisionTreeRoute(...)`, remove the `matchedRoute.targetStepNumber === undefined` condition from same-step `no_op` branch traversal.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[ ] Subtask 104.3. Change `transitionToStep(...)` to accept `target: WorkflowStepTransitionTarget`; resolve `entry_branch` to the target step's `entryBranchId`, resolve `named_branch` to its explicit `branchId`, and return `undefined` when the named branch is absent instead of falling back.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[ ] Subtask 104.4. In `buildNextActionFromDecisionTreeAction(...)`, add a `transition_step` case that calls `transitionToStep(...)`, clears prior-step UI state through that helper, then calls `resolveNextAction({ taskState })`; if the re-entered result is `no_op`, return a `project_prompt` action built from `buildTurnProjection({ taskState })` so the step mutation is persisted.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[ ] Subtask 104.5. In `buildNextActionFromDecisionTreeRoute(...)`, delete the `route.targetStepNumber` transition block; for non-`transition_step` actions, set `session.branchContext.activeBranchId = nextActiveBranchId`, clear `lastTriggerEvent`, and dispatch `route.action`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[ ] Subtask 104.6. In `validateWorkflowDefinition(...)`, delete validation for `route.targetStepNumber`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[ ] Subtask 104.7. In `validateWorkflowDefinition(...)`, add `transition_step` validation requiring the target step to exist, requiring a `named_branch` target branch to exist on that target step, and rejecting any `transition_step` route that also declares `followingBranchId`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[ ] Task 105. Update runtime tests for action-owned step transitions.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 105.1. In `WorkflowRuntime.test.ts`, add typed test helpers for `transition_step` actions targeting an entry branch and a named branch; do not use `as any`, `as unknown as`, or forced type assertions.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 105.2. Remove `targetStepNumber` support from `createProjectPromptDecisionTree(...)`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 105.3. Remove `completionTargetStepNumber` support from `createWorkflowFormDecisionTree(...)`; transition-form cases must pass `completionAction: transition_step`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 105.4. Remove `successTargetStepNumber` and `failureTargetStepNumber` support from `createToolBackedOperationDecisionTree(...)`; success/failure transition cases must pass `successAction` or `failureAction` as `transition_step`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 105.5. Remove `approvedTargetStepNumber` support from `createWorkflowProgressDecisionTree(...)`; approved transition cases must pass the approved route action as `transition_step`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 105.6. Update the explicit target-step progression test so the step-1 success route action is `transition_step`, and assert the next returned action is selected from step 3 rather than from the prior step's route.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 105.7. Add regression coverage proving transition into a step with passing completion rules returns `complete_workflow` and tears down workflow state before any target-step handoff.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 105.8. Add regression coverage proving transition into a step with no selected action returns a `project_prompt` handoff rather than `no_op`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 105.9. Update workflow-progress request tests to use `transition_step` for approved step movement.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 105.10. Add definition-validation coverage for missing `transition_step` target step.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 105.11. Add definition-validation coverage for missing `transition_step` named target branch.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 105.12. Add definition-validation coverage rejecting `transition_step` routes that also declare `followingBranchId`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Task 106. Validate Phase 47.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 106.1. Run `rg "targetStepNumber|successTargetStepNumber|failureTargetStepNumber|completionTargetStepNumber|approvedTargetStepNumber" src/core/task/workflow-runtime src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`; it must return no matches.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 106.2. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts`; it must pass.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 106.3. Run `npm run check-types` and `npm run lint`; both must pass before Phase 47 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
 ## Validation
 
@@ -5665,6 +5857,7 @@ Validation expectations:
 - Phase 41 QA must verify active child workflow turns use `workflowToolSchemaOverride` as the authoritative model-authored tool surface, static subagent tools are rejected when not projected, workflow-projected tools outside `SUBAGENT_DEFAULT_ALLOWED_TOOLS` still execute, `use_skill` remains rejected, and active child workflow system prompts do not advertise static file/search/command capabilities.
 - Phase 42 QA must verify module-authored `terminal_error` decision actions require a non-empty `errorMessage`, runtime terminal next actions surface that module-authored message, and runtime fail-closed terminal errors without a matched module terminal route still preserve fallback failure text behavior.
 - Phase 43 QA must verify active-step selectorDiscovery fields validate submitted values against the rendered options stored in the live form session, failed form submissions do not persist durable workflow values, freeform file/directory fields without selectorDiscovery remain allowed, and no submission-time rediscovery is introduced.
+- Phase 47 QA must verify `WorkflowDecisionBranchRoute` no longer has `targetStepNumber`, step movement is represented only by `transition_step` decision actions, transition actions do not execute prior-step actions afterward, target-step completion rules are evaluated immediately after transition, and no `targetStepNumber` test fixtures remain.
 - `check-types` must pass without reintroducing removed workflow mirror fields, deterministic-step-resolution types, statically exposed workflow-only tool schemas, or legacy `createWorkflowSkillMetadata(...)` references.
 - `lint` must pass without leaving dead imports, compatibility shims, or deleted legacy-surface references behind.
 - Phase 7 QA must verify `applyWorkflowValueWrites(...)` no longer derives authorization from active-step `set_workflow_values` schema visibility and instead uses only `WorkflowDefinition.workflowValueKeys`.

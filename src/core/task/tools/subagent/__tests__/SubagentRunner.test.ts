@@ -683,7 +683,7 @@ describe("SubagentRunner", () => {
 				formSession: undefined,
 				stepResolutionSession: undefined,
 				suppressedWorkflowFormIds: [],
-				suppressedWorkflowStepResolutionDefinitionIds: [],
+				suppressedWorkflowStepResolutionRoutes: [],
 			},
 			branchContext: {
 				activeBranchId: "project-prompt",
@@ -754,7 +754,7 @@ describe("SubagentRunner", () => {
 				formSession: undefined,
 				stepResolutionSession: undefined,
 				suppressedWorkflowFormIds: [],
-				suppressedWorkflowStepResolutionDefinitionIds: [],
+				suppressedWorkflowStepResolutionRoutes: [],
 			},
 			branchContext: {
 				activeBranchId: "project-prompt",
@@ -854,7 +854,7 @@ describe("SubagentRunner", () => {
 				formSession: undefined,
 				stepResolutionSession: undefined,
 				suppressedWorkflowFormIds: [],
-				suppressedWorkflowStepResolutionDefinitionIds: [],
+				suppressedWorkflowStepResolutionRoutes: [],
 			},
 			branchContext: {
 				activeBranchId: "project-prompt",
@@ -943,7 +943,7 @@ describe("SubagentRunner", () => {
 				formSession: undefined,
 				stepResolutionSession: undefined,
 				suppressedWorkflowFormIds: [],
-				suppressedWorkflowStepResolutionDefinitionIds: [],
+				suppressedWorkflowStepResolutionRoutes: [],
 			},
 			branchContext: {
 				activeBranchId: "project-prompt",
@@ -1034,7 +1034,7 @@ describe("SubagentRunner", () => {
 				formSession: undefined,
 				stepResolutionSession: undefined,
 				suppressedWorkflowFormIds: [],
-				suppressedWorkflowStepResolutionDefinitionIds: [],
+				suppressedWorkflowStepResolutionRoutes: [],
 			},
 			branchContext: {
 				activeBranchId: "project-prompt",
@@ -1237,7 +1237,7 @@ describe("SubagentRunner", () => {
 				formSession: undefined,
 				stepResolutionSession: undefined,
 				suppressedWorkflowFormIds: [],
-				suppressedWorkflowStepResolutionDefinitionIds: [],
+				suppressedWorkflowStepResolutionRoutes: [],
 			},
 			branchContext: {
 				activeBranchId: "project-prompt",
@@ -1966,7 +1966,7 @@ describe("SubagentRunner", () => {
 				formSession: undefined,
 				stepResolutionSession: undefined,
 				suppressedWorkflowFormIds: [],
-				suppressedWorkflowStepResolutionDefinitionIds: [],
+				suppressedWorkflowStepResolutionRoutes: [],
 			},
 			branchContext: {
 				activeBranchId: "project-prompt",
@@ -2021,7 +2021,7 @@ describe("SubagentRunner", () => {
 						formSession: undefined,
 						stepResolutionSession: undefined,
 						suppressedWorkflowFormIds: [],
-						suppressedWorkflowStepResolutionDefinitionIds: [],
+						suppressedWorkflowStepResolutionRoutes: [],
 					},
 					branchContext: {
 						activeBranchId: "project-prompt",
@@ -2042,7 +2042,7 @@ describe("SubagentRunner", () => {
 						formSession: undefined,
 						stepResolutionSession: undefined,
 						suppressedWorkflowFormIds: [],
-						suppressedWorkflowStepResolutionDefinitionIds: [],
+						suppressedWorkflowStepResolutionRoutes: [],
 					},
 					branchContext: {
 						activeBranchId: "project-prompt",
@@ -2137,7 +2137,7 @@ describe("SubagentRunner", () => {
 				formSession: undefined,
 				stepResolutionSession: undefined,
 				suppressedWorkflowFormIds: [],
-				suppressedWorkflowStepResolutionDefinitionIds: [],
+				suppressedWorkflowStepResolutionRoutes: [],
 			},
 			branchContext: {
 				activeBranchId: "project-prompt",
@@ -2234,7 +2234,7 @@ describe("SubagentRunner", () => {
 				formSession: undefined,
 				stepResolutionSession: undefined,
 				suppressedWorkflowFormIds: [],
-				suppressedWorkflowStepResolutionDefinitionIds: [],
+				suppressedWorkflowStepResolutionRoutes: [],
 			},
 			branchContext: {
 				activeBranchId: "project-prompt",
@@ -2284,7 +2284,7 @@ describe("SubagentRunner", () => {
 				formSession: undefined,
 				stepResolutionSession: undefined,
 				suppressedWorkflowFormIds: [],
-				suppressedWorkflowStepResolutionDefinitionIds: [],
+				suppressedWorkflowStepResolutionRoutes: [],
 			},
 			branchContext: {
 				activeBranchId: "project-prompt",
@@ -2374,7 +2374,7 @@ describe("SubagentRunner", () => {
 				formSession: undefined,
 				stepResolutionSession: undefined,
 				suppressedWorkflowFormIds: [],
-				suppressedWorkflowStepResolutionDefinitionIds: [],
+				suppressedWorkflowStepResolutionRoutes: [],
 			},
 			branchContext: {
 				activeBranchId: "project-prompt",
@@ -2416,7 +2416,7 @@ describe("SubagentRunner", () => {
 				formSession: undefined,
 				stepResolutionSession: undefined,
 				suppressedWorkflowFormIds: [],
-				suppressedWorkflowStepResolutionDefinitionIds: [],
+				suppressedWorkflowStepResolutionRoutes: [],
 			},
 			branchContext: {
 				activeBranchId: "project-prompt",

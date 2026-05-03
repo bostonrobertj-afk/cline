@@ -9,7 +9,10 @@ import * as sinon from "sinon"
 import { formatResponse } from "@/core/prompts/responses"
 import type { ClineToolSpec } from "@/core/prompts/system-prompt/spec"
 import { TaskState } from "@/core/task/TaskState"
-import type { WorkflowToolBackedOperationDefinition } from "@/core/task/workflow-step-resolution/types"
+import type {
+	WorkflowStepResolutionSourceRoute,
+	WorkflowToolBackedActionInstruction,
+} from "@/core/task/workflow-step-resolution/types"
 import { ModelFamily } from "@/shared/prompts"
 import { ClineDefaultTool } from "@/shared/tools"
 import { WorkflowArtifactFamily } from "../artifactFamilies"
@@ -21,6 +24,7 @@ import type {
 	WorkflowDecisionTree,
 	WorkflowDefinition,
 	WorkflowDiscoveryRequest,
+	WorkflowDocumentBuildActionInstruction,
 	WorkflowEntryProjectValueKeys,
 	WorkflowNextAction,
 	WorkflowStepDefinition,
@@ -39,7 +43,7 @@ type ObservedDecisionPredicateInput = {
 	hasUi: boolean
 	hasBranchContext: boolean
 	hasSuppressedWorkflowFormIds: boolean
-	hasSuppressedWorkflowStepResolutionDefinitionIds: boolean
+	hasSuppressedWorkflowStepResolutionRoutes: boolean
 	hasTriggerEvent: boolean
 	triggerEventKind?: string
 }
@@ -49,7 +53,7 @@ describe("WorkflowRuntime", () => {
 		"activeWorkflowFormSession",
 		"activeWorkflowStepResolutionSession",
 		"suppressedWorkflowFormResolverIds",
-		"suppressedWorkflowStepResolutionDefinitionIds",
+		"suppressedWorkflowStepResolutionRoutes",
 	] as const
 	const ENTRY_FORM_ID = "__workflow_runtime_entry_form__"
 	const ENTRY_INFO_PANEL_ID = "__workflow_runtime_entry_info__"
@@ -109,6 +113,18 @@ describe("WorkflowRuntime", () => {
 	}
 
 	const ARTIFACT_ALLOCATION_TERMINAL_ERROR_MESSAGE = "Artifact allocation failed."
+	const STEP_RESOLUTION_SOURCE_ROUTE: WorkflowStepResolutionSourceRoute = {
+		branchId: "run-step-resolution",
+		routeId: "start-step-resolution",
+	}
+	const ARTIFACT_ALLOCATION_SOURCE_ROUTE: WorkflowStepResolutionSourceRoute = {
+		branchId: "allocate-artifact",
+		routeId: "allocate-artifact-route",
+	}
+
+	function sourceRoutesEqual(left: WorkflowStepResolutionSourceRoute, right: WorkflowStepResolutionSourceRoute): boolean {
+		return left.branchId === right.branchId && left.routeId === right.routeId
+	}
 
 	function createProjectPromptDecisionTree(args?: {
 		entryBranchId?: string
@@ -210,8 +226,7 @@ describe("WorkflowRuntime", () => {
 		}
 	}
 
-	function createToolBackedOperationDecisionTree(args: {
-		toolBackedOperationId: string
+	function createToolBackedOperationDecisionTree(args?: {
 		startAction?: WorkflowDecisionAction
 		successAction?: WorkflowDecisionAction
 		successTargetStepNumber?: number
@@ -230,9 +245,9 @@ describe("WorkflowRuntime", () => {
 						{
 							id: "start-step-resolution",
 							trigger: { kind: "always" },
-							action: args.startAction ?? {
+							action: args?.startAction ?? {
 								kind: "execute_tool_backed_operation",
-								toolBackedOperationId: args.toolBackedOperationId,
+								instruction: createToolBackedActionInstruction(),
 							},
 							followingBranchId: "await-step-resolution",
 						},
@@ -247,11 +262,11 @@ describe("WorkflowRuntime", () => {
 								kind: "event_predicate",
 								matches: ({ triggerEvent }) =>
 									triggerEvent.kind === "tool_backed_operation_succeeded" &&
-									triggerEvent.toolBackedOperationId === args.toolBackedOperationId,
+									sourceRoutesEqual(triggerEvent.sourceRoute, STEP_RESOLUTION_SOURCE_ROUTE),
 							},
-							action: args.successAction ?? { kind: "project_prompt" },
-							targetStepNumber: args.successTargetStepNumber,
-							followingBranchId: args.successTargetStepNumber === undefined ? successBranchId : undefined,
+							action: args?.successAction ?? { kind: "project_prompt" },
+							targetStepNumber: args?.successTargetStepNumber,
+							followingBranchId: args?.successTargetStepNumber === undefined ? successBranchId : undefined,
 						},
 						{
 							id: "step-resolution-failed",
@@ -259,15 +274,15 @@ describe("WorkflowRuntime", () => {
 								kind: "event_predicate",
 								matches: ({ triggerEvent }) =>
 									triggerEvent.kind === "tool_backed_operation_failed" &&
-									triggerEvent.toolBackedOperationId === args.toolBackedOperationId,
+									sourceRoutesEqual(triggerEvent.sourceRoute, STEP_RESOLUTION_SOURCE_ROUTE),
 							},
-							action: args.failureAction ?? { kind: "project_prompt" },
-							targetStepNumber: args.failureTargetStepNumber,
-							followingBranchId: args.failureTargetStepNumber === undefined ? failureBranchId : undefined,
+							action: args?.failureAction ?? { kind: "project_prompt" },
+							targetStepNumber: args?.failureTargetStepNumber,
+							followingBranchId: args?.failureTargetStepNumber === undefined ? failureBranchId : undefined,
 						},
 					],
 				},
-				...(args.successTargetStepNumber === undefined
+				...(args?.successTargetStepNumber === undefined
 					? {
 							[successBranchId]: {
 								id: successBranchId,
@@ -281,7 +296,7 @@ describe("WorkflowRuntime", () => {
 							},
 						}
 					: {}),
-				...(args.failureTargetStepNumber === undefined
+				...(args?.failureTargetStepNumber === undefined
 					? {
 							[failureBranchId]: {
 								id: failureBranchId,
@@ -411,7 +426,7 @@ describe("WorkflowRuntime", () => {
 								kind: "event_predicate",
 								matches: ({ triggerEvent }) =>
 									triggerEvent.kind === "tool_backed_operation_succeeded" &&
-									triggerEvent.toolBackedOperationId === artifactId,
+									sourceRoutesEqual(triggerEvent.sourceRoute, ARTIFACT_ALLOCATION_SOURCE_ROUTE),
 							},
 							action: { kind: "project_prompt" },
 						},
@@ -421,7 +436,7 @@ describe("WorkflowRuntime", () => {
 								kind: "event_predicate",
 								matches: ({ triggerEvent }) =>
 									triggerEvent.kind === "tool_backed_operation_failed" &&
-									triggerEvent.toolBackedOperationId === artifactId,
+									sourceRoutesEqual(triggerEvent.sourceRoute, ARTIFACT_ALLOCATION_SOURCE_ROUTE),
 							},
 							action: {
 								kind: "terminal_error",
@@ -440,7 +455,6 @@ describe("WorkflowRuntime", () => {
 		decisionTree?: WorkflowDecisionTree
 		completionRules?: WorkflowStepDefinition["completionRules"]
 		toolSchema?: readonly ClineToolSpec[]
-		documentBuilderIds?: string[]
 	}): WorkflowStepDefinition {
 		return {
 			id: `step-${args.stepNumber}` as WorkflowStepDefinition["id"],
@@ -450,7 +464,6 @@ describe("WorkflowRuntime", () => {
 			buildToolSchema: () => args.toolSchema ?? [],
 			decisionTree: args.decisionTree ?? createProjectPromptDecisionTree(),
 			completionRules: args.completionRules,
-			documentBuilderIds: args.documentBuilderIds,
 		}
 	}
 
@@ -460,11 +473,9 @@ describe("WorkflowRuntime", () => {
 		entryProjectValueKeys?: WorkflowEntryProjectValueKeys
 		includeEntryProjectValueKeysInWorkflowValueKeys?: boolean
 		workflowForms?: Record<string, WorkflowFormDefinitionPayload>
-		toolBackedOperationDefinitions?: Record<string, WorkflowToolBackedOperationDefinition>
 		steps?: WorkflowDefinition["steps"]
 		childInheritance?: WorkflowDefinition["childInheritance"]
 		artifacts?: WorkflowDefinition["artifacts"]
-		documentBuilders?: WorkflowDefinition["documentBuilders"]
 	}): WorkflowDefinition {
 		const defaultSteps: Record<string, WorkflowStepDefinition> = {
 			"step-1": createStepDefinition({ stepNumber: 1 }),
@@ -489,9 +500,7 @@ describe("WorkflowRuntime", () => {
 			},
 			steps: args?.steps ?? defaultSteps,
 			workflowForms: args?.workflowForms ?? {},
-			toolBackedOperationDefinitions: args?.toolBackedOperationDefinitions ?? {},
 			artifacts: args?.artifacts,
-			documentBuilders: args?.documentBuilders,
 			childInheritance: args?.childInheritance,
 		}
 	}
@@ -578,13 +587,13 @@ describe("WorkflowRuntime", () => {
 		} as WorkflowFormDefinitionPayload
 	}
 
-	function createToolBackedOperationDefinition(args?: {
+	function createToolBackedActionInstruction(args?: {
 		fallbackToAgent?: boolean
 		shouldSucceed?: boolean
 		toolName?: ClineDefaultTool
-	}): WorkflowToolBackedOperationDefinition {
+		toolRequestToolName?: ClineDefaultTool
+	}): WorkflowToolBackedActionInstruction {
 		return {
-			id: "step-resolution-1",
 			toolName: args?.toolName ?? ClineDefaultTool.GENERATE_EXPLANATION,
 			buildStatusDefinition: () => ({
 				title: "Step Resolution",
@@ -593,7 +602,7 @@ describe("WorkflowRuntime", () => {
 				failureLabel: "Failure",
 			}),
 			buildToolExecutionRequest: () => ({
-				toolName: args?.toolName ?? ClineDefaultTool.GENERATE_EXPLANATION,
+				toolName: args?.toolRequestToolName ?? args?.toolName ?? ClineDefaultTool.GENERATE_EXPLANATION,
 				toolInput: {},
 				toolParams: {},
 			}),
@@ -609,6 +618,29 @@ describe("WorkflowRuntime", () => {
 				return { succeeded: true }
 			},
 		}
+	}
+
+	function createDocumentBuildActionInstruction(args?: {
+		artifactId?: string
+		toolContract?: WorkflowDocumentBuildActionInstruction["toolContract"]
+		buildContent?: WorkflowDocumentBuildActionInstruction["buildContent"]
+		workflowValueWrites?: WorkflowValues
+	}): WorkflowDocumentBuildActionInstruction {
+		const instruction: WorkflowDocumentBuildActionInstruction = {
+			artifactId: args?.artifactId ?? "output_file",
+			toolContract: args?.toolContract ?? {
+				id: ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT,
+				name: "build_workflow_document",
+				parameters: [],
+			},
+			buildContent: args?.buildContent ?? (() => "# Resolved spec"),
+		}
+
+		if (args?.workflowValueWrites !== undefined) {
+			instruction.workflowValueWrites = args.workflowValueWrites
+		}
+
+		return instruction
 	}
 
 	function createWorkflowProgressRequestToolSchema(): readonly ClineToolSpec[] {
@@ -677,7 +709,7 @@ describe("WorkflowRuntime", () => {
 				formSession: undefined,
 				stepResolutionSession: undefined,
 				suppressedWorkflowFormIds: [],
-				suppressedWorkflowStepResolutionDefinitionIds: [],
+				suppressedWorkflowStepResolutionRoutes: [],
 			},
 			branchContext: {
 				activeBranchId: "parent-branch",
@@ -936,7 +968,7 @@ describe("WorkflowRuntime", () => {
 				formSession: undefined,
 				stepResolutionSession: undefined,
 				suppressedWorkflowFormIds: ["stale-form-id"],
-				suppressedWorkflowStepResolutionDefinitionIds: ["stale-step-resolution-id"],
+				suppressedWorkflowStepResolutionRoutes: [{ branchId: "stale-branch", routeId: "stale-route" }],
 			},
 			branchContext: {
 				activeBranchId: "stale-branch",
@@ -957,7 +989,7 @@ describe("WorkflowRuntime", () => {
 		expect(activeSession.ui.formSession).to.exist
 		expect(activeSession.ui.stepResolutionSession).to.be.undefined
 		expect(activeSession.ui.suppressedWorkflowFormIds).to.deep.equal([])
-		expect(activeSession.ui.suppressedWorkflowStepResolutionDefinitionIds).to.deep.equal([])
+		expect(activeSession.ui.suppressedWorkflowStepResolutionRoutes).to.deep.equal([])
 		expect(result.payload.panel?.panelId).to.equal(ENTRY_INFO_PANEL_ID)
 		expect(taskState.currentFocusChainChecklist).to.equal("- [ ] Step 1\n- [ ] Step 2")
 	})
@@ -1021,7 +1053,7 @@ describe("WorkflowRuntime", () => {
 				formSession: undefined,
 				stepResolutionSession: undefined,
 				suppressedWorkflowFormIds: ["existing-form-id"],
-				suppressedWorkflowStepResolutionDefinitionIds: ["existing-step-id"],
+				suppressedWorkflowStepResolutionRoutes: [{ branchId: "existing-branch", routeId: "existing-route" }],
 			},
 			branchContext: {
 				activeBranchId: "existing-branch",
@@ -1061,16 +1093,20 @@ describe("WorkflowRuntime", () => {
 						outputValueKeys: outputFileKeys,
 					},
 				},
-				documentBuilders: {
-					"build-spec": {
-						id: "build-spec",
-						artifactId: "output_file",
-						toolContract: {} as never,
-						buildContent: () => "# Resolved spec",
-						workflowValueWrites: {
-							missing_key: "ready",
-						},
-					},
+				steps: {
+					"step-1": createStepDefinition({
+						stepNumber: 1,
+						decisionTree: createToolBackedOperationDecisionTree({
+							startAction: {
+								kind: "build_workflow_document",
+								instruction: createDocumentBuildActionInstruction({
+									workflowValueWrites: {
+										missing_key: "ready",
+									},
+								}),
+							},
+						}),
+					}),
 				},
 			}),
 			createWorkflowDefinition({
@@ -1210,7 +1246,7 @@ describe("WorkflowRuntime", () => {
 		}
 	})
 
-	it("rejects document builders that reference missing artifacts or declare module-owned path keys", async () => {
+	it("rejects document build actions that reference missing artifacts or invalid tool contracts", async () => {
 		const outputFileKeys = createStandaloneArtifactOutputValueKeys("output_file")
 		const validArtifactDefinition = {
 			id: "output_file",
@@ -1220,32 +1256,42 @@ describe("WorkflowRuntime", () => {
 			targetIdentitySource: undefined,
 			outputValueKeys: outputFileKeys,
 		} satisfies NonNullable<WorkflowDefinition["artifacts"]>[string]
-		const pollutedDocumentBuilder = {
-			id: "build-spec",
-			artifactId: "output_file",
-			artifactAbsolutePathWorkflowValueKey: "module_chosen_absolute_path",
-			toolContract: {} as never,
-			buildContent: () => "# Resolved spec",
-		} as unknown as NonNullable<WorkflowDefinition["documentBuilders"]>[string]
 		const invalidWorkflows = [
 			createWorkflowDefinition({
 				workflowValueKeys: collectArtifactOutputWorkflowValueKeys(outputFileKeys),
-				documentBuilders: {
-					"build-spec": {
-						id: "build-spec",
-						artifactId: "missing_output_file",
-						toolContract: {} as never,
-						buildContent: () => "# Resolved spec",
-					},
+				steps: {
+					"step-1": createStepDefinition({
+						stepNumber: 1,
+						decisionTree: createToolBackedOperationDecisionTree({
+							startAction: {
+								kind: "build_workflow_document",
+								instruction: createDocumentBuildActionInstruction({ artifactId: "missing_output_file" }),
+							},
+						}),
+					}),
 				},
 			}),
 			createWorkflowDefinition({
-				workflowValueKeys: ["module_chosen_absolute_path", ...collectArtifactOutputWorkflowValueKeys(outputFileKeys)],
+				workflowValueKeys: collectArtifactOutputWorkflowValueKeys(outputFileKeys),
 				artifacts: {
 					output_file: validArtifactDefinition,
 				},
-				documentBuilders: {
-					"build-spec": pollutedDocumentBuilder,
+				steps: {
+					"step-1": createStepDefinition({
+						stepNumber: 1,
+						decisionTree: createToolBackedOperationDecisionTree({
+							startAction: {
+								kind: "build_workflow_document",
+								instruction: createDocumentBuildActionInstruction({
+									toolContract: {
+										id: ClineDefaultTool.GENERATE_EXPLANATION,
+										name: "generate_explanation",
+										parameters: [],
+									},
+								}),
+							},
+						}),
+					}),
 				},
 			}),
 		]
@@ -1260,7 +1306,7 @@ describe("WorkflowRuntime", () => {
 		}
 	})
 
-	it("rejects runtime-owned tools in generic tool-backed operation definitions", async () => {
+	it("rejects runtime-owned tools in inline tool-backed action instructions", async () => {
 		const forbiddenToolNames = [
 			ClineDefaultTool.SET_WORKFLOW_VALUES,
 			ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT,
@@ -1274,8 +1320,16 @@ describe("WorkflowRuntime", () => {
 				invalidState,
 				createWorkflowDefinition({
 					name: `forbidden-tool-${forbiddenToolName}`,
-					toolBackedOperationDefinitions: {
-						forbidden: createToolBackedOperationDefinition({ toolName: forbiddenToolName }),
+					steps: {
+						"step-1": createStepDefinition({
+							stepNumber: 1,
+							decisionTree: createToolBackedOperationDecisionTree({
+								startAction: {
+									kind: "execute_tool_backed_operation",
+									instruction: createToolBackedActionInstruction({ toolName: forbiddenToolName }),
+								},
+							}),
+						}),
 					},
 				}),
 			)
@@ -1286,7 +1340,40 @@ describe("WorkflowRuntime", () => {
 		}
 	})
 
-	it("rejects document builders reached through generic tool-backed operation actions", async () => {
+	it("rejects runtime-owned tool requests built by allowed inline tool-backed action instructions", async () => {
+		const workflow = createWorkflowDefinition({
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createToolBackedOperationDecisionTree({
+						startAction: {
+							kind: "execute_tool_backed_operation",
+							instruction: createToolBackedActionInstruction({
+								toolName: ClineDefaultTool.GENERATE_EXPLANATION,
+								toolRequestToolName: ClineDefaultTool.SET_WORKFLOW_VALUES,
+							}),
+						},
+					}),
+				}),
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		await runtime.resolveNextAction({ taskState })
+		const result = await submitNewProjectSelection(taskState, "Runtime-Owned Tool Request Project")
+
+		expect(result.kind).to.equal("terminal_error")
+		if (result.kind !== "terminal_error") {
+			throw new Error(`Expected terminal_error, received ${result.kind}.`)
+		}
+		expect(result.errorMessage).to.equal(
+			"Invalid workflow configuration: tool-backed action route run-step-resolution/start-step-resolution declared tool generate_explanation but built request for runtime-owned tool set_workflow_values.",
+		)
+		expect(taskState.activeWorkflowName).to.be.undefined
+		expect(taskState.activeWorkflowSession).to.be.undefined
+	})
+
+	it("rejects document build actions with undeclared workflow value writes", async () => {
 		const outputFileKeys = createStandaloneArtifactOutputValueKeys("output_file")
 		const invalidState = new TaskState()
 		const result = await activateWorkflow(
@@ -1303,20 +1390,18 @@ describe("WorkflowRuntime", () => {
 						outputValueKeys: outputFileKeys,
 					},
 				},
-				documentBuilders: {
-					"build-spec": {
-						id: "build-spec",
-						artifactId: "output_file",
-						toolContract: {} as never,
-						buildContent: () => "# Resolved spec",
-					},
-				},
 				steps: {
 					"step-1": createStepDefinition({
 						stepNumber: 1,
-						documentBuilderIds: ["build-spec"],
 						decisionTree: createToolBackedOperationDecisionTree({
-							toolBackedOperationId: "build-spec",
+							startAction: {
+								kind: "build_workflow_document",
+								instruction: createDocumentBuildActionInstruction({
+									workflowValueWrites: {
+										spec_doc: "ready",
+									},
+								}),
+							},
 						}),
 					}),
 				},
@@ -2380,15 +2465,10 @@ describe("WorkflowRuntime", () => {
 			const failureState = new TaskState()
 			const workflow = createWorkflowDefinition({
 				name: `serialized-tool-backed operation-failure-${failureCases.indexOf(failureCase)}`,
-				toolBackedOperationDefinitions: {
-					"step-resolution-1": createToolBackedOperationDefinition(),
-				},
 				steps: {
 					"step-1": createStepDefinition({
 						stepNumber: 1,
-						decisionTree: createToolBackedOperationDecisionTree({
-							toolBackedOperationId: "step-resolution-1",
-						}),
+						decisionTree: createToolBackedOperationDecisionTree(),
 					}),
 				},
 			})
@@ -2410,21 +2490,17 @@ describe("WorkflowRuntime", () => {
 				retryAttemptCount: 1,
 				terminalErrorMessage: failureCase.expectedErrorMessage,
 			})
-			expect(activeSession.ui.suppressedWorkflowStepResolutionDefinitionIds).to.deep.equal(["step-resolution-1"])
+			expect(activeSession.ui.suppressedWorkflowStepResolutionRoutes).to.deep.equal([STEP_RESOLUTION_SOURCE_ROUTE])
 			expect(activeSession.activeStepNumber).to.equal(1)
 		}
 	})
 
 	it("runs tool-backed operation routes with explicit target-step progression and failure context", async () => {
 		const successWorkflow = createWorkflowDefinition({
-			toolBackedOperationDefinitions: {
-				"step-resolution-1": createToolBackedOperationDefinition(),
-			},
 			steps: {
 				"step-1": createStepDefinition({
 					stepNumber: 1,
 					decisionTree: createToolBackedOperationDecisionTree({
-						toolBackedOperationId: "step-resolution-1",
 						successTargetStepNumber: 3,
 					}),
 				}),
@@ -2437,10 +2513,6 @@ describe("WorkflowRuntime", () => {
 		await runtime.resolveNextAction({ taskState })
 		await submitNewProjectSelection(taskState, "Step Resolution Project")
 		const toolBackedOperation = await runtime.resolveNextAction({ taskState })
-		const successResult = await runtime.handleToolBackedOperationToolResult({
-			taskState,
-			toolResultText: "ok",
-		})
 
 		expect(toolBackedOperation.kind).to.equal("execute_tool_backed_operation")
 		if (toolBackedOperation.kind !== "execute_tool_backed_operation") {
@@ -2450,7 +2522,7 @@ describe("WorkflowRuntime", () => {
 		if (!toolBackedOperation.toolBackedOperationSession) {
 			throw new Error("Expected a runtime-owned tool-backed operation session.")
 		}
-		expect(toolBackedOperation.toolBackedOperationSession.definitionId).to.equal("step-resolution-1")
+		expect(toolBackedOperation.toolBackedOperationSession.sourceRoute).to.deep.equal(STEP_RESOLUTION_SOURCE_ROUTE)
 		expect(toolBackedOperation.toolBackedOperationSession.triggerSource).to.equal("execute_tool_backed_operation")
 		expect(toolBackedOperation.toolBackedOperationSession.owner).to.deep.equal({
 			kind: "workflow_step",
@@ -2466,7 +2538,7 @@ describe("WorkflowRuntime", () => {
 			}),
 		).to.deep.equal({
 			sessionId: toolBackedOperation.toolBackedOperationSession.sessionId,
-			definitionId: "step-resolution-1",
+			sourceRoute: STEP_RESOLUTION_SOURCE_ROUTE,
 			owner: {
 				workflowName: successWorkflow.name,
 				stepNumber: 1,
@@ -2479,22 +2551,26 @@ describe("WorkflowRuntime", () => {
 				failureLabel: "Failure",
 			},
 		})
+		const successResult = await runtime.handleToolBackedOperationToolResult({
+			taskState,
+			toolResultText: "ok",
+		})
 		expect(getActiveWorkflowSession(taskState).activeStepNumber).to.equal(3)
-		expect(getActiveWorkflowSession(taskState).ui.suppressedWorkflowStepResolutionDefinitionIds).to.deep.equal([])
+		expect(getActiveWorkflowSession(taskState).ui.suppressedWorkflowStepResolutionRoutes).to.deep.equal([])
 		expect(successResult.kind).to.equal("project_prompt")
 		expect(getActiveWorkflowSession(taskState).branchContext.activeBranchId).to.equal("project-prompt")
 
 		const failureWorkflow = createWorkflowDefinition({
-			toolBackedOperationDefinitions: {
-				"step-resolution-1": createToolBackedOperationDefinition({
-					shouldSucceed: false,
-				}),
-			},
 			steps: {
 				"step-1": createStepDefinition({
 					stepNumber: 1,
 					decisionTree: createToolBackedOperationDecisionTree({
-						toolBackedOperationId: "step-resolution-1",
+						startAction: {
+							kind: "execute_tool_backed_operation",
+							instruction: createToolBackedActionInstruction({
+								shouldSucceed: false,
+							}),
+						},
 					}),
 				}),
 				"step-2": createStepDefinition({ stepNumber: 2 }),
@@ -2511,8 +2587,8 @@ describe("WorkflowRuntime", () => {
 		})
 
 		expect(getActiveWorkflowSession(failureState).activeStepNumber).to.equal(1)
-		expect(getActiveWorkflowSession(failureState).ui.suppressedWorkflowStepResolutionDefinitionIds).to.deep.equal([
-			"step-resolution-1",
+		expect(getActiveWorkflowSession(failureState).ui.suppressedWorkflowStepResolutionRoutes).to.deep.equal([
+			STEP_RESOLUTION_SOURCE_ROUTE,
 		])
 		expect(getActiveWorkflowSession(failureState).branchContext.failureState).to.deep.equal({
 			retryAttemptCount: 1,
@@ -2524,19 +2600,21 @@ describe("WorkflowRuntime", () => {
 
 	it("retries tool-backed operations only when the matched failure branch prescribes another execute_tool_backed_operation", async () => {
 		const retryWorkflow = createWorkflowDefinition({
-			toolBackedOperationDefinitions: {
-				"step-resolution-1": createToolBackedOperationDefinition({
-					shouldSucceed: false,
-				}),
-			},
 			steps: {
 				"step-1": createStepDefinition({
 					stepNumber: 1,
 					decisionTree: createToolBackedOperationDecisionTree({
-						toolBackedOperationId: "step-resolution-1",
+						startAction: {
+							kind: "execute_tool_backed_operation",
+							instruction: createToolBackedActionInstruction({
+								shouldSucceed: false,
+							}),
+						},
 						failureAction: {
 							kind: "execute_tool_backed_operation",
-							toolBackedOperationId: "step-resolution-1",
+							instruction: createToolBackedActionInstruction({
+								shouldSucceed: false,
+							}),
 						},
 					}),
 				}),
@@ -2565,16 +2643,16 @@ describe("WorkflowRuntime", () => {
 	it("executes explicit terminal-error failure branches without silently downgrading to project_prompt", async () => {
 		const terminalFailureMessage = "Module-authored terminal failure."
 		const terminalFailureWorkflow = createWorkflowDefinition({
-			toolBackedOperationDefinitions: {
-				"step-resolution-1": createToolBackedOperationDefinition({
-					shouldSucceed: false,
-				}),
-			},
 			steps: {
 				"step-1": createStepDefinition({
 					stepNumber: 1,
 					decisionTree: createToolBackedOperationDecisionTree({
-						toolBackedOperationId: "step-resolution-1",
+						startAction: {
+							kind: "execute_tool_backed_operation",
+							instruction: createToolBackedActionInstruction({
+								shouldSucceed: false,
+							}),
+						},
 						failureAction: { kind: "terminal_error", errorMessage: terminalFailureMessage },
 					}),
 				}),
@@ -2604,11 +2682,6 @@ describe("WorkflowRuntime", () => {
 
 	it("fails closed with terminal_error when tool-backed operation failure has no matching failure branch", async () => {
 		const unmatchedFailureWorkflow = createWorkflowDefinition({
-			toolBackedOperationDefinitions: {
-				"step-resolution-1": createToolBackedOperationDefinition({
-					shouldSucceed: false,
-				}),
-			},
 			steps: {
 				"step-1": createStepDefinition({
 					stepNumber: 1,
@@ -2623,7 +2696,9 @@ describe("WorkflowRuntime", () => {
 										trigger: { kind: "always" },
 										action: {
 											kind: "execute_tool_backed_operation",
-											toolBackedOperationId: "step-resolution-1",
+											instruction: createToolBackedActionInstruction({
+												shouldSucceed: false,
+											}),
 										},
 										followingBranchId: "await-step-resolution",
 									},
@@ -2638,7 +2713,7 @@ describe("WorkflowRuntime", () => {
 											kind: "event_predicate",
 											matches: ({ triggerEvent }) =>
 												triggerEvent.kind === "tool_backed_operation_succeeded" &&
-												triggerEvent.toolBackedOperationId === "step-resolution-1",
+												sourceRoutesEqual(triggerEvent.sourceRoute, STEP_RESOLUTION_SOURCE_ROUTE),
 										},
 										action: { kind: "project_prompt" },
 										followingBranchId: "after-step-resolution-success",
@@ -2682,9 +2757,9 @@ describe("WorkflowRuntime", () => {
 		expectWorkflowStateCleared(unmatchedFailureState)
 	})
 
-	it("persists document-builder tool-backed operation failure context and re-evaluates the same failure branch", async () => {
+	it("persists document build action failure context and re-evaluates the same failure branch", async () => {
 		const outputFileKeys = createStandaloneArtifactOutputValueKeys("output_file")
-		const documentBuilderWorkflow = createWorkflowDefinition({
+		const documentBuildWorkflow = createWorkflowDefinition({
 			workflowValueKeys: collectArtifactOutputWorkflowValueKeys(outputFileKeys),
 			artifacts: {
 				output_file: {
@@ -2696,52 +2771,45 @@ describe("WorkflowRuntime", () => {
 					outputValueKeys: outputFileKeys,
 				},
 			},
-			documentBuilders: {
-				"build-spec": {
-					id: "build-spec",
-					artifactId: "output_file",
-					toolContract: {} as never,
-					buildContent: () => "# Resolved spec",
-				},
-			},
 			steps: {
 				"step-1": createStepDefinition({
 					stepNumber: 1,
 					decisionTree: createToolBackedOperationDecisionTree({
-						toolBackedOperationId: "build-spec",
-						startAction: { kind: "build_workflow_document", documentBuilderId: "build-spec" },
+						startAction: {
+							kind: "build_workflow_document",
+							instruction: createDocumentBuildActionInstruction(),
+						},
 						failureAction: { kind: "no_op" },
 					}),
-					documentBuilderIds: ["build-spec"],
 				}),
 				"step-2": createStepDefinition({ stepNumber: 2 }),
 			},
 		})
 
-		const documentBuilderFailureState = new TaskState()
-		await activateWorkflow(documentBuilderFailureState, documentBuilderWorkflow)
-		getActiveWorkflowSession(documentBuilderFailureState).workflowValues[outputFileKeys.artifactAbsolutePath] = join(
+		const documentBuildFailureState = new TaskState()
+		await activateWorkflow(documentBuildFailureState, documentBuildWorkflow)
+		getActiveWorkflowSession(documentBuildFailureState).workflowValues[outputFileKeys.artifactAbsolutePath] = join(
 			cwd,
 			"builder-failure-project",
 			"planning",
 			"Epics.md",
 		)
-		await runtime.resolveNextAction({ taskState: documentBuilderFailureState })
-		expect((await submitNewProjectSelection(documentBuilderFailureState, "Builder Failure Project")).kind).to.equal(
+		await runtime.resolveNextAction({ taskState: documentBuildFailureState })
+		expect((await submitNewProjectSelection(documentBuildFailureState, "Builder Failure Project")).kind).to.equal(
 			"execute_tool_backed_operation",
 		)
 
 		const failureResult = await runtime.handleToolBackedOperationToolResult({
-			taskState: documentBuilderFailureState,
+			taskState: documentBuildFailureState,
 			toolResultText: "Error: write failed",
 		})
 
 		expect(failureResult.kind).to.equal("project_prompt")
-		expect(getActiveWorkflowSession(documentBuilderFailureState).branchContext.failureState).to.deep.equal({
+		expect(getActiveWorkflowSession(documentBuildFailureState).branchContext.failureState).to.deep.equal({
 			retryAttemptCount: 1,
 			terminalErrorMessage: "Error: write failed",
 		})
-		expect(getActiveWorkflowSession(documentBuilderFailureState).branchContext.activeBranchId).to.equal(
+		expect(getActiveWorkflowSession(documentBuildFailureState).branchContext.activeBranchId).to.equal(
 			"after-step-resolution-failure",
 		)
 	})
@@ -2807,7 +2875,7 @@ describe("WorkflowRuntime", () => {
 
 		const approvedSession = getActiveWorkflowSession(approvedState)
 		approvedSession.ui.suppressedWorkflowFormIds = ["form-1"]
-		approvedSession.ui.suppressedWorkflowStepResolutionDefinitionIds = ["step-resolution-1"]
+		approvedSession.ui.suppressedWorkflowStepResolutionRoutes = [STEP_RESOLUTION_SOURCE_ROUTE]
 
 		const approvedProgress = await runtime.submitWorkflowProgressRequest({
 			taskState: approvedState,
@@ -2817,7 +2885,7 @@ describe("WorkflowRuntime", () => {
 		expect(approvedProgress.kind).to.equal("project_prompt")
 		expect(approvedSession.activeStepNumber).to.equal(3)
 		expect(approvedSession.ui.suppressedWorkflowFormIds).to.deep.equal([])
-		expect(approvedSession.ui.suppressedWorkflowStepResolutionDefinitionIds).to.deep.equal([])
+		expect(approvedSession.ui.suppressedWorkflowStepResolutionRoutes).to.deep.equal([])
 	})
 
 	it("passes only documented decision inputs to session predicates", async () => {
@@ -2847,9 +2915,9 @@ describe("WorkflowRuntime", () => {
 													hasUi: Reflect.has(input, "ui"),
 													hasBranchContext: Reflect.has(input, "branchContext"),
 													hasSuppressedWorkflowFormIds: Reflect.has(input, "suppressedWorkflowFormIds"),
-													hasSuppressedWorkflowStepResolutionDefinitionIds: Reflect.has(
+													hasSuppressedWorkflowStepResolutionRoutes: Reflect.has(
 														input,
-														"suppressedWorkflowStepResolutionDefinitionIds",
+														"suppressedWorkflowStepResolutionRoutes",
 													),
 													hasTriggerEvent: Reflect.has(input, "triggerEvent"),
 												}
@@ -2880,7 +2948,7 @@ describe("WorkflowRuntime", () => {
 			hasUi: false,
 			hasBranchContext: false,
 			hasSuppressedWorkflowFormIds: false,
-			hasSuppressedWorkflowStepResolutionDefinitionIds: false,
+			hasSuppressedWorkflowStepResolutionRoutes: false,
 			hasTriggerEvent: false,
 		})
 	})
@@ -2912,9 +2980,9 @@ describe("WorkflowRuntime", () => {
 													hasUi: Reflect.has(input, "ui"),
 													hasBranchContext: Reflect.has(input, "branchContext"),
 													hasSuppressedWorkflowFormIds: Reflect.has(input, "suppressedWorkflowFormIds"),
-													hasSuppressedWorkflowStepResolutionDefinitionIds: Reflect.has(
+													hasSuppressedWorkflowStepResolutionRoutes: Reflect.has(
 														input,
-														"suppressedWorkflowStepResolutionDefinitionIds",
+														"suppressedWorkflowStepResolutionRoutes",
 													),
 													hasTriggerEvent: Reflect.has(input, "triggerEvent"),
 													triggerEventKind: input.triggerEvent.kind,
@@ -2946,7 +3014,7 @@ describe("WorkflowRuntime", () => {
 			hasUi: false,
 			hasBranchContext: false,
 			hasSuppressedWorkflowFormIds: false,
-			hasSuppressedWorkflowStepResolutionDefinitionIds: false,
+			hasSuppressedWorkflowStepResolutionRoutes: false,
 			hasTriggerEvent: true,
 			triggerEventKind: "project_selection_completed",
 		})
@@ -3073,10 +3141,12 @@ describe("WorkflowRuntime", () => {
 
 	it("persists declared workflow-form value destinations before emitting a tool-backed operation request", async () => {
 		const workflowFormId = "value-destination-form"
-		const operationDefinitionId = "after-form-operation"
+		const formCompletionSourceRoute: WorkflowStepResolutionSourceRoute = {
+			branchId: "await-form-completion",
+			routeId: "form-completed-event",
+		}
 		let capturedWorkflowValues: WorkflowValues | undefined
-		const operationDefinition: WorkflowToolBackedOperationDefinition = {
-			id: operationDefinitionId,
+		const operationInstruction: WorkflowToolBackedActionInstruction = {
 			toolName: ClineDefaultTool.GENERATE_EXPLANATION,
 			buildStatusDefinition: () => ({
 				title: "After Form",
@@ -3126,9 +3196,6 @@ describe("WorkflowRuntime", () => {
 					},
 				},
 			},
-			toolBackedOperationDefinitions: {
-				[operationDefinitionId]: operationDefinition,
-			},
 			steps: {
 				"step-1": createStepDefinition({
 					stepNumber: 1,
@@ -3136,7 +3203,7 @@ describe("WorkflowRuntime", () => {
 						workflowFormId,
 						completionAction: {
 							kind: "execute_tool_backed_operation",
-							toolBackedOperationId: operationDefinitionId,
+							instruction: operationInstruction,
 						},
 					}),
 				}),
@@ -3170,7 +3237,7 @@ describe("WorkflowRuntime", () => {
 		if (nextAction.kind !== "execute_tool_backed_operation") {
 			throw new Error(`Expected execute_tool_backed_operation, received ${nextAction.kind}.`)
 		}
-		expect(nextAction.toolBackedOperationSession?.definitionId).to.equal(operationDefinitionId)
+		expect(nextAction.toolBackedOperationSession?.sourceRoute).to.deep.equal(formCompletionSourceRoute)
 		expect(nextAction.toolRequest.toolInput).to.deep.equal({ summary: "Captured summary" })
 		expect(capturedWorkflowValues).to.deep.include({ summary: "Captured summary" })
 		expect(activeSession.workflowValues).to.deep.include({ summary: "Captured summary" })
@@ -3627,26 +3694,15 @@ describe("WorkflowRuntime", () => {
 					outputValueKeys: outputFileKeys,
 				},
 			},
-			documentBuilders: {
-				"build-spec": {
-					id: "build-spec",
-					artifactId: "output_file",
-					toolContract: {
-						id: ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT,
-						name: "build_workflow_document",
-						parameters: [],
-					},
-					buildContent: () => "# Resolved spec",
-				},
-			},
 			steps: {
 				"step-1": createStepDefinition({
 					stepNumber: 1,
 					decisionTree: createToolBackedOperationDecisionTree({
-						toolBackedOperationId: "build-spec",
-						startAction: { kind: "build_workflow_document", documentBuilderId: "build-spec" },
+						startAction: {
+							kind: "build_workflow_document",
+							instruction: createDocumentBuildActionInstruction(),
+						},
 					}),
-					documentBuilderIds: ["build-spec"],
 				}),
 			},
 		})
@@ -3667,7 +3723,7 @@ describe("WorkflowRuntime", () => {
 			throw new Error("Expected artifact destination resolution to reject a non-string workflow value.")
 		}
 		expect(destinationError.message).to.equal(
-			`Workflow value ${outputFileKeys.artifactAbsolutePath} must be a non-empty string for artifact destination resolution for document builder build-spec.`,
+			`Workflow value ${outputFileKeys.artifactAbsolutePath} must be a non-empty string for artifact destination resolution for workflow document build route run-step-resolution/start-step-resolution.`,
 		)
 	})
 
@@ -4541,7 +4597,7 @@ describe("WorkflowRuntime", () => {
 		}
 	})
 
-	it("builds build_workflow_document tool-backed operations from step-approved document builders", async () => {
+	it("builds build_workflow_document tool-backed operations from action-owned instructions", async () => {
 		const allocatedArtifactAbsolutePath = join(cwd, "builder-project", "planning", "Epics.md")
 		const moduleChosenAbsolutePath = join(cwd, "builder-project", "planning", "Module-chosen.md")
 		const outputFileKeys = createStandaloneArtifactOutputValueKeys("output_file")
@@ -4561,25 +4617,19 @@ describe("WorkflowRuntime", () => {
 					outputValueKeys: outputFileKeys,
 				},
 			},
-			documentBuilders: {
-				"build-spec": {
-					id: "build-spec",
-					artifactId: "output_file",
-					toolContract: {} as never,
-					buildContent: () => "# Resolved spec",
-					workflowValueWrites: {
-						spec_doc: "ready",
-					},
-				},
-			},
 			steps: {
 				"step-1": createStepDefinition({
 					stepNumber: 1,
 					decisionTree: createToolBackedOperationDecisionTree({
-						toolBackedOperationId: "build-spec",
-						startAction: { kind: "build_workflow_document", documentBuilderId: "build-spec" },
+						startAction: {
+							kind: "build_workflow_document",
+							instruction: createDocumentBuildActionInstruction({
+								workflowValueWrites: {
+									spec_doc: "ready",
+								},
+							}),
+						},
 					}),
-					documentBuilderIds: ["build-spec"],
 				}),
 				"step-2": createStepDefinition({ stepNumber: 2 }),
 			},
@@ -4610,7 +4660,7 @@ describe("WorkflowRuntime", () => {
 		})
 	})
 
-	it("routes serialized denied and errored document-builder tool results through tool_backed_operation_failed", async () => {
+	it("routes serialized denied and errored document build tool results through tool_backed_operation_failed", async () => {
 		const failureCases = [formatResponse.toolDenied(), formatResponse.toolError("boom")]
 
 		for (const [failureCaseIndex, toolResultText] of failureCases.entries()) {
@@ -4623,7 +4673,7 @@ describe("WorkflowRuntime", () => {
 			)
 			const failureState = new TaskState()
 			const workflow = createWorkflowDefinition({
-				name: `serialized-document-builder-failure-${failureCaseIndex}`,
+				name: `serialized-document-build-failure-${failureCaseIndex}`,
 				workflowValueKeys: collectArtifactOutputWorkflowValueKeys(outputFileKeys),
 				artifacts: {
 					output_file: {
@@ -4635,22 +4685,15 @@ describe("WorkflowRuntime", () => {
 						outputValueKeys: outputFileKeys,
 					},
 				},
-				documentBuilders: {
-					"build-spec": {
-						id: "build-spec",
-						artifactId: "output_file",
-						toolContract: {} as never,
-						buildContent: () => "# Resolved spec",
-					},
-				},
 				steps: {
 					"step-1": createStepDefinition({
 						stepNumber: 1,
 						decisionTree: createToolBackedOperationDecisionTree({
-							toolBackedOperationId: "build-spec",
-							startAction: { kind: "build_workflow_document", documentBuilderId: "build-spec" },
+							startAction: {
+								kind: "build_workflow_document",
+								instruction: createDocumentBuildActionInstruction(),
+							},
 						}),
-						documentBuilderIds: ["build-spec"],
 					}),
 				},
 			})
@@ -4949,7 +4992,12 @@ describe("WorkflowRuntime", () => {
 			{
 				name: "stale step-resolution suppression id",
 				mutate: (session) => {
-					session.ui.suppressedWorkflowStepResolutionDefinitionIds = ["missing-operation"]
+					session.ui.suppressedWorkflowStepResolutionRoutes = [
+						{
+							branchId: "missing-branch",
+							routeId: "missing-route",
+						},
+					]
 				},
 			},
 		]
@@ -5167,17 +5215,11 @@ describe("WorkflowRuntime", () => {
 	})
 
 	it("fails closed for stale or malformed restored step-resolution sessions", async () => {
-		const toolBackedOperationId = "step-resolution-1"
 		const workflow = createWorkflowDefinition({
-			toolBackedOperationDefinitions: {
-				[toolBackedOperationId]: createToolBackedOperationDefinition(),
-			},
 			steps: {
 				"step-1": createStepDefinition({
 					stepNumber: 1,
-					decisionTree: createToolBackedOperationDecisionTree({
-						toolBackedOperationId,
-					}),
+					decisionTree: createToolBackedOperationDecisionTree(),
 				}),
 			},
 		})
@@ -5187,12 +5229,15 @@ describe("WorkflowRuntime", () => {
 			mutate(session: PersistedWorkflowSession): void
 		}> = [
 			{
-				name: "stale operation definition id",
+				name: "stale source route",
 				mutate: (session) => {
 					if (session.ui.stepResolutionSession === undefined) {
 						throw new Error("Expected a step-resolution session.")
 					}
-					session.ui.stepResolutionSession.definitionId = "missing-operation"
+					session.ui.stepResolutionSession.sourceRoute = {
+						branchId: "missing-branch",
+						routeId: "missing-route",
+					}
 				},
 			},
 			{
@@ -5230,17 +5275,11 @@ describe("WorkflowRuntime", () => {
 	})
 
 	it("restores valid pending step-resolution sessions through execute_tool_backed_operation", async () => {
-		const toolBackedOperationId = "step-resolution-1"
 		const workflow = createWorkflowDefinition({
-			toolBackedOperationDefinitions: {
-				[toolBackedOperationId]: createToolBackedOperationDefinition(),
-			},
 			steps: {
 				"step-1": createStepDefinition({
 					stepNumber: 1,
-					decisionTree: createToolBackedOperationDecisionTree({
-						toolBackedOperationId,
-					}),
+					decisionTree: createToolBackedOperationDecisionTree(),
 				}),
 			},
 		})
@@ -5258,8 +5297,10 @@ describe("WorkflowRuntime", () => {
 		if (restored?.kind !== "execute_tool_backed_operation") {
 			throw new Error(`Expected execute_tool_backed_operation, received ${restored?.kind ?? "undefined"}.`)
 		}
-		expect(restored.toolBackedOperationSession?.definitionId).to.equal(toolBackedOperationId)
-		expect(restoredState.activeWorkflowSession?.ui.stepResolutionSession?.definitionId).to.equal(toolBackedOperationId)
+		expect(restored.toolBackedOperationSession?.sourceRoute).to.deep.equal(STEP_RESOLUTION_SOURCE_ROUTE)
+		expect(restoredState.activeWorkflowSession?.ui.stepResolutionSession?.sourceRoute).to.deep.equal(
+			STEP_RESOLUTION_SOURCE_ROUTE,
+		)
 	})
 
 	it("completes workflows when completion rules pass and tears down all runtime-owned state", async () => {
@@ -5290,7 +5331,7 @@ describe("WorkflowRuntime", () => {
 		await activateWorkflow(teardownState, createWorkflowDefinition())
 		const teardownSession = getActiveWorkflowSession(teardownState)
 		teardownSession.ui.suppressedWorkflowFormIds = ["form-1"]
-		teardownSession.ui.suppressedWorkflowStepResolutionDefinitionIds = ["step-resolution-1"]
+		teardownSession.ui.suppressedWorkflowStepResolutionRoutes = [STEP_RESOLUTION_SOURCE_ROUTE]
 		teardownState.currentFocusChainChecklist = "checklist"
 
 		await runtime.teardownWorkflow({ taskState: teardownState })
