@@ -230,7 +230,85 @@ describe("WorkflowNextActionConsumer", () => {
 			taskState,
 			toolResultText: "tool result",
 		})
-		sinon.assert.calledOnce(adapter.persistWorkflowRuntimeMetadata)
+		sinon.assert.calledTwice(adapter.persistWorkflowRuntimeMetadata)
+		assert.equal(
+			adapter.persistWorkflowRuntimeMetadata.firstCall.calledBefore(adapter.renderWorkflowStepResolutionStatus.firstCall),
+			true,
+		)
+		assert.equal(
+			adapter.renderWorkflowStepResolutionStatus.firstCall.calledBefore(adapter.executeToolBackedOperation.firstCall),
+			true,
+		)
+		assert.equal(
+			adapter.executeToolBackedOperation.firstCall.calledBefore(handleToolBackedOperationToolResult.firstCall),
+			true,
+		)
+		assert.equal(
+			handleToolBackedOperationToolResult.firstCall.calledBefore(adapter.persistWorkflowRuntimeMetadata.secondCall),
+			true,
+		)
 		assert.equal(adapter.shouldAbort.callCount > 0, true)
+	})
+
+	it("persists pending tool-backed operation state before execution failures are surfaced", async () => {
+		const operationSession = createToolBackedOperationSession()
+		const statusPayload = createStatusPayload(operationSession)
+		const executionError = new Error("operation failed")
+		sandbox.stub(runtime, "buildToolBackedOperationStatusPayload").returns(statusPayload)
+		const handleToolBackedOperationToolResult = sandbox.stub(runtime, "handleToolBackedOperationToolResult")
+		adapter.executeToolBackedOperation.rejects(executionError)
+		const action = {
+			kind: "execute_tool_backed_operation" as const,
+			toolBackedOperationSession: operationSession,
+			toolRequest: {
+				toolName: ClineDefaultTool.FILE_READ,
+				toolParams: {
+					path: "README.md",
+				},
+				toolInput: {},
+			},
+		}
+
+		await assert.rejects(consumer.consume(action), {
+			message: "operation failed",
+		})
+
+		sinon.assert.calledOnce(adapter.persistWorkflowRuntimeMetadata)
+		assert.equal(
+			adapter.persistWorkflowRuntimeMetadata.firstCall.calledBefore(adapter.executeToolBackedOperation.firstCall),
+			true,
+		)
+		sinon.assert.calledOnceWithExactly(adapter.executeToolBackedOperation, action)
+		sinon.assert.notCalled(handleToolBackedOperationToolResult)
+	})
+
+	it("does not pre-persist tool-backed operations without pending step-resolution state", async () => {
+		const handleToolBackedOperationToolResult = sandbox
+			.stub(runtime, "handleToolBackedOperationToolResult")
+			.resolves({ kind: "no_op" })
+		const action = {
+			kind: "execute_tool_backed_operation" as const,
+			toolRequest: {
+				toolName: ClineDefaultTool.FILE_READ,
+				toolParams: {
+					path: "README.md",
+				},
+				toolInput: {},
+			},
+		}
+
+		await consumer.consume(action)
+
+		sinon.assert.notCalled(adapter.renderWorkflowStepResolutionStatus)
+		sinon.assert.calledOnceWithExactly(adapter.executeToolBackedOperation, action)
+		sinon.assert.calledOnceWithExactly(handleToolBackedOperationToolResult, {
+			taskState,
+			toolResultText: "tool result",
+		})
+		sinon.assert.calledOnce(adapter.persistWorkflowRuntimeMetadata)
+		assert.equal(
+			handleToolBackedOperationToolResult.firstCall.calledBefore(adapter.persistWorkflowRuntimeMetadata.firstCall),
+			true,
+		)
 	})
 })

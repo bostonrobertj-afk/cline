@@ -245,6 +245,7 @@ Responsibilities:
 - declare workflow-level and per-step native tool schema
 - declare workflow-entry informational panel content and workflow-form configuration
 - declare deterministic step-resolution rules
+- declare next-action decision actions as self-contained action instructions; when an action invokes a tool-backed operation, that action owns the tool/capability instruction rather than referencing a workflow-level generic operation registry
 - declare workflow-owned artifact/document builders
 - declare expected workflow values and any explicit child-session inheritance rules
 - declare completion rules; any workflow-specific follow-up work must be modeled as normal workflow steps, decision actions, document builders, or tool-backed operations before completion
@@ -334,7 +335,7 @@ Exact filenames beyond this level are deferred to requirements and implementatio
 3. Workflow form capability renders the payload and captures user input.
 4. Workflow runtime receives the result and applies any declared durable form values through the workflow-value persistence seam.
 5. Workflow runtime performs any runtime-owned deterministic procedures needed to evaluate workflow/session state and re-enters canonical next-action evaluation.
-6. If the selected next action is a tool-backed deterministic operation, workflow runtime invokes that one operation through the normal tool path.
+6. If the selected next action is an action-owned tool-backed deterministic instruction, workflow runtime invokes that one instruction through the normal tool path.
 7. Workflow runtime applies the result to workflow session state and either:
    - keeps the workflow on the same step
    - advances the step
@@ -356,9 +357,9 @@ Exact filenames beyond this level are deferred to requirements and implementatio
 
 1. Workflow runtime determines that the current step has a deterministic resolution path.
 2. Workflow runtime checks that deterministic progression is permitted for the current step.
-3. Workflow runtime executes any direct runtime-owned deterministic procedures needed to evaluate state, resolve workflow values, build runtime-owned payload inputs, or decide whether a tool-backed operation is required.
-4. If resolution selects a tool-backed deterministic operation, workflow runtime invokes the normal tool path for that one operation.
-5. Workflow runtime interprets the direct runtime result or tool-backed result using workflow-module configuration.
+3. Workflow runtime executes any direct runtime-owned deterministic procedures needed to evaluate state, resolve workflow values, build runtime-owned payload inputs, or decide whether an action-owned tool-backed instruction is selected.
+4. If resolution selects an action-owned tool-backed deterministic instruction, workflow runtime invokes the normal tool path for that one instruction.
+5. Workflow runtime interprets the direct runtime result or tool-backed instruction result using workflow-module configuration.
 6. On success, workflow runtime updates session state and active-step state.
 7. On failure, workflow runtime executes the retry procedure defined for the active workflow and step.
 8. If that retry fails, workflow runtime surfaces a final user-visible error.
@@ -523,7 +524,7 @@ Returned workflow next actions are the canonical continuation of workflow execut
 
 `Task` and `SubagentRunner` may provide context-specific adapters, but they must not interpret workflow branches independently.
 
-The consumer persists workflow metadata for model-driven handoff actions, renders workflow forms only in main-task contexts, rejects workflow-form rendering in child contexts, executes tool-backed operations through the normal tool path for that context, feeds tool results back into `WorkflowRuntime`, and continues evaluation until control is handed back, completed, or failed.
+The consumer persists workflow metadata for model-driven handoff actions, renders workflow forms only in main-task contexts, rejects workflow-form rendering in child contexts, executes action-owned tool-backed instructions through the normal tool path for that context without resolving generic operation ids through a workflow-level registry, feeds tool results back into `WorkflowRuntime`, and continues evaluation until control is handed back, completed, or failed.
 
 ### 8.7 Persistence and Resume
 

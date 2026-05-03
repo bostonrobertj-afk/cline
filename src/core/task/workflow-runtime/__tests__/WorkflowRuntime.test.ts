@@ -4878,6 +4878,37 @@ describe("WorkflowRuntime", () => {
 		await expectPersistedRestoreFailsClosed(workflow, persistedSession)
 	})
 
+	it("restores declared JSON-safe array and object workflow values", async () => {
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: ["restored_array", "restored_object"],
+		})
+		const persistedSession = await createRestorablePersistedSession(workflow)
+		const declaredWorkflowValues: WorkflowValues = {
+			restored_array: ["alpha", { nested: true, count: 2 }],
+			restored_object: {
+				outer: { count: 1 },
+				order: ["first", "second"],
+			},
+		}
+		persistedSession.workflowValues.restored_array = declaredWorkflowValues.restored_array
+		persistedSession.workflowValues.restored_object = declaredWorkflowValues.restored_object
+		registerResolvedWorkflow(workflow)
+
+		const restoredState = new TaskState()
+		restoredState.activeWorkflowName = workflow.name
+		const restored = await runtime.restorePersistedSession({
+			taskState: restoredState,
+			persistedSession,
+		})
+
+		expect(restored?.kind).to.equal("project_prompt")
+		const restoredSession = getActiveWorkflowSession(restoredState)
+		expect(restoredSession.workflowValues.restored_array).to.deep.equal(declaredWorkflowValues.restored_array)
+		expect(restoredSession.workflowValues.restored_object).to.deep.equal(declaredWorkflowValues.restored_object)
+		expect(restoredSession.workflowValues.restored_array).to.not.equal(persistedSession.workflowValues.restored_array)
+		expect(restoredSession.workflowValues.restored_object).to.not.equal(persistedSession.workflowValues.restored_object)
+	})
+
 	it("fails closed for invalid restored workflow values, project selection, and ui suppression state", async () => {
 		const workflow = createWorkflowDefinition()
 		const persistedSession = await createRestorablePersistedSession(workflow)
@@ -4889,6 +4920,12 @@ describe("WorkflowRuntime", () => {
 				name: "invalid workflow values",
 				mutate: (session) => {
 					Reflect.set(session.workflowValues, "bad_value", undefined)
+				},
+			},
+			{
+				name: "stale workflow value key",
+				mutate: (session) => {
+					session.workflowValues.stale_workflow_value = "stale"
 				},
 			},
 			{

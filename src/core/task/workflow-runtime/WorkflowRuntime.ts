@@ -745,12 +745,13 @@ export class WorkflowRuntime {
 		return Array.isArray(value) && value.every((entry) => typeof entry === "string")
 	}
 
-	private isWorkflowValueRecord(value: unknown): value is WorkflowValues {
+	private isRestorableWorkflowValueRecord(value: unknown, definition: WorkflowDefinition): value is WorkflowValues {
 		if (this.isPlainRecord(value) === false) {
 			return false
 		}
 
-		return Object.values(value).every((entry) => isWorkflowValue(entry))
+		const allowedKeys = new Set(definition.workflowValueKeys)
+		return Object.entries(value).every(([key, entry]) => allowedKeys.has(key) && isWorkflowValue(entry))
 	}
 
 	private isWorkflowProjectSelectionState(value: unknown): value is WorkflowProjectSelectionState {
@@ -1063,7 +1064,7 @@ export class WorkflowRuntime {
 			return undefined
 		}
 
-		if (this.isWorkflowValueRecord(persistedSession.workflowValues) === false) {
+		if (this.isRestorableWorkflowValueRecord(persistedSession.workflowValues, definition) === false) {
 			return undefined
 		}
 

@@ -74,6 +74,7 @@ export class WorkflowNextActionConsumer {
 					break
 				case "execute_tool_backed_operation": {
 					if (currentAction.toolBackedOperationSession) {
+						await this.adapter.persistWorkflowRuntimeMetadata()
 						const toolBackedOperationStatusPayload = this.workflowRuntime.buildToolBackedOperationStatusPayload({
 							taskState: this.taskState,
 							session: currentAction.toolBackedOperationSession,
