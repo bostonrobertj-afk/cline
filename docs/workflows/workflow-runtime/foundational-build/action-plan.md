@@ -6041,6 +6041,173 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
+## Phase 51 - Root-Bounded Workflow Selector Discovery
+
+Pause for QA review after completing Phase 51 before commit.
+
+### Phase 51 Scope
+
+Make workflow-form selector discovery fail closed unless module-declared `targetPathSegments` resolve beneath the documented workflow discovery root. Align runtime code with `FR-10g3`, `FR-29f3`, `FR-29f4`, and `FR-29g1`.
+
+### Phase 51 Scope Boundary
+
+Do not change `.clineignore` semantics. Do not change `WorkflowFormRuntime` submitted-value validation. Do not change artifact identity, artifact destination, or project-folder creation behavior except where existing `discoverWorkflowCandidates(...)` call sites must adopt the renamed discovery request field.
+
+### Phase 51 Known Issues / Risks / Technical Debt
+
+None.
+
+[ ] Task 116. Update workflow discovery request typing and root-bounded path resolution.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/shared/ExtensionMessage.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/discovery.ts`
+
+[ ] Subtask 116.1. In `ExtensionMessage.ts`, change `WorkflowFormSelectorDiscoveryConfig.targetPathSegments?: string[]` to `targetPathSegments?: readonly string[]`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/shared/ExtensionMessage.ts`
+
+[ ] Subtask 116.2. In `types.ts`, rename `WorkflowDiscoveryRequest.baseDirectory` to `rootDirectory`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+
+[ ] Subtask 116.3. In `types.ts`, change `WorkflowDiscoveryRequest.targetPathSegments?: string[]` to `targetPathSegments?: readonly string[]`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+
+[ ] Subtask 116.4. In `discovery.ts`, add an exported `isWorkflowDiscoveryTargetPathSegment(segment: string): boolean` helper that returns `true` only when `segment` is non-empty, is not `.`, is not `..`, is not absolute under POSIX or Windows path rules, does not contain `/`, does not contain `\`, and does not use Windows drive syntax such as `C:`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/discovery.ts`
+
+[ ] Subtask 116.5. In `discovery.ts`, replace `resolveTargetDirectory(...)` with exported `resolveWorkflowDiscoveryTargetDirectory(request: Pick<WorkflowDiscoveryRequest, "rootDirectory" | "targetPathSegments">): string`; it must resolve `rootDirectory`, validate every `targetPathSegments` entry with `isWorkflowDiscoveryTargetPathSegment(...)`, join only valid segments beneath the resolved root, and throw if `path.relative(resolvedRootDirectory, resolvedTargetDirectory)` indicates the target is outside the resolved root.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/discovery.ts`
+
+[ ] Subtask 116.6. In `discoverWorkflowCandidates(...)`, call `resolveWorkflowDiscoveryTargetDirectory(...)` before `workspacePathPolicy.validateAccess(...)`; keep the target-directory path-policy check, child-entry path-policy filtering, `ENOENT` empty-list behavior, and candidate sorting behavior unchanged.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/discovery.ts`
+
+[ ] Task 117. Update `WorkflowRuntime` discovery call sites and definition validation.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[ ] Subtask 117.1. In `WorkflowRuntime.ts`, update the discovery import to include `isWorkflowDiscoveryTargetPathSegment` and `resolveWorkflowDiscoveryTargetDirectory` from `discovery.ts`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[ ] Subtask 117.2. In the mandatory entry existing-project discovery call, replace `baseDirectory: this.cwd` with `rootDirectory: this.cwd`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[ ] Subtask 117.3. In `discoverWorkflowFormSelectorOptions(...)`, replace the mutable `targetPathSegments` initialization with `const targetPathSegments = discoveryConfig.targetPathSegments` and `let rootDirectory = this.cwd`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[ ] Subtask 117.4. In the `selected_project_root` branch of `discoverWorkflowFormSelectorOptions(...)`, set `rootDirectory` by calling `resolveWorkflowDiscoveryTargetDirectory({ rootDirectory: this.cwd, targetPathSegments: [session.projectSelection.projectFolderName] })`; do not prepend `projectFolderName` to module-declared `targetPathSegments`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[ ] Subtask 117.5. In the selector `discoverWorkflowCandidates(...)` call, pass `rootDirectory` and the unchanged module-declared `targetPathSegments`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[ ] Subtask 117.6. In `discoverWorkflowArtifactFilenames(...)`, replace `baseDirectory: this.cwd` with `rootDirectory: this.cwd`; keep its existing runtime-owned `[projectFolderName, subfolder]` target segments unchanged.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[ ] Subtask 117.7. In `validateWorkflowDefinition(...)`, while scanning workflow-form fields, validate each `field.selectorDiscovery?.targetPathSegments` entry with `isWorkflowDiscoveryTargetPathSegment(...)`; return an invalid workflow result when any segment fails validation.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[ ] Task 118. Add root-boundary discovery helper coverage.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/discovery.test.ts`
+
+[ ] Subtask 118.1. In `discovery.test.ts`, update existing `discoverWorkflowCandidates(...)` fixtures to use `rootDirectory` instead of `baseDirectory`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/discovery.test.ts`
+
+[ ] Subtask 118.2. In `discovery.test.ts`, add a table-driven test proving allow-all workspace path policy still rejects invalid `targetPathSegments`: empty string, `.`, `..`, `nested/path`, `nested\path`, an absolute path, and Windows drive syntax.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/discovery.test.ts`
+
+[ ] Subtask 118.3. In `discovery.test.ts`, add coverage proving invalid `targetPathSegments` are rejected before `workspacePathPolicy.validateAccess(...)` is called.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/discovery.test.ts`
+
+[ ] Task 119. Update workflow-runtime selector discovery tests.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 119.1. In `WorkflowRuntime.test.ts`, replace selector discovery request assertions that read `request.baseDirectory` with `request.rootDirectory`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 119.2. In selector-discovery tests for `selected_project_root`, update expectations so `request.rootDirectory` equals the selected project directory under `cwd`, and `request.targetPathSegments` contains only module-declared segments such as `["planning"]`, `["stories"]`, or `["artifacts"]`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 119.3. In workflow definition validation tests, add invalid workflow fixtures proving selector discovery target path segments fail activation when they contain empty string, `.`, `..`, slash, backslash, absolute path, or Windows drive syntax.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Task 120. Validate Phase 51.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/shared/ExtensionMessage.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/discovery.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/discovery.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 120.1. Run `rg "baseDirectory" src/core/task/workflow-runtime src/core/task/workflow-runtime/__tests__`; it must return no matches.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/discovery.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/discovery.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 120.2. Run `rg "targetPathSegments = \\[session\\.projectSelection\\.projectFolderName|targetPathSegments: \\[session\\.projectSelection\\.projectFolderName" src/core/task/workflow-runtime/WorkflowRuntime.ts`; it must return no matches.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[ ] Subtask 120.3. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/discovery.test.ts src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, `npm run check-types`, and `npm run lint`; all must pass before Phase 51 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/shared/ExtensionMessage.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/discovery.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/discovery.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
 ## Validation
 
 After all implementation tasks are complete, run these commands from `/Users/robertboston/Documents/Cline Extension/cline`:

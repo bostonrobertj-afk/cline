@@ -215,11 +215,15 @@ Responsibilities:
   - `testing`
 - create and own workflow session state per execution context
 - create and own the canonical workflow value map for each workflow session
+- persist shared entry project selection into workflow-module-declared `entryProjectValueKeys`
 - create and own canonical normalization of user-provided project titles into filesystem-safe project identity
 - create and own the canonical artifact identity and numbering chain used across related workflow outputs
 - load workflow definition by `activeWorkflowName`
 - determine active step from session state
+- own workflow discovery root resolution; selector discovery roots resolve only to the visible project output root or selected project folder beneath it
+- validate module-declared selector discovery target path segments as relative path-name components and reject absolute paths, parent-directory traversal, separators, drive/root syntax, or normalized root escapes
 - own decision-tree source-route identity as structural runtime metadata for persistence, suppression, status/result correlation, and restore validation
+- emit only documented `WorkflowBranchTriggerEvent` variants and payloads for branch-result correlation and next-action re-evaluation
 - orchestrate workflow lifecycle across turns
 - orchestrate multiple concurrent workflow sessions across parent and child execution contexts
 - validate and apply workflow-value mutations from backend-owned logic and AI-callable tool paths
@@ -243,13 +247,15 @@ Responsibilities:
 - declare the canonical project subfolder designation for the workflow
 - declare step graph and transition behavior through per-step next-action decision trees whose satisfied routes select exactly one decision action
 - assign stable non-empty route ids that are unique within each decision-tree branch; route ids are structural identifiers for runtime correlation, not user-visible instructions, route priority, or standalone workflow behavior
+- branch only on documented `WorkflowBranchTriggerEvent` variants and payloads; modules must not define custom trigger-event variants or depend on runtime-internal event fields
+- declare selector discovery only through documented roots, target path segments, filters, labels, and sort rules; modules must not provide arbitrary filesystem paths or path traversal conventions
 - declare per-step prompt content
 - declare workflow-level and per-step native tool schema
 - declare workflow-entry informational panel content and workflow-form configuration
 - declare deterministic step-resolution rules
 - declare next-action decision actions as self-contained action instructions; when an action invokes a tool-backed operation, that action owns the tool/capability instruction rather than referencing a workflow-level generic operation registry
 - declare workflow-owned artifact/document builders
-- declare expected workflow values and any explicit child-session inheritance rules
+- declare expected workflow values, mandatory `entryProjectValueKeys`, and any explicit child-session inheritance rules
 - declare completion rules; any workflow-specific follow-up work must be modeled as normal workflow steps, decision actions, document builders, or tool-backed operations before completion
 
 #### Workflow Value Mutation Seam
@@ -511,6 +517,8 @@ That means:
 Runtime-owned deterministic filesystem procedures are subject to the same workspace path-policy as normal tool execution.
 
 `Task` owns the initialized `ClineIgnoreController` for the execution context and passes it into `WorkflowRuntime` through a narrow runtime dependency. `WorkflowRuntime` must not instantiate its own independent path-policy controller and must not depend on tool-handler-only classes such as `ToolValidator`.
+
+The workflow discovery root boundary is enforced before workspace path-policy. `project_output_root` resolves to the visible project output root, and `selected_project_root` resolves to the selected project folder beneath that root. Runtime validates `targetPathSegments` as relative single path components, joins them beneath the resolved root, verifies the normalized target remains inside that root, and only then applies workspace path-policy checks. Absence of `.clineignore` must not authorize discovery outside the resolved workflow discovery root.
 
 `WorkflowRuntime` and shared runtime discovery helpers must use that runtime path-policy dependency before runtime-owned filesystem access:
 
