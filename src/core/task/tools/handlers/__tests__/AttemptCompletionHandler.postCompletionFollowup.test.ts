@@ -1,4 +1,6 @@
 import { strict as assert } from "node:assert"
+import type { ToolUse } from "@core/assistant-message"
+import { PreToolUseHookCancellationError } from "@core/hooks/PreToolUseHookCancellationError"
 import * as disk from "@core/storage/disk"
 import * as notifications from "@integrations/notifications"
 import { afterEach, describe, it } from "mocha"
@@ -6,11 +8,14 @@ import sinon from "sinon"
 import { Logger } from "@/shared/services/Logger"
 import { ClineDefaultTool } from "@/shared/tools"
 import { TaskState } from "../../../TaskState"
+import type { ActiveWorkflowSession } from "../../../workflow-runtime/types"
+import { WorkflowRuntime } from "../../../workflow-runtime/WorkflowRuntime"
 import { RESPONSE_TOOL_SUCCESS_MESSAGE } from "../../response/types"
 import type { TaskConfig } from "../../types/TaskConfig"
+import { ToolHookUtils } from "../../utils/ToolHookUtils"
 import { AttemptCompletionHandler } from "../AttemptCompletionHandler"
 
-function createConfig(options?: { autoApproveCommand?: boolean }): {
+function createConfig(options?: { autoApproveCommand?: boolean; workflowRuntime?: TaskConfig["workflowRuntime"] }): {
 	config: TaskConfig
 	callbacks: Record<string, sinon.SinonStub>
 	taskState: TaskState
@@ -27,6 +32,7 @@ function createConfig(options?: { autoApproveCommand?: boolean }): {
 		executeCommandTool: sinon.stub().resolves([false, "ok"]),
 		doesLatestTaskCompletionHaveNewChanges: sinon.stub().resolves(false),
 		updateFCListFromToolResponse: sinon.stub().resolves(),
+		queueWorkflowNextAction: sinon.stub(),
 		shouldAutoApproveTool: sinon.stub().returns([false, false]),
 		shouldAutoApproveToolWithPath: sinon.stub().resolves(false),
 		postStateToWebview: sinon.stub().resolves(),
@@ -88,12 +94,66 @@ function createConfig(options?: { autoApproveCommand?: boolean }): {
 			},
 		},
 		callbacks,
+		workflowRuntime:
+			options?.workflowRuntime ??
+			new WorkflowRuntime({
+				cwd: "/tmp",
+				workspacePathPolicy: {
+					validateAccess: () => true,
+				},
+			}),
 		coordinator: {
 			getHandler: sinon.stub(),
 		},
 	} as unknown as TaskConfig
 
 	return { config, callbacks, taskState }
+}
+
+function createActiveWorkflowSession(): ActiveWorkflowSession {
+	return {
+		activeStepNumber: 4,
+		workflowValues: {
+			output_file: "/tmp/project/discovery/brainstorming.md",
+		},
+		projectSelection: {
+			projectMode: "new",
+			projectTitle: "Project",
+			projectFolderName: "project",
+		},
+		ui: {
+			formSession: undefined,
+			stepResolutionSession: undefined,
+			suppressedWorkflowFormIds: [],
+			suppressedWorkflowStepResolutionRoutes: [],
+		},
+		branchContext: {
+			activeBranchId: "project-prompt",
+		},
+	}
+}
+
+function createAttemptCompletionBlock(params: ToolUse["params"]): ToolUse {
+	return {
+		type: "tool_use",
+		name: ClineDefaultTool.ATTEMPT,
+		params,
+		partial: false,
+	}
+}
+
+function setActiveWorkflowState(taskState: TaskState): ActiveWorkflowSession {
+	const session = createActiveWorkflowSession()
+	taskState.activeWorkflowName = "brainstorming"
+	taskState.activeWorkflowSession = session
+	taskState.currentFocusChainChecklist = "- [ ] Organize Ideas & Plan Next Actions"
+	return session
+}
+
+function assertActiveWorkflowStatePreserved(taskState: TaskState, session: ActiveWorkflowSession): void {
+	assert.equal(taskState.activeWorkflowName, "brainstorming")
+	assert.equal(taskState.activeWorkflowSession, session)
+	assert.equal(taskState.currentFocusChainChecklist, "- [ ] Organize Ideas & Plan Next Actions")
 }
 
 describe("AttemptCompletionHandler post-completion follow-up", () => {
@@ -122,6 +182,69 @@ describe("AttemptCompletionHandler post-completion follow-up", () => {
 		assert.equal(taskState.pendingResponseToolFollowup, undefined)
 		assert.equal(taskState.responseToolTurnShouldEnd, true)
 		assert.equal(taskState.responseToolTurnCompletedBy, ClineDefaultTool.ATTEMPT)
+	})
+
+	it("clears active workflow state and queues teardown after successful attempt_completion", async () => {
+		const { config, callbacks, taskState } = createConfig()
+		setActiveWorkflowState(taskState)
+
+		const handler = new AttemptCompletionHandler()
+		const result = await handler.execute(
+			config,
+			createAttemptCompletionBlock({
+				result: "Brainstorming complete.",
+			}),
+		)
+
+		assert.equal(result, RESPONSE_TOOL_SUCCESS_MESSAGE)
+		assert.equal(taskState.activeWorkflowName, undefined)
+		assert.equal(taskState.activeWorkflowSession, undefined)
+		assert.equal(taskState.currentFocusChainChecklist, null)
+		sinon.assert.calledOnceWithExactly(callbacks.queueWorkflowNextAction, { kind: "persist_workflow_teardown" })
+	})
+
+	it("preserves active workflow state when attempt_completion is denied, invalid, or failed", async () => {
+		const invalidCase = createConfig()
+		const invalidSession = setActiveWorkflowState(invalidCase.taskState)
+		const handler = new AttemptCompletionHandler()
+
+		const invalidResult = await handler.execute(invalidCase.config, createAttemptCompletionBlock({}))
+
+		assert.notEqual(invalidResult, RESPONSE_TOOL_SUCCESS_MESSAGE)
+		assertActiveWorkflowStatePreserved(invalidCase.taskState, invalidSession)
+		sinon.assert.notCalled(invalidCase.callbacks.queueWorkflowNextAction)
+
+		const deniedCase = createConfig()
+		const deniedSession = setActiveWorkflowState(deniedCase.taskState)
+		sinon.stub(ToolHookUtils, "runPreToolUseIfEnabled").rejects(new PreToolUseHookCancellationError("Denied by hook."))
+
+		const deniedResult = await handler.execute(
+			deniedCase.config,
+			createAttemptCompletionBlock({
+				result: "done",
+			}),
+		)
+
+		assert.notEqual(deniedResult, RESPONSE_TOOL_SUCCESS_MESSAGE)
+		assertActiveWorkflowStatePreserved(deniedCase.taskState, deniedSession)
+		sinon.assert.notCalled(deniedCase.callbacks.queueWorkflowNextAction)
+		sinon.restore()
+
+		const failedCommandCase = createConfig({ autoApproveCommand: true })
+		const failedCommandSession = setActiveWorkflowState(failedCommandCase.taskState)
+		failedCommandCase.callbacks.executeCommandTool.resolves([true, "command failed"])
+
+		const failedCommandResult = await handler.execute(
+			failedCommandCase.config,
+			createAttemptCompletionBlock({
+				result: "done",
+				command: "echo hi",
+			}),
+		)
+
+		assert.equal(failedCommandResult, "command failed")
+		assertActiveWorkflowStatePreserved(failedCommandCase.taskState, failedCommandSession)
+		sinon.assert.notCalled(failedCommandCase.callbacks.queueWorkflowNextAction)
 	})
 
 	it("does not show task-complete system notifications", async () => {

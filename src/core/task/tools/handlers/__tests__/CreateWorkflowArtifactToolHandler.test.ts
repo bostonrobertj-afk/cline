@@ -31,13 +31,15 @@ const ENTRY_PROJECT_VALUE_KEYS = {
 	projectFolderName: "entry_project_folder_name",
 }
 
-function createArtifactBlock(overrides?: Partial<Pick<ToolUse, "partial" | "isNativeToolCall" | "call_id">>): ToolUse {
+function createArtifactBlock(
+	overrides?: Partial<Pick<ToolUse, "partial" | "isNativeToolCall" | "call_id">> & { artifactId?: string },
+): ToolUse {
 	return {
 		type: "tool_use",
 		name: ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT,
 		params: {
-			artifact_id: "epic_doc",
-		} as ToolUse["params"],
+			artifact_id: overrides?.artifactId ?? "epic_doc",
+		},
 		partial: overrides?.partial ?? false,
 		isNativeToolCall: overrides?.isNativeToolCall ?? true,
 		call_id: overrides?.call_id ?? "workflow_artifact_1",
@@ -275,6 +277,44 @@ function createRealArtifactWorkflow(): WorkflowDefinition {
 	}
 }
 
+function createRealBrainstormingArtifactWorkflow(): WorkflowDefinition {
+	const artifactOutputKeys = {
+		...createStandaloneArtifactOutputValueKeys("brainstorming"),
+		artifactAbsolutePath: "output_file",
+	}
+
+	return {
+		name: "create-workflow-artifact-brainstorming-test",
+		slashCommandName: "create-workflow-artifact-brainstorming-test",
+		useSkillName: "create-workflow-artifact-brainstorming-test",
+		persona: "Workflow runtime persona",
+		projectSubfolder: "discovery",
+		workflowValueKeys: [
+			...Object.values(ENTRY_PROJECT_VALUE_KEYS),
+			...collectArtifactOutputWorkflowValueKeys(artifactOutputKeys),
+		],
+		entryProjectValueKeys: ENTRY_PROJECT_VALUE_KEYS,
+		entryPanel: {
+			promptMarkdown: "Start this workflow",
+		},
+		steps: {
+			"step-1": createWorkflowStepDefinition(),
+		},
+		workflowForms: {},
+		artifacts: {
+			brainstorming_session: {
+				id: "brainstorming_session",
+				family: WorkflowArtifactFamily.BrainstormingSession,
+				intentMode: "new",
+				parentIdentitySource: undefined,
+				targetIdentitySource: undefined,
+				outputValueKeys: artifactOutputKeys,
+			},
+		},
+		childInheritance: [],
+	}
+}
+
 function createActiveWorkflowSession(workflow: WorkflowDefinition): ActiveWorkflowSession {
 	return {
 		activeStepNumber: 1,
@@ -483,6 +523,52 @@ describe("CreateWorkflowArtifactToolHandler", () => {
 			await access(artifactAbsolutePath)
 			expect(await readFile(artifactAbsolutePath, "utf8")).to.equal("")
 			expect(parsedResult.persisted_artifact_output_values.epic_artifact_absolute_path).to.equal(artifactAbsolutePath)
+		} finally {
+			await rm(tmpCwd, { recursive: true, force: true })
+		}
+	})
+
+	it("creates the brainstorming singleton artifact through the real workflow runtime", async () => {
+		const tmpCwd = await mkdtemp(path.join(tmpdir(), "create-workflow-artifact-brainstorming-handler-test-"))
+		try {
+			const workflow = createRealBrainstormingArtifactWorkflow()
+			sandbox
+				.stub(WorkflowRegistry, "resolveWorkflowDefinition")
+				.callsFake((workflowName: string) => (workflowName === workflow.name ? workflow : undefined))
+			const taskState = new TaskState()
+			taskState.activeWorkflowName = workflow.name
+			taskState.activeWorkflowSession = createActiveWorkflowSession(workflow)
+			const runtime = new WorkflowRuntime({
+				cwd: tmpCwd,
+				workspacePathPolicy: createAllowAllWorkspacePathPolicy(),
+			})
+			const { config } = createConfig({
+				cwd: tmpCwd,
+				taskState,
+				workflowRuntime: runtime,
+			})
+			const handler = new CreateWorkflowArtifactToolHandler(createToolValidator(config.cwd))
+
+			const result = await handler.execute(config, createArtifactBlock({ artifactId: "brainstorming_session" }))
+
+			expect(typeof result).to.equal("string")
+			if (typeof result !== "string") {
+				throw new Error("Expected string tool result.")
+			}
+			const parsedResult = JSON.parse(result)
+			const artifactAbsolutePath = path.join(tmpCwd, "real-artifact-project", "discovery", "brainstorming.md")
+			expect(parsedResult).to.deep.include({
+				created: true,
+				artifact_id: "brainstorming_session",
+				artifact_family: "brainstorming_session",
+				artifact_identity: "brainstorming_session",
+				artifact_filename: "brainstorming.md",
+				artifact_relative_path: path.join("discovery", "brainstorming.md"),
+				artifact_absolute_path: artifactAbsolutePath,
+			})
+			expect(parsedResult.persisted_artifact_output_values.output_file).to.equal(artifactAbsolutePath)
+			await access(artifactAbsolutePath)
+			expect(await readFile(artifactAbsolutePath, "utf8")).to.equal("")
 		} finally {
 			await rm(tmpCwd, { recursive: true, force: true })
 		}

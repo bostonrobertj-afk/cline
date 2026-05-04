@@ -1294,6 +1294,15 @@ export class WorkflowRuntime {
 		taskState.currentFocusChainChecklist = null
 	}
 
+	async completeActiveWorkflowAfterFinalDelivery(args: { taskState: TaskState }): Promise<WorkflowNextAction> {
+		if (!args.taskState.activeWorkflowName && !args.taskState.activeWorkflowSession) {
+			return { kind: "no_op" }
+		}
+
+		await this.teardownWorkflow({ taskState: args.taskState })
+		return { kind: "persist_workflow_teardown" }
+	}
+
 	private async teardownWorkflowAndRequirePersistence(args: { taskState: TaskState }): Promise<WorkflowNextAction> {
 		await this.teardownWorkflow({ taskState: args.taskState })
 		return { kind: "persist_workflow_teardown" }
@@ -2435,6 +2444,24 @@ export class WorkflowRuntime {
 					toolBackedOperationSession: stepResolutionSession,
 				}
 			}
+			case "run_deterministic_procedure": {
+				const procedureResult = await action.instruction.run(this.cloneWorkflowSession(session))
+				if (procedureResult.kind === "failed") {
+					return this.buildTerminalErrorNextAction({
+						taskState,
+						errorMessage: procedureResult.errorMessage,
+					})
+				}
+
+				if (procedureResult.workflowValueWrites !== undefined) {
+					await this.applyWorkflowValueWrites({
+						taskState,
+						values: procedureResult.workflowValueWrites,
+					})
+				}
+
+				return this.resolveNextAction({ taskState })
+			}
 			case "build_workflow_document": {
 				const artifactDefinition = definition.artifacts?.[action.instruction.artifactId]
 				if (!artifactDefinition) {
@@ -2642,7 +2669,8 @@ export class WorkflowRuntime {
 	}): Promise<WorkflowArtifactIdentityResolution> {
 		switch (args.artifactDefinition.family) {
 			case WorkflowArtifactFamily.Epics:
-			case WorkflowArtifactFamily.EpicsIndex: {
+			case WorkflowArtifactFamily.EpicsIndex:
+			case WorkflowArtifactFamily.BrainstormingSession: {
 				if (args.familyDefinition.allocationMode !== "singleton_project") {
 					throw new Error(`Workflow artifact ${args.artifactDefinition.id} requires a singleton project family.`)
 				}
@@ -3031,6 +3059,7 @@ export class WorkflowRuntime {
 		switch (familyDefinition.family) {
 			case WorkflowArtifactFamily.Epics:
 			case WorkflowArtifactFamily.EpicsIndex:
+			case WorkflowArtifactFamily.BrainstormingSession:
 				return undefined
 			case WorkflowArtifactFamily.EpicDeliverySpec:
 				return this.parseDottedWorkflowArtifactIdentity(match[1])
@@ -3598,6 +3627,14 @@ export class WorkflowRuntime {
 								return {
 									valid: false,
 									errorMessage: `Workflow step ${step.id} route ${route.id} inline tool-backed action must declare all instruction functions.`,
+								}
+							}
+							break
+						case "run_deterministic_procedure":
+							if (!this.isRecord(route.action.instruction) || typeof route.action.instruction.run !== "function") {
+								return {
+									valid: false,
+									errorMessage: `Workflow step ${step.id} route ${route.id} deterministic procedure action must declare a run function.`,
 								}
 							}
 							break

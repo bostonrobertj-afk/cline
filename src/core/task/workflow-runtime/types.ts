@@ -166,9 +166,18 @@ export type WorkflowStepTransitionTarget =
 	| { kind: "entry_branch"; stepNumber: number }
 	| { kind: "named_branch"; stepNumber: number; branchId: WorkflowDecisionBranchId }
 
+export type WorkflowDeterministicProcedureResult =
+	| { kind: "succeeded"; workflowValueWrites?: WorkflowValues }
+	| { kind: "failed"; errorMessage: string }
+
+export interface WorkflowDeterministicProcedureActionInstruction {
+	run(session: ActiveWorkflowSession): WorkflowDeterministicProcedureResult | Promise<WorkflowDeterministicProcedureResult>
+}
+
 export type WorkflowDecisionAction =
 	| { kind: "render_workflow_form"; workflowFormId: WorkflowFormId }
 	| { kind: "execute_tool_backed_operation"; instruction: WorkflowToolBackedActionInstruction }
+	| { kind: "run_deterministic_procedure"; instruction: WorkflowDeterministicProcedureActionInstruction }
 	| { kind: "build_workflow_document"; instruction: WorkflowDocumentBuildActionInstruction }
 	| { kind: "allocate_artifact"; artifactId: string }
 	| { kind: "transition_step"; target: WorkflowStepTransitionTarget }
@@ -260,7 +269,7 @@ export type WorkflowArtifactOutputValueKeys =
 export type WorkflowArtifactDefinition =
 	| {
 			id: string
-			family: WorkflowArtifactFamily.Epics | WorkflowArtifactFamily.EpicsIndex
+			family: WorkflowArtifactFamily.Epics | WorkflowArtifactFamily.EpicsIndex | WorkflowArtifactFamily.BrainstormingSession
 			intentMode: "new"
 			parentIdentitySource: undefined
 			targetIdentitySource: undefined

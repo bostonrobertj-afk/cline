@@ -163,6 +163,16 @@ export class AttemptCompletionHandler implements IToolHandler, IPartialBlockHand
 			await emitAgentFeedbackOnce()
 		}
 
-		return responseToolRuntime.finalizeSuccess(config, this.name)
+		const successResult = responseToolRuntime.finalizeSuccess(config, this.name)
+		if (config.taskState.activeWorkflowSession) {
+			const workflowNextAction = await config.workflowRuntime.completeActiveWorkflowAfterFinalDelivery({
+				taskState: config.taskState,
+			})
+			if (workflowNextAction.kind !== "no_op") {
+				config.callbacks.queueWorkflowNextAction(workflowNextAction)
+			}
+		}
+
+		return successResult
 	}
 }

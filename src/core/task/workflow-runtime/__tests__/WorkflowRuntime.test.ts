@@ -24,6 +24,7 @@ import type {
 	WorkflowDecisionBranchRoute,
 	WorkflowDecisionTree,
 	WorkflowDefinition,
+	WorkflowDeterministicProcedureResult,
 	WorkflowDiscoveryRequest,
 	WorkflowDocumentBuildActionInstruction,
 	WorkflowEntryProjectValueKeys,
@@ -501,6 +502,7 @@ describe("WorkflowRuntime", () => {
 		steps?: WorkflowDefinition["steps"]
 		childInheritance?: WorkflowDefinition["childInheritance"]
 		artifacts?: WorkflowDefinition["artifacts"]
+		projectSubfolder?: WorkflowDefinition["projectSubfolder"]
 	}): WorkflowDefinition {
 		const defaultSteps: Record<string, WorkflowStepDefinition> = {
 			"step-1": createStepDefinition({ stepNumber: 1 }),
@@ -517,7 +519,7 @@ describe("WorkflowRuntime", () => {
 			slashCommandName: "workflow-runtime-test",
 			useSkillName: "workflow-runtime-test",
 			persona: "Workflow runtime persona",
-			projectSubfolder: "planning",
+			projectSubfolder: args?.projectSubfolder ?? "planning",
 			workflowValueKeys,
 			entryProjectValueKeys,
 			entryPanel: {
@@ -4251,6 +4253,117 @@ describe("WorkflowRuntime", () => {
 		})
 	})
 
+	it("runs deterministic procedures through workflow values and continues without a tool-backed operation", async () => {
+		const procedureRun = sandbox.stub().callsFake((session: ActiveWorkflowSession): WorkflowDeterministicProcedureResult => {
+			expect(session.workflowValues.deterministic_value).to.equal(undefined)
+			return {
+				kind: "succeeded",
+				workflowValueWrites: {
+					deterministic_value: "persisted",
+				},
+			}
+		})
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: ["deterministic_value"],
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: {
+						entryBranchId: "run-procedure",
+						branches: {
+							"run-procedure": {
+								id: "run-procedure",
+								routes: [
+									{
+										id: "select-value",
+										trigger: { kind: "always" },
+										action: {
+											kind: "run_deterministic_procedure",
+											instruction: {
+												run: procedureRun,
+											},
+										},
+										followingBranchId: "after-procedure",
+									},
+								],
+							},
+							"after-procedure": {
+								id: "after-procedure",
+								routes: [
+									{
+										id: "continue-after-write",
+										trigger: { kind: "on_event", eventKind: "workflow_values_persisted" },
+										action: { kind: "project_prompt" },
+									},
+								],
+							},
+						},
+					},
+				}),
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		await runtime.resolveNextAction({ taskState })
+		const nextAction = await submitNewProjectSelection(taskState, "Deterministic Procedure Project")
+
+		expect(nextAction.kind).to.equal("project_prompt")
+		expect(nextAction.kind).not.to.equal("execute_tool_backed_operation")
+		sinon.assert.calledOnce(procedureRun)
+		expect(getActiveWorkflowSession(taskState).workflowValues.deterministic_value).to.equal("persisted")
+		expect(getActiveWorkflowSession(taskState).branchContext.activeBranchId).to.equal("after-procedure")
+	})
+
+	it("routes failed deterministic procedures through terminal_error without a tool-backed operation", async () => {
+		const failureMessage = "Deterministic procedure failed."
+		const procedureRun = sandbox.stub().callsFake((_session: ActiveWorkflowSession): WorkflowDeterministicProcedureResult => {
+			return {
+				kind: "failed",
+				errorMessage: failureMessage,
+			}
+		})
+		const workflow = createWorkflowDefinition({
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: {
+						entryBranchId: "run-procedure",
+						branches: {
+							"run-procedure": {
+								id: "run-procedure",
+								routes: [
+									{
+										id: "fail-procedure",
+										trigger: { kind: "always" },
+										action: {
+											kind: "run_deterministic_procedure",
+											instruction: {
+												run: procedureRun,
+											},
+										},
+									},
+								],
+							},
+						},
+					},
+				}),
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		await runtime.resolveNextAction({ taskState })
+		const nextAction = await submitNewProjectSelection(taskState, "Failed Procedure Project")
+
+		expect(nextAction.kind).to.equal("terminal_error")
+		expect(nextAction.kind).not.to.equal("execute_tool_backed_operation")
+		if (nextAction.kind !== "terminal_error") {
+			throw new Error(`Expected terminal_error, received ${nextAction.kind}.`)
+		}
+		expect(nextAction.errorMessage).to.equal(failureMessage)
+		sinon.assert.calledOnce(procedureRun)
+		expectWorkflowStateCleared(taskState)
+	})
+
 	it("blocks artifact creation before creating a denied artifact parent directory", async () => {
 		const projectFolderName = "artifact-parent-policy-project"
 		const artifactParentDirectory = join(cwd, projectFolderName, "planning")
@@ -4704,6 +4817,55 @@ describe("WorkflowRuntime", () => {
 			[reviewInputMarkdownKeys.artifactFilename]: "Review-input-1-1-1.md",
 			[reviewInputDiffKeys.artifactFilename]: "Review-input-1-1-1.diff",
 		})
+	})
+
+	it("allocates the brainstorming singleton artifact in discovery and maps its absolute path to output_file", async () => {
+		discoverWorkflowCandidatesStub.restore()
+		const brainstormingKeys = {
+			...createStandaloneArtifactOutputValueKeys("brainstorming"),
+			artifactAbsolutePath: "output_file",
+		}
+		const workflow = createWorkflowDefinition({
+			projectSubfolder: "discovery",
+			workflowValueKeys: collectArtifactOutputWorkflowValueKeys(brainstormingKeys),
+			artifacts: {
+				brainstorming_session: {
+					id: "brainstorming_session",
+					family: WorkflowArtifactFamily.BrainstormingSession,
+					intentMode: "new",
+					parentIdentitySource: undefined,
+					targetIdentitySource: undefined,
+					outputValueKeys: brainstormingKeys,
+				},
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		await runtime.resolveNextAction({ taskState })
+		await submitNewProjectSelection(taskState, "Brainstorming Artifact Project")
+
+		const result = await runtime.createWorkflowArtifact({
+			taskState,
+			artifactId: "brainstorming_session",
+			expectedArtifactAbsolutePath: undefined,
+		})
+		const artifactAbsolutePath = join(cwd, "brainstorming-artifact-project", "discovery", "brainstorming.md")
+
+		expect(result).to.deep.include({
+			artifactIdentity: "brainstorming_session",
+			artifactFilename: "brainstorming.md",
+			artifactRelativePath: join("discovery", "brainstorming.md"),
+			artifactAbsolutePath,
+			parentIdentity: undefined,
+			targetIdentity: undefined,
+		})
+		expect(getActiveWorkflowSession(taskState).workflowValues).to.deep.include({
+			[brainstormingKeys.artifactFamily]: WorkflowArtifactFamily.BrainstormingSession,
+			[brainstormingKeys.artifactIdentity]: "brainstorming_session",
+			[brainstormingKeys.artifactFilename]: "brainstorming.md",
+			output_file: artifactAbsolutePath,
+		})
+		await access(artifactAbsolutePath)
 	})
 
 	it("derives epic delivery specs from Epics.index.json and skips existing delivery specs", async () => {
