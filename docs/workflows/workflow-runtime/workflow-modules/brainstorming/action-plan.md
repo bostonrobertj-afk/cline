@@ -189,53 +189,53 @@ Allowed files:
 
 After completing this phase, pause for QA review before moving to Phase 3.
 
-[ ] Task 4. Create the module-owned brainstorming technique registry.
+[x] Task 4. Create the module-owned brainstorming technique registry.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingTechniqueRegistry.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingTechniqueRegistry.test.ts`
 
-[ ] Subtask 4.1. Create `src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingTechniqueRegistry.ts` with exported `BrainstormingTechniqueCategory` enum values `Collaborative`, `Creative`, `Deep`, `IntrospectiveDelight`, `Structured`, `Theatrical`, `Wild`, `Biomimetic`, `Quantum`, and `Cultural`.
+[x] Subtask 4.1. Create `src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingTechniqueRegistry.ts` with exported `BrainstormingTechniqueCategory` enum values `Collaborative`, `Creative`, `Deep`, `IntrospectiveDelight`, `Structured`, `Theatrical`, `Wild`, `Biomimetic`, `Quantum`, and `Cultural`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingTechniqueRegistry.ts`
 
-[ ] Subtask 4.2. In `brainstormingTechniqueRegistry.ts`, add exported `BrainstormingTechnique` interface with required `id`, `name`, `category`, and `description` fields.
+[x] Subtask 4.2. In `brainstormingTechniqueRegistry.ts`, add exported `BrainstormingTechnique` interface with required `id`, `name`, `category`, and `description` fields.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingTechniqueRegistry.ts`
 
-[ ] Subtask 4.3. In `brainstormingTechniqueRegistry.ts`, migrate all 60 rows from `.cline/skills/bmad-brainstorming/brain-methods.csv` into a readonly `BRAINSTORMING_TECHNIQUES` array using lowercase kebab-case ids derived from each technique name, preserving each source technique name, category, and description exactly.
+[x] Subtask 4.3. In `brainstormingTechniqueRegistry.ts`, migrate all 61 rows from `.cline/skills/bmad-brainstorming/brain-methods.csv` into a readonly `BRAINSTORMING_TECHNIQUES` array using lowercase kebab-case ids derived from each technique name, preserving each source technique name, category, and description exactly.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingTechniqueRegistry.ts`
 
-[ ] Subtask 4.4. In `brainstormingTechniqueRegistry.ts`, export `listBrainstormingTechniqueCategories()` returning the ten display categories in the exact Step 2 dropdown order from the requirements.
+[x] Subtask 4.4. In `brainstormingTechniqueRegistry.ts`, export `listBrainstormingTechniqueCategories()` returning the ten display categories in the exact Step 2 dropdown order from the requirements.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingTechniqueRegistry.ts`
 
-[ ] Subtask 4.5. In `brainstormingTechniqueRegistry.ts`, export `listBrainstormingTechniquesByCategory(category: BrainstormingTechniqueCategory): readonly BrainstormingTechnique[]`.
+[x] Subtask 4.5. In `brainstormingTechniqueRegistry.ts`, export `listBrainstormingTechniquesByCategory(category: BrainstormingTechniqueCategory): readonly BrainstormingTechnique[]`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingTechniqueRegistry.ts`
 
-[ ] Subtask 4.6. In `brainstormingTechniqueRegistry.ts`, export `findBrainstormingTechniqueByIdOrName(input: { id?: string; name?: string }): BrainstormingTechnique | undefined`.
+[x] Subtask 4.6. In `brainstormingTechniqueRegistry.ts`, export `findBrainstormingTechniqueByIdOrName(input: { id?: string; name?: string }): BrainstormingTechnique | undefined`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingTechniqueRegistry.ts`
 
-[ ] Subtask 4.7. In `brainstormingTechniqueRegistry.ts`, export `selectRandomBrainstormingTechnique(input: { excludedIds: readonly string[]; random?: () => number }): BrainstormingTechnique | undefined` that filters excluded ids, uses the supplied random function when present, and returns `undefined` when no eligible entries remain.
+[x] Subtask 4.7. In `brainstormingTechniqueRegistry.ts`, export `selectRandomBrainstormingTechnique(input: { excludedIds: readonly string[]; random?: () => number }): BrainstormingTechnique | undefined` that filters excluded ids, uses the supplied random function when present, and returns `undefined` when no eligible entries remain.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingTechniqueRegistry.ts`
 
-[ ] Subtask 4.8. Create `src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingTechniqueRegistry.test.ts` with coverage for row count, category order, category filtering, id/name lookup, excluded-id random selection, and no-runtime-CSV dependency.
+[x] Subtask 4.8. Create `src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingTechniqueRegistry.test.ts` with coverage for row count, category order, category filtering, id/name lookup, excluded-id random selection, and no-runtime-CSV dependency.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingTechniqueRegistry.test.ts`
 
-[ ] Task 5. Create brainstorming document and tool-schema helpers.
+[x] Task 5. Create brainstorming document and tool-schema helpers.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingDocument.ts`
@@ -243,47 +243,47 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingDocument.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingToolSchemas.test.ts`
 
-[ ] Subtask 5.1. Create `brainstormingDocument.ts` with exported heading constants for `stepsCompleted`, `inputDocuments`, `session topic`, `session goals`, `selected approach`, `selected techniques`, `ideas generated`, and `context file`.
+[x] Subtask 5.1. Create `brainstormingDocument.ts` with exported heading constants for `stepsCompleted`, `inputDocuments`, `session topic`, `session goals`, `selected approach`, `selected techniques`, `ideas generated`, and `context file`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingDocument.ts`
 
-[ ] Subtask 5.2. In `brainstormingDocument.ts`, export `buildInitialBrainstormingDocument(): string` that returns a markdown document containing exactly those H1 headings in requirements order and no source-template file reads.
+[x] Subtask 5.2. In `brainstormingDocument.ts`, export `buildInitialBrainstormingDocument(): string` that returns a markdown document containing exactly those H1 headings in requirements order and no source-template file reads.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingDocument.ts`
 
-[ ] Subtask 5.3. In `brainstormingDocument.ts`, export `buildBrainstormingDocumentFromSession(session: ActiveWorkflowSession): string` that renders the same heading shell and inserts `context_file`, `session_topic`, `session_goals`, `selected_approach`, `selected_techniques`, `techniques_used`, and `ideas_generated` from workflow values when present.
+[x] Subtask 5.3. In `brainstormingDocument.ts`, export `buildBrainstormingDocumentFromSession(session: ActiveWorkflowSession): string` that renders the same heading shell and inserts `context_file`, `session_topic`, `session_goals`, `selected_approach`, `selected_techniques`, `techniques_used`, and `ideas_generated` from workflow values when present.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingDocument.ts`
 
-[ ] Subtask 5.4. In `brainstormingDocument.ts`, render `selected_techniques` as bullet lines containing technique name and description when it is an array, and render non-array placeholder text only for the approved `user requested technique suggestion` line.
+[x] Subtask 5.4. In `brainstormingDocument.ts`, render `selected_techniques` as bullet lines containing technique name and description when it is an array, and render non-array placeholder text only for the approved `user requested technique suggestion` line.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingDocument.ts`
 
-[ ] Subtask 5.5. Create `brainstormingToolSchemas.ts` with helper functions returning `ClineToolSpec` entries for `build_workflow_document`, `workflow_progress_request`, `set_workflow_values`, `get_brainstorming_methods`, `append_brainstorming_selected_technique`, and `attempt_completion`.
+[x] Subtask 5.5. Create `brainstormingToolSchemas.ts` with helper functions returning `ClineToolSpec` entries only for currently existing tools: `build_workflow_document`, `workflow_progress_request`, `set_workflow_values`, and `attempt_completion`. Do not add helpers for `get_brainstorming_methods` or `append_brainstorming_selected_technique` in Phase 2 because their `ClineDefaultTool` enum members are introduced in Phase 3.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingToolSchemas.ts`
 
-[ ] Subtask 5.6. In `brainstormingToolSchemas.ts`, make the Step 3 `set_workflow_values` schema expose only `techniques_used` and `ideas_generated`.
+[x] Subtask 5.6. In `brainstormingToolSchemas.ts`, make the Step 3 `set_workflow_values` schema expose only `techniques_used` and `ideas_generated`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingToolSchemas.ts`
 
-[ ] Subtask 5.7. In `brainstormingToolSchemas.ts`, do not include `create_workflow_artifact` or `select_random_brainstorming_technique` in any helper.
+[x] Subtask 5.7. In `brainstormingToolSchemas.ts`, do not include `create_workflow_artifact` or `select_random_brainstorming_technique` in any helper.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingToolSchemas.ts`
 
-[ ] Subtask 5.8. Create `brainstormingDocument.test.ts` with coverage for initial headings, Step 1 value rendering, selected-technique array rendering, suggestion placeholder rendering, and ideas/techniques-used rendering.
+[x] Subtask 5.8. Create `brainstormingDocument.test.ts` with coverage for initial headings, Step 1 value rendering, selected-technique array rendering, suggestion placeholder rendering, and ideas/techniques-used rendering.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingDocument.test.ts`
 
-[ ] Subtask 5.9. Create `brainstormingToolSchemas.test.ts` with coverage proving Step 3 suggest exposes `get_brainstorming_methods` and `append_brainstorming_selected_technique`, Step 3 choose/random does not expose those two tools, and `selected_techniques` is never present in the `set_workflow_values` schema.
+[x] Subtask 5.9. Create `brainstormingToolSchemas.test.ts` with coverage proving the Phase 2 helper surface can build schemas for `build_workflow_document`, `workflow_progress_request`, `set_workflow_values`, and `attempt_completion`, and proving `selected_techniques` is never present in the `set_workflow_values` schema. Do not assert `get_brainstorming_methods` or `append_brainstorming_selected_technique` exposure until Phase 3 adds their enum members.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingToolSchemas.test.ts`
@@ -302,6 +302,8 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/AppendBrainstormingSelectedTechniqueToolHandler.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/GetBrainstormingMethodsToolHandler.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/AppendBrainstormingSelectedTechniqueToolHandler.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingToolSchemas.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingToolSchemas.test.ts`
 
 [ ] Subtask 6.1. In `src/shared/tools.ts`, add enum members `GET_BRAINSTORMING_METHODS = "get_brainstorming_methods"` and `APPEND_BRAINSTORMING_SELECTED_TECHNIQUE = "append_brainstorming_selected_technique"`.
 
@@ -372,6 +374,16 @@ Allowed files:
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/AppendBrainstormingSelectedTechniqueToolHandler.test.ts`
+
+[ ] Subtask 6.15. In `brainstormingToolSchemas.ts`, after `ClineDefaultTool.GET_BRAINSTORMING_METHODS` and `ClineDefaultTool.APPEND_BRAINSTORMING_SELECTED_TECHNIQUE` exist, add helper support for `get_brainstorming_methods` and `append_brainstorming_selected_technique` so the Step 3 suggest variant can expose those tools.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingToolSchemas.ts`
+
+[ ] Subtask 6.16. In `brainstormingToolSchemas.test.ts`, add coverage proving Step 3 suggest exposes `get_brainstorming_methods` and `append_brainstorming_selected_technique`, and Step 3 choose/random omits those two tools.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingToolSchemas.test.ts`
 
 ### Phase 4 - Brainstorming Workflow Definition And Registration
 
