@@ -647,17 +647,11 @@ describe("WorkflowRuntime", () => {
 
 	function createDocumentBuildActionInstruction(args?: {
 		artifactId?: string
-		toolContract?: WorkflowDocumentBuildActionInstruction["toolContract"]
 		buildContent?: WorkflowDocumentBuildActionInstruction["buildContent"]
 		workflowValueWrites?: WorkflowValues
 	}): WorkflowDocumentBuildActionInstruction {
 		const instruction: WorkflowDocumentBuildActionInstruction = {
 			artifactId: args?.artifactId ?? "output_file",
-			toolContract: args?.toolContract ?? {
-				id: ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT,
-				name: "build_workflow_document",
-				parameters: [],
-			},
 			buildContent: args?.buildContent ?? (() => "# Resolved spec"),
 		}
 
@@ -1547,16 +1541,8 @@ describe("WorkflowRuntime", () => {
 		expect(invalidState.activeWorkflowSession).to.be.undefined
 	})
 
-	it("rejects document build actions that reference missing artifacts or invalid tool contracts", async () => {
+	it("rejects document build actions that reference missing artifacts", async () => {
 		const outputFileKeys = createStandaloneArtifactOutputValueKeys("output_file")
-		const validArtifactDefinition = {
-			id: "output_file",
-			family: WorkflowArtifactFamily.Epics,
-			intentMode: "new",
-			parentIdentitySource: undefined,
-			targetIdentitySource: undefined,
-			outputValueKeys: outputFileKeys,
-		} satisfies NonNullable<WorkflowDefinition["artifacts"]>[string]
 		const invalidWorkflows = [
 			createWorkflowDefinition({
 				workflowValueKeys: collectArtifactOutputWorkflowValueKeys(outputFileKeys),
@@ -1567,29 +1553,6 @@ describe("WorkflowRuntime", () => {
 							startAction: {
 								kind: "build_workflow_document",
 								instruction: createDocumentBuildActionInstruction({ artifactId: "missing_output_file" }),
-							},
-						}),
-					}),
-				},
-			}),
-			createWorkflowDefinition({
-				workflowValueKeys: collectArtifactOutputWorkflowValueKeys(outputFileKeys),
-				artifacts: {
-					output_file: validArtifactDefinition,
-				},
-				steps: {
-					"step-1": createStepDefinition({
-						stepNumber: 1,
-						decisionTree: createToolBackedOperationDecisionTree({
-							startAction: {
-								kind: "build_workflow_document",
-								instruction: createDocumentBuildActionInstruction({
-									toolContract: {
-										id: ClineDefaultTool.GENERATE_EXPLANATION,
-										name: "generate_explanation",
-										parameters: [],
-									},
-								}),
 							},
 						}),
 					}),

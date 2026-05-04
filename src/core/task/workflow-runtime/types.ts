@@ -1,6 +1,5 @@
 import type { WorkflowForm, WorkflowFormDefinitionPayload } from "@shared/ExtensionMessage"
 import type { ClineToolSpec } from "@/core/prompts/system-prompt/spec"
-import type { BackendWorkflowToolContract } from "@/core/task/tools/backendWorkflowToolContractTypes"
 import type { WorkflowFormId, WorkflowFormSessionState } from "@/core/task/workflow-form/types"
 import type { WorkflowArtifactFamily } from "@/core/task/workflow-runtime/artifactFamilies"
 import type {
@@ -197,7 +196,6 @@ export interface WorkflowDecisionTree {
 
 export interface WorkflowDocumentBuildActionInstruction {
 	artifactId: string
-	toolContract: BackendWorkflowToolContract
 	buildContent(session: ActiveWorkflowSession): string | Promise<string>
 	workflowValueWrites?: WorkflowValues
 }

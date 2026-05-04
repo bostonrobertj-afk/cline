@@ -3603,22 +3603,6 @@ export class WorkflowRuntime {
 									errorMessage: `Workflow step ${step.id} route ${route.id} document build action references missing artifactId ${route.action.instruction.artifactId}.`,
 								}
 							}
-							if (route.action.instruction.toolContract.id !== ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT) {
-								return {
-									valid: false,
-									errorMessage: `Workflow step ${step.id} route ${route.id} document build action must use build_workflow_document tool contract.`,
-								}
-							}
-							if (
-								typeof route.action.instruction.toolContract.name !== "string" ||
-								route.action.instruction.toolContract.name.trim() === "" ||
-								Array.isArray(route.action.instruction.toolContract.parameters) === false
-							) {
-								return {
-									valid: false,
-									errorMessage: `Workflow step ${step.id} route ${route.id} document build action has an invalid tool contract.`,
-								}
-							}
 							if (typeof route.action.instruction.buildContent !== "function") {
 								return {
 									valid: false,

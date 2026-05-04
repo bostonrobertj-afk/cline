@@ -5937,6 +5937,110 @@ Allowed files:
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
+## Phase 50 - Runtime-Owned Document Build Tool Contract
+
+Pause for QA review after completing Phase 50 before commit.
+
+### Phase 50 Scope
+
+Remove module-authored backend tool-contract requirements from action-owned `build_workflow_document` instructions. Preserve Phase 46's action-owned document instruction model and keep runtime ownership of the shared backend `build_workflow_document` tool request.
+
+### Phase 50 Scope Boundary
+
+Do not reintroduce `WorkflowDefinition.documentBuilders`, `documentBuilderId`, `documentBuilderIds`, or any central document-builder catalog. Do not change `backendWorkflowToolContracts.ts`, `BuildWorkflowDocumentToolHandler`, or the shared backend `build_workflow_document` contract.
+
+### Phase 50 Known Issues / Risks / Technical Debt
+
+None.
+
+[x] Task 112. Remove backend tool contracts from document-build action instructions.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+
+[x] Subtask 112.1. In `types.ts`, remove the unused `BackendWorkflowToolContract` import.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+
+[x] Subtask 112.2. In `WorkflowDocumentBuildActionInstruction`, delete the `toolContract: BackendWorkflowToolContract` field and do not replace it with any module-authored backend tool-contract field.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+
+[x] Task 113. Keep document-build backend request construction runtime-owned.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 113.1. In `validateWorkflowDefinition(...)`, delete the `build_workflow_document` validation block that requires `route.action.instruction.toolContract.id` to equal `ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 113.2. In `validateWorkflowDefinition(...)`, delete the `build_workflow_document` validation block that checks `route.action.instruction.toolContract.name` and `route.action.instruction.toolContract.parameters`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 113.3. In the `build_workflow_document` decision-action execution path, keep the runtime-built tool request using `ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT`, runtime-resolved `destination_path`, `artifact_id`, and `content`; do not add any module-provided backend contract lookup.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Task 114. Update workflow-runtime document-build tests.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 114.1. In `createDocumentBuildActionInstruction(...)`, remove the `toolContract` optional argument and remove the default `toolContract` object from the returned instruction.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 114.2. In the test currently named `rejects document build actions that reference missing artifacts or invalid tool contracts`, rename the test so it covers missing artifact references only.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 114.3. In that renamed test, delete the invalid `toolContract` workflow fixture and keep the missing-artifact fail-closed fixture and assertions.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 114.4. Preserve the existing positive coverage proving a `build_workflow_document` action-owned instruction produces a runtime-built `ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT` request with `artifact_id`, runtime-resolved `destination_path`, and `content`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Task 115. Validate Phase 50.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 115.1. Run `rg "toolContract" src/core/task/workflow-runtime`; it must return no matches.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 115.2. Run `rg "documentBuilders|documentBuilderId|documentBuilderIds|WorkflowDocumentBuilderDefinition" src/core/task/workflow-runtime`; it must return no matches, preserving the Phase 46 registry removal.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 115.3. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, `npm run check-types`, and `npm run lint`; all must pass before Phase 50 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
 ## Validation
 
 After all implementation tasks are complete, run these commands from `/Users/robertboston/Documents/Cline Extension/cline`:
