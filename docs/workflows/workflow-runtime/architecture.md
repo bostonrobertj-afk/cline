@@ -71,24 +71,24 @@ This architecture covers:
 - progression, completion, teardown, persistence, and resume
 - subagent-local workflow sessions
 - the following in-scope workflow set only:
-  - `brainstorming.md`
-  - `create-prd.md`
-  - `create-architecture.md`
-  - `create-epics.md`
-  - `pi-planning.md`
-  - `create-story.md`
-  - `dev-story.md`
-  - `code-review.md`
-  - `review-adversarial-general.md`
-  - `review-edge-case-hunter.md`
-  - `blind-review.md`
-  - `problem-solving.md`
-  - `create-product-brief.md`
-  - `document-project.md`
-  - `quick-spec.md`
-  - `quick-dev.md`
-  - `correct-course.md`
-  - `write-remediation-story.md`
+  - `brainstorming`
+  - `create-prd`
+  - `create-architecture`
+  - `create-epics`
+  - `pi-planning`
+  - `create-story`
+  - `dev-story`
+  - `code-review`
+  - `review-adversarial-general`
+  - `review-edge-case-hunter`
+  - `blind-review`
+  - `problem-solving`
+  - `create-product-brief`
+  - `document-project`
+  - `quick-spec`
+  - `quick-dev`
+  - `correct-course`
+  - `write-remediation-story`
 
 ### 3.3 Out of Scope
 
@@ -638,26 +638,26 @@ The canonical in-scope workflow mapping for this architecture is:
 
 | Workflow | Persona | Project Subfolder |
 | --- | --- | --- |
-| `blind-review.md` | `quality-control` | `review` |
-| `brainstorming.md` | `analyst` | `discovery` |
-| `code-review.md` | `quality-control` | `review` |
-| `correct-course.md` | `scrum-master` | `planning` |
-| `create-architecture.md` | `architect` | `planning` |
-| `create-epics.md` | `product-manager` | `planning` |
-| `create-prd.md` | `product-manager` | `planning` |
-| `create-product-brief.md` | `analyst` | `planning` |
-| `create-story.md` | `scrum-master` | `planning` |
-| `dev-story.md` | `developer` | `implementation` |
-| `document-project.md` | `analyst` | `implementation` |
-| `pi-planning.md` | `scrum-master` | `planning` |
-| `quick-dev.md` | `quick-flow-solo-dev` | `implementation` |
-| `problem-solving.md` | `analyst` | `discovery` |
-| `quick-spec.md` | `quick-flow-solo-dev` | `planning` |
-| `review-adversarial-general.md` | `quality-control` | `review` |
-| `review-edge-case-hunter.md` | `quality-control` | `review` |
-| `write-remediation-story.md` | `developer` | `planning` |
+| `blind-review` | `quality-control` | `review` |
+| `brainstorming` | `analyst` | `discovery` |
+| `code-review` | `quality-control` | `review` |
+| `correct-course` | `scrum-master` | `planning` |
+| `create-architecture` | `architect` | `planning` |
+| `create-epics` | `product-manager` | `planning` |
+| `create-prd` | `product-manager` | `planning` |
+| `create-product-brief` | `analyst` | `planning` |
+| `create-story` | `scrum-master` | `planning` |
+| `dev-story` | `developer` | `implementation` |
+| `document-project` | `analyst` | `implementation` |
+| `pi-planning` | `scrum-master` | `planning` |
+| `quick-dev` | `quick-flow-solo-dev` | `implementation` |
+| `problem-solving` | `analyst` | `discovery` |
+| `quick-spec` | `quick-flow-solo-dev` | `planning` |
+| `review-adversarial-general` | `quality-control` | `review` |
+| `review-edge-case-hunter` | `quality-control` | `review` |
+| `write-remediation-story` | `developer` | `planning` |
 
-`problem-solving.md` is the target migrated workflow name for this initiative and replaces the legacy `cis-problem-solving.md` naming in the in-scope runtime design.
+`problem-solving` is the target migrated workflow name for this initiative and replaces the legacy `cis-problem-solving` naming in the in-scope runtime design.
 
 ## 9. Architectural Decisions
 
