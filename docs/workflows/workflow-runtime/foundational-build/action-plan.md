@@ -5897,42 +5897,42 @@ Do not change runtime behavior, artifact validation behavior, artifact family de
 
 None.
 
-[ ] Task 110. Replace forced invalid artifact fixtures with mutation-based fixtures.
+[x] Task 110. Replace forced invalid artifact fixtures with mutation-based fixtures.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 110.1. In the test `rejects module-owned artifact families and artifact naming conventions before activation`, delete the `invalidArtifactDefinitions = [...].map(...)` array construction that ends with `as unknown as NonNullable<WorkflowDefinition["artifacts"]>[string]`.
+[x] Subtask 110.1. In the test `rejects module-owned artifact families and artifact naming conventions before activation`, delete the `invalidArtifactDefinitions = [...].map(...)` array construction that ends with `as unknown as NonNullable<WorkflowDefinition["artifacts"]>[string]`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 110.2. In the same test, replace the deleted array with `invalidArtifactCases`, typed as an array of objects containing `name: string` and `mutate(artifactDefinition: NonNullable<WorkflowDefinition["artifacts"]>[string]): void`.
+[x] Subtask 110.2. In the same test, replace the deleted array with `invalidArtifactCases`, typed as an array of objects containing `name: string` and `mutate(artifactDefinition: NonNullable<WorkflowDefinition["artifacts"]>[string]): void`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 110.3. In `invalidArtifactCases`, define one case for each existing invalid condition: invalid `family`, forbidden `filenamePattern`, forbidden `fileExtension`, forbidden `numberingScope`, and forbidden `discoveryPattern`; each case must mutate the artifact definition with `Object.assign(...)` and must not use `as any`, `as unknown as`, or `as WorkflowArtifactFamily`.
+[x] Subtask 110.3. In `invalidArtifactCases`, define one case for each existing invalid condition: invalid `family`, forbidden `filenamePattern`, forbidden `fileExtension`, forbidden `numberingScope`, and forbidden `discoveryPattern`; each case must mutate the artifact definition with `Object.assign(...)` and must not use `as any`, `as unknown as`, or `as WorkflowArtifactFamily`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 110.4. Update the test loop so each case creates a valid workflow using `baseArtifactDefinition`, retrieves `workflow.artifacts?.output_file` with explicit undefined checking, applies `invalidArtifactCase.mutate(...)`, activates the workflow, and keeps the existing fail-closed assertions.
+[x] Subtask 110.4. Update the test loop so each case creates a valid workflow using `baseArtifactDefinition`, retrieves `workflow.artifacts?.output_file` with explicit undefined checking, applies `invalidArtifactCase.mutate(...)`, activates the workflow, and keeps the existing fail-closed assertions.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Task 111. Validate Phase 49.
+[x] Task 111. Validate Phase 49.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 111.1. Run `rg "as any|as unknown as" src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`; it must return no matches.
+[x] Subtask 111.1. Run `rg "as any|as unknown as" src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`; it must return no matches.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 111.2. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, `npm run check-types`, and `npm run lint`; all must pass before Phase 49 is marked complete.
+[x] Subtask 111.2. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, `npm run check-types`, and `npm run lint`; all must pass before Phase 49 is marked complete.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`

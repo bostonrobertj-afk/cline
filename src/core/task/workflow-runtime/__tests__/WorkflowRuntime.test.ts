@@ -1789,40 +1789,56 @@ describe("WorkflowRuntime", () => {
 			targetIdentitySource: undefined,
 			outputValueKeys,
 		} satisfies NonNullable<WorkflowDefinition["artifacts"]>[string]
-		const invalidArtifactDefinitions = [
+		const invalidArtifactCases: {
+			name: string
+			mutate(artifactDefinition: NonNullable<WorkflowDefinition["artifacts"]>[string]): void
+		}[] = [
 			{
-				...baseArtifactDefinition,
-				family: "module_owned_family" as WorkflowArtifactFamily,
+				name: "invalid family",
+				mutate: (artifactDefinition) => {
+					Object.assign(artifactDefinition, { family: "module_owned_family" })
+				},
 			},
 			{
-				...baseArtifactDefinition,
-				filenamePattern: "Module-{N}.md",
+				name: "forbidden filename pattern",
+				mutate: (artifactDefinition) => {
+					Object.assign(artifactDefinition, { filenamePattern: "Module-{N}.md" })
+				},
 			},
 			{
-				...baseArtifactDefinition,
-				fileExtension: ".module",
+				name: "forbidden file extension",
+				mutate: (artifactDefinition) => {
+					Object.assign(artifactDefinition, { fileExtension: ".module" })
+				},
 			},
 			{
-				...baseArtifactDefinition,
-				numberingScope: "module_scope",
+				name: "forbidden numbering scope",
+				mutate: (artifactDefinition) => {
+					Object.assign(artifactDefinition, { numberingScope: "module_scope" })
+				},
 			},
 			{
-				...baseArtifactDefinition,
-				discoveryPattern: /^Module-(\d+)\.md$/,
+				name: "forbidden discovery pattern",
+				mutate: (artifactDefinition) => {
+					Object.assign(artifactDefinition, { discoveryPattern: /^Module-(\d+)\.md$/ })
+				},
 			},
-		].map((artifactDefinition) => artifactDefinition as unknown as NonNullable<WorkflowDefinition["artifacts"]>[string])
+		]
 
-		for (const artifactDefinition of invalidArtifactDefinitions) {
+		for (const invalidArtifactCase of invalidArtifactCases) {
 			const invalidState = new TaskState()
-			const result = await activateWorkflow(
-				invalidState,
-				createWorkflowDefinition({
-					workflowValueKeys,
-					artifacts: {
-						output_file: artifactDefinition,
-					},
-				}),
-			)
+			const workflow = createWorkflowDefinition({
+				workflowValueKeys,
+				artifacts: {
+					output_file: { ...baseArtifactDefinition },
+				},
+			})
+			const artifactDefinition = workflow.artifacts?.output_file
+			if (artifactDefinition === undefined) {
+				throw new Error(`Expected output_file artifact for ${invalidArtifactCase.name}.`)
+			}
+			invalidArtifactCase.mutate(artifactDefinition)
+			const result = await activateWorkflow(invalidState, workflow)
 
 			expect(result).to.deep.equal({ kind: "no_op" })
 			expect(invalidState.activeWorkflowName).to.be.undefined
