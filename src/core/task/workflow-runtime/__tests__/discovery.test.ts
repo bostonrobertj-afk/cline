@@ -23,6 +23,69 @@ describe("discoverWorkflowCandidates", () => {
 		}
 	}
 
+	it("rejects invalid target path segments before applying allow-all workspace path policy", async () => {
+		const invalidTargetPathSegments: ReadonlyArray<{ readonly label: string; readonly segment: string }> = [
+			{ label: "empty string", segment: "" },
+			{ label: "current directory", segment: "." },
+			{ label: "parent directory", segment: ".." },
+			{ label: "POSIX nested path", segment: "nested/path" },
+			{ label: "Windows nested path", segment: "nested\\path" },
+			{ label: "absolute path", segment: path.resolve(cwd, "outside") },
+			{ label: "Windows drive syntax", segment: "C:" },
+		]
+
+		for (const invalidTargetPathSegment of invalidTargetPathSegments) {
+			let capturedError: unknown
+			try {
+				await discoverWorkflowCandidates({
+					rootDirectory: cwd,
+					workspacePathPolicy: createAllowAllWorkspacePathPolicy(),
+					targetPathSegments: [invalidTargetPathSegment.segment],
+					entryType: "file",
+					immediateChildrenOnly: true,
+					sort: "alpha_asc",
+				})
+			} catch (error) {
+				capturedError = error
+			}
+
+			expect(capturedError, invalidTargetPathSegment.label).to.be.instanceOf(Error)
+			if (!(capturedError instanceof Error)) {
+				throw new Error(`Expected ${invalidTargetPathSegment.label} target path segment to throw.`)
+			}
+			expect(capturedError.message, invalidTargetPathSegment.label).to.include(
+				"Invalid workflow discovery target path segment",
+			)
+		}
+	})
+
+	it("rejects invalid target path segments before workspace path policy validation", async () => {
+		let validateAccessCallCount = 0
+		const workspacePathPolicy: WorkflowWorkspacePathPolicy = {
+			validateAccess: () => {
+				validateAccessCallCount += 1
+				return true
+			},
+		}
+
+		let capturedError: unknown
+		try {
+			await discoverWorkflowCandidates({
+				rootDirectory: cwd,
+				workspacePathPolicy,
+				targetPathSegments: [".."],
+				entryType: "file",
+				immediateChildrenOnly: true,
+				sort: "alpha_asc",
+			})
+		} catch (error) {
+			capturedError = error
+		}
+
+		expect(capturedError).to.be.instanceOf(Error)
+		expect(validateAccessCallCount).to.equal(0)
+	})
+
 	it("fails denied target directories before returning the ENOENT fallback", async () => {
 		const missingDeniedDirectory = path.join(cwd, "missing-denied-directory")
 		const workspacePathPolicy: WorkflowWorkspacePathPolicy = {
@@ -32,7 +95,7 @@ describe("discoverWorkflowCandidates", () => {
 		let capturedError: unknown
 		try {
 			await discoverWorkflowCandidates({
-				baseDirectory: cwd,
+				rootDirectory: cwd,
 				workspacePathPolicy,
 				targetPathSegments: ["missing-denied-directory"],
 				entryType: "file",
@@ -63,7 +126,7 @@ describe("discoverWorkflowCandidates", () => {
 		}
 
 		const candidates = await discoverWorkflowCandidates({
-			baseDirectory: cwd,
+			rootDirectory: cwd,
 			workspacePathPolicy,
 			entryType: "file",
 			immediateChildrenOnly: true,
@@ -75,7 +138,7 @@ describe("discoverWorkflowCandidates", () => {
 
 	it("still returns an empty candidate list for allowed missing target directories", async () => {
 		const candidates = await discoverWorkflowCandidates({
-			baseDirectory: cwd,
+			rootDirectory: cwd,
 			workspacePathPolicy: createAllowAllWorkspacePathPolicy(),
 			targetPathSegments: ["missing-allowed-directory"],
 			entryType: "file",

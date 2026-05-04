@@ -1227,6 +1227,71 @@ describe("WorkflowRuntime", () => {
 		}
 	})
 
+	it("rejects invalid selector discovery target path segments before activation", async () => {
+		const createFormWithSelectorDiscoveryTargetPathSegment = (targetPathSegment: string): WorkflowFormDefinitionPayload => ({
+			definitionVersion: 2,
+			title: "Invalid Selector Discovery Form",
+			toolDictionaryTitle: "Invalid Selector Discovery Tools",
+			toolDictionaryMarkdown: "Invalid selector discovery help",
+			firstPanelId: "details",
+			panels: {
+				details: {
+					panelId: "details",
+					title: "Details",
+					promptMarkdown: "Capture details.",
+					fields: [
+						{
+							key: "selected_file",
+							kind: "file_path",
+							label: "Selected File",
+							required: true,
+							allowedValueType: "string",
+							selectorDiscovery: {
+								root: {
+									kind: "selected_project_root",
+								},
+								entryType: "file",
+								targetPathSegments: [targetPathSegment],
+								immediateChildrenOnly: true,
+								sort: "alpha_asc",
+							},
+							valueSchema: { type: "string" },
+						},
+					],
+					allowedActions: ["submit"],
+					transition: createTerminalTransition(),
+				},
+			},
+		})
+		const invalidTargetPathSegments: ReadonlyArray<{ readonly label: string; readonly segment: string }> = [
+			{ label: "empty string", segment: "" },
+			{ label: "current directory", segment: "." },
+			{ label: "parent directory", segment: ".." },
+			{ label: "slash", segment: "nested/path" },
+			{ label: "backslash", segment: "nested\\path" },
+			{ label: "absolute path", segment: join(cwd, "outside") },
+			{ label: "Windows drive syntax", segment: "C:" },
+		]
+
+		for (const invalidTargetPathSegment of invalidTargetPathSegments) {
+			const invalidState = new TaskState()
+			const result = await activateWorkflow(
+				invalidState,
+				createWorkflowDefinition({
+					workflowForms: {
+						invalid_selector_discovery_form: createFormWithSelectorDiscoveryTargetPathSegment(
+							invalidTargetPathSegment.segment,
+						),
+					},
+				}),
+			)
+
+			expect(result, invalidTargetPathSegment.label).to.deep.equal({ kind: "no_op" })
+			expect(invalidState.activeWorkflowName, invalidTargetPathSegment.label).to.be.undefined
+			expect(invalidState.activeWorkflowSession, invalidTargetPathSegment.label).to.be.undefined
+		}
+	})
+
 	it("fails closed before activation when a decision-tree route id is missing", async () => {
 		const route: WorkflowDecisionBranchRoute = {
 			id: "missing-route-id",
@@ -1866,7 +1931,7 @@ describe("WorkflowRuntime", () => {
 			.map((call) => call.args[0])
 			.find(
 				(request: WorkflowDiscoveryRequest) =>
-					request.baseDirectory === cwd &&
+					request.rootDirectory === cwd &&
 					request.entryType === "directory" &&
 					request.targetPathSegments === undefined,
 			)
@@ -2143,23 +2208,23 @@ describe("WorkflowRuntime", () => {
 		})
 
 		discoverWorkflowCandidatesStub.callsFake((request: WorkflowDiscoveryRequest) => {
-			if (request.entryType === "directory" && request.targetPathSegments === undefined) {
+			if (request.entryType === "directory" && request.rootDirectory === cwd && request.targetPathSegments === undefined) {
 				return Promise.resolve([{ value: "Existing Alpha", label: "Existing Alpha" }])
 			}
 
 			if (
 				request.entryType === "directory" &&
-				request.targetPathSegments?.length === 1 &&
-				request.targetPathSegments[0] === "selector-project"
+				request.rootDirectory === join(cwd, "selector-project") &&
+				request.targetPathSegments === undefined
 			) {
 				return Promise.resolve([{ value: "planning", label: "planning" }])
 			}
 
 			if (
 				request.entryType === "file" &&
-				request.targetPathSegments?.length === 2 &&
-				request.targetPathSegments[0] === "selector-project" &&
-				request.targetPathSegments[1] === "planning"
+				request.rootDirectory === join(cwd, "selector-project") &&
+				request.targetPathSegments?.length === 1 &&
+				request.targetPathSegments[0] === "planning"
 			) {
 				return Promise.resolve([
 					{ value: "notes.md", label: "notes.md" },
@@ -2182,11 +2247,27 @@ describe("WorkflowRuntime", () => {
 		const selectorDiscoveryRequests = discoverWorkflowCandidatesStub
 			.getCalls()
 			.map((call) => call.args[0])
-			.filter((request: WorkflowDiscoveryRequest) => request.baseDirectory === cwd)
+			.filter((request: WorkflowDiscoveryRequest) => request.workspacePathPolicy === workspacePathPolicy)
 		expect(selectorDiscoveryRequests.length).to.be.greaterThan(0)
 		for (const request of selectorDiscoveryRequests) {
 			expect(request.workspacePathPolicy).to.equal(workspacePathPolicy)
 		}
+		const selectedProjectDirectory = join(cwd, "selector-project")
+		const selectedFolderDiscoveryRequest = selectorDiscoveryRequests.find(
+			(request: WorkflowDiscoveryRequest) =>
+				request.rootDirectory === selectedProjectDirectory &&
+				request.entryType === "directory" &&
+				request.targetPathSegments === undefined,
+		)
+		expect(selectedFolderDiscoveryRequest).to.not.equal(undefined)
+		const selectedProjectFileDiscoveryRequests = selectorDiscoveryRequests.filter(
+			(request: WorkflowDiscoveryRequest) =>
+				request.rootDirectory === selectedProjectDirectory &&
+				request.entryType === "file" &&
+				request.targetPathSegments?.length === 1 &&
+				request.targetPathSegments[0] === "planning",
+		)
+		expect(selectedProjectFileDiscoveryRequests.length).to.equal(2)
 
 		const expectedExistingProjectOptions = [{ value: "Existing Alpha", label: "Existing Alpha" }]
 		const expectedFolderOptions = [{ value: "planning", label: "planning" }]
@@ -2372,20 +2453,29 @@ describe("WorkflowRuntime", () => {
 						? [...options, { value: fakeOption.value, label: fakeOption.value }]
 						: options
 
-				if (request.entryType === "directory" && request.targetPathSegments === undefined) {
+				if (
+					request.entryType === "directory" &&
+					request.rootDirectory === cwd &&
+					request.targetPathSegments === undefined
+				) {
 					return Promise.resolve(
 						includeFake("existing_project_choice", [{ value: "Existing Alpha", label: "Existing Alpha" }]),
 					)
 				}
 
-				if (request.entryType === "directory" && request.targetPathSegments?.length === 1) {
+				if (
+					request.entryType === "directory" &&
+					request.rootDirectory !== cwd &&
+					request.targetPathSegments === undefined
+				) {
 					return Promise.resolve(includeFake("selected_folder", [{ value: "planning", label: "planning" }]))
 				}
 
 				if (
 					request.entryType === "file" &&
-					request.targetPathSegments?.length === 2 &&
-					request.targetPathSegments[1] === "planning"
+					request.rootDirectory !== cwd &&
+					request.targetPathSegments?.length === 1 &&
+					request.targetPathSegments[0] === "planning"
 				) {
 					const options = [
 						{ value: "notes.md", label: "notes.md" },
@@ -2598,9 +2688,9 @@ describe("WorkflowRuntime", () => {
 		discoverWorkflowCandidatesStub.callsFake((request: WorkflowDiscoveryRequest) => {
 			if (
 				request.entryType === "file" &&
-				request.targetPathSegments?.length === 2 &&
-				request.targetPathSegments[0] === "pattern-project" &&
-				request.targetPathSegments[1] === "stories"
+				request.rootDirectory === join(cwd, "pattern-project") &&
+				request.targetPathSegments?.length === 1 &&
+				request.targetPathSegments[0] === "stories"
 			) {
 				observedNamingPattern = request.namingPattern
 				const entries = ["story-alpha.md", "notes.md"].filter((entryName) => {
@@ -2701,9 +2791,9 @@ describe("WorkflowRuntime", () => {
 		discoverWorkflowCandidatesStub.callsFake((request: WorkflowDiscoveryRequest) => {
 			if (
 				request.entryType === "file" &&
-				request.targetPathSegments?.length === 2 &&
-				request.targetPathSegments[0] === "template-project" &&
-				request.targetPathSegments[1] === "artifacts"
+				request.rootDirectory === join(cwd, "template-project") &&
+				request.targetPathSegments?.length === 1 &&
+				request.targetPathSegments[0] === "artifacts"
 			) {
 				return Promise.resolve(
 					["brief.md"].map((entryName) => ({
@@ -4283,7 +4373,7 @@ describe("WorkflowRuntime", () => {
 			.map((call) => call.args[0])
 			.find(
 				(request: WorkflowDiscoveryRequest) =>
-					request.baseDirectory === cwd &&
+					request.rootDirectory === cwd &&
 					request.entryType === "file" &&
 					request.targetPathSegments?.[0] === projectFolderName,
 			)

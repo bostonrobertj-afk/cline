@@ -27,7 +27,11 @@ import {
 	WorkflowArtifactFamily,
 	type WorkflowArtifactFamilyDefinition,
 } from "@/core/task/workflow-runtime/artifactFamilies"
-import { discoverWorkflowCandidates } from "@/core/task/workflow-runtime/discovery"
+import {
+	discoverWorkflowCandidates,
+	isWorkflowDiscoveryTargetPathSegment,
+	resolveWorkflowDiscoveryTargetDirectory,
+} from "@/core/task/workflow-runtime/discovery"
 import { resolveWorkflowDefinition } from "@/core/task/workflow-runtime/WorkflowRegistry"
 import { buildWorkflowStepResolutionStatusPayload } from "@/core/task/workflow-step-resolution/buildWorkflowStepResolutionStatusPayload"
 import type {
@@ -1674,7 +1678,7 @@ export class WorkflowRuntime {
 			}
 
 			const existingProjectOptions = await discoverWorkflowCandidates({
-				baseDirectory: this.cwd,
+				rootDirectory: this.cwd,
 				workspacePathPolicy: this.workspacePathPolicy,
 				entryType: "directory",
 				immediateChildrenOnly: true,
@@ -2040,7 +2044,8 @@ export class WorkflowRuntime {
 			return undefined
 		}
 
-		let targetPathSegments = discoveryConfig.targetPathSegments
+		const targetPathSegments = discoveryConfig.targetPathSegments
+		let rootDirectory = this.cwd
 		const namingPattern = discoveryConfig.namingPattern === undefined ? undefined : new RegExp(discoveryConfig.namingPattern)
 
 		if (discoveryConfig.root.kind === "selected_project_root") {
@@ -2049,11 +2054,14 @@ export class WorkflowRuntime {
 				return undefined
 			}
 
-			targetPathSegments = [session.projectSelection.projectFolderName, ...(discoveryConfig.targetPathSegments ?? [])]
+			rootDirectory = resolveWorkflowDiscoveryTargetDirectory({
+				rootDirectory: this.cwd,
+				targetPathSegments: [session.projectSelection.projectFolderName],
+			})
 		}
 
 		return discoverWorkflowCandidates({
-			baseDirectory: this.cwd,
+			rootDirectory,
 			workspacePathPolicy: this.workspacePathPolicy,
 			targetPathSegments,
 			namingPattern,
@@ -2611,7 +2619,7 @@ export class WorkflowRuntime {
 		const filenames: string[] = []
 		for (const subfolder of subfolders) {
 			const candidates = await discoverWorkflowCandidates({
-				baseDirectory: this.cwd,
+				rootDirectory: this.cwd,
 				workspacePathPolicy: this.workspacePathPolicy,
 				targetPathSegments: [projectFolderName, subfolder],
 				entryType: "file",
@@ -3432,6 +3440,15 @@ export class WorkflowRuntime {
 		for (const [workflowFormId, workflowForm] of Object.entries(workflowForms)) {
 			for (const panel of Object.values(workflowForm.panels)) {
 				for (const field of panel.fields) {
+					for (const targetPathSegment of field.selectorDiscovery?.targetPathSegments ?? []) {
+						if (!isWorkflowDiscoveryTargetPathSegment(targetPathSegment)) {
+							return {
+								valid: false,
+								errorMessage: `Workflow form ${workflowFormId} field ${field.key} selectorDiscovery targetPathSegments entry ${targetPathSegment} is invalid.`,
+							}
+						}
+					}
+
 					if (field.workflowValueKey === undefined) {
 						continue
 					}

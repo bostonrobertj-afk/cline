@@ -330,9 +330,9 @@ export interface WorkflowDefinition {
 }
 
 export interface WorkflowDiscoveryRequest {
-	baseDirectory: string
+	rootDirectory: string
 	workspacePathPolicy: WorkflowWorkspacePathPolicy
-	targetPathSegments?: string[]
+	targetPathSegments?: readonly string[]
 	entryType: "file" | "directory" | "any"
 	immediateChildrenOnly: boolean
 	namingPattern?: RegExp

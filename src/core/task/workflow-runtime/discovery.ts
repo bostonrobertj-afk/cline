@@ -4,9 +4,48 @@ import path from "path"
 import type { WorkflowDiscoveryCandidate, WorkflowDiscoveryRequest } from "@/core/task/workflow-runtime/types"
 
 const alphaCollator = new Intl.Collator("en", { numeric: true, sensitivity: "base" })
+const windowsDriveSyntaxPattern = /^[A-Za-z]:/
 
-function resolveTargetDirectory(request: WorkflowDiscoveryRequest): string {
-	return path.resolve(request.baseDirectory, ...(request.targetPathSegments ?? []))
+export function isWorkflowDiscoveryTargetPathSegment(segment: string): boolean {
+	if (segment.length === 0) {
+		return false
+	}
+
+	if (segment === "." || segment === "..") {
+		return false
+	}
+
+	if (path.posix.isAbsolute(segment) || path.win32.isAbsolute(segment)) {
+		return false
+	}
+
+	if (segment.includes(path.posix.sep) || segment.includes(path.win32.sep)) {
+		return false
+	}
+
+	return !windowsDriveSyntaxPattern.test(segment)
+}
+
+export function resolveWorkflowDiscoveryTargetDirectory(
+	request: Pick<WorkflowDiscoveryRequest, "rootDirectory" | "targetPathSegments">,
+): string {
+	const resolvedRootDirectory = path.resolve(request.rootDirectory)
+	const targetPathSegments = request.targetPathSegments ?? []
+
+	for (const segment of targetPathSegments) {
+		if (!isWorkflowDiscoveryTargetPathSegment(segment)) {
+			throw new Error(`Invalid workflow discovery target path segment: ${JSON.stringify(segment)}`)
+		}
+	}
+
+	const resolvedTargetDirectory = path.resolve(resolvedRootDirectory, ...targetPathSegments)
+	const relativeTargetPath = path.relative(resolvedRootDirectory, resolvedTargetDirectory)
+
+	if (relativeTargetPath === ".." || relativeTargetPath.startsWith(`..${path.sep}`) || path.isAbsolute(relativeTargetPath)) {
+		throw new Error(`Workflow discovery target directory must stay within root directory: ${resolvedTargetDirectory}`)
+	}
+
+	return resolvedTargetDirectory
 }
 
 function matchesEntryType(
@@ -61,7 +100,7 @@ function compareCandidates(
 }
 
 export async function discoverWorkflowCandidates(request: WorkflowDiscoveryRequest): Promise<WorkflowDiscoveryCandidate[]> {
-	const resolvedTargetDirectory = resolveTargetDirectory(request)
+	const resolvedTargetDirectory = resolveWorkflowDiscoveryTargetDirectory(request)
 
 	if (!request.workspacePathPolicy.validateAccess(resolvedTargetDirectory)) {
 		throw new Error(`Workflow discovery target directory is blocked by workspace path policy: ${resolvedTargetDirectory}`)

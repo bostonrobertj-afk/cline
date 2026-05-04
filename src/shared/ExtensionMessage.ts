@@ -471,7 +471,7 @@ export type WorkflowFormSelectorDiscoveryRoot =
 export interface WorkflowFormSelectorDiscoveryConfig {
 	root: WorkflowFormSelectorDiscoveryRoot
 	entryType: "file" | "directory" | "any"
-	targetPathSegments?: string[]
+	targetPathSegments?: readonly string[]
 	namingPattern?: string
 	labelTemplate?: string
 	immediateChildrenOnly: boolean
