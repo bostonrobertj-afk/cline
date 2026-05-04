@@ -3514,7 +3514,23 @@ export class WorkflowRuntime {
 					}
 				}
 
+				const seenRouteIds = new Set<string>()
 				for (const route of branch.routes) {
+					if (typeof route.id !== "string" || route.id.trim() === "") {
+						return {
+							valid: false,
+							errorMessage: `Workflow step ${step.id} decision-tree branch ${branch.id} route id must be a non-empty string.`,
+						}
+					}
+
+					if (seenRouteIds.has(route.id)) {
+						return {
+							valid: false,
+							errorMessage: `Workflow step ${step.id} decision-tree branch ${branch.id} route id ${route.id} is duplicated.`,
+						}
+					}
+					seenRouteIds.add(route.id)
+
 					if (route.action.kind === "transition_step" && route.followingBranchId !== undefined) {
 						return {
 							valid: false,

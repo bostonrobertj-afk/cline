@@ -5819,63 +5819,63 @@ Do not change `WorkflowDecisionBranchRoute.id`, `WorkflowStepResolutionSourceRou
 
 None.
 
-[ ] Task 107. Validate route ids before workflow activation.
+[x] Task 107. Validate route ids before workflow activation.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 107.1. In `validateWorkflowDefinition(...)`, immediately after the `branch.routes.length === 0` check, create a `const seenRouteIds = new Set<string>()` scoped inside the current branch loop.
+[x] Subtask 107.1. In `validateWorkflowDefinition(...)`, immediately after the `branch.routes.length === 0` check, create a `const seenRouteIds = new Set<string>()` scoped inside the current branch loop.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 107.2. In `validateWorkflowDefinition(...)`, at the start of the `for (const route of branch.routes)` loop and before any route action validation, reject routes whose `id` is not a string or whose trimmed value is empty; return `valid: false` with an error message that identifies the workflow step id and branch id without depending on `route.id`.
+[x] Subtask 107.2. In `validateWorkflowDefinition(...)`, at the start of the `for (const route of branch.routes)` loop and before any route action validation, reject routes whose `id` is not a string or whose trimmed value is empty; return `valid: false` with an error message that identifies the workflow step id and branch id without depending on `route.id`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 107.3. In `validateWorkflowDefinition(...)`, immediately after the non-empty route-id check, reject duplicate `route.id` values already present in `seenRouteIds`; add each accepted `route.id` to `seenRouteIds` before continuing route action validation.
+[x] Subtask 107.3. In `validateWorkflowDefinition(...)`, immediately after the non-empty route-id check, reject duplicate `route.id` values already present in `seenRouteIds`; add each accepted `route.id` to `seenRouteIds` before continuing route action validation.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Task 108. Add route identity validation tests.
+[x] Task 108. Add route identity validation tests.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 108.1. In `WorkflowRuntime.test.ts`, add a definition-validation test proving activation fails closed when a decision-tree route id is missing; construct a typed route object first, then remove `id` with `Reflect.deleteProperty(route, "id")` before activation.
+[x] Subtask 108.1. In `WorkflowRuntime.test.ts`, add a definition-validation test proving activation fails closed when a decision-tree route id is missing; construct a typed route object first, then remove `id` with `Reflect.deleteProperty(route, "id")` before activation.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 108.2. In `WorkflowRuntime.test.ts`, add definition-validation coverage proving activation fails closed for blank decision-tree route ids `""` and `"   "`.
+[x] Subtask 108.2. In `WorkflowRuntime.test.ts`, add definition-validation coverage proving activation fails closed for blank decision-tree route ids `""` and `"   "`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 108.3. In `WorkflowRuntime.test.ts`, add definition-validation coverage proving activation fails closed when two routes in the same branch declare the same `id`.
+[x] Subtask 108.3. In `WorkflowRuntime.test.ts`, add definition-validation coverage proving activation fails closed when two routes in the same branch declare the same `id`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 108.4. In `WorkflowRuntime.test.ts`, add positive coverage proving the same route id may be reused in different branches without validation failure.
+[x] Subtask 108.4. In `WorkflowRuntime.test.ts`, add positive coverage proving the same route id may be reused in different branches without validation failure.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Task 109. Validate Phase 48.
+[x] Task 109. Validate Phase 48.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 109.1. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`; it must pass.
+[x] Subtask 109.1. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`; it must pass.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 109.2. Run `npm run check-types` and `npm run lint`; both must pass before Phase 48 is marked complete.
+[x] Subtask 109.2. Run `npm run check-types` and `npm run lint`; both must pass before Phase 48 is marked complete.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`

@@ -21,6 +21,7 @@ import type {
 	ActiveWorkflowSession,
 	PersistedWorkflowSession,
 	WorkflowDecisionAction,
+	WorkflowDecisionBranchRoute,
 	WorkflowDecisionTree,
 	WorkflowDefinition,
 	WorkflowDiscoveryRequest,
@@ -1230,6 +1231,164 @@ describe("WorkflowRuntime", () => {
 			expect(invalidState.activeWorkflowName).to.be.undefined
 			expect(invalidState.activeWorkflowSession).to.be.undefined
 		}
+	})
+
+	it("fails closed before activation when a decision-tree route id is missing", async () => {
+		const route: WorkflowDecisionBranchRoute = {
+			id: "missing-route-id",
+			trigger: { kind: "always" },
+			action: { kind: "project_prompt" },
+		}
+		expect(Reflect.deleteProperty(route, "id")).to.equal(true)
+		const invalidState = new TaskState()
+
+		const result = await activateWorkflow(
+			invalidState,
+			createWorkflowDefinition({
+				name: "missing-decision-route-id",
+				steps: {
+					"step-1": createStepDefinition({
+						stepNumber: 1,
+						decisionTree: {
+							entryBranchId: "route-id-validation",
+							branches: {
+								"route-id-validation": {
+									id: "route-id-validation",
+									routes: [route],
+								},
+							},
+						},
+					}),
+				},
+			}),
+		)
+
+		expect(result).to.deep.equal({ kind: "no_op" })
+		expect(invalidState.activeWorkflowName).to.be.undefined
+		expect(invalidState.activeWorkflowSession).to.be.undefined
+	})
+
+	it("fails closed before activation when decision-tree route ids are blank", async () => {
+		const blankRouteIds = ["", "   "]
+
+		for (const [caseIndex, routeId] of blankRouteIds.entries()) {
+			const invalidState = new TaskState()
+			const branchId = `blank-route-id-validation-${caseIndex}`
+			const result = await activateWorkflow(
+				invalidState,
+				createWorkflowDefinition({
+					name: `blank-decision-route-id-${caseIndex}`,
+					steps: {
+						"step-1": createStepDefinition({
+							stepNumber: 1,
+							decisionTree: {
+								entryBranchId: branchId,
+								branches: {
+									[branchId]: {
+										id: branchId,
+										routes: [
+											{
+												id: routeId,
+												trigger: { kind: "always" },
+												action: { kind: "project_prompt" },
+											},
+										],
+									},
+								},
+							},
+						}),
+					},
+				}),
+			)
+
+			expect(result).to.deep.equal({ kind: "no_op" })
+			expect(invalidState.activeWorkflowName).to.be.undefined
+			expect(invalidState.activeWorkflowSession).to.be.undefined
+		}
+	})
+
+	it("fails closed before activation when a branch declares duplicate decision-tree route ids", async () => {
+		const invalidState = new TaskState()
+		const result = await activateWorkflow(
+			invalidState,
+			createWorkflowDefinition({
+				name: "duplicate-decision-route-id",
+				steps: {
+					"step-1": createStepDefinition({
+						stepNumber: 1,
+						decisionTree: {
+							entryBranchId: "duplicate-route-id-validation",
+							branches: {
+								"duplicate-route-id-validation": {
+									id: "duplicate-route-id-validation",
+									routes: [
+										{
+											id: "duplicate-route",
+											trigger: { kind: "always" },
+											action: { kind: "project_prompt" },
+										},
+										{
+											id: "duplicate-route",
+											trigger: { kind: "always" },
+											action: { kind: "project_prompt" },
+										},
+									],
+								},
+							},
+						},
+					}),
+				},
+			}),
+		)
+
+		expect(result).to.deep.equal({ kind: "no_op" })
+		expect(invalidState.activeWorkflowName).to.be.undefined
+		expect(invalidState.activeWorkflowSession).to.be.undefined
+	})
+
+	it("allows the same decision-tree route id in different branches before activation", async () => {
+		const validState = new TaskState()
+		const result = await activateWorkflow(
+			validState,
+			createWorkflowDefinition({
+				name: "shared-decision-route-id-across-branches",
+				steps: {
+					"step-1": createStepDefinition({
+						stepNumber: 1,
+						decisionTree: {
+							entryBranchId: "first-route-id-validation-branch",
+							branches: {
+								"first-route-id-validation-branch": {
+									id: "first-route-id-validation-branch",
+									routes: [
+										{
+											id: "shared-route-id",
+											trigger: { kind: "always" },
+											action: { kind: "project_prompt" },
+											followingBranchId: "second-route-id-validation-branch",
+										},
+									],
+								},
+								"second-route-id-validation-branch": {
+									id: "second-route-id-validation-branch",
+									routes: [
+										{
+											id: "shared-route-id",
+											trigger: { kind: "always" },
+											action: { kind: "project_prompt" },
+										},
+									],
+								},
+							},
+						},
+					}),
+				},
+			}),
+		)
+
+		expect(result.kind).to.equal("render_workflow_form")
+		expect(validState.activeWorkflowName).to.equal("shared-decision-route-id-across-branches")
+		expect(validState.activeWorkflowSession).to.not.equal(undefined)
 	})
 
 	it("rejects terminal-error decision actions with empty messages before activation", async () => {
