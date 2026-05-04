@@ -5652,154 +5652,232 @@ This phase must not redesign same-step branch traversal, remove `followingBranch
 
 This phase does not add whole-graph cycle detection for workflow modules that author infinite transition loops. Such loops are module misconfiguration and are outside this foundational correction.
 
-[ ] Task 103. Replace route-level step-transition typing with an explicit decision action.
+[x] Task 103. Replace route-level step-transition typing with an explicit decision action.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 
-[ ] Subtask 103.1. In `types.ts`, immediately before `WorkflowDecisionAction`, add `WorkflowStepTransitionTarget` as an explicit union with `{ kind: "entry_branch"; stepNumber: number }` and `{ kind: "named_branch"; stepNumber: number; branchId: WorkflowDecisionBranchId }`.
+[x] Subtask 103.1. In `types.ts`, immediately before `WorkflowDecisionAction`, add `WorkflowStepTransitionTarget` as an explicit union with `{ kind: "entry_branch"; stepNumber: number }` and `{ kind: "named_branch"; stepNumber: number; branchId: WorkflowDecisionBranchId }`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 
-[ ] Subtask 103.2. In `WorkflowDecisionAction`, add `{ kind: "transition_step"; target: WorkflowStepTransitionTarget }`.
+[x] Subtask 103.2. In `WorkflowDecisionAction`, add `{ kind: "transition_step"; target: WorkflowStepTransitionTarget }`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 
-[ ] Subtask 103.3. In `WorkflowDecisionBranchRoute`, delete `targetStepNumber?: number`.
+[x] Subtask 103.3. In `WorkflowDecisionBranchRoute`, delete `targetStepNumber?: number`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 
-[ ] Task 104. Update `WorkflowRuntime` to execute step transitions only through `transition_step`.
+[x] Task 104. Update `WorkflowRuntime` to execute step transitions only through `transition_step`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 104.1. In the `./types` import list, add `WorkflowStepTransitionTarget`.
+[x] Subtask 104.1. In the `./types` import list, add `WorkflowStepTransitionTarget`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 104.2. In `resolveDecisionTreeRoute(...)`, remove the `matchedRoute.targetStepNumber === undefined` condition from same-step `no_op` branch traversal.
+[x] Subtask 104.2. In `resolveDecisionTreeRoute(...)`, remove the `matchedRoute.targetStepNumber === undefined` condition from same-step `no_op` branch traversal.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 104.3. Change `transitionToStep(...)` to accept `target: WorkflowStepTransitionTarget`; resolve `entry_branch` to the target step's `entryBranchId`, resolve `named_branch` to its explicit `branchId`, and return `undefined` when the named branch is absent instead of falling back.
+[x] Subtask 104.3. Change `transitionToStep(...)` to accept `target: WorkflowStepTransitionTarget`; resolve `entry_branch` to the target step's `entryBranchId`, resolve `named_branch` to its explicit `branchId`, and return `undefined` when the named branch is absent instead of falling back.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 104.4. In `buildNextActionFromDecisionTreeAction(...)`, add a `transition_step` case that calls `transitionToStep(...)`, clears prior-step UI state through that helper, then calls `resolveNextAction({ taskState })`; if the re-entered result is `no_op`, return a `project_prompt` action built from `buildTurnProjection({ taskState })` so the step mutation is persisted.
+[x] Subtask 104.4. In `buildNextActionFromDecisionTreeAction(...)`, add a `transition_step` case that calls `transitionToStep(...)`, clears prior-step UI state through that helper, then calls `resolveNextAction({ taskState })`; if the re-entered result is `no_op`, return a `project_prompt` action built from `buildTurnProjection({ taskState })` so the step mutation is persisted.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 104.5. In `buildNextActionFromDecisionTreeRoute(...)`, delete the `route.targetStepNumber` transition block; for non-`transition_step` actions, set `session.branchContext.activeBranchId = nextActiveBranchId`, clear `lastTriggerEvent`, and dispatch `route.action`.
+[x] Subtask 104.5. In `buildNextActionFromDecisionTreeRoute(...)`, delete the `route.targetStepNumber` transition block; for non-`transition_step` actions, set `session.branchContext.activeBranchId = nextActiveBranchId`, clear `lastTriggerEvent`, and dispatch `route.action`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 104.6. In `validateWorkflowDefinition(...)`, delete validation for `route.targetStepNumber`.
+[x] Subtask 104.6. In `validateWorkflowDefinition(...)`, delete validation for `route.targetStepNumber`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 104.7. In `validateWorkflowDefinition(...)`, add `transition_step` validation requiring the target step to exist, requiring a `named_branch` target branch to exist on that target step, and rejecting any `transition_step` route that also declares `followingBranchId`.
+[x] Subtask 104.7. In `validateWorkflowDefinition(...)`, add `transition_step` validation requiring the target step to exist, requiring a `named_branch` target branch to exist on that target step, and rejecting any `transition_step` route that also declares `followingBranchId`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Task 105. Update runtime tests for action-owned step transitions.
+[x] Task 105. Update runtime tests for action-owned step transitions.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 105.1. In `WorkflowRuntime.test.ts`, add typed test helpers for `transition_step` actions targeting an entry branch and a named branch; do not use `as any`, `as unknown as`, or forced type assertions.
+[x] Subtask 105.1. In `WorkflowRuntime.test.ts`, add typed test helpers for `transition_step` actions targeting an entry branch and a named branch; do not use `as any`, `as unknown as`, or forced type assertions.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 105.2. Remove `targetStepNumber` support from `createProjectPromptDecisionTree(...)`.
+[x] Subtask 105.2. Remove `targetStepNumber` support from `createProjectPromptDecisionTree(...)`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 105.3. Remove `completionTargetStepNumber` support from `createWorkflowFormDecisionTree(...)`; transition-form cases must pass `completionAction: transition_step`.
+[x] Subtask 105.3. Remove `completionTargetStepNumber` support from `createWorkflowFormDecisionTree(...)`; transition-form cases must pass `completionAction: transition_step`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 105.4. Remove `successTargetStepNumber` and `failureTargetStepNumber` support from `createToolBackedOperationDecisionTree(...)`; success/failure transition cases must pass `successAction` or `failureAction` as `transition_step`.
+[x] Subtask 105.4. Remove `successTargetStepNumber` and `failureTargetStepNumber` support from `createToolBackedOperationDecisionTree(...)`; success/failure transition cases must pass `successAction` or `failureAction` as `transition_step`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 105.5. Remove `approvedTargetStepNumber` support from `createWorkflowProgressDecisionTree(...)`; approved transition cases must pass the approved route action as `transition_step`.
+[x] Subtask 105.5. Remove `approvedTargetStepNumber` support from `createWorkflowProgressDecisionTree(...)`; approved transition cases must pass the approved route action as `transition_step`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 105.6. Update the explicit target-step progression test so the step-1 success route action is `transition_step`, and assert the next returned action is selected from step 3 rather than from the prior step's route.
+[x] Subtask 105.6. Update the explicit target-step progression test so the step-1 success route action is `transition_step`, and assert the next returned action is selected from step 3 rather than from the prior step's route.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 105.7. Add regression coverage proving transition into a step with passing completion rules returns `complete_workflow` and tears down workflow state before any target-step handoff.
+[x] Subtask 105.7. Add regression coverage proving transition into a step with passing completion rules returns `complete_workflow` and tears down workflow state before any target-step handoff.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 105.8. Add regression coverage proving transition into a step with no selected action returns a `project_prompt` handoff rather than `no_op`.
+[x] Subtask 105.8. Add regression coverage proving transition into a step with no selected action returns a `project_prompt` handoff rather than `no_op`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 105.9. Update workflow-progress request tests to use `transition_step` for approved step movement.
+[x] Subtask 105.9. Update workflow-progress request tests to use `transition_step` for approved step movement.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 105.10. Add definition-validation coverage for missing `transition_step` target step.
+[x] Subtask 105.10. Add definition-validation coverage for missing `transition_step` target step.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 105.11. Add definition-validation coverage for missing `transition_step` named target branch.
+[x] Subtask 105.11. Add definition-validation coverage for missing `transition_step` named target branch.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 105.12. Add definition-validation coverage rejecting `transition_step` routes that also declare `followingBranchId`.
+[x] Subtask 105.12. Add definition-validation coverage rejecting `transition_step` routes that also declare `followingBranchId`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Task 106. Validate Phase 47.
-
-Allowed files:
-- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
-- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
-- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
-
-[ ] Subtask 106.1. Run `rg "targetStepNumber|successTargetStepNumber|failureTargetStepNumber|completionTargetStepNumber|approvedTargetStepNumber" src/core/task/workflow-runtime src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`; it must return no matches.
+[x] Task 106. Validate Phase 47.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 106.2. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts`; it must pass.
+[x] Subtask 106.1. Run `rg "targetStepNumber|successTargetStepNumber|failureTargetStepNumber|completionTargetStepNumber|approvedTargetStepNumber" src/core/task/workflow-runtime src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`; it must return no matches.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 106.2. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts`; it must pass.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 106.3. Run `npm run check-types` and `npm run lint`; both must pass before Phase 47 is marked complete.
+[x] Subtask 106.3. Run `npm run check-types` and `npm run lint`; both must pass before Phase 47 is marked complete.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+## Phase 48 - Decision-Tree Route Identity Validation
+
+Pause for QA review after completing Phase 48 before commit.
+
+### Phase 48 Scope
+
+Harden the runtime-owned decision-tree route identity contract documented in `FR-29b4`, `FR-29j`, and `FR-63b`. Route ids remain structural metadata used for `{ branchId, routeId }` source-route correlation.
+
+### Phase 48 Scope Boundary
+
+Do not change `WorkflowDecisionBranchRoute.id`, `WorkflowStepResolutionSourceRoute`, source-route persistence, source-route event payloads, or `getWorkflowDecisionRouteBySource(...)`. Do not require route ids to be globally unique across branches.
+
+### Phase 48 Known Issues / Risks / Technical Debt
+
+None.
+
+[ ] Task 107. Validate route ids before workflow activation.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[ ] Subtask 107.1. In `validateWorkflowDefinition(...)`, immediately after the `branch.routes.length === 0` check, create a `const seenRouteIds = new Set<string>()` scoped inside the current branch loop.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[ ] Subtask 107.2. In `validateWorkflowDefinition(...)`, at the start of the `for (const route of branch.routes)` loop and before any route action validation, reject routes whose `id` is not a string or whose trimmed value is empty; return `valid: false` with an error message that identifies the workflow step id and branch id without depending on `route.id`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[ ] Subtask 107.3. In `validateWorkflowDefinition(...)`, immediately after the non-empty route-id check, reject duplicate `route.id` values already present in `seenRouteIds`; add each accepted `route.id` to `seenRouteIds` before continuing route action validation.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[ ] Task 108. Add route identity validation tests.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 108.1. In `WorkflowRuntime.test.ts`, add a definition-validation test proving activation fails closed when a decision-tree route id is missing; construct a typed route object first, then remove `id` with `Reflect.deleteProperty(route, "id")` before activation.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 108.2. In `WorkflowRuntime.test.ts`, add definition-validation coverage proving activation fails closed for blank decision-tree route ids `""` and `"   "`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 108.3. In `WorkflowRuntime.test.ts`, add definition-validation coverage proving activation fails closed when two routes in the same branch declare the same `id`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 108.4. In `WorkflowRuntime.test.ts`, add positive coverage proving the same route id may be reused in different branches without validation failure.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Task 109. Validate Phase 48.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 109.1. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`; it must pass.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 109.2. Run `npm run check-types` and `npm run lint`; both must pass before Phase 48 is marked complete.
+
+Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 

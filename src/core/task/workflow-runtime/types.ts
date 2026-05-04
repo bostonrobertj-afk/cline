@@ -163,11 +163,16 @@ export type WorkflowDecisionBranchTrigger =
 			): boolean
 	  }
 
+export type WorkflowStepTransitionTarget =
+	| { kind: "entry_branch"; stepNumber: number }
+	| { kind: "named_branch"; stepNumber: number; branchId: WorkflowDecisionBranchId }
+
 export type WorkflowDecisionAction =
 	| { kind: "render_workflow_form"; workflowFormId: WorkflowFormId }
 	| { kind: "execute_tool_backed_operation"; instruction: WorkflowToolBackedActionInstruction }
 	| { kind: "build_workflow_document"; instruction: WorkflowDocumentBuildActionInstruction }
 	| { kind: "allocate_artifact"; artifactId: string }
+	| { kind: "transition_step"; target: WorkflowStepTransitionTarget }
 	| { kind: "project_prompt" }
 	| { kind: "terminal_error"; errorMessage: string }
 	| { kind: "complete_workflow" }
@@ -178,7 +183,6 @@ export interface WorkflowDecisionBranchRoute {
 	trigger: WorkflowDecisionBranchTrigger
 	action: WorkflowDecisionAction
 	followingBranchId?: WorkflowDecisionBranchId
-	targetStepNumber?: number
 }
 
 export interface WorkflowDecisionBranch {

@@ -219,6 +219,7 @@ Responsibilities:
 - create and own the canonical artifact identity and numbering chain used across related workflow outputs
 - load workflow definition by `activeWorkflowName`
 - determine active step from session state
+- own decision-tree source-route identity as structural runtime metadata for persistence, suppression, status/result correlation, and restore validation
 - orchestrate workflow lifecycle across turns
 - orchestrate multiple concurrent workflow sessions across parent and child execution contexts
 - validate and apply workflow-value mutations from backend-owned logic and AI-callable tool paths
@@ -241,6 +242,7 @@ Responsibilities:
 - declare workflow metadata
 - declare the canonical project subfolder designation for the workflow
 - declare step graph and transition behavior through per-step next-action decision trees whose satisfied routes select exactly one decision action
+- assign stable non-empty route ids that are unique within each decision-tree branch; route ids are structural identifiers for runtime correlation, not user-visible instructions, route priority, or standalone workflow behavior
 - declare per-step prompt content
 - declare workflow-level and per-step native tool schema
 - declare workflow-entry informational panel content and workflow-form configuration

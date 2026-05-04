@@ -53,6 +53,7 @@ import type {
 	WorkflowPromptBuilderInput,
 	WorkflowPromptProjection,
 	WorkflowStepDefinition,
+	WorkflowStepTransitionTarget,
 	WorkflowValidationResult,
 	WorkflowValue,
 	WorkflowValues,
@@ -2143,11 +2144,7 @@ export class WorkflowRuntime {
 			}
 
 			const nextActiveBranchId = matchedRoute.followingBranchId ?? currentBranch.id
-			if (
-				matchedRoute.action.kind === "no_op" &&
-				matchedRoute.targetStepNumber === undefined &&
-				matchedRoute.followingBranchId !== undefined
-			) {
+			if (matchedRoute.action.kind === "no_op" && matchedRoute.followingBranchId !== undefined) {
 				const followingBranch = step.decisionTree.branches[matchedRoute.followingBranchId]
 				if (!followingBranch) {
 					return undefined
@@ -2302,26 +2299,25 @@ export class WorkflowRuntime {
 	private transitionToStep(args: {
 		taskState: TaskState
 		definition: WorkflowDefinition
-		targetStepNumber: number
-		targetBranchId?: string
+		target: WorkflowStepTransitionTarget
 	}): WorkflowStepDefinition | undefined {
-		const { taskState, definition, targetStepNumber, targetBranchId } = args
+		const { taskState, definition, target } = args
 		const session = taskState.activeWorkflowSession
 		if (!session) {
 			return undefined
 		}
 
-		const targetStep = definition.steps[`step-${targetStepNumber}`]
+		const targetStep = definition.steps[`step-${target.stepNumber}`]
 		if (!targetStep) {
 			return undefined
 		}
 
-		const nextBranchId =
-			targetBranchId !== undefined && targetStep.decisionTree.branches[targetBranchId] !== undefined
-				? targetBranchId
-				: targetStep.decisionTree.entryBranchId
+		const nextBranchId = target.kind === "entry_branch" ? targetStep.decisionTree.entryBranchId : target.branchId
+		if (targetStep.decisionTree.branches[nextBranchId] === undefined) {
+			return undefined
+		}
 
-		session.activeStepNumber = targetStepNumber
+		session.activeStepNumber = target.stepNumber
 		session.ui.formSession = undefined
 		session.ui.stepResolutionSession = undefined
 		session.ui.suppressedWorkflowFormIds = []
@@ -2479,6 +2475,27 @@ export class WorkflowRuntime {
 					},
 				}
 			}
+			case "transition_step": {
+				const transitionedStep = this.transitionToStep({
+					taskState,
+					definition,
+					target: action.target,
+				})
+				if (transitionedStep === undefined) {
+					return { kind: "no_op" }
+				}
+
+				const reenteredNextAction = await this.resolveNextAction({ taskState })
+				if (reenteredNextAction.kind !== "no_op") {
+					return reenteredNextAction
+				}
+
+				const promptProjection = await this.buildTurnProjection({ taskState })
+				return {
+					kind: "project_prompt",
+					promptProjection,
+				}
+			}
 			case "project_prompt": {
 				const promptProjection = await this.buildTurnProjection({ taskState })
 				return {
@@ -2509,21 +2526,10 @@ export class WorkflowRuntime {
 			return { kind: "no_op" }
 		}
 
-		if (route.targetStepNumber !== undefined) {
-			const transitionedStep = this.transitionToStep({
-				taskState,
-				definition,
-				targetStepNumber: route.targetStepNumber,
-				targetBranchId: route.followingBranchId,
-			})
-			if (!transitionedStep) {
-				return { kind: "no_op" }
-			}
-		} else {
+		if (route.action.kind !== "transition_step") {
 			session.branchContext.activeBranchId = nextActiveBranchId
+			session.branchContext.lastTriggerEvent = undefined
 		}
-
-		session.branchContext.lastTriggerEvent = undefined
 
 		return this.buildNextActionFromDecisionTreeAction({
 			taskState,
@@ -3509,6 +3515,13 @@ export class WorkflowRuntime {
 				}
 
 				for (const route of branch.routes) {
+					if (route.action.kind === "transition_step" && route.followingBranchId !== undefined) {
+						return {
+							valid: false,
+							errorMessage: `Workflow step ${step.id} route ${route.id} transition_step action must not declare followingBranchId.`,
+						}
+					}
+
 					if (
 						route.followingBranchId !== undefined &&
 						step.decisionTree.branches[route.followingBranchId] === undefined
@@ -3516,13 +3529,6 @@ export class WorkflowRuntime {
 						return {
 							valid: false,
 							errorMessage: `Workflow step ${step.id} route ${route.id} references missing followingBranchId ${route.followingBranchId}.`,
-						}
-					}
-
-					if (route.targetStepNumber !== undefined && workflow.steps[`step-${route.targetStepNumber}`] === undefined) {
-						return {
-							valid: false,
-							errorMessage: `Workflow step ${step.id} route ${route.id} references missing targetStepNumber ${route.targetStepNumber}.`,
 						}
 					}
 
@@ -3628,6 +3634,25 @@ export class WorkflowRuntime {
 								}
 							}
 							break
+						case "transition_step": {
+							const targetStep = workflow.steps[`step-${route.action.target.stepNumber}`]
+							if (targetStep === undefined) {
+								return {
+									valid: false,
+									errorMessage: `Workflow step ${step.id} route ${route.id} transition_step action references missing target step ${route.action.target.stepNumber}.`,
+								}
+							}
+							if (
+								route.action.target.kind === "named_branch" &&
+								targetStep.decisionTree.branches[route.action.target.branchId] === undefined
+							) {
+								return {
+									valid: false,
+									errorMessage: `Workflow step ${step.id} route ${route.id} transition_step action references missing target branch ${route.action.target.branchId} on step ${targetStep.id}.`,
+								}
+							}
+							break
+						}
 						case "project_prompt":
 							break
 						case "terminal_error":

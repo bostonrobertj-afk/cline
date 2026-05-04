@@ -28,6 +28,7 @@ import type {
 	WorkflowEntryProjectValueKeys,
 	WorkflowNextAction,
 	WorkflowStepDefinition,
+	WorkflowStepTransitionTarget,
 	WorkflowValues,
 	WorkflowWorkspacePathPolicy,
 } from "../types"
@@ -126,10 +127,34 @@ describe("WorkflowRuntime", () => {
 		return left.branchId === right.branchId && left.routeId === right.routeId
 	}
 
+	function createEntryBranchStepTransitionAction(stepNumber: number): WorkflowDecisionAction {
+		const target: WorkflowStepTransitionTarget = {
+			kind: "entry_branch",
+			stepNumber,
+		}
+
+		return {
+			kind: "transition_step",
+			target,
+		}
+	}
+
+	function createNamedBranchStepTransitionAction(args: { stepNumber: number; branchId: string }): WorkflowDecisionAction {
+		const target: WorkflowStepTransitionTarget = {
+			kind: "named_branch",
+			stepNumber: args.stepNumber,
+			branchId: args.branchId,
+		}
+
+		return {
+			kind: "transition_step",
+			target,
+		}
+	}
+
 	function createProjectPromptDecisionTree(args?: {
 		entryBranchId?: string
 		followingBranchId?: string
-		targetStepNumber?: number
 	}): WorkflowDecisionTree {
 		const entryBranchId = args?.entryBranchId ?? "project-prompt"
 		const followingBranchId = args?.followingBranchId
@@ -145,7 +170,6 @@ describe("WorkflowRuntime", () => {
 							trigger: { kind: "always" },
 							action: { kind: "project_prompt" },
 							followingBranchId,
-							targetStepNumber: args?.targetStepNumber,
 						},
 					],
 				},
@@ -170,9 +194,10 @@ describe("WorkflowRuntime", () => {
 	function createWorkflowFormDecisionTree(args: {
 		workflowFormId: string
 		completionAction?: WorkflowDecisionAction
-		completionTargetStepNumber?: number
 	}): WorkflowDecisionTree {
 		const completionBranchId = "after-form-complete"
+		const completionAction: WorkflowDecisionAction = args.completionAction ?? { kind: "project_prompt" }
+		const shouldFollowCompletionBranch = completionAction.kind !== "transition_step"
 
 		return {
 			entryBranchId: "show-form",
@@ -202,13 +227,12 @@ describe("WorkflowRuntime", () => {
 									triggerEvent.kind === "workflow_form_completed" &&
 									triggerEvent.workflowFormId === args.workflowFormId,
 							},
-							action: args.completionAction ?? { kind: "project_prompt" },
-							targetStepNumber: args.completionTargetStepNumber,
-							followingBranchId: args.completionTargetStepNumber === undefined ? completionBranchId : undefined,
+							action: completionAction,
+							...(shouldFollowCompletionBranch ? { followingBranchId: completionBranchId } : {}),
 						},
 					],
 				},
-				...(args.completionTargetStepNumber === undefined
+				...(shouldFollowCompletionBranch
 					? {
 							[completionBranchId]: {
 								id: completionBranchId,
@@ -229,12 +253,14 @@ describe("WorkflowRuntime", () => {
 	function createToolBackedOperationDecisionTree(args?: {
 		startAction?: WorkflowDecisionAction
 		successAction?: WorkflowDecisionAction
-		successTargetStepNumber?: number
 		failureAction?: WorkflowDecisionAction
-		failureTargetStepNumber?: number
 	}): WorkflowDecisionTree {
 		const successBranchId = "after-step-resolution-success"
 		const failureBranchId = "after-step-resolution-failure"
+		const successAction: WorkflowDecisionAction = args?.successAction ?? { kind: "project_prompt" }
+		const failureAction: WorkflowDecisionAction = args?.failureAction ?? { kind: "project_prompt" }
+		const shouldFollowSuccessBranch = successAction.kind !== "transition_step"
+		const shouldFollowFailureBranch = failureAction.kind !== "transition_step"
 
 		return {
 			entryBranchId: "run-step-resolution",
@@ -264,9 +290,8 @@ describe("WorkflowRuntime", () => {
 									triggerEvent.kind === "tool_backed_operation_succeeded" &&
 									sourceRoutesEqual(triggerEvent.sourceRoute, STEP_RESOLUTION_SOURCE_ROUTE),
 							},
-							action: args?.successAction ?? { kind: "project_prompt" },
-							targetStepNumber: args?.successTargetStepNumber,
-							followingBranchId: args?.successTargetStepNumber === undefined ? successBranchId : undefined,
+							action: successAction,
+							...(shouldFollowSuccessBranch ? { followingBranchId: successBranchId } : {}),
 						},
 						{
 							id: "step-resolution-failed",
@@ -276,13 +301,12 @@ describe("WorkflowRuntime", () => {
 									triggerEvent.kind === "tool_backed_operation_failed" &&
 									sourceRoutesEqual(triggerEvent.sourceRoute, STEP_RESOLUTION_SOURCE_ROUTE),
 							},
-							action: args?.failureAction ?? { kind: "project_prompt" },
-							targetStepNumber: args?.failureTargetStepNumber,
-							followingBranchId: args?.failureTargetStepNumber === undefined ? failureBranchId : undefined,
+							action: failureAction,
+							...(shouldFollowFailureBranch ? { followingBranchId: failureBranchId } : {}),
 						},
 					],
 				},
-				...(args?.successTargetStepNumber === undefined
+				...(shouldFollowSuccessBranch
 					? {
 							[successBranchId]: {
 								id: successBranchId,
@@ -296,7 +320,7 @@ describe("WorkflowRuntime", () => {
 							},
 						}
 					: {}),
-				...(args?.failureTargetStepNumber === undefined
+				...(shouldFollowFailureBranch
 					? {
 							[failureBranchId]: {
 								id: failureBranchId,
@@ -315,10 +339,11 @@ describe("WorkflowRuntime", () => {
 	}
 
 	function createWorkflowProgressDecisionTree(args?: {
-		approvedTargetStepNumber?: number
+		approvedAction?: WorkflowDecisionAction
 		deniedFollowingBranchId?: string
 	}): WorkflowDecisionTree {
 		const deniedFollowingBranchId = args?.deniedFollowingBranchId ?? "progress-denied"
+		const approvedAction: WorkflowDecisionAction = args?.approvedAction ?? { kind: "project_prompt" }
 
 		return {
 			entryBranchId: "project-prompt-entry",
@@ -340,8 +365,7 @@ describe("WorkflowRuntime", () => {
 						{
 							id: "progress-approved",
 							trigger: { kind: "on_event", eventKind: "workflow_progress_request_confirmed" },
-							action: { kind: "project_prompt" },
-							targetStepNumber: args?.approvedTargetStepNumber,
+							action: approvedAction,
 						},
 						{
 							id: "progress-denied",
@@ -1244,6 +1268,124 @@ describe("WorkflowRuntime", () => {
 			expect(invalidState.activeWorkflowName).to.be.undefined
 			expect(invalidState.activeWorkflowSession).to.be.undefined
 		}
+	})
+
+	it("rejects transition step actions that reference missing target steps before activation", async () => {
+		const invalidState = new TaskState()
+		const result = await activateWorkflow(
+			invalidState,
+			createWorkflowDefinition({
+				steps: {
+					"step-1": createStepDefinition({
+						stepNumber: 1,
+						decisionTree: {
+							entryBranchId: "transition-entry",
+							branches: {
+								"transition-entry": {
+									id: "transition-entry",
+									routes: [
+										{
+											id: "missing-target-step",
+											trigger: { kind: "always" },
+											action: createEntryBranchStepTransitionAction(99),
+										},
+									],
+								},
+							},
+						},
+					}),
+				},
+			}),
+		)
+
+		expect(result).to.deep.equal({ kind: "no_op" })
+		expect(invalidState.activeWorkflowName).to.be.undefined
+		expect(invalidState.activeWorkflowSession).to.be.undefined
+	})
+
+	it("rejects transition step actions that reference missing named target branches before activation", async () => {
+		const invalidState = new TaskState()
+		const result = await activateWorkflow(
+			invalidState,
+			createWorkflowDefinition({
+				steps: {
+					"step-1": createStepDefinition({
+						stepNumber: 1,
+						decisionTree: {
+							entryBranchId: "transition-entry",
+							branches: {
+								"transition-entry": {
+									id: "transition-entry",
+									routes: [
+										{
+											id: "missing-target-branch",
+											trigger: { kind: "always" },
+											action: createNamedBranchStepTransitionAction({
+												stepNumber: 2,
+												branchId: "missing-named-branch",
+											}),
+										},
+									],
+								},
+							},
+						},
+					}),
+					"step-2": createStepDefinition({
+						stepNumber: 2,
+						decisionTree: createProjectPromptDecisionTree({ entryBranchId: "target-entry" }),
+					}),
+				},
+			}),
+		)
+
+		expect(result).to.deep.equal({ kind: "no_op" })
+		expect(invalidState.activeWorkflowName).to.be.undefined
+		expect(invalidState.activeWorkflowSession).to.be.undefined
+	})
+
+	it("rejects transition step routes that also declare followingBranchId before activation", async () => {
+		const invalidState = new TaskState()
+		const result = await activateWorkflow(
+			invalidState,
+			createWorkflowDefinition({
+				steps: {
+					"step-1": createStepDefinition({
+						stepNumber: 1,
+						decisionTree: {
+							entryBranchId: "transition-entry",
+							branches: {
+								"transition-entry": {
+									id: "transition-entry",
+									routes: [
+										{
+											id: "transition-with-following-branch",
+											trigger: { kind: "always" },
+											action: createEntryBranchStepTransitionAction(2),
+											followingBranchId: "same-step-following",
+										},
+									],
+								},
+								"same-step-following": {
+									id: "same-step-following",
+									routes: [
+										{
+											id: "same-step-following-route",
+											trigger: { kind: "always" },
+											action: { kind: "project_prompt" },
+										},
+									],
+								},
+							},
+						},
+					}),
+					"step-2": createStepDefinition({ stepNumber: 2 }),
+				},
+			}),
+		)
+
+		expect(result).to.deep.equal({ kind: "no_op" })
+		expect(invalidState.activeWorkflowName).to.be.undefined
+		expect(invalidState.activeWorkflowSession).to.be.undefined
 	})
 
 	it("rejects document build actions that reference missing artifacts or invalid tool contracts", async () => {
@@ -2501,7 +2643,7 @@ describe("WorkflowRuntime", () => {
 				"step-1": createStepDefinition({
 					stepNumber: 1,
 					decisionTree: createToolBackedOperationDecisionTree({
-						successTargetStepNumber: 3,
+						successAction: createEntryBranchStepTransitionAction(3),
 					}),
 				}),
 				"step-2": createStepDefinition({ stepNumber: 2 }),
@@ -2558,6 +2700,10 @@ describe("WorkflowRuntime", () => {
 		expect(getActiveWorkflowSession(taskState).activeStepNumber).to.equal(3)
 		expect(getActiveWorkflowSession(taskState).ui.suppressedWorkflowStepResolutionRoutes).to.deep.equal([])
 		expect(successResult.kind).to.equal("project_prompt")
+		if (successResult.kind !== "project_prompt") {
+			throw new Error(`Expected project_prompt, received ${successResult.kind}.`)
+		}
+		expect(successResult.promptProjection.fullTurnWorkflowInputInstructionsBlock).to.contain("Step 3: Step 3")
 		expect(getActiveWorkflowSession(taskState).branchContext.activeBranchId).to.equal("project-prompt")
 
 		const failureWorkflow = createWorkflowDefinition({
@@ -2596,6 +2742,93 @@ describe("WorkflowRuntime", () => {
 		})
 		expect(getActiveWorkflowSession(failureState).branchContext.activeBranchId).to.equal("after-step-resolution-failure")
 		expect(failureResult.kind).to.equal("project_prompt")
+	})
+
+	it("completes workflow when transition enters a step with passing completion rules", async () => {
+		const workflow = createWorkflowDefinition({
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createToolBackedOperationDecisionTree({
+						successAction: createEntryBranchStepTransitionAction(2),
+					}),
+				}),
+				"step-2": createStepDefinition({
+					stepNumber: 2,
+					decisionTree: createProjectPromptDecisionTree(),
+					completionRules: [
+						{
+							id: "complete-on-entry",
+							isComplete: () => true,
+						},
+					],
+				}),
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		await runtime.resolveNextAction({ taskState })
+		await submitNewProjectSelection(taskState, "Completion Transition Project")
+		expect((await runtime.resolveNextAction({ taskState })).kind).to.equal("execute_tool_backed_operation")
+
+		const result = await runtime.handleToolBackedOperationToolResult({
+			taskState,
+			toolResultText: "ok",
+		})
+
+		expect(result.kind).to.equal("complete_workflow")
+		expectWorkflowStateCleared(taskState)
+	})
+
+	it("returns a project prompt when transition enters a step with no selected action", async () => {
+		const workflow = createWorkflowDefinition({
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createToolBackedOperationDecisionTree({
+						successAction: createEntryBranchStepTransitionAction(2),
+					}),
+				}),
+				"step-2": createStepDefinition({
+					stepNumber: 2,
+					checklistLabel: "Waiting Step",
+					decisionTree: {
+						entryBranchId: "no-selected-action",
+						branches: {
+							"no-selected-action": {
+								id: "no-selected-action",
+								routes: [
+									{
+										id: "never-selected",
+										trigger: { kind: "session_predicate", matches: () => false },
+										action: { kind: "project_prompt" },
+									},
+								],
+							},
+						},
+					},
+				}),
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		await runtime.resolveNextAction({ taskState })
+		await submitNewProjectSelection(taskState, "No Selected Action Project")
+		expect((await runtime.resolveNextAction({ taskState })).kind).to.equal("execute_tool_backed_operation")
+
+		const result = await runtime.handleToolBackedOperationToolResult({
+			taskState,
+			toolResultText: "ok",
+		})
+
+		expect(result.kind).to.equal("project_prompt")
+		if (result.kind !== "project_prompt") {
+			throw new Error(`Expected project_prompt, received ${result.kind}.`)
+		}
+		const activeSession = getActiveWorkflowSession(taskState)
+		expect(activeSession.activeStepNumber).to.equal(2)
+		expect(activeSession.branchContext.activeBranchId).to.equal("no-selected-action")
+		expect(result.promptProjection.fullTurnWorkflowInputInstructionsBlock).to.contain("Step 2: Waiting Step")
 	})
 
 	it("retries tool-backed operations only when the matched failure branch prescribes another execute_tool_backed_operation", async () => {
@@ -2820,7 +3053,7 @@ describe("WorkflowRuntime", () => {
 				"step-1": createStepDefinition({
 					stepNumber: 1,
 					decisionTree: createWorkflowProgressDecisionTree({
-						approvedTargetStepNumber: 3,
+						approvedAction: createEntryBranchStepTransitionAction(3),
 					}),
 					toolSchema: createWorkflowProgressRequestToolSchema(),
 				}),
