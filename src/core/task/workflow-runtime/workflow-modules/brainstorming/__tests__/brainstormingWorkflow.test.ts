@@ -162,6 +162,11 @@ describe("brainstormingWorkflowDefinition", () => {
 			kind: "boolean",
 			required: true,
 		})
+		const noSessionGoalsBranch =
+			setupForm?.panels["step-1-goals-check-panel"]?.transition.type === "conditional"
+				? setupForm.panels["step-1-goals-check-panel"]?.transition.branches.find((branch) => branch.matchValue === false)
+				: undefined
+		expect(noSessionGoalsBranch?.staleValueKeysToClear).to.deep.equal(["session_goals"])
 		expect(setupForm?.panels["step-1-goals-detail-panel"]?.promptMarkdown).to.equal("What are your goals for this session?")
 
 		const entryRoute = findRoute("step-1", "step-1-allocate-artifact", "step-1-allocate-artifact")
@@ -249,6 +254,23 @@ describe("brainstormingWorkflowDefinition", () => {
 		)
 		expect(randomPanel?.fields[0]?.workflowValueKey).to.equal("random_technique_confirmation")
 		expect(randomPanel?.fields[0]?.options?.map((option) => option.value)).to.deep.equal(["confirm", "retry"])
+	})
+
+	it("keeps random confirmation inside the Step 2 approach form route", () => {
+		const workflowFormIds = Object.keys(brainstormingWorkflowDefinition.workflowForms ?? {})
+		const renderRandomConfirmationAction = getAction(
+			"step-2",
+			"step-2-after-random-selection",
+			"step-2-render-random-confirmation",
+		)
+
+		expect(workflowFormIds).to.include("step-2-approach-form")
+		expect(workflowFormIds).to.not.include("step-2-random-confirmation-form")
+		expect(renderRandomConfirmationAction).to.deep.include({
+			kind: "render_workflow_form",
+			workflowFormId: "step-2-approach-form",
+			startPanelId: "step-2-random-confirmation-panel",
+		})
 	})
 
 	it("implements Step 2 choose, suggest, and random routes without a random-selection tool", async () => {
@@ -376,6 +398,31 @@ describe("brainstormingWorkflowDefinition", () => {
 				category: "Deep",
 			},
 		])
+	})
+
+	it("does not reference a random technique selector tool in Step 2 routes or Step 3 schemas", () => {
+		const forbiddenToolName = "select_random_brainstorming_technique"
+		const step2 = brainstormingWorkflowDefinition.steps["step-2"]
+		const step3 = brainstormingWorkflowDefinition.steps["step-3"]
+		const step2RouteSurfaces = Object.values(step2.decisionTree.branches).flatMap((branch) =>
+			branch.routes.map((route) => JSON.stringify(route)),
+		)
+		const step3ToolSchemaSurfaces = [
+			{
+				selected_approach: "I want you to suggest a technique",
+			},
+			{
+				selected_approach: "I want to choose",
+			},
+			{
+				selected_approach: "I want a random technique",
+			},
+		].flatMap((workflowValues) =>
+			step3.buildToolSchema(createPromptInput(step3, workflowValues)).map((schema) => JSON.stringify(schema)),
+		)
+
+		expect(step2RouteSurfaces.some((routeSurface) => routeSurface.includes(forbiddenToolName))).to.equal(false)
+		expect(step3ToolSchemaSurfaces.some((schemaSurface) => schemaSurface.includes(forbiddenToolName))).to.equal(false)
 	})
 
 	it("builds Step 3 prompt and tool variants and routes workflow progress decisions", () => {

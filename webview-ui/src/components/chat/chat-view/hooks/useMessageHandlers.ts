@@ -1,6 +1,12 @@
 import type { ClineMessage, WorkflowForm, WorkflowFormFieldDefinition } from "@shared/ExtensionMessage"
 import { EmptyRequest, StringRequest } from "@shared/proto/cline/common"
-import { AskResponseRequest, NewTaskRequest, WorkflowFormAction, WorkflowFormSubmissionRequest } from "@shared/proto/cline/task"
+import {
+	AskResponseRequest,
+	NewTaskRequest,
+	WorkflowFormAction,
+	WorkflowFormSubmissionRequest,
+	type WorkflowFormValue,
+} from "@shared/proto/cline/task"
 import { useCallback, useRef } from "react"
 import { useExtensionState } from "@/context/ExtensionStateContext"
 import { SlashServiceClient, TaskServiceClient } from "@/services/grpc-client"
@@ -46,7 +52,7 @@ export async function submitWorkflowForm(
 	await TaskServiceClient.submitWorkflowForm(buildWorkflowFormSubmissionRequest(workflowForm, action, values))
 }
 
-function serializeWorkflowFormFieldValue(field: WorkflowFormFieldDefinition, value: unknown) {
+function serializeWorkflowFormFieldValue(field: WorkflowFormFieldDefinition, value: unknown): WorkflowFormValue | undefined {
 	if (field.kind === "markdown_display" || field.kind === "static_notice") {
 		return undefined
 	}
@@ -59,6 +65,9 @@ function serializeWorkflowFormFieldValue(field: WorkflowFormFieldDefinition, val
 		case "boolean":
 			return typeof value === "boolean" ? { booleanValue: value } : undefined
 		case "number": {
+			if (typeof value === "string" && value.trim().length === 0) {
+				return undefined
+			}
 			const normalized = typeof value === "number" ? value : Number(String(value).trim())
 			if (Number.isNaN(normalized)) {
 				return undefined
@@ -81,7 +90,7 @@ function serializeWorkflowFormFieldValue(field: WorkflowFormFieldDefinition, val
 				: undefined
 		case "dropdown":
 			if ((field.selectionCardinality ?? "single") === "single") {
-				return typeof value === "string" && value.trim().length > 0 ? { stringValue: value.trim() } : undefined
+				return serializeStringWorkflowFormFieldValue(value, true)
 			}
 			return Array.isArray(value)
 				? {
@@ -102,14 +111,14 @@ function serializeWorkflowFormFieldValue(field: WorkflowFormFieldDefinition, val
 			if (typeof value !== "string") {
 				return undefined
 			}
-			if (value.trim().length === 0) {
-				return undefined
-			}
 			if (field.kind === "small_text" && field.allowedValueType === "integer") {
+				if (value.trim().length === 0) {
+					return undefined
+				}
 				const normalized = Number(value.trim())
 				return Number.isInteger(normalized) ? { integerValue: normalized } : undefined
 			}
-			return { stringValue: value.trim() }
+			return serializeStringWorkflowFormFieldValue(value, true)
 		case "large_text":
 			if (field.allowedValueType === "array") {
 				const parsedArray = typeof value === "string" ? tryParseJson(value) : value
@@ -134,10 +143,23 @@ function serializeWorkflowFormFieldValue(field: WorkflowFormFieldDefinition, val
 						}
 					: undefined
 			}
-			return typeof value === "string" && value.length > 0 ? { stringValue: value } : undefined
+			return serializeStringWorkflowFormFieldValue(value, false)
 		default:
-			return typeof value === "string" && value.trim().length > 0 ? { stringValue: value.trim() } : undefined
+			return serializeStringWorkflowFormFieldValue(value, true)
 	}
+}
+
+function serializeStringWorkflowFormFieldValue(value: unknown, trimNonEmptyValue: boolean): WorkflowFormValue | undefined {
+	if (typeof value !== "string") {
+		return undefined
+	}
+
+	const trimmedValue = value.trim()
+	if (trimmedValue.length === 0) {
+		return { stringValue: "" }
+	}
+
+	return { stringValue: trimNonEmptyValue ? trimmedValue : value }
 }
 
 function tryParseJson(value: string): unknown {
@@ -148,7 +170,7 @@ function tryParseJson(value: string): unknown {
 	}
 }
 
-function serializeUnknownValue(value: unknown): any {
+function serializeUnknownValue(value: unknown): WorkflowFormValue {
 	if (typeof value === "string") {
 		return { stringValue: value }
 	}

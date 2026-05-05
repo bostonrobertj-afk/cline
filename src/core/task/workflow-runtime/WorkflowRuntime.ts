@@ -20,6 +20,7 @@ import { isWorkflowFormSubmittedValuePayload } from "@/core/task/workflow-form/s
 import type {
 	WorkflowFormRuntimeCreateSessionOptions,
 	WorkflowFormRuntimeOutcome,
+	WorkflowFormRuntimeValueChanges,
 	WorkflowFormSessionData,
 	WorkflowFormSessionDataValue,
 	WorkflowFormSessionState,
@@ -318,6 +319,7 @@ export class WorkflowRuntime {
 					await this.persistWorkflowFormValues({
 						taskState,
 						formSession: outcome.session,
+						valueChanges: outcome.valueChanges,
 					})
 				}
 				session.ui.formSession = outcome.session
@@ -340,6 +342,7 @@ export class WorkflowRuntime {
 				await this.persistWorkflowFormValues({
 					taskState,
 					formSession: outcome.session,
+					valueChanges: outcome.valueChanges,
 				})
 				session.ui.formSession = undefined
 				if (!session.ui.suppressedWorkflowFormIds.includes(outcome.session.workflowFormId)) {
@@ -530,7 +533,13 @@ export class WorkflowRuntime {
 	async applyWorkflowValueWrites(args: {
 		taskState: TaskState
 		values: WorkflowValues
-	}): Promise<{ changedValues: WorkflowValues; unchangedValues: WorkflowValues }> {
+		clearKeys?: readonly string[]
+	}): Promise<{
+		changedValues: WorkflowValues
+		unchangedValues: WorkflowValues
+		clearedKeys: readonly string[]
+		unchangedClearKeys: readonly string[]
+	}> {
 		const { taskState, values } = args
 		const session = taskState.activeWorkflowSession
 		const definition = session ? this.getActiveWorkflowDefinition(taskState) : undefined
@@ -538,6 +547,24 @@ export class WorkflowRuntime {
 
 		const changedValues: WorkflowValues = {}
 		const unchangedValues: WorkflowValues = {}
+		const clearedKeys: string[] = []
+		const unchangedClearKeys: string[] = []
+		const seenClearKeys = new Set<string>()
+
+		for (const clearKey of args.clearKeys ?? []) {
+			if (seenClearKeys.has(clearKey)) {
+				continue
+			}
+			seenClearKeys.add(clearKey)
+
+			if (!allowedKeys.has(clearKey) || session === undefined || session.workflowValues[clearKey] === undefined) {
+				unchangedClearKeys.push(clearKey)
+				continue
+			}
+
+			delete session.workflowValues[clearKey]
+			clearedKeys.push(clearKey)
+		}
 
 		for (const [key, rawValue] of Object.entries(values)) {
 			if (!isWorkflowValue(rawValue)) {
@@ -562,9 +589,13 @@ export class WorkflowRuntime {
 
 			session.workflowValues[key] = rawValue
 			changedValues[key] = rawValue
+			const clearedKeyIndex = clearedKeys.indexOf(key)
+			if (clearedKeyIndex >= 0) {
+				clearedKeys.splice(clearedKeyIndex, 1)
+			}
 		}
 
-		const changedKeys = Object.keys(changedValues)
+		const changedKeys = this.dedupeWorkflowValueKeys([...Object.keys(changedValues), ...clearedKeys])
 		if (changedKeys.length > 0) {
 			this.recordWorkflowValuesPersistedTriggerIfRouted({
 				taskState,
@@ -575,7 +606,23 @@ export class WorkflowRuntime {
 		return {
 			changedValues,
 			unchangedValues,
+			clearedKeys,
+			unchangedClearKeys,
 		}
+	}
+
+	private dedupeWorkflowValueKeys(keys: readonly string[]): string[] {
+		const seenKeys = new Set<string>()
+		const dedupedKeys: string[] = []
+		for (const key of keys) {
+			if (seenKeys.has(key)) {
+				continue
+			}
+			seenKeys.add(key)
+			dedupedKeys.push(key)
+		}
+
+		return dedupedKeys
 	}
 
 	private recordWorkflowValuesPersistedTriggerIfRouted(args: { taskState: TaskState; changedKeys: readonly string[] }): void {
@@ -1591,10 +1638,12 @@ export class WorkflowRuntime {
 		}
 	}
 
-	private collectWorkflowValueWritesFromFormSession(
+	private collectWorkflowValueMutationsFromFormOutcome(
 		formSession: Pick<WorkflowFormSessionState, "definitionPayload" | "values">,
-	): WorkflowValues {
-		const workflowValueWrites: WorkflowValues = {}
+		valueChanges: WorkflowFormRuntimeValueChanges,
+	): { values: WorkflowValues; clearKeys: readonly string[] } {
+		const values: WorkflowValues = {}
+		const clearKeys: string[] = []
 		const workflowValueKeyByFieldKey: Record<string, string> = {}
 
 		for (const panel of Object.values(formSession.definitionPayload.panels)) {
@@ -1618,24 +1667,40 @@ export class WorkflowRuntime {
 				throw new Error(conversion.errorMessage)
 			}
 
-			workflowValueWrites[workflowValueKey] = conversion.value
+			values[workflowValueKey] = conversion.value
 		}
 
-		return workflowValueWrites
+		const seenClearKeys = new Set<string>()
+		for (const clearedValueKey of valueChanges.clearedValueKeys) {
+			const workflowValueKey = workflowValueKeyByFieldKey[clearedValueKey]
+			if (workflowValueKey === undefined || seenClearKeys.has(workflowValueKey)) {
+				continue
+			}
+
+			seenClearKeys.add(workflowValueKey)
+			clearKeys.push(workflowValueKey)
+		}
+
+		return {
+			values,
+			clearKeys: clearKeys.filter((workflowValueKey) => values[workflowValueKey] === undefined),
+		}
 	}
 
 	private async persistWorkflowFormValues(args: {
 		taskState: TaskState
 		formSession: WorkflowFormSessionState
+		valueChanges: WorkflowFormRuntimeValueChanges
 	}): Promise<void> {
-		const workflowValueWrites = this.collectWorkflowValueWritesFromFormSession(args.formSession)
-		if (Object.keys(workflowValueWrites).length === 0) {
+		const workflowValueMutations = this.collectWorkflowValueMutationsFromFormOutcome(args.formSession, args.valueChanges)
+		if (Object.keys(workflowValueMutations.values).length === 0 && workflowValueMutations.clearKeys.length === 0) {
 			return
 		}
 
 		await this.applyWorkflowValueWrites({
 			taskState: args.taskState,
-			values: workflowValueWrites,
+			values: workflowValueMutations.values,
+			clearKeys: workflowValueMutations.clearKeys,
 		})
 	}
 

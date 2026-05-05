@@ -1057,6 +1057,16 @@ describe("WorkflowRuntime", () => {
 		})
 	})
 
+	it("resolves only the unsuffixed shipped brainstorming workflow identity", () => {
+		resolveWorkflowDefinitionStub.restore()
+
+		const resolvedWorkflow = WorkflowRegistry.resolveWorkflowDefinition("brainstorming")
+
+		expect(resolvedWorkflow).to.equal(brainstormingWorkflowDefinition)
+		expect(resolvedWorkflow?.name).to.equal("brainstorming")
+		expect(WorkflowRegistry.resolveWorkflowDefinition("brainstorming.md")).to.equal(undefined)
+	})
+
 	it("copies complete parent project selection into child workflow activation without rendering entry form", async () => {
 		const workflow = createWorkflowDefinition()
 		registerResolvedWorkflow(workflow)
@@ -4196,6 +4206,44 @@ describe("WorkflowRuntime", () => {
 		expect(getActiveWorkflowSession(noOverrideState).workflowValues).to.not.have.property("alpha")
 	})
 
+	it("clears allowed workflow values through the canonical workflow value write seam", async () => {
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: ["alpha", "beta", "absent"],
+		})
+		await activateWorkflow(taskState, workflow)
+		await runtime.resolveNextAction({ taskState })
+		await submitNewProjectSelection(taskState, "Clearable Values Project")
+		await runtime.applyWorkflowValueWrites({
+			taskState,
+			values: {
+				alpha: "one",
+				beta: "two",
+			},
+		})
+
+		const clearResult = await runtime.applyWorkflowValueWrites({
+			taskState,
+			values: {},
+			clearKeys: ["alpha", "absent", "gamma", "alpha"],
+		})
+		const replacementResult = await runtime.applyWorkflowValueWrites({
+			taskState,
+			values: {
+				beta: "replacement",
+			},
+			clearKeys: ["beta"],
+		})
+
+		expect(getActiveWorkflowSession(taskState).workflowValues).to.deep.include({ beta: "replacement" })
+		expect(getActiveWorkflowSession(taskState).workflowValues).to.not.have.property("alpha")
+		expect(clearResult.changedValues).to.deep.equal({})
+		expect(clearResult.unchangedValues).to.deep.equal({})
+		expect(clearResult.clearedKeys).to.deep.equal(["alpha"])
+		expect(clearResult.unchangedClearKeys).to.deep.equal(["absent", "gamma"])
+		expect(replacementResult.changedValues).to.deep.equal({ beta: "replacement" })
+		expect(replacementResult.clearedKeys).to.deep.equal([])
+	})
+
 	it("uses deterministic deep equality for typed workflow value writes", async () => {
 		const workflow = createWorkflowDefinition({
 			workflowValueKeys: ["typed_array", "typed_object"],
@@ -4360,6 +4408,361 @@ describe("WorkflowRuntime", () => {
 		expect(capturedWorkflowValues).to.deep.include({ summary: "Captured summary" })
 		expect(activeSession.workflowValues).to.deep.include({ summary: "Captured summary" })
 		expect(activeSession.ui.suppressedWorkflowFormIds).to.deep.equal([workflowFormId])
+	})
+
+	it("clears optional text workflow-form durable values before resolving the next workflow action", async () => {
+		const workflowFormId = "clear-text-value-destination-form"
+		let capturedWorkflowValues: WorkflowValues | undefined
+		const operationInstruction: WorkflowToolBackedActionInstruction = {
+			toolName: ClineDefaultTool.GENERATE_EXPLANATION,
+			buildStatusDefinition: () => ({
+				title: "After Clear",
+				pendingLabel: "Pending",
+				successLabel: "Success",
+				failureLabel: "Failure",
+			}),
+			buildToolExecutionRequest: ({ activeWorkflowSession }) => {
+				capturedWorkflowValues = { ...activeWorkflowSession.workflowValues }
+				return {
+					toolName: ClineDefaultTool.GENERATE_EXPLANATION,
+					toolInput: {},
+					toolParams: {},
+				}
+			},
+			evaluateToolExecutionResult: () => ({ succeeded: true }),
+		}
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: ["summary"],
+			workflowForms: {
+				[workflowFormId]: {
+					definitionVersion: 2,
+					title: "Clear Text Value Destination Form",
+					toolDictionaryTitle: "Clear Text Value Destination Tools",
+					toolDictionaryMarkdown: "Clear text destination help",
+					firstPanelId: "details",
+					panels: {
+						details: {
+							panelId: "details",
+							title: "Details",
+							promptMarkdown: "Optionally capture details.",
+							fields: [
+								{
+									key: "summary_field",
+									workflowValueKey: "summary",
+									kind: "small_text",
+									label: "Summary",
+									required: false,
+									allowedValueType: "string",
+								},
+							],
+							allowedActions: ["submit"],
+							transition: createTerminalTransition(),
+						},
+					},
+				},
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createWorkflowFormDecisionTree({
+						workflowFormId,
+						completionAction: {
+							kind: "execute_tool_backed_operation",
+							instruction: operationInstruction,
+						},
+					}),
+				}),
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		await runtime.resolveNextAction({ taskState })
+		const renderFormAction = await submitNewProjectSelection(taskState, "Clear Text Value Destination Project")
+		expect(renderFormAction.kind).to.equal("render_workflow_form")
+		if (renderFormAction.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${renderFormAction.kind}.`)
+		}
+		getActiveWorkflowSession(taskState).workflowValues.summary = "Stale summary"
+
+		const nextAction = await runtime.submitWorkflowForm({
+			taskState,
+			request: createFormSubmitRequest({
+				sessionId: renderFormAction.formSession.sessionId,
+				panelId: renderFormAction.formSession.currentPanelId,
+				fields: [
+					{
+						key: "summary_field",
+						value: { stringValue: "" },
+					},
+				],
+			}),
+		})
+
+		expect(nextAction.kind).to.equal("execute_tool_backed_operation")
+		expect(capturedWorkflowValues).to.not.equal(undefined)
+		if (capturedWorkflowValues === undefined) {
+			throw new Error("Expected workflow values to be captured.")
+		}
+		expect(capturedWorkflowValues).to.not.have.property("summary")
+		expect(getActiveWorkflowSession(taskState).workflowValues).to.not.have.property("summary")
+	})
+
+	it("does not clear durable workflow values for omitted optional workflow-form fields without stale clear rules", async () => {
+		const workflowFormId = "omitted-optional-value-destination-form"
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: ["summary"],
+			workflowForms: {
+				[workflowFormId]: {
+					definitionVersion: 2,
+					title: "Omitted Optional Value Destination Form",
+					toolDictionaryTitle: "Omitted Optional Value Destination Tools",
+					toolDictionaryMarkdown: "Omitted optional destination help",
+					firstPanelId: "details",
+					panels: {
+						details: {
+							panelId: "details",
+							title: "Details",
+							promptMarkdown: "Optionally capture details.",
+							fields: [
+								{
+									key: "summary_field",
+									workflowValueKey: "summary",
+									kind: "small_text",
+									label: "Summary",
+									required: false,
+									allowedValueType: "string",
+								},
+							],
+							allowedActions: ["submit"],
+							transition: createTerminalTransition(),
+						},
+					},
+				},
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createWorkflowFormDecisionTree({ workflowFormId }),
+				}),
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		await runtime.resolveNextAction({ taskState })
+		const renderFormAction = await submitNewProjectSelection(taskState, "Omitted Optional Value Destination Project")
+		expect(renderFormAction.kind).to.equal("render_workflow_form")
+		if (renderFormAction.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${renderFormAction.kind}.`)
+		}
+		getActiveWorkflowSession(taskState).workflowValues.summary = "Retained summary"
+
+		const nextAction = await runtime.submitWorkflowForm({
+			taskState,
+			request: createFormSubmitRequest({
+				sessionId: renderFormAction.formSession.sessionId,
+				panelId: renderFormAction.formSession.currentPanelId,
+			}),
+		})
+
+		expect(nextAction.kind).to.equal("project_prompt")
+		expect(getActiveWorkflowSession(taskState).workflowValues.summary).to.equal("Retained summary")
+	})
+
+	it("clears declared durable workflow values for workflow-form transition stale value keys", async () => {
+		const workflowFormId = "transition-stale-clear-form"
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: ["stale_summary"],
+			workflowForms: {
+				[workflowFormId]: {
+					definitionVersion: 2,
+					title: "Transition Stale Clear Form",
+					toolDictionaryTitle: "Transition Stale Clear Tools",
+					toolDictionaryMarkdown: "Transition stale clear help",
+					firstPanelId: "details",
+					panels: {
+						details: {
+							panelId: "details",
+							title: "Details",
+							promptMarkdown: "Capture details.",
+							fields: [
+								{
+									key: "source",
+									kind: "small_text",
+									label: "Source",
+									required: true,
+									allowedValueType: "string",
+								},
+								{
+									key: "stale_summary_field",
+									workflowValueKey: "stale_summary",
+									kind: "small_text",
+									label: "Stale Summary",
+									required: false,
+									allowedValueType: "string",
+								},
+							],
+							allowedActions: ["submit"],
+							transition: {
+								type: "sequential",
+								nextPanelId: "done",
+								staleValueKeysToClear: ["stale_summary_field"],
+							},
+						},
+						done: {
+							panelId: "done",
+							title: "Done",
+							promptMarkdown: "Done.",
+							fields: [],
+							allowedActions: ["submit"],
+							transition: createTerminalTransition(),
+						},
+					},
+				},
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createWorkflowFormDecisionTree({ workflowFormId }),
+				}),
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		await runtime.resolveNextAction({ taskState })
+		const renderFormAction = await submitNewProjectSelection(taskState, "Transition Stale Clear Project")
+		expect(renderFormAction.kind).to.equal("render_workflow_form")
+		if (renderFormAction.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${renderFormAction.kind}.`)
+		}
+		getActiveWorkflowSession(taskState).workflowValues.stale_summary = "Old stale summary"
+
+		const nextAction = await runtime.submitWorkflowForm({
+			taskState,
+			request: createFormSubmitRequest({
+				sessionId: renderFormAction.formSession.sessionId,
+				panelId: renderFormAction.formSession.currentPanelId,
+				fields: [
+					{
+						key: "source",
+						value: { stringValue: "new source" },
+					},
+				],
+			}),
+		})
+
+		expect(nextAction.kind).to.equal("render_workflow_form")
+		expect(getActiveWorkflowSession(taskState).workflowValues).to.not.have.property("stale_summary")
+	})
+
+	it("routes workflow-form durable clears through workflow_values_persisted changed keys", async () => {
+		const workflowFormId = "clear-route-form"
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: ["durable_choice"],
+			workflowForms: {
+				[workflowFormId]: {
+					definitionVersion: 2,
+					title: "Clear Route Form",
+					toolDictionaryTitle: "Clear Route Tools",
+					toolDictionaryMarkdown: "Clear route help",
+					firstPanelId: "choice",
+					panels: {
+						choice: {
+							panelId: "choice",
+							title: "Choice",
+							promptMarkdown: "Optionally capture a choice.",
+							fields: [
+								{
+									key: "choice_field",
+									workflowValueKey: "durable_choice",
+									kind: "small_text",
+									label: "Choice",
+									required: false,
+									allowedValueType: "string",
+								},
+							],
+							allowedActions: ["submit"],
+							transition: { type: "sequential", nextPanelId: "confirm" },
+						},
+						confirm: {
+							panelId: "confirm",
+							title: "Confirm",
+							promptMarkdown: "Confirm.",
+							fields: [],
+							allowedActions: ["submit"],
+							transition: createTerminalTransition(),
+						},
+					},
+				},
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: {
+						entryBranchId: "show-form",
+						branches: {
+							"show-form": {
+								id: "show-form",
+								routes: [
+									{
+										id: "render-form",
+										trigger: { kind: "always" },
+										action: { kind: "render_workflow_form", workflowFormId },
+										followingBranchId: "await-clear",
+									},
+								],
+							},
+							"await-clear": {
+								id: "await-clear",
+								routes: [
+									{
+										id: "durable-choice-cleared",
+										trigger: {
+											kind: "event_predicate",
+											matches: ({ triggerEvent }) =>
+												triggerEvent.kind === "workflow_values_persisted" &&
+												triggerEvent.changedKeys.includes("durable_choice"),
+										},
+										action: { kind: "project_prompt" },
+									},
+								],
+							},
+						},
+					},
+				}),
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		await runtime.resolveNextAction({ taskState })
+		const renderFormAction = await submitNewProjectSelection(taskState, "Clear Route Project")
+		expect(renderFormAction.kind).to.equal("render_workflow_form")
+		if (renderFormAction.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${renderFormAction.kind}.`)
+		}
+		getActiveWorkflowSession(taskState).workflowValues.durable_choice = "stale choice"
+
+		const nextPanelAction = await runtime.submitWorkflowForm({
+			taskState,
+			request: createFormSubmitRequest({
+				sessionId: renderFormAction.formSession.sessionId,
+				panelId: renderFormAction.formSession.currentPanelId,
+				fields: [
+					{
+						key: "choice_field",
+						value: { stringValue: "" },
+					},
+				],
+			}),
+		})
+		const triggerEvent = getActiveWorkflowSession(taskState).branchContext.lastTriggerEvent
+		const routedAction = await runtime.resolveNextAction({ taskState })
+
+		expect(nextPanelAction.kind).to.equal("render_workflow_form")
+		expect(triggerEvent).to.deep.equal({
+			kind: "workflow_values_persisted",
+			changedKeys: ["durable_choice"],
+		})
+		expect(routedAction.kind).to.equal("project_prompt")
 	})
 
 	it("persists typed workflow-form value destinations as JSON-safe workflow values", async () => {

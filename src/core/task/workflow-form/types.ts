@@ -63,15 +63,22 @@ export type WorkflowFormRuntimeCreateSessionOptions =
 	| WorkflowFormRuntimeCreateSessionOptionsWithData
 	| WorkflowFormRuntimeCreateSessionOptionsWithStartPanelAndData
 
+export interface WorkflowFormRuntimeValueChanges {
+	submittedValueKeys: readonly string[]
+	clearedValueKeys: readonly string[]
+}
+
 export type WorkflowFormRuntimeOutcome =
 	| {
 			kind: "render_form"
 			session: WorkflowFormSessionState
+			valueChanges: WorkflowFormRuntimeValueChanges
 	  }
 	| {
 			kind: "complete_success"
 			session: WorkflowFormSessionState
 			successMessage: string
+			valueChanges: WorkflowFormRuntimeValueChanges
 	  }
 
 export interface WorkflowFormRuntimeLike {

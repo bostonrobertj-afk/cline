@@ -51,7 +51,7 @@ The brainstorming artifact definition must map `outputValueKeys.artifactAbsolute
 
 Any workflow form field whose submitted value must survive beyond form-local state must declare a durable workflow-value destination and persist through the runtime value seam, per `FR-39f` through `FR-39m`.
 
-Any AI-writable brainstorming values must be exposed only through module-owned active-step tool schema. The module must use `set_workflow_values` where replacement semantics are sufficient and may use `append_brainstorming_selected_technique` only for the selected-technique append semantics specified below, per `FR-35a`, `FR-35g` through `FR-35m`, and `FR-35n` through `FR-35n3`.
+Any AI-writable brainstorming values must be exposed only through module-owned active-step tool schema. The active step and prompt variant schema is authoritative for which mutation tools and workflow values are model-visible for that turn. The module must use `set_workflow_values` only when the active prompt variant explicitly exposes replacement-style workflow-value writes, and must use `append_brainstorming_selected_technique` for the selected-technique append semantics specified below, per `FR-35a`, `FR-35g` through `FR-35m`, and `FR-35n` through `FR-35n3`.
 
 Workflow values must remain JSON-safe and preserve type/shape, per `FR-35i` through `FR-35k`. Prompt builders may render workflow values only through deterministic rendering, per `FR-35l`; runtime or tool code requiring string paths or identities must validate non-empty strings per `FR-35m`.
 
@@ -66,7 +66,7 @@ The brainstorming module must define step-specific AI-writable workflow-value ex
 | Step 1 | none | none | Step 1 values are form/deterministic writes only. |
 | Step 2 | none | none | Step 2 values are form/deterministic writes only. |
 | Step 3 choose/random | `set_workflow_values` | `techniques_used`, `ideas_generated` | `selected_techniques` must not be exposed through `set_workflow_values`. |
-| Step 3 suggest | `append_brainstorming_selected_technique`, `set_workflow_values` | append tool updates `selected_techniques`; `set_workflow_values` may write `techniques_used`, `ideas_generated` | The AI must not write `selected_techniques` directly. |
+| Step 3 suggest | `append_brainstorming_selected_technique` | append tool updates `selected_techniques` | Step 3 suggest must not expose `set_workflow_values`; session notes must be written to `{output_file}` through `build_workflow_document`. |
 | Step 4 | none | none | Step 4 writes the output document through `build_workflow_document`. |
 
 ## Entry And Steps
@@ -125,7 +125,7 @@ The Step 1 workflow form must include these four panels:
 - Panel 3 must show: `Do you have any specific goals for this session?` and collect required `has_session_goals` through a yes/no boolean field.
 - Panel 4 must show only when `has_session_goals` is yes. It must show: `What are your goals for this session?` and collect required `session_goals` through a large text area.
 
-The Step 1 workflow form must collect optional context file and required topic/problem/opportunity input. Durable submitted values must persist through workflow-value destinations declared by the module.
+The Step 1 workflow form must collect optional context file and required topic/problem/opportunity input. Durable submitted values must persist and clear through workflow-value destinations declared by the module, using the central workflow-form clearing semantics in `FR-39n` through `FR-39r`.
 
 After the Step 1 workflow form completes, the next action must use `build_workflow_document` to populate the already-created brainstorming output artifact by writing `context_file` under `context file`, `session_topic` under `session topic`, and `session_goals` under `session goals` when goals were provided. When that `build_workflow_document` action succeeds, the Step 1 decision tree must select a `transition_step` action targeting Step 2. Step 1 must not rely on implicit completion, optional progression, or model-driven handoff to advance to Step 2.
 
@@ -263,6 +263,8 @@ Goal: Guide an interactive brainstorming session from setup through technique se
 Once the user indicates they're ready, use `workflow_progress_request` to confirm and unlock the next workflow step.
 
 Step 3 tool schema must expose exactly the tools required by the selected prompt variant. For the suggestion variant, Step 3 must expose `get_brainstorming_methods`, `append_brainstorming_selected_technique`, `build_workflow_document`, and `workflow_progress_request`. For choose/random variants, Step 3 must expose `build_workflow_document`, `set_workflow_values` for `techniques_used` and `ideas_generated`, and `workflow_progress_request`, but must not expose `get_brainstorming_methods` or `append_brainstorming_selected_technique`.
+
+In the suggestion variant, `techniques_used` and `ideas_generated` must not be exposed as AI-writable runtime workflow values; any needed session notes must be written to `{output_file}` through `build_workflow_document`.
 
 When Step 3 receives a `workflow_progress_request_confirmed` event, the Step 3 decision tree must select a `transition_step` action targeting Step 4. If the request is denied, Step 3 must remain active and return to `project_prompt` for continued brainstorming facilitation.
 

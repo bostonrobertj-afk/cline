@@ -18,6 +18,7 @@ import { normalizeWorkflowFormSubmittedValue, validateWorkflowFormSubmittedValue
 import type {
 	WorkflowFormRuntimeCreateSessionOptions,
 	WorkflowFormRuntimeOutcome,
+	WorkflowFormRuntimeValueChanges,
 	WorkflowFormSessionData,
 	WorkflowFormSessionState,
 	WorkflowFormSessionValues,
@@ -94,6 +95,82 @@ function submittedValuesEqual(
 	right: WorkflowFormSubmittedValuePayload | undefined,
 ): boolean {
 	return JSON.stringify(left ?? null) === JSON.stringify(right ?? null)
+}
+
+function dedupeFieldKeys(fieldKeys: Iterable<string>): string[] {
+	const seenFieldKeys = new Set<string>()
+	const dedupedFieldKeys: string[] = []
+
+	for (const fieldKey of fieldKeys) {
+		if (seenFieldKeys.has(fieldKey)) {
+			continue
+		}
+
+		seenFieldKeys.add(fieldKey)
+		dedupedFieldKeys.push(fieldKey)
+	}
+
+	return dedupedFieldKeys
+}
+
+function createWorkflowFormRuntimeValueChanges(
+	submittedValueKeys: Iterable<string>,
+	clearedValueKeys: Iterable<string>,
+): WorkflowFormRuntimeValueChanges {
+	const dedupedSubmittedValueKeys = dedupeFieldKeys(submittedValueKeys)
+	const submittedValueKeySet = new Set(dedupedSubmittedValueKeys)
+
+	return {
+		submittedValueKeys: dedupedSubmittedValueKeys,
+		clearedValueKeys: dedupeFieldKeys(clearedValueKeys).filter((fieldKey) => !submittedValueKeySet.has(fieldKey)),
+	}
+}
+
+function removeValueChangeKeys(valueKeys: readonly string[], keysToRemove: Iterable<string>): string[] {
+	const keyRemovalSet = new Set(keysToRemove)
+	return valueKeys.filter((valueKey) => !keyRemovalSet.has(valueKey))
+}
+
+function isClearedWorkflowFormSubmittedValue(
+	field: WorkflowFormFieldDefinition,
+	value: WorkflowFormSubmittedValuePayload | undefined,
+): boolean {
+	if (value === undefined) {
+		return false
+	}
+
+	switch (field.kind) {
+		case "small_text":
+			if (field.allowedValueType === "integer") {
+				return false
+			}
+			return value.valueType === "string" && (value.stringValue ?? "").trim().length === 0
+		case "large_text":
+			if (field.allowedValueType === "array" || field.allowedValueType === "object") {
+				return false
+			}
+			return value.valueType === "string" && (value.stringValue ?? "").trim().length === 0
+		case "dropdown":
+			if ((field.selectionCardinality ?? "single") === "single") {
+				return value.valueType === "string" && (value.stringValue ?? "").trim().length === 0
+			}
+			return value.valueType === "array" && (value.arrayValue ?? []).length === 0
+		case "radio_group":
+		case "date":
+		case "date_time":
+		case "file_path":
+		case "directory_path":
+		case "artifact_picker":
+			return value.valueType === "string" && (value.stringValue ?? "").trim().length === 0
+		case "multi_select":
+		case "checkbox_group":
+			return value.valueType === "array" && (value.arrayValue ?? []).length === 0
+		case "boolean":
+		case "number":
+		case "markdown_display":
+		case "static_notice":
+			return false
+	}
 }
 
 function resolveComparableSourceValue(session: Pick<WorkflowFormSessionState, "values" | "data">, sourceKey: string): unknown {
@@ -488,9 +565,10 @@ function applyFieldResetRules(
 	previousValues: WorkflowFormSessionValues,
 	nextValues: WorkflowFormSessionValues,
 	data: WorkflowFormSessionData,
-): { values: WorkflowFormSessionValues; data: WorkflowFormSessionData } {
+): { values: WorkflowFormSessionValues; data: WorkflowFormSessionData; clearedValueKeys: readonly string[] } {
 	const updatedValues = { ...nextValues }
 	const updatedData = { ...data }
+	const clearedValueKeys: string[] = []
 
 	for (const field of panel.fields) {
 		if (!field.resetValueKeysOnChange?.length && !field.resetDataKeysOnChange?.length) {
@@ -503,6 +581,7 @@ function applyFieldResetRules(
 
 		for (const key of field.resetValueKeysOnChange ?? []) {
 			delete updatedValues[key]
+			clearedValueKeys.push(key)
 		}
 
 		for (const key of field.resetDataKeysOnChange ?? []) {
@@ -513,6 +592,7 @@ function applyFieldResetRules(
 	return {
 		values: updatedValues,
 		data: updatedData,
+		clearedValueKeys,
 	}
 }
 
@@ -521,12 +601,14 @@ function clearDeclaredKeys(
 	data: WorkflowFormSessionData,
 	valueKeys: string[] | undefined,
 	dataKeys: string[] | undefined,
-): { values: WorkflowFormSessionValues; data: WorkflowFormSessionData } {
+): { values: WorkflowFormSessionValues; data: WorkflowFormSessionData; clearedValueKeys: readonly string[] } {
 	const nextValues = { ...values }
 	const nextData = { ...data }
+	const clearedValueKeys: string[] = []
 
 	for (const key of valueKeys ?? []) {
 		delete nextValues[key]
+		clearedValueKeys.push(key)
 	}
 
 	for (const key of dataKeys ?? []) {
@@ -536,6 +618,7 @@ function clearDeclaredKeys(
 	return {
 		values: nextValues,
 		data: nextData,
+		clearedValueKeys,
 	}
 }
 
@@ -645,13 +728,24 @@ export class WorkflowFormRuntime {
 		}
 
 		const mergedValues = { ...session.values }
+		const submittedValueKeys: string[] = []
+		const clearedValueKeys: string[] = []
 		for (const field of activePanel.fields.filter((entry) => isInputField(entry))) {
-			if (submittedValues[field.key]) {
-				mergedValues[field.key] = submittedValues[field.key]
-			} else if (!(field.key in submittedValues)) {
+			if (field.key in submittedValues) {
+				const submittedValue = submittedValues[field.key]
+				if (isClearedWorkflowFormSubmittedValue(field, submittedValue)) {
+					delete mergedValues[field.key]
+					clearedValueKeys.push(field.key)
+					continue
+				}
+
+				mergedValues[field.key] = submittedValue
+				submittedValueKeys.push(field.key)
+			} else {
 				delete mergedValues[field.key]
 			}
 		}
+		let valueChanges = createWorkflowFormRuntimeValueChanges(submittedValueKeys, clearedValueKeys)
 
 		let nextSession: WorkflowFormSessionState = {
 			...session,
@@ -678,7 +772,12 @@ export class WorkflowFormRuntime {
 				}
 
 				if (submittedValue && !validateStructuredValueShape(field, submittedValue)) {
-					return this.renderFailure(nextSession, activePanel.panelId, `Field "${field.key}" has an invalid value.`)
+					return this.renderFailure(
+						nextSession,
+						activePanel.panelId,
+						`Field "${field.key}" has an invalid value.`,
+						valueChanges,
+					)
 				}
 
 				if (
@@ -686,11 +785,16 @@ export class WorkflowFormRuntime {
 					field.valueSchema &&
 					!validateWorkflowFormSubmittedValueAgainstSchema(submittedValue, field.valueSchema)
 				) {
-					return this.renderFailure(nextSession, activePanel.panelId, `Field "${field.key}" has an invalid value.`)
+					return this.renderFailure(
+						nextSession,
+						activePanel.panelId,
+						`Field "${field.key}" has an invalid value.`,
+						valueChanges,
+					)
 				}
 
 				if (field.required && !hasRenderableValue(submittedValue)) {
-					return this.renderFailure(nextSession, activePanel.panelId, `Field "${field.key}" is required.`)
+					return this.renderFailure(nextSession, activePanel.panelId, `Field "${field.key}" is required.`, valueChanges)
 				}
 
 				if (submittedValue && !validateSelectionRules(field, submittedValue)) {
@@ -698,6 +802,7 @@ export class WorkflowFormRuntime {
 						nextSession,
 						activePanel.panelId,
 						`Field "${field.key}" does not satisfy the declared selection rules.`,
+						valueChanges,
 					)
 				}
 			}
@@ -707,11 +812,16 @@ export class WorkflowFormRuntime {
 					nextSession,
 					activePanel.panelId,
 					"Provide at least one of the allowed alternative inputs before submitting.",
+					valueChanges,
 				)
 			}
 		}
 
 		const resetResult = applyFieldResetRules(activePanel, session.values, nextSession.values, nextSession.data)
+		valueChanges = createWorkflowFormRuntimeValueChanges(
+			removeValueChangeKeys(valueChanges.submittedValueKeys, resetResult.clearedValueKeys),
+			[...valueChanges.clearedValueKeys, ...resetResult.clearedValueKeys],
+		)
 		nextSession = {
 			...nextSession,
 			values: resetResult.values,
@@ -723,29 +833,33 @@ export class WorkflowFormRuntime {
 			return {
 				kind: "render_form",
 				session: nextSession,
+				valueChanges,
 			}
 		}
 		if (request.action === WorkflowFormAction.CANCEL && !allowedActions.has("cancel")) {
 			return {
 				kind: "render_form",
 				session: nextSession,
+				valueChanges,
 			}
 		}
 		if (request.action === WorkflowFormAction.BACK && !allowedActions.has("back")) {
 			return {
 				kind: "render_form",
 				session: nextSession,
+				valueChanges,
 			}
 		}
 		if (request.action === WorkflowFormAction.RETRY && (!session.failure || !allowedActions.has("retry"))) {
 			return {
 				kind: "render_form",
 				session: nextSession,
+				valueChanges,
 			}
 		}
 
 		if (request.action === WorkflowFormAction.BACK) {
-			return this.handleBack(nextSession, activePanel)
+			return this.handleBack(nextSession, activePanel, valueChanges)
 		}
 
 		if (request.action === WorkflowFormAction.RETRY) {
@@ -756,6 +870,7 @@ export class WorkflowFormRuntime {
 			return {
 				kind: "render_form",
 				session: nextSession,
+				valueChanges,
 			}
 		}
 
@@ -765,6 +880,10 @@ export class WorkflowFormRuntime {
 			nextSession.data,
 			transitionOutcome.staleValueKeysToClear,
 			transitionOutcome.staleDataKeysToClear,
+		)
+		valueChanges = createWorkflowFormRuntimeValueChanges(
+			removeValueChangeKeys(valueChanges.submittedValueKeys, clearedAfterTransition.clearedValueKeys),
+			[...valueChanges.clearedValueKeys, ...clearedAfterTransition.clearedValueKeys],
 		)
 		nextSession = {
 			...nextSession,
@@ -777,6 +896,7 @@ export class WorkflowFormRuntime {
 				kind: "complete_success",
 				session: nextSession,
 				successMessage: "",
+				valueChanges,
 			}
 		}
 
@@ -794,14 +914,20 @@ export class WorkflowFormRuntime {
 		return {
 			kind: "render_form",
 			session: transitionedSession,
+			valueChanges,
 		}
 	}
 
-	private handleBack(session: WorkflowFormSessionState, activePanel: WorkflowFormPanelDefinition): WorkflowFormRuntimeOutcome {
+	private handleBack(
+		session: WorkflowFormSessionState,
+		activePanel: WorkflowFormPanelDefinition,
+		valueChanges: WorkflowFormRuntimeValueChanges,
+	): WorkflowFormRuntimeOutcome {
 		if (session.currentPanelId === session.firstPanelId) {
 			return {
 				kind: "render_form",
 				session,
+				valueChanges,
 			}
 		}
 
@@ -822,17 +948,31 @@ export class WorkflowFormRuntime {
 			data: cleared.data,
 			failure: undefined,
 		}
+		const nextValueChanges = createWorkflowFormRuntimeValueChanges(
+			removeValueChangeKeys(valueChanges.submittedValueKeys, cleared.clearedValueKeys),
+			[...valueChanges.clearedValueKeys, ...cleared.clearedValueKeys],
+		)
 
 		return {
 			kind: "render_form",
 			session: nextSession,
+			valueChanges: nextValueChanges,
 		}
 	}
 
 	private handleRetry(session: WorkflowFormSessionState): WorkflowFormRuntimeOutcome {
 		const firstPanel = this.getPanel(session.definitionPayload, session.firstPanelId)
 		const firstPanelFieldKeys = new Set(firstPanel.fields.filter((field) => isInputField(field)).map((field) => field.key))
-		const retainedValues = Object.fromEntries(Object.entries(session.values).filter(([key]) => firstPanelFieldKeys.has(key)))
+		const droppedValueKeys: string[] = []
+		const retainedValues = Object.fromEntries(
+			Object.entries(session.values).filter(([key]) => {
+				const shouldRetainValue = firstPanelFieldKeys.has(key)
+				if (!shouldRetainValue) {
+					droppedValueKeys.push(key)
+				}
+				return shouldRetainValue
+			}),
+		)
 		const nextSession: WorkflowFormSessionState = {
 			...session,
 			currentPanelId: session.firstPanelId,
@@ -844,10 +984,16 @@ export class WorkflowFormRuntime {
 		return {
 			kind: "render_form",
 			session: nextSession,
+			valueChanges: createWorkflowFormRuntimeValueChanges([], droppedValueKeys),
 		}
 	}
 
-	private renderFailure(session: WorkflowFormSessionState, panelId: string, errorMessage: string): WorkflowFormRuntimeOutcome {
+	private renderFailure(
+		session: WorkflowFormSessionState,
+		panelId: string,
+		errorMessage: string,
+		valueChanges: WorkflowFormRuntimeValueChanges,
+	): WorkflowFormRuntimeOutcome {
 		const failureSession: WorkflowFormSessionState = {
 			...session,
 			failure: {
@@ -859,6 +1005,7 @@ export class WorkflowFormRuntime {
 		return {
 			kind: "render_form",
 			session: failureSession,
+			valueChanges,
 		}
 	}
 

@@ -603,66 +603,66 @@ Allowed files:
 
 After completing this phase, pause for QA review before moving to Validation.
 
-[ ] Task 8. Verify prompt/native-tool projection for the registered brainstorming module.
+[x] Task 8. Verify prompt/native-tool projection for the registered brainstorming module.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 8.1. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, add coverage proving active `brainstorming` Step 3 suggest projection includes `get_brainstorming_methods` and `append_brainstorming_selected_technique`.
+[x] Subtask 8.1. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, add coverage proving active `brainstorming` Step 3 suggest projection includes `get_brainstorming_methods` and `append_brainstorming_selected_technique`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 8.2. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, add coverage proving active `brainstorming` Step 3 choose/random projection omits `get_brainstorming_methods` and `append_brainstorming_selected_technique`.
+[x] Subtask 8.2. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, add coverage proving active `brainstorming` Step 3 choose/random projection omits `get_brainstorming_methods` and `append_brainstorming_selected_technique`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 8.3. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, add coverage proving active `brainstorming` Step 4 projection includes `attempt_completion` and omits `workflow_progress_request`.
+[x] Subtask 8.3. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, add coverage proving active `brainstorming` Step 4 projection includes `attempt_completion` and omits `workflow_progress_request`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Task 9. Verify shipped workflow registry and activation lookup.
+[x] Task 9. Verify shipped workflow registry and activation lookup.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRegistry.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/UseSkillToolHandler.test.ts`
 
-[ ] Subtask 9.1. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving `resolveWorkflowDefinition("brainstorming")` resolves the registered module and `resolveWorkflowDefinition("brainstorming.md")` does not.
+[x] Subtask 9.1. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving `resolveWorkflowDefinition("brainstorming")` resolves the registered module and `resolveWorkflowDefinition("brainstorming.md")` does not.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 9.2. In `src/core/task/tools/handlers/__tests__/UseSkillToolHandler.test.ts`, add coverage proving `use_skill` with `brainstorming` activates the brainstorming workflow through `resolveWorkflowByUseSkillName(...)`.
+[x] Subtask 9.2. In `src/core/task/tools/handlers/__tests__/UseSkillToolHandler.test.ts`, add coverage proving `use_skill` with `brainstorming` activates the brainstorming workflow through `resolveWorkflowByUseSkillName(...)`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/UseSkillToolHandler.test.ts`
 
-[ ] Task 10. Verify legacy brainstorming-specific surfaces are not revived.
+[x] Task 10. Verify legacy brainstorming-specific surfaces are not revived.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/ToolExecutorCoordinator.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/shared/tools.ts`
 
-[ ] Subtask 10.1. In `brainstormingWorkflow.test.ts`, add an assertion that no Step 2 route or Step 3 tool schema references `select_random_brainstorming_technique`.
+[x] Subtask 10.1. In `brainstormingWorkflow.test.ts`, add an assertion that no Step 2 route or Step 3 tool schema references `select_random_brainstorming_technique`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
 
-[ ] Subtask 10.2. In `src/shared/tools.ts`, confirm no enum member or tool name for `select_random_brainstorming_technique` exists; if one exists, delete only that enum member and its direct references.
+[x] Subtask 10.2. In `src/shared/tools.ts`, confirm no enum member or tool name for `select_random_brainstorming_technique` exists; if one exists, delete only that enum member and its direct references.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/shared/tools.ts`
 
-[ ] Subtask 10.3. In `src/core/task/tools/ToolExecutorCoordinator.ts`, confirm no handler registration for `select_random_brainstorming_technique` exists; if one exists, delete only that registration and import.
+[x] Subtask 10.3. In `src/core/task/tools/ToolExecutorCoordinator.ts`, confirm no handler registration for `select_random_brainstorming_technique` exists; if one exists, delete only that registration and import.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/ToolExecutorCoordinator.ts`
 
-[ ] Subtask 10.4. In `brainstormingWorkflow.test.ts`, add an assertion that `brainstormingWorkflowDefinition.workflowForms` contains `step-2-approach-form`, does not contain `step-2-random-confirmation-form`, and that the Step 2 random-confirmation route renders `step-2-approach-form` with `startPanelId: "step-2-random-confirmation-panel"`.
+[x] Subtask 10.4. In `brainstormingWorkflow.test.ts`, add an assertion that `brainstormingWorkflowDefinition.workflowForms` contains `step-2-approach-form`, does not contain `step-2-random-confirmation-form`, and that the Step 2 random-confirmation route renders `step-2-approach-form` with `startPanelId: "step-2-random-confirmation-panel"`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`

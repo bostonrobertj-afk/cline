@@ -21,6 +21,9 @@
 import * as fs from "node:fs/promises"
 import * as path from "node:path"
 import { expect } from "chai"
+import { TaskState } from "@/core/task/TaskState"
+import type { ActiveWorkflowSession, WorkflowValues, WorkflowWorkspacePathPolicy } from "@/core/task/workflow-runtime/types"
+import { WorkflowRuntime } from "@/core/task/workflow-runtime/WorkflowRuntime"
 import type { McpHub } from "@/services/mcp/McpHub"
 import type { McpServer } from "@/shared/mcp"
 import { ModelFamily } from "@/shared/prompts"
@@ -429,6 +432,50 @@ const getNativeToolEntries = (tools: ClineTool[] | undefined): NativeToolEntry[]
 
 const getNativeToolNames = (tools: ClineTool[] | undefined): string[] =>
 	getNativeToolEntries(tools).flatMap((tool) => (tool.name ? [tool.name] : []))
+
+const createBrainstormingWorkflowSession = (input: {
+	activeStepNumber: 3 | 4
+	workflowValues: WorkflowValues
+}): ActiveWorkflowSession => ({
+	activeStepNumber: input.activeStepNumber,
+	workflowValues: input.workflowValues,
+	projectSelection: {
+		projectMode: "new",
+		projectTitle: "Brainstorming Session",
+		projectFolderName: "brainstorming-session",
+	},
+	ui: {
+		suppressedWorkflowFormIds: [],
+		suppressedWorkflowStepResolutionRoutes: [],
+	},
+	branchContext: {
+		activeBranchId: `step-${input.activeStepNumber}`,
+	},
+})
+
+const buildBrainstormingPromptContext = async (input: {
+	activeStepNumber: 3 | 4
+	workflowValues: WorkflowValues
+}): Promise<SystemPromptContext> => {
+	const workspacePathPolicy: WorkflowWorkspacePathPolicy = {
+		validateAccess: () => true,
+	}
+	const runtime = new WorkflowRuntime({ cwd: "/test/project", workspacePathPolicy })
+	const taskState = new TaskState()
+	taskState.activeWorkflowName = "brainstorming"
+	taskState.activeWorkflowSession = createBrainstormingWorkflowSession(input)
+	taskState.apiRequestCount = 1
+	const workflowProjection = await runtime.buildTurnProjection({ taskState })
+
+	return {
+		...baseContext,
+		mcpHub: makeMcpHub([]),
+		providerInfo: makeProviderInfo("gpt-5-codex", "openai"),
+		enableNativeToolCalls: true,
+		useMinimalGptPrompt: true,
+		...workflowProjection,
+	}
+}
 
 const isNativeToolsFamily = (family: ModelFamily) =>
 	[ModelFamily.NATIVE_NEXT_GEN, ModelFamily.NATIVE_GPT_5, ModelFamily.NATIVE_GPT_5_1, ModelFamily.GEMINI_3].includes(family)
@@ -851,6 +898,70 @@ describe("Prompt System Integration Tests", () => {
 					expect(getNativeToolNames(tools)).to.deep.equal(["workflow_progress_request"])
 				},
 			)
+		})
+
+		it("projects active brainstorming Step 3 suggest tools into native GPT-5 prompts", async function () {
+			const context = await buildBrainstormingPromptContext({
+				activeStepNumber: 3,
+				workflowValues: {
+					selected_approach: "I want you to suggest a technique",
+					output_file: "/test/project/discovery/brainstorming.md",
+				},
+			})
+
+			await runPromptTest(this, context, "gpt-5-codex", async ({ systemPrompt, tools }) => {
+				const nativeToolNames = getNativeToolNames(tools)
+
+				expect(nativeToolNames).to.include("get_brainstorming_methods")
+				expect(nativeToolNames).to.include("append_brainstorming_selected_technique")
+				expect(systemPrompt).to.include("Workflow: brainstorming")
+				expect(systemPrompt).to.include("Call `get_brainstorming_methods`")
+				expect(systemPrompt).to.include("call `append_brainstorming_selected_technique`")
+			})
+		})
+
+		it("omits suggest-only tools from active brainstorming Step 3 choose and random native projections", async function () {
+			const selectedApproaches = ["I want to choose", "I want a random technique"] as const
+
+			for (const selectedApproach of selectedApproaches) {
+				const context = await buildBrainstormingPromptContext({
+					activeStepNumber: 3,
+					workflowValues: {
+						selected_approach: selectedApproach,
+						output_file: "/test/project/discovery/brainstorming.md",
+					},
+				})
+
+				await runPromptTest(this, context, "gpt-5-codex", async ({ tools }) => {
+					const nativeToolNames = getNativeToolNames(tools)
+
+					expect(nativeToolNames).to.include("build_workflow_document")
+					expect(nativeToolNames).to.include("set_workflow_values")
+					expect(nativeToolNames).to.include("workflow_progress_request")
+					expect(nativeToolNames).to.not.include("get_brainstorming_methods")
+					expect(nativeToolNames).to.not.include("append_brainstorming_selected_technique")
+				})
+			}
+		})
+
+		it("projects active brainstorming Step 4 completion tools without workflow progress requests", async function () {
+			const context = await buildBrainstormingPromptContext({
+				activeStepNumber: 4,
+				workflowValues: {
+					output_file: "/test/project/discovery/brainstorming.md",
+				},
+			})
+
+			await runPromptTest(this, context, "gpt-5-codex", async ({ systemPrompt, tools }) => {
+				const nativeToolNames = getNativeToolNames(tools)
+
+				expect(nativeToolNames).to.include("build_workflow_document")
+				expect(nativeToolNames).to.include("attempt_completion")
+				expect(nativeToolNames).to.not.include("workflow_progress_request")
+				expect(systemPrompt).to.include("Workflow: brainstorming")
+				expect(systemPrompt).to.include("using `attempt_completion`")
+				expect(systemPrompt).to.not.include("workflow_progress_request")
+			})
 		})
 
 		it("projects create_workflow_artifact only through workflow override schemas", async function () {

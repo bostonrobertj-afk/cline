@@ -279,6 +279,256 @@ describe("WorkflowFormRuntime", () => {
 		})
 	})
 
+	it("accepts an optional text field submitted as an explicit clear", () => {
+		const runtime = createRuntime()
+		const session = createSession({
+			runtime,
+			definitionPayload: createDefinition({
+				firstPanelId: "details",
+				panels: {
+					details: {
+						panelId: "details",
+						title: "Details",
+						promptMarkdown: "Optionally capture notes.",
+						fields: [
+							{
+								key: "notes",
+								kind: "small_text",
+								label: "Notes",
+								required: false,
+								allowedValueType: "string",
+							},
+						],
+						allowedActions: ["submit"],
+						transition: createTerminalTransition(),
+					},
+				},
+			}),
+		})
+		const seededSession: WorkflowFormSessionState = {
+			...session,
+			values: {
+				notes: {
+					valueType: "string",
+					stringValue: "old notes",
+				},
+			},
+		}
+
+		const outcome = runtime.handleSubmission(
+			seededSession,
+			createSubmitRequest({
+				sessionId: seededSession.sessionId,
+				panelId: "details",
+				fields: [
+					{
+						key: "notes",
+						value: { stringValue: "" },
+					},
+				],
+			}),
+		)
+
+		expect(outcome.kind).to.equal("complete_success")
+		if (outcome.kind !== "complete_success") {
+			throw new Error(`Expected complete_success, received ${outcome.kind}.`)
+		}
+		expect(outcome.session.values.notes).to.equal(undefined)
+		expect(outcome.valueChanges).to.deep.equal({
+			submittedValueKeys: [],
+			clearedValueKeys: ["notes"],
+		})
+	})
+
+	it("accepts an optional checkbox group submitted as an explicit empty-array clear", () => {
+		const runtime = createRuntime()
+		const session = createSession({
+			runtime,
+			definitionPayload: createDefinition({
+				firstPanelId: "tags",
+				panels: {
+					tags: {
+						panelId: "tags",
+						title: "Tags",
+						promptMarkdown: "Optionally select tags.",
+						fields: [
+							{
+								key: "selected_tags",
+								kind: "checkbox_group",
+								label: "Tags",
+								required: false,
+								allowedValueType: "array",
+								options: [
+									{ value: "alpha", label: "Alpha" },
+									{ value: "beta", label: "Beta" },
+								],
+							},
+						],
+						allowedActions: ["submit"],
+						transition: createTerminalTransition(),
+					},
+				},
+			}),
+		})
+		const seededSession: WorkflowFormSessionState = {
+			...session,
+			values: {
+				selected_tags: {
+					valueType: "array",
+					arrayValue: [{ valueType: "string", stringValue: "alpha" }],
+				},
+			},
+		}
+
+		const outcome = runtime.handleSubmission(
+			seededSession,
+			createSubmitRequest({
+				sessionId: seededSession.sessionId,
+				panelId: "tags",
+				fields: [
+					{
+						key: "selected_tags",
+						value: { arrayValue: { values: [] } },
+					},
+				],
+			}),
+		)
+
+		expect(outcome.kind).to.equal("complete_success")
+		if (outcome.kind !== "complete_success") {
+			throw new Error(`Expected complete_success, received ${outcome.kind}.`)
+		}
+		expect(outcome.session.values.selected_tags).to.equal(undefined)
+		expect(outcome.valueChanges).to.deep.equal({
+			submittedValueKeys: [],
+			clearedValueKeys: ["selected_tags"],
+		})
+	})
+
+	it("does not report omitted active optional fields as explicit clears", () => {
+		const runtime = createRuntime()
+		const session = createSession({
+			runtime,
+			definitionPayload: createDefinition({
+				firstPanelId: "details",
+				panels: {
+					details: {
+						panelId: "details",
+						title: "Details",
+						promptMarkdown: "Optionally capture notes.",
+						fields: [
+							{
+								key: "notes",
+								kind: "small_text",
+								label: "Notes",
+								required: false,
+								allowedValueType: "string",
+							},
+						],
+						allowedActions: ["submit"],
+						transition: createTerminalTransition(),
+					},
+				},
+			}),
+		})
+		const seededSession: WorkflowFormSessionState = {
+			...session,
+			values: {
+				notes: {
+					valueType: "string",
+					stringValue: "old notes",
+				},
+			},
+		}
+
+		const outcome = runtime.handleSubmission(
+			seededSession,
+			createSubmitRequest({
+				sessionId: seededSession.sessionId,
+				panelId: "details",
+			}),
+		)
+
+		expect(outcome.kind).to.equal("complete_success")
+		if (outcome.kind !== "complete_success") {
+			throw new Error(`Expected complete_success, received ${outcome.kind}.`)
+		}
+		expect(outcome.session.values.notes).to.equal(undefined)
+		expect(outcome.valueChanges).to.deep.equal({
+			submittedValueKeys: [],
+			clearedValueKeys: [],
+		})
+	})
+
+	it("reports resetValueKeysOnChange stale value keys even when the target was absent", () => {
+		const runtime = createRuntime()
+		const session = createSession({
+			runtime,
+			definitionPayload: createDefinition({
+				firstPanelId: "details",
+				panels: {
+					details: {
+						panelId: "details",
+						title: "Details",
+						promptMarkdown: "Capture dependent details.",
+						fields: [
+							{
+								key: "source",
+								kind: "small_text",
+								label: "Source",
+								required: true,
+								allowedValueType: "string",
+								resetValueKeysOnChange: ["dependent"],
+							},
+							{
+								key: "dependent",
+								kind: "small_text",
+								label: "Dependent",
+								required: false,
+								allowedValueType: "string",
+							},
+						],
+						allowedActions: ["submit"],
+						transition: createTerminalTransition(),
+					},
+				},
+			}),
+		})
+		const seededSession: WorkflowFormSessionState = {
+			...session,
+			values: {
+				source: {
+					valueType: "string",
+					stringValue: "old source",
+				},
+			},
+		}
+
+		const outcome = runtime.handleSubmission(
+			seededSession,
+			createSubmitRequest({
+				sessionId: seededSession.sessionId,
+				panelId: "details",
+				fields: [
+					{
+						key: "source",
+						value: { stringValue: "new source" },
+					},
+				],
+			}),
+		)
+
+		expect(outcome.kind).to.equal("complete_success")
+		if (outcome.kind !== "complete_success") {
+			throw new Error(`Expected complete_success, received ${outcome.kind}.`)
+		}
+		expect(outcome.session.values.dependent).to.equal(undefined)
+		expect(outcome.valueChanges).to.deep.equal({
+			submittedValueKeys: ["source"],
+			clearedValueKeys: ["dependent"],
+		})
+	})
+
 	it("routes through a conditional transition using a radio-group field and lands on the correct next panel", () => {
 		const runtime = createRuntime()
 		const session = createSession({
@@ -511,6 +761,7 @@ describe("WorkflowFormRuntime", () => {
 			valueType: "string",
 			stringValue: "commit",
 		})
+		expect(backOutcome.valueChanges.clearedValueKeys).to.deep.equal(["source.detail"])
 	})
 
 	it("restarts a retry flow at the first panel and clears failure", () => {

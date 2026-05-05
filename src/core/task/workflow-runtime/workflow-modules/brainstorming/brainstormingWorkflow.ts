@@ -394,6 +394,7 @@ function buildStep1SetupWorkflowForm(): WorkflowFormDefinitionPayload {
 						{
 							matchValue: false,
 							terminal: true,
+							staleValueKeysToClear: [BrainstormingWorkflowValueKey.SessionGoals],
 						},
 					],
 					defaultTerminal: true,

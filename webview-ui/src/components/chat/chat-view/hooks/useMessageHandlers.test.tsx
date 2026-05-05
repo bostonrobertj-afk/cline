@@ -145,6 +145,61 @@ describe("useMessageHandlers workflow form submit builders", () => {
 		expect(request.fields[0]?.value?.stringValue).toBeUndefined()
 	})
 
+	it("submits empty text and path values as explicit clears while omitting empty numeric values", () => {
+		const request = buildWorkflowFormSubmissionRequest(
+			createWorkflowForm([
+				{
+					key: "summary",
+					kind: "small_text",
+					label: "Summary",
+					required: false,
+				},
+				{
+					key: "notes",
+					kind: "large_text",
+					label: "Notes",
+					required: false,
+				},
+				{
+					key: "context_file",
+					kind: "file_path",
+					label: "Context File",
+					required: false,
+				},
+				{
+					key: "step_number",
+					kind: "small_text",
+					label: "Step Number",
+					required: false,
+					allowedValueType: "integer",
+				},
+				{
+					key: "score",
+					kind: "number",
+					label: "Score",
+					required: false,
+					allowedValueType: "number",
+				},
+			]),
+			WorkflowFormAction.SUBMIT,
+			{
+				summary: "   ",
+				notes: "",
+				context_file: " ",
+				step_number: "",
+				score: "",
+			},
+		)
+
+		expect(request.fields).toMatchObject([
+			{ key: "summary", value: { stringValue: "" } },
+			{ key: "notes", value: { stringValue: "" } },
+			{ key: "context_file", value: { stringValue: "" } },
+		])
+		expect(request.fields.map((field) => field.key)).not.toContain("step_number")
+		expect(request.fields.map((field) => field.key)).not.toContain("score")
+	})
+
 	it("submits number values through the typed transport", async () => {
 		await submitWorkflowForm(
 			createWorkflowForm([
@@ -204,6 +259,44 @@ describe("useMessageHandlers workflow form submit builders", () => {
 				},
 			],
 		})
+	})
+
+	it("submits empty multi-select values as explicit empty arrays", () => {
+		const request = buildWorkflowFormSubmissionRequest(
+			createWorkflowForm([
+				{
+					key: "paths",
+					kind: "multi_select",
+					label: "Paths",
+					required: false,
+				},
+				{
+					key: "tags",
+					kind: "checkbox_group",
+					label: "Tags",
+					required: false,
+				},
+				{
+					key: "choices",
+					kind: "dropdown",
+					label: "Choices",
+					required: false,
+					selectionCardinality: "unbounded",
+				},
+			]),
+			WorkflowFormAction.SUBMIT,
+			{
+				paths: [],
+				tags: [],
+				choices: [],
+			},
+		)
+
+		expect(request.fields).toMatchObject([
+			{ key: "paths", value: { arrayValue: { values: [] } } },
+			{ key: "tags", value: { arrayValue: { values: [] } } },
+			{ key: "choices", value: { arrayValue: { values: [] } } },
+		])
 	})
 
 	it("submits object-backed large_text values through the typed transport", async () => {

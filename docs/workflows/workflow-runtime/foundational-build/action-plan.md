@@ -6434,6 +6434,326 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
+## Phase 53 - Workflow Form Durable Value Clearing
+
+After completing this phase, pause for QA review before resuming downstream workflow-module validation.
+
+### Phase 53 Scope
+
+This phase implements `FR-39n` through `FR-39r` by adding explicit durable workflow-form clearing semantics to the central workflow-form and workflow-runtime path. The implementation must distinguish explicit cleared submissions from merely omitted form fields, must clear module-declared stale durable values when workflow form rules invalidate them, and must ensure canonical next-action re-evaluation observes the post-submission workflow-value state.
+
+### Phase 53 Scope Boundary
+
+- Do not change workflow form protobuf message shape; the existing `WorkflowFormValue` oneof already supports explicit empty string values and empty array values.
+- Do not add `null` or `undefined` to `WorkflowValue`.
+- Do not encode clears as placeholder strings, sentinel workflow values, empty JSON objects, or module-specific conventions.
+- Do not change AI-authored `set_workflow_values` replacement semantics in this phase.
+- Do not make stale durable clearing brainstorming-specific; brainstorming may declare a stale clear rule, but central runtime code must implement the behavior generically.
+- Do not alter workflow form UI layout, labels, focus-chain behavior, or workflow prompt behavior.
+
+### Phase 53 Known Issues / Risks / Technical Debt
+
+- The workflow form runtime already clears stale form-local values for omitted active fields, field reset rules, transition stale keys, back stale keys, and retry. Before this phase, those form-local deletes did not reach durable workflow values because `WorkflowRuntime.persistWorkflowFormValues(...)` only persisted present form-session values.
+- The webview submission builder currently omits empty string inputs and therefore cannot represent an explicit user clear for text/path-style fields. This phase fixes that transport gap without changing the protobuf contract.
+
+[x] Task 127. Extend workflow-form runtime outcomes to report explicit submitted and cleared form field keys.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
+
+[x] Subtask 127.1. In `src/core/task/workflow-form/types.ts`, add `WorkflowFormRuntimeValueChanges` with `submittedValueKeys: readonly string[]` and `clearedValueKeys: readonly string[]`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/types.ts`
+
+[x] Subtask 127.2. In `src/core/task/workflow-form/types.ts`, add `valueChanges: WorkflowFormRuntimeValueChanges` to both `WorkflowFormRuntimeOutcome` variants, so every `render_form` and `complete_success` outcome carries the form-local field keys submitted and cleared during that submission.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/types.ts`
+
+[x] Subtask 127.3. In `src/core/task/workflow-form/WorkflowFormRuntime.ts`, import `WorkflowFormRuntimeValueChanges` from `./types` as a type-only import.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
+
+[x] Subtask 127.4. In `src/core/task/workflow-form/WorkflowFormRuntime.ts`, add a local helper named `createWorkflowFormRuntimeValueChanges(...)` that accepts readonly submitted and cleared field-key iterables, de-dupes each list while preserving first-seen order, removes any key from `clearedValueKeys` when it also appears in `submittedValueKeys`, and returns `WorkflowFormRuntimeValueChanges`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
+
+[x] Subtask 127.5. In `src/core/task/workflow-form/WorkflowFormRuntime.ts`, add a local helper named `isClearedWorkflowFormSubmittedValue(field: WorkflowFormFieldDefinition, value: WorkflowFormSubmittedValuePayload | undefined): boolean` that returns true for empty strings after trimming on `small_text`, `large_text` with string values, `dropdown` with single selection, `radio_group`, `date`, `date_time`, `file_path`, `directory_path`, and `artifact_picker`; returns true for empty arrays on `multi_select`, `checkbox_group`, and `dropdown` with non-single selection; and returns false for booleans, numbers, integers, objects, missing values, and non-empty values.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
+
+[x] Subtask 127.6. In `WorkflowFormRuntime.handleSubmission(...)`, replace the current `mergedValues` loop so explicit cleared submitted values delete the field from `mergedValues` and record the field key in a local `clearedValueKeys` list, while omitted active-panel fields may still be removed from form-local `mergedValues` but must not be recorded as explicit clears.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
+
+[x] Subtask 127.7. In `WorkflowFormRuntime.handleSubmission(...)`, update validation so optional fields with explicit cleared submitted values do not fail structured-shape, value-schema, or selection-rule validation; required fields with explicit cleared submitted values must continue to fail the existing required-value check on submit.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
+
+[x] Subtask 127.8. In `applyFieldResetRules(...)`, change the return object so it includes `clearedValueKeys: readonly string[]` populated from every `resetValueKeysOnChange` key whose source field changed, even when the target key was not present in the form-local value map.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
+
+[x] Subtask 127.9. In `clearDeclaredKeys(...)`, change the return object so it includes `clearedValueKeys: readonly string[]` populated from every declared `valueKeys` entry, even when the target key was not present in the form-local value map.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
+
+[x] Subtask 127.10. In `WorkflowFormRuntime.handleSubmission(...)`, merge explicit cleared submitted field keys, reset-rule cleared field keys, and transition-stale cleared field keys into the outcome `valueChanges.clearedValueKeys`, and merge submitted non-cleared field keys into `valueChanges.submittedValueKeys`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
+
+[x] Subtask 127.11. In `WorkflowFormRuntime.handleSubmission(...)`, pass the current accumulated `WorkflowFormRuntimeValueChanges` into `handleBack(...)`; update `handleBack(...)` to merge that value-change object with every field key from `activePanel.backStaleValueKeysToClear`, then return a `render_form` outcome carrying the merged `valueChanges`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
+
+[x] Subtask 127.12. In `WorkflowFormRuntime.handleRetry(...)`, return a `render_form` outcome whose `valueChanges.clearedValueKeys` includes every form-local value key dropped by retry, and whose `submittedValueKeys` is empty.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
+
+[x] Subtask 127.13. In `WorkflowFormRuntime.ts`, update every remaining `render_form`, `complete_success`, and `renderFailure(...)` return path so each outcome includes a `valueChanges` object; use empty submitted/cleared arrays only for paths where the submission made no accepted form-local value changes.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
+
+[x] Task 128. Extend the canonical workflow-value mutation seam to support durable clears.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 128.1. In `WorkflowRuntime.applyWorkflowValueWrites(...)`, extend the argument type to accept `clearKeys?: readonly string[]` while keeping existing callers that pass only `values` valid.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 128.2. In `WorkflowRuntime.applyWorkflowValueWrites(...)`, extend the return type to include `clearedKeys: readonly string[]` and `unchangedClearKeys: readonly string[]` in addition to the existing `changedValues` and `unchangedValues`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 128.3. In `WorkflowRuntime.applyWorkflowValueWrites(...)`, process `clearKeys` before `values`: for each unique allowed clear key that currently exists in `session.workflowValues`, delete that key and append it to `clearedKeys`; for allowed clear keys that are already absent or disallowed, append to `unchangedClearKeys`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 128.4. In `WorkflowRuntime.applyWorkflowValueWrites(...)`, when applying `values`, keep the existing validation and allowed-key behavior, and ensure a key written in `values` is removed from `clearedKeys` so replacement writes win over clears for the same key in one mutation call.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 128.5. In `WorkflowRuntime.applyWorkflowValueWrites(...)`, build the `workflow_values_persisted` trigger changed-key list from both `Object.keys(changedValues)` and `clearedKeys`, de-duped in first-seen order.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Task 129. Map workflow-form runtime clears to durable workflow-value clears.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 129.1. In `WorkflowRuntime.ts`, replace `collectWorkflowValueWritesFromFormSession(...)` with `collectWorkflowValueMutationsFromFormOutcome(...)`, accepting the form session and `WorkflowFormRuntimeValueChanges`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 129.2. In `collectWorkflowValueMutationsFromFormOutcome(...)`, build one field-key to workflow-value-key map from every workflow form field that declares `workflowValueKey`, preserving the existing behavior that form field keys are local unless a destination is declared.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 129.3. In `collectWorkflowValueMutationsFromFormOutcome(...)`, convert every present `formSession.values` entry with a declared workflow-value destination into `values`, using the existing `convertWorkflowFormSubmittedValueToWorkflowValue(...)` helper and preserving explicit failure on malformed submitted values.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 129.4. In `collectWorkflowValueMutationsFromFormOutcome(...)`, convert every `valueChanges.clearedValueKeys` field key with a declared workflow-value destination into `clearKeys`; do not include field keys that have no durable workflow-value destination.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 129.5. In `collectWorkflowValueMutationsFromFormOutcome(...)`, when a workflow-value key appears in both `values` and `clearKeys`, remove that key from `clearKeys` so present writes win over clears.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 129.6. In `persistWorkflowFormValues(...)`, pass `outcome.valueChanges` to `collectWorkflowValueMutationsFromFormOutcome(...)` and call `applyWorkflowValueWrites(...)` when either `values` is non-empty or `clearKeys` is non-empty.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 129.7. In `submitWorkflowForm(...)`, update both non-entry workflow-form branches so `persistWorkflowFormValues(...)` receives `outcome.valueChanges`; preserve the existing behavior that failed form outcomes do not persist durable workflow values.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Task 130. Update workflow-form submission transport to represent explicit cleared values.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/webview-ui/src/components/chat/chat-view/hooks/useMessageHandlers.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/webview-ui/src/components/chat/chat-view/hooks/useMessageHandlers.test.tsx`
+
+[x] Subtask 130.1. In `webview-ui/src/components/chat/chat-view/hooks/useMessageHandlers.ts`, update `serializeWorkflowFormFieldValue(...)` for `small_text`, `large_text` with string values, `date`, `date_time`, `file_path`, `directory_path`, `artifact_picker`, `radio_group`, and single-select `dropdown` so a string input that is empty after trimming serializes as `{ stringValue: "" }` instead of being omitted.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/webview-ui/src/components/chat/chat-view/hooks/useMessageHandlers.ts`
+
+[x] Subtask 130.2. In `webview-ui/src/components/chat/chat-view/hooks/useMessageHandlers.ts`, keep integer-typed `small_text` and numeric fields from serializing empty strings as values; empty numeric input must continue to be omitted because the current protobuf contract has no explicit cleared numeric value.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/webview-ui/src/components/chat/chat-view/hooks/useMessageHandlers.ts`
+
+[x] Subtask 130.3. In `webview-ui/src/components/chat/chat-view/hooks/useMessageHandlers.ts`, ensure `multi_select`, `checkbox_group`, and multi-select `dropdown` serialize empty arrays as `{ arrayValue: { values: [] } }` instead of omitting the field.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/webview-ui/src/components/chat/chat-view/hooks/useMessageHandlers.ts`
+
+[x] Subtask 130.4. In `webview-ui/src/components/chat/chat-view/hooks/useMessageHandlers.test.tsx`, add coverage proving empty optional text/path-style values are submitted as explicit `{ stringValue: "" }` workflow form values, while empty integer and number inputs remain omitted.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/webview-ui/src/components/chat/chat-view/hooks/useMessageHandlers.test.tsx`
+
+[x] Subtask 130.5. In `webview-ui/src/components/chat/chat-view/hooks/useMessageHandlers.test.tsx`, add coverage proving empty multi-select values are submitted as explicit empty arrays rather than omitted fields.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/webview-ui/src/components/chat/chat-view/hooks/useMessageHandlers.test.tsx`
+
+[x] Task 131. Add workflow-form runtime tests for explicit clears and stale clear reporting.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`
+
+[x] Subtask 131.1. In `WorkflowFormRuntime.test.ts`, add coverage proving an optional text field submitted with `{ stringValue: "" }` is accepted, removed from `session.values`, and reported in `outcome.valueChanges.clearedValueKeys`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`
+
+[x] Subtask 131.2. In `WorkflowFormRuntime.test.ts`, add coverage proving an optional multi-select or checkbox field submitted with an empty array is accepted, removed from `session.values`, and reported in `outcome.valueChanges.clearedValueKeys`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`
+
+[x] Subtask 131.3. In `WorkflowFormRuntime.test.ts`, add coverage proving an omitted active optional field may be removed from form-local `session.values` but is not reported in `outcome.valueChanges.clearedValueKeys`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`
+
+[x] Subtask 131.4. In `WorkflowFormRuntime.test.ts`, add coverage proving `resetValueKeysOnChange` reports the declared stale field keys in `valueChanges.clearedValueKeys` when the source field changes.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`
+
+[x] Subtask 131.5. In `WorkflowFormRuntime.test.ts`, extend the existing back-navigation stale-clear test so it asserts `outcome.valueChanges.clearedValueKeys` includes the declared `backStaleValueKeysToClear` field key.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`
+
+[x] Task 132. Add workflow-runtime durable clearing tests.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 132.1. In `WorkflowRuntime.test.ts`, add `applyWorkflowValueWrites(...)` coverage proving `clearKeys` deletes allowed existing workflow values, reports `clearedKeys`, reports absent or disallowed clear requests as `unchangedClearKeys`, and does not place cleared values into `changedValues`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 132.2. In `WorkflowRuntime.test.ts`, add coverage proving a workflow form optional text field submitted with `{ stringValue: "" }` clears its declared durable workflow value before next-action re-evaluation.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 132.3. In `WorkflowRuntime.test.ts`, add coverage proving an omitted active optional workflow-form field does not clear an existing durable workflow value unless a declarative stale clear rule applies.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 132.4. In `WorkflowRuntime.test.ts`, add coverage proving a workflow form transition with `staleValueKeysToClear` clears the corresponding declared durable workflow value during the same form-result handling cycle.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 132.5. In `WorkflowRuntime.test.ts`, add coverage proving workflow values cleared by form submission are included in the `workflow_values_persisted` trigger changed-key list and can drive a matching next-action route.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Task 133. Add the brainstorming module stale-clear declaration needed by the central workflow-form clearing capability.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
+[x] Subtask 133.1. In `brainstormingWorkflow.ts`, update the Step 1 setup form conditional branch where `has_session_goals` matches `false` so the branch includes `staleValueKeysToClear: [BrainstormingWorkflowValueKey.SessionGoals]`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[x] Subtask 133.2. In `brainstormingWorkflow.test.ts`, add coverage proving the Step 1 `has_session_goals === false` branch declares `staleValueKeysToClear: ["session_goals"]`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
+[x] Task 134. Validate Phase 53.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/webview-ui/src/components/chat/chat-view/hooks/useMessageHandlers.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/webview-ui/src/components/chat/chat-view/hooks/useMessageHandlers.test.tsx`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
+[x] Subtask 134.1. Run `npm run test:unit -- src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`; it must pass before Phase 53 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
+[x] Subtask 134.2. Run `npm run test:webview -- src/components/chat/chat-view/hooks/useMessageHandlers.test.tsx`; it must pass before Phase 53 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/webview-ui/src/components/chat/chat-view/hooks/useMessageHandlers.test.tsx`
+
+[x] Subtask 134.3. Run `npm run check-types` and `npm run lint`; both must pass before Phase 53 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/webview-ui/src/components/chat/chat-view/hooks/useMessageHandlers.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/webview-ui/src/components/chat/chat-view/hooks/useMessageHandlers.test.tsx`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
+[x] Subtask 134.4. Run `rg "clearKeys|clearedKeys|unchangedClearKeys|clearedValueKeys|submittedValueKeys" src/core/task/workflow-form src/core/task/workflow-runtime webview-ui/src/components/chat/chat-view/hooks/useMessageHandlers.ts`; manually confirm matches are limited to the Phase 53 contract, implementation, and tests, and that no sentinel string, `null` workflow value, or placeholder value is used to represent durable clears.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/webview-ui/src/components/chat/chat-view/hooks/useMessageHandlers.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
 ## Validation
 
 After all implementation tasks are complete, run these commands from `/Users/robertboston/Documents/Cline Extension/cline`:

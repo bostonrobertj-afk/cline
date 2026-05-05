@@ -114,12 +114,12 @@ function createMainAgentConfig(nextAction: WorkflowNextAction): {
 	return { config, activateWorkflow, queueWorkflowNextAction }
 }
 
-function createUseSkillBlock(): ToolUse {
+function createUseSkillBlock(skillName = "workflow-runtime-test"): ToolUse {
 	return {
 		type: "tool_use",
 		name: ClineDefaultTool.USE_SKILL,
 		params: {
-			skill_name: "workflow-runtime-test",
+			skill_name: skillName,
 		},
 		partial: false,
 	}
@@ -155,6 +155,24 @@ describe("UseSkillToolHandler", () => {
 		sinon.assert.calledOnceWithExactly(activateWorkflow, {
 			taskState: config.taskState,
 			workflowName: workflow.name,
+		})
+		sinon.assert.calledOnceWithExactly(queueWorkflowNextAction, nextAction)
+	})
+
+	it("activates the shipped brainstorming workflow through its use_skill name", async () => {
+		const nextAction: WorkflowNextAction = { kind: "project_prompt", promptProjection: {} }
+		const { config, activateWorkflow, queueWorkflowNextAction } = createMainAgentConfig(nextAction)
+		const resolvedWorkflow = WorkflowRegistry.resolveWorkflowByUseSkillName("brainstorming")
+		const handler = new UseSkillToolHandler()
+
+		const result = await handler.execute(config, createUseSkillBlock("brainstorming"))
+
+		assert.equal(resolvedWorkflow?.name, "brainstorming")
+		assert.match(String(result), /Workflow "brainstorming" is now active/)
+		assert.equal(config.taskState.activeWorkflowName, "brainstorming")
+		sinon.assert.calledOnceWithExactly(activateWorkflow, {
+			taskState: config.taskState,
+			workflowName: "brainstorming",
 		})
 		sinon.assert.calledOnceWithExactly(queueWorkflowNextAction, nextAction)
 	})
