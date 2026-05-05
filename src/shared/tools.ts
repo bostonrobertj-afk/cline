@@ -38,6 +38,8 @@ export enum ClineDefaultTool {
 	SET_WORKFLOW_VALUES = "set_workflow_values",
 	BUILD_WORKFLOW_DOCUMENT = "build_workflow_document",
 	CREATE_WORKFLOW_ARTIFACT = "create_workflow_artifact",
+	GET_BRAINSTORMING_METHODS = "get_brainstorming_methods",
+	APPEND_BRAINSTORMING_SELECTED_TECHNIQUE = "append_brainstorming_selected_technique",
 	CODE_REVIEW_SPEC_UPDATE = "code_review_spec_update",
 	STORY_TASK_REMINDER = "story_task_reminder",
 	STORY_TASK_COMPLETE = "story_task_complete",
@@ -77,6 +79,7 @@ export const READ_ONLY_TOOLS = [
 	ClineDefaultTool.WEB_SEARCH,
 	ClineDefaultTool.WEB_FETCH,
 	ClineDefaultTool.USE_SKILL,
+	ClineDefaultTool.GET_BRAINSTORMING_METHODS,
 	ClineDefaultTool.STORY_TASK_REMINDER,
 	ClineDefaultTool.USE_SUBAGENTS,
 ] as const

@@ -78,6 +78,73 @@ export function buildBrainstormingStep3SetWorkflowValuesToolSchema(): ClineToolS
 	}
 }
 
+export function buildBrainstormingGetMethodsToolSchema(): ClineToolSpec {
+	return {
+		variant: BRAINSTORMING_TOOL_SCHEMA_VARIANT,
+		id: ClineDefaultTool.GET_BRAINSTORMING_METHODS,
+		name: "get_brainstorming_methods",
+		description: "Retrieve the supported brainstorming technique inventory from the active brainstorming workflow registry.",
+		parameters: [],
+	}
+}
+
+export function buildBrainstormingAppendSelectedTechniqueToolSchema(): ClineToolSpec {
+	return {
+		variant: BRAINSTORMING_TOOL_SCHEMA_VARIANT,
+		id: ClineDefaultTool.APPEND_BRAINSTORMING_SELECTED_TECHNIQUE,
+		name: "append_brainstorming_selected_technique",
+		description:
+			"Append the user-accepted brainstorming technique to the active brainstorming workflow selected-techniques list.",
+		parameters: [
+			{
+				name: "name",
+				required: true,
+				type: "string",
+				instruction: "The user-accepted brainstorming technique name from get_brainstorming_methods.",
+				description: "User-accepted brainstorming technique name.",
+			},
+			{
+				name: "description",
+				required: true,
+				type: "string",
+				instruction: "The user-accepted brainstorming technique description from get_brainstorming_methods.",
+				description: "User-accepted brainstorming technique description.",
+			},
+			{
+				name: "id",
+				required: false,
+				type: "string",
+				instruction: "Optional stable technique id from get_brainstorming_methods.",
+				description: "Optional stable technique id.",
+			},
+			{
+				name: "category",
+				required: false,
+				type: "string",
+				instruction: "Optional technique category from get_brainstorming_methods.",
+				description: "Optional technique category.",
+			},
+		],
+	}
+}
+
+export function buildBrainstormingStep3SuggestToolSchemas(): readonly ClineToolSpec[] {
+	return [
+		buildBrainstormingGetMethodsToolSchema(),
+		buildBrainstormingAppendSelectedTechniqueToolSchema(),
+		buildBrainstormingBuildWorkflowDocumentToolSchema(),
+		buildBrainstormingWorkflowProgressRequestToolSchema(),
+	]
+}
+
+export function buildBrainstormingStep3ChooseOrRandomToolSchemas(): readonly ClineToolSpec[] {
+	return [
+		buildBrainstormingBuildWorkflowDocumentToolSchema(),
+		buildBrainstormingStep3SetWorkflowValuesToolSchema(),
+		buildBrainstormingWorkflowProgressRequestToolSchema(),
+	]
+}
+
 export function buildBrainstormingAttemptCompletionToolSchema(): ClineToolSpec {
 	return {
 		variant: BRAINSTORMING_TOOL_SCHEMA_VARIANT,

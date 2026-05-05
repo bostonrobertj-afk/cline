@@ -83,6 +83,41 @@ export const backendWorkflowToolContracts: Partial<Record<ClineDefaultTool, Back
 			},
 		],
 	},
+	[ClineDefaultTool.GET_BRAINSTORMING_METHODS]: {
+		id: ClineDefaultTool.GET_BRAINSTORMING_METHODS,
+		name: "get_brainstorming_methods",
+		parameters: [],
+	},
+	[ClineDefaultTool.APPEND_BRAINSTORMING_SELECTED_TECHNIQUE]: {
+		id: ClineDefaultTool.APPEND_BRAINSTORMING_SELECTED_TECHNIQUE,
+		name: "append_brainstorming_selected_technique",
+		parameters: [
+			{
+				name: "name",
+				required: true,
+				type: "string",
+				description: "Accepted brainstorming technique name.",
+			},
+			{
+				name: "description",
+				required: true,
+				type: "string",
+				description: "Accepted brainstorming technique description.",
+			},
+			{
+				name: "id",
+				required: false,
+				type: "string",
+				description: "Optional stable brainstorming technique id.",
+			},
+			{
+				name: "category",
+				required: false,
+				type: "string",
+				description: "Optional brainstorming technique category.",
+			},
+		],
+	},
 	[ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE]: {
 		id: ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE,
 		name: "code_review_spec_update",

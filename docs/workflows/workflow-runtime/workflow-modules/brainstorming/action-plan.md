@@ -292,12 +292,14 @@ Allowed files:
 
 After completing this phase, pause for QA review before moving to Phase 4.
 
-[ ] Task 6. Add the shared brainstorming method and selected-technique append tools.
+[x] Task 6. Add the shared brainstorming method and selected-technique append tools.
 
 Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/assistant-message/index.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/shared/tools.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/backendWorkflowToolContracts.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/ToolExecutorCoordinator.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/response/ResponseToolRegistry.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/GetBrainstormingMethodsToolHandler.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/AppendBrainstormingSelectedTechniqueToolHandler.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/GetBrainstormingMethodsToolHandler.test.ts`
@@ -305,85 +307,95 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingToolSchemas.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingToolSchemas.test.ts`
 
-[ ] Subtask 6.1. In `src/shared/tools.ts`, add enum members `GET_BRAINSTORMING_METHODS = "get_brainstorming_methods"` and `APPEND_BRAINSTORMING_SELECTED_TECHNIQUE = "append_brainstorming_selected_technique"`.
+[x] Subtask 6.1. In `src/shared/tools.ts`, add enum members `GET_BRAINSTORMING_METHODS = "get_brainstorming_methods"` and `APPEND_BRAINSTORMING_SELECTED_TECHNIQUE = "append_brainstorming_selected_technique"`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/shared/tools.ts`
 
-[ ] Subtask 6.2. In `src/shared/tools.ts`, add `ClineDefaultTool.GET_BRAINSTORMING_METHODS` to `READ_ONLY_TOOLS` and do not add `ClineDefaultTool.APPEND_BRAINSTORMING_SELECTED_TECHNIQUE` to `READ_ONLY_TOOLS`.
+[x] Subtask 6.2. In `src/shared/tools.ts`, add `ClineDefaultTool.GET_BRAINSTORMING_METHODS` to `READ_ONLY_TOOLS` and do not add `ClineDefaultTool.APPEND_BRAINSTORMING_SELECTED_TECHNIQUE` to `READ_ONLY_TOOLS`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/shared/tools.ts`
 
-[ ] Subtask 6.3. In `src/core/task/tools/backendWorkflowToolContracts.ts`, add a zero-parameter backend contract for `ClineDefaultTool.GET_BRAINSTORMING_METHODS`.
+[x] Subtask 6.3. In `src/core/task/tools/backendWorkflowToolContracts.ts`, add a zero-parameter backend contract for `ClineDefaultTool.GET_BRAINSTORMING_METHODS`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/backendWorkflowToolContracts.ts`
 
-[ ] Subtask 6.4. In `src/core/task/tools/backendWorkflowToolContracts.ts`, add a backend contract for `ClineDefaultTool.APPEND_BRAINSTORMING_SELECTED_TECHNIQUE` with required string parameters `name` and `description`, optional string parameters `id` and `category`, and no additional mutation parameters.
+[x] Subtask 6.4. In `src/core/task/tools/backendWorkflowToolContracts.ts`, add a backend contract for `ClineDefaultTool.APPEND_BRAINSTORMING_SELECTED_TECHNIQUE` with required string parameters `name` and `description`, optional string parameters `id` and `category`, and no additional mutation parameters.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/backendWorkflowToolContracts.ts`
 
-[ ] Subtask 6.5. Create `src/core/task/tools/handlers/GetBrainstormingMethodsToolHandler.ts` with an `IToolHandler` implementation that accepts no parameters, reads the module-owned brainstorming technique registry, returns JSON containing category/name/description/id for every technique, never writes workflow values, and never touches the filesystem.
+[x] Subtask 6.5. Create `src/core/task/tools/handlers/GetBrainstormingMethodsToolHandler.ts` with an `IToolHandler` implementation that accepts no parameters, reads the module-owned brainstorming technique registry, returns JSON containing category/name/description/id for every technique, never writes workflow values, and never touches the filesystem.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/GetBrainstormingMethodsToolHandler.ts`
 
-[ ] Subtask 6.6. Create `src/core/task/tools/handlers/AppendBrainstormingSelectedTechniqueToolHandler.ts` with an `IToolHandler` implementation that rejects calls unless `taskState.activeWorkflowName === "brainstorming"` and an active workflow session exists.
+[x] Subtask 6.6. Create `src/core/task/tools/handlers/AppendBrainstormingSelectedTechniqueToolHandler.ts` with an `IToolHandler` implementation that rejects calls unless `taskState.activeWorkflowName === "brainstorming"` and an active workflow session exists.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/AppendBrainstormingSelectedTechniqueToolHandler.ts`
 
-[ ] Subtask 6.7. In `src/core/task/tools/handlers/AppendBrainstormingSelectedTechniqueToolHandler.ts`, implement parameter parsing so `name` and `description` are required non-empty strings and `id` and `category` are optional non-empty strings.
+[x] Subtask 6.7. In `src/core/task/tools/handlers/AppendBrainstormingSelectedTechniqueToolHandler.ts`, implement parameter parsing so `name` and `description` are required non-empty strings and `id` and `category` are optional non-empty strings.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/AppendBrainstormingSelectedTechniqueToolHandler.ts`
 
-[ ] Subtask 6.8. In `src/core/task/tools/handlers/AppendBrainstormingSelectedTechniqueToolHandler.ts`, validate the accepted technique against the brainstorming registry by stable id when provided, otherwise by name, and return a tool error when no registry entry matches.
+[x] Subtask 6.8. In `src/core/task/tools/handlers/AppendBrainstormingSelectedTechniqueToolHandler.ts`, validate the accepted technique against the brainstorming registry by stable id when provided, otherwise by name, and return a tool error when no registry entry matches.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/AppendBrainstormingSelectedTechniqueToolHandler.ts`
 
-[ ] Subtask 6.9. In `src/core/task/tools/handlers/AppendBrainstormingSelectedTechniqueToolHandler.ts`, read the existing `selected_techniques` workflow value, require it to be absent or an array of objects, append the accepted technique, de-dupe by stable id when present otherwise by name, and call `workflowRuntime.applyWorkflowValueWrites(...)` with the complete updated `selected_techniques` array.
+[x] Subtask 6.9. In `src/core/task/tools/handlers/AppendBrainstormingSelectedTechniqueToolHandler.ts`, read the existing `selected_techniques` workflow value, require it to be absent or an array of objects, append the accepted technique, de-dupe by stable id when present otherwise by name, and call `workflowRuntime.applyWorkflowValueWrites(...)` with the complete updated `selected_techniques` array.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/AppendBrainstormingSelectedTechniqueToolHandler.ts`
 
-[ ] Subtask 6.10. In `src/core/task/tools/handlers/AppendBrainstormingSelectedTechniqueToolHandler.ts`, after a successful changed write, call `workflowRuntime.resolveNextAction(...)` and queue any non-`no_op` result through `callbacks.queueWorkflowNextAction(...)`.
+[x] Subtask 6.10. In `src/core/task/tools/handlers/AppendBrainstormingSelectedTechniqueToolHandler.ts`, after a successful changed write, call `workflowRuntime.resolveNextAction(...)` and queue any non-`no_op` result through `callbacks.queueWorkflowNextAction(...)`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/AppendBrainstormingSelectedTechniqueToolHandler.ts`
 
-[ ] Subtask 6.11. In `src/core/task/tools/ToolExecutorCoordinator.ts`, import and register `GetBrainstormingMethodsToolHandler` under `ClineDefaultTool.GET_BRAINSTORMING_METHODS`.
+[x] Subtask 6.11. In `src/core/task/tools/ToolExecutorCoordinator.ts`, import and register `GetBrainstormingMethodsToolHandler` under `ClineDefaultTool.GET_BRAINSTORMING_METHODS`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/ToolExecutorCoordinator.ts`
 
-[ ] Subtask 6.12. In `src/core/task/tools/ToolExecutorCoordinator.ts`, import and register `AppendBrainstormingSelectedTechniqueToolHandler` under `ClineDefaultTool.APPEND_BRAINSTORMING_SELECTED_TECHNIQUE`.
+[x] Subtask 6.12. In `src/core/task/tools/ToolExecutorCoordinator.ts`, import and register `AppendBrainstormingSelectedTechniqueToolHandler` under `ClineDefaultTool.APPEND_BRAINSTORMING_SELECTED_TECHNIQUE`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/ToolExecutorCoordinator.ts`
 
-[ ] Subtask 6.13. Create `src/core/task/tools/handlers/__tests__/GetBrainstormingMethodsToolHandler.test.ts` with coverage proving the handler returns the full code-owned inventory and does not call workflow mutation APIs.
+[x] Subtask 6.13. Create `src/core/task/tools/handlers/__tests__/GetBrainstormingMethodsToolHandler.test.ts` with coverage proving the handler returns the full code-owned inventory and does not call workflow mutation APIs.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/GetBrainstormingMethodsToolHandler.test.ts`
 
-[ ] Subtask 6.14. Create `src/core/task/tools/handlers/__tests__/AppendBrainstormingSelectedTechniqueToolHandler.test.ts` with coverage for active-workflow gating, missing required parameters, registry validation failure, append-without-overwrite behavior, and de-dupe behavior.
+[x] Subtask 6.14. Create `src/core/task/tools/handlers/__tests__/AppendBrainstormingSelectedTechniqueToolHandler.test.ts` with coverage for active-workflow gating, missing required parameters, registry validation failure, append-without-overwrite behavior, and de-dupe behavior.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/AppendBrainstormingSelectedTechniqueToolHandler.test.ts`
 
-[ ] Subtask 6.15. In `brainstormingToolSchemas.ts`, after `ClineDefaultTool.GET_BRAINSTORMING_METHODS` and `ClineDefaultTool.APPEND_BRAINSTORMING_SELECTED_TECHNIQUE` exist, add helper support for `get_brainstorming_methods` and `append_brainstorming_selected_technique` so the Step 3 suggest variant can expose those tools.
+[x] Subtask 6.15. In `brainstormingToolSchemas.ts`, after `ClineDefaultTool.GET_BRAINSTORMING_METHODS` and `ClineDefaultTool.APPEND_BRAINSTORMING_SELECTED_TECHNIQUE` exist, add helper support for `get_brainstorming_methods` and `append_brainstorming_selected_technique` so the Step 3 suggest variant can expose those tools.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingToolSchemas.ts`
 
-[ ] Subtask 6.16. In `brainstormingToolSchemas.test.ts`, add coverage proving Step 3 suggest exposes `get_brainstorming_methods` and `append_brainstorming_selected_technique`, and Step 3 choose/random omits those two tools.
+[x] Subtask 6.16. In `brainstormingToolSchemas.test.ts`, add coverage proving Step 3 suggest exposes `get_brainstorming_methods` and `append_brainstorming_selected_technique`, and Step 3 choose/random omits those two tools.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingToolSchemas.test.ts`
+
+[x] Subtask 6.17. In `src/core/task/tools/response/ResponseToolRegistry.ts`, add exhaustive `RESPONSE_TOOL_METADATA` entries for `ClineDefaultTool.GET_BRAINSTORMING_METHODS` and `ClineDefaultTool.APPEND_BRAINSTORMING_SELECTED_TECHNIQUE`, both set to `undefined` because they are backend workflow tools, not response tools.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/response/ResponseToolRegistry.ts`
+
+[x] Subtask 6.18. In `src/core/assistant-message/index.ts`, extend `toolParamNames` with backend workflow tool parameter names from `backendWorkflowToolContracts.ts` that are not already present: `values`, `artifact_id`, `destination_path`, `workflow_value_writes`, `name`, `description`, `id`, and `category`. Do not widen `ToolUse.params` to arbitrary string keys and do not reintroduce type assertions in tests to hide missing tool parameter names.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/assistant-message/index.ts`
 
 ### Phase 4 - Brainstorming Workflow Definition And Registration
 
