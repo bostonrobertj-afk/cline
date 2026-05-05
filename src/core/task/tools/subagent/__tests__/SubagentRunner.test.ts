@@ -2185,6 +2185,7 @@ describe("SubagentRunner", () => {
 		const handleToolBackedOperationToolResult = sinon.stub(config.workflowRuntime, "handleToolBackedOperationToolResult")
 		handleToolBackedOperationToolResult.onFirstCall().resolves({
 			kind: "execute_tool_backed_operation",
+			runtimeOwnedSourceRoute: undefined,
 			toolRequest: {
 				toolName: ClineDefaultTool.LIST_FILES,
 				toolParams: {
@@ -2197,6 +2198,10 @@ describe("SubagentRunner", () => {
 
 		await consumeChildWorkflowNextAction.call(runner, state, {
 			kind: "execute_tool_backed_operation",
+			runtimeOwnedSourceRoute: {
+				branchId: "child-runtime-owned-branch",
+				routeId: "child-create-artifact",
+			},
 			toolRequest: {
 				toolName: ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT,
 				toolParams: {
@@ -2216,10 +2221,15 @@ describe("SubagentRunner", () => {
 		assert.deepEqual(handleToolBackedOperationToolResult.firstCall.args[0], {
 			taskState: state,
 			toolResultText: "created artifact",
+			runtimeOwnedSourceRoute: {
+				branchId: "child-runtime-owned-branch",
+				routeId: "child-create-artifact",
+			},
 		})
 		assert.deepEqual(handleToolBackedOperationToolResult.secondCall.args[0], {
 			taskState: state,
 			toolResultText: "listed files",
+			runtimeOwnedSourceRoute: undefined,
 		})
 	})
 

@@ -88,6 +88,7 @@ export class WorkflowNextActionConsumer {
 					currentAction = await this.workflowRuntime.handleToolBackedOperationToolResult({
 						taskState: this.taskState,
 						toolResultText: toolResult.toolResultText,
+						runtimeOwnedSourceRoute: currentAction.runtimeOwnedSourceRoute,
 					})
 					await this.adapter.persistWorkflowRuntimeMetadata()
 					break

@@ -95,6 +95,8 @@ export interface WorkflowRenderFormNextAction {
 export interface WorkflowExecuteToolBackedOperationNextAction {
 	kind: "execute_tool_backed_operation"
 	toolRequest: WorkflowToolBackedOperationExecutionRequest
+	// Set only for direct runtime-owned operation actions such as allocate_artifact and build_workflow_document.
+	runtimeOwnedSourceRoute: WorkflowStepResolutionSourceRoute | undefined
 	toolBackedOperationSession?: WorkflowStepResolutionSessionState
 }
 

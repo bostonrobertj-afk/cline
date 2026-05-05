@@ -6861,6 +6861,337 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
+## Phase 55 - Project Output Root, Conditional Form Reveal, And Real Runtime Handoff Regression
+
+After completing this phase, pause for QA review before packaged-extension retesting.
+
+### Phase 55 Scope
+
+This phase aligns the foundational runtime with `FR-10g0`, `FR-10g0a`, and `FR-10g3` by moving workflow project folders from the workspace root to `docs/projects/`; fixes the central `WorkflowFormRuntime` behavior where a required field that becomes visible during the same submit is treated as an immediate failure; and adds a real main-task runtime handoff regression for the brainstorming Step 1 `create_workflow_artifact` -> `build_workflow_document` -> setup-form chain.
+
+### Phase 55 Scope Boundary
+
+- Do not change thread display state while runtime-owned tools execute. The UI must not be moved back to active user-input state during an internal runtime-owned operation chain.
+- Do not change workflow module decision trees, brainstorming workflow definitions, workflow prompt projection, workflow tool schemas, or static/default tool exposure.
+- Do not weaken `ToolResultUtils` duplicate-result suppression or `isSerializedToolFailureResultText(...)` failure classification.
+- Do not introduce a configurable project-output-root setting in this phase; the approved foundational root is `join(cwd, "docs", "projects")`.
+- Do not change webview workflow-form submission serialization in this phase; Phase 55 is backend runtime/form behavior plus backend tests only.
+- Do not preserve the old root-level project-folder behavior as a fallback or compatibility path.
+
+### Phase 55 Known Issues / Risks / Technical Debt
+
+- `WorkflowRuntime` still resolves existing-project discovery, selected-project discovery, project folder creation, and artifact discovery from `cwd`; those paths must be migrated together so project selection and artifact allocation use one root convention.
+- `WorkflowFormRuntime.handleSubmission(...)` resolves fields after merging submitted values and then validates newly visible required fields immediately. That is correct for fields that were already visible, but wrong for a field that first appears because of the same submitted value.
+- `WorkflowRuntime.handleWorkflowEntryFormOutcome(...)` treats a project-selection panel submit without a form failure as a completed entry selection. That entry-specific ownership must recognize mode-only submits as reveal-only renders.
+- Phase 54 added stubbed task-level coverage for chained runtime-owned operations, but it still does not exercise the real create/build workflow handlers through the main-task next-action consumer.
+
+[x] Task 139. Move foundational workflow project output paths to `docs/projects/`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 139.1. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, add a module-level constant near `WORKFLOW_PROJECT_SUBFOLDERS` named `WORKFLOW_PROJECT_OUTPUT_ROOT_PATH_SEGMENTS` with value `["docs", "projects"] as const`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 139.2. In `WorkflowRuntime`, add a private method named `resolveWorkflowProjectOutputRoot(): string` that returns `join(this.cwd, ...WORKFLOW_PROJECT_OUTPUT_ROOT_PATH_SEGMENTS)`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 139.3. In `resolveWorkflowEntryProjectSelection(...)`, replace the existing-project discovery request `rootDirectory: this.cwd` with `rootDirectory: this.resolveWorkflowProjectOutputRoot()`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 139.4. In `discoverWorkflowFormSelectorOptions(...)`, initialize `rootDirectory` from `this.resolveWorkflowProjectOutputRoot()` for `project_output_root`, and update the `selected_project_root` branch so it resolves the selected project directory by calling `resolveWorkflowDiscoveryTargetDirectory({ rootDirectory: this.resolveWorkflowProjectOutputRoot(), targetPathSegments: [session.projectSelection.projectFolderName] })`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 139.5. In `resolveWorkflowProjectOutputFolder(...)`, replace `return join(this.cwd, session.projectSelection.projectFolderName)` with `return join(this.resolveWorkflowProjectOutputRoot(), session.projectSelection.projectFolderName)`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 139.6. In `discoverWorkflowArtifactFilenames(...)`, replace `rootDirectory: this.cwd` with `rootDirectory: this.resolveWorkflowProjectOutputRoot()`, while preserving `targetPathSegments: [projectFolderName, subfolder]`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 139.7. In `ensureProjectFoldersExist(...)`, resolve `projectOutputRoot` with `this.resolveWorkflowProjectOutputRoot()`, assert workspace access for that root before filesystem writes, set `projectRoot` to `join(projectOutputRoot, session.projectSelection.projectFolderName)`, call `await mkdir(projectOutputRoot, { recursive: true })` before creating the per-project folder, and keep the existing per-project canonical subfolder creation under that new `projectRoot`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Task 140. Update workflow-runtime project-root and artifact-path tests for `docs/projects/`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 140.1. In `WorkflowRuntime.test.ts`, update shared-entry project folder creation assertions so new-project subfolders are checked under `join(cwd, "docs", "projects", newProjectFolderName, subfolderName)` instead of `join(cwd, newProjectFolderName, subfolderName)`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 140.2. In `WorkflowRuntime.test.ts`, update existing-project discovery assertions so the runtime discovery request for immediate project directories uses `rootDirectory === join(cwd, "docs", "projects")` and `targetPathSegments === undefined`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 140.3. In `WorkflowRuntime.test.ts`, update selector-discovery tests for `project_output_root` and `selected_project_root` so `project_output_root` requests use `join(cwd, "docs", "projects")`, and `selected_project_root` requests use `join(cwd, "docs", "projects", projectFolderName)` before any module-declared `targetPathSegments`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 140.4. In `WorkflowRuntime.test.ts`, update artifact allocation, artifact discovery, Epics index, and document-builder path expectations so every per-project artifact path is under `join(cwd, "docs", "projects", projectFolderName, workflow.projectSubfolder, artifactFilename)`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 140.5. In `WorkflowRuntime.test.ts`, update workspace path-policy denial tests for project root, project subfolder, artifact parent directory, artifact file path, artifact discovery, and Epics index reads so denied paths are constructed under `join(cwd, "docs", "projects", projectFolderName, ...)`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 140.6. In `WorkflowRuntime.test.ts`, add coverage proving existing-project discovery against `join(cwd, "docs", "projects")` returns an empty option list and renders the project-selection panel without throwing when that directory does not exist.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Task 141. Make newly visible required workflow-form fields re-render without failure.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
+
+[x] Subtask 141.1. In `WorkflowFormRuntime.handleSubmission(...)`, compute `previousResolvedFields` by calling `resolvePanelFields(activePanel, session)` before `mergedValues` is built.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
+
+[x] Subtask 141.2. In `WorkflowFormRuntime.ts`, add a local helper named `hasNewlyVisibleUnsubmittedRequiredInputField(...)` that accepts `previousResolvedFields`, `nextResolvedFields`, `submittedValues`, and `nextSession`; it must return `true` only when `request.action` is `SUBMIT`, a next resolved field is an input field, the field is required, the field was absent from the previous resolved field keys, the field key is absent from `submittedValues`, and `hasRenderableValue(nextSession.values[field.key])` is false.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
+
+[x] Subtask 141.3. In `WorkflowFormRuntime.handleSubmission(...)`, after submitted-key inactive-field validation and before the existing required-field failure loop, call `hasNewlyVisibleUnsubmittedRequiredInputField(...)`; when it returns true, return `{ kind: "render_form", session: nextSession, valueChanges }` with `failure` still undefined and without resolving the panel transition.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
+
+[x] Task 142. Keep the shared entry project-selection panel in reveal mode until a complete project selection is submitted.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 142.1. In `WorkflowRuntime.ts`, add a private method named `doesWorkflowEntryProjectSelectionSubmitContainSelectionValue(request: WorkflowFormSubmissionRequest): boolean`. It must read the submitted `WORKFLOW_ENTRY_PROJECT_MODE_FIELD_KEY` value from `request.fields`; return true for `projectMode === "new"` only when `request.fields` includes `WORKFLOW_ENTRY_NEW_PROJECT_TITLE_FIELD_KEY`; return true for `projectMode === "existing"` only when `request.fields` includes `WORKFLOW_ENTRY_EXISTING_PROJECT_FIELD_KEY`; and return false otherwise.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 142.2. In `handleWorkflowEntryFormOutcome(...)`, update the `WorkflowFormAction.SUBMIT` / `WORKFLOW_ENTRY_PROJECT_SELECTION_PANEL_ID` / no-failure branch so it first calls `doesWorkflowEntryProjectSelectionSubmitContainSelectionValue(args.request)`. When that helper returns false, assign `session.ui.formSession = args.outcome.session` and return `this.resolveNextAction({ taskState: args.taskState })` without calling `resolveWorkflowEntryProjectSelection(...)`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Task 143. Add workflow-form and shared-entry regression tests for conditional required field reveal.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 143.1. In `WorkflowFormRuntime.test.ts`, add a test proving a mode field submission that makes a required dependent field visible returns `render_form` with no `session.failure`, preserves the submitted mode value, keeps `currentPanelId` unchanged, and does not complete or transition the form.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`
+
+[x] Subtask 143.2. In `WorkflowFormRuntime.test.ts`, extend the new conditional reveal coverage so a second submit from the re-rendered session with the dependent required field still empty returns the existing required-field failure for that dependent field.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`
+
+[x] Subtask 143.3. In `WorkflowFormRuntime.test.ts`, add coverage proving a submit that includes both the controlling mode field and the newly visible required dependent field in the same request continues through the normal transition path and does not get treated as reveal-only.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`
+
+[x] Subtask 143.4. In `WorkflowRuntime.test.ts`, add shared entry coverage proving a mode-only `new` project submit re-renders the project-selection panel, includes `WORKFLOW_ENTRY_NEW_PROJECT_TITLE_FIELD_KEY` in the payload, has no error message, leaves `session.projectSelection.projectTitle` and `session.projectSelection.projectFolderName` empty, and does not create project folders.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 143.5. In `WorkflowRuntime.test.ts`, add shared entry coverage proving a mode-only `existing` project submit re-renders the project-selection panel, includes `WORKFLOW_ENTRY_EXISTING_PROJECT_FIELD_KEY` in the payload with discovered options, has no error message, leaves project selection incomplete, and does not create project folders.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 143.6. In `WorkflowRuntime.test.ts`, update existing shared-entry helper assertions so final `new` and `existing` submissions still persist `entryProjectValueKeys`, clear the entry form session, create canonical folders only after complete selection, and return the expected next workflow action.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Task 144. Carry runtime-owned operation source routes through main-task result handling.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowNextActionConsumer.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+
+[x] Subtask 144.1. In `src/core/task/workflow-runtime/types.ts`, add `runtimeOwnedSourceRoute: WorkflowStepResolutionSourceRoute | undefined` to `WorkflowExecuteToolBackedOperationNextAction`, with a comment stating it is set only for direct runtime-owned operation actions such as `allocate_artifact` and `build_workflow_document`; keep `toolBackedOperationSession` as the tracking carrier for normal tool-governed workflow-step operations.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+
+[x] Subtask 144.1a. In `buildNextActionFromDecisionTreeAction(...)`, add `runtimeOwnedSourceRoute: undefined` to the returned `execute_tool_backed_operation` next action for the normal `execute_tool_backed_operation` decision action that also returns `toolBackedOperationSession`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 144.2. In `buildNextActionFromDecisionTreeAction(...)`, add `runtimeOwnedSourceRoute: sourceRoute` to the returned `execute_tool_backed_operation` next action for the `build_workflow_document` decision action.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 144.3. In `buildNextActionFromDecisionTreeAction(...)`, add `runtimeOwnedSourceRoute: sourceRoute` to the returned `execute_tool_backed_operation` next action for the `allocate_artifact` decision action.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 144.4. In `WorkflowNextActionConsumer.consume(...)`, when calling `workflowRuntime.handleToolBackedOperationToolResult(...)`, pass `runtimeOwnedSourceRoute: currentAction.runtimeOwnedSourceRoute` alongside `taskState` and `toolResultText`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowNextActionConsumer.ts`
+
+[x] Subtask 144.5. In `WorkflowRuntime.handleToolBackedOperationToolResult(...)`, extend the argument object with `runtimeOwnedSourceRoute: WorkflowStepResolutionSourceRoute | undefined`; before `findPendingArtifactAllocationSourceRoute(...)` and `findPendingDocumentBuildSourceRoute(...)`, if `runtimeOwnedSourceRoute` is not undefined, route serialized failures through `completeToolBackedOperationFailure(...)` for that exact source route and non-failure results through `completeToolBackedOperationSuccess(...)` for that exact source route.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 144.6. In `WorkflowRuntime.test.ts`, update runtime-owned `allocate_artifact` and `build_workflow_document` next-action assertions so they prove the returned action carries the expected `runtimeOwnedSourceRoute` and no `toolBackedOperationSession`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 144.7. In `WorkflowNextActionConsumer.test.ts`, add coverage proving `execute_tool_backed_operation` actions with `runtimeOwnedSourceRoute` pass that exact route into `handleToolBackedOperationToolResult(...)` after the adapter returns the tool result.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts`
+
+[x] Subtask 144.8. In `WorkflowRuntime.test.ts`, `WorkflowNextActionConsumer.test.ts`, `workflow-runtime-metadata.test.ts`, and `SubagentRunner.test.ts`, update every hand-built `execute_tool_backed_operation` next-action fixture so runtime-owned operation fixtures set the expected `runtimeOwnedSourceRoute` and non-runtime-owned operation fixtures set `runtimeOwnedSourceRoute: undefined`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+
+[x] Task 145. Recover runtime-owned tool results by native call id instead of first appended result.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
+
+[x] Subtask 145.1. In `Task.consumeWorkflowNextAction(...)`, assign `const workflowRuntimeToolCallId = this.createWorkflowRuntimeToolCallId(workflowAction)` before calling `this.toolExecutor.executeTool(...)`, pass that local as the tool block `call_id`, and pass the same local into the result-recovery helper after execution.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
+
+[x] Subtask 145.2. In `src/core/task/index.ts`, replace `getWorkflowFormToolResultText(previousUserMessageContentLength: number)` with `getWorkflowRuntimeToolResultText(previousUserMessageContentLength: number, workflowRuntimeToolCallId: string): string | undefined`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
+
+[x] Subtask 145.3. In the renamed `getWorkflowRuntimeToolResultText(...)`, scan only `this.taskState.userMessageContent.slice(previousUserMessageContentLength)` and first return the normalized content from a `tool_result` block whose `call_id` equals `workflowRuntimeToolCallId` or whose `tool_use_id` equals `workflowRuntimeToolCallId`. If no matching native tool result exists, return `undefined`; do not fall back to the first unrelated appended text or tool result.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
+
+[x] Subtask 145.4. In `workflow-runtime-metadata.test.ts`, update the Phase 54 chained-operation test so the `executeTool(...)` stub appends an unrelated successful tool result before or after the real runtime-owned tool result, and assert each `handleToolBackedOperationToolResult(...)` call receives the result text for the matching runtime-owned `call_id`, not the unrelated result.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
+
+[x] Task 146. Add a real main-task regression for brainstorming Step 1 runtime-owned handler chaining.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
+
+[x] Subtask 146.1. In `workflow-runtime-metadata.test.ts`, add imports for `mkdtemp`, `rm`, and `mkdir` from `fs/promises`, `join` from `path`, `tmpdir` from `os`, `ClineIgnoreController` from `@/core/ignore/ClineIgnoreController`, `CreateWorkflowArtifactToolHandler`, `BuildWorkflowDocumentToolHandler`, `ToolExecutorCoordinator`, `ToolValidator`, and `brainstormingWorkflowDefinition`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
+
+[x] Subtask 146.2. In `workflow-runtime-metadata.test.ts`, add a typed test helper that creates a temporary cwd, registers `brainstormingWorkflowDefinition` through the existing workflow registry stub, constructs a real `WorkflowRuntime` with that cwd and an allow-all workspace path policy, creates a `ToolExecutorCoordinator`, registers real `CreateWorkflowArtifactToolHandler` and `BuildWorkflowDocumentToolHandler` instances using `new ToolValidator(new ClineIgnoreController(cwd))`, and returns a cleanup callback that removes the temp cwd.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
+
+[x] Subtask 146.3. In `workflow-runtime-metadata.test.ts`, add a typed test helper that builds the minimal `TaskConfig` required by `CreateWorkflowArtifactToolHandler` and `BuildWorkflowDocumentToolHandler`, using real `taskState`, `workflowRuntime`, `cwd`, an auto-approving `shouldAutoApproveToolWithPath` callback, no-op `say` / `ask` / `removeLastPartialMessageIfExistsWithType` callbacks, and no unsafe `any`, `as any`, or `as unknown as TaskConfig` assertions.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
+
+[x] Subtask 146.4. In `workflow-runtime-metadata.test.ts`, add a test named `consumes real brainstorming runtime-owned create and build handlers before rendering the setup form`. The test must activate `brainstorming`, drive the mandatory entry form through a complete new-project selection, inject a `toolExecutor.executeTool(...)` implementation that delegates to the real coordinator from Subtask 146.2 and appends each real handler result with `ToolResultUtils.pushToolResult(...)`, invoke `consumeWorkflowNextAction(...)` with the returned Step 1 action, and assert the real executed tool sequence is exactly `create_workflow_artifact` followed by `build_workflow_document`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
+
+[x] Subtask 146.5. In the new real-handler regression test, assert that `join(cwd, "docs", "projects", "brainstorming-runtime-project", "discovery", "brainstorming.md")` exists after consumption, that the file content includes the initial brainstorming document shell, and that the active workflow form session exists with `workflowFormId === "step-1-setup-form"`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
+
+[x] Subtask 146.6. In the new real-handler regression test, assert that no project folder was created directly at `join(cwd, "brainstorming-runtime-project")`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
+
+[x] Task 147. Validate Phase 55.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowNextActionConsumer.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
+
+[x] Subtask 147.1. Run `npm run test:unit -- src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`; it must pass before Phase 55 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 147.2. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts src/core/task/__tests__/workflow-runtime-metadata.test.ts`; it must pass before Phase 55 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
+
+[x] Subtask 147.3. Run `npm run check-types` and `npm run lint`; both must pass before Phase 55 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowNextActionConsumer.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
+
+[x] Subtask 147.4. Run `rg "join\\(this\\.cwd, session\\.projectSelection\\.projectFolderName\\)|rootDirectory: this\\.cwd|join\\(cwd, [^\\n]*projectFolderName" src/core/task/workflow-runtime/WorkflowRuntime.ts src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`; manually confirm there are no surviving root-level workflow project-folder path expectations or runtime path resolutions.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
 ## Validation
 
 After all implementation tasks are complete, run these commands from `/Users/robertboston/Documents/Cline Extension/cline`:
@@ -6895,6 +7226,7 @@ npm run test:unit -- src/core/task/__tests__/workflow-runtime-metadata.test.ts
 npm run test:unit -- src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts
 npm run test:unit -- src/core/task/__tests__/ToolExecutor.nativeToolParity.test.ts src/core/task/__tests__/ToolExecutor.responseToolFailureBudget.test.ts
 npm run test:unit -- src/core/task/__tests__/workflow-runtime-metadata.test.ts src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/tools/utils/__tests__/ToolResultUtils.test.ts src/core/prompts/__tests__/responses.test.ts
+npm run test:unit -- src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts src/core/task/__tests__/workflow-runtime-metadata.test.ts
 ```
 
 Validation expectations:
@@ -6979,6 +7311,13 @@ Validation expectations:
 - Phase 54 QA must verify runtime-owned internal tool-backed operations generated by `Task.consumeWorkflowNextAction(...)` use unique native `call_id` values per operation, do not trip `ToolResultUtils` duplicate-result suppression, and do not inherit or leave behind normal assistant-turn `didAlreadyUseTool` gating.
 - Phase 54 QA must verify the serialized failure classifier remains unchanged: missing, empty, denied, `Error:`-prefixed, and serialized tool-error results must still route through workflow tool-backed operation failure handling.
 - Phase 54 QA must verify brainstorming Step 1 successful artifact allocation followed by successful initial document build routes to the Step 1 setup form instead of `Unable to initialize brainstorming.md.`.
+- Phase 55 QA must verify every foundational workflow project folder, existing-project discovery root, selected-project discovery root, artifact allocation path, artifact discovery path, and document-builder destination path is under `join(cwd, "docs", "projects")`, and no per-project workflow folder is created directly under `cwd`.
+- Phase 55 QA must verify missing `docs/projects` existing-project discovery returns an empty project list without failing workflow entry rendering.
+- Phase 55 QA must verify a workflow-form submit that only reveals a newly visible required field re-renders without `session.failure`, while a subsequent submit from that rendered state with the required field still empty produces the normal required-field failure.
+- Phase 55 QA must verify shared entry project-selection mode-only submits for `new` and `existing` re-render the dependent field without starting the workflow, and complete project-selection submits still persist `entryProjectValueKeys`, create folders, and continue workflow next-action evaluation.
+- Phase 55 QA must verify runtime-owned `allocate_artifact` and `build_workflow_document` actions carry explicit `runtimeOwnedSourceRoute` values into `handleToolBackedOperationToolResult(...)`, and normal tool-governed workflow-step operations carry `runtimeOwnedSourceRoute: undefined`.
+- Phase 55 QA must verify `Task.consumeWorkflowNextAction(...)` recovers runtime-owned tool results by matching the generated native `call_id`, not by taking the first appended result.
+- Phase 55 QA must verify the real main-task regression executes real `create_workflow_artifact` and `build_workflow_document` handlers in sequence for brainstorming Step 1 and renders `step-1-setup-form` without changing thread display state to active during the internal runtime-owned tool chain.
 - Subagent tests must prove parent-assigned workflow activation consumes its returned next action, child workflows reject `render_workflow_form` clearly, and child workflow `execute_tool_backed_operation` executes through the child tool handler path before re-entering workflow next-action evaluation.
 - `rg "if \\(block\\.name === ClineDefaultTool\\.SET_WORKFLOW_VALUES" src/core/task/index.ts` must return no matches.
 - `rg "const nextAction = await config\\.workflowRuntime\\.activateWorkflow" src/core/task/tools/handlers/UseSkillToolHandler.ts` must show the successful non-`no_op` result is passed to `config.callbacks.queueWorkflowNextAction(nextAction)`.

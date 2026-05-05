@@ -1474,6 +1474,7 @@ export class Task {
 						toolParams[key] = serializedValue === undefined ? String(value) : serializedValue
 					}
 					const previousDidAlreadyUseTool = this.taskState.didAlreadyUseTool
+					const workflowRuntimeToolCallId = this.createWorkflowRuntimeToolCallId(workflowAction)
 					try {
 						this.taskState.didAlreadyUseTool = false
 						await this.toolExecutor.executeTool({
@@ -1482,13 +1483,16 @@ export class Task {
 							params: toolParams,
 							partial: false,
 							isNativeToolCall: true,
-							call_id: this.createWorkflowRuntimeToolCallId(workflowAction),
+							call_id: workflowRuntimeToolCallId,
 						})
 					} finally {
 						this.taskState.didAlreadyUseTool = previousDidAlreadyUseTool
 					}
 					return {
-						toolResultText: this.getWorkflowFormToolResultText(previousUserMessageContentLength),
+						toolResultText: this.getWorkflowRuntimeToolResultText(
+							previousUserMessageContentLength,
+							workflowRuntimeToolCallId,
+						),
 					}
 				},
 			},
@@ -1497,7 +1501,10 @@ export class Task {
 		await consumer.consume(nextAction)
 	}
 
-	private getWorkflowFormToolResultText(previousUserMessageContentLength: number): string | undefined {
+	private getWorkflowRuntimeToolResultText(
+		previousUserMessageContentLength: number,
+		workflowRuntimeToolCallId: string,
+	): string | undefined {
 		const normalizeWorkflowFormToolText = (text: string | undefined): string | undefined => {
 			const trimmedText = text?.trim()
 			if (!trimmedText) {
@@ -1522,17 +1529,19 @@ export class Task {
 		}
 
 		const appendedContent = this.taskState.userMessageContent.slice(previousUserMessageContentLength)
-		const appendedToolResult = appendedContent.find(
-			(item) => item.type === "tool_result" && typeof item.content === "string" && item.content.trim().length > 0,
-		)
-		if (appendedToolResult?.type === "tool_result" && typeof appendedToolResult.content === "string") {
-			return normalizeWorkflowFormToolText(appendedToolResult.content)
+		const matchingToolResult = appendedContent.find((item) => {
+			if (item.type !== "tool_result" || typeof item.content !== "string" || item.content.trim().length === 0) {
+				return false
+			}
+
+			const callId = Reflect.get(item, "call_id")
+			return callId === workflowRuntimeToolCallId || item.tool_use_id === workflowRuntimeToolCallId
+		})
+		if (matchingToolResult?.type === "tool_result" && typeof matchingToolResult.content === "string") {
+			return normalizeWorkflowFormToolText(matchingToolResult.content)
 		}
 
-		return appendedContent
-			.map((item) => (item.type === "text" ? item.text : undefined))
-			.map((item) => normalizeWorkflowFormToolText(item))
-			.find((item): item is string => typeof item === "string" && item.trim().length > 0)
+		return undefined
 	}
 
 	async say(

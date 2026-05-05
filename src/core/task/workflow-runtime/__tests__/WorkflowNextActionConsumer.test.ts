@@ -218,6 +218,7 @@ describe("WorkflowNextActionConsumer", () => {
 			.resolves({ kind: "no_op" })
 		const action = {
 			kind: "execute_tool_backed_operation" as const,
+			runtimeOwnedSourceRoute: undefined,
 			toolBackedOperationSession: operationSession,
 			toolRequest: {
 				toolName: ClineDefaultTool.FILE_READ,
@@ -235,6 +236,7 @@ describe("WorkflowNextActionConsumer", () => {
 		sinon.assert.calledOnceWithExactly(handleToolBackedOperationToolResult, {
 			taskState,
 			toolResultText: "tool result",
+			runtimeOwnedSourceRoute: undefined,
 		})
 		sinon.assert.calledTwice(adapter.persistWorkflowRuntimeMetadata)
 		assert.equal(
@@ -265,6 +267,7 @@ describe("WorkflowNextActionConsumer", () => {
 		adapter.executeToolBackedOperation.rejects(executionError)
 		const action = {
 			kind: "execute_tool_backed_operation" as const,
+			runtimeOwnedSourceRoute: undefined,
 			toolBackedOperationSession: operationSession,
 			toolRequest: {
 				toolName: ClineDefaultTool.FILE_READ,
@@ -294,6 +297,7 @@ describe("WorkflowNextActionConsumer", () => {
 			.resolves({ kind: "no_op" })
 		const action = {
 			kind: "execute_tool_backed_operation" as const,
+			runtimeOwnedSourceRoute: undefined,
 			toolRequest: {
 				toolName: ClineDefaultTool.FILE_READ,
 				toolParams: {
@@ -310,11 +314,42 @@ describe("WorkflowNextActionConsumer", () => {
 		sinon.assert.calledOnceWithExactly(handleToolBackedOperationToolResult, {
 			taskState,
 			toolResultText: "tool result",
+			runtimeOwnedSourceRoute: undefined,
 		})
 		sinon.assert.calledOnce(adapter.persistWorkflowRuntimeMetadata)
 		assert.equal(
 			handleToolBackedOperationToolResult.firstCall.calledBefore(adapter.persistWorkflowRuntimeMetadata.firstCall),
 			true,
 		)
+	})
+
+	it("passes runtime-owned source routes into tool-result handling", async () => {
+		const runtimeOwnedSourceRoute = {
+			branchId: "runtime-owned-branch",
+			routeId: "runtime-owned-route",
+		}
+		const handleToolBackedOperationToolResult = sandbox
+			.stub(runtime, "handleToolBackedOperationToolResult")
+			.resolves({ kind: "no_op" })
+		const action: Extract<WorkflowNextAction, { kind: "execute_tool_backed_operation" }> = {
+			kind: "execute_tool_backed_operation",
+			runtimeOwnedSourceRoute,
+			toolRequest: {
+				toolName: ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT,
+				toolParams: {
+					artifact_id: "brainstorming_session",
+				},
+				toolInput: {},
+			},
+		}
+
+		await consumer.consume(action)
+
+		sinon.assert.calledOnceWithExactly(adapter.executeToolBackedOperation, action)
+		sinon.assert.calledOnceWithExactly(handleToolBackedOperationToolResult, {
+			taskState,
+			toolResultText: "tool result",
+			runtimeOwnedSourceRoute,
+		})
 	})
 })

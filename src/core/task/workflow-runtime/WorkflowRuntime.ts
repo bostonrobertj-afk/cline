@@ -81,6 +81,7 @@ const WORKFLOW_PROJECT_SUBFOLDERS: readonly WorkflowProjectSubfolder[] = [
 	"review",
 	"testing",
 ]
+const WORKFLOW_PROJECT_OUTPUT_ROOT_PATH_SEGMENTS = ["docs", "projects"] as const
 const WORKFLOW_ENTRY_FORM_ID = "__workflow_runtime_entry_form__"
 const WORKFLOW_ENTRY_INFO_PANEL_ID = "__workflow_runtime_entry_info__"
 const WORKFLOW_ENTRY_PROJECT_SELECTION_PANEL_ID = "__workflow_runtime_entry_project_selection__"
@@ -155,6 +156,10 @@ export class WorkflowRuntime {
 		if (!this.workspacePathPolicy.validateAccess(filePath)) {
 			throw new Error(`Workflow runtime path is blocked by workspace path policy: ${filePath}`)
 		}
+	}
+
+	private resolveWorkflowProjectOutputRoot(): string {
+		return join(this.cwd, ...WORKFLOW_PROJECT_OUTPUT_ROOT_PATH_SEGMENTS)
 	}
 
 	async activateWorkflow(args: {
@@ -359,8 +364,9 @@ export class WorkflowRuntime {
 	async handleToolBackedOperationToolResult(args: {
 		taskState: TaskState
 		toolResultText?: string
+		runtimeOwnedSourceRoute: WorkflowStepResolutionSourceRoute | undefined
 	}): Promise<WorkflowNextAction> {
-		const { taskState, toolResultText } = args
+		const { taskState, toolResultText, runtimeOwnedSourceRoute } = args
 		const session = taskState.activeWorkflowSession
 		if (!session) {
 			return { kind: "no_op" }
@@ -409,6 +415,21 @@ export class WorkflowRuntime {
 				taskState,
 				sourceRoute: stepResolutionSession.sourceRoute,
 				errorMessage: evaluation.errorMessage,
+			})
+		}
+
+		if (runtimeOwnedSourceRoute !== undefined) {
+			if (isSerializedToolFailureResultText(toolResultText)) {
+				return this.completeToolBackedOperationFailure({
+					taskState,
+					sourceRoute: runtimeOwnedSourceRoute,
+					errorMessage: toolResultText,
+				})
+			}
+
+			return this.completeToolBackedOperationSuccess({
+				taskState,
+				sourceRoute: runtimeOwnedSourceRoute,
 			})
 		}
 
@@ -1861,6 +1882,22 @@ export class WorkflowRuntime {
 		return submittedValue.stringValue?.trim()
 	}
 
+	private doesWorkflowEntryProjectSelectionSubmitContainSelectionValue(request: WorkflowFormSubmissionRequest): boolean {
+		const projectMode = request.fields
+			.find((field) => field.key === WORKFLOW_ENTRY_PROJECT_MODE_FIELD_KEY)
+			?.value?.stringValue?.trim()
+
+		if (projectMode === "new") {
+			return request.fields.some((field) => field.key === WORKFLOW_ENTRY_NEW_PROJECT_TITLE_FIELD_KEY)
+		}
+
+		if (projectMode === "existing") {
+			return request.fields.some((field) => field.key === WORKFLOW_ENTRY_EXISTING_PROJECT_FIELD_KEY)
+		}
+
+		return false
+	}
+
 	private async resolveWorkflowEntryProjectSelection(args: { formSession: Pick<WorkflowFormSessionState, "values"> }): Promise<
 		| {
 				projectSelection: WorkflowProjectSelectionState
@@ -1882,7 +1919,7 @@ export class WorkflowRuntime {
 			}
 
 			const existingProjectOptions = await discoverWorkflowCandidates({
-				rootDirectory: this.cwd,
+				rootDirectory: this.resolveWorkflowProjectOutputRoot(),
 				workspacePathPolicy: this.workspacePathPolicy,
 				entryType: "directory",
 				immediateChildrenOnly: true,
@@ -1954,6 +1991,11 @@ export class WorkflowRuntime {
 					args.request.panelId === WORKFLOW_ENTRY_PROJECT_SELECTION_PANEL_ID &&
 					!args.outcome.session.failure
 				) {
+					if (!this.doesWorkflowEntryProjectSelectionSubmitContainSelectionValue(args.request)) {
+						session.ui.formSession = args.outcome.session
+						return this.resolveNextAction({ taskState: args.taskState })
+					}
+
 					const selectionResult = await this.resolveWorkflowEntryProjectSelection({
 						formSession: args.outcome.session,
 					})
@@ -2561,14 +2603,16 @@ export class WorkflowRuntime {
 		let rootDirectory = this.cwd
 		const namingPattern = discoveryConfig.namingPattern === undefined ? undefined : new RegExp(discoveryConfig.namingPattern)
 
-		if (discoveryConfig.root.kind === "selected_project_root") {
+		if (discoveryConfig.root.kind === "project_output_root") {
+			rootDirectory = this.resolveWorkflowProjectOutputRoot()
+		} else if (discoveryConfig.root.kind === "selected_project_root") {
 			const session = args.taskState.activeWorkflowSession
 			if (!session || session.projectSelection.projectFolderName === "") {
 				return undefined
 			}
 
 			rootDirectory = resolveWorkflowDiscoveryTargetDirectory({
-				rootDirectory: this.cwd,
+				rootDirectory: this.resolveWorkflowProjectOutputRoot(),
 				targetPathSegments: [session.projectSelection.projectFolderName],
 			})
 		}
@@ -2989,6 +3033,7 @@ export class WorkflowRuntime {
 				return {
 					kind: "execute_tool_backed_operation",
 					toolRequest,
+					runtimeOwnedSourceRoute: undefined,
 					toolBackedOperationSession: stepResolutionSession,
 				}
 			}
@@ -3026,6 +3071,7 @@ export class WorkflowRuntime {
 				session.ui.stepResolutionSession = undefined
 				return {
 					kind: "execute_tool_backed_operation",
+					runtimeOwnedSourceRoute: sourceRoute,
 					toolRequest: {
 						toolName: ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT,
 						toolInput: action.instruction.workflowValueWrites
@@ -3049,6 +3095,7 @@ export class WorkflowRuntime {
 
 				return {
 					kind: "execute_tool_backed_operation",
+					runtimeOwnedSourceRoute: sourceRoute,
 					toolRequest: {
 						toolName: ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT,
 						toolInput: {},
@@ -3136,7 +3183,7 @@ export class WorkflowRuntime {
 			throw new Error("Cannot resolve workflow artifact path without a selected project folder.")
 		}
 
-		return join(this.cwd, session.projectSelection.projectFolderName)
+		return join(this.resolveWorkflowProjectOutputRoot(), session.projectSelection.projectFolderName)
 	}
 
 	private async resolveWorkflowArtifactAllocation(args: {
@@ -3194,7 +3241,7 @@ export class WorkflowRuntime {
 		const filenames: string[] = []
 		for (const subfolder of subfolders) {
 			const candidates = await discoverWorkflowCandidates({
-				rootDirectory: this.cwd,
+				rootDirectory: this.resolveWorkflowProjectOutputRoot(),
 				workspacePathPolicy: this.workspacePathPolicy,
 				targetPathSegments: [projectFolderName, subfolder],
 				entryType: "file",
@@ -4606,13 +4653,16 @@ export class WorkflowRuntime {
 	}
 
 	private async ensureProjectFoldersExist(session: ActiveWorkflowSession): Promise<void> {
-		const projectRoot = join(this.cwd, session.projectSelection.projectFolderName)
+		const projectOutputRoot = this.resolveWorkflowProjectOutputRoot()
+		this.assertWorkspacePathAllowed(projectOutputRoot)
+		const projectRoot = join(projectOutputRoot, session.projectSelection.projectFolderName)
 		this.assertWorkspacePathAllowed(projectRoot)
 		const projectSubfolderPaths = WORKFLOW_PROJECT_SUBFOLDERS.map((subfolderName) => join(projectRoot, subfolderName))
 		for (const projectSubfolderPath of projectSubfolderPaths) {
 			this.assertWorkspacePathAllowed(projectSubfolderPath)
 		}
 
+		await mkdir(projectOutputRoot, { recursive: true })
 		await mkdir(projectRoot, { recursive: true })
 
 		for (const projectSubfolderPath of projectSubfolderPaths) {

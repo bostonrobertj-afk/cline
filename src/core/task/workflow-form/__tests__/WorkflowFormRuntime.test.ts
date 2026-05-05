@@ -904,6 +904,142 @@ describe("WorkflowFormRuntime", () => {
 		expect("payload" in outcome).to.equal(false)
 	})
 
+	it("re-renders when a submit reveals a required dependent field", () => {
+		const runtime = createRuntime()
+		const session = createSession({
+			runtime,
+			definitionPayload: createDefinition({
+				firstPanelId: "project",
+				panels: {
+					project: {
+						panelId: "project",
+						title: "Project",
+						promptMarkdown: "Choose project mode.",
+						fields: [
+							{
+								key: "mode",
+								kind: "radio_group",
+								label: "Mode",
+								required: true,
+								allowedValueType: "string",
+								options: [
+									{ value: "new", label: "New" },
+									{ value: "existing", label: "Existing" },
+								],
+							},
+							{
+								key: "project_title",
+								kind: "small_text",
+								label: "Project title",
+								required: true,
+								allowedValueType: "string",
+								visibilityCondition: {
+									sourceKey: "mode",
+									operator: "equals",
+									value: "new",
+								},
+							},
+						],
+						allowedActions: ["submit"],
+						transition: {
+							type: "sequential",
+							nextPanelId: "done",
+						},
+					},
+					done: {
+						panelId: "done",
+						title: "Done",
+						promptMarkdown: "Ready.",
+						fields: [],
+						allowedActions: ["submit"],
+						transition: createTerminalTransition(),
+					},
+				},
+			}),
+		})
+
+		const outcome = runtime.handleSubmission(
+			session,
+			createSubmitRequest({
+				sessionId: session.sessionId,
+				panelId: "project",
+				fields: [
+					{
+						key: "mode",
+						value: { stringValue: "new" },
+					},
+				],
+			}),
+		)
+
+		expect(outcome.kind).to.equal("render_form")
+		if (outcome.kind !== "render_form") {
+			throw new Error(`Expected render_form, received ${outcome.kind}.`)
+		}
+		expect(outcome.session.failure).to.equal(undefined)
+		expect(outcome.session.values.mode).to.deep.equal({
+			valueType: "string",
+			stringValue: "new",
+		})
+		expect(outcome.session.currentPanelId).to.equal("project")
+
+		const secondOutcome = runtime.handleSubmission(
+			outcome.session,
+			createSubmitRequest({
+				sessionId: outcome.session.sessionId,
+				panelId: "project",
+				fields: [
+					{
+						key: "mode",
+						value: { stringValue: "new" },
+					},
+				],
+			}),
+		)
+
+		expect(secondOutcome.kind).to.equal("render_form")
+		if (secondOutcome.kind !== "render_form") {
+			throw new Error(`Expected render_form, received ${secondOutcome.kind}.`)
+		}
+		expect(secondOutcome.session.failure).to.deep.equal({
+			panelId: "project",
+			errorMessage: 'Field "project_title" is required.',
+		})
+
+		const directSubmitSession = createSession({
+			runtime,
+			definitionPayload: session.definitionPayload,
+		})
+		const directOutcome = runtime.handleSubmission(
+			directSubmitSession,
+			createSubmitRequest({
+				sessionId: directSubmitSession.sessionId,
+				panelId: "project",
+				fields: [
+					{
+						key: "mode",
+						value: { stringValue: "new" },
+					},
+					{
+						key: "project_title",
+						value: { stringValue: "Launch Plan" },
+					},
+				],
+			}),
+		)
+
+		expect(directOutcome.kind).to.equal("render_form")
+		if (directOutcome.kind !== "render_form") {
+			throw new Error(`Expected render_form, received ${directOutcome.kind}.`)
+		}
+		expect(directOutcome.session.currentPanelId).to.equal("done")
+		expect(directOutcome.session.failure).to.equal(undefined)
+		expect(directOutcome.session.values.project_title).to.deep.equal({
+			valueType: "string",
+			stringValue: "Launch Plan",
+		})
+	})
+
 	it("rejects selectorDiscovery dropdown submissions when rendered options are empty", () => {
 		const runtime = createRuntime()
 		const session = createSession({

@@ -1,11 +1,26 @@
 import { expect } from "chai"
+import { mkdir, mkdtemp, readFile, rm } from "fs/promises"
 import { afterEach, beforeEach, describe, it } from "mocha"
+import { tmpdir } from "os"
+import { join } from "path"
 import sinon from "sinon"
 import type { ToolUse } from "@/core/assistant-message"
+import { ContextManager } from "@/core/context/context-management/ContextManager"
 import type { TaskMetadata } from "@/core/context/context-tracking/ContextTrackerTypes"
+import { FileContextTracker } from "@/core/context/context-tracking/FileContextTracker"
+import { ClineIgnoreController } from "@/core/ignore/ClineIgnoreController"
+import { CommandPermissionController } from "@/core/permissions"
 import * as disk from "@/core/storage/disk"
+import { StateManager } from "@/core/storage/StateManager"
 import { Task } from "@/core/task"
+import { MessageStateHandler } from "@/core/task/message-state"
 import { TaskState } from "@/core/task/TaskState"
+import { AutoApprove } from "@/core/task/tools/autoApprove"
+import { BuildWorkflowDocumentToolHandler } from "@/core/task/tools/handlers/BuildWorkflowDocumentToolHandler"
+import { CreateWorkflowArtifactToolHandler } from "@/core/task/tools/handlers/CreateWorkflowArtifactToolHandler"
+import { ToolExecutorCoordinator } from "@/core/task/tools/ToolExecutorCoordinator"
+import { ToolValidator } from "@/core/task/tools/ToolValidator"
+import type { TaskConfig } from "@/core/task/tools/types/TaskConfig"
 import { ToolResultUtils } from "@/core/task/tools/utils"
 import type { WorkflowFormSessionState } from "@/core/task/workflow-form/types"
 import type {
@@ -15,8 +30,20 @@ import type {
 } from "@/core/task/workflow-runtime/types"
 import * as WorkflowRegistry from "@/core/task/workflow-runtime/WorkflowRegistry"
 import { WorkflowRuntime } from "@/core/task/workflow-runtime/WorkflowRuntime"
+import { brainstormingWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/brainstorming"
+import { buildInitialBrainstormingDocument } from "@/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingDocument"
+import { DiffViewProvider } from "@/integrations/editor/DiffViewProvider"
+import { BrowserSession } from "@/services/browser/BrowserSession"
+import { UrlContentFetcher } from "@/services/browser/UrlContentFetcher"
+import { McpHub } from "@/services/mcp/McpHub"
+import { DEFAULT_AUTO_APPROVAL_SETTINGS } from "@/shared/AutoApprovalSettings"
+import { DEFAULT_BROWSER_SETTINGS } from "@/shared/BrowserSettings"
+import type { AwaitingUserResponseSubtype, ThreadDisplayState } from "@/shared/ExtensionMessage"
+import { DEFAULT_FOCUS_CHAIN_SETTINGS } from "@/shared/FocusChainSettings"
+import { ApiFormat } from "@/shared/proto/cline/models"
 import { WorkflowFormAction, type WorkflowFormSubmissionRequest } from "@/shared/proto/cline/task"
 import { ClineDefaultTool } from "@/shared/tools"
+import * as pathUtils from "@/utils/path"
 
 function createPersistedSession(): PersistedWorkflowSession {
 	return {
@@ -50,6 +77,171 @@ function createMetadata(): TaskMetadata {
 function createAllowAllWorkspacePathPolicy(): WorkflowWorkspacePathPolicy {
 	return {
 		validateAccess: () => true,
+	}
+}
+
+interface RealBrainstormingRuntimeHarness {
+	cwd: string
+	taskState: TaskState
+	workflowRuntime: WorkflowRuntime
+	coordinator: ToolExecutorCoordinator
+	cleanup(): Promise<void>
+}
+
+async function createRealBrainstormingRuntimeHarness(sandbox: sinon.SinonSandbox): Promise<RealBrainstormingRuntimeHarness> {
+	const cwd = await mkdtemp(join(tmpdir(), "workflow-runtime-real-brainstorming-"))
+	await mkdir(cwd, { recursive: true })
+	sandbox
+		.stub(WorkflowRegistry, "resolveWorkflowDefinition")
+		.callsFake((workflowName: string) =>
+			workflowName === brainstormingWorkflowDefinition.name ? brainstormingWorkflowDefinition : undefined,
+		)
+	const workflowRuntime = new WorkflowRuntime({
+		cwd,
+		workspacePathPolicy: createAllowAllWorkspacePathPolicy(),
+	})
+	const taskState = new TaskState()
+	const coordinator = new ToolExecutorCoordinator()
+	const toolValidator = new ToolValidator(new ClineIgnoreController(cwd))
+	coordinator.register(new CreateWorkflowArtifactToolHandler(toolValidator))
+	coordinator.register(new BuildWorkflowDocumentToolHandler(toolValidator))
+
+	return {
+		cwd,
+		taskState,
+		workflowRuntime,
+		coordinator,
+		cleanup: async () => {
+			await rm(cwd, { recursive: true, force: true })
+		},
+	}
+}
+
+class TestDiffViewProvider extends DiffViewProvider {
+	protected async openDiffEditor(): Promise<void> {}
+
+	protected async scrollEditorToLine(_line: number): Promise<void> {}
+
+	protected async scrollAnimation(_startLine: number, _endLine: number): Promise<void> {}
+
+	protected async truncateDocument(_lineNumber: number): Promise<void> {}
+
+	protected async getDocumentLineCount(): Promise<number> {
+		return 0
+	}
+
+	protected async getDocumentText(): Promise<string | undefined> {
+		return undefined
+	}
+
+	protected async saveDocument(): Promise<boolean> {
+		return true
+	}
+
+	protected async closeAllDiffViews(): Promise<void> {}
+
+	protected async resetDiffView(): Promise<void> {}
+
+	async replaceText(
+		_content: string,
+		_rangeToReplace: { startLine: number; endLine: number },
+		_currentLine: number | undefined,
+	): Promise<void> {}
+}
+
+function createRealWorkflowHandlerTaskConfig(args: {
+	taskState: TaskState
+	workflowRuntime: WorkflowRuntime
+	coordinator: ToolExecutorCoordinator
+	cwd: string
+}): TaskConfig {
+	const browserSession = sinon.createStubInstance(BrowserSession)
+	const stateManager = sinon.createStubInstance(StateManager)
+	stateManager.getGlobalSettingsKey.withArgs("hooksEnabled").returns(false)
+	const autoApprover = sinon.createStubInstance(AutoApprove)
+	autoApprover.shouldAutoApproveTool.returns([true, true])
+	const autoApprovalSettings = {
+		...DEFAULT_AUTO_APPROVAL_SETTINGS,
+		enableNotifications: false,
+	}
+	const browserSettings = {
+		...DEFAULT_BROWSER_SETTINGS,
+		viewport: { ...DEFAULT_BROWSER_SETTINGS.viewport },
+	}
+	const messageState = new MessageStateHandler({
+		taskId: "task-1",
+		ulid: "ulid-1",
+		taskState: args.taskState,
+		updateTaskHistory: async () => [],
+	})
+
+	return {
+		taskId: "task-1",
+		ulid: "ulid-1",
+		cwd: args.cwd,
+		mode: "act",
+		strictPlanModeEnabled: false,
+		yoloModeToggled: false,
+		doubleCheckCompletionEnabled: false,
+		vscodeTerminalExecutionMode: "backgroundExec",
+		enableParallelToolCalling: false,
+		isSubagentExecution: false,
+		taskState: args.taskState,
+		messageState,
+		api: {
+			getModel: () => ({
+				id: "anthropic/claude-sonnet-4.5",
+				info: {
+					contextWindow: 200_000,
+					apiFormat: ApiFormat.ANTHROPIC_CHAT,
+					supportsPromptCache: true,
+				},
+			}),
+			createMessage: sinon.stub().callsFake(async function* (): AsyncGenerator<never, void, unknown> {}),
+		},
+		services: {
+			mcpHub: sinon.createStubInstance(McpHub),
+			browserSession,
+			urlContentFetcher: sinon.createStubInstance(UrlContentFetcher),
+			diffViewProvider: new TestDiffViewProvider(),
+			fileContextTracker: sinon.createStubInstance(FileContextTracker),
+			clineIgnoreController: new ClineIgnoreController(args.cwd),
+			commandPermissionController: sinon.createStubInstance(CommandPermissionController),
+			contextManager: new ContextManager(),
+			stateManager,
+		},
+		autoApprovalSettings,
+		autoApprover,
+		browserSettings,
+		focusChainSettings: { ...DEFAULT_FOCUS_CHAIN_SETTINGS },
+		callbacks: {
+			say: async () => undefined,
+			ask: async () => ({ response: "yesButtonClicked" }),
+			saveCheckpoint: async () => undefined,
+			sayAndCreateMissingParamError: async () => "missing",
+			removeLastPartialMessageIfExistsWithType: async () => undefined,
+			upsertPartialResponseToolSayPreview: async () => false,
+			clearPartialResponseToolPreview: async () => false,
+			executeCommandTool: async (): Promise<[boolean, string]> => [false, "ok"],
+			cancelRunningCommandTool: async () => false,
+			doesLatestTaskCompletionHaveNewChanges: async () => false,
+			updateFCListFromToolResponse: async () => ({ accepted: true }),
+			queueWorkflowNextAction: () => undefined,
+			shouldAutoApproveTool: (): [boolean, boolean] => [true, true],
+			shouldAutoApproveToolWithPath: async () => true,
+			postStateToWebview: async () => undefined,
+			reinitExistingTaskFromId: async () => undefined,
+			cancelTask: async () => undefined,
+			updateTaskHistory: async () => [],
+			applyLatestBrowserSettings: async () => browserSession,
+			switchToActMode: async () => false,
+			setActiveHookExecution: async () => undefined,
+			clearActiveHookExecution: async () => undefined,
+			getActiveHookExecution: async () => undefined,
+			runUserPromptSubmitHook: async () => ({}),
+		},
+		workflowRuntime: args.workflowRuntime,
+		coordinator: args.coordinator,
 	}
 }
 
@@ -451,8 +643,17 @@ describe("workflow runtime metadata persistence", () => {
 			workspacePathPolicy: createAllowAllWorkspacePathPolicy(),
 		})
 		const task = createTaskHarness(taskState, workflowRuntime)
+		const firstRuntimeOwnedSourceRoute = {
+			branchId: "step-1-allocate-artifact",
+			routeId: "step-1-allocate-artifact",
+		}
+		const secondRuntimeOwnedSourceRoute = {
+			branchId: "step-1-await-allocation",
+			routeId: "step-1-build-initial-shell",
+		}
 		const firstAction: Extract<WorkflowNextAction, { kind: "execute_tool_backed_operation" }> = {
 			kind: "execute_tool_backed_operation",
+			runtimeOwnedSourceRoute: firstRuntimeOwnedSourceRoute,
 			toolRequest: {
 				toolName: ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT,
 				toolInput: {},
@@ -463,6 +664,7 @@ describe("workflow runtime metadata persistence", () => {
 		}
 		const secondAction: Extract<WorkflowNextAction, { kind: "execute_tool_backed_operation" }> = {
 			kind: "execute_tool_backed_operation",
+			runtimeOwnedSourceRoute: secondRuntimeOwnedSourceRoute,
 			toolRequest: {
 				toolName: ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT,
 				toolInput: {},
@@ -474,6 +676,17 @@ describe("workflow runtime metadata persistence", () => {
 			},
 		}
 		const executeTool = sandbox.stub().callsFake(async (block: ToolUse) => {
+			const unrelatedCallId = `unrelated_${block.call_id ?? "missing"}`
+			const unrelatedBlock: ToolUse = {
+				...block,
+				call_id: unrelatedCallId,
+			}
+			ToolResultUtils.pushToolResult(
+				JSON.stringify({ call_id: unrelatedCallId, unrelated: true }),
+				unrelatedBlock,
+				taskState.userMessageContent,
+				(toolBlock) => `[${toolBlock.name}]`,
+			)
 			ToolResultUtils.pushToolResult(
 				JSON.stringify({ call_id: block.call_id }),
 				block,
@@ -501,9 +714,181 @@ describe("workflow runtime metadata persistence", () => {
 		expect(secondToolUse.call_id).to.match(/^workflow_runtime_task-1_/)
 		expect(firstToolUse.call_id).to.include("create_workflow_artifact")
 		expect(secondToolUse.call_id).to.include("build_workflow_document")
+		const firstWorkflowRuntimeToolCallId = firstToolUse.call_id
+		const secondWorkflowRuntimeToolCallId = secondToolUse.call_id
+		if (firstWorkflowRuntimeToolCallId === undefined || secondWorkflowRuntimeToolCallId === undefined) {
+			throw new Error("Expected workflow runtime tool calls to carry native call ids.")
+		}
+		const firstToolResultText = handleToolBackedOperationToolResult.firstCall.args[0].toolResultText
 		const secondToolResultText = handleToolBackedOperationToolResult.secondCall.args[0].toolResultText
+		expect(firstToolResultText).to.be.a("string")
 		expect(secondToolResultText).to.be.a("string")
-		expect(secondToolResultText).to.include(secondToolUse.call_id)
+		if (typeof firstToolResultText !== "string" || typeof secondToolResultText !== "string") {
+			throw new Error("Expected workflow runtime tool result text for both native call ids.")
+		}
+		expect(firstToolResultText).to.include(firstWorkflowRuntimeToolCallId)
+		expect(firstToolResultText).not.to.include("unrelated")
+		expect(secondToolResultText).to.include(secondWorkflowRuntimeToolCallId)
+		expect(secondToolResultText).not.to.include("unrelated")
+	})
+
+	it("consumes real brainstorming runtime-owned create and build handlers before rendering the setup form", async () => {
+		const harness = await createRealBrainstormingRuntimeHarness(sandbox)
+		try {
+			const task = createTaskHarness(harness.taskState, harness.workflowRuntime)
+			const messageStateHandler = new MessageStateHandler({
+				taskId: "task-1",
+				ulid: "ulid-1",
+				taskState: harness.taskState,
+				updateTaskHistory: async () => [],
+			})
+			const taskConfig = createRealWorkflowHandlerTaskConfig({
+				taskState: harness.taskState,
+				workflowRuntime: harness.workflowRuntime,
+				coordinator: harness.coordinator,
+				cwd: harness.cwd,
+			})
+			sandbox.stub(pathUtils, "isLocatedInWorkspace").resolves(true)
+			const executedTools: ClineDefaultTool[] = []
+			let runtimeOwnedToolExecuting = false
+			const threadDisplayStateChangesDuringRuntimeTools: ThreadDisplayState[] = []
+			const setThreadDisplayState = Reflect.get(task, "setThreadDisplayState")
+			if (typeof setThreadDisplayState !== "function") {
+				throw new Error("Expected task harness to expose setThreadDisplayState.")
+			}
+			Reflect.set(
+				task,
+				"setThreadDisplayState",
+				function (
+					this: object,
+					threadDisplayState: ThreadDisplayState,
+					reason: string,
+					details: Record<string, unknown> | undefined,
+					awaitingUserResponseSubtype: AwaitingUserResponseSubtype | undefined,
+				): void {
+					if (runtimeOwnedToolExecuting) {
+						threadDisplayStateChangesDuringRuntimeTools.push(threadDisplayState)
+					}
+					Reflect.apply(setThreadDisplayState, this, [threadDisplayState, reason, details, awaitingUserResponseSubtype])
+				},
+			)
+			const executeTool = sandbox.stub().callsFake(async (block: ToolUse) => {
+				executedTools.push(block.name)
+				runtimeOwnedToolExecuting = true
+				try {
+					const result = await harness.coordinator.execute(taskConfig, block)
+					if (block.name === ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT) {
+						const persistedOutputFile = harness.taskState.activeWorkflowSession?.workflowValues.output_file
+						if (typeof persistedOutputFile !== "string" || persistedOutputFile.length === 0) {
+							const renderedResult = typeof result === "string" ? result : JSON.stringify(result)
+							throw new Error(`Expected create handler to persist output_file. Handler result: ${renderedResult}`)
+						}
+					}
+					ToolResultUtils.pushToolResult(
+						result,
+						block,
+						harness.taskState.userMessageContent,
+						(toolBlock) => `[${toolBlock.name}]`,
+						harness.coordinator,
+						harness.taskState.toolUseIdMap,
+					)
+				} finally {
+					runtimeOwnedToolExecuting = false
+				}
+				return { status: "executed", emittedToolResult: true, workflowNextActions: [] }
+			})
+			sandbox.stub(disk, "getTaskMetadata").resolves(createMetadata())
+			sandbox.stub(disk, "saveTaskMetadata").resolves()
+			Reflect.set(task, "messageStateHandler", messageStateHandler)
+			Reflect.set(task, "postStateToWebview", async () => undefined)
+			Reflect.set(task, "waitForWorkflowFormSubmissionNextAction", sandbox.stub().resolves(undefined))
+			Reflect.set(task, "toolExecutor", { executeTool })
+
+			const entryAction = await harness.workflowRuntime.activateWorkflow({
+				taskState: harness.taskState,
+				workflowName: brainstormingWorkflowDefinition.name,
+			})
+			expect(entryAction.kind).to.equal("render_workflow_form")
+			if (entryAction.kind !== "render_workflow_form") {
+				throw new Error(`Expected render_workflow_form, received ${entryAction.kind}.`)
+			}
+			const projectSelectionAction = await harness.workflowRuntime.submitWorkflowForm({
+				taskState: harness.taskState,
+				request: {
+					metadata: undefined,
+					sessionId: entryAction.formSession.sessionId,
+					panelId: entryAction.formSession.currentPanelId,
+					action: WorkflowFormAction.SUBMIT,
+					fields: [],
+				},
+			})
+			expect(projectSelectionAction.kind).to.equal("render_workflow_form")
+			if (projectSelectionAction.kind !== "render_workflow_form") {
+				throw new Error(`Expected render_workflow_form, received ${projectSelectionAction.kind}.`)
+			}
+			const stepOneAction = await harness.workflowRuntime.submitWorkflowForm({
+				taskState: harness.taskState,
+				request: {
+					metadata: undefined,
+					sessionId: projectSelectionAction.formSession.sessionId,
+					panelId: projectSelectionAction.formSession.currentPanelId,
+					action: WorkflowFormAction.SUBMIT,
+					fields: [
+						{
+							key: "__workflow_runtime_project_mode__",
+							value: { stringValue: "new" },
+						},
+						{
+							key: "__workflow_runtime_new_project_title__",
+							value: { stringValue: "Brainstorming Runtime Project" },
+						},
+					],
+				},
+			})
+			expect(stepOneAction.kind).to.equal("execute_tool_backed_operation")
+			if (stepOneAction.kind !== "execute_tool_backed_operation") {
+				throw new Error(`Expected execute_tool_backed_operation, received ${stepOneAction.kind}.`)
+			}
+
+			await callTaskMethod(task, "consumeWorkflowNextAction", stepOneAction)
+
+			expect(executedTools).to.deep.equal([
+				ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT,
+				ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT,
+			])
+			expect(threadDisplayStateChangesDuringRuntimeTools).to.deep.equal([])
+			const artifactPath = join(
+				harness.cwd,
+				"docs",
+				"projects",
+				"brainstorming-runtime-project",
+				"discovery",
+				"brainstorming.md",
+			)
+			const artifactContent = await readFile(artifactPath, "utf8")
+			expect(artifactContent).to.include(buildInitialBrainstormingDocument())
+			const activeWorkflowSession = harness.taskState.activeWorkflowSession
+			expect(activeWorkflowSession).to.not.equal(undefined)
+			if (activeWorkflowSession === undefined) {
+				throw new Error("Expected active workflow session after rendering setup form.")
+			}
+			const activeFormSession = activeWorkflowSession.ui.formSession
+			expect(activeFormSession).to.not.equal(undefined)
+			if (activeFormSession === undefined) {
+				throw new Error("Expected active workflow form session after rendering setup form.")
+			}
+			expect(activeFormSession.workflowFormId).to.equal("step-1-setup-form")
+			const rootProjectPath = join(harness.cwd, "brainstorming-runtime-project")
+			let rootProjectReadErrorCode: unknown
+			try {
+				await readFile(rootProjectPath, "utf8")
+			} catch (error) {
+				rootProjectReadErrorCode = typeof error === "object" && error !== null ? Reflect.get(error, "code") : undefined
+			}
+			expect(rootProjectReadErrorCode).to.equal("ENOENT")
+		} finally {
+			await harness.cleanup()
+		}
 	})
 
 	it("isolates runtime-owned tool-backed operations from assistant turn single-tool gating", async () => {
@@ -516,6 +901,10 @@ describe("workflow runtime metadata persistence", () => {
 		const task = createTaskHarness(taskState, workflowRuntime)
 		const action: Extract<WorkflowNextAction, { kind: "execute_tool_backed_operation" }> = {
 			kind: "execute_tool_backed_operation",
+			runtimeOwnedSourceRoute: {
+				branchId: "step-1-allocate-artifact",
+				routeId: "step-1-allocate-artifact",
+			},
 			toolRequest: {
 				toolName: ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT,
 				toolInput: {},

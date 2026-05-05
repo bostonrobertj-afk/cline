@@ -944,6 +944,9 @@ describe("WorkflowRuntime", () => {
 		if (existingSelectorAction.kind !== "render_workflow_form") {
 			throw new Error(`Expected render_workflow_form, received ${existingSelectorAction.kind}.`)
 		}
+		expect(getActiveWorkflowSession(state).projectSelection.projectTitle).to.equal("")
+		expect(getActiveWorkflowSession(state).projectSelection.projectFolderName).to.equal("")
+		expect(await pathExists(join(cwd, "docs", "projects", selectedExistingProject))).to.equal(false)
 
 		return runtime.submitWorkflowForm({
 			taskState: state,
@@ -1049,6 +1052,11 @@ describe("WorkflowRuntime", () => {
 		expect(stepOneAction.toolRequest.toolParams).to.deep.equal({
 			artifact_id: "brainstorming_session",
 		})
+		expect(stepOneAction.runtimeOwnedSourceRoute).to.deep.equal({
+			branchId: "step-1-allocate-artifact",
+			routeId: "step-1-allocate-artifact",
+		})
+		expect(stepOneAction.toolBackedOperationSession).to.be.undefined
 		expect(getActiveWorkflowSession(taskState).activeStepNumber).to.equal(1)
 		expect(getActiveWorkflowSession(taskState).workflowValues).to.deep.include({
 			projectMode: "new",
@@ -1074,6 +1082,11 @@ describe("WorkflowRuntime", () => {
 		expect(allocationAction.toolRequest.toolParams).to.deep.equal({
 			artifact_id: "brainstorming_session",
 		})
+		expect(allocationAction.runtimeOwnedSourceRoute).to.deep.equal({
+			branchId: "step-1-allocate-artifact",
+			routeId: "step-1-allocate-artifact",
+		})
+		expect(allocationAction.toolBackedOperationSession).to.be.undefined
 
 		const artifactResult = await runtime.createWorkflowArtifact({
 			taskState,
@@ -1085,6 +1098,7 @@ describe("WorkflowRuntime", () => {
 		const documentBuildAction = await runtime.handleToolBackedOperationToolResult({
 			taskState,
 			toolResultText: JSON.stringify({ ok: true }),
+			runtimeOwnedSourceRoute: allocationAction.runtimeOwnedSourceRoute,
 		})
 
 		expect(documentBuildAction.kind).to.equal("execute_tool_backed_operation")
@@ -1094,10 +1108,16 @@ describe("WorkflowRuntime", () => {
 		expect(documentBuildAction.toolRequest.toolName).to.equal(ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT)
 		expect(documentBuildAction.toolRequest.toolParams.artifact_id).to.equal("brainstorming_session")
 		expect(documentBuildAction.toolRequest.toolParams.destination_path).to.equal(artifactResult.artifactAbsolutePath)
+		expect(documentBuildAction.runtimeOwnedSourceRoute).to.deep.equal({
+			branchId: "step-1-await-allocation",
+			routeId: "step-1-build-initial-shell",
+		})
+		expect(documentBuildAction.toolBackedOperationSession).to.be.undefined
 
 		const setupFormAction = await runtime.handleToolBackedOperationToolResult({
 			taskState,
 			toolResultText: JSON.stringify({ ok: true }),
+			runtimeOwnedSourceRoute: documentBuildAction.runtimeOwnedSourceRoute,
 		})
 
 		expect(setupFormAction.kind).to.equal("render_workflow_form")
@@ -2012,7 +2032,7 @@ describe("WorkflowRuntime", () => {
 		expect(getActiveWorkflowSession(taskState).ui.formSession).to.be.undefined
 
 		for (const subfolderName of ["discovery", "planning", "implementation", "review", "testing"]) {
-			await access(join(cwd, newProjectFolderName, subfolderName))
+			await access(join(cwd, "docs", "projects", newProjectFolderName, subfolderName))
 		}
 
 		const existingTaskState = new TaskState()
@@ -2030,12 +2050,16 @@ describe("WorkflowRuntime", () => {
 			[DEFAULT_ENTRY_PROJECT_VALUE_KEYS.projectTitle]: "Existing Beta",
 			[DEFAULT_ENTRY_PROJECT_VALUE_KEYS.projectFolderName]: "Existing Beta",
 		})
+		expect(getActiveWorkflowSession(existingTaskState).ui.formSession).to.be.undefined
+		for (const subfolderName of ["discovery", "planning", "implementation", "review", "testing"]) {
+			await access(join(cwd, "docs", "projects", "Existing Beta", subfolderName))
+		}
 		const existingProjectDiscoveryRequest = discoverWorkflowCandidatesStub
 			.getCalls()
 			.map((call) => call.args[0])
 			.find(
 				(request: WorkflowDiscoveryRequest) =>
-					request.rootDirectory === cwd &&
+					request.rootDirectory === join(cwd, "docs", "projects") &&
 					request.entryType === "directory" &&
 					request.targetPathSegments === undefined,
 			)
@@ -2107,8 +2131,119 @@ describe("WorkflowRuntime", () => {
 		)
 	})
 
+	it("renders empty existing-project options when the project output root is missing", async () => {
+		discoverWorkflowCandidatesStub.restore()
+		const projectOutputRoot = join(cwd, "docs", "projects")
+		const workflow = createWorkflowDefinition()
+		registerResolvedWorkflow(workflow)
+
+		expect(await pathExists(projectOutputRoot)).to.equal(false)
+		await activateWorkflow(taskState, workflow)
+		await advanceToEntryProjectSelectionPanel(taskState)
+		const activeFormSession = getActiveFormSession(taskState)
+		const revealExistingProjectsAction = await runtime.submitWorkflowForm({
+			taskState,
+			request: createFormSubmitRequest({
+				sessionId: activeFormSession.sessionId,
+				panelId: activeFormSession.currentPanelId,
+				fields: [
+					{
+						key: ENTRY_PROJECT_MODE_FIELD_KEY,
+						value: { stringValue: "existing" },
+					},
+				],
+			}),
+		})
+
+		expect(revealExistingProjectsAction.kind).to.equal("render_workflow_form")
+		if (revealExistingProjectsAction.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${revealExistingProjectsAction.kind}.`)
+		}
+		expect(revealExistingProjectsAction.payload.panel?.panelId).to.equal(ENTRY_PROJECT_SELECTION_PANEL_ID)
+		expect(revealExistingProjectsAction.payload.errorMessage).to.be.undefined
+		expect(
+			revealExistingProjectsAction.payload.panel?.fields.find((field) => field.key === ENTRY_EXISTING_PROJECT_FIELD_KEY)
+				?.options,
+		).to.deep.equal([])
+		expect(await pathExists(projectOutputRoot)).to.equal(false)
+	})
+
+	it("keeps mode-only new project entry submissions in reveal mode", async () => {
+		const projectOutputRoot = join(cwd, "docs", "projects")
+		const workflow = createWorkflowDefinition()
+		registerResolvedWorkflow(workflow)
+
+		await activateWorkflow(taskState, workflow)
+		await advanceToEntryProjectSelectionPanel(taskState)
+		const activeFormSession = getActiveFormSession(taskState)
+		const revealNewProjectAction = await runtime.submitWorkflowForm({
+			taskState,
+			request: createFormSubmitRequest({
+				sessionId: activeFormSession.sessionId,
+				panelId: activeFormSession.currentPanelId,
+				fields: [
+					{
+						key: ENTRY_PROJECT_MODE_FIELD_KEY,
+						value: { stringValue: "new" },
+					},
+				],
+			}),
+		})
+
+		expect(revealNewProjectAction.kind).to.equal("render_workflow_form")
+		if (revealNewProjectAction.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${revealNewProjectAction.kind}.`)
+		}
+		expect(revealNewProjectAction.payload.panel?.panelId).to.equal(ENTRY_PROJECT_SELECTION_PANEL_ID)
+		expect(revealNewProjectAction.payload.panel?.fields.map((field) => field.key)).to.include(
+			ENTRY_NEW_PROJECT_TITLE_FIELD_KEY,
+		)
+		expect(revealNewProjectAction.payload.errorMessage).to.be.undefined
+		expect(getActiveWorkflowSession(taskState).projectSelection.projectTitle).to.equal("")
+		expect(getActiveWorkflowSession(taskState).projectSelection.projectFolderName).to.equal("")
+		expect(await pathExists(projectOutputRoot)).to.equal(false)
+	})
+
+	it("keeps mode-only existing project entry submissions in reveal mode", async () => {
+		const projectOutputRoot = join(cwd, "docs", "projects")
+		const workflow = createWorkflowDefinition()
+		registerResolvedWorkflow(workflow)
+		setDiscoveredProjects(["Existing Alpha"])
+
+		await activateWorkflow(taskState, workflow)
+		await advanceToEntryProjectSelectionPanel(taskState)
+		const activeFormSession = getActiveFormSession(taskState)
+		const revealExistingProjectAction = await runtime.submitWorkflowForm({
+			taskState,
+			request: createFormSubmitRequest({
+				sessionId: activeFormSession.sessionId,
+				panelId: activeFormSession.currentPanelId,
+				fields: [
+					{
+						key: ENTRY_PROJECT_MODE_FIELD_KEY,
+						value: { stringValue: "existing" },
+					},
+				],
+			}),
+		})
+
+		expect(revealExistingProjectAction.kind).to.equal("render_workflow_form")
+		if (revealExistingProjectAction.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${revealExistingProjectAction.kind}.`)
+		}
+		expect(revealExistingProjectAction.payload.panel?.panelId).to.equal(ENTRY_PROJECT_SELECTION_PANEL_ID)
+		expect(
+			revealExistingProjectAction.payload.panel?.fields.find((field) => field.key === ENTRY_EXISTING_PROJECT_FIELD_KEY)
+				?.options,
+		).to.deep.equal([{ value: "Existing Alpha", label: "Existing Alpha" }])
+		expect(revealExistingProjectAction.payload.errorMessage).to.be.undefined
+		expect(getActiveWorkflowSession(taskState).projectSelection.projectTitle).to.equal("")
+		expect(getActiveWorkflowSession(taskState).projectSelection.projectFolderName).to.equal("")
+		expect(await pathExists(projectOutputRoot)).to.equal(false)
+	})
+
 	it("blocks entry project setup before creating a denied project root", async () => {
-		const projectRoot = join(cwd, "denied-root-project")
+		const projectRoot = join(cwd, "docs", "projects", "denied-root-project")
 		runtime = new WorkflowRuntime({
 			cwd,
 			workspacePathPolicy: {
@@ -2134,7 +2269,7 @@ describe("WorkflowRuntime", () => {
 	})
 
 	it("blocks entry project setup before creating a denied canonical subfolder", async () => {
-		const projectRoot = join(cwd, "denied-subfolder-project")
+		const projectRoot = join(cwd, "docs", "projects", "denied-subfolder-project")
 		const deniedSubfolder = join(projectRoot, "review")
 		runtime = new WorkflowRuntime({
 			cwd,
@@ -2925,13 +3060,17 @@ describe("WorkflowRuntime", () => {
 		})
 
 		discoverWorkflowCandidatesStub.callsFake((request: WorkflowDiscoveryRequest) => {
-			if (request.entryType === "directory" && request.rootDirectory === cwd && request.targetPathSegments === undefined) {
+			if (
+				request.entryType === "directory" &&
+				request.rootDirectory === join(cwd, "docs", "projects") &&
+				request.targetPathSegments === undefined
+			) {
 				return Promise.resolve([{ value: "Existing Alpha", label: "Existing Alpha" }])
 			}
 
 			if (
 				request.entryType === "directory" &&
-				request.rootDirectory === join(cwd, "selector-project") &&
+				request.rootDirectory === join(cwd, "docs", "projects", "selector-project") &&
 				request.targetPathSegments === undefined
 			) {
 				return Promise.resolve([{ value: "planning", label: "planning" }])
@@ -2939,7 +3078,7 @@ describe("WorkflowRuntime", () => {
 
 			if (
 				request.entryType === "file" &&
-				request.rootDirectory === join(cwd, "selector-project") &&
+				request.rootDirectory === join(cwd, "docs", "projects", "selector-project") &&
 				request.targetPathSegments?.length === 1 &&
 				request.targetPathSegments[0] === "planning"
 			) {
@@ -2969,7 +3108,7 @@ describe("WorkflowRuntime", () => {
 		for (const request of selectorDiscoveryRequests) {
 			expect(request.workspacePathPolicy).to.equal(workspacePathPolicy)
 		}
-		const selectedProjectDirectory = join(cwd, "selector-project")
+		const selectedProjectDirectory = join(cwd, "docs", "projects", "selector-project")
 		const selectedFolderDiscoveryRequest = selectorDiscoveryRequests.find(
 			(request: WorkflowDiscoveryRequest) =>
 				request.rootDirectory === selectedProjectDirectory &&
@@ -3172,7 +3311,7 @@ describe("WorkflowRuntime", () => {
 
 				if (
 					request.entryType === "directory" &&
-					request.rootDirectory === cwd &&
+					request.rootDirectory === join(cwd, "docs", "projects") &&
 					request.targetPathSegments === undefined
 				) {
 					return Promise.resolve(
@@ -3182,7 +3321,7 @@ describe("WorkflowRuntime", () => {
 
 				if (
 					request.entryType === "directory" &&
-					request.rootDirectory !== cwd &&
+					request.rootDirectory.endsWith("selector-validation-project") &&
 					request.targetPathSegments === undefined
 				) {
 					return Promise.resolve(includeFake("selected_folder", [{ value: "planning", label: "planning" }]))
@@ -3190,7 +3329,7 @@ describe("WorkflowRuntime", () => {
 
 				if (
 					request.entryType === "file" &&
-					request.rootDirectory !== cwd &&
+					request.rootDirectory.endsWith("selector-validation-project") &&
 					request.targetPathSegments?.length === 1 &&
 					request.targetPathSegments[0] === "planning"
 				) {
@@ -3405,7 +3544,7 @@ describe("WorkflowRuntime", () => {
 		discoverWorkflowCandidatesStub.callsFake((request: WorkflowDiscoveryRequest) => {
 			if (
 				request.entryType === "file" &&
-				request.rootDirectory === join(cwd, "pattern-project") &&
+				request.rootDirectory === join(cwd, "docs", "projects", "pattern-project") &&
 				request.targetPathSegments?.length === 1 &&
 				request.targetPathSegments[0] === "stories"
 			) {
@@ -3508,7 +3647,7 @@ describe("WorkflowRuntime", () => {
 		discoverWorkflowCandidatesStub.callsFake((request: WorkflowDiscoveryRequest) => {
 			if (
 				request.entryType === "file" &&
-				request.rootDirectory === join(cwd, "template-project") &&
+				request.rootDirectory === join(cwd, "docs", "projects", "template-project") &&
 				request.targetPathSegments?.length === 1 &&
 				request.targetPathSegments[0] === "artifacts"
 			) {
@@ -3568,6 +3707,7 @@ describe("WorkflowRuntime", () => {
 			const result = await runtime.handleToolBackedOperationToolResult({
 				taskState: failureState,
 				toolResultText: failureCase.toolResultText,
+				runtimeOwnedSourceRoute: undefined,
 			})
 			const activeSession = getActiveWorkflowSession(failureState)
 
@@ -3641,6 +3781,7 @@ describe("WorkflowRuntime", () => {
 		const successResult = await runtime.handleToolBackedOperationToolResult({
 			taskState,
 			toolResultText: "ok",
+			runtimeOwnedSourceRoute: undefined,
 		})
 		expect(getActiveWorkflowSession(taskState).activeStepNumber).to.equal(3)
 		expect(getActiveWorkflowSession(taskState).ui.suppressedWorkflowStepResolutionRoutes).to.deep.equal([])
@@ -3675,6 +3816,7 @@ describe("WorkflowRuntime", () => {
 		const failureResult = await runtime.handleToolBackedOperationToolResult({
 			taskState: failureState,
 			toolResultText: "ok",
+			runtimeOwnedSourceRoute: undefined,
 		})
 
 		expect(getActiveWorkflowSession(failureState).activeStepNumber).to.equal(1)
@@ -3719,6 +3861,7 @@ describe("WorkflowRuntime", () => {
 		const result = await runtime.handleToolBackedOperationToolResult({
 			taskState,
 			toolResultText: "ok",
+			runtimeOwnedSourceRoute: undefined,
 		})
 
 		expect(result.kind).to.equal("complete_workflow")
@@ -3764,6 +3907,7 @@ describe("WorkflowRuntime", () => {
 		const result = await runtime.handleToolBackedOperationToolResult({
 			taskState,
 			toolResultText: "ok",
+			runtimeOwnedSourceRoute: undefined,
 		})
 
 		expect(result.kind).to.equal("project_prompt")
@@ -3809,6 +3953,7 @@ describe("WorkflowRuntime", () => {
 		const retryResult = await runtime.handleToolBackedOperationToolResult({
 			taskState: retryState,
 			toolResultText: "ok",
+			runtimeOwnedSourceRoute: undefined,
 		})
 
 		expect(retryResult.kind).to.equal("execute_tool_backed_operation")
@@ -3849,6 +3994,7 @@ describe("WorkflowRuntime", () => {
 		const terminalFailureResult = await runtime.handleToolBackedOperationToolResult({
 			taskState: terminalFailureState,
 			toolResultText: "ok",
+			runtimeOwnedSourceRoute: undefined,
 		})
 
 		expect(terminalFailureResult).to.deep.equal({
@@ -3926,6 +4072,7 @@ describe("WorkflowRuntime", () => {
 		const unmatchedFailureResult = await runtime.handleToolBackedOperationToolResult({
 			taskState: unmatchedFailureState,
 			toolResultText: "ok",
+			runtimeOwnedSourceRoute: undefined,
 		})
 
 		expect(unmatchedFailureResult).to.deep.equal({
@@ -3968,18 +4115,23 @@ describe("WorkflowRuntime", () => {
 		await activateWorkflow(documentBuildFailureState, documentBuildWorkflow)
 		getActiveWorkflowSession(documentBuildFailureState).workflowValues[outputFileKeys.artifactAbsolutePath] = join(
 			cwd,
+			"docs",
+			"projects",
 			"builder-failure-project",
 			"planning",
 			"Epics.md",
 		)
 		await runtime.resolveNextAction({ taskState: documentBuildFailureState })
-		expect((await submitNewProjectSelection(documentBuildFailureState, "Builder Failure Project")).kind).to.equal(
-			"execute_tool_backed_operation",
-		)
+		const documentBuildFailureAction = await submitNewProjectSelection(documentBuildFailureState, "Builder Failure Project")
+		expect(documentBuildFailureAction.kind).to.equal("execute_tool_backed_operation")
+		if (documentBuildFailureAction.kind !== "execute_tool_backed_operation") {
+			throw new Error(`Expected execute_tool_backed_operation, received ${documentBuildFailureAction.kind}.`)
+		}
 
 		const failureResult = await runtime.handleToolBackedOperationToolResult({
 			taskState: documentBuildFailureState,
 			toolResultText: "Error: write failed",
+			runtimeOwnedSourceRoute: documentBuildFailureAction.runtimeOwnedSourceRoute,
 		})
 
 		expect(failureResult.kind).to.equal("project_prompt")
@@ -5474,7 +5626,7 @@ describe("WorkflowRuntime", () => {
 
 	it("blocks artifact creation before creating a denied artifact parent directory", async () => {
 		const projectFolderName = "artifact-parent-policy-project"
-		const artifactParentDirectory = join(cwd, projectFolderName, "planning")
+		const artifactParentDirectory = join(cwd, "docs", "projects", projectFolderName, "planning")
 		runtime = new WorkflowRuntime({
 			cwd,
 			workspacePathPolicy: {
@@ -5514,7 +5666,7 @@ describe("WorkflowRuntime", () => {
 
 	it("blocks artifact creation before writing a denied artifact file path", async () => {
 		const projectFolderName = "artifact-file-policy-project"
-		const artifactAbsolutePath = join(cwd, projectFolderName, "planning", "Epics.md")
+		const artifactAbsolutePath = join(cwd, "docs", "projects", projectFolderName, "planning", "Epics.md")
 		runtime = new WorkflowRuntime({
 			cwd,
 			workspacePathPolicy: {
@@ -5576,7 +5728,7 @@ describe("WorkflowRuntime", () => {
 			projectTitle: "Artifact Discovery Policy Project",
 			projectFolderName,
 		}
-		const planningFolder = join(cwd, projectFolderName, "planning")
+		const planningFolder = join(cwd, "docs", "projects", projectFolderName, "planning")
 		await mkdir(planningFolder, { recursive: true })
 		await writeFile(
 			join(planningFolder, "Epics.index.json"),
@@ -5594,7 +5746,7 @@ describe("WorkflowRuntime", () => {
 			.map((call) => call.args[0])
 			.find(
 				(request: WorkflowDiscoveryRequest) =>
-					request.rootDirectory === cwd &&
+					request.rootDirectory === join(cwd, "docs", "projects") &&
 					request.entryType === "file" &&
 					request.targetPathSegments?.[0] === projectFolderName,
 			)
@@ -5799,7 +5951,7 @@ describe("WorkflowRuntime", () => {
 			artifactIdentity: "epics",
 			artifactFilename: "Epics.md",
 			artifactRelativePath: join("planning", "Epics.md"),
-			artifactAbsolutePath: join(cwd, "artifact-allocation-project", "planning", "Epics.md"),
+			artifactAbsolutePath: join(cwd, "docs", "projects", "artifact-allocation-project", "planning", "Epics.md"),
 			parentIdentity: undefined,
 			targetIdentity: undefined,
 		})
@@ -5807,7 +5959,7 @@ describe("WorkflowRuntime", () => {
 			artifactIdentity: "epics_index",
 			artifactFilename: "Epics.index.json",
 			artifactRelativePath: join("planning", "Epics.index.json"),
-			artifactAbsolutePath: join(cwd, "artifact-allocation-project", "planning", "Epics.index.json"),
+			artifactAbsolutePath: join(cwd, "docs", "projects", "artifact-allocation-project", "planning", "Epics.index.json"),
 			parentIdentity: undefined,
 			targetIdentity: undefined,
 		})
@@ -5815,7 +5967,14 @@ describe("WorkflowRuntime", () => {
 			artifactIdentity: "1",
 			artifactFilename: "Epic-1-delivery-spec.md",
 			artifactRelativePath: join("planning", "Epic-1-delivery-spec.md"),
-			artifactAbsolutePath: join(cwd, "artifact-allocation-project", "planning", "Epic-1-delivery-spec.md"),
+			artifactAbsolutePath: join(
+				cwd,
+				"docs",
+				"projects",
+				"artifact-allocation-project",
+				"planning",
+				"Epic-1-delivery-spec.md",
+			),
 			parentIdentity: undefined,
 			targetIdentity: undefined,
 		})
@@ -5823,7 +5982,7 @@ describe("WorkflowRuntime", () => {
 			artifactIdentity: "1.1",
 			artifactFilename: "Story-1-1.md",
 			artifactRelativePath: join("planning", "Story-1-1.md"),
-			artifactAbsolutePath: join(cwd, "artifact-allocation-project", "planning", "Story-1-1.md"),
+			artifactAbsolutePath: join(cwd, "docs", "projects", "artifact-allocation-project", "planning", "Story-1-1.md"),
 			parentIdentity: "1",
 			targetIdentity: undefined,
 		})
@@ -5831,7 +5990,14 @@ describe("WorkflowRuntime", () => {
 			artifactIdentity: "1.1.1",
 			artifactFilename: "Remediation-story-1-1-1.md",
 			artifactRelativePath: join("planning", "Remediation-story-1-1-1.md"),
-			artifactAbsolutePath: join(cwd, "artifact-allocation-project", "planning", "Remediation-story-1-1-1.md"),
+			artifactAbsolutePath: join(
+				cwd,
+				"docs",
+				"projects",
+				"artifact-allocation-project",
+				"planning",
+				"Remediation-story-1-1-1.md",
+			),
 			parentIdentity: "1.1",
 			targetIdentity: undefined,
 		})
@@ -5839,7 +6005,14 @@ describe("WorkflowRuntime", () => {
 			artifactIdentity: "1.1.1",
 			artifactFilename: "Review-blind-hunter-1-1-1.md",
 			artifactRelativePath: join("planning", "Review-blind-hunter-1-1-1.md"),
-			artifactAbsolutePath: join(cwd, "artifact-allocation-project", "planning", "Review-blind-hunter-1-1-1.md"),
+			artifactAbsolutePath: join(
+				cwd,
+				"docs",
+				"projects",
+				"artifact-allocation-project",
+				"planning",
+				"Review-blind-hunter-1-1-1.md",
+			),
 			parentIdentity: undefined,
 			targetIdentity: "1.1.1",
 		})
@@ -5847,7 +6020,14 @@ describe("WorkflowRuntime", () => {
 			artifactIdentity: "1.1.1",
 			artifactFilename: "Review-edge-case-hunter-1-1-1.md",
 			artifactRelativePath: join("planning", "Review-edge-case-hunter-1-1-1.md"),
-			artifactAbsolutePath: join(cwd, "artifact-allocation-project", "planning", "Review-edge-case-hunter-1-1-1.md"),
+			artifactAbsolutePath: join(
+				cwd,
+				"docs",
+				"projects",
+				"artifact-allocation-project",
+				"planning",
+				"Review-edge-case-hunter-1-1-1.md",
+			),
 			parentIdentity: undefined,
 			targetIdentity: "1.1.1",
 		})
@@ -5855,7 +6035,14 @@ describe("WorkflowRuntime", () => {
 			artifactIdentity: "1.1.1",
 			artifactFilename: "Adversarial-review-1-1-1.md",
 			artifactRelativePath: join("planning", "Adversarial-review-1-1-1.md"),
-			artifactAbsolutePath: join(cwd, "artifact-allocation-project", "planning", "Adversarial-review-1-1-1.md"),
+			artifactAbsolutePath: join(
+				cwd,
+				"docs",
+				"projects",
+				"artifact-allocation-project",
+				"planning",
+				"Adversarial-review-1-1-1.md",
+			),
 			parentIdentity: undefined,
 			targetIdentity: "1.1.1",
 		})
@@ -5863,7 +6050,14 @@ describe("WorkflowRuntime", () => {
 			artifactIdentity: "1.1.1",
 			artifactFilename: "Review-input-1-1-1.md",
 			artifactRelativePath: join("planning", "Review-input-1-1-1.md"),
-			artifactAbsolutePath: join(cwd, "artifact-allocation-project", "planning", "Review-input-1-1-1.md"),
+			artifactAbsolutePath: join(
+				cwd,
+				"docs",
+				"projects",
+				"artifact-allocation-project",
+				"planning",
+				"Review-input-1-1-1.md",
+			),
 			parentIdentity: undefined,
 			targetIdentity: "1.1.1",
 		})
@@ -5871,7 +6065,14 @@ describe("WorkflowRuntime", () => {
 			artifactIdentity: "1.1.1",
 			artifactFilename: "Review-input-1-1-1.diff",
 			artifactRelativePath: join("planning", "Review-input-1-1-1.diff"),
-			artifactAbsolutePath: join(cwd, "artifact-allocation-project", "planning", "Review-input-1-1-1.diff"),
+			artifactAbsolutePath: join(
+				cwd,
+				"docs",
+				"projects",
+				"artifact-allocation-project",
+				"planning",
+				"Review-input-1-1-1.diff",
+			),
 			parentIdentity: undefined,
 			targetIdentity: "1.1.1",
 		})
@@ -5897,18 +6098,34 @@ describe("WorkflowRuntime", () => {
 			[epicsKeys.artifactIdentity]: "epics",
 			[epicsKeys.artifactFilename]: "Epics.md",
 			[epicsKeys.artifactRelativePath]: join("planning", "Epics.md"),
-			[epicsKeys.artifactAbsolutePath]: join(cwd, "artifact-allocation-project", "planning", "Epics.md"),
+			[epicsKeys.artifactAbsolutePath]: join(
+				cwd,
+				"docs",
+				"projects",
+				"artifact-allocation-project",
+				"planning",
+				"Epics.md",
+			),
 			[epicsIndexKeys.artifactFamily]: WorkflowArtifactFamily.EpicsIndex,
 			[epicsIndexKeys.artifactIdentity]: "epics_index",
 			[epicsIndexKeys.artifactFilename]: "Epics.index.json",
 			[epicsIndexKeys.artifactRelativePath]: join("planning", "Epics.index.json"),
-			[epicsIndexKeys.artifactAbsolutePath]: join(cwd, "artifact-allocation-project", "planning", "Epics.index.json"),
+			[epicsIndexKeys.artifactAbsolutePath]: join(
+				cwd,
+				"docs",
+				"projects",
+				"artifact-allocation-project",
+				"planning",
+				"Epics.index.json",
+			),
 			[deliverySpecKeys.artifactFamily]: WorkflowArtifactFamily.EpicDeliverySpec,
 			[deliverySpecKeys.artifactIdentity]: "1",
 			[deliverySpecKeys.artifactFilename]: "Epic-1-delivery-spec.md",
 			[deliverySpecKeys.artifactRelativePath]: join("planning", "Epic-1-delivery-spec.md"),
 			[deliverySpecKeys.artifactAbsolutePath]: join(
 				cwd,
+				"docs",
+				"projects",
 				"artifact-allocation-project",
 				"planning",
 				"Epic-1-delivery-spec.md",
@@ -5957,7 +6174,14 @@ describe("WorkflowRuntime", () => {
 			artifactId: "brainstorming_session",
 			expectedArtifactAbsolutePath: undefined,
 		})
-		const artifactAbsolutePath = join(cwd, "brainstorming-artifact-project", "discovery", "brainstorming.md")
+		const artifactAbsolutePath = join(
+			cwd,
+			"docs",
+			"projects",
+			"brainstorming-artifact-project",
+			"discovery",
+			"brainstorming.md",
+		)
 
 		expect(result).to.deep.include({
 			artifactIdentity: "brainstorming_session",
@@ -5997,7 +6221,7 @@ describe("WorkflowRuntime", () => {
 		await runtime.resolveNextAction({ taskState })
 		await submitNewProjectSelection(taskState, "Convention Numbering Project")
 
-		const planningFolder = join(cwd, "convention-numbering-project", "planning")
+		const planningFolder = join(cwd, "docs", "projects", "convention-numbering-project", "planning")
 		await writeFile(join(planningFolder, "Epics.md"), "# Epic 1 from markdown only\n", "utf8")
 		await writeFile(
 			join(planningFolder, "Epics.index.json"),
@@ -6051,7 +6275,7 @@ describe("WorkflowRuntime", () => {
 		await activateWorkflow(taskState, workflow)
 		await runtime.resolveNextAction({ taskState })
 		await submitNewProjectSelection(taskState, "Story Parent Validation Project")
-		const planningFolder = join(cwd, "story-parent-validation-project", "planning")
+		const planningFolder = join(cwd, "docs", "projects", "story-parent-validation-project", "planning")
 		await writeFile(
 			join(planningFolder, "Epics.index.json"),
 			'{"version":1,"epics":[{"identity":"1","title":"One"}]}',
@@ -6126,7 +6350,13 @@ describe("WorkflowRuntime", () => {
 			await activateWorkflow(state, workflow)
 			await runtime.resolveNextAction({ taskState: state })
 			await submitNewProjectSelection(state, args.projectTitle)
-			const planningFolder = join(cwd, getActiveWorkflowSession(state).projectSelection.projectFolderName, "planning")
+			const planningFolder = join(
+				cwd,
+				"docs",
+				"projects",
+				getActiveWorkflowSession(state).projectSelection.projectFolderName,
+				"planning",
+			)
 			const epicsIndexPath = join(planningFolder, "Epics.index.json")
 			const deliverySpecPath = join(planningFolder, "Epic-1-delivery-spec.md")
 			await writeFile(join(planningFolder, "Epics.md"), "# Epic 1 from markdown only\n", "utf8")
@@ -6177,7 +6407,7 @@ describe("WorkflowRuntime", () => {
 		expect(await pathExists(malformedCase.deliverySpecPath)).to.equal(false)
 
 		const deniedProjectFolderName = "denied-index-project"
-		const deniedIndexPath = join(cwd, deniedProjectFolderName, "planning", "Epics.index.json")
+		const deniedIndexPath = join(cwd, "docs", "projects", deniedProjectFolderName, "planning", "Epics.index.json")
 		const deniedCase = await createDeliverySpecCase({
 			projectTitle: "Denied Index Project",
 			indexText: '{"version":1,"epics":[{"identity":"1","title":"One"}]}',
@@ -6267,10 +6497,14 @@ describe("WorkflowRuntime", () => {
 
 			const allocationAction = await runtime.resolveNextAction({ taskState: missingIdentityState })
 			expect(allocationAction.kind).to.equal("execute_tool_backed_operation")
+			if (allocationAction.kind !== "execute_tool_backed_operation") {
+				throw new Error(`Expected execute_tool_backed_operation, received ${allocationAction.kind}.`)
+			}
 
 			const failureResult = await runtime.handleToolBackedOperationToolResult({
 				taskState: missingIdentityState,
 				toolResultText: "Error: required artifact identity was not found",
+				runtimeOwnedSourceRoute: allocationAction.runtimeOwnedSourceRoute,
 			})
 
 			expect(failureResult.kind).to.equal("terminal_error")
@@ -6312,11 +6546,16 @@ describe("WorkflowRuntime", () => {
 			await activateWorkflow(failureState, workflow)
 			await runtime.resolveNextAction({ taskState: failureState })
 			await submitNewProjectSelection(failureState, `Serialized Artifact Failure ${failureCaseIndex}`)
-			expect((await runtime.resolveNextAction({ taskState: failureState })).kind).to.equal("execute_tool_backed_operation")
+			const allocationFailureAction = await runtime.resolveNextAction({ taskState: failureState })
+			expect(allocationFailureAction.kind).to.equal("execute_tool_backed_operation")
+			if (allocationFailureAction.kind !== "execute_tool_backed_operation") {
+				throw new Error(`Expected execute_tool_backed_operation, received ${allocationFailureAction.kind}.`)
+			}
 
 			const result = await runtime.handleToolBackedOperationToolResult({
 				taskState: failureState,
 				toolResultText,
+				runtimeOwnedSourceRoute: allocationFailureAction.runtimeOwnedSourceRoute,
 			})
 
 			expect(result.kind).to.equal("terminal_error")
@@ -6329,8 +6568,8 @@ describe("WorkflowRuntime", () => {
 	})
 
 	it("builds build_workflow_document tool-backed operations from action-owned instructions", async () => {
-		const allocatedArtifactAbsolutePath = join(cwd, "builder-project", "planning", "Epics.md")
-		const moduleChosenAbsolutePath = join(cwd, "builder-project", "planning", "Module-chosen.md")
+		const allocatedArtifactAbsolutePath = join(cwd, "docs", "projects", "builder-project", "planning", "Epics.md")
+		const moduleChosenAbsolutePath = join(cwd, "docs", "projects", "builder-project", "planning", "Module-chosen.md")
 		const outputFileKeys = createStandaloneArtifactOutputValueKeys("output_file")
 		const workflow = createWorkflowDefinition({
 			workflowValueKeys: [
@@ -6378,6 +6617,7 @@ describe("WorkflowRuntime", () => {
 		}
 
 		expect(toolBackedOperation.toolBackedOperationSession).to.be.undefined
+		expect(toolBackedOperation.runtimeOwnedSourceRoute).to.deep.equal(STEP_RESOLUTION_SOURCE_ROUTE)
 		expect(toolBackedOperation.toolRequest.toolName).to.equal(ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT)
 		expect(toolBackedOperation.toolRequest.toolParams).to.deep.equal({
 			artifact_id: "output_file",
@@ -6398,6 +6638,8 @@ describe("WorkflowRuntime", () => {
 			const outputFileKeys = createStandaloneArtifactOutputValueKeys(`serialized_document_${failureCaseIndex}`)
 			const allocatedArtifactAbsolutePath = join(
 				cwd,
+				"docs",
+				"projects",
 				`serialized-builder-project-${failureCaseIndex}`,
 				"planning",
 				"Epics.md",
@@ -6438,10 +6680,14 @@ describe("WorkflowRuntime", () => {
 				`Serialized Builder Failure ${failureCaseIndex}`,
 			)
 			expect(toolBackedOperation.kind).to.equal("execute_tool_backed_operation")
+			if (toolBackedOperation.kind !== "execute_tool_backed_operation") {
+				throw new Error(`Expected execute_tool_backed_operation, received ${toolBackedOperation.kind}.`)
+			}
 
 			const result = await runtime.handleToolBackedOperationToolResult({
 				taskState: failureState,
 				toolResultText,
+				runtimeOwnedSourceRoute: toolBackedOperation.runtimeOwnedSourceRoute,
 			})
 			const activeSession = getActiveWorkflowSession(failureState)
 

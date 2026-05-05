@@ -727,6 +727,7 @@ export class WorkflowFormRuntime {
 			}
 		}
 
+		const previousResolvedFields = resolvePanelFields(activePanel, session)
 		const mergedValues = { ...session.values }
 		const submittedValueKeys: string[] = []
 		const clearedValueKeys: string[] = []
@@ -753,11 +754,50 @@ export class WorkflowFormRuntime {
 			failure: undefined,
 		}
 
+		const hasNewlyVisibleUnsubmittedRequiredInputField = (args: {
+			previousResolvedFields: WorkflowFormFieldDefinition[]
+			nextResolvedFields: WorkflowFormFieldDefinition[]
+			submittedValues: WorkflowFormSessionValues
+			nextSession: WorkflowFormSessionState
+		}): boolean => {
+			if (request.action !== WorkflowFormAction.SUBMIT) {
+				return false
+			}
+
+			const previousResolvedFieldKeys = new Set(args.previousResolvedFields.map((field) => field.key))
+			return args.nextResolvedFields.some((field) => {
+				if (!isInputField(field) || field.required !== true || previousResolvedFieldKeys.has(field.key)) {
+					return false
+				}
+
+				if (field.key in args.submittedValues) {
+					return false
+				}
+
+				return !hasRenderableValue(args.nextSession.values[field.key])
+			})
+		}
+
 		const resolvedFields = resolvePanelFields(activePanel, nextSession)
 		for (const submittedKey of Object.keys(submittedValues)) {
 			const resolvedField = resolvedFields.find((field) => field.key === submittedKey)
 			if (!resolvedField || !isInputField(resolvedField)) {
 				throw new Error(`Workflow form submission referenced an inactive field: ${submittedKey}`)
+			}
+		}
+
+		if (
+			hasNewlyVisibleUnsubmittedRequiredInputField({
+				previousResolvedFields,
+				nextResolvedFields: resolvedFields,
+				submittedValues,
+				nextSession,
+			})
+		) {
+			return {
+				kind: "render_form",
+				session: nextSession,
+				valueChanges,
 			}
 		}
 
