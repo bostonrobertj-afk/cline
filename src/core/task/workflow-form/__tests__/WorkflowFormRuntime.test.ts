@@ -2,7 +2,7 @@ import type { WorkflowFormDefinitionPayload, WorkflowFormFieldKind, WorkflowForm
 import { WorkflowFormAction, WorkflowFormSubmissionRequest } from "@shared/proto/cline/task"
 import { expect } from "chai"
 import { describe, it } from "mocha"
-import type { WorkflowFormSessionState } from "../types"
+import type { WorkflowFormSessionData, WorkflowFormSessionState } from "../types"
 import { WorkflowFormRuntime } from "../WorkflowFormRuntime"
 
 function createDefinition(args: {
@@ -83,6 +83,105 @@ describe("WorkflowFormRuntime", () => {
 		expect(session.values).to.deep.equal({})
 		expect(session.data).to.deep.equal({})
 		expect(session.failure).to.equal(undefined)
+	})
+
+	it("creates a session at a requested non-first start panel", () => {
+		const runtime = createRuntime()
+		const definitionPayload = createDefinition({
+			firstPanelId: "intro",
+			panels: {
+				intro: {
+					panelId: "intro",
+					title: "Intro",
+					promptMarkdown: "Start here.",
+					fields: [],
+					allowedActions: ["submit"],
+					transition: {
+						type: "sequential",
+						nextPanelId: "details",
+					},
+				},
+				details: {
+					panelId: "details",
+					title: "Details",
+					promptMarkdown: "Continue here.",
+					fields: [],
+					allowedActions: ["submit"],
+					transition: createTerminalTransition(),
+				},
+			},
+		})
+
+		const session = runtime.createSession({
+			workflowFormId: "test-form",
+			definitionPayload,
+			startPanelId: "details",
+		})
+
+		expect(session.firstPanelId).to.equal("intro")
+		expect(session.currentPanelId).to.equal("details")
+	})
+
+	it("creates a session with cloned seed data", () => {
+		const runtime = createRuntime()
+		const definitionPayload = createDefinition({
+			firstPanelId: "intro",
+			panels: {
+				intro: {
+					panelId: "intro",
+					title: "Intro",
+					promptMarkdown: "Start here.",
+					fields: [],
+					allowedActions: ["submit"],
+					transition: createTerminalTransition(),
+				},
+			},
+		})
+		const nestedData = { label: "original" }
+		const callerData: WorkflowFormSessionData = {
+			topic: "alpha",
+			nested: nestedData,
+		}
+
+		const session = runtime.createSession({
+			workflowFormId: "test-form",
+			definitionPayload,
+			data: callerData,
+		})
+		callerData.topic = "changed"
+		nestedData.label = "changed"
+
+		expect(session.data).to.deep.equal({
+			topic: "alpha",
+			nested: {
+				label: "original",
+			},
+		})
+	})
+
+	it("rejects a requested start panel missing from the definition", () => {
+		const runtime = createRuntime()
+		const definitionPayload = createDefinition({
+			firstPanelId: "intro",
+			panels: {
+				intro: {
+					panelId: "intro",
+					title: "Intro",
+					promptMarkdown: "Start here.",
+					fields: [],
+					allowedActions: ["submit"],
+					transition: createTerminalTransition(),
+				},
+			},
+		})
+
+		expect(() =>
+			runtime.createSession({
+				workflowFormId: "test-form",
+				definitionPayload,
+				startPanelId: "missing",
+			}),
+		).to.throw("Workflow form requested start panel is missing from definition: missing")
 	})
 
 	it("rejects stale panel mismatches", () => {

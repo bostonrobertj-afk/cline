@@ -6208,6 +6208,232 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/discovery.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
+## Phase 52 - Workflow Form Start Panel And UI Text Interpolation
+
+Pause for QA review after completing Phase 52 before commit.
+
+### Phase 52 Scope
+
+Add foundational workflow-form support for module-prescribed form suspension/resumption at a specified panel and deterministic interpolation of workflow/session values into UI-visible workflow-form text. This phase exists so workflow modules can render forms after runtime-owned deterministic state changes without inventing module-specific form workarounds.
+
+### Phase 52 Scope Boundary
+
+- Do not implement or revise any workflow module in this phase.
+- Do not add brainstorming-specific form behavior, ids, values, or text in this phase.
+- Do not allow arbitrary JavaScript, function execution, expression evaluation, or file/system access from interpolation placeholders.
+- Do not widen workflow-form session data to arbitrary unknown values.
+- Do not change workflow-form submission semantics, durable workflow-value persistence, selector discovery, or entry project-selection behavior except where explicitly prescribed below.
+
+### Phase 52 Known Issues / Risks / Technical Debt
+
+- Current `render_workflow_form` actions can name only a form id, so modules cannot start a form at a non-first panel after a deterministic decision action has prepared required state.
+- Current `WorkflowFormRuntime.createSession(...)` always sets `currentPanelId` to the form definition's `firstPanelId`, which prevents module-authored decision trees from resuming a form at a specified panel.
+- Current workflow-form render payload assembly copies form, panel, field, and option text literally, so UI-visible text cannot display workflow-owned or form-session-owned values without module-specific workarounds.
+- This phase intentionally keeps interpolation deterministic and non-executable. Placeholders are lookup-only references to active workflow values or workflow-form session data.
+
+[x] Task 121. Extend workflow-form action and session contracts for explicit start-panel rendering and session data seeding.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/types.ts`
+
+[x] Subtask 121.1. In `src/core/task/workflow-runtime/types.ts`, update the workflow-form type import from `@/core/task/workflow-form/types` so it imports `WorkflowFormSessionData` in addition to the existing workflow-form types.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+
+[x] Subtask 121.2. In `src/core/task/workflow-runtime/types.ts`, replace the `WorkflowDecisionAction` union member `{ kind: "render_workflow_form"; workflowFormId: WorkflowFormId }` with a named `WorkflowRenderFormDecisionAction` union that explicitly models the four supported render-form shapes: form id only, form id plus `startPanelId: string`, form id plus `buildSessionData: WorkflowFormSessionDataBuilder`, and form id plus both `startPanelId: string` and `buildSessionData: WorkflowFormSessionDataBuilder`; define `WorkflowFormSessionDataBuilder` as `(session: ActiveWorkflowSession) => WorkflowFormSessionData | Promise<WorkflowFormSessionData>`, and reference `WorkflowRenderFormDecisionAction` from `WorkflowDecisionAction`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+
+[x] Subtask 121.3. In `src/core/task/workflow-form/types.ts`, replace the current loose `WorkflowFormSessionData` definition with a recursive `WorkflowFormSessionDataValue` type that permits `WorkflowFormSubmittedValuePayload`, string, number, boolean, readonly arrays of `WorkflowFormSessionDataValue`, and readonly object maps of `WorkflowFormSessionDataValue`; then define `WorkflowFormSessionData` as `Record<string, WorkflowFormSessionDataValue>`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/types.ts`
+
+[x] Subtask 121.4. In `src/core/task/workflow-form/types.ts`, replace `WorkflowFormRuntimeCreateSessionOptions` with a base interface for `workflowFormId` and `definitionPayload`, plus a `WorkflowFormRuntimeCreateSessionOptions` union that explicitly models the four supported session-creation shapes: base options only, base options plus `startPanelId: string`, base options plus `data: WorkflowFormSessionData`, and base options plus both `startPanelId: string` and `data: WorkflowFormSessionData`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/types.ts`
+
+[x] Task 122. Update the generic workflow-form runtime to honor explicit start panels and seeded data.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`
+
+[x] Subtask 122.1. In `src/core/task/workflow-form/WorkflowFormRuntime.ts`, update `createSession(...)` so it computes the current panel id with `"startPanelId" in options ? options.startPanelId : options.definitionPayload.firstPanelId`, validates that the computed panel id exists in `options.definitionPayload.panels`, and throws a clear error when the requested start panel is missing.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
+
+[x] Subtask 122.2. In `src/core/task/workflow-form/WorkflowFormRuntime.ts`, update the `WorkflowFormSessionState` returned by `createSession(...)` so `firstPanelId` remains `options.definitionPayload.firstPanelId`, `currentPanelId` uses the validated current panel id from Subtask 122.1, and `data` is assigned with `"data" in options ? structuredClone(options.data) : {}` so callers cannot mutate stored session data after session creation.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
+
+[x] Subtask 122.3. In `src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`, add coverage proving `createSession(...)` can start at a non-first panel while preserving the original `firstPanelId`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`
+
+[x] Subtask 122.4. In `src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`, add coverage proving `createSession(...)` seeds `session.data` from the supplied data object and does not keep a mutable reference to the caller's data object.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`
+
+[x] Subtask 122.5. In `src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`, add coverage proving `createSession(...)` throws a clear error when `startPanelId` does not exist in the form definition.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`
+
+[x] Task 123. Update `WorkflowRuntime` to execute the new render-form action inputs safely.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 123.1. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, replace the current top-level-only `isWorkflowFormSessionData(...)` implementation with recursive validation that accepts only `WorkflowFormSessionDataValue` shapes, including nested arrays, nested plain objects, and `WorkflowFormSubmittedValuePayload` values, and rejects `undefined`, functions, symbols, class instances, circular objects, and other non-serializable values.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 123.2. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, update the new-session branch of the `render_workflow_form` action in `buildNextActionFromDecisionTreeAction(...)` so it uses `"buildSessionData" in action` to decide whether to call the builder, validates any returned value with `isWorkflowFormSessionData(...)`, returns a `terminal_error` when the builder throws or returns invalid data, uses `"startPanelId" in action` to decide whether a start panel was requested, and constructs the `workflowFormRuntime.createSession(...)` options object with only the union fields that are actually present.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 123.3. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, extend `validateWorkflowDefinition(...)` render-form action validation so the `render_workflow_form` branch checks `"startPanelId" in route.action` and, when true, requires the value to be a non-empty trimmed string that exists in the referenced form definition's `panels`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 123.4. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, extend `validateWorkflowDefinition(...)` render-form action validation so the `render_workflow_form` branch checks `"buildSessionData" in route.action` and, when true, requires the value to be a function.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Task 124. Add deterministic interpolation for UI-visible workflow-form text.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 124.1. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, add a private helper named `resolveWorkflowFormTextPlaceholderValue(...)` that resolves only placeholders whose source begins with `workflow.` or `data.`, supports dot-separated path segments made from letters, numbers, underscores, and hyphens, reads `workflow.` values from `ActiveWorkflowSession.workflowValues`, reads `data.` values from `WorkflowFormSessionState.data`, and returns `undefined` for missing or invalid paths.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 124.2. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, add a private helper named `interpolateWorkflowFormText(...)` that replaces `{workflow.some.path}` and `{data.some.path}` placeholders with deterministic string renderings of values from `resolveWorkflowFormTextPlaceholderValue(...)`, renders workflow values through existing `stringifyWorkflowValueForPrompt(...)`, converts submitted-value payloads with `buildWorkflowFormSubmittedValueComparableValue(...)` before rendering them, renders form-session-data strings unchanged, renders form-session-data numbers and booleans with `String(...)`, renders form-session-data arrays and plain objects as stable JSON with sorted object keys, leaves unresolved placeholders unchanged, and does not evaluate arbitrary expressions or call module-provided code.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 124.3. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, add a private helper named `interpolateWorkflowFormDefinitionPayload(...)` that returns a cloned `WorkflowFormDefinitionPayload` with only `title`, `toolDictionaryTitle`, and `toolDictionaryMarkdown` interpolated from the active workflow session and form session data; the helper must not mutate `WorkflowFormSessionState.definitionPayload` or the workflow module's canonical form definition.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 124.4. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, add a private helper named `interpolateWorkflowFormResolvedPanelPayload(...)` that returns a cloned `WorkflowFormResolvedPanelPayload` with panel `title`, `promptMarkdown`, `actionLabels`, field `label`, `helpText`, `placeholder`, `formatHint`, `contentMarkdown`, `trueLabel`, `falseLabel`, and option `label` and `description` interpolated from the active workflow session and form session data after field visibility/option resolution has been determined.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 124.5. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, update `buildWorkflowFormRenderPayload(...)` so it builds the resolved panel, stores the non-interpolated resolved fields through the existing `storeResolvedWorkflowFormPanelFields(...)` call, then passes `interpolateWorkflowFormDefinitionPayload(...)` and `interpolateWorkflowFormResolvedPanelPayload(...)` results into `buildWorkflowFormPayload(...)`; field keys, workflow value destinations, option values, selector discovery configuration, validation schemas, and stored form-session definition payloads must remain non-interpolated.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Task 125. Add workflow-runtime coverage for start-panel rendering, seeded data, interpolation, validation, and restore behavior.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 125.1. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving a `render_workflow_form` decision action with `startPanelId` creates a form session whose `currentPanelId` is the requested start panel and whose `firstPanelId` remains the form definition's first panel.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 125.2. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving `buildSessionData` runs when a new form session is created, the returned data is stored in `formSession.data`, and active-form continuation does not re-run `buildSessionData`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 125.3. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving interpolation resolves workflow-value placeholders in form title, tool dictionary title, tool dictionary markdown, panel title, and panel prompt markdown.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 125.4. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving interpolation resolves form-session-data placeholders in field label, help text, placeholder, format hint, content markdown, boolean true/false labels, action labels, option labels, and option descriptions without changing option values or field keys.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 125.5. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add definition-validation coverage proving a `render_workflow_form` action with an unknown, blank, or untrimmed `startPanelId` fails validation before activation.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 125.6. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add definition-validation coverage proving a `render_workflow_form` action with a non-function `buildSessionData` fails validation before activation by mutating a typed route object with `Reflect.set(...)` rather than using unsafe type assertions.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 125.7. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving a `buildSessionData` function that throws or returns invalid session data produces a `terminal_error` and does not create a live form session.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 125.8. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add restore coverage proving persisted form sessions keep their current panel and session data, refresh from the canonical workflow form definition on restore, and re-render interpolated UI text from restored workflow values and restored form session data.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 125.9. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving unresolved placeholders and invalid placeholder syntax remain unchanged in rendered UI text and that placeholder interpolation does not evaluate arbitrary expression syntax.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 125.10. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving interpolated UI-visible text is not written back into `formSession.definitionPayload`, so a later render with changed workflow values or changed form-session data produces updated interpolated text instead of stale previously rendered text.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Task 126. Validate Phase 52.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 126.1. Run `npm run test:unit -- src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`; it must pass before Phase 52 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 126.2. Run `npm run check-types` and `npm run lint`; both must pass before Phase 52 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 126.3. Run `rg "startPanelId|buildSessionData|workflow\\.|data\\." src/core/task/workflow-runtime src/core/task/workflow-form`; manually confirm matches are limited to the Phase 52 contract, implementation, and tests, and that interpolation remains lookup-only with no `eval`, `Function`, or module-authored expression execution.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
 ## Validation
 
 After all implementation tasks are complete, run these commands from `/Users/robertboston/Documents/Cline Extension/cline`:

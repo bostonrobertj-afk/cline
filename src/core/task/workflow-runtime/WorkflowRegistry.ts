@@ -1,6 +1,7 @@
 import type { WorkflowDefinition, WorkflowName } from "@/core/task/workflow-runtime/types"
+import { brainstormingWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/brainstorming"
 
-const shippedWorkflowDefinitions: WorkflowDefinition[] = []
+const shippedWorkflowDefinitions: WorkflowDefinition[] = [brainstormingWorkflowDefinition]
 
 const shippedWorkflowDefinitionsByName = new Map<WorkflowName, WorkflowDefinition>(
 	shippedWorkflowDefinitions.map((definition) => [definition.name, definition]),

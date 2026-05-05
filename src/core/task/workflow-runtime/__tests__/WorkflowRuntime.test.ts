@@ -36,6 +36,7 @@ import type {
 } from "../types"
 import * as WorkflowRegistry from "../WorkflowRegistry"
 import { WorkflowRuntime } from "../WorkflowRuntime"
+import { brainstormingWorkflowDefinition } from "../workflow-modules/brainstorming"
 
 type ObservedDecisionPredicateInput = {
 	activeBranchId: string
@@ -50,6 +51,8 @@ type ObservedDecisionPredicateInput = {
 	hasTriggerEvent: boolean
 	triggerEventKind?: string
 }
+
+type WorkflowRenderFormDecisionAction = Extract<WorkflowDecisionAction, { kind: "render_workflow_form" }>
 
 describe("WorkflowRuntime", () => {
 	const LEGACY_WORKFLOW_MIRROR_KEYS = [
@@ -195,11 +198,16 @@ describe("WorkflowRuntime", () => {
 
 	function createWorkflowFormDecisionTree(args: {
 		workflowFormId: string
+		renderAction?: WorkflowRenderFormDecisionAction
 		completionAction?: WorkflowDecisionAction
 	}): WorkflowDecisionTree {
 		const completionBranchId = "after-form-complete"
 		const completionAction: WorkflowDecisionAction = args.completionAction ?? { kind: "project_prompt" }
 		const shouldFollowCompletionBranch = completionAction.kind !== "transition_step"
+		const renderAction: WorkflowRenderFormDecisionAction = args.renderAction ?? {
+			kind: "render_workflow_form",
+			workflowFormId: args.workflowFormId,
+		}
 
 		return {
 			entryBranchId: "show-form",
@@ -210,10 +218,7 @@ describe("WorkflowRuntime", () => {
 						{
 							id: "render-form",
 							trigger: { kind: "always" },
-							action: {
-								kind: "render_workflow_form",
-								workflowFormId: args.workflowFormId,
-							},
+							action: renderAction,
 							followingBranchId: "await-form-completion",
 						},
 					],
@@ -1013,6 +1018,43 @@ describe("WorkflowRuntime", () => {
 		expect(activeSession.ui.suppressedWorkflowStepResolutionRoutes).to.deep.equal([])
 		expect(result.payload.panel?.panelId).to.equal(ENTRY_INFO_PANEL_ID)
 		expect(taskState.currentFocusChainChecklist).to.equal("- [ ] Step 1\n- [ ] Step 2")
+	})
+
+	it("activates the brainstorming workflow through the shared entry form and resolves its first Step 1 action", async () => {
+		registerResolvedWorkflow(brainstormingWorkflowDefinition)
+
+		const result = await runtime.activateWorkflow({
+			taskState,
+			workflowName: brainstormingWorkflowDefinition.name,
+		})
+
+		expect(result.kind).to.equal("render_workflow_form")
+		if (result.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${result.kind}.`)
+		}
+		expect(result.formSession.workflowFormId).to.equal(ENTRY_FORM_ID)
+		expect(result.payload.panel?.panelId).to.equal(ENTRY_INFO_PANEL_ID)
+		expect(result.payload.panel?.promptMarkdown).to.include("interactive brainstorming session")
+		expect(taskState.currentFocusChainChecklist).to.equal(
+			"- [ ] Gather Inputs\n- [ ] Resolve Session Approach\n- [ ] Perform Interactive Brainstorming\n- [ ] Organize Ideas & Plan Next Actions",
+		)
+
+		const stepOneAction = await submitNewProjectSelection(taskState, "Brainstorming Runtime Project")
+
+		expect(stepOneAction.kind).to.equal("execute_tool_backed_operation")
+		if (stepOneAction.kind !== "execute_tool_backed_operation") {
+			throw new Error(`Expected execute_tool_backed_operation, received ${stepOneAction.kind}.`)
+		}
+		expect(stepOneAction.toolRequest.toolName).to.equal(ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT)
+		expect(stepOneAction.toolRequest.toolParams).to.deep.equal({
+			artifact_id: "brainstorming_session",
+		})
+		expect(getActiveWorkflowSession(taskState).activeStepNumber).to.equal(1)
+		expect(getActiveWorkflowSession(taskState).workflowValues).to.deep.include({
+			projectMode: "new",
+			projectTitle: "Brainstorming Runtime Project",
+			projectFolderName: "brainstorming-runtime-project",
+		})
 	})
 
 	it("copies complete parent project selection into child workflow activation without rendering entry form", async () => {
@@ -2096,6 +2138,619 @@ describe("WorkflowRuntime", () => {
 			firstTurnProjection.continuationTurnWorkflowInputInstructionsBlock,
 		)
 		expect(emptyProjection).to.deep.equal({})
+	})
+
+	it("creates workflow form sessions at a render action startPanelId", async () => {
+		const workflowFormId = "start-panel-form"
+		const workflow = createWorkflowDefinition({
+			workflowForms: {
+				[workflowFormId]: createWorkflowFormDefinitionPayload(),
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createWorkflowFormDecisionTree({
+						workflowFormId,
+						renderAction: {
+							kind: "render_workflow_form",
+							workflowFormId,
+							startPanelId: "panel-2",
+						},
+					}),
+				}),
+			},
+		})
+		registerResolvedWorkflow(workflow)
+
+		const result = await runtime.activateWorkflow({
+			taskState,
+			workflowName: workflow.name,
+			parentSession: createParentWorkflowSession(),
+		})
+
+		expect(result.kind).to.equal("render_workflow_form")
+		if (result.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${result.kind}.`)
+		}
+		expect(result.formSession.firstPanelId).to.equal("panel-1")
+		expect(result.formSession.currentPanelId).to.equal("panel-2")
+		expect(result.payload.panel?.panelId).to.equal("panel-2")
+		expect(getActiveFormSession(taskState).firstPanelId).to.equal("panel-1")
+		expect(getActiveFormSession(taskState).currentPanelId).to.equal("panel-2")
+	})
+
+	it("seeds workflow form session data only when creating a new form session", async () => {
+		const workflowFormId = "seeded-data-form"
+		let buildSessionDataCallCount = 0
+		const workflow = createWorkflowDefinition({
+			workflowForms: {
+				[workflowFormId]: createWorkflowFormDefinitionPayload(),
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createWorkflowFormDecisionTree({
+						workflowFormId,
+						renderAction: {
+							kind: "render_workflow_form",
+							workflowFormId,
+							buildSessionData: (session) => {
+								buildSessionDataCallCount += 1
+								expect(session.activeStepNumber).to.equal(1)
+								return {
+									seed: "alpha",
+									nested: {
+										count: 1,
+									},
+									submitted: {
+										valueType: "string",
+										stringValue: "submitted seed",
+									},
+								}
+							},
+						},
+					}),
+				}),
+			},
+		})
+		registerResolvedWorkflow(workflow)
+
+		const result = await runtime.activateWorkflow({
+			taskState,
+			workflowName: workflow.name,
+			parentSession: createParentWorkflowSession(),
+		})
+
+		expect(result.kind).to.equal("render_workflow_form")
+		if (result.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${result.kind}.`)
+		}
+		expect(buildSessionDataCallCount).to.equal(1)
+		expect(result.formSession.data).to.deep.equal({
+			seed: "alpha",
+			nested: {
+				count: 1,
+			},
+			submitted: {
+				valueType: "string",
+				stringValue: "submitted seed",
+			},
+		})
+
+		const continuation = await runtime.resolveNextAction({ taskState })
+
+		expect(continuation.kind).to.equal("render_workflow_form")
+		if (continuation.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${continuation.kind}.`)
+		}
+		expect(buildSessionDataCallCount).to.equal(1)
+		expect(continuation.formSession.data).to.deep.equal(result.formSession.data)
+	})
+
+	it("interpolates workflow values in workflow form and panel text", async () => {
+		const workflowFormId = "workflow-value-interpolation-form"
+		const parentSession = createParentWorkflowSession()
+		parentSession.workflowValues.form_title = "Alpha Form"
+		parentSession.workflowValues.tool_title = "Alpha Tools"
+		parentSession.workflowValues.tool_markdown = "Alpha Markdown"
+		parentSession.workflowValues.panel_title = "Alpha Panel"
+		parentSession.workflowValues.panel_prompt = "Alpha Prompt"
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: ["form_title", "tool_title", "tool_markdown", "panel_title", "panel_prompt"],
+			childInheritance: [
+				{ parentKey: "form_title", childKey: "form_title" },
+				{ parentKey: "tool_title", childKey: "tool_title" },
+				{ parentKey: "tool_markdown", childKey: "tool_markdown" },
+				{ parentKey: "panel_title", childKey: "panel_title" },
+				{ parentKey: "panel_prompt", childKey: "panel_prompt" },
+			],
+			workflowForms: {
+				[workflowFormId]: {
+					definitionVersion: 2,
+					title: "Form {workflow.form_title}",
+					toolDictionaryTitle: "Tools {workflow.tool_title}",
+					toolDictionaryMarkdown: "Dictionary {workflow.tool_markdown}",
+					firstPanelId: "intro",
+					panels: {
+						intro: {
+							panelId: "intro",
+							title: "Panel {workflow.panel_title}",
+							promptMarkdown: "Prompt {workflow.panel_prompt}",
+							fields: [],
+							allowedActions: ["submit"],
+							transition: createTerminalTransition(),
+						},
+					},
+				},
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createWorkflowFormDecisionTree({ workflowFormId }),
+				}),
+			},
+		})
+		registerResolvedWorkflow(workflow)
+
+		const result = await runtime.activateWorkflow({
+			taskState,
+			workflowName: workflow.name,
+			parentSession,
+		})
+
+		expect(result.kind).to.equal("render_workflow_form")
+		if (result.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${result.kind}.`)
+		}
+		expect(result.payload.title).to.equal("Form Alpha Form")
+		expect(result.payload.toolDictionaryTitle).to.equal("Tools Alpha Tools")
+		expect(result.payload.toolDictionaryMarkdown).to.equal("Dictionary Alpha Markdown")
+		expect(result.payload.panel?.title).to.equal("Panel Alpha Panel")
+		expect(result.payload.panel?.promptMarkdown).to.equal("Prompt Alpha Prompt")
+	})
+
+	it("interpolates form session data in resolved field, action, and option text", async () => {
+		const workflowFormId = "session-data-interpolation-form"
+		const workflow = createWorkflowDefinition({
+			workflowForms: {
+				[workflowFormId]: {
+					definitionVersion: 2,
+					title: "Session Data Form",
+					toolDictionaryTitle: "Session Data Tools",
+					toolDictionaryMarkdown: "Session data help",
+					firstPanelId: "details",
+					panels: {
+						details: {
+							panelId: "details",
+							title: "Details",
+							promptMarkdown: "Review seeded text.",
+							fields: [
+								{
+									key: "text_field",
+									kind: "small_text",
+									label: "Label {data.labelText}",
+									helpText: "Help {data.helpText}",
+									required: false,
+									allowedValueType: "string",
+									placeholder: "Placeholder {data.placeholderText}",
+									formatHint: "Format {data.formatHint}",
+								},
+								{
+									key: "content_field",
+									kind: "markdown_display",
+									label: "Content Display",
+									required: false,
+									contentMarkdown: "Content {data.objectText}",
+								},
+								{
+									key: "boolean_field",
+									kind: "boolean",
+									label: "Boolean",
+									required: false,
+									trueLabel: "True {data.trueText}",
+									falseLabel: "False {data.falseText}",
+								},
+								{
+									key: "option_field",
+									kind: "dropdown",
+									label: "Option",
+									required: false,
+									allowedValueType: "string",
+									options: [
+										{
+											value: "stable-option-value",
+											label: "Option {data.optionLabel}",
+											description: "Description {data.optionDescription}",
+										},
+									],
+								},
+							],
+							allowedActions: ["submit", "cancel"],
+							actionLabels: {
+								submit: "Submit {data.actionText}",
+								cancel: "Cancel {data.actionText}",
+							},
+							transition: createTerminalTransition(),
+						},
+					},
+				},
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createWorkflowFormDecisionTree({
+						workflowFormId,
+						renderAction: {
+							kind: "render_workflow_form",
+							workflowFormId,
+							buildSessionData: () => ({
+								labelText: "Seed Label",
+								helpText: "Seed Help",
+								placeholderText: "Seed Placeholder",
+								formatHint: "Seed Format",
+								objectText: {
+									zeta: "last",
+									alpha: "first",
+								},
+								trueText: "Seed True",
+								falseText: "Seed False",
+								actionText: "Seed Action",
+								optionLabel: "Seed Option",
+								optionDescription: "Seed Description",
+							}),
+						},
+					}),
+				}),
+			},
+		})
+		registerResolvedWorkflow(workflow)
+
+		const result = await runtime.activateWorkflow({
+			taskState,
+			workflowName: workflow.name,
+			parentSession: createParentWorkflowSession(),
+		})
+
+		expect(result.kind).to.equal("render_workflow_form")
+		if (result.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${result.kind}.`)
+		}
+		const panel = result.payload.panel
+		expect(panel?.actionLabels?.submit).to.equal("Submit Seed Action")
+		expect(panel?.actionLabels?.cancel).to.equal("Cancel Seed Action")
+		expect(panel?.fields.map((field) => field.key)).to.deep.equal([
+			"text_field",
+			"content_field",
+			"boolean_field",
+			"option_field",
+		])
+
+		const textField = panel?.fields.find((field) => field.key === "text_field")
+		expect(textField?.label).to.equal("Label Seed Label")
+		expect(textField?.helpText).to.equal("Help Seed Help")
+		expect(textField?.placeholder).to.equal("Placeholder Seed Placeholder")
+		expect(textField?.formatHint).to.equal("Format Seed Format")
+
+		const contentField = panel?.fields.find((field) => field.key === "content_field")
+		expect(contentField?.contentMarkdown).to.equal('Content {"alpha":"first","zeta":"last"}')
+
+		const booleanField = panel?.fields.find((field) => field.key === "boolean_field")
+		expect(booleanField?.trueLabel).to.equal("True Seed True")
+		expect(booleanField?.falseLabel).to.equal("False Seed False")
+
+		const optionField = panel?.fields.find((field) => field.key === "option_field")
+		expect(optionField?.options?.[0]?.value).to.equal("stable-option-value")
+		expect(optionField?.options?.[0]?.label).to.equal("Option Seed Option")
+		expect(optionField?.options?.[0]?.description).to.equal("Description Seed Description")
+	})
+
+	it("leaves unresolved placeholders and expression-like placeholder syntax unchanged", async () => {
+		const workflowFormId = "invalid-placeholder-form"
+		const parentSession = createParentWorkflowSession()
+		parentSession.workflowValues.count = 2
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: ["count"],
+			childInheritance: [{ parentKey: "count", childKey: "count" }],
+			workflowForms: {
+				[workflowFormId]: {
+					definitionVersion: 2,
+					title: "Known {data.safe} Missing {data.missing} Invalid {data.safe.toUpperCase()} Index {data.safe[0]}",
+					toolDictionaryTitle: "Invalid Placeholder Tools",
+					toolDictionaryMarkdown: "Missing workflow {workflow.missing}",
+					firstPanelId: "intro",
+					panels: {
+						intro: {
+							panelId: "intro",
+							title: "Intro {data.safe}",
+							promptMarkdown: "Expression {workflow.count + 1}",
+							fields: [],
+							allowedActions: ["submit"],
+							transition: createTerminalTransition(),
+						},
+					},
+				},
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createWorkflowFormDecisionTree({
+						workflowFormId,
+						renderAction: {
+							kind: "render_workflow_form",
+							workflowFormId,
+							buildSessionData: () => ({
+								safe: "safe value",
+							}),
+						},
+					}),
+				}),
+			},
+		})
+		registerResolvedWorkflow(workflow)
+
+		const result = await runtime.activateWorkflow({
+			taskState,
+			workflowName: workflow.name,
+			parentSession,
+		})
+
+		expect(result.kind).to.equal("render_workflow_form")
+		if (result.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${result.kind}.`)
+		}
+		expect(result.payload.title).to.equal(
+			"Known safe value Missing {data.missing} Invalid {data.safe.toUpperCase()} Index {data.safe[0]}",
+		)
+		expect(result.payload.toolDictionaryMarkdown).to.equal("Missing workflow {workflow.missing}")
+		expect(result.payload.panel?.title).to.equal("Intro safe value")
+		expect(result.payload.panel?.promptMarkdown).to.equal("Expression {workflow.count + 1}")
+	})
+
+	it("does not write interpolated text back into workflow form session definitions", async () => {
+		const workflowFormId = "non-mutating-interpolation-form"
+		const parentSession = createParentWorkflowSession()
+		parentSession.workflowValues.dynamicTitle = "First Workflow"
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: ["dynamicTitle"],
+			childInheritance: [{ parentKey: "dynamicTitle", childKey: "dynamicTitle" }],
+			workflowForms: {
+				[workflowFormId]: {
+					definitionVersion: 2,
+					title: "Title {workflow.dynamicTitle}",
+					toolDictionaryTitle: "Tools",
+					toolDictionaryMarkdown: "Tool help",
+					firstPanelId: "intro",
+					panels: {
+						intro: {
+							panelId: "intro",
+							title: "Panel {data.dynamicPanel}",
+							promptMarkdown: "Prompt {workflow.dynamicTitle} {data.dynamicPrompt}",
+							fields: [],
+							allowedActions: ["submit"],
+							transition: createTerminalTransition(),
+						},
+					},
+				},
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createWorkflowFormDecisionTree({
+						workflowFormId,
+						renderAction: {
+							kind: "render_workflow_form",
+							workflowFormId,
+							buildSessionData: () => ({
+								dynamicPanel: "First Panel",
+								dynamicPrompt: "First Prompt",
+							}),
+						},
+					}),
+				}),
+			},
+		})
+		registerResolvedWorkflow(workflow)
+
+		const firstRender = await runtime.activateWorkflow({
+			taskState,
+			workflowName: workflow.name,
+			parentSession,
+		})
+
+		expect(firstRender.kind).to.equal("render_workflow_form")
+		if (firstRender.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${firstRender.kind}.`)
+		}
+		expect(firstRender.payload.title).to.equal("Title First Workflow")
+		expect(firstRender.payload.panel?.title).to.equal("Panel First Panel")
+		expect(firstRender.formSession.definitionPayload.title).to.equal("Title {workflow.dynamicTitle}")
+		expect(firstRender.formSession.definitionPayload.panels.intro?.title).to.equal("Panel {data.dynamicPanel}")
+
+		const activeSession = getActiveWorkflowSession(taskState)
+		activeSession.workflowValues.dynamicTitle = "Second Workflow"
+		const activeFormSession = getActiveFormSession(taskState)
+		activeFormSession.data.dynamicPanel = "Second Panel"
+		activeFormSession.data.dynamicPrompt = "Second Prompt"
+		const secondRender = await runtime.resolveNextAction({ taskState })
+
+		expect(secondRender.kind).to.equal("render_workflow_form")
+		if (secondRender.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${secondRender.kind}.`)
+		}
+		expect(secondRender.payload.title).to.equal("Title Second Workflow")
+		expect(secondRender.payload.panel?.title).to.equal("Panel Second Panel")
+		expect(secondRender.payload.panel?.promptMarkdown).to.equal("Prompt Second Workflow Second Prompt")
+		expect(secondRender.formSession.definitionPayload.title).to.equal("Title {workflow.dynamicTitle}")
+		expect(secondRender.formSession.definitionPayload.panels.intro?.title).to.equal("Panel {data.dynamicPanel}")
+	})
+
+	it("rejects render form actions with invalid startPanelId values before activation", async () => {
+		const workflowFormId = "invalid-start-panel-form"
+		const invalidStartPanelCases: Array<{ label: string; startPanelId: string }> = [
+			{ label: "unknown", startPanelId: "missing-panel" },
+			{ label: "blank", startPanelId: "" },
+			{ label: "untrimmed", startPanelId: " panel-2" },
+		]
+
+		for (const invalidStartPanelCase of invalidStartPanelCases) {
+			const invalidState = new TaskState()
+			const workflow = createWorkflowDefinition({
+				name: `invalid-start-panel-${invalidStartPanelCase.label}`,
+				workflowForms: {
+					[workflowFormId]: createWorkflowFormDefinitionPayload(),
+				},
+				steps: {
+					"step-1": createStepDefinition({
+						stepNumber: 1,
+						decisionTree: createWorkflowFormDecisionTree({
+							workflowFormId,
+							renderAction: {
+								kind: "render_workflow_form",
+								workflowFormId,
+								startPanelId: invalidStartPanelCase.startPanelId,
+							},
+						}),
+					}),
+				},
+			})
+			registerResolvedWorkflow(workflow)
+
+			const result = await runtime.activateWorkflow({
+				taskState: invalidState,
+				workflowName: workflow.name,
+				parentSession: createParentWorkflowSession(),
+			})
+
+			expect(result).to.deep.equal({ kind: "no_op" })
+			expect(invalidState.activeWorkflowName).to.be.undefined
+			expect(invalidState.activeWorkflowSession).to.be.undefined
+		}
+	})
+
+	it("rejects render form actions with non-function buildSessionData before activation", async () => {
+		const workflowFormId = "invalid-session-data-builder-form"
+		const renderRoute: WorkflowDecisionBranchRoute = {
+			id: "render-form",
+			trigger: { kind: "always" },
+			action: {
+				kind: "render_workflow_form",
+				workflowFormId,
+			},
+			followingBranchId: "await-form-completion",
+		}
+		expect(Reflect.set(renderRoute.action, "buildSessionData", "not-a-function")).to.equal(true)
+		const workflow = createWorkflowDefinition({
+			workflowForms: {
+				[workflowFormId]: createWorkflowFormDefinitionPayload(),
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: {
+						entryBranchId: "show-form",
+						branches: {
+							"show-form": {
+								id: "show-form",
+								routes: [renderRoute],
+							},
+							"await-form-completion": {
+								id: "await-form-completion",
+								routes: [
+									{
+										id: "after-form",
+										trigger: { kind: "always" },
+										action: { kind: "project_prompt" },
+									},
+								],
+							},
+						},
+					},
+				}),
+			},
+		})
+		registerResolvedWorkflow(workflow)
+
+		const result = await runtime.activateWorkflow({
+			taskState,
+			workflowName: workflow.name,
+			parentSession: createParentWorkflowSession(),
+		})
+
+		expect(result).to.deep.equal({ kind: "no_op" })
+		expect(taskState.activeWorkflowName).to.be.undefined
+		expect(taskState.activeWorkflowSession).to.be.undefined
+	})
+
+	it("returns terminal_error when buildSessionData throws or returns invalid data", async () => {
+		const throwingWorkflowFormId = "throwing-session-data-form"
+		const invalidWorkflowFormId = "invalid-session-data-form"
+		const invalidDataRenderAction: WorkflowRenderFormDecisionAction = {
+			kind: "render_workflow_form",
+			workflowFormId: invalidWorkflowFormId,
+			buildSessionData: () => ({
+				valid: "initial",
+			}),
+		}
+		expect(Reflect.set(invalidDataRenderAction, "buildSessionData", () => ({ invalid: undefined }))).to.equal(true)
+		const failureCases: Array<{
+			workflowName: string
+			workflowFormId: string
+			renderAction: WorkflowRenderFormDecisionAction
+			expectedMessage: string
+		}> = [
+			{
+				workflowName: "throwing-session-data-workflow",
+				workflowFormId: throwingWorkflowFormId,
+				renderAction: {
+					kind: "render_workflow_form",
+					workflowFormId: throwingWorkflowFormId,
+					buildSessionData: () => {
+						throw new Error("builder boom")
+					},
+				},
+				expectedMessage: `Workflow form session data builder failed for form ${throwingWorkflowFormId}: builder boom`,
+			},
+			{
+				workflowName: "invalid-session-data-workflow",
+				workflowFormId: invalidWorkflowFormId,
+				renderAction: invalidDataRenderAction,
+				expectedMessage: `Workflow form session data builder returned invalid data for form ${invalidWorkflowFormId}.`,
+			},
+		]
+
+		for (const failureCase of failureCases) {
+			const failureState = new TaskState()
+			const workflow = createWorkflowDefinition({
+				name: failureCase.workflowName,
+				workflowForms: {
+					[failureCase.workflowFormId]: createWorkflowFormDefinitionPayload(),
+				},
+				steps: {
+					"step-1": createStepDefinition({
+						stepNumber: 1,
+						decisionTree: createWorkflowFormDecisionTree({
+							workflowFormId: failureCase.workflowFormId,
+							renderAction: failureCase.renderAction,
+						}),
+					}),
+				},
+			})
+			registerResolvedWorkflow(workflow)
+
+			const result = await runtime.activateWorkflow({
+				taskState: failureState,
+				workflowName: workflow.name,
+				parentSession: createParentWorkflowSession(),
+			})
+
+			expect(result.kind).to.equal("terminal_error")
+			if (result.kind !== "terminal_error") {
+				throw new Error(`Expected terminal_error, received ${result.kind}.`)
+			}
+			expect(result.errorMessage).to.equal(failureCase.expectedMessage)
+			expect(failureState.activeWorkflowName).to.be.undefined
+			expect(failureState.activeWorkflowSession).to.be.undefined
+		}
 	})
 
 	it("builds runtime-owned workflow-form payloads and persists selector submissions through workflow values", async () => {
@@ -5776,6 +6431,136 @@ describe("WorkflowRuntime", () => {
 			expect(restored.formSession.currentPanelId).to.equal("panel-2")
 			expect(restored.formSession.definitionPayload.title).to.equal("Workflow Form")
 		}
+	})
+
+	it("restores workflow form sessions with current panel, data, canonical definitions, and interpolated text", async () => {
+		const workflowFormId = "interpolated-form-restore"
+		const parentSession = createParentWorkflowSession()
+		parentSession.workflowValues.restoredTitle = "Restored Workflow Title"
+		parentSession.workflowValues.restoredPrompt = "Restored Workflow Prompt"
+		const canonicalDefinition: WorkflowFormDefinitionPayload = {
+			definitionVersion: 2,
+			title: "Restored {workflow.restoredTitle}",
+			toolDictionaryTitle: "Restored Tools",
+			toolDictionaryMarkdown: "Restored tool help",
+			firstPanelId: "panel-1",
+			panels: {
+				"panel-1": {
+					panelId: "panel-1",
+					title: "Panel 1",
+					promptMarkdown: "Panel 1 prompt",
+					fields: [],
+					allowedActions: ["submit"],
+					transition: {
+						type: "sequential",
+						nextPanelId: "panel-2",
+					},
+				},
+				"panel-2": {
+					panelId: "panel-2",
+					title: "Panel {data.panelTitle}",
+					promptMarkdown: "Prompt {workflow.restoredPrompt} {data.panelPrompt}",
+					fields: [
+						{
+							key: "note",
+							kind: "small_text",
+							label: "Note {data.fieldLabel}",
+							required: false,
+							allowedValueType: "string",
+						},
+					],
+					allowedActions: ["submit"],
+					transition: createTerminalTransition(),
+				},
+			},
+		}
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: ["restoredTitle", "restoredPrompt"],
+			childInheritance: [
+				{ parentKey: "restoredTitle", childKey: "restoredTitle" },
+				{ parentKey: "restoredPrompt", childKey: "restoredPrompt" },
+			],
+			workflowForms: {
+				[workflowFormId]: canonicalDefinition,
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createWorkflowFormDecisionTree({
+						workflowFormId,
+						renderAction: {
+							kind: "render_workflow_form",
+							workflowFormId,
+							startPanelId: "panel-2",
+							buildSessionData: () => ({
+								panelTitle: "Restored Data Panel",
+								panelPrompt: "Restored Data Prompt",
+								fieldLabel: "Restored Field",
+							}),
+						},
+					}),
+				}),
+			},
+		})
+		registerResolvedWorkflow(workflow)
+		const sourceState = new TaskState()
+		const initialRender = await runtime.activateWorkflow({
+			taskState: sourceState,
+			workflowName: workflow.name,
+			parentSession,
+		})
+		expect(initialRender.kind).to.equal("render_workflow_form")
+		if (initialRender.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${initialRender.kind}.`)
+		}
+
+		const persistedSession = runtime.getPersistedSession({ taskState: sourceState })
+		if (persistedSession === undefined || persistedSession.ui.formSession === undefined) {
+			throw new Error("Expected a persisted workflow form session for restore.")
+		}
+		expect(persistedSession.ui.formSession.currentPanelId).to.equal("panel-2")
+		expect(persistedSession.ui.formSession.data).to.deep.equal({
+			panelTitle: "Restored Data Panel",
+			panelPrompt: "Restored Data Prompt",
+			fieldLabel: "Restored Field",
+		})
+		const stalePanel = persistedSession.ui.formSession.definitionPayload.panels["panel-2"]
+		if (stalePanel === undefined) {
+			throw new Error("Expected a stale persisted panel fixture.")
+		}
+		persistedSession.ui.formSession.definitionPayload = {
+			...persistedSession.ui.formSession.definitionPayload,
+			title: "Stale Persisted Form",
+			panels: {
+				...persistedSession.ui.formSession.definitionPayload.panels,
+				"panel-2": {
+					...stalePanel,
+					title: "Stale Persisted Panel",
+					promptMarkdown: "Stale persisted prompt",
+				},
+			},
+		}
+
+		const restoredState = new TaskState()
+		restoredState.activeWorkflowName = workflow.name
+		const restored = await runtime.restorePersistedSession({
+			taskState: restoredState,
+			persistedSession,
+		})
+
+		expect(restored?.kind).to.equal("render_workflow_form")
+		if (restored?.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${restored?.kind ?? "undefined"}.`)
+		}
+		const restoredFormSession = getActiveFormSession(restoredState)
+		expect(restoredFormSession.currentPanelId).to.equal("panel-2")
+		expect(restoredFormSession.data).to.deep.equal(persistedSession.ui.formSession.data)
+		expect(restoredFormSession.definitionPayload.title).to.equal("Restored {workflow.restoredTitle}")
+		expect(restoredFormSession.definitionPayload.panels["panel-2"]?.title).to.equal("Panel {data.panelTitle}")
+		expect(restored.payload.title).to.equal("Restored Restored Workflow Title")
+		expect(restored.payload.panel?.title).to.equal("Panel Restored Data Panel")
+		expect(restored.payload.panel?.promptMarkdown).to.equal("Prompt Restored Workflow Prompt Restored Data Prompt")
+		expect(restored.payload.panel?.fields.find((field) => field.key === "note")?.label).to.equal("Note Restored Field")
 	})
 
 	it("restores valid mandatory entry form sessions through the runtime-owned entry path", async () => {

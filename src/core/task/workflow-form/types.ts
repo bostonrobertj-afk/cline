@@ -6,10 +6,15 @@ export type WorkflowFormId = string
 export type WorkflowFormSessionValues = Record<string, WorkflowFormSubmittedValuePayload>
 export type WorkflowFormValues = WorkflowFormSessionValues
 
-export type WorkflowFormSessionData = Record<
-	string,
-	WorkflowFormSubmittedValuePayload | Record<string, unknown> | unknown[] | string | number | boolean | undefined
->
+export type WorkflowFormSessionDataValue =
+	| WorkflowFormSubmittedValuePayload
+	| string
+	| number
+	| boolean
+	| readonly WorkflowFormSessionDataValue[]
+	| { readonly [key: string]: WorkflowFormSessionDataValue }
+
+export type WorkflowFormSessionData = Record<string, WorkflowFormSessionDataValue>
 
 export interface WorkflowFormSessionFailure {
 	panelId: string
@@ -28,10 +33,35 @@ export interface WorkflowFormSessionState {
 	failure?: WorkflowFormSessionFailure
 }
 
-export interface WorkflowFormRuntimeCreateSessionOptions {
+export interface WorkflowFormRuntimeCreateSessionBaseOptions {
 	workflowFormId: WorkflowFormId
 	definitionPayload: WorkflowFormDefinitionPayload
 }
+
+export interface WorkflowFormRuntimeCreateSessionOptionsWithStartPanel {
+	workflowFormId: WorkflowFormId
+	definitionPayload: WorkflowFormDefinitionPayload
+	startPanelId: string
+}
+
+export interface WorkflowFormRuntimeCreateSessionOptionsWithData {
+	workflowFormId: WorkflowFormId
+	definitionPayload: WorkflowFormDefinitionPayload
+	data: WorkflowFormSessionData
+}
+
+export interface WorkflowFormRuntimeCreateSessionOptionsWithStartPanelAndData {
+	workflowFormId: WorkflowFormId
+	definitionPayload: WorkflowFormDefinitionPayload
+	startPanelId: string
+	data: WorkflowFormSessionData
+}
+
+export type WorkflowFormRuntimeCreateSessionOptions =
+	| WorkflowFormRuntimeCreateSessionBaseOptions
+	| WorkflowFormRuntimeCreateSessionOptionsWithStartPanel
+	| WorkflowFormRuntimeCreateSessionOptionsWithData
+	| WorkflowFormRuntimeCreateSessionOptionsWithStartPanelAndData
 
 export type WorkflowFormRuntimeOutcome =
 	| {

@@ -50,6 +50,7 @@ Sibling-pattern audit summary:
 - Do not read `.cline/skills/bmad-brainstorming/brain-methods.csv`, `_bmad/core/skills/bmad-brainstorming/brain-methods.csv`, `.cline/skills/bmad-brainstorming/template.md`, or `/Users/robertboston/Documents/Cline/Workflows/brainstorming.md` at runtime.
 - Do not add static/default prompt or native-tool schemas for `get_brainstorming_methods`, `append_brainstorming_selected_technique`, `create_workflow_artifact`, `build_workflow_document`, `set_workflow_values`, or `workflow_progress_request`.
 - Do not add `select_random_brainstorming_technique` as a tool, enum member, handler, contract, or schema.
+- Do not implement a separate Step 2 random-confirmation workflow form; Step 2 random confirmation must remain a panel inside the Step 2 approach form and must be entered through the Phase 52 `render_workflow_form` `startPanelId` capability.
 - Do not change real markdown output filename `brainstorming.md`; only workflow identity must be unsuffixed.
 
 ## Known Issues / Risks / Technical Debt
@@ -401,7 +402,7 @@ Allowed files:
 
 After completing this phase, pause for QA review before moving to Phase 5.
 
-[ ] Task 7. Implement and register the brainstorming workflow definition.
+[x] Task 7. Implement and register the brainstorming workflow definition.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
@@ -411,62 +412,92 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 7.1. Create `brainstormingWorkflow.ts` exporting `brainstormingWorkflowDefinition` with `name`, `slashCommandName`, and `useSkillName` all set to `brainstorming`, `persona` set to `analyst`, and `projectSubfolder` set to `discovery`.
+[x] Subtask 7.1. Create `brainstormingWorkflow.ts` exporting `brainstormingWorkflowDefinition` with `name`, `slashCommandName`, and `useSkillName` all set to `brainstorming`, `persona` set to `analyst`, and `projectSubfolder` set to `discovery`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
 
-[ ] Subtask 7.2. In `brainstormingWorkflow.ts`, declare `workflowValueKeys` containing every key listed in the Runtime-Owned Values section of `brainstorming-requirements.md`, including `output_file` and artifact metadata keys.
+[x] Subtask 7.2. In `brainstormingWorkflow.ts`, declare `workflowValueKeys` containing every key listed in the Runtime-Owned Values section of `brainstorming-requirements.md`, including `output_file` and artifact metadata keys, plus the internal Step 2 form support key `chosen_technique_id`; do not add any singular `selected_technique` workflow value.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
 
-[ ] Subtask 7.3. In `brainstormingWorkflow.ts`, declare `entryProjectValueKeys` mapping exactly to `projectMode`, `projectTitle`, and `projectFolderName`.
+[x] Subtask 7.3. In `brainstormingWorkflow.ts`, declare `entryProjectValueKeys` mapping exactly to `projectMode`, `projectTitle`, and `projectFolderName`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
 
-[ ] Subtask 7.4. In `brainstormingWorkflow.ts`, declare an artifact definition with id `brainstorming_session`, family `WorkflowArtifactFamily.BrainstormingSession`, intent mode `new`, no parent or target identity source, and `outputValueKeys.artifactAbsolutePath` mapped to `output_file`.
+[x] Subtask 7.4. In `brainstormingWorkflow.ts`, declare an artifact definition with id `brainstorming_session`, family `WorkflowArtifactFamily.BrainstormingSession`, intent mode `new`, no parent or target identity source, and `outputValueKeys.artifactAbsolutePath` mapped to `output_file`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
 
-[ ] Subtask 7.5. In `brainstormingWorkflow.ts`, add the mandatory entry-panel copy for the shared entry `WorkflowForm`, describing the brainstorming workflow without adding a landing page or unrelated workflow behavior.
+[x] Subtask 7.5. In `brainstormingWorkflow.ts`, add the mandatory entry-panel copy for the shared entry `WorkflowForm`, describing the brainstorming workflow without adding a landing page or unrelated workflow behavior.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
 
-[ ] Subtask 7.6. In `brainstormingWorkflow.ts`, define the Step 1 setup workflow form as one multi-panel form with these exact panels: Panel 1 shows `You can provide a file to be used as context. If you have a file you'd like to use, enter the file path below. If not, leave the text box empty and click continue` and collects optional `context_file` through a small text area; Panel 2 shows `Please share the details of the topic, problem, or opportunity you'd like to focus on during this session` and collects required `session_topic` through a large text area; Panel 3 shows `Do you have any specific goals for this session?` and collects required `has_session_goals` through a yes/no boolean field; Panel 4 is conditional on `has_session_goals` being yes, shows `What are your goals for this session?`, and collects required `session_goals` through a large text area.
+[x] Subtask 7.6. In `brainstormingWorkflow.ts`, define the Step 1 setup workflow form as one multi-panel form with these exact panels: Panel 1 shows `You can provide a file to be used as context. If you have a file you'd like to use, enter the file path below. If not, leave the text box empty and click continue` and collects optional `context_file` through a small text area; Panel 2 shows `Please share the details of the topic, problem, or opportunity you'd like to focus on during this session` and collects required `session_topic` through a large text area; Panel 3 shows `Do you have any specific goals for this session?` and collects required `has_session_goals` through a yes/no boolean field; Panel 4 is conditional on `has_session_goals` being yes, shows `What are your goals for this session?`, and collects required `session_goals` through a large text area.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
 
-[ ] Subtask 7.7. In `brainstormingWorkflow.ts`, define the Step 2 approach workflow form as one multi-panel form whose first panel asks `How would you like to select the brainstorming approach for this session?` and collects required `selected_approach` with exactly these radio options: `I want to choose`, `I want a random technique`, and `I want you to suggest a technique`; whose choose-path category panel title is `Which category would you like to explore?` and uses one dropdown with exactly `Collaborative`, `Creative`, `Deep`, `Introspective Delight`, `Structured`, `Theatrical`, `Wild`, `Biomimetic`, `Quantum`, and `Cultural`; whose choose-path technique panel title is `Which technique would you like?` and uses one dropdown populated from the selected registry category; and whose random-confirmation panel shows `Random Technique: {technique name}`, `About This Technique: {technique description}`, and `Ready to get started?` before collecting required `random_technique_confirmation` with confirm/retry choices.
+[x] Subtask 7.7a. In `brainstormingWorkflow.ts`, define exactly one Step 2 workflow form with id `step-2-approach-form`, `firstPanelId` set to `step-2-approach-panel`, and panels `step-2-approach-panel`, `step-2-category-panel`, `step-2-technique-panel`, and `step-2-random-confirmation-panel`; do not define `step-2-random-confirmation-form`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
 
-[ ] Subtask 7.8. In `brainstormingWorkflow.ts`, implement Step 1 decision tree routes in this exact order: allocate artifact, retry allocation once on failure, terminal error on retry failure, build initial shell, terminal error on initial-shell failure, render Step 1 form, build submitted-values document, transition to Step 2.
+[x] Subtask 7.7b. In `brainstormingWorkflow.ts`, define `step-2-approach-panel` so it asks `How would you like to select the brainstorming approach for this session?`, collects required `selected_approach` through a `radio_group` with exactly `I want to choose`, `I want a random technique`, and `I want you to suggest a technique`, persists to workflow value `selected_approach`, transitions to `step-2-category-panel` only for `I want to choose`, and terminal-completes for the random and suggest options.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
 
-[ ] Subtask 7.9. In `brainstormingWorkflow.ts`, implement Step 2 choose-path decision routes so choosing category/technique persists `selected_approach` and `selected_techniques`, writes the selected technique under `selected techniques`, and transitions to Step 3 after the document write succeeds.
+[x] Subtask 7.7c. In `brainstormingWorkflow.ts`, define the choose-path panels so `step-2-category-panel` has title `Which category would you like to explore?`, collects required form-local `chosen_technique_category` from exactly `Collaborative`, `Creative`, `Deep`, `Introspective Delight`, `Structured`, `Theatrical`, `Wild`, `Biomimetic`, `Quantum`, and `Cultural`, and `step-2-technique-panel` has title `Which technique would you like?`, collects required `chosen_technique_id` persisted to workflow value `chosen_technique_id`, and populates options from the module-owned technique registry filtered by `chosen_technique_category`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
 
-[ ] Subtask 7.10. In `brainstormingWorkflow.ts`, implement Step 2 random-path decision routes using `run_deterministic_procedure` to select `random_technique_candidate`, maintain `random_technique_rejected_ids`, render the random confirmation panel, persist confirmed candidates into `selected_techniques`, write the confirmed technique under `selected techniques`, retry on `random_technique_confirmation = retry`, and terminal-error when the registry has no eligible candidate.
+[x] Subtask 7.7d. In `brainstormingWorkflow.ts`, define `step-2-random-confirmation-panel` inside `step-2-approach-form` so its UI-visible text uses Phase 52 workflow-value interpolation with `Random Technique: {workflow.random_technique_candidate.name}`, `About This Technique: {workflow.random_technique_candidate.description}`, and `Ready to get started?`, then collects required `random_technique_confirmation` persisted to workflow value `random_technique_confirmation` with option values `confirm` and `retry`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
 
-[ ] Subtask 7.11. In `brainstormingWorkflow.ts`, implement Step 2 suggest-path decision routes so `selected_approach` is persisted, `user requested technique suggestion` is written under `selected techniques`, and Step 2 transitions to Step 3 only after that document write succeeds.
+[x] Subtask 7.8. In `brainstormingWorkflow.ts`, implement Step 1 decision tree routes in this exact order: allocate artifact, retry allocation once on failure, terminal error on retry failure, build initial shell, terminal error on initial-shell failure, render Step 1 form, build submitted-values document, transition to Step 2.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
 
-[ ] Subtask 7.12. In `brainstormingWorkflow.ts`, implement Step 3 `buildPromptSource(...)` keyed only from `selected_approach`: when it is `I want you to suggest a technique`, start with `Read {output_file}.` then instruct the model to call `get_brainstorming_methods`, select and propose an appropriate technique, call `append_brainstorming_selected_technique` only after user acceptance, not call `set_workflow_values` for `selected_techniques`, call `build_workflow_document` to replace `user requested technique suggestion` under `selected techniques` in `{output_file}`, and then continue with the shared facilitation instructions; when it is `I want to choose` or `I want a random technique`, start with `Read {output_file}.` then `Use the already selected brainstorming technique recorded in {output_file}. Do not call get_brainstorming_methods.` and then include the same shared facilitation instructions: `Goal: Guide an interactive brainstorming session from setup through technique selection, idea capture, and final organization, pausing whenever user input or confirmation is needed.`, `Engage the user in interactive brainstorming using the selected approach.`, `Keep the user in control at each decision point. Pause for clarification, a technique switch, or continuation whenever needed. Record techniques_used and ideas_generated in {output_file} as needed.`, `The goal is to generate as many ideas as possible without exhausting the user.`, `Techniques for keeping brainstorming going: ask probing questions, ask users how the current idea connects to an earlier idea, offer challenges to the user's idea or assumptions, offer new ideas or angles to keep the conversation going.`, and `Once the user indicates they're ready, use workflow_progress_request to confirm and unlock the next workflow step.`
+[x] Subtask 7.9. In `brainstormingWorkflow.ts`, implement Step 2 choose-path decision routes so completion of `step-2-approach-form` with `selected_approach = I want to choose` reads `chosen_technique_id`, resolves that id against the module-owned technique registry, persists `selected_techniques` as an array containing the resolved technique object, writes `selected_approach` under `selected approach` and the resolved technique name/description under `selected techniques`, and transitions to Step 3 only after the document write succeeds.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[x] Subtask 7.10a. In `brainstormingWorkflow.ts`, implement the Step 2 random-selection route so completion of `step-2-approach-form` with `selected_approach = I want a random technique` and no current `random_technique_candidate` runs `run_deterministic_procedure`, selects an eligible technique from the module-owned registry while excluding `random_technique_rejected_ids`, and writes `random_technique_candidate` as a JSON-safe object containing `id`, `name`, `description`, and `category`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[x] Subtask 7.10b. In `brainstormingWorkflow.ts`, implement the Step 2 random-confirmation render route so when `selected_approach = I want a random technique`, `random_technique_candidate` exists, and `random_technique_confirmation` is absent, the action is `render_workflow_form` with `workflowFormId: "step-2-approach-form"` and `startPanelId: "step-2-random-confirmation-panel"`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[x] Subtask 7.10c. In `brainstormingWorkflow.ts`, implement the Step 2 random-confirm route so `random_technique_confirmation = confirm` persists the current `random_technique_candidate` into `selected_techniques`, writes the confirmed technique under `selected techniques`, and transitions to Step 3 only after the document write succeeds.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[x] Subtask 7.10d. In `brainstormingWorkflow.ts`, implement the Step 2 random-retry route so `random_technique_confirmation = retry` appends the current candidate id to `random_technique_rejected_ids`, clears `random_technique_candidate` and `random_technique_confirmation`, re-runs deterministic selection, and routes to `terminal_error` when no eligible candidate remains.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[x] Subtask 7.11. In `brainstormingWorkflow.ts`, implement Step 2 suggest-path decision routes so `selected_approach` is persisted, `user requested technique suggestion` is written under `selected techniques`, and Step 2 transitions to Step 3 only after that document write succeeds.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[x] Subtask 7.12. In `brainstormingWorkflow.ts`, implement Step 3 `buildPromptSource(...)` keyed only from `selected_approach`: when it is `I want you to suggest a technique`, start with `Read {output_file}.` then instruct the model to call `get_brainstorming_methods`, select and propose an appropriate technique, call `append_brainstorming_selected_technique` only after user acceptance, not call `set_workflow_values` for `selected_techniques`, call `build_workflow_document` to replace `user requested technique suggestion` under `selected techniques` in `{output_file}`, and then continue with the shared facilitation instructions; when it is `I want to choose` or `I want a random technique`, start with `Read {output_file}.` then `Use the already selected brainstorming technique recorded in {output_file}. Do not call get_brainstorming_methods.` and then include the same shared facilitation instructions: `Goal: Guide an interactive brainstorming session from setup through technique selection, idea capture, and final organization, pausing whenever user input or confirmation is needed.`, `Engage the user in interactive brainstorming using the selected approach.`, `Keep the user in control at each decision point. Pause for clarification, a technique switch, or continuation whenever needed. Record techniques_used and ideas_generated in {output_file} as needed.`, `The goal is to generate as many ideas as possible without exhausting the user.`, `Techniques for keeping brainstorming going: ask probing questions, ask users how the current idea connects to an earlier idea, offer challenges to the user's idea or assumptions, offer new ideas or angles to keep the conversation going.`, and `Once the user indicates they're ready, use workflow_progress_request to confirm and unlock the next workflow step.`
 
 Required Step 3 suggestion-variant prompt text:
 
@@ -506,17 +537,17 @@ Once the user indicates they're ready, use `workflow_progress_request` to confir
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
 
-[ ] Subtask 7.13. In `brainstormingWorkflow.ts`, implement Step 3 `buildToolSchema(...)` so the suggest variant exposes `get_brainstorming_methods`, `append_brainstorming_selected_technique`, `build_workflow_document`, and `workflow_progress_request`, while choose/random variants expose only `build_workflow_document`, `set_workflow_values` for `techniques_used` and `ideas_generated`, and `workflow_progress_request`.
+[x] Subtask 7.13. In `brainstormingWorkflow.ts`, implement Step 3 `buildToolSchema(...)` so the suggest variant exposes `get_brainstorming_methods`, `append_brainstorming_selected_technique`, `build_workflow_document`, and `workflow_progress_request`, while choose/random variants expose only `build_workflow_document`, `set_workflow_values` for `techniques_used` and `ideas_generated`, and `workflow_progress_request`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
 
-[ ] Subtask 7.14. In `brainstormingWorkflow.ts`, implement Step 3 decision routes so `workflow_progress_request_confirmed` transitions to Step 4 and `workflow_progress_request_denied` returns to `project_prompt`.
+[x] Subtask 7.14. In `brainstormingWorkflow.ts`, implement Step 3 decision routes so `workflow_progress_request_confirmed` transitions to Step 4 and `workflow_progress_request_denied` returns to `project_prompt`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
 
-[ ] Subtask 7.15. In `brainstormingWorkflow.ts`, implement Step 4 `buildPromptSource(...)` with this exact source-derived prompt content: review captured ideas, cluster them into themes, identify strongest candidates, and ask the user which ideas matter most right now: high-impact, quick wins, or the most innovative concepts; for each prioritized idea, define next steps, resource needs, obstacles, and success indicators; do not extend into solutioning during this workflow, and if the user steers toward solutioning or planning actions, stop and say this workflow is scoped to idea-generation and direct them to `create architecture` for larger epic-scale solution work or `quick spec` for small patches; append the themes, priorities, and summary to `{output_file}`; then send the user a final message through `attempt_completion` indicating the brainstorming session is complete and including the full file path of `{output_file}`.
+[x] Subtask 7.15. In `brainstormingWorkflow.ts`, implement Step 4 `buildPromptSource(...)` with this exact source-derived prompt content: review captured ideas, cluster them into themes, identify strongest candidates, and ask the user which ideas matter most right now: high-impact, quick wins, or the most innovative concepts; for each prioritized idea, define next steps, resource needs, obstacles, and success indicators; do not extend into solutioning during this workflow, and if the user steers toward solutioning or planning actions, stop and say this workflow is scoped to idea-generation and direct them to `create architecture` for larger epic-scale solution work or `quick spec` for small patches; append the themes, priorities, and summary to `{output_file}`; then send the user a final message through `attempt_completion` indicating the brainstorming session is complete and including the full file path of `{output_file}`.
 
 Required Step 4 prompt text:
 
@@ -533,37 +564,37 @@ Required Step 4 prompt text:
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
 
-[ ] Subtask 7.16. In `brainstormingWorkflow.ts`, implement Step 4 `buildToolSchema(...)` so it exposes only `build_workflow_document` and `attempt_completion`.
+[x] Subtask 7.16. In `brainstormingWorkflow.ts`, implement Step 4 `buildToolSchema(...)` so it exposes only `build_workflow_document` and `attempt_completion`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
 
-[ ] Subtask 7.17. In `brainstormingWorkflow.ts`, implement Step 4 decision routes so Step 4 enters model-driven work through `project_prompt` and does not define a workflow-specific completion handler.
+[x] Subtask 7.17. In `brainstormingWorkflow.ts`, implement Step 4 decision routes so Step 4 enters model-driven work through `project_prompt` and does not define a workflow-specific completion handler.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
 
-[ ] Subtask 7.18. Create `src/core/task/workflow-runtime/workflow-modules/brainstorming/index.ts` exporting `brainstormingWorkflowDefinition` and the registry APIs needed by shared handlers.
+[x] Subtask 7.18. Create `src/core/task/workflow-runtime/workflow-modules/brainstorming/index.ts` exporting `brainstormingWorkflowDefinition` and the registry APIs needed by shared handlers.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/index.ts`
 
-[ ] Subtask 7.19. In `src/core/task/workflow-runtime/WorkflowRegistry.ts`, import `brainstormingWorkflowDefinition` and include it in `shippedWorkflowDefinitions`.
+[x] Subtask 7.19. In `src/core/task/workflow-runtime/WorkflowRegistry.ts`, import `brainstormingWorkflowDefinition` and include it in `shippedWorkflowDefinitions`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRegistry.ts`
 
-[ ] Subtask 7.20. In `src/core/prompts/system-prompt/registry/workflowPersonaRegistry.ts`, replace the `"brainstorming.md": "analyst"` key with `"brainstorming": "analyst"` and do not change real markdown filename references elsewhere.
+[x] Subtask 7.20. In `src/core/prompts/system-prompt/registry/workflowPersonaRegistry.ts`, replace the `"brainstorming.md": "analyst"` key with `"brainstorming": "analyst"` and do not change real markdown filename references elsewhere.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/registry/workflowPersonaRegistry.ts`
 
-[ ] Subtask 7.21. Create `brainstormingWorkflow.test.ts` with coverage for workflow identity, four checklist labels, workflow value inventory, entry project keys, artifact output key mapping, Step 1 form/pipeline, Step 2 choose/random/suggest paths, Step 3 prompt/tool variants, Step 3 progression, and Step 4 prompt/tool exposure.
+[x] Subtask 7.21. Create `brainstormingWorkflow.test.ts` with coverage for workflow identity, four checklist labels, workflow value inventory including `chosen_technique_id`, entry project keys, artifact output key mapping, Step 1 form/pipeline, Step 2 choose path, Step 2 suggest path, Step 2 random path using one `step-2-approach-form` plus `startPanelId: "step-2-random-confirmation-panel"`, random-confirmation interpolation placeholders, Step 3 prompt/tool variants, Step 3 progression, and Step 4 prompt/tool exposure.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
 
-[ ] Subtask 7.22. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add integration-style runtime coverage that activates `brainstorming`, renders the shared entry form, projects the four-step focus-chain checklist, and resolves the first Step 1 action after project selection.
+[x] Subtask 7.22. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add integration-style runtime coverage that activates `brainstorming`, renders the shared entry form, projects the four-step focus-chain checklist, and resolves the first Step 1 action after project selection.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
@@ -631,6 +662,11 @@ Allowed files:
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/ToolExecutorCoordinator.ts`
 
+[ ] Subtask 10.4. In `brainstormingWorkflow.test.ts`, add an assertion that `brainstormingWorkflowDefinition.workflowForms` contains `step-2-approach-form`, does not contain `step-2-random-confirmation-form`, and that the Step 2 random-confirmation route renders `step-2-approach-form` with `startPanelId: "step-2-random-confirmation-panel"`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
 ## Validation
 
 Run these commands after all tasks and subtasks are complete:
@@ -667,3 +703,6 @@ Run these commands after all tasks and subtasks are complete:
     - Confirm `get_brainstorming_methods` and `append_brainstorming_selected_technique` are exposed only through brainstorming Step 3 module-owned `buildToolSchema`.
     - Confirm Step 2 random selection uses `run_deterministic_procedure` and not any tool-backed operation.
     - Confirm Step 4 completion uses successful `attempt_completion` plus generic runtime teardown, with no workflow-specific completion handler.
+
+11. `rg -n "step-2-random-confirmation-form" src`
+    - Expected: no matches. Step 2 random confirmation must be a panel in `step-2-approach-form`, not a separate workflow form.

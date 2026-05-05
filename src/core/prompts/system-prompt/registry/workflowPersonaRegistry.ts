@@ -14,7 +14,7 @@ export type WorkflowPersonaId =
 export const WORKFLOW_PERSONA_BY_WORKFLOW: Record<string, WorkflowPersonaId | undefined> = {
 	"advanced-elicitation.md": "analyst",
 	"blind-review.md": "quality-control",
-	"brainstorming.md": "analyst",
+	brainstorming: "analyst",
 	"check-implementation-readiness.md": "architect",
 	"cis-design-thinking.md": "ux-designer",
 	"cis-innovation-strategy.md": "architect",

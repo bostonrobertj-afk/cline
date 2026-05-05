@@ -1,6 +1,6 @@
 import type { WorkflowForm, WorkflowFormDefinitionPayload } from "@shared/ExtensionMessage"
 import type { ClineToolSpec } from "@/core/prompts/system-prompt/spec"
-import type { WorkflowFormId, WorkflowFormSessionState } from "@/core/task/workflow-form/types"
+import type { WorkflowFormId, WorkflowFormSessionData, WorkflowFormSessionState } from "@/core/task/workflow-form/types"
 import type { WorkflowArtifactFamily } from "@/core/task/workflow-runtime/artifactFamilies"
 import type {
 	WorkflowStepResolutionSessionState,
@@ -174,8 +174,42 @@ export interface WorkflowDeterministicProcedureActionInstruction {
 	run(session: ActiveWorkflowSession): WorkflowDeterministicProcedureResult | Promise<WorkflowDeterministicProcedureResult>
 }
 
+export type WorkflowFormSessionDataBuilder = (
+	session: ActiveWorkflowSession,
+) => WorkflowFormSessionData | Promise<WorkflowFormSessionData>
+
+export interface WorkflowRenderFormDecisionActionWithFormIdOnly {
+	kind: "render_workflow_form"
+	workflowFormId: WorkflowFormId
+}
+
+export interface WorkflowRenderFormDecisionActionWithStartPanel {
+	kind: "render_workflow_form"
+	workflowFormId: WorkflowFormId
+	startPanelId: string
+}
+
+export interface WorkflowRenderFormDecisionActionWithSessionData {
+	kind: "render_workflow_form"
+	workflowFormId: WorkflowFormId
+	buildSessionData: WorkflowFormSessionDataBuilder
+}
+
+export interface WorkflowRenderFormDecisionActionWithStartPanelAndSessionData {
+	kind: "render_workflow_form"
+	workflowFormId: WorkflowFormId
+	startPanelId: string
+	buildSessionData: WorkflowFormSessionDataBuilder
+}
+
+export type WorkflowRenderFormDecisionAction =
+	| WorkflowRenderFormDecisionActionWithFormIdOnly
+	| WorkflowRenderFormDecisionActionWithStartPanel
+	| WorkflowRenderFormDecisionActionWithSessionData
+	| WorkflowRenderFormDecisionActionWithStartPanelAndSessionData
+
 export type WorkflowDecisionAction =
-	| { kind: "render_workflow_form"; workflowFormId: WorkflowFormId }
+	| WorkflowRenderFormDecisionAction
 	| { kind: "execute_tool_backed_operation"; instruction: WorkflowToolBackedActionInstruction }
 	| { kind: "run_deterministic_procedure"; instruction: WorkflowDeterministicProcedureActionInstruction }
 	| { kind: "build_workflow_document"; instruction: WorkflowDocumentBuildActionInstruction }

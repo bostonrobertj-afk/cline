@@ -609,15 +609,21 @@ export class WorkflowFormRuntime {
 	createSession(options: WorkflowFormRuntimeCreateSessionOptions): WorkflowFormSessionState {
 		this.validateDefinition(options.definitionPayload)
 
+		const currentPanelId = "startPanelId" in options ? options.startPanelId : options.definitionPayload.firstPanelId
+		const currentPanel = options.definitionPayload.panels[currentPanelId]
+		if (currentPanel === undefined) {
+			throw new Error(`Workflow form requested start panel is missing from definition: ${currentPanelId}`)
+		}
+
 		return {
 			sessionId: randomUUID(),
 			workflowFormId: options.workflowFormId,
 			definitionVersion: 2,
 			definitionPayload: structuredClone(options.definitionPayload),
 			firstPanelId: options.definitionPayload.firstPanelId,
-			currentPanelId: options.definitionPayload.firstPanelId,
+			currentPanelId,
 			values: {},
-			data: {},
+			data: "data" in options ? structuredClone(options.data) : {},
 		}
 	}
 

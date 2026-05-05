@@ -4,6 +4,7 @@ import type {
 	WorkflowFormDefinitionPayload,
 	WorkflowFormFieldDefinition,
 	WorkflowFormOptionDefinition,
+	WorkflowFormPanelAction,
 	WorkflowFormPanelDefinition,
 	WorkflowFormResolvedPanelPayload,
 	WorkflowFormSubmittedValuePayload,
@@ -17,8 +18,10 @@ import type { TaskState } from "@/core/task/TaskState"
 import { buildWorkflowFormPayload } from "@/core/task/workflow-form/buildWorkflowFormPayload"
 import { isWorkflowFormSubmittedValuePayload } from "@/core/task/workflow-form/schema"
 import type {
+	WorkflowFormRuntimeCreateSessionOptions,
 	WorkflowFormRuntimeOutcome,
 	WorkflowFormSessionData,
+	WorkflowFormSessionDataValue,
 	WorkflowFormSessionState,
 } from "@/core/task/workflow-form/types"
 import { WorkflowFormRuntime } from "@/core/task/workflow-form/WorkflowFormRuntime"
@@ -849,19 +852,146 @@ export class WorkflowRuntime {
 		}
 	}
 
-	private isWorkflowFormSessionData(value: unknown): value is WorkflowFormSessionData {
-		if (this.isPlainRecord(value) === false) {
+	private isWorkflowFormSessionDataPlainObject(value: unknown): value is Record<string, unknown> {
+		if (typeof value !== "object" || value === null || Array.isArray(value)) {
 			return false
 		}
 
-		return Object.values(value).every(
-			(entry) =>
-				entry === undefined ||
-				typeof entry === "string" ||
-				typeof entry === "number" ||
-				typeof entry === "boolean" ||
-				Array.isArray(entry) ||
-				this.isPlainRecord(entry),
+		const prototype = Object.getPrototypeOf(value)
+		return prototype === Object.prototype || prototype === null
+	}
+
+	private validateWorkflowFormSessionDataObjectTraversal(
+		objectValue: object,
+		visitedObjects: Set<object>,
+		validateObject: () => boolean,
+	): boolean {
+		if (visitedObjects.has(objectValue)) {
+			return false
+		}
+
+		visitedObjects.add(objectValue)
+		const objectIsValid = validateObject()
+		visitedObjects.delete(objectValue)
+		return objectIsValid
+	}
+
+	private isWorkflowFormSessionDataSubmittedValuePayload(
+		value: unknown,
+		visitedObjects: Set<object>,
+	): value is WorkflowFormSubmittedValuePayload {
+		if (this.isWorkflowFormSessionDataPlainObject(value) === false) {
+			return false
+		}
+
+		return this.validateWorkflowFormSessionDataObjectTraversal(value, visitedObjects, () => {
+			let typedValueCount = 0
+			if (value.stringValue !== undefined) {
+				typedValueCount += 1
+			}
+			if (value.booleanValue !== undefined) {
+				typedValueCount += 1
+			}
+			if (value.integerValue !== undefined) {
+				typedValueCount += 1
+			}
+			if (value.numberValue !== undefined) {
+				typedValueCount += 1
+			}
+			if (value.arrayValue !== undefined) {
+				typedValueCount += 1
+			}
+			if (value.objectValue !== undefined) {
+				typedValueCount += 1
+			}
+
+			if (typedValueCount !== 1) {
+				return false
+			}
+
+			switch (value.valueType) {
+				case "string":
+					return typeof value.stringValue === "string"
+				case "boolean":
+					return typeof value.booleanValue === "boolean"
+				case "integer":
+					return Number.isInteger(value.integerValue)
+				case "number":
+					return typeof value.numberValue === "number" && Number.isFinite(value.numberValue)
+				case "array": {
+					const arrayValue = value.arrayValue
+					return (
+						Array.isArray(arrayValue) &&
+						this.validateWorkflowFormSessionDataObjectTraversal(arrayValue, visitedObjects, () =>
+							arrayValue.every((entry) =>
+								this.isWorkflowFormSessionDataSubmittedValuePayload(entry, visitedObjects),
+							),
+						)
+					)
+				}
+				case "object": {
+					const objectValue = value.objectValue
+					return (
+						Array.isArray(objectValue) &&
+						this.validateWorkflowFormSessionDataObjectTraversal(objectValue, visitedObjects, () =>
+							objectValue.every((entry) => {
+								if (this.isWorkflowFormSessionDataPlainObject(entry) === false) {
+									return false
+								}
+
+								return this.validateWorkflowFormSessionDataObjectTraversal(entry, visitedObjects, () => {
+									return (
+										typeof entry.key === "string" &&
+										entry.key.trim() !== "" &&
+										this.isWorkflowFormSessionDataSubmittedValuePayload(entry.value, visitedObjects)
+									)
+								})
+							}),
+						)
+					)
+				}
+				default:
+					return false
+			}
+		})
+	}
+
+	private isWorkflowFormSessionDataValue(value: unknown, visitedObjects: Set<object>): value is WorkflowFormSessionDataValue {
+		if (typeof value === "string" || typeof value === "boolean") {
+			return true
+		}
+
+		if (typeof value === "number") {
+			return Number.isFinite(value)
+		}
+
+		if (Array.isArray(value)) {
+			return this.validateWorkflowFormSessionDataObjectTraversal(value, visitedObjects, () =>
+				value.every((entry) => this.isWorkflowFormSessionDataValue(entry, visitedObjects)),
+			)
+		}
+
+		if (this.isWorkflowFormSessionDataSubmittedValuePayload(value, visitedObjects)) {
+			return true
+		}
+
+		if (this.isWorkflowFormSessionDataPlainObject(value) === false) {
+			return false
+		}
+
+		return this.validateWorkflowFormSessionDataObjectTraversal(value, visitedObjects, () =>
+			Object.values(value).every((entry) => this.isWorkflowFormSessionDataValue(entry, visitedObjects)),
+		)
+	}
+
+	private isWorkflowFormSessionData(value: unknown): value is WorkflowFormSessionData {
+		if (this.isWorkflowFormSessionDataPlainObject(value) === false) {
+			return false
+		}
+
+		const visitedObjects = new Set<object>()
+		return this.validateWorkflowFormSessionDataObjectTraversal(value, visitedObjects, () =>
+			Object.values(value).every((entry) => this.isWorkflowFormSessionDataValue(entry, visitedObjects)),
 		)
 	}
 
@@ -1840,6 +1970,300 @@ export class WorkflowRuntime {
 		return current
 	}
 
+	private resolveWorkflowFormTextPlaceholderValue(args: {
+		source: string
+		workflowSession: ActiveWorkflowSession
+		formSession: WorkflowFormSessionState
+	}): { source: "workflow"; value: WorkflowValue } | { source: "data"; value: WorkflowFormSessionDataValue } | undefined {
+		const workflowPrefix = "workflow."
+		const dataPrefix = "data."
+		const pathSegmentPattern = /^[A-Za-z0-9_-]+$/
+
+		let placeholderSource: "workflow" | "data"
+		let pathText: string
+		if (args.source.startsWith(workflowPrefix)) {
+			placeholderSource = "workflow"
+			pathText = args.source.slice(workflowPrefix.length)
+		} else if (args.source.startsWith(dataPrefix)) {
+			placeholderSource = "data"
+			pathText = args.source.slice(dataPrefix.length)
+		} else {
+			return undefined
+		}
+
+		if (pathText.trim() === "") {
+			return undefined
+		}
+
+		const pathSegments = pathText.split(".")
+		if (pathSegments.some((pathSegment) => pathSegmentPattern.test(pathSegment) === false)) {
+			return undefined
+		}
+
+		let current: unknown = placeholderSource === "workflow" ? args.workflowSession.workflowValues : args.formSession.data
+		for (const pathSegment of pathSegments) {
+			if (this.isWorkflowFormSessionDataPlainObject(current) === false) {
+				return undefined
+			}
+
+			const matchingEntry = Object.entries(current).find(([entryKey]) => entryKey === pathSegment)
+			if (matchingEntry === undefined) {
+				return undefined
+			}
+
+			current = matchingEntry[1]
+		}
+
+		if (placeholderSource === "workflow") {
+			return isWorkflowValue(current) ? { source: "workflow", value: current } : undefined
+		}
+
+		return this.isWorkflowFormSessionDataValue(current, new Set<object>()) ? { source: "data", value: current } : undefined
+	}
+
+	private buildStableWorkflowFormTextJsonValue(value: unknown): unknown {
+		if (Array.isArray(value)) {
+			return value.map((entry) => this.buildStableWorkflowFormTextJsonValue(entry))
+		}
+
+		if (this.isWorkflowFormSessionDataPlainObject(value)) {
+			const sortedEntries = Object.entries(value)
+				.sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
+				.map(([entryKey, entryValue]) => [entryKey, this.buildStableWorkflowFormTextJsonValue(entryValue)])
+
+			return Object.fromEntries(sortedEntries)
+		}
+
+		return value
+	}
+
+	private stringifyStableWorkflowFormTextJson(value: unknown): string {
+		const renderedValue = JSON.stringify(this.buildStableWorkflowFormTextJsonValue(value))
+		return renderedValue === undefined ? "" : renderedValue
+	}
+
+	private renderWorkflowFormSessionDataValueForText(value: WorkflowFormSessionDataValue): string {
+		if (this.isWorkflowFormSessionDataSubmittedValuePayload(value, new Set<object>())) {
+			return this.renderWorkflowFormSessionDataComparableValueForText(
+				this.buildWorkflowFormSubmittedValueComparableValue(value),
+			)
+		}
+
+		return this.renderWorkflowFormSessionDataComparableValueForText(value)
+	}
+
+	private renderWorkflowFormSessionDataComparableValueForText(value: unknown): string {
+		if (typeof value === "string") {
+			return value
+		}
+
+		if (typeof value === "number" || typeof value === "boolean") {
+			return String(value)
+		}
+
+		return this.stringifyStableWorkflowFormTextJson(value)
+	}
+
+	private interpolateWorkflowFormText(args: {
+		text: string
+		workflowSession: ActiveWorkflowSession
+		formSession: WorkflowFormSessionState
+	}): string {
+		return args.text.replace(/\{([^{}]+)\}/g, (placeholder, source) => {
+			const placeholderValue = this.resolveWorkflowFormTextPlaceholderValue({
+				source,
+				workflowSession: args.workflowSession,
+				formSession: args.formSession,
+			})
+			if (placeholderValue === undefined) {
+				return placeholder
+			}
+
+			if (placeholderValue.source === "workflow") {
+				return stringifyWorkflowValueForPrompt(placeholderValue.value)
+			}
+
+			return this.renderWorkflowFormSessionDataValueForText(placeholderValue.value)
+		})
+	}
+
+	private interpolateWorkflowFormDefinitionPayload(args: {
+		definition: WorkflowFormDefinitionPayload
+		workflowSession: ActiveWorkflowSession
+		formSession: WorkflowFormSessionState
+	}): WorkflowFormDefinitionPayload {
+		const definition = structuredClone(args.definition)
+		return {
+			...definition,
+			title: this.interpolateWorkflowFormText({
+				text: definition.title,
+				workflowSession: args.workflowSession,
+				formSession: args.formSession,
+			}),
+			toolDictionaryTitle: this.interpolateWorkflowFormText({
+				text: definition.toolDictionaryTitle,
+				workflowSession: args.workflowSession,
+				formSession: args.formSession,
+			}),
+			toolDictionaryMarkdown: this.interpolateWorkflowFormText({
+				text: definition.toolDictionaryMarkdown,
+				workflowSession: args.workflowSession,
+				formSession: args.formSession,
+			}),
+		}
+	}
+
+	private interpolateWorkflowFormActionLabels(args: {
+		actionLabels: WorkflowFormResolvedPanelPayload["actionLabels"]
+		workflowSession: ActiveWorkflowSession
+		formSession: WorkflowFormSessionState
+	}): WorkflowFormResolvedPanelPayload["actionLabels"] {
+		if (args.actionLabels === undefined) {
+			return undefined
+		}
+
+		const panelActions: readonly WorkflowFormPanelAction[] = ["submit", "cancel", "back", "retry"]
+		const actionLabels: Partial<Record<WorkflowFormPanelAction, string>> = {}
+		for (const panelAction of panelActions) {
+			const label = args.actionLabels[panelAction]
+			if (label !== undefined) {
+				actionLabels[panelAction] = this.interpolateWorkflowFormText({
+					text: label,
+					workflowSession: args.workflowSession,
+					formSession: args.formSession,
+				})
+			}
+		}
+
+		return actionLabels
+	}
+
+	private interpolateWorkflowFormOptionDefinition(args: {
+		option: WorkflowFormOptionDefinition
+		workflowSession: ActiveWorkflowSession
+		formSession: WorkflowFormSessionState
+	}): WorkflowFormOptionDefinition {
+		const option: WorkflowFormOptionDefinition = {
+			...args.option,
+			label: this.interpolateWorkflowFormText({
+				text: args.option.label,
+				workflowSession: args.workflowSession,
+				formSession: args.formSession,
+			}),
+		}
+
+		if (args.option.description !== undefined) {
+			option.description = this.interpolateWorkflowFormText({
+				text: args.option.description,
+				workflowSession: args.workflowSession,
+				formSession: args.formSession,
+			})
+		}
+
+		return option
+	}
+
+	private interpolateWorkflowFormFieldDefinition(args: {
+		field: WorkflowFormFieldDefinition
+		workflowSession: ActiveWorkflowSession
+		formSession: WorkflowFormSessionState
+	}): WorkflowFormFieldDefinition {
+		const field: WorkflowFormFieldDefinition = {
+			...args.field,
+			label: this.interpolateWorkflowFormText({
+				text: args.field.label,
+				workflowSession: args.workflowSession,
+				formSession: args.formSession,
+			}),
+		}
+
+		if (args.field.helpText !== undefined) {
+			field.helpText = this.interpolateWorkflowFormText({
+				text: args.field.helpText,
+				workflowSession: args.workflowSession,
+				formSession: args.formSession,
+			})
+		}
+		if (args.field.placeholder !== undefined) {
+			field.placeholder = this.interpolateWorkflowFormText({
+				text: args.field.placeholder,
+				workflowSession: args.workflowSession,
+				formSession: args.formSession,
+			})
+		}
+		if (args.field.formatHint !== undefined) {
+			field.formatHint = this.interpolateWorkflowFormText({
+				text: args.field.formatHint,
+				workflowSession: args.workflowSession,
+				formSession: args.formSession,
+			})
+		}
+		if (args.field.contentMarkdown !== undefined) {
+			field.contentMarkdown = this.interpolateWorkflowFormText({
+				text: args.field.contentMarkdown,
+				workflowSession: args.workflowSession,
+				formSession: args.formSession,
+			})
+		}
+		if (args.field.trueLabel !== undefined) {
+			field.trueLabel = this.interpolateWorkflowFormText({
+				text: args.field.trueLabel,
+				workflowSession: args.workflowSession,
+				formSession: args.formSession,
+			})
+		}
+		if (args.field.falseLabel !== undefined) {
+			field.falseLabel = this.interpolateWorkflowFormText({
+				text: args.field.falseLabel,
+				workflowSession: args.workflowSession,
+				formSession: args.formSession,
+			})
+		}
+		if (args.field.options !== undefined) {
+			field.options = args.field.options.map((option) =>
+				this.interpolateWorkflowFormOptionDefinition({
+					option,
+					workflowSession: args.workflowSession,
+					formSession: args.formSession,
+				}),
+			)
+		}
+
+		return field
+	}
+
+	private interpolateWorkflowFormResolvedPanelPayload(args: {
+		panel: WorkflowFormResolvedPanelPayload
+		workflowSession: ActiveWorkflowSession
+		formSession: WorkflowFormSessionState
+	}): WorkflowFormResolvedPanelPayload {
+		return {
+			...args.panel,
+			title: this.interpolateWorkflowFormText({
+				text: args.panel.title,
+				workflowSession: args.workflowSession,
+				formSession: args.formSession,
+			}),
+			promptMarkdown: this.interpolateWorkflowFormText({
+				text: args.panel.promptMarkdown,
+				workflowSession: args.workflowSession,
+				formSession: args.formSession,
+			}),
+			fields: args.panel.fields.map((field) =>
+				this.interpolateWorkflowFormFieldDefinition({
+					field,
+					workflowSession: args.workflowSession,
+					formSession: args.formSession,
+				}),
+			),
+			actionLabels: this.interpolateWorkflowFormActionLabels({
+				actionLabels: args.panel.actionLabels,
+				workflowSession: args.workflowSession,
+				formSession: args.formSession,
+			}),
+		}
+	}
+
 	private evaluateWorkflowFormCondition(args: {
 		condition: WorkflowFormConditionDefinition | undefined
 		session: Pick<WorkflowFormSessionState, "values" | "data">
@@ -1899,6 +2323,11 @@ export class WorkflowRuntime {
 		session: WorkflowFormSessionState
 	}): Promise<ReturnType<typeof buildWorkflowFormPayload>> {
 		const { session } = args
+		const workflowSession = args.taskState.activeWorkflowSession
+		if (workflowSession === undefined) {
+			throw new Error("Workflow form render requires an active workflow session.")
+		}
+
 		const panelId = session.failure?.panelId ?? session.currentPanelId
 		const panel = this.getWorkflowFormPanel(session.definitionPayload, panelId)
 		const resolvedPanel = await this.buildResolvedWorkflowFormPanelPayload({
@@ -1908,11 +2337,21 @@ export class WorkflowRuntime {
 			panel,
 		})
 		this.storeResolvedWorkflowFormPanelFields(session, panelId, resolvedPanel.fields)
+		const interpolatedDefinition = this.interpolateWorkflowFormDefinitionPayload({
+			definition: session.definitionPayload,
+			workflowSession,
+			formSession: session,
+		})
+		const interpolatedPanel = this.interpolateWorkflowFormResolvedPanelPayload({
+			panel: resolvedPanel,
+			workflowSession,
+			formSession: session,
+		})
 
 		return buildWorkflowFormPayload({
 			session,
-			definition: session.definitionPayload,
-			panel: resolvedPanel,
+			definition: interpolatedDefinition,
+			panel: interpolatedPanel,
 			errorMessage: session.failure?.errorMessage,
 		})
 	}
@@ -2379,10 +2818,54 @@ export class WorkflowRuntime {
 					return { kind: "no_op" }
 				}
 
-				const formSession = this.workflowFormRuntime.createSession({
-					workflowFormId: action.workflowFormId,
-					definitionPayload,
-				})
+				let createSessionOptions: WorkflowFormRuntimeCreateSessionOptions
+				if ("buildSessionData" in action) {
+					let builtSessionData: WorkflowFormSessionData
+					try {
+						builtSessionData = await action.buildSessionData(session)
+					} catch (error) {
+						const errorMessage = error instanceof Error ? error.message : "Unknown error."
+						return this.buildTerminalErrorNextAction({
+							taskState,
+							errorMessage: `Workflow form session data builder failed for form ${action.workflowFormId}: ${errorMessage}`,
+						})
+					}
+
+					if (this.isWorkflowFormSessionData(builtSessionData) === false) {
+						return this.buildTerminalErrorNextAction({
+							taskState,
+							errorMessage: `Workflow form session data builder returned invalid data for form ${action.workflowFormId}.`,
+						})
+					}
+
+					createSessionOptions =
+						"startPanelId" in action
+							? {
+									workflowFormId: action.workflowFormId,
+									definitionPayload,
+									startPanelId: action.startPanelId,
+									data: builtSessionData,
+								}
+							: {
+									workflowFormId: action.workflowFormId,
+									definitionPayload,
+									data: builtSessionData,
+								}
+				} else {
+					createSessionOptions =
+						"startPanelId" in action
+							? {
+									workflowFormId: action.workflowFormId,
+									definitionPayload,
+									startPanelId: action.startPanelId,
+								}
+							: {
+									workflowFormId: action.workflowFormId,
+									definitionPayload,
+								}
+				}
+
+				const formSession = this.workflowFormRuntime.createSession(createSessionOptions)
 				session.ui.formSession = formSession
 				const payload = await this.buildWorkflowFormRenderPayload({
 					taskState,
@@ -3595,14 +4078,43 @@ export class WorkflowRuntime {
 					}
 
 					switch (route.action.kind) {
-						case "render_workflow_form":
-							if (workflowForms[route.action.workflowFormId] === undefined) {
+						case "render_workflow_form": {
+							const workflowForm = workflowForms[route.action.workflowFormId]
+							if (workflowForm === undefined) {
 								return {
 									valid: false,
 									errorMessage: `Workflow step ${step.id} route ${route.id} references missing workflowFormId ${route.action.workflowFormId}.`,
 								}
 							}
+							if ("startPanelId" in route.action) {
+								const startPanelId = route.action.startPanelId
+								if (typeof startPanelId !== "string" || startPanelId.trim() === "") {
+									return {
+										valid: false,
+										errorMessage: `Workflow step ${step.id} route ${route.id} render_workflow_form startPanelId must be a non-empty string.`,
+									}
+								}
+								if (startPanelId.trim() !== startPanelId) {
+									return {
+										valid: false,
+										errorMessage: `Workflow step ${step.id} route ${route.id} render_workflow_form startPanelId ${startPanelId} must already be trimmed.`,
+									}
+								}
+								if (workflowForm.panels[startPanelId] === undefined) {
+									return {
+										valid: false,
+										errorMessage: `Workflow step ${step.id} route ${route.id} render_workflow_form references missing startPanelId ${startPanelId}.`,
+									}
+								}
+							}
+							if ("buildSessionData" in route.action && typeof route.action.buildSessionData !== "function") {
+								return {
+									valid: false,
+									errorMessage: `Workflow step ${step.id} route ${route.id} render_workflow_form buildSessionData must be a function.`,
+								}
+							}
 							break
+						}
 						case "execute_tool_backed_operation":
 							if (
 								typeof route.action.instruction.toolName !== "string" ||
