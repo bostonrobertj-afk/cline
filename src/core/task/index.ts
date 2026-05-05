@@ -681,6 +681,7 @@ export class Task {
 	private currentRequestShouldSendFullPromptAssembly = true
 	private currentRequestPromptInjectionBlocks: ClineTextContentBlock[] = []
 	private workflowFormSubmissionNextActionResolvers = new Map<string, (nextAction: WorkflowNextAction | undefined) => void>()
+	private workflowRuntimeToolCallSequence = 0
 
 	constructor(params: TaskParams) {
 		const {
@@ -1440,6 +1441,18 @@ export class Task {
 		await this.postStateToWebview()
 	}
 
+	private createWorkflowRuntimeToolCallId(
+		workflowAction: Extract<WorkflowNextAction, { kind: "execute_tool_backed_operation" }>,
+	): string {
+		if (workflowAction.toolBackedOperationSession) {
+			return `workflow_step_resolution_${workflowAction.toolBackedOperationSession.sessionId}`
+		}
+
+		const nextSequence = Number.isInteger(this.workflowRuntimeToolCallSequence) ? this.workflowRuntimeToolCallSequence + 1 : 1
+		this.workflowRuntimeToolCallSequence = nextSequence
+		return `workflow_runtime_${this.taskId}_${nextSequence}_${workflowAction.toolRequest.toolName}`
+	}
+
 	private async consumeWorkflowNextAction(nextAction?: WorkflowNextAction): Promise<void> {
 		const consumer = new WorkflowNextActionConsumer({
 			taskState: this.taskState,
@@ -1460,16 +1473,20 @@ export class Task {
 						const serializedValue = typeof value === "string" ? value : JSON.stringify(value)
 						toolParams[key] = serializedValue === undefined ? String(value) : serializedValue
 					}
-					await this.toolExecutor.executeTool({
-						type: "tool_use",
-						name: workflowAction.toolRequest.toolName,
-						params: toolParams,
-						partial: false,
-						isNativeToolCall: true,
-						call_id: workflowAction.toolBackedOperationSession
-							? `workflow_step_resolution_${workflowAction.toolBackedOperationSession.sessionId}`
-							: `workflow_runtime_${this.taskId}`,
-					})
+					const previousDidAlreadyUseTool = this.taskState.didAlreadyUseTool
+					try {
+						this.taskState.didAlreadyUseTool = false
+						await this.toolExecutor.executeTool({
+							type: "tool_use",
+							name: workflowAction.toolRequest.toolName,
+							params: toolParams,
+							partial: false,
+							isNativeToolCall: true,
+							call_id: this.createWorkflowRuntimeToolCallId(workflowAction),
+						})
+					} finally {
+						this.taskState.didAlreadyUseTool = previousDidAlreadyUseTool
+					}
 					return {
 						toolResultText: this.getWorkflowFormToolResultText(previousUserMessageContentLength),
 					}

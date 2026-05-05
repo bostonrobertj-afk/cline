@@ -6754,6 +6754,113 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
 
+## Phase 54 - Runtime-Owned Tool-Backed Operation Result Handoff
+
+After completing this phase, pause for QA review before resuming workflow-module validation or packaged-extension retesting.
+
+### Phase 54 Scope
+
+This phase fixes runtime-owned tool-backed operation result handoff for chained workflow runtime actions. Runtime-owned internal operations must not reuse the same native tool `call_id` across multiple operations in one workflow next-action chain, must not be blocked by normal assistant-turn single-tool gating, and must continue to classify explicit missing/denied/error tool results as failures. This phase addresses the observed runtime defect where brainstorming Step 1 successfully created and wrote `brainstorming.md` but then surfaced `Unable to initialize brainstorming.md.` because the successful document-build result was not appended or recovered.
+
+### Phase 54 Scope Boundary
+
+- Do not change `ToolResultUtils` duplicate-result suppression; duplicate native tool result suppression remains correct for actual duplicate call ids.
+- Do not change `isSerializedToolFailureResultText(...)`; missing, empty, denied, and serialized error results must remain failure results.
+- Do not change workflow module decision trees, brainstorming document builders, artifact allocation semantics, workflow-form behavior, prompt projection, or workflow tool schemas.
+- Do not add workflow-runtime-specific exceptions inside general model-authored tool execution paths.
+- Do not change subagent child-workflow tool execution in this phase; `SubagentRunner.executeChildWorkflowToolBackedOperation(...)` already executes child workflow tool handlers directly and serializes the handler result instead of recovering it from `TaskState.userMessageContent`.
+
+### Phase 54 Known Issues / Risks / Technical Debt
+
+- `Task.consumeWorkflowNextAction(...)` currently executes runtime-owned internal tool-backed operations through the normal `ToolExecutor` path and recovers the result by reading the just-appended tool result from `taskState.userMessageContent`. That is acceptable for this phase, but it means runtime-owned internal operations must use valid unique native tool ids and must not inherit assistant-turn gating state.
+- Existing runtime tests call `WorkflowRuntime.handleToolBackedOperationToolResult(...)` directly with `"ok"` or serialized failures, so they do not cover the task-level adapter path that generates native call ids, executes the tool, appends the tool result, and recovers the result text.
+
+[ ] Task 135. Make main-task runtime-owned internal tool-backed operation execution use operation-scoped native tool call ids and isolated assistant-turn gating.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
+
+[ ] Subtask 135.1. In `src/core/task/index.ts`, add `private workflowRuntimeToolCallSequence = 0` next to the existing `workflowFormSubmissionNextActionResolvers` field on `Task`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
+
+[ ] Subtask 135.2. In `src/core/task/index.ts`, add a private method named `createWorkflowRuntimeToolCallId(workflowAction: Extract<WorkflowNextAction, { kind: "execute_tool_backed_operation" }>): string` on `Task`. If `workflowAction.toolBackedOperationSession` exists, return the existing stable step-resolution id `workflow_step_resolution_${workflowAction.toolBackedOperationSession.sessionId}`. Otherwise, compute the next sequence as `Number.isInteger(this.workflowRuntimeToolCallSequence) ? this.workflowRuntimeToolCallSequence + 1 : 1`, assign it back to `this.workflowRuntimeToolCallSequence`, and return `workflow_runtime_${this.taskId}_${nextSequence}_${workflowAction.toolRequest.toolName}`. The `Number.isInteger(...)` fallback is required because several tests construct `Task` with `Object.create(Task.prototype)` and therefore bypass field initialization.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
+
+[ ] Subtask 135.3. In the `consumeWorkflowNextAction(...)` adapter's `executeToolBackedOperation(...)` implementation in `src/core/task/index.ts`, replace the inline `call_id` conditional with `call_id: this.createWorkflowRuntimeToolCallId(workflowAction)`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
+
+[ ] Subtask 135.4. In the same `executeToolBackedOperation(...)` implementation in `src/core/task/index.ts`, preserve the current value of `this.taskState.didAlreadyUseTool` in a local constant before calling `this.toolExecutor.executeTool(...)`, set `this.taskState.didAlreadyUseTool = false` immediately before the call, and restore the preserved value in a `finally` block immediately after the call. Keep `previousUserMessageContentLength` captured before this isolation block and keep `getWorkflowFormToolResultText(...)` called after the tool execution completes.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
+
+[ ] Task 136. Add task-level regression coverage for chained runtime-owned tool-backed operations.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
+
+[ ] Subtask 136.1. In `src/core/task/__tests__/workflow-runtime-metadata.test.ts`, add type-only import `ToolUse` from `@/core/assistant-message` and add import `ToolResultUtils` from `@/core/task/tools/utils`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
+
+[ ] Subtask 136.2. In `src/core/task/__tests__/workflow-runtime-metadata.test.ts`, add a test named `uses distinct native call ids and captures results for chained runtime-owned tool-backed operations`. The test must create a `Task` harness with task id `task-1`, stub `toolExecutor.executeTool(...)` to call `ToolResultUtils.pushToolResult(...)` against `taskState.userMessageContent` using the received `ToolUse` block and JSON string content containing that block's `call_id`, stub `workflowRuntime.handleToolBackedOperationToolResult(...)` so its first call returns a second `execute_tool_backed_operation` action and its second call returns `{ kind: "no_op" }`, invoke `consumeWorkflowNextAction(...)` with the first runtime-owned operation, and assert that `executeTool(...)` was called twice, both received non-empty `call_id` values, the two `call_id` values are different, both ids start with `workflow_runtime_task-1_`, the first id includes `create_workflow_artifact`, the second id includes `build_workflow_document`, and the second `handleToolBackedOperationToolResult(...)` call receives a defined `toolResultText` containing the second call id.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
+
+[ ] Subtask 136.3. In `src/core/task/__tests__/workflow-runtime-metadata.test.ts`, add a test named `isolates runtime-owned tool-backed operations from assistant turn single-tool gating`. The test must set `taskState.didAlreadyUseTool = true`, stub `toolExecutor.executeTool(...)` to assert `taskState.didAlreadyUseTool` is `false` while the internal runtime operation is executing and to append a successful tool result with `ToolResultUtils.pushToolResult(...)`, stub `workflowRuntime.handleToolBackedOperationToolResult(...)` to return `{ kind: "no_op" }`, invoke `consumeWorkflowNextAction(...)` with a runtime-owned `execute_tool_backed_operation` action, and assert after consumption that `taskState.didAlreadyUseTool` is restored to `true`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
+
+[ ] Task 137. Add workflow-runtime regression coverage for the brainstorming Step 1 success chain.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 137.1. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add a test named `routes brainstorming Step 1 allocation success and initial document build success to the setup form`. The test must register `brainstormingWorkflowDefinition`, activate the `brainstorming` workflow, submit a new project title, assert the first Step 1 action is `CREATE_WORKFLOW_ARTIFACT`, call `runtime.createWorkflowArtifact(...)` for artifact id `brainstorming_session` to persist `output_file`, call `runtime.handleToolBackedOperationToolResult(...)` with a non-failure serialized success result to simulate successful artifact allocation, assert the returned action is `BUILD_WORKFLOW_DOCUMENT` for `brainstorming_session` and uses the persisted `output_file` as `destination_path`, then call `runtime.handleToolBackedOperationToolResult(...)` with a non-failure serialized success result to simulate successful document build, and assert the returned action is `render_workflow_form` with workflow form id `step-1-setup-form`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Task 138. Validate Phase 54.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/utils/__tests__/ToolResultUtils.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/__tests__/responses.test.ts`
+
+[ ] Subtask 138.1. Run `npm run test:unit -- src/core/task/__tests__/workflow-runtime-metadata.test.ts src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`; it must pass before Phase 54 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 138.2. Run `npm run test:unit -- src/core/task/tools/utils/__tests__/ToolResultUtils.test.ts src/core/prompts/__tests__/responses.test.ts`; it must pass before Phase 54 is marked complete, proving the phase did not weaken duplicate-result suppression or serialized failure classification.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/utils/__tests__/ToolResultUtils.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/__tests__/responses.test.ts`
+
+[ ] Subtask 138.3. Run `npm run check-types` and `npm run lint`; both must pass before Phase 54 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
 ## Validation
 
 After all implementation tasks are complete, run these commands from `/Users/robertboston/Documents/Cline Extension/cline`:
@@ -6787,6 +6894,7 @@ npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.te
 npm run test:unit -- src/core/task/__tests__/workflow-runtime-metadata.test.ts
 npm run test:unit -- src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts
 npm run test:unit -- src/core/task/__tests__/ToolExecutor.nativeToolParity.test.ts src/core/task/__tests__/ToolExecutor.responseToolFailureBudget.test.ts
+npm run test:unit -- src/core/task/__tests__/workflow-runtime-metadata.test.ts src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/tools/utils/__tests__/ToolResultUtils.test.ts src/core/prompts/__tests__/responses.test.ts
 ```
 
 Validation expectations:
@@ -6868,6 +6976,9 @@ Validation expectations:
 - Workflow progress request tests must prove the next action returned from `submitWorkflowProgressRequest(...)` is queued for post-tool consumption.
 - Set-workflow-values tests must prove changed workflow values queue next-action re-evaluation and unchanged values do not.
 - Task-level tests must prove `presentAssistantMessage(...)` consumes returned workflow next actions from `ToolExecutionOutcome.workflowNextActions` and no longer special-cases only `set_workflow_values`.
+- Phase 54 QA must verify runtime-owned internal tool-backed operations generated by `Task.consumeWorkflowNextAction(...)` use unique native `call_id` values per operation, do not trip `ToolResultUtils` duplicate-result suppression, and do not inherit or leave behind normal assistant-turn `didAlreadyUseTool` gating.
+- Phase 54 QA must verify the serialized failure classifier remains unchanged: missing, empty, denied, `Error:`-prefixed, and serialized tool-error results must still route through workflow tool-backed operation failure handling.
+- Phase 54 QA must verify brainstorming Step 1 successful artifact allocation followed by successful initial document build routes to the Step 1 setup form instead of `Unable to initialize brainstorming.md.`.
 - Subagent tests must prove parent-assigned workflow activation consumes its returned next action, child workflows reject `render_workflow_form` clearly, and child workflow `execute_tool_backed_operation` executes through the child tool handler path before re-entering workflow next-action evaluation.
 - `rg "if \\(block\\.name === ClineDefaultTool\\.SET_WORKFLOW_VALUES" src/core/task/index.ts` must return no matches.
 - `rg "const nextAction = await config\\.workflowRuntime\\.activateWorkflow" src/core/task/tools/handlers/UseSkillToolHandler.ts` must show the successful non-`no_op` result is passed to `config.callbacks.queueWorkflowNextAction(nextAction)`.

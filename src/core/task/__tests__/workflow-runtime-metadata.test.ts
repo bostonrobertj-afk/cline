@@ -1,10 +1,12 @@
 import { expect } from "chai"
 import { afterEach, beforeEach, describe, it } from "mocha"
 import sinon from "sinon"
+import type { ToolUse } from "@/core/assistant-message"
 import type { TaskMetadata } from "@/core/context/context-tracking/ContextTrackerTypes"
 import * as disk from "@/core/storage/disk"
 import { Task } from "@/core/task"
 import { TaskState } from "@/core/task/TaskState"
+import { ToolResultUtils } from "@/core/task/tools/utils"
 import type { WorkflowFormSessionState } from "@/core/task/workflow-form/types"
 import type {
 	PersistedWorkflowSession,
@@ -440,5 +442,109 @@ describe("workflow runtime metadata persistence", () => {
 			request,
 		})
 		sinon.assert.calledOnceWithExactly(consumeWorkflowNextAction, nextAction)
+	})
+
+	it("uses distinct native call ids and captures results for chained runtime-owned tool-backed operations", async () => {
+		const taskState = new TaskState()
+		const workflowRuntime = new WorkflowRuntime({
+			cwd: "/tmp",
+			workspacePathPolicy: createAllowAllWorkspacePathPolicy(),
+		})
+		const task = createTaskHarness(taskState, workflowRuntime)
+		const firstAction: Extract<WorkflowNextAction, { kind: "execute_tool_backed_operation" }> = {
+			kind: "execute_tool_backed_operation",
+			toolRequest: {
+				toolName: ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT,
+				toolInput: {},
+				toolParams: {
+					artifact_id: "brainstorming_session",
+				},
+			},
+		}
+		const secondAction: Extract<WorkflowNextAction, { kind: "execute_tool_backed_operation" }> = {
+			kind: "execute_tool_backed_operation",
+			toolRequest: {
+				toolName: ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT,
+				toolInput: {},
+				toolParams: {
+					artifact_id: "brainstorming_session",
+					destination_path: "/tmp/brainstorming.md",
+					content: "# Brainstorming",
+				},
+			},
+		}
+		const executeTool = sandbox.stub().callsFake(async (block: ToolUse) => {
+			ToolResultUtils.pushToolResult(
+				JSON.stringify({ call_id: block.call_id }),
+				block,
+				taskState.userMessageContent,
+				(toolBlock) => `[${toolBlock.name}]`,
+			)
+			return { status: "executed", emittedToolResult: true, workflowNextActions: [] }
+		})
+		const handleToolBackedOperationToolResult = sandbox.stub(workflowRuntime, "handleToolBackedOperationToolResult")
+		handleToolBackedOperationToolResult.onFirstCall().resolves(secondAction)
+		handleToolBackedOperationToolResult.onSecondCall().resolves({ kind: "no_op" })
+		sandbox.stub(disk, "getTaskMetadata").resolves(createMetadata())
+		sandbox.stub(disk, "saveTaskMetadata").resolves()
+		Reflect.set(task, "toolExecutor", { executeTool })
+
+		await callTaskMethod(task, "consumeWorkflowNextAction", firstAction)
+
+		sinon.assert.calledTwice(executeTool)
+		const firstToolUse = executeTool.firstCall.args[0] as ToolUse
+		const secondToolUse = executeTool.secondCall.args[0] as ToolUse
+		expect(firstToolUse.call_id).to.be.a("string").and.not.equal("")
+		expect(secondToolUse.call_id).to.be.a("string").and.not.equal("")
+		expect(firstToolUse.call_id).to.not.equal(secondToolUse.call_id)
+		expect(firstToolUse.call_id).to.match(/^workflow_runtime_task-1_/)
+		expect(secondToolUse.call_id).to.match(/^workflow_runtime_task-1_/)
+		expect(firstToolUse.call_id).to.include("create_workflow_artifact")
+		expect(secondToolUse.call_id).to.include("build_workflow_document")
+		const secondToolResultText = handleToolBackedOperationToolResult.secondCall.args[0].toolResultText
+		expect(secondToolResultText).to.be.a("string")
+		expect(secondToolResultText).to.include(secondToolUse.call_id)
+	})
+
+	it("isolates runtime-owned tool-backed operations from assistant turn single-tool gating", async () => {
+		const taskState = new TaskState()
+		taskState.didAlreadyUseTool = true
+		const workflowRuntime = new WorkflowRuntime({
+			cwd: "/tmp",
+			workspacePathPolicy: createAllowAllWorkspacePathPolicy(),
+		})
+		const task = createTaskHarness(taskState, workflowRuntime)
+		const action: Extract<WorkflowNextAction, { kind: "execute_tool_backed_operation" }> = {
+			kind: "execute_tool_backed_operation",
+			toolRequest: {
+				toolName: ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT,
+				toolInput: {},
+				toolParams: {
+					artifact_id: "brainstorming_session",
+				},
+			},
+		}
+		const executeTool = sandbox.stub().callsFake(async (block: ToolUse) => {
+			expect(taskState.didAlreadyUseTool).to.equal(false)
+			ToolResultUtils.pushToolResult(
+				JSON.stringify({ ok: true, call_id: block.call_id }),
+				block,
+				taskState.userMessageContent,
+				(toolBlock) => `[${toolBlock.name}]`,
+			)
+			return { status: "executed", emittedToolResult: true, workflowNextActions: [] }
+		})
+		const handleToolBackedOperationToolResult = sandbox
+			.stub(workflowRuntime, "handleToolBackedOperationToolResult")
+			.resolves({ kind: "no_op" })
+		sandbox.stub(disk, "getTaskMetadata").resolves(createMetadata())
+		sandbox.stub(disk, "saveTaskMetadata").resolves()
+		Reflect.set(task, "toolExecutor", { executeTool })
+
+		await callTaskMethod(task, "consumeWorkflowNextAction", action)
+
+		sinon.assert.calledOnce(executeTool)
+		sinon.assert.calledOnce(handleToolBackedOperationToolResult)
+		expect(taskState.didAlreadyUseTool).to.equal(true)
 	})
 })

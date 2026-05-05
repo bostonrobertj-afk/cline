@@ -1057,6 +1057,56 @@ describe("WorkflowRuntime", () => {
 		})
 	})
 
+	it("routes brainstorming Step 1 allocation success and initial document build success to the setup form", async () => {
+		registerResolvedWorkflow(brainstormingWorkflowDefinition)
+		await runtime.activateWorkflow({
+			taskState,
+			workflowName: brainstormingWorkflowDefinition.name,
+		})
+
+		const allocationAction = await submitNewProjectSelection(taskState, "Brainstorming Runtime Project")
+
+		expect(allocationAction.kind).to.equal("execute_tool_backed_operation")
+		if (allocationAction.kind !== "execute_tool_backed_operation") {
+			throw new Error(`Expected execute_tool_backed_operation, received ${allocationAction.kind}.`)
+		}
+		expect(allocationAction.toolRequest.toolName).to.equal(ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT)
+		expect(allocationAction.toolRequest.toolParams).to.deep.equal({
+			artifact_id: "brainstorming_session",
+		})
+
+		const artifactResult = await runtime.createWorkflowArtifact({
+			taskState,
+			artifactId: "brainstorming_session",
+			expectedArtifactAbsolutePath: undefined,
+		})
+		expect(getActiveWorkflowSession(taskState).workflowValues.output_file).to.equal(artifactResult.artifactAbsolutePath)
+
+		const documentBuildAction = await runtime.handleToolBackedOperationToolResult({
+			taskState,
+			toolResultText: JSON.stringify({ ok: true }),
+		})
+
+		expect(documentBuildAction.kind).to.equal("execute_tool_backed_operation")
+		if (documentBuildAction.kind !== "execute_tool_backed_operation") {
+			throw new Error(`Expected execute_tool_backed_operation, received ${documentBuildAction.kind}.`)
+		}
+		expect(documentBuildAction.toolRequest.toolName).to.equal(ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT)
+		expect(documentBuildAction.toolRequest.toolParams.artifact_id).to.equal("brainstorming_session")
+		expect(documentBuildAction.toolRequest.toolParams.destination_path).to.equal(artifactResult.artifactAbsolutePath)
+
+		const setupFormAction = await runtime.handleToolBackedOperationToolResult({
+			taskState,
+			toolResultText: JSON.stringify({ ok: true }),
+		})
+
+		expect(setupFormAction.kind).to.equal("render_workflow_form")
+		if (setupFormAction.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${setupFormAction.kind}.`)
+		}
+		expect(setupFormAction.formSession.workflowFormId).to.equal("step-1-setup-form")
+	})
+
 	it("resolves only the unsuffixed shipped brainstorming workflow identity", () => {
 		resolveWorkflowDefinitionStub.restore()
 
