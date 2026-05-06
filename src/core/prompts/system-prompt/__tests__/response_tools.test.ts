@@ -1,6 +1,9 @@
 import { expect } from "chai"
 import { describe, it } from "mocha"
+import { ModelFamily } from "@/shared/prompts"
+import { ClineDefaultTool } from "@/shared/tools"
 import { getCurrentModeResponseToolsLine, getResponseToolsSection } from "../components/response_tools"
+import type { ClineToolSpec } from "../spec"
 import type { SystemPromptContext } from "../types"
 
 const makeContext = (overrides: Partial<SystemPromptContext> = {}): SystemPromptContext =>
@@ -14,6 +17,20 @@ const makeContext = (overrides: Partial<SystemPromptContext> = {}): SystemPrompt
 		yoloModeToggled: false,
 		...overrides,
 	}) as SystemPromptContext
+
+const buildWorkflowDocumentToolSpec: ClineToolSpec = {
+	variant: ModelFamily.GENERIC,
+	id: ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT,
+	name: "build_workflow_document",
+	description: "Build a workflow document.",
+}
+
+const workflowProgressRequestToolSpec: ClineToolSpec = {
+	variant: ModelFamily.GENERIC,
+	id: ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST,
+	name: "workflow_progress_request",
+	description: "Ask the user to confirm whether the current workflow step is ready to advance.",
+}
 
 describe("response tools prompt helpers", () => {
 	it("omits workflow_progress_request from non-native ACT response tools", () => {
@@ -51,7 +68,7 @@ describe("response tools prompt helpers", () => {
 		expect(responseToolsSection).to.not.contain("- `workflow_progress_request`:")
 	})
 
-	it("omits workflow_progress_request from ACT response tools even when native visibility includes it", () => {
+	it("renders workflow_progress_request from ACT response tools when native visibility includes it", () => {
 		const context = makeContext({
 			enableNativeToolCalls: true,
 			visibleNativeToolNames: [
@@ -62,8 +79,10 @@ describe("response tools prompt helpers", () => {
 			],
 		})
 
-		expect(getCurrentModeResponseToolsLine(context)).to.not.contain("`workflow_progress_request`")
-		expect(getResponseToolsSection(context)).to.not.contain("`workflow_progress_request`")
+		expect(getCurrentModeResponseToolsLine(context)).to.contain("`workflow_progress_request`")
+		expect(getResponseToolsSection(context)).to.contain(
+			"- `workflow_progress_request`: Use to ask the user to confirm whether the current workflow step is ready to advance",
+		)
 	})
 
 	it("omits workflow_progress_request from ACT response tools when native visibility excludes it", () => {
@@ -95,7 +114,7 @@ describe("response tools prompt helpers", () => {
 		expect(responseToolsSection).to.contain("- `send_user_message`: Use by default to send messages to the user")
 	})
 
-	it("omits workflow_progress_request from PLAN response tools even when native visibility includes it", () => {
+	it("renders workflow_progress_request from PLAN response tools when native visibility includes it", () => {
 		const context = makeContext({
 			providerInfo: { ...makeContext().providerInfo, mode: "plan" },
 			enableNativeToolCalls: true,
@@ -107,9 +126,11 @@ describe("response tools prompt helpers", () => {
 			],
 		})
 
-		expect(getCurrentModeResponseToolsLine(context)).to.not.contain("`workflow_progress_request`")
+		expect(getCurrentModeResponseToolsLine(context)).to.contain("`workflow_progress_request`")
 		expect(getCurrentModeResponseToolsLine(context)).to.not.contain("`act_mode_respond`")
-		expect(getResponseToolsSection(context)).to.not.contain("`workflow_progress_request`")
+		expect(getResponseToolsSection(context)).to.contain(
+			"- `workflow_progress_request`: Use to ask the user to confirm whether the current workflow step is ready to advance",
+		)
 	})
 
 	it("mentions act_mode_respond only when it is visible in native ACT mode", () => {
@@ -139,5 +160,35 @@ describe("response tools prompt helpers", () => {
 
 		expect(getCurrentModeResponseToolsLine(hiddenContext)).to.not.contain("`act_mode_respond`")
 		expect(getResponseToolsSection(hiddenContext)).to.not.contain("`act_mode_respond`")
+	})
+
+	it("renders no response guidance for a non-native workflow override without response tools", () => {
+		const context = makeContext({
+			enableNativeToolCalls: false,
+			workflowToolSchemaOverride: [buildWorkflowDocumentToolSpec],
+		})
+
+		expect(getCurrentModeResponseToolsLine(context)).to.equal(undefined)
+		expect(getResponseToolsSection(context)).to.equal("")
+	})
+
+	it("renders only projected response guidance for a non-native workflow override", () => {
+		const context = makeContext({
+			enableNativeToolCalls: false,
+			workflowToolSchemaOverride: [workflowProgressRequestToolSpec],
+		})
+
+		const currentModeLine = getCurrentModeResponseToolsLine(context)
+		const responseToolsSection = getResponseToolsSection(context)
+
+		expect(currentModeLine).to.equal("- Use `workflow_progress_request` when responding to the user.")
+		expect(responseToolsSection).to.contain(
+			"- `workflow_progress_request`: Use to ask the user to confirm whether the current workflow step is ready to advance",
+		)
+		expect(responseToolsSection).to.not.contain("`attempt_completion`")
+		expect(responseToolsSection).to.not.contain("`ask_followup_question`")
+		expect(responseToolsSection).to.not.contain("`send_user_message`")
+		expect(responseToolsSection).to.not.contain("`act_mode_respond`")
+		expect(responseToolsSection).to.not.contain("`generate_plan_output`")
 	})
 })

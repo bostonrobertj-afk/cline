@@ -373,6 +373,15 @@ const workflowProgressOnlyToolSpecs: ClineToolSpec[] = [
 	},
 ]
 
+const workflowBuildDocumentOnlyToolSpecs: ClineToolSpec[] = [
+	{
+		variant: ModelFamily.GENERIC,
+		id: ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT,
+		name: "build_workflow_document",
+		description: "Build a workflow document.",
+	},
+]
+
 const createWorkflowArtifactNativeOnlyToolSpecs: ClineToolSpec[] = [
 	{
 		variant: ModelFamily.NATIVE_GPT_5_1,
@@ -689,7 +698,7 @@ describe("Prompt System Integration Tests", () => {
 			)
 		})
 
-		it("omits workflow_progress_request from generic native GPT-5.1 continuation response guidance even when visible", async function () {
+		it("renders workflow_progress_request in generic native GPT-5.1 continuation response guidance when visible", async function () {
 			await runPromptTest(
 				this,
 				{
@@ -707,7 +716,7 @@ describe("Prompt System Integration Tests", () => {
 				"gpt-5-1",
 				async ({ systemPrompt }) => {
 					expect(systemPrompt).to.include("CONTINUATION TURN")
-					expect(systemPrompt).to.not.include("workflow_progress_request")
+					expect(systemPrompt).to.include("workflow_progress_request")
 					expect(systemPrompt).to.include("attempt_completion")
 					expect(systemPrompt).to.include("ask_followup_question")
 					expect(systemPrompt).to.include("send_user_message")
@@ -915,6 +924,77 @@ describe("Prompt System Integration Tests", () => {
 				"gpt-5-1",
 				async ({ tools }) => {
 					expect(getNativeToolNames(tools)).to.deep.equal(["workflow_progress_request"])
+				},
+			)
+		})
+
+		it("renders native workflow-projected workflow progress request guidance without default response tools", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: makeProviderInfo("gpt-5-1", "openai"),
+					enableNativeToolCalls: true,
+					useMinimalGptPrompt: true,
+					workflowToolSchemaOverride: workflowProgressOnlyToolSpecs,
+				},
+				"gpt-5-1",
+				async ({ systemPrompt }) => {
+					expect(systemPrompt).to.include("RESPONSE TOOLS")
+					expectResponseToolNames(
+						systemPrompt,
+						["`workflow_progress_request`"],
+						["`attempt_completion`", "`ask_followup_question`", "`send_user_message`", "`generate_plan_output`"],
+					)
+				},
+			)
+		})
+
+		it("omits default ACT response guidance from non-native workflow overrides without response tools", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: makeProviderInfo("gpt-3", "openai"),
+					enableNativeToolCalls: false,
+					workflowToolSchemaOverride: workflowBuildDocumentOnlyToolSpecs,
+				},
+				"gpt-3",
+				async ({ systemPrompt, tools }) => {
+					expect(tools).to.be.undefined
+					expect(systemPrompt).to.include("build_workflow_document")
+					expect(systemPrompt).to.not.include("RESPONSE TOOLS")
+					expectResponseToolNames(
+						systemPrompt,
+						[],
+						[
+							"`attempt_completion`",
+							"`ask_followup_question`",
+							"`send_user_message`",
+							"`act_mode_respond`",
+							"`generate_plan_output`",
+						],
+					)
+				},
+			)
+		})
+
+		it("omits invalid continuation response guidance for workflow overrides without response tools", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: makeProviderInfo("gpt-5-1", "openai"),
+					enableNativeToolCalls: true,
+					isContinuationTurn: true,
+					workflowToolSchemaOverride: workflowBuildDocumentOnlyToolSpecs,
+				},
+				"gpt-5-1",
+				async ({ systemPrompt }) => {
+					expect(systemPrompt).to.include("CONTINUATION TURN")
+					expect(systemPrompt).to.not.include("RESPONSE TOOLS")
+					expect(systemPrompt).to.not.include("undefined")
+					expect(systemPrompt).to.not.include("and undefined")
 				},
 			)
 		})

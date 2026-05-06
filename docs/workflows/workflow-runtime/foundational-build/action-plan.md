@@ -7688,107 +7688,107 @@ This phase fixes the remaining Phase 56 response-tool prompt guidance gap so act
 - Native workflow turns with no response tools can render an empty `RESPONSE TOOLS` section or invalid continuation guidance.
 - `workflow_progress_request` is a response tool at execution time but has no response-tool prompt guidance line.
 
-[ ] Task 156. Make response-tool prompt guidance derive from the authoritative workflow override before native/default fallbacks.
+[x] Task 156. Make response-tool prompt guidance derive from the authoritative workflow override before native/default fallbacks.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/response_tools.ts`
 
-[ ] Subtask 156.1. In `response_tools.ts`, add `workflow_progress_request` to `RESPONSE_TOOL_LINES` with exact text `- \`workflow_progress_request\`: Use to ask the user to confirm whether the current workflow step is ready to advance`.
+[x] Subtask 156.1. In `response_tools.ts`, add `workflow_progress_request` to `RESPONSE_TOOL_LINES` with exact text `- \`workflow_progress_request\`: Use to ask the user to confirm whether the current workflow step is ready to advance`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/response_tools.ts`
 
-[ ] Subtask 156.2. In `response_tools.ts`, add a typed `isResponseToolName(toolName: string): toolName is ResponseToolName` helper and use it for all dynamic response-tool-name filtering.
+[x] Subtask 156.2. In `response_tools.ts`, add a typed `isResponseToolName(toolName: string): toolName is ResponseToolName` helper and use it for all dynamic response-tool-name filtering.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/response_tools.ts`
 
-[ ] Subtask 156.3. In `response_tools.ts`, add `getWorkflowOverrideResponseToolNames(context: SystemPromptContext): ResponseToolName[] | undefined` that returns `undefined` only when `context.workflowToolSchemaOverride === undefined`, otherwise returns only response-tool names from `workflowToolSchemaOverride` in schema order using `tool.name ?? tool.id`.
+[x] Subtask 156.3. In `response_tools.ts`, add `getWorkflowOverrideResponseToolNames(context: SystemPromptContext): ResponseToolName[] | undefined` that returns `undefined` only when `context.workflowToolSchemaOverride === undefined`, otherwise returns only response-tool names from `workflowToolSchemaOverride` in schema order using `tool.name ?? tool.id`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/response_tools.ts`
 
-[ ] Subtask 156.4. In `response_tools.ts`, update `getVisibleResponseToolNames(...)` so workflow override response names are returned before native visibility or mode-default fallback logic.
+[x] Subtask 156.4. In `response_tools.ts`, update `getVisibleResponseToolNames(...)` so workflow override response names are returned before native visibility or mode-default fallback logic.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/response_tools.ts`
 
-[ ] Subtask 156.5. In `response_tools.ts`, update native visible-tool filtering so it can render `workflow_progress_request` when that tool is present in `visibleNativeToolNames`, and remove the existing non-null assertion from the ordered-tool construction.
+[x] Subtask 156.5. In `response_tools.ts`, update native visible-tool filtering so it can render `workflow_progress_request` when that tool is present in `visibleNativeToolNames`, and remove the existing non-null assertion from the ordered-tool construction.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/response_tools.ts`
 
-[ ] Subtask 156.6. In `response_tools.ts`, update `getCurrentModeResponseToolsLine(...)` so it returns `undefined` when no response tools are visible and never calls `joinToolNames(...)` with an empty list.
+[x] Subtask 156.6. In `response_tools.ts`, update `getCurrentModeResponseToolsLine(...)` so it returns `undefined` when no response tools are visible and never calls `joinToolNames(...)` with an empty list.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/response_tools.ts`
 
-[ ] Subtask 156.7. In `response_tools.ts`, update `getResponseToolsSection(...)` so it returns an empty string when no response-tool lines are visible instead of rendering a bare `RESPONSE TOOLS` section.
+[x] Subtask 156.7. In `response_tools.ts`, update `getResponseToolsSection(...)` so it returns an empty string when no response-tool lines are visible instead of rendering a bare `RESPONSE TOOLS` section.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/response_tools.ts`
 
-[ ] Task 157. Update continuation-turn assembly for optional response-tool guidance.
+[x] Task 157. Update continuation-turn assembly for optional response-tool guidance.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/continuation_turn.ts`
 
-[ ] Subtask 157.1. In `continuation_turn.ts`, replace the inline `getCurrentModeResponseToolsLine(context)` array entry with a local `responseToolsLine` variable and push it only when it is not `undefined`.
+[x] Subtask 157.1. In `continuation_turn.ts`, replace the inline `getCurrentModeResponseToolsLine(context)` array entry with a local `responseToolsLine` variable and push it only when it is not `undefined`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/continuation_turn.ts`
 
-[ ] Task 158. Update response-tool component unit coverage.
+[x] Task 158. Update response-tool component unit coverage.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/response_tools.test.ts`
 
-[ ] Subtask 158.1. In `response_tools.test.ts`, add typed workflow-tool-schema fixtures for `build_workflow_document` and `workflow_progress_request`.
+[x] Subtask 158.1. In `response_tools.test.ts`, add typed workflow-tool-schema fixtures for `build_workflow_document` and `workflow_progress_request`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/response_tools.test.ts`
 
-[ ] Subtask 158.2. In `response_tools.test.ts`, replace expectations that native-visible `workflow_progress_request` is omitted with expectations that it is rendered when visible.
+[x] Subtask 158.2. In `response_tools.test.ts`, replace expectations that native-visible `workflow_progress_request` is omitted with expectations that it is rendered when visible.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/response_tools.test.ts`
 
-[ ] Subtask 158.3. In `response_tools.test.ts`, add coverage proving a non-native workflow override with only `build_workflow_document` renders no response-tools section and no current-mode response line.
+[x] Subtask 158.3. In `response_tools.test.ts`, add coverage proving a non-native workflow override with only `build_workflow_document` renders no response-tools section and no current-mode response line.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/response_tools.test.ts`
 
-[ ] Subtask 158.4. In `response_tools.test.ts`, add coverage proving a non-native workflow override with `workflow_progress_request` renders only `workflow_progress_request` response guidance and no default ACT response tools.
+[x] Subtask 158.4. In `response_tools.test.ts`, add coverage proving a non-native workflow override with `workflow_progress_request` renders only `workflow_progress_request` response guidance and no default ACT response tools.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/response_tools.test.ts`
 
-[ ] Task 159. Add integration coverage for workflow-authoritative response-tool guidance.
+[x] Task 159. Add integration coverage for workflow-authoritative response-tool guidance.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 159.1. In `integration.test.ts`, add a workflow override fixture containing only `build_workflow_document`.
+[x] Subtask 159.1. In `integration.test.ts`, add a workflow override fixture containing only `build_workflow_document`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 159.2. In `integration.test.ts`, add native workflow override coverage proving `workflow_progress_request` appears in response-tool guidance when it is the only projected response tool.
+[x] Subtask 159.2. In `integration.test.ts`, add native workflow override coverage proving `workflow_progress_request` appears in response-tool guidance when it is the only projected response tool.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 159.3. In `integration.test.ts`, add non-native workflow override coverage proving default ACT response tools are not advertised when absent from `workflowToolSchemaOverride`.
+[x] Subtask 159.3. In `integration.test.ts`, add non-native workflow override coverage proving default ACT response tools are not advertised when absent from `workflowToolSchemaOverride`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 159.4. In `integration.test.ts`, add continuation-turn coverage proving a workflow override with no response tools does not render `RESPONSE TOOLS`, `undefined`, or `and undefined`.
+[x] Subtask 159.4. In `integration.test.ts`, add continuation-turn coverage proving a workflow override with no response tools does not render `RESPONSE TOOLS`, `undefined`, or `and undefined`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Task 160. Validate Phase 57.
+[x] Task 160. Validate Phase 57.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/response_tools.ts`
@@ -7796,13 +7796,13 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/response_tools.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 160.1. Run `npm run test:unit -- src/core/prompts/system-prompt/__tests__/response_tools.test.ts src/core/prompts/system-prompt/__tests__/integration.test.ts`; it must pass before Phase 57 is marked complete.
+[x] Subtask 160.1. Run `npm run test:unit -- src/core/prompts/system-prompt/__tests__/response_tools.test.ts src/core/prompts/system-prompt/__tests__/integration.test.ts`; it must pass before Phase 57 is marked complete.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/response_tools.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 160.2. Run `npm run check-types` and `npm run lint`; both must pass before Phase 57 is marked complete.
+[x] Subtask 160.2. Run `npm run check-types` and `npm run lint`; both must pass before Phase 57 is marked complete.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/response_tools.ts`
