@@ -5,6 +5,7 @@ import type { McpHub } from "@/services/mcp/McpHub"
 import type { McpServer } from "@/shared/mcp"
 import { ModelFamily } from "@/shared/prompts"
 import { ClineDefaultTool } from "@/shared/tools"
+import { getSystemPromptComponents } from "../components"
 import {
 	getCodeExplorationGuidance,
 	getIndxrToolMatches,
@@ -16,6 +17,7 @@ import {
 } from "../components/mcp"
 import type { ClineToolSpec } from "../spec"
 import { toolSpecFunctionDeclarations, toolSpecFunctionDefinition, toolSpecInputSchema } from "../spec"
+import { STANDARD_PLACEHOLDERS, SystemPromptSection } from "../templates/placeholders"
 import { access_mcp_resource_variants } from "../tools/access_mcp_resource"
 import { ask_followup_question_variants } from "../tools/ask_followup_question"
 import { list_code_definition_names_variants } from "../tools/list_code_definition_names"
@@ -25,6 +27,7 @@ import { search_files_variants } from "../tools/search_files"
 import { send_user_message_variants } from "../tools/send_user_message"
 import { use_mcp_tool_variants } from "../tools/use_mcp_tool"
 import type { SystemPromptContext } from "../types"
+import { loadAllVariantConfigs } from "../variants"
 
 type JsonSchemaProperty = {
 	description?: string
@@ -312,6 +315,34 @@ describe("Gemini and Anthropic parameter descriptions match", () => {
 		const anthropicDesc = getAnthropicProperties(anthropic).path?.description
 
 		expect(geminiDesc).to.equal(anthropicDesc)
+	})
+})
+
+describe("system prompt workflow component removal", () => {
+	it("omits removed workflow sections from components, placeholders, and variant configs", () => {
+		const removedSectionKeys = [["WORKFLOW", "SYSTEM", "INSTRUCTIONS"].join("_"), ["WORKFLOW", "INPUT"].join("_")]
+		const removedSectionValues = removedSectionKeys.map((key) => [key, "SECTION"].join("_"))
+		const registeredComponentIds = getSystemPromptComponents().map((component) => component.id)
+		const placeholderValues = Object.values(STANDARD_PLACEHOLDERS)
+
+		for (const key of removedSectionKeys) {
+			expect(Object.hasOwn(SystemPromptSection, key)).to.equal(false)
+		}
+
+		for (const value of removedSectionValues) {
+			expect(registeredComponentIds).to.not.include(value)
+			expect(placeholderValues).to.not.include(value)
+		}
+
+		for (const config of Object.values(loadAllVariantConfigs())) {
+			const overrideKeys = Object.keys(config.componentOverrides ?? {})
+
+			for (const value of removedSectionValues) {
+				expect(config.componentOrder).to.not.include(value as SystemPromptSection)
+				expect(config.baseTemplate ?? "").to.not.include(`{{${value}}}`)
+				expect(overrideKeys).to.not.include(value)
+			}
+		}
 	})
 })
 

@@ -11,7 +11,6 @@ Use these tools to respond to the user. A reply reaches the human user only when
 - `ask_followup_question`: Use to ask a question + present options for user to select
 - `send_user_message`: Use by default to send messages to the user
 - `act_mode_respond`: Use to send a brief ACT MODE progress update and intentionally wait for the user's next reply
-- If you hit a meaningful blocker, material ambiguity, or unstable behavior that affects correctness or progress, include `agent_feedback` on your response tool call with a concise description of the issue.
 
 ====
 

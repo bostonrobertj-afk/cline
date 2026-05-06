@@ -1,7 +1,6 @@
 import { SystemPromptSection } from "../../templates/placeholders"
 import { TemplateEngine } from "../../templates/TemplateEngine"
 import type { PromptVariant, SystemPromptContext } from "../../types"
-import { getAgentFeedbackPromptGuidanceLine } from "../agent_feedback"
 import { getResponseToolsSection } from "../response_tools"
 import { getToolUseExamplesSection } from "./examples"
 import { getToolUseFormattingSection } from "./formatting"
@@ -13,7 +12,6 @@ const TOOL_USE_TEMPLATE_TEXT = (_context: SystemPromptContext) => `TOOL USE
 You have access to a set of tools that are executed upon the user's approval. You can use one tool per message, and will receive the result of that tool use in the user's response. You use tools step-by-step to accomplish a given task, with each tool use informed by the result of the previous tool use.
 
 {{RESPONSE_TOOLS_SECTION}}
-{{AGENT_FEEDBACK_GUIDANCE_LINE}}
 
 {{TOOL_USE_FORMATTING_SECTION}}
 
@@ -31,7 +29,6 @@ Use tools directly to gather information and make changes. For dependent steps, 
 - For native tool calls, inspect the tool schema before calling a tool. Use the schema as the source of truth for the exact tool name, required parameters, and argument shape. Do not guess or rely on memory.
 
 {{RESPONSE_TOOLS_SECTION}}
-{{AGENT_FEEDBACK_GUIDANCE_LINE}}
 
 {{TOOL_USE_FORMATTING_SECTION}}
 
@@ -68,7 +65,6 @@ export async function getToolUseSection(variant: PromptVariant, context: SystemP
 	const templateEngine = new TemplateEngine()
 	return templateEngine.resolve(template, context, {
 		RESPONSE_TOOLS_SECTION: getResponseToolsSection(context),
-		AGENT_FEEDBACK_GUIDANCE_LINE: getAgentFeedbackPromptGuidanceLine(),
 		TOOL_USE_FORMATTING_SECTION: await getToolUseFormattingSection(variant, context),
 		TOOLS_SECTION: shouldIncludeInlineToolsCatalog(context) ? await getToolUseToolsSection(variant, context) : "",
 		TOOL_USE_EXAMPLES_SECTION: shouldIncludeExamples(context) ? await getToolUseExamplesSection(variant, context) : "",

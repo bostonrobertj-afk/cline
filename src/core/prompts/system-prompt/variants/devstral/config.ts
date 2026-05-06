@@ -20,7 +20,6 @@ export const config = createVariant(ModelFamily.DEVSTRAL)
 	})
 	.template(baseTemplate)
 	.components(
-		SystemPromptSection.WORKFLOW_SYSTEM_INSTRUCTIONS,
 		SystemPromptSection.TOOL_USE,
 		SystemPromptSection.MCP,
 		SystemPromptSection.EDITING_FILES,
@@ -29,7 +28,6 @@ export const config = createVariant(ModelFamily.DEVSTRAL)
 		SystemPromptSection.RULES,
 		SystemPromptSection.SYSTEM_INFO,
 		SystemPromptSection.OBJECTIVE,
-		SystemPromptSection.WORKFLOW_INPUT,
 		SystemPromptSection.USER_INSTRUCTIONS,
 		SystemPromptSection.SKILLS,
 	)

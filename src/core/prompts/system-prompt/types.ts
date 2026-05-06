@@ -103,15 +103,11 @@ export interface SystemPromptContext {
 	readonly mcpHub?: McpHub
 	readonly activeWorkflowName?: string
 	readonly activeWorkflowStepNumber?: number
-	readonly fullTurnWorkflowSystemInstructionsBlock?: string
-	readonly fullTurnWorkflowInputInstructionsBlock?: string
 	/**
 	 * Complete runtime-projected tool schema for the current workflow turn.
 	 * When present, it is the authoritative prompt/native tool surface.
 	 */
 	readonly workflowToolSchemaOverride?: readonly ClineToolSpec[]
-	readonly continuationTurnWorkflowSystemInstructionsBlock?: string
-	readonly continuationTurnWorkflowInputInstructionsBlock?: string
 	readonly isContinuationTurn?: boolean
 	readonly isPromptRefreshTurn?: boolean
 	readonly currentFocusChainChecklist?: string | null
@@ -278,9 +274,6 @@ export interface VariantSchema {
 	readonly optional: readonly string[]
 	readonly validation: Record<string, (value: unknown) => boolean>
 }
-
-export const AGENT_FEEDBACK_PROMPT_GUIDANCE =
-	"- If you hit a meaningful blocker, material ambiguity, or unstable behavior that affects correctness or progress, include `agent_feedback` on your response tool call with a concise description of the issue."
 
 export const AGENT_FEEDBACK_PARAMETER = {
 	name: "agent_feedback",

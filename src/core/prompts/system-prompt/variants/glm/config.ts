@@ -21,7 +21,6 @@ export const config = createVariant(ModelFamily.GLM)
 	})
 	.template(baseTemplate)
 	.components(
-		SystemPromptSection.WORKFLOW_SYSTEM_INSTRUCTIONS,
 		SystemPromptSection.TOOL_USE,
 		SystemPromptSection.RULES,
 		SystemPromptSection.ACT_VS_PLAN,
@@ -31,7 +30,6 @@ export const config = createVariant(ModelFamily.GLM)
 		SystemPromptSection.MCP,
 		SystemPromptSection.SYSTEM_INFO,
 		SystemPromptSection.OBJECTIVE,
-		SystemPromptSection.WORKFLOW_INPUT,
 		SystemPromptSection.USER_INSTRUCTIONS,
 		SystemPromptSection.SKILLS,
 	)

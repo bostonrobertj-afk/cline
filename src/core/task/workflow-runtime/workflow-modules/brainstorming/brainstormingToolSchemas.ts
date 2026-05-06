@@ -1,8 +1,19 @@
 import type { ClineToolSpec } from "@/core/prompts/system-prompt/spec"
 import { ModelFamily } from "@/shared/prompts"
 import { ClineDefaultTool } from "@/shared/tools"
+import type { WorkflowPromptBuilderInput } from "../../types"
 
 const BRAINSTORMING_TOOL_SCHEMA_VARIANT = ModelFamily.NATIVE_GPT_5
+const BRAINSTORMING_SELECTED_APPROACH_KEY = "selected_approach"
+const BRAINSTORMING_SUGGEST_APPROACH = "I want you to suggest a technique"
+
+export function buildBrainstormingStep1ToolSchemas(): readonly ClineToolSpec[] {
+	return []
+}
+
+export function buildBrainstormingStep2ToolSchemas(): readonly ClineToolSpec[] {
+	return []
+}
 
 export function buildBrainstormingBuildWorkflowDocumentToolSchema(): ClineToolSpec {
 	return {
@@ -145,6 +156,15 @@ export function buildBrainstormingStep3ChooseOrRandomToolSchemas(): readonly Cli
 	]
 }
 
+export function buildBrainstormingStep3ToolSchemas(input: WorkflowPromptBuilderInput): readonly ClineToolSpec[] {
+	const selectedApproach = input.session.workflowValues[BRAINSTORMING_SELECTED_APPROACH_KEY]
+	if (selectedApproach === BRAINSTORMING_SUGGEST_APPROACH) {
+		return buildBrainstormingStep3SuggestToolSchemas()
+	}
+
+	return buildBrainstormingStep3ChooseOrRandomToolSchemas()
+}
+
 export function buildBrainstormingAttemptCompletionToolSchema(): ClineToolSpec {
 	return {
 		variant: BRAINSTORMING_TOOL_SCHEMA_VARIANT,
@@ -161,4 +181,8 @@ export function buildBrainstormingAttemptCompletionToolSchema(): ClineToolSpec {
 			},
 		],
 	}
+}
+
+export function buildBrainstormingStep4ToolSchemas(): readonly ClineToolSpec[] {
+	return [buildBrainstormingBuildWorkflowDocumentToolSchema(), buildBrainstormingAttemptCompletionToolSchema()]
 }

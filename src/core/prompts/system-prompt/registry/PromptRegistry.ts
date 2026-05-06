@@ -104,7 +104,7 @@ export class PromptRegistry {
 		// filtered native-tool surface the prompt body sees.
 		const initialNativeTools = ClineToolSet.getNativeTools(variant, context)
 		const visibleNativeToolNames =
-			context.visibleNativeToolNames !== undefined
+			context.visibleNativeToolNames !== undefined && context.workflowToolSchemaOverride === undefined
 				? [...context.visibleNativeToolNames]
 				: getVisibleNativeToolNames(initialNativeTools)
 		const promptContext = { ...context, visibleNativeToolNames }

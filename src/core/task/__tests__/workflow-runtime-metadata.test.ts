@@ -1,5 +1,5 @@
 import { expect } from "chai"
-import { mkdir, mkdtemp, readFile, rm } from "fs/promises"
+import { mkdir, mkdtemp, readdir, readFile, rm } from "fs/promises"
 import { afterEach, beforeEach, describe, it } from "mocha"
 import { tmpdir } from "os"
 import { join } from "path"
@@ -26,6 +26,7 @@ import type { WorkflowFormSessionState } from "@/core/task/workflow-form/types"
 import type {
 	PersistedWorkflowSession,
 	WorkflowNextAction,
+	WorkflowPromptProjection,
 	WorkflowWorkspacePathPolicy,
 } from "@/core/task/workflow-runtime/types"
 import * as WorkflowRegistry from "@/core/task/workflow-runtime/WorkflowRegistry"
@@ -40,6 +41,7 @@ import { DEFAULT_AUTO_APPROVAL_SETTINGS } from "@/shared/AutoApprovalSettings"
 import { DEFAULT_BROWSER_SETTINGS } from "@/shared/BrowserSettings"
 import type { AwaitingUserResponseSubtype, ThreadDisplayState } from "@/shared/ExtensionMessage"
 import { DEFAULT_FOCUS_CHAIN_SETTINGS } from "@/shared/FocusChainSettings"
+import type { ClineContent } from "@/shared/messages"
 import { ApiFormat } from "@/shared/proto/cline/models"
 import { WorkflowFormAction, type WorkflowFormSubmissionRequest } from "@/shared/proto/cline/task"
 import { ClineDefaultTool } from "@/shared/tools"
@@ -77,6 +79,14 @@ function createMetadata(): TaskMetadata {
 function createAllowAllWorkspacePathPolicy(): WorkflowWorkspacePathPolicy {
 	return {
 		validateAccess: () => true,
+	}
+}
+
+function createEmptyWorkflowPromptProjection(): WorkflowPromptProjection {
+	return {
+		workflowInputPayloadBlock: undefined,
+		continuationWorkflowInputPayloadBlock: undefined,
+		workflowToolSchemaOverride: undefined,
 	}
 }
 
@@ -359,7 +369,10 @@ describe("workflow runtime metadata persistence", () => {
 		const metadata = createMetadata()
 		metadata.activeWorkflowName = "workflow-runtime-test"
 		metadata.activeWorkflowSession = createPersistedSession()
-		const nextAction: WorkflowNextAction = { kind: "project_prompt", promptProjection: {} }
+		const nextAction: WorkflowNextAction = {
+			kind: "project_prompt",
+			promptProjection: createEmptyWorkflowPromptProjection(),
+		}
 		const workflowRuntime = new WorkflowRuntime({
 			cwd: "/tmp",
 			workspacePathPolicy: createAllowAllWorkspacePathPolicy(),
@@ -458,7 +471,10 @@ describe("workflow runtime metadata persistence", () => {
 
 	it("consumes workflow next actions returned from normal tool execution", async () => {
 		const taskState = new TaskState()
-		const returnedNextAction: WorkflowNextAction = { kind: "project_prompt", promptProjection: {} }
+		const returnedNextAction: WorkflowNextAction = {
+			kind: "project_prompt",
+			promptProjection: createEmptyWorkflowPromptProjection(),
+		}
 		taskState.assistantMessageContent = [
 			{
 				type: "tool_use",
@@ -520,6 +536,105 @@ describe("workflow runtime metadata persistence", () => {
 		sinon.assert.notCalled(consumeWorkflowNextAction)
 	})
 
+	it("stores workflow input payload on user content and outside the saved system prompt artifact", async () => {
+		const artifactRoot = await mkdtemp(join(tmpdir(), "workflow-input-payload-artifacts-"))
+		const artifactDir = join(artifactRoot, "prompt-artifacts")
+		const originalWriteFlag = process.env.CLINE_WRITE_PROMPT_ARTIFACTS
+		const originalArtifactDir = process.env.CLINE_PROMPT_ARTIFACT_DIR
+		try {
+			const taskState = new TaskState()
+			taskState.apiRequestCount = 3
+			const task = createTaskHarness(taskState)
+			Reflect.set(task, "cwd", artifactRoot)
+			Reflect.set(task, "ulid", "ulid-1")
+			Reflect.set(task, "api", {
+				getLastRequestId: () => "request-1",
+			})
+			const workflowInputPayloadBlock =
+				"CURRENT STEP DETAILED INSTRUCTIONS\nStep 3: Perform Interactive Brainstorming\nCurrent step payload"
+			const workflowProjection: WorkflowPromptProjection = {
+				workflowInputPayloadBlock,
+				continuationWorkflowInputPayloadBlock: "Continuation workflow payload",
+				workflowToolSchemaOverride: undefined,
+			}
+			const userContent = callTaskMethodResult(
+				task,
+				"appendWorkflowInputPayloadToUserContent",
+				[
+					{
+						type: "text",
+						text: "User request",
+					},
+				] satisfies ClineContent[],
+				workflowProjection,
+				"full",
+			) as ClineContent[]
+			const messageStateHandler = new MessageStateHandler({
+				taskId: "task-1",
+				ulid: "ulid-1",
+				taskState,
+				updateTaskHistory: async () => [],
+			})
+			await messageStateHandler.addToApiConversationHistory({
+				role: "user",
+				content: userContent,
+				ts: Date.now(),
+			})
+
+			const storedUserMessage = messageStateHandler.getApiConversationHistory()[0]
+			const storedUserContent = Array.isArray(storedUserMessage?.content) ? storedUserMessage.content : []
+			expect(storedUserContent.some((block) => block.type === "text" && block.text === workflowInputPayloadBlock)).to.equal(
+				true,
+			)
+
+			process.env.CLINE_WRITE_PROMPT_ARTIFACTS = "1"
+			process.env.CLINE_PROMPT_ARTIFACT_DIR = artifactDir
+			await callTaskMethod(task, "writePromptMetadataArtifacts", {
+				systemPrompt: "System prompt without current-step workflow details.",
+				providerInfo: {
+					mode: "act",
+					providerId: "test-provider",
+					model: {
+						id: "test-model",
+					},
+				},
+				workflowInputPayloadBlock,
+			})
+
+			const artifactFiles = await readdir(artifactDir)
+			const systemPromptFile = artifactFiles.find((file) => file.endsWith(".system_prompt.md"))
+			const workflowInputPayloadFile = artifactFiles.find((file) => file.endsWith(".workflow_input_payload.md"))
+			const manifestFile = artifactFiles.find((file) => file.endsWith(".manifest.json"))
+			expect(systemPromptFile).to.be.a("string")
+			expect(workflowInputPayloadFile).to.be.a("string")
+			expect(manifestFile).to.be.a("string")
+			if (!systemPromptFile || !workflowInputPayloadFile || !manifestFile) {
+				throw new Error("Expected prompt artifact files to be written.")
+			}
+			const savedSystemPrompt = await readFile(join(artifactDir, systemPromptFile), "utf8")
+			const savedWorkflowInputPayload = await readFile(join(artifactDir, workflowInputPayloadFile), "utf8")
+			const manifest = JSON.parse(await readFile(join(artifactDir, manifestFile), "utf8")) as {
+				workflowInputPayloadPath?: string
+			}
+			expect(savedSystemPrompt).to.not.include("CURRENT STEP DETAILED INSTRUCTIONS")
+			expect(savedSystemPrompt).to.not.include("Perform Interactive Brainstorming")
+			expect(savedWorkflowInputPayload).to.equal(workflowInputPayloadBlock)
+			expect(manifest.workflowInputPayloadPath).to.equal(join(artifactDir, workflowInputPayloadFile))
+		} finally {
+			if (originalWriteFlag === undefined) {
+				delete process.env.CLINE_WRITE_PROMPT_ARTIFACTS
+			} else {
+				process.env.CLINE_WRITE_PROMPT_ARTIFACTS = originalWriteFlag
+			}
+			if (originalArtifactDir === undefined) {
+				delete process.env.CLINE_PROMPT_ARTIFACT_DIR
+			} else {
+				process.env.CLINE_PROMPT_ARTIFACT_DIR = originalArtifactDir
+			}
+			await rm(artifactRoot, { recursive: true, force: true })
+		}
+	})
+
 	it("passes submitted workflow-form next actions to the pending form wait resolver without double-consuming", async () => {
 		const taskState = new TaskState()
 		const activeSession = createPersistedSession()
@@ -527,7 +642,10 @@ describe("workflow runtime metadata persistence", () => {
 		activeSession.ui.formSession = formSession
 		taskState.activeWorkflowName = "workflow-runtime-test"
 		taskState.activeWorkflowSession = activeSession
-		const nextAction: WorkflowNextAction = { kind: "project_prompt", promptProjection: {} }
+		const nextAction: WorkflowNextAction = {
+			kind: "project_prompt",
+			promptProjection: createEmptyWorkflowPromptProjection(),
+		}
 		const workflowRuntime = new WorkflowRuntime({
 			cwd: "/tmp",
 			workspacePathPolicy: createAllowAllWorkspacePathPolicy(),
@@ -566,7 +684,10 @@ describe("workflow runtime metadata persistence", () => {
 		activeSession.ui.formSession = formSession
 		taskState.activeWorkflowName = "workflow-runtime-test"
 		taskState.activeWorkflowSession = activeSession
-		const nextAction: WorkflowNextAction = { kind: "project_prompt", promptProjection: {} }
+		const nextAction: WorkflowNextAction = {
+			kind: "project_prompt",
+			promptProjection: createEmptyWorkflowPromptProjection(),
+		}
 		const workflowRuntime = new WorkflowRuntime({
 			cwd: "/tmp",
 			workspacePathPolicy: createAllowAllWorkspacePathPolicy(),
@@ -613,7 +734,10 @@ describe("workflow runtime metadata persistence", () => {
 		activeSession.ui.formSession = formSession
 		taskState.activeWorkflowName = "workflow-runtime-test"
 		taskState.activeWorkflowSession = activeSession
-		const nextAction: WorkflowNextAction = { kind: "project_prompt", promptProjection: {} }
+		const nextAction: WorkflowNextAction = {
+			kind: "project_prompt",
+			promptProjection: createEmptyWorkflowPromptProjection(),
+		}
 		const workflowRuntime = new WorkflowRuntime({
 			cwd: "/tmp",
 			workspacePathPolicy: createAllowAllWorkspacePathPolicy(),

@@ -30,7 +30,6 @@ export const config = createVariant(ModelFamily.GPT_5)
 	})
 	.template(GPT_5_TEMPLATE_OVERRIDES.BASE)
 	.components(
-		SystemPromptSection.WORKFLOW_SYSTEM_INSTRUCTIONS,
 		SystemPromptSection.TOOL_USE,
 		SystemPromptSection.MCP,
 		SystemPromptSection.EDITING_FILES,
@@ -38,7 +37,6 @@ export const config = createVariant(ModelFamily.GPT_5)
 		SystemPromptSection.FEEDBACK,
 		SystemPromptSection.RULES,
 		SystemPromptSection.SYSTEM_INFO,
-		SystemPromptSection.WORKFLOW_INPUT,
 		SystemPromptSection.USER_INSTRUCTIONS,
 		SystemPromptSection.SKILLS,
 	)

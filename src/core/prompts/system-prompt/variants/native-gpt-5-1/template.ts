@@ -3,9 +3,7 @@ import { SystemPromptSection } from "../../templates/placeholders"
 /**
  * Base template for GPT-5 variant with structured sections
  */
-export const BASE = `{{${SystemPromptSection.WORKFLOW_SYSTEM_INSTRUCTIONS}}}
-
-{{${SystemPromptSection.TOOL_USE}}}
+export const BASE = `{{${SystemPromptSection.TOOL_USE}}}
 
 ====
 
@@ -34,10 +32,6 @@ export const BASE = `{{${SystemPromptSection.WORKFLOW_SYSTEM_INSTRUCTIONS}}}
 ====
 
 {{${SystemPromptSection.OBJECTIVE}}}
-
-====
-
-{{${SystemPromptSection.WORKFLOW_INPUT}}}
 
 ====
 

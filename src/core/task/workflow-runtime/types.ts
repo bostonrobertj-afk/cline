@@ -8,13 +8,21 @@ import type {
 	WorkflowToolBackedActionInstruction,
 	WorkflowToolBackedOperationExecutionRequest,
 } from "@/core/task/workflow-step-resolution/types"
-import type { SkillMetadata } from "@/shared/skills"
 
 export type WorkflowName = string
 export type WorkflowValue = string | number | boolean | WorkflowValue[] | { [key: string]: WorkflowValue }
 export type WorkflowValues = Record<string, WorkflowValue>
 export type WorkflowProjectMode = "new" | "existing"
 export type WorkflowProjectSubfolder = "discovery" | "planning" | "implementation" | "review" | "testing"
+
+export interface WorkflowPersonaDefinition {
+	name: string
+	role: string
+	identity: string
+	capabilities: readonly string[]
+	communicationStyle: string
+	principles: readonly string[]
+}
 
 export interface WorkflowDiscoveryCandidate {
 	value: string
@@ -75,15 +83,13 @@ export interface ActiveWorkflowSession {
 export type PersistedWorkflowSession = ActiveWorkflowSession
 
 export interface WorkflowPromptProjection {
-	fullTurnWorkflowSystemInstructionsBlock?: string
-	fullTurnWorkflowInputInstructionsBlock?: string
+	workflowInputPayloadBlock: string | undefined
+	continuationWorkflowInputPayloadBlock: string | undefined
 	/**
 	 * Complete module-derived tool schema for the active turn.
 	 * When present, this replaces the default prompt/native tool surface.
 	 */
-	workflowToolSchemaOverride?: readonly ClineToolSpec[]
-	continuationTurnWorkflowSystemInstructionsBlock?: string
-	continuationTurnWorkflowInputInstructionsBlock?: string
+	workflowToolSchemaOverride: readonly ClineToolSpec[] | undefined
 }
 
 export interface WorkflowRenderFormNextAction {
@@ -138,7 +144,6 @@ export interface WorkflowPromptBuilderInput {
 }
 
 export interface WorkflowStepPromptSource {
-	workflowSystemInstructions?: string
 	currentStepInstructions?: string
 }
 
@@ -361,9 +366,11 @@ export interface WorkflowStepDefinition {
 
 export interface WorkflowDefinition {
 	name: WorkflowName
+	displayName: string
+	description: string
 	slashCommandName: string
 	useSkillName: string
-	persona: SkillMetadata["name"] | string
+	persona: WorkflowPersonaDefinition
 	projectSubfolder: WorkflowProjectSubfolder
 	workflowValueKeys: readonly string[]
 	entryProjectValueKeys: WorkflowEntryProjectValueKeys
@@ -387,7 +394,9 @@ export interface WorkflowDiscoveryRequest {
 
 export interface ShippedWorkflowMetadata {
 	name: WorkflowName
-	persona: SkillMetadata["name"] | string
+	displayName: string
+	description: string
+	persona: WorkflowPersonaDefinition
 	projectSubfolder: WorkflowProjectSubfolder
 }
 

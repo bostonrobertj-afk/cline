@@ -31,7 +31,6 @@ export const config = createVariant(ModelFamily.NATIVE_NEXT_GEN)
 	})
 	.template(TEMPLATE_OVERRIDES.BASE)
 	.components(
-		SystemPromptSection.WORKFLOW_SYSTEM_INSTRUCTIONS,
 		SystemPromptSection.TOOL_USE,
 		SystemPromptSection.TODO,
 		SystemPromptSection.ACT_VS_PLAN,
@@ -40,7 +39,6 @@ export const config = createVariant(ModelFamily.NATIVE_NEXT_GEN)
 		SystemPromptSection.RULES,
 		SystemPromptSection.SYSTEM_INFO,
 		SystemPromptSection.OBJECTIVE,
-		SystemPromptSection.WORKFLOW_INPUT,
 		SystemPromptSection.USER_INSTRUCTIONS,
 		SystemPromptSection.SKILLS,
 	)

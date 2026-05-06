@@ -27,7 +27,7 @@ import { ClineDefaultTool, ClineTool } from "@shared/tools"
 import { ContextManager } from "@/core/context/context-management/ContextManager"
 import { checkContextWindowExceededError } from "@/core/context/context-management/context-error-handling"
 import { getContextWindowInfo } from "@/core/context/context-management/context-window-utils"
-import type { WorkflowNextAction } from "@/core/task/workflow-runtime/types"
+import type { WorkflowNextAction, WorkflowPromptProjection } from "@/core/task/workflow-runtime/types"
 import { WorkflowNextActionConsumer } from "@/core/task/workflow-runtime/WorkflowNextActionConsumer"
 import { resolveWorkflowByUseSkillName } from "@/core/task/workflow-runtime/WorkflowRegistry"
 import { HostRegistryInfo } from "@/registry"
@@ -558,6 +558,15 @@ export class SubagentRunner {
 					turnsSinceFullPromptRefresh: state.turnsSinceFullPromptRefresh,
 				})
 				const promptInjectionBlocks = await this.buildSubagentPromptInjectionBlocks(state, shouldSendFullPromptAssembly)
+				const workflowPromptProjection = await this.baseConfig.workflowRuntime.buildTurnProjection({
+					taskState: state,
+					isFirstTaskRequest: state.apiRequestCount === 1,
+				})
+				this.appendWorkflowInputPayloadToLatestUserMessage(
+					conversation,
+					workflowPromptProjection,
+					shouldUseContinuationPrompt ? "continuation" : "full",
+				)
 
 				const context = await this.buildPromptContext({
 					state,
@@ -568,6 +577,7 @@ export class SubagentRunner {
 					nativeToolCallsRequested,
 					shouldSendFullPromptAssembly,
 					shouldUseContinuationPrompt,
+					workflowPromptProjection,
 				})
 				const allowedToolNamesForTurn = this.buildAllowedToolNamesForTurn(context)
 				const projectedNativeTools = this.agent.buildNativeTools(context)
@@ -946,12 +956,12 @@ export class SubagentRunner {
 		nativeToolCallsRequested: boolean
 		shouldSendFullPromptAssembly: boolean
 		shouldUseContinuationPrompt: boolean
+		workflowPromptProjection: WorkflowPromptProjection
 	}): Promise<SystemPromptContext> {
 		const skills = params.shouldSendFullPromptAssembly
 			? this.resolvePromptSkills(params.availableSkills, params.configuredSkillNames)
 			: []
 		const includeMcpHub = this.agent.isMcpExposureEnabled()
-		const workflowPromptProjection = await this.baseConfig.workflowRuntime.buildTurnProjection({ taskState: params.state })
 
 		return {
 			providerInfo: params.providerInfo,
@@ -960,13 +970,7 @@ export class SubagentRunner {
 			skills,
 			activeWorkflowName: params.state.activeWorkflowName,
 			activeWorkflowStepNumber: params.state.activeWorkflowSession?.activeStepNumber,
-			fullTurnWorkflowSystemInstructionsBlock: workflowPromptProjection.fullTurnWorkflowSystemInstructionsBlock,
-			fullTurnWorkflowInputInstructionsBlock: workflowPromptProjection.fullTurnWorkflowInputInstructionsBlock,
-			workflowToolSchemaOverride: workflowPromptProjection.workflowToolSchemaOverride,
-			continuationTurnWorkflowSystemInstructionsBlock:
-				workflowPromptProjection.continuationTurnWorkflowSystemInstructionsBlock,
-			continuationTurnWorkflowInputInstructionsBlock:
-				workflowPromptProjection.continuationTurnWorkflowInputInstructionsBlock,
+			workflowToolSchemaOverride: params.workflowPromptProjection.workflowToolSchemaOverride,
 			isContinuationTurn: params.shouldUseContinuationPrompt,
 			focusChainSettings: this.baseConfig.focusChainSettings,
 			browserSettings: this.baseConfig.browserSettings,
@@ -976,6 +980,27 @@ export class SubagentRunner {
 			enableParallelToolCalling: false,
 			isSubagentRun: true,
 		}
+	}
+
+	private appendWorkflowInputPayloadToLatestUserMessage(
+		conversation: ClineStorageMessage[],
+		workflowPromptProjection: WorkflowPromptProjection,
+		turnKind: "full" | "continuation",
+	): void {
+		const payloadBlock =
+			turnKind === "full"
+				? workflowPromptProjection.workflowInputPayloadBlock
+				: workflowPromptProjection.continuationWorkflowInputPayloadBlock
+		if (payloadBlock === undefined) {
+			return
+		}
+
+		const latestUserMessage = [...conversation].reverse().find((message) => message.role === "user")
+		if (latestUserMessage === undefined) {
+			return
+		}
+
+		ensureUserMessageContentArray(latestUserMessage).push(toTextContentBlock(payloadBlock))
 	}
 
 	private getPromptRefreshFrequency(): number {

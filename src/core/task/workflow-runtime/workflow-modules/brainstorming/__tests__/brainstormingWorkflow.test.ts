@@ -12,6 +12,12 @@ import type {
 } from "../../../types"
 import { buildBrainstormingDocumentFromSession } from "../brainstormingDocument"
 import { BRAINSTORMING_TECHNIQUES } from "../brainstormingTechniqueRegistry"
+import {
+	buildBrainstormingStep1ToolSchemas,
+	buildBrainstormingStep2ToolSchemas,
+	buildBrainstormingStep3ToolSchemas,
+	buildBrainstormingStep4ToolSchemas,
+} from "../brainstormingToolSchemas"
 import { brainstormingWorkflowDefinition } from "../brainstormingWorkflow"
 
 const OUTPUT_FILE = "/tmp/brainstorming-project/discovery/brainstorming.md"
@@ -71,12 +77,32 @@ function expectToolNames(toolNames: readonly string[], expectedToolNames: readon
 	expect(toolNames).to.deep.equal(expectedToolNames)
 }
 
+function listRouteActionKinds(step: WorkflowStepDefinition): readonly WorkflowDecisionAction["kind"][] {
+	return Object.values(step.decisionTree.branches).flatMap((branch) => branch.routes.map((route) => route.action.kind))
+}
+
 describe("brainstormingWorkflowDefinition", () => {
 	it("declares workflow identity, checklist labels, value inventory, entry project keys, and artifact mapping", () => {
 		expect(brainstormingWorkflowDefinition.name).to.equal("brainstorming")
+		expect(brainstormingWorkflowDefinition.displayName).to.equal("Brainstorming")
+		expect(brainstormingWorkflowDefinition.description).to.equal(
+			"This workflow guides an interactive brainstorming session, captures the session topic and goals, helps resolve an appropriate brainstorming technique, records generated ideas, and writes the session output to brainstorming.md.",
+		)
 		expect(brainstormingWorkflowDefinition.slashCommandName).to.equal("brainstorming")
 		expect(brainstormingWorkflowDefinition.useSkillName).to.equal("brainstorming")
-		expect(brainstormingWorkflowDefinition.persona).to.equal("analyst")
+		expect(brainstormingWorkflowDefinition.persona).to.deep.equal({
+			name: "Mary",
+			role: "Analyst",
+			identity:
+				"Mary is an insightful analyst who helps turn messy ideas into clear options through brainstorming, market research, competitive analysis, and requirements elicitation.",
+			capabilities: ["brainstorming", "ideation", "market research", "competitive analysis", "requirements elicitation"],
+			communicationStyle: "Curious, precise, evidence-driven, and discovery-oriented.",
+			principles: [
+				"Use structured analysis such as Porter's Five Forces, SWOT, root-cause analysis, brainstorming methods, and competitive intelligence to uncover what matters.",
+			],
+		})
+		expect(brainstormingWorkflowDefinition.persona.name).to.equal("Mary")
+		expect(brainstormingWorkflowDefinition.persona).not.to.equal("analyst")
 		expect(brainstormingWorkflowDefinition.projectSubfolder).to.equal("discovery")
 		expect(Object.values(brainstormingWorkflowDefinition.steps).map((step) => step.checklistLabel)).to.deep.equal([
 			"Gather Inputs",
@@ -117,6 +143,7 @@ describe("brainstormingWorkflowDefinition", () => {
 		expect(brainstormingWorkflowDefinition.entryPanel.promptMarkdown).to.include(
 			"guides an interactive brainstorming session",
 		)
+		expect(brainstormingWorkflowDefinition.entryPanel.promptMarkdown).to.equal(brainstormingWorkflowDefinition.description)
 		const artifact = brainstormingWorkflowDefinition.artifacts?.brainstorming_session
 		expect(artifact).to.deep.equal({
 			id: "brainstorming_session",
@@ -139,6 +166,9 @@ describe("brainstormingWorkflowDefinition", () => {
 	})
 
 	it("defines the Step 1 setup form and ordered artifact/form/document pipeline", () => {
+		const step1 = brainstormingWorkflowDefinition.steps["step-1"]
+		expect(step1.buildToolSchema).to.equal(buildBrainstormingStep1ToolSchemas)
+
 		const setupForm = brainstormingWorkflowDefinition.workflowForms?.["step-1-setup-form"]
 		expect(setupForm?.firstPanelId).to.equal("step-1-context-panel")
 		expect(Object.keys(setupForm?.panels ?? {})).to.deep.equal([
@@ -201,6 +231,9 @@ describe("brainstormingWorkflowDefinition", () => {
 	})
 
 	it("defines one Step 2 approach form with choose panels and the random confirmation interpolation panel", () => {
+		const step2 = brainstormingWorkflowDefinition.steps["step-2"]
+		expect(step2.buildToolSchema).to.equal(buildBrainstormingStep2ToolSchemas)
+
 		const workflowForms = brainstormingWorkflowDefinition.workflowForms ?? {}
 		const forbiddenRandomConfirmationFormId = ["step-2-random", "confirmation-form"].join("-")
 		expect(Object.keys(workflowForms)).not.to.include(forbiddenRandomConfirmationFormId)
@@ -254,6 +287,14 @@ describe("brainstormingWorkflowDefinition", () => {
 		)
 		expect(randomPanel?.fields[0]?.workflowValueKey).to.equal("random_technique_confirmation")
 		expect(randomPanel?.fields[0]?.options?.map((option) => option.value)).to.deep.equal(["confirm", "retry"])
+	})
+
+	it("keeps Step 1 and Step 2 decision trees out of project_prompt routing", () => {
+		const step1ActionKinds = listRouteActionKinds(brainstormingWorkflowDefinition.steps["step-1"])
+		const step2ActionKinds = listRouteActionKinds(brainstormingWorkflowDefinition.steps["step-2"])
+
+		expect(step1ActionKinds).not.to.include("project_prompt")
+		expect(step2ActionKinds).not.to.include("project_prompt")
 	})
 
 	it("keeps random confirmation inside the Step 2 approach form route", () => {
@@ -427,23 +468,28 @@ describe("brainstormingWorkflowDefinition", () => {
 
 	it("builds Step 3 prompt and tool variants and routes workflow progress decisions", () => {
 		const step3 = brainstormingWorkflowDefinition.steps["step-3"]
-		const suggestPrompt = step3.buildPromptSource(
+		expect(step3.buildToolSchema).to.equal(buildBrainstormingStep3ToolSchemas)
+		const suggestPromptSource = step3.buildPromptSource(
 			createPromptInput(step3, {
 				selected_approach: "I want you to suggest a technique",
 				output_file: OUTPUT_FILE,
 			}),
-		).currentStepInstructions
+		)
+		expect(suggestPromptSource).to.not.have.property("workflowSystemInstructions")
+		const suggestPrompt = suggestPromptSource.currentStepInstructions
 		expect(suggestPrompt).to.include(`Read \`${OUTPUT_FILE}\`.`)
 		expect(suggestPrompt).to.include("Call `get_brainstorming_methods`")
 		expect(suggestPrompt).to.include("Do not call `set_workflow_values` for `selected_techniques`.")
 		expect(suggestPrompt).to.include("Once the user indicates they're ready")
 
-		const choosePrompt = step3.buildPromptSource(
+		const choosePromptSource = step3.buildPromptSource(
 			createPromptInput(step3, {
 				selected_approach: "I want to choose",
 				output_file: OUTPUT_FILE,
 			}),
-		).currentStepInstructions
+		)
+		expect(choosePromptSource).to.not.have.property("workflowSystemInstructions")
+		const choosePrompt = choosePromptSource.currentStepInstructions
 		expect(choosePrompt).to.include(`Read \`${OUTPUT_FILE}\`.`)
 		expect(choosePrompt).to.include(
 			`Use the already selected brainstorming technique recorded in \`${OUTPUT_FILE}\`. Do not call \`get_brainstorming_methods\`.`,
@@ -485,11 +531,14 @@ describe("brainstormingWorkflowDefinition", () => {
 
 	it("builds Step 4 prompt and exposes only document build plus final delivery tools", () => {
 		const step4 = brainstormingWorkflowDefinition.steps["step-4"]
-		const prompt = step4.buildPromptSource(
+		expect(step4.buildToolSchema).to.equal(buildBrainstormingStep4ToolSchemas)
+		const promptSource = step4.buildPromptSource(
 			createPromptInput(step4, {
 				output_file: OUTPUT_FILE,
 			}),
-		).currentStepInstructions
+		)
+		expect(promptSource).to.not.have.property("workflowSystemInstructions")
+		const prompt = promptSource.currentStepInstructions
 		expect(prompt).to.include("Review the captured ideas, cluster them into themes")
 		expect(prompt).to.include("Do not extend into solutioning during this workflow.")
 		expect(prompt).to.include("create architecture")

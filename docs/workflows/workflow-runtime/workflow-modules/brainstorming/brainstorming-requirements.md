@@ -290,6 +290,18 @@ Step 4 completion requires successful final delivery through `attempt_completion
 
 Step prompts must be module-owned prompt builders. Shared workflow tool handlers live outside workflow modules, but brainstorming module definitions must own when those tools are invoked or exposed for this workflow.
 
+The brainstorming module's canonical tool-schema file is `brainstormingToolSchemas.ts`.
+
+`brainstormingWorkflow.ts` must not define inline tool schemas. Every `buildToolSchema(...)` assignment in the brainstorming workflow definition must delegate directly to an exported builder from `brainstormingToolSchemas.ts`.
+
+`brainstormingToolSchemas.ts` must own the complete model-visible tool schema for each model-facing brainstorming step and variant, including Step 3 choose, Step 3 random, Step 3 suggest, and Step 4.
+
+Step 3 choose/random schemas must expose exactly `build_workflow_document`, `set_workflow_values` for `techniques_used` and `ideas_generated`, and `workflow_progress_request`.
+
+Step 3 suggest schema must expose exactly `get_brainstorming_methods`, `append_brainstorming_selected_technique`, `build_workflow_document`, and `workflow_progress_request`.
+
+Step 4 schema must expose exactly `build_workflow_document` and `attempt_completion`.
+
 `set_workflow_values`, `create_workflow_artifact`, `build_workflow_document`, `workflow_progress_request`, `get_brainstorming_methods`, and `append_brainstorming_selected_technique` may be exposed only through module-owned per-step tool schema when needed.
 
 The implementation must add an AI-callable `get_brainstorming_methods` tool backed by the module-owned brainstorming technique registry.

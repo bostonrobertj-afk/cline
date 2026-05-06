@@ -16,9 +16,18 @@ function createResolvedWorkflow(
 ): WorkflowDefinition {
 	return {
 		name: args?.name ?? "quick-spec",
+		displayName: "Quick Spec",
+		description: "Create a quick planning spec.",
 		slashCommandName: args?.slashCommandName ?? "quick-spec",
 		useSkillName: args?.useSkillName ?? "quick-spec",
-		persona: "engineer",
+		persona: {
+			name: "Spec Engineer",
+			role: "Planning engineer",
+			identity: "A focused workflow persona for drafting compact implementation plans.",
+			capabilities: ["scope clarification", "implementation planning"],
+			communicationStyle: "Concise and practical.",
+			principles: ["Keep plans actionable", "Preserve workflow contracts"],
+		},
 		projectSubfolder: "planning",
 		workflowValueKeys: Object.values(ENTRY_PROJECT_VALUE_KEYS),
 		entryProjectValueKeys: ENTRY_PROJECT_VALUE_KEYS,

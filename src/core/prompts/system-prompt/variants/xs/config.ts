@@ -29,7 +29,6 @@ export const config = createVariant(ModelFamily.XS)
 	})
 	.template(baseTemplate)
 	.components(
-		SystemPromptSection.WORKFLOW_SYSTEM_INSTRUCTIONS,
 		SystemPromptSection.TOOL_USE,
 		SystemPromptSection.RULES,
 		SystemPromptSection.ACT_VS_PLAN,
@@ -37,7 +36,6 @@ export const config = createVariant(ModelFamily.XS)
 		SystemPromptSection.EDITING_FILES,
 		SystemPromptSection.OBJECTIVE,
 		SystemPromptSection.SYSTEM_INFO,
-		SystemPromptSection.WORKFLOW_INPUT,
 		SystemPromptSection.USER_INSTRUCTIONS,
 		SystemPromptSection.SKILLS,
 	)

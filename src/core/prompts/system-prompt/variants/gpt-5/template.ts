@@ -1,4 +1,3 @@
-import { getAgentFeedbackPromptGuidanceLine } from "../../components/agent_feedback"
 import { getCodeExplorationGuidance, hasEnabledMcpServers } from "../../components/mcp"
 import { getResponseToolsSection } from "../../components/response_tools"
 import { SystemPromptSection } from "../../templates/placeholders"
@@ -7,8 +6,7 @@ import type { SystemPromptContext } from "../../types"
 /**
  * Base template for GPT-5 variant with structured sections
  */
-export const BASE = `{{${SystemPromptSection.WORKFLOW_SYSTEM_INSTRUCTIONS}}}
-{{${SystemPromptSection.TOOL_USE}}}
+export const BASE = `{{${SystemPromptSection.TOOL_USE}}}
 ====
 {{${SystemPromptSection.MCP}}}
 ====
@@ -26,8 +24,6 @@ export const BASE = `{{${SystemPromptSection.WORKFLOW_SYSTEM_INSTRUCTIONS}}}
 ====
 {{${SystemPromptSection.OBJECTIVE}}}
 ====
-{{${SystemPromptSection.WORKFLOW_INPUT}}}
-====
 {{${SystemPromptSection.USER_INSTRUCTIONS}}}`
 
 const ACT_VS_PLAN = (_context: SystemPromptContext) => `ACT MODE V.S. PLAN MODE
@@ -42,7 +38,6 @@ You have access to a set of tools that are executed upon the user's approval. Yo
 - Use list_files when you need directory structure beyond the current visible-file context.
 
 ${getResponseToolsSection(context)}
-${getAgentFeedbackPromptGuidanceLine()}
 
 {{TOOL_USE_FORMATTING_SECTION}}
 

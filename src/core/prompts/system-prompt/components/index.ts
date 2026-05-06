@@ -11,8 +11,6 @@ import { getSkillsSection } from "./skills"
 import { getSystemInfo } from "./system_info"
 import { getToolUseSection } from "./tool_use"
 import { getUserInstructions } from "./user_instructions"
-import { getWorkflowInputSection } from "./workflow_input"
-import { getWorkflowSystemInstructionsSection } from "./workflow_system_instructions"
 
 /**
  * Registers all tool variants with the ClineToolSet provider.
@@ -21,10 +19,6 @@ import { getWorkflowSystemInstructionsSection } from "./workflow_system_instruct
  */
 export function getSystemPromptComponents() {
 	return [
-		{
-			id: SystemPromptSection.WORKFLOW_SYSTEM_INSTRUCTIONS,
-			fn: getWorkflowSystemInstructionsSection,
-		},
 		{ id: SystemPromptSection.CONTINUATION_TURN, fn: getContinuationTurnSection },
 		{ id: SystemPromptSection.SYSTEM_INFO, fn: getSystemInfo },
 		{ id: SystemPromptSection.MCP, fn: getMcp },
@@ -52,6 +46,5 @@ export function getSystemPromptComponents() {
 			id: SystemPromptSection.FEEDBACK,
 			fn: getFeedbackSection,
 		},
-		{ id: SystemPromptSection.WORKFLOW_INPUT, fn: getWorkflowInputSection },
 	]
 }

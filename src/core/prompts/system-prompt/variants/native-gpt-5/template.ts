@@ -1,4 +1,3 @@
-import { getAgentFeedbackPromptGuidanceLine } from "../../components/agent_feedback"
 import { getResponseToolsSection } from "../../components/response_tools"
 import { SystemPromptSection } from "../../templates/placeholders"
 import type { SystemPromptContext } from "../../types"
@@ -6,9 +5,7 @@ import type { SystemPromptContext } from "../../types"
 /**
  * Base template for GPT-5 variant with structured sections
  */
-export const BASE = `{{${SystemPromptSection.WORKFLOW_SYSTEM_INSTRUCTIONS}}}
-====
-{{${SystemPromptSection.TOOL_USE}}}
+export const BASE = `{{${SystemPromptSection.TOOL_USE}}}
 ====
 {{${SystemPromptSection.MCP}}}
 ====
@@ -23,8 +20,6 @@ export const BASE = `{{${SystemPromptSection.WORKFLOW_SYSTEM_INSTRUCTIONS}}}
 {{${SystemPromptSection.SYSTEM_INFO}}}
 ====
 {{${SystemPromptSection.OBJECTIVE}}}
-====
-{{${SystemPromptSection.WORKFLOW_INPUT}}}
 ====
 {{${SystemPromptSection.USER_INSTRUCTIONS}}}`
 
@@ -42,7 +37,6 @@ Use these tools in one response when they are not dependent on one another; if u
 - environment_details provides runtime context
 - Use list_files when you need directory structure
 - For native tool calls, treat the tool schema as the source of truth for canonical parameter names, required fields, and argument shape. Match the schema exactly.
-${getAgentFeedbackPromptGuidanceLine()}
 
 ${getResponseToolsSection(_context)}`
 

@@ -32,7 +32,6 @@ import { isGPT5ModelFamily } from "@/utils/model-utils"
 import { getSystemPrompt, PromptRegistry } from "../index"
 import type { ClineToolSpec } from "../spec"
 import type { SystemPromptContext } from "../types"
-import { AGENT_FEEDBACK_PROMPT_GUIDANCE } from "../types"
 
 // ============================================================================
 // Configuration
@@ -42,6 +41,8 @@ const UPDATE_SNAPSHOTS = process.argv.includes("--update-snapshots") || process.
 const SNAPSHOTS_DIR = path.join(__dirname, "__snapshots__")
 const TEST_TIMEOUT = 30000
 const MAX_DIFF_LINES = 10
+const STALE_AGENT_FEEDBACK_PROMPT_TEXT =
+	"- If you hit a meaningful blocker, material ambiguity, or unstable behavior that affects correctness or progress, include `agent_feedback` on your response tool call with a concise description of the issue."
 
 // ============================================================================
 // Snapshot Helpers
@@ -152,10 +153,6 @@ function normalizePromptSnapshotSurface(content: string): string {
 
 		if (line === "## access_mcp_resource") {
 			inAccessMcpResourceToolSection = true
-			continue
-		}
-
-		if (line === AGENT_FEEDBACK_PROMPT_GUIDANCE) {
 			continue
 		}
 
@@ -650,7 +647,7 @@ describe("Prompt System Integration Tests", () => {
 			)
 		})
 
-		it("includes the shared agent_feedback guidance in continuation-turn prompts", async function () {
+		it("omits stale agent_feedback guidance in continuation-turn prompts", async function () {
 			await runPromptTest(
 				this,
 				{
@@ -660,7 +657,7 @@ describe("Prompt System Integration Tests", () => {
 				},
 				"fast",
 				async ({ systemPrompt }) => {
-					expect(systemPrompt).to.include(AGENT_FEEDBACK_PROMPT_GUIDANCE)
+					expect(systemPrompt).to.not.include(STALE_AGENT_FEEDBACK_PROMPT_TEXT)
 				},
 			)
 		})
@@ -883,6 +880,28 @@ describe("Prompt System Integration Tests", () => {
 			)
 		})
 
+		it("renders response tools from workflow-projected native tool schema overrides", async function () {
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: makeProviderInfo("gpt-5-1", "openai"),
+					enableNativeToolCalls: true,
+					useMinimalGptPrompt: true,
+					workflowToolSchemaOverride: genericWorkflowOverrideToolSpecs,
+				},
+				"gpt-5-1",
+				async ({ systemPrompt }) => {
+					expect(systemPrompt).to.include("RESPONSE TOOLS")
+					expectResponseToolNames(
+						systemPrompt,
+						["`attempt_completion`", "`ask_followup_question`", "`send_user_message`"],
+						["`generate_plan_output`", "`workflow_progress_request`"],
+					)
+				},
+			)
+		})
+
 		it("uses the workflow-projected schema as the exact native tool surface", async function () {
 			await runPromptTest(
 				this,
@@ -914,9 +933,9 @@ describe("Prompt System Integration Tests", () => {
 
 				expect(nativeToolNames).to.include("get_brainstorming_methods")
 				expect(nativeToolNames).to.include("append_brainstorming_selected_technique")
-				expect(systemPrompt).to.include("Workflow: brainstorming")
-				expect(systemPrompt).to.include("Call `get_brainstorming_methods`")
-				expect(systemPrompt).to.include("call `append_brainstorming_selected_technique`")
+				expect(systemPrompt).to.not.include("Workflow: brainstorming")
+				expect(systemPrompt).to.not.include("Call `get_brainstorming_methods`")
+				expect(systemPrompt).to.not.include("call `append_brainstorming_selected_technique`")
 			})
 		})
 
@@ -958,8 +977,8 @@ describe("Prompt System Integration Tests", () => {
 				expect(nativeToolNames).to.include("build_workflow_document")
 				expect(nativeToolNames).to.include("attempt_completion")
 				expect(nativeToolNames).to.not.include("workflow_progress_request")
-				expect(systemPrompt).to.include("Workflow: brainstorming")
-				expect(systemPrompt).to.include("using `attempt_completion`")
+				expect(systemPrompt).to.not.include("Workflow: brainstorming")
+				expect(systemPrompt).to.not.include("using `attempt_completion`")
 				expect(systemPrompt).to.not.include("workflow_progress_request")
 			})
 		})
@@ -1097,7 +1116,7 @@ describe("Prompt System Integration Tests", () => {
 			)
 		})
 
-		it("includes the shared agent_feedback guidance in a normal tool-use prompt", async function () {
+		it("omits stale agent_feedback guidance in a normal tool-use prompt", async function () {
 			await runPromptTest(
 				this,
 				{
@@ -1107,12 +1126,12 @@ describe("Prompt System Integration Tests", () => {
 				},
 				"gpt-3",
 				async ({ systemPrompt }) => {
-					expect(systemPrompt).to.include(AGENT_FEEDBACK_PROMPT_GUIDANCE)
+					expect(systemPrompt).to.not.include(STALE_AGENT_FEEDBACK_PROMPT_TEXT)
 				},
 			)
 		})
 
-		it("includes the shared agent_feedback guidance in the GPT-5 tool-use prompt", async function () {
+		it("omits stale agent_feedback guidance in the GPT-5 tool-use prompt", async function () {
 			this.timeout(TEST_TIMEOUT)
 
 			const systemPrompt = await PromptRegistry.getInstance().get({
@@ -1121,10 +1140,10 @@ describe("Prompt System Integration Tests", () => {
 				enableNativeToolCalls: false,
 			})
 
-			expect(systemPrompt).to.include(AGENT_FEEDBACK_PROMPT_GUIDANCE)
+			expect(systemPrompt).to.not.include(STALE_AGENT_FEEDBACK_PROMPT_TEXT)
 		})
 
-		it("includes the shared agent_feedback guidance in the Hermes tool-use prompt", async function () {
+		it("omits stale agent_feedback guidance in the Hermes tool-use prompt", async function () {
 			this.timeout(TEST_TIMEOUT)
 
 			const systemPrompt = await PromptRegistry.getInstance().get({
@@ -1133,7 +1152,7 @@ describe("Prompt System Integration Tests", () => {
 				enableNativeToolCalls: false,
 			})
 
-			expect(systemPrompt).to.include(AGENT_FEEDBACK_PROMPT_GUIDANCE)
+			expect(systemPrompt).to.not.include(STALE_AGENT_FEEDBACK_PROMPT_TEXT)
 		})
 
 		it("keeps native response-tool specs aligned with the shared response-tool contract", async function () {
@@ -1183,7 +1202,7 @@ describe("Prompt System Integration Tests", () => {
 				},
 			)
 		})
-		it("renders first-turn runtime-projected workflow persona, system, and input blocks in GPT-5.4 OpenAI full prompts", async function () {
+		it("omits workflow placeholder output from full prompts while applying workflow tool overrides", async function () {
 			await runPromptTest(
 				this,
 				{
@@ -1191,45 +1210,19 @@ describe("Prompt System Integration Tests", () => {
 					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
 					enableNativeToolCalls: true,
 					useMinimalGptPrompt: true,
-					fullTurnWorkflowSystemInstructionsBlock:
-						"## WORKFLOW\nWorkflow: review-workflow\n\n## WORKFLOW PERSONA\nReview Workflow\n\n## WORKFLOW INSTRUCTIONS\nReview carefully",
-					fullTurnWorkflowInputInstructionsBlock: "# CURRENT WORKFLOW STEP\nStep 1: Gather Context",
+					workflowToolSchemaOverride: workflowProgressOnlyToolSpecs,
 				},
 				"gpt-5.4-2026-03-05",
-				async ({ systemPrompt }) => {
-					expect(systemPrompt).to.include("## WORKFLOW PERSONA\nReview Workflow")
-					expect(systemPrompt).to.include("## WORKFLOW INSTRUCTIONS\nReview carefully")
-					expect(systemPrompt).to.include("# CURRENT WORKFLOW STEP\nStep 1: Gather Context")
-					expect(systemPrompt).to.not.include("<agent")
-					expect(systemPrompt).to.not.include("<persona")
-					expect(systemPrompt).to.not.include("Active BMAD agent persona")
+				async ({ systemPrompt, tools }) => {
+					expect(getNativeToolNames(tools)).to.deep.equal(["workflow_progress_request"])
+					expect(systemPrompt).to.not.include("{{WORKFLOW")
+					expect(systemPrompt).to.not.include("## WORKFLOW")
+					expect(systemPrompt).to.not.include("# CURRENT WORKFLOW STEP")
 				},
 			)
 		})
 
-		it("omits workflow persona on later full-turn refresh projections", async function () {
-			await runPromptTest(
-				this,
-				{
-					...baseContext,
-					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
-					enableNativeToolCalls: true,
-					useMinimalGptPrompt: true,
-					fullTurnWorkflowSystemInstructionsBlock:
-						"## WORKFLOW\nWorkflow: review-workflow\n\n## WORKFLOW INSTRUCTIONS\nReview carefully",
-					fullTurnWorkflowInputInstructionsBlock: "# CURRENT WORKFLOW STEP\nStep 1: Gather Context",
-				},
-				"gpt-5.4-2026-03-05",
-				async ({ systemPrompt }) => {
-					expect(systemPrompt).to.include("## WORKFLOW\nWorkflow: review-workflow")
-					expect(systemPrompt).to.include("## WORKFLOW INSTRUCTIONS\nReview carefully")
-					expect(systemPrompt).to.not.include("## WORKFLOW PERSONA")
-					expect(systemPrompt).to.not.include("Role: Review Workflow")
-				},
-			)
-		})
-
-		it("renders continuation-turn workflow blocks when both projected blocks are present", async function () {
+		it("omits workflow placeholder output from continuation prompts", async function () {
 			await runPromptTest(
 				this,
 				{
@@ -1238,61 +1231,12 @@ describe("Prompt System Integration Tests", () => {
 					enableNativeToolCalls: true,
 					useMinimalGptPrompt: true,
 					isContinuationTurn: true,
-					fullTurnWorkflowSystemInstructionsBlock: "## FULL WORKFLOW IDENTITY\nRole: Review Workflow",
-					fullTurnWorkflowInputInstructionsBlock: "# FULL CURRENT WORKFLOW STEP\nStep 1: Gather Context",
-					continuationTurnWorkflowSystemInstructionsBlock: "## WORKFLOW CONTINUATION IDENTITY\nRole: Review Workflow",
-					continuationTurnWorkflowInputInstructionsBlock: "# WORKFLOW CONTINUATION\nStep 1 in progress",
 				},
 				"gpt-5.4-2026-03-05",
 				async ({ systemPrompt }) => {
 					expect(systemPrompt).to.include("CONTINUATION TURN")
-					expect(systemPrompt).to.include("## WORKFLOW CONTINUATION IDENTITY\nRole: Review Workflow")
-					expect(systemPrompt).to.include("# WORKFLOW CONTINUATION\nStep 1 in progress")
-					expect(systemPrompt).to.not.include("## FULL WORKFLOW IDENTITY")
-					expect(systemPrompt).to.not.include("# FULL CURRENT WORKFLOW STEP")
-				},
-			)
-		})
-
-		it("omits the workflow system block on continuation turns when only the workflow input block is projected", async function () {
-			await runPromptTest(
-				this,
-				{
-					...baseContext,
-					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
-					enableNativeToolCalls: true,
-					useMinimalGptPrompt: true,
-					isContinuationTurn: true,
-					continuationTurnWorkflowSystemInstructionsBlock: undefined,
-					continuationTurnWorkflowInputInstructionsBlock: "# WORKFLOW CONTINUATION\nStep 2: Review",
-				},
-				"gpt-5.4-2026-03-05",
-				async ({ systemPrompt }) => {
-					expect(systemPrompt).to.include("CONTINUATION TURN")
-					expect(systemPrompt).to.include("# WORKFLOW CONTINUATION")
-					expect(systemPrompt).to.include("Step 2: Review")
-					expect(systemPrompt).to.not.include("## WORKFLOW IDENTITY")
-				},
-			)
-		})
-
-		it("omits the workflow input block on continuation turns when only the workflow system block is projected", async function () {
-			await runPromptTest(
-				this,
-				{
-					...baseContext,
-					providerInfo: makeProviderInfo("gpt-5.4-2026-03-05", "openai"),
-					enableNativeToolCalls: true,
-					useMinimalGptPrompt: true,
-					isContinuationTurn: true,
-					continuationTurnWorkflowSystemInstructionsBlock: "## WORKFLOW IDENTITY\nRole: Review Workflow",
-					continuationTurnWorkflowInputInstructionsBlock: undefined,
-				},
-				"gpt-5.4-2026-03-05",
-				async ({ systemPrompt }) => {
-					expect(systemPrompt).to.include("CONTINUATION TURN")
-					expect(systemPrompt).to.include("## WORKFLOW IDENTITY")
-					expect(systemPrompt).to.include("Role: Review Workflow")
+					expect(systemPrompt).to.not.include("{{WORKFLOW")
+					expect(systemPrompt).to.not.include("## WORKFLOW")
 					expect(systemPrompt).to.not.include("# CURRENT WORKFLOW STEP")
 				},
 			)

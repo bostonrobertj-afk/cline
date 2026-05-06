@@ -22,6 +22,7 @@ import type {
 	WorkflowDecisionTree,
 	WorkflowDefinition,
 	WorkflowNextAction,
+	WorkflowPromptProjection,
 	WorkflowWorkspacePathPolicy,
 } from "@/core/task/workflow-runtime/types"
 import { WorkflowNextActionConsumer } from "@/core/task/workflow-runtime/WorkflowNextActionConsumer"
@@ -52,17 +53,14 @@ type PromptContextArgs = {
 	nativeToolCallsRequested: boolean
 	shouldSendFullPromptAssembly: boolean
 	shouldUseContinuationPrompt: boolean
+	workflowPromptProjection: WorkflowPromptProjection
 }
 
 type PromptContextResult = {
 	mcpHub?: unknown
 	activeWorkflowName?: string
 	activeWorkflowStepNumber?: number
-	fullTurnWorkflowSystemInstructionsBlock?: string
-	fullTurnWorkflowInputInstructionsBlock?: string
 	workflowToolSchemaOverride?: readonly ClineToolSpec[]
-	continuationTurnWorkflowSystemInstructionsBlock?: string
-	continuationTurnWorkflowInputInstructionsBlock?: string
 	skills?: Array<{ name: string }>
 	isContinuationTurn?: boolean
 	enableNativeToolCalls?: boolean
@@ -179,6 +177,14 @@ function getInitialUserText(conversation: unknown): string {
 function createAllowAllWorkspacePathPolicy(): WorkflowWorkspacePathPolicy {
 	return {
 		validateAccess: () => true,
+	}
+}
+
+function createEmptyWorkflowPromptProjection(): WorkflowPromptProjection {
+	return {
+		workflowInputPayloadBlock: undefined,
+		continuationWorkflowInputPayloadBlock: undefined,
+		workflowToolSchemaOverride: undefined,
 	}
 }
 
@@ -372,7 +378,6 @@ function createResolvedWorkflow(args?: {
 	useSkillName?: string
 	stepOneChecklistLabel?: string
 	stepTwoChecklistLabel?: string
-	workflowSystemInstructions?: string
 	currentStepInstructions?: string
 	workflowToolSchemaOverride?: readonly ClineToolSpec[]
 	workflowValueKeys?: readonly string[]
@@ -400,7 +405,6 @@ function createResolvedWorkflow(args?: {
 			stepNumber: 1,
 			checklistLabel: args?.stepOneChecklistLabel ?? "Step 1: Gather Context",
 			buildPromptSource: () => ({
-				workflowSystemInstructions: args?.workflowSystemInstructions,
 				currentStepInstructions: args?.currentStepInstructions,
 			}),
 			buildToolSchema: () => args?.workflowToolSchemaOverride ?? [],
@@ -413,7 +417,6 @@ function createResolvedWorkflow(args?: {
 			stepNumber: 2,
 			checklistLabel: args.stepTwoChecklistLabel,
 			buildPromptSource: () => ({
-				workflowSystemInstructions: args?.workflowSystemInstructions,
 				currentStepInstructions: args?.currentStepInstructions,
 			}),
 			buildToolSchema: () => args?.workflowToolSchemaOverride ?? [],
@@ -422,9 +425,18 @@ function createResolvedWorkflow(args?: {
 	}
 	return {
 		name: args?.name ?? "review-workflow",
+		displayName: "Review Workflow",
+		description: "A review workflow used by subagent tests.",
 		slashCommandName: args?.name ?? "review-workflow",
 		useSkillName: args?.useSkillName ?? "review-workflow",
-		persona: "engineer",
+		persona: {
+			name: "Rhea",
+			role: "Reviewer",
+			identity: "Rhea reviews focused work bundles for correctness and clarity.",
+			capabilities: ["review", "verification"],
+			communicationStyle: "Concise and evidence-oriented.",
+			principles: ["Keep review findings grounded in observable behavior."],
+		},
 		projectSubfolder: "review",
 		workflowValueKeys: [...Object.values(ENTRY_PROJECT_VALUE_KEYS), ...(args?.workflowValueKeys ?? [])],
 		entryProjectValueKeys: ENTRY_PROJECT_VALUE_KEYS,
@@ -490,6 +502,7 @@ describe("SubagentRunner", () => {
 			nativeToolCallsRequested: false,
 			shouldSendFullPromptAssembly: true,
 			shouldUseContinuationPrompt: false,
+			workflowPromptProjection: createEmptyWorkflowPromptProjection(),
 		})
 
 		assert.equal(context.mcpHub, undefined)
@@ -510,6 +523,7 @@ describe("SubagentRunner", () => {
 			nativeToolCallsRequested: false,
 			shouldSendFullPromptAssembly: true,
 			shouldUseContinuationPrompt: false,
+			workflowPromptProjection: createEmptyWorkflowPromptProjection(),
 		})
 
 		assert.equal(context.mcpHub, config.services.mcpHub)
@@ -1781,7 +1795,6 @@ describe("SubagentRunner", () => {
 		const workflow = createResolvedWorkflow({
 			name: "review-workflow",
 			useSkillName: "review-workflow",
-			workflowSystemInstructions: "SYSTEM BLOCK",
 			currentStepInstructions: "INPUT BLOCK",
 			workflowToolSchemaOverride,
 		})
@@ -1791,7 +1804,10 @@ describe("SubagentRunner", () => {
 			taskState: state,
 			workflowName: workflow.name,
 		})
-		const buildTurnProjectionSpy = sinon.spy(config.workflowRuntime, "buildTurnProjection")
+		const workflowPromptProjection = await config.workflowRuntime.buildTurnProjection({
+			taskState: state,
+			isFirstTaskRequest: true,
+		})
 
 		state.apiRequestCount = 1
 		const context = await buildPromptContext.call(runner, {
@@ -1803,27 +1819,11 @@ describe("SubagentRunner", () => {
 			nativeToolCallsRequested: false,
 			shouldSendFullPromptAssembly: true,
 			shouldUseContinuationPrompt: false,
+			workflowPromptProjection,
 		})
 
-		assert.equal(buildTurnProjectionSpy.callCount, 1)
 		assert.equal(context.activeWorkflowName, "review-workflow")
 		assert.equal(context.activeWorkflowStepNumber, 1)
-		assert.equal(
-			context.fullTurnWorkflowSystemInstructionsBlock,
-			"## WORKFLOW\nWorkflow: review-workflow\n\n## WORKFLOW PERSONA\nengineer\n\n## WORKFLOW STEPS\n- [ ] Step 1: Gather Context\n\n## WORKFLOW INSTRUCTIONS\nSYSTEM BLOCK",
-		)
-		assert.equal(
-			context.fullTurnWorkflowInputInstructionsBlock,
-			"## CURRENT STEP\nStep 1: Step 1: Gather Context\n\nINPUT BLOCK",
-		)
-		assert.equal(
-			context.continuationTurnWorkflowSystemInstructionsBlock,
-			"## WORKFLOW\nWorkflow: review-workflow\n\n## WORKFLOW STEPS\n- [ ] Step 1: Gather Context\n\n## WORKFLOW INSTRUCTIONS\nSYSTEM BLOCK",
-		)
-		assert.equal(
-			context.continuationTurnWorkflowInputInstructionsBlock,
-			"## WORKFLOW CONTINUATION\nContinue working on step 1: Step 1: Gather Context.",
-		)
 		assert.deepEqual(context.workflowToolSchemaOverride, workflowToolSchemaOverride)
 		assert.deepEqual(context.skills, [])
 		assert.equal(context.isContinuationTurn, false)
@@ -1832,6 +1832,10 @@ describe("SubagentRunner", () => {
 		assert.equal(context.isSubagentRun, true)
 
 		state.apiRequestCount = 2
+		const refreshWorkflowPromptProjection = await config.workflowRuntime.buildTurnProjection({
+			taskState: state,
+			isFirstTaskRequest: false,
+		})
 		const refreshContext = await buildPromptContext.call(runner, {
 			state,
 			hostIde: "TestIde",
@@ -1841,14 +1845,10 @@ describe("SubagentRunner", () => {
 			nativeToolCallsRequested: false,
 			shouldSendFullPromptAssembly: true,
 			shouldUseContinuationPrompt: false,
+			workflowPromptProjection: refreshWorkflowPromptProjection,
 		})
 
-		assert.equal(
-			refreshContext.fullTurnWorkflowSystemInstructionsBlock,
-			"## WORKFLOW\nWorkflow: review-workflow\n\n## WORKFLOW STEPS\n- [ ] Step 1: Gather Context\n\n## WORKFLOW INSTRUCTIONS\nSYSTEM BLOCK",
-		)
-		assert.equal(buildTurnProjectionSpy.callCount, 2)
-		assert.equal(refreshContext.fullTurnWorkflowSystemInstructionsBlock?.includes("## WORKFLOW PERSONA"), false)
+		assert.deepEqual(refreshContext.workflowToolSchemaOverride, workflowToolSchemaOverride)
 	})
 
 	it("suppresses prompt skills on internal turns while preserving workflow runtime projection", async () => {
@@ -1858,7 +1858,6 @@ describe("SubagentRunner", () => {
 		const workflow = createResolvedWorkflow({
 			name: "review-workflow",
 			useSkillName: "review-workflow",
-			workflowSystemInstructions: "SYSTEM BLOCK",
 			currentStepInstructions: "INPUT BLOCK",
 		})
 		stubResolvedWorkflowByName(workflow)
@@ -1869,6 +1868,10 @@ describe("SubagentRunner", () => {
 		})
 
 		state.apiRequestCount = 1
+		const workflowPromptProjection = await config.workflowRuntime.buildTurnProjection({
+			taskState: state,
+			isFirstTaskRequest: true,
+		})
 		const context = await buildPromptContext.call(runner, {
 			state,
 			hostIde: "TestIde",
@@ -1878,37 +1881,26 @@ describe("SubagentRunner", () => {
 			nativeToolCallsRequested: false,
 			shouldSendFullPromptAssembly: false,
 			shouldUseContinuationPrompt: true,
+			workflowPromptProjection,
 		})
 
 		assert.deepEqual(context.skills, [])
 		assert.equal(context.activeWorkflowName, "review-workflow")
 		assert.equal(context.activeWorkflowStepNumber, 1)
-		assert.equal(
-			context.fullTurnWorkflowSystemInstructionsBlock,
-			"## WORKFLOW\nWorkflow: review-workflow\n\n## WORKFLOW PERSONA\nengineer\n\n## WORKFLOW STEPS\n- [ ] Step 1: Gather Context\n\n## WORKFLOW INSTRUCTIONS\nSYSTEM BLOCK",
-		)
-		assert.equal(
-			context.fullTurnWorkflowInputInstructionsBlock,
-			"## CURRENT STEP\nStep 1: Step 1: Gather Context\n\nINPUT BLOCK",
-		)
-		assert.equal(
-			context.continuationTurnWorkflowSystemInstructionsBlock,
-			"## WORKFLOW\nWorkflow: review-workflow\n\n## WORKFLOW STEPS\n- [ ] Step 1: Gather Context\n\n## WORKFLOW INSTRUCTIONS\nSYSTEM BLOCK",
-		)
-		assert.equal(
-			context.continuationTurnWorkflowInputInstructionsBlock,
-			"## WORKFLOW CONTINUATION\nContinue working on step 1: Step 1: Gather Context.",
-		)
 		assert.equal(context.isContinuationTurn, true)
 		assert.equal(context.isSubagentRun, true)
 	})
 
 	it("auto-activates an explicitly assigned shipped workflow before the first subagent turn", async () => {
-		const createMessage = sinon.stub().callsFake(async function* (_systemPrompt: string, conversation: unknown) {
+		const createMessage = sinon.stub().callsFake(async function* (systemPrompt: string, conversation: unknown) {
 			const initialUserText = getInitialUserText(conversation)
 			assert.doesNotMatch(initialUserText, /use_skill/)
 			assert.doesNotMatch(initialUserText, /skill_name/)
-			assert.doesNotMatch(initialUserText, /review-workflow/)
+			assert.match(initialUserText, /Workflow:\nReview Workflow/)
+			assert.match(initialUserText, /CURRENT STEP DETAILED INSTRUCTIONS/)
+			assert.match(initialUserText, /INPUT BLOCK/)
+			assert.doesNotMatch(systemPrompt, /INPUT BLOCK/)
+			assert.doesNotMatch(systemPrompt, /Review Workflow/)
 			yield {
 				type: "tool_calls",
 				tool_call: {
@@ -1924,7 +1916,6 @@ describe("SubagentRunner", () => {
 		const workflow = createResolvedWorkflow({
 			name: "review-workflow",
 			useSkillName: "review-workflow",
-			workflowSystemInstructions: "SYSTEM BLOCK",
 			currentStepInstructions: "INPUT BLOCK",
 		})
 		sinon.stub(WorkflowRegistry, "resolveWorkflowByUseSkillName").returns(workflow)
@@ -1934,14 +1925,6 @@ describe("SubagentRunner", () => {
 		const promptRegistryGetStub = sinon.stub(promptRegistry, "get").callsFake(async (context) => {
 			assert.equal(context.activeWorkflowName, "review-workflow")
 			assert.equal(context.activeWorkflowStepNumber, 1)
-			assert.equal(
-				context.fullTurnWorkflowSystemInstructionsBlock,
-				"## WORKFLOW\nWorkflow: review-workflow\n\n## WORKFLOW PERSONA\nengineer\n\n## WORKFLOW STEPS\n- [ ] Step 1: Gather Context\n\n## WORKFLOW INSTRUCTIONS\nSYSTEM BLOCK",
-			)
-			assert.equal(
-				context.fullTurnWorkflowInputInstructionsBlock,
-				"## CURRENT STEP\nStep 1: Step 1: Gather Context\n\nINPUT BLOCK",
-			)
 			assert.equal(context.isSubagentRun, true)
 			promptRegistry.nativeTools = undefined
 			return "system prompt"

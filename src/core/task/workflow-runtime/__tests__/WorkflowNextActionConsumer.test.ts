@@ -166,7 +166,14 @@ describe("WorkflowNextActionConsumer", () => {
 	})
 
 	it("persists project_prompt before returning", async () => {
-		await consumer.consume({ kind: "project_prompt", promptProjection: {} })
+		await consumer.consume({
+			kind: "project_prompt",
+			promptProjection: {
+				workflowInputPayloadBlock: undefined,
+				continuationWorkflowInputPayloadBlock: undefined,
+				workflowToolSchemaOverride: undefined,
+			},
+		})
 
 		sinon.assert.calledOnce(adapter.persistWorkflowRuntimeMetadata)
 	})

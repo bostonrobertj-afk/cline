@@ -88,7 +88,7 @@ import type { TaskMetadata } from "@/core/context/context-tracking/ContextTracke
 import type { SystemPromptContext } from "@/core/prompts/system-prompt"
 import { getSystemPrompt } from "@/core/prompts/system-prompt"
 import type { WorkflowFormSessionState } from "@/core/task/workflow-form/types"
-import type { WorkflowNextAction } from "@/core/task/workflow-runtime/types"
+import type { WorkflowNextAction, WorkflowPromptProjection } from "@/core/task/workflow-runtime/types"
 import { WorkflowNextActionConsumer } from "@/core/task/workflow-runtime/WorkflowNextActionConsumer"
 import { WorkflowRuntime } from "@/core/task/workflow-runtime/WorkflowRuntime"
 import { HostProvider } from "@/hosts/host-provider"
@@ -680,6 +680,8 @@ export class Task {
 	private currentRequestHasHumanAuthoredInput = false
 	private currentRequestShouldSendFullPromptAssembly = true
 	private currentRequestPromptInjectionBlocks: ClineTextContentBlock[] = []
+	private currentRequestWorkflowPromptProjection: WorkflowPromptProjection | undefined
+	private currentRequestWorkflowInputPayloadBlock: string | undefined
 	private workflowFormSubmissionNextActionResolvers = new Map<string, (nextAction: WorkflowNextAction | undefined) => void>()
 	private workflowRuntimeToolCallSequence = 0
 
@@ -2695,7 +2697,11 @@ export class Task {
 		return { model, providerId, customPrompt, mode }
 	}
 
-	private async writePromptMetadataArtifacts(params: { systemPrompt: string; providerInfo: ApiProviderInfo }): Promise<void> {
+	private async writePromptMetadataArtifacts(params: {
+		systemPrompt: string
+		providerInfo: ApiProviderInfo
+		workflowInputPayloadBlock: string | undefined
+	}): Promise<void> {
 		const enabledFlag = process.env.CLINE_WRITE_PROMPT_ARTIFACTS?.toLowerCase()
 		const enabled = enabledFlag === "1" || enabledFlag === "true" || enabledFlag === "yes"
 		if (!enabled) {
@@ -2717,6 +2723,10 @@ export class Task {
 			const baseName = `task-${this.taskId}-req-${this.taskState.apiRequestCount}-${safeTs}`
 			const manifestPath = path.join(artifactDir, `${baseName}.manifest.json`)
 			const promptPath = path.join(artifactDir, `${baseName}.system_prompt.md`)
+			const workflowInputPayloadPath =
+				params.workflowInputPayloadBlock === undefined
+					? undefined
+					: path.join(artifactDir, `${baseName}.workflow_input_payload.md`)
 
 			const manifest = {
 				taskId: this.taskId,
@@ -2729,15 +2739,42 @@ export class Task {
 				model: params.providerInfo.model.id,
 				apiRequestId: this.getApiRequestIdSafe(),
 				systemPromptPath: promptPath,
+				workflowInputPayloadPath,
 			}
 
-			await Promise.all([
+			const artifactWrites = [
 				fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2), "utf8"),
 				fs.writeFile(promptPath, params.systemPrompt, "utf8"),
-			])
+			]
+			if (workflowInputPayloadPath !== undefined && params.workflowInputPayloadBlock !== undefined) {
+				artifactWrites.push(fs.writeFile(workflowInputPayloadPath, params.workflowInputPayloadBlock, "utf8"))
+			}
+			await Promise.all(artifactWrites)
 		} catch (error) {
 			Logger.error("Failed to write prompt metadata artifacts:", error)
 		}
+	}
+
+	private appendWorkflowInputPayloadToUserContent(
+		userContent: ClineContent[],
+		workflowPromptProjection: WorkflowPromptProjection,
+		turnKind: "full" | "continuation",
+	): ClineContent[] {
+		const payloadBlock =
+			turnKind === "full"
+				? workflowPromptProjection.workflowInputPayloadBlock
+				: workflowPromptProjection.continuationWorkflowInputPayloadBlock
+		if (payloadBlock === undefined) {
+			return userContent
+		}
+
+		return [
+			...userContent,
+			{
+				type: "text",
+				text: payloadBlock,
+			},
+		]
 	}
 
 	private getApiRequestIdSafe(): string | undefined {
@@ -2900,7 +2937,12 @@ export class Task {
 			// If toggle exists, use it; otherwise default to enabled (true)
 			return toggles[skill.path] !== false
 		})
-		const workflowPromptProjection = await this.workflowRuntime.buildTurnProjection({ taskState: this.taskState })
+		const workflowPromptProjection =
+			this.currentRequestWorkflowPromptProjection ??
+			(await this.workflowRuntime.buildTurnProjection({
+				taskState: this.taskState,
+				isFirstTaskRequest: this.taskState.apiRequestCount === 1,
+			}))
 		const promptSkills = shouldSendFullPromptAssembly ? await this.buildPromptSkillScope(availableSkills) : []
 
 		// Snapshot editor tabs so prompt tools can decide whether to include
@@ -2922,13 +2964,7 @@ export class Task {
 			mcpHub: this.mcpHub,
 			activeWorkflowName: this.taskState.activeWorkflowName,
 			activeWorkflowStepNumber: this.taskState.activeWorkflowSession?.activeStepNumber,
-			fullTurnWorkflowSystemInstructionsBlock: workflowPromptProjection.fullTurnWorkflowSystemInstructionsBlock,
-			fullTurnWorkflowInputInstructionsBlock: workflowPromptProjection.fullTurnWorkflowInputInstructionsBlock,
 			workflowToolSchemaOverride: workflowPromptProjection.workflowToolSchemaOverride,
-			continuationTurnWorkflowSystemInstructionsBlock:
-				workflowPromptProjection.continuationTurnWorkflowSystemInstructionsBlock,
-			continuationTurnWorkflowInputInstructionsBlock:
-				workflowPromptProjection.continuationTurnWorkflowInputInstructionsBlock,
 			isContinuationTurn: shouldUseContinuationPrompt,
 			isPromptRefreshTurn: shouldSendFullPromptAssembly,
 			currentFocusChainChecklist: this.taskState.currentFocusChainChecklist,
@@ -2973,7 +3009,11 @@ export class Task {
 			this.currentRequestPromptInjectionBlocks,
 		)
 		this.useNativeToolCalls = !!tools?.length
-		await this.writePromptMetadataArtifacts({ systemPrompt: effectiveSystemPrompt, providerInfo })
+		await this.writePromptMetadataArtifacts({
+			systemPrompt: effectiveSystemPrompt,
+			providerInfo,
+			workflowInputPayloadBlock: this.currentRequestWorkflowInputPayloadBlock,
+		})
 
 		const taskDirectory = await ensureTaskDirectoryExists(this.taskId)
 		const apiConversationHistory = this.messageStateHandler.getApiConversationHistory()
@@ -3621,6 +3661,22 @@ export class Task {
 		}
 
 		this.currentRequestPromptInjectionBlocks = runtimePromptInjectionBlocks
+		const workflowTurnKind: "full" | "continuation" = shouldUseContinuationTurnPrompt({
+			hasHumanAuthoredInput: this.currentRequestHasHumanAuthoredInput,
+			shouldSendFullPromptAssembly: this.currentRequestShouldSendFullPromptAssembly,
+		})
+			? "continuation"
+			: "full"
+		const workflowPromptProjection = await this.workflowRuntime.buildTurnProjection({
+			taskState: this.taskState,
+			isFirstTaskRequest: this.taskState.apiRequestCount === 1,
+		})
+		this.currentRequestWorkflowPromptProjection = workflowPromptProjection
+		this.currentRequestWorkflowInputPayloadBlock =
+			workflowTurnKind === "full"
+				? workflowPromptProjection.workflowInputPayloadBlock
+				: workflowPromptProjection.continuationWorkflowInputPayloadBlock
+		userContent = this.appendWorkflowInputPayloadToUserContent(userContent, workflowPromptProjection, workflowTurnKind)
 
 		// getting verbose details is an expensive operation, it uses globby to top-down build file structure of project which for large projects can take a few seconds
 		// for the best UX we show a placeholder api_req_started message with a loading spinner as this happens

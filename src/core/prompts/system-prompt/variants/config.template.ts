@@ -32,7 +32,6 @@ export const config: Omit<PromptVariant, "id"> = createVariant(ModelFamily.GENER
 	.template(baseTemplate)
 	.components(
 		// Define component order - this is type-safe and will show available options
-		SystemPromptSection.WORKFLOW_SYSTEM_INSTRUCTIONS,
 		SystemPromptSection.TOOL_USE,
 		SystemPromptSection.MCP,
 		SystemPromptSection.EDITING_FILES,
@@ -42,7 +41,6 @@ export const config: Omit<PromptVariant, "id"> = createVariant(ModelFamily.GENER
 		SystemPromptSection.RULES,
 		SystemPromptSection.SYSTEM_INFO,
 		SystemPromptSection.OBJECTIVE,
-		SystemPromptSection.WORKFLOW_INPUT,
 		SystemPromptSection.USER_INSTRUCTIONS,
 	)
 	.tools(
@@ -120,7 +118,6 @@ export const createAdvancedVariant = (family: ModelFamily) =>
 	createVariant(family)
 		.description("Full-featured variant for advanced models")
 		.components(
-			SystemPromptSection.WORKFLOW_SYSTEM_INSTRUCTIONS,
 			SystemPromptSection.TOOL_USE,
 			SystemPromptSection.MCP,
 			SystemPromptSection.EDITING_FILES,
@@ -131,7 +128,6 @@ export const createAdvancedVariant = (family: ModelFamily) =>
 			SystemPromptSection.RULES,
 			SystemPromptSection.SYSTEM_INFO,
 			SystemPromptSection.OBJECTIVE,
-			SystemPromptSection.WORKFLOW_INPUT,
 			SystemPromptSection.USER_INSTRUCTIONS,
 		)
 		.tools(

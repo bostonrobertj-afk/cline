@@ -1,7 +1,7 @@
 # Authoring Non-Negotiables:
 - Each action plan must be a standalone document and must be saved in the project folder if one exists
 - The action plan must directly support achievement/delivery of every project requirement
-- If you encounter a decision point which was not already explicitly discussed and decided/approved by the user, you must STOP and present the decision to them along with a recommendation, then gain their approval and/or alignment before continuing your work authoring the action plan.
+- If you encounter a decision point which was not already explicitly discussed and decided/approved by the user, you must STOP and present the decision to them along with a recommendation, then gain their approval and/or alignment before continuing your work authoring the action plan. YOU DO NOT SOLVE FOR AMBIGUOUS REQUIREMENTS UNLESS YOU CLEARLY STATE TO THE USER THAT THE REQUIREMENTS ARE AMBIGUOUS OR LEAVE ROOM FOR INTERPRETATION AND YOU ARE PROPOSING A SPECIFIC APPROACH.
 -When a plan references existing artifacts or placeholders, trace the exact runtime resolution path end to end:
     config/source of truth
     resolver/helper

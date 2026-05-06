@@ -12,6 +12,7 @@ import { WorkflowArtifactFamily } from "@/core/task/workflow-runtime/artifactFam
 import type {
 	ActiveWorkflowSession,
 	WorkflowDefinition,
+	WorkflowPersonaDefinition,
 	WorkflowStepDefinition,
 	WorkflowWorkspacePathPolicy,
 } from "@/core/task/workflow-runtime/types"
@@ -29,6 +30,15 @@ const ENTRY_PROJECT_VALUE_KEYS = {
 	projectMode: "entry_project_mode",
 	projectTitle: "entry_project_title",
 	projectFolderName: "entry_project_folder_name",
+}
+
+const WORKFLOW_PERSONA_FIXTURE: WorkflowPersonaDefinition = {
+	name: "Workflow Fixture Persona",
+	role: "Workflow artifact tester",
+	identity: "A test persona for workflow artifact handler fixtures.",
+	capabilities: ["workflow artifact testing"],
+	communicationStyle: "Concise and deterministic.",
+	principles: ["Keep workflow fixture contracts explicit."],
 }
 
 function createArtifactBlock(
@@ -220,7 +230,6 @@ function createWorkflowStepDefinition(): WorkflowStepDefinition {
 		stepNumber: 1,
 		checklistLabel: "Step 1",
 		buildPromptSource: () => ({
-			workflowSystemInstructions: "system",
 			currentStepInstructions: "input",
 		}),
 		buildToolSchema: () => [],
@@ -247,9 +256,11 @@ function createRealArtifactWorkflow(): WorkflowDefinition {
 
 	return {
 		name: "create-workflow-artifact-real-test",
+		displayName: "Create Workflow Artifact Real Test",
+		description: "Test workflow for creating a real workflow artifact.",
 		slashCommandName: "create-workflow-artifact-real-test",
 		useSkillName: "create-workflow-artifact-real-test",
-		persona: "Workflow runtime persona",
+		persona: WORKFLOW_PERSONA_FIXTURE,
 		projectSubfolder: "planning",
 		workflowValueKeys: [
 			...Object.values(ENTRY_PROJECT_VALUE_KEYS),
@@ -285,9 +296,11 @@ function createRealBrainstormingArtifactWorkflow(): WorkflowDefinition {
 
 	return {
 		name: "create-workflow-artifact-brainstorming-test",
+		displayName: "Create Workflow Artifact Brainstorming Test",
+		description: "Test workflow for creating a brainstorming workflow artifact.",
 		slashCommandName: "create-workflow-artifact-brainstorming-test",
 		useSkillName: "create-workflow-artifact-brainstorming-test",
-		persona: "Workflow runtime persona",
+		persona: WORKFLOW_PERSONA_FIXTURE,
 		projectSubfolder: "discovery",
 		workflowValueKeys: [
 			...Object.values(ENTRY_PROJECT_VALUE_KEYS),
@@ -519,7 +532,9 @@ describe("CreateWorkflowArtifactToolHandler", () => {
 			}
 			const parsedResult = JSON.parse(result)
 			const artifactAbsolutePath = parsedResult.artifact_absolute_path
-			expect(artifactAbsolutePath).to.equal(path.join(tmpCwd, "real-artifact-project", "planning", "Epics.md"))
+			expect(artifactAbsolutePath).to.equal(
+				path.join(tmpCwd, "docs", "projects", "real-artifact-project", "planning", "Epics.md"),
+			)
 			await access(artifactAbsolutePath)
 			expect(await readFile(artifactAbsolutePath, "utf8")).to.equal("")
 			expect(parsedResult.persisted_artifact_output_values.epic_artifact_absolute_path).to.equal(artifactAbsolutePath)
@@ -556,7 +571,14 @@ describe("CreateWorkflowArtifactToolHandler", () => {
 				throw new Error("Expected string tool result.")
 			}
 			const parsedResult = JSON.parse(result)
-			const artifactAbsolutePath = path.join(tmpCwd, "real-artifact-project", "discovery", "brainstorming.md")
+			const artifactAbsolutePath = path.join(
+				tmpCwd,
+				"docs",
+				"projects",
+				"real-artifact-project",
+				"discovery",
+				"brainstorming.md",
+			)
 			expect(parsedResult).to.deep.include({
 				created: true,
 				artifact_id: "brainstorming_session",

@@ -7192,6 +7192,622 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
+## Phase 56 - Workflow Prompt Payload Separation And Template Cleanup
+
+After completing this phase, pause for QA review before packaged-extension retesting.
+
+### Phase 56 Scope
+
+This phase fixes the foundational prompt assembly contract so workflow-owned content is projected through the correct carrier: stable workflow identity, workflow description, persona, and step-status context are assembled by `WorkflowRuntime`, current-step details are appended to the model input payload instead of the system prompt, and system-prompt templates no longer contain workflow placeholder sections. This phase also removes the stale `agent_feedback` guidance line from prompt text and verifies that response-tool instructions render when the runtime-projected full per-turn tool schema contains response tools.
+
+### Phase 56 Scope Boundary
+
+- Do not read `_bmad`, `.bmad`, `.cline/skills`, or legacy agent persona files at runtime. Workflow persona data must come from workflow module definitions.
+- Do not update the brainstorming workflow module in this phase except through tests that exercise generic runtime behavior with local test fixtures. The real brainstorming module persona/tool-schema content belongs to the brainstorming module action plan.
+- Do not remove the `agent_feedback` tool parameter, response-tool validation, or response-tool handler behavior in this phase; delete only prompt guidance text that tells the model to use `agent_feedback`.
+- Do not add static/default workflow prompt tools or response tools. Response-tool visibility must continue to come from the runtime-projected full per-turn tool schema.
+- Do not preserve `WORKFLOW_SYSTEM_INSTRUCTIONS` or `WORKFLOW_INPUT` placeholders as aliases, no-op components, hidden sections, or compatibility paths.
+- Do not put current-step details back into the system prompt. Current-step details must be appended to the model input payload for the turn.
+
+### Phase 56 Known Issues / Risks / Technical Debt
+
+- `WorkflowRuntime.buildTurnProjection(...)` currently produces workflow system-prompt blocks and workflow input blocks, and the system-prompt templates still place both through prompt placeholders.
+- Workflow persona projection currently has only a persona title/name string. The runtime contract must support module-authored persona detail without relying on legacy BMAD files.
+- The visible workflow step list currently does not reliably preserve step numbering and active/complete/not-started status in the delivered prompt.
+- The response-tools section can render empty during active workflow turns when the runtime-projected tool schema does not expose response tools or the prompt registry does not derive visible response-tool names from that override.
+- The tool-use prompt still contains a stale `agent_feedback` guidance line.
+
+[x] Task 148. Replace thin workflow prompt metadata with module-authored workflow display and persona data.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 148.1. In `src/core/task/workflow-runtime/types.ts`, add exported `WorkflowPersonaDefinition` with required fields `name: string`, `role: string`, `identity: string`, `capabilities: readonly string[]`, `communicationStyle: string`, and `principles: readonly string[]`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+
+[x] Subtask 148.2. In `src/core/task/workflow-runtime/types.ts`, update `WorkflowDefinition` so it has required `displayName: string`, required `description: string`, and required `persona: WorkflowPersonaDefinition`; delete the old `SkillMetadata["name"] | string` persona shape and its import if it becomes unused.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+
+[x] Subtask 148.3. In `src/core/task/workflow-runtime/types.ts`, replace `WorkflowPromptProjection` fields `fullTurnWorkflowSystemInstructionsBlock`, `fullTurnWorkflowInputInstructionsBlock`, `continuationTurnWorkflowSystemInstructionsBlock`, and `continuationTurnWorkflowInputInstructionsBlock` with required fields `workflowInputPayloadBlock: string | undefined`, `continuationWorkflowInputPayloadBlock: string | undefined`, and `workflowToolSchemaOverride: readonly ClineToolSpec[] | undefined`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+
+[x] Subtask 148.4. In `src/core/task/workflow-runtime/types.ts`, delete `workflowSystemInstructions` from `WorkflowStepPromptSource` so workflow modules can provide only current-step input instructions through `currentStepInstructions`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+
+[x] Subtask 148.5. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, update workflow definition validation so every shipped workflow requires non-empty `displayName`, non-empty `description`, non-empty `persona.name`, non-empty `persona.role`, non-empty `persona.identity`, at least one persona capability, non-empty `persona.communicationStyle`, and at least one persona principle.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 148.6. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, update local workflow fixtures to use `displayName`, `description`, and the full `WorkflowPersonaDefinition` object instead of a persona string.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Task 149. Make `WorkflowRuntime` build workflow input payload blocks instead of workflow system-prompt blocks.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 149.1. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, replace `buildWorkflowStepChecklist(...)` output with plain numbered status lines in this exact shape: `1. Step Label - Complete`, `2. Step Label - Active`, and `3. Step Label - Not Started`; do not use markdown checkboxes.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 149.2. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, update `buildTurnProjection(...)` so it no longer creates any `## WORKFLOW`, `## WORKFLOW PERSONA`, or `## WORKFLOW STEPS` system-prompt block fields.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 149.3. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, update `buildTurnProjection(...)` so `workflowInputPayloadBlock` contains the workflow display name, workflow description, full persona detail from `WorkflowDefinition.persona`, numbered workflow step status lines, and the active step's current-step input instructions from `buildPromptSource(...)`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 149.4. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, update `buildTurnProjection(...)` so `continuationWorkflowInputPayloadBlock` contains the workflow display name, numbered workflow step status lines, and the active step's current-step input instructions, but omits first-turn-only persona detail.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 149.5. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, preserve first-turn-only persona gating with the existing `isFirstTaskRequest` input so full persona detail appears only in `workflowInputPayloadBlock` for the first workflow request and never in `continuationWorkflowInputPayloadBlock`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 149.6. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, replace assertions for workflow system-prompt blocks with assertions that `workflowInputPayloadBlock` contains workflow display name, workflow description, full persona detail, numbered step status lines, and current-step details.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 149.7. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving `continuationWorkflowInputPayloadBlock` includes current-step details and numbered step statuses but does not repeat persona detail.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Task 150. Append workflow payload blocks to model input instead of system prompt context.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentRunner.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+
+[x] Subtask 150.1. In `src/core/task/index.ts`, add a private helper that accepts a `UserContent` value, the active `WorkflowPromptProjection`, and `turnKind: "full" | "continuation"`; it must append a text block containing `workflowInputPayloadBlock` for `turnKind === "full"` or `continuationWorkflowInputPayloadBlock` for `turnKind === "continuation"` and must return the original content unchanged when the selected payload block is undefined.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
+
+[x] Subtask 150.2. In `src/core/task/index.ts`, compute the active workflow projection before the request's user content is persisted to API conversation history, use the existing full-turn versus continuation-turn decision to choose the correct workflow input payload block, and append that block to the user content through the helper from Subtask 150.1.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
+
+[x] Subtask 150.3. In `src/core/task/index.ts`, update system-prompt context creation so it passes only `workflowToolSchemaOverride` from the active workflow projection and no longer passes workflow system or workflow input instruction block fields.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
+
+[x] Subtask 150.4. In `src/core/task/index.ts`, update prompt metadata artifact writing so the saved prompt debug artifacts include the workflow input payload block used for the request in a separate metadata field or companion file, without inserting that payload into the saved system prompt artifact.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
+
+[x] Subtask 150.5. In `src/core/task/tools/subagent/SubagentRunner.ts`, append the selected child workflow input payload block to the subagent request content instead of adding it to system-prompt context.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentRunner.ts`
+
+[x] Subtask 150.6. In `src/core/task/tools/subagent/SubagentRunner.ts`, update subagent prompt context creation so it passes only `workflowToolSchemaOverride` from the workflow projection and no longer passes workflow system or workflow input instruction block fields.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentRunner.ts`
+
+[x] Subtask 150.7. In `src/core/task/__tests__/workflow-runtime-metadata.test.ts`, add coverage proving the main task API user content contains the workflow input payload block and the saved system prompt artifact does not contain current-step workflow details.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
+
+[x] Subtask 150.8. In `src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`, update workflow prompt assertions so child workflow current-step details are asserted in the subagent user/input payload and not in the subagent system prompt.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+
+[x] Task 151. Remove workflow placeholders and workflow prompt components from system-prompt templates.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/index.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/workflow_system_instructions.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/workflow_input.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/templates/placeholders.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/config.template.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/devstral/config.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/devstral/template.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/gemini-3/config.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/gemini-3/template.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/generic/config.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/generic/template.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/glm/config.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/glm/template.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/gpt-5/config.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/gpt-5/template.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/hermes/config.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/hermes/template.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/native-gpt-5/config.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/native-gpt-5/template.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/native-gpt-5-1/config.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/native-gpt-5-1/template.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/native-next-gen/config.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/native-next-gen/template.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/next-gen/config.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/next-gen/template.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/trinity/config.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/trinity/template.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/xs/config.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/xs/template.ts`
+
+[x] Subtask 151.1. Delete `src/core/prompts/system-prompt/components/workflow_system_instructions.ts` entirely.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/workflow_system_instructions.ts`
+
+[x] Subtask 151.2. Delete `src/core/prompts/system-prompt/components/workflow_input.ts` entirely.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/workflow_input.ts`
+
+[x] Subtask 151.3. In `src/core/prompts/system-prompt/components/index.ts`, remove the workflow system/input component imports and component registry entries.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/index.ts`
+
+[x] Subtask 151.4. In `src/core/prompts/system-prompt/templates/placeholders.ts`, delete `WORKFLOW_SYSTEM_INSTRUCTIONS` and `WORKFLOW_INPUT` from the placeholder enum/registry.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/templates/placeholders.ts`
+
+[x] Subtask 151.5. In every listed system-prompt variant `config.ts`, remove `WORKFLOW_SYSTEM_INSTRUCTIONS` and `WORKFLOW_INPUT` from the ordered component list without changing the relative order of the surviving components.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/config.template.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/devstral/config.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/gemini-3/config.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/generic/config.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/glm/config.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/gpt-5/config.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/hermes/config.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/native-gpt-5/config.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/native-gpt-5-1/config.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/native-next-gen/config.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/next-gen/config.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/trinity/config.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/xs/config.ts`
+
+[x] Subtask 151.6. In every listed system-prompt variant `template.ts`, remove literal `{{WORKFLOW_SYSTEM_INSTRUCTIONS}}` and `{{WORKFLOW_INPUT}}` placeholders without adding replacement blank sections.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/devstral/template.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/gemini-3/template.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/generic/template.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/glm/template.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/gpt-5/template.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/hermes/template.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/native-gpt-5/template.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/native-gpt-5-1/template.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/native-next-gen/template.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/next-gen/template.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/trinity/template.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/xs/template.ts`
+
+[x] Task 152. Remove stale `agent_feedback` prompt guidance while preserving response-tool behavior.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/tool_use/index.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/continuation_turn.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/agent_feedback.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/gpt-5/template.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/native-gpt-5/template.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/native-next-gen/template.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/gemini-3/overrides.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/glm/overrides.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/hermes/overrides.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/native-gpt-5-1/overrides.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/trinity/overrides.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/spec.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/__snapshots__/*`
+
+[x] Subtask 152.1. In `src/core/prompts/system-prompt/components/tool_use/index.ts`, delete the `getAgentFeedbackPromptGuidanceLine` import, delete `{{AGENT_FEEDBACK_GUIDANCE_LINE}}` from the default and minimal tool-use templates, and delete the resolver entry that populates `AGENT_FEEDBACK_GUIDANCE_LINE`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/tool_use/index.ts`
+
+[x] Subtask 152.2. In `src/core/prompts/system-prompt/components/continuation_turn.ts`, delete the `getAgentFeedbackPromptGuidanceLine` import and remove the agent-feedback guidance line from continuation-turn text.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/continuation_turn.ts`
+
+[x] Subtask 152.2a. In the listed prompt variant templates and overrides, delete every `getAgentFeedbackPromptGuidanceLine` import and delete each interpolation or line that inserts `getAgentFeedbackPromptGuidanceLine()` into prompt text; preserve all other variant-specific prompt text and do not remove response-tool schema parameters.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/gpt-5/template.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/native-gpt-5/template.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/native-next-gen/template.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/gemini-3/overrides.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/glm/overrides.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/hermes/overrides.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/native-gpt-5-1/overrides.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/trinity/overrides.ts`
+
+[x] Subtask 152.3. Delete `src/core/prompts/system-prompt/components/agent_feedback.ts` if its only surviving export is `getAgentFeedbackPromptGuidanceLine`; otherwise delete only that export and its associated prompt-guidance constant.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/agent_feedback.ts`
+
+[x] Subtask 152.4. In `src/core/prompts/system-prompt/types.ts`, delete `AGENT_FEEDBACK_PROMPT_GUIDANCE` while preserving `AGENT_FEEDBACK_PARAMETER`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/types.ts`
+
+[x] Subtask 152.5. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, `spec.test.ts`, and touched snapshots, update prompt expectations so no generated system prompt or continuation-turn prompt tells the model to use `agent_feedback`; do not remove schema expectations for the `agent_feedback` parameter itself.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/spec.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/__snapshots__/*`
+
+[x] Task 153. Verify response-tool section rendering from runtime-projected workflow tool schemas.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/response_tools.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/registry/PromptRegistry.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/response_tools.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
+
+[x] Subtask 153.1. In `src/core/prompts/system-prompt/__tests__/response_tools.test.ts`, add coverage proving the response-tools component renders `ask_followup_question`, `send_user_message`, and `attempt_completion` when those names are present in `visibleNativeToolNames`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/response_tools.test.ts`
+
+[x] Subtask 153.2. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, add coverage proving a workflow-projected full tool schema override that contains response tools causes the generated system prompt to include a non-empty Response Tools section for that turn.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
+
+[x] Subtask 153.3. In `src/core/prompts/system-prompt/registry/PromptRegistry.ts`, update `visibleNativeToolNames` derivation so it uses the authoritative native tool list after `workflowToolSchemaOverride` has replaced the default tool surface, including when the active workflow override contains response tools.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/registry/PromptRegistry.ts`
+
+[x] Subtask 153.4. In `src/core/prompts/system-prompt/components/response_tools.ts`, ensure response-tool filtering uses only `visibleNativeToolNames` and the response-tool registry; delete any static/default-tool ownership check that suppresses workflow-projected response tools.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/response_tools.ts`
+
+[x] Task 154. Update foundational prompt, runtime, and subagent tests for the separated workflow payload contract.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/spec.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/response_tools.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/__snapshots__/*`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/slash-commands/__tests__/index.test.ts`
+
+[x] Subtask 154.1. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, replace workflow system-prompt block assertions with assertions that system prompts contain no workflow placeholder output and still apply `workflowToolSchemaOverride` as the authoritative full tool surface.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
+
+[x] Subtask 154.2. In `src/core/prompts/system-prompt/__tests__/spec.test.ts`, update component/order expectations so `WORKFLOW_SYSTEM_INSTRUCTIONS` and `WORKFLOW_INPUT` are absent from prompt components, placeholders, and variant configs.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/spec.test.ts`
+
+[x] Subtask 154.3. In touched prompt snapshots, regenerate only the snapshots affected by removing workflow placeholders and `agent_feedback` guidance; do not refresh unrelated prompt content.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/__snapshots__/*`
+
+[x] Subtask 154.4. In `src/core/slash-commands/__tests__/index.test.ts`, update workflow fixtures so they satisfy the new `displayName`, `description`, `WorkflowPersonaDefinition`, and `currentStepInstructions`-only prompt source contract.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/slash-commands/__tests__/index.test.ts`
+
+[x] Subtask 154.5. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, update all workflow projection tests so system prompt fields are absent and workflow payload fields carry workflow context.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 154.6. In `src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`, update child workflow prompt assertions so workflow context is verified in input payload content and not in system prompt content.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+
+[x] Task 154A. Align missed create-artifact handler workflow fixtures with the Phase 56 workflow contract.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/CreateWorkflowArtifactToolHandler.test.ts`
+
+[x] Subtask 154A.1. In `src/core/task/tools/handlers/__tests__/CreateWorkflowArtifactToolHandler.test.ts`, update the hand-built workflow fixtures to satisfy the Phase 56 workflow definition and prompt-source contract: delete `workflowSystemInstructions` from `createWorkflowStepDefinition().buildPromptSource(...)`, add `displayName` and `description` to `createRealArtifactWorkflow()` and `createRealBrainstormingArtifactWorkflow()`, and replace their persona string values with a structured `WorkflowPersonaDefinition` fixture.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/CreateWorkflowArtifactToolHandler.test.ts`
+
+[x] Subtask 154A.2. Run `npm run test:unit -- src/core/task/tools/handlers/__tests__/CreateWorkflowArtifactToolHandler.test.ts`; it must pass before Task 154A is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/CreateWorkflowArtifactToolHandler.test.ts`
+
+[x] Task 154B. Align missed workflow activation and next-action consumer test fixtures with the Phase 56 projection contract.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/UseSkillToolHandler.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts`
+
+[x] Subtask 154B.1. In `src/core/task/tools/handlers/__tests__/UseSkillToolHandler.test.ts`, update `createWorkflowDefinition()` so it includes `displayName`, `description`, and a structured `WorkflowPersonaDefinition` fixture instead of `persona: "engineer"`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/UseSkillToolHandler.test.ts`
+
+[x] Subtask 154B.2. In `src/core/task/tools/handlers/__tests__/UseSkillToolHandler.test.ts`, replace every `promptProjection: {}` fixture with an explicit `WorkflowPromptProjection` object whose `workflowInputPayloadBlock`, `continuationWorkflowInputPayloadBlock`, and `workflowToolSchemaOverride` fields are all `undefined`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/UseSkillToolHandler.test.ts`
+
+[x] Subtask 154B.3. In `src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts`, replace every `promptProjection: {}` fixture with an explicit `WorkflowPromptProjection` object whose `workflowInputPayloadBlock`, `continuationWorkflowInputPayloadBlock`, and `workflowToolSchemaOverride` fields are all `undefined`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts`
+
+[x] Subtask 154B.4. Run `npm run test:unit -- src/core/task/tools/handlers/__tests__/UseSkillToolHandler.test.ts src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts`; it must pass before Task 154B is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/UseSkillToolHandler.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts`
+
+[x] Task 155. Validate Phase 56.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentRunner.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/index.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/tool_use/index.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/continuation_turn.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/templates/placeholders.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/*`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/*`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/CreateWorkflowArtifactToolHandler.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/UseSkillToolHandler.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts`
+
+[x] Subtask 155.1. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/__tests__/workflow-runtime-metadata.test.ts src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`; it must pass before Phase 56 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+
+[x] Subtask 155.2. Run `npm run test:unit -- src/core/prompts/system-prompt/__tests__/integration.test.ts src/core/prompts/system-prompt/__tests__/spec.test.ts src/core/prompts/system-prompt/__tests__/response_tools.test.ts`; it must pass before Phase 56 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/spec.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/response_tools.test.ts`
+
+[x] Subtask 155.3. Run `rg "WORKFLOW_SYSTEM_INSTRUCTIONS|WORKFLOW_INPUT|fullTurnWorkflowSystemInstructionsBlock|fullTurnWorkflowInputInstructionsBlock|continuationTurnWorkflowSystemInstructionsBlock|continuationTurnWorkflowInputInstructionsBlock|workflowSystemInstructions" src/core/prompts/system-prompt src/core/task`; it must return no matches before Phase 56 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/index.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/templates/placeholders.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/variants/*`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentRunner.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/CreateWorkflowArtifactToolHandler.test.ts`
+
+[x] Subtask 155.4. Run `rg "AGENT_FEEDBACK_PROMPT_GUIDANCE|getAgentFeedbackPromptGuidanceLine|AGENT_FEEDBACK_GUIDANCE_LINE" src/core/prompts/system-prompt`; it must return no matches before Phase 56 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/tool_use/index.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/continuation_turn.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/agent_feedback.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/types.ts`
+
+[x] Subtask 155.5. Run `npm run check-types` and `npm run lint`; both must pass before Phase 56 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentRunner.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/CreateWorkflowArtifactToolHandler.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/UseSkillToolHandler.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/index.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/tool_use/index.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/continuation_turn.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/templates/placeholders.ts`
+
+## Phase 57 - Authoritative Workflow Response-Tool Guidance
+
+Pause for QA review after completing Phase 57 before final validation.
+
+### Phase 57 Scope
+
+This phase fixes the remaining Phase 56 response-tool prompt guidance gap so active workflow turns derive response-tool instructions from the authoritative `workflowToolSchemaOverride` in both native and non-native prompt paths.
+
+### Phase 57 Scope Boundary
+
+- Do not change workflow module tool schemas in this phase.
+- Do not add static/default workflow response tools.
+- Do not change actual tool execution, response-tool runtime behavior, or `ResponseToolRegistry` metadata.
+- Do not change `ClineToolSet` workflow tool-surface replacement behavior.
+
+### Phase 57 Known Issues / Risks / Technical Debt
+
+- `response_tools.ts` currently falls back to default ACT/PLAN response tools for non-native workflow turns even when those tools are absent from `workflowToolSchemaOverride`.
+- Native workflow turns with no response tools can render an empty `RESPONSE TOOLS` section or invalid continuation guidance.
+- `workflow_progress_request` is a response tool at execution time but has no response-tool prompt guidance line.
+
+[ ] Task 156. Make response-tool prompt guidance derive from the authoritative workflow override before native/default fallbacks.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/response_tools.ts`
+
+[ ] Subtask 156.1. In `response_tools.ts`, add `workflow_progress_request` to `RESPONSE_TOOL_LINES` with exact text `- \`workflow_progress_request\`: Use to ask the user to confirm whether the current workflow step is ready to advance`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/response_tools.ts`
+
+[ ] Subtask 156.2. In `response_tools.ts`, add a typed `isResponseToolName(toolName: string): toolName is ResponseToolName` helper and use it for all dynamic response-tool-name filtering.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/response_tools.ts`
+
+[ ] Subtask 156.3. In `response_tools.ts`, add `getWorkflowOverrideResponseToolNames(context: SystemPromptContext): ResponseToolName[] | undefined` that returns `undefined` only when `context.workflowToolSchemaOverride === undefined`, otherwise returns only response-tool names from `workflowToolSchemaOverride` in schema order using `tool.name ?? tool.id`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/response_tools.ts`
+
+[ ] Subtask 156.4. In `response_tools.ts`, update `getVisibleResponseToolNames(...)` so workflow override response names are returned before native visibility or mode-default fallback logic.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/response_tools.ts`
+
+[ ] Subtask 156.5. In `response_tools.ts`, update native visible-tool filtering so it can render `workflow_progress_request` when that tool is present in `visibleNativeToolNames`, and remove the existing non-null assertion from the ordered-tool construction.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/response_tools.ts`
+
+[ ] Subtask 156.6. In `response_tools.ts`, update `getCurrentModeResponseToolsLine(...)` so it returns `undefined` when no response tools are visible and never calls `joinToolNames(...)` with an empty list.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/response_tools.ts`
+
+[ ] Subtask 156.7. In `response_tools.ts`, update `getResponseToolsSection(...)` so it returns an empty string when no response-tool lines are visible instead of rendering a bare `RESPONSE TOOLS` section.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/response_tools.ts`
+
+[ ] Task 157. Update continuation-turn assembly for optional response-tool guidance.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/continuation_turn.ts`
+
+[ ] Subtask 157.1. In `continuation_turn.ts`, replace the inline `getCurrentModeResponseToolsLine(context)` array entry with a local `responseToolsLine` variable and push it only when it is not `undefined`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/continuation_turn.ts`
+
+[ ] Task 158. Update response-tool component unit coverage.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/response_tools.test.ts`
+
+[ ] Subtask 158.1. In `response_tools.test.ts`, add typed workflow-tool-schema fixtures for `build_workflow_document` and `workflow_progress_request`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/response_tools.test.ts`
+
+[ ] Subtask 158.2. In `response_tools.test.ts`, replace expectations that native-visible `workflow_progress_request` is omitted with expectations that it is rendered when visible.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/response_tools.test.ts`
+
+[ ] Subtask 158.3. In `response_tools.test.ts`, add coverage proving a non-native workflow override with only `build_workflow_document` renders no response-tools section and no current-mode response line.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/response_tools.test.ts`
+
+[ ] Subtask 158.4. In `response_tools.test.ts`, add coverage proving a non-native workflow override with `workflow_progress_request` renders only `workflow_progress_request` response guidance and no default ACT response tools.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/response_tools.test.ts`
+
+[ ] Task 159. Add integration coverage for workflow-authoritative response-tool guidance.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
+
+[ ] Subtask 159.1. In `integration.test.ts`, add a workflow override fixture containing only `build_workflow_document`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
+
+[ ] Subtask 159.2. In `integration.test.ts`, add native workflow override coverage proving `workflow_progress_request` appears in response-tool guidance when it is the only projected response tool.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
+
+[ ] Subtask 159.3. In `integration.test.ts`, add non-native workflow override coverage proving default ACT response tools are not advertised when absent from `workflowToolSchemaOverride`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
+
+[ ] Subtask 159.4. In `integration.test.ts`, add continuation-turn coverage proving a workflow override with no response tools does not render `RESPONSE TOOLS`, `undefined`, or `and undefined`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
+
+[ ] Task 160. Validate Phase 57.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/response_tools.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/continuation_turn.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/response_tools.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
+
+[ ] Subtask 160.1. Run `npm run test:unit -- src/core/prompts/system-prompt/__tests__/response_tools.test.ts src/core/prompts/system-prompt/__tests__/integration.test.ts`; it must pass before Phase 57 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/response_tools.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
+
+[ ] Subtask 160.2. Run `npm run check-types` and `npm run lint`; both must pass before Phase 57 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/response_tools.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/components/continuation_turn.ts`
+
 ## Validation
 
 After all implementation tasks are complete, run these commands from `/Users/robertboston/Documents/Cline Extension/cline`:
@@ -7227,6 +7843,10 @@ npm run test:unit -- src/core/task/tools/subagent/__tests__/SubagentRunner.test.
 npm run test:unit -- src/core/task/__tests__/ToolExecutor.nativeToolParity.test.ts src/core/task/__tests__/ToolExecutor.responseToolFailureBudget.test.ts
 npm run test:unit -- src/core/task/__tests__/workflow-runtime-metadata.test.ts src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/tools/utils/__tests__/ToolResultUtils.test.ts src/core/prompts/__tests__/responses.test.ts
 npm run test:unit -- src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts src/core/task/__tests__/workflow-runtime-metadata.test.ts
+npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/__tests__/workflow-runtime-metadata.test.ts src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts
+npm run test:unit -- src/core/prompts/system-prompt/__tests__/integration.test.ts src/core/prompts/system-prompt/__tests__/spec.test.ts src/core/prompts/system-prompt/__tests__/response_tools.test.ts
+rg "WORKFLOW_SYSTEM_INSTRUCTIONS|WORKFLOW_INPUT|fullTurnWorkflowSystemInstructionsBlock|fullTurnWorkflowInputInstructionsBlock|continuationTurnWorkflowSystemInstructionsBlock|continuationTurnWorkflowInputInstructionsBlock|workflowSystemInstructions" src/core/prompts/system-prompt src/core/task
+rg "AGENT_FEEDBACK_PROMPT_GUIDANCE|getAgentFeedbackPromptGuidanceLine|AGENT_FEEDBACK_GUIDANCE_LINE" src/core/prompts/system-prompt
 ```
 
 Validation expectations:
@@ -7267,6 +7887,9 @@ Validation expectations:
 - `rg "FocusChainManager|subagentFocusChain|getOrCreateSubagentFocusChainManager|generateFocusChainInstructions" src/core/task/tools/subagent/SubagentRunner.ts` must return no matches.
 - `rg "generateFocusChainInstructions|getFocusChainInstructionsDecision|shouldIncludeFocusChainInstructions|FocusChainInstructionDecision|CURRENT WORKFLOW STATUS" src/core/task src/core/task/focus-chain/__tests__` must return no matches.
 - `rg "focusChainInstructions|summarizeFocusChainText|summarizeFocusChainTextBlocks|focus_chain_decision|focus_chain_generation" src/core/task/index.ts src/core/task/focus-chain/index.ts` must return no matches.
+- Phase 56 QA must verify workflow placeholder removal is complete: `WORKFLOW_SYSTEM_INSTRUCTIONS`, `WORKFLOW_INPUT`, old workflow system/input projection fields, and `workflowSystemInstructions` must not remain in prompt-system or task-runtime code.
+- Phase 56 QA must verify active workflow current-step details appear in the request input payload and do not appear in the generated system prompt artifact.
+- Phase 56 QA must verify the Response Tools section renders when the runtime-projected full tool schema contains response tools, and that no prompt text tells the model to use `agent_feedback` while the `agent_feedback` parameter remains available where response-tool schemas intentionally define it.
 - Workflow-runtime and subagent tests must prove child workflow activation copies parent `projectSelection`, skips mandatory entry `WorkflowForm` rendering, and no-ops without mutating child task state when parent project selection is incomplete.
 - `rg "workflowValues\\.output_folder|output_folder" src/core/task/workflow-runtime/WorkflowRuntime.ts src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts` must return no matches.
 - `rg "toggleWorkflow|ToggleWorkflowRequest|refreshWorkflowToggles|getWorkflowCommands" proto src webview-ui cli` must return no matches.

@@ -8,7 +8,6 @@ Use these tools to respond to the user. A reply reaches the human user only when
 - `attempt_completion`: Use once at the end of each workflow
 - `ask_followup_question`: Use to ask a question + present options for user to select
 - `send_user_message`: Use by default to send messages to the user
-- If you hit a meaningful blocker, material ambiguity, or unstable behavior that affects correctness or progress, include `agent_feedback` on your response tool call with a concise description of the issue.
 
 # Tool Use Formatting
 

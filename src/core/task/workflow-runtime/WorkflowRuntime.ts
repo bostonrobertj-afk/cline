@@ -746,21 +746,33 @@ export class WorkflowRuntime {
 		}
 	}
 
-	async buildTurnProjection(args: { taskState: TaskState }): Promise<WorkflowPromptProjection> {
+	async buildTurnProjection(args: { taskState: TaskState; isFirstTaskRequest?: boolean }): Promise<WorkflowPromptProjection> {
 		const { taskState } = args
 		const session = taskState.activeWorkflowSession
 		if (!session) {
-			return {}
+			return {
+				workflowInputPayloadBlock: undefined,
+				continuationWorkflowInputPayloadBlock: undefined,
+				workflowToolSchemaOverride: undefined,
+			}
 		}
 
 		const definition = this.getActiveWorkflowDefinition(taskState)
 		if (!definition) {
-			return {}
+			return {
+				workflowInputPayloadBlock: undefined,
+				continuationWorkflowInputPayloadBlock: undefined,
+				workflowToolSchemaOverride: undefined,
+			}
 		}
 
 		const activeStep = this.getActiveStepDefinition(definition, session)
 		if (!activeStep) {
-			return {}
+			return {
+				workflowInputPayloadBlock: undefined,
+				continuationWorkflowInputPayloadBlock: undefined,
+				workflowToolSchemaOverride: undefined,
+			}
 		}
 
 		const promptBuilderInput: WorkflowPromptBuilderInput = {
@@ -771,32 +783,52 @@ export class WorkflowRuntime {
 		const promptSource = activeStep.buildPromptSource(promptBuilderInput)
 		const workflowStepList = this.buildWorkflowStepChecklist(definition, session)
 		const workflowToolSchemaOverride = activeStep.buildToolSchema(promptBuilderInput)
+		const includePersona = args.isFirstTaskRequest ?? taskState.apiRequestCount === 1
 
 		return {
-			fullTurnWorkflowSystemInstructionsBlock: this.joinPromptSections([
-				`## WORKFLOW\nWorkflow: ${definition.name}`,
-				taskState.apiRequestCount === 1 ? `## WORKFLOW PERSONA\n${definition.persona}` : undefined,
-				`## WORKFLOW STEPS\n${workflowStepList}`,
-				promptSource.workflowSystemInstructions
-					? `## WORKFLOW INSTRUCTIONS\n${promptSource.workflowSystemInstructions}`
-					: undefined,
+			workflowInputPayloadBlock: this.joinPromptSections([
+				includePersona ? this.buildWorkflowPersonaInputPayloadBlock(definition) : undefined,
+				this.buildWorkflowContextInputPayloadBlock(definition, workflowStepList),
+				this.buildWorkflowCurrentStepInputPayloadBlock(activeStep, promptSource.currentStepInstructions),
 			]),
-			fullTurnWorkflowInputInstructionsBlock: this.joinPromptSections([
-				`## CURRENT STEP\nStep ${activeStep.stepNumber}: ${activeStep.checklistLabel}`,
-				promptSource.currentStepInstructions,
+			continuationWorkflowInputPayloadBlock: this.joinPromptSections([
+				this.buildWorkflowContextInputPayloadBlock(definition, workflowStepList),
+				this.buildWorkflowCurrentStepInputPayloadBlock(activeStep, promptSource.currentStepInstructions),
 			]),
 			workflowToolSchemaOverride,
-			continuationTurnWorkflowSystemInstructionsBlock: this.joinPromptSections([
-				`## WORKFLOW\nWorkflow: ${definition.name}`,
-				`## WORKFLOW STEPS\n${workflowStepList}`,
-				promptSource.workflowSystemInstructions
-					? `## WORKFLOW INSTRUCTIONS\n${promptSource.workflowSystemInstructions}`
-					: undefined,
-			]),
-			continuationTurnWorkflowInputInstructionsBlock: this.joinPromptSections([
-				`## WORKFLOW CONTINUATION\nContinue working on step ${activeStep.stepNumber}: ${activeStep.checklistLabel}.`,
-			]),
 		}
+	}
+
+	private buildWorkflowPersonaInputPayloadBlock(definition: WorkflowDefinition): string | undefined {
+		const persona = definition.persona
+		return this.joinPromptSections([
+			"Persona:\nYou are to adopt this persona throughout your interactions with the user.",
+			`Name: ${persona.name}`,
+			`Role: ${persona.role}`,
+			`Identity: ${persona.identity}`,
+			`Capabilities: ${persona.capabilities.join(", ")}`,
+			`Communication Style: ${persona.communicationStyle}`,
+			`Principles: ${persona.principles.join("\n")}`,
+		])
+	}
+
+	private buildWorkflowContextInputPayloadBlock(definition: WorkflowDefinition, workflowStepList: string): string | undefined {
+		return this.joinPromptSections([
+			`Workflow:\n${definition.displayName}`,
+			`Description: ${definition.description}`,
+			`Workflow Steps:\n${workflowStepList}`,
+		])
+	}
+
+	private buildWorkflowCurrentStepInputPayloadBlock(
+		activeStep: WorkflowStepDefinition,
+		currentStepInstructions: string | undefined,
+	): string | undefined {
+		return this.joinPromptSections([
+			"CURRENT STEP DETAILED INSTRUCTIONS",
+			`Step ${activeStep.stepNumber}: ${activeStep.checklistLabel}`,
+			currentStepInstructions,
+		])
 	}
 
 	buildToolBackedOperationStatusPayload(args: {
@@ -3983,12 +4015,44 @@ export class WorkflowRuntime {
 			return { valid: false, errorMessage: "Workflow name must not be empty." }
 		}
 
+		if (workflow.displayName.trim() === "") {
+			return { valid: false, errorMessage: "Workflow displayName must not be empty." }
+		}
+
+		if (workflow.description.trim() === "") {
+			return { valid: false, errorMessage: "Workflow description must not be empty." }
+		}
+
 		if (workflow.slashCommandName.trim() === "") {
 			return { valid: false, errorMessage: "Workflow slashCommandName must not be empty." }
 		}
 
 		if (workflow.useSkillName.trim() === "") {
 			return { valid: false, errorMessage: "Workflow useSkillName must not be empty." }
+		}
+
+		if (workflow.persona.name.trim() === "") {
+			return { valid: false, errorMessage: "Workflow persona name must not be empty." }
+		}
+
+		if (workflow.persona.role.trim() === "") {
+			return { valid: false, errorMessage: "Workflow persona role must not be empty." }
+		}
+
+		if (workflow.persona.identity.trim() === "") {
+			return { valid: false, errorMessage: "Workflow persona identity must not be empty." }
+		}
+
+		if (!workflow.persona.capabilities.some((capability) => capability.trim() !== "")) {
+			return { valid: false, errorMessage: "Workflow persona capabilities must not be empty." }
+		}
+
+		if (workflow.persona.communicationStyle.trim() === "") {
+			return { valid: false, errorMessage: "Workflow persona communicationStyle must not be empty." }
+		}
+
+		if (!workflow.persona.principles.some((principle) => principle.trim() !== "")) {
+			return { valid: false, errorMessage: "Workflow persona principles must not be empty." }
 		}
 
 		if (workflow.entryPanel.promptMarkdown.trim() === "") {
@@ -4695,9 +4759,15 @@ export class WorkflowRuntime {
 	private buildWorkflowStepChecklist(definition: WorkflowDefinition, session: ActiveWorkflowSession): string {
 		return Object.values(definition.steps)
 			.sort((left, right) => left.stepNumber - right.stepNumber)
-			.map((step) =>
-				step.stepNumber < session.activeStepNumber ? `- [x] ${step.checklistLabel}` : `- [ ] ${step.checklistLabel}`,
-			)
+			.map((step) => {
+				const status =
+					step.stepNumber < session.activeStepNumber
+						? "Complete"
+						: step.stepNumber === session.activeStepNumber
+							? "Active"
+							: "Not Started"
+				return `${step.stepNumber}. ${step.checklistLabel} - ${status}`
+			})
 			.join("\n")
 	}
 }

@@ -1,8 +1,6 @@
 import { SystemPromptSection } from "../../templates/placeholders"
 
-export const baseTemplate = `{{${SystemPromptSection.WORKFLOW_SYSTEM_INSTRUCTIONS}}}
-
-{{${SystemPromptSection.TOOL_USE}}}
+export const baseTemplate = `{{${SystemPromptSection.TOOL_USE}}}
 
 ====
 
@@ -39,10 +37,6 @@ export const baseTemplate = `{{${SystemPromptSection.WORKFLOW_SYSTEM_INSTRUCTION
 ====
 
 {{${SystemPromptSection.OBJECTIVE}}}
-
-====
-
-{{${SystemPromptSection.WORKFLOW_INPUT}}}
 
 ====
 

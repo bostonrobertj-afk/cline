@@ -1,4 +1,3 @@
-import { getAgentFeedbackPromptGuidanceLine } from "../../components/agent_feedback"
 import { hasEnabledMcpServers } from "../../components/mcp"
 import { getResponseToolsSection } from "../../components/response_tools"
 import { SystemPromptSection } from "../../templates/placeholders"
@@ -7,9 +6,7 @@ import type { SystemPromptContext } from "../../types"
 /**
  * Base template for GPT-5 variant with structured sections
  */
-export const BASE = `{{${SystemPromptSection.WORKFLOW_SYSTEM_INSTRUCTIONS}}}
-
-{{${SystemPromptSection.TOOL_USE}}}
+export const BASE = `{{${SystemPromptSection.TOOL_USE}}}
 
 ====
 
@@ -49,10 +46,6 @@ export const BASE = `{{${SystemPromptSection.WORKFLOW_SYSTEM_INSTRUCTIONS}}}
 
 ====
 
-{{${SystemPromptSection.WORKFLOW_INPUT}}}
-
-====
-
 {{${SystemPromptSection.USER_INSTRUCTIONS}}}`
 
 const RULES = (context: SystemPromptContext) => {
@@ -73,7 +66,7 @@ const TOOL_USE = (context: SystemPromptContext) => `TOOL USE
 You have access to a set of tools that are executed upon the user's approval.${context.enableParallelToolCalling ? " You may use multiple tools in a single response when the operations are independent (e.g., reading several files, searching in parallel). For dependent operations where one result informs the next, use tools sequentially." : ""} You will receive the results of all tool uses in the user's response.
 
 ${getResponseToolsSection(context)}
-${getAgentFeedbackPromptGuidanceLine()}`
+`
 
 const ACT_VS_PLAN = (context: SystemPromptContext) => `ACT MODE V.S. PLAN MODE
 

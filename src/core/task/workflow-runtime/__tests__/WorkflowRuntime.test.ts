@@ -29,6 +29,7 @@ import type {
 	WorkflowDocumentBuildActionInstruction,
 	WorkflowEntryProjectValueKeys,
 	WorkflowNextAction,
+	WorkflowPersonaDefinition,
 	WorkflowStepDefinition,
 	WorkflowStepTransitionTarget,
 	WorkflowValues,
@@ -72,6 +73,14 @@ describe("WorkflowRuntime", () => {
 		projectTitle: "entry_project_title",
 		projectFolderName: "entry_project_folder_name",
 	}
+	const DEFAULT_WORKFLOW_PERSONA: WorkflowPersonaDefinition = {
+		name: "Runtime Mary",
+		role: "Runtime Analyst",
+		identity: "Runtime Mary helps test workflow prompt projection.",
+		capabilities: ["workflow testing"],
+		communicationStyle: "Precise and verification-oriented.",
+		principles: ["Keep runtime fixtures explicit and deterministic."],
+	}
 
 	let sandbox: sinon.SinonSandbox
 	let cwd: string
@@ -98,7 +107,6 @@ describe("WorkflowRuntime", () => {
 
 	function createPromptSource() {
 		return {
-			workflowSystemInstructions: "system",
 			currentStepInstructions: "input",
 		}
 	}
@@ -508,6 +516,9 @@ describe("WorkflowRuntime", () => {
 		childInheritance?: WorkflowDefinition["childInheritance"]
 		artifacts?: WorkflowDefinition["artifacts"]
 		projectSubfolder?: WorkflowDefinition["projectSubfolder"]
+		displayName?: string
+		description?: string
+		persona?: WorkflowPersonaDefinition
 	}): WorkflowDefinition {
 		const defaultSteps: Record<string, WorkflowStepDefinition> = {
 			"step-1": createStepDefinition({ stepNumber: 1 }),
@@ -521,9 +532,11 @@ describe("WorkflowRuntime", () => {
 
 		return {
 			name: args?.name ?? "workflow-runtime-test",
+			displayName: args?.displayName ?? "Workflow Runtime Test",
+			description: args?.description ?? "A workflow fixture used by runtime tests.",
 			slashCommandName: "workflow-runtime-test",
 			useSkillName: "workflow-runtime-test",
-			persona: "Workflow runtime persona",
+			persona: args?.persona ?? DEFAULT_WORKFLOW_PERSONA,
 			projectSubfolder: args?.projectSubfolder ?? "planning",
 			workflowValueKeys,
 			entryProjectValueKeys,
@@ -1020,7 +1033,7 @@ describe("WorkflowRuntime", () => {
 		expect(activeSession.ui.suppressedWorkflowFormIds).to.deep.equal([])
 		expect(activeSession.ui.suppressedWorkflowStepResolutionRoutes).to.deep.equal([])
 		expect(result.payload.panel?.panelId).to.equal(ENTRY_INFO_PANEL_ID)
-		expect(taskState.currentFocusChainChecklist).to.equal("- [ ] Step 1\n- [ ] Step 2")
+		expect(taskState.currentFocusChainChecklist).to.equal("1. Step 1 - Active\n2. Step 2 - Not Started")
 	})
 
 	it("activates the brainstorming workflow through the shared entry form and resolves its first Step 1 action", async () => {
@@ -1039,7 +1052,7 @@ describe("WorkflowRuntime", () => {
 		expect(result.payload.panel?.panelId).to.equal(ENTRY_INFO_PANEL_ID)
 		expect(result.payload.panel?.promptMarkdown).to.include("interactive brainstorming session")
 		expect(taskState.currentFocusChainChecklist).to.equal(
-			"- [ ] Gather Inputs\n- [ ] Resolve Session Approach\n- [ ] Perform Interactive Brainstorming\n- [ ] Organize Ideas & Plan Next Actions",
+			"1. Gather Inputs - Active\n2. Resolve Session Approach - Not Started\n3. Perform Interactive Brainstorming - Not Started\n4. Organize Ideas & Plan Next Actions - Not Started",
 		)
 
 		const stepOneAction = await submitNewProjectSelection(taskState, "Brainstorming Runtime Project")
@@ -2309,30 +2322,47 @@ describe("WorkflowRuntime", () => {
 		const emptyProjection = await runtime.buildTurnProjection({ taskState: new TaskState() })
 
 		expect(nextAction.kind).to.equal("project_prompt")
-		expect(firstTurnProjection).to.deep.equal({
-			fullTurnWorkflowSystemInstructionsBlock:
-				"## WORKFLOW\nWorkflow: workflow-runtime-test\n\n## WORKFLOW PERSONA\nWorkflow runtime persona\n\n## WORKFLOW STEPS\n- [ ] Step 1\n- [ ] Step 2\n\n## WORKFLOW INSTRUCTIONS\nsystem",
-			fullTurnWorkflowInputInstructionsBlock: "## CURRENT STEP\nStep 1: Step 1\n\ninput",
-			workflowToolSchemaOverride: [],
-			continuationTurnWorkflowSystemInstructionsBlock:
-				"## WORKFLOW\nWorkflow: workflow-runtime-test\n\n## WORKFLOW STEPS\n- [ ] Step 1\n- [ ] Step 2\n\n## WORKFLOW INSTRUCTIONS\nsystem",
-			continuationTurnWorkflowInputInstructionsBlock: "## WORKFLOW CONTINUATION\nContinue working on step 1: Step 1.",
-		})
-		expect(refreshTurnProjection.fullTurnWorkflowSystemInstructionsBlock).to.equal(
-			"## WORKFLOW\nWorkflow: workflow-runtime-test\n\n## WORKFLOW STEPS\n- [ ] Step 1\n- [ ] Step 2\n\n## WORKFLOW INSTRUCTIONS\nsystem",
+		expect(firstTurnProjection.workflowInputPayloadBlock).to.contain("Workflow:\nWorkflow Runtime Test")
+		expect(firstTurnProjection.workflowInputPayloadBlock).to.contain("Description: A workflow fixture used by runtime tests.")
+		expect(firstTurnProjection.workflowInputPayloadBlock).to.contain("Name: Runtime Mary")
+		expect(firstTurnProjection.workflowInputPayloadBlock).to.contain("Role: Runtime Analyst")
+		expect(firstTurnProjection.workflowInputPayloadBlock).to.contain(
+			"Identity: Runtime Mary helps test workflow prompt projection.",
 		)
-		expect(refreshTurnProjection.fullTurnWorkflowSystemInstructionsBlock).to.not.include("## WORKFLOW PERSONA")
-		expect(refreshTurnProjection.fullTurnWorkflowInputInstructionsBlock).to.equal(
-			firstTurnProjection.fullTurnWorkflowInputInstructionsBlock,
+		expect(firstTurnProjection.workflowInputPayloadBlock).to.contain("Capabilities: workflow testing")
+		expect(firstTurnProjection.workflowInputPayloadBlock).to.contain(
+			"Communication Style: Precise and verification-oriented.",
+		)
+		expect(firstTurnProjection.workflowInputPayloadBlock).to.contain(
+			"Principles: Keep runtime fixtures explicit and deterministic.",
+		)
+		expect(firstTurnProjection.workflowInputPayloadBlock).to.contain("1. Step 1 - Active")
+		expect(firstTurnProjection.workflowInputPayloadBlock).to.contain("2. Step 2 - Not Started")
+		expect(firstTurnProjection.workflowInputPayloadBlock).to.contain("Step 1: Step 1")
+		expect(firstTurnProjection.workflowInputPayloadBlock).to.contain("input")
+		expect(firstTurnProjection.continuationWorkflowInputPayloadBlock).to.contain("Workflow:\nWorkflow Runtime Test")
+		expect(firstTurnProjection.continuationWorkflowInputPayloadBlock).to.contain("1. Step 1 - Active")
+		expect(firstTurnProjection.continuationWorkflowInputPayloadBlock).to.contain("2. Step 2 - Not Started")
+		expect(firstTurnProjection.continuationWorkflowInputPayloadBlock).to.contain("Step 1: Step 1")
+		expect(firstTurnProjection.continuationWorkflowInputPayloadBlock).to.contain("input")
+		expect(firstTurnProjection.continuationWorkflowInputPayloadBlock).to.not.contain("Name: Runtime Mary")
+		const removedProjectionKeys = [
+			["fullTurnWorkflow", "SystemInstructionsBlock"].join(""),
+			["fullTurnWorkflow", "InputInstructionsBlock"].join(""),
+			["continuationTurnWorkflow", "SystemInstructionsBlock"].join(""),
+			["continuationTurnWorkflow", "InputInstructionsBlock"].join(""),
+		]
+		expect(Object.keys(firstTurnProjection)).to.not.include.members(removedProjectionKeys)
+		expect(refreshTurnProjection.workflowInputPayloadBlock).to.not.contain("Name: Runtime Mary")
+		expect(refreshTurnProjection.continuationWorkflowInputPayloadBlock).to.equal(
+			firstTurnProjection.continuationWorkflowInputPayloadBlock,
 		)
 		expect(refreshTurnProjection.workflowToolSchemaOverride).to.deep.equal(firstTurnProjection.workflowToolSchemaOverride)
-		expect(refreshTurnProjection.continuationTurnWorkflowSystemInstructionsBlock).to.equal(
-			firstTurnProjection.continuationTurnWorkflowSystemInstructionsBlock,
-		)
-		expect(refreshTurnProjection.continuationTurnWorkflowInputInstructionsBlock).to.equal(
-			firstTurnProjection.continuationTurnWorkflowInputInstructionsBlock,
-		)
-		expect(emptyProjection).to.deep.equal({})
+		expect(emptyProjection).to.deep.equal({
+			workflowInputPayloadBlock: undefined,
+			continuationWorkflowInputPayloadBlock: undefined,
+			workflowToolSchemaOverride: undefined,
+		})
 	})
 
 	it("creates workflow form sessions at a render action startPanelId", async () => {
@@ -3789,7 +3819,7 @@ describe("WorkflowRuntime", () => {
 		if (successResult.kind !== "project_prompt") {
 			throw new Error(`Expected project_prompt, received ${successResult.kind}.`)
 		}
-		expect(successResult.promptProjection.fullTurnWorkflowInputInstructionsBlock).to.contain("Step 3: Step 3")
+		expect(successResult.promptProjection.workflowInputPayloadBlock).to.contain("Step 3: Step 3")
 		expect(getActiveWorkflowSession(taskState).branchContext.activeBranchId).to.equal("project-prompt")
 
 		const failureWorkflow = createWorkflowDefinition({
@@ -3917,7 +3947,7 @@ describe("WorkflowRuntime", () => {
 		const activeSession = getActiveWorkflowSession(taskState)
 		expect(activeSession.activeStepNumber).to.equal(2)
 		expect(activeSession.branchContext.activeBranchId).to.equal("no-selected-action")
-		expect(result.promptProjection.fullTurnWorkflowInputInstructionsBlock).to.contain("Step 2: Waiting Step")
+		expect(result.promptProjection.workflowInputPayloadBlock).to.contain("Step 2: Waiting Step")
 	})
 
 	it("retries tool-backed operations only when the matched failure branch prescribes another execute_tool_backed_operation", async () => {

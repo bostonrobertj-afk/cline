@@ -667,6 +667,296 @@ Allowed files:
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
 
+### Phase 6 - Module-Owned Prompt Data And Response Tool Surface
+
+After completing this phase, pause for QA review before moving to Validation.
+
+### Phase 6 Scope
+
+This phase aligns the shipped `brainstorming` workflow module with the foundational workflow prompt payload contract introduced by foundational-build Phase 56. It embeds the workflow display description and complete Mary/Analyst persona directly into the brainstorming module, updates brainstorming prompt sources so current-step details are input-payload data rather than system-prompt data, and canonicalizes module-authored per-step tool schemas so every brainstorming step delegates to `brainstormingToolSchemas.ts` under `FR-15a` through `FR-15f`.
+
+### Phase 6 Scope Boundary
+
+- Do not read `_bmad/bmm/agents/analyst.md`, `.bmad`, `.cline/skills`, or any other legacy BMAD persona file at runtime. The old analyst file is only migration source material for constants committed into the brainstorming module.
+- Do not implement foundational prompt plumbing in this module phase. System-prompt placeholder removal, input-payload insertion, and prompt-registry behavior belong to foundational-build Phase 56.
+- Do not add static/default prompt or native-tool schemas for brainstorming tools. Brainstorming tool exposure must come only from `brainstormingToolSchemas.ts` through workflow step `buildToolSchema` delegation.
+- Do not change workflow forms, artifact families, deterministic procedure routing, project-output paths, or decision-tree behavior in this phase.
+- Do not preserve `persona: "analyst"` as a compatibility alias.
+
+### Phase 6 Known Issues / Risks / Technical Debt
+
+- `brainstormingWorkflowDefinition` currently carries only a persona string, so the runtime cannot project the full persona details the user expects.
+- The workflow description shown on the mandatory entry form must also be available as module-authored workflow description data for runtime prompt/input projection.
+- Step prompt source builders still need to align with the foundational contract where current-step details belong in input payloads, not system-prompt instructions.
+- Step 3 and Step 4 tool schema ownership is split between `brainstormingWorkflow.ts` and `brainstormingToolSchemas.ts`, which violates the canonical module tool-schema ownership requirements in `FR-15a` through `FR-15f`.
+
+[x] Task 11. Embed module-owned brainstorming display metadata and full persona detail.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
+[x] Subtask 11.1. In `brainstormingWorkflow.ts`, add a module-level `BRAINSTORMING_WORKFLOW_DISPLAY_NAME` constant with exact value `"Brainstorming"`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[x] Subtask 11.2. In `brainstormingWorkflow.ts`, add a module-level `BRAINSTORMING_WORKFLOW_DESCRIPTION` constant whose value is the same user-facing workflow description currently rendered in the mandatory entry form first panel.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[x] Subtask 11.3. In `brainstormingWorkflow.ts`, add a module-level `BRAINSTORMING_WORKFLOW_PERSONA` constant typed as `WorkflowPersonaDefinition` with exact `name: "Mary"`, exact `role: "Analyst"`, exact `identity: "Mary is an insightful analyst who helps turn messy ideas into clear options through brainstorming, market research, competitive analysis, and requirements elicitation."`, exact `capabilities: ["brainstorming", "ideation", "market research", "competitive analysis", "requirements elicitation"]`, exact `communicationStyle: "Curious, precise, evidence-driven, and discovery-oriented."`, and exact `principles: ["Use structured analysis such as Porter's Five Forces, SWOT, root-cause analysis, brainstorming methods, and competitive intelligence to uncover what matters."]`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[x] Subtask 11.4. In `brainstormingWorkflowDefinition`, replace the old `persona: "analyst"` assignment with `persona: BRAINSTORMING_WORKFLOW_PERSONA`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[x] Subtask 11.5. In `brainstormingWorkflowDefinition`, add `displayName: BRAINSTORMING_WORKFLOW_DISPLAY_NAME` and `description: BRAINSTORMING_WORKFLOW_DESCRIPTION`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[x] Subtask 11.6. In the workflow entry panel definition, replace duplicated literal description text with `BRAINSTORMING_WORKFLOW_DESCRIPTION` so the first workflow-form panel and runtime workflow description share one module-owned value.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[x] Subtask 11.7. In `brainstormingWorkflow.test.ts`, replace the old persona-string assertion with assertions for `displayName`, `description`, and every field of `BRAINSTORMING_WORKFLOW_PERSONA`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
+[x] Subtask 11.8. In `brainstormingWorkflow.test.ts`, add coverage proving the entry panel prompt markdown equals `brainstormingWorkflowDefinition.description`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
+[x] Task 12. Align brainstorming step prompt sources with input-payload-only current-step details.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
+[x] Subtask 12.1. In every `buildPromptSource(...)` implementation in `brainstormingWorkflow.ts`, delete `workflowSystemInstructions` from returned objects and return current-step prompt copy only through `currentStepInstructions`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[x] Subtask 12.2. In Step 3 prompt source construction, keep the selected-approach-specific facilitation prompt in `currentStepInstructions` and do not move that prompt into workflow-level instructions or persona fields.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[x] Subtask 12.3. In Step 4 prompt source construction, keep the organize-and-plan-next-actions prompt in `currentStepInstructions` and do not move it into workflow-level instructions or persona fields.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[x] Subtask 12.4. In `brainstormingWorkflow.test.ts`, update Step 3 and Step 4 prompt-source assertions so they verify `currentStepInstructions` and do not assert or construct `workflowSystemInstructions`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
+[x] Task 13. Canonicalize brainstorming module per-step tool-schema ownership.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingToolSchemas.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingToolSchemas.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
+[x] Subtask 13.1. In `brainstormingToolSchemas.ts`, remove `send_user_message` and `ask_followup_question` imports/builders/exposure from brainstorming step schemas because the updated brainstorming requirements define exact Step 3 and Step 4 schemas that do not include those response tools.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingToolSchemas.ts`
+
+[x] Subtask 13.2. In `brainstormingToolSchemas.ts`, export a typed `buildBrainstormingStep3ToolSchemas(input: WorkflowPromptBuilderInput): readonly ClineToolSpec[]` builder that selects suggest versus choose/random schemas from explicit persisted `selected_approach` workflow value.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingToolSchemas.ts`
+
+[x] Subtask 13.3. In `brainstormingToolSchemas.ts`, export `buildBrainstormingStep4ToolSchemas(): readonly ClineToolSpec[]` returning exactly `build_workflow_document` and `attempt_completion`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingToolSchemas.ts`
+
+[x] Subtask 13.4. In `brainstormingWorkflow.ts`, delete local `buildStep3ToolSchema(...)` and update Step 3 `buildToolSchema` to delegate directly to `buildBrainstormingStep3ToolSchemas`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[x] Subtask 13.5. In `brainstormingWorkflow.ts`, replace Step 4 inline `buildToolSchema` array with direct delegation to `buildBrainstormingStep4ToolSchemas`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[x] Subtask 13.6. In `brainstormingToolSchemas.test.ts`, update exact expectations for Step 3 suggest, Step 3 choose/random, and Step 4 to match the updated brainstorming requirements.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingToolSchemas.test.ts`
+
+[x] Subtask 13.7. In `brainstormingWorkflow.test.ts`, add coverage proving Step 3 and Step 4 `buildToolSchema` delegate through the canonical exported builders and expose the exact required tool names.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
+[x] Task 14. Verify the brainstorming module has no runtime BMAD persona dependency.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingToolSchemas.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
+[x] Subtask 14.1. In `brainstormingWorkflow.test.ts`, add coverage proving `brainstormingWorkflowDefinition.persona.name === "Mary"` and that the definition does not expose `"analyst"` as its persona value.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
+[x] Subtask 14.2. Run `rg "_bmad|analyst\\.md|readFile|fs/promises|fs" src/core/task/workflow-runtime/workflow-modules/brainstorming`; manually confirm there are no runtime file reads or BMAD persona-file references in the brainstorming module.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingToolSchemas.ts`
+
+[x] Task 15. Validate Phase 6.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingToolSchemas.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingToolSchemas.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
+
+[x] Subtask 15.1. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingToolSchemas.test.ts`; it must pass before Phase 6 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingToolSchemas.test.ts`
+
+[x] Subtask 15.2. Run `npm run test:unit -- src/core/prompts/system-prompt/__tests__/integration.test.ts`; it must pass before Phase 6 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
+
+[x] Subtask 15.3. Run `npm run check-types` and `npm run lint`; both must pass before Phase 6 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingToolSchemas.ts`
+
+### Phase 7 - Complete Canonical Tool-Schema Delegation For Runtime-Driven Steps
+
+Pause for QA review before final validation.
+
+This phase closes the remaining `FR-15b` compliance gap where runtime-driven Step 1 and Step 2 still inherit a local `buildToolSchema` fallback body from `brainstormingWorkflow.ts`. Step 1 and Step 2 remain runtime-driven and must continue exposing no model-visible tools, but that empty schema must be owned by `brainstormingToolSchemas.ts` and directly delegated by the workflow definition.
+
+[x] Task 16. Move Step 1 and Step 2 empty tool-schema ownership into the canonical brainstorming tool-schema file.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingToolSchemas.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[x] Subtask 16.1. In `brainstormingToolSchemas.ts`, export `buildBrainstormingStep1ToolSchemas(): readonly ClineToolSpec[]` returning an empty array because Step 1 is entirely runtime-driven and must not route to model-driven work.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingToolSchemas.ts`
+
+[x] Subtask 16.2. In `brainstormingToolSchemas.ts`, export `buildBrainstormingStep2ToolSchemas(): readonly ClineToolSpec[]` returning an empty array because Step 2 is entirely runtime-driven and must not route to model-driven work.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingToolSchemas.ts`
+
+[x] Subtask 16.3. In `brainstormingWorkflow.ts`, import `buildBrainstormingStep1ToolSchemas` and `buildBrainstormingStep2ToolSchemas` from `brainstormingToolSchemas.ts`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[x] Subtask 16.4. In the Step 1 `createStepDefinition(...)` call, add `buildToolSchema: buildBrainstormingStep1ToolSchemas`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[x] Subtask 16.5. In the Step 2 `createStepDefinition(...)` call, add `buildToolSchema: buildBrainstormingStep2ToolSchemas`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[x] Subtask 16.6. In the `createStepDefinition(...)` argument type, make `buildToolSchema` required instead of optional.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[x] Subtask 16.7. In `createStepDefinition(...)`, replace `buildToolSchema: args.buildToolSchema ?? (() => [])` with direct assignment to `args.buildToolSchema`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[x] Task 17. Add regression coverage for canonical Step 1 and Step 2 tool-schema delegation.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingToolSchemas.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
+[x] Subtask 17.1. In `brainstormingToolSchemas.test.ts`, import `buildBrainstormingStep1ToolSchemas` and `buildBrainstormingStep2ToolSchemas`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingToolSchemas.test.ts`
+
+[x] Subtask 17.2. In `brainstormingToolSchemas.test.ts`, add coverage proving Step 1 and Step 2 canonical builders each return an empty tool-schema array.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingToolSchemas.test.ts`
+
+[x] Subtask 17.3. In `brainstormingWorkflow.test.ts`, import `buildBrainstormingStep1ToolSchemas` and `buildBrainstormingStep2ToolSchemas`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
+[x] Subtask 17.4. In `brainstormingWorkflow.test.ts`, add coverage proving Step 1 `buildToolSchema` is exactly `buildBrainstormingStep1ToolSchemas`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
+[x] Subtask 17.5. In `brainstormingWorkflow.test.ts`, add coverage proving Step 2 `buildToolSchema` is exactly `buildBrainstormingStep2ToolSchemas`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
+[x] Subtask 17.6. In `brainstormingWorkflow.test.ts`, add structured decision-tree coverage proving Step 1 and Step 2 route actions do not include `project_prompt`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
+[x] Task 18. Validate Phase 7.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingToolSchemas.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingToolSchemas.test.ts`
+
+[x] Subtask 18.1. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingToolSchemas.test.ts`; it must pass before Phase 7 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingToolSchemas.test.ts`
+
+[x] Subtask 18.2. Run `rg -n "\\(\\) => \\[\\]|buildToolSchema\\?:|buildToolSchema: args\\.buildToolSchema \\?\\?" src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`; it must return no matches before Phase 7 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[x] Subtask 18.3. Run `npm run check-types`; it must pass before Phase 7 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingToolSchemas.ts`
+
 ## Validation
 
 Run these commands after all tasks and subtasks are complete:
@@ -692,17 +982,28 @@ Run these commands after all tasks and subtasks are complete:
 7. `npm run test:unit -- --grep "AttemptCompletion"`
    - Expected: attempt-completion post-delivery workflow teardown coverage passes.
 
-8. `npm run check-types`
+8. `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingToolSchemas.test.ts`
+   - Expected: brainstorming workflow metadata, prompt-source, persona, and canonical tool-schema coverage passes.
+
+9. `npm run test:unit -- src/core/prompts/system-prompt/__tests__/integration.test.ts`
+   - Expected: active brainstorming prompt coverage proves workflow-projected schemas remain authoritative.
+
+10. `rg -n "_bmad|analyst\\.md|readFile|fs/promises|fs" src/core/task/workflow-runtime/workflow-modules/brainstorming`
+   - Expected: no runtime BMAD persona-file references or runtime file reads in the brainstorming module.
+
+11. `npm run check-types`
    - Expected: TypeScript completes without errors.
 
-9. `npm run lint`
+12. `npm run lint`
    - Expected: lint completes without errors.
 
-10. Manual code review:
+13. Manual code review:
     - Confirm no runtime code reads `.cline/skills/bmad-brainstorming/brain-methods.csv`, `_bmad/core/skills/bmad-brainstorming/brain-methods.csv`, `.cline/skills/bmad-brainstorming/template.md`, or `/Users/robertboston/Documents/Cline/Workflows/brainstorming.md`.
     - Confirm `get_brainstorming_methods` and `append_brainstorming_selected_technique` are exposed only through brainstorming Step 3 module-owned `buildToolSchema`.
     - Confirm Step 2 random selection uses `run_deterministic_procedure` and not any tool-backed operation.
     - Confirm Step 4 completion uses successful `attempt_completion` plus generic runtime teardown, with no workflow-specific completion handler.
+    - Confirm the Mary/Analyst persona is committed as module-owned data and not loaded from `_bmad/bmm/agents/analyst.md`.
+    - Confirm Step 3 and Step 4 tool schemas are delegated through `brainstormingToolSchemas.ts` and expose exactly the tools required by `brainstorming-requirements.md`.
 
-11. `rg -n "step-2-random-confirmation-form" src`
+14. `rg -n "step-2-random-confirmation-form" src`
     - Expected: no matches. Step 2 random confirmation must be a panel in `step-2-approach-form`, not a separate workflow form.

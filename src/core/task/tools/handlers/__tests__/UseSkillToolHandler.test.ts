@@ -2,7 +2,7 @@ import { strict as assert } from "node:assert"
 import type { ToolUse } from "@core/assistant-message"
 import { afterEach, describe, it } from "mocha"
 import sinon from "sinon"
-import type { WorkflowDefinition, WorkflowNextAction } from "@/core/task/workflow-runtime/types"
+import type { WorkflowDefinition, WorkflowNextAction, WorkflowPersonaDefinition } from "@/core/task/workflow-runtime/types"
 import * as WorkflowRegistry from "@/core/task/workflow-runtime/WorkflowRegistry"
 import { ClineDefaultTool } from "@/shared/tools"
 import { TaskState } from "../../../TaskState"
@@ -15,12 +15,23 @@ const ENTRY_PROJECT_VALUE_KEYS = {
 	projectFolderName: "entry_project_folder_name",
 }
 
+const WORKFLOW_PERSONA_FIXTURE: WorkflowPersonaDefinition = {
+	name: "Workflow Runtime Engineer",
+	role: "Workflow activation tester",
+	identity: "A test workflow persona for use-skill activation fixtures.",
+	capabilities: ["workflow activation testing"],
+	communicationStyle: "Concise and deterministic.",
+	principles: ["Keep workflow activation fixtures explicit."],
+}
+
 function createWorkflowDefinition(): WorkflowDefinition {
 	return {
 		name: "workflow-runtime-test",
+		displayName: "Workflow Runtime Test",
+		description: "Test workflow for use-skill activation.",
 		slashCommandName: "workflow-runtime-test",
 		useSkillName: "workflow-runtime-test",
-		persona: "engineer",
+		persona: WORKFLOW_PERSONA_FIXTURE,
 		projectSubfolder: "planning",
 		workflowValueKeys: Object.values(ENTRY_PROJECT_VALUE_KEYS),
 		entryProjectValueKeys: ENTRY_PROJECT_VALUE_KEYS,
@@ -143,7 +154,14 @@ describe("UseSkillToolHandler", () => {
 
 	it("queues successful workflow activation next actions", async () => {
 		const workflow = createWorkflowDefinition()
-		const nextAction: WorkflowNextAction = { kind: "project_prompt", promptProjection: {} }
+		const nextAction: WorkflowNextAction = {
+			kind: "project_prompt",
+			promptProjection: {
+				workflowInputPayloadBlock: undefined,
+				continuationWorkflowInputPayloadBlock: undefined,
+				workflowToolSchemaOverride: undefined,
+			},
+		}
 		const { config, activateWorkflow, queueWorkflowNextAction } = createMainAgentConfig(nextAction)
 		sinon.stub(WorkflowRegistry, "resolveWorkflowByUseSkillName").returns(workflow)
 		const handler = new UseSkillToolHandler()
@@ -160,7 +178,14 @@ describe("UseSkillToolHandler", () => {
 	})
 
 	it("activates the shipped brainstorming workflow through its use_skill name", async () => {
-		const nextAction: WorkflowNextAction = { kind: "project_prompt", promptProjection: {} }
+		const nextAction: WorkflowNextAction = {
+			kind: "project_prompt",
+			promptProjection: {
+				workflowInputPayloadBlock: undefined,
+				continuationWorkflowInputPayloadBlock: undefined,
+				workflowToolSchemaOverride: undefined,
+			},
+		}
 		const { config, activateWorkflow, queueWorkflowNextAction } = createMainAgentConfig(nextAction)
 		const resolvedWorkflow = WorkflowRegistry.resolveWorkflowByUseSkillName("brainstorming")
 		const handler = new UseSkillToolHandler()

@@ -45,9 +45,7 @@ export const config = createVariant(ModelFamily.NATIVE_GPT_5)
 	.template(GPT_5_TEMPLATE_OVERRIDES.BASE)
 	.components(
 		SystemPromptSection.USER_INSTRUCTIONS,
-		SystemPromptSection.WORKFLOW_SYSTEM_INSTRUCTIONS,
 		SystemPromptSection.TOOL_USE,
-		SystemPromptSection.WORKFLOW_INPUT,
 		SystemPromptSection.MCP,
 		SystemPromptSection.RULES,
 		SystemPromptSection.SYSTEM_INFO,

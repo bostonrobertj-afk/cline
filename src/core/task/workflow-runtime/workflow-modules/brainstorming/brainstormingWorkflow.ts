@@ -10,6 +10,7 @@ import type {
 	WorkflowDecisionTree,
 	WorkflowDefinition,
 	WorkflowDeterministicProcedureResult,
+	WorkflowPersonaDefinition,
 	WorkflowPromptBuilderInput,
 	WorkflowStepDefinition,
 	WorkflowStepPromptSource,
@@ -25,10 +26,10 @@ import {
 	selectRandomBrainstormingTechnique,
 } from "./brainstormingTechniqueRegistry"
 import {
-	buildBrainstormingAttemptCompletionToolSchema,
-	buildBrainstormingBuildWorkflowDocumentToolSchema,
-	buildBrainstormingStep3ChooseOrRandomToolSchemas,
-	buildBrainstormingStep3SuggestToolSchemas,
+	buildBrainstormingStep1ToolSchemas,
+	buildBrainstormingStep2ToolSchemas,
+	buildBrainstormingStep3ToolSchemas,
+	buildBrainstormingStep4ToolSchemas,
 } from "./brainstormingToolSchemas"
 
 enum BrainstormingWorkflowValueKey {
@@ -70,6 +71,20 @@ const STEP_1_SETUP_FORM_ID = "step-1-setup-form"
 const STEP_2_APPROACH_FORM_ID = "step-2-approach-form"
 const STEP_2_RANDOM_CONFIRMATION_PANEL_ID = "step-2-random-confirmation-panel"
 const SUGGESTED_TECHNIQUE_PLACEHOLDER = "user requested technique suggestion"
+const BRAINSTORMING_WORKFLOW_DISPLAY_NAME = "Brainstorming"
+const BRAINSTORMING_WORKFLOW_DESCRIPTION =
+	"This workflow guides an interactive brainstorming session, captures the session topic and goals, helps resolve an appropriate brainstorming technique, records generated ideas, and writes the session output to brainstorming.md."
+const BRAINSTORMING_WORKFLOW_PERSONA: WorkflowPersonaDefinition = {
+	name: "Mary",
+	role: "Analyst",
+	identity:
+		"Mary is an insightful analyst who helps turn messy ideas into clear options through brainstorming, market research, competitive analysis, and requirements elicitation.",
+	capabilities: ["brainstorming", "ideation", "market research", "competitive analysis", "requirements elicitation"],
+	communicationStyle: "Curious, precise, evidence-driven, and discovery-oriented.",
+	principles: [
+		"Use structured analysis such as Porter's Five Forces, SWOT, root-cause analysis, brainstorming methods, and competitive intelligence to uncover what matters.",
+	],
+}
 
 const STEP_3_SHARED_FACILITATION_PROMPT = `Goal: Guide an interactive brainstorming session from setup through technique selection, idea capture, and final organization, pausing whenever user input or confirmation is needed.
 
@@ -697,15 +712,6 @@ ${STEP_3_SHARED_FACILITATION_PROMPT}`,
 	}
 }
 
-function buildStep3ToolSchema(input: WorkflowPromptBuilderInput): ReturnType<WorkflowStepDefinition["buildToolSchema"]> {
-	const selectedApproach = readSelectedApproach(input.session.workflowValues)
-	if (selectedApproach === BrainstormingSelectedApproach.Suggest) {
-		return buildBrainstormingStep3SuggestToolSchemas()
-	}
-
-	return buildBrainstormingStep3ChooseOrRandomToolSchemas()
-}
-
 function createEmptyPromptSource(): WorkflowStepPromptSource {
 	return {}
 }
@@ -715,14 +721,14 @@ function createStepDefinition(args: {
 	checklistLabel: string
 	decisionTree: WorkflowDecisionTree
 	buildPromptSource?: WorkflowStepDefinition["buildPromptSource"]
-	buildToolSchema?: WorkflowStepDefinition["buildToolSchema"]
+	buildToolSchema: WorkflowStepDefinition["buildToolSchema"]
 }): WorkflowStepDefinition {
 	return {
 		id: `step-${args.stepNumber}`,
 		stepNumber: args.stepNumber,
 		checklistLabel: args.checklistLabel,
 		buildPromptSource: args.buildPromptSource ?? createEmptyPromptSource,
-		buildToolSchema: args.buildToolSchema ?? (() => []),
+		buildToolSchema: args.buildToolSchema,
 		decisionTree: args.decisionTree,
 	}
 }
@@ -1194,9 +1200,11 @@ function buildStep4DecisionTree(): WorkflowDecisionTree {
 
 export const brainstormingWorkflowDefinition: WorkflowDefinition = {
 	name: "brainstorming",
+	displayName: BRAINSTORMING_WORKFLOW_DISPLAY_NAME,
+	description: BRAINSTORMING_WORKFLOW_DESCRIPTION,
 	slashCommandName: "brainstorming",
 	useSkillName: "brainstorming",
-	persona: "analyst",
+	persona: BRAINSTORMING_WORKFLOW_PERSONA,
 	projectSubfolder: "discovery",
 	workflowValueKeys: BRAINSTORMING_WORKFLOW_VALUE_KEYS,
 	entryProjectValueKeys: {
@@ -1205,8 +1213,7 @@ export const brainstormingWorkflowDefinition: WorkflowDefinition = {
 		projectFolderName: BrainstormingWorkflowValueKey.ProjectFolderName,
 	},
 	entryPanel: {
-		promptMarkdown:
-			"This workflow guides an interactive brainstorming session, captures the session topic and goals, helps resolve an appropriate brainstorming technique, records generated ideas, and writes the session output to brainstorming.md.",
+		promptMarkdown: BRAINSTORMING_WORKFLOW_DESCRIPTION,
 	},
 	artifacts: {
 		[BRAINSTORMING_SESSION_ARTIFACT_ID]: {
@@ -1237,18 +1244,20 @@ export const brainstormingWorkflowDefinition: WorkflowDefinition = {
 			stepNumber: 1,
 			checklistLabel: "Gather Inputs",
 			decisionTree: buildStep1DecisionTree(),
+			buildToolSchema: buildBrainstormingStep1ToolSchemas,
 		}),
 		"step-2": createStepDefinition({
 			stepNumber: 2,
 			checklistLabel: "Resolve Session Approach",
 			decisionTree: buildStep2DecisionTree(),
+			buildToolSchema: buildBrainstormingStep2ToolSchemas,
 		}),
 		"step-3": createStepDefinition({
 			stepNumber: 3,
 			checklistLabel: "Perform Interactive Brainstorming",
 			decisionTree: buildStep3DecisionTree(),
 			buildPromptSource: buildStep3PromptSource,
-			buildToolSchema: buildStep3ToolSchema,
+			buildToolSchema: buildBrainstormingStep3ToolSchemas,
 		}),
 		"step-4": createStepDefinition({
 			stepNumber: 4,
@@ -1257,10 +1266,7 @@ export const brainstormingWorkflowDefinition: WorkflowDefinition = {
 			buildPromptSource: (input) => ({
 				currentStepInstructions: replaceOutputFilePlaceholder(input, STEP_4_PROMPT),
 			}),
-			buildToolSchema: () => [
-				buildBrainstormingBuildWorkflowDocumentToolSchema(),
-				buildBrainstormingAttemptCompletionToolSchema(),
-			],
+			buildToolSchema: buildBrainstormingStep4ToolSchemas,
 		}),
 	},
 }
