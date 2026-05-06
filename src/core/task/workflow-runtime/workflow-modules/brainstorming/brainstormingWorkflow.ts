@@ -86,14 +86,24 @@ const BRAINSTORMING_WORKFLOW_PERSONA: WorkflowPersonaDefinition = {
 	],
 }
 
-const STEP_3_SHARED_FACILITATION_PROMPT = `Goal: Guide an interactive brainstorming session from setup through technique selection, idea capture, and final organization, pausing whenever user input or confirmation is needed.
+const STEP_3_SHARED_FACILITATION_PROMPT = `Identify the following critical information within the document:
+- Session Topic
+- Session Goals
+- Selected Techniques
 
-- Engage the user in interactive brainstorming using the selected approach.
-- Keep the user in control at each decision point. Pause for clarification, a technique switch, or continuation whenever needed. Record \`techniques_used\` and \`ideas_generated\` in \`{output_file}\` as needed.
-- The goal is to generate as many ideas as possible without exhausting the user.
-- Techniques for keeping brainstorming going: ask probing questions, ask users how the current idea connects to an earlier idea, offer challenges to the user's idea or assumptions, offer new ideas or angles to keep the conversation going.
+Help the user to refine their topic and goals to serve as a strong foundation for the brainstorming session if needed. Ask probing questions and offer suggestions to encourage the user to transform overly-brief or vague topics and goals into more thoughtful, detailed versions, updating the document to reflect revised versions once they’ve approved.
 
-Once the user indicates they're ready, use \`workflow_progress_request\` to confirm and unlock the next workflow step.`
+Once the session topic and session goals are detailed and thoughtful enough to serve as a launching point for brainstorming, leverage the selected technique to guide the user through a thorough brainstorming process. 
+If at any point the user asks to switch to a new brainstorming technique, you can use get_brainstorming_methods to retrieve a full list of supported techniques. 
+
+Tips for the session:
+- Ask probing questions
+- Ask how ideas connect to earlier ideas
+- Offer challenges to to the user's ideas or assumptions
+- Offer new ideas and angles
+Be sure to record the session's progress in \`{output_file}\`, including noting any new techniques which are adopted and ideas that are generated.
+
+Once the user indicates they're ready to move on from idea generation, use \`workflow_progress_request\` to confirm and unlock the next workflow step.`
 
 const STEP_4_PROMPT = `- Review the captured ideas, cluster them into themes, and identify the strongest candidates. Ask the user which ideas matter most right now: high-impact, quick wins, or the most innovative concepts.
 - For each prioritized idea, define next steps, resource needs, obstacles, and success indicators.
@@ -691,16 +701,14 @@ function buildStep3PromptSource(input: WorkflowPromptBuilderInput): WorkflowStep
 		selectedApproach === BrainstormingSelectedApproach.Suggest
 			? `Read \`{output_file}\`.
 
-Call \`get_brainstorming_methods\` to retrieve the list of supported brainstorming methods. Select a brainstorming technique that seems appropriate based on the topic indicated in \`{output_file}\`. Propose the selected technique to the user.
+The user has requested that you propose an appropriate brainstorming technique based on the information they've provided in \`{output_file}\`. Call \`get_brainstorming_methods\` to retrieve the list of supported brainstorming methods. Select a brainstorming technique that seems appropriate, then propose that technique to the user.
 
 After the user accepts the proposed technique, call \`append_brainstorming_selected_technique\` with the accepted technique name, description, and category/id when available. Do not call \`set_workflow_values\` for \`selected_techniques\`.
 
-Then call \`build_workflow_document\` to replace the \`user requested technique suggestion\` line under the \`selected techniques\` heading in \`{output_file}\` with the accepted technique name and description.
+Then record the selected technique under the \`selected techniques\` heading in \`{output_file}\` with the accepted technique name and description.
 
 After the accepted technique has been appended and written to \`{output_file}\`, continue with the shared brainstorming facilitation instructions below.`
-			: `Read \`{output_file}\`.
-
-Use the already selected brainstorming technique recorded in \`{output_file}\`. Do not call \`get_brainstorming_methods\`.`
+			: `Read \`{output_file}\`.`
 
 	return {
 		currentStepInstructions: replaceOutputFilePlaceholder(
