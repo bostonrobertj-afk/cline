@@ -65,7 +65,7 @@ The brainstorming module must define step-specific AI-writable workflow-value ex
 | --- | --- | --- | --- |
 | Step 1 | none | none | Step 1 values are form/deterministic writes only. |
 | Step 2 | none | none | Step 2 values are form/deterministic writes only. |
-| Step 3 choose/random | `set_workflow_values` | `techniques_used`, `ideas_generated` | `selected_techniques` must not be exposed through `set_workflow_values`. |
+| Step 3 choose/random | `append_brainstorming_selected_technique` | append tool updates `selected_techniques` | Step 3 session progress must be recorded in `{output_file}` through governed file-edit tools; technique additions must use `append_brainstorming_selected_technique`. |
 | Step 3 suggest | `append_brainstorming_selected_technique` | append tool updates `selected_techniques` | Step 3 suggest must not expose `set_workflow_values`; session notes must be edited in `{output_file}` through governed file-edit tools. |
 | Step 4 | none | none | Step 4 updates the output document through governed file-edit tools. |
 
@@ -249,22 +249,22 @@ When `selected_approach` is `I want to choose` or `I want a random technique`, S
 
 Read `{output_file}`.
 
-Use the already selected brainstorming technique recorded in `{output_file}`. Do not call `get_brainstorming_methods`.
+Use the already selected brainstorming technique recorded in `{output_file}`.
 
 Then include these shared brainstorming facilitation instructions for both prompt variants:
 
 Goal: Guide an interactive brainstorming session from setup through technique selection, idea capture, and final organization, pausing whenever user input or confirmation is needed.
 
 - Engage the user in interactive brainstorming using the selected approach.
-- Keep the user in control at each decision point. Pause for clarification, a technique switch, or continuation whenever needed. Record `techniques_used` and `ideas_generated` through `set_workflow_values` where exposed and in `{output_file}` through governed file-edit tools as needed.
+- Keep the user in control at each decision point. Pause for clarification, a technique switch, or continuation whenever needed. Record `ideas_generated` through `set_workflow_values` where exposed and in `{output_file}` through governed file-edit tools as needed.
 - The goal is to generate as many ideas as possible without exhausting the user.
 - Techniques for keeping brainstorming going: ask probing questions, ask users how the current idea connects to an earlier idea, offer challenges to the user's idea or assumptions, offer new ideas or angles to keep the conversation going.
 
 Once the user indicates they're ready, use `workflow_progress_request` to confirm and unlock the next workflow step.
 
-Step 3 tool schema must expose exactly the tools required by the selected prompt variant. For the suggestion variant, Step 3 must expose `get_brainstorming_methods`, `append_brainstorming_selected_technique`, `read_file`, `apply_patch`, `send_user_message`, `ask_followup_question`, and `workflow_progress_request`. For choose/random variants, Step 3 must expose `read_file`, `apply_patch`, `set_workflow_values` for `techniques_used` and `ideas_generated`, `send_user_message`, `ask_followup_question`, and `workflow_progress_request`, but must not expose `get_brainstorming_methods` or `append_brainstorming_selected_technique`.
+Every Step 3 tool schema variant must expose exactly `get_brainstorming_methods`, `append_brainstorming_selected_technique`, `read_file`, `apply_patch`, `send_user_message`, `ask_followup_question`, and `workflow_progress_request`.
 
-In the suggestion variant, `techniques_used` and `ideas_generated` must not be exposed as AI-writable runtime workflow values; any needed session notes must be edited in `{output_file}` through governed file-edit tools.
+In every Step 3 variant, `selected_techniques` must be mutated only through `append_brainstorming_selected_technique`, and session notes must be edited in `{output_file}` through governed file-edit tools.
 
 When Step 3 receives a `workflow_progress_request_confirmed` event, the Step 3 decision tree must select a `transition_step` action targeting Step 4. If the request is denied, Step 3 must remain active and return to `project_prompt` for continued brainstorming facilitation.
 
@@ -296,19 +296,17 @@ The brainstorming module's canonical tool-schema file is `brainstormingToolSchem
 
 `brainstormingToolSchemas.ts` must own the complete model-visible tool schema for each model-facing brainstorming step and variant, including Step 3 choose, Step 3 random, Step 3 suggest, and Step 4.
 
-Step 3 choose/random schemas must expose exactly `read_file`, `apply_patch`, `set_workflow_values` for `techniques_used` and `ideas_generated`, `send_user_message`, `ask_followup_question`, and `workflow_progress_request`.
-
-Step 3 suggest schema must expose exactly `get_brainstorming_methods`, `append_brainstorming_selected_technique`, `read_file`, `apply_patch`, `send_user_message`, `ask_followup_question`, and `workflow_progress_request`.
+Every Step 3 schema variant must expose exactly `get_brainstorming_methods`, `append_brainstorming_selected_technique`, `read_file`, `apply_patch`, `send_user_message`, `ask_followup_question`, and `workflow_progress_request`.
 
 Step 4 schema must expose exactly `read_file`, `apply_patch`, `send_user_message`, `ask_followup_question`, and `attempt_completion`.
 
-`set_workflow_values`, `create_workflow_artifact`, `workflow_progress_request`, `get_brainstorming_methods`, and `append_brainstorming_selected_technique` may be exposed only through module-owned per-step tool schema when needed. `build_workflow_document` must not be exposed through brainstorming model-facing tool schema.
+`create_workflow_artifact`, `workflow_progress_request`, `get_brainstorming_methods`, and `append_brainstorming_selected_technique` may be exposed only through module-owned per-step tool schema when needed. Step 3 and Step 4 must not expose `set_workflow_values` or `build_workflow_document`; `build_workflow_document` remains runtime-owned only.
 
 The implementation must add an AI-callable `get_brainstorming_methods` tool backed by the module-owned brainstorming technique registry.
 
 `get_brainstorming_methods` must be read-only. It must return the supported brainstorming inventory with category, name, and description, and must not mutate workflow values, allocate artifacts, or write to `brainstorming.md`.
 
-Step 3 must expose `get_brainstorming_methods` only when `selected_approach` is `I want you to suggest a technique`. For choose or random paths, Step 3 must not expose that tool and must prompt the AI to use the already selected technique.
+Every Step 3 variant must expose `get_brainstorming_methods` and `append_brainstorming_selected_technique` so technique switching is available in every Step 3 path.
 
 ## Completion
 

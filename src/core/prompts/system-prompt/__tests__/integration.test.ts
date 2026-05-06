@@ -1010,17 +1010,36 @@ describe("Prompt System Integration Tests", () => {
 
 			await runPromptTest(this, context, "gpt-5-codex", async ({ systemPrompt, tools }) => {
 				const nativeToolNames = getNativeToolNames(tools)
+				const approvedStep3ToolNames = [
+					"get_brainstorming_methods",
+					"append_brainstorming_selected_technique",
+					"read_file",
+					"apply_patch",
+					"send_user_message",
+					"ask_followup_question",
+					"workflow_progress_request",
+				]
 
-				expect(nativeToolNames).to.include("get_brainstorming_methods")
-				expect(nativeToolNames).to.include("append_brainstorming_selected_technique")
+				expect(nativeToolNames).to.deep.equal(approvedStep3ToolNames)
+				expect(nativeToolNames).to.not.include("build_workflow_document")
+				expect(nativeToolNames).to.not.include("set_workflow_values")
 				expect(systemPrompt).to.not.include("Workflow: brainstorming")
 				expect(systemPrompt).to.not.include("Call `get_brainstorming_methods`")
 				expect(systemPrompt).to.not.include("call `append_brainstorming_selected_technique`")
 			})
 		})
 
-		it("omits suggest-only tools from active brainstorming Step 3 choose and random native projections", async function () {
+		it("projects active brainstorming Step 3 choose and random tools into native GPT-5 prompts", async function () {
 			const selectedApproaches = ["I want to choose", "I want a random technique"] as const
+			const approvedStep3ToolNames = [
+				"get_brainstorming_methods",
+				"append_brainstorming_selected_technique",
+				"read_file",
+				"apply_patch",
+				"send_user_message",
+				"ask_followup_question",
+				"workflow_progress_request",
+			]
 
 			for (const selectedApproach of selectedApproaches) {
 				const context = await buildBrainstormingPromptContext({
@@ -1034,11 +1053,9 @@ describe("Prompt System Integration Tests", () => {
 				await runPromptTest(this, context, "gpt-5-codex", async ({ tools }) => {
 					const nativeToolNames = getNativeToolNames(tools)
 
-					expect(nativeToolNames).to.include("build_workflow_document")
-					expect(nativeToolNames).to.include("set_workflow_values")
-					expect(nativeToolNames).to.include("workflow_progress_request")
-					expect(nativeToolNames).to.not.include("get_brainstorming_methods")
-					expect(nativeToolNames).to.not.include("append_brainstorming_selected_technique")
+					expect(nativeToolNames).to.deep.equal(approvedStep3ToolNames)
+					expect(nativeToolNames).to.not.include("build_workflow_document")
+					expect(nativeToolNames).to.not.include("set_workflow_values")
 				})
 			}
 		})
@@ -1054,8 +1071,15 @@ describe("Prompt System Integration Tests", () => {
 			await runPromptTest(this, context, "gpt-5-codex", async ({ systemPrompt, tools }) => {
 				const nativeToolNames = getNativeToolNames(tools)
 
-				expect(nativeToolNames).to.include("build_workflow_document")
-				expect(nativeToolNames).to.include("attempt_completion")
+				expect(nativeToolNames).to.deep.equal([
+					"read_file",
+					"apply_patch",
+					"send_user_message",
+					"ask_followup_question",
+					"attempt_completion",
+				])
+				expect(nativeToolNames).to.not.include("build_workflow_document")
+				expect(nativeToolNames).to.not.include("set_workflow_values")
 				expect(nativeToolNames).to.not.include("workflow_progress_request")
 				expect(systemPrompt).to.not.include("Workflow: brainstorming")
 				expect(systemPrompt).to.not.include("using `attempt_completion`")

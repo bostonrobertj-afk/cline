@@ -957,6 +957,138 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingToolSchemas.ts`
 
+### Phase 8 - Correct Brainstorming Interactive Tool Schema Exposure
+
+Pause for QA review before final validation.
+
+This phase corrects the model-facing Step 3 and Step 4 brainstorming tool schemas so interactive document work uses governed file tools, technique switching is supported in every Step 3 path, and runtime-owned `build_workflow_document` remains excluded from model-facing schema.
+
+[x] Task 19. Align brainstorming requirements with approved Step 3 technique-switching behavior.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/brainstorming/brainstorming-requirements.md`
+
+[x] Subtask 19.1. In `brainstorming-requirements.md`, replace the AI-writable Step 3 choose/random row so it no longer exposes `set_workflow_values`; Step 3 session progress must be recorded in `{output_file}` through governed file-edit tools, while technique additions use `append_brainstorming_selected_technique`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/brainstorming/brainstorming-requirements.md`
+
+[x] Subtask 19.2. In `brainstorming-requirements.md`, replace the Step 3 tool-schema paragraph so every Step 3 variant exposes exactly `get_brainstorming_methods`, `append_brainstorming_selected_technique`, `read_file`, `apply_patch`, `send_user_message`, `ask_followup_question`, and `workflow_progress_request`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/brainstorming/brainstorming-requirements.md`
+
+[x] Subtask 19.3. In `brainstorming-requirements.md`, replace the Step 3 suggest-specific AI-writable note with a note applying to all Step 3 variants: `selected_techniques` must be mutated only through `append_brainstorming_selected_technique`, and session notes must be edited in `{output_file}`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/brainstorming/brainstorming-requirements.md`
+
+[x] Subtask 19.4. In `brainstorming-requirements.md`, replace the exact schema lines under `Prompting And Tools` so Step 3 has one exact schema for all variants, Step 4 keeps its exact schema, and neither Step 3 nor Step 4 exposes `set_workflow_values` or `build_workflow_document`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/brainstorming/brainstorming-requirements.md`
+
+[x] Task 20. Update brainstorming model-facing tool-schema builders.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingToolSchemas.ts`
+
+[x] Subtask 20.1. In `brainstormingToolSchemas.ts`, delete `buildBrainstormingBuildWorkflowDocumentToolSchema(...)`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingToolSchemas.ts`
+
+[x] Subtask 20.2. In `brainstormingToolSchemas.ts`, delete `buildBrainstormingStep3SetWorkflowValuesToolSchema(...)`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingToolSchemas.ts`
+
+[x] Subtask 20.3. In `brainstormingToolSchemas.ts`, add module-owned helper builders for `read_file`, `apply_patch`, `send_user_message`, and `ask_followup_question` using the corresponding `ClineDefaultTool` ids and valid parameter schemas.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingToolSchemas.ts`
+
+[x] Subtask 20.4. In `brainstormingToolSchemas.ts`, update `buildBrainstormingStep3SuggestToolSchemas(...)` so it returns exactly `get_brainstorming_methods`, `append_brainstorming_selected_technique`, `read_file`, `apply_patch`, `send_user_message`, `ask_followup_question`, and `workflow_progress_request`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingToolSchemas.ts`
+
+[x] Subtask 20.5. In `brainstormingToolSchemas.ts`, update `buildBrainstormingStep3ChooseOrRandomToolSchemas(...)` so it returns the same exact Step 3 tool list as the suggest builder.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingToolSchemas.ts`
+
+[x] Subtask 20.6. In `brainstormingToolSchemas.ts`, update `buildBrainstormingStep4ToolSchemas(...)` so it returns exactly `read_file`, `apply_patch`, `send_user_message`, `ask_followup_question`, and `attempt_completion`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingToolSchemas.ts`
+
+[x] Task 21. Update schema and projection tests.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingToolSchemas.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
+
+[x] Subtask 21.1. In `brainstormingToolSchemas.test.ts`, remove imports and expectations for `buildBrainstormingBuildWorkflowDocumentToolSchema` and `buildBrainstormingStep3SetWorkflowValuesToolSchema`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingToolSchemas.test.ts`
+
+[x] Subtask 21.2. In `brainstormingToolSchemas.test.ts`, update exact Step 3 suggest, choose, and random schema assertions to the approved seven-tool Step 3 list.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingToolSchemas.test.ts`
+
+[x] Subtask 21.3. In `brainstormingToolSchemas.test.ts`, update exact Step 4 schema assertions to the approved five-tool Step 4 list.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingToolSchemas.test.ts`
+
+[x] Subtask 21.4. In `brainstormingWorkflow.test.ts`, update Step 3 and Step 4 `buildToolSchema(...)` exact tool-name expectations to match the approved lists and assert neither list includes `build_workflow_document` or `set_workflow_values`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
+[x] Subtask 21.5. In `integration.test.ts`, update active brainstorming Step 3 suggest/choose/random native projection assertions to expect the approved seven-tool Step 3 schema and no `build_workflow_document` or `set_workflow_values`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
+
+[x] Subtask 21.6. In `integration.test.ts`, update active brainstorming Step 4 native projection assertions to expect `read_file`, `apply_patch`, `send_user_message`, `ask_followup_question`, and `attempt_completion`, and to reject `build_workflow_document`, `set_workflow_values`, and `workflow_progress_request`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
+
+[x] Task 22. Validate Phase 8.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingToolSchemas.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingToolSchemas.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
+
+[x] Subtask 22.1. Run `rg -n "build_workflow_document|set_workflow_values" src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingToolSchemas.ts`; it must return no matches.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingToolSchemas.ts`
+
+[x] Subtask 22.2. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingToolSchemas.test.ts`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingToolSchemas.test.ts`
+
+[x] Subtask 22.3. Run `npm run test:unit -- src/core/prompts/system-prompt/__tests__/integration.test.ts`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
+
+[x] Subtask 22.4. Run `npm run check-types`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingToolSchemas.ts`
+
 ## Validation
 
 Run these commands after all tasks and subtasks are complete:

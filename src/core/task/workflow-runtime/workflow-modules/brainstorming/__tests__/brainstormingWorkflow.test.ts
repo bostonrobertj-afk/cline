@@ -491,11 +491,19 @@ describe("brainstormingWorkflowDefinition", () => {
 		expect(choosePromptSource).to.not.have.property("workflowSystemInstructions")
 		const choosePrompt = choosePromptSource.currentStepInstructions
 		expect(choosePrompt).to.include(`Read \`${OUTPUT_FILE}\`.`)
-		expect(choosePrompt).to.include(
-			`Use the already selected brainstorming technique recorded in \`${OUTPUT_FILE}\`. Do not call \`get_brainstorming_methods\`.`,
-		)
+		expect(choosePrompt).to.include("If at any point the user asks to switch to a new brainstorming technique")
+		expect(choosePrompt).to.include("get_brainstorming_methods")
 
-		expectToolNames(
+		const approvedStep3ToolNames = [
+			"get_brainstorming_methods",
+			"append_brainstorming_selected_technique",
+			"read_file",
+			"apply_patch",
+			"send_user_message",
+			"ask_followup_question",
+			"workflow_progress_request",
+		]
+		const step3ToolNamesByApproach = [
 			step3
 				.buildToolSchema(
 					createPromptInput(step3, {
@@ -503,14 +511,13 @@ describe("brainstormingWorkflowDefinition", () => {
 					}),
 				)
 				.map((schema) => schema.name),
-			[
-				"get_brainstorming_methods",
-				"append_brainstorming_selected_technique",
-				"build_workflow_document",
-				"workflow_progress_request",
-			],
-		)
-		expectToolNames(
+			step3
+				.buildToolSchema(
+					createPromptInput(step3, {
+						selected_approach: "I want to choose",
+					}),
+				)
+				.map((schema) => schema.name),
 			step3
 				.buildToolSchema(
 					createPromptInput(step3, {
@@ -518,8 +525,12 @@ describe("brainstormingWorkflowDefinition", () => {
 					}),
 				)
 				.map((schema) => schema.name),
-			["build_workflow_document", "set_workflow_values", "workflow_progress_request"],
-		)
+		]
+		for (const step3ToolNames of step3ToolNamesByApproach) {
+			expectToolNames(step3ToolNames, approvedStep3ToolNames)
+			expect(step3ToolNames).not.to.include("build_workflow_document")
+			expect(step3ToolNames).not.to.include("set_workflow_values")
+		}
 
 		expect(getAction("step-3", "step-3-await-progress-request", "step-3-transition-to-step-4")).to.deep.include({
 			kind: "transition_step",
@@ -529,7 +540,7 @@ describe("brainstormingWorkflowDefinition", () => {
 		})
 	})
 
-	it("builds Step 4 prompt and exposes only document build plus final delivery tools", () => {
+	it("builds Step 4 prompt and exposes only governed file-edit plus final delivery tools", () => {
 		const step4 = brainstormingWorkflowDefinition.steps["step-4"]
 		expect(step4.buildToolSchema).to.equal(buildBrainstormingStep4ToolSchemas)
 		const promptSource = step4.buildPromptSource(
@@ -545,10 +556,16 @@ describe("brainstormingWorkflowDefinition", () => {
 		expect(prompt).to.include("quick spec")
 		expect(prompt).to.include(`Append the themes, priorities, and summary to \`${OUTPUT_FILE}\`.`)
 		expect(prompt).to.include("using `attempt_completion`")
-		expectToolNames(
-			step4.buildToolSchema(createPromptInput(step4, {})).map((schema) => schema.name),
-			["build_workflow_document", "attempt_completion"],
-		)
+		const step4ToolNames = step4.buildToolSchema(createPromptInput(step4, {})).map((schema) => schema.name)
+		expectToolNames(step4ToolNames, [
+			"read_file",
+			"apply_patch",
+			"send_user_message",
+			"ask_followup_question",
+			"attempt_completion",
+		])
+		expect(step4ToolNames).not.to.include("build_workflow_document")
+		expect(step4ToolNames).not.to.include("set_workflow_values")
 		expect(getAction("step-4", "step-4-project-prompt", "step-4-project-prompt")).to.deep.include({
 			kind: "project_prompt",
 		})

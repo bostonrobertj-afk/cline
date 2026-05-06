@@ -1,4 +1,5 @@
 import type { ClineToolSpec } from "@/core/prompts/system-prompt/spec"
+import { AGENT_FEEDBACK_PARAMETER } from "@/core/prompts/system-prompt/types"
 import { ModelFamily } from "@/shared/prompts"
 import { ClineDefaultTool } from "@/shared/tools"
 import type { WorkflowPromptBuilderInput } from "../../types"
@@ -15,39 +16,6 @@ export function buildBrainstormingStep2ToolSchemas(): readonly ClineToolSpec[] {
 	return []
 }
 
-export function buildBrainstormingBuildWorkflowDocumentToolSchema(): ClineToolSpec {
-	return {
-		variant: BRAINSTORMING_TOOL_SCHEMA_VARIANT,
-		id: ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT,
-		name: "build_workflow_document",
-		description:
-			"Write fully resolved markdown content to the active brainstorming workflow document path supplied by the workflow prompt.",
-		parameters: [
-			{
-				name: "artifact_id",
-				required: true,
-				type: "string",
-				instruction: "The workflow artifact definition id for the active brainstorming document.",
-				description: "Workflow artifact definition id for the active brainstorming document.",
-			},
-			{
-				name: "destination_path",
-				required: true,
-				type: "string",
-				instruction: "The absolute output file path provided by the workflow prompt.",
-				description: "Absolute output file path provided by the workflow prompt.",
-			},
-			{
-				name: "content",
-				required: true,
-				type: "string",
-				instruction: "The complete markdown content to write to the brainstorming document.",
-				description: "Complete markdown content to write to the brainstorming document.",
-			},
-		],
-	}
-}
-
 export function buildBrainstormingWorkflowProgressRequestToolSchema(): ClineToolSpec {
 	return {
 		variant: BRAINSTORMING_TOOL_SCHEMA_VARIANT,
@@ -58,33 +26,87 @@ export function buildBrainstormingWorkflowProgressRequestToolSchema(): ClineTool
 	}
 }
 
-export function buildBrainstormingStep3SetWorkflowValuesToolSchema(): ClineToolSpec {
+export function buildBrainstormingReadFileToolSchema(): ClineToolSpec {
 	return {
 		variant: BRAINSTORMING_TOOL_SCHEMA_VARIANT,
-		id: ClineDefaultTool.SET_WORKFLOW_VALUES,
-		name: "set_workflow_values",
-		description: "Persist brainstorming workflow values collected during interactive brainstorming facilitation.",
+		id: ClineDefaultTool.FILE_READ,
+		name: "read_file",
+		description:
+			"Request to read the contents of a file at the specified path. Automatically extracts raw text from PDF and DOCX files. Do NOT use this tool to list the contents of a directory.",
 		parameters: [
 			{
-				name: "values",
+				name: "path",
 				required: true,
-				type: "object",
-				instruction: "Workflow values to persist for the active brainstorming session.",
-				description: "Workflow values to persist for the active brainstorming session.",
-				properties: {
-					techniques_used: {
-						type: "array",
-						items: { type: "string" },
-						description: "Brainstorming techniques used during the session.",
-					},
-					ideas_generated: {
-						type: "array",
-						items: { type: "string" },
-						description: "Ideas generated during the session.",
-					},
-				},
-				additionalProperties: false,
+				type: "string",
+				instruction: "The path of the file to read.",
+				description: "The path of the file to read.",
 			},
+		],
+	}
+}
+
+export function buildBrainstormingApplyPatchToolSchema(): ClineToolSpec {
+	return {
+		variant: BRAINSTORMING_TOOL_SCHEMA_VARIANT,
+		id: ClineDefaultTool.APPLY_PATCH,
+		name: "apply_patch",
+		description: "Apply a structured patch to one or more files using the repository apply_patch format.",
+		parameters: [
+			{
+				name: "input",
+				required: true,
+				type: "string",
+				instruction: "The apply_patch command that you wish to execute.",
+				description: "The apply_patch command that you wish to execute.",
+			},
+		],
+	}
+}
+
+export function buildBrainstormingSendUserMessageToolSchema(): ClineToolSpec {
+	return {
+		variant: BRAINSTORMING_TOOL_SCHEMA_VARIANT,
+		id: ClineDefaultTool.SEND_USER_MESSAGE,
+		name: "send_user_message",
+		description:
+			"Send a direct user-visible message when other response tools are not appropriate or available. On success, this tool displays the message to the user and ends your current turn.",
+		parameters: [
+			{
+				name: "message",
+				required: true,
+				type: "string",
+				instruction: "The direct message to show to the user.",
+				description: "The direct message to show to the user.",
+			},
+			AGENT_FEEDBACK_PARAMETER,
+		],
+	}
+}
+
+export function buildBrainstormingAskFollowupQuestionToolSchema(): ClineToolSpec {
+	return {
+		variant: BRAINSTORMING_TOOL_SCHEMA_VARIANT,
+		id: ClineDefaultTool.ASK,
+		name: "ask_followup_question",
+		description:
+			"Ask the user a concise question when clarification or a direct answer is needed. On success, this tool displays the question to the user and ends your current turn.",
+		parameters: [
+			{
+				name: "question",
+				required: true,
+				type: "string",
+				instruction: "The single question to ask the user.",
+				description: "The single question to ask the user.",
+			},
+			{
+				name: "options",
+				required: true,
+				type: "array",
+				items: { type: "string" },
+				instruction: "An array of 2-5 options for the user to choose from.",
+				description: "An array of 2-5 options for the user to choose from.",
+			},
+			AGENT_FEEDBACK_PARAMETER,
 		],
 	}
 }
@@ -143,17 +165,16 @@ export function buildBrainstormingStep3SuggestToolSchemas(): readonly ClineToolS
 	return [
 		buildBrainstormingGetMethodsToolSchema(),
 		buildBrainstormingAppendSelectedTechniqueToolSchema(),
-		buildBrainstormingBuildWorkflowDocumentToolSchema(),
+		buildBrainstormingReadFileToolSchema(),
+		buildBrainstormingApplyPatchToolSchema(),
+		buildBrainstormingSendUserMessageToolSchema(),
+		buildBrainstormingAskFollowupQuestionToolSchema(),
 		buildBrainstormingWorkflowProgressRequestToolSchema(),
 	]
 }
 
 export function buildBrainstormingStep3ChooseOrRandomToolSchemas(): readonly ClineToolSpec[] {
-	return [
-		buildBrainstormingBuildWorkflowDocumentToolSchema(),
-		buildBrainstormingStep3SetWorkflowValuesToolSchema(),
-		buildBrainstormingWorkflowProgressRequestToolSchema(),
-	]
+	return buildBrainstormingStep3SuggestToolSchemas()
 }
 
 export function buildBrainstormingStep3ToolSchemas(input: WorkflowPromptBuilderInput): readonly ClineToolSpec[] {
@@ -184,5 +205,11 @@ export function buildBrainstormingAttemptCompletionToolSchema(): ClineToolSpec {
 }
 
 export function buildBrainstormingStep4ToolSchemas(): readonly ClineToolSpec[] {
-	return [buildBrainstormingBuildWorkflowDocumentToolSchema(), buildBrainstormingAttemptCompletionToolSchema()]
+	return [
+		buildBrainstormingReadFileToolSchema(),
+		buildBrainstormingApplyPatchToolSchema(),
+		buildBrainstormingSendUserMessageToolSchema(),
+		buildBrainstormingAskFollowupQuestionToolSchema(),
+		buildBrainstormingAttemptCompletionToolSchema(),
+	]
 }
