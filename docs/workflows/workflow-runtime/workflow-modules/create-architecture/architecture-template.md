@@ -8,6 +8,8 @@
 
 ## Core architectural rules
 
+## Project Context Analysis
+
 ## Interpretation
 
 # Responsibility boundaries
@@ -21,6 +23,7 @@
 ### Aligned
 
 ### Partially aligned
+
 ### Not aligned / conflicts
 
 # Key tradeoffs and risks
@@ -29,9 +32,10 @@
 
 ## Risks
 
-# Recommended implementation order
+# Project Blast Radius
 
+# Dependencies
 
-# Final recommendation
+# Project Roadmap
 
 
