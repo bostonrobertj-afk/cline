@@ -103,7 +103,11 @@ The new artifact family must use:
 
 The artifact must be created in the selected project's `planning` subfolder beneath the runtime-owned project output root.
 
-Step 1 must allocate/create this artifact through an `allocate_artifact` decision action, which the runtime executes through `create_workflow_artifact`. The runtime must create the empty file and persist project/artifact metadata into workflow values per `FR-20l`, `FR-20m`, and `FR-20n`.
+Step 1 must begin by waiting for the runtime-owned `entry_artifact_resolution_completed` event for the `architecture_document` artifact instead of beginning with an unconditional `allocate_artifact` action.
+
+When `entry_artifact_resolution_completed` reports `creationRequired: true` for `architecture_document`, Step 1 must allocate/create `architecture.md`, build the initial architecture document shell, and transition to Step 2 after the shell build succeeds.
+
+When `entry_artifact_resolution_completed` reports `creationRequired: false` for `architecture_document`, Step 1 must skip `allocate_artifact`, skip the initial `build_workflow_document`, skip the Step 2 input form and submitted-values document build, use the runtime-persisted `output_file`, and transition directly to Step 3.
 
 Subsequent runtime-owned deterministic document population must use `build_workflow_document`, which consumes the runtime-resolved destination path and must not allocate identity, choose filenames, or choose folders, per `FR-20p`.
 
@@ -157,7 +161,7 @@ The template file is a migration reference only. The module-owned document build
 # Project Roadmap
 ```
 
-Step 1 must build this shell immediately after artifact allocation.
+When artifact creation is required, Step 1 must build this shell immediately after artifact allocation.
 
 Step 2 must write submitted form values under the matching headings in the same document by using `build_workflow_document` with deterministic module-owned content construction. Later model-facing steps must update the document through governed file-edit tools.
 
@@ -180,7 +184,7 @@ The module must define these nine steps, using these exact `checklistLabel` valu
 
 | Step id | Step number | `checklistLabel` | Required runtime shape |
 | --- | --- | --- | --- |
-| `step-1` | 1 | `Generate Output Document` | Allocate/create `architecture.md`, build the initial document shell, and transition to Step 2. |
+| `step-1` | 1 | `Generate Output Document` | Wait for entry artifact resolution; create and initialize `architecture.md` only when creation is required, otherwise continue the existing document directly at Step 3. |
 | `step-2` | 2 | `Gather User Inputs` | Render one multi-panel input form, write submitted values into the output document, and transition to Step 3. |
 | `step-3` | 3 | `Establish Architecture Foundational Elements` | Model-driven architecture foundation step; progression requires `workflow_progress_request` confirmation. |
 | `step-4` | 4 | `Revolve Responsibility & Ownership` | Model-driven responsibility and ownership step; progression requires `workflow_progress_request` confirmation. |
@@ -192,11 +196,13 @@ The module must define these nine steps, using these exact `checklistLabel` valu
 
 ## Step 1: Generate Output Document
 
-Step 1 must model progression as explicit decision actions in this order: `allocate_artifact`, `build_workflow_document` for the initial document shell, then `transition_step` to Step 2.
+Step 1 must model progression by first branching on `entry_artifact_resolution_completed` for `architecture_document`.
 
-Step 1 must begin with an `allocate_artifact` decision action for the architecture output artifact. The runtime converts that action into `create_workflow_artifact`.
+When `creationRequired: true`, Step 1 must run explicit decision actions in this order: `allocate_artifact`, `build_workflow_document` for the initial document shell, then `transition_step` to Step 2.
 
-Step 1 must define success and failure routes for the first artifact-allocation result. If the first allocation succeeds, the next action must build the initial document shell. If the first allocation fails, the next action must retry allocation exactly once.
+When `creationRequired: false`, Step 1 must select a `transition_step` action targeting Step 3 and must not run `allocate_artifact`, `build_workflow_document`, or the Step 2 workflow form.
+
+Step 1 must define success and failure routes for the first artifact-allocation result when creation is required. If the first allocation succeeds, the next action must build the initial document shell. If the first allocation fails, the next action must retry allocation exactly once.
 
 Step 1 must define success and failure routes for the retry allocation result. If the retry succeeds, the next action must build the initial document shell. If the retry fails, the next action must be `terminal_error`.
 

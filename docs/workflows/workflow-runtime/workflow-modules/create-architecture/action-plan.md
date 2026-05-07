@@ -654,6 +654,138 @@ Allowed files:
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-architecture/action-plan.md`
 
+### Phase 6 - Runtime Entry Artifact Resolution For Create Architecture
+
+Pause for QA review after completing this phase.
+
+This phase aligns the create-architecture module with the runtime-owned entry singleton artifact resolution contract from Foundational Build Phases 58 and 59. The module must branch on `entry_artifact_resolution_completed` before allocating `architecture.md`, must skip allocation and initial document-building when the user continues an existing document, and must transition directly to Step 3 for continued existing architecture documents.
+
+### Phase 6 Scope Boundary
+
+- Do not change foundational runtime code in this phase.
+- Do not revise any workflow module other than `create-architecture`.
+- Do not add filesystem existence checks, archive behavior, or delete behavior to the create-architecture module.
+- Do not expose `archive_workflow_artifact`, `delete_workflow_artifact`, `create_workflow_artifact`, or `build_workflow_document` through model-facing create-architecture tool schemas.
+- Do not change Step 3 through Step 9 model-facing tool schemas in this phase.
+
+[x] Task 10. Align create-architecture requirements with runtime-owned entry artifact resolution.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-architecture/create-architecture-requirements.md`
+
+[x] Subtask 10.1. In `create-architecture-requirements.md`, revise the output-artifact section so Step 1 begins by waiting for `entry_artifact_resolution_completed` for the `architecture_document` artifact instead of beginning with unconditional `allocate_artifact`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-architecture/create-architecture-requirements.md`
+
+[x] Subtask 10.2. In `create-architecture-requirements.md`, add that when `entry_artifact_resolution_completed` reports `creationRequired: true` for `architecture_document`, Step 1 must allocate/create `architecture.md`, build the initial architecture document shell, and transition to Step 2 after the shell build succeeds.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-architecture/create-architecture-requirements.md`
+
+[x] Subtask 10.3. In `create-architecture-requirements.md`, add that when `entry_artifact_resolution_completed` reports `creationRequired: false` for `architecture_document`, Step 1 must skip `allocate_artifact`, skip the initial `build_workflow_document`, skip the Step 2 input form and submitted-values document build, use the runtime-persisted `output_file`, and transition directly to Step 3.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-architecture/create-architecture-requirements.md`
+
+[x] Task 11. Update the create-architecture Step 1 decision tree to consume runtime entry artifact resolution.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/createArchitectureWorkflow.ts`
+
+[x] Subtask 11.1. In `createArchitectureWorkflow.ts`, add `entryArtifactResolutionCompletedWithCreationRequired(creationRequired: boolean): WorkflowDecisionBranchTrigger` matching only `entry_artifact_resolution_completed` events whose `artifactResolutions` include `artifactId === ARCHITECTURE_DOCUMENT_ARTIFACT_ID` and the supplied `creationRequired` value.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/createArchitectureWorkflow.ts`
+
+[x] Subtask 11.2. In `buildStep1DecisionTree()`, change `entryBranchId` from `"step-1-allocate-artifact"` to `"step-1-resolve-entry-artifact"`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/createArchitectureWorkflow.ts`
+
+[x] Subtask 11.3. In `buildStep1DecisionTree()`, replace the old `"step-1-allocate-artifact"` entry branch with a `"step-1-resolve-entry-artifact"` branch whose `creationRequired: true` route has id `"step-1-allocate-artifact"`, performs the existing `allocate_artifact` action for `ARCHITECTURE_DOCUMENT_ARTIFACT_ID`, and follows `"step-1-await-allocation"`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/createArchitectureWorkflow.ts`
+
+[x] Subtask 11.4. In the `"step-1-resolve-entry-artifact"` branch, add a `creationRequired: false` route with id `"step-1-continue-existing-artifact"` that performs a `transition_step` action targeting Step 3 entry branch.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/createArchitectureWorkflow.ts`
+
+[x] Subtask 11.5. In `"step-1-await-allocation"`, update the first allocation success trigger to read from source route branch `"step-1-resolve-entry-artifact"` and route `"step-1-allocate-artifact"`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/createArchitectureWorkflow.ts`
+
+[x] Subtask 11.6. In `"step-1-await-allocation"`, update the first allocation failure trigger to read from source route branch `"step-1-resolve-entry-artifact"` and route `"step-1-allocate-artifact"`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/createArchitectureWorkflow.ts`
+
+[x] Task 12. Update create-architecture module tests for entry artifact resolution.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`
+
+[x] Subtask 12.1. In `createArchitectureWorkflow.test.ts`, add test helpers for building an `entry_artifact_resolution_completed` trigger event for `architecture_document` with a caller-supplied `creationRequired` value and for asserting that a route matches that event.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`
+
+[x] Subtask 12.2. In `createArchitectureWorkflow.test.ts`, add coverage proving Step 1 uses entry branch `"step-1-resolve-entry-artifact"`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`
+
+[x] Subtask 12.3. In `createArchitectureWorkflow.test.ts`, add coverage proving the Step 1 `creationRequired: true` route matches `entry_artifact_resolution_completed`, allocates `architecture_document`, and follows `"step-1-await-allocation"`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`
+
+[x] Subtask 12.4. In `createArchitectureWorkflow.test.ts`, add coverage proving the Step 1 `creationRequired: false` route matches `entry_artifact_resolution_completed`, transitions directly to Step 3, and does not route to `allocate_artifact`, `build_workflow_document`, or `render_workflow_form`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`
+
+[x] Subtask 12.5. In `createArchitectureWorkflow.test.ts`, add coverage proving the first allocation success and failure routes listen to source branch `"step-1-resolve-entry-artifact"` and route `"step-1-allocate-artifact"`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`
+
+[x] Task 13. Validate Phase 6.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-architecture/create-architecture-requirements.md`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/createArchitectureWorkflow.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureDocument.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureToolSchemas.test.ts`
+
+[x] Subtask 13.1. Run `rg -n "entryBranchId: \"step-1-allocate-artifact\"|toolBackedOperationSucceeded\\(\"step-1-allocate-artifact\", \"step-1-allocate-artifact\"\\)|toolBackedOperationFailed\\(\"step-1-allocate-artifact\", \"step-1-allocate-artifact\"\\)" src/core/task/workflow-runtime/workflow-modules/create-architecture/createArchitectureWorkflow.ts`; it must return no matches.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/createArchitectureWorkflow.ts`
+
+[x] Subtask 13.2. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureDocument.test.ts src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureToolSchemas.test.ts`; it must pass before Phase 6 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureDocument.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureToolSchemas.test.ts`
+
+[x] Subtask 13.3. Run `npm run check-types`; it must pass before Phase 6 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/createArchitectureWorkflow.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`
+
+[x] Subtask 13.4. Run `npm run lint`; it must pass before Phase 6 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/createArchitectureWorkflow.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`
+
 ## Validation
 
 After every task and subtask is complete, run:

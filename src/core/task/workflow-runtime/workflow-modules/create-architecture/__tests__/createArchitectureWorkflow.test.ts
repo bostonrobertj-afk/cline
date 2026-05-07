@@ -6,7 +6,9 @@ import { resolve } from "path"
 import { WorkflowArtifactFamily } from "../../../artifactFamilies"
 import type {
 	ActiveWorkflowSession,
+	WorkflowBranchTriggerEvent,
 	WorkflowDecisionAction,
+	WorkflowDecisionBranchRoute,
 	WorkflowPromptBuilderInput,
 	WorkflowStepDefinition,
 	WorkflowValue,
@@ -63,14 +65,96 @@ function getPanel(form: WorkflowFormDefinitionPayload, panelId: string): Workflo
 	return panel
 }
 
-function getAction(stepId: WorkflowStepDefinition["id"], branchId: string, routeId: string): WorkflowDecisionAction {
+function findRoute(stepId: WorkflowStepDefinition["id"], branchId: string, routeId: string): WorkflowDecisionBranchRoute {
 	const step = createArchitectureWorkflowDefinition.steps[stepId]
 	const route = step?.decisionTree.branches[branchId]?.routes.find((candidate) => candidate.id === routeId)
 	if (route === undefined) {
 		throw new Error(`Missing route ${stepId}/${branchId}/${routeId}.`)
 	}
 
+	return route
+}
+
+function getAction(stepId: WorkflowStepDefinition["id"], branchId: string, routeId: string): WorkflowDecisionAction {
+	const route = findRoute(stepId, branchId, routeId)
 	return route.action
+}
+
+function buildEntryArtifactResolutionCompletedEvent(creationRequired: boolean): WorkflowBranchTriggerEvent {
+	return {
+		kind: "entry_artifact_resolution_completed",
+		artifactResolutions: [
+			{
+				artifactId: "architecture_document",
+				artifactFamily: WorkflowArtifactFamily.ArchitectureDocument,
+				artifactIdentity: "architecture_document",
+				artifactFilename: "architecture.md",
+				artifactRelativePath: "planning/architecture.md",
+				artifactAbsolutePath: OUTPUT_FILE,
+				creationRequired,
+				existingArtifactAction: creationRequired ? "none" : "continue_existing",
+			},
+		],
+	}
+}
+
+function buildToolBackedOperationEvent(
+	kind: "tool_backed_operation_succeeded" | "tool_backed_operation_failed",
+	branchId: string,
+	routeId: string,
+): WorkflowBranchTriggerEvent {
+	if (kind === "tool_backed_operation_succeeded") {
+		return {
+			kind,
+			sourceRoute: {
+				branchId,
+				routeId,
+			},
+		}
+	}
+
+	return {
+		kind,
+		sourceRoute: {
+			branchId,
+			routeId,
+		},
+	}
+}
+
+function expectRouteMatchesEntryArtifactResolution(route: WorkflowDecisionBranchRoute, creationRequired: boolean): void {
+	if (route.trigger.kind !== "event_predicate") {
+		throw new Error(`Expected event_predicate trigger, received ${route.trigger.kind}.`)
+	}
+
+	expect(
+		route.trigger.matches({
+			activeBranchId: "step-1-resolve-entry-artifact",
+			workflowValues: {},
+			step: createArchitectureWorkflowDefinition.steps["step-1"],
+			triggerEvent: buildEntryArtifactResolutionCompletedEvent(creationRequired),
+		}),
+	).to.equal(true)
+}
+
+function expectRouteMatchesToolBackedOperationEvent(
+	route: WorkflowDecisionBranchRoute,
+	kind: "tool_backed_operation_succeeded" | "tool_backed_operation_failed",
+	branchId: string,
+	routeId: string,
+): void {
+	if (route.trigger.kind !== "event_predicate") {
+		throw new Error(`Expected event_predicate trigger, received ${route.trigger.kind}.`)
+	}
+
+	expect(
+		route.trigger.matches({
+			activeBranchId: "step-1-await-allocation",
+			workflowValues: {},
+			step: createArchitectureWorkflowDefinition.steps["step-1"],
+			triggerEvent: buildToolBackedOperationEvent(kind, branchId, routeId),
+		}),
+	).to.equal(true)
 }
 
 function listRouteActionKinds(step: WorkflowStepDefinition): readonly WorkflowDecisionAction["kind"][] {
@@ -354,6 +438,57 @@ describe("createArchitectureWorkflowDefinition", () => {
 			branches: [],
 			defaultTerminal: true,
 		})
+	})
+
+	it("uses entry artifact resolution as the Step 1 entry branch", () => {
+		const step1 = createArchitectureWorkflowDefinition.steps["step-1"]
+		expect(step1.decisionTree.entryBranchId).to.equal("step-1-resolve-entry-artifact")
+	})
+
+	it("allocates architecture_document after entry artifact resolution requires creation", () => {
+		const creationRequiredRoute = findRoute("step-1", "step-1-resolve-entry-artifact", "step-1-allocate-artifact")
+
+		expectRouteMatchesEntryArtifactResolution(creationRequiredRoute, true)
+		expect(creationRequiredRoute.action).to.deep.include({
+			kind: "allocate_artifact",
+			artifactId: "architecture_document",
+		})
+		expect(creationRequiredRoute.followingBranchId).to.equal("step-1-await-allocation")
+	})
+
+	it("continues existing architecture documents directly to Step 3 without setup actions", () => {
+		const continueExistingRoute = findRoute("step-1", "step-1-resolve-entry-artifact", "step-1-continue-existing-artifact")
+
+		expectRouteMatchesEntryArtifactResolution(continueExistingRoute, false)
+		expect(continueExistingRoute.action).to.deep.equal({
+			kind: "transition_step",
+			target: {
+				kind: "entry_branch",
+				stepNumber: 3,
+			},
+		})
+		expect(continueExistingRoute).not.to.have.property("followingBranchId")
+		expect(["allocate_artifact", "build_workflow_document", "render_workflow_form"]).not.to.include(
+			continueExistingRoute.action.kind,
+		)
+	})
+
+	it("listens for first allocation results from the entry artifact allocation route", () => {
+		const initialShellRoute = findRoute("step-1", "step-1-await-allocation", "step-1-build-initial-shell")
+		expectRouteMatchesToolBackedOperationEvent(
+			initialShellRoute,
+			"tool_backed_operation_succeeded",
+			"step-1-resolve-entry-artifact",
+			"step-1-allocate-artifact",
+		)
+
+		const retryAllocationRoute = findRoute("step-1", "step-1-await-allocation", "step-1-retry-allocate-artifact")
+		expectRouteMatchesToolBackedOperationEvent(
+			retryAllocationRoute,
+			"tool_backed_operation_failed",
+			"step-1-resolve-entry-artifact",
+			"step-1-allocate-artifact",
+		)
 	})
 
 	it("keeps runtime-driven steps out of project prompts and routes progress decisions for Steps 3 through 8", () => {
