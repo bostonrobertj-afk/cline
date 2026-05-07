@@ -310,7 +310,11 @@ export type WorkflowArtifactOutputValueKeys =
 export type WorkflowArtifactDefinition =
 	| {
 			id: string
-			family: WorkflowArtifactFamily.Epics | WorkflowArtifactFamily.EpicsIndex | WorkflowArtifactFamily.BrainstormingSession
+			family:
+				| WorkflowArtifactFamily.Epics
+				| WorkflowArtifactFamily.EpicsIndex
+				| WorkflowArtifactFamily.BrainstormingSession
+				| WorkflowArtifactFamily.ArchitectureDocument
 			intentMode: "new"
 			parentIdentitySource: undefined
 			targetIdentitySource: undefined

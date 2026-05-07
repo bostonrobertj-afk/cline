@@ -46,7 +46,33 @@ Define:
 - `projectSubfolder`
 - persona fields
 
-The persona must be module-owned data. Do not load persona text from BMAD files, markdown workflow files, user-authored workflow files, or other runtime filesystem sources.
+Use the canonical workflow-to-persona-to-project-subfolder mapping in `docs/workflows/workflow-runtime/requirements.md` to select the workflow persona and project subfolder. That mapping is the authority for which persona a workflow uses.
+
+Use `_bmad/bmm/agents/` only as migration source material while building the module. Derive the structured `WorkflowPersonaDefinition` fields from the mapped persona source file, then copy the resulting data into module-owned constants. The runtime workflow module must not read BMAD files at activation time, prompt-projection time, or step execution time.
+
+For the current in-scope mappings, the BMAD migration source files are:
+
+| Requirements persona | BMAD source file |
+| --- | --- |
+| `analyst` | `_bmad/bmm/agents/analyst.md` |
+| `architect` | `_bmad/bmm/agents/architect.md` |
+| `developer` | `_bmad/bmm/agents/dev.md` |
+| `product-manager` | `_bmad/bmm/agents/pm.md` |
+| `quality-control` | `_bmad/bmm/agents/quality-control.md` |
+| `scrum-master` | `_bmad/bmm/agents/sm.md` |
+
+Map BMAD source content into `WorkflowPersonaDefinition` as follows:
+
+| WorkflowPersonaDefinition field | Source |
+| --- | --- |
+| `name` | BMAD agent `name` attribute when present; otherwise the persona display name prescribed by requirements |
+| `role` | BMAD `<role>` text |
+| `identity` | BMAD `<identity>` text |
+| `capabilities` | BMAD agent `capabilities` attribute split into trimmed entries |
+| `communicationStyle` | BMAD `<communication_style>` text |
+| `principles` | BMAD `<principles>` content split into explicit principle strings |
+
+If the requirements mapping, BMAD source file, or derived persona fields conflict or are incomplete, stop and tighten the requirements or migration source before implementing the workflow module. Do not invent persona data ad hoc inside the action plan or implementation.
 
 In the brainstorming module, `displayName`, `description`, and `persona` live as constants in `brainstormingWorkflow.ts`, and the entry panel reuses `brainstormingWorkflowDefinition.description`.
 
@@ -175,7 +201,22 @@ Each `WorkflowStepDefinition.buildToolSchema(...)` must delegate directly to a n
 
 The returned `readonly ClineToolSpec[]` is the complete model-visible workflow tool surface for that turn. It is not additive with default workflow tools, and the legacy contextual tool matrix must not participate.
 
-The deleted `contextualToolMatrix.ts` is reference material only. If it is useful, read `docs/workflows/workflow-runtime/workflow-modules/legacy-tool-matrix.md` to understand historical tool-category intent, then translate that intent into explicit module-owned schemas.
+The deleted `contextualToolMatrix.ts` is reference material only. Use `docs/workflows/workflow-runtime/workflow-modules/legacy-tool-matrix.md` as a loose migration reference for historical tool-category intent, not as an implementation source and not as a 1:1 step mapping.
+
+Use this translation process for each model-driven step:
+
+1. Read the current workflow source prompt for the step.
+2. Compare it to the legacy matrix entry for the old markdown workflow step, if one exists.
+3. Identify the actual actions the AI must perform in the runtime workflow step.
+4. Translate those actions into exact `ClineDefaultTool` schema builders in `{workflowId}ToolSchemas.ts`.
+5. Add workflow-specific backend tools only when normal shared tools cannot safely express the action.
+6. Add user-facing response or delivery tools required by the step.
+7. Exclude placeholder-era tools and runtime-owned deterministic tools that are not model-facing.
+8. Add tests that assert the exact tool names returned for the step.
+
+Do not copy legacy bundle names literally. For example, old `DOC_WRITE` intent should become the exact governed file-edit tools needed by the runtime prompt, such as `apply_patch`, not `build_workflow_document`. Old placeholder-write intent should not become `set_workflow_values` unless the step requirements explicitly make workflow values AI-writable for that turn.
+
+If the prompt, legacy matrix, and available tool set do not clearly imply the exact schema, stop and tighten the module requirements before writing code.
 
 ### Response Tools
 

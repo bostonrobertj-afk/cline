@@ -328,6 +328,46 @@ function createRealBrainstormingArtifactWorkflow(): WorkflowDefinition {
 	}
 }
 
+function createRealArchitectureArtifactWorkflow(): WorkflowDefinition {
+	const artifactOutputKeys = {
+		...createStandaloneArtifactOutputValueKeys("architecture"),
+		artifactAbsolutePath: "output_file",
+	}
+
+	return {
+		name: "create-workflow-artifact-architecture-test",
+		displayName: "Create Workflow Artifact Architecture Test",
+		description: "Test workflow for creating an architecture workflow artifact.",
+		slashCommandName: "create-workflow-artifact-architecture-test",
+		useSkillName: "create-workflow-artifact-architecture-test",
+		persona: WORKFLOW_PERSONA_FIXTURE,
+		projectSubfolder: "planning",
+		workflowValueKeys: [
+			...Object.values(ENTRY_PROJECT_VALUE_KEYS),
+			...collectArtifactOutputWorkflowValueKeys(artifactOutputKeys),
+		],
+		entryProjectValueKeys: ENTRY_PROJECT_VALUE_KEYS,
+		entryPanel: {
+			promptMarkdown: "Start this workflow",
+		},
+		steps: {
+			"step-1": createWorkflowStepDefinition(),
+		},
+		workflowForms: {},
+		artifacts: {
+			architecture_document: {
+				id: "architecture_document",
+				family: WorkflowArtifactFamily.ArchitectureDocument,
+				intentMode: "new",
+				parentIdentitySource: undefined,
+				targetIdentitySource: undefined,
+				outputValueKeys: artifactOutputKeys,
+			},
+		},
+		childInheritance: [],
+	}
+}
+
 function createActiveWorkflowSession(workflow: WorkflowDefinition): ActiveWorkflowSession {
 	return {
 		activeStepNumber: 1,
@@ -586,6 +626,59 @@ describe("CreateWorkflowArtifactToolHandler", () => {
 				artifact_identity: "brainstorming_session",
 				artifact_filename: "brainstorming.md",
 				artifact_relative_path: path.join("discovery", "brainstorming.md"),
+				artifact_absolute_path: artifactAbsolutePath,
+			})
+			expect(parsedResult.persisted_artifact_output_values.output_file).to.equal(artifactAbsolutePath)
+			await access(artifactAbsolutePath)
+			expect(await readFile(artifactAbsolutePath, "utf8")).to.equal("")
+		} finally {
+			await rm(tmpCwd, { recursive: true, force: true })
+		}
+	})
+
+	it("creates the architecture singleton artifact through the real workflow runtime", async () => {
+		const tmpCwd = await mkdtemp(path.join(tmpdir(), "create-workflow-artifact-architecture-handler-test-"))
+		try {
+			const workflow = createRealArchitectureArtifactWorkflow()
+			sandbox
+				.stub(WorkflowRegistry, "resolveWorkflowDefinition")
+				.callsFake((workflowName: string) => (workflowName === workflow.name ? workflow : undefined))
+			const taskState = new TaskState()
+			taskState.activeWorkflowName = workflow.name
+			taskState.activeWorkflowSession = createActiveWorkflowSession(workflow)
+			const runtime = new WorkflowRuntime({
+				cwd: tmpCwd,
+				workspacePathPolicy: createAllowAllWorkspacePathPolicy(),
+			})
+			const { config } = createConfig({
+				cwd: tmpCwd,
+				taskState,
+				workflowRuntime: runtime,
+			})
+			const handler = new CreateWorkflowArtifactToolHandler(createToolValidator(config.cwd))
+
+			const result = await handler.execute(config, createArtifactBlock({ artifactId: "architecture_document" }))
+
+			expect(typeof result).to.equal("string")
+			if (typeof result !== "string") {
+				throw new Error("Expected string tool result.")
+			}
+			const parsedResult = JSON.parse(result)
+			const artifactAbsolutePath = path.join(
+				tmpCwd,
+				"docs",
+				"projects",
+				"real-artifact-project",
+				"planning",
+				"architecture.md",
+			)
+			expect(parsedResult).to.deep.include({
+				created: true,
+				artifact_id: "architecture_document",
+				artifact_family: "architecture_document",
+				artifact_identity: "architecture_document",
+				artifact_filename: "architecture.md",
+				artifact_relative_path: path.join("planning", "architecture.md"),
 				artifact_absolute_path: artifactAbsolutePath,
 			})
 			expect(parsedResult.persisted_artifact_output_values.output_file).to.equal(artifactAbsolutePath)

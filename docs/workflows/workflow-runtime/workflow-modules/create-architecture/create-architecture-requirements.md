@@ -1,0 +1,483 @@
+# Create Architecture Workflow Module Requirements
+
+## Scope
+
+Build the product-owned `create-architecture` workflow module using `/Users/robertboston/Documents/Cline/Workflows/create-architecture.md` as the behavior reference. Workflow names must not include `.md`.
+
+Use `docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md` as the controlling module-build guide. Use `docs/workflows/workflow-runtime/workflow-modules/brainstorming/brainstorming-requirements.md` only as a structural reference where it still aligns with the guide.
+
+The create-architecture workflow must create and guide completion of an `architecture.md` planning artifact through collaborative discovery, explicit design decisions, code-aware assessment, roadmap sequencing, and final readiness review.
+
+Do not rely on the source markdown workflow file, the markdown output template, BMAD files, placeholder workflow state, managed-workflow state, `.cline/workflow-config.yaml`, or other legacy workflow assets at runtime. Source files are migration references only.
+
+## Workflow Identity
+
+- `name`: `create-architecture`
+- `slashCommandName`: `create-architecture`
+- `useSkillName`: `create-architecture`
+- `displayName`: `Create Architecture`
+- `description`: `Create a complete architecture document through collaborative discovery, explicit design decisions, and a final readiness review.`
+- `persona`: `architect`
+- `projectSubfolder`: `planning`
+
+The workflow-specific shared entry `WorkflowForm` informational panel must reuse the module-owned description above.
+
+## Persona
+
+The create-architecture module must derive its structured persona from the canonical workflow mapping in `docs/workflows/workflow-runtime/requirements.md` and the migration source `_bmad/bmm/agents/architect.md`.
+
+The module must copy the derived persona into module-owned constants and must not read `_bmad/bmm/agents/architect.md` at runtime.
+
+The module-owned persona must use:
+
+- `name`: `Winston`
+- `role`: `Architect`
+- `identity`: `Designs scalable systems and chooses practical technology with care.`
+- `capabilities`: `distributed systems`, `cloud`, `API design`, `scalability`
+- `communicationStyle`: `Calm, pragmatic, and tradeoff-aware.`
+- `principles`:
+  - `Prefer simple, boring solutions that scale when needed.`
+  - `Let user journeys, business value, and developer productivity guide technical decisions.`
+
+If the requirements mapping or BMAD source changes before implementation, the module-build action plan must require re-deriving this persona before code changes.
+
+## Runtime-Owned Values
+
+The create-architecture module must define its workflow-owned value contract according to `FR-10a` through `FR-10c1`, `FR-21a`, and `FR-21b`.
+
+The module must declare every supported workflow value key in `workflowValueKeys`. `WorkflowRuntime.applyWorkflowValueWrites(...)` must be able to reject or no-op any write outside that inventory per `FR-10c1`, `FR-35g1`, and `FR-35g2`.
+
+The module must declare `entryProjectValueKeys` with exactly these three destinations, and each destination must also appear in `workflowValueKeys`, per `FR-10j1` and `FR-10j2`:
+
+- `projectMode`
+- `projectTitle`
+- `projectFolderName`
+
+The module must include workflow-value keys for:
+
+- entry project selection values
+- `has_context_files`
+- optional `context_files`
+- `scope`
+- `has_architectural_goals`
+- optional `architectural_goals`
+- `has_core_architectural_rules`
+- optional `core_architectural_rules`
+- `output_file`, the canonical prompt-readable absolute path to `architecture.md`
+- output artifact metadata required by `FR-20l` and `FR-20m`, including project context, artifact family, artifact identity, artifact filename, artifact relative path, and artifact absolute path
+
+The architecture artifact definition must map `outputValueKeys.artifactAbsolutePath` to `output_file`. This makes the generic runtime-resolved artifact absolute path available as the workflow's canonical output file path for later `buildPromptSource` functions and document builders.
+
+Any workflow form field whose submitted value must survive beyond form-local state must declare a durable workflow-value destination and persist through the runtime value seam, per `FR-39f` through `FR-39m`.
+
+The create-architecture module must not expose `set_workflow_values` in any model-facing step. User-approved document content must be persisted to `architecture.md` through governed file-edit tools, not through AI-authored workflow-value mutation.
+
+Workflow values must remain JSON-safe and preserve type/shape, per `FR-35i` through `FR-35k`. Prompt builders may render workflow values only through deterministic rendering, per `FR-35l`; runtime or tool code requiring string paths or identities must validate non-empty strings per `FR-35m`.
+
+Workflow-owned values must clear on teardown and participate in safe resume through runtime-owned session state, per `FR-49a`, `FR-50`, and `FR-52` through `FR-52b`.
+
+## AI-Writable Workflow Values
+
+The create-architecture module must not define AI-writable workflow values.
+
+No create-architecture step may expose `set_workflow_values`. The architecture document is the source of truth after Step 2 form persistence and later model-facing document edits.
+
+## Output Artifact
+
+The create-architecture workflow requires a runtime-owned unnumbered singleton project markdown artifact for its architecture output document.
+
+The implementation must extend the artifact-family registry and related type surface to support an architecture document artifact family, consistent with `FR-20b1a`, `FR-20j3`, and `FR-20j3a`.
+
+The new artifact family must be runtime-owned, not module-owned. The create-architecture module may reference the artifact-family identifier, but must not define or override canonical filename patterns, extensions, numbering scopes, discovery patterns, or path construction, per `FR-20j4` and `FR-20k`.
+
+The new artifact family must use:
+
+- allocation mode: singleton project artifact
+- identity requirement: none
+- numbering scope: project singleton
+- content kind: markdown
+- file extension: `.md`
+- stable singleton identity: `architecture_document`
+- canonical filename pattern: `architecture.md`
+- discovery pattern matching only `architecture.md`
+
+The artifact must be created in the selected project's `planning` subfolder beneath the runtime-owned project output root.
+
+Step 1 must allocate/create this artifact through an `allocate_artifact` decision action, which the runtime executes through `create_workflow_artifact`. The runtime must create the empty file and persist project/artifact metadata into workflow values per `FR-20l`, `FR-20m`, and `FR-20n`.
+
+Subsequent runtime-owned deterministic document population must use `build_workflow_document`, which consumes the runtime-resolved destination path and must not allocate identity, choose filenames, or choose folders, per `FR-20p`.
+
+Model-facing steps that edit `{output_file}` must use governed file-read and file-edit tools rather than `build_workflow_document`.
+
+## Document Template
+
+The initial `architecture.md` document shell must be produced from module-owned code, not by reading `docs/workflows/workflow-runtime/workflow-modules/create-architecture/architecture-template.md` at runtime.
+
+The template file is a migration reference only. The module-owned document builder must generate this heading structure exactly:
+
+```markdown
+# Scope, Context, & Goals
+
+## Relevant Context
+
+## Scope
+
+## Architectural goals
+
+## Core architectural rules
+
+## Project Context Analysis
+
+## Interpretation
+
+# Responsibility boundaries
+
+## Durable vs transient ownership
+
+### Required additional baseline for authority enforcement
+
+# Current code assessment
+
+### Aligned
+
+### Partially aligned
+
+### Not aligned / conflicts
+
+# Key tradeoffs and risks
+
+## Tradeoffs
+
+## Risks
+
+# Project Blast Radius
+
+# Dependencies
+
+# Project Roadmap
+```
+
+Step 1 must build this shell immediately after artifact allocation.
+
+Step 2 must write submitted form values under the matching headings in the same document by using `build_workflow_document` with deterministic module-owned content construction. Later model-facing steps must update the document through governed file-edit tools.
+
+## Entry And Steps
+
+The shared entry `WorkflowForm` remains mandatory for user-facing main-agent workflow invocations. Workflow-specific entry copy must describe the create-architecture workflow.
+
+The module must define each workflow step as a `WorkflowStepDefinition` that satisfies the main workflow-runtime contract:
+
+- `id` must use canonical `step-{stepNumber}` form and exactly match `stepNumber`, per `FR-29b1`.
+- `stepNumber` must define the runtime step order.
+- `checklistLabel` must define the focus-chain task text projected to the UI.
+- `buildPromptSource` must provide module-owned prompt text per `FR-14a` through `FR-14g`.
+- `buildToolSchema` must provide module-owned per-step tool schema per `FR-15` and `FR-35`.
+- `decisionTree` must own step progression, form rendering, deterministic actions, transitions, model handoff, and completion behavior per `FR-16` and `FR-29`.
+- Any workflow-form or deterministic operation selected by a step must follow `FR-39` through `FR-43`.
+- Final-step completion must use workflow-runtime completion and teardown behavior per `FR-46` through `FR-49`.
+
+The module must define these nine steps, using these exact `checklistLabel` values:
+
+| Step id | Step number | `checklistLabel` | Required runtime shape |
+| --- | --- | --- | --- |
+| `step-1` | 1 | `Generate Output Document` | Allocate/create `architecture.md`, build the initial document shell, and transition to Step 2. |
+| `step-2` | 2 | `Gather User Inputs` | Render one multi-panel input form, write submitted values into the output document, and transition to Step 3. |
+| `step-3` | 3 | `Establish Architecture Foundational Elements` | Model-driven architecture foundation step; progression requires `workflow_progress_request` confirmation. |
+| `step-4` | 4 | `Revolve Responsibility & Ownership` | Model-driven responsibility and ownership step; progression requires `workflow_progress_request` confirmation. |
+| `step-5` | 5 | `Code Alignment Assessment` | Model-driven code and test assessment step; progression requires `workflow_progress_request` confirmation. |
+| `step-6` | 6 | `Identify Key Tradeoffs & Risks` | Model-driven tradeoff and risk step; progression requires `workflow_progress_request` confirmation. |
+| `step-7` | 7 | `Map out Blast Radius` | Model-driven blast-radius step; progression requires `workflow_progress_request` confirmation. |
+| `step-8` | 8 | `Build Project Roadmap` | Model-driven dependency and roadmap step; progression requires `workflow_progress_request` confirmation. |
+| `step-9` | 9 | `Finalize Architecture Document` | Model-driven final readiness review and final delivery through `attempt_completion`. |
+
+## Step 1: Generate Output Document
+
+Step 1 must model progression as explicit decision actions in this order: `allocate_artifact`, `build_workflow_document` for the initial document shell, then `transition_step` to Step 2.
+
+Step 1 must begin with an `allocate_artifact` decision action for the architecture output artifact. The runtime converts that action into `create_workflow_artifact`.
+
+Step 1 must define success and failure routes for the first artifact-allocation result. If the first allocation succeeds, the next action must build the initial document shell. If the first allocation fails, the next action must retry allocation exactly once.
+
+Step 1 must define success and failure routes for the retry allocation result. If the retry succeeds, the next action must build the initial document shell. If the retry fails, the next action must be `terminal_error`.
+
+If the initial document-shell build succeeds, the Step 1 decision tree must select a `transition_step` action targeting Step 2. If the initial document-shell build fails, the next action must be `terminal_error`.
+
+Step 1 must be runtime-driven and must expose an empty tool schema through an exported builder from `createArchitectureToolSchemas.ts`.
+
+## Step 2: Gather User Inputs
+
+Step 2 must begin with one `render_workflow_form` decision action. Multi-panel behavior must live inside the form definition, not as separate decision actions per panel.
+
+The Step 2 workflow form must include these seven panels:
+
+| Panel | Trigger | Field behavior |
+| --- | --- | --- |
+| Panel 1 | First panel | Ask `Are there any files which you'd like to provide as context for this session?`; collect required yes/no value into `has_context_files`. |
+| Panel 2 | Only when Panel 1 is yes | Ask `Please provide the full file path for each file you'd like to use as session context.`; collect required large text area value into `context_files`. |
+| Panel 3 | When Panel 1 is no, or after Panel 2 completes | Ask `Please describe the scope of this architecture document`; collect required large text area value into `scope`. |
+| Panel 4 | After Panel 3 | Ask `Would you like to provide architectural goals?`; collect required yes/no value into `has_architectural_goals`. |
+| Panel 5 | Only when Panel 4 is yes | Ask `Please provide the architectural goals below.`; collect required large text area value into `architectural_goals`. |
+| Panel 6 | When Panel 4 is no, or after Panel 5 completes | Ask `Would you like to provide the core architectural rules now?`; collect required yes/no value into `has_core_architectural_rules`. |
+| Panel 7 | Only when Panel 6 is yes | Ask `Please provide the core architectural rules below.`; collect required large text area value into `core_architectural_rules`. |
+
+The form must only collect and persist the user's input. It must not validate context-file existence, validate file access, read provided context files, normalize file paths, or reject paths based on workspace policy during form submission.
+
+If `has_context_files` changes from yes to no through navigation, stale `context_files` must be cleared. If `has_architectural_goals` changes from yes to no, stale `architectural_goals` must be cleared. If `has_core_architectural_rules` changes from yes to no, stale `core_architectural_rules` must be cleared.
+
+After the Step 2 workflow form completes, the next action must use `build_workflow_document` to populate the already-created architecture output artifact by writing:
+
+- `context_files` under `Relevant Context`, when provided
+- `scope` under `Scope`
+- `architectural_goals` under `Architectural goals`, when provided
+- `core_architectural_rules` under `Core architectural rules`, when provided
+
+When that `build_workflow_document` action succeeds, the Step 2 decision tree must select a `transition_step` action targeting Step 3. Step 2 must not rely on implicit completion, optional progression, or model-driven handoff to advance to Step 3.
+
+Step 2 must be runtime-driven and must expose an empty tool schema through an exported builder from `createArchitectureToolSchemas.ts`.
+
+## Step 3: Establish Architecture Foundational Elements
+
+Step 3 must enter model-driven work through a `project_prompt` decision action.
+
+Step 3 `buildPromptSource` must construct the Step 3 prompt from the source workflow prompt, normalized to use `{output_file}` consistently. The prompt must instruct the AI to:
+
+- read `{output_file}`
+- read any additional files listed in the `Relevant Context` section when useful
+- if files were provided, draft and propose content for `Project Context Analysis`, then save approved content to `{output_file}`
+- ensure that `Scope`, `Architectural goals`, and `Core architectural rules` are sufficient to support the remaining architecture sections
+- ask the user for clarification or improvement when those sections are vague, overly broad, or insufficient
+- draft and propose content for `Interpretation`, then save approved content to `{output_file}`
+- use `workflow_progress_request` to confirm and unlock the next workflow step after user-approved interpretation content has been saved
+
+Step 3 tool schema must expose exactly:
+
+- `read_file`
+- `apply_patch`
+- `send_user_message`
+- `ask_followup_question`
+- `workflow_progress_request`
+
+When Step 3 receives a `workflow_progress_request_confirmed` event, the Step 3 decision tree must select a `transition_step` action targeting Step 4. If the request is denied, Step 3 must remain active and return to `project_prompt`.
+
+## Step 4: Revolve Responsibility & Ownership
+
+Step 4 must enter model-driven work through a `project_prompt` decision action.
+
+Step 4 `buildPromptSource` must construct the Step 4 prompt from the source workflow prompt, normalized to use `{output_file}` consistently. The prompt must instruct the AI to:
+
+- guide the user through documenting `Responsibility Boundaries`, `Durable vs Transient Ownership`, and `Required Additional Baseline for Authority Enforcement`
+- refer to relevant context, runtime code, and tests frequently to keep the section grounded in reality
+- save user-approved content under the matching headings in `{output_file}`
+- use `workflow_progress_request` to confirm and unlock the next workflow step once the user is aligned with the content
+
+Step 4 tool schema must expose exactly:
+
+- `list_files`
+- `search_files`
+- `list_code_definition_names`
+- `read_file`
+- `read_file_range`
+- `apply_patch`
+- `send_user_message`
+- `ask_followup_question`
+- `workflow_progress_request`
+
+When Step 4 receives a `workflow_progress_request_confirmed` event, the Step 4 decision tree must select a `transition_step` action targeting Step 5. If the request is denied, Step 4 must remain active and return to `project_prompt`.
+
+## Step 5: Code Alignment Assessment
+
+Step 5 must enter model-driven work through a `project_prompt` decision action.
+
+Step 5 `buildPromptSource` must construct the Step 5 prompt from the source workflow prompt, normalized to use `{output_file}` consistently. The prompt must instruct the AI to:
+
+- tell the user that it will assess current runtime code and tests for alignment with the intended architecture
+- perform a thorough repository assessment
+- record findings under `Aligned`, `Partially aligned`, and `Not aligned / conflicts`
+- brief the user on findings
+- answer user questions and adjust the document when needed
+- use `workflow_progress_request` to unlock the next workflow step once the user approves the content
+
+Step 5 tool schema must expose exactly:
+
+- `list_files`
+- `search_files`
+- `list_code_definition_names`
+- `read_file`
+- `read_file_range`
+- `apply_patch`
+- `send_user_message`
+- `ask_followup_question`
+- `workflow_progress_request`
+
+Step 5 must not expose `execute_command` unless requirements are explicitly revised to require command execution during architecture assessment.
+
+When Step 5 receives a `workflow_progress_request_confirmed` event, the Step 5 decision tree must select a `transition_step` action targeting Step 6. If the request is denied, Step 5 must remain active and return to `project_prompt`.
+
+## Step 6: Identify Key Tradeoffs & Risks
+
+Step 6 must enter model-driven work through a `project_prompt` decision action.
+
+Step 6 `buildPromptSource` must construct the Step 6 prompt from the source workflow prompt, normalized to use `{output_file}` consistently. The prompt must instruct the AI to:
+
+- identify key tradeoffs and risks based on the existing contents of `{output_file}`
+- perform additional code assessment if needed
+- propose draft content for the `Tradeoffs` and `Risks` sections
+- refine based on user feedback
+- save user-approved final content under the matching headings in `{output_file}`
+- use `workflow_progress_request` to unlock the next workflow step once tradeoffs and risks are populated
+
+Step 6 tool schema must expose exactly:
+
+- `list_files`
+- `search_files`
+- `list_code_definition_names`
+- `read_file`
+- `read_file_range`
+- `apply_patch`
+- `send_user_message`
+- `ask_followup_question`
+- `workflow_progress_request`
+
+When Step 6 receives a `workflow_progress_request_confirmed` event, the Step 6 decision tree must select a `transition_step` action targeting Step 7. If the request is denied, Step 6 must remain active and return to `project_prompt`.
+
+## Step 7: Map out Blast Radius
+
+Step 7 must enter model-driven work through a `project_prompt` decision action.
+
+Step 7 `buildPromptSource` must construct the Step 7 prompt from the source workflow prompt, normalized to use `{output_file}` consistently. The prompt must instruct the AI to:
+
+- draft a comprehensive blast radius for the project
+- include files, modules, directories, shared components, and integration boundaries
+- propose the blast radius to the user
+- adjust based on user feedback
+- save approved content under `Project Blast Radius` in `{output_file}`
+- use `workflow_progress_request` to unlock the next workflow step once the section is populated
+
+Step 7 tool schema must expose exactly:
+
+- `list_files`
+- `search_files`
+- `list_code_definition_names`
+- `read_file`
+- `read_file_range`
+- `apply_patch`
+- `send_user_message`
+- `ask_followup_question`
+- `workflow_progress_request`
+
+When Step 7 receives a `workflow_progress_request_confirmed` event, the Step 7 decision tree must select a `transition_step` action targeting Step 8. If the request is denied, Step 7 must remain active and return to `project_prompt`.
+
+## Step 8: Build Project Roadmap
+
+Step 8 must enter model-driven work through a `project_prompt` decision action.
+
+Step 8 `buildPromptSource` must construct the Step 8 prompt from the source workflow prompt, normalized to use `{output_file}` consistently. The prompt must instruct the AI to:
+
+- identify key dependencies that will matter during project implementation
+- present those dependencies to the user and adjust based on feedback
+- save approved dependencies under `Dependencies` in `{output_file}`
+- build an implementation roadmap establishing high-level project implementation sequencing based on dependencies and blast radius
+- present the roadmap to the user and adjust based on feedback
+- save approved roadmap content under `Project Roadmap` in `{output_file}`
+- use `workflow_progress_request` to unlock the final workflow step once both sections are populated
+
+Step 8 tool schema must expose exactly:
+
+- `list_files`
+- `search_files`
+- `list_code_definition_names`
+- `read_file`
+- `read_file_range`
+- `apply_patch`
+- `send_user_message`
+- `ask_followup_question`
+- `workflow_progress_request`
+
+When Step 8 receives a `workflow_progress_request_confirmed` event, the Step 8 decision tree must select a `transition_step` action targeting Step 9. If the request is denied, Step 8 must remain active and return to `project_prompt`.
+
+## Step 9: Finalize Architecture Document
+
+Step 9 must enter model-driven work through a `project_prompt` decision action.
+
+Step 9 `buildPromptSource` must construct the Step 9 prompt from the source workflow prompt, normalized to use `{output_file}` consistently. The prompt must instruct the AI to:
+
+- read and review the full architecture document for coherence, pattern alignment, and structure alignment
+- classify issues as critical, important, or minor
+- if critical issues exist, present them and ask how the user wants to resolve them before implementation
+- if important or minor issues exist, present them as refinements and ask whether to address them now
+- when the document is ready, use `attempt_completion` to present a short completion summary
+- explain in the completion summary that the architecture document is now the technical source of truth and is ready to inform the create-epics workflow
+
+Step 9 tool schema must expose exactly:
+
+- `read_file`
+- `apply_patch`
+- `send_user_message`
+- `ask_followup_question`
+- `attempt_completion`
+
+Step 9 completion requires successful final delivery through `attempt_completion`. After that final delivery, the workflow runtime must perform normal workflow completion and teardown. Step 9 must not use a workflow-specific completion handler.
+
+## Prompting And Tools
+
+Step prompts must be module-owned prompt builders. Shared workflow tool handlers live outside workflow modules, but create-architecture module definitions must own when those tools are exposed for this workflow.
+
+The create-architecture module's canonical tool-schema file is `createArchitectureToolSchemas.ts`.
+
+`createArchitectureWorkflow.ts` must not define inline tool schemas. Every `buildToolSchema(...)` assignment in the create-architecture workflow definition must delegate directly to an exported builder from `createArchitectureToolSchemas.ts`.
+
+`createArchitectureToolSchemas.ts` must own the complete model-visible tool schema for each create-architecture step.
+
+Step 1 and Step 2 schemas must return empty arrays through named exported builders because those steps are runtime-driven and never route to model-driven work.
+
+Step 3 schema must expose exactly `read_file`, `apply_patch`, `send_user_message`, `ask_followup_question`, and `workflow_progress_request`.
+
+Steps 4 through 8 schemas must expose exactly `list_files`, `search_files`, `list_code_definition_names`, `read_file`, `read_file_range`, `apply_patch`, `send_user_message`, `ask_followup_question`, and `workflow_progress_request`.
+
+Step 9 schema must expose exactly `read_file`, `apply_patch`, `send_user_message`, `ask_followup_question`, and `attempt_completion`.
+
+No create-architecture model-facing step may expose `create_workflow_artifact`, `build_workflow_document`, or `set_workflow_values`. Artifact creation and deterministic document writes remain runtime-owned.
+
+The legacy tool matrix is a loose migration reference only. The create-architecture module must not copy legacy placeholder-write behavior, must not expose placeholder-era tools, and must not treat the old step numbers as authoritative over this requirements document.
+
+## Completion
+
+Step 9 completes through final user delivery and workflow teardown. No workflow-specific completion handler is allowed.
+
+The workflow is complete only after `attempt_completion` succeeds in Step 9.
+
+## Tests And Validation Expectations
+
+The implementation must include module tests proving:
+
+- workflow identity, display name, description, project subfolder, and persona match this document
+- workflow value inventory includes every declared value and no undeclared hidden runtime-written values
+- entry project value keys map to declared workflow values
+- architecture artifact definition maps runtime output values into create-architecture workflow values, including `output_file`
+- `architecture.md` document builder produces the exact required heading structure without reading `architecture-template.md` at runtime
+- Step 2 form panels, transitions, required fields, and stale clears match this document
+- Step 1 and Step 2 are runtime-driven and expose empty schemas through named exported builders
+- Step 3 exposes exactly the required tool schema
+- Steps 4 through 8 expose exactly the required tool schema
+- Step 9 exposes exactly the required tool schema
+- no model-facing step exposes `create_workflow_artifact`, `build_workflow_document`, or `set_workflow_values`
+- all workflow steps delegate `buildToolSchema(...)` directly to named exports from `createArchitectureToolSchemas.ts`
+- Step 3 through Step 8 denied progress requests return to `project_prompt`
+- Step 3 through Step 8 confirmed progress requests transition to the next step
+- Step 9 final delivery completes and triggers normal workflow teardown
+
+Runtime tests must cover:
+
+- architecture artifact family registry allocation and path resolution under the selected project's `planning` folder
+- successful Step 1 allocation, initial shell write, and transition to Step 2
+- successful Step 2 form completion, submitted-value document write, and transition to Step 3
+- prompt projection for create-architecture current-step input payloads
+- response-tool guidance matching the projected tool schema for model-facing steps
+
+Validation must include targeted unit tests, `npm run check-types`, and a packaged smoke test that verifies:
+
+- project entry flow works
+- `architecture.md` is created under `docs/projects/{project}/planning/`
+- Step 2 form persists submitted values under the correct headings
+- Step 3 through Step 8 can update the document and advance by `workflow_progress_request`
+- Step 9 completes with `attempt_completion`

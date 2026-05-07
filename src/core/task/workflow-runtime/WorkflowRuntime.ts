@@ -3297,7 +3297,8 @@ export class WorkflowRuntime {
 		switch (args.artifactDefinition.family) {
 			case WorkflowArtifactFamily.Epics:
 			case WorkflowArtifactFamily.EpicsIndex:
-			case WorkflowArtifactFamily.BrainstormingSession: {
+			case WorkflowArtifactFamily.BrainstormingSession:
+			case WorkflowArtifactFamily.ArchitectureDocument: {
 				if (args.familyDefinition.allocationMode !== "singleton_project") {
 					throw new Error(`Workflow artifact ${args.artifactDefinition.id} requires a singleton project family.`)
 				}
@@ -3687,6 +3688,7 @@ export class WorkflowRuntime {
 			case WorkflowArtifactFamily.Epics:
 			case WorkflowArtifactFamily.EpicsIndex:
 			case WorkflowArtifactFamily.BrainstormingSession:
+			case WorkflowArtifactFamily.ArchitectureDocument:
 				return undefined
 			case WorkflowArtifactFamily.EpicDeliverySpec:
 				return this.parseDottedWorkflowArtifactIdentity(match[1])

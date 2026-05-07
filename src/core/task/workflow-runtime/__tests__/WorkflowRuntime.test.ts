@@ -6230,6 +6230,55 @@ describe("WorkflowRuntime", () => {
 		await access(artifactAbsolutePath)
 	})
 
+	it("allocates the architecture singleton artifact in planning and maps its absolute path to output_file", async () => {
+		discoverWorkflowCandidatesStub.restore()
+		const architectureKeys = {
+			...createStandaloneArtifactOutputValueKeys("architecture"),
+			artifactAbsolutePath: "output_file",
+		}
+		const workflow = createWorkflowDefinition({
+			projectSubfolder: "planning",
+			workflowValueKeys: collectArtifactOutputWorkflowValueKeys(architectureKeys),
+			artifacts: {
+				architecture_document: {
+					id: "architecture_document",
+					family: WorkflowArtifactFamily.ArchitectureDocument,
+					intentMode: "new",
+					parentIdentitySource: undefined,
+					targetIdentitySource: undefined,
+					outputValueKeys: architectureKeys,
+				},
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		await runtime.resolveNextAction({ taskState })
+		await submitNewProjectSelection(taskState, "Architecture Artifact Project")
+
+		const result = await runtime.createWorkflowArtifact({
+			taskState,
+			artifactId: "architecture_document",
+			expectedArtifactAbsolutePath: undefined,
+		})
+		const artifactAbsolutePath = join(cwd, "docs", "projects", "architecture-artifact-project", "planning", "architecture.md")
+
+		expect(result).to.deep.include({
+			artifactIdentity: "architecture_document",
+			artifactFilename: "architecture.md",
+			artifactRelativePath: join("planning", "architecture.md"),
+			artifactAbsolutePath,
+			parentIdentity: undefined,
+			targetIdentity: undefined,
+		})
+		expect(getActiveWorkflowSession(taskState).workflowValues).to.deep.include({
+			[architectureKeys.artifactFamily]: WorkflowArtifactFamily.ArchitectureDocument,
+			[architectureKeys.artifactIdentity]: "architecture_document",
+			[architectureKeys.artifactFilename]: "architecture.md",
+			output_file: artifactAbsolutePath,
+		})
+		await access(artifactAbsolutePath)
+	})
+
 	it("derives epic delivery specs from Epics.index.json and skips existing delivery specs", async () => {
 		discoverWorkflowCandidatesStub.restore()
 		const deliverySpecKeys = createStandaloneArtifactOutputValueKeys("delivery_spec")

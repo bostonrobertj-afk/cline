@@ -2,6 +2,7 @@ export enum WorkflowArtifactFamily {
 	Epics = "epics",
 	EpicsIndex = "epics_index",
 	BrainstormingSession = "brainstorming_session",
+	ArchitectureDocument = "architecture_document",
 	EpicDeliverySpec = "epic_delivery_spec",
 	Story = "story",
 	RemediationStory = "remediation_story",
@@ -41,11 +42,15 @@ interface WorkflowArtifactFamilyDefinitionBase {
 }
 
 export interface WorkflowSingletonProjectArtifactFamilyDefinition extends WorkflowArtifactFamilyDefinitionBase {
-	family: WorkflowArtifactFamily.Epics | WorkflowArtifactFamily.EpicsIndex | WorkflowArtifactFamily.BrainstormingSession
+	family:
+		| WorkflowArtifactFamily.Epics
+		| WorkflowArtifactFamily.EpicsIndex
+		| WorkflowArtifactFamily.BrainstormingSession
+		| WorkflowArtifactFamily.ArchitectureDocument
 	allocationMode: "singleton_project"
 	identityRequirement: "none"
 	numberingScope: "project_singleton"
-	singletonIdentity: "epics" | "epics_index" | "brainstorming_session"
+	singletonIdentity: "epics" | "epics_index" | "brainstorming_session" | "architecture_document"
 }
 
 export interface WorkflowEpicIndexDerivedArtifactFamilyDefinition extends WorkflowArtifactFamilyDefinitionBase {
@@ -113,6 +118,17 @@ export const WORKFLOW_ARTIFACT_FAMILY_REGISTRY: Readonly<Record<WorkflowArtifact
 		numberingScope: "project_singleton",
 		singletonIdentity: "brainstorming_session",
 		discoveryPattern: /^brainstorming\.md$/,
+	},
+	[WorkflowArtifactFamily.ArchitectureDocument]: {
+		family: WorkflowArtifactFamily.ArchitectureDocument,
+		allocationMode: "singleton_project",
+		identityRequirement: "none",
+		filenamePattern: "architecture.md",
+		fileExtension: ".md",
+		contentKind: "markdown",
+		numberingScope: "project_singleton",
+		singletonIdentity: "architecture_document",
+		discoveryPattern: /^architecture\.md$/,
 	},
 	[WorkflowArtifactFamily.EpicDeliverySpec]: {
 		family: WorkflowArtifactFamily.EpicDeliverySpec,
