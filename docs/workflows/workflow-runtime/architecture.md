@@ -319,8 +319,12 @@ Exact filenames beyond this level are deferred to requirements and implementatio
    - `discovery`
    - `planning`
    - `implementation`
+     - `stories-backlog`
+     - `stories-review`
+     - `stories-complete`
    - `review`
    - `testing`
+   - `archive`
 8. Workflow runtime initializes active-step state and marks the workflow as just started.
 9. Workflow runtime projects downstream state for prompts, focus chain, tools, and any active workflow-form UI.
 10. The activation caller routes the returned `WorkflowNextAction` into the shared next-action consumer for the same execution context before workflow execution continues. Tool-based activation paths may record the tool result first, but they must not drop, privately consume, or re-resolve around the returned activation action.
@@ -609,6 +613,8 @@ Workflow runtime owns artifact allocation and derivation:
 - runtime persists project context, artifact family, artifact identity, artifact filename, artifact relative path, artifact absolute path, and parent or target identity into workflow session values where applicable
 - document builders consume runtime-resolved artifact destination paths and remain content builders rather than artifact identity, filename, or project-folder allocators
 
+Workflow runtime must provide a backend-owned file-move capability for workflow decision trees that need to move existing project files between canonical project folders. File moves remain runtime/tool-governed filesystem operations and must stay inside the selected project folder.
+
 Workflow runtime also owns canonical normalization of user-provided project titles into filesystem-safe project identity.
 
 At the architectural level, that means:
@@ -631,6 +637,10 @@ At the architectural level, that means:
 - workflow automation is only guaranteed for artifacts that continue to match the documented naming and placement conventions
 - if a user renames a project folder or artifact so it no longer matches the expected convention, downstream workflows may no longer recognize it
 - that outcome is acceptable within this architecture and is treated as user-managed document hygiene rather than runtime data corruption
+
+Workflow modules may require prerequisite files before model-driven work begins. Prerequisite-file discovery, user selection, and confirmation are module-owned step behavior, normally represented as a Step 1 workflow form after shared project selection. The mandatory shared pre-workflow entry form must not own workflow-specific prerequisite selection.
+
+A prerequisite-file requirement must identify the workflow that produces the prerequisite file. If no valid prerequisite file is discoverable, the module-owned form must tell the user which workflow must be run first.
 
 ### 8.10 Canonical Workflow Mapping
 

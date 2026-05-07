@@ -250,6 +250,7 @@ The functional requirements below are grouped by the primary implementation phas
   - `review`
   - `testing`
   - `archive`
+- `FR-10l1`: Runtime project-folder creation must also ensure `stories-backlog`, `stories-review`, and `stories-complete` exist under each project’s `implementation` folder.
 - `FR-10m`: After an existing project is selected in the mandatory shared pre-workflow entry `WorkflowForm`, and before workflow-specific step orchestration begins, `WorkflowRuntime` must check the selected project for existing canonical singleton project artifacts declared by the active workflow with `intentMode: "new"`.
 - `FR-10m0`: When a new project is selected, `WorkflowRuntime` must not run existing singleton artifact checks and must complete entry artifact resolution for declared entry singleton artifacts with `creationRequired: true` and `existingArtifactAction: "none"`.
 - `FR-10m1`: Existing singleton artifact checks must be runtime-owned. Runtime must derive the artifact path from the active workflow's `projectSubfolder`, the workflow artifact definition, and the runtime-owned artifact-family registry. Workflow modules must not compute the path, filename, or discovery pattern.
@@ -348,6 +349,10 @@ The functional requirements below are grouped by the primary implementation phas
 - `FR-20j3a`: The artifact-family registry must explicitly model singleton project artifacts, epic-index-derived artifacts, newly numbered artifacts, and target-derived artifacts as separate allocation or derivation modes.
 - `FR-20j4`: Workflow modules may reference runtime-owned artifact-family identifiers from that registry, but must not define or override canonical artifact-family filename patterns, extensions, numbering scopes, or discovery patterns.
 - `FR-20j5`: When an artifact family requires a structured sidecar/index artifact for identity selection or validation, that sidecar/index behavior must be represented in the runtime-owned artifact-family registry rather than implemented as module-specific filename or markdown-parsing logic.
+- `FR-20j6`: Workflow modules may declare required prerequisite files as module-owned Step 1 workflow-form requirements.
+- `FR-20j7`: Prerequisite discovery must use the shared runtime-owned workflow-form selector discovery seam bounded to the selected project folder.
+- `FR-20j8`: A prerequisite declaration must identify the workflow that produces the prerequisite file. If no valid prerequisite file is discoverable, the module must inform the user that they must run that producing workflow by name before continuing.
+- `FR-20j9`: Runtime must provide a backend-owned workflow file-move capability that workflow decision trees can invoke for existing project files. Moves must stay inside the selected project folder, satisfy workspace path-policy checks, and must not be exposed through model-facing tool schemas unless explicitly projected by a module.
 - `FR-20k`: Workflow modules must not prescribe canonical artifact filenames, increment artifact numbers, or compute canonical artifact paths.
 - `FR-20l`: The artifact allocation/create capability must resolve the active project, allocate or derive the canonical artifact identity, produce the canonical filename, project-relative path, and absolute path, and persist those outputs into workflow session values.
 - `FR-20l1`: When entry artifact resolution selects an existing singleton artifact, runtime must persist the same artifact output values that allocation would have produced, including project context, artifact family, artifact identity, artifact filename, artifact relative path, and artifact absolute path, without creating, overwriting, or rebuilding the file.
