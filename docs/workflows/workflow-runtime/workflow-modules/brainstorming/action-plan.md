@@ -1089,6 +1089,170 @@ Allowed files:
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingToolSchemas.ts`
 
+### Phase 9 - Runtime Entry Artifact Resolution For Brainstorming
+
+Pause for QA review before final validation.
+
+This phase aligns the brainstorming module with the runtime-owned existing singleton artifact resolution added in Foundational Build Phase 58. The brainstorming module must branch on `entry_artifact_resolution_completed` before allocating `brainstorming.md`, must skip allocation and initial document-building when the user continues an existing document, and must not expose runtime archive/delete tools to the AI agent.
+
+### Phase 9 Scope Boundary
+
+- Do not change foundational runtime code in this phase.
+- Do not add filesystem existence checks, archive behavior, or delete behavior to the brainstorming module.
+- Do not expose `archive_workflow_artifact`, `delete_workflow_artifact`, `create_workflow_artifact`, or `build_workflow_document` through model-facing brainstorming tool schemas.
+- Do not change Step 3 or Step 4 interactive tool schemas except to add regression assertions.
+
+[ ] Task 23. Align brainstorming requirements with runtime-owned existing singleton artifact resolution.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/brainstorming/brainstorming-requirements.md`
+
+[ ] Subtask 23.1. In `brainstorming-requirements.md`, replace the Step 1 required runtime shape table cell so Step 1 branches on runtime entry singleton artifact resolution: when `creationRequired` is `true`, allocate/create `brainstorming.md`, build the initial shell, render the setup form, and write submitted values; when `creationRequired` is `false`, skip allocation, skip initial document builds, skip the Step 1 setup form, and transition directly to Step 3 to continue work against the existing `output_file`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/brainstorming/brainstorming-requirements.md`
+
+[ ] Subtask 23.2. In `brainstorming-requirements.md`, replace the paragraph that says Step 1 must model progression beginning with `allocate_artifact` so it instead says Step 1 must begin by waiting for `entry_artifact_resolution_completed` for the brainstorming session artifact.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/brainstorming/brainstorming-requirements.md`
+
+[ ] Subtask 23.3. In `brainstorming-requirements.md`, revise the Step 1 allocation and retry paragraphs so they apply only to the `creationRequired: true` branch.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/brainstorming/brainstorming-requirements.md`
+
+[ ] Subtask 23.4. In `brainstorming-requirements.md`, revise the Step 1 initial-shell and setup-form paragraphs so the initial shell, setup form, submitted-values document build, and Step 2 transition occur only on the `creationRequired: true` branch.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/brainstorming/brainstorming-requirements.md`
+
+[ ] Subtask 23.5. In `brainstorming-requirements.md`, revise the artifact-family section so allocation through `allocate_artifact` is required only when runtime entry artifact resolution returns `creationRequired: true`, while `creationRequired: false` uses runtime-persisted artifact output values and does not recompute or rediscover the path.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/brainstorming/brainstorming-requirements.md`
+
+[ ] Subtask 23.6. In `brainstorming-requirements.md`, revise the prompting/tooling section so `create_workflow_artifact`, `archive_workflow_artifact`, `delete_workflow_artifact`, and `build_workflow_document` are explicitly runtime/backend-owned surfaces that must not appear in model-facing Step 3 or Step 4 brainstorming schemas.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/brainstorming/brainstorming-requirements.md`
+
+[ ] Task 24. Update the brainstorming Step 1 decision tree to consume runtime entry artifact resolution.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[ ] Subtask 24.1. In `brainstormingWorkflow.ts`, add a helper returning `WorkflowDecisionBranchTrigger` that matches `triggerEvent.kind === "entry_artifact_resolution_completed"` and finds a resolution with `artifactId === BRAINSTORMING_SESSION_ARTIFACT_ID` and a caller-supplied `creationRequired` boolean.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[ ] Subtask 24.2. In `buildStep1DecisionTree()`, change `entryBranchId` from `"step-1-allocate-artifact"` to `"step-1-resolve-entry-artifact"`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[ ] Subtask 24.3. In `buildStep1DecisionTree()`, replace the old `"step-1-allocate-artifact"` entry branch with a `"step-1-resolve-entry-artifact"` branch whose `creationRequired: true` route has id `"step-1-allocate-artifact"`, performs the existing `allocate_artifact` action for `BRAINSTORMING_SESSION_ARTIFACT_ID`, and follows `"step-1-await-allocation"`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[ ] Subtask 24.4. In the same `"step-1-resolve-entry-artifact"` branch, add a `creationRequired: false` route with id `"step-1-continue-existing-artifact"` that performs a `transition_step` action targeting Step 3 entry branch.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[ ] Subtask 24.5. In `"step-1-await-allocation"`, update the first allocation success trigger to read from source route branch `"step-1-resolve-entry-artifact"` and route `"step-1-allocate-artifact"`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[ ] Subtask 24.6. In `"step-1-await-allocation"`, update the first allocation failure trigger to read from source route branch `"step-1-resolve-entry-artifact"` and route `"step-1-allocate-artifact"`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[ ] Task 25. Update brainstorming and runtime tests for entry artifact resolution.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingToolSchemas.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 25.1. In `brainstormingWorkflow.test.ts`, update the Step 1 pipeline test so it expects entry branch `"step-1-resolve-entry-artifact"` and the `creationRequired: true` allocation route.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
+[ ] Subtask 25.2. In `brainstormingWorkflow.test.ts`, add coverage proving the `creationRequired: false` route transitions directly to Step 3 and does not route to `allocate_artifact`, `build_workflow_document`, or `render_workflow_form`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
+[ ] Subtask 25.3. In `brainstormingWorkflow.test.ts`, update first allocation success and failure source-route expectations from `"step-1-allocate-artifact"` branch to `"step-1-resolve-entry-artifact"` branch.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
+[ ] Subtask 25.4. In `brainstormingToolSchemas.test.ts`, add coverage proving no brainstorming model-facing schema contains `archive_workflow_artifact`, `delete_workflow_artifact`, `create_workflow_artifact`, or `build_workflow_document`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingToolSchemas.test.ts`
+
+[ ] Subtask 25.5. In `WorkflowRuntime.test.ts`, update active brainstorming runtime expectations so the first create-artifact operation after new-project or no-existing-artifact project selection uses source route branch `"step-1-resolve-entry-artifact"` and route `"step-1-allocate-artifact"`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 25.6. In `WorkflowRuntime.test.ts`, add integration coverage proving continuing an existing `discovery/brainstorming.md` persists `output_file`, does not emit `create_workflow_artifact` or `build_workflow_document`, and advances to Step 3 model-driven work.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Task 26. Validate Phase 9.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/brainstorming/brainstorming-requirements.md`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingToolSchemas.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingToolSchemas.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 26.1. Run `rg -n "entryBranchId: \"step-1-allocate-artifact\"|toolBackedOperationSucceeded\\(\"step-1-allocate-artifact\", \"step-1-allocate-artifact\"\\)|toolBackedOperationFailed\\(\"step-1-allocate-artifact\", \"step-1-allocate-artifact\"\\)" src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`; it must return no matches.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[ ] Subtask 26.2. Run `rg -n "archive_workflow_artifact|delete_workflow_artifact|create_workflow_artifact|build_workflow_document" src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingToolSchemas.ts`; it must return no matches.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingToolSchemas.ts`
+
+[ ] Subtask 26.3. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingToolSchemas.test.ts`; it must pass before Phase 9 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingToolSchemas.test.ts`
+
+[ ] Subtask 26.4. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`; it must pass before Phase 9 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 26.5. Run `npm run check-types`; it must pass before Phase 9 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingToolSchemas.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 26.6. Run `npm run lint`; it must pass before Phase 9 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingToolSchemas.ts`
+
 ## Validation
 
 Run these commands after all tasks and subtasks are complete:

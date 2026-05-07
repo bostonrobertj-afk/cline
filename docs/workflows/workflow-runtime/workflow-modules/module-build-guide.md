@@ -102,6 +102,15 @@ Module artifact definitions should reference runtime-owned artifact families and
 
 For model-facing steps, persist the resolved artifact path into a workflow value such as `output_file`, then render that value into prompts. The AI should not recompute the artifact path.
 
+For singleton artifacts with `intentMode: "new"`, existing-project conflict handling is runtime-owned. The module must not inspect the filesystem, compute whether the artifact already exists, archive files, delete files, or expose archive/delete tools to the model.
+
+After project selection, runtime emits `entry_artifact_resolution_completed` for entry singleton artifact resolution. The module decision tree must branch on that event:
+
+- `creationRequired: true`: run the normal `allocate_artifact` and initial `build_workflow_document` setup route.
+- `creationRequired: false`: skip `allocate_artifact` and skip the initial document build for that artifact, then continue through the post-artifact-ready route.
+
+The runtime persists artifact output values for continued existing artifacts, so prompts should read the same workflow values they would read after allocation.
+
 ### Runtime Writes Versus AI Writes
 
 Use `build_workflow_document` only for runtime-owned deterministic full-document replacement actions.
@@ -202,6 +211,8 @@ Each `WorkflowStepDefinition.buildToolSchema(...)` must delegate directly to a n
 The returned `readonly ClineToolSpec[]` is the complete model-visible workflow tool surface for that turn. It is not additive with default workflow tools, and the legacy contextual tool matrix must not participate.
 
 The deleted `contextualToolMatrix.ts` is reference material only. Use `docs/workflows/workflow-runtime/workflow-modules/legacy-tool-matrix.md` as a loose migration reference for historical tool-category intent, not as an implementation source and not as a 1:1 step mapping.
+
+Do not include `archive_workflow_artifact` or `delete_workflow_artifact` in module tool schemas. Those are backend-only runtime-owned tools used by the shared existing-artifact conflict flow.
 
 Use this translation process for each model-driven step:
 
@@ -395,14 +406,14 @@ Document builders should:
 
 ### Runtime-Driven Setup
 
-Typical startup flow:
+Typical singleton artifact startup flow:
 
-1. `allocate_artifact`
-2. wait for success or retry once on failure
-3. `build_workflow_document` for the initial shell
-4. `render_workflow_form`
-5. `build_workflow_document` with submitted values
-6. `transition_step`
+1. Wait for `entry_artifact_resolution_completed`.
+2. If the active artifact resolution has `creationRequired: true`, run `allocate_artifact`.
+3. After allocation succeeds, run the initial `build_workflow_document`.
+4. If the active artifact resolution has `creationRequired: false`, skip allocation and initial document build.
+5. Route both paths into the same artifact-ready branch.
+6. Continue with setup forms, deterministic document updates, `transition_step`, or `project_prompt`.
 
 Each tool-backed operation should have explicit success and failure routes. Failure routes should go to retry or `terminal_error`; they should not silently no-op.
 
@@ -456,8 +467,11 @@ Add tests for:
 - workflow forms, panels, transitions, and stale clearing
 - deterministic procedures
 - decision-tree route structure
+- singleton artifact route for `entry_artifact_resolution_completed` with `creationRequired: true`
+- singleton artifact route for `entry_artifact_resolution_completed` with `creationRequired: false`
 - prompt source output
 - exact tool-schema outputs
+- absence of archive/delete workflow artifact tools from model-facing schemas
 - absence of retired tools
 
 ### Data And Document Tests
@@ -576,6 +590,9 @@ Avoid these patterns:
 - Creating separate forms for panels that belong to one logical form flow.
 - Preserving markdown filename activation aliases after moving to canonical workflow names.
 - Copying the legacy contextual tool matrix literally instead of translating its tool-category intent into explicit module-owned schemas.
+- Starting singleton artifact workflows with `allocate_artifact` before handling `entry_artifact_resolution_completed`.
+- Rebuilding an existing singleton artifact after the user chose to continue the existing document.
+- Exposing `archive_workflow_artifact` or `delete_workflow_artifact` to the AI agent.
 
 ## Smoke Test Checklist
 
