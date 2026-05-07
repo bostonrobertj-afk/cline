@@ -294,6 +294,19 @@ function toolBackedOperationFailed(branchId: string, routeId: string): WorkflowD
 	}
 }
 
+function entryArtifactResolutionCompletedWithCreationRequired(creationRequired: boolean): WorkflowDecisionBranchTrigger {
+	return {
+		kind: "event_predicate",
+		matches: ({ triggerEvent }) =>
+			triggerEvent.kind === "entry_artifact_resolution_completed" &&
+			triggerEvent.artifactResolutions.some(
+				(artifactResolution) =>
+					artifactResolution.artifactId === BRAINSTORMING_SESSION_ARTIFACT_ID &&
+					artifactResolution.creationRequired === creationRequired,
+			),
+	}
+}
+
 function workflowFormCompleted(workflowFormId: string): WorkflowDecisionBranchTrigger {
 	return {
 		kind: "event_predicate",
@@ -743,19 +756,30 @@ function createStepDefinition(args: {
 
 function buildStep1DecisionTree(): WorkflowDecisionTree {
 	return {
-		entryBranchId: "step-1-allocate-artifact",
+		entryBranchId: "step-1-resolve-entry-artifact",
 		branches: {
-			"step-1-allocate-artifact": {
-				id: "step-1-allocate-artifact",
+			"step-1-resolve-entry-artifact": {
+				id: "step-1-resolve-entry-artifact",
 				routes: [
 					{
 						id: "step-1-allocate-artifact",
-						trigger: { kind: "always" },
+						trigger: entryArtifactResolutionCompletedWithCreationRequired(true),
 						action: {
 							kind: "allocate_artifact",
 							artifactId: BRAINSTORMING_SESSION_ARTIFACT_ID,
 						},
 						followingBranchId: "step-1-await-allocation",
+					},
+					{
+						id: "step-1-continue-existing-artifact",
+						trigger: entryArtifactResolutionCompletedWithCreationRequired(false),
+						action: {
+							kind: "transition_step",
+							target: {
+								kind: "entry_branch",
+								stepNumber: 3,
+							},
+						},
 					},
 				],
 			},
@@ -764,7 +788,7 @@ function buildStep1DecisionTree(): WorkflowDecisionTree {
 				routes: [
 					{
 						id: "step-1-build-initial-shell",
-						trigger: toolBackedOperationSucceeded("step-1-allocate-artifact", "step-1-allocate-artifact"),
+						trigger: toolBackedOperationSucceeded("step-1-resolve-entry-artifact", "step-1-allocate-artifact"),
 						action: {
 							kind: "build_workflow_document",
 							instruction: {
@@ -776,7 +800,7 @@ function buildStep1DecisionTree(): WorkflowDecisionTree {
 					},
 					{
 						id: "step-1-retry-allocate-artifact",
-						trigger: toolBackedOperationFailed("step-1-allocate-artifact", "step-1-allocate-artifact"),
+						trigger: toolBackedOperationFailed("step-1-resolve-entry-artifact", "step-1-allocate-artifact"),
 						action: {
 							kind: "allocate_artifact",
 							artifactId: BRAINSTORMING_SESSION_ARTIFACT_ID,

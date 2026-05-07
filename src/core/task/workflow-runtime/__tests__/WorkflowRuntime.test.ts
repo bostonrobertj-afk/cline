@@ -1303,7 +1303,7 @@ describe("WorkflowRuntime", () => {
 			artifact_id: "brainstorming_session",
 		})
 		expect(stepOneAction.runtimeOwnedSourceRoute).to.deep.equal({
-			branchId: "step-1-allocate-artifact",
+			branchId: "step-1-resolve-entry-artifact",
 			routeId: "step-1-allocate-artifact",
 		})
 		expect(stepOneAction.toolBackedOperationSession).to.be.undefined
@@ -1333,7 +1333,7 @@ describe("WorkflowRuntime", () => {
 			artifact_id: "brainstorming_session",
 		})
 		expect(allocationAction.runtimeOwnedSourceRoute).to.deep.equal({
-			branchId: "step-1-allocate-artifact",
+			branchId: "step-1-resolve-entry-artifact",
 			routeId: "step-1-allocate-artifact",
 		})
 		expect(allocationAction.toolBackedOperationSession).to.be.undefined
@@ -1375,6 +1375,60 @@ describe("WorkflowRuntime", () => {
 			throw new Error(`Expected render_workflow_form, received ${setupFormAction.kind}.`)
 		}
 		expect(setupFormAction.formSession.workflowFormId).to.equal("step-1-setup-form")
+	})
+
+	it("continues an existing brainstorming artifact into Step 3 without artifact or document tool operations", async () => {
+		const projectName = "Existing Brainstorming"
+		const existingArtifactContent = "# Existing brainstorming\n"
+		const existingArtifactPath = join(cwd, "docs", "projects", projectName, "discovery", "brainstorming.md")
+		await mkdir(join(cwd, "docs", "projects", projectName, "discovery"), { recursive: true })
+		await writeFile(existingArtifactPath, existingArtifactContent, "utf8")
+		registerResolvedWorkflow(brainstormingWorkflowDefinition)
+		setDiscoveredProjects([projectName])
+		await runtime.activateWorkflow({
+			taskState,
+			workflowName: brainstormingWorkflowDefinition.name,
+		})
+
+		const conflictResult = await submitExistingProjectSelectionFromExistingFolder(taskState, projectName)
+		expect(conflictResult.kind).to.equal("render_workflow_form")
+		if (conflictResult.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${conflictResult.kind}.`)
+		}
+		expect(conflictResult.formSession.currentPanelId).to.equal(ENTRY_ARTIFACT_CONFLICT_PANEL_ID)
+		const result = await submitEntryArtifactConflictAction(taskState, "continue_existing")
+
+		expect(result.kind).to.equal("project_prompt")
+		if (result.kind !== "project_prompt") {
+			throw new Error(`Expected project_prompt, received ${result.kind}.`)
+		}
+		expect(result.promptProjection.workflowInputPayloadBlock).to.contain("Step 3: Perform Interactive Brainstorming")
+		const activeSession = getActiveWorkflowSession(taskState)
+		expect(activeSession.activeStepNumber).to.equal(3)
+		expect(activeSession.workflowValues).to.deep.include({
+			projectMode: "existing",
+			projectTitle: projectName,
+			projectFolderName: projectName,
+			output_artifact_family: WorkflowArtifactFamily.BrainstormingSession,
+			output_artifact_identity: "brainstorming_session",
+			output_artifact_filename: "brainstorming.md",
+			output_artifact_relative_path: join("discovery", "brainstorming.md"),
+			output_file: existingArtifactPath,
+		})
+		expect(activeSession.entryArtifactResolution?.artifactResolutions).to.deep.equal([
+			{
+				artifactId: "brainstorming_session",
+				artifactFamily: WorkflowArtifactFamily.BrainstormingSession,
+				artifactIdentity: "brainstorming_session",
+				artifactFilename: "brainstorming.md",
+				artifactRelativePath: join("discovery", "brainstorming.md"),
+				artifactAbsolutePath: existingArtifactPath,
+				creationRequired: false,
+				existingArtifactAction: "continue_existing",
+			},
+		])
+		expect(activeSession.ui.stepResolutionSession).to.be.undefined
+		expect(await readFile(existingArtifactPath, "utf8")).to.equal(existingArtifactContent)
 	})
 
 	it("resolves only the unsuffixed shipped brainstorming workflow identity", () => {

@@ -79,4 +79,29 @@ describe("brainstormingToolSchemas", () => {
 			"attempt_completion",
 		])
 	})
+
+	it("keeps runtime-owned artifact tools out of model-facing brainstorming schemas", () => {
+		const forbiddenToolNames = [
+			"archive_workflow_artifact",
+			"delete_workflow_artifact",
+			"create_workflow_artifact",
+			"build_workflow_document",
+		]
+		const modelFacingToolNames = [
+			...buildBrainstormingStep3ToolSchemas(
+				createPromptInput({ selected_approach: "I want you to suggest a technique" }),
+			).map((schema) => schema.name),
+			...buildBrainstormingStep3ToolSchemas(createPromptInput({ selected_approach: "I want to choose" })).map(
+				(schema) => schema.name,
+			),
+			...buildBrainstormingStep3ToolSchemas(createPromptInput({ selected_approach: "I want a random technique" })).map(
+				(schema) => schema.name,
+			),
+			...buildBrainstormingStep4ToolSchemas().map((schema) => schema.name),
+		]
+
+		for (const forbiddenToolName of forbiddenToolNames) {
+			expect(modelFacingToolNames).not.to.include(forbiddenToolName)
+		}
+	})
 })

@@ -88,22 +88,22 @@ The module must define these four steps, using these exact `checklistLabel` valu
 
 | Step id | Step number | `checklistLabel` | Required runtime shape |
 | --- | --- | --- | --- |
-| `step-1` | 1 | `Gather Inputs` | Allocate/create `brainstorming.md`, build the initial document shell, render one multi-panel setup form, and write submitted context/topic/goals into the output document. |
+| `step-1` | 1 | `Gather Inputs` | Branch on runtime entry singleton artifact resolution. When `creationRequired` is `true`, allocate/create `brainstorming.md`, build the initial document shell, render one multi-panel setup form, and write submitted context/topic/goals into the output document. When `creationRequired` is `false`, skip allocation, skip initial document builds, skip the Step 1 setup form, and transition directly to Step 3 to continue work against the existing `output_file`. |
 | `step-2` | 2 | `Resolve Session Approach` | Present the three approach paths, persist `selected_approach`, route through choose/random/suggest behavior, and write selected technique state into the output document. |
 | `step-3` | 3 | `Perform Interactive Brainstorming` | Model-driven facilitation step; may retrieve brainstorming methods when suggestion was requested; progression requires `workflow_progress_request` confirmation. |
 | `step-4` | 4 | `Organize Ideas & Plan Next Actions` | Model-driven organization/final-report step that appends the summary to `output_file`, completes the workflow, and triggers teardown after final delivery. |
 
 ## Forms And Deterministic Behavior
 
-Step 1 must model progression as explicit decision actions in this order: `allocate_artifact`, `build_workflow_document` for the initial document shell, `render_workflow_form`, `build_workflow_document` for submitted setup values, then `transition_step` to Step 2.
+Step 1 must begin by waiting for `entry_artifact_resolution_completed` for the brainstorming session artifact.
 
-Step 1 must begin with an `allocate_artifact` decision action for the brainstorming session output artifact. The runtime converts that action into `create_workflow_artifact`.
+When `entry_artifact_resolution_completed` reports `creationRequired: true` for the brainstorming session artifact, Step 1 must run an `allocate_artifact` decision action for the brainstorming session output artifact. The runtime converts that action into `create_workflow_artifact`.
 
-Step 1 must define success and failure routes for the first artifact-allocation result. If the first allocation succeeds, the next action must build the initial document shell. If the first allocation fails, the next action must retry allocation exactly once.
+In the `creationRequired: true` branch, Step 1 must define success and failure routes for the first artifact-allocation result. If the first allocation succeeds, the next action must build the initial document shell. If the first allocation fails, the next action must retry allocation exactly once.
 
-Step 1 must define success and failure routes for the retry allocation result. If the retry succeeds, the next action must build the initial document shell. If the retry fails, the next action must be `terminal_error`.
+In the `creationRequired: true` branch, Step 1 must define success and failure routes for the retry allocation result. If the retry succeeds, the next action must build the initial document shell. If the retry fails, the next action must be `terminal_error`.
 
-Step 1 must call `build_workflow_document` after artifact allocation and before the Step 1 workflow form to create the initial document layout with these H1 headings:
+In the `creationRequired: true` branch, Step 1 must call `build_workflow_document` after artifact allocation and before the Step 1 workflow form to create the initial document layout with these H1 headings:
 
 - `stepsCompleted`
 - `inputDocuments`
@@ -114,20 +114,20 @@ Step 1 must call `build_workflow_document` after artifact allocation and before 
 - `ideas generated`
 - `context file`
 
-If the initial document-shell build succeeds, the next action must render the Step 1 workflow form. If the initial document-shell build fails, the next action must be `terminal_error`.
+In the `creationRequired: true` branch, if the initial document-shell build succeeds, the next action must render the Step 1 workflow form. If the initial document-shell build fails, the next action must be `terminal_error`.
 
-The Step 1 workflow form must be triggered by one `render_workflow_form` decision action. Multi-panel behavior must live inside the form definition, not as separate decision actions per panel.
+In the `creationRequired: true` branch, the Step 1 workflow form must be triggered by one `render_workflow_form` decision action. Multi-panel behavior must live inside the form definition, not as separate decision actions per panel.
 
-The Step 1 workflow form must include these four panels:
+The Step 1 workflow form used by the `creationRequired: true` branch must include these four panels:
 
 - Panel 1 must show: `You can provide a file to be used as context. If you have a file you'd like to use, enter the file path below. If not, leave the text box empty and click continue` and collect optional `context_file` through a small text area.
 - Panel 2 must show: `Please share the details of the topic, problem, or opportunity you'd like to focus on during this session` and collect required `session_topic` through a large text area.
 - Panel 3 must show: `Do you have any specific goals for this session?` and collect required `has_session_goals` through a yes/no boolean field.
 - Panel 4 must show only when `has_session_goals` is yes. It must show: `What are your goals for this session?` and collect required `session_goals` through a large text area.
 
-The Step 1 workflow form must collect optional context file and required topic/problem/opportunity input. Durable submitted values must persist and clear through workflow-value destinations declared by the module, using the central workflow-form clearing semantics in `FR-39n` through `FR-39r`.
+The Step 1 workflow form used by the `creationRequired: true` branch must collect optional context file and required topic/problem/opportunity input. Durable submitted values must persist and clear through workflow-value destinations declared by the module, using the central workflow-form clearing semantics in `FR-39n` through `FR-39r`.
 
-After the Step 1 workflow form completes, the next action must use `build_workflow_document` to populate the already-created brainstorming output artifact by writing `context_file` under `context file`, `session_topic` under `session topic`, and `session_goals` under `session goals` when goals were provided. When that `build_workflow_document` action succeeds, the Step 1 decision tree must select a `transition_step` action targeting Step 2. Step 1 must not rely on implicit completion, optional progression, or model-driven handoff to advance to Step 2.
+In the `creationRequired: true` branch, after the Step 1 workflow form completes, the next action must use `build_workflow_document` to populate the already-created brainstorming output artifact by writing `context_file` under `context file`, `session_topic` under `session topic`, and `session_goals` under `session goals` when goals were provided. When that `build_workflow_document` action succeeds, the Step 1 decision tree must select a `transition_step` action targeting Step 2. Step 1 must not rely on implicit completion, optional progression, or model-driven handoff to advance to Step 2.
 
 Step 2 must begin with one `render_workflow_form` decision action for approach selection. The first panel must ask `How would you like to select the brainstorming approach for this session?` and must present a required `radio_group` with exactly these options:
 
@@ -172,9 +172,9 @@ The new artifact family must use:
 - canonical filename pattern: `brainstorming.md`
 - discovery pattern matching only `brainstorming.md`
 
-Step 1 must allocate/create this artifact through an `allocate_artifact` decision action, which the runtime executes through `create_workflow_artifact`. The runtime must create the empty file and persist project/artifact metadata into workflow values per `FR-20l`, `FR-20m`, and `FR-20n`.
+When runtime entry artifact resolution returns `creationRequired: true`, Step 1 must allocate/create this artifact through an `allocate_artifact` decision action, which the runtime executes through `create_workflow_artifact`. The runtime must create the empty file and persist project/artifact metadata into workflow values per `FR-20l`, `FR-20m`, and `FR-20n`.
 
-The artifact definition for this family must map the runtime artifact output value keys into brainstorming workflow values. In particular, `outputValueKeys.artifactAbsolutePath` must be `output_file`, so a successful Step 1 artifact allocation persists `session.workflowValues.output_file` with the absolute file path. Later workflow prompts and document builders must read `output_file` rather than recomputing or rediscovering the path.
+The artifact definition for this family must map the runtime artifact output value keys into brainstorming workflow values. In particular, `outputValueKeys.artifactAbsolutePath` must be `output_file`, so runtime entry artifact resolution with `creationRequired: false` and successful Step 1 artifact allocation with `creationRequired: true` both persist `session.workflowValues.output_file` with the absolute file path. Later workflow prompts and document builders must read `output_file` rather than recomputing or rediscovering the path.
 
 Subsequent runtime-owned deterministic document population must use `build_workflow_document`, which consumes the runtime-resolved destination path and must not allocate identity, choose filenames, or choose folders, per `FR-20p`. Model-facing steps that edit `{output_file}` must use governed file-read and file-edit tools rather than `build_workflow_document`.
 
@@ -300,7 +300,9 @@ Every Step 3 schema variant must expose exactly `get_brainstorming_methods`, `ap
 
 Step 4 schema must expose exactly `read_file`, `apply_patch`, `send_user_message`, `ask_followup_question`, and `attempt_completion`.
 
-`create_workflow_artifact`, `workflow_progress_request`, `get_brainstorming_methods`, and `append_brainstorming_selected_technique` may be exposed only through module-owned per-step tool schema when needed. Step 3 and Step 4 must not expose `set_workflow_values` or `build_workflow_document`; `build_workflow_document` remains runtime-owned only.
+`create_workflow_artifact`, `archive_workflow_artifact`, `delete_workflow_artifact`, and `build_workflow_document` are runtime/backend-owned surfaces that must not appear in model-facing Step 3 or Step 4 brainstorming schemas.
+
+`workflow_progress_request`, `get_brainstorming_methods`, and `append_brainstorming_selected_technique` may be exposed only through module-owned per-step tool schema when needed. Step 3 and Step 4 must not expose `set_workflow_values`.
 
 The implementation must add an AI-callable `get_brainstorming_methods` tool backed by the module-owned brainstorming technique registry.
 

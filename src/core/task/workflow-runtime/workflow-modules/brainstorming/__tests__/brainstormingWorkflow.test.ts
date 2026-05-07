@@ -3,6 +3,7 @@ import { describe, it } from "mocha"
 import { WorkflowArtifactFamily } from "../../../artifactFamilies"
 import type {
 	ActiveWorkflowSession,
+	WorkflowBranchTriggerEvent,
 	WorkflowDecisionAction,
 	WorkflowDecisionBranchRoute,
 	WorkflowPromptBuilderInput,
@@ -72,6 +73,83 @@ function findRoute(stepId: WorkflowStepDefinition["id"], branchId: string, route
 
 function getAction(stepId: WorkflowStepDefinition["id"], branchId: string, routeId: string): WorkflowDecisionAction {
 	return findRoute(stepId, branchId, routeId).action
+}
+
+function buildEntryArtifactResolutionCompletedEvent(creationRequired: boolean): WorkflowBranchTriggerEvent {
+	return {
+		kind: "entry_artifact_resolution_completed",
+		artifactResolutions: [
+			{
+				artifactId: "brainstorming_session",
+				artifactFamily: WorkflowArtifactFamily.BrainstormingSession,
+				artifactIdentity: "brainstorming_session",
+				artifactFilename: "brainstorming.md",
+				artifactRelativePath: "discovery/brainstorming.md",
+				artifactAbsolutePath: OUTPUT_FILE,
+				creationRequired,
+				existingArtifactAction: creationRequired ? "none" : "continue_existing",
+			},
+		],
+	}
+}
+
+function buildToolBackedOperationEvent(
+	kind: "tool_backed_operation_succeeded" | "tool_backed_operation_failed",
+	branchId: string,
+	routeId: string,
+): WorkflowBranchTriggerEvent {
+	if (kind === "tool_backed_operation_succeeded") {
+		return {
+			kind,
+			sourceRoute: {
+				branchId,
+				routeId,
+			},
+		}
+	}
+
+	return {
+		kind,
+		sourceRoute: {
+			branchId,
+			routeId,
+		},
+	}
+}
+
+function expectRouteMatchesEntryArtifactResolution(route: WorkflowDecisionBranchRoute, creationRequired: boolean): void {
+	if (route.trigger.kind !== "event_predicate") {
+		throw new Error(`Expected event_predicate trigger, received ${route.trigger.kind}.`)
+	}
+
+	expect(
+		route.trigger.matches({
+			activeBranchId: "step-1-resolve-entry-artifact",
+			workflowValues: {},
+			step: brainstormingWorkflowDefinition.steps["step-1"],
+			triggerEvent: buildEntryArtifactResolutionCompletedEvent(creationRequired),
+		}),
+	).to.equal(true)
+}
+
+function expectRouteMatchesToolBackedOperationEvent(
+	route: WorkflowDecisionBranchRoute,
+	kind: "tool_backed_operation_succeeded" | "tool_backed_operation_failed",
+	branchId: string,
+	routeId: string,
+): void {
+	if (route.trigger.kind !== "event_predicate") {
+		throw new Error(`Expected event_predicate trigger, received ${route.trigger.kind}.`)
+	}
+
+	expect(
+		route.trigger.matches({
+			activeBranchId: "step-1-await-allocation",
+			workflowValues: {},
+			step: brainstormingWorkflowDefinition.steps["step-1"],
+			triggerEvent: buildToolBackedOperationEvent(kind, branchId, routeId),
+		}),
+	).to.equal(true)
 }
 
 function expectToolNames(toolNames: readonly string[], expectedToolNames: readonly string[]): void {
@@ -169,6 +247,7 @@ describe("brainstormingWorkflowDefinition", () => {
 	it("defines the Step 1 setup form and ordered artifact/form/document pipeline", () => {
 		const step1 = brainstormingWorkflowDefinition.steps["step-1"]
 		expect(step1.buildToolSchema).to.equal(buildBrainstormingStep1ToolSchemas)
+		expect(step1.decisionTree.entryBranchId).to.equal("step-1-resolve-entry-artifact")
 
 		const setupForm = brainstormingWorkflowDefinition.workflowForms?.["step-1-setup-form"]
 		expect(setupForm?.firstPanelId).to.equal("step-1-context-panel")
@@ -200,22 +279,35 @@ describe("brainstormingWorkflowDefinition", () => {
 		expect(noSessionGoalsBranch?.staleValueKeysToClear).to.deep.equal(["session_goals"])
 		expect(setupForm?.panels["step-1-goals-detail-panel"]?.promptMarkdown).to.equal("What are your goals for this session?")
 
-		const entryRoute = findRoute("step-1", "step-1-allocate-artifact", "step-1-allocate-artifact")
+		const entryRoute = findRoute("step-1", "step-1-resolve-entry-artifact", "step-1-allocate-artifact")
+		expectRouteMatchesEntryArtifactResolution(entryRoute, true)
 		expect(entryRoute.action).to.deep.include({
 			kind: "allocate_artifact",
 			artifactId: "brainstorming_session",
 		})
 		expect(entryRoute.followingBranchId).to.equal("step-1-await-allocation")
-		expect(getAction("step-1", "step-1-await-allocation", "step-1-retry-allocate-artifact")).to.deep.include({
+		const initialShellRoute = findRoute("step-1", "step-1-await-allocation", "step-1-build-initial-shell")
+		expectRouteMatchesToolBackedOperationEvent(
+			initialShellRoute,
+			"tool_backed_operation_succeeded",
+			"step-1-resolve-entry-artifact",
+			"step-1-allocate-artifact",
+		)
+		const retryAllocationRoute = findRoute("step-1", "step-1-await-allocation", "step-1-retry-allocate-artifact")
+		expectRouteMatchesToolBackedOperationEvent(
+			retryAllocationRoute,
+			"tool_backed_operation_failed",
+			"step-1-resolve-entry-artifact",
+			"step-1-allocate-artifact",
+		)
+		expect(retryAllocationRoute.action).to.deep.include({
 			kind: "allocate_artifact",
 			artifactId: "brainstorming_session",
 		})
 		expect(
 			getAction("step-1", "step-1-await-retry-allocation", "step-1-terminal-error-after-retry-allocation").kind,
 		).to.equal("terminal_error")
-		expect(getAction("step-1", "step-1-await-allocation", "step-1-build-initial-shell").kind).to.equal(
-			"build_workflow_document",
-		)
+		expect(initialShellRoute.action.kind).to.equal("build_workflow_document")
 		expect(getAction("step-1", "step-1-await-initial-shell", "step-1-terminal-error-after-initial-shell").kind).to.equal(
 			"terminal_error",
 		)
@@ -229,6 +321,22 @@ describe("brainstormingWorkflowDefinition", () => {
 		expect(getAction("step-1", "step-1-await-submitted-values-document", "step-1-transition-to-step-2")).to.deep.include({
 			kind: "transition_step",
 		})
+	})
+
+	it("continues existing entry artifacts directly to Step 3 without Step 1 setup actions", () => {
+		const continueExistingRoute = findRoute("step-1", "step-1-resolve-entry-artifact", "step-1-continue-existing-artifact")
+		expectRouteMatchesEntryArtifactResolution(continueExistingRoute, false)
+		expect(continueExistingRoute.action).to.deep.equal({
+			kind: "transition_step",
+			target: {
+				kind: "entry_branch",
+				stepNumber: 3,
+			},
+		})
+		expect(continueExistingRoute).not.to.have.property("followingBranchId")
+		expect(["allocate_artifact", "build_workflow_document", "render_workflow_form"]).not.to.include(
+			continueExistingRoute.action.kind,
+		)
 	})
 
 	it("defines one Step 2 approach form with choose panels and the random confirmation interpolation panel", () => {
