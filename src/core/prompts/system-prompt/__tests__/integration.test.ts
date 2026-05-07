@@ -859,8 +859,12 @@ describe("Prompt System Integration Tests", () => {
 			)
 		})
 
-		it("omits archive and delete workflow artifact tools from default prompt tool surfaces", async function () {
-			const backendOnlyWorkflowToolNames = ["archive_workflow_artifact", "delete_workflow_artifact"]
+		it("omits backend-only workflow file-operation tools from default prompt tool surfaces", async function () {
+			const backendOnlyWorkflowToolNames = [
+				"archive_workflow_artifact",
+				"delete_workflow_artifact",
+				"move_workflow_project_file",
+			]
 
 			await runPromptTest(
 				this,

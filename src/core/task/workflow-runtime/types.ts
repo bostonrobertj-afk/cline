@@ -257,6 +257,12 @@ export type WorkflowDecisionAction =
 	| { kind: "run_deterministic_procedure"; instruction: WorkflowDeterministicProcedureActionInstruction }
 	| { kind: "build_workflow_document"; instruction: WorkflowDocumentBuildActionInstruction }
 	| { kind: "allocate_artifact"; artifactId: string }
+	| {
+			kind: "move_project_file"
+			sourceFolderSegments: readonly string[]
+			destinationFolderSegments: readonly string[]
+			filenameWorkflowValueKey: string
+	  }
 	| { kind: "transition_step"; target: WorkflowStepTransitionTarget }
 	| { kind: "project_prompt" }
 	| { kind: "terminal_error"; errorMessage: string }

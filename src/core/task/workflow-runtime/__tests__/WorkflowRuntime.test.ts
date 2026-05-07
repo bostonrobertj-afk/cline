@@ -98,6 +98,7 @@ describe("WorkflowRuntime", () => {
 		communicationStyle: "Precise and verification-oriented.",
 		principles: ["Keep runtime fixtures explicit and deterministic."],
 	}
+	const MOVE_PROJECT_FILE_FILENAME_KEY = "selected_story_filename"
 
 	let sandbox: sinon.SinonSandbox
 	let cwd: string
@@ -502,6 +503,19 @@ describe("WorkflowRuntime", () => {
 					],
 				},
 			},
+		}
+	}
+
+	function createMoveProjectFileAction(args: {
+		sourceFolderSegments: readonly string[]
+		destinationFolderSegments: readonly string[]
+		filenameWorkflowValueKey: string
+	}): WorkflowDecisionAction {
+		return {
+			kind: "move_project_file",
+			sourceFolderSegments: args.sourceFolderSegments,
+			destinationFolderSegments: args.destinationFolderSegments,
+			filenameWorkflowValueKey: args.filenameWorkflowValueKey,
 		}
 	}
 
@@ -2042,6 +2056,112 @@ describe("WorkflowRuntime", () => {
 		}
 	})
 
+	it("rejects move_project_file routes with invalid source or destination folder segments before activation", async () => {
+		const invalidFolderSegments: ReadonlyArray<{ readonly label: string; readonly segment: string }> = [
+			{ label: "empty string", segment: "" },
+			{ label: "current directory", segment: "." },
+			{ label: "parent directory", segment: ".." },
+			{ label: "slash", segment: "nested/path" },
+			{ label: "backslash", segment: "nested\\path" },
+			{ label: "absolute path", segment: join(cwd, "outside") },
+			{ label: "Windows drive syntax", segment: "C:" },
+		]
+
+		for (const invalidFolderSegment of invalidFolderSegments) {
+			const invalidSourceState = new TaskState()
+			const invalidSourceWorkflow = createWorkflowDefinition({
+				workflowValueKeys: [MOVE_PROJECT_FILE_FILENAME_KEY],
+				steps: {
+					"step-1": createStepDefinition({
+						stepNumber: 1,
+						decisionTree: createToolBackedOperationDecisionTree({
+							startAction: createMoveProjectFileAction({
+								sourceFolderSegments: ["implementation", invalidFolderSegment.segment],
+								destinationFolderSegments: ["implementation", "stories-review"],
+								filenameWorkflowValueKey: MOVE_PROJECT_FILE_FILENAME_KEY,
+							}),
+						}),
+					}),
+				},
+			})
+
+			const invalidSourceResult = await activateWorkflow(invalidSourceState, invalidSourceWorkflow)
+			expect(invalidSourceResult, `source ${invalidFolderSegment.label}`).to.deep.equal({ kind: "no_op" })
+			expect(invalidSourceState.activeWorkflowName, `source ${invalidFolderSegment.label}`).to.be.undefined
+			expect(invalidSourceState.activeWorkflowSession, `source ${invalidFolderSegment.label}`).to.be.undefined
+
+			const invalidDestinationState = new TaskState()
+			const invalidDestinationWorkflow = createWorkflowDefinition({
+				workflowValueKeys: [MOVE_PROJECT_FILE_FILENAME_KEY],
+				steps: {
+					"step-1": createStepDefinition({
+						stepNumber: 1,
+						decisionTree: createToolBackedOperationDecisionTree({
+							startAction: createMoveProjectFileAction({
+								sourceFolderSegments: ["implementation", "stories-backlog"],
+								destinationFolderSegments: ["implementation", invalidFolderSegment.segment],
+								filenameWorkflowValueKey: MOVE_PROJECT_FILE_FILENAME_KEY,
+							}),
+						}),
+					}),
+				},
+			})
+
+			const invalidDestinationResult = await activateWorkflow(invalidDestinationState, invalidDestinationWorkflow)
+			expect(invalidDestinationResult, `destination ${invalidFolderSegment.label}`).to.deep.equal({ kind: "no_op" })
+			expect(invalidDestinationState.activeWorkflowName, `destination ${invalidFolderSegment.label}`).to.be.undefined
+			expect(invalidDestinationState.activeWorkflowSession, `destination ${invalidFolderSegment.label}`).to.be.undefined
+		}
+	})
+
+	it("rejects move_project_file routes with invalid filename workflow-value keys before activation", async () => {
+		const invalidFilenameKeyCases: ReadonlyArray<{
+			readonly label: string
+			readonly filenameWorkflowValueKey: string
+			readonly workflowValueKeys: readonly string[]
+		}> = [
+			{
+				label: "blank",
+				filenameWorkflowValueKey: "",
+				workflowValueKeys: [MOVE_PROJECT_FILE_FILENAME_KEY],
+			},
+			{
+				label: "untrimmed",
+				filenameWorkflowValueKey: ` ${MOVE_PROJECT_FILE_FILENAME_KEY}`,
+				workflowValueKeys: [MOVE_PROJECT_FILE_FILENAME_KEY],
+			},
+			{
+				label: "undeclared",
+				filenameWorkflowValueKey: "missing_story_filename",
+				workflowValueKeys: [MOVE_PROJECT_FILE_FILENAME_KEY],
+			},
+		]
+
+		for (const invalidFilenameKeyCase of invalidFilenameKeyCases) {
+			const invalidState = new TaskState()
+			const invalidWorkflow = createWorkflowDefinition({
+				workflowValueKeys: invalidFilenameKeyCase.workflowValueKeys,
+				steps: {
+					"step-1": createStepDefinition({
+						stepNumber: 1,
+						decisionTree: createToolBackedOperationDecisionTree({
+							startAction: createMoveProjectFileAction({
+								sourceFolderSegments: ["implementation", "stories-backlog"],
+								destinationFolderSegments: ["implementation", "stories-review"],
+								filenameWorkflowValueKey: invalidFilenameKeyCase.filenameWorkflowValueKey,
+							}),
+						}),
+					}),
+				},
+			})
+
+			const result = await activateWorkflow(invalidState, invalidWorkflow)
+			expect(result, invalidFilenameKeyCase.label).to.deep.equal({ kind: "no_op" })
+			expect(invalidState.activeWorkflowName, invalidFilenameKeyCase.label).to.be.undefined
+			expect(invalidState.activeWorkflowSession, invalidFilenameKeyCase.label).to.be.undefined
+		}
+	})
+
 	it("fails closed before activation when a decision-tree route id is missing", async () => {
 		const route: WorkflowDecisionBranchRoute = {
 			id: "missing-route-id",
@@ -2660,6 +2780,9 @@ describe("WorkflowRuntime", () => {
 		for (const subfolderName of ["discovery", "planning", "implementation", "review", "testing"]) {
 			await access(join(cwd, "docs", "projects", newProjectFolderName, subfolderName))
 		}
+		for (const storyFolderName of ["stories-backlog", "stories-review", "stories-complete"]) {
+			await access(join(cwd, "docs", "projects", newProjectFolderName, "implementation", storyFolderName))
+		}
 
 		const existingTaskState = new TaskState()
 		await activateWorkflow(existingTaskState, workflow)
@@ -2679,6 +2802,9 @@ describe("WorkflowRuntime", () => {
 		expect(getActiveWorkflowSession(existingTaskState).ui.formSession).to.be.undefined
 		for (const subfolderName of ["discovery", "planning", "implementation", "review", "testing", "archive"]) {
 			await access(join(cwd, "docs", "projects", "Existing Beta", subfolderName))
+		}
+		for (const storyFolderName of ["stories-backlog", "stories-review", "stories-complete"]) {
+			await access(join(cwd, "docs", "projects", "Existing Beta", "implementation", storyFolderName))
 		}
 		const existingProjectDiscoveryRequest = discoverWorkflowCandidatesStub
 			.getCalls()
@@ -7917,6 +8043,160 @@ describe("WorkflowRuntime", () => {
 				spec_doc: "ready",
 			},
 		})
+	})
+
+	it("builds move_workflow_project_file tool-backed operations from move_project_file actions", async () => {
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: [MOVE_PROJECT_FILE_FILENAME_KEY],
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createToolBackedOperationDecisionTree({
+						startAction: createMoveProjectFileAction({
+							sourceFolderSegments: ["implementation", "stories-backlog"],
+							destinationFolderSegments: ["implementation", "stories-review"],
+							filenameWorkflowValueKey: MOVE_PROJECT_FILE_FILENAME_KEY,
+						}),
+					}),
+				}),
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		getActiveWorkflowSession(taskState).workflowValues[MOVE_PROJECT_FILE_FILENAME_KEY] = "Story-1.md"
+		await runtime.resolveNextAction({ taskState })
+		const toolBackedOperation = await submitNewProjectSelection(taskState, "Move Project")
+
+		expect(toolBackedOperation.kind).to.equal("execute_tool_backed_operation")
+		if (toolBackedOperation.kind !== "execute_tool_backed_operation") {
+			throw new Error(`Expected execute_tool_backed_operation, received ${toolBackedOperation.kind}.`)
+		}
+
+		expect(toolBackedOperation.toolBackedOperationSession).to.be.undefined
+		expect(toolBackedOperation.runtimeOwnedSourceRoute).to.deep.equal(STEP_RESOLUTION_SOURCE_ROUTE)
+		expect(toolBackedOperation.toolRequest.toolName).to.equal(ClineDefaultTool.MOVE_WORKFLOW_PROJECT_FILE)
+		expect(toolBackedOperation.toolRequest.toolParams).to.deep.equal({
+			source_path: join(cwd, "docs", "projects", "move-project", "implementation", "stories-backlog", "Story-1.md"),
+			destination_path: join(cwd, "docs", "projects", "move-project", "implementation", "stories-review", "Story-1.md"),
+		})
+		expect(toolBackedOperation.toolRequest.toolInput).to.deep.equal({})
+	})
+
+	it("moves workflow project files and routes successful move results through tool_backed_operation_succeeded", async () => {
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: [MOVE_PROJECT_FILE_FILENAME_KEY],
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createToolBackedOperationDecisionTree({
+						startAction: createMoveProjectFileAction({
+							sourceFolderSegments: ["implementation", "stories-backlog"],
+							destinationFolderSegments: ["implementation", "stories-review"],
+							filenameWorkflowValueKey: MOVE_PROJECT_FILE_FILENAME_KEY,
+						}),
+						successAction: createEntryBranchStepTransitionAction(2),
+					}),
+				}),
+				"step-2": createStepDefinition({ stepNumber: 2 }),
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		getActiveWorkflowSession(taskState).workflowValues[MOVE_PROJECT_FILE_FILENAME_KEY] = "Story-2.md"
+		await runtime.resolveNextAction({ taskState })
+		const toolBackedOperation = await submitNewProjectSelection(taskState, "Move Success Project")
+
+		expect(toolBackedOperation.kind).to.equal("execute_tool_backed_operation")
+		if (toolBackedOperation.kind !== "execute_tool_backed_operation") {
+			throw new Error(`Expected execute_tool_backed_operation, received ${toolBackedOperation.kind}.`)
+		}
+
+		const sourcePath = toolBackedOperation.toolRequest.toolParams.source_path
+		const destinationPath = toolBackedOperation.toolRequest.toolParams.destination_path
+		await writeFile(sourcePath, "story content", "utf8")
+
+		const movedFile = await runtime.moveWorkflowProjectFile({
+			taskState,
+			expectedSourceAbsolutePath: sourcePath,
+			expectedDestinationAbsolutePath: destinationPath,
+		})
+
+		expect(movedFile).to.deep.equal({
+			sourceAbsolutePath: sourcePath,
+			destinationAbsolutePath: destinationPath,
+		})
+		expect(await pathExists(sourcePath)).to.equal(false)
+		expect(await readFile(destinationPath, "utf8")).to.equal("story content")
+
+		const successResult = await runtime.handleToolBackedOperationToolResult({
+			taskState,
+			toolResultText: JSON.stringify({
+				moved: true,
+				source_path: sourcePath,
+				destination_path: destinationPath,
+			}),
+			runtimeOwnedSourceRoute: toolBackedOperation.runtimeOwnedSourceRoute,
+		})
+
+		expect(getActiveWorkflowSession(taskState).activeStepNumber).to.equal(2)
+		expect(successResult.kind).to.equal("project_prompt")
+		if (successResult.kind !== "project_prompt") {
+			throw new Error(`Expected project_prompt, received ${successResult.kind}.`)
+		}
+	})
+
+	it("fails workflow project file moves clearly without overwriting destination collisions", async () => {
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: [MOVE_PROJECT_FILE_FILENAME_KEY],
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createToolBackedOperationDecisionTree({
+						startAction: createMoveProjectFileAction({
+							sourceFolderSegments: ["implementation", "stories-backlog"],
+							destinationFolderSegments: ["implementation", "stories-review"],
+							filenameWorkflowValueKey: MOVE_PROJECT_FILE_FILENAME_KEY,
+						}),
+					}),
+				}),
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		getActiveWorkflowSession(taskState).workflowValues[MOVE_PROJECT_FILE_FILENAME_KEY] = "Story-3.md"
+		await runtime.resolveNextAction({ taskState })
+		const toolBackedOperation = await submitNewProjectSelection(taskState, "Move Collision Project")
+
+		expect(toolBackedOperation.kind).to.equal("execute_tool_backed_operation")
+		if (toolBackedOperation.kind !== "execute_tool_backed_operation") {
+			throw new Error(`Expected execute_tool_backed_operation, received ${toolBackedOperation.kind}.`)
+		}
+
+		const sourcePath = toolBackedOperation.toolRequest.toolParams.source_path
+		const destinationPath = toolBackedOperation.toolRequest.toolParams.destination_path
+		await writeFile(sourcePath, "source content", "utf8")
+		await writeFile(destinationPath, "existing destination", "utf8")
+
+		let capturedError: unknown
+		try {
+			await runtime.moveWorkflowProjectFile({
+				taskState,
+				expectedSourceAbsolutePath: sourcePath,
+				expectedDestinationAbsolutePath: destinationPath,
+			})
+		} catch (error) {
+			capturedError = error
+		}
+
+		expect(capturedError).to.be.instanceOf(Error)
+		if (!(capturedError instanceof Error)) {
+			throw new Error("Expected move collision to throw.")
+		}
+		expect(capturedError.message).to.equal(
+			`Cannot move workflow project file because destination already exists: ${destinationPath}`,
+		)
+		expect(await readFile(sourcePath, "utf8")).to.equal("source content")
+		expect(await readFile(destinationPath, "utf8")).to.equal("existing destination")
 	})
 
 	it("routes serialized denied and errored document build tool results through tool_backed_operation_failed", async () => {

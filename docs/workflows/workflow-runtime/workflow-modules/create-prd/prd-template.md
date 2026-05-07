@@ -26,6 +26,12 @@ How complex is this domain? (low, medium, high)
 
 # Product Background
 
+## Project Context
+
+## Project Documentation
+
+## Additional Context
+
 ## Product Type
 
 ## Vertical

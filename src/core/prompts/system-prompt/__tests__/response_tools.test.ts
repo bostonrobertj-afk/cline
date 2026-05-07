@@ -48,6 +48,13 @@ const deleteWorkflowArtifactToolSpec: ClineToolSpec = {
 	description: "Delete a workflow artifact.",
 }
 
+const moveWorkflowProjectFileToolSpec: ClineToolSpec = {
+	variant: ModelFamily.GENERIC,
+	id: ClineDefaultTool.MOVE_WORKFLOW_PROJECT_FILE,
+	name: "move_workflow_project_file",
+	description: "Move a workflow project file.",
+}
+
 type CreateArchitectureResponseToolStepId = "step-3" | "step-4" | "step-9"
 
 interface CreateArchitectureResponseToolCase {
@@ -253,10 +260,14 @@ describe("response tools prompt helpers", () => {
 		expect(getResponseToolsSection(context)).to.equal("")
 	})
 
-	it("does not render archive or delete workflow artifact response guidance", () => {
+	it("does not render backend-only workflow file-operation response guidance", () => {
 		const nonNativeContext = makeContext({
 			enableNativeToolCalls: false,
-			workflowToolSchemaOverride: [archiveWorkflowArtifactToolSpec, deleteWorkflowArtifactToolSpec],
+			workflowToolSchemaOverride: [
+				archiveWorkflowArtifactToolSpec,
+				deleteWorkflowArtifactToolSpec,
+				moveWorkflowProjectFileToolSpec,
+			],
 		})
 
 		expect(getCurrentModeResponseToolsLine(nonNativeContext)).to.equal(undefined)
@@ -264,7 +275,12 @@ describe("response tools prompt helpers", () => {
 
 		const nativeContext = makeContext({
 			enableNativeToolCalls: true,
-			visibleNativeToolNames: ["send_user_message", "archive_workflow_artifact", "delete_workflow_artifact"],
+			visibleNativeToolNames: [
+				"send_user_message",
+				"archive_workflow_artifact",
+				"delete_workflow_artifact",
+				"move_workflow_project_file",
+			],
 		})
 		const currentModeLine = getCurrentModeResponseToolsLine(nativeContext)
 		const responseToolsSection = getResponseToolsSection(nativeContext)
@@ -272,9 +288,11 @@ describe("response tools prompt helpers", () => {
 		expect(currentModeLine).to.contain("`send_user_message`")
 		expect(currentModeLine).to.not.contain("`archive_workflow_artifact`")
 		expect(currentModeLine).to.not.contain("`delete_workflow_artifact`")
+		expect(currentModeLine).to.not.contain("`move_workflow_project_file`")
 		expect(responseToolsSection).to.contain("`send_user_message`")
 		expect(responseToolsSection).to.not.contain("`archive_workflow_artifact`")
 		expect(responseToolsSection).to.not.contain("`delete_workflow_artifact`")
+		expect(responseToolsSection).to.not.contain("`move_workflow_project_file`")
 	})
 
 	it("renders only projected response guidance for a non-native workflow override", () => {

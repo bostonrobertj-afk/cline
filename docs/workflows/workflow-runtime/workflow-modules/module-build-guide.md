@@ -160,6 +160,16 @@ Rules of thumb:
 
 The brainstorming Step 2 form is the reference pattern: approach selection, category selection, technique selection, and random confirmation are all one form with conditional panels.
 
+### Prerequisite Files
+
+If a module requires a prerequisite file from the selected project before model-driven work can begin, make that prerequisite selection a module-owned Step 1 workflow form after shared project selection. The form field must discover files from the selected project, with `selectorDiscovery.root.kind: "selected_project_root"`, so the runtime-owned project-selection root remains the authority for file discovery.
+
+When no valid prerequisite file is available, the form copy or validation message must identify the workflow that produces the prerequisite by workflow name. Do not leave the user with a generic missing-file error.
+
+Use the module decision action `move_project_file` for deterministic file lifecycle moves between folders under the selected project. The action should provide source and destination folder segments plus a `filenameWorkflowValueKey`; the runtime resolves the selected project root and performs the governed move.
+
+Project setup creates `implementation/stories-backlog`, `implementation/stories-review`, and `implementation/stories-complete` under every workflow project. Future story lifecycle modules should use those folders rather than inventing parallel backlog, review, or completed-story locations.
+
 ### Deterministic Procedures
 
 Use deterministic procedures for code-owned state changes that should not be AI-callable tools.
@@ -212,7 +222,7 @@ The returned `readonly ClineToolSpec[]` is the complete model-visible workflow t
 
 The deleted `contextualToolMatrix.ts` is reference material only. Use `docs/workflows/workflow-runtime/workflow-modules/legacy-tool-matrix.md` as a loose migration reference for historical tool-category intent, not as an implementation source and not as a 1:1 step mapping.
 
-Do not include `archive_workflow_artifact` or `delete_workflow_artifact` in module tool schemas. Those are backend-only runtime-owned tools used by the shared existing-artifact conflict flow.
+Do not include `archive_workflow_artifact`, `delete_workflow_artifact`, or `move_workflow_project_file` in module tool schemas. Those are backend-only runtime-owned tools. `move_workflow_project_file` must not be model-facing unless a future requirement explicitly approves projection.
 
 Use this translation process for each model-driven step:
 

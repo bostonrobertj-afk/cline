@@ -107,6 +107,24 @@ export const backendWorkflowToolContracts: Partial<Record<ClineDefaultTool, Back
 			},
 		],
 	},
+	[ClineDefaultTool.MOVE_WORKFLOW_PROJECT_FILE]: {
+		id: ClineDefaultTool.MOVE_WORKFLOW_PROJECT_FILE,
+		name: "move_workflow_project_file",
+		parameters: [
+			{
+				name: "source_path",
+				required: true,
+				type: "string",
+				description: "Resolved absolute source path prepared upstream by WorkflowRuntime.",
+			},
+			{
+				name: "destination_path",
+				required: true,
+				type: "string",
+				description: "Resolved absolute destination path prepared upstream by WorkflowRuntime.",
+			},
+		],
+	},
 	[ClineDefaultTool.GET_BRAINSTORMING_METHODS]: {
 		id: ClineDefaultTool.GET_BRAINSTORMING_METHODS,
 		name: "get_brainstorming_methods",

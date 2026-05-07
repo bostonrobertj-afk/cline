@@ -8501,200 +8501,207 @@ Scope Boundary:
 Known Issues / Risks / Technical Debt:
 - Existing `apply_patch` and shell commands can move files, but they are model/operator tools. This phase adds a governed runtime-owned workflow operation for deterministic workflow lifecycle moves.
 
-[ ] Task 175. Add the backend workflow file-move tool contract and handler registration.
+[x] Task 175. Add the backend workflow file-move tool contract and handler registration.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/shared/tools.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/backendWorkflowToolContracts.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/assistant-message/index.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/ToolExecutorCoordinator.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/autoApprove.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/response/ResponseToolRegistry.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/MoveWorkflowProjectFileToolHandler.ts`
 
-[ ] Subtask 175.1. In `tools.ts`, add `MOVE_WORKFLOW_PROJECT_FILE = "move_workflow_project_file"` to `ClineDefaultTool` immediately after the existing workflow artifact file-operation tools.
+[x] Subtask 175.1. In `tools.ts`, add `MOVE_WORKFLOW_PROJECT_FILE = "move_workflow_project_file"` to `ClineDefaultTool` immediately after the existing workflow artifact file-operation tools.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/shared/tools.ts`
 
-[ ] Subtask 175.2. In `backendWorkflowToolContracts.ts`, add a backend workflow tool contract for `MOVE_WORKFLOW_PROJECT_FILE` named `move_workflow_project_file` with required string parameters `source_path` and `destination_path`.
+[x] Subtask 175.2. In `backendWorkflowToolContracts.ts`, add a backend workflow tool contract for `MOVE_WORKFLOW_PROJECT_FILE` named `move_workflow_project_file` with required string parameters `source_path` and `destination_path`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/backendWorkflowToolContracts.ts`
 
-[ ] Subtask 175.3. In `ResponseToolRegistry.ts`, register `ClineDefaultTool.MOVE_WORKFLOW_PROJECT_FILE` with value `undefined`.
+[x] Subtask 175.3. In `src/core/assistant-message/index.ts`, add `"source_path"` to `toolParamNames` adjacent to `"destination_path"` so `ToolUse["params"]` supports the approved backend tool parameter.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/assistant-message/index.ts`
+
+[x] Subtask 175.4. In `ResponseToolRegistry.ts`, register `ClineDefaultTool.MOVE_WORKFLOW_PROJECT_FILE` with value `undefined`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/response/ResponseToolRegistry.ts`
 
-[ ] Subtask 175.4. In `autoApprove.ts`, classify `MOVE_WORKFLOW_PROJECT_FILE` with the same edit-file approval behavior as `ARCHIVE_WORKFLOW_ARTIFACT` and `DELETE_WORKFLOW_ARTIFACT`.
+[x] Subtask 175.5. In `autoApprove.ts`, classify `MOVE_WORKFLOW_PROJECT_FILE` with the same edit-file approval behavior as `ARCHIVE_WORKFLOW_ARTIFACT` and `DELETE_WORKFLOW_ARTIFACT`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/autoApprove.ts`
 
-[ ] Subtask 175.5. Add `MoveWorkflowProjectFileToolHandler.ts` with the same backend-tool structure as archive/delete: reject partial blocks, require `source_path` and `destination_path`, call workflow runtime prepare/execute seams, enforce clineignore checks on both paths before approval, use edit-file approval, clear both file-read cache entries after success, and return structured JSON containing `moved`, `source_path`, and `destination_path`.
+[x] Subtask 175.6. Add `MoveWorkflowProjectFileToolHandler.ts` with the same backend-tool structure as archive/delete: reject partial blocks, require `source_path` and `destination_path`, call workflow runtime prepare/execute seams, enforce clineignore checks on both paths before approval, use edit-file approval, clear both file-read cache entries after success, and return structured JSON containing `moved`, `source_path`, and `destination_path`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/MoveWorkflowProjectFileToolHandler.ts`
 
-[ ] Subtask 175.6. In `ToolExecutorCoordinator.ts`, import and register `MoveWorkflowProjectFileToolHandler` for `ClineDefaultTool.MOVE_WORKFLOW_PROJECT_FILE`.
+[x] Subtask 175.7. In `ToolExecutorCoordinator.ts`, import and register `MoveWorkflowProjectFileToolHandler` for `ClineDefaultTool.MOVE_WORKFLOW_PROJECT_FILE`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/ToolExecutorCoordinator.ts`
 
-[ ] Task 176. Add runtime `move_project_file` decision-action support.
+[x] Task 176. Add runtime `move_project_file` decision-action support.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 176.1. In `types.ts`, add a `move_project_file` `WorkflowDecisionAction` variant with `sourceFolderSegments: readonly string[]`, `destinationFolderSegments: readonly string[]`, and `filenameWorkflowValueKey: string`.
+[x] Subtask 176.1. In `types.ts`, add a `move_project_file` `WorkflowDecisionAction` variant with `sourceFolderSegments: readonly string[]`, `destinationFolderSegments: readonly string[]`, and `filenameWorkflowValueKey: string`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 
-[ ] Subtask 176.2. In `WorkflowRuntime.ts`, add `ClineDefaultTool.MOVE_WORKFLOW_PROJECT_FILE` to `isRuntimeOwnedWorkflowTool(...)`.
+[x] Subtask 176.2. In `WorkflowRuntime.ts`, add `ClineDefaultTool.MOVE_WORKFLOW_PROJECT_FILE` to `isRuntimeOwnedWorkflowTool(...)`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 176.3. In workflow definition validation, validate `move_project_file` routes by checking every source and destination folder segment with `isWorkflowDiscoveryTargetPathSegment(...)`.
+[x] Subtask 176.3. In workflow definition validation, validate `move_project_file` routes by checking every source and destination folder segment with `isWorkflowDiscoveryTargetPathSegment(...)`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 176.4. In workflow definition validation, validate `move_project_file.filenameWorkflowValueKey` is non-empty, already trimmed, and declared in `workflow.workflowValueKeys`.
+[x] Subtask 176.4. In workflow definition validation, validate `move_project_file.filenameWorkflowValueKey` is non-empty, already trimmed, and declared in `workflow.workflowValueKeys`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 176.5. In `buildNextActionFromDecisionTreeAction(...)`, add a `move_project_file` case that resolves the filename workflow value, validates it as a single path segment, resolves source/destination absolute paths under the selected project folder, and returns a runtime-owned `execute_tool_backed_operation` for `MOVE_WORKFLOW_PROJECT_FILE` with `source_path` and `destination_path`.
+[x] Subtask 176.5. In `buildNextActionFromDecisionTreeAction(...)`, add a `move_project_file` case that resolves the filename workflow value, validates it as a single path segment, resolves source/destination absolute paths under the selected project folder, and returns a runtime-owned `execute_tool_backed_operation` for `MOVE_WORKFLOW_PROJECT_FILE` with `source_path` and `destination_path`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 176.6. In `WorkflowRuntime.ts`, add runtime prepare/execute methods for project file moves that validate active workflow session, selected project root containment, workspace path policy, source file existence, destination non-existence, and unchanged prepared paths before execution.
+[x] Subtask 176.6. In `WorkflowRuntime.ts`, add runtime prepare/execute methods for project file moves that validate active workflow session, selected project root containment, workspace path policy, source file existence, destination non-existence, and unchanged prepared paths before execution.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 176.7. In `WorkflowRuntime.ts`, implement the move execution with no-overwrite behavior using exclusive copy followed by source unlink, matching the existing archive safety pattern.
+[x] Subtask 176.7. In `WorkflowRuntime.ts`, implement the move execution with no-overwrite behavior using exclusive copy followed by source unlink, matching the existing archive safety pattern.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Task 177. Create nested implementation story folders during project setup.
+[x] Task 177. Create nested implementation story folders during project setup.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 177.1. In `WorkflowRuntime.ts`, add a constant for implementation story child folders: `stories-backlog`, `stories-review`, and `stories-complete`.
+[x] Subtask 177.1. In `WorkflowRuntime.ts`, add a constant for implementation story child folders: `stories-backlog`, `stories-review`, and `stories-complete`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 177.2. In `ensureProjectFoldersExist(...)`, create each implementation story child folder under `{projectRoot}/implementation`.
+[x] Subtask 177.2. In `ensureProjectFoldersExist(...)`, create each implementation story child folder under `{projectRoot}/implementation`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 177.3. In `WorkflowRuntime.test.ts`, update shared entry project-selection folder creation coverage to assert new and existing projects both have `implementation/stories-backlog`, `implementation/stories-review`, and `implementation/stories-complete`.
+[x] Subtask 177.3. In `WorkflowRuntime.test.ts`, update shared entry project-selection folder creation coverage to assert new and existing projects both have `implementation/stories-backlog`, `implementation/stories-review`, and `implementation/stories-complete`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Task 178. Add runtime and handler tests for project file moves.
+[x] Task 178. Add runtime and handler tests for project file moves.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/MoveWorkflowProjectFileToolHandler.test.ts`
 
-[ ] Subtask 178.1. In `WorkflowRuntime.test.ts`, add validation coverage rejecting `move_project_file` routes with invalid source or destination folder segments.
+[x] Subtask 178.1. In `WorkflowRuntime.test.ts`, add validation coverage rejecting `move_project_file` routes with invalid source or destination folder segments.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 178.2. In `WorkflowRuntime.test.ts`, add validation coverage rejecting `move_project_file` routes whose `filenameWorkflowValueKey` is blank, untrimmed, or absent from `workflowValueKeys`.
+[x] Subtask 178.2. In `WorkflowRuntime.test.ts`, add validation coverage rejecting `move_project_file` routes whose `filenameWorkflowValueKey` is blank, untrimmed, or absent from `workflowValueKeys`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 178.3. In `WorkflowRuntime.test.ts`, add decision-tree coverage proving `move_project_file` emits `MOVE_WORKFLOW_PROJECT_FILE` with resolved `source_path` and `destination_path`.
+[x] Subtask 178.3. In `WorkflowRuntime.test.ts`, add decision-tree coverage proving `move_project_file` emits `MOVE_WORKFLOW_PROJECT_FILE` with resolved `source_path` and `destination_path`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 178.4. In `WorkflowRuntime.test.ts`, add success coverage proving a moved file leaves the source folder, appears in the destination folder, and routes through `tool_backed_operation_succeeded`.
+[x] Subtask 178.4. In `WorkflowRuntime.test.ts`, add success coverage proving a moved file leaves the source folder, appears in the destination folder, and routes through `tool_backed_operation_succeeded`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 178.5. In `WorkflowRuntime.test.ts`, add failure coverage proving destination collision fails clearly and does not overwrite the destination file.
+[x] Subtask 178.5. In `WorkflowRuntime.test.ts`, add failure coverage proving destination collision fails clearly and does not overwrite the destination file.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 178.6. Add `MoveWorkflowProjectFileToolHandler.test.ts` covering missing params, partial blocks, blocked source path, blocked destination path, approval denial, successful runtime delegation, cache invalidation, and structured success JSON.
+[x] Subtask 178.6. Add `MoveWorkflowProjectFileToolHandler.test.ts` covering missing params, partial blocks, blocked source path, blocked destination path, approval denial, successful runtime delegation, cache invalidation, and structured success JSON.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/MoveWorkflowProjectFileToolHandler.test.ts`
 
-[ ] Task 179. Keep `move_workflow_project_file` backend-only unless explicitly projected by a module.
+[x] Task 179. Keep `move_workflow_project_file` backend-only unless explicitly projected by a module.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/response/__tests__/ResponseToolRuntime.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/response_tools.test.ts`
 
-[ ] Subtask 179.1. In `ResponseToolRuntime.test.ts`, assert `ResponseToolRegistry.get(ClineDefaultTool.MOVE_WORKFLOW_PROJECT_FILE)` is `undefined`.
+[x] Subtask 179.1. In `ResponseToolRuntime.test.ts`, assert `ResponseToolRegistry.get(ClineDefaultTool.MOVE_WORKFLOW_PROJECT_FILE)` is `undefined`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/response/__tests__/ResponseToolRuntime.test.ts`
 
-[ ] Subtask 179.2. In `integration.test.ts`, include `move_workflow_project_file` in backend-only workflow tool assertions so it is absent from default prompt/native tool surfaces.
+[x] Subtask 179.2. In `integration.test.ts`, include `move_workflow_project_file` in backend-only workflow tool assertions so it is absent from default prompt/native tool surfaces.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 179.3. In `response_tools.test.ts`, include `move_workflow_project_file` in backend-only response-tool assertions so it is not rendered as a response tool.
+[x] Subtask 179.3. In `response_tools.test.ts`, include `move_workflow_project_file` in backend-only response-tool assertions so it is not rendered as a response tool.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/response_tools.test.ts`
 
-[ ] Task 180. Update the workflow module build guide for prerequisite files and runtime-owned project file moves.
+[x] Task 180. Update the workflow module build guide for prerequisite files and runtime-owned project file moves.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
 
-[ ] Subtask 180.1. In `module-build-guide.md`, add guidance that modules with required prerequisite files must use a module-owned Step 1 workflow form after shared project selection, with `selectorDiscovery.root.kind: "selected_project_root"`.
+[x] Subtask 180.1. In `module-build-guide.md`, add guidance that modules with required prerequisite files must use a module-owned Step 1 workflow form after shared project selection, with `selectorDiscovery.root.kind: "selected_project_root"`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
 
-[ ] Subtask 180.2. In `module-build-guide.md`, add guidance that prerequisite file forms must identify the producing workflow by name when no valid prerequisite file is available.
+[x] Subtask 180.2. In `module-build-guide.md`, add guidance that prerequisite file forms must identify the producing workflow by name when no valid prerequisite file is available.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
 
-[ ] Subtask 180.3. In `module-build-guide.md`, document `move_project_file` as the approved module decision action for deterministic file lifecycle moves between selected-project folders.
+[x] Subtask 180.3. In `module-build-guide.md`, document `move_project_file` as the approved module decision action for deterministic file lifecycle moves between selected-project folders.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
 
-[ ] Subtask 180.4. In `module-build-guide.md`, document that `move_workflow_project_file` is backend-only and must not be included in model-facing module tool schemas unless a future requirement explicitly approves projection.
+[x] Subtask 180.4. In `module-build-guide.md`, document that `move_workflow_project_file` is backend-only and must not be included in model-facing module tool schemas unless a future requirement explicitly approves projection.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
 
-[ ] Subtask 180.5. In `module-build-guide.md`, document that project setup creates `implementation/stories-backlog`, `implementation/stories-review`, and `implementation/stories-complete`, and future story lifecycle modules should use those folders.
+[x] Subtask 180.5. In `module-build-guide.md`, document that project setup creates `implementation/stories-backlog`, `implementation/stories-review`, and `implementation/stories-complete`, and future story lifecycle modules should use those folders.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
 
-[ ] Task 181. Validate Phase 60.
+[x] Task 181. Validate Phase 60.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/shared/tools.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/assistant-message/index.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/backendWorkflowToolContracts.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/ToolExecutorCoordinator.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/autoApprove.ts`
@@ -8709,7 +8716,7 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/response_tools.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
 
-[ ] Subtask 181.1. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/tools/handlers/__tests__/MoveWorkflowProjectFileToolHandler.test.ts src/core/task/tools/response/__tests__/ResponseToolRuntime.test.ts src/core/prompts/system-prompt/__tests__/integration.test.ts src/core/prompts/system-prompt/__tests__/response_tools.test.ts`; it must pass before Phase 60 is marked complete.
+[x] Subtask 181.1. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/tools/handlers/__tests__/MoveWorkflowProjectFileToolHandler.test.ts src/core/task/tools/response/__tests__/ResponseToolRuntime.test.ts src/core/prompts/system-prompt/__tests__/integration.test.ts src/core/prompts/system-prompt/__tests__/response_tools.test.ts`; it must pass before Phase 60 is marked complete.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
@@ -8718,27 +8725,29 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/response_tools.test.ts`
 
-[ ] Subtask 181.2. Run `rg -n "move_workflow_project_file|MOVE_WORKFLOW_PROJECT_FILE" src/core/prompts/system-prompt/tools src/core/prompts/system-prompt/variants src/core/prompts/system-prompt/__tests__/__snapshots__`; it must return no matches.
+[x] Subtask 181.2. Run `rg -n "move_workflow_project_file|MOVE_WORKFLOW_PROJECT_FILE" src/core/prompts/system-prompt/tools src/core/prompts/system-prompt/variants src/core/prompts/system-prompt/__tests__/__snapshots__`; it must return no matches.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/response_tools.test.ts`
 
-[ ] Subtask 181.3. Run `rg -n "move_workflow_project_file|MOVE_WORKFLOW_PROJECT_FILE" src/core/task/workflow-runtime/workflow-modules/brainstorming src/core/task/workflow-runtime/workflow-modules/create-architecture`; it must return no matches.
+[x] Subtask 181.3. Run `rg -n "move_workflow_project_file|MOVE_WORKFLOW_PROJECT_FILE" src/core/task/workflow-runtime/workflow-modules/brainstorming src/core/task/workflow-runtime/workflow-modules/create-architecture`; it must return no matches.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture`
 
-[ ] Subtask 181.4. Run `npm run check-types`; it must pass before Phase 60 is marked complete.
+[x] Subtask 181.4. Run `npm run check-types`; it must pass before Phase 60 is marked complete.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/shared/tools.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/assistant-message/index.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/MoveWorkflowProjectFileToolHandler.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/MoveWorkflowProjectFileToolHandler.test.ts`
 
-[ ] Subtask 181.5. Run `npm run lint`; it must pass before Phase 60 is marked complete.
+[x] Subtask 181.5. Run `npm run lint`; it must pass before Phase 60 is marked complete.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/shared/tools.ts`

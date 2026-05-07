@@ -21,6 +21,7 @@ import { GetBrainstormingMethodsToolHandler } from "./handlers/GetBrainstormingM
 import { ListCodeDefinitionNamesToolHandler } from "./handlers/ListCodeDefinitionNamesToolHandler"
 import { ListFilesToolHandler } from "./handlers/ListFilesToolHandler"
 import { LoadMcpDocumentationHandler } from "./handlers/LoadMcpDocumentationHandler"
+import { MoveWorkflowProjectFileToolHandler } from "./handlers/MoveWorkflowProjectFileToolHandler"
 import { NewTaskHandler } from "./handlers/NewTaskHandler"
 import { PlanModeRespondHandler } from "./handlers/PlanModeRespondHandler"
 import { ReadFileRangeToolHandler } from "./handlers/ReadFileRangeToolHandler"
@@ -128,6 +129,7 @@ export class ToolExecutorCoordinator {
 		[ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT]: (v: ToolValidator) => new CreateWorkflowArtifactToolHandler(v),
 		[ClineDefaultTool.ARCHIVE_WORKFLOW_ARTIFACT]: (v: ToolValidator) => new ArchiveWorkflowArtifactToolHandler(v),
 		[ClineDefaultTool.DELETE_WORKFLOW_ARTIFACT]: (v: ToolValidator) => new DeleteWorkflowArtifactToolHandler(v),
+		[ClineDefaultTool.MOVE_WORKFLOW_PROJECT_FILE]: (v: ToolValidator) => new MoveWorkflowProjectFileToolHandler(v),
 		[ClineDefaultTool.GET_BRAINSTORMING_METHODS]: (_v: ToolValidator) => new GetBrainstormingMethodsToolHandler(),
 		[ClineDefaultTool.APPEND_BRAINSTORMING_SELECTED_TECHNIQUE]: (_v: ToolValidator) =>
 			new AppendBrainstormingSelectedTechniqueToolHandler(),

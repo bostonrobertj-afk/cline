@@ -55,6 +55,7 @@ export class AutoApprove {
 				case ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT:
 				case ClineDefaultTool.ARCHIVE_WORKFLOW_ARTIFACT:
 				case ClineDefaultTool.DELETE_WORKFLOW_ARTIFACT:
+				case ClineDefaultTool.MOVE_WORKFLOW_PROJECT_FILE:
 				case ClineDefaultTool.BASH:
 				case ClineDefaultTool.USE_SUBAGENTS:
 					return [true, true]
@@ -83,6 +84,7 @@ export class AutoApprove {
 				case ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT:
 				case ClineDefaultTool.ARCHIVE_WORKFLOW_ARTIFACT:
 				case ClineDefaultTool.DELETE_WORKFLOW_ARTIFACT:
+				case ClineDefaultTool.MOVE_WORKFLOW_PROJECT_FILE:
 				case ClineDefaultTool.BASH:
 				case ClineDefaultTool.USE_SUBAGENTS:
 					return [true, true]
@@ -113,6 +115,7 @@ export class AutoApprove {
 			case ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT:
 			case ClineDefaultTool.ARCHIVE_WORKFLOW_ARTIFACT:
 			case ClineDefaultTool.DELETE_WORKFLOW_ARTIFACT:
+			case ClineDefaultTool.MOVE_WORKFLOW_PROJECT_FILE:
 				return [autoApprovalSettings.actions.editFiles, autoApprovalSettings.actions.editFilesExternally ?? false]
 			case ClineDefaultTool.BASH:
 				return [

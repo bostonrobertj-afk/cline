@@ -13,7 +13,7 @@ import { WorkflowFormAction, type WorkflowFormSubmissionRequest } from "@shared/
 import { randomUUID } from "crypto"
 import { constants } from "fs"
 import { copyFile, mkdir, readFile, stat, unlink, writeFile } from "fs/promises"
-import { dirname, join } from "path"
+import { dirname, isAbsolute, join, relative, resolve, sep } from "path"
 import { isSerializedToolFailureResultText } from "@/core/prompts/responses"
 import type { TaskState } from "@/core/task/TaskState"
 import { buildWorkflowFormPayload } from "@/core/task/workflow-form/buildWorkflowFormPayload"
@@ -89,6 +89,7 @@ const WORKFLOW_PROJECT_SUBFOLDERS: readonly WorkflowProjectSubfolder[] = [
 	"testing",
 	"archive",
 ]
+const WORKFLOW_IMPLEMENTATION_STORY_CHILD_FOLDERS = ["stories-backlog", "stories-review", "stories-complete"] as const
 const WORKFLOW_PROJECT_OUTPUT_ROOT_PATH_SEGMENTS = ["docs", "projects"] as const
 const WORKFLOW_ENTRY_FORM_ID = "__workflow_runtime_entry_form__"
 const WORKFLOW_ENTRY_INFO_PANEL_ID = "__workflow_runtime_entry_info__"
@@ -131,6 +132,13 @@ export interface WorkflowArtifactArchivePreparation extends WorkflowArtifactAllo
 export type WorkflowArtifactArchiveResult = WorkflowArtifactArchivePreparation
 export type WorkflowArtifactDeletionPreparation = WorkflowArtifactAllocationOutput
 export type WorkflowArtifactDeletionResult = WorkflowArtifactDeletionPreparation
+
+export interface WorkflowProjectFileMovePreparation {
+	sourceAbsolutePath: string
+	destinationAbsolutePath: string
+}
+
+export type WorkflowProjectFileMoveResult = WorkflowProjectFileMovePreparation
 
 interface WorkflowArtifactIdentityResolution {
 	artifactIdentity: string
@@ -867,6 +875,93 @@ export class WorkflowRuntime {
 		this.assertWorkspacePathAllowed(preparedDeletion.artifactAbsolutePath)
 		await unlink(preparedDeletion.artifactAbsolutePath)
 		return preparedDeletion
+	}
+
+	async prepareWorkflowProjectFileMove(args: {
+		taskState: TaskState
+		sourcePath: string
+		destinationPath: string
+	}): Promise<WorkflowProjectFileMovePreparation> {
+		const session = args.taskState.activeWorkflowSession
+		if (!session) {
+			throw new Error("Cannot move workflow project file without an active workflow session.")
+		}
+
+		const selectedProjectRoot = this.resolveWorkflowProjectOutputFolder(session)
+		const sourceAbsolutePath = this.resolveWorkflowProjectMovePath({
+			selectedProjectRoot,
+			filePath: args.sourcePath,
+			pathRole: "source",
+		})
+		const destinationAbsolutePath = this.resolveWorkflowProjectMovePath({
+			selectedProjectRoot,
+			filePath: args.destinationPath,
+			pathRole: "destination",
+		})
+
+		let sourceStats: Awaited<ReturnType<typeof stat>>
+		try {
+			sourceStats = await stat(sourceAbsolutePath)
+		} catch (error) {
+			if (this.isFileNotFoundError(error)) {
+				throw new Error(`Cannot move workflow project file because source does not exist: ${sourceAbsolutePath}`)
+			}
+			throw error
+		}
+
+		if (!sourceStats.isFile()) {
+			throw new Error(`Cannot move workflow project file because source is not a file: ${sourceAbsolutePath}`)
+		}
+
+		try {
+			await stat(destinationAbsolutePath)
+			throw new Error(`Cannot move workflow project file because destination already exists: ${destinationAbsolutePath}`)
+		} catch (error) {
+			if (this.isFileNotFoundError(error)) {
+				return {
+					sourceAbsolutePath,
+					destinationAbsolutePath,
+				}
+			}
+			throw error
+		}
+	}
+
+	async moveWorkflowProjectFile(args: {
+		taskState: TaskState
+		expectedSourceAbsolutePath: string
+		expectedDestinationAbsolutePath: string
+	}): Promise<WorkflowProjectFileMoveResult> {
+		const preparedMove = await this.prepareWorkflowProjectFileMove({
+			taskState: args.taskState,
+			sourcePath: args.expectedSourceAbsolutePath,
+			destinationPath: args.expectedDestinationAbsolutePath,
+		})
+		if (
+			preparedMove.sourceAbsolutePath !== args.expectedSourceAbsolutePath ||
+			preparedMove.destinationAbsolutePath !== args.expectedDestinationAbsolutePath
+		) {
+			throw new Error("Workflow project file move paths changed before move execution.")
+		}
+
+		const destinationParentDirectory = dirname(preparedMove.destinationAbsolutePath)
+		this.assertWorkspacePathAllowed(destinationParentDirectory)
+		await mkdir(destinationParentDirectory, { recursive: true })
+		this.assertWorkspacePathAllowed(preparedMove.sourceAbsolutePath)
+		this.assertWorkspacePathAllowed(preparedMove.destinationAbsolutePath)
+		try {
+			await copyFile(preparedMove.sourceAbsolutePath, preparedMove.destinationAbsolutePath, constants.COPYFILE_EXCL)
+		} catch (error) {
+			if (this.isFileAlreadyExistsError(error)) {
+				throw new Error(
+					`Cannot move workflow project file because destination already exists: ${preparedMove.destinationAbsolutePath}`,
+				)
+			}
+			throw error
+		}
+		await unlink(preparedMove.sourceAbsolutePath)
+
+		return preparedMove
 	}
 
 	private async resolveActiveWorkflowNewArtifactOutputs(args: {
@@ -4112,6 +4207,43 @@ export class WorkflowRuntime {
 					},
 				}
 			}
+			case "move_project_file": {
+				const filename = readRequiredStringWorkflowValue({
+					workflowValues: session.workflowValues,
+					key: action.filenameWorkflowValueKey,
+					context: `project file move route ${sourceRoute.branchId}/${sourceRoute.routeId}`,
+				})
+				if (!isWorkflowDiscoveryTargetPathSegment(filename)) {
+					return this.buildTerminalErrorNextAction({
+						taskState,
+						errorMessage: `Workflow project file move route ${sourceRoute.branchId}/${sourceRoute.routeId} resolved filename value ${filename} must be a single path segment.`,
+					})
+				}
+
+				const selectedProjectRoot = this.resolveWorkflowProjectOutputFolder(session)
+				const sourceFolderPath = resolveWorkflowDiscoveryTargetDirectory({
+					rootDirectory: selectedProjectRoot,
+					targetPathSegments: action.sourceFolderSegments,
+				})
+				const destinationFolderPath = resolveWorkflowDiscoveryTargetDirectory({
+					rootDirectory: selectedProjectRoot,
+					targetPathSegments: action.destinationFolderSegments,
+				})
+
+				session.ui.stepResolutionSession = undefined
+				return {
+					kind: "execute_tool_backed_operation",
+					runtimeOwnedSourceRoute: sourceRoute,
+					toolRequest: {
+						toolName: ClineDefaultTool.MOVE_WORKFLOW_PROJECT_FILE,
+						toolInput: {},
+						toolParams: {
+							source_path: join(sourceFolderPath, filename),
+							destination_path: join(destinationFolderPath, filename),
+						},
+					},
+				}
+			}
 			case "transition_step": {
 				const transitionedStep = this.transitionToStep({
 					taskState,
@@ -4191,6 +4323,29 @@ export class WorkflowRuntime {
 		}
 
 		return join(this.resolveWorkflowProjectOutputRoot(), session.projectSelection.projectFolderName)
+	}
+
+	private resolveWorkflowProjectMovePath(args: {
+		selectedProjectRoot: string
+		filePath: string
+		pathRole: "source" | "destination"
+	}): string {
+		if (!isAbsolute(args.filePath)) {
+			throw new Error(`Workflow project file move ${args.pathRole} path must be absolute: ${args.filePath}`)
+		}
+
+		const resolvedProjectRoot = resolve(args.selectedProjectRoot)
+		const resolvedFilePath = resolve(args.filePath)
+		const relativeFilePath = relative(resolvedProjectRoot, resolvedFilePath)
+		if (relativeFilePath === ".." || relativeFilePath.startsWith(`..${sep}`) || isAbsolute(relativeFilePath)) {
+			throw new Error(
+				`Workflow project file move ${args.pathRole} path must stay within selected project root: ${resolvedFilePath}`,
+			)
+		}
+
+		this.assertWorkspacePathAllowed(resolvedFilePath)
+		this.assertWorkspacePathAllowed(dirname(resolvedFilePath))
+		return resolvedFilePath
 	}
 
 	private async resolveWorkflowArtifactAllocation(args: {
@@ -4905,6 +5060,7 @@ export class WorkflowRuntime {
 			case ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT:
 			case ClineDefaultTool.ARCHIVE_WORKFLOW_ARTIFACT:
 			case ClineDefaultTool.DELETE_WORKFLOW_ARTIFACT:
+			case ClineDefaultTool.MOVE_WORKFLOW_PROJECT_FILE:
 			case ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT:
 			case ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST:
 				return true
@@ -5355,6 +5511,42 @@ export class WorkflowRuntime {
 								}
 							}
 							break
+						case "move_project_file":
+							for (const sourceFolderSegment of route.action.sourceFolderSegments) {
+								if (!isWorkflowDiscoveryTargetPathSegment(sourceFolderSegment)) {
+									return {
+										valid: false,
+										errorMessage: `Workflow step ${step.id} route ${route.id} move_project_file sourceFolderSegments entry ${sourceFolderSegment} is invalid.`,
+									}
+								}
+							}
+							for (const destinationFolderSegment of route.action.destinationFolderSegments) {
+								if (!isWorkflowDiscoveryTargetPathSegment(destinationFolderSegment)) {
+									return {
+										valid: false,
+										errorMessage: `Workflow step ${step.id} route ${route.id} move_project_file destinationFolderSegments entry ${destinationFolderSegment} is invalid.`,
+									}
+								}
+							}
+							if (route.action.filenameWorkflowValueKey.trim() === "") {
+								return {
+									valid: false,
+									errorMessage: `Workflow step ${step.id} route ${route.id} move_project_file filenameWorkflowValueKey must not be empty.`,
+								}
+							}
+							if (route.action.filenameWorkflowValueKey.trim() !== route.action.filenameWorkflowValueKey) {
+								return {
+									valid: false,
+									errorMessage: `Workflow step ${step.id} route ${route.id} move_project_file filenameWorkflowValueKey ${route.action.filenameWorkflowValueKey} must already be trimmed.`,
+								}
+							}
+							if (!workflowValueKeys.has(route.action.filenameWorkflowValueKey)) {
+								return {
+									valid: false,
+									errorMessage: `Workflow step ${step.id} route ${route.id} move_project_file filenameWorkflowValueKey ${route.action.filenameWorkflowValueKey} must be declared in workflowValueKeys.`,
+								}
+							}
+							break
 						case "transition_step": {
 							const targetStep = workflow.steps[`step-${route.action.target.stepNumber}`]
 							if (targetStep === undefined) {
@@ -5701,15 +5893,19 @@ export class WorkflowRuntime {
 		const projectRoot = join(projectOutputRoot, session.projectSelection.projectFolderName)
 		this.assertWorkspacePathAllowed(projectRoot)
 		const projectSubfolderPaths = WORKFLOW_PROJECT_SUBFOLDERS.map((subfolderName) => join(projectRoot, subfolderName))
-		for (const projectSubfolderPath of projectSubfolderPaths) {
-			this.assertWorkspacePathAllowed(projectSubfolderPath)
+		const implementationStoryFolderPaths = WORKFLOW_IMPLEMENTATION_STORY_CHILD_FOLDERS.map((folderName) =>
+			join(projectRoot, "implementation", folderName),
+		)
+		const projectFolderPaths = [...projectSubfolderPaths, ...implementationStoryFolderPaths]
+		for (const projectFolderPath of projectFolderPaths) {
+			this.assertWorkspacePathAllowed(projectFolderPath)
 		}
 
 		await mkdir(projectOutputRoot, { recursive: true })
 		await mkdir(projectRoot, { recursive: true })
 
-		for (const projectSubfolderPath of projectSubfolderPaths) {
-			await mkdir(projectSubfolderPath, { recursive: true })
+		for (const projectFolderPath of projectFolderPaths) {
+			await mkdir(projectFolderPath, { recursive: true })
 		}
 	}
 

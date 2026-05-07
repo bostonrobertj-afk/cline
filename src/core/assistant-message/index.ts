@@ -48,6 +48,7 @@ export const toolParamNames = [
 	"needs_more_exploration",
 	"values",
 	"artifact_id",
+	"source_path",
 	"destination_path",
 	"workflow_value_writes",
 	"name",

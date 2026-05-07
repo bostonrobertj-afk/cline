@@ -84,9 +84,10 @@ describe("ResponseToolRuntime", () => {
 		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT), undefined)
 	})
 
-	it("keeps archive and delete workflow artifact tools registered as non-response tools", () => {
+	it("keeps workflow file-operation tools registered as non-response tools", () => {
 		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.ARCHIVE_WORKFLOW_ARTIFACT), undefined)
 		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.DELETE_WORKFLOW_ARTIFACT), undefined)
+		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.MOVE_WORKFLOW_PROJECT_FILE), undefined)
 	})
 
 	it("registers post-turn thread display states for governed response tools", () => {
