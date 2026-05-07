@@ -507,115 +507,115 @@ Allowed files:
 
 After completing this phase, pause for QA review before moving to Phase 5.
 
-[ ] Task 6. Register the create-architecture workflow as a shipped workflow.
+[x] Task 6. Register the create-architecture workflow as a shipped workflow.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRegistry.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/UseSkillToolHandler.test.ts`
 
-[ ] Subtask 6.1. In `src/core/task/workflow-runtime/WorkflowRegistry.ts`, import `createArchitectureWorkflowDefinition` from `@/core/task/workflow-runtime/workflow-modules/create-architecture`.
+[x] Subtask 6.1. In `src/core/task/workflow-runtime/WorkflowRegistry.ts`, import `createArchitectureWorkflowDefinition` from `@/core/task/workflow-runtime/workflow-modules/create-architecture`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRegistry.ts`
 
-[ ] Subtask 6.2. In `src/core/task/workflow-runtime/WorkflowRegistry.ts`, add `createArchitectureWorkflowDefinition` to `shippedWorkflowDefinitions` after `brainstormingWorkflowDefinition`.
+[x] Subtask 6.2. In `src/core/task/workflow-runtime/WorkflowRegistry.ts`, add `createArchitectureWorkflowDefinition` to `shippedWorkflowDefinitions` after `brainstormingWorkflowDefinition`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRegistry.ts`
 
-[ ] Subtask 6.3. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving `WorkflowRegistry.resolveWorkflowDefinition("create-architecture")` resolves the registered module and `WorkflowRegistry.resolveWorkflowDefinition("create-architecture.md")` returns `undefined`.
+[x] Subtask 6.3. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving `WorkflowRegistry.resolveWorkflowDefinition("create-architecture")` resolves the registered module and `WorkflowRegistry.resolveWorkflowDefinition("create-architecture.md")` returns `undefined`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 6.4. In `src/core/task/tools/handlers/__tests__/UseSkillToolHandler.test.ts`, add coverage proving `use_skill` with `skill_name` `create-architecture` activates the shipped create-architecture workflow by canonical name and queues the runtime next action.
+[x] Subtask 6.4. In `src/core/task/tools/handlers/__tests__/UseSkillToolHandler.test.ts`, add coverage proving `use_skill` with `skill_name` `create-architecture` activates the shipped create-architecture workflow by canonical name and queues the runtime next action.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/UseSkillToolHandler.test.ts`
 
-[ ] Task 7. Add runtime orchestration coverage for create-architecture activation, artifact creation, form persistence, and final completion.
+[x] Task 7. Add runtime orchestration coverage for create-architecture activation, artifact creation, form persistence, and final completion.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 7.1. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving activating `create-architecture` renders the mandatory shared entry form, uses the workflow description as the informational panel prompt, and projects a focus-chain checklist with all nine prescribed step labels.
+[x] Subtask 7.1. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving activating `create-architecture` renders the mandatory shared entry form, uses the workflow description as the informational panel prompt, and projects a focus-chain checklist with all nine prescribed step labels.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 7.2. In `WorkflowRuntime.test.ts`, add coverage proving submitting a new project selection for create-architecture returns an `execute_tool_backed_operation` for `create_workflow_artifact` with `artifact_id: "architecture_document"` and keeps active step number `1`.
+[x] Subtask 7.2. In `WorkflowRuntime.test.ts`, add coverage proving submitting a new project selection for create-architecture returns an `execute_tool_backed_operation` for `create_workflow_artifact` with `artifact_id: "architecture_document"` and keeps active step number `1`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 7.3. In `WorkflowRuntime.test.ts`, add coverage proving create-architecture Step 1 allocation success persists `output_file`, then routes to a `build_workflow_document` operation for the initial architecture shell using the runtime-resolved destination path.
+[x] Subtask 7.3. In `WorkflowRuntime.test.ts`, add coverage proving create-architecture Step 1 allocation success persists `output_file`, then routes to a `build_workflow_document` operation for the initial architecture shell using the runtime-resolved destination path.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 7.4. In `WorkflowRuntime.test.ts`, add coverage proving successful create-architecture initial shell build transitions to Step 2 and returns the Step 2 workflow form.
+[x] Subtask 7.4. In `WorkflowRuntime.test.ts`, add coverage proving successful create-architecture initial shell build transitions to Step 2 and returns the Step 2 workflow form.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 7.5. In `WorkflowRuntime.test.ts`, add coverage proving completing the Step 2 form persists `has_context_files`, `context_files`, `scope`, `has_architectural_goals`, `architectural_goals`, `has_core_architectural_rules`, and `core_architectural_rules` through workflow values and returns a `build_workflow_document` operation using the architecture submitted-values builder.
+[x] Subtask 7.5. In `WorkflowRuntime.test.ts`, add coverage proving completing the Step 2 form persists `has_context_files`, `context_files`, `scope`, `has_architectural_goals`, `architectural_goals`, `has_core_architectural_rules`, and `core_architectural_rules` through workflow values and returns a `build_workflow_document` operation using the architecture submitted-values builder.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 7.6. In `WorkflowRuntime.test.ts`, add coverage proving Step 2 form submissions with false boolean answers clear stale dependent text workflow values for `context_files`, `architectural_goals`, and `core_architectural_rules`.
+[x] Subtask 7.6. In `WorkflowRuntime.test.ts`, add coverage proving Step 2 form submissions with false boolean answers clear stale dependent text workflow values for `context_files`, `architectural_goals`, and `core_architectural_rules`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 7.7. In `WorkflowRuntime.test.ts`, add coverage proving successful Step 2 submitted-values document build transitions to Step 3 and returns `project_prompt`.
+[x] Subtask 7.7. In `WorkflowRuntime.test.ts`, add coverage proving successful Step 2 submitted-values document build transitions to Step 3 and returns `project_prompt`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 7.8. In `WorkflowRuntime.test.ts`, add coverage proving `workflow_progress_request` confirmation advances create-architecture from Step 3 through Step 8 one step at a time, and denial on any of those steps returns to `project_prompt` without changing the active step number.
+[x] Subtask 7.8. In `WorkflowRuntime.test.ts`, add coverage proving `workflow_progress_request` confirmation advances create-architecture from Step 3 through Step 8 one step at a time, and denial on any of those steps returns to `project_prompt` without changing the active step number.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 7.9. In `WorkflowRuntime.test.ts`, add coverage proving successful final `attempt_completion` while Step 9 is active clears active workflow state through the existing generic final-delivery teardown path.
+[x] Subtask 7.9. In `WorkflowRuntime.test.ts`, add coverage proving successful final `attempt_completion` while Step 9 is active clears active workflow state through the existing generic final-delivery teardown path.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Task 8. Add prompt-projection coverage for create-architecture.
+[x] Task 8. Add prompt-projection coverage for create-architecture.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/response_tools.test.ts`
 
-[ ] Subtask 8.1. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, add a create-architecture prompt-context helper mirroring the active brainstorming helper but using `createArchitectureWorkflowDefinition`, `activeWorkflowName: "create-architecture"`, project subfolder `planning`, and `output_file: "/test/project/planning/architecture.md"`.
+[x] Subtask 8.1. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, add a create-architecture prompt-context helper mirroring the active brainstorming helper but using `createArchitectureWorkflowDefinition`, `activeWorkflowName: "create-architecture"`, project subfolder `planning`, and `output_file: "/test/project/planning/architecture.md"`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 8.2. In `integration.test.ts`, add coverage proving active create-architecture Step 3 native GPT-5 projection returns exactly `read_file`, `apply_patch`, `send_user_message`, `ask_followup_question`, and `workflow_progress_request`, and omits `create_workflow_artifact`, `build_workflow_document`, `set_workflow_values`, and `execute_command`.
+[x] Subtask 8.2. In `integration.test.ts`, add coverage proving active create-architecture Step 3 native GPT-5 projection returns exactly `read_file`, `apply_patch`, `send_user_message`, `ask_followup_question`, and `workflow_progress_request`, and omits `create_workflow_artifact`, `build_workflow_document`, `set_workflow_values`, and `execute_command`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 8.3. In `integration.test.ts`, add coverage proving active create-architecture Step 4 native GPT-5 projection returns exactly `list_files`, `search_files`, `list_code_definition_names`, `read_file`, `read_file_range`, `apply_patch`, `send_user_message`, `ask_followup_question`, and `workflow_progress_request`, and omits `create_workflow_artifact`, `build_workflow_document`, `set_workflow_values`, and `execute_command`.
+[x] Subtask 8.3. In `integration.test.ts`, add coverage proving active create-architecture Step 4 native GPT-5 projection returns exactly `list_files`, `search_files`, `list_code_definition_names`, `read_file`, `read_file_range`, `apply_patch`, `send_user_message`, `ask_followup_question`, and `workflow_progress_request`, and omits `create_workflow_artifact`, `build_workflow_document`, `set_workflow_values`, and `execute_command`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 8.4. In `integration.test.ts`, add coverage proving active create-architecture Step 9 native GPT-5 projection returns exactly `read_file`, `apply_patch`, `send_user_message`, `ask_followup_question`, and `attempt_completion`, and omits `workflow_progress_request`, `create_workflow_artifact`, `build_workflow_document`, `set_workflow_values`, and `execute_command`.
+[x] Subtask 8.4. In `integration.test.ts`, add coverage proving active create-architecture Step 9 native GPT-5 projection returns exactly `read_file`, `apply_patch`, `send_user_message`, `ask_followup_question`, and `attempt_completion`, and omits `workflow_progress_request`, `create_workflow_artifact`, `build_workflow_document`, `set_workflow_values`, and `execute_command`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 8.5. In `integration.test.ts`, add coverage proving the full-turn input payload for create-architecture includes workflow display name, workflow description, structured persona, workflow step list, and current-step details, while system instructions do not contain create-architecture current-step details.
+[x] Subtask 8.5. In `integration.test.ts`, add coverage proving the full-turn input payload for create-architecture includes workflow display name, workflow description, structured persona, workflow step list, and current-step details, while system instructions do not contain create-architecture current-step details.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 8.6. In `src/core/prompts/system-prompt/__tests__/response_tools.test.ts`, add coverage proving response-tool guidance for create-architecture workflow overrides is derived from the active workflow schema for Step 3, Step 4, and Step 9 and does not list response tools absent from those schemas.
+[x] Subtask 8.6. In `src/core/prompts/system-prompt/__tests__/response_tools.test.ts`, add coverage proving response-tool guidance for create-architecture workflow overrides is derived from the active workflow schema for Step 3, Step 4, and Step 9 and does not list response tools absent from those schemas.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/response_tools.test.ts`

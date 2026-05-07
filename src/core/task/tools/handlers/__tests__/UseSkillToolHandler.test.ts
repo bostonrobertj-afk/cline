@@ -202,6 +202,31 @@ describe("UseSkillToolHandler", () => {
 		sinon.assert.calledOnceWithExactly(queueWorkflowNextAction, nextAction)
 	})
 
+	it("activates the shipped create-architecture workflow through its use_skill name", async () => {
+		const nextAction: WorkflowNextAction = {
+			kind: "project_prompt",
+			promptProjection: {
+				workflowInputPayloadBlock: undefined,
+				continuationWorkflowInputPayloadBlock: undefined,
+				workflowToolSchemaOverride: undefined,
+			},
+		}
+		const { config, activateWorkflow, queueWorkflowNextAction } = createMainAgentConfig(nextAction)
+		const resolvedWorkflow = WorkflowRegistry.resolveWorkflowByUseSkillName("create-architecture")
+		const handler = new UseSkillToolHandler()
+
+		const result = await handler.execute(config, createUseSkillBlock("create-architecture"))
+
+		assert.equal(resolvedWorkflow?.name, "create-architecture")
+		assert.match(String(result), /Workflow "create-architecture" is now active/)
+		assert.equal(config.taskState.activeWorkflowName, "create-architecture")
+		sinon.assert.calledOnceWithExactly(activateWorkflow, {
+			taskState: config.taskState,
+			workflowName: "create-architecture",
+		})
+		sinon.assert.calledOnceWithExactly(queueWorkflowNextAction, nextAction)
+	})
+
 	it("rolls back workflow activation without queueing when runtime returns no_op", async () => {
 		const workflow = createWorkflowDefinition()
 		const { config, queueWorkflowNextAction } = createMainAgentConfig({ kind: "no_op" })

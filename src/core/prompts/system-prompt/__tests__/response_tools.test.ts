@@ -1,5 +1,7 @@
 import { expect } from "chai"
 import { describe, it } from "mocha"
+import type { ActiveWorkflowSession, WorkflowPromptBuilderInput, WorkflowValue } from "@/core/task/workflow-runtime/types"
+import { createArchitectureWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/create-architecture"
 import { ModelFamily } from "@/shared/prompts"
 import { ClineDefaultTool } from "@/shared/tools"
 import { getCurrentModeResponseToolsLine, getResponseToolsSection } from "../components/response_tools"
@@ -30,6 +32,67 @@ const workflowProgressRequestToolSpec: ClineToolSpec = {
 	id: ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST,
 	name: "workflow_progress_request",
 	description: "Ask the user to confirm whether the current workflow step is ready to advance.",
+}
+
+type CreateArchitectureResponseToolStepId = "step-3" | "step-4" | "step-9"
+
+interface CreateArchitectureResponseToolCase {
+	stepId: CreateArchitectureResponseToolStepId
+	activeStepNumber: 3 | 4 | 9
+	expectedLine: string
+	expectedSectionNames: readonly string[]
+	absentSectionNames: readonly string[]
+}
+
+function renderWorkflowValue(value: WorkflowValue): string {
+	if (typeof value === "string") {
+		return value
+	}
+
+	if (typeof value === "number" || typeof value === "boolean") {
+		return String(value)
+	}
+
+	return JSON.stringify(value)
+}
+
+function createCreateArchitecturePromptBuilderInput(args: {
+	stepId: CreateArchitectureResponseToolStepId
+	activeStepNumber: 3 | 4 | 9
+}): WorkflowPromptBuilderInput {
+	const step = createArchitectureWorkflowDefinition.steps[args.stepId]
+	const session: ActiveWorkflowSession = {
+		activeStepNumber: args.activeStepNumber,
+		workflowValues: {
+			output_file: "/test/project/planning/architecture.md",
+		},
+		projectSelection: {
+			projectMode: "new",
+			projectTitle: "Create Architecture Session",
+			projectFolderName: "create-architecture-session",
+		},
+		ui: {
+			suppressedWorkflowFormIds: [],
+			suppressedWorkflowStepResolutionRoutes: [],
+		},
+		branchContext: {
+			activeBranchId: step.decisionTree.entryBranchId,
+		},
+	}
+
+	return {
+		session,
+		step,
+		renderWorkflowValue,
+	}
+}
+
+function buildCreateArchitectureWorkflowToolSchemaOverride(args: {
+	stepId: CreateArchitectureResponseToolStepId
+	activeStepNumber: 3 | 4 | 9
+}): readonly ClineToolSpec[] {
+	const step = createArchitectureWorkflowDefinition.steps[args.stepId]
+	return step.buildToolSchema(createCreateArchitecturePromptBuilderInput(args))
 }
 
 describe("response tools prompt helpers", () => {
@@ -190,5 +253,51 @@ describe("response tools prompt helpers", () => {
 		expect(responseToolsSection).to.not.contain("`send_user_message`")
 		expect(responseToolsSection).to.not.contain("`act_mode_respond`")
 		expect(responseToolsSection).to.not.contain("`generate_plan_output`")
+	})
+
+	it("derives create-architecture response guidance from active workflow schemas", () => {
+		const responseToolCases: readonly CreateArchitectureResponseToolCase[] = [
+			{
+				stepId: "step-3",
+				activeStepNumber: 3,
+				expectedLine:
+					"- Use `send_user_message`, `ask_followup_question` and `workflow_progress_request` when responding to the user.",
+				expectedSectionNames: ["`send_user_message`", "`ask_followup_question`", "`workflow_progress_request`"],
+				absentSectionNames: ["`attempt_completion`", "`act_mode_respond`", "`generate_plan_output`"],
+			},
+			{
+				stepId: "step-4",
+				activeStepNumber: 4,
+				expectedLine:
+					"- Use `send_user_message`, `ask_followup_question` and `workflow_progress_request` when responding to the user.",
+				expectedSectionNames: ["`send_user_message`", "`ask_followup_question`", "`workflow_progress_request`"],
+				absentSectionNames: ["`attempt_completion`", "`act_mode_respond`", "`generate_plan_output`"],
+			},
+			{
+				stepId: "step-9",
+				activeStepNumber: 9,
+				expectedLine:
+					"- Use `send_user_message`, `ask_followup_question` and `attempt_completion` when responding to the user.",
+				expectedSectionNames: ["`send_user_message`", "`ask_followup_question`", "`attempt_completion`"],
+				absentSectionNames: ["`workflow_progress_request`", "`act_mode_respond`", "`generate_plan_output`"],
+			},
+		]
+
+		for (const responseToolCase of responseToolCases) {
+			const context = makeContext({
+				enableNativeToolCalls: false,
+				workflowToolSchemaOverride: buildCreateArchitectureWorkflowToolSchemaOverride(responseToolCase),
+			})
+			const currentModeLine = getCurrentModeResponseToolsLine(context)
+			const responseToolsSection = getResponseToolsSection(context)
+
+			expect(currentModeLine).to.equal(responseToolCase.expectedLine)
+			for (const expectedSectionName of responseToolCase.expectedSectionNames) {
+				expect(responseToolsSection).to.contain(expectedSectionName)
+			}
+			for (const absentSectionName of responseToolCase.absentSectionNames) {
+				expect(responseToolsSection).to.not.contain(absentSectionName)
+			}
+		}
 	})
 })

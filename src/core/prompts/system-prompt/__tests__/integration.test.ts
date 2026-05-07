@@ -22,8 +22,14 @@ import * as fs from "node:fs/promises"
 import * as path from "node:path"
 import { expect } from "chai"
 import { TaskState } from "@/core/task/TaskState"
-import type { ActiveWorkflowSession, WorkflowValues, WorkflowWorkspacePathPolicy } from "@/core/task/workflow-runtime/types"
+import type {
+	ActiveWorkflowSession,
+	WorkflowPromptProjection,
+	WorkflowValues,
+	WorkflowWorkspacePathPolicy,
+} from "@/core/task/workflow-runtime/types"
 import { WorkflowRuntime } from "@/core/task/workflow-runtime/WorkflowRuntime"
+import { createArchitectureWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/create-architecture"
 import type { McpHub } from "@/services/mcp/McpHub"
 import type { McpServer } from "@/shared/mcp"
 import { ModelFamily } from "@/shared/prompts"
@@ -470,6 +476,64 @@ const buildBrainstormingPromptContext = async (input: {
 	const taskState = new TaskState()
 	taskState.activeWorkflowName = "brainstorming"
 	taskState.activeWorkflowSession = createBrainstormingWorkflowSession(input)
+	taskState.apiRequestCount = 1
+	const workflowProjection = await runtime.buildTurnProjection({ taskState })
+
+	return {
+		...baseContext,
+		mcpHub: makeMcpHub([]),
+		providerInfo: makeProviderInfo("gpt-5-codex", "openai"),
+		enableNativeToolCalls: true,
+		useMinimalGptPrompt: true,
+		...workflowProjection,
+	}
+}
+
+const CREATE_ARCHITECTURE_OUTPUT_FILE = "/test/project/planning/architecture.md"
+
+const getCreateArchitectureEntryBranchId = (activeStepNumber: 3 | 4 | 9): string => {
+	switch (activeStepNumber) {
+		case 3:
+			return createArchitectureWorkflowDefinition.steps["step-3"].decisionTree.entryBranchId
+		case 4:
+			return createArchitectureWorkflowDefinition.steps["step-4"].decisionTree.entryBranchId
+		case 9:
+			return createArchitectureWorkflowDefinition.steps["step-9"].decisionTree.entryBranchId
+	}
+
+	const unreachableActiveStepNumber: never = activeStepNumber
+	return unreachableActiveStepNumber
+}
+
+const createCreateArchitectureWorkflowSession = (activeStepNumber: 3 | 4 | 9): ActiveWorkflowSession => ({
+	activeStepNumber,
+	workflowValues: {
+		output_file: CREATE_ARCHITECTURE_OUTPUT_FILE,
+	},
+	projectSelection: {
+		projectMode: "new",
+		projectTitle: "Create Architecture Session",
+		projectFolderName: "create-architecture-session",
+	},
+	ui: {
+		suppressedWorkflowFormIds: [],
+		suppressedWorkflowStepResolutionRoutes: [],
+	},
+	branchContext: {
+		activeBranchId: getCreateArchitectureEntryBranchId(activeStepNumber),
+	},
+})
+
+const buildCreateArchitecturePromptContext = async (
+	activeStepNumber: 3 | 4 | 9,
+): Promise<SystemPromptContext & WorkflowPromptProjection> => {
+	const workspacePathPolicy: WorkflowWorkspacePathPolicy = {
+		validateAccess: () => true,
+	}
+	const runtime = new WorkflowRuntime({ cwd: "/test/project", workspacePathPolicy })
+	const taskState = new TaskState()
+	taskState.activeWorkflowName = "create-architecture"
+	taskState.activeWorkflowSession = createCreateArchitectureWorkflowSession(activeStepNumber)
 	taskState.apiRequestCount = 1
 	const workflowProjection = await runtime.buildTurnProjection({ taskState })
 
@@ -1026,6 +1090,111 @@ describe("Prompt System Integration Tests", () => {
 				expect(systemPrompt).to.not.include("Workflow: brainstorming")
 				expect(systemPrompt).to.not.include("Call `get_brainstorming_methods`")
 				expect(systemPrompt).to.not.include("call `append_brainstorming_selected_technique`")
+			})
+		})
+
+		it("projects active create-architecture Step 3 tools into native GPT-5 prompts", async function () {
+			const context = await buildCreateArchitecturePromptContext(3)
+
+			await runPromptTest(this, context, "gpt-5-codex", async ({ tools }) => {
+				const nativeToolNames = getNativeToolNames(tools)
+
+				expect(nativeToolNames).to.deep.equal([
+					"read_file",
+					"apply_patch",
+					"send_user_message",
+					"ask_followup_question",
+					"workflow_progress_request",
+				])
+				expect(nativeToolNames).to.not.include("create_workflow_artifact")
+				expect(nativeToolNames).to.not.include("build_workflow_document")
+				expect(nativeToolNames).to.not.include("set_workflow_values")
+				expect(nativeToolNames).to.not.include("execute_command")
+			})
+		})
+
+		it("projects active create-architecture Step 4 tools into native GPT-5 prompts", async function () {
+			const context = await buildCreateArchitecturePromptContext(4)
+
+			await runPromptTest(this, context, "gpt-5-codex", async ({ tools }) => {
+				const nativeToolNames = getNativeToolNames(tools)
+
+				expect(nativeToolNames).to.deep.equal([
+					"list_files",
+					"search_files",
+					"list_code_definition_names",
+					"read_file",
+					"read_file_range",
+					"apply_patch",
+					"send_user_message",
+					"ask_followup_question",
+					"workflow_progress_request",
+				])
+				expect(nativeToolNames).to.not.include("create_workflow_artifact")
+				expect(nativeToolNames).to.not.include("build_workflow_document")
+				expect(nativeToolNames).to.not.include("set_workflow_values")
+				expect(nativeToolNames).to.not.include("execute_command")
+			})
+		})
+
+		it("projects active create-architecture Step 9 tools into native GPT-5 prompts", async function () {
+			const context = await buildCreateArchitecturePromptContext(9)
+
+			await runPromptTest(this, context, "gpt-5-codex", async ({ tools }) => {
+				const nativeToolNames = getNativeToolNames(tools)
+
+				expect(nativeToolNames).to.deep.equal([
+					"read_file",
+					"apply_patch",
+					"send_user_message",
+					"ask_followup_question",
+					"attempt_completion",
+				])
+				expect(nativeToolNames).to.not.include("workflow_progress_request")
+				expect(nativeToolNames).to.not.include("create_workflow_artifact")
+				expect(nativeToolNames).to.not.include("build_workflow_document")
+				expect(nativeToolNames).to.not.include("set_workflow_values")
+				expect(nativeToolNames).to.not.include("execute_command")
+			})
+		})
+
+		it("projects create-architecture workflow context into the full-turn input payload only", async function () {
+			const context = await buildCreateArchitecturePromptContext(3)
+			const workflowInputPayloadBlock = context.workflowInputPayloadBlock
+			expect(workflowInputPayloadBlock).to.not.equal(undefined)
+			if (workflowInputPayloadBlock === undefined) {
+				throw new Error("Expected create-architecture workflow input payload.")
+			}
+
+			expect(workflowInputPayloadBlock).to.include("Workflow:\nCreate Architecture")
+			expect(workflowInputPayloadBlock).to.include(
+				"Description: Create a complete architecture document through collaborative discovery, explicit design decisions, and a final readiness review.",
+			)
+			expect(workflowInputPayloadBlock).to.include(
+				"Persona:\nYou are to adopt this persona throughout your interactions with the user.",
+			)
+			expect(workflowInputPayloadBlock).to.include("Name: Winston")
+			expect(workflowInputPayloadBlock).to.include("Role: Architect")
+			expect(workflowInputPayloadBlock).to.include(
+				"Identity: Designs scalable systems and chooses practical technology with care.",
+			)
+			expect(workflowInputPayloadBlock).to.include("Capabilities: distributed systems, cloud, API design, scalability")
+			expect(workflowInputPayloadBlock).to.include("Communication Style: Calm, pragmatic, and tradeoff-aware.")
+			expect(workflowInputPayloadBlock).to.include("Prefer simple, boring solutions that scale when needed.")
+			expect(workflowInputPayloadBlock).to.include("1. Generate Output Document - Complete")
+			expect(workflowInputPayloadBlock).to.include("2. Gather User Inputs - Complete")
+			expect(workflowInputPayloadBlock).to.include("3. Establish Architecture Foundational Elements - Active")
+			expect(workflowInputPayloadBlock).to.include("9. Finalize Architecture Document - Not Started")
+			expect(workflowInputPayloadBlock).to.include("CURRENT STEP DETAILED INSTRUCTIONS")
+			expect(workflowInputPayloadBlock).to.include("Step 3: Establish Architecture Foundational Elements")
+			expect(workflowInputPayloadBlock).to.include(`Read \`${CREATE_ARCHITECTURE_OUTPUT_FILE}\`.`)
+			expect(workflowInputPayloadBlock).to.include("Draft and propose content for Project Context Analysis")
+
+			await runPromptTest(this, context, "gpt-5-codex", async ({ systemPrompt }) => {
+				expect(systemPrompt).to.not.include("CURRENT STEP DETAILED INSTRUCTIONS")
+				expect(systemPrompt).to.not.include("Step 3: Establish Architecture Foundational Elements")
+				expect(systemPrompt).to.not.include(`Read \`${CREATE_ARCHITECTURE_OUTPUT_FILE}\`.`)
+				expect(systemPrompt).to.not.include("Draft and propose content for Project Context Analysis")
 			})
 		})
 

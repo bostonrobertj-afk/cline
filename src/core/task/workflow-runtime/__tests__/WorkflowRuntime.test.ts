@@ -38,6 +38,11 @@ import type {
 import * as WorkflowRegistry from "../WorkflowRegistry"
 import { WorkflowRuntime } from "../WorkflowRuntime"
 import { brainstormingWorkflowDefinition } from "../workflow-modules/brainstorming"
+import { createArchitectureWorkflowDefinition } from "../workflow-modules/create-architecture"
+import {
+	buildCreateArchitectureDocumentFromSession,
+	buildInitialCreateArchitectureDocument,
+} from "../workflow-modules/create-architecture/createArchitectureDocument"
 
 type ObservedDecisionPredicateInput = {
 	activeBranchId: string
@@ -54,6 +59,13 @@ type ObservedDecisionPredicateInput = {
 }
 
 type WorkflowRenderFormDecisionAction = Extract<WorkflowDecisionAction, { kind: "render_workflow_form" }>
+type WorkflowExecuteToolBackedOperationNextAction = Extract<WorkflowNextAction, { kind: "execute_tool_backed_operation" }>
+type WorkflowRenderWorkflowFormNextAction = Extract<WorkflowNextAction, { kind: "render_workflow_form" }>
+
+interface CreateArchitectureInitialDocumentBuildResult {
+	artifactAbsolutePath: string
+	documentBuildAction: WorkflowExecuteToolBackedOperationNextAction
+}
 
 describe("WorkflowRuntime", () => {
 	const LEGACY_WORKFLOW_MIRROR_KEYS = [
@@ -994,6 +1006,134 @@ describe("WorkflowRuntime", () => {
 		})
 	}
 
+	async function startCreateArchitectureInitialDocumentBuild(
+		state: TaskState,
+		projectTitle: string,
+	): Promise<CreateArchitectureInitialDocumentBuildResult> {
+		registerResolvedWorkflow(createArchitectureWorkflowDefinition)
+		await runtime.activateWorkflow({
+			taskState: state,
+			workflowName: createArchitectureWorkflowDefinition.name,
+		})
+		const allocationAction = await submitNewProjectSelection(state, projectTitle)
+		expect(allocationAction.kind).to.equal("execute_tool_backed_operation")
+		if (allocationAction.kind !== "execute_tool_backed_operation") {
+			throw new Error(`Expected execute_tool_backed_operation, received ${allocationAction.kind}.`)
+		}
+
+		const artifactResult = await runtime.createWorkflowArtifact({
+			taskState: state,
+			artifactId: "architecture_document",
+			expectedArtifactAbsolutePath: undefined,
+		})
+		const documentBuildAction = await runtime.handleToolBackedOperationToolResult({
+			taskState: state,
+			toolResultText: JSON.stringify({ ok: true }),
+			runtimeOwnedSourceRoute: allocationAction.runtimeOwnedSourceRoute,
+		})
+		expect(documentBuildAction.kind).to.equal("execute_tool_backed_operation")
+		if (documentBuildAction.kind !== "execute_tool_backed_operation") {
+			throw new Error(`Expected execute_tool_backed_operation, received ${documentBuildAction.kind}.`)
+		}
+
+		return {
+			artifactAbsolutePath: artifactResult.artifactAbsolutePath,
+			documentBuildAction,
+		}
+	}
+
+	async function advanceCreateArchitectureToStep2Form(
+		state: TaskState,
+		projectTitle: string,
+	): Promise<WorkflowRenderWorkflowFormNextAction> {
+		const { documentBuildAction } = await startCreateArchitectureInitialDocumentBuild(state, projectTitle)
+		const stepTwoFormAction = await runtime.handleToolBackedOperationToolResult({
+			taskState: state,
+			toolResultText: JSON.stringify({ ok: true }),
+			runtimeOwnedSourceRoute: documentBuildAction.runtimeOwnedSourceRoute,
+		})
+
+		expect(stepTwoFormAction.kind).to.equal("render_workflow_form")
+		if (stepTwoFormAction.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${stepTwoFormAction.kind}.`)
+		}
+
+		return stepTwoFormAction
+	}
+
+	async function submitActiveWorkflowFormPanelFields(
+		state: TaskState,
+		fields: WorkflowFormSubmissionRequest["fields"],
+	): Promise<WorkflowNextAction> {
+		const activeFormSession = getActiveFormSession(state)
+
+		return runtime.submitWorkflowForm({
+			taskState: state,
+			request: createFormSubmitRequest({
+				sessionId: activeFormSession.sessionId,
+				panelId: activeFormSession.currentPanelId,
+				fields,
+			}),
+		})
+	}
+
+	async function submitCreateArchitectureStep2InputFormWithAllValues(
+		state: TaskState,
+	): Promise<WorkflowExecuteToolBackedOperationNextAction> {
+		const contextCheckAction = await submitActiveWorkflowFormPanelFields(state, [
+			{ key: "has_context_files", value: { booleanValue: true } },
+		])
+		expect(contextCheckAction.kind).to.equal("render_workflow_form")
+
+		const contextDetailsAction = await submitActiveWorkflowFormPanelFields(state, [
+			{ key: "context_files", value: { stringValue: "docs/workflows/runtime.md" } },
+		])
+		expect(contextDetailsAction.kind).to.equal("render_workflow_form")
+
+		const scopeAction = await submitActiveWorkflowFormPanelFields(state, [
+			{ key: "scope", value: { stringValue: "Define runtime workflow orchestration." } },
+		])
+		expect(scopeAction.kind).to.equal("render_workflow_form")
+
+		const goalsCheckAction = await submitActiveWorkflowFormPanelFields(state, [
+			{ key: "has_architectural_goals", value: { booleanValue: true } },
+		])
+		expect(goalsCheckAction.kind).to.equal("render_workflow_form")
+
+		const goalsDetailsAction = await submitActiveWorkflowFormPanelFields(state, [
+			{ key: "architectural_goals", value: { stringValue: "Keep workflow state explicit and recoverable." } },
+		])
+		expect(goalsDetailsAction.kind).to.equal("render_workflow_form")
+
+		const rulesCheckAction = await submitActiveWorkflowFormPanelFields(state, [
+			{ key: "has_core_architectural_rules", value: { booleanValue: true } },
+		])
+		expect(rulesCheckAction.kind).to.equal("render_workflow_form")
+
+		const completedAction = await submitActiveWorkflowFormPanelFields(state, [
+			{ key: "core_architectural_rules", value: { stringValue: "Runtime-owned tools stay hidden from model steps." } },
+		])
+		expect(completedAction.kind).to.equal("execute_tool_backed_operation")
+		if (completedAction.kind !== "execute_tool_backed_operation") {
+			throw new Error(`Expected execute_tool_backed_operation, received ${completedAction.kind}.`)
+		}
+
+		return completedAction
+	}
+
+	async function advanceCreateArchitectureToStep3ProjectPrompt(state: TaskState, projectTitle: string): Promise<void> {
+		await advanceCreateArchitectureToStep2Form(state, projectTitle)
+		const documentBuildAction = await submitCreateArchitectureStep2InputFormWithAllValues(state)
+		const stepThreeAction = await runtime.handleToolBackedOperationToolResult({
+			taskState: state,
+			toolResultText: JSON.stringify({ ok: true }),
+			runtimeOwnedSourceRoute: documentBuildAction.runtimeOwnedSourceRoute,
+		})
+
+		expect(stepThreeAction.kind).to.equal("project_prompt")
+		expect(getActiveWorkflowSession(state).activeStepNumber).to.equal(3)
+	}
+
 	it("activates a valid workflow and initializes runtime-owned state", async () => {
 		const workflow = createWorkflowDefinition()
 
@@ -1148,6 +1288,259 @@ describe("WorkflowRuntime", () => {
 		expect(resolvedWorkflow).to.equal(brainstormingWorkflowDefinition)
 		expect(resolvedWorkflow?.name).to.equal("brainstorming")
 		expect(WorkflowRegistry.resolveWorkflowDefinition("brainstorming.md")).to.equal(undefined)
+	})
+
+	it("resolves only the unsuffixed shipped create-architecture workflow identity", () => {
+		resolveWorkflowDefinitionStub.restore()
+
+		const resolvedWorkflow = WorkflowRegistry.resolveWorkflowDefinition("create-architecture")
+
+		expect(resolvedWorkflow).to.equal(createArchitectureWorkflowDefinition)
+		expect(resolvedWorkflow?.name).to.equal("create-architecture")
+		expect(WorkflowRegistry.resolveWorkflowDefinition("create-architecture.md")).to.equal(undefined)
+	})
+
+	it("activates create-architecture through the shared entry form and projects its nine-step checklist", async () => {
+		registerResolvedWorkflow(createArchitectureWorkflowDefinition)
+
+		const result = await runtime.activateWorkflow({
+			taskState,
+			workflowName: createArchitectureWorkflowDefinition.name,
+		})
+
+		expect(result.kind).to.equal("render_workflow_form")
+		if (result.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${result.kind}.`)
+		}
+		expect(result.formSession.workflowFormId).to.equal(ENTRY_FORM_ID)
+		expect(result.payload.panel?.panelId).to.equal(ENTRY_INFO_PANEL_ID)
+		expect(result.payload.panel?.promptMarkdown).to.equal(createArchitectureWorkflowDefinition.description)
+		expect(taskState.currentFocusChainChecklist).to.equal(
+			"1. Generate Output Document - Active\n" +
+				"2. Gather User Inputs - Not Started\n" +
+				"3. Establish Architecture Foundational Elements - Not Started\n" +
+				"4. Revolve Responsibility & Ownership - Not Started\n" +
+				"5. Code Alignment Assessment - Not Started\n" +
+				"6. Identify Key Tradeoffs & Risks - Not Started\n" +
+				"7. Map out Blast Radius - Not Started\n" +
+				"8. Build Project Roadmap - Not Started\n" +
+				"9. Finalize Architecture Document - Not Started",
+		)
+	})
+
+	it("starts create-architecture Step 1 artifact allocation after new project selection", async () => {
+		registerResolvedWorkflow(createArchitectureWorkflowDefinition)
+		await runtime.activateWorkflow({
+			taskState,
+			workflowName: createArchitectureWorkflowDefinition.name,
+		})
+
+		const stepOneAction = await submitNewProjectSelection(taskState, "Create Architecture Runtime Project")
+
+		expect(stepOneAction.kind).to.equal("execute_tool_backed_operation")
+		if (stepOneAction.kind !== "execute_tool_backed_operation") {
+			throw new Error(`Expected execute_tool_backed_operation, received ${stepOneAction.kind}.`)
+		}
+		expect(stepOneAction.toolRequest.toolName).to.equal(ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT)
+		expect(stepOneAction.toolRequest.toolParams).to.deep.equal({
+			artifact_id: "architecture_document",
+		})
+		expect(getActiveWorkflowSession(taskState).activeStepNumber).to.equal(1)
+	})
+
+	it("routes create-architecture Step 1 allocation success to the initial shell document build", async () => {
+		registerResolvedWorkflow(createArchitectureWorkflowDefinition)
+		await runtime.activateWorkflow({
+			taskState,
+			workflowName: createArchitectureWorkflowDefinition.name,
+		})
+		const allocationAction = await submitNewProjectSelection(taskState, "Create Architecture Runtime Project")
+		expect(allocationAction.kind).to.equal("execute_tool_backed_operation")
+		if (allocationAction.kind !== "execute_tool_backed_operation") {
+			throw new Error(`Expected execute_tool_backed_operation, received ${allocationAction.kind}.`)
+		}
+
+		const artifactResult = await runtime.createWorkflowArtifact({
+			taskState,
+			artifactId: "architecture_document",
+			expectedArtifactAbsolutePath: undefined,
+		})
+		expect(getActiveWorkflowSession(taskState).workflowValues.output_file).to.equal(artifactResult.artifactAbsolutePath)
+
+		const documentBuildAction = await runtime.handleToolBackedOperationToolResult({
+			taskState,
+			toolResultText: JSON.stringify({ ok: true }),
+			runtimeOwnedSourceRoute: allocationAction.runtimeOwnedSourceRoute,
+		})
+
+		expect(documentBuildAction.kind).to.equal("execute_tool_backed_operation")
+		if (documentBuildAction.kind !== "execute_tool_backed_operation") {
+			throw new Error(`Expected execute_tool_backed_operation, received ${documentBuildAction.kind}.`)
+		}
+		expect(documentBuildAction.toolRequest.toolName).to.equal(ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT)
+		expect(documentBuildAction.toolRequest.toolParams).to.deep.equal({
+			artifact_id: "architecture_document",
+			destination_path: artifactResult.artifactAbsolutePath,
+			content: buildInitialCreateArchitectureDocument(),
+		})
+	})
+
+	it("transitions create-architecture to Step 2 after the initial shell build succeeds", async () => {
+		registerResolvedWorkflow(createArchitectureWorkflowDefinition)
+		await runtime.activateWorkflow({
+			taskState,
+			workflowName: createArchitectureWorkflowDefinition.name,
+		})
+		const allocationAction = await submitNewProjectSelection(taskState, "Create Architecture Runtime Project")
+		expect(allocationAction.kind).to.equal("execute_tool_backed_operation")
+		if (allocationAction.kind !== "execute_tool_backed_operation") {
+			throw new Error(`Expected execute_tool_backed_operation, received ${allocationAction.kind}.`)
+		}
+		await runtime.createWorkflowArtifact({
+			taskState,
+			artifactId: "architecture_document",
+			expectedArtifactAbsolutePath: undefined,
+		})
+		const documentBuildAction = await runtime.handleToolBackedOperationToolResult({
+			taskState,
+			toolResultText: JSON.stringify({ ok: true }),
+			runtimeOwnedSourceRoute: allocationAction.runtimeOwnedSourceRoute,
+		})
+		expect(documentBuildAction.kind).to.equal("execute_tool_backed_operation")
+		if (documentBuildAction.kind !== "execute_tool_backed_operation") {
+			throw new Error(`Expected execute_tool_backed_operation, received ${documentBuildAction.kind}.`)
+		}
+
+		const stepTwoFormAction = await runtime.handleToolBackedOperationToolResult({
+			taskState,
+			toolResultText: JSON.stringify({ ok: true }),
+			runtimeOwnedSourceRoute: documentBuildAction.runtimeOwnedSourceRoute,
+		})
+
+		expect(stepTwoFormAction.kind).to.equal("render_workflow_form")
+		if (stepTwoFormAction.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${stepTwoFormAction.kind}.`)
+		}
+		expect(getActiveWorkflowSession(taskState).activeStepNumber).to.equal(2)
+		expect(stepTwoFormAction.formSession.workflowFormId).to.equal("step-2-user-input-form")
+		expect(stepTwoFormAction.payload.panel?.panelId).to.equal("step-2-context-files-check-panel")
+	})
+
+	it("persists create-architecture Step 2 form values and builds the submitted-values document", async () => {
+		await advanceCreateArchitectureToStep2Form(taskState, "Create Architecture Runtime Project")
+
+		const documentBuildAction = await submitCreateArchitectureStep2InputFormWithAllValues(taskState)
+		const activeSession = getActiveWorkflowSession(taskState)
+
+		expect(activeSession.workflowValues).to.deep.include({
+			has_context_files: true,
+			context_files: "docs/workflows/runtime.md",
+			scope: "Define runtime workflow orchestration.",
+			has_architectural_goals: true,
+			architectural_goals: "Keep workflow state explicit and recoverable.",
+			has_core_architectural_rules: true,
+			core_architectural_rules: "Runtime-owned tools stay hidden from model steps.",
+		})
+		expect(documentBuildAction.toolRequest.toolName).to.equal(ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT)
+		expect(documentBuildAction.toolRequest.toolParams).to.deep.equal({
+			artifact_id: "architecture_document",
+			destination_path: activeSession.workflowValues.output_file,
+			content: buildCreateArchitectureDocumentFromSession(activeSession),
+		})
+	})
+
+	it("clears stale create-architecture Step 2 dependent text values when boolean controls are false", async () => {
+		await advanceCreateArchitectureToStep2Form(taskState, "Create Architecture Runtime Project")
+		const activeSession = getActiveWorkflowSession(taskState)
+		activeSession.workflowValues.context_files = "stale-context.md"
+		activeSession.workflowValues.architectural_goals = "Stale goals"
+		activeSession.workflowValues.core_architectural_rules = "Stale rules"
+
+		const contextCheckAction = await submitActiveWorkflowFormPanelFields(taskState, [
+			{ key: "has_context_files", value: { booleanValue: false } },
+		])
+		expect(contextCheckAction.kind).to.equal("render_workflow_form")
+		expect(activeSession.workflowValues).to.not.have.property("context_files")
+
+		const scopeAction = await submitActiveWorkflowFormPanelFields(taskState, [
+			{ key: "scope", value: { stringValue: "Define runtime workflow orchestration." } },
+		])
+		expect(scopeAction.kind).to.equal("render_workflow_form")
+
+		const goalsCheckAction = await submitActiveWorkflowFormPanelFields(taskState, [
+			{ key: "has_architectural_goals", value: { booleanValue: false } },
+		])
+		expect(goalsCheckAction.kind).to.equal("render_workflow_form")
+		expect(activeSession.workflowValues).to.not.have.property("architectural_goals")
+
+		const rulesCheckAction = await submitActiveWorkflowFormPanelFields(taskState, [
+			{ key: "has_core_architectural_rules", value: { booleanValue: false } },
+		])
+
+		expect(rulesCheckAction.kind).to.equal("execute_tool_backed_operation")
+		if (rulesCheckAction.kind !== "execute_tool_backed_operation") {
+			throw new Error(`Expected execute_tool_backed_operation, received ${rulesCheckAction.kind}.`)
+		}
+		expect(activeSession.workflowValues).to.deep.include({
+			has_context_files: false,
+			scope: "Define runtime workflow orchestration.",
+			has_architectural_goals: false,
+			has_core_architectural_rules: false,
+		})
+		expect(activeSession.workflowValues).to.not.have.property("core_architectural_rules")
+		expect(rulesCheckAction.toolRequest.toolName).to.equal(ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT)
+	})
+
+	it("transitions create-architecture to Step 3 after the submitted-values document build succeeds", async () => {
+		await advanceCreateArchitectureToStep2Form(taskState, "Create Architecture Runtime Project")
+		const documentBuildAction = await submitCreateArchitectureStep2InputFormWithAllValues(taskState)
+
+		const stepThreeAction = await runtime.handleToolBackedOperationToolResult({
+			taskState,
+			toolResultText: JSON.stringify({ ok: true }),
+			runtimeOwnedSourceRoute: documentBuildAction.runtimeOwnedSourceRoute,
+		})
+
+		expect(stepThreeAction.kind).to.equal("project_prompt")
+		expect(getActiveWorkflowSession(taskState).activeStepNumber).to.equal(3)
+	})
+
+	it("advances create-architecture from Step 3 through Step 8 only after progress confirmation", async () => {
+		await advanceCreateArchitectureToStep3ProjectPrompt(taskState, "Create Architecture Runtime Project")
+
+		for (let stepNumber = 3; stepNumber <= 8; stepNumber += 1) {
+			const deniedAction = await runtime.submitWorkflowProgressRequest({
+				taskState,
+				approved: false,
+			})
+			expect(deniedAction.kind).to.equal("project_prompt")
+			expect(getActiveWorkflowSession(taskState).activeStepNumber).to.equal(stepNumber)
+
+			const confirmedAction = await runtime.submitWorkflowProgressRequest({
+				taskState,
+				approved: true,
+			})
+			expect(confirmedAction.kind).to.equal("project_prompt")
+			expect(getActiveWorkflowSession(taskState).activeStepNumber).to.equal(stepNumber + 1)
+		}
+	})
+
+	it("tears down create-architecture through final delivery after Step 9 attempt_completion", async () => {
+		await advanceCreateArchitectureToStep3ProjectPrompt(taskState, "Create Architecture Runtime Project")
+		for (let stepNumber = 3; stepNumber <= 8; stepNumber += 1) {
+			const confirmedAction = await runtime.submitWorkflowProgressRequest({
+				taskState,
+				approved: true,
+			})
+			expect(confirmedAction.kind).to.equal("project_prompt")
+		}
+		const activeSession = getActiveWorkflowSession(taskState)
+		expect(activeSession.activeStepNumber).to.equal(9)
+
+		const finalDeliveryResult = await runtime.completeActiveWorkflowAfterFinalDelivery({ taskState })
+
+		expect(finalDeliveryResult).to.deep.equal({ kind: "persist_workflow_teardown" })
+		expectWorkflowStateCleared(taskState)
 	})
 
 	it("copies complete parent project selection into child workflow activation without rendering entry form", async () => {
