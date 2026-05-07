@@ -32,6 +32,9 @@ function createSession(workflowValues: WorkflowValues): ActiveWorkflowSession {
 			projectTitle: "Brainstorming Project",
 			projectFolderName: "brainstorming-project",
 		},
+		lifecycle: {
+			projectSelectionCompleted: true,
+		},
 		entryArtifactResolution: undefined,
 		ui: {
 			formSession: undefined,

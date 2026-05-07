@@ -66,6 +66,7 @@ import type {
 	WorkflowProjectSubfolder,
 	WorkflowPromptBuilderInput,
 	WorkflowPromptProjection,
+	WorkflowRuntimeLifecycleState,
 	WorkflowStepDefinition,
 	WorkflowStepTransitionTarget,
 	WorkflowValidationResult,
@@ -245,6 +246,9 @@ export class WorkflowRuntime {
 			activeStepNumber: firstStepNumber,
 			workflowValues,
 			projectSelection,
+			lifecycle: {
+				projectSelectionCompleted: parentSession !== undefined,
+			},
 			entryArtifactResolution: undefined,
 			ui: {
 				formSession: undefined,
@@ -707,6 +711,10 @@ export class WorkflowRuntime {
 		}
 
 		return dedupedKeys
+	}
+
+	private recordWorkflowProjectSelectionCompleted(session: ActiveWorkflowSession): void {
+		session.lifecycle.projectSelectionCompleted = true
 	}
 
 	private recordWorkflowValuesPersistedTriggerIfRouted(args: { taskState: TaskState; changedKeys: readonly string[] }): void {
@@ -1287,6 +1295,19 @@ export class WorkflowRuntime {
 		})
 	}
 
+	private async resolveNewProjectWorkflowEntryArtifactResolutions(args: {
+		taskState: TaskState
+	}): Promise<readonly WorkflowEntryArtifactResolution[]> {
+		const artifactOutputs = await this.resolveActiveWorkflowNewSingletonArtifactOutputs({ taskState: args.taskState })
+		return artifactOutputs.map((artifactOutput) =>
+			this.buildWorkflowEntryArtifactResolution({
+				artifactOutput,
+				creationRequired: true,
+				existingArtifactAction: "none",
+			}),
+		)
+	}
+
 	async createWorkflowArtifact(args: {
 		taskState: TaskState
 		artifactId: string
@@ -1435,6 +1456,7 @@ export class WorkflowRuntime {
 			activeStepNumber: session.activeStepNumber,
 			workflowValues: structuredClone(session.workflowValues),
 			projectSelection: structuredClone(session.projectSelection),
+			lifecycle: structuredClone(session.lifecycle),
 			entryArtifactResolution: structuredClone(session.entryArtifactResolution),
 			ui: structuredClone(session.ui),
 			branchContext: structuredClone(session.branchContext),
@@ -1497,6 +1519,14 @@ export class WorkflowRuntime {
 			typeof value.projectTitle === "string" &&
 			typeof value.projectFolderName === "string"
 		)
+	}
+
+	private isWorkflowRuntimeLifecycleState(value: unknown): value is WorkflowRuntimeLifecycleState {
+		if (this.isPlainRecord(value) === false) {
+			return false
+		}
+
+		return typeof value.projectSelectionCompleted === "boolean"
 	}
 
 	private isWorkflowArtifactFamily(value: unknown): value is WorkflowArtifactFamily {
@@ -1586,7 +1616,6 @@ export class WorkflowRuntime {
 		}
 
 		switch (value.kind) {
-			case "project_selection_completed":
 			case "workflow_progress_request_confirmed":
 			case "workflow_progress_request_denied":
 				return true
@@ -2007,6 +2036,10 @@ export class WorkflowRuntime {
 			return undefined
 		}
 
+		if (this.isWorkflowRuntimeLifecycleState(persistedSession.lifecycle) === false) {
+			return undefined
+		}
+
 		let entryArtifactResolution: WorkflowEntryArtifactResolutionState | undefined
 		if (persistedSession.entryArtifactResolution !== undefined) {
 			if (this.isWorkflowEntryArtifactResolutionState(persistedSession.entryArtifactResolution) === false) {
@@ -2123,6 +2156,9 @@ export class WorkflowRuntime {
 				projectMode: persistedSession.projectSelection.projectMode,
 				projectTitle: persistedSession.projectSelection.projectTitle,
 				projectFolderName: persistedSession.projectSelection.projectFolderName,
+			},
+			lifecycle: {
+				projectSelectionCompleted: persistedSession.lifecycle.projectSelectionCompleted,
 			},
 			entryArtifactResolution,
 			ui: {
@@ -2702,6 +2738,7 @@ export class WorkflowRuntime {
 			projectTitle: "",
 			projectFolderName: "",
 		}
+		session.lifecycle.projectSelectionCompleted = false
 		return this.buildWorkflowEntryProjectSelectionFormNextAction({
 			taskState: args.taskState,
 			workflow: args.workflow,
@@ -2901,6 +2938,7 @@ export class WorkflowRuntime {
 						},
 					})
 					await this.ensureProjectFoldersExist(session)
+					this.recordWorkflowProjectSelectionCompleted(session)
 					if (selectionResult.projectSelection.projectMode === "existing") {
 						return this.continueWorkflowEntryArtifactResolution({
 							taskState: args.taskState,
@@ -2908,11 +2946,12 @@ export class WorkflowRuntime {
 							artifactResolutions: [],
 						})
 					}
-					session.branchContext.lastTriggerEvent = {
-						kind: "project_selection_completed",
-					}
-					this.refreshCurrentFocusChainChecklist(args.taskState)
-					return this.resolveNextAction({ taskState: args.taskState })
+					return this.completeWorkflowEntryArtifactResolution({
+						taskState: args.taskState,
+						artifactResolutions: await this.resolveNewProjectWorkflowEntryArtifactResolutions({
+							taskState: args.taskState,
+						}),
+					})
 				}
 
 				if (

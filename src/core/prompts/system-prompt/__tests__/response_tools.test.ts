@@ -85,6 +85,9 @@ function createCreateArchitecturePromptBuilderInput(args: {
 			projectTitle: "Create Architecture Session",
 			projectFolderName: "create-architecture-session",
 		},
+		lifecycle: {
+			projectSelectionCompleted: true,
+		},
 		entryArtifactResolution: undefined,
 		ui: {
 			suppressedWorkflowFormIds: [],

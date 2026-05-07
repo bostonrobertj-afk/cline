@@ -59,6 +59,9 @@ function createPersistedSession(): PersistedWorkflowSession {
 			projectTitle: "Persisted Project",
 			projectFolderName: "persisted-project",
 		},
+		lifecycle: {
+			projectSelectionCompleted: true,
+		},
 		entryArtifactResolution: undefined,
 		ui: {
 			formSession: undefined,
@@ -568,6 +571,59 @@ describe("workflow runtime metadata persistence", () => {
 		expect(saveMetadata.firstCall.args[0]).to.equal("task-1")
 		expect(saveMetadata.firstCall.args[1].activeWorkflowName).to.equal(undefined)
 		expect(saveMetadata.firstCall.args[1].activeWorkflowSession).to.equal(undefined)
+	})
+
+	it("persists teardown when persisted lifecycle state is missing or malformed", async () => {
+		const workflow = createMetadataRestoreWorkflow()
+		const invalidLifecycleCases: Array<{
+			name: string
+			createSession(): PersistedWorkflowSession
+		}> = [
+			{
+				name: "missing lifecycle",
+				createSession: () => {
+					const session = createPersistedSession()
+					Reflect.deleteProperty(session, "lifecycle")
+					return session
+				},
+			},
+			{
+				name: "malformed lifecycle completion flag",
+				createSession: () => {
+					const session = createPersistedSession()
+					Reflect.set(session, "lifecycle", { projectSelectionCompleted: "yes" })
+					return session
+				},
+			},
+		]
+		sandbox.stub(WorkflowRegistry, "resolveWorkflowDefinition").returns(workflow)
+		const saveMetadata = sandbox.stub(disk, "saveTaskMetadata").resolves()
+
+		for (const invalidLifecycleCase of invalidLifecycleCases) {
+			const metadata = createMetadata()
+			metadata.activeWorkflowName = workflow.name
+			metadata.activeWorkflowSession = invalidLifecycleCase.createSession()
+			const workflowRuntime = new WorkflowRuntime({
+				cwd: "/tmp",
+				workspacePathPolicy: createAllowAllWorkspacePathPolicy(),
+			})
+			const resolveNextAction = sandbox.stub(workflowRuntime, "resolveNextAction").resolves({ kind: "no_op" })
+			const taskState = new TaskState()
+			const task = createTaskHarness(taskState, workflowRuntime)
+
+			await callTaskMethod(task, "restoreWorkflowRuntimeStateFromMetadata", metadata)
+
+			sinon.assert.notCalled(resolveNextAction)
+			sinon.assert.calledOnce(saveMetadata)
+			expect(taskState.activeWorkflowName, invalidLifecycleCase.name).to.equal(undefined)
+			expect(taskState.activeWorkflowSession, invalidLifecycleCase.name).to.equal(undefined)
+			expect(metadata.activeWorkflowName, invalidLifecycleCase.name).to.equal(undefined)
+			expect(metadata.activeWorkflowSession, invalidLifecycleCase.name).to.equal(undefined)
+			expect(saveMetadata.firstCall.args[0], invalidLifecycleCase.name).to.equal("task-1")
+			expect(saveMetadata.firstCall.args[1].activeWorkflowName, invalidLifecycleCase.name).to.equal(undefined)
+			expect(saveMetadata.firstCall.args[1].activeWorkflowSession, invalidLifecycleCase.name).to.equal(undefined)
+			saveMetadata.resetHistory()
+		}
 	})
 
 	it("persists cleared workflow metadata when persisted sessions are missing canonical workflow identity", async () => {

@@ -66,6 +66,10 @@ export interface WorkflowProjectSelectionState {
 	projectFolderName: string
 }
 
+export interface WorkflowRuntimeLifecycleState {
+	projectSelectionCompleted: boolean
+}
+
 export interface WorkflowUiSessionState {
 	formSession?: WorkflowFormSessionState
 	stepResolutionSession?: WorkflowStepResolutionSessionState
@@ -76,7 +80,6 @@ export interface WorkflowUiSessionState {
 export type WorkflowDecisionBranchId = string
 
 export type WorkflowBranchTriggerEvent =
-	| { kind: "project_selection_completed" }
 	| { kind: "workflow_progress_request_confirmed" }
 	| { kind: "workflow_progress_request_denied" }
 	| { kind: "workflow_form_completed"; workflowFormId: WorkflowFormId }
@@ -107,6 +110,7 @@ export interface ActiveWorkflowSession {
 	activeStepNumber: number
 	workflowValues: WorkflowValues
 	projectSelection: WorkflowProjectSelectionState
+	lifecycle: WorkflowRuntimeLifecycleState
 	entryArtifactResolution: WorkflowEntryArtifactResolutionState | undefined
 	ui: WorkflowUiSessionState
 	branchContext: WorkflowBranchContextState

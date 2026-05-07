@@ -761,6 +761,9 @@ describe("WorkflowRuntime", () => {
 				projectTitle: args?.projectTitle ?? "Parent Project",
 				projectFolderName: args?.projectFolderName ?? "parent-project",
 			},
+			lifecycle: {
+				projectSelectionCompleted: true,
+			},
 			entryArtifactResolution: undefined,
 			ui: {
 				formSession: undefined,
@@ -880,7 +883,46 @@ describe("WorkflowRuntime", () => {
 			.filter((value): value is string => typeof value === "string")
 	}
 
-	function createEpicsArtifactWorkflow(args?: { artifactId?: string; outputValuePrefix?: string }): {
+	function createEntryArtifactResolutionObserverSteps(args: {
+		observeArtifactResolutions(artifactResolutions: readonly WorkflowEntryArtifactResolution[]): void
+	}): WorkflowDefinition["steps"] {
+		return {
+			"step-1": createStepDefinition({
+				stepNumber: 1,
+				decisionTree: {
+					entryBranchId: "await-entry-artifact-resolution",
+					branches: {
+						"await-entry-artifact-resolution": {
+							id: "await-entry-artifact-resolution",
+							routes: [
+								{
+									id: "entry-artifact-resolution-completed",
+									trigger: {
+										kind: "event_predicate",
+										matches: ({ triggerEvent }) => {
+											if (triggerEvent.kind !== "entry_artifact_resolution_completed") {
+												return false
+											}
+
+											args.observeArtifactResolutions(triggerEvent.artifactResolutions)
+											return true
+										},
+									},
+									action: { kind: "project_prompt" },
+								},
+							],
+						},
+					},
+				},
+			}),
+		}
+	}
+
+	function createEpicsArtifactWorkflow(args?: {
+		artifactId?: string
+		outputValuePrefix?: string
+		steps?: WorkflowDefinition["steps"]
+	}): {
 		workflow: WorkflowDefinition
 		artifactId: string
 		outputValueKeys: ReturnType<typeof createStandaloneArtifactOutputValueKeys>
@@ -899,6 +941,7 @@ describe("WorkflowRuntime", () => {
 					outputValueKeys,
 				},
 			},
+			steps: args?.steps,
 		})
 
 		return { workflow, artifactId, outputValueKeys }
@@ -1242,6 +1285,9 @@ describe("WorkflowRuntime", () => {
 				projectTitle: "Stale Project",
 				projectFolderName: "stale-project",
 			},
+			lifecycle: {
+				projectSelectionCompleted: true,
+			},
 			entryArtifactResolution: undefined,
 			ui: {
 				formSession: undefined,
@@ -1307,6 +1353,25 @@ describe("WorkflowRuntime", () => {
 			routeId: "step-1-allocate-artifact",
 		})
 		expect(stepOneAction.toolBackedOperationSession).to.be.undefined
+		expect(getActiveWorkflowSession(taskState).entryArtifactResolution?.artifactResolutions).to.deep.equal([
+			{
+				artifactId: "brainstorming_session",
+				artifactFamily: WorkflowArtifactFamily.BrainstormingSession,
+				artifactIdentity: "brainstorming_session",
+				artifactFilename: "brainstorming.md",
+				artifactRelativePath: join("discovery", "brainstorming.md"),
+				artifactAbsolutePath: join(
+					cwd,
+					"docs",
+					"projects",
+					"brainstorming-runtime-project",
+					"discovery",
+					"brainstorming.md",
+				),
+				creationRequired: true,
+				existingArtifactAction: "none",
+			},
+		])
 		expect(getActiveWorkflowSession(taskState).activeStepNumber).to.equal(1)
 		expect(getActiveWorkflowSession(taskState).workflowValues).to.deep.include({
 			projectMode: "new",
@@ -1748,6 +1813,9 @@ describe("WorkflowRuntime", () => {
 				projectMode: "new",
 				projectTitle: "Existing Project",
 				projectFolderName: "existing-project",
+			},
+			lifecycle: {
+				projectSelectionCompleted: true,
 			},
 			entryArtifactResolution: undefined,
 			ui: {
@@ -2753,9 +2821,132 @@ describe("WorkflowRuntime", () => {
 
 		expect(result.kind).to.equal("project_prompt")
 		expect(observedArtifactResolutions).to.deep.equal([expectedArtifactResolution])
+		expect(getActiveWorkflowSession(taskState).lifecycle.projectSelectionCompleted).to.equal(true)
 		expect(getActiveWorkflowSession(taskState).entryArtifactResolution).to.deep.equal({
 			artifactResolutions: [expectedArtifactResolution],
 			pendingFileOperation: undefined,
+		})
+	})
+
+	it("emits entry artifact resolution completed with creation required when a new project has an entry singleton artifact", async () => {
+		let observedArtifactResolutions: readonly WorkflowEntryArtifactResolution[] | undefined
+		const outputValueKeys = createStandaloneArtifactOutputValueKeys("entry_new_epics")
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: collectArtifactOutputWorkflowValueKeys(outputValueKeys),
+			artifacts: {
+				epics_doc: {
+					id: "epics_doc",
+					family: WorkflowArtifactFamily.Epics,
+					intentMode: "new",
+					parentIdentitySource: undefined,
+					targetIdentitySource: undefined,
+					outputValueKeys,
+				},
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: {
+						entryBranchId: "await-entry-artifact-resolution",
+						branches: {
+							"await-entry-artifact-resolution": {
+								id: "await-entry-artifact-resolution",
+								routes: [
+									{
+										id: "entry-artifact-resolution-completed",
+										trigger: {
+											kind: "event_predicate",
+											matches: ({ triggerEvent }) => {
+												if (triggerEvent.kind !== "entry_artifact_resolution_completed") {
+													return false
+												}
+
+												observedArtifactResolutions = triggerEvent.artifactResolutions
+												return true
+											},
+										},
+										action: { kind: "project_prompt" },
+									},
+								],
+							},
+						},
+					},
+				}),
+			},
+		})
+		registerResolvedWorkflow(workflow)
+
+		await activateWorkflow(taskState, workflow)
+		const result = await submitNewProjectSelection(taskState, "New Artifact Project")
+		const expectedArtifactResolution: WorkflowEntryArtifactResolution = {
+			artifactId: "epics_doc",
+			artifactFamily: WorkflowArtifactFamily.Epics,
+			artifactIdentity: "epics",
+			artifactFilename: "Epics.md",
+			artifactRelativePath: join("planning", "Epics.md"),
+			artifactAbsolutePath: join(cwd, "docs", "projects", "new-artifact-project", "planning", "Epics.md"),
+			creationRequired: true,
+			existingArtifactAction: "none",
+		}
+
+		expect(result.kind).to.equal("project_prompt")
+		expect(observedArtifactResolutions).to.deep.equal([expectedArtifactResolution])
+		expect(getActiveWorkflowSession(taskState).entryArtifactResolution).to.deep.equal({
+			artifactResolutions: [expectedArtifactResolution],
+			pendingFileOperation: undefined,
+		})
+	})
+
+	it("does not render an entry artifact conflict panel for a new project even when the canonical artifact path already exists", async () => {
+		const outputValueKeys = createStandaloneArtifactOutputValueKeys("entry_new_no_scan_epics")
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: collectArtifactOutputWorkflowValueKeys(outputValueKeys),
+			artifacts: {
+				epics_doc: {
+					id: "epics_doc",
+					family: WorkflowArtifactFamily.Epics,
+					intentMode: "new",
+					parentIdentitySource: undefined,
+					targetIdentitySource: undefined,
+					outputValueKeys,
+				},
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: {
+						entryBranchId: "await-entry-artifact-resolution",
+						branches: {
+							"await-entry-artifact-resolution": {
+								id: "await-entry-artifact-resolution",
+								routes: [
+									{
+										id: "entry-artifact-resolution-completed",
+										trigger: { kind: "on_event", eventKind: "entry_artifact_resolution_completed" },
+										action: { kind: "project_prompt" },
+									},
+								],
+							},
+						},
+					},
+				}),
+			},
+		})
+		const newProjectTitle = "New Existing Artifact Project"
+		const existingArtifactPath = join(cwd, "docs", "projects", "new-existing-artifact-project", "planning", "Epics.md")
+		await mkdir(join(cwd, "docs", "projects", "new-existing-artifact-project", "planning"), { recursive: true })
+		await writeFile(existingArtifactPath, "# Pre-existing epics\n", "utf8")
+		registerResolvedWorkflow(workflow)
+
+		await activateWorkflow(taskState, workflow)
+		const result = await submitNewProjectSelection(taskState, newProjectTitle)
+
+		expect(result.kind).to.equal("project_prompt")
+		expect(getActiveWorkflowSession(taskState).ui.formSession).to.be.undefined
+		expect(getActiveWorkflowSession(taskState).entryArtifactResolution?.artifactResolutions[0]).to.deep.include({
+			artifactAbsolutePath: existingArtifactPath,
+			creationRequired: true,
+			existingArtifactAction: "none",
 		})
 	})
 
@@ -2823,6 +3014,7 @@ describe("WorkflowRuntime", () => {
 			"continue_existing",
 			"replace_existing",
 		])
+		expect(getActiveWorkflowSession(taskState).lifecycle.projectSelectionCompleted).to.equal(true)
 		expect(getActiveWorkflowSession(taskState).branchContext.lastTriggerEvent).to.be.undefined
 		expect(getActiveWorkflowSession(taskState).entryArtifactResolution).to.deep.equal({
 			artifactResolutions: [],
@@ -2916,11 +3108,29 @@ describe("WorkflowRuntime", () => {
 	})
 
 	it("archives an existing singleton artifact to the selected project archive folder with the same filename", async () => {
+		let observedArtifactResolutions: readonly WorkflowEntryArtifactResolution[] | undefined
 		const projectName = "Existing Beta"
 		const existingContent = "# Existing epics\n"
-		const { workflow, artifactId } = createEpicsArtifactWorkflow({ outputValuePrefix: "entry_archive_epics" })
+		const { workflow, artifactId } = createEpicsArtifactWorkflow({
+			outputValuePrefix: "entry_archive_epics",
+			steps: createEntryArtifactResolutionObserverSteps({
+				observeArtifactResolutions: (artifactResolutions) => {
+					observedArtifactResolutions = artifactResolutions
+				},
+			}),
+		})
 		const sourceArtifactPath = await writeExistingEpicsArtifact(projectName, existingContent)
 		const archiveArtifactPath = join(cwd, "docs", "projects", projectName, "archive", "Epics.md")
+		const expectedArtifactResolution: WorkflowEntryArtifactResolution = {
+			artifactId,
+			artifactFamily: WorkflowArtifactFamily.Epics,
+			artifactIdentity: "epics",
+			artifactFilename: "Epics.md",
+			artifactRelativePath: join("planning", "Epics.md"),
+			artifactAbsolutePath: sourceArtifactPath,
+			creationRequired: true,
+			existingArtifactAction: "archive_existing",
+		}
 		registerResolvedWorkflow(workflow)
 		setDiscoveredProjects([projectName])
 
@@ -2952,6 +3162,15 @@ describe("WorkflowRuntime", () => {
 		expect(archiveResult.archiveAbsolutePath).to.equal(archiveArtifactPath)
 		expect(await pathExists(sourceArtifactPath)).to.equal(false)
 		expect(await readFile(archiveArtifactPath, "utf8")).to.equal(existingContent)
+
+		const result = await runtime.handleToolBackedOperationToolResult({
+			taskState,
+			toolResultText: JSON.stringify({ ok: true }),
+			runtimeOwnedSourceRoute: archiveAction.runtimeOwnedSourceRoute,
+		})
+		expect(result.kind).to.equal("project_prompt")
+		expect(observedArtifactResolutions).to.deep.equal([expectedArtifactResolution])
+		expect(getActiveWorkflowSession(taskState).lifecycle.projectSelectionCompleted).to.equal(true)
 	})
 
 	it("fails clearly without overwriting when the singleton artifact archive target already exists", async () => {
@@ -2996,14 +3215,32 @@ describe("WorkflowRuntime", () => {
 	})
 
 	it("deletes only the resolved canonical singleton artifact source path", async () => {
+		let observedArtifactResolutions: readonly WorkflowEntryArtifactResolution[] | undefined
 		const projectName = "Existing Beta"
 		const existingContent = "# Existing epics\n"
 		const siblingContent = "# Keep this planning file\n"
 		const archiveContent = "# Keep this archive file\n"
-		const { workflow, artifactId } = createEpicsArtifactWorkflow({ outputValuePrefix: "entry_delete_epics" })
+		const { workflow, artifactId } = createEpicsArtifactWorkflow({
+			outputValuePrefix: "entry_delete_epics",
+			steps: createEntryArtifactResolutionObserverSteps({
+				observeArtifactResolutions: (artifactResolutions) => {
+					observedArtifactResolutions = artifactResolutions
+				},
+			}),
+		})
 		const sourceArtifactPath = await writeExistingEpicsArtifact(projectName, existingContent)
 		const siblingPlanningPath = join(cwd, "docs", "projects", projectName, "planning", "Keep.md")
 		const archiveArtifactPath = join(cwd, "docs", "projects", projectName, "archive", "Epics.md")
+		const expectedArtifactResolution: WorkflowEntryArtifactResolution = {
+			artifactId,
+			artifactFamily: WorkflowArtifactFamily.Epics,
+			artifactIdentity: "epics",
+			artifactFilename: "Epics.md",
+			artifactRelativePath: join("planning", "Epics.md"),
+			artifactAbsolutePath: sourceArtifactPath,
+			creationRequired: true,
+			existingArtifactAction: "delete_existing",
+		}
 		await writeFile(siblingPlanningPath, siblingContent, "utf8")
 		await mkdir(join(cwd, "docs", "projects", projectName, "archive"), { recursive: true })
 		await writeFile(archiveArtifactPath, archiveContent, "utf8")
@@ -3031,6 +3268,15 @@ describe("WorkflowRuntime", () => {
 		expect(await pathExists(sourceArtifactPath)).to.equal(false)
 		expect(await readFile(siblingPlanningPath, "utf8")).to.equal(siblingContent)
 		expect(await readFile(archiveArtifactPath, "utf8")).to.equal(archiveContent)
+
+		const result = await runtime.handleToolBackedOperationToolResult({
+			taskState,
+			toolResultText: JSON.stringify({ ok: true }),
+			runtimeOwnedSourceRoute: deleteAction.runtimeOwnedSourceRoute,
+		})
+		expect(result.kind).to.equal("project_prompt")
+		expect(observedArtifactResolutions).to.deep.equal([expectedArtifactResolution])
+		expect(getActiveWorkflowSession(taskState).lifecycle.projectSelectionCompleted).to.equal(true)
 	})
 
 	it("returns to project selection without emitting entry artifact resolution when replacement is canceled", async () => {
@@ -3098,6 +3344,7 @@ describe("WorkflowRuntime", () => {
 		expect(observedArtifactResolutionCompleted).to.equal(false)
 		expect(getActiveWorkflowSession(taskState).entryArtifactResolution).to.be.undefined
 		expect(getActiveWorkflowSession(taskState).branchContext.lastTriggerEvent).to.be.undefined
+		expect(getActiveWorkflowSession(taskState).lifecycle.projectSelectionCompleted).to.equal(false)
 		expect(getActiveWorkflowSession(taskState).projectSelection).to.deep.equal({
 			projectMode: "new",
 			projectTitle: "",
@@ -5309,7 +5556,7 @@ describe("WorkflowRuntime", () => {
 													triggerEventKind: input.triggerEvent.kind,
 												}
 
-												return input.triggerEvent.kind === "project_selection_completed"
+												return input.triggerEvent.kind === "entry_artifact_resolution_completed"
 											},
 										},
 										action: { kind: "project_prompt" },
@@ -5326,6 +5573,7 @@ describe("WorkflowRuntime", () => {
 		const result = await submitNewProjectSelection(taskState, "Event Predicate Project")
 
 		expect(result.kind).to.equal("project_prompt")
+		expect(getActiveWorkflowSession(taskState).lifecycle.projectSelectionCompleted).to.equal(true)
 		expect(observedInput).to.deep.equal({
 			activeBranchId: "event-predicate-entry",
 			projectTitleValue: "Event Predicate Project",
@@ -5337,7 +5585,7 @@ describe("WorkflowRuntime", () => {
 			hasSuppressedWorkflowFormIds: false,
 			hasSuppressedWorkflowStepResolutionRoutes: false,
 			hasTriggerEvent: true,
-			triggerEventKind: "project_selection_completed",
+			triggerEventKind: "entry_artifact_resolution_completed",
 		})
 	})
 

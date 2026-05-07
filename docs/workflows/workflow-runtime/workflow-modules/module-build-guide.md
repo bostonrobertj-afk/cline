@@ -104,7 +104,7 @@ For model-facing steps, persist the resolved artifact path into a workflow value
 
 For singleton artifacts with `intentMode: "new"`, existing-project conflict handling is runtime-owned. The module must not inspect the filesystem, compute whether the artifact already exists, archive files, delete files, or expose archive/delete tools to the model.
 
-After project selection, runtime emits `entry_artifact_resolution_completed` for entry singleton artifact resolution. The module decision tree must branch on that event:
+Project selection completion is runtime lifecycle state only; workflow modules must not branch on `project_selection_completed`. After project selection and any runtime-owned entry singleton artifact resolution, runtime emits `entry_artifact_resolution_completed`. The module decision tree must branch on that event:
 
 - `creationRequired: true`: run the normal `allocate_artifact` and initial `build_workflow_document` setup route.
 - `creationRequired: false`: skip `allocate_artifact` and skip the initial document build for that artifact, then continue through the post-artifact-ready route.

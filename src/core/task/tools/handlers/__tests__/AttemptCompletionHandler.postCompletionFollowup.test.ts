@@ -121,6 +121,9 @@ function createActiveWorkflowSession(): ActiveWorkflowSession {
 			projectTitle: "Project",
 			projectFolderName: "project",
 		},
+		lifecycle: {
+			projectSelectionCompleted: true,
+		},
 		entryArtifactResolution: undefined,
 		ui: {
 			formSession: undefined,

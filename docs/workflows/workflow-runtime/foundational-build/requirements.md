@@ -51,6 +51,7 @@ Module Build requirements, Cleanup requirements, External Interface Requirements
 - `FR-10j`: The workflow runtime must preserve the user-provided project title as human-facing project text while using the normalized filesystem-safe identity for folder creation and path resolution.
 - `FR-10j1`: Each workflow module must declare `entryProjectValueKeys` with exactly three workflow-value destinations: `projectMode`, `projectTitle`, and `projectFolderName`. These keys define where the shared mandatory entry `WorkflowForm` persists the runtime-owned project selection into the active workflow's canonical workflow-value map.
 - `FR-10j2`: Every `entryProjectValueKeys` value must be non-empty, already trimmed, and present in the workflow module's `workflowValueKeys` inventory. Runtime validation must fail closed before activation when those destinations are missing, malformed, or undeclared.
+- `FR-10j3`: Completion of mandatory entry project selection must be recorded as runtime lifecycle state for both `new` and `existing` project modes. This lifecycle state is not a workflow decision-tree trigger.
 - `FR-10k`: The workflow runtime must ensure the per-project folder exists before workflow-specific artifact-producing steps can run.
 - `FR-10l`: The workflow runtime must ensure these canonical project subfolders exist within each per-project folder before workflow-specific artifact-producing steps can run:
   - `discovery`
@@ -60,6 +61,7 @@ Module Build requirements, Cleanup requirements, External Interface Requirements
   - `testing`
   - `archive`
 - `FR-10m`: After an existing project is selected in the mandatory shared pre-workflow entry `WorkflowForm`, and before workflow-specific step orchestration begins, `WorkflowRuntime` must check the selected project for existing canonical singleton project artifacts declared by the active workflow with `intentMode: "new"`.
+- `FR-10m0`: When a new project is selected, `WorkflowRuntime` must not run existing singleton artifact checks and must complete entry artifact resolution for declared entry singleton artifacts with `creationRequired: true` and `existingArtifactAction: "none"`.
 - `FR-10m1`: Existing singleton artifact checks must be runtime-owned. Runtime must derive the artifact path from the active workflow's `projectSubfolder`, the workflow artifact definition, and the runtime-owned artifact-family registry. Workflow modules must not compute the path, filename, or discovery pattern.
 - `FR-10m2`: If no matching singleton artifact exists, runtime must complete entry artifact resolution with `creationRequired: true` for that artifact.
 - `FR-10m3`: If a matching singleton artifact exists, runtime must render a runtime-owned conflict panel notifying the user that the workflow output file already exists for the selected project and asking whether to continue work on the existing document.
@@ -180,7 +182,6 @@ Module Build requirements, Cleanup requirements, External Interface Requirements
 - `FR-29i`: The canonical next-action consumer may be called through main-task and child/subagent context adapters, but branch/result interpretation remains owned by `WorkflowRuntime`.
 - `FR-29j`: Workflow module decision trees may branch only on documented runtime decision inputs: the active branch id, the current step definition, workflow values declared in the active workflow's canonical workflow-value inventory, and documented `WorkflowBranchTriggerEvent` variants and payloads. For trigger events carrying `sourceRoute`, predicates may compare the documented `{ branchId, routeId }` source-route identity only as event-correlation metadata.
 - `FR-29j1`: The approved `WorkflowBranchTriggerEvent` variants and payloads are:
-  - `project_selection_completed`: emitted after mandatory shared entry project selection is persisted into the workflow session; no payload.
   - `entry_artifact_resolution_completed`: emitted after mandatory shared entry project selection and runtime-owned entry singleton artifact conflict resolution have completed. Payload `artifactResolutions` is an array of `{ artifactId, artifactFamily, artifactIdentity, artifactFilename, artifactRelativePath, artifactAbsolutePath, creationRequired, existingArtifactAction }`, where `creationRequired` is boolean and `existingArtifactAction` is one of `"none"`, `"continue_existing"`, `"archive_existing"`, or `"delete_existing"`.
   - `workflow_progress_request_confirmed`: emitted after the user confirms a workflow progress request; no payload.
   - `workflow_progress_request_denied`: emitted after the user denies a workflow progress request; no payload.

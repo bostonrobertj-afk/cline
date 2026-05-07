@@ -456,6 +456,9 @@ const createBrainstormingWorkflowSession = (input: {
 		projectTitle: "Brainstorming Session",
 		projectFolderName: "brainstorming-session",
 	},
+	lifecycle: {
+		projectSelectionCompleted: true,
+	},
 	entryArtifactResolution: undefined,
 	ui: {
 		suppressedWorkflowFormIds: [],
@@ -515,6 +518,9 @@ const createCreateArchitectureWorkflowSession = (activeStepNumber: 3 | 4 | 9): A
 		projectMode: "new",
 		projectTitle: "Create Architecture Session",
 		projectFolderName: "create-architecture-session",
+	},
+	lifecycle: {
+		projectSelectionCompleted: true,
 	},
 	entryArtifactResolution: undefined,
 	ui: {

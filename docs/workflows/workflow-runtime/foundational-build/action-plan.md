@@ -8200,187 +8200,188 @@ This phase corrects the Phase 58 event contract so project selection completion 
 - Do not change archive/delete filesystem semantics from Phase 58.
 - Do not change brainstorming module behavior in this phase except test fixtures required by shared type changes.
 
-[ ] Task 168. Align requirements and module guidance with the approved lifecycle-signal contract.
+[x] Task 168. Align requirements and module guidance with the approved lifecycle-signal contract.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/requirements.md`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/requirements.md`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
 
-[ ] Subtask 168.1. In `docs/workflows/workflow-runtime/requirements.md`, add a requirement after `FR-10j2` stating that completion of mandatory entry project selection must be recorded as runtime lifecycle state for both new and existing project modes, and that this lifecycle state is not a workflow decision-tree trigger.
+[x] Subtask 168.1. In `docs/workflows/workflow-runtime/requirements.md`, add a requirement after `FR-10j2` stating that completion of mandatory entry project selection must be recorded as runtime lifecycle state for both new and existing project modes, and that this lifecycle state is not a workflow decision-tree trigger.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/requirements.md`
 
-[ ] Subtask 168.2. In `docs/workflows/workflow-runtime/foundational-build/requirements.md`, add the same post-`FR-10j2` lifecycle-state requirement as Subtask 168.1.
+[x] Subtask 168.2. In `docs/workflows/workflow-runtime/foundational-build/requirements.md`, add the same post-`FR-10j2` lifecycle-state requirement as Subtask 168.1.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/requirements.md`
 
-[ ] Subtask 168.3. In `docs/workflows/workflow-runtime/requirements.md`, add a requirement under `FR-10m` stating that when a new project is selected, runtime must not run existing singleton artifact checks and must complete entry artifact resolution for declared entry singleton artifacts with `creationRequired: true` and `existingArtifactAction: "none"`.
+[x] Subtask 168.3. In `docs/workflows/workflow-runtime/requirements.md`, add a requirement under `FR-10m` stating that when a new project is selected, runtime must not run existing singleton artifact checks and must complete entry artifact resolution for declared entry singleton artifacts with `creationRequired: true` and `existingArtifactAction: "none"`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/requirements.md`
 
-[ ] Subtask 168.4. In `docs/workflows/workflow-runtime/foundational-build/requirements.md`, add the same new-project no-scan entry artifact resolution requirement as Subtask 168.3.
+[x] Subtask 168.4. In `docs/workflows/workflow-runtime/foundational-build/requirements.md`, add the same new-project no-scan entry artifact resolution requirement as Subtask 168.3.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/requirements.md`
 
-[ ] Subtask 168.5. In `docs/workflows/workflow-runtime/requirements.md`, remove `project_selection_completed` from the approved `WorkflowBranchTriggerEvent` variant list under `FR-29j1`.
+[x] Subtask 168.5. In `docs/workflows/workflow-runtime/requirements.md`, remove `project_selection_completed` from the approved `WorkflowBranchTriggerEvent` variant list under `FR-29j1`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/requirements.md`
 
-[ ] Subtask 168.6. In `docs/workflows/workflow-runtime/foundational-build/requirements.md`, remove `project_selection_completed` from the approved `WorkflowBranchTriggerEvent` variant list under `FR-29j1`.
+[x] Subtask 168.6. In `docs/workflows/workflow-runtime/foundational-build/requirements.md`, remove `project_selection_completed` from the approved `WorkflowBranchTriggerEvent` variant list under `FR-29j1`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/requirements.md`
 
-[ ] Subtask 168.7. In `module-build-guide.md`, update the singleton artifact startup guidance so it states that `project_selection_completed` is runtime lifecycle state only, while workflow modules branch on `entry_artifact_resolution_completed`.
+[x] Subtask 168.7. In `module-build-guide.md`, update the singleton artifact startup guidance so it states that `project_selection_completed` is runtime lifecycle state only, while workflow modules branch on `entry_artifact_resolution_completed`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
 
-[ ] Task 169. Move project selection completion out of the workflow decision-tree trigger type.
+[x] Task 169. Move project selection completion out of the workflow decision-tree trigger type.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 
-[ ] Subtask 169.1. In `types.ts`, add `WorkflowRuntimeLifecycleState` with required field `projectSelectionCompleted: boolean`.
+[x] Subtask 169.1. In `types.ts`, add `WorkflowRuntimeLifecycleState` with required field `projectSelectionCompleted: boolean`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 
-[ ] Subtask 169.2. In `types.ts`, add `lifecycle: WorkflowRuntimeLifecycleState` to `ActiveWorkflowSession`.
+[x] Subtask 169.2. In `types.ts`, add `lifecycle: WorkflowRuntimeLifecycleState` to `ActiveWorkflowSession`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 
-[ ] Subtask 169.3. In `types.ts`, remove `{ kind: "project_selection_completed" }` from `WorkflowBranchTriggerEvent`.
+[x] Subtask 169.3. In `types.ts`, remove `{ kind: "project_selection_completed" }` from `WorkflowBranchTriggerEvent`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 
-[ ] Task 170. Persist and restore project selection lifecycle state.
+[x] Task 170. Persist and restore project selection lifecycle state.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 170.1. In `activateWorkflow(...)`, initialize new root workflow sessions with `lifecycle: { projectSelectionCompleted: false }`.
+[x] Subtask 170.1. In `activateWorkflow(...)`, initialize new root workflow sessions with `lifecycle: { projectSelectionCompleted: false }`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 170.2. In `activateWorkflow(...)`, initialize child workflow sessions created with a parent session using `lifecycle: { projectSelectionCompleted: true }`.
+[x] Subtask 170.2. In `activateWorkflow(...)`, initialize child workflow sessions created with a parent session using `lifecycle: { projectSelectionCompleted: true }`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 170.3. In `cloneWorkflowSession(...)`, include a structured clone of `session.lifecycle`.
+[x] Subtask 170.3. In `cloneWorkflowSession(...)`, include a structured clone of `session.lifecycle`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 170.4. In `WorkflowRuntime.ts`, add validation for `WorkflowRuntimeLifecycleState` requiring `projectSelectionCompleted` to be boolean.
+[x] Subtask 170.4. In `WorkflowRuntime.ts`, add validation for `WorkflowRuntimeLifecycleState` requiring `projectSelectionCompleted` to be boolean.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 170.5. In `validatePersistedWorkflowSessionForRestore(...)`, reject persisted sessions whose `lifecycle` field is missing or malformed.
+[x] Subtask 170.5. In `validatePersistedWorkflowSessionForRestore(...)`, reject persisted sessions whose `lifecycle` field is missing or malformed.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 170.6. In valid restore output construction, restore `lifecycle.projectSelectionCompleted` from the persisted session.
+[x] Subtask 170.6. In valid restore output construction, restore `lifecycle.projectSelectionCompleted` from the persisted session.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 170.7. In `isWorkflowBranchTriggerEvent(...)`, remove the `project_selection_completed` case.
+[x] Subtask 170.7. In `isWorkflowBranchTriggerEvent(...)`, remove the `project_selection_completed` case.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Task 171. Correct project-selection completion and entry artifact resolution sequencing.
+[x] Task 171. Correct project-selection completion and entry artifact resolution sequencing.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 171.1. In `WorkflowRuntime.ts`, add a helper that records project-selection lifecycle completion by setting `session.lifecycle.projectSelectionCompleted = true`.
+[x] Subtask 171.1. In `WorkflowRuntime.ts`, add a helper that records project-selection lifecycle completion by setting `session.lifecycle.projectSelectionCompleted = true`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 171.2. In `handleWorkflowEntryFormOutcome(...)`, call the lifecycle-completion helper after project values are persisted and `ensureProjectFoldersExist(session)` completes, before branching on project mode.
+[x] Subtask 171.2. In `handleWorkflowEntryFormOutcome(...)`, call the lifecycle-completion helper after project values are persisted and `ensureProjectFoldersExist(session)` completes, before branching on project mode.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 171.3. In `WorkflowRuntime.ts`, add a helper for new-project entry artifact resolution that resolves declared entry singleton artifact outputs without checking file existence and builds `WorkflowEntryArtifactResolution` entries with `creationRequired: true` and `existingArtifactAction: "none"`.
+[x] Subtask 171.3. In `WorkflowRuntime.ts`, add a helper for new-project entry artifact resolution that resolves declared entry singleton artifact outputs without checking file existence and builds `WorkflowEntryArtifactResolution` entries with `creationRequired: true` and `existingArtifactAction: "none"`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 171.4. In the new-project branch of `handleWorkflowEntryFormOutcome(...)`, replace the old `lastTriggerEvent = { kind: "project_selection_completed" }` path with the new no-scan entry artifact resolution helper.
+[x] Subtask 171.4. In the new-project branch of `handleWorkflowEntryFormOutcome(...)`, replace the old `lastTriggerEvent = { kind: "project_selection_completed" }` path with the new no-scan entry artifact resolution helper.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 171.5. In the existing-project branch of `handleWorkflowEntryFormOutcome(...)`, preserve the Phase 58 call to `continueWorkflowEntryArtifactResolution(...)` after lifecycle completion.
+[x] Subtask 171.5. In the existing-project branch of `handleWorkflowEntryFormOutcome(...)`, preserve the Phase 58 call to `continueWorkflowEntryArtifactResolution(...)` after lifecycle completion.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 171.6. In the replacement-cancel path that returns to project selection, reset lifecycle state to `projectSelectionCompleted: false` when clearing `session.projectSelection`.
+[x] Subtask 171.6. In the replacement-cancel path that returns to project selection, reset lifecycle state to `projectSelectionCompleted: false` when clearing `session.projectSelection`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Task 172. Update runtime tests for lifecycle state and no-scan new-project artifact resolution.
+[x] Task 172. Update runtime tests for lifecycle state and no-scan new-project artifact resolution.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 172.1. In `WorkflowRuntime.test.ts`, replace tests that expect `project_selection_completed` as a decision-tree trigger with coverage proving `session.lifecycle.projectSelectionCompleted === true` after successful new-project selection.
+[x] Subtask 172.1. In `WorkflowRuntime.test.ts`, replace tests that expect `project_selection_completed` as a decision-tree trigger with coverage proving `session.lifecycle.projectSelectionCompleted === true` after successful new-project selection.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 172.2. In `WorkflowRuntime.test.ts`, add coverage proving new-project selection for a workflow with an entry singleton artifact emits `entry_artifact_resolution_completed` with `creationRequired: true` and `existingArtifactAction: "none"`.
+[x] Subtask 172.2. In `WorkflowRuntime.test.ts`, add coverage proving new-project selection for a workflow with an entry singleton artifact emits `entry_artifact_resolution_completed` with `creationRequired: true` and `existingArtifactAction: "none"`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 172.3. In `WorkflowRuntime.test.ts`, add coverage proving new-project entry artifact resolution does not run existing-artifact conflict detection, using a pre-existing canonical artifact path under the normalized new project folder and asserting no conflict panel is rendered.
+[x] Subtask 172.3. In `WorkflowRuntime.test.ts`, add coverage proving new-project entry artifact resolution does not run existing-artifact conflict detection, using a pre-existing canonical artifact path under the normalized new project folder and asserting no conflict panel is rendered.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 172.4. In `WorkflowRuntime.test.ts`, update the active brainstorming new-project regression so it expects the Step 1 `create_workflow_artifact` action after no-scan `entry_artifact_resolution_completed`.
+[x] Subtask 172.4. In `WorkflowRuntime.test.ts`, update the active brainstorming new-project regression so it expects the Step 1 `create_workflow_artifact` action after no-scan `entry_artifact_resolution_completed`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 172.5. In `WorkflowRuntime.test.ts`, add coverage proving existing-project selection records `session.lifecycle.projectSelectionCompleted === true` before rendering the entry artifact conflict panel.
+[x] Subtask 172.5. In `WorkflowRuntime.test.ts`, add coverage proving existing-project selection records `session.lifecycle.projectSelectionCompleted === true` before rendering the entry artifact conflict panel.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 172.6. In `WorkflowRuntime.test.ts`, update existing-project continue/archive/delete entry artifact resolution tests so they assert lifecycle state remains completed while `entry_artifact_resolution_completed` carries the true or false `creationRequired` branch data.
+[x] Subtask 172.6. In `WorkflowRuntime.test.ts`, update existing-project continue/archive/delete entry artifact resolution tests so they assert lifecycle state remains completed while `entry_artifact_resolution_completed` carries the true or false `creationRequired` branch data.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 172.7. In `WorkflowRuntime.test.ts`, update replacement-cancel coverage so it asserts `session.lifecycle.projectSelectionCompleted === false` after returning to project selection.
+[x] Subtask 172.7. In `WorkflowRuntime.test.ts`, update replacement-cancel coverage so it asserts `session.lifecycle.projectSelectionCompleted === false` after returning to project selection.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Task 173. Update workflow session fixtures for required lifecycle state.
+[x] Task 173. Update workflow session fixtures for required lifecycle state.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/response_tools.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/AppendBrainstormingSelectedTechniqueToolHandler.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/AttemptCompletionHandler.postCompletionFollowup.test.ts`
@@ -8393,17 +8394,17 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureDocument.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`
 
-[ ] Subtask 173.1. In `workflow-runtime-metadata.test.ts`, update valid persisted workflow session fixtures to include `lifecycle: { projectSelectionCompleted: true }`.
+[x] Subtask 173.1. In `workflow-runtime-metadata.test.ts`, update valid persisted workflow session fixtures to include `lifecycle: { projectSelectionCompleted: true }`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
 
-[ ] Subtask 173.2. In `workflow-runtime-metadata.test.ts`, add restore coverage proving malformed or missing persisted `lifecycle` state fails closed.
+[x] Subtask 173.2. In `workflow-runtime-metadata.test.ts`, add restore coverage proving malformed or missing persisted `lifecycle` state fails closed.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
 
-[ ] Subtask 173.3. In every remaining hand-built `ActiveWorkflowSession` fixture in the allowed files for Task 173, add explicit `lifecycle: { projectSelectionCompleted: true }` when the fixture represents a selected project and `lifecycle: { projectSelectionCompleted: false }` when it represents pre-selection state.
+[x] Subtask 173.3. In every remaining hand-built `ActiveWorkflowSession` fixture in the allowed files for Task 173, add explicit `lifecycle: { projectSelectionCompleted: true }` when the fixture represents a selected project and `lifecycle: { projectSelectionCompleted: false }` when it represents pre-selection state.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
@@ -8418,12 +8419,18 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureDocument.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`
 
-[ ] Task 174. Validate Phase 59.
+[x] Subtask 173.4. In `response_tools.test.ts`, update every hand-built `ActiveWorkflowSession` fixture to include explicit `lifecycle: { projectSelectionCompleted: true }` when the fixture represents a selected project and `lifecycle: { projectSelectionCompleted: false }` when it represents pre-selection state.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/response_tools.test.ts`
+
+[x] Task 174. Validate Phase 59.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/requirements.md`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/requirements.md`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/response_tools.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
@@ -8440,20 +8447,20 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureDocument.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`
 
-[ ] Subtask 174.1. Run `rg -n "project_selection_completed" src/core/task/workflow-runtime/types.ts src/core/task/workflow-runtime/WorkflowRuntime.ts src/core/task/workflow-runtime/workflow-modules`; it must return no matches.
+[x] Subtask 174.1. Run `rg -n "project_selection_completed" src/core/task/workflow-runtime/types.ts src/core/task/workflow-runtime/WorkflowRuntime.ts src/core/task/workflow-runtime/workflow-modules`; it must return no matches.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 174.2. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts src/core/task/__tests__/workflow-runtime-metadata.test.ts`; it must pass before Phase 59 is marked complete.
+[x] Subtask 174.2. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts src/core/task/__tests__/workflow-runtime-metadata.test.ts`; it must pass before Phase 59 is marked complete.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
 
-[ ] Subtask 174.3. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingDocument.test.ts src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureDocument.test.ts`; it must pass before Phase 59 is marked complete.
+[x] Subtask 174.3. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingDocument.test.ts src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureDocument.test.ts`; it must pass before Phase 59 is marked complete.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
@@ -8461,13 +8468,14 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureDocument.test.ts`
 
-[ ] Subtask 174.4. Run `npm run check-types`; it must pass before Phase 59 is marked complete.
+[x] Subtask 174.4. Run `npm run check-types`; it must pass before Phase 59 is marked complete.
 
 Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/response_tools.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 174.5. Run `npm run lint`; it must pass before Phase 59 is marked complete.
+[x] Subtask 174.5. Run `npm run lint`; it must pass before Phase 59 is marked complete.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`

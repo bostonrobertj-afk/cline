@@ -693,6 +693,7 @@ describe("SubagentRunner", () => {
 			activeStepNumber: 1,
 			workflowValues: {},
 			projectSelection: { projectMode: "existing", projectTitle: "Parent Project", projectFolderName: "parent-project" },
+			lifecycle: { projectSelectionCompleted: true },
 			entryArtifactResolution: undefined,
 			ui: {
 				formSession: undefined,
@@ -765,6 +766,7 @@ describe("SubagentRunner", () => {
 			activeStepNumber: 1,
 			workflowValues: {},
 			projectSelection: { projectMode: "existing", projectTitle: "Parent Project", projectFolderName: "parent-project" },
+			lifecycle: { projectSelectionCompleted: true },
 			entryArtifactResolution: undefined,
 			ui: {
 				formSession: undefined,
@@ -866,6 +868,7 @@ describe("SubagentRunner", () => {
 			activeStepNumber: 1,
 			workflowValues: {},
 			projectSelection: { projectMode: "existing", projectTitle: "Parent Project", projectFolderName: "parent-project" },
+			lifecycle: { projectSelectionCompleted: true },
 			entryArtifactResolution: undefined,
 			ui: {
 				formSession: undefined,
@@ -956,6 +959,7 @@ describe("SubagentRunner", () => {
 			activeStepNumber: 1,
 			workflowValues: {},
 			projectSelection: { projectMode: "existing", projectTitle: "Parent Project", projectFolderName: "parent-project" },
+			lifecycle: { projectSelectionCompleted: true },
 			entryArtifactResolution: undefined,
 			ui: {
 				formSession: undefined,
@@ -1048,6 +1052,7 @@ describe("SubagentRunner", () => {
 			activeStepNumber: 1,
 			workflowValues: {},
 			projectSelection: { projectMode: "existing", projectTitle: "Parent Project", projectFolderName: "parent-project" },
+			lifecycle: { projectSelectionCompleted: true },
 			entryArtifactResolution: undefined,
 			ui: {
 				formSession: undefined,
@@ -1252,6 +1257,7 @@ describe("SubagentRunner", () => {
 			activeStepNumber: 1,
 			workflowValues: {},
 			projectSelection: { projectMode: "existing", projectTitle: "Parent Project", projectFolderName: "parent-project" },
+			lifecycle: { projectSelectionCompleted: true },
 			entryArtifactResolution: undefined,
 			ui: {
 				formSession: undefined,
@@ -1951,6 +1957,7 @@ describe("SubagentRunner", () => {
 				projectTitle: "Parent Project",
 				projectFolderName: "parent-project",
 			},
+			lifecycle: { projectSelectionCompleted: true },
 			entryArtifactResolution: undefined,
 			ui: {
 				formSession: undefined,
@@ -2007,6 +2014,7 @@ describe("SubagentRunner", () => {
 						projectTitle: " ",
 						projectFolderName: "parent-project",
 					},
+					lifecycle: { projectSelectionCompleted: false },
 					entryArtifactResolution: undefined,
 					ui: {
 						formSession: undefined,
@@ -2029,6 +2037,7 @@ describe("SubagentRunner", () => {
 						projectTitle: "Parent Project",
 						projectFolderName: " ",
 					},
+					lifecycle: { projectSelectionCompleted: false },
 					entryArtifactResolution: undefined,
 					ui: {
 						formSession: undefined,
@@ -2125,6 +2134,7 @@ describe("SubagentRunner", () => {
 			activeStepNumber: 1,
 			workflowValues: {},
 			projectSelection: { projectMode: "existing", projectTitle: "Parent Project", projectFolderName: "parent-project" },
+			lifecycle: { projectSelectionCompleted: true },
 			entryArtifactResolution: undefined,
 			ui: {
 				formSession: undefined,
@@ -2233,6 +2243,7 @@ describe("SubagentRunner", () => {
 			activeStepNumber: 1,
 			workflowValues: { review_input: "/tmp/review-input.md", ignored_parent: "drop" },
 			projectSelection: { projectMode: "existing", projectTitle: "Parent Project", projectFolderName: "parent-project" },
+			lifecycle: { projectSelectionCompleted: true },
 			entryArtifactResolution: undefined,
 			ui: {
 				formSession: undefined,
@@ -2284,6 +2295,7 @@ describe("SubagentRunner", () => {
 			activeStepNumber: 1,
 			workflowValues: {},
 			projectSelection: { projectMode: "new", projectTitle: "", projectFolderName: "" },
+			lifecycle: { projectSelectionCompleted: false },
 			entryArtifactResolution: undefined,
 			ui: {
 				formSession: undefined,
@@ -2375,6 +2387,7 @@ describe("SubagentRunner", () => {
 			activeStepNumber: 1,
 			workflowValues: {},
 			projectSelection: { projectMode: "existing", projectTitle: "Parent Project", projectFolderName: "parent-project" },
+			lifecycle: { projectSelectionCompleted: true },
 			entryArtifactResolution: undefined,
 			ui: {
 				formSession: undefined,
@@ -2418,6 +2431,7 @@ describe("SubagentRunner", () => {
 			activeStepNumber: 1,
 			workflowValues: {},
 			projectSelection: { projectMode: "existing", projectTitle: "Parent Project", projectFolderName: "parent-project" },
+			lifecycle: { projectSelectionCompleted: true },
 			entryArtifactResolution: undefined,
 			ui: {
 				formSession: undefined,

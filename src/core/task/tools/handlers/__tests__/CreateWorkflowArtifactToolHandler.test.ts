@@ -377,6 +377,9 @@ function createActiveWorkflowSession(workflow: WorkflowDefinition): ActiveWorkfl
 			projectTitle: "Real Artifact Project",
 			projectFolderName: "real-artifact-project",
 		},
+		lifecycle: {
+			projectSelectionCompleted: true,
+		},
 		entryArtifactResolution: undefined,
 		ui: {
 			formSession: undefined,
