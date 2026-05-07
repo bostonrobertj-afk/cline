@@ -624,32 +624,32 @@ Allowed files:
 
 After completing this phase, pause for QA review before packaging or smoke testing.
 
-[ ] Task 9. Run targeted validation for the create-architecture module build.
+[x] Task 9. Run targeted validation for the create-architecture module build.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-architecture/action-plan.md`
 
-[ ] Subtask 9.1. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureDocument.test.ts src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureToolSchemas.test.ts src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`; it must pass before Task 9 is marked complete.
+[x] Subtask 9.1. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureDocument.test.ts src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureToolSchemas.test.ts src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`; it must pass before Task 9 is marked complete.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-architecture/action-plan.md`
 
-[ ] Subtask 9.2. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/tools/handlers/__tests__/CreateWorkflowArtifactToolHandler.test.ts src/core/task/tools/handlers/__tests__/UseSkillToolHandler.test.ts`; it must pass before Task 9 is marked complete.
+[x] Subtask 9.2. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/tools/handlers/__tests__/CreateWorkflowArtifactToolHandler.test.ts src/core/task/tools/handlers/__tests__/UseSkillToolHandler.test.ts`; it must pass before Task 9 is marked complete.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-architecture/action-plan.md`
 
-[ ] Subtask 9.3. Run `npm run test:unit -- src/core/prompts/system-prompt/__tests__/integration.test.ts src/core/prompts/system-prompt/__tests__/response_tools.test.ts`; it must pass before Task 9 is marked complete.
+[x] Subtask 9.3. Run `npm run test:unit -- src/core/prompts/system-prompt/__tests__/integration.test.ts src/core/prompts/system-prompt/__tests__/response_tools.test.ts`; it must pass before Task 9 is marked complete.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-architecture/action-plan.md`
 
-[ ] Subtask 9.4. Run `npm run check-types`; it must pass before Task 9 is marked complete.
+[x] Subtask 9.4. Run `npm run check-types`; it must pass before Task 9 is marked complete.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-architecture/action-plan.md`
 
-[ ] Subtask 9.5. Run `npm run lint`; it must pass before Task 9 is marked complete.
+[x] Subtask 9.5. Run `npm run lint`; it must pass before Task 9 is marked complete.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-architecture/action-plan.md`
