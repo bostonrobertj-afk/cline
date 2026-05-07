@@ -693,6 +693,7 @@ describe("SubagentRunner", () => {
 			activeStepNumber: 1,
 			workflowValues: {},
 			projectSelection: { projectMode: "existing", projectTitle: "Parent Project", projectFolderName: "parent-project" },
+			entryArtifactResolution: undefined,
 			ui: {
 				formSession: undefined,
 				stepResolutionSession: undefined,
@@ -764,6 +765,7 @@ describe("SubagentRunner", () => {
 			activeStepNumber: 1,
 			workflowValues: {},
 			projectSelection: { projectMode: "existing", projectTitle: "Parent Project", projectFolderName: "parent-project" },
+			entryArtifactResolution: undefined,
 			ui: {
 				formSession: undefined,
 				stepResolutionSession: undefined,
@@ -864,6 +866,7 @@ describe("SubagentRunner", () => {
 			activeStepNumber: 1,
 			workflowValues: {},
 			projectSelection: { projectMode: "existing", projectTitle: "Parent Project", projectFolderName: "parent-project" },
+			entryArtifactResolution: undefined,
 			ui: {
 				formSession: undefined,
 				stepResolutionSession: undefined,
@@ -953,6 +956,7 @@ describe("SubagentRunner", () => {
 			activeStepNumber: 1,
 			workflowValues: {},
 			projectSelection: { projectMode: "existing", projectTitle: "Parent Project", projectFolderName: "parent-project" },
+			entryArtifactResolution: undefined,
 			ui: {
 				formSession: undefined,
 				stepResolutionSession: undefined,
@@ -1044,6 +1048,7 @@ describe("SubagentRunner", () => {
 			activeStepNumber: 1,
 			workflowValues: {},
 			projectSelection: { projectMode: "existing", projectTitle: "Parent Project", projectFolderName: "parent-project" },
+			entryArtifactResolution: undefined,
 			ui: {
 				formSession: undefined,
 				stepResolutionSession: undefined,
@@ -1247,6 +1252,7 @@ describe("SubagentRunner", () => {
 			activeStepNumber: 1,
 			workflowValues: {},
 			projectSelection: { projectMode: "existing", projectTitle: "Parent Project", projectFolderName: "parent-project" },
+			entryArtifactResolution: undefined,
 			ui: {
 				formSession: undefined,
 				stepResolutionSession: undefined,
@@ -1945,6 +1951,7 @@ describe("SubagentRunner", () => {
 				projectTitle: "Parent Project",
 				projectFolderName: "parent-project",
 			},
+			entryArtifactResolution: undefined,
 			ui: {
 				formSession: undefined,
 				stepResolutionSession: undefined,
@@ -2000,6 +2007,7 @@ describe("SubagentRunner", () => {
 						projectTitle: " ",
 						projectFolderName: "parent-project",
 					},
+					entryArtifactResolution: undefined,
 					ui: {
 						formSession: undefined,
 						stepResolutionSession: undefined,
@@ -2021,6 +2029,7 @@ describe("SubagentRunner", () => {
 						projectTitle: "Parent Project",
 						projectFolderName: " ",
 					},
+					entryArtifactResolution: undefined,
 					ui: {
 						formSession: undefined,
 						stepResolutionSession: undefined,
@@ -2116,6 +2125,7 @@ describe("SubagentRunner", () => {
 			activeStepNumber: 1,
 			workflowValues: {},
 			projectSelection: { projectMode: "existing", projectTitle: "Parent Project", projectFolderName: "parent-project" },
+			entryArtifactResolution: undefined,
 			ui: {
 				formSession: undefined,
 				stepResolutionSession: undefined,
@@ -2223,6 +2233,7 @@ describe("SubagentRunner", () => {
 			activeStepNumber: 1,
 			workflowValues: { review_input: "/tmp/review-input.md", ignored_parent: "drop" },
 			projectSelection: { projectMode: "existing", projectTitle: "Parent Project", projectFolderName: "parent-project" },
+			entryArtifactResolution: undefined,
 			ui: {
 				formSession: undefined,
 				stepResolutionSession: undefined,
@@ -2273,6 +2284,7 @@ describe("SubagentRunner", () => {
 			activeStepNumber: 1,
 			workflowValues: {},
 			projectSelection: { projectMode: "new", projectTitle: "", projectFolderName: "" },
+			entryArtifactResolution: undefined,
 			ui: {
 				formSession: undefined,
 				stepResolutionSession: undefined,
@@ -2363,6 +2375,7 @@ describe("SubagentRunner", () => {
 			activeStepNumber: 1,
 			workflowValues: {},
 			projectSelection: { projectMode: "existing", projectTitle: "Parent Project", projectFolderName: "parent-project" },
+			entryArtifactResolution: undefined,
 			ui: {
 				formSession: undefined,
 				stepResolutionSession: undefined,
@@ -2405,6 +2418,7 @@ describe("SubagentRunner", () => {
 			activeStepNumber: 1,
 			workflowValues: {},
 			projectSelection: { projectMode: "existing", projectTitle: "Parent Project", projectFolderName: "parent-project" },
+			entryArtifactResolution: undefined,
 			ui: {
 				formSession: undefined,
 				stepResolutionSession: undefined,

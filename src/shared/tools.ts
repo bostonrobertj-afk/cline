@@ -38,6 +38,8 @@ export enum ClineDefaultTool {
 	SET_WORKFLOW_VALUES = "set_workflow_values",
 	BUILD_WORKFLOW_DOCUMENT = "build_workflow_document",
 	CREATE_WORKFLOW_ARTIFACT = "create_workflow_artifact",
+	ARCHIVE_WORKFLOW_ARTIFACT = "archive_workflow_artifact",
+	DELETE_WORKFLOW_ARTIFACT = "delete_workflow_artifact",
 	GET_BRAINSTORMING_METHODS = "get_brainstorming_methods",
 	APPEND_BRAINSTORMING_SELECTED_TECHNIQUE = "append_brainstorming_selected_technique",
 	CODE_REVIEW_SPEC_UPDATE = "code_review_spec_update",

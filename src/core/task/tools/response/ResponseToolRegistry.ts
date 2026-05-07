@@ -92,6 +92,8 @@ const RESPONSE_TOOL_METADATA: Record<ClineDefaultTool, ResponseToolMetadata | un
 	[ClineDefaultTool.SET_WORKFLOW_VALUES]: undefined,
 	[ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT]: undefined,
 	[ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT]: undefined,
+	[ClineDefaultTool.ARCHIVE_WORKFLOW_ARTIFACT]: undefined,
+	[ClineDefaultTool.DELETE_WORKFLOW_ARTIFACT]: undefined,
 	[ClineDefaultTool.GET_BRAINSTORMING_METHODS]: undefined,
 	[ClineDefaultTool.APPEND_BRAINSTORMING_SELECTED_TECHNIQUE]: undefined,
 	[ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE]: undefined,

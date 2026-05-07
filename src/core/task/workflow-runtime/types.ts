@@ -13,7 +13,34 @@ export type WorkflowName = string
 export type WorkflowValue = string | number | boolean | WorkflowValue[] | { [key: string]: WorkflowValue }
 export type WorkflowValues = Record<string, WorkflowValue>
 export type WorkflowProjectMode = "new" | "existing"
-export type WorkflowProjectSubfolder = "discovery" | "planning" | "implementation" | "review" | "testing"
+export type WorkflowProjectSubfolder = "discovery" | "planning" | "implementation" | "review" | "testing" | "archive"
+export type WorkflowEntryArtifactExistingAction = "none" | "continue_existing" | "archive_existing" | "delete_existing"
+
+export interface WorkflowEntryArtifactResolution {
+	artifactId: string
+	artifactFamily: WorkflowArtifactFamily
+	artifactIdentity: string
+	artifactFilename: string
+	artifactRelativePath: string
+	artifactAbsolutePath: string
+	creationRequired: boolean
+	existingArtifactAction: WorkflowEntryArtifactExistingAction
+}
+
+export type WorkflowEntryArtifactFileOperation = Extract<
+	WorkflowEntryArtifactExistingAction,
+	"archive_existing" | "delete_existing"
+>
+
+export interface WorkflowEntryArtifactPendingFileOperation
+	extends Omit<WorkflowEntryArtifactResolution, "creationRequired" | "existingArtifactAction"> {
+	operation: WorkflowEntryArtifactFileOperation
+}
+
+export interface WorkflowEntryArtifactResolutionState {
+	artifactResolutions: readonly WorkflowEntryArtifactResolution[]
+	pendingFileOperation: WorkflowEntryArtifactPendingFileOperation | undefined
+}
 
 export interface WorkflowPersonaDefinition {
 	name: string
@@ -54,6 +81,10 @@ export type WorkflowBranchTriggerEvent =
 	| { kind: "workflow_progress_request_denied" }
 	| { kind: "workflow_form_completed"; workflowFormId: WorkflowFormId }
 	| { kind: "workflow_values_persisted"; changedKeys: readonly string[] }
+	| {
+			kind: "entry_artifact_resolution_completed"
+			artifactResolutions: readonly WorkflowEntryArtifactResolution[]
+	  }
 	| { kind: "tool_backed_operation_succeeded"; sourceRoute: WorkflowStepResolutionSourceRoute }
 	| {
 			kind: "tool_backed_operation_failed"
@@ -76,6 +107,7 @@ export interface ActiveWorkflowSession {
 	activeStepNumber: number
 	workflowValues: WorkflowValues
 	projectSelection: WorkflowProjectSelectionState
+	entryArtifactResolution: WorkflowEntryArtifactResolutionState | undefined
 	ui: WorkflowUiSessionState
 	branchContext: WorkflowBranchContextState
 }

@@ -34,6 +34,20 @@ const workflowProgressRequestToolSpec: ClineToolSpec = {
 	description: "Ask the user to confirm whether the current workflow step is ready to advance.",
 }
 
+const archiveWorkflowArtifactToolSpec: ClineToolSpec = {
+	variant: ModelFamily.GENERIC,
+	id: ClineDefaultTool.ARCHIVE_WORKFLOW_ARTIFACT,
+	name: "archive_workflow_artifact",
+	description: "Archive a workflow artifact.",
+}
+
+const deleteWorkflowArtifactToolSpec: ClineToolSpec = {
+	variant: ModelFamily.GENERIC,
+	id: ClineDefaultTool.DELETE_WORKFLOW_ARTIFACT,
+	name: "delete_workflow_artifact",
+	description: "Delete a workflow artifact.",
+}
+
 type CreateArchitectureResponseToolStepId = "step-3" | "step-4" | "step-9"
 
 interface CreateArchitectureResponseToolCase {
@@ -71,6 +85,7 @@ function createCreateArchitecturePromptBuilderInput(args: {
 			projectTitle: "Create Architecture Session",
 			projectFolderName: "create-architecture-session",
 		},
+		entryArtifactResolution: undefined,
 		ui: {
 			suppressedWorkflowFormIds: [],
 			suppressedWorkflowStepResolutionRoutes: [],
@@ -233,6 +248,30 @@ describe("response tools prompt helpers", () => {
 
 		expect(getCurrentModeResponseToolsLine(context)).to.equal(undefined)
 		expect(getResponseToolsSection(context)).to.equal("")
+	})
+
+	it("does not render archive or delete workflow artifact response guidance", () => {
+		const nonNativeContext = makeContext({
+			enableNativeToolCalls: false,
+			workflowToolSchemaOverride: [archiveWorkflowArtifactToolSpec, deleteWorkflowArtifactToolSpec],
+		})
+
+		expect(getCurrentModeResponseToolsLine(nonNativeContext)).to.equal(undefined)
+		expect(getResponseToolsSection(nonNativeContext)).to.equal("")
+
+		const nativeContext = makeContext({
+			enableNativeToolCalls: true,
+			visibleNativeToolNames: ["send_user_message", "archive_workflow_artifact", "delete_workflow_artifact"],
+		})
+		const currentModeLine = getCurrentModeResponseToolsLine(nativeContext)
+		const responseToolsSection = getResponseToolsSection(nativeContext)
+
+		expect(currentModeLine).to.contain("`send_user_message`")
+		expect(currentModeLine).to.not.contain("`archive_workflow_artifact`")
+		expect(currentModeLine).to.not.contain("`delete_workflow_artifact`")
+		expect(responseToolsSection).to.contain("`send_user_message`")
+		expect(responseToolsSection).to.not.contain("`archive_workflow_artifact`")
+		expect(responseToolsSection).to.not.contain("`delete_workflow_artifact`")
 	})
 
 	it("renders only projected response guidance for a non-native workflow override", () => {

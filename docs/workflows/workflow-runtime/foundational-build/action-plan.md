@@ -7814,111 +7814,119 @@ Pause for QA review before workflow-module action plans are updated to consume `
 
 This phase implements runtime-owned detection and resolution of existing canonical singleton workflow artifacts after existing-project selection. It does not update workflow modules; module decision-tree revisions must happen in the relevant module action plans after this foundational phase passes QA.
 
-[ ] Task 161. Add canonical runtime state and branch-event types for entry singleton artifact resolution.
+[x] Task 161. Add canonical runtime state and branch-event types for entry singleton artifact resolution.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/AppendBrainstormingSelectedTechniqueToolHandler.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/AttemptCompletionHandler.postCompletionFollowup.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/CreateWorkflowArtifactToolHandler.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/DevStoryStoryTools.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/response_tools.test.ts`
 
-[ ] Subtask 161.1. In `types.ts`, add `archive` to `WorkflowProjectSubfolder`.
+[x] Subtask 161.1. In `types.ts`, add `archive` to `WorkflowProjectSubfolder`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 
-[ ] Subtask 161.2. In `types.ts`, add `WorkflowEntryArtifactExistingAction` with exactly `"none"`, `"continue_existing"`, `"archive_existing"`, and `"delete_existing"`.
+[x] Subtask 161.2. In `types.ts`, add `WorkflowEntryArtifactExistingAction` with exactly `"none"`, `"continue_existing"`, `"archive_existing"`, and `"delete_existing"`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 
-[ ] Subtask 161.3. In `types.ts`, add `WorkflowEntryArtifactResolution` carrying `artifactId`, `artifactFamily`, `artifactIdentity`, `artifactFilename`, `artifactRelativePath`, `artifactAbsolutePath`, `creationRequired`, and `existingArtifactAction`.
+[x] Subtask 161.3. In `types.ts`, add `WorkflowEntryArtifactResolution` carrying `artifactId`, `artifactFamily`, `artifactIdentity`, `artifactFilename`, `artifactRelativePath`, `artifactAbsolutePath`, `creationRequired`, and `existingArtifactAction`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 
-[ ] Subtask 161.4. In `types.ts`, add `WorkflowEntryArtifactResolutionState` to persist accumulated `artifactResolutions` and a pending file operation whose operation is only `"archive_existing"` or `"delete_existing"`.
+[x] Subtask 161.4. In `types.ts`, add `WorkflowEntryArtifactResolutionState` to persist accumulated `artifactResolutions` and a pending file operation whose operation is only `"archive_existing"` or `"delete_existing"`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 
-[ ] Subtask 161.5. In `types.ts`, add `entryArtifactResolution: WorkflowEntryArtifactResolutionState | undefined` to `ActiveWorkflowSession`.
+[x] Subtask 161.5. In `types.ts`, add `entryArtifactResolution: WorkflowEntryArtifactResolutionState | undefined` to `ActiveWorkflowSession`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 
-[ ] Subtask 161.6. In `types.ts`, add the `entry_artifact_resolution_completed` `WorkflowBranchTriggerEvent` variant with `artifactResolutions: readonly WorkflowEntryArtifactResolution[]`.
+[x] Subtask 161.6. In `types.ts`, add the `entry_artifact_resolution_completed` `WorkflowBranchTriggerEvent` variant with `artifactResolutions: readonly WorkflowEntryArtifactResolution[]`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 
-[ ] Subtask 161.7. In `WorkflowRuntime.ts`, initialize new workflow sessions with `entryArtifactResolution: undefined`.
+[x] Subtask 161.7. In `WorkflowRuntime.ts`, initialize new workflow sessions with `entryArtifactResolution: undefined`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 161.8. In `WorkflowRuntime.ts`, update persisted-session validation so malformed `entryArtifactResolution` state and malformed `entry_artifact_resolution_completed` events fail closed.
+[x] Subtask 161.8. In `WorkflowRuntime.ts`, update persisted-session validation so malformed `entryArtifactResolution` state and malformed `entry_artifact_resolution_completed` events fail closed.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 161.9. In affected tests, update hand-built `ActiveWorkflowSession` fixtures to include `entryArtifactResolution: undefined`.
+[x] Subtask 161.9. In affected tests, update hand-built `ActiveWorkflowSession` fixtures to include `entryArtifactResolution: undefined`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/AppendBrainstormingSelectedTechniqueToolHandler.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/AttemptCompletionHandler.postCompletionFollowup.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/CreateWorkflowArtifactToolHandler.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/DevStoryStoryTools.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/response_tools.test.ts`
 
-[ ] Task 162. Add runtime-owned existing singleton artifact discovery and entry conflict forms.
+[x] Task 162. Add runtime-owned existing singleton artifact discovery and entry conflict forms.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 162.1. In `WorkflowRuntime.ts`, add `archive` to `WORKFLOW_PROJECT_SUBFOLDERS`.
+[x] Subtask 162.1. In `WorkflowRuntime.ts`, add `archive` to `WORKFLOW_PROJECT_SUBFOLDERS`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 162.2. In `WorkflowRuntime.ts`, add a runtime helper that resolves active workflow artifacts with `intentMode: "new"` to canonical artifact output values without creating files.
+[x] Subtask 162.2. In `WorkflowRuntime.ts`, add a runtime helper that resolves active workflow artifacts with `intentMode: "new"` to canonical artifact output values without creating files.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 162.3. In `WorkflowRuntime.ts`, after existing-project selection and project-folder creation, check resolved singleton artifact paths for existing files before emitting any workflow step event.
+[x] Subtask 162.3. In `WorkflowRuntime.ts`, after existing-project selection and project-folder creation, check resolved singleton artifact paths for existing files before emitting any workflow step event.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 162.4. In `WorkflowRuntime.ts`, when no resolved singleton artifact exists, persist `entryArtifactResolution` results with `creationRequired: true` and `existingArtifactAction: "none"`, then emit `entry_artifact_resolution_completed`.
+[x] Subtask 162.4. In `WorkflowRuntime.ts`, when no resolved singleton artifact exists, persist `entryArtifactResolution` results with `creationRequired: true` and `existingArtifactAction: "none"`, then emit `entry_artifact_resolution_completed`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 162.5. In `WorkflowRuntime.ts`, when a resolved singleton artifact exists, render a runtime-owned conflict `WorkflowForm` panel asking whether to continue work on the existing document.
+[x] Subtask 162.5. In `WorkflowRuntime.ts`, when a resolved singleton artifact exists, render a runtime-owned conflict `WorkflowForm` panel asking whether to continue work on the existing document.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 162.6. In `WorkflowRuntime.ts`, if the user chooses to continue the existing document, persist the artifact output workflow values for the existing file and append a resolution with `creationRequired: false` and `existingArtifactAction: "continue_existing"`.
+[x] Subtask 162.6. In `WorkflowRuntime.ts`, if the user chooses to continue the existing document, persist the artifact output workflow values for the existing file and append a resolution with `creationRequired: false` and `existingArtifactAction: "continue_existing"`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 162.7. In `WorkflowRuntime.ts`, if the user chooses not to continue the existing document, render a runtime-owned replacement `WorkflowForm` panel offering only archive, delete, or cancel.
+[x] Subtask 162.7. In `WorkflowRuntime.ts`, if the user chooses not to continue the existing document, render a runtime-owned replacement `WorkflowForm` panel offering only archive, delete, or cancel.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 162.8. In `WorkflowRuntime.ts`, if the user cancels from the replacement panel, return to the project-selection panel and emit no `entry_artifact_resolution_completed` event.
+[x] Subtask 162.8. In `WorkflowRuntime.ts`, if the user cancels from the replacement panel, return to the project-selection panel and emit no `entry_artifact_resolution_completed` event.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Task 163. Add backend-only workflow artifact archive/delete tool contracts and handlers.
+[x] Task 163. Add backend-only workflow artifact archive/delete tool contracts and handlers.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/shared/tools.ts`
@@ -7931,42 +7939,42 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/ArchiveWorkflowArtifactToolHandler.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/DeleteWorkflowArtifactToolHandler.test.ts`
 
-[ ] Subtask 163.1. In `src/shared/tools.ts`, add `ARCHIVE_WORKFLOW_ARTIFACT = "archive_workflow_artifact"` and `DELETE_WORKFLOW_ARTIFACT = "delete_workflow_artifact"` to `ClineDefaultTool`; do not add either tool to `READ_ONLY_TOOLS`.
+[x] Subtask 163.1. In `src/shared/tools.ts`, add `ARCHIVE_WORKFLOW_ARTIFACT = "archive_workflow_artifact"` and `DELETE_WORKFLOW_ARTIFACT = "delete_workflow_artifact"` to `ClineDefaultTool`; do not add either tool to `READ_ONLY_TOOLS`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/shared/tools.ts`
 
-[ ] Subtask 163.2. In `backendWorkflowToolContracts.ts`, add backend workflow contracts for `archive_workflow_artifact` and `delete_workflow_artifact`, each requiring only non-empty `artifact_id`.
+[x] Subtask 163.2. In `backendWorkflowToolContracts.ts`, add backend workflow contracts for `archive_workflow_artifact` and `delete_workflow_artifact`, each requiring only non-empty `artifact_id`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/backendWorkflowToolContracts.ts`
 
-[ ] Subtask 163.3. In `ResponseToolRegistry.ts`, register both new tools with `undefined` response-tool metadata.
+[x] Subtask 163.3. In `ResponseToolRegistry.ts`, register both new tools with `undefined` response-tool metadata.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/response/ResponseToolRegistry.ts`
 
-[ ] Subtask 163.4. In `ToolExecutorCoordinator.ts`, register `ArchiveWorkflowArtifactToolHandler` and `DeleteWorkflowArtifactToolHandler`.
+[x] Subtask 163.4. In `ToolExecutorCoordinator.ts`, register `ArchiveWorkflowArtifactToolHandler` and `DeleteWorkflowArtifactToolHandler`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/ToolExecutorCoordinator.ts`
 
-[ ] Subtask 163.5. In `autoApprove.ts`, classify both new tools as edit-file operations wherever `CREATE_WORKFLOW_ARTIFACT` and `BUILD_WORKFLOW_DOCUMENT` are classified as edit-file operations.
+[x] Subtask 163.5. In `autoApprove.ts`, classify both new tools as edit-file operations wherever `CREATE_WORKFLOW_ARTIFACT` and `BUILD_WORKFLOW_DOCUMENT` are classified as edit-file operations.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/autoApprove.ts`
 
-[ ] Subtask 163.6. Add `ArchiveWorkflowArtifactToolHandler.ts`, following the approval, path-policy, hook, cache-invalidation, and structured-result pattern used by `CreateWorkflowArtifactToolHandler`.
+[x] Subtask 163.6. Add `ArchiveWorkflowArtifactToolHandler.ts`, following the approval, path-policy, hook, cache-invalidation, and structured-result pattern used by `CreateWorkflowArtifactToolHandler`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/ArchiveWorkflowArtifactToolHandler.ts`
 
-[ ] Subtask 163.7. Add `DeleteWorkflowArtifactToolHandler.ts`, following the approval, path-policy, hook, cache-invalidation, and structured-result pattern used by `CreateWorkflowArtifactToolHandler`.
+[x] Subtask 163.7. Add `DeleteWorkflowArtifactToolHandler.ts`, following the approval, path-policy, hook, cache-invalidation, and structured-result pattern used by `CreateWorkflowArtifactToolHandler`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/DeleteWorkflowArtifactToolHandler.ts`
 
-[ ] Task 164. Implement runtime-owned archive/delete filesystem operations and result consumption.
+[x] Task 164. Implement runtime-owned archive/delete filesystem operations and result consumption.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
@@ -7974,52 +7982,52 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts`
 
-[ ] Subtask 164.1. In `WorkflowRuntime.ts`, add `prepareWorkflowArtifactArchive(...)` that returns the source canonical artifact path and top-level `{project}/archive/{filename}` target for the pending archive operation.
+[x] Subtask 164.1. In `WorkflowRuntime.ts`, add `prepareWorkflowArtifactArchive(...)` that returns the source canonical artifact path and top-level `{project}/archive/{filename}` target for the pending archive operation.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 164.2. In `WorkflowRuntime.ts`, add `archiveWorkflowArtifact(...)` that moves the source artifact into the selected project’s top-level `archive` folder using the same filename, with no nested archive folder and no rename.
+[x] Subtask 164.2. In `WorkflowRuntime.ts`, add `archiveWorkflowArtifact(...)` that moves the source artifact into the selected project’s top-level `archive` folder using the same filename, with no nested archive folder and no rename.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 164.3. In `WorkflowRuntime.ts`, implement archive no-overwrite behavior so `{project}/archive/{filename}` is never overwritten; do not use a bare POSIX `rename` path that can overwrite an existing target.
+[x] Subtask 164.3. In `WorkflowRuntime.ts`, implement archive no-overwrite behavior so `{project}/archive/{filename}` is never overwritten; do not use a bare POSIX `rename` path that can overwrite an existing target.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 164.4. In `WorkflowRuntime.ts`, add `prepareWorkflowArtifactDeletion(...)` that returns only the pending canonical artifact source path for deletion.
+[x] Subtask 164.4. In `WorkflowRuntime.ts`, add `prepareWorkflowArtifactDeletion(...)` that returns only the pending canonical artifact source path for deletion.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 164.5. In `WorkflowRuntime.ts`, add `deleteWorkflowArtifact(...)` that deletes only the resolved pending canonical artifact path.
+[x] Subtask 164.5. In `WorkflowRuntime.ts`, add `deleteWorkflowArtifact(...)` that deletes only the resolved pending canonical artifact path.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 164.6. In `WorkflowRuntime.ts`, when the replacement panel selects archive or delete, store the pending operation in `session.entryArtifactResolution` and return the matching backend-only tool-backed operation.
+[x] Subtask 164.6. In `WorkflowRuntime.ts`, when the replacement panel selects archive or delete, store the pending operation in `session.entryArtifactResolution` and return the matching backend-only tool-backed operation.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 164.7. In `WorkflowRuntime.ts`, update `isRuntimeOwnedWorkflowTool(...)` so archive/delete are treated as runtime-owned workflow tools.
+[x] Subtask 164.7. In `WorkflowRuntime.ts`, update `isRuntimeOwnedWorkflowTool(...)` so archive/delete are treated as runtime-owned workflow tools.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 164.8. In `WorkflowRuntime.ts`, update `handleToolBackedOperationToolResult(...)` so successful pending archive/delete operations append the correct `entryArtifactResolution` result and continue entry artifact resolution.
+[x] Subtask 164.8. In `WorkflowRuntime.ts`, update `handleToolBackedOperationToolResult(...)` so successful pending archive/delete operations append the correct `entryArtifactResolution` result and continue entry artifact resolution.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 164.9. In `WorkflowRuntime.ts`, update `handleToolBackedOperationToolResult(...)` so failed pending archive/delete operations clear the pending operation and return a clear terminal error.
+[x] Subtask 164.9. In `WorkflowRuntime.ts`, update `handleToolBackedOperationToolResult(...)` so failed pending archive/delete operations clear the pending operation and return a clear terminal error.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Task 165. Add foundational runtime coverage for existing singleton artifact resolution.
+[x] Task 165. Add foundational runtime coverage for existing singleton artifact resolution.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
@@ -8028,84 +8036,84 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/ArchiveWorkflowArtifactToolHandler.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/DeleteWorkflowArtifactToolHandler.test.ts`
 
-[ ] Subtask 165.1. In `WorkflowRuntime.test.ts`, add coverage proving existing-project selection creates the top-level `archive` project subfolder.
+[x] Subtask 165.1. In `WorkflowRuntime.test.ts`, add coverage proving existing-project selection creates the top-level `archive` project subfolder.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 165.2. In `WorkflowRuntime.test.ts`, add coverage proving no existing singleton artifact emits `entry_artifact_resolution_completed` with `creationRequired: true` and `existingArtifactAction: "none"`.
+[x] Subtask 165.2. In `WorkflowRuntime.test.ts`, add coverage proving no existing singleton artifact emits `entry_artifact_resolution_completed` with `creationRequired: true` and `existingArtifactAction: "none"`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 165.3. In `WorkflowRuntime.test.ts`, add coverage proving an existing singleton artifact renders the conflict panel before workflow step orchestration.
+[x] Subtask 165.3. In `WorkflowRuntime.test.ts`, add coverage proving an existing singleton artifact renders the conflict panel before workflow step orchestration.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 165.4. In `WorkflowRuntime.test.ts`, add coverage proving continue-existing persists artifact output values and emits `creationRequired: false` with `existingArtifactAction: "continue_existing"`.
+[x] Subtask 165.4. In `WorkflowRuntime.test.ts`, add coverage proving continue-existing persists artifact output values and emits `creationRequired: false` with `existingArtifactAction: "continue_existing"`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 165.5. In `WorkflowRuntime.test.ts`, add coverage proving archive moves the file to `{project}/archive/{filename}` with the same filename and leaves no file at the source path.
+[x] Subtask 165.5. In `WorkflowRuntime.test.ts`, add coverage proving archive moves the file to `{project}/archive/{filename}` with the same filename and leaves no file at the source path.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 165.6. In `WorkflowRuntime.test.ts`, add coverage proving archive fails clearly and does not overwrite when `{project}/archive/{filename}` already exists.
+[x] Subtask 165.6. In `WorkflowRuntime.test.ts`, add coverage proving archive fails clearly and does not overwrite when `{project}/archive/{filename}` already exists.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 165.7. In `WorkflowRuntime.test.ts`, add coverage proving delete removes only the resolved canonical singleton artifact source path.
+[x] Subtask 165.7. In `WorkflowRuntime.test.ts`, add coverage proving delete removes only the resolved canonical singleton artifact source path.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 165.8. In `WorkflowRuntime.test.ts`, add coverage proving cancel from the replacement panel returns to project selection and emits no `entry_artifact_resolution_completed` event.
+[x] Subtask 165.8. In `WorkflowRuntime.test.ts`, add coverage proving cancel from the replacement panel returns to project selection and emits no `entry_artifact_resolution_completed` event.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 165.9. In `workflow-runtime-metadata.test.ts`, add restore coverage proving valid persisted entry artifact resolution state restores and malformed persisted state tears down with persistence required.
+[x] Subtask 165.9. In `workflow-runtime-metadata.test.ts`, add restore coverage proving valid persisted entry artifact resolution state restores and malformed persisted state tears down with persistence required.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
 
-[ ] Subtask 165.10. In `ArchiveWorkflowArtifactToolHandler.test.ts`, cover missing `artifact_id`, partial blocks, path-policy denial for source and archive paths, approval denial, hook denial, and successful archive.
+[x] Subtask 165.10. In `ArchiveWorkflowArtifactToolHandler.test.ts`, cover missing `artifact_id`, partial blocks, path-policy denial for source and archive paths, approval denial, hook denial, and successful archive.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/ArchiveWorkflowArtifactToolHandler.test.ts`
 
-[ ] Subtask 165.11. In `DeleteWorkflowArtifactToolHandler.test.ts`, cover missing `artifact_id`, partial blocks, path-policy denial, approval denial, hook denial, and successful delete.
+[x] Subtask 165.11. In `DeleteWorkflowArtifactToolHandler.test.ts`, cover missing `artifact_id`, partial blocks, path-policy denial, approval denial, hook denial, and successful delete.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/DeleteWorkflowArtifactToolHandler.test.ts`
 
-[ ] Task 166. Prove archive/delete remain backend-only and are not statically prompt-exposed.
+[x] Task 166. Prove archive/delete remain backend-only and are not statically prompt-exposed.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/response_tools.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/response/__tests__/ResponseToolRuntime.test.ts`
 
-[ ] Subtask 166.1. In `integration.test.ts`, add coverage proving `archive_workflow_artifact` and `delete_workflow_artifact` are absent from default system-prompt tool surfaces when no active workflow projects them.
+[x] Subtask 166.1. In `integration.test.ts`, add coverage proving `archive_workflow_artifact` and `delete_workflow_artifact` are absent from default system-prompt tool surfaces when no active workflow projects them.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 166.2. In `response_tools.test.ts`, add coverage proving archive/delete do not render response-tool guidance.
+[x] Subtask 166.2. In `response_tools.test.ts`, add coverage proving archive/delete do not render response-tool guidance.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/response_tools.test.ts`
 
-[ ] Subtask 166.3. In `ResponseToolRuntime.test.ts`, add coverage proving response metadata for archive/delete is `undefined`.
+[x] Subtask 166.3. In `ResponseToolRuntime.test.ts`, add coverage proving response metadata for archive/delete is `undefined`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/response/__tests__/ResponseToolRuntime.test.ts`
 
-[ ] Task 167. Validate Phase 58.
+[x] Task 167. Validate Phase 58.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
@@ -8120,39 +8128,52 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/ArchiveWorkflowArtifactToolHandler.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/DeleteWorkflowArtifactToolHandler.test.ts`
-- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/response_tools.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/response/__tests__/ResponseToolRuntime.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingDocument.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureDocument.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`
 
-[ ] Subtask 167.1. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts src/core/task/__tests__/workflow-runtime-metadata.test.ts`; it must pass before Phase 58 is marked complete.
+[x] Subtask 167.1. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts src/core/task/__tests__/workflow-runtime-metadata.test.ts`; it must pass before Phase 58 is marked complete.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
 
-[ ] Subtask 167.2. Run `npm run test:unit -- src/core/task/tools/handlers/__tests__/ArchiveWorkflowArtifactToolHandler.test.ts src/core/task/tools/handlers/__tests__/DeleteWorkflowArtifactToolHandler.test.ts src/core/task/tools/response/__tests__/ResponseToolRuntime.test.ts`; it must pass before Phase 58 is marked complete.
+[x] Subtask 167.2. Run `npm run test:unit -- src/core/task/tools/handlers/__tests__/ArchiveWorkflowArtifactToolHandler.test.ts src/core/task/tools/handlers/__tests__/DeleteWorkflowArtifactToolHandler.test.ts src/core/task/tools/response/__tests__/ResponseToolRuntime.test.ts`; it must pass before Phase 58 is marked complete.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/ArchiveWorkflowArtifactToolHandler.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/DeleteWorkflowArtifactToolHandler.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/response/__tests__/ResponseToolRuntime.test.ts`
 
-[ ] Subtask 167.3. Run `npm run test:unit -- src/core/prompts/system-prompt/__tests__/integration.test.ts src/core/prompts/system-prompt/__tests__/response_tools.test.ts`; it must pass before Phase 58 is marked complete.
+[x] Subtask 167.3. Run `npm run test:unit -- src/core/prompts/system-prompt/__tests__/integration.test.ts src/core/prompts/system-prompt/__tests__/response_tools.test.ts`; it must pass before Phase 58 is marked complete.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/response_tools.test.ts`
 
-[ ] Subtask 167.4. Run `rg "archive_workflow_artifact|delete_workflow_artifact" src/core/prompts/system-prompt/tools src/core/prompts/system-prompt/variants src/core/prompts/system-prompt/__tests__/__snapshots__`; it must return no matches before Phase 58 is marked complete.
+[x] Subtask 167.4. Run `rg "archive_workflow_artifact|delete_workflow_artifact" src/core/prompts/system-prompt/tools src/core/prompts/system-prompt/variants src/core/prompts/system-prompt/__tests__/__snapshots__`; it must return no matches before Phase 58 is marked complete.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/response_tools.test.ts`
 
-[ ] Subtask 167.5. Run `npm run check-types` and `npm run lint`; both must pass before Phase 58 is marked complete.
+[x] Subtask 167.4a. In the check-types fixture files, add `entryArtifactResolution: undefined` to hand-built `ActiveWorkflowSession` fixtures exposed by Phase 58 type changes; do not change workflow-module behavior.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingDocument.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureDocument.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`
+
+[x] Subtask 167.5. Run `npm run check-types` and `npm run lint`; both must pass before Phase 58 is marked complete.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`

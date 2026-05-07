@@ -6,6 +6,7 @@ import { AccessMcpResourceHandler } from "./handlers/AccessMcpResourceHandler"
 import { ActModeRespondHandler } from "./handlers/ActModeRespondHandler"
 import { AppendBrainstormingSelectedTechniqueToolHandler } from "./handlers/AppendBrainstormingSelectedTechniqueToolHandler"
 import { ApplyPatchHandler } from "./handlers/ApplyPatchHandler"
+import { ArchiveWorkflowArtifactToolHandler } from "./handlers/ArchiveWorkflowArtifactToolHandler"
 import { AskFollowupQuestionToolHandler } from "./handlers/AskFollowupQuestionToolHandler"
 import { AttemptCompletionHandler } from "./handlers/AttemptCompletionHandler"
 import { BrowserToolHandler } from "./handlers/BrowserToolHandler"
@@ -13,6 +14,7 @@ import { BuildWorkflowDocumentToolHandler } from "./handlers/BuildWorkflowDocume
 import { CodeReviewSpecUpdateToolHandler } from "./handlers/CodeReviewSpecUpdateToolHandler"
 import { CondenseHandler } from "./handlers/CondenseHandler"
 import { CreateWorkflowArtifactToolHandler } from "./handlers/CreateWorkflowArtifactToolHandler"
+import { DeleteWorkflowArtifactToolHandler } from "./handlers/DeleteWorkflowArtifactToolHandler"
 import { ExecuteCommandToolHandler } from "./handlers/ExecuteCommandToolHandler"
 import { GenerateExplanationToolHandler } from "./handlers/GenerateExplanationToolHandler"
 import { GetBrainstormingMethodsToolHandler } from "./handlers/GetBrainstormingMethodsToolHandler"
@@ -124,6 +126,8 @@ export class ToolExecutorCoordinator {
 		[ClineDefaultTool.SET_WORKFLOW_VALUES]: (_v: ToolValidator) => new SetWorkflowValuesToolHandler(),
 		[ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT]: (v: ToolValidator) => new BuildWorkflowDocumentToolHandler(v),
 		[ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT]: (v: ToolValidator) => new CreateWorkflowArtifactToolHandler(v),
+		[ClineDefaultTool.ARCHIVE_WORKFLOW_ARTIFACT]: (v: ToolValidator) => new ArchiveWorkflowArtifactToolHandler(v),
+		[ClineDefaultTool.DELETE_WORKFLOW_ARTIFACT]: (v: ToolValidator) => new DeleteWorkflowArtifactToolHandler(v),
 		[ClineDefaultTool.GET_BRAINSTORMING_METHODS]: (_v: ToolValidator) => new GetBrainstormingMethodsToolHandler(),
 		[ClineDefaultTool.APPEND_BRAINSTORMING_SELECTED_TECHNIQUE]: (_v: ToolValidator) =>
 			new AppendBrainstormingSelectedTechniqueToolHandler(),

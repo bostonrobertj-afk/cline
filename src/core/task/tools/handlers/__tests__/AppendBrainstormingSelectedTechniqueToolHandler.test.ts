@@ -47,6 +47,7 @@ function createBrainstormingSession(workflowValues: WorkflowValues): ActiveWorkf
 			projectTitle: "Project One",
 			projectFolderName: "project-one",
 		},
+		entryArtifactResolution: undefined,
 		ui: {
 			formSession: undefined,
 			stepResolutionSession: undefined,

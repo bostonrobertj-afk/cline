@@ -23,8 +23,11 @@ import { ToolValidator } from "@/core/task/tools/ToolValidator"
 import type { TaskConfig } from "@/core/task/tools/types/TaskConfig"
 import { ToolResultUtils } from "@/core/task/tools/utils"
 import type { WorkflowFormSessionState } from "@/core/task/workflow-form/types"
+import { WorkflowArtifactFamily } from "@/core/task/workflow-runtime/artifactFamilies"
 import type {
 	PersistedWorkflowSession,
+	WorkflowDefinition,
+	WorkflowEntryArtifactResolution,
 	WorkflowNextAction,
 	WorkflowPromptProjection,
 	WorkflowWorkspacePathPolicy,
@@ -56,6 +59,7 @@ function createPersistedSession(): PersistedWorkflowSession {
 			projectTitle: "Persisted Project",
 			projectFolderName: "persisted-project",
 		},
+		entryArtifactResolution: undefined,
 		ui: {
 			formSession: undefined,
 			stepResolutionSession: undefined,
@@ -65,6 +69,74 @@ function createPersistedSession(): PersistedWorkflowSession {
 		branchContext: {
 			activeBranchId: "project-prompt",
 		},
+	}
+}
+
+function createValidEntryArtifactResolution(): WorkflowEntryArtifactResolution {
+	return {
+		artifactId: "epics_doc",
+		artifactFamily: WorkflowArtifactFamily.Epics,
+		artifactIdentity: "epics",
+		artifactFilename: "Epics.md",
+		artifactRelativePath: "planning/Epics.md",
+		artifactAbsolutePath: "/tmp/docs/projects/persisted-project/planning/Epics.md",
+		creationRequired: false,
+		existingArtifactAction: "continue_existing",
+	}
+}
+
+function createMetadataRestoreWorkflow(): WorkflowDefinition {
+	return {
+		name: "workflow-runtime-metadata-restore-test",
+		displayName: "Workflow Runtime Metadata Restore Test",
+		description: "A minimal workflow fixture for metadata restore validation.",
+		slashCommandName: "workflow-runtime-metadata-restore-test",
+		useSkillName: "workflow-runtime-metadata-restore-test",
+		persona: {
+			name: "Metadata Mary",
+			role: "Runtime metadata tester",
+			identity: "Metadata Mary validates workflow metadata restore behavior.",
+			capabilities: ["metadata restore validation"],
+			communicationStyle: "Direct and deterministic.",
+			principles: ["Keep persisted workflow state canonical."],
+		},
+		projectSubfolder: "planning",
+		workflowValueKeys: ["entry_project_mode", "entry_project_title", "entry_project_folder_name"],
+		entryProjectValueKeys: {
+			projectMode: "entry_project_mode",
+			projectTitle: "entry_project_title",
+			projectFolderName: "entry_project_folder_name",
+		},
+		entryPanel: {
+			promptMarkdown: "Restore metadata workflow.",
+		},
+		steps: {
+			"step-1": {
+				id: "step-1",
+				stepNumber: 1,
+				checklistLabel: "Restore metadata",
+				buildPromptSource: () => ({
+					currentStepInstructions: "Restore metadata.",
+				}),
+				buildToolSchema: () => [],
+				decisionTree: {
+					entryBranchId: "project-prompt",
+					branches: {
+						"project-prompt": {
+							id: "project-prompt",
+							routes: [
+								{
+									id: "project-prompt-route",
+									trigger: { kind: "always" },
+									action: { kind: "project_prompt" },
+								},
+							],
+						},
+					},
+				},
+			},
+		},
+		workflowForms: {},
 	}
 }
 
@@ -428,6 +500,74 @@ describe("workflow runtime metadata persistence", () => {
 			sinon.assert.notCalled(saveMetadata)
 			saveMetadata.resetHistory()
 		}
+	})
+
+	it("restores valid persisted entry artifact resolution state from metadata", async () => {
+		const workflow = createMetadataRestoreWorkflow()
+		const entryArtifactResolution = {
+			artifactResolutions: [createValidEntryArtifactResolution()],
+			pendingFileOperation: undefined,
+		}
+		const metadata = createMetadata()
+		metadata.activeWorkflowName = workflow.name
+		metadata.activeWorkflowSession = {
+			...createPersistedSession(),
+			entryArtifactResolution,
+		}
+		const workflowRuntime = new WorkflowRuntime({
+			cwd: "/tmp",
+			workspacePathPolicy: createAllowAllWorkspacePathPolicy(),
+		})
+		const resolveNextAction = sandbox.stub(workflowRuntime, "resolveNextAction").resolves({ kind: "no_op" })
+		sandbox.stub(WorkflowRegistry, "resolveWorkflowDefinition").returns(workflow)
+		const taskState = new TaskState()
+		const task = createTaskHarness(taskState, workflowRuntime)
+		const saveMetadata = sandbox.stub(disk, "saveTaskMetadata").resolves()
+
+		await callTaskMethod(task, "restoreWorkflowRuntimeStateFromMetadata", metadata)
+
+		sinon.assert.calledOnce(resolveNextAction)
+		sinon.assert.notCalled(saveMetadata)
+		expect(taskState.activeWorkflowName).to.equal(workflow.name)
+		const restoredSession = taskState.activeWorkflowSession
+		expect(restoredSession).to.not.equal(undefined)
+		if (restoredSession === undefined) {
+			throw new Error("Expected restored workflow session.")
+		}
+		expect(restoredSession.entryArtifactResolution).to.deep.equal(entryArtifactResolution)
+	})
+
+	it("persists teardown when persisted entry artifact resolution state is malformed", async () => {
+		const workflow = createMetadataRestoreWorkflow()
+		const metadata = createMetadata()
+		const malformedSession = createPersistedSession()
+		Reflect.set(malformedSession, "entryArtifactResolution", {
+			artifactResolutions: "not-an-array",
+			pendingFileOperation: undefined,
+		})
+		metadata.activeWorkflowName = workflow.name
+		metadata.activeWorkflowSession = malformedSession
+		const workflowRuntime = new WorkflowRuntime({
+			cwd: "/tmp",
+			workspacePathPolicy: createAllowAllWorkspacePathPolicy(),
+		})
+		const resolveNextAction = sandbox.stub(workflowRuntime, "resolveNextAction").resolves({ kind: "no_op" })
+		sandbox.stub(WorkflowRegistry, "resolveWorkflowDefinition").returns(workflow)
+		const taskState = new TaskState()
+		const task = createTaskHarness(taskState, workflowRuntime)
+		const saveMetadata = sandbox.stub(disk, "saveTaskMetadata").resolves()
+
+		await callTaskMethod(task, "restoreWorkflowRuntimeStateFromMetadata", metadata)
+
+		sinon.assert.notCalled(resolveNextAction)
+		sinon.assert.calledOnce(saveMetadata)
+		expect(taskState.activeWorkflowName).to.equal(undefined)
+		expect(taskState.activeWorkflowSession).to.equal(undefined)
+		expect(metadata.activeWorkflowName).to.equal(undefined)
+		expect(metadata.activeWorkflowSession).to.equal(undefined)
+		expect(saveMetadata.firstCall.args[0]).to.equal("task-1")
+		expect(saveMetadata.firstCall.args[1].activeWorkflowName).to.equal(undefined)
+		expect(saveMetadata.firstCall.args[1].activeWorkflowSession).to.equal(undefined)
 	})
 
 	it("persists cleared workflow metadata when persisted sessions are missing canonical workflow identity", async () => {

@@ -51,6 +51,7 @@ function createConfig(storyPath: string): {
 		activeStepNumber: 2,
 		workflowValues: { story_path: storyPath },
 		projectSelection: { projectMode: "new", projectTitle: "", projectFolderName: "" },
+		entryArtifactResolution: undefined,
 		ui: {
 			formSession: undefined,
 			stepResolutionSession: undefined,

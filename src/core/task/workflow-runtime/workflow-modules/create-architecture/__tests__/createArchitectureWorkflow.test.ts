@@ -86,6 +86,7 @@ function createSession(workflowValues: WorkflowValues): ActiveWorkflowSession {
 			projectTitle: "Create Architecture Project",
 			projectFolderName: "create-architecture-project",
 		},
+		entryArtifactResolution: undefined,
 		ui: {
 			formSession: undefined,
 			stepResolutionSession: undefined,

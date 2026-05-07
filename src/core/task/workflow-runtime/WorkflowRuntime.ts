@@ -11,7 +11,8 @@ import type {
 } from "@shared/ExtensionMessage"
 import { WorkflowFormAction, type WorkflowFormSubmissionRequest } from "@shared/proto/cline/task"
 import { randomUUID } from "crypto"
-import { mkdir, readFile, writeFile } from "fs/promises"
+import { constants } from "fs"
+import { copyFile, mkdir, readFile, stat, unlink, writeFile } from "fs/promises"
 import { dirname, join } from "path"
 import { isSerializedToolFailureResultText } from "@/core/prompts/responses"
 import type { TaskState } from "@/core/task/TaskState"
@@ -55,6 +56,11 @@ import type {
 	WorkflowDecisionBranchEvaluationInput,
 	WorkflowDecisionBranchRoute,
 	WorkflowDefinition,
+	WorkflowEntryArtifactExistingAction,
+	WorkflowEntryArtifactFileOperation,
+	WorkflowEntryArtifactPendingFileOperation,
+	WorkflowEntryArtifactResolution,
+	WorkflowEntryArtifactResolutionState,
 	WorkflowNextAction,
 	WorkflowProjectSelectionState,
 	WorkflowProjectSubfolder,
@@ -80,6 +86,7 @@ const WORKFLOW_PROJECT_SUBFOLDERS: readonly WorkflowProjectSubfolder[] = [
 	"implementation",
 	"review",
 	"testing",
+	"archive",
 ]
 const WORKFLOW_PROJECT_OUTPUT_ROOT_PATH_SEGMENTS = ["docs", "projects"] as const
 const WORKFLOW_ENTRY_FORM_ID = "__workflow_runtime_entry_form__"
@@ -88,6 +95,13 @@ const WORKFLOW_ENTRY_PROJECT_SELECTION_PANEL_ID = "__workflow_runtime_entry_proj
 const WORKFLOW_ENTRY_PROJECT_MODE_FIELD_KEY = "__workflow_runtime_project_mode__"
 const WORKFLOW_ENTRY_EXISTING_PROJECT_FIELD_KEY = "__workflow_runtime_existing_project__"
 const WORKFLOW_ENTRY_NEW_PROJECT_TITLE_FIELD_KEY = "__workflow_runtime_new_project_title__"
+const WORKFLOW_ENTRY_ARTIFACT_CONFLICT_PANEL_ID = "__workflow_runtime_entry_artifact_conflict__"
+const WORKFLOW_ENTRY_ARTIFACT_CONFLICT_ACTION_FIELD_KEY = "__workflow_runtime_entry_artifact_conflict_action__"
+const WORKFLOW_ENTRY_ARTIFACT_CONFLICT_CONTINUE_VALUE = "continue_existing"
+const WORKFLOW_ENTRY_ARTIFACT_CONFLICT_REPLACE_VALUE = "replace_existing"
+const WORKFLOW_ENTRY_ARTIFACT_REPLACEMENT_PANEL_ID = "__workflow_runtime_entry_artifact_replacement__"
+const WORKFLOW_ENTRY_ARTIFACT_REPLACEMENT_ACTION_FIELD_KEY = "__workflow_runtime_entry_artifact_replacement_action__"
+const WORKFLOW_ENTRY_ARTIFACT_REPLACEMENT_CANCEL_VALUE = "cancel"
 
 export interface WorkflowArtifactAllocationOutput {
 	artifactId: string
@@ -107,6 +121,15 @@ export interface WorkflowArtifactCreationResult extends WorkflowArtifactAllocati
 	changedWorkflowValues: WorkflowValues
 	unchangedWorkflowValues: WorkflowValues
 }
+
+export interface WorkflowArtifactArchivePreparation extends WorkflowArtifactAllocationOutput {
+	archiveRelativePath: string
+	archiveAbsolutePath: string
+}
+
+export type WorkflowArtifactArchiveResult = WorkflowArtifactArchivePreparation
+export type WorkflowArtifactDeletionPreparation = WorkflowArtifactAllocationOutput
+export type WorkflowArtifactDeletionResult = WorkflowArtifactDeletionPreparation
 
 interface WorkflowArtifactIdentityResolution {
 	artifactIdentity: string
@@ -140,6 +163,11 @@ interface WorkflowResolvedDecisionTreeRoute {
 interface WorkflowContinuationSourceRoute {
 	route: WorkflowDecisionBranchRoute
 	sourceRoute: WorkflowStepResolutionSourceRoute
+}
+
+interface WorkflowEntrySingletonArtifactCheck {
+	artifactOutputs: readonly WorkflowArtifactAllocationOutput[]
+	existingArtifactOutputs: readonly WorkflowArtifactAllocationOutput[]
 }
 
 export class WorkflowRuntime {
@@ -217,6 +245,7 @@ export class WorkflowRuntime {
 			activeStepNumber: firstStepNumber,
 			workflowValues,
 			projectSelection,
+			entryArtifactResolution: undefined,
 			ui: {
 				formSession: undefined,
 				stepResolutionSession: undefined,
@@ -430,6 +459,40 @@ export class WorkflowRuntime {
 			return this.completeToolBackedOperationSuccess({
 				taskState,
 				sourceRoute: runtimeOwnedSourceRoute,
+			})
+		}
+
+		const pendingEntryArtifactFileOperation = session.entryArtifactResolution?.pendingFileOperation
+		if (pendingEntryArtifactFileOperation !== undefined && isSerializedToolFailureResultText(toolResultText)) {
+			session.entryArtifactResolution = {
+				artifactResolutions: structuredClone(session.entryArtifactResolution?.artifactResolutions ?? []),
+				pendingFileOperation: undefined,
+			}
+			return this.buildTerminalErrorNextAction({
+				taskState,
+				errorMessage: `Workflow artifact ${pendingEntryArtifactFileOperation.operation} operation failed. ${toolResultText}`,
+			})
+		}
+
+		if (pendingEntryArtifactFileOperation !== undefined && isSerializedToolFailureResultText(toolResultText) === false) {
+			const definition = this.getActiveWorkflowDefinition(taskState)
+			if (!definition) {
+				return this.teardownWorkflowAndRequirePersistence({ taskState })
+			}
+
+			const artifactResolutions = [
+				...(session.entryArtifactResolution?.artifactResolutions ?? []),
+				this.buildWorkflowEntryArtifactResolutionFromPendingFileOperation(pendingEntryArtifactFileOperation),
+			]
+			session.entryArtifactResolution = {
+				artifactResolutions,
+				pendingFileOperation: undefined,
+			}
+
+			return this.continueWorkflowEntryArtifactResolution({
+				taskState,
+				workflow: definition,
+				artifactResolutions,
 			})
 		}
 
@@ -711,6 +774,519 @@ export class WorkflowRuntime {
 		})
 	}
 
+	async prepareWorkflowArtifactArchive(args: {
+		taskState: TaskState
+		artifactId: string
+	}): Promise<WorkflowArtifactArchivePreparation> {
+		const artifactOutput = await this.prepareWorkflowArtifactCreation(args)
+		const session = args.taskState.activeWorkflowSession
+		if (!session) {
+			throw new Error("Cannot archive workflow artifact without an active workflow session.")
+		}
+
+		const archiveRelativePath = join("archive", artifactOutput.artifactFilename)
+		const archiveAbsolutePath = join(this.resolveWorkflowProjectOutputFolder(session), archiveRelativePath)
+		this.assertWorkspacePathAllowed(artifactOutput.artifactAbsolutePath)
+		this.assertWorkspacePathAllowed(archiveAbsolutePath)
+
+		return {
+			...artifactOutput,
+			archiveRelativePath,
+			archiveAbsolutePath,
+		}
+	}
+
+	async archiveWorkflowArtifact(args: {
+		taskState: TaskState
+		artifactId: string
+		expectedArtifactAbsolutePath: string
+		expectedArchiveAbsolutePath: string
+	}): Promise<WorkflowArtifactArchiveResult> {
+		const preparedArchive = await this.prepareWorkflowArtifactArchive({
+			taskState: args.taskState,
+			artifactId: args.artifactId,
+		})
+		if (
+			preparedArchive.artifactAbsolutePath !== args.expectedArtifactAbsolutePath ||
+			preparedArchive.archiveAbsolutePath !== args.expectedArchiveAbsolutePath
+		) {
+			throw new Error("Workflow artifact archive paths changed before archive execution.")
+		}
+
+		const archiveParentDirectory = dirname(preparedArchive.archiveAbsolutePath)
+		this.assertWorkspacePathAllowed(archiveParentDirectory)
+		await mkdir(archiveParentDirectory, { recursive: true })
+		this.assertWorkspacePathAllowed(preparedArchive.artifactAbsolutePath)
+		this.assertWorkspacePathAllowed(preparedArchive.archiveAbsolutePath)
+		try {
+			await copyFile(preparedArchive.artifactAbsolutePath, preparedArchive.archiveAbsolutePath, constants.COPYFILE_EXCL)
+		} catch (error) {
+			if (this.isFileAlreadyExistsError(error)) {
+				throw new Error(
+					`Cannot archive workflow artifact because archive target already exists: ${preparedArchive.archiveAbsolutePath}`,
+				)
+			}
+
+			throw error
+		}
+		await unlink(preparedArchive.artifactAbsolutePath)
+
+		return preparedArchive
+	}
+
+	async prepareWorkflowArtifactDeletion(args: {
+		taskState: TaskState
+		artifactId: string
+	}): Promise<WorkflowArtifactDeletionPreparation> {
+		const artifactOutput = await this.prepareWorkflowArtifactCreation(args)
+		this.assertWorkspacePathAllowed(artifactOutput.artifactAbsolutePath)
+		return artifactOutput
+	}
+
+	async deleteWorkflowArtifact(args: {
+		taskState: TaskState
+		artifactId: string
+		expectedArtifactAbsolutePath: string
+	}): Promise<WorkflowArtifactDeletionResult> {
+		const preparedDeletion = await this.prepareWorkflowArtifactDeletion({
+			taskState: args.taskState,
+			artifactId: args.artifactId,
+		})
+		if (preparedDeletion.artifactAbsolutePath !== args.expectedArtifactAbsolutePath) {
+			throw new Error("Workflow artifact deletion path changed before deletion execution.")
+		}
+
+		this.assertWorkspacePathAllowed(preparedDeletion.artifactAbsolutePath)
+		await unlink(preparedDeletion.artifactAbsolutePath)
+		return preparedDeletion
+	}
+
+	private async resolveActiveWorkflowNewArtifactOutputs(args: {
+		taskState: TaskState
+	}): Promise<readonly WorkflowArtifactAllocationOutput[]> {
+		const session = args.taskState.activeWorkflowSession
+		if (!session) {
+			throw new Error("Cannot resolve workflow artifacts without an active workflow session.")
+		}
+
+		const workflow = this.getActiveWorkflowDefinition(args.taskState)
+		if (!workflow) {
+			throw new Error("Cannot resolve workflow artifacts without an active workflow definition.")
+		}
+
+		const artifactOutputs: WorkflowArtifactAllocationOutput[] = []
+		for (const artifactDefinition of Object.values(workflow.artifacts ?? {})) {
+			if (artifactDefinition.intentMode !== "new") {
+				continue
+			}
+
+			artifactOutputs.push(
+				await this.resolveWorkflowArtifactAllocation({
+					workflow,
+					session,
+					artifactDefinition,
+				}),
+			)
+		}
+
+		return artifactOutputs
+	}
+
+	private async resolveActiveWorkflowNewSingletonArtifactOutputs(args: {
+		taskState: TaskState
+	}): Promise<readonly WorkflowArtifactAllocationOutput[]> {
+		const session = args.taskState.activeWorkflowSession
+		if (!session) {
+			throw new Error("Cannot resolve workflow singleton artifacts without an active workflow session.")
+		}
+
+		const workflow = this.getActiveWorkflowDefinition(args.taskState)
+		if (!workflow) {
+			throw new Error("Cannot resolve workflow singleton artifacts without an active workflow definition.")
+		}
+
+		const artifactOutputs: WorkflowArtifactAllocationOutput[] = []
+		for (const artifactDefinition of Object.values(workflow.artifacts ?? {})) {
+			if (artifactDefinition.intentMode !== "new") {
+				continue
+			}
+
+			const familyDefinition = WORKFLOW_ARTIFACT_FAMILY_REGISTRY[artifactDefinition.family]
+			if (familyDefinition.allocationMode !== "singleton_project") {
+				continue
+			}
+
+			artifactOutputs.push(
+				await this.resolveWorkflowArtifactAllocation({
+					workflow,
+					session,
+					artifactDefinition,
+				}),
+			)
+		}
+
+		return artifactOutputs
+	}
+
+	private async doesWorkflowArtifactOutputFileExist(artifactOutput: WorkflowArtifactAllocationOutput): Promise<boolean> {
+		this.assertWorkspacePathAllowed(artifactOutput.artifactAbsolutePath)
+		try {
+			const artifactStats = await stat(artifactOutput.artifactAbsolutePath)
+			return artifactStats.isFile()
+		} catch (error) {
+			if (this.isFileNotFoundError(error)) {
+				return false
+			}
+
+			throw error
+		}
+	}
+
+	private async checkWorkflowEntrySingletonArtifacts(args: {
+		taskState: TaskState
+	}): Promise<WorkflowEntrySingletonArtifactCheck> {
+		const artifactOutputs = await this.resolveActiveWorkflowNewSingletonArtifactOutputs(args)
+		const existingArtifactOutputs: WorkflowArtifactAllocationOutput[] = []
+		for (const artifactOutput of artifactOutputs) {
+			if (await this.doesWorkflowArtifactOutputFileExist(artifactOutput)) {
+				existingArtifactOutputs.push(artifactOutput)
+			}
+		}
+
+		return {
+			artifactOutputs,
+			existingArtifactOutputs,
+		}
+	}
+
+	private buildWorkflowEntryArtifactResolution(args: {
+		artifactOutput: WorkflowArtifactAllocationOutput
+		creationRequired: boolean
+		existingArtifactAction: WorkflowEntryArtifactExistingAction
+	}): WorkflowEntryArtifactResolution {
+		if (this.isWorkflowArtifactFamily(args.artifactOutput.artifactFamily) === false) {
+			throw new Error(`Workflow artifact ${args.artifactOutput.artifactId} resolved an unsupported artifact family.`)
+		}
+
+		return {
+			artifactId: args.artifactOutput.artifactId,
+			artifactFamily: args.artifactOutput.artifactFamily,
+			artifactIdentity: args.artifactOutput.artifactIdentity,
+			artifactFilename: args.artifactOutput.artifactFilename,
+			artifactRelativePath: args.artifactOutput.artifactRelativePath,
+			artifactAbsolutePath: args.artifactOutput.artifactAbsolutePath,
+			creationRequired: args.creationRequired,
+			existingArtifactAction: args.existingArtifactAction,
+		}
+	}
+
+	private buildWorkflowEntryArtifactPendingFileOperation(args: {
+		artifactOutput: WorkflowArtifactAllocationOutput
+		operation: WorkflowEntryArtifactFileOperation
+	}): WorkflowEntryArtifactPendingFileOperation {
+		if (this.isWorkflowArtifactFamily(args.artifactOutput.artifactFamily) === false) {
+			throw new Error(`Workflow artifact ${args.artifactOutput.artifactId} resolved an unsupported artifact family.`)
+		}
+
+		return {
+			artifactId: args.artifactOutput.artifactId,
+			artifactFamily: args.artifactOutput.artifactFamily,
+			artifactIdentity: args.artifactOutput.artifactIdentity,
+			artifactFilename: args.artifactOutput.artifactFilename,
+			artifactRelativePath: args.artifactOutput.artifactRelativePath,
+			artifactAbsolutePath: args.artifactOutput.artifactAbsolutePath,
+			operation: args.operation,
+		}
+	}
+
+	private buildWorkflowEntryArtifactResolutionFromPendingFileOperation(
+		pendingFileOperation: WorkflowEntryArtifactPendingFileOperation,
+	): WorkflowEntryArtifactResolution {
+		return {
+			artifactId: pendingFileOperation.artifactId,
+			artifactFamily: pendingFileOperation.artifactFamily,
+			artifactIdentity: pendingFileOperation.artifactIdentity,
+			artifactFilename: pendingFileOperation.artifactFilename,
+			artifactRelativePath: pendingFileOperation.artifactRelativePath,
+			artifactAbsolutePath: pendingFileOperation.artifactAbsolutePath,
+			creationRequired: true,
+			existingArtifactAction: pendingFileOperation.operation,
+		}
+	}
+
+	private async completeWorkflowEntryArtifactResolution(args: {
+		taskState: TaskState
+		artifactResolutions: readonly WorkflowEntryArtifactResolution[]
+	}): Promise<WorkflowNextAction> {
+		const session = args.taskState.activeWorkflowSession
+		if (!session) {
+			return { kind: "no_op" }
+		}
+
+		const artifactResolutions: WorkflowEntryArtifactResolution[] = structuredClone([...args.artifactResolutions])
+		session.entryArtifactResolution = {
+			artifactResolutions,
+			pendingFileOperation: undefined,
+		}
+		session.ui.formSession = undefined
+		session.branchContext.lastTriggerEvent = {
+			kind: "entry_artifact_resolution_completed",
+			artifactResolutions,
+		}
+		this.refreshCurrentFocusChainChecklist(args.taskState)
+		return this.resolveNextAction({ taskState: args.taskState })
+	}
+
+	private buildWorkflowEntryArtifactFormData(artifactOutput: WorkflowArtifactAllocationOutput): WorkflowFormSessionData {
+		return {
+			artifactId: artifactOutput.artifactId,
+			artifactFamily: artifactOutput.artifactFamily,
+			artifactIdentity: artifactOutput.artifactIdentity,
+			artifactFilename: artifactOutput.artifactFilename,
+			artifactRelativePath: artifactOutput.artifactRelativePath,
+			artifactAbsolutePath: artifactOutput.artifactAbsolutePath,
+		}
+	}
+
+	private buildWorkflowEntryArtifactConflictFormDefinition(
+		artifactOutput: WorkflowArtifactAllocationOutput,
+	): WorkflowFormDefinitionPayload {
+		return {
+			definitionVersion: 1,
+			title: "Existing Workflow Artifact",
+			toolDictionaryTitle: "",
+			toolDictionaryMarkdown: "",
+			firstPanelId: WORKFLOW_ENTRY_ARTIFACT_CONFLICT_PANEL_ID,
+			panels: {
+				[WORKFLOW_ENTRY_ARTIFACT_CONFLICT_PANEL_ID]: {
+					panelId: WORKFLOW_ENTRY_ARTIFACT_CONFLICT_PANEL_ID,
+					title: "Existing Document Found",
+					promptMarkdown: `A canonical workflow document already exists at \`${artifactOutput.artifactRelativePath}\`. Continue work on this existing document?`,
+					fields: [
+						{
+							key: WORKFLOW_ENTRY_ARTIFACT_CONFLICT_ACTION_FIELD_KEY,
+							kind: "radio_group",
+							label: "Existing document",
+							helpText: "Choose whether this workflow should continue with the existing document.",
+							required: true,
+							options: [
+								{
+									value: WORKFLOW_ENTRY_ARTIFACT_CONFLICT_CONTINUE_VALUE,
+									label: "Continue Existing",
+								},
+								{
+									value: WORKFLOW_ENTRY_ARTIFACT_CONFLICT_REPLACE_VALUE,
+									label: "Replace Existing",
+								},
+							],
+						},
+					],
+					allowedActions: ["submit"],
+					actionLabels: {
+						submit: "Continue",
+					},
+					transition: {
+						type: "conditional",
+						conditionSourceKey: WORKFLOW_ENTRY_ARTIFACT_CONFLICT_ACTION_FIELD_KEY,
+						branches: [
+							{
+								matchValue: WORKFLOW_ENTRY_ARTIFACT_CONFLICT_CONTINUE_VALUE,
+								terminal: true,
+							},
+							{
+								matchValue: WORKFLOW_ENTRY_ARTIFACT_CONFLICT_REPLACE_VALUE,
+								terminal: true,
+							},
+						],
+						defaultTerminal: true,
+					},
+				},
+			},
+		}
+	}
+
+	private buildWorkflowEntryArtifactReplacementFormDefinition(
+		artifactOutput: WorkflowArtifactAllocationOutput,
+	): WorkflowFormDefinitionPayload {
+		return {
+			definitionVersion: 1,
+			title: "Replace Existing Workflow Artifact",
+			toolDictionaryTitle: "",
+			toolDictionaryMarkdown: "",
+			firstPanelId: WORKFLOW_ENTRY_ARTIFACT_REPLACEMENT_PANEL_ID,
+			panels: {
+				[WORKFLOW_ENTRY_ARTIFACT_REPLACEMENT_PANEL_ID]: {
+					panelId: WORKFLOW_ENTRY_ARTIFACT_REPLACEMENT_PANEL_ID,
+					title: "Replace Existing Document",
+					promptMarkdown: `Choose how to resolve the existing canonical workflow document at \`${artifactOutput.artifactRelativePath}\`.`,
+					fields: [
+						{
+							key: WORKFLOW_ENTRY_ARTIFACT_REPLACEMENT_ACTION_FIELD_KEY,
+							kind: "radio_group",
+							label: "Replacement action",
+							helpText: "Archive, delete, or cancel replacement for the existing document.",
+							required: true,
+							options: [
+								{
+									value: "archive_existing",
+									label: "Archive Existing",
+								},
+								{
+									value: "delete_existing",
+									label: "Delete Existing",
+								},
+								{
+									value: WORKFLOW_ENTRY_ARTIFACT_REPLACEMENT_CANCEL_VALUE,
+									label: "Cancel",
+								},
+							],
+						},
+					],
+					allowedActions: ["submit"],
+					actionLabels: {
+						submit: "Continue",
+					},
+					transition: {
+						type: "conditional",
+						conditionSourceKey: WORKFLOW_ENTRY_ARTIFACT_REPLACEMENT_ACTION_FIELD_KEY,
+						branches: [
+							{
+								matchValue: "archive_existing",
+								terminal: true,
+							},
+							{
+								matchValue: "delete_existing",
+								terminal: true,
+							},
+							{
+								matchValue: WORKFLOW_ENTRY_ARTIFACT_REPLACEMENT_CANCEL_VALUE,
+								terminal: true,
+							},
+						],
+						defaultTerminal: true,
+					},
+				},
+			},
+		}
+	}
+
+	private async buildWorkflowEntryArtifactConflictFormNextAction(args: {
+		taskState: TaskState
+		workflow: WorkflowDefinition
+		artifactOutput: WorkflowArtifactAllocationOutput
+		artifactResolutions: readonly WorkflowEntryArtifactResolution[]
+	}): Promise<WorkflowNextAction> {
+		const session = args.taskState.activeWorkflowSession
+		if (!session) {
+			return { kind: "no_op" }
+		}
+
+		session.entryArtifactResolution = {
+			artifactResolutions: structuredClone(args.artifactResolutions),
+			pendingFileOperation: undefined,
+		}
+
+		const definitionPayload = this.buildWorkflowEntryArtifactConflictFormDefinition(args.artifactOutput)
+		const formSession = this.workflowFormRuntime.createSession({
+			workflowFormId: WORKFLOW_ENTRY_FORM_ID,
+			definitionPayload,
+			data: this.buildWorkflowEntryArtifactFormData(args.artifactOutput),
+		})
+		session.ui.formSession = formSession
+
+		return {
+			kind: "render_workflow_form",
+			formSession,
+			payload: await this.buildWorkflowFormRenderPayload({
+				taskState: args.taskState,
+				workflow: args.workflow,
+				session: formSession,
+			}),
+		}
+	}
+
+	private async buildWorkflowEntryArtifactReplacementFormNextAction(args: {
+		taskState: TaskState
+		workflow: WorkflowDefinition
+		formSession: WorkflowFormSessionState
+	}): Promise<WorkflowNextAction> {
+		const session = args.taskState.activeWorkflowSession
+		if (!session) {
+			return { kind: "no_op" }
+		}
+
+		const artifactOutput = await this.resolveWorkflowEntryArtifactOutputFromFormSession({
+			workflow: args.workflow,
+			session,
+			formSession: args.formSession,
+		})
+		if (artifactOutput === undefined) {
+			return this.buildTerminalErrorNextAction({
+				taskState: args.taskState,
+				errorMessage: "Workflow entry artifact replacement could not restore the selected existing artifact.",
+			})
+		}
+
+		const definitionPayload = this.buildWorkflowEntryArtifactReplacementFormDefinition(artifactOutput)
+		const replacementFormSession = this.workflowFormRuntime.createSession({
+			workflowFormId: WORKFLOW_ENTRY_FORM_ID,
+			definitionPayload,
+			data: this.buildWorkflowEntryArtifactFormData(artifactOutput),
+		})
+		session.ui.formSession = replacementFormSession
+
+		return {
+			kind: "render_workflow_form",
+			formSession: replacementFormSession,
+			payload: await this.buildWorkflowFormRenderPayload({
+				taskState: args.taskState,
+				workflow: args.workflow,
+				session: replacementFormSession,
+			}),
+		}
+	}
+
+	private async continueWorkflowEntryArtifactResolution(args: {
+		taskState: TaskState
+		workflow: WorkflowDefinition
+		artifactResolutions: readonly WorkflowEntryArtifactResolution[]
+	}): Promise<WorkflowNextAction> {
+		const entryArtifactCheck = await this.checkWorkflowEntrySingletonArtifacts({ taskState: args.taskState })
+		const existingArtifactPathSet = new Set(
+			entryArtifactCheck.existingArtifactOutputs.map((artifactOutput) => artifactOutput.artifactAbsolutePath),
+		)
+		const artifactResolutions: WorkflowEntryArtifactResolution[] = structuredClone([...args.artifactResolutions])
+		const resolvedArtifactIds = new Set(artifactResolutions.map((artifactResolution) => artifactResolution.artifactId))
+
+		for (const artifactOutput of entryArtifactCheck.artifactOutputs) {
+			if (resolvedArtifactIds.has(artifactOutput.artifactId)) {
+				continue
+			}
+
+			if (existingArtifactPathSet.has(artifactOutput.artifactAbsolutePath)) {
+				return this.buildWorkflowEntryArtifactConflictFormNextAction({
+					taskState: args.taskState,
+					workflow: args.workflow,
+					artifactOutput,
+					artifactResolutions,
+				})
+			}
+
+			const artifactResolution = this.buildWorkflowEntryArtifactResolution({
+				artifactOutput,
+				creationRequired: true,
+				existingArtifactAction: "none",
+			})
+			artifactResolutions.push(artifactResolution)
+			resolvedArtifactIds.add(artifactResolution.artifactId)
+		}
+
+		return this.completeWorkflowEntryArtifactResolution({
+			taskState: args.taskState,
+			artifactResolutions,
+		})
+	}
+
 	async createWorkflowArtifact(args: {
 		taskState: TaskState
 		artifactId: string
@@ -859,6 +1435,7 @@ export class WorkflowRuntime {
 			activeStepNumber: session.activeStepNumber,
 			workflowValues: structuredClone(session.workflowValues),
 			projectSelection: structuredClone(session.projectSelection),
+			entryArtifactResolution: structuredClone(session.entryArtifactResolution),
 			ui: structuredClone(session.ui),
 			branchContext: structuredClone(session.branchContext),
 		}
@@ -866,6 +1443,18 @@ export class WorkflowRuntime {
 
 	private isPlainRecord(value: unknown): value is Record<string, unknown> {
 		return typeof value === "object" && value !== null && Array.isArray(value) === false
+	}
+
+	private isFileNotFoundError(error: unknown): boolean {
+		return typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT"
+	}
+
+	private isFileAlreadyExistsError(error: unknown): boolean {
+		return typeof error === "object" && error !== null && "code" in error && error.code === "EEXIST"
+	}
+
+	private isNonEmptyString(value: unknown): value is string {
+		return typeof value === "string" && value.trim() !== ""
 	}
 
 	private isStringArray(value: unknown): value is string[] {
@@ -910,6 +1499,71 @@ export class WorkflowRuntime {
 		)
 	}
 
+	private isWorkflowArtifactFamily(value: unknown): value is WorkflowArtifactFamily {
+		if (typeof value !== "string") {
+			return false
+		}
+
+		return Object.values(WORKFLOW_ARTIFACT_FAMILY_REGISTRY).some((definition) => definition.family === value)
+	}
+
+	private isWorkflowEntryArtifactExistingAction(value: unknown): value is WorkflowEntryArtifactExistingAction {
+		return value === "none" || value === "continue_existing" || value === "archive_existing" || value === "delete_existing"
+	}
+
+	private isWorkflowEntryArtifactFileOperation(value: unknown): value is WorkflowEntryArtifactFileOperation {
+		return value === "archive_existing" || value === "delete_existing"
+	}
+
+	private isWorkflowEntryArtifactResolution(value: unknown): value is WorkflowEntryArtifactResolution {
+		if (this.isPlainRecord(value) === false) {
+			return false
+		}
+
+		return (
+			this.isNonEmptyString(value.artifactId) &&
+			this.isWorkflowArtifactFamily(value.artifactFamily) &&
+			this.isNonEmptyString(value.artifactIdentity) &&
+			this.isNonEmptyString(value.artifactFilename) &&
+			this.isNonEmptyString(value.artifactRelativePath) &&
+			this.isNonEmptyString(value.artifactAbsolutePath) &&
+			typeof value.creationRequired === "boolean" &&
+			this.isWorkflowEntryArtifactExistingAction(value.existingArtifactAction)
+		)
+	}
+
+	private isWorkflowEntryArtifactResolutionArray(value: unknown): value is readonly WorkflowEntryArtifactResolution[] {
+		return Array.isArray(value) && value.every((entry) => this.isWorkflowEntryArtifactResolution(entry))
+	}
+
+	private isWorkflowEntryArtifactPendingFileOperation(value: unknown): value is WorkflowEntryArtifactPendingFileOperation {
+		if (this.isPlainRecord(value) === false) {
+			return false
+		}
+
+		return (
+			this.isNonEmptyString(value.artifactId) &&
+			this.isWorkflowArtifactFamily(value.artifactFamily) &&
+			this.isNonEmptyString(value.artifactIdentity) &&
+			this.isNonEmptyString(value.artifactFilename) &&
+			this.isNonEmptyString(value.artifactRelativePath) &&
+			this.isNonEmptyString(value.artifactAbsolutePath) &&
+			this.isWorkflowEntryArtifactFileOperation(value.operation)
+		)
+	}
+
+	private isWorkflowEntryArtifactResolutionState(value: unknown): value is WorkflowEntryArtifactResolutionState {
+		if (this.isPlainRecord(value) === false) {
+			return false
+		}
+
+		const pendingFileOperation = value.pendingFileOperation
+		return (
+			this.isWorkflowEntryArtifactResolutionArray(value.artifactResolutions) &&
+			(pendingFileOperation === undefined || this.isWorkflowEntryArtifactPendingFileOperation(pendingFileOperation))
+		)
+	}
+
 	private isWorkflowBranchFailureState(value: unknown): value is WorkflowBranchFailureState {
 		if (this.isPlainRecord(value) === false) {
 			return false
@@ -940,6 +1594,8 @@ export class WorkflowRuntime {
 				return typeof value.workflowFormId === "string" && value.workflowFormId.trim() !== ""
 			case "workflow_values_persisted":
 				return this.isStringArray(value.changedKeys)
+			case "entry_artifact_resolution_completed":
+				return this.isWorkflowEntryArtifactResolutionArray(value.artifactResolutions)
 			case "tool_backed_operation_succeeded":
 				return this.isWorkflowStepResolutionSourceRoute(value.sourceRoute)
 			case "tool_backed_operation_failed":
@@ -1351,6 +2007,15 @@ export class WorkflowRuntime {
 			return undefined
 		}
 
+		let entryArtifactResolution: WorkflowEntryArtifactResolutionState | undefined
+		if (persistedSession.entryArtifactResolution !== undefined) {
+			if (this.isWorkflowEntryArtifactResolutionState(persistedSession.entryArtifactResolution) === false) {
+				return undefined
+			}
+
+			entryArtifactResolution = structuredClone(persistedSession.entryArtifactResolution)
+		}
+
 		if (this.isPlainRecord(persistedSession.branchContext) === false) {
 			return undefined
 		}
@@ -1459,6 +2124,7 @@ export class WorkflowRuntime {
 				projectTitle: persistedSession.projectSelection.projectTitle,
 				projectFolderName: persistedSession.projectSelection.projectFolderName,
 			},
+			entryArtifactResolution,
 			ui: {
 				formSession,
 				stepResolutionSession,
@@ -1902,6 +2568,34 @@ export class WorkflowRuntime {
 		}
 	}
 
+	private async buildWorkflowEntryProjectSelectionFormNextAction(args: {
+		taskState: TaskState
+		workflow: WorkflowDefinition
+	}): Promise<WorkflowNextAction> {
+		const session = args.taskState.activeWorkflowSession
+		if (!session) {
+			return { kind: "no_op" }
+		}
+
+		const definitionPayload = this.buildWorkflowEntryFormDefinition(args.workflow)
+		const formSession = this.workflowFormRuntime.createSession({
+			workflowFormId: WORKFLOW_ENTRY_FORM_ID,
+			definitionPayload,
+			startPanelId: WORKFLOW_ENTRY_PROJECT_SELECTION_PANEL_ID,
+		})
+		session.ui.formSession = formSession
+
+		return {
+			kind: "render_workflow_form",
+			formSession,
+			payload: await this.buildWorkflowFormRenderPayload({
+				taskState: args.taskState,
+				workflow: args.workflow,
+				session: formSession,
+			}),
+		}
+	}
+
 	private readWorkflowEntryFormStringValue(
 		formSession: Pick<WorkflowFormSessionState, "values">,
 		key: string,
@@ -1912,6 +2606,154 @@ export class WorkflowRuntime {
 		}
 
 		return submittedValue.stringValue?.trim()
+	}
+
+	private readWorkflowEntryArtifactFormDataStringValue(
+		formSession: Pick<WorkflowFormSessionState, "data">,
+		key: string,
+	): string | undefined {
+		const value = formSession.data[key]
+		return typeof value === "string" && value.trim() !== "" ? value : undefined
+	}
+
+	private async resolveWorkflowEntryArtifactOutputFromFormSession(args: {
+		workflow: WorkflowDefinition
+		session: ActiveWorkflowSession
+		formSession: WorkflowFormSessionState
+	}): Promise<WorkflowArtifactAllocationOutput | undefined> {
+		const artifactId = this.readWorkflowEntryArtifactFormDataStringValue(args.formSession, "artifactId")
+		const expectedArtifactAbsolutePath = this.readWorkflowEntryArtifactFormDataStringValue(
+			args.formSession,
+			"artifactAbsolutePath",
+		)
+		if (artifactId === undefined || expectedArtifactAbsolutePath === undefined) {
+			return undefined
+		}
+
+		const artifactDefinition = args.workflow.artifacts?.[artifactId]
+		if (artifactDefinition === undefined || artifactDefinition.id !== artifactId) {
+			return undefined
+		}
+
+		const artifactOutput = await this.resolveWorkflowArtifactAllocation({
+			workflow: args.workflow,
+			session: args.session,
+			artifactDefinition,
+		})
+		return artifactOutput.artifactAbsolutePath === expectedArtifactAbsolutePath ? artifactOutput : undefined
+	}
+
+	private async continueWorkflowEntryExistingArtifact(args: {
+		taskState: TaskState
+		workflow: WorkflowDefinition
+		formSession: WorkflowFormSessionState
+	}): Promise<WorkflowNextAction> {
+		const session = args.taskState.activeWorkflowSession
+		if (!session) {
+			return { kind: "no_op" }
+		}
+
+		const artifactOutput = await this.resolveWorkflowEntryArtifactOutputFromFormSession({
+			workflow: args.workflow,
+			session,
+			formSession: args.formSession,
+		})
+		if (artifactOutput === undefined) {
+			return this.buildTerminalErrorNextAction({
+				taskState: args.taskState,
+				errorMessage: "Workflow entry artifact resolution could not restore the selected existing artifact.",
+			})
+		}
+
+		await this.applyWorkflowValueWrites({
+			taskState: args.taskState,
+			values: artifactOutput.workflowValueWrites,
+		})
+
+		const artifactResolutions = [
+			...(session.entryArtifactResolution?.artifactResolutions ?? []),
+			this.buildWorkflowEntryArtifactResolution({
+				artifactOutput,
+				creationRequired: false,
+				existingArtifactAction: "continue_existing",
+			}),
+		]
+
+		return this.continueWorkflowEntryArtifactResolution({
+			taskState: args.taskState,
+			workflow: args.workflow,
+			artifactResolutions,
+		})
+	}
+
+	private async cancelWorkflowEntryArtifactReplacement(args: {
+		taskState: TaskState
+		workflow: WorkflowDefinition
+	}): Promise<WorkflowNextAction> {
+		const session = args.taskState.activeWorkflowSession
+		if (!session) {
+			return { kind: "no_op" }
+		}
+
+		session.entryArtifactResolution = undefined
+		session.branchContext.lastTriggerEvent = undefined
+		session.projectSelection = {
+			projectMode: "new",
+			projectTitle: "",
+			projectFolderName: "",
+		}
+		return this.buildWorkflowEntryProjectSelectionFormNextAction({
+			taskState: args.taskState,
+			workflow: args.workflow,
+		})
+	}
+
+	private async startWorkflowEntryArtifactFileOperation(args: {
+		taskState: TaskState
+		workflow: WorkflowDefinition
+		formSession: WorkflowFormSessionState
+		operation: WorkflowEntryArtifactFileOperation
+	}): Promise<WorkflowNextAction> {
+		const session = args.taskState.activeWorkflowSession
+		if (!session) {
+			return { kind: "no_op" }
+		}
+
+		const artifactOutput = await this.resolveWorkflowEntryArtifactOutputFromFormSession({
+			workflow: args.workflow,
+			session,
+			formSession: args.formSession,
+		})
+		if (artifactOutput === undefined) {
+			return this.buildTerminalErrorNextAction({
+				taskState: args.taskState,
+				errorMessage: "Workflow entry artifact file operation could not restore the selected existing artifact.",
+			})
+		}
+
+		session.entryArtifactResolution = {
+			artifactResolutions: structuredClone(session.entryArtifactResolution?.artifactResolutions ?? []),
+			pendingFileOperation: this.buildWorkflowEntryArtifactPendingFileOperation({
+				artifactOutput,
+				operation: args.operation,
+			}),
+		}
+		session.ui.formSession = undefined
+
+		return {
+			kind: "execute_tool_backed_operation",
+			runtimeOwnedSourceRoute: undefined,
+			toolRequest: {
+				toolName:
+					args.operation === "archive_existing"
+						? ClineDefaultTool.ARCHIVE_WORKFLOW_ARTIFACT
+						: ClineDefaultTool.DELETE_WORKFLOW_ARTIFACT,
+				toolInput: {},
+				toolParams: {
+					artifact_id: artifactOutput.artifactId,
+				},
+			},
+		}
 	}
 
 	private doesWorkflowEntryProjectSelectionSubmitContainSelectionValue(request: WorkflowFormSubmissionRequest): boolean {
@@ -2059,11 +2901,105 @@ export class WorkflowRuntime {
 						},
 					})
 					await this.ensureProjectFoldersExist(session)
+					if (selectionResult.projectSelection.projectMode === "existing") {
+						return this.continueWorkflowEntryArtifactResolution({
+							taskState: args.taskState,
+							workflow,
+							artifactResolutions: [],
+						})
+					}
 					session.branchContext.lastTriggerEvent = {
 						kind: "project_selection_completed",
 					}
 					this.refreshCurrentFocusChainChecklist(args.taskState)
 					return this.resolveNextAction({ taskState: args.taskState })
+				}
+
+				if (
+					args.request.action === WorkflowFormAction.SUBMIT &&
+					args.request.panelId === WORKFLOW_ENTRY_ARTIFACT_CONFLICT_PANEL_ID
+				) {
+					const workflow = this.getActiveWorkflowDefinition(args.taskState)
+					if (!workflow) {
+						return this.teardownWorkflowAndRequirePersistence({ taskState: args.taskState })
+					}
+
+					if (args.outcome.session.failure !== undefined) {
+						session.ui.formSession = args.outcome.session
+						return {
+							kind: "render_workflow_form",
+							formSession: args.outcome.session,
+							payload: await this.buildWorkflowFormRenderPayload({
+								taskState: args.taskState,
+								workflow,
+								session: args.outcome.session,
+							}),
+						}
+					}
+
+					const selectedAction = this.readWorkflowEntryFormStringValue(
+						args.outcome.session,
+						WORKFLOW_ENTRY_ARTIFACT_CONFLICT_ACTION_FIELD_KEY,
+					)
+					if (selectedAction === WORKFLOW_ENTRY_ARTIFACT_CONFLICT_CONTINUE_VALUE) {
+						session.ui.formSession = undefined
+						return this.continueWorkflowEntryExistingArtifact({
+							taskState: args.taskState,
+							workflow,
+							formSession: args.outcome.session,
+						})
+					}
+
+					if (selectedAction === WORKFLOW_ENTRY_ARTIFACT_CONFLICT_REPLACE_VALUE) {
+						return this.buildWorkflowEntryArtifactReplacementFormNextAction({
+							taskState: args.taskState,
+							workflow,
+							formSession: args.outcome.session,
+						})
+					}
+				}
+
+				if (
+					args.request.action === WorkflowFormAction.SUBMIT &&
+					args.request.panelId === WORKFLOW_ENTRY_ARTIFACT_REPLACEMENT_PANEL_ID
+				) {
+					const workflow = this.getActiveWorkflowDefinition(args.taskState)
+					if (!workflow) {
+						return this.teardownWorkflowAndRequirePersistence({ taskState: args.taskState })
+					}
+
+					if (args.outcome.session.failure !== undefined) {
+						session.ui.formSession = args.outcome.session
+						return {
+							kind: "render_workflow_form",
+							formSession: args.outcome.session,
+							payload: await this.buildWorkflowFormRenderPayload({
+								taskState: args.taskState,
+								workflow,
+								session: args.outcome.session,
+							}),
+						}
+					}
+
+					const selectedAction = this.readWorkflowEntryFormStringValue(
+						args.outcome.session,
+						WORKFLOW_ENTRY_ARTIFACT_REPLACEMENT_ACTION_FIELD_KEY,
+					)
+					if (selectedAction === WORKFLOW_ENTRY_ARTIFACT_REPLACEMENT_CANCEL_VALUE) {
+						return this.cancelWorkflowEntryArtifactReplacement({
+							taskState: args.taskState,
+							workflow,
+						})
+					}
+
+					if (this.isWorkflowEntryArtifactFileOperation(selectedAction)) {
+						return this.startWorkflowEntryArtifactFileOperation({
+							taskState: args.taskState,
+							workflow,
+							formSession: args.outcome.session,
+							operation: selectedAction,
+						})
+					}
 				}
 
 				session.ui.formSession = args.outcome.session
@@ -3928,6 +4864,8 @@ export class WorkflowRuntime {
 		switch (toolName) {
 			case ClineDefaultTool.SET_WORKFLOW_VALUES:
 			case ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT:
+			case ClineDefaultTool.ARCHIVE_WORKFLOW_ARTIFACT:
+			case ClineDefaultTool.DELETE_WORKFLOW_ARTIFACT:
 			case ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT:
 			case ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST:
 				return true

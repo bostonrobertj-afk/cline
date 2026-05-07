@@ -377,6 +377,7 @@ function createActiveWorkflowSession(workflow: WorkflowDefinition): ActiveWorkfl
 			projectTitle: "Real Artifact Project",
 			projectFolderName: "real-artifact-project",
 		},
+		entryArtifactResolution: undefined,
 		ui: {
 			formSession: undefined,
 			stepResolutionSession: undefined,

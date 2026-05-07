@@ -83,6 +83,30 @@ export const backendWorkflowToolContracts: Partial<Record<ClineDefaultTool, Back
 			},
 		],
 	},
+	[ClineDefaultTool.ARCHIVE_WORKFLOW_ARTIFACT]: {
+		id: ClineDefaultTool.ARCHIVE_WORKFLOW_ARTIFACT,
+		name: "archive_workflow_artifact",
+		parameters: [
+			{
+				name: "artifact_id",
+				required: true,
+				type: "string",
+				description: "Workflow artifact definition id to archive through WorkflowRuntime.",
+			},
+		],
+	},
+	[ClineDefaultTool.DELETE_WORKFLOW_ARTIFACT]: {
+		id: ClineDefaultTool.DELETE_WORKFLOW_ARTIFACT,
+		name: "delete_workflow_artifact",
+		parameters: [
+			{
+				name: "artifact_id",
+				required: true,
+				type: "string",
+				description: "Workflow artifact definition id to delete through WorkflowRuntime.",
+			},
+		],
+	},
 	[ClineDefaultTool.GET_BRAINSTORMING_METHODS]: {
 		id: ClineDefaultTool.GET_BRAINSTORMING_METHODS,
 		name: "get_brainstorming_methods",

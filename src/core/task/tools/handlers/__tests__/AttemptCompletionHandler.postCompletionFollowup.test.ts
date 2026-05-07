@@ -121,6 +121,7 @@ function createActiveWorkflowSession(): ActiveWorkflowSession {
 			projectTitle: "Project",
 			projectFolderName: "project",
 		},
+		entryArtifactResolution: undefined,
 		ui: {
 			formSession: undefined,
 			stepResolutionSession: undefined,

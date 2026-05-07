@@ -456,6 +456,7 @@ const createBrainstormingWorkflowSession = (input: {
 		projectTitle: "Brainstorming Session",
 		projectFolderName: "brainstorming-session",
 	},
+	entryArtifactResolution: undefined,
 	ui: {
 		suppressedWorkflowFormIds: [],
 		suppressedWorkflowStepResolutionRoutes: [],
@@ -515,6 +516,7 @@ const createCreateArchitectureWorkflowSession = (activeStepNumber: 3 | 4 | 9): A
 		projectTitle: "Create Architecture Session",
 		projectFolderName: "create-architecture-session",
 	},
+	entryArtifactResolution: undefined,
 	ui: {
 		suppressedWorkflowFormIds: [],
 		suppressedWorkflowStepResolutionRoutes: [],
@@ -847,6 +849,44 @@ describe("Prompt System Integration Tests", () => {
 					expect(systemPrompt).to.not.include("In ACT MODE, respond using these:")
 					expect(systemPrompt).to.not.include("# Tools")
 					expect(systemPrompt).to.not.include("## execute_command")
+				},
+			)
+		})
+
+		it("omits archive and delete workflow artifact tools from default prompt tool surfaces", async function () {
+			const backendOnlyWorkflowToolNames = ["archive_workflow_artifact", "delete_workflow_artifact"]
+
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: makeProviderInfo("gpt-5-1", "openai"),
+					enableNativeToolCalls: true,
+					useMinimalGptPrompt: true,
+				},
+				"gpt-5-1",
+				async ({ systemPrompt, tools }) => {
+					const nativeToolNames = getNativeToolNames(tools)
+					for (const toolName of backendOnlyWorkflowToolNames) {
+						expect(nativeToolNames).to.not.include(toolName)
+						expect(systemPrompt).to.not.include(toolName)
+					}
+				},
+			)
+
+			await runPromptTest(
+				this,
+				{
+					...baseContext,
+					providerInfo: makeProviderInfo("gpt-3", "openai"),
+					enableNativeToolCalls: false,
+				},
+				"gpt-3",
+				async ({ systemPrompt, tools }) => {
+					expect(tools).to.be.undefined
+					for (const toolName of backendOnlyWorkflowToolNames) {
+						expect(systemPrompt).to.not.include(toolName)
+					}
 				},
 			)
 		})
