@@ -97,6 +97,7 @@ const RESPONSE_TOOL_METADATA: Record<ClineDefaultTool, ResponseToolMetadata | un
 	[ClineDefaultTool.MOVE_WORKFLOW_PROJECT_FILE]: undefined,
 	[ClineDefaultTool.GET_BRAINSTORMING_METHODS]: undefined,
 	[ClineDefaultTool.APPEND_BRAINSTORMING_SELECTED_TECHNIQUE]: undefined,
+	[ClineDefaultTool.UPSERT_EPIC]: undefined,
 	[ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE]: undefined,
 	[ClineDefaultTool.USE_SUBAGENTS]: undefined,
 }

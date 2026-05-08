@@ -52,6 +52,7 @@ export class AutoApprove {
 				case ClineDefaultTool.FILE_EDIT:
 				case ClineDefaultTool.APPLY_PATCH:
 				case ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT:
+				case ClineDefaultTool.UPSERT_EPIC:
 				case ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT:
 				case ClineDefaultTool.ARCHIVE_WORKFLOW_ARTIFACT:
 				case ClineDefaultTool.DELETE_WORKFLOW_ARTIFACT:
@@ -81,6 +82,7 @@ export class AutoApprove {
 				case ClineDefaultTool.FILE_EDIT:
 				case ClineDefaultTool.APPLY_PATCH:
 				case ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT:
+				case ClineDefaultTool.UPSERT_EPIC:
 				case ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT:
 				case ClineDefaultTool.ARCHIVE_WORKFLOW_ARTIFACT:
 				case ClineDefaultTool.DELETE_WORKFLOW_ARTIFACT:
@@ -112,6 +114,7 @@ export class AutoApprove {
 			case ClineDefaultTool.FILE_EDIT:
 			case ClineDefaultTool.APPLY_PATCH:
 			case ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT:
+			case ClineDefaultTool.UPSERT_EPIC:
 			case ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT:
 			case ClineDefaultTool.ARCHIVE_WORKFLOW_ARTIFACT:
 			case ClineDefaultTool.DELETE_WORKFLOW_ARTIFACT:

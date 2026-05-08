@@ -36,6 +36,7 @@ import { StoryTaskReminderToolHandler } from "./handlers/StoryTaskReminderToolHa
 import { StoryTestingCompleteToolHandler } from "./handlers/StoryTestingCompleteToolHandler"
 import { UseSubagentsToolHandler } from "./handlers/SubagentToolHandler"
 import { SummarizeTaskHandler } from "./handlers/SummarizeTaskHandler"
+import { UpsertEpicToolHandler } from "./handlers/UpsertEpicToolHandler"
 import { UseMcpToolHandler } from "./handlers/UseMcpToolHandler"
 import { UseSkillToolHandler } from "./handlers/UseSkillToolHandler"
 import { WebFetchToolHandler } from "./handlers/WebFetchToolHandler"
@@ -133,6 +134,7 @@ export class ToolExecutorCoordinator {
 		[ClineDefaultTool.GET_BRAINSTORMING_METHODS]: (_v: ToolValidator) => new GetBrainstormingMethodsToolHandler(),
 		[ClineDefaultTool.APPEND_BRAINSTORMING_SELECTED_TECHNIQUE]: (_v: ToolValidator) =>
 			new AppendBrainstormingSelectedTechniqueToolHandler(),
+		[ClineDefaultTool.UPSERT_EPIC]: (v: ToolValidator) => new UpsertEpicToolHandler(v),
 		[ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE]: (_v: ToolValidator) => new CodeReviewSpecUpdateToolHandler(),
 		[ClineDefaultTool.STORY_TASK_REMINDER]: (_v: ToolValidator) => new StoryTaskReminderToolHandler(),
 		[ClineDefaultTool.STORY_TASK_COMPLETE]: (_v: ToolValidator) => new StoryTaskCompleteToolHandler(),

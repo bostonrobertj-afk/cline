@@ -257,7 +257,7 @@ Allowed files:
 
 After completing this phase, pause for QA review before moving to Phase 4.
 
-[ ] Task 4. Register the `upsert_epic` tool identity and backend contract.
+[x] Task 4. Register the `upsert_epic` tool identity and backend contract.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/shared/tools.ts`
@@ -266,119 +266,119 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/response/ResponseToolRegistry.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/autoApprove.ts`
 
-[ ] Subtask 4.1. In `src/shared/tools.ts`, add `UPSERT_EPIC = "upsert_epic"` to `ClineDefaultTool` immediately after `APPEND_BRAINSTORMING_SELECTED_TECHNIQUE`.
+[x] Subtask 4.1. In `src/shared/tools.ts`, add `UPSERT_EPIC = "upsert_epic"` to `ClineDefaultTool` immediately after `APPEND_BRAINSTORMING_SELECTED_TECHNIQUE`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/shared/tools.ts`
 
-[ ] Subtask 4.2. In `src/shared/tools.ts`, do not add `ClineDefaultTool.UPSERT_EPIC` to `READ_ONLY_TOOLS`.
+[x] Subtask 4.2. In `src/shared/tools.ts`, do not add `ClineDefaultTool.UPSERT_EPIC` to `READ_ONLY_TOOLS`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/shared/tools.ts`
 
-[ ] Subtask 4.3. In `src/core/assistant-message/index.ts`, add `identity`, `objective`, `requirements`, `scope`, and `scope_boundary` to `toolParamNames`.
+[x] Subtask 4.3. In `src/core/assistant-message/index.ts`, add `identity`, `objective`, `requirements`, `scope`, and `scope_boundary` to `toolParamNames`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/assistant-message/index.ts`
 
-[ ] Subtask 4.4. In `src/core/task/tools/backendWorkflowToolContracts.ts`, add a `ClineDefaultTool.UPSERT_EPIC` contract with required parameters `identity`, `title`, `objective`, `description`, `requirements`, `scope`, and `scope_boundary`.
+[x] Subtask 4.4. In `src/core/task/tools/backendWorkflowToolContracts.ts`, add a `ClineDefaultTool.UPSERT_EPIC` contract with required parameters `identity`, `title`, `objective`, `description`, `requirements`, `scope`, and `scope_boundary`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/backendWorkflowToolContracts.ts`
 
-[ ] Subtask 4.5. In `src/core/task/tools/backendWorkflowToolContracts.ts`, define the `objective` contract as an object with required string properties `as_a`, `i_want`, and `so_that`; omit `additionalProperties` because `BackendWorkflowToolSchemaNode` does not model boolean `false`.
+[x] Subtask 4.5. In `src/core/task/tools/backendWorkflowToolContracts.ts`, define the `objective` contract as an object with required string properties `as_a`, `i_want`, and `so_that`; omit `additionalProperties` because `BackendWorkflowToolSchemaNode` does not model boolean `false`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/backendWorkflowToolContracts.ts`
 
-[ ] Subtask 4.6. In `src/core/task/tools/backendWorkflowToolContracts.ts`, define `requirements`, `scope`, and `scope_boundary` as arrays whose items are strings.
+[x] Subtask 4.6. In `src/core/task/tools/backendWorkflowToolContracts.ts`, define `requirements`, `scope`, and `scope_boundary` as arrays whose items are strings.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/backendWorkflowToolContracts.ts`
 
-[ ] Subtask 4.7. In `src/core/task/tools/response/ResponseToolRegistry.ts`, add `ClineDefaultTool.UPSERT_EPIC: undefined` so the registry remains exhaustive and `upsert_epic` is not treated as a response tool.
+[x] Subtask 4.7. In `src/core/task/tools/response/ResponseToolRegistry.ts`, add `ClineDefaultTool.UPSERT_EPIC: undefined` so the registry remains exhaustive and `upsert_epic` is not treated as a response tool.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/response/ResponseToolRegistry.ts`
 
-[ ] Subtask 4.8. In `src/core/task/tools/autoApprove.ts`, add `ClineDefaultTool.UPSERT_EPIC` to the same write/edit approval branches as `ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT` and `ClineDefaultTool.APPLY_PATCH`.
+[x] Subtask 4.8. In `src/core/task/tools/autoApprove.ts`, add `ClineDefaultTool.UPSERT_EPIC` to the same write/edit approval branches as `ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT` and `ClineDefaultTool.APPLY_PATCH`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/autoApprove.ts`
 
-[ ] Task 5. Implement and register `UpsertEpicToolHandler`.
+[x] Task 5. Implement and register `UpsertEpicToolHandler`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/ToolExecutorCoordinator.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/UpsertEpicToolHandler.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/UpsertEpicToolHandler.test.ts`
 
-[ ] Subtask 5.1. Create `src/core/task/tools/handlers/UpsertEpicToolHandler.ts` exporting `UpsertEpicToolHandler implements IToolHandler` with `readonly name = ClineDefaultTool.UPSERT_EPIC`.
+[x] Subtask 5.1. Create `src/core/task/tools/handlers/UpsertEpicToolHandler.ts` exporting `UpsertEpicToolHandler implements IToolHandler` with `readonly name = ClineDefaultTool.UPSERT_EPIC`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/UpsertEpicToolHandler.ts`
 
-[ ] Subtask 5.2. In `UpsertEpicToolHandler.ts`, implement request parsing that accepts JSON-string or already-materialized values for `objective`, `requirements`, `scope`, and `scope_boundary`.
+[x] Subtask 5.2. In `UpsertEpicToolHandler.ts`, implement request parsing that accepts JSON-string or already-materialized values for `objective`, `requirements`, `scope`, and `scope_boundary`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/UpsertEpicToolHandler.ts`
 
-[ ] Subtask 5.3. In `UpsertEpicToolHandler.ts`, reject missing, empty, non-string, non-array, malformed, partial, or unsupported parameter shapes with a clear tool error.
+[x] Subtask 5.3. In `UpsertEpicToolHandler.ts`, reject missing, empty, non-string, non-array, malformed, partial, or unsupported parameter shapes with a clear tool error.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/UpsertEpicToolHandler.ts`
 
-[ ] Subtask 5.4. In `UpsertEpicToolHandler.ts`, validate that `taskState.activeWorkflowName === "create-epics"` and `taskState.activeWorkflowSession` exists before reading or writing files.
+[x] Subtask 5.4. In `UpsertEpicToolHandler.ts`, validate that `taskState.activeWorkflowName === "create-epics"` and `taskState.activeWorkflowSession` exists before reading or writing files.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/UpsertEpicToolHandler.ts`
 
-[ ] Subtask 5.5. In `UpsertEpicToolHandler.ts`, resolve the destination path only from the active workflow session's `output_file` workflow value, and reject calls when `output_file` is absent or not a non-empty string.
+[x] Subtask 5.5. In `UpsertEpicToolHandler.ts`, resolve the destination path only from the active workflow session's `output_file` workflow value, and reject calls when `output_file` is absent or not a non-empty string.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/UpsertEpicToolHandler.ts`
 
-[ ] Subtask 5.6. In `UpsertEpicToolHandler.ts`, validate the resolved `output_file` path through `ToolValidator.checkClineIgnorePath(...)` before file reads or writes.
+[x] Subtask 5.6. In `UpsertEpicToolHandler.ts`, validate the resolved `output_file` path through `ToolValidator.checkClineIgnorePath(...)` before file reads or writes.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/UpsertEpicToolHandler.ts`
 
-[ ] Subtask 5.7. In `UpsertEpicToolHandler.ts`, read existing `Epics.md`, update it with `upsertCanonicalEpicSection(...)`, and write the updated content atomically only when the content changes.
+[x] Subtask 5.7. In `UpsertEpicToolHandler.ts`, read existing `Epics.md`, update it with `upsertCanonicalEpicSection(...)`, and write the updated content atomically only when the content changes.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/UpsertEpicToolHandler.ts`
 
-[ ] Subtask 5.8. In `UpsertEpicToolHandler.ts`, mark `taskState.didEditFile = true` and clear the lowercased file-read cache entry when the document changes.
+[x] Subtask 5.8. In `UpsertEpicToolHandler.ts`, mark `taskState.didEditFile = true` and clear the lowercased file-read cache entry when the document changes.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/UpsertEpicToolHandler.ts`
 
-[ ] Subtask 5.9. In `UpsertEpicToolHandler.ts`, return structured JSON containing `persisted`, `identity`, `title`, and `epics` inventory from the updated canonical epic sections.
+[x] Subtask 5.9. In `UpsertEpicToolHandler.ts`, return structured JSON containing `persisted`, `identity`, `title`, and `epics` inventory from the updated canonical epic sections.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/UpsertEpicToolHandler.ts`
 
-[ ] Subtask 5.10. In `src/core/task/tools/ToolExecutorCoordinator.ts`, import `UpsertEpicToolHandler` and register it for `ClineDefaultTool.UPSERT_EPIC` using the shared `ToolValidator`.
+[x] Subtask 5.10. In `src/core/task/tools/ToolExecutorCoordinator.ts`, import `UpsertEpicToolHandler` and register it for `ClineDefaultTool.UPSERT_EPIC` using the shared `ToolValidator`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/ToolExecutorCoordinator.ts`
 
-[ ] Subtask 5.11. Create `src/core/task/tools/handlers/__tests__/UpsertEpicToolHandler.test.ts` with coverage for active workflow gating, missing parameter rejection, malformed JSON rejection, empty value rejection, positive numeric identity validation, non-empty title validation, and `output_file` path resolution.
+[x] Subtask 5.11. Create `src/core/task/tools/handlers/__tests__/UpsertEpicToolHandler.test.ts` with coverage for active workflow gating, missing parameter rejection, malformed JSON rejection, empty value rejection, positive numeric identity validation, non-empty title validation, and `output_file` path resolution.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/UpsertEpicToolHandler.test.ts`
 
-[ ] Subtask 5.12. In `UpsertEpicToolHandler.test.ts`, add coverage for insertion, same-identity replacement, numeric ordering, preservation of other canonical epic sections, structured JSON result shape, and file-read cache invalidation.
+[x] Subtask 5.12. In `UpsertEpicToolHandler.test.ts`, add coverage for insertion, same-identity replacement, numeric ordering, preservation of other canonical epic sections, structured JSON result shape, and file-read cache invalidation.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/UpsertEpicToolHandler.test.ts`
 
-[ ] Subtask 5.13. In `UpsertEpicToolHandler.test.ts`, add coverage proving the handler rejects story/task/subtask/acceptance-criteria fields and unsupported extra top-level fields.
+[x] Subtask 5.13. In `UpsertEpicToolHandler.test.ts`, add coverage proving the handler rejects story/task/subtask/acceptance-criteria fields and unsupported extra top-level fields.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/UpsertEpicToolHandler.test.ts`
 
-[ ] Subtask 5.14. In `UpsertEpicToolHandler.test.ts`, add coverage proving clineignore/path-policy rejection happens before file mutation.
+[x] Subtask 5.14. In `UpsertEpicToolHandler.test.ts`, add coverage proving clineignore/path-policy rejection happens before file mutation.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/UpsertEpicToolHandler.test.ts`

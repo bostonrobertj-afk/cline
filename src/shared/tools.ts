@@ -43,6 +43,7 @@ export enum ClineDefaultTool {
 	MOVE_WORKFLOW_PROJECT_FILE = "move_workflow_project_file",
 	GET_BRAINSTORMING_METHODS = "get_brainstorming_methods",
 	APPEND_BRAINSTORMING_SELECTED_TECHNIQUE = "append_brainstorming_selected_technique",
+	UPSERT_EPIC = "upsert_epic",
 	CODE_REVIEW_SPEC_UPDATE = "code_review_spec_update",
 	STORY_TASK_REMINDER = "story_task_reminder",
 	STORY_TASK_COMPLETE = "story_task_complete",

@@ -160,6 +160,63 @@ export const backendWorkflowToolContracts: Partial<Record<ClineDefaultTool, Back
 			},
 		],
 	},
+	[ClineDefaultTool.UPSERT_EPIC]: {
+		id: ClineDefaultTool.UPSERT_EPIC,
+		name: "upsert_epic",
+		parameters: [
+			{
+				name: "identity",
+				required: true,
+				type: "string",
+				description: "Positive numeric epic identity.",
+			},
+			{
+				name: "title",
+				required: true,
+				type: "string",
+				description: "Non-empty epic title.",
+			},
+			{
+				name: "objective",
+				required: true,
+				type: "object",
+				description: "Epic objective with as_a, i_want, and so_that fields.",
+				properties: {
+					as_a: { type: "string" },
+					i_want: { type: "string" },
+					so_that: { type: "string" },
+				},
+				requiredProperties: ["as_a", "i_want", "so_that"],
+			},
+			{
+				name: "description",
+				required: true,
+				type: "string",
+				description: "Non-empty epic description.",
+			},
+			{
+				name: "requirements",
+				required: true,
+				type: "array",
+				description: "Non-empty requirement statements for this epic.",
+				items: { type: "string" },
+			},
+			{
+				name: "scope",
+				required: true,
+				type: "array",
+				description: "Non-empty in-scope items for this epic.",
+				items: { type: "string" },
+			},
+			{
+				name: "scope_boundary",
+				required: true,
+				type: "array",
+				description: "Non-empty out-of-scope boundary items for this epic.",
+				items: { type: "string" },
+			},
+		],
+	},
 	[ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE]: {
 		id: ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE,
 		name: "code_review_spec_update",
