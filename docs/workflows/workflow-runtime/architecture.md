@@ -638,9 +638,17 @@ At the architectural level, that means:
 - if a user renames a project folder or artifact so it no longer matches the expected convention, downstream workflows may no longer recognize it
 - that outcome is acceptable within this architecture and is treated as user-managed document hygiene rather than runtime data corruption
 
-Workflow modules may require prerequisite files before model-driven work begins. Prerequisite-file discovery, user selection, and confirmation are module-owned step behavior, normally represented as a Step 1 workflow form after shared project selection. The mandatory shared pre-workflow entry form must not own workflow-specific prerequisite selection.
+Workflow modules may require prerequisite files before model-driven work begins. Prerequisite-file discovery and selection is a distinct runtime workflow capability. It is not part of shared project selection and must not be implemented by mutating or repurposing project-selection behavior.
 
-A prerequisite-file requirement must identify the workflow that produces the prerequisite file. If no valid prerequisite file is discoverable, the module-owned form must tell the user which workflow must be run first.
+A workflow module declares each prerequisite file, including whether it is required or optional, the selected-project subfolder to scan, the exact filename or file-naming pattern to match, the workflow that produces the file, the workflow-value destination for the selected full path when persistence is required, and whether the selected path must be added to the workflow's output document by deterministic workflow behavior.
+
+WorkflowRuntime owns prerequisite-file scanning after project selection. It scans only inside the selected project folder and the module-declared subfolder, applies the module-declared filename or naming pattern, validates scan roots and candidate paths through runtime path-boundary and workspace path-policy rules, and produces candidate records containing filename and full absolute path.
+
+For one required match, WorkflowRuntime renders a confirmation panel showing the filename and full path and asks whether to continue with that file selected. For multiple required matches, WorkflowRuntime renders a required dropdown containing every matched file and a cancel option. For no required matches, or for required cancellation/rejection, WorkflowRuntime renders a cannot-continue panel naming the workflow that produces the prerequisite file.
+
+Optional prerequisites use the same discovery and selection behavior, except no-match, cancel, or rejection continues without a cannot-continue panel.
+
+The mandatory shared pre-workflow entry form must not own workflow-specific prerequisite selection.
 
 ### 8.10 Canonical Workflow Mapping
 
