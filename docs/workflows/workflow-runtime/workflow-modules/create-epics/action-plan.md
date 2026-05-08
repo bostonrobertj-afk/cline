@@ -643,6 +643,57 @@ Allowed files:
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
 
+### Phase 6A - Persona Test Contract Remediation
+
+After completing this phase, pause for QA review before resuming Phase 6 validation from Subtask 10.1.
+
+### Phase 6A Scope
+
+Correct the create-epics persona test contract so module tests verify structured persona ownership, required field population, and product-manager mapping without locking editable persona prose into brittle exact-string assertions.
+
+### Phase 6A Scope Boundary
+
+- Do not change `createEpicsWorkflow.ts` persona prose in this phase.
+- Do not change runtime persona projection behavior.
+- Do not modify brainstorming or create-architecture workflow tests.
+- Do not reintroduce `workflowPersonaRegistry.ts`, `.md` workflow aliases, BMAD runtime lookups, or centralized workflow persona lookup behavior.
+- Do not revise completed Phase 4 task/subtask checkboxes or rewrite completed Phase 4 task descriptions.
+
+### Phase 6A Known Issues / Risks / Technical Debt
+
+- `createEpicsWorkflow.test.ts` currently deep-equals the entire persona object, which makes editable persona prose a test contract. The runtime contract only requires a module-owned structured persona with the correct mapped role and populated fields.
+
+[ ] Task 9A. Clarify create-epics persona requirements and tests so exact persona prose is not a test contract.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-epics/create-epics-requirements.md`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`
+
+[ ] Subtask 9A.1. In `docs/workflows/workflow-runtime/workflow-modules/create-epics/create-epics-requirements.md`, replace the Persona subsection sentence `The module-owned persona must use:` and its exact field-value bullet list with requirements stating that the module-owned persona must be a structured `WorkflowPersonaDefinition` for the mapped `product-manager` persona, `role` must be `Product Manager`, `name`, `identity`, and `communicationStyle` must be non-empty strings, and `capabilities` and `principles` must be non-empty arrays of non-empty strings.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-epics/create-epics-requirements.md`
+
+[ ] Subtask 9A.2. In `src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`, replace the `expect(createEpicsWorkflowDefinition.persona).to.deep.equal({ ... })` block with assertions that `persona` is not the legacy string `"product-manager"`, `persona.name` is a non-empty string, `persona.role` equals `"Product Manager"`, `persona.identity` is a non-empty string, `persona.communicationStyle` is a non-empty string, `persona.capabilities` is a non-empty array whose values are non-empty strings, and `persona.principles` is a non-empty array whose values are non-empty strings.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`
+
+[ ] Task 9B. Validate the persona test contract remediation.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-epics/action-plan.md`
+
+[ ] Subtask 9B.1. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-epics/action-plan.md`
+
+[ ] Subtask 9B.2. Run `rg -n "Drives PRDs|PRD creation|Jobs-to-be-Done|smallest validator|Builds epics through|Strict adherence|Bridge the gap" src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts` and confirm it returns no matches.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-epics/action-plan.md`
+
 ### Phase 6 - Validation
 
 [ ] Task 10. Run focused create-epics module and handler validation.
