@@ -177,78 +177,78 @@ Allowed files:
 
 After completing this phase, pause for QA review before moving to Phase 3.
 
-[ ] Task 3. Create module-owned document and epic-section helpers.
+[x] Task 3. Create module-owned document and epic-section helpers.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsDocument.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsDocument.test.ts`
 
-[ ] Subtask 3.1. Create `src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsDocument.ts` with exported heading constants for `# Context`, `## Architecture`, `## Brainstorming`, `## Additional Context`, and `# Epics`.
+[x] Subtask 3.1. Create `src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsDocument.ts` with exported heading constants for `# Context`, `## Architecture`, `## Brainstorming`, `## Additional Context`, and `# Epics`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsDocument.ts`
 
-[ ] Subtask 3.2. In `createEpicsDocument.ts`, export `buildInitialCreateEpicsDocumentFromSession(session: ActiveWorkflowSession): string` that renders exactly the required heading shell and writes non-empty `architecture_document`, `brainstorming_document`, and `additional_context_files` workflow values under their matching context headings.
+[x] Subtask 3.2. In `createEpicsDocument.ts`, export `buildInitialCreateEpicsDocumentFromSession(session: ActiveWorkflowSession): string` that renders exactly the required heading shell and writes non-empty `architecture_document`, `brainstorming_document`, and `additional_context_files` workflow values under their matching context headings.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsDocument.ts`
 
-[ ] Subtask 3.3. In `createEpicsDocument.ts`, add exported `CreateEpicSectionInput` with required `identity`, `title`, `objective`, `description`, `requirements`, `scope`, and `scopeBoundary` fields matching the create-epics requirements.
+[x] Subtask 3.3. In `createEpicsDocument.ts`, add exported `CreateEpicSectionInput` with required `identity`, `title`, `objective`, `description`, `requirements`, `scope`, and `scopeBoundary` fields matching the create-epics requirements.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsDocument.ts`
 
-[ ] Subtask 3.4. In `createEpicsDocument.ts`, export `buildCanonicalEpicSection(input: CreateEpicSectionInput): string` that returns the exact markdown shape prescribed in the `upsert_epic` requirements, with a final trailing newline.
+[x] Subtask 3.4. In `createEpicsDocument.ts`, export `buildCanonicalEpicSection(input: CreateEpicSectionInput): string` that returns the exact markdown shape prescribed in the `upsert_epic` requirements, with a final trailing newline.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsDocument.ts`
 
-[ ] Subtask 3.5. In `createEpicsDocument.ts`, export `upsertCanonicalEpicSection(documentContent: string, input: CreateEpicSectionInput): string` that inserts or replaces exactly one `## Epic {identity}: {title}` section under `# Epics`.
+[x] Subtask 3.5. In `createEpicsDocument.ts`, export `upsertCanonicalEpicSection(documentContent: string, input: CreateEpicSectionInput): string` that inserts or replaces exactly one `## Epic {identity}: {title}` section under `# Epics`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsDocument.ts`
 
-[ ] Subtask 3.6. In `createEpicsDocument.ts`, make `upsertCanonicalEpicSection(...)` preserve all other canonical epic sections and sort resulting epic sections by numeric identity.
+[x] Subtask 3.6. In `createEpicsDocument.ts`, make `upsertCanonicalEpicSection(...)` preserve all other canonical epic sections and sort resulting epic sections by numeric identity.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsDocument.ts`
 
-[ ] Subtask 3.7. In `createEpicsDocument.ts`, export `parseCanonicalEpicIndexEntries(documentContent: string): readonly { identity: string; title: string }[]` that returns canonical `## Epic {identity}: {title}` headings with positive numeric identities and non-empty titles.
+[x] Subtask 3.7. In `createEpicsDocument.ts`, export `parseCanonicalEpicIndexEntries(documentContent: string): readonly { identity: string; title: string }[]` that returns canonical `## Epic {identity}: {title}` headings with positive numeric identities and non-empty titles.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsDocument.ts`
 
-[ ] Subtask 3.8. In `createEpicsDocument.ts`, export `buildEpicsIndexJson(documentContent: string): string` that returns exactly the JSON schema `{ "version": 1, "epics": [{ "identity": "1", "title": "..." }] }`, ordered by numeric identity, with pretty JSON formatting and a final trailing newline.
+[x] Subtask 3.8. In `createEpicsDocument.ts`, export `buildEpicsIndexJson(documentContent: string): string` that returns exactly the JSON schema `{ "version": 1, "epics": [{ "identity": "1", "title": "..." }] }`, ordered by numeric identity, with pretty JSON formatting and a final trailing newline.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsDocument.ts`
 
-[ ] Subtask 3.9. In `createEpicsDocument.ts`, make `buildEpicsIndexJson(...)` throw clear `Error` messages for no canonical epics and duplicate canonical epic identities. Malformed identities and empty titles must be rejected by `upsert_epic` before persistence, not handled as normal index-generation input.
+[x] Subtask 3.9. In `createEpicsDocument.ts`, make `buildEpicsIndexJson(...)` throw clear `Error` messages for no canonical epics and duplicate canonical epic identities. Malformed identities and empty titles must be rejected by `upsert_epic` before persistence, not handled as normal index-generation input.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsDocument.ts`
 
-[ ] Subtask 3.10. Create `src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsDocument.test.ts` with coverage proving the initial document builder renders the exact heading order and required context values.
+[x] Subtask 3.10. Create `src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsDocument.test.ts` with coverage proving the initial document builder renders the exact heading order and required context values.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsDocument.test.ts`
 
-[ ] Subtask 3.11. In `createEpicsDocument.test.ts`, add coverage proving `buildCanonicalEpicSection(...)` returns the exact required epic markdown shape.
+[x] Subtask 3.11. In `createEpicsDocument.test.ts`, add coverage proving `buildCanonicalEpicSection(...)` returns the exact required epic markdown shape.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsDocument.test.ts`
 
-[ ] Subtask 3.12. In `createEpicsDocument.test.ts`, add coverage proving `upsertCanonicalEpicSection(...)` inserts, replaces, preserves other canonical sections, and orders sections by numeric identity.
+[x] Subtask 3.12. In `createEpicsDocument.test.ts`, add coverage proving `upsertCanonicalEpicSection(...)` inserts, replaces, preserves other canonical sections, and orders sections by numeric identity.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsDocument.test.ts`
 
-[ ] Subtask 3.13. In `createEpicsDocument.test.ts`, add coverage proving `buildEpicsIndexJson(...)` succeeds for one and multiple canonical epics and returns no story, review, objective, scope, or requirements data.
+[x] Subtask 3.13. In `createEpicsDocument.test.ts`, add coverage proving `buildEpicsIndexJson(...)` succeeds for one and multiple canonical epics and returns no story, review, objective, scope, or requirements data.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsDocument.test.ts`
 
-[ ] Subtask 3.14. In `createEpicsDocument.test.ts`, add coverage proving `buildEpicsIndexJson(...)` fails clearly for no canonical epics and duplicate canonical epic identities.
+[x] Subtask 3.14. In `createEpicsDocument.test.ts`, add coverage proving `buildEpicsIndexJson(...)` fails clearly for no canonical epics and duplicate canonical epic identities.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsDocument.test.ts`
