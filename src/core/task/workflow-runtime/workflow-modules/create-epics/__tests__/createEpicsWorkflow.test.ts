@@ -240,17 +240,27 @@ describe("createEpicsWorkflowDefinition", () => {
 		expect(createEpicsWorkflowDefinition.useSkillName).to.equal("create-epics")
 		expect(createEpicsWorkflowDefinition.projectSubfolder).to.equal("planning")
 		expect(createEpicsWorkflowDefinition.entryPanel.promptMarkdown).to.equal(createEpicsWorkflowDefinition.description)
-		expect(createEpicsWorkflowDefinition.persona).to.deep.equal({
-			name: "John",
-			role: "Product Manager",
-			identity: "Drives PRDs through interviews, discovery, and stakeholder alignment.",
-			capabilities: ["PRD creation", "discovery", "stakeholder alignment", "interviews"],
-			communicationStyle: "Relentlessly asks why. Direct, data-sharp, and cuts the fluff.",
-			principles: [
-				"Use user-centered design, Jobs-to-be-Done, and opportunity scoring.",
-				"Discover real needs from interviews, ship the smallest validator, and put user value first.",
-			],
-		})
+
+		const persona = createEpicsWorkflowDefinition.persona
+		expect(persona).to.not.equal("product-manager")
+		expect(persona.name).to.be.a("string")
+		expect(persona.name).to.not.equal("")
+		expect(persona.role).to.equal("Product Manager")
+		expect(persona.identity).to.be.a("string")
+		expect(persona.identity).to.not.equal("")
+		expect(persona.communicationStyle).to.be.a("string")
+		expect(persona.communicationStyle).to.not.equal("")
+		expect(persona.capabilities).to.be.an("array").that.is.not.empty
+		for (const capability of persona.capabilities) {
+			expect(capability).to.be.a("string")
+			expect(capability).to.not.equal("")
+		}
+		expect(persona.principles).to.be.an("array").that.is.not.empty
+		for (const principle of persona.principles) {
+			expect(principle).to.be.a("string")
+			expect(principle).to.not.equal("")
+		}
+
 		expect(Object.keys(createEpicsWorkflowDefinition.steps)).to.deep.equal(["step-1", "step-2"])
 		expect(Object.values(createEpicsWorkflowDefinition.steps).map((step) => step.checklistLabel)).to.deep.equal([
 			"Gather Inputs",

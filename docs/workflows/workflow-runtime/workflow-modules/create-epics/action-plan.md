@@ -663,100 +663,100 @@ Correct the create-epics persona test contract so module tests verify structured
 
 - `createEpicsWorkflow.test.ts` currently deep-equals the entire persona object, which makes editable persona prose a test contract. The runtime contract only requires a module-owned structured persona with the correct mapped role and populated fields.
 
-[ ] Task 9A. Clarify create-epics persona requirements and tests so exact persona prose is not a test contract.
+[x] Task 9A. Clarify create-epics persona requirements and tests so exact persona prose is not a test contract.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-epics/create-epics-requirements.md`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`
 
-[ ] Subtask 9A.1. In `docs/workflows/workflow-runtime/workflow-modules/create-epics/create-epics-requirements.md`, replace the Persona subsection sentence `The module-owned persona must use:` and its exact field-value bullet list with requirements stating that the module-owned persona must be a structured `WorkflowPersonaDefinition` for the mapped `product-manager` persona, `role` must be `Product Manager`, `name`, `identity`, and `communicationStyle` must be non-empty strings, and `capabilities` and `principles` must be non-empty arrays of non-empty strings.
+[x] Subtask 9A.1. In `docs/workflows/workflow-runtime/workflow-modules/create-epics/create-epics-requirements.md`, replace the Persona subsection sentence `The module-owned persona must use:` and its exact field-value bullet list with requirements stating that the module-owned persona must be a structured `WorkflowPersonaDefinition` for the mapped `product-manager` persona, `role` must be `Product Manager`, `name`, `identity`, and `communicationStyle` must be non-empty strings, and `capabilities` and `principles` must be non-empty arrays of non-empty strings.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-epics/create-epics-requirements.md`
 
-[ ] Subtask 9A.2. In `src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`, replace the `expect(createEpicsWorkflowDefinition.persona).to.deep.equal({ ... })` block with assertions that `persona` is not the legacy string `"product-manager"`, `persona.name` is a non-empty string, `persona.role` equals `"Product Manager"`, `persona.identity` is a non-empty string, `persona.communicationStyle` is a non-empty string, `persona.capabilities` is a non-empty array whose values are non-empty strings, and `persona.principles` is a non-empty array whose values are non-empty strings.
+[x] Subtask 9A.2. In `src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`, replace the `expect(createEpicsWorkflowDefinition.persona).to.deep.equal({ ... })` block with assertions that `persona` is not the legacy string `"product-manager"`, `persona.name` is a non-empty string, `persona.role` equals `"Product Manager"`, `persona.identity` is a non-empty string, `persona.communicationStyle` is a non-empty string, `persona.capabilities` is a non-empty array whose values are non-empty strings, and `persona.principles` is a non-empty array whose values are non-empty strings.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`
 
-[ ] Task 9B. Validate the persona test contract remediation.
+[x] Task 9B. Validate the persona test contract remediation.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-epics/action-plan.md`
 
-[ ] Subtask 9B.1. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`.
+[x] Subtask 9B.1. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-epics/action-plan.md`
 
-[ ] Subtask 9B.2. Run `rg -n "Drives PRDs|PRD creation|Jobs-to-be-Done|smallest validator|Builds epics through|Strict adherence|Bridge the gap" src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts` and confirm it returns no matches.
+[x] Subtask 9B.2. Run `rg -n "Drives PRDs|PRD creation|Jobs-to-be-Done|smallest validator|Builds epics through|Strict adherence|Bridge the gap" src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts` and confirm it returns no matches.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-epics/action-plan.md`
 
 ### Phase 6 - Validation
 
-[ ] Task 10. Run focused create-epics module and handler validation.
+[x] Task 10. Run focused create-epics module and handler validation.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-epics/action-plan.md`
 
-[ ] Subtask 10.1. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsDocument.test.ts src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsToolSchemas.test.ts src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`.
+[x] Subtask 10.1. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsDocument.test.ts src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsToolSchemas.test.ts src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-epics/action-plan.md`
 
-[ ] Subtask 10.2. Run `npm run test:unit -- src/core/task/tools/handlers/__tests__/UpsertEpicToolHandler.test.ts`.
+[x] Subtask 10.2. Run `npm run test:unit -- src/core/task/tools/handlers/__tests__/UpsertEpicToolHandler.test.ts`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-epics/action-plan.md`
 
-[ ] Task 11. Run shared runtime and prompt-projection validation.
+[x] Task 11. Run shared runtime and prompt-projection validation.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-epics/action-plan.md`
 
-[ ] Subtask 11.1. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/tools/handlers/__tests__/AttemptCompletionHandler.postCompletionFollowup.test.ts src/core/task/tools/handlers/__tests__/UseSkillToolHandler.test.ts`.
+[x] Subtask 11.1. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/tools/handlers/__tests__/AttemptCompletionHandler.postCompletionFollowup.test.ts src/core/task/tools/handlers/__tests__/UseSkillToolHandler.test.ts`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-epics/action-plan.md`
 
-[ ] Subtask 11.2. Run `npm run test:unit -- src/core/prompts/system-prompt/__tests__/integration.test.ts src/core/prompts/system-prompt/__tests__/response_tools.test.ts src/core/task/__tests__/workflow-runtime-metadata.test.ts`.
+[x] Subtask 11.2. Run `npm run test:unit -- src/core/prompts/system-prompt/__tests__/integration.test.ts src/core/prompts/system-prompt/__tests__/response_tools.test.ts src/core/task/__tests__/workflow-runtime-metadata.test.ts`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-epics/action-plan.md`
 
-[ ] Task 12. Run typecheck, lint, and static guards.
+[x] Task 12. Run typecheck, lint, and static guards.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-epics/action-plan.md`
 
-[ ] Subtask 12.1. Run `npm run check-types`.
+[x] Subtask 12.1. Run `npm run check-types`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-epics/action-plan.md`
 
-[ ] Subtask 12.2. Run `npm run lint`.
+[x] Subtask 12.2. Run `npm run lint`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-epics/action-plan.md`
 
-[ ] Subtask 12.3. Run `rg -n "build_workflow_document|apply_patch|set_workflow_values|workflow_progress_request|create_workflow_artifact|archive_workflow_artifact|delete_workflow_artifact|move_workflow_project_file" src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsToolSchemas.ts` and confirm no forbidden tool appears in Step 2 schema output.
+[x] Subtask 12.3. Run `rg -n "build_workflow_document|apply_patch|set_workflow_values|workflow_progress_request|create_workflow_artifact|archive_workflow_artifact|delete_workflow_artifact|move_workflow_project_file" src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsToolSchemas.ts` and confirm no forbidden tool appears in Step 2 schema output.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-epics/action-plan.md`
 
-[ ] Subtask 12.4. Run `rg -n "create-epics\\.md|createEpics\\.md|/Users/robertboston/Documents/Cline/Workflows/create-epics.md|epic-delivery-spec-template.md|_bmad/bmm/agents/pm.md" src/core/task/workflow-runtime/workflow-modules/create-epics src/core/task/workflow-runtime/WorkflowRegistry.ts` and confirm no runtime dependency on migration source files or `.md` workflow identity aliases.
+[x] Subtask 12.4. Run `rg -n "create-epics\\.md|createEpics\\.md|/Users/robertboston/Documents/Cline/Workflows/create-epics.md|epic-delivery-spec-template.md|_bmad/bmm/agents/pm.md" src/core/task/workflow-runtime/workflow-modules/create-epics src/core/task/workflow-runtime/WorkflowRegistry.ts` and confirm no runtime dependency on migration source files or `.md` workflow identity aliases.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-epics/action-plan.md`
 
-[ ] Subtask 12.5. Run `rg -n "selectorDiscovery|selected_project_root" src/core/task/workflow-runtime/workflow-modules/create-epics` and confirm it returns no matches.
+[x] Subtask 12.5. Run `rg -n "selectorDiscovery|selected_project_root" src/core/task/workflow-runtime/workflow-modules/create-epics` and confirm it returns no matches.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-epics/action-plan.md`
 
-[ ] Subtask 12.6. Run `rg -n "resolve_prerequisite_files|prerequisiteFiles" src/core/task/workflow-runtime/workflow-modules/create-epics` and confirm matches are limited to the create-epics workflow definition and tests.
+[x] Subtask 12.6. Run `rg -n "resolve_prerequisite_files|prerequisiteFiles" src/core/task/workflow-runtime/workflow-modules/create-epics` and confirm matches are limited to the create-epics workflow definition and tests.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-epics/action-plan.md`

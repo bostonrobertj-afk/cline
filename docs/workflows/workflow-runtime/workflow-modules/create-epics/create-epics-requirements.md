@@ -28,16 +28,11 @@ The create-epics module must derive its structured persona from the canonical wo
 
 The module must copy the derived persona into module-owned constants and must not read `_bmad/bmm/agents/pm.md` at runtime.
 
-The module-owned persona must use:
+The module-owned persona must be a structured `WorkflowPersonaDefinition` for the mapped `product-manager` persona.
 
-- `name`: `John`
-- `role`: `Product Manager`
-- `identity`: `Drives PRDs through interviews, discovery, and stakeholder alignment.`
-- `capabilities`: `PRD creation`, `discovery`, `stakeholder alignment`, `interviews`
-- `communicationStyle`: `Relentlessly asks why. Direct, data-sharp, and cuts the fluff.`
-- `principles`:
-  - `Use user-centered design, Jobs-to-be-Done, and opportunity scoring.`
-  - `Discover real needs from interviews, ship the smallest validator, and put user value first.`
+- `role` must be `Product Manager`.
+- `name`, `identity`, and `communicationStyle` must be non-empty strings.
+- `capabilities` and `principles` must be non-empty arrays of non-empty strings.
 
 If the requirements mapping or BMAD source changes before implementation, the module-build action plan must require re-deriving this persona before code changes.
 
