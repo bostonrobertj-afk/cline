@@ -4,7 +4,7 @@ import { expect } from "chai"
 import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "fs/promises"
 import { afterEach, beforeEach, describe, it } from "mocha"
 import { tmpdir } from "os"
-import { join } from "path"
+import { dirname, join } from "path"
 import * as sinon from "sinon"
 import { formatResponse } from "@/core/prompts/responses"
 import type { ClineToolSpec } from "@/core/prompts/system-prompt/spec"
@@ -34,6 +34,7 @@ import type {
 	WorkflowFinalDeliveryFinalizationResult,
 	WorkflowNextAction,
 	WorkflowPersonaDefinition,
+	WorkflowPrerequisiteFileDefinition,
 	WorkflowStepDefinition,
 	WorkflowStepTransitionTarget,
 	WorkflowValues,
@@ -88,6 +89,9 @@ describe("WorkflowRuntime", () => {
 	const ENTRY_ARTIFACT_CONFLICT_ACTION_FIELD_KEY = "__workflow_runtime_entry_artifact_conflict_action__"
 	const ENTRY_ARTIFACT_REPLACEMENT_PANEL_ID = "__workflow_runtime_entry_artifact_replacement__"
 	const ENTRY_ARTIFACT_REPLACEMENT_ACTION_FIELD_KEY = "__workflow_runtime_entry_artifact_replacement_action__"
+	const PREREQUISITE_CANNOT_CONTINUE_PANEL_ID = "__workflow_runtime_prerequisite_cannot_continue__"
+	const PREREQUISITE_SELECTED_FILE_FIELD_KEY = "__workflow_runtime_prerequisite_selected_file__"
+	const PREREQUISITE_SINGLE_MATCH_CONFIRMATION_FIELD_KEY = "__workflow_runtime_prerequisite_single_match_confirmation__"
 	const DEFAULT_ENTRY_PROJECT_VALUE_KEYS: WorkflowEntryProjectValueKeys = {
 		projectMode: "entry_project_mode",
 		projectTitle: "entry_project_title",
@@ -522,6 +526,38 @@ describe("WorkflowRuntime", () => {
 		}
 	}
 
+	function createResolvePrerequisiteFilesAction(prerequisiteIds: readonly string[]): WorkflowDecisionAction {
+		return {
+			kind: "resolve_prerequisite_files",
+			prerequisiteIds,
+		}
+	}
+
+	function createPrerequisiteFileDefinition(
+		args?: Partial<WorkflowPrerequisiteFileDefinition>,
+	): WorkflowPrerequisiteFileDefinition {
+		return {
+			id: args?.id ?? "requirements",
+			requirement: args?.requirement ?? "required",
+			projectSubfolderSegments: args?.projectSubfolderSegments ?? ["planning"],
+			match: args?.match ?? {
+				kind: "exact_filename",
+				filename: "requirements.md",
+			},
+			producingWorkflowName: args?.producingWorkflowName ?? "create-prd",
+			workflowValueKey: args?.workflowValueKey ?? "requirements_path",
+			outputDocumentReference: args?.outputDocumentReference ?? "none",
+		}
+	}
+
+	function createMalformedPrerequisiteFileDefinition(
+		mutate: (definition: WorkflowPrerequisiteFileDefinition) => void,
+	): WorkflowPrerequisiteFileDefinition {
+		const definition = createPrerequisiteFileDefinition()
+		mutate(definition)
+		return definition
+	}
+
 	function createStepDefinition(args: {
 		stepNumber: number
 		checklistLabel?: string
@@ -549,6 +585,7 @@ describe("WorkflowRuntime", () => {
 		steps?: WorkflowDefinition["steps"]
 		childInheritance?: WorkflowDefinition["childInheritance"]
 		artifacts?: WorkflowDefinition["artifacts"]
+		prerequisiteFiles?: WorkflowDefinition["prerequisiteFiles"]
 		projectSubfolder?: WorkflowDefinition["projectSubfolder"]
 		displayName?: string
 		description?: string
@@ -580,6 +617,7 @@ describe("WorkflowRuntime", () => {
 			steps: args?.steps ?? defaultSteps,
 			workflowForms: args?.workflowForms ?? {},
 			artifacts: args?.artifacts,
+			prerequisiteFiles: args?.prerequisiteFiles,
 			childInheritance: args?.childInheritance,
 		}
 	}
@@ -962,6 +1000,136 @@ describe("WorkflowRuntime", () => {
 		})
 
 		return { workflow, artifactId, outputValueKeys }
+	}
+
+	function createPrerequisiteResolutionDecisionTree(args: {
+		prerequisiteIds: readonly string[]
+		artifactId: string
+	}): WorkflowDecisionTree {
+		return {
+			entryBranchId: "resolve-prerequisites",
+			branches: {
+				"resolve-prerequisites": {
+					id: "resolve-prerequisites",
+					routes: [
+						{
+							id: "resolve-prerequisites-route",
+							trigger: { kind: "always" },
+							action: createResolvePrerequisiteFilesAction(args.prerequisiteIds),
+							followingBranchId: "after-prerequisites",
+						},
+					],
+				},
+				"after-prerequisites": {
+					id: "after-prerequisites",
+					routes: [
+						{
+							id: "allocate-after-prerequisites",
+							trigger: { kind: "always" },
+							action: {
+								kind: "allocate_artifact",
+								artifactId: args.artifactId,
+							},
+						},
+					],
+				},
+			},
+		}
+	}
+
+	function createPrerequisiteResolutionWorkflow(args?: {
+		prerequisite?: WorkflowPrerequisiteFileDefinition
+		projectSubfolder?: WorkflowDefinition["projectSubfolder"]
+	}): {
+		workflow: WorkflowDefinition
+		artifactId: string
+		outputValueKeys: ReturnType<typeof createStandaloneArtifactOutputValueKeys>
+		prerequisite: WorkflowPrerequisiteFileDefinition
+	} {
+		const artifactId = "epics_doc"
+		const outputValueKeys = createStandaloneArtifactOutputValueKeys("prerequisite_output")
+		const prerequisite = args?.prerequisite ?? createPrerequisiteFileDefinition()
+		const workflow = createWorkflowDefinition({
+			projectSubfolder: args?.projectSubfolder,
+			workflowValueKeys: [prerequisite.workflowValueKey, ...collectArtifactOutputWorkflowValueKeys(outputValueKeys)],
+			prerequisiteFiles: {
+				[prerequisite.id]: prerequisite,
+			},
+			artifacts: {
+				[artifactId]: {
+					id: artifactId,
+					family: WorkflowArtifactFamily.Epics,
+					intentMode: "new",
+					parentIdentitySource: undefined,
+					targetIdentitySource: undefined,
+					outputValueKeys,
+				},
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createPrerequisiteResolutionDecisionTree({
+						prerequisiteIds: [prerequisite.id],
+						artifactId,
+					}),
+				}),
+			},
+		})
+
+		return { workflow, artifactId, outputValueKeys, prerequisite }
+	}
+
+	function createMultiPrerequisiteResolutionWorkflow(args: {
+		prerequisites: readonly WorkflowPrerequisiteFileDefinition[]
+		projectSubfolder?: WorkflowDefinition["projectSubfolder"]
+	}): {
+		workflow: WorkflowDefinition
+		artifactId: string
+		outputValueKeys: ReturnType<typeof createStandaloneArtifactOutputValueKeys>
+		prerequisites: readonly WorkflowPrerequisiteFileDefinition[]
+	} {
+		const artifactId = "epics_doc"
+		const outputValueKeys = createStandaloneArtifactOutputValueKeys("prerequisite_output")
+		const prerequisiteFiles: NonNullable<WorkflowDefinition["prerequisiteFiles"]> = {}
+		for (const prerequisite of args.prerequisites) {
+			prerequisiteFiles[prerequisite.id] = prerequisite
+		}
+		const workflow = createWorkflowDefinition({
+			projectSubfolder: args.projectSubfolder,
+			workflowValueKeys: [
+				...args.prerequisites.map((prerequisite) => prerequisite.workflowValueKey),
+				...collectArtifactOutputWorkflowValueKeys(outputValueKeys),
+			],
+			prerequisiteFiles,
+			artifacts: {
+				[artifactId]: {
+					id: artifactId,
+					family: WorkflowArtifactFamily.Epics,
+					intentMode: "new",
+					parentIdentitySource: undefined,
+					targetIdentitySource: undefined,
+					outputValueKeys,
+				},
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createPrerequisiteResolutionDecisionTree({
+						prerequisiteIds: args.prerequisites.map((prerequisite) => prerequisite.id),
+						artifactId,
+					}),
+				}),
+			},
+		})
+
+		return { workflow, artifactId, outputValueKeys, prerequisites: args.prerequisites }
+	}
+
+	async function writePrerequisiteProjectFile(projectFolderName: string, relativePath: string): Promise<string> {
+		const absolutePath = join(cwd, "docs", "projects", projectFolderName, relativePath)
+		await mkdir(dirname(absolutePath), { recursive: true })
+		await writeFile(absolutePath, "prerequisite", "utf8")
+		return absolutePath
 	}
 
 	async function advanceToEntryProjectSelectionPanel(state: TaskState) {
@@ -2307,6 +2475,887 @@ describe("WorkflowRuntime", () => {
 			expect(invalidState.activeWorkflowName, invalidFilenameKeyCase.label).to.be.undefined
 			expect(invalidState.activeWorkflowSession, invalidFilenameKeyCase.label).to.be.undefined
 		}
+	})
+
+	it("rejects invalid prerequisite file declarations before activation", async () => {
+		const invalidPrerequisiteCases: ReadonlyArray<{
+			readonly label: string
+			readonly prerequisiteKey: string
+			readonly definition: WorkflowPrerequisiteFileDefinition
+			readonly workflowValueKeys: readonly string[]
+		}> = [
+			{
+				label: "record key mismatch",
+				prerequisiteKey: "requirements",
+				definition: createPrerequisiteFileDefinition({ id: "different-requirements" }),
+				workflowValueKeys: ["requirements_path"],
+			},
+			{
+				label: "blank id",
+				prerequisiteKey: "",
+				definition: createPrerequisiteFileDefinition({ id: "" }),
+				workflowValueKeys: ["requirements_path"],
+			},
+			{
+				label: "untrimmed id",
+				prerequisiteKey: " requirements",
+				definition: createPrerequisiteFileDefinition({ id: " requirements" }),
+				workflowValueKeys: ["requirements_path"],
+			},
+			{
+				label: "blank producing workflow",
+				prerequisiteKey: "requirements",
+				definition: createPrerequisiteFileDefinition({ producingWorkflowName: "" }),
+				workflowValueKeys: ["requirements_path"],
+			},
+			{
+				label: "untrimmed producing workflow",
+				prerequisiteKey: "requirements",
+				definition: createPrerequisiteFileDefinition({ producingWorkflowName: " create-prd" }),
+				workflowValueKeys: ["requirements_path"],
+			},
+			{
+				label: "blank workflow value key",
+				prerequisiteKey: "requirements",
+				definition: createPrerequisiteFileDefinition({ workflowValueKey: "" }),
+				workflowValueKeys: ["requirements_path"],
+			},
+			{
+				label: "untrimmed workflow value key",
+				prerequisiteKey: "requirements",
+				definition: createPrerequisiteFileDefinition({ workflowValueKey: " requirements_path" }),
+				workflowValueKeys: ["requirements_path"],
+			},
+			{
+				label: "undeclared workflow value key",
+				prerequisiteKey: "requirements",
+				definition: createPrerequisiteFileDefinition({ workflowValueKey: "missing_requirements_path" }),
+				workflowValueKeys: ["requirements_path"],
+			},
+			{
+				label: "malformed requirement",
+				prerequisiteKey: "requirements",
+				definition: createMalformedPrerequisiteFileDefinition((definition) => {
+					Object.assign(definition, { requirement: "recommended" })
+				}),
+				workflowValueKeys: ["requirements_path"],
+			},
+			{
+				label: "malformed output document reference",
+				prerequisiteKey: "requirements",
+				definition: createMalformedPrerequisiteFileDefinition((definition) => {
+					Object.assign(definition, { outputDocumentReference: "artifact" })
+				}),
+				workflowValueKeys: ["requirements_path"],
+			},
+			{
+				label: "invalid project subfolder segment",
+				prerequisiteKey: "requirements",
+				definition: createPrerequisiteFileDefinition({ projectSubfolderSegments: ["planning/nested"] }),
+				workflowValueKeys: ["requirements_path"],
+			},
+			{
+				label: "blank exact filename",
+				prerequisiteKey: "requirements",
+				definition: createPrerequisiteFileDefinition({
+					match: {
+						kind: "exact_filename",
+						filename: "",
+					},
+				}),
+				workflowValueKeys: ["requirements_path"],
+			},
+			{
+				label: "untrimmed exact filename",
+				prerequisiteKey: "requirements",
+				definition: createPrerequisiteFileDefinition({
+					match: {
+						kind: "exact_filename",
+						filename: " requirements.md",
+					},
+				}),
+				workflowValueKeys: ["requirements_path"],
+			},
+			{
+				label: "unsafe exact filename",
+				prerequisiteKey: "requirements",
+				definition: createPrerequisiteFileDefinition({
+					match: {
+						kind: "exact_filename",
+						filename: "nested/requirements.md",
+					},
+				}),
+				workflowValueKeys: ["requirements_path"],
+			},
+			{
+				label: "unknown match kind",
+				prerequisiteKey: "requirements",
+				definition: createMalformedPrerequisiteFileDefinition((definition) => {
+					Object.assign(definition, {
+						match: {
+							kind: "glob",
+							pattern: "*.md",
+						},
+					})
+				}),
+				workflowValueKeys: ["requirements_path"],
+			},
+			{
+				label: "missing match kind",
+				prerequisiteKey: "requirements",
+				definition: createMalformedPrerequisiteFileDefinition((definition) => {
+					Object.assign(definition, {
+						match: {
+							filename: "requirements.md",
+						},
+					})
+				}),
+				workflowValueKeys: ["requirements_path"],
+			},
+			{
+				label: "non-string match kind",
+				prerequisiteKey: "requirements",
+				definition: createMalformedPrerequisiteFileDefinition((definition) => {
+					Object.assign(definition, {
+						match: {
+							kind: 1,
+							filename: "requirements.md",
+						},
+					})
+				}),
+				workflowValueKeys: ["requirements_path"],
+			},
+			{
+				label: "non-RegExp naming pattern",
+				prerequisiteKey: "requirements",
+				definition: createMalformedPrerequisiteFileDefinition((definition) => {
+					Object.assign(definition, {
+						match: {
+							kind: "naming_pattern",
+							pattern: "^requirements\\.md$",
+						},
+					})
+				}),
+				workflowValueKeys: ["requirements_path"],
+			},
+		]
+
+		for (const invalidPrerequisiteCase of invalidPrerequisiteCases) {
+			const invalidState = new TaskState()
+			const invalidWorkflow = createWorkflowDefinition({
+				workflowValueKeys: invalidPrerequisiteCase.workflowValueKeys,
+				prerequisiteFiles: {
+					[invalidPrerequisiteCase.prerequisiteKey]: invalidPrerequisiteCase.definition,
+				},
+			})
+
+			const result = await activateWorkflow(invalidState, invalidWorkflow)
+			expect(result, invalidPrerequisiteCase.label).to.deep.equal({ kind: "no_op" })
+			expect(invalidState.activeWorkflowName, invalidPrerequisiteCase.label).to.be.undefined
+			expect(invalidState.activeWorkflowSession, invalidPrerequisiteCase.label).to.be.undefined
+		}
+	})
+
+	it("rejects invalid resolve_prerequisite_files routes before activation", async () => {
+		const invalidRouteCases: ReadonlyArray<{
+			readonly label: string
+			readonly prerequisiteIds: readonly string[]
+		}> = [
+			{ label: "empty ids", prerequisiteIds: [] },
+			{ label: "blank id", prerequisiteIds: [""] },
+			{ label: "untrimmed id", prerequisiteIds: [" requirements"] },
+			{ label: "duplicate id", prerequisiteIds: ["requirements", "requirements"] },
+			{ label: "missing id", prerequisiteIds: ["missing_requirements"] },
+		]
+
+		for (const invalidRouteCase of invalidRouteCases) {
+			const invalidState = new TaskState()
+			const invalidWorkflow = createWorkflowDefinition({
+				workflowValueKeys: ["requirements_path"],
+				prerequisiteFiles: {
+					requirements: createPrerequisiteFileDefinition(),
+				},
+				steps: {
+					"step-1": createStepDefinition({
+						stepNumber: 1,
+						decisionTree: createToolBackedOperationDecisionTree({
+							startAction: createResolvePrerequisiteFilesAction(invalidRouteCase.prerequisiteIds),
+						}),
+					}),
+				},
+			})
+
+			const result = await activateWorkflow(invalidState, invalidWorkflow)
+			expect(result, invalidRouteCase.label).to.deep.equal({ kind: "no_op" })
+			expect(invalidState.activeWorkflowName, invalidRouteCase.label).to.be.undefined
+			expect(invalidState.activeWorkflowSession, invalidRouteCase.label).to.be.undefined
+		}
+	})
+
+	it("renders a required prerequisite cannot-continue panel when no exact filename matches", async () => {
+		const { workflow } = createPrerequisiteResolutionWorkflow({
+			prerequisite: createPrerequisiteFileDefinition({
+				producingWorkflowName: "create-prd",
+				match: {
+					kind: "exact_filename",
+					filename: "requirements.md",
+				},
+			}),
+		})
+		await activateWorkflow(taskState, workflow)
+
+		const result = await submitNewProjectSelection(taskState, "prerequisite-no-match")
+
+		expect(result.kind).to.equal("render_workflow_form")
+		if (result.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${result.kind}.`)
+		}
+		expect(result.payload.panel?.panelId).to.equal(PREREQUISITE_CANNOT_CONTINUE_PANEL_ID)
+		expect(result.payload.panel?.promptMarkdown).to.include("create-prd")
+		expect(result.payload.panel?.promptMarkdown).to.include("cannot continue without the required prerequisite file")
+
+		const repeated = await runtime.resolveNextAction({ taskState })
+		expect(repeated.kind).to.equal("render_workflow_form")
+		if (repeated.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${repeated.kind}.`)
+		}
+		expect(repeated.payload.panel?.panelId).to.equal(PREREQUISITE_CANNOT_CONTINUE_PANEL_ID)
+	})
+
+	it("persists a required one-match prerequisite path after confirmation and continues next-action evaluation", async () => {
+		const projectFolderName = "prerequisite-one-match"
+		const prerequisitePath = await writePrerequisiteProjectFile(projectFolderName, join("planning", "requirements.md"))
+		const { workflow, prerequisite } = createPrerequisiteResolutionWorkflow()
+		await activateWorkflow(taskState, workflow)
+
+		const result = await submitNewProjectSelection(taskState, projectFolderName)
+
+		expect(result.kind).to.equal("render_workflow_form")
+		if (result.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${result.kind}.`)
+		}
+		expect(result.payload.panel?.promptMarkdown).to.include("requirements.md")
+		expect(result.payload.panel?.promptMarkdown).to.include(prerequisitePath)
+		const confirmationField = result.payload.panel?.fields.find(
+			(field) => field.key === PREREQUISITE_SINGLE_MATCH_CONFIRMATION_FIELD_KEY,
+		)
+		expect(confirmationField?.kind).to.equal("boolean")
+		expect(confirmationField?.required).to.equal(true)
+
+		const accepted = await runtime.submitWorkflowForm({
+			taskState,
+			request: createFormSubmitRequest({
+				sessionId: result.formSession.sessionId,
+				panelId: result.formSession.currentPanelId,
+				fields: [
+					{
+						key: PREREQUISITE_SINGLE_MATCH_CONFIRMATION_FIELD_KEY,
+						value: { booleanValue: true },
+					},
+				],
+			}),
+		})
+
+		expect(getActiveWorkflowSession(taskState).workflowValues[prerequisite.workflowValueKey]).to.equal(prerequisitePath)
+		expect(accepted.kind).to.equal("execute_tool_backed_operation")
+		if (accepted.kind !== "execute_tool_backed_operation") {
+			throw new Error(`Expected execute_tool_backed_operation, received ${accepted.kind}.`)
+		}
+		expect(accepted.toolRequest.toolName).to.equal(ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT)
+	})
+
+	it("renders cannot-continue without persisting a path when a required one-match prerequisite is rejected", async () => {
+		const projectFolderName = "prerequisite-one-match-rejected"
+		await writePrerequisiteProjectFile(projectFolderName, join("planning", "requirements.md"))
+		const { workflow, prerequisite } = createPrerequisiteResolutionWorkflow()
+		await activateWorkflow(taskState, workflow)
+		const result = await submitNewProjectSelection(taskState, projectFolderName)
+		expect(result.kind).to.equal("render_workflow_form")
+		if (result.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${result.kind}.`)
+		}
+
+		const rejected = await runtime.submitWorkflowForm({
+			taskState,
+			request: createFormSubmitRequest({
+				sessionId: result.formSession.sessionId,
+				panelId: result.formSession.currentPanelId,
+				fields: [
+					{
+						key: PREREQUISITE_SINGLE_MATCH_CONFIRMATION_FIELD_KEY,
+						value: { booleanValue: false },
+					},
+				],
+			}),
+		})
+
+		expect(getActiveWorkflowSession(taskState).workflowValues[prerequisite.workflowValueKey]).to.be.undefined
+		expect(rejected.kind).to.equal("render_workflow_form")
+		if (rejected.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${rejected.kind}.`)
+		}
+		expect(rejected.payload.panel?.panelId).to.equal(PREREQUISITE_CANNOT_CONTINUE_PANEL_ID)
+	})
+
+	it("persists the selected full path from a required multi-match prerequisite dropdown", async () => {
+		const projectFolderName = "prerequisite-multi-match"
+		const alphaPath = await writePrerequisiteProjectFile(projectFolderName, join("planning", "requirements-alpha.md"))
+		const betaPath = await writePrerequisiteProjectFile(projectFolderName, join("planning", "requirements-beta.md"))
+		const { workflow, prerequisite } = createPrerequisiteResolutionWorkflow({
+			prerequisite: createPrerequisiteFileDefinition({
+				match: {
+					kind: "naming_pattern",
+					pattern: /^requirements-.+\.md$/,
+				},
+			}),
+		})
+		await activateWorkflow(taskState, workflow)
+
+		const result = await submitNewProjectSelection(taskState, projectFolderName)
+
+		expect(result.kind).to.equal("render_workflow_form")
+		if (result.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${result.kind}.`)
+		}
+		const dropdownField = result.payload.panel?.fields.find((field) => field.key === PREREQUISITE_SELECTED_FILE_FIELD_KEY)
+		expect(dropdownField?.kind).to.equal("dropdown")
+		expect(dropdownField?.required).to.equal(true)
+		expect(dropdownField?.options?.map((option) => option.value)).to.deep.equal([alphaPath, betaPath])
+		expect(dropdownField?.options?.[0]?.label).to.include("requirements-alpha.md")
+		expect(dropdownField?.options?.[1]?.label).to.include("requirements-beta.md")
+
+		const selected = await runtime.submitWorkflowForm({
+			taskState,
+			request: createFormSubmitRequest({
+				sessionId: result.formSession.sessionId,
+				panelId: result.formSession.currentPanelId,
+				fields: [
+					{
+						key: PREREQUISITE_SELECTED_FILE_FIELD_KEY,
+						value: { stringValue: betaPath },
+					},
+				],
+			}),
+		})
+
+		expect(getActiveWorkflowSession(taskState).workflowValues[prerequisite.workflowValueKey]).to.equal(betaPath)
+		expect(selected.kind).to.equal("execute_tool_backed_operation")
+		if (selected.kind !== "execute_tool_backed_operation") {
+			throw new Error(`Expected execute_tool_backed_operation, received ${selected.kind}.`)
+		}
+		expect(selected.toolRequest.toolName).to.equal(ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT)
+	})
+
+	it("routes required multi-match prerequisite cancel to cannot-continue without proceeding", async () => {
+		const projectFolderName = "prerequisite-multi-match-cancel"
+		await writePrerequisiteProjectFile(projectFolderName, join("planning", "requirements-alpha.md"))
+		await writePrerequisiteProjectFile(projectFolderName, join("planning", "requirements-beta.md"))
+		const { workflow, prerequisite } = createPrerequisiteResolutionWorkflow({
+			prerequisite: createPrerequisiteFileDefinition({
+				match: {
+					kind: "naming_pattern",
+					pattern: /^requirements-.+\.md$/,
+				},
+			}),
+		})
+		await activateWorkflow(taskState, workflow)
+		const result = await submitNewProjectSelection(taskState, projectFolderName)
+		expect(result.kind).to.equal("render_workflow_form")
+		if (result.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${result.kind}.`)
+		}
+
+		const cancelled = await runtime.submitWorkflowForm({
+			taskState,
+			request: createFormSubmitRequest({
+				sessionId: result.formSession.sessionId,
+				panelId: result.formSession.currentPanelId,
+				action: WorkflowFormAction.CANCEL,
+			}),
+		})
+
+		expect(getActiveWorkflowSession(taskState).workflowValues[prerequisite.workflowValueKey]).to.be.undefined
+		expect(cancelled.kind).to.equal("render_workflow_form")
+		if (cancelled.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${cancelled.kind}.`)
+		}
+		expect(cancelled.payload.panel?.panelId).to.equal(PREREQUISITE_CANNOT_CONTINUE_PANEL_ID)
+		const repeated = await runtime.resolveNextAction({ taskState })
+		expect(repeated.kind).to.equal("render_workflow_form")
+		if (repeated.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${repeated.kind}.`)
+		}
+		expect(repeated.payload.panel?.panelId).to.equal(PREREQUISITE_CANNOT_CONTINUE_PANEL_ID)
+	})
+
+	it("skips optional no-match prerequisites and continues next-action evaluation", async () => {
+		const { workflow, prerequisite } = createPrerequisiteResolutionWorkflow({
+			prerequisite: createPrerequisiteFileDefinition({
+				requirement: "optional",
+				match: {
+					kind: "exact_filename",
+					filename: "optional-context.md",
+				},
+			}),
+		})
+		await activateWorkflow(taskState, workflow)
+
+		const result = await submitNewProjectSelection(taskState, "optional-prerequisite-no-match")
+
+		expect(getActiveWorkflowSession(taskState).workflowValues[prerequisite.workflowValueKey]).to.be.undefined
+		expect(getActiveWorkflowSession(taskState).ui.formSession).to.be.undefined
+		expect(result.kind).to.equal("execute_tool_backed_operation")
+		if (result.kind !== "execute_tool_backed_operation") {
+			throw new Error(`Expected execute_tool_backed_operation, received ${result.kind}.`)
+		}
+		expect(result.toolRequest.toolName).to.equal(ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT)
+	})
+
+	it("continues optional prerequisite flows with or without persisted selections", async () => {
+		const expectArtifactAllocation = (action: WorkflowNextAction, label: string): void => {
+			expect(action.kind, label).to.equal("execute_tool_backed_operation")
+			if (action.kind !== "execute_tool_backed_operation") {
+				throw new Error(`Expected execute_tool_backed_operation for ${label}, received ${action.kind}.`)
+			}
+			expect(action.toolRequest.toolName, label).to.equal(ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT)
+		}
+
+		const oneMatchAcceptState = new TaskState()
+		const oneMatchAcceptFolder = "optional-one-match-accept"
+		const oneMatchPath = await writePrerequisiteProjectFile(oneMatchAcceptFolder, join("planning", "optional.md"))
+		const oneMatchAcceptPrerequisite = createPrerequisiteFileDefinition({
+			requirement: "optional",
+			match: {
+				kind: "exact_filename",
+				filename: "optional.md",
+			},
+		})
+		const oneMatchAcceptWorkflow = createPrerequisiteResolutionWorkflow({
+			prerequisite: oneMatchAcceptPrerequisite,
+		}).workflow
+		await activateWorkflow(oneMatchAcceptState, oneMatchAcceptWorkflow)
+		const oneMatchPrompt = await submitNewProjectSelection(oneMatchAcceptState, oneMatchAcceptFolder)
+		expect(oneMatchPrompt.kind).to.equal("render_workflow_form")
+		if (oneMatchPrompt.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${oneMatchPrompt.kind}.`)
+		}
+		const oneMatchAccepted = await runtime.submitWorkflowForm({
+			taskState: oneMatchAcceptState,
+			request: createFormSubmitRequest({
+				sessionId: oneMatchPrompt.formSession.sessionId,
+				panelId: oneMatchPrompt.formSession.currentPanelId,
+				fields: [
+					{
+						key: PREREQUISITE_SINGLE_MATCH_CONFIRMATION_FIELD_KEY,
+						value: { booleanValue: true },
+					},
+				],
+			}),
+		})
+		expect(
+			getActiveWorkflowSession(oneMatchAcceptState).workflowValues[oneMatchAcceptPrerequisite.workflowValueKey],
+		).to.equal(oneMatchPath)
+		expectArtifactAllocation(oneMatchAccepted, "optional one-match accepted")
+
+		const oneMatchRejectState = new TaskState()
+		const oneMatchRejectFolder = "optional-one-match-reject"
+		await writePrerequisiteProjectFile(oneMatchRejectFolder, join("planning", "optional.md"))
+		const oneMatchRejectWorkflow = createPrerequisiteResolutionWorkflow({
+			prerequisite: oneMatchAcceptPrerequisite,
+		}).workflow
+		await activateWorkflow(oneMatchRejectState, oneMatchRejectWorkflow)
+		const oneMatchRejectPrompt = await submitNewProjectSelection(oneMatchRejectState, oneMatchRejectFolder)
+		expect(oneMatchRejectPrompt.kind).to.equal("render_workflow_form")
+		if (oneMatchRejectPrompt.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${oneMatchRejectPrompt.kind}.`)
+		}
+		const oneMatchRejected = await runtime.submitWorkflowForm({
+			taskState: oneMatchRejectState,
+			request: createFormSubmitRequest({
+				sessionId: oneMatchRejectPrompt.formSession.sessionId,
+				panelId: oneMatchRejectPrompt.formSession.currentPanelId,
+				fields: [
+					{
+						key: PREREQUISITE_SINGLE_MATCH_CONFIRMATION_FIELD_KEY,
+						value: { booleanValue: false },
+					},
+				],
+			}),
+		})
+		expect(getActiveWorkflowSession(oneMatchRejectState).workflowValues[oneMatchAcceptPrerequisite.workflowValueKey]).to.be
+			.undefined
+		expectArtifactAllocation(oneMatchRejected, "optional one-match rejected")
+
+		const multiMatchPrerequisite = createPrerequisiteFileDefinition({
+			requirement: "optional",
+			match: {
+				kind: "naming_pattern",
+				pattern: /^optional-.+\.md$/,
+			},
+		})
+
+		const multiMatchSelectedState = new TaskState()
+		const multiMatchSelectedFolder = "optional-multi-match-selected"
+		await writePrerequisiteProjectFile(multiMatchSelectedFolder, join("planning", "optional-alpha.md"))
+		const selectedMultiMatchPath = await writePrerequisiteProjectFile(
+			multiMatchSelectedFolder,
+			join("planning", "optional-beta.md"),
+		)
+		const multiMatchSelectedWorkflow = createPrerequisiteResolutionWorkflow({
+			prerequisite: multiMatchPrerequisite,
+		}).workflow
+		await activateWorkflow(multiMatchSelectedState, multiMatchSelectedWorkflow)
+		const multiMatchPrompt = await submitNewProjectSelection(multiMatchSelectedState, multiMatchSelectedFolder)
+		expect(multiMatchPrompt.kind).to.equal("render_workflow_form")
+		if (multiMatchPrompt.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${multiMatchPrompt.kind}.`)
+		}
+		const multiMatchSelected = await runtime.submitWorkflowForm({
+			taskState: multiMatchSelectedState,
+			request: createFormSubmitRequest({
+				sessionId: multiMatchPrompt.formSession.sessionId,
+				panelId: multiMatchPrompt.formSession.currentPanelId,
+				fields: [
+					{
+						key: PREREQUISITE_SELECTED_FILE_FIELD_KEY,
+						value: { stringValue: selectedMultiMatchPath },
+					},
+				],
+			}),
+		})
+		expect(
+			getActiveWorkflowSession(multiMatchSelectedState).workflowValues[multiMatchPrerequisite.workflowValueKey],
+		).to.equal(selectedMultiMatchPath)
+		expectArtifactAllocation(multiMatchSelected, "optional multi-match selected")
+
+		const multiMatchCancelState = new TaskState()
+		const multiMatchCancelFolder = "optional-multi-match-cancel"
+		await writePrerequisiteProjectFile(multiMatchCancelFolder, join("planning", "optional-alpha.md"))
+		await writePrerequisiteProjectFile(multiMatchCancelFolder, join("planning", "optional-beta.md"))
+		const multiMatchCancelWorkflow = createPrerequisiteResolutionWorkflow({
+			prerequisite: multiMatchPrerequisite,
+		}).workflow
+		await activateWorkflow(multiMatchCancelState, multiMatchCancelWorkflow)
+		const multiMatchCancelPrompt = await submitNewProjectSelection(multiMatchCancelState, multiMatchCancelFolder)
+		expect(multiMatchCancelPrompt.kind).to.equal("render_workflow_form")
+		if (multiMatchCancelPrompt.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${multiMatchCancelPrompt.kind}.`)
+		}
+		const multiMatchCancelled = await runtime.submitWorkflowForm({
+			taskState: multiMatchCancelState,
+			request: createFormSubmitRequest({
+				sessionId: multiMatchCancelPrompt.formSession.sessionId,
+				panelId: multiMatchCancelPrompt.formSession.currentPanelId,
+				action: WorkflowFormAction.CANCEL,
+			}),
+		})
+		expect(getActiveWorkflowSession(multiMatchCancelState).workflowValues[multiMatchPrerequisite.workflowValueKey]).to.be
+			.undefined
+		expectArtifactAllocation(multiMatchCancelled, "optional multi-match cancelled")
+
+		const multiMatchNoSelectionState = new TaskState()
+		const multiMatchNoSelectionFolder = "optional-multi-match-no-selection"
+		await writePrerequisiteProjectFile(multiMatchNoSelectionFolder, join("planning", "optional-alpha.md"))
+		await writePrerequisiteProjectFile(multiMatchNoSelectionFolder, join("planning", "optional-beta.md"))
+		const multiMatchNoSelectionWorkflow = createPrerequisiteResolutionWorkflow({
+			prerequisite: multiMatchPrerequisite,
+		}).workflow
+		await activateWorkflow(multiMatchNoSelectionState, multiMatchNoSelectionWorkflow)
+		const multiMatchNoSelectionPrompt = await submitNewProjectSelection(
+			multiMatchNoSelectionState,
+			multiMatchNoSelectionFolder,
+		)
+		expect(multiMatchNoSelectionPrompt.kind).to.equal("render_workflow_form")
+		if (multiMatchNoSelectionPrompt.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${multiMatchNoSelectionPrompt.kind}.`)
+		}
+		const multiMatchNoSelection = await runtime.submitWorkflowForm({
+			taskState: multiMatchNoSelectionState,
+			request: createFormSubmitRequest({
+				sessionId: multiMatchNoSelectionPrompt.formSession.sessionId,
+				panelId: multiMatchNoSelectionPrompt.formSession.currentPanelId,
+			}),
+		})
+		expect(getActiveWorkflowSession(multiMatchNoSelectionState).workflowValues[multiMatchPrerequisite.workflowValueKey]).to.be
+			.undefined
+		expectArtifactAllocation(multiMatchNoSelection, "optional multi-match no selection")
+	})
+
+	it("accumulates skipped optional prerequisites across repeated cancels", async () => {
+		const projectFolderName = "optional-prerequisites-repeated-cancel"
+		const firstPath = await writePrerequisiteProjectFile(projectFolderName, join("planning", "optional-alpha.md"))
+		const secondPath = await writePrerequisiteProjectFile(projectFolderName, join("planning", "optional-beta.md"))
+		const firstPrerequisite = createPrerequisiteFileDefinition({
+			id: "optional-alpha",
+			requirement: "optional",
+			match: {
+				kind: "exact_filename",
+				filename: "optional-alpha.md",
+			},
+			workflowValueKey: "optional_alpha_path",
+		})
+		const secondPrerequisite = createPrerequisiteFileDefinition({
+			id: "optional-beta",
+			requirement: "optional",
+			match: {
+				kind: "exact_filename",
+				filename: "optional-beta.md",
+			},
+			workflowValueKey: "optional_beta_path",
+		})
+		const { workflow } = createMultiPrerequisiteResolutionWorkflow({
+			prerequisites: [firstPrerequisite, secondPrerequisite],
+		})
+		await activateWorkflow(taskState, workflow)
+
+		const firstPrompt = await submitNewProjectSelection(taskState, projectFolderName)
+		expect(firstPrompt.kind).to.equal("render_workflow_form")
+		if (firstPrompt.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${firstPrompt.kind}.`)
+		}
+		expect(firstPrompt.payload.panel?.promptMarkdown).to.include(firstPath)
+
+		const secondPrompt = await runtime.submitWorkflowForm({
+			taskState,
+			request: createFormSubmitRequest({
+				sessionId: firstPrompt.formSession.sessionId,
+				panelId: firstPrompt.formSession.currentPanelId,
+				action: WorkflowFormAction.CANCEL,
+			}),
+		})
+		expect(secondPrompt.kind).to.equal("render_workflow_form")
+		if (secondPrompt.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${secondPrompt.kind}.`)
+		}
+		expect(secondPrompt.payload.panel?.promptMarkdown).to.include(secondPath)
+		expect(secondPrompt.payload.panel?.promptMarkdown).to.not.include(firstPath)
+
+		const allocated = await runtime.submitWorkflowForm({
+			taskState,
+			request: createFormSubmitRequest({
+				sessionId: secondPrompt.formSession.sessionId,
+				panelId: secondPrompt.formSession.currentPanelId,
+				action: WorkflowFormAction.CANCEL,
+			}),
+		})
+
+		expect(getActiveWorkflowSession(taskState).workflowValues[firstPrerequisite.workflowValueKey]).to.be.undefined
+		expect(getActiveWorkflowSession(taskState).workflowValues[secondPrerequisite.workflowValueKey]).to.be.undefined
+		expect(getActiveWorkflowSession(taskState).ui.formSession).to.be.undefined
+		expect(allocated.kind).to.equal("execute_tool_backed_operation")
+		if (allocated.kind !== "execute_tool_backed_operation") {
+			throw new Error(`Expected execute_tool_backed_operation, received ${allocated.kind}.`)
+		}
+		expect(allocated.toolRequest.toolName).to.equal(ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT)
+	})
+
+	it("keeps earlier optional prerequisites skipped when a later optional prerequisite is selected", async () => {
+		const projectFolderName = "optional-prerequisites-skip-then-select"
+		const firstPath = await writePrerequisiteProjectFile(projectFolderName, join("planning", "optional-alpha.md"))
+		const secondPath = await writePrerequisiteProjectFile(projectFolderName, join("planning", "optional-beta.md"))
+		const firstPrerequisite = createPrerequisiteFileDefinition({
+			id: "optional-alpha",
+			requirement: "optional",
+			match: {
+				kind: "exact_filename",
+				filename: "optional-alpha.md",
+			},
+			workflowValueKey: "optional_alpha_path",
+		})
+		const secondPrerequisite = createPrerequisiteFileDefinition({
+			id: "optional-beta",
+			requirement: "optional",
+			match: {
+				kind: "exact_filename",
+				filename: "optional-beta.md",
+			},
+			workflowValueKey: "optional_beta_path",
+		})
+		const { workflow } = createMultiPrerequisiteResolutionWorkflow({
+			prerequisites: [firstPrerequisite, secondPrerequisite],
+		})
+		await activateWorkflow(taskState, workflow)
+
+		const firstPrompt = await submitNewProjectSelection(taskState, projectFolderName)
+		expect(firstPrompt.kind).to.equal("render_workflow_form")
+		if (firstPrompt.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${firstPrompt.kind}.`)
+		}
+		expect(firstPrompt.payload.panel?.promptMarkdown).to.include(firstPath)
+
+		const secondPrompt = await runtime.submitWorkflowForm({
+			taskState,
+			request: createFormSubmitRequest({
+				sessionId: firstPrompt.formSession.sessionId,
+				panelId: firstPrompt.formSession.currentPanelId,
+				action: WorkflowFormAction.CANCEL,
+			}),
+		})
+		expect(secondPrompt.kind).to.equal("render_workflow_form")
+		if (secondPrompt.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${secondPrompt.kind}.`)
+		}
+		expect(secondPrompt.payload.panel?.promptMarkdown).to.include(secondPath)
+		expect(secondPrompt.payload.panel?.promptMarkdown).to.not.include(firstPath)
+
+		const selected = await runtime.submitWorkflowForm({
+			taskState,
+			request: createFormSubmitRequest({
+				sessionId: secondPrompt.formSession.sessionId,
+				panelId: secondPrompt.formSession.currentPanelId,
+				fields: [
+					{
+						key: PREREQUISITE_SINGLE_MATCH_CONFIRMATION_FIELD_KEY,
+						value: { booleanValue: true },
+					},
+				],
+			}),
+		})
+
+		expect(getActiveWorkflowSession(taskState).workflowValues[firstPrerequisite.workflowValueKey]).to.be.undefined
+		expect(getActiveWorkflowSession(taskState).workflowValues[secondPrerequisite.workflowValueKey]).to.equal(secondPath)
+		expect(getActiveWorkflowSession(taskState).ui.formSession).to.be.undefined
+		expect(selected.kind).to.equal("execute_tool_backed_operation")
+		if (selected.kind !== "execute_tool_backed_operation") {
+			throw new Error(`Expected execute_tool_backed_operation, received ${selected.kind}.`)
+		}
+		expect(selected.toolRequest.toolName).to.equal(ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT)
+	})
+
+	it("scans prerequisite files from a project subfolder different from the active workflow projectSubfolder", async () => {
+		const projectFolderName = "prerequisite-different-subfolder"
+		const prerequisitePath = await writePrerequisiteProjectFile(projectFolderName, join("review", "requirements.md"))
+		const prerequisite = createPrerequisiteFileDefinition({
+			projectSubfolderSegments: ["review"],
+			match: {
+				kind: "exact_filename",
+				filename: "requirements.md",
+			},
+		})
+		const { workflow } = createPrerequisiteResolutionWorkflow({
+			projectSubfolder: "implementation",
+			prerequisite,
+		})
+		await activateWorkflow(taskState, workflow)
+		const result = await submitNewProjectSelection(taskState, projectFolderName)
+		expect(result.kind).to.equal("render_workflow_form")
+		if (result.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${result.kind}.`)
+		}
+		expect(result.payload.panel?.promptMarkdown).to.include(prerequisitePath)
+
+		const accepted = await runtime.submitWorkflowForm({
+			taskState,
+			request: createFormSubmitRequest({
+				sessionId: result.formSession.sessionId,
+				panelId: result.formSession.currentPanelId,
+				fields: [
+					{
+						key: PREREQUISITE_SINGLE_MATCH_CONFIRMATION_FIELD_KEY,
+						value: { booleanValue: true },
+					},
+				],
+			}),
+		})
+
+		expect(getActiveWorkflowSession(taskState).workflowValues[prerequisite.workflowValueKey]).to.equal(prerequisitePath)
+		expect(accepted.kind).to.equal("execute_tool_backed_operation")
+		if (accepted.kind !== "execute_tool_backed_operation") {
+			throw new Error(`Expected execute_tool_backed_operation, received ${accepted.kind}.`)
+		}
+	})
+
+	it("keeps shared project selection and generic selector discovery values name-based", async () => {
+		const workflowFormId = "selector-name-regression-form"
+		const selectedFileValueKey = "selected_file_value"
+		const projectFolderName = "selector-name-regression"
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: [selectedFileValueKey],
+			workflowForms: {
+				[workflowFormId]: {
+					definitionVersion: 2,
+					title: "Selector Name Regression",
+					toolDictionaryTitle: "Selector Name Regression Tools",
+					toolDictionaryMarkdown: "Selector regression help",
+					firstPanelId: "selectors",
+					panels: {
+						selectors: {
+							panelId: "selectors",
+							title: "Selectors",
+							promptMarkdown: "Select a file.",
+							fields: [
+								{
+									key: "selected_file",
+									workflowValueKey: selectedFileValueKey,
+									kind: "file_path",
+									label: "Selected file",
+									required: true,
+									allowedValueType: "string",
+									selectorDiscovery: {
+										root: {
+											kind: "selected_project_root",
+										},
+										entryType: "file",
+										targetPathSegments: ["planning"],
+										immediateChildrenOnly: true,
+										sort: "alpha_asc",
+									},
+									valueSchema: { type: "string" },
+								},
+							],
+							allowedActions: ["submit"],
+							transition: createTerminalTransition(),
+						},
+					},
+				},
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createWorkflowFormDecisionTree({ workflowFormId }),
+				}),
+			},
+		})
+		discoverWorkflowCandidatesStub.callsFake((request: WorkflowDiscoveryRequest) => {
+			if (
+				request.rootDirectory === join(cwd, "docs", "projects", projectFolderName) &&
+				request.entryType === "file" &&
+				request.targetPathSegments?.length === 1 &&
+				request.targetPathSegments[0] === "planning"
+			) {
+				return Promise.resolve([{ value: "requirements.md", label: "requirements.md" }])
+			}
+
+			return Promise.resolve([])
+		})
+		await activateWorkflow(taskState, workflow)
+		const renderFormAction = await submitNewProjectSelection(taskState, projectFolderName)
+		expect(renderFormAction.kind).to.equal("render_workflow_form")
+		if (renderFormAction.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${renderFormAction.kind}.`)
+		}
+
+		const submitted = await runtime.submitWorkflowForm({
+			taskState,
+			request: createFormSubmitRequest({
+				sessionId: renderFormAction.formSession.sessionId,
+				panelId: renderFormAction.formSession.currentPanelId,
+				fields: [
+					{
+						key: "selected_file",
+						value: { stringValue: "requirements.md" },
+					},
+				],
+			}),
+		})
+
+		const workflowValues = getActiveWorkflowSession(taskState).workflowValues
+		expect(submitted.kind).to.equal("project_prompt")
+		expect(workflowValues[DEFAULT_ENTRY_PROJECT_VALUE_KEYS.projectFolderName]).to.equal(projectFolderName)
+		expect(workflowValues[selectedFileValueKey]).to.equal("requirements.md")
+		expect(workflowValues[selectedFileValueKey]).not.to.equal(
+			join(cwd, "docs", "projects", projectFolderName, "planning", "requirements.md"),
+		)
 	})
 
 	it("fails closed before activation when a decision-tree route id is missing", async () => {

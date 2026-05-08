@@ -37,6 +37,10 @@ import {
 	isWorkflowDiscoveryTargetPathSegment,
 	resolveWorkflowDiscoveryTargetDirectory,
 } from "@/core/task/workflow-runtime/discovery"
+import {
+	discoverWorkflowPrerequisiteFileCandidates,
+	type WorkflowPrerequisiteFileCandidate,
+} from "@/core/task/workflow-runtime/prerequisiteFiles"
 import { resolveWorkflowDefinition } from "@/core/task/workflow-runtime/WorkflowRegistry"
 import { buildWorkflowStepResolutionStatusPayload } from "@/core/task/workflow-step-resolution/buildWorkflowStepResolutionStatusPayload"
 import type {
@@ -64,6 +68,7 @@ import type {
 	WorkflowFinalDeliveryArtifactResolution,
 	WorkflowFinalDeliveryFinalizationResult,
 	WorkflowNextAction,
+	WorkflowPrerequisiteFileDefinition,
 	WorkflowProjectSelectionState,
 	WorkflowProjectSubfolder,
 	WorkflowPromptBuilderInput,
@@ -106,6 +111,13 @@ const WORKFLOW_ENTRY_ARTIFACT_CONFLICT_REPLACE_VALUE = "replace_existing"
 const WORKFLOW_ENTRY_ARTIFACT_REPLACEMENT_PANEL_ID = "__workflow_runtime_entry_artifact_replacement__"
 const WORKFLOW_ENTRY_ARTIFACT_REPLACEMENT_ACTION_FIELD_KEY = "__workflow_runtime_entry_artifact_replacement_action__"
 const WORKFLOW_ENTRY_ARTIFACT_REPLACEMENT_CANCEL_VALUE = "cancel"
+const WORKFLOW_PREREQUISITE_FORM_ID = "__workflow_runtime_prerequisite_files__"
+const WORKFLOW_PREREQUISITE_SELECTED_FILE_FIELD_KEY = "__workflow_runtime_prerequisite_selected_file__"
+const WORKFLOW_PREREQUISITE_SINGLE_MATCH_CONFIRMATION_FIELD_KEY = "__workflow_runtime_prerequisite_single_match_confirmation__"
+const WORKFLOW_PREREQUISITE_CANNOT_CONTINUE_PANEL_ID = "__workflow_runtime_prerequisite_cannot_continue__"
+const WORKFLOW_PREREQUISITE_ID_DATA_KEY = "__workflow_runtime_prerequisite_id__"
+const WORKFLOW_PREREQUISITE_SINGLE_MATCH_PATH_DATA_KEY = "__workflow_runtime_prerequisite_single_match_path__"
+const WORKFLOW_PREREQUISITE_SKIPPED_IDS_DATA_KEY = "__workflow_runtime_prerequisite_skipped_ids__"
 
 export interface WorkflowArtifactAllocationOutput {
 	artifactId: string
@@ -309,6 +321,18 @@ export class WorkflowRuntime {
 			})
 		}
 
+		if (session.ui.formSession !== undefined && this.isWorkflowPrerequisiteFormSession(session.ui.formSession)) {
+			return {
+				kind: "render_workflow_form",
+				formSession: session.ui.formSession,
+				payload: await this.buildWorkflowFormRenderPayload({
+					taskState,
+					workflow: definition,
+					session: session.ui.formSession,
+				}),
+			}
+		}
+
 		if (activeStep.completionRules?.some((rule) => rule.isComplete(session))) {
 			await this.teardownWorkflow({ taskState })
 			return { kind: "complete_workflow" }
@@ -355,6 +379,13 @@ export class WorkflowRuntime {
 		const outcome = this.workflowFormRuntime.handleSubmission(formSession, request)
 		if (this.isWorkflowEntryFormSession(formSession)) {
 			return this.handleWorkflowEntryFormOutcome({
+				taskState,
+				request,
+				outcome,
+			})
+		}
+		if (this.isWorkflowPrerequisiteFormSession(formSession)) {
+			return this.handleWorkflowPrerequisiteFormOutcome({
 				taskState,
 				request,
 				outcome,
@@ -2616,6 +2647,10 @@ export class WorkflowRuntime {
 		return formSession.workflowFormId === WORKFLOW_ENTRY_FORM_ID
 	}
 
+	private isWorkflowPrerequisiteFormSession(formSession: Pick<WorkflowFormSessionState, "workflowFormId">): boolean {
+		return formSession.workflowFormId === WORKFLOW_PREREQUISITE_FORM_ID
+	}
+
 	private buildWorkflowEntryTitle(workflowName: string): string {
 		const transformedName = workflowName
 			.split("-")
@@ -3198,6 +3233,250 @@ export class WorkflowRuntime {
 				return this.resolveNextAction({ taskState: args.taskState })
 			}
 		}
+	}
+
+	private readWorkflowFormDataStringValue(
+		formSession: Pick<WorkflowFormSessionState, "data">,
+		key: string,
+	): string | undefined {
+		const value = formSession.data[key]
+		return typeof value === "string" && value.trim() !== "" ? value : undefined
+	}
+
+	private readWorkflowPrerequisiteSkippedIds(
+		formSession: Pick<WorkflowFormSessionState, "data">,
+	): { valid: true; skippedPrerequisiteIds: readonly string[] } | { valid: false } {
+		const value = formSession.data[WORKFLOW_PREREQUISITE_SKIPPED_IDS_DATA_KEY]
+		if (value === undefined) {
+			return { valid: true, skippedPrerequisiteIds: [] }
+		}
+		if (!Array.isArray(value) || value.some((skippedPrerequisiteId) => typeof skippedPrerequisiteId !== "string")) {
+			return { valid: false }
+		}
+
+		return { valid: true, skippedPrerequisiteIds: value }
+	}
+
+	private appendWorkflowPrerequisiteSkippedId(args: {
+		skippedPrerequisiteIds: readonly string[]
+		prerequisiteId: string
+	}): string[] {
+		if (args.skippedPrerequisiteIds.includes(args.prerequisiteId)) {
+			return [...args.skippedPrerequisiteIds]
+		}
+
+		return [...args.skippedPrerequisiteIds, args.prerequisiteId]
+	}
+
+	private readWorkflowFormSubmittedStringValue(
+		formSession: Pick<WorkflowFormSessionState, "values">,
+		key: string,
+	): string | undefined {
+		const value = formSession.values[key]
+		if (value === undefined || value.valueType !== "string") {
+			return undefined
+		}
+
+		const stringValue = value.stringValue ?? ""
+		return stringValue.trim() === "" ? undefined : stringValue
+	}
+
+	private readWorkflowFormSubmittedBooleanValue(
+		formSession: Pick<WorkflowFormSessionState, "values">,
+		key: string,
+	): boolean | undefined {
+		const value = formSession.values[key]
+		return value?.valueType === "boolean" ? value.booleanValue : undefined
+	}
+
+	private resolveWorkflowPrerequisiteFromFormSession(args: {
+		definition: WorkflowDefinition
+		formSession: Pick<WorkflowFormSessionState, "data">
+	}): WorkflowPrerequisiteFileDefinition | undefined {
+		const prerequisiteId = this.readWorkflowFormDataStringValue(args.formSession, WORKFLOW_PREREQUISITE_ID_DATA_KEY)
+		return prerequisiteId === undefined ? undefined : args.definition.prerequisiteFiles?.[prerequisiteId]
+	}
+
+	private resolveSelectedPrerequisitePathFromFormSession(
+		formSession: Pick<WorkflowFormSessionState, "currentPanelId" | "values" | "data">,
+	): string | undefined {
+		if (
+			formSession.currentPanelId === "required-prerequisite-single-match" ||
+			formSession.currentPanelId === "optional-prerequisite-single-match"
+		) {
+			const confirmed = this.readWorkflowFormSubmittedBooleanValue(
+				formSession,
+				WORKFLOW_PREREQUISITE_SINGLE_MATCH_CONFIRMATION_FIELD_KEY,
+			)
+			return confirmed === true
+				? this.readWorkflowFormDataStringValue(formSession, WORKFLOW_PREREQUISITE_SINGLE_MATCH_PATH_DATA_KEY)
+				: undefined
+		}
+
+		return this.readWorkflowFormSubmittedStringValue(formSession, WORKFLOW_PREREQUISITE_SELECTED_FILE_FIELD_KEY)
+	}
+
+	private async renderWorkflowPrerequisiteFormSession(args: {
+		taskState: TaskState
+		definition: WorkflowDefinition
+		formSession: WorkflowFormSessionState
+	}): Promise<WorkflowNextAction> {
+		const session = args.taskState.activeWorkflowSession
+		if (!session) {
+			return { kind: "no_op" }
+		}
+
+		session.ui.formSession = args.formSession
+		return {
+			kind: "render_workflow_form",
+			formSession: args.formSession,
+			payload: await this.buildWorkflowFormRenderPayload({
+				taskState: args.taskState,
+				workflow: args.definition,
+				session: args.formSession,
+			}),
+		}
+	}
+
+	private async continueWorkflowPrerequisiteResolution(args: {
+		taskState: TaskState
+		definition: WorkflowDefinition
+		action: Extract<WorkflowDecisionAction, { kind: "resolve_prerequisite_files" }>
+		skippedPrerequisiteIds?: readonly string[]
+	}): Promise<WorkflowNextAction> {
+		const session = args.taskState.activeWorkflowSession
+		if (!session) {
+			return { kind: "no_op" }
+		}
+
+		session.ui.formSession = undefined
+		return this.buildResolvePrerequisiteFilesNextAction({
+			taskState: args.taskState,
+			definition: args.definition,
+			action: args.action,
+			skippedPrerequisiteIds: args.skippedPrerequisiteIds,
+		})
+	}
+
+	private async handleWorkflowPrerequisiteNoSelection(args: {
+		taskState: TaskState
+		definition: WorkflowDefinition
+		action: Extract<WorkflowDecisionAction, { kind: "resolve_prerequisite_files" }>
+		prerequisite: WorkflowPrerequisiteFileDefinition
+		skippedPrerequisiteIds: readonly string[]
+	}): Promise<WorkflowNextAction> {
+		if (args.prerequisite.requirement === "required") {
+			return this.buildPrerequisiteFormNextAction({
+				taskState: args.taskState,
+				definition: args.definition,
+				prerequisite: args.prerequisite,
+				panel: this.buildRequiredPrerequisiteCannotContinuePanel(args.prerequisite),
+				skippedPrerequisiteIds: args.skippedPrerequisiteIds,
+			})
+		}
+
+		return this.continueWorkflowPrerequisiteResolution({
+			taskState: args.taskState,
+			definition: args.definition,
+			action: args.action,
+			skippedPrerequisiteIds: this.appendWorkflowPrerequisiteSkippedId({
+				skippedPrerequisiteIds: args.skippedPrerequisiteIds,
+				prerequisiteId: args.prerequisite.id,
+			}),
+		})
+	}
+
+	private async handleWorkflowPrerequisiteFormOutcome(args: {
+		taskState: TaskState
+		request: WorkflowFormSubmissionRequest
+		outcome: WorkflowFormRuntimeOutcome
+	}): Promise<WorkflowNextAction> {
+		const session = args.taskState.activeWorkflowSession
+		if (!session) {
+			return { kind: "no_op" }
+		}
+
+		const definition = this.getActiveWorkflowDefinition(args.taskState)
+		const activeStep = definition ? this.getActiveStepDefinition(definition, session) : undefined
+		const continuationRoute = activeStep
+			? this.findContinuationSourceRoute({
+					step: activeStep,
+					activeBranchId: session.branchContext.activeBranchId,
+					matches: ({ route }) => route.action.kind === "resolve_prerequisite_files",
+				})
+			: undefined
+
+		if (
+			definition === undefined ||
+			continuationRoute === undefined ||
+			continuationRoute.route.action.kind !== "resolve_prerequisite_files"
+		) {
+			return { kind: "no_op" }
+		}
+
+		const prerequisite = this.resolveWorkflowPrerequisiteFromFormSession({
+			definition,
+			formSession: args.outcome.session,
+		})
+		if (prerequisite === undefined) {
+			return { kind: "no_op" }
+		}
+
+		const skippedPrerequisiteIdsResult = this.readWorkflowPrerequisiteSkippedIds(args.outcome.session)
+		if (!skippedPrerequisiteIdsResult.valid) {
+			return { kind: "no_op" }
+		}
+		const skippedPrerequisiteIds = skippedPrerequisiteIdsResult.skippedPrerequisiteIds
+
+		if (args.outcome.session.currentPanelId === WORKFLOW_PREREQUISITE_CANNOT_CONTINUE_PANEL_ID) {
+			return this.renderWorkflowPrerequisiteFormSession({
+				taskState: args.taskState,
+				definition,
+				formSession: args.outcome.session,
+			})
+		}
+
+		if (args.request.action === WorkflowFormAction.CANCEL) {
+			return this.handleWorkflowPrerequisiteNoSelection({
+				taskState: args.taskState,
+				definition,
+				action: continuationRoute.route.action,
+				prerequisite,
+				skippedPrerequisiteIds,
+			})
+		}
+
+		if (args.outcome.kind === "render_form") {
+			return this.renderWorkflowPrerequisiteFormSession({
+				taskState: args.taskState,
+				definition,
+				formSession: args.outcome.session,
+			})
+		}
+
+		const selectedPrerequisitePath = this.resolveSelectedPrerequisitePathFromFormSession(args.outcome.session)
+		if (selectedPrerequisitePath === undefined) {
+			return this.handleWorkflowPrerequisiteNoSelection({
+				taskState: args.taskState,
+				definition,
+				action: continuationRoute.route.action,
+				prerequisite,
+				skippedPrerequisiteIds,
+			})
+		}
+
+		await this.applyWorkflowValueWrites({
+			taskState: args.taskState,
+			values: {
+				[prerequisite.workflowValueKey]: selectedPrerequisitePath,
+			},
+		})
+		return this.continueWorkflowPrerequisiteResolution({
+			taskState: args.taskState,
+			definition,
+			action: continuationRoute.route.action,
+			skippedPrerequisiteIds,
+		})
 	}
 
 	private resolveWorkflowFormComparableSourceValue(
@@ -3789,6 +4068,318 @@ export class WorkflowRuntime {
 		})
 	}
 
+	private async discoverPrerequisiteFileCandidates(args: {
+		session: ActiveWorkflowSession
+		prerequisite: WorkflowPrerequisiteFileDefinition
+	}): Promise<WorkflowPrerequisiteFileCandidate[]> {
+		const selectedProjectRoot = this.resolveWorkflowProjectOutputFolder(args.session)
+		return discoverWorkflowPrerequisiteFileCandidates({
+			selectedProjectRoot,
+			prerequisite: args.prerequisite,
+			workspacePathPolicy: this.workspacePathPolicy,
+		})
+	}
+
+	private buildRequiredPrerequisiteCannotContinuePanel(
+		prerequisite: WorkflowPrerequisiteFileDefinition,
+	): WorkflowFormPanelDefinition {
+		return {
+			panelId: WORKFLOW_PREREQUISITE_CANNOT_CONTINUE_PANEL_ID,
+			title: "Required Prerequisite File Missing",
+			promptMarkdown: `This workflow cannot continue without the required prerequisite file. Run \`${prerequisite.producingWorkflowName}\` first to produce the required file, then return to this workflow.`,
+			fields: [],
+			allowedActions: ["submit"],
+			actionLabels: {
+				submit: "Close",
+			},
+			transition: {
+				type: "conditional",
+				conditionSourceKey: "__terminal__",
+				branches: [],
+				defaultTerminal: true,
+			},
+		}
+	}
+
+	private buildRequiredPrerequisiteSingleMatchPanel(candidate: WorkflowPrerequisiteFileCandidate): WorkflowFormPanelDefinition {
+		return {
+			panelId: "required-prerequisite-single-match",
+			title: "Required Prerequisite File Found",
+			promptMarkdown: `A required prerequisite file was found.\n\nFile name: \`${candidate.filename}\`\n\nFull path: \`${candidate.absolutePath}\``,
+			fields: [
+				{
+					key: WORKFLOW_PREREQUISITE_SINGLE_MATCH_CONFIRMATION_FIELD_KEY,
+					kind: "boolean",
+					label: "Continue with this prerequisite file selected?",
+					required: true,
+					allowedValueType: "boolean",
+					trueLabel: "Yes",
+					falseLabel: "No",
+				},
+			],
+			allowedActions: ["submit", "cancel"],
+			actionLabels: {
+				submit: "Continue",
+				cancel: "Cancel",
+			},
+			transition: {
+				type: "conditional",
+				conditionSourceKey: "__terminal__",
+				branches: [],
+				defaultTerminal: true,
+			},
+		}
+	}
+
+	private buildRequiredPrerequisiteMultiMatchPanel(
+		candidates: readonly WorkflowPrerequisiteFileCandidate[],
+	): WorkflowFormPanelDefinition {
+		return {
+			panelId: "required-prerequisite-multi-match",
+			title: "Select Required Prerequisite File",
+			promptMarkdown:
+				"This workflow requires selection of one of the following prerequisite files. Please select the target file using the dropdown below.",
+			fields: [
+				{
+					key: WORKFLOW_PREREQUISITE_SELECTED_FILE_FIELD_KEY,
+					kind: "dropdown",
+					label: "Prerequisite file",
+					required: true,
+					allowedValueType: "string",
+					options: candidates.map((candidate) => ({
+						value: candidate.absolutePath,
+						label: `${candidate.filename} (${candidate.projectRelativePath})`,
+						description: candidate.absolutePath,
+					})),
+				},
+			],
+			allowedActions: ["submit", "cancel"],
+			actionLabels: {
+				submit: "Continue",
+				cancel: "Cancel",
+			},
+			transition: {
+				type: "conditional",
+				conditionSourceKey: "__terminal__",
+				branches: [],
+				defaultTerminal: true,
+			},
+		}
+	}
+
+	private buildOptionalPrerequisiteSingleMatchPanel(candidate: WorkflowPrerequisiteFileCandidate): WorkflowFormPanelDefinition {
+		return {
+			panelId: "optional-prerequisite-single-match",
+			title: "Optional Prerequisite File Found",
+			promptMarkdown: `An optional prerequisite file was found.\n\nFile name: \`${candidate.filename}\`\n\nFull path: \`${candidate.absolutePath}\``,
+			fields: [
+				{
+					key: WORKFLOW_PREREQUISITE_SINGLE_MATCH_CONFIRMATION_FIELD_KEY,
+					kind: "boolean",
+					label: "Continue with this prerequisite file selected?",
+					required: false,
+					allowedValueType: "boolean",
+					trueLabel: "Yes",
+					falseLabel: "No",
+				},
+			],
+			allowedActions: ["submit", "cancel"],
+			actionLabels: {
+				submit: "Continue",
+				cancel: "Skip",
+			},
+			transition: {
+				type: "conditional",
+				conditionSourceKey: "__terminal__",
+				branches: [],
+				defaultTerminal: true,
+			},
+		}
+	}
+
+	private buildOptionalPrerequisiteMultiMatchPanel(
+		candidates: readonly WorkflowPrerequisiteFileCandidate[],
+	): WorkflowFormPanelDefinition {
+		return {
+			panelId: "optional-prerequisite-multi-match",
+			title: "Select Optional Prerequisite File",
+			promptMarkdown:
+				"This workflow can use one of the following optional prerequisite files. Select a target file or continue without one.",
+			fields: [
+				{
+					key: WORKFLOW_PREREQUISITE_SELECTED_FILE_FIELD_KEY,
+					kind: "dropdown",
+					label: "Optional prerequisite file",
+					required: false,
+					allowedValueType: "string",
+					options: candidates.map((candidate) => ({
+						value: candidate.absolutePath,
+						label: `${candidate.filename} (${candidate.projectRelativePath})`,
+						description: candidate.absolutePath,
+					})),
+				},
+			],
+			allowedActions: ["submit", "cancel"],
+			actionLabels: {
+				submit: "Continue",
+				cancel: "Skip",
+			},
+			transition: {
+				type: "conditional",
+				conditionSourceKey: "__terminal__",
+				branches: [],
+				defaultTerminal: true,
+			},
+		}
+	}
+
+	private buildPrerequisiteFormDefinitionPayload(panel: WorkflowFormPanelDefinition): WorkflowFormDefinitionPayload {
+		return {
+			definitionVersion: 2,
+			title: "Workflow Prerequisite File",
+			toolDictionaryTitle: "Workflow Prerequisite File",
+			toolDictionaryMarkdown: "Runtime-owned prerequisite file resolution.",
+			firstPanelId: panel.panelId,
+			panels: {
+				[panel.panelId]: panel,
+			},
+		}
+	}
+
+	private hasPersistedPrerequisiteWorkflowValue(
+		session: ActiveWorkflowSession,
+		prerequisite: WorkflowPrerequisiteFileDefinition,
+	): boolean {
+		const value = session.workflowValues[prerequisite.workflowValueKey]
+		return typeof value === "string" && value.trim() !== ""
+	}
+
+	private async buildPrerequisiteFormNextAction(args: {
+		taskState: TaskState
+		definition: WorkflowDefinition
+		prerequisite: WorkflowPrerequisiteFileDefinition
+		panel: WorkflowFormPanelDefinition
+		singleMatchCandidate?: WorkflowPrerequisiteFileCandidate
+		skippedPrerequisiteIds?: readonly string[]
+	}): Promise<WorkflowNextAction> {
+		const session = args.taskState.activeWorkflowSession
+		if (!session) {
+			return { kind: "no_op" }
+		}
+
+		const data: WorkflowFormSessionData = {
+			[WORKFLOW_PREREQUISITE_ID_DATA_KEY]: args.prerequisite.id,
+		}
+		if (args.singleMatchCandidate !== undefined) {
+			data[WORKFLOW_PREREQUISITE_SINGLE_MATCH_PATH_DATA_KEY] = args.singleMatchCandidate.absolutePath
+		}
+		if (args.skippedPrerequisiteIds !== undefined && args.skippedPrerequisiteIds.length > 0) {
+			data[WORKFLOW_PREREQUISITE_SKIPPED_IDS_DATA_KEY] = [...args.skippedPrerequisiteIds]
+		}
+
+		const formSession = this.workflowFormRuntime.createSession({
+			workflowFormId: WORKFLOW_PREREQUISITE_FORM_ID,
+			definitionPayload: this.buildPrerequisiteFormDefinitionPayload(args.panel),
+			data,
+		})
+		session.ui.formSession = formSession
+
+		return {
+			kind: "render_workflow_form",
+			formSession,
+			payload: await this.buildWorkflowFormRenderPayload({
+				taskState: args.taskState,
+				workflow: args.definition,
+				session: formSession,
+			}),
+		}
+	}
+
+	private async buildResolvePrerequisiteFilesNextAction(args: {
+		taskState: TaskState
+		definition: WorkflowDefinition
+		action: Extract<WorkflowDecisionAction, { kind: "resolve_prerequisite_files" }>
+		skippedPrerequisiteIds?: readonly string[]
+	}): Promise<WorkflowNextAction> {
+		const session = args.taskState.activeWorkflowSession
+		if (!session) {
+			return { kind: "no_op" }
+		}
+		if (session.ui.formSession !== undefined && this.isWorkflowPrerequisiteFormSession(session.ui.formSession)) {
+			return {
+				kind: "render_workflow_form",
+				formSession: session.ui.formSession,
+				payload: await this.buildWorkflowFormRenderPayload({
+					taskState: args.taskState,
+					workflow: args.definition,
+					session: session.ui.formSession,
+				}),
+			}
+		}
+
+		const skippedPrerequisiteIds = [...new Set(args.skippedPrerequisiteIds ?? [])]
+		const skippedPrerequisiteIdSet = new Set(skippedPrerequisiteIds)
+		for (const prerequisiteId of args.action.prerequisiteIds) {
+			const prerequisite = args.definition.prerequisiteFiles?.[prerequisiteId]
+			if (
+				prerequisite === undefined ||
+				skippedPrerequisiteIdSet.has(prerequisiteId) ||
+				this.hasPersistedPrerequisiteWorkflowValue(session, prerequisite)
+			) {
+				continue
+			}
+
+			const candidates = await this.discoverPrerequisiteFileCandidates({
+				session,
+				prerequisite,
+			})
+
+			if (candidates.length === 0) {
+				if (prerequisite.requirement === "required") {
+					return this.buildPrerequisiteFormNextAction({
+						taskState: args.taskState,
+						definition: args.definition,
+						prerequisite,
+						panel: this.buildRequiredPrerequisiteCannotContinuePanel(prerequisite),
+						skippedPrerequisiteIds,
+					})
+				}
+				continue
+			}
+
+			if (candidates.length === 1) {
+				const candidate = candidates[0]
+				const panel =
+					prerequisite.requirement === "required"
+						? this.buildRequiredPrerequisiteSingleMatchPanel(candidate)
+						: this.buildOptionalPrerequisiteSingleMatchPanel(candidate)
+				return this.buildPrerequisiteFormNextAction({
+					taskState: args.taskState,
+					definition: args.definition,
+					prerequisite,
+					panel,
+					singleMatchCandidate: candidate,
+					skippedPrerequisiteIds,
+				})
+			}
+
+			const panel =
+				prerequisite.requirement === "required"
+					? this.buildRequiredPrerequisiteMultiMatchPanel(candidates)
+					: this.buildOptionalPrerequisiteMultiMatchPanel(candidates)
+			return this.buildPrerequisiteFormNextAction({
+				taskState: args.taskState,
+				definition: args.definition,
+				prerequisite,
+				panel,
+				skippedPrerequisiteIds,
+			})
+		}
+
+		session.ui.formSession = undefined
+		return this.resolveNextAction({ taskState: args.taskState })
+	}
+
 	private buildDecisionTreeEvaluationInput(
 		session: ActiveWorkflowSession,
 		step: WorkflowStepDefinition,
@@ -3947,8 +4538,10 @@ export class WorkflowRuntime {
 				step,
 				activeBranchId,
 				matches: ({ route }) =>
-					route.action.kind === "render_workflow_form" &&
-					route.action.workflowFormId === activeFormSession.workflowFormId,
+					this.isWorkflowPrerequisiteFormSession(activeFormSession)
+						? route.action.kind === "resolve_prerequisite_files"
+						: route.action.kind === "render_workflow_form" &&
+							route.action.workflowFormId === activeFormSession.workflowFormId,
 			})
 			if (continuationRoute) {
 				return {
@@ -4302,6 +4895,12 @@ export class WorkflowRuntime {
 					},
 				}
 			}
+			case "resolve_prerequisite_files":
+				return this.buildResolvePrerequisiteFilesNextAction({
+					taskState,
+					definition,
+					action,
+				})
 			case "transition_step": {
 				const transitionedStep = this.transitionToStep({
 					taskState,
@@ -5368,6 +5967,7 @@ export class WorkflowRuntime {
 		const seenStepNumbers = new Set<number>()
 		const workflowForms = workflow.workflowForms ?? {}
 		const artifacts = workflow.artifacts ?? {}
+		const prerequisiteFiles = workflow.prerequisiteFiles ?? {}
 
 		for (const [workflowFormId, workflowForm] of Object.entries(workflowForms)) {
 			for (const panel of Object.values(workflowForm.panels)) {
@@ -5414,6 +6014,133 @@ export class WorkflowRuntime {
 			})
 			if (!artifactValidation.valid) {
 				return artifactValidation
+			}
+		}
+
+		for (const [prerequisiteId, prerequisiteDefinition] of Object.entries(prerequisiteFiles)) {
+			if (prerequisiteDefinition.id !== prerequisiteId) {
+				return {
+					valid: false,
+					errorMessage: `Workflow prerequisite file ${prerequisiteId} must have a matching prerequisite id.`,
+				}
+			}
+			if (prerequisiteDefinition.id.trim() === "") {
+				return {
+					valid: false,
+					errorMessage: `Workflow prerequisite file ${prerequisiteId} id must not be empty.`,
+				}
+			}
+			if (prerequisiteDefinition.id.trim() !== prerequisiteDefinition.id) {
+				return {
+					valid: false,
+					errorMessage: `Workflow prerequisite file ${prerequisiteId} id ${prerequisiteDefinition.id} must already be trimmed.`,
+				}
+			}
+			if (prerequisiteDefinition.producingWorkflowName.trim() === "") {
+				return {
+					valid: false,
+					errorMessage: `Workflow prerequisite file ${prerequisiteId} producingWorkflowName must not be empty.`,
+				}
+			}
+			if (prerequisiteDefinition.producingWorkflowName.trim() !== prerequisiteDefinition.producingWorkflowName) {
+				return {
+					valid: false,
+					errorMessage: `Workflow prerequisite file ${prerequisiteId} producingWorkflowName ${prerequisiteDefinition.producingWorkflowName} must already be trimmed.`,
+				}
+			}
+			if (prerequisiteDefinition.workflowValueKey.trim() === "") {
+				return {
+					valid: false,
+					errorMessage: `Workflow prerequisite file ${prerequisiteId} workflowValueKey must not be empty.`,
+				}
+			}
+			if (prerequisiteDefinition.workflowValueKey.trim() !== prerequisiteDefinition.workflowValueKey) {
+				return {
+					valid: false,
+					errorMessage: `Workflow prerequisite file ${prerequisiteId} workflowValueKey ${prerequisiteDefinition.workflowValueKey} must already be trimmed.`,
+				}
+			}
+			if (!workflowValueKeys.has(prerequisiteDefinition.workflowValueKey)) {
+				return {
+					valid: false,
+					errorMessage: `Workflow prerequisite file ${prerequisiteId} workflowValueKey ${prerequisiteDefinition.workflowValueKey} must be declared in workflowValueKeys.`,
+				}
+			}
+			if (prerequisiteDefinition.requirement !== "required" && prerequisiteDefinition.requirement !== "optional") {
+				return {
+					valid: false,
+					errorMessage: `Workflow prerequisite file ${prerequisiteId} requirement must be required or optional.`,
+				}
+			}
+			if (
+				prerequisiteDefinition.outputDocumentReference !== "none" &&
+				prerequisiteDefinition.outputDocumentReference !== "module_document_builder"
+			) {
+				return {
+					valid: false,
+					errorMessage: `Workflow prerequisite file ${prerequisiteId} outputDocumentReference must be none or module_document_builder.`,
+				}
+			}
+			for (const projectSubfolderSegment of prerequisiteDefinition.projectSubfolderSegments) {
+				if (!isWorkflowDiscoveryTargetPathSegment(projectSubfolderSegment)) {
+					return {
+						valid: false,
+						errorMessage: `Workflow prerequisite file ${prerequisiteId} projectSubfolderSegments entry ${projectSubfolderSegment} is invalid.`,
+					}
+				}
+			}
+			const prerequisiteMatch = prerequisiteDefinition.match
+			if (!this.isRecord(prerequisiteMatch)) {
+				return {
+					valid: false,
+					errorMessage: `Workflow prerequisite file ${prerequisiteId} match must be a valid object.`,
+				}
+			}
+			const prerequisiteMatchKind = prerequisiteMatch.kind
+			if (typeof prerequisiteMatchKind !== "string") {
+				return {
+					valid: false,
+					errorMessage: `Workflow prerequisite file ${prerequisiteId} match kind must be exact_filename or naming_pattern.`,
+				}
+			}
+			if (prerequisiteMatchKind === "exact_filename") {
+				const exactFilename = prerequisiteMatch.filename
+				if (typeof exactFilename !== "string") {
+					return {
+						valid: false,
+						errorMessage: `Workflow prerequisite file ${prerequisiteId} exact filename must be a string.`,
+					}
+				}
+				if (exactFilename.trim() === "") {
+					return {
+						valid: false,
+						errorMessage: `Workflow prerequisite file ${prerequisiteId} exact filename must not be empty.`,
+					}
+				}
+				if (exactFilename.trim() !== exactFilename) {
+					return {
+						valid: false,
+						errorMessage: `Workflow prerequisite file ${prerequisiteId} exact filename ${exactFilename} must already be trimmed.`,
+					}
+				}
+				if (!isWorkflowDiscoveryTargetPathSegment(exactFilename)) {
+					return {
+						valid: false,
+						errorMessage: `Workflow prerequisite file ${prerequisiteId} exact filename ${exactFilename} is invalid.`,
+					}
+				}
+			} else if (prerequisiteMatchKind === "naming_pattern") {
+				if (!(prerequisiteMatch.pattern instanceof RegExp)) {
+					return {
+						valid: false,
+						errorMessage: `Workflow prerequisite file ${prerequisiteId} naming_pattern pattern must be a RegExp.`,
+					}
+				}
+			} else {
+				return {
+					valid: false,
+					errorMessage: `Workflow prerequisite file ${prerequisiteId} match kind ${prerequisiteMatchKind} is invalid.`,
+				}
 			}
 		}
 
@@ -5656,6 +6383,43 @@ export class WorkflowRuntime {
 								}
 							}
 							break
+						case "resolve_prerequisite_files": {
+							if (route.action.prerequisiteIds.length === 0) {
+								return {
+									valid: false,
+									errorMessage: `Workflow step ${step.id} route ${route.id} resolve_prerequisite_files prerequisiteIds must not be empty.`,
+								}
+							}
+							const seenPrerequisiteIds = new Set<string>()
+							for (const prerequisiteId of route.action.prerequisiteIds) {
+								if (prerequisiteId.trim() === "") {
+									return {
+										valid: false,
+										errorMessage: `Workflow step ${step.id} route ${route.id} resolve_prerequisite_files prerequisiteIds entry must not be empty.`,
+									}
+								}
+								if (prerequisiteId.trim() !== prerequisiteId) {
+									return {
+										valid: false,
+										errorMessage: `Workflow step ${step.id} route ${route.id} resolve_prerequisite_files prerequisiteIds entry ${prerequisiteId} must already be trimmed.`,
+									}
+								}
+								if (seenPrerequisiteIds.has(prerequisiteId)) {
+									return {
+										valid: false,
+										errorMessage: `Workflow step ${step.id} route ${route.id} resolve_prerequisite_files prerequisiteIds entry ${prerequisiteId} is duplicated.`,
+									}
+								}
+								seenPrerequisiteIds.add(prerequisiteId)
+								if (prerequisiteFiles[prerequisiteId] === undefined) {
+									return {
+										valid: false,
+										errorMessage: `Workflow step ${step.id} route ${route.id} resolve_prerequisite_files references missing prerequisite id ${prerequisiteId}.`,
+									}
+								}
+							}
+							break
+						}
 						case "transition_step": {
 							const targetStep = workflow.steps[`step-${route.action.target.stepNumber}`]
 							if (targetStep === undefined) {

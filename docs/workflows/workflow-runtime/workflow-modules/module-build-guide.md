@@ -162,9 +162,37 @@ The brainstorming Step 2 form is the reference pattern: approach selection, cate
 
 ### Prerequisite Files
 
-If a module requires a prerequisite file from the selected project before model-driven work can begin, make that prerequisite selection a module-owned Step 1 workflow form after shared project selection. The form field must discover files from the selected project, with `selectorDiscovery.root.kind: "selected_project_root"`, so the runtime-owned project-selection root remains the authority for file discovery.
+If a module requires prerequisite files from the selected project before model-driven work can begin, declare them in `WorkflowDefinition.prerequisiteFiles` and invoke them with the runtime-owned `resolve_prerequisite_files` decision action.
 
-When no valid prerequisite file is available, the form copy or validation message must identify the workflow that produces the prerequisite by workflow name. Do not leave the user with a generic missing-file error.
+Prerequisite-file selection must not be implemented as a module-owned `selectorDiscovery` workflow form, and it must not mutate shared project-selection behavior. Shared project selection still chooses only the project folder; prerequisite resolution happens afterward inside `WorkflowRuntime`.
+
+Each prerequisite declaration must include:
+
+- `id`: the canonical prerequisite id, matching the `prerequisiteFiles` record key.
+- `requirement`: `required` or `optional`.
+- `projectSubfolderSegments`: the selected-project subfolder segments to scan.
+- `match`: either an exact filename or a naming pattern.
+- `producingWorkflowName`: the workflow that produces the prerequisite file.
+- `workflowValueKey`: the declared workflow value key that receives the selected absolute path.
+- `outputDocumentReference`: `none` or `module_document_builder`, depending on whether the module-owned document builder must render the persisted path into an output document.
+
+When a user selects a prerequisite file, `resolve_prerequisite_files` persists the selected full absolute path to the declaration's `workflowValueKey`. If the workflow output document must reference that path, render the persisted workflow value through the module-owned document builder; do not recompute or rediscover the path in module prompt code.
+
+Required prerequisite behavior is runtime-owned:
+
+- No match: render a cannot-continue panel naming the producing workflow; do not proceed.
+- One match: render a confirmation panel showing the file name and full absolute path; yes persists the path and continues.
+- Multiple matches: render a required dropdown whose option values are full absolute paths and whose labels identify file names.
+- User rejection: persist no path and render the cannot-continue panel.
+- Cancel: persist no path and render the cannot-continue panel.
+
+Optional prerequisite behavior is runtime-owned:
+
+- No match: skip the prerequisite and continue without a cannot-continue panel.
+- One match: render a non-required confirmation panel; yes persists the path, while no or no selection continues without persisting a path.
+- Multiple matches: render a non-required dropdown whose option values are full absolute paths and whose labels identify file names.
+- User rejection: persist no path and continue.
+- Cancel: persist no path and continue.
 
 Use the module decision action `move_project_file` for deterministic file lifecycle moves between folders under the selected project. The action should provide source and destination folder segments plus a `filenameWorkflowValueKey`; the runtime resolves the selected project root and performs the governed move.
 

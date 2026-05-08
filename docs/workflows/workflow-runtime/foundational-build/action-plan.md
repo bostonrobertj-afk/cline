@@ -8779,315 +8779,410 @@ This phase adds the approved `resolve_prerequisite_files` workflow decision acti
 - Phase 60 module-build-guide prerequisite guidance currently tells modules to use module-owned Step 1 selector forms. This is now stale and must be replaced by `resolve_prerequisite_files` guidance in this phase.
 - Existing generic selector discovery can locate files, but it intentionally persists option values such as file names. It must remain separate from prerequisite-file discovery, which must preserve and persist full absolute paths.
 
-[ ] Task 182. Add the prerequisite-file contract to workflow runtime types.
+[x] Task 182. Add the prerequisite-file contract to workflow runtime types.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 
-[ ] Subtask 182.1. In `types.ts`, add a `WorkflowPrerequisiteFileMatchDefinition` discriminated union with exactly two variants: `{ kind: "exact_filename"; filename: string }` and `{ kind: "naming_pattern"; pattern: RegExp }`.
+[x] Subtask 182.1. In `types.ts`, add a `WorkflowPrerequisiteFileMatchDefinition` discriminated union with exactly two variants: `{ kind: "exact_filename"; filename: string }` and `{ kind: "naming_pattern"; pattern: RegExp }`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 
-[ ] Subtask 182.2. In `types.ts`, add a `WorkflowPrerequisiteFileRequirement` type with values `"required"` and `"optional"`.
+[x] Subtask 182.2. In `types.ts`, add a `WorkflowPrerequisiteFileRequirement` type with values `"required"` and `"optional"`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 
-[ ] Subtask 182.3. In `types.ts`, add a `WorkflowPrerequisiteFileOutputDocumentReference` type with values `"none"` and `"module_document_builder"`.
+[x] Subtask 182.3. In `types.ts`, add a `WorkflowPrerequisiteFileOutputDocumentReference` type with values `"none"` and `"module_document_builder"`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 
-[ ] Subtask 182.4. In `types.ts`, add a `WorkflowPrerequisiteFileDefinition` interface with these required fields: `id`, `requirement`, `projectSubfolderSegments`, `match`, `producingWorkflowName`, `workflowValueKey`, and `outputDocumentReference`.
+[x] Subtask 182.4. In `types.ts`, add a `WorkflowPrerequisiteFileDefinition` interface with these required fields: `id`, `requirement`, `projectSubfolderSegments`, `match`, `producingWorkflowName`, `workflowValueKey`, and `outputDocumentReference`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 
-[ ] Subtask 182.5. In `types.ts`, add `prerequisiteFiles?: Record<string, WorkflowPrerequisiteFileDefinition>` to `WorkflowDefinition`.
+[x] Subtask 182.5. In `types.ts`, add `prerequisiteFiles?: Record<string, WorkflowPrerequisiteFileDefinition>` to `WorkflowDefinition`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 
-[ ] Subtask 182.6. In `types.ts`, add `{ kind: "resolve_prerequisite_files"; prerequisiteIds: readonly string[] }` to `WorkflowDecisionAction`.
+[x] Subtask 182.6. In `types.ts`, add `{ kind: "resolve_prerequisite_files"; prerequisiteIds: readonly string[] }` to `WorkflowDecisionAction`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 
-[ ] Task 183. Add dedicated prerequisite-file discovery helpers without changing generic selector discovery.
+[x] Task 183. Add dedicated prerequisite-file discovery helpers without changing generic selector discovery.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/prerequisiteFiles.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/prerequisiteFiles.test.ts`
 
-[ ] Subtask 183.1. Create `prerequisiteFiles.ts` with a `WorkflowPrerequisiteFileCandidate` interface containing `filename`, `absolutePath`, and `projectRelativePath`.
+[x] Subtask 183.1. Create `prerequisiteFiles.ts` with a `WorkflowPrerequisiteFileCandidate` interface containing `filename`, `absolutePath`, and `projectRelativePath`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/prerequisiteFiles.ts`
 
-[ ] Subtask 183.2. In `prerequisiteFiles.ts`, add `discoverWorkflowPrerequisiteFileCandidates(...)` that accepts selected project root, prerequisite definition, and workspace path policy, then scans only the declared project subfolder segments.
+[x] Subtask 183.2. In `prerequisiteFiles.ts`, add `discoverWorkflowPrerequisiteFileCandidates(...)` that accepts selected project root, prerequisite definition, and workspace path policy, then scans only the declared project subfolder segments.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/prerequisiteFiles.ts`
 
-[ ] Subtask 183.3. In `discoverWorkflowPrerequisiteFileCandidates(...)`, use `resolveWorkflowDiscoveryTargetDirectory(...)` and `isWorkflowDiscoveryTargetPathSegment(...)` for project-subfolder validation, but do not call or modify `discoverWorkflowCandidates(...)`.
+[x] Subtask 183.3. In `discoverWorkflowPrerequisiteFileCandidates(...)`, use `resolveWorkflowDiscoveryTargetDirectory(...)` and `isWorkflowDiscoveryTargetPathSegment(...)` for project-subfolder validation, but do not call or modify `discoverWorkflowCandidates(...)`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/prerequisiteFiles.ts`
 
-[ ] Subtask 183.4. In `discoverWorkflowPrerequisiteFileCandidates(...)`, enforce workspace path policy on the resolved prerequisite directory and on each candidate file path before returning candidates.
+[x] Subtask 183.4. In `discoverWorkflowPrerequisiteFileCandidates(...)`, enforce workspace path policy on the resolved prerequisite directory and on each candidate file path before returning candidates.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/prerequisiteFiles.ts`
 
-[ ] Subtask 183.5. In `discoverWorkflowPrerequisiteFileCandidates(...)`, support both exact filename matching and naming-pattern matching, and sort returned candidates alphabetically by `filename`.
+[x] Subtask 183.5. In `discoverWorkflowPrerequisiteFileCandidates(...)`, support both exact filename matching and naming-pattern matching, and sort returned candidates alphabetically by `filename`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/prerequisiteFiles.ts`
 
-[ ] Subtask 183.6. Create `prerequisiteFiles.test.ts` covering exact filename matching, naming-pattern matching, no-match empty results, safe nested project subfolder segments, invalid path segment rejection, and workspace-policy rejection.
+[x] Subtask 183.6. Create `prerequisiteFiles.test.ts` covering exact filename matching, naming-pattern matching, no-match empty results, safe nested project subfolder segments, invalid path segment rejection, and workspace-policy rejection.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/prerequisiteFiles.test.ts`
 
-[ ] Task 184. Add runtime validation for prerequisite declarations and actions.
+[x] Task 184. Add runtime validation for prerequisite declarations and actions.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 184.1. In `WorkflowRuntime.ts`, extend `validateWorkflowDefinition(...)` to reject prerequisite definition records whose key does not match `definition.id`.
+[x] Subtask 184.1. In `WorkflowRuntime.ts`, extend `validateWorkflowDefinition(...)` to reject prerequisite definition records whose key does not match `definition.id`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 184.2. In `WorkflowRuntime.ts`, extend validation to reject prerequisite definitions with blank or untrimmed `id`, blank or untrimmed `producingWorkflowName`, or blank or untrimmed `workflowValueKey`.
+[x] Subtask 184.2. In `WorkflowRuntime.ts`, extend validation to reject prerequisite definitions with blank or untrimmed `id`, blank or untrimmed `producingWorkflowName`, or blank or untrimmed `workflowValueKey`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 184.3. In `WorkflowRuntime.ts`, extend validation to reject prerequisite definitions whose `workflowValueKey` is not declared in `workflow.workflowValueKeys`.
+[x] Subtask 184.3. In `WorkflowRuntime.ts`, extend validation to reject prerequisite definitions whose `workflowValueKey` is not declared in `workflow.workflowValueKeys`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 184.4. In `WorkflowRuntime.ts`, extend validation to reject prerequisite definitions with invalid `projectSubfolderSegments` entries using `isWorkflowDiscoveryTargetPathSegment(...)`.
+[x] Subtask 184.4. In `WorkflowRuntime.ts`, extend validation to reject prerequisite definitions with invalid `projectSubfolderSegments` entries using `isWorkflowDiscoveryTargetPathSegment(...)`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 184.5. In `WorkflowRuntime.ts`, extend validation to reject exact-filename prerequisites when `filename` is blank, untrimmed, or not a single safe path segment.
+[x] Subtask 184.5. In `WorkflowRuntime.ts`, extend validation to reject exact-filename prerequisites when `filename` is blank, untrimmed, or not a single safe path segment.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 184.6. In `WorkflowRuntime.ts`, extend validation to reject `resolve_prerequisite_files` routes when `prerequisiteIds` is empty, contains blanks/untrimmed ids, contains duplicates, or references ids absent from `workflow.prerequisiteFiles`.
+[x] Subtask 184.6. In `WorkflowRuntime.ts`, extend validation to reject `resolve_prerequisite_files` routes when `prerequisiteIds` is empty, contains blanks/untrimmed ids, contains duplicates, or references ids absent from `workflow.prerequisiteFiles`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 184.7. In `WorkflowRuntime.test.ts`, add validation coverage for invalid prerequisite declarations and invalid `resolve_prerequisite_files` routes.
+[x] Subtask 184.7. In `WorkflowRuntime.test.ts`, add validation coverage for invalid prerequisite declarations and invalid `resolve_prerequisite_files` routes.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Task 185. Implement `resolve_prerequisite_files` runtime next-action behavior.
+[x] Task 185. Implement `resolve_prerequisite_files` runtime next-action behavior.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/prerequisiteFiles.ts`
 
-[ ] Subtask 185.1. In `WorkflowRuntime.ts`, import the prerequisite-file discovery helper and candidate type from `prerequisiteFiles.ts`.
+[x] Subtask 185.1. In `WorkflowRuntime.ts`, import the prerequisite-file discovery helper and candidate type from `prerequisiteFiles.ts`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 185.2. In `WorkflowRuntime.ts`, add runtime-owned prerequisite form constants for form id, selected-file field key, single-match confirmation field key, and cannot-continue panel id.
+[x] Subtask 185.2. In `WorkflowRuntime.ts`, add runtime-owned prerequisite form constants for form id, selected-file field key, single-match confirmation field key, and cannot-continue panel id.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 185.3. In `WorkflowRuntime.ts`, add a helper that resolves the selected project root through `resolveWorkflowProjectOutputFolder(session)` and calls `discoverWorkflowPrerequisiteFileCandidates(...)` for one prerequisite definition.
+[x] Subtask 185.3. In `WorkflowRuntime.ts`, add a helper that resolves the selected project root through `resolveWorkflowProjectOutputFolder(session)` and calls `discoverWorkflowPrerequisiteFileCandidates(...)` for one prerequisite definition.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 185.4. In `WorkflowRuntime.ts`, add a helper that builds the required no-match cannot-continue prerequisite form panel, with copy that names the producing workflow and states the workflow cannot continue without the required file.
+[x] Subtask 185.4. In `WorkflowRuntime.ts`, add a helper that builds the required no-match cannot-continue prerequisite form panel, with copy that names the producing workflow and states the workflow cannot continue without the required file.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 185.5. In `WorkflowRuntime.ts`, add a helper that builds the required one-match confirmation form panel showing both file name and full absolute file path, with a required yes/no field asking whether to continue with that file selected.
+[x] Subtask 185.5. In `WorkflowRuntime.ts`, add a helper that builds the required one-match confirmation form panel showing both file name and full absolute file path, with a required yes/no field asking whether to continue with that file selected.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 185.6. In `WorkflowRuntime.ts`, add a helper that builds the required multi-match selection form panel using the exact prompt text `This workflow requires selection of one of the following prerequisite files. Please select the target file using the dropdown below.`, with a required dropdown whose option values are full absolute paths and whose labels include file names.
+[x] Subtask 185.6. In `WorkflowRuntime.ts`, add a helper that builds the required multi-match selection form panel using the exact prompt text `This workflow requires selection of one of the following prerequisite files. Please select the target file using the dropdown below.`, with a required dropdown whose option values are full absolute paths and whose labels include file names.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 185.7. In `WorkflowRuntime.ts`, add optional one-match and optional multi-match prerequisite panels where selection fields are not required, cancel/no selection continues the workflow, and no cannot-continue panel is rendered.
+[x] Subtask 185.7. In `WorkflowRuntime.ts`, add optional one-match and optional multi-match prerequisite panels where selection fields are not required, cancel/no selection continues the workflow, and no cannot-continue panel is rendered.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 185.8. In `WorkflowRuntime.ts`, add a `resolve_prerequisite_files` case to `buildNextActionFromDecisionTreeAction(...)` that processes the action’s `prerequisiteIds` in order, skips already-persisted prerequisite workflow values, renders the required/optional panels described above when user input is needed, persists selected full absolute paths through `applyWorkflowValueWrites(...)`, and calls `resolveNextAction(...)` when all prerequisites are resolved or skipped.
+[x] Subtask 185.8. In `WorkflowRuntime.ts`, add a `resolve_prerequisite_files` case to `buildNextActionFromDecisionTreeAction(...)` that processes the action’s `prerequisiteIds` in order, skips already-persisted prerequisite workflow values, renders the required/optional panels described above when user input is needed, persists selected full absolute paths through `applyWorkflowValueWrites(...)`, and calls `resolveNextAction(...)` when all prerequisites are resolved or skipped.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 185.9. In `WorkflowRuntime.ts`, add continuation-route support for active runtime-owned prerequisite forms so `resolve_prerequisite_files` remains the continuation source while a prerequisite form is active.
+[x] Subtask 185.9. In `WorkflowRuntime.ts`, add continuation-route support for active runtime-owned prerequisite forms so `resolve_prerequisite_files` remains the continuation source while a prerequisite form is active.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 185.10. In `WorkflowRuntime.ts`, update `submitWorkflowForm(...)` to detect runtime-owned prerequisite forms before generic module workflow forms, handle cancel/no for required prerequisites by rendering the cannot-continue panel, and handle cancel/no for optional prerequisites by clearing the runtime-owned form and continuing next-action resolution.
+[x] Subtask 185.10. In `WorkflowRuntime.ts`, update `submitWorkflowForm(...)` to detect runtime-owned prerequisite forms before generic module workflow forms, handle cancel/no for required prerequisites by rendering the cannot-continue panel, and handle cancel/no for optional prerequisites by clearing the runtime-owned form and continuing next-action resolution.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 185.11. In `WorkflowRuntime.ts`, ensure required prerequisite no-match, user rejection, or cancel does not call `resolveNextAction(...)`, does not transition branches, and does not allow artifact allocation, document build, model prompt, or workflow completion to proceed.
+[x] Subtask 185.11. In `WorkflowRuntime.ts`, ensure required prerequisite no-match, user rejection, or cancel does not call `resolveNextAction(...)`, does not transition branches, and does not allow artifact allocation, document build, model prompt, or workflow completion to proceed.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Task 186. Add runtime tests for prerequisite-file resolution behavior.
+[x] Task 186. Add runtime tests for prerequisite-file resolution behavior.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 186.1. In `WorkflowRuntime.test.ts`, add a required exact-filename no-match test proving runtime renders the cannot-continue panel naming the producing workflow and does not proceed to artifact allocation.
+[x] Subtask 186.1. In `WorkflowRuntime.test.ts`, add a required exact-filename no-match test proving runtime renders the cannot-continue panel naming the producing workflow and does not proceed to artifact allocation.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 186.2. In `WorkflowRuntime.test.ts`, add a required one-match test proving the confirmation panel shows the file name and full absolute path, yes persists the full absolute path to the declared workflow value, and next-action evaluation continues.
+[x] Subtask 186.2. In `WorkflowRuntime.test.ts`, add a required one-match test proving the confirmation panel shows the file name and full absolute path, yes persists the full absolute path to the declared workflow value, and next-action evaluation continues.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 186.3. In `WorkflowRuntime.test.ts`, add a required one-match rejection test proving no persists no path and renders the cannot-continue panel.
+[x] Subtask 186.3. In `WorkflowRuntime.test.ts`, add a required one-match rejection test proving no persists no path and renders the cannot-continue panel.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 186.4. In `WorkflowRuntime.test.ts`, add a required multi-match test proving the dropdown is required, option values are full absolute paths, option labels identify file names, and selected submission persists the selected full absolute path.
+[x] Subtask 186.4. In `WorkflowRuntime.test.ts`, add a required multi-match test proving the dropdown is required, option values are full absolute paths, option labels identify file names, and selected submission persists the selected full absolute path.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 186.5. In `WorkflowRuntime.test.ts`, add a required multi-match cancel test proving cancel routes to the cannot-continue panel and does not proceed.
+[x] Subtask 186.5. In `WorkflowRuntime.test.ts`, add a required multi-match cancel test proving cancel routes to the cannot-continue panel and does not proceed.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 186.6. In `WorkflowRuntime.test.ts`, add an optional no-match test proving runtime skips the prerequisite without rendering a cannot-continue panel and continues next-action evaluation.
+[x] Subtask 186.6. In `WorkflowRuntime.test.ts`, add an optional no-match test proving runtime skips the prerequisite without rendering a cannot-continue panel and continues next-action evaluation.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 186.7. In `WorkflowRuntime.test.ts`, add optional one-match and multi-match tests proving user selection persists the full absolute path, while no/cancel/no selection continues without persisting a path.
+[x] Subtask 186.7. In `WorkflowRuntime.test.ts`, add optional one-match and multi-match tests proving user selection persists the full absolute path, while no/cancel/no selection continues without persisting a path.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 186.8. In `WorkflowRuntime.test.ts`, add a test proving prerequisite scanning can target a project subfolder different from the active workflow’s `projectSubfolder`.
+[x] Subtask 186.8. In `WorkflowRuntime.test.ts`, add a test proving prerequisite scanning can target a project subfolder different from the active workflow’s `projectSubfolder`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 186.9. In `WorkflowRuntime.test.ts`, add a regression test proving shared project selection and generic selector discovery still persist name-based values and are not changed to prerequisite absolute-path behavior.
+[x] Subtask 186.9. In `WorkflowRuntime.test.ts`, add a regression test proving shared project selection and generic selector discovery still persist name-based values and are not changed to prerequisite absolute-path behavior.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Task 187. Replace stale module-build-guide prerequisite guidance with `resolve_prerequisite_files` guidance.
+[x] Task 187. Replace stale module-build-guide prerequisite guidance with `resolve_prerequisite_files` guidance.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
 
-[ ] Subtask 187.1. In `module-build-guide.md`, replace the existing `### Prerequisite Files` section with guidance that modules must declare prerequisite files in `WorkflowDefinition.prerequisiteFiles` and invoke them through `resolve_prerequisite_files`.
+[x] Subtask 187.1. In `module-build-guide.md`, replace the existing `### Prerequisite Files` section with guidance that modules must declare prerequisite files in `WorkflowDefinition.prerequisiteFiles` and invoke them through `resolve_prerequisite_files`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
 
-[ ] Subtask 187.2. In the replacement `### Prerequisite Files` section, state that prerequisite-file selection must not be implemented as a module-owned selectorDiscovery workflow form and must not mutate shared project-selection behavior.
+[x] Subtask 187.2. In the replacement `### Prerequisite Files` section, state that prerequisite-file selection must not be implemented as a module-owned selectorDiscovery workflow form and must not mutate shared project-selection behavior.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
 
-[ ] Subtask 187.3. In the replacement `### Prerequisite Files` section, document every required prerequisite declaration field: id, required/optional requirement, project subfolder segments, exact filename or naming pattern, producing workflow name, workflow value key for the selected absolute path, and output-document reference mode.
+[x] Subtask 187.3. In the replacement `### Prerequisite Files` section, document every required prerequisite declaration field: id, required/optional requirement, project subfolder segments, exact filename or naming pattern, producing workflow name, workflow value key for the selected absolute path, and output-document reference mode.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
 
-[ ] Subtask 187.4. In the replacement `### Prerequisite Files` section, state that `resolve_prerequisite_files` persists selected full absolute paths to declared workflow value keys and that modules requiring those paths in output documents must render the persisted workflow value through their module-owned document builder.
+[x] Subtask 187.4. In the replacement `### Prerequisite Files` section, state that `resolve_prerequisite_files` persists selected full absolute paths to declared workflow value keys and that modules requiring those paths in output documents must render the persisted workflow value through their module-owned document builder.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
 
-[ ] Subtask 187.5. In the replacement `### Prerequisite Files` section, document required prerequisite behavior for no match, one match, multiple matches, user rejection, and cancel, matching the runtime requirements.
+[x] Subtask 187.5. In the replacement `### Prerequisite Files` section, document required prerequisite behavior for no match, one match, multiple matches, user rejection, and cancel, matching the runtime requirements.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
 
-[ ] Subtask 187.6. In the replacement `### Prerequisite Files` section, document optional prerequisite behavior for no match, one match, multiple matches, user rejection, and cancel, matching the runtime requirements.
+[x] Subtask 187.6. In the replacement `### Prerequisite Files` section, document optional prerequisite behavior for no match, one match, multiple matches, user rejection, and cancel, matching the runtime requirements.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
 
-[ ] Task 188. Validate Phase 61.
+[x] Task 188. Validate Phase 61.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/prerequisiteFiles.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/prerequisiteFiles.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/discovery.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
+
+[x] Subtask 188.1. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/prerequisiteFiles.test.ts src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/workflow-runtime/__tests__/discovery.test.ts`; it must pass before Phase 61 is marked complete.
+
+Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/prerequisiteFiles.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/discovery.test.ts`
+
+[x] Subtask 188.2. Run `rg -n "module-owned Step 1 workflow form|selectorDiscovery.root.kind: \"selected_project_root\"" docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`; it must return no matches before Phase 61 is marked complete.
+
+Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
 
-[ ] Subtask 188.1. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/prerequisiteFiles.test.ts src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/workflow-runtime/__tests__/discovery.test.ts`; it must pass before Phase 61 is marked complete.
+[x] Subtask 188.3. Run `rg -n "resolve_prerequisite_files|prerequisiteFiles|discoverWorkflowPrerequisiteFileCandidates" src/core/task/workflow-runtime docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`; manually confirm matches are limited to the approved runtime-owned prerequisite-file contract, implementation, tests, and guide text.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/prerequisiteFiles.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/prerequisiteFiles.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
+
+[x] Subtask 188.4. Run `npm run check-types`; it must pass before Phase 61 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/prerequisiteFiles.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/prerequisiteFiles.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 188.5. Run `npm run lint`; it must pass before Phase 61 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/prerequisiteFiles.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/prerequisiteFiles.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
+
+[x] Task 189. Remediate Phase 61 optional prerequisite skip-state and validation gaps.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 189.1. In `WorkflowRuntime.ts`, add a runtime prerequisite form-session data key for accumulated skipped prerequisite ids.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 189.2. In `WorkflowRuntime.ts`, add a helper that reads accumulated skipped prerequisite ids from prerequisite form-session data as a string array, rejecting non-string entries by treating the data as invalid and returning an empty array only when the data key is absent.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 189.3. In `WorkflowRuntime.ts`, update prerequisite no-selection handling so optional prerequisite rejection/cancel appends the current prerequisite id to the accumulated skipped prerequisite ids instead of replacing prior skipped ids.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 189.4. In `WorkflowRuntime.ts`, update prerequisite form creation so every subsequent prerequisite form stores the accumulated skipped prerequisite ids in form-session data.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 189.5. In `WorkflowRuntime.ts`, update `buildResolvePrerequisiteFilesNextAction(...)` so the skipped prerequisite set is built from all accumulated skipped ids and is passed forward whenever another prerequisite form is rendered.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 189.6. In `WorkflowRuntime.ts`, update prerequisite declaration validation to reject `requirement` values other than `"required"` or `"optional"`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 189.7. In `WorkflowRuntime.ts`, update prerequisite declaration validation to reject `outputDocumentReference` values other than `"none"` or `"module_document_builder"`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 189.8. In `WorkflowRuntime.ts`, update prerequisite declaration validation to reject malformed `match` shapes, including missing/non-string `kind`, unknown `kind`, and `naming_pattern` entries whose `pattern` is not a `RegExp`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Task 190. Add Phase 61 QA regression tests.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 190.1. In `WorkflowRuntime.test.ts`, add a regression test with two matching optional prerequisites where the user rejects/cancels both; assert runtime continues to allocation and does not re-render either prerequisite form.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 190.2. In `WorkflowRuntime.test.ts`, add a regression test with two matching optional prerequisites where the user skips the first and selects the second; assert the first is not re-prompted and the second persists its full absolute path.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 190.3. In `WorkflowRuntime.test.ts`, extend invalid prerequisite declaration coverage for malformed `requirement`, malformed `outputDocumentReference`, unknown `match.kind`, missing `match.kind`, and `naming_pattern.pattern` values that are not `RegExp` instances.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Task 191. Validate Phase 61 QA remediation.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 191.1. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`; it must pass before Phase 61 QA remediation is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 191.2. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/prerequisiteFiles.test.ts src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/workflow-runtime/__tests__/discovery.test.ts`; it must pass before Phase 61 QA remediation is marked complete.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/prerequisiteFiles.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/discovery.test.ts`
 
-[ ] Subtask 188.2. Run `rg -n "module-owned Step 1 workflow form|selectorDiscovery.root.kind: \"selected_project_root\"" docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`; it must return no matches before Phase 61 is marked complete.
+[x] Subtask 191.3. Run `npm run check-types`; it must pass before Phase 61 QA remediation is marked complete.
 
 Allowed files:
-- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
-
-[ ] Subtask 188.3. Run `rg -n "resolve_prerequisite_files|prerequisiteFiles|discoverWorkflowPrerequisiteFileCandidates" src/core/task/workflow-runtime docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`; manually confirm matches are limited to the approved runtime-owned prerequisite-file contract, implementation, tests, and guide text.
-
-Allowed files:
-- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
-- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/prerequisiteFiles.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
-- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/prerequisiteFiles.test.ts`
-- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
-- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
-
-[ ] Subtask 188.4. Run `npm run check-types`; it must pass before Phase 61 is marked complete.
-
-Allowed files:
-- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
-- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/prerequisiteFiles.ts`
-- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
-- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/prerequisiteFiles.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 188.5. Run `npm run lint`; it must pass before Phase 61 is marked complete.
+[x] Subtask 191.4. Run `npm run lint`; it must pass before Phase 61 QA remediation is marked complete.
 
 Allowed files:
-- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
-- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/prerequisiteFiles.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
-- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/prerequisiteFiles.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
-- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
 
 ## Validation
 

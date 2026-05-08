@@ -60,6 +60,24 @@ export interface WorkflowWorkspacePathPolicy {
 	validateAccess(filePath: string): boolean
 }
 
+export type WorkflowPrerequisiteFileMatchDefinition =
+	| { kind: "exact_filename"; filename: string }
+	| { kind: "naming_pattern"; pattern: RegExp }
+
+export type WorkflowPrerequisiteFileRequirement = "required" | "optional"
+
+export type WorkflowPrerequisiteFileOutputDocumentReference = "none" | "module_document_builder"
+
+export interface WorkflowPrerequisiteFileDefinition {
+	id: string
+	requirement: WorkflowPrerequisiteFileRequirement
+	projectSubfolderSegments: readonly string[]
+	match: WorkflowPrerequisiteFileMatchDefinition
+	producingWorkflowName: string
+	workflowValueKey: string
+	outputDocumentReference: WorkflowPrerequisiteFileOutputDocumentReference
+}
+
 export interface WorkflowProjectSelectionState {
 	projectMode: WorkflowProjectMode
 	projectTitle: string
@@ -263,6 +281,7 @@ export type WorkflowDecisionAction =
 			destinationFolderSegments: readonly string[]
 			filenameWorkflowValueKey: string
 	  }
+	| { kind: "resolve_prerequisite_files"; prerequisiteIds: readonly string[] }
 	| { kind: "transition_step"; target: WorkflowStepTransitionTarget }
 	| { kind: "project_prompt" }
 	| { kind: "terminal_error"; errorMessage: string }
@@ -454,6 +473,7 @@ export interface WorkflowDefinition {
 	steps: Record<WorkflowStepDefinition["id"], WorkflowStepDefinition>
 	workflowForms?: Record<WorkflowFormId, WorkflowFormDefinitionPayload>
 	artifacts?: Record<string, WorkflowArtifactDefinition>
+	prerequisiteFiles?: Record<string, WorkflowPrerequisiteFileDefinition>
 	childInheritance?: WorkflowChildInheritanceRule[]
 	finalDeliveryFinalizer?: WorkflowFinalDeliveryFinalizer
 }
