@@ -1,33 +1,11 @@
-# Epic Name
+# Context
 
-### Epic #: Epic_Name
+## Architecture
 
-#### Objective
-As a Product Owner
-I want
-So that
+## Brainstorming
 
-#### Description
+## Additional Context
 
-
-#### Success Measures
+# Epics
 
 
-#### Scope
-
-
-#### Scope Boundary
-
-# User Stories
-
-## Story #
-<!-- Repeat this block for each story -->
-
-### Objective
-As a
-I want
-so that
-
-### Acceptance Criteria
-
-### Sequencing/ Dependencies

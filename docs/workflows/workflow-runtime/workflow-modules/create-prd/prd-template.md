@@ -26,26 +26,28 @@ How complex is this domain? (low, medium, high)
 
 # Product Background
 
-## Project Context
+# Project Context
 
 ## Project Documentation
 
 ## Additional Context
 
-## Product Type
+# Product Type
 
-## Vertical
+## Domain Complexity
+
+## Domain Concerns
 
 # Classification
 
 # Scope
 
-## Primary Objective
+# Primary Objective
 
-## Project Discovery
+# Project Discovery
 
 
-### Confirmed Classification
+# Confirmed Classification
 
 - This PRD is a brownfield internal product/platform document.
 - Its primary outcome is backend workflow completion, not UI-first polish.
