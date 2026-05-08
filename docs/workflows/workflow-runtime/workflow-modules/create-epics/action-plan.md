@@ -387,38 +387,38 @@ Allowed files:
 
 After completing this phase, pause for QA review before moving to Phase 5.
 
-[ ] Task 6. Create module-owned create-epics tool schemas.
+[x] Task 6. Create module-owned create-epics tool schemas.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsToolSchemas.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsToolSchemas.test.ts`
 
-[ ] Subtask 6.1. Create `src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsToolSchemas.ts` with exported `buildCreateEpicsStep1ToolSchemas(): readonly ClineToolSpec[]` returning an empty readonly array.
+[x] Subtask 6.1. Create `src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsToolSchemas.ts` with exported `buildCreateEpicsStep1ToolSchemas(): readonly ClineToolSpec[]` returning an empty readonly array.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsToolSchemas.ts`
 
-[ ] Subtask 6.2. In `createEpicsToolSchemas.ts`, add named builders for `read_file`, `upsert_epic`, `send_user_message`, `ask_followup_question`, and `attempt_completion`.
+[x] Subtask 6.2. In `createEpicsToolSchemas.ts`, add named builders for `read_file`, `upsert_epic`, `send_user_message`, `ask_followup_question`, and `attempt_completion`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsToolSchemas.ts`
 
-[ ] Subtask 6.3. In `createEpicsToolSchemas.ts`, define the `upsert_epic` schema with required parameters `identity`, `title`, `objective`, `description`, `requirements`, `scope`, and `scope_boundary`, using object/array schema shapes matching the backend contract.
+[x] Subtask 6.3. In `createEpicsToolSchemas.ts`, define the `upsert_epic` schema with required parameters `identity`, `title`, `objective`, `description`, `requirements`, `scope`, and `scope_boundary`, using object/array schema shapes matching the backend contract.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsToolSchemas.ts`
 
-[ ] Subtask 6.4. In `createEpicsToolSchemas.ts`, export `buildCreateEpicsStep2ToolSchemas(): readonly ClineToolSpec[]` returning exactly `read_file`, `upsert_epic`, `send_user_message`, `ask_followup_question`, and `attempt_completion` in that order.
+[x] Subtask 6.4. In `createEpicsToolSchemas.ts`, export `buildCreateEpicsStep2ToolSchemas(): readonly ClineToolSpec[]` returning exactly `read_file`, `upsert_epic`, `send_user_message`, `ask_followup_question`, and `attempt_completion` in that order.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsToolSchemas.ts`
 
-[ ] Subtask 6.5. Create `src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsToolSchemas.test.ts` proving Step 1 returns an empty array and Step 2 returns exactly `read_file`, `upsert_epic`, `send_user_message`, `ask_followup_question`, and `attempt_completion`.
+[x] Subtask 6.5. Create `src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsToolSchemas.test.ts` proving Step 1 returns an empty array and Step 2 returns exactly `read_file`, `upsert_epic`, `send_user_message`, `ask_followup_question`, and `attempt_completion`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsToolSchemas.test.ts`
 
-[ ] Subtask 6.6. In `createEpicsToolSchemas.test.ts`, add coverage proving Step 2 does not include `build_workflow_document`, `apply_patch`, `set_workflow_values`, `workflow_progress_request`, `create_workflow_artifact`, `archive_workflow_artifact`, `delete_workflow_artifact`, or `move_workflow_project_file`.
+[x] Subtask 6.6. In `createEpicsToolSchemas.test.ts`, add coverage proving Step 2 does not include `build_workflow_document`, `apply_patch`, `set_workflow_values`, `workflow_progress_request`, `create_workflow_artifact`, `archive_workflow_artifact`, `delete_workflow_artifact`, or `move_workflow_project_file`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsToolSchemas.test.ts`
