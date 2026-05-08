@@ -423,164 +423,164 @@ Allowed files:
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsToolSchemas.test.ts`
 
-[ ] Task 7. Create the create-epics workflow definition.
+[x] Task 7. Create the create-epics workflow definition.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/index.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`
 
-[ ] Subtask 7.1. Create `src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts` with `CreateEpicsWorkflowValueKey` enum containing every workflow value key listed in `create-epics-requirements.md`.
+[x] Subtask 7.1. Create `src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts` with `CreateEpicsWorkflowValueKey` enum containing every workflow value key listed in `create-epics-requirements.md`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
 
-[ ] Subtask 7.2. In `createEpicsWorkflow.ts`, add module-owned identity constants for `name: "create-epics"`, `displayName: "Create Epics"`, `slashCommandName: "create-epics"`, `useSkillName: "create-epics"`, `projectSubfolder: "planning"`, and the exact requirements-prescribed description.
+[x] Subtask 7.2. In `createEpicsWorkflow.ts`, add module-owned identity constants for `name: "create-epics"`, `displayName: "Create Epics"`, `slashCommandName: "create-epics"`, `useSkillName: "create-epics"`, `projectSubfolder: "planning"`, and the exact requirements-prescribed description.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
 
-[ ] Subtask 7.3. In `createEpicsWorkflow.ts`, add the module-owned product-manager persona exactly as prescribed in `create-epics-requirements.md`.
+[x] Subtask 7.3. In `createEpicsWorkflow.ts`, add the module-owned product-manager persona exactly as prescribed in `create-epics-requirements.md`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
 
-[ ] Subtask 7.4. In `createEpicsWorkflow.ts`, define artifact ids `EPICS_DOCUMENT_ARTIFACT_ID = "epics"` and `EPICS_INDEX_ARTIFACT_ID = "epics_index"`.
+[x] Subtask 7.4. In `createEpicsWorkflow.ts`, define artifact ids `EPICS_DOCUMENT_ARTIFACT_ID = "epics"` and `EPICS_INDEX_ARTIFACT_ID = "epics_index"`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
 
-[ ] Subtask 7.5. In `createEpicsWorkflow.ts`, define artifact definitions for `WorkflowArtifactFamily.Epics` and `WorkflowArtifactFamily.EpicsIndex`, mapping `artifactAbsolutePath` to `output_file` and `epics_index_file` respectively.
+[x] Subtask 7.5. In `createEpicsWorkflow.ts`, define artifact definitions for `WorkflowArtifactFamily.Epics` and `WorkflowArtifactFamily.EpicsIndex`, mapping `artifactAbsolutePath` to `output_file` and `epics_index_file` respectively.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
 
-[ ] Subtask 7.6. In `createEpicsWorkflow.ts`, define `ARCHITECTURE_PREREQUISITE_ID = "architecture_document"`.
+[x] Subtask 7.6. In `createEpicsWorkflow.ts`, define `ARCHITECTURE_PREREQUISITE_ID = "architecture_document"`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
 
-[ ] Subtask 7.7. In `createEpicsWorkflow.ts`, add `prerequisiteFiles.architecture_document` to `createEpicsWorkflowDefinition` with `id: ARCHITECTURE_PREREQUISITE_ID`, `requirement: "required"`, `projectSubfolderSegments: ["planning"]`, `match: { kind: "exact_filename", filename: "architecture.md" }`, `producingWorkflowName: "create-architecture"`, `workflowValueKey: CreateEpicsWorkflowValueKey.ArchitectureDocument`, and `outputDocumentReference: "module_document_builder"`.
+[x] Subtask 7.7. In `createEpicsWorkflow.ts`, add `prerequisiteFiles.architecture_document` to `createEpicsWorkflowDefinition` with `id: ARCHITECTURE_PREREQUISITE_ID`, `requirement: "required"`, `projectSubfolderSegments: ["planning"]`, `match: { kind: "exact_filename", filename: "architecture.md" }`, `producingWorkflowName: "create-architecture"`, `workflowValueKey: CreateEpicsWorkflowValueKey.ArchitectureDocument`, and `outputDocumentReference: "module_document_builder"`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
 
-[ ] Subtask 7.8. In `createEpicsWorkflow.ts`, do not define a module-owned architecture prerequisite workflow form, `selectorDiscovery`, or prerequisite failure-copy panel; prerequisite discovery, confirmation, missing-file copy, and path persistence are owned by runtime through `resolve_prerequisite_files`.
+[x] Subtask 7.8. In `createEpicsWorkflow.ts`, do not define a module-owned architecture prerequisite workflow form, `selectorDiscovery`, or prerequisite failure-copy panel; prerequisite discovery, confirmation, missing-file copy, and path persistence are owned by runtime through `resolve_prerequisite_files`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
 
-[ ] Subtask 7.9. In `createEpicsWorkflow.ts`, add the Step 1 context workflow form with Panel A, Panel B, and Panel C exactly as prescribed in `create-epics-requirements.md`.
+[x] Subtask 7.9. In `createEpicsWorkflow.ts`, add the Step 1 context workflow form with Panel A, Panel B, and Panel C exactly as prescribed in `create-epics-requirements.md`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
 
-[ ] Subtask 7.10. In `createEpicsWorkflow.ts`, configure Panel A to persist required boolean `has_brainstorming_document`.
+[x] Subtask 7.10. In `createEpicsWorkflow.ts`, configure Panel A to persist required boolean `has_brainstorming_document`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
 
-[ ] Subtask 7.11. In `createEpicsWorkflow.ts`, configure Panel B to appear only when Panel A is yes, require a small text area, and persist `brainstorming_document`.
+[x] Subtask 7.11. In `createEpicsWorkflow.ts`, configure Panel B to appear only when Panel A is yes, require a small text area, and persist `brainstorming_document`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
 
-[ ] Subtask 7.12. In `createEpicsWorkflow.ts`, configure Panel A's no branch to clear stale `brainstorming_document` before Panel C.
+[x] Subtask 7.12. In `createEpicsWorkflow.ts`, configure Panel A's no branch to clear stale `brainstorming_document` before Panel C.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
 
-[ ] Subtask 7.13. In `createEpicsWorkflow.ts`, configure Panel C as an optional large text area that persists `additional_context_files` only when provided.
+[x] Subtask 7.13. In `createEpicsWorkflow.ts`, configure Panel C as an optional large text area that persists `additional_context_files` only when provided.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
 
-[ ] Subtask 7.14. In `createEpicsWorkflow.ts`, define Step 1 decision-tree branches so `entry_artifact_resolution_completed` with `creationRequired: true` runs `resolve_prerequisite_files` for `ARCHITECTURE_PREREQUISITE_ID`, then renders the context form, then allocates `Epics.md`, then builds the initial document shell, then transitions to Step 2.
+[x] Subtask 7.14. In `createEpicsWorkflow.ts`, define Step 1 decision-tree branches so `entry_artifact_resolution_completed` with `creationRequired: true` runs `resolve_prerequisite_files` for `ARCHITECTURE_PREREQUISITE_ID`, then renders the context form, then allocates `Epics.md`, then builds the initial document shell, then transitions to Step 2.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
 
-[ ] Subtask 7.15. In `createEpicsWorkflow.ts`, define Step 1 decision-tree branches so `entry_artifact_resolution_completed` with `creationRequired: false` runs `resolve_prerequisite_files` for `ARCHITECTURE_PREREQUISITE_ID`, then renders the context form, then transitions to Step 2 without `allocate_artifact` and without `build_workflow_document`.
+[x] Subtask 7.15. In `createEpicsWorkflow.ts`, define Step 1 decision-tree branches so `entry_artifact_resolution_completed` with `creationRequired: false` runs `resolve_prerequisite_files` for `ARCHITECTURE_PREREQUISITE_ID`, then renders the context form, then transitions to Step 2 without `allocate_artifact` and without `build_workflow_document`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
 
-[ ] Subtask 7.16. In `createEpicsWorkflow.ts`, define Step 1 allocation retry behavior exactly once before `terminal_error` when allocation fails.
+[x] Subtask 7.16. In `createEpicsWorkflow.ts`, define Step 1 allocation retry behavior exactly once before `terminal_error` when allocation fails.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
 
-[ ] Subtask 7.17. In `createEpicsWorkflow.ts`, define Step 1 initial shell build failure behavior as `terminal_error`.
+[x] Subtask 7.17. In `createEpicsWorkflow.ts`, define Step 1 initial shell build failure behavior as `terminal_error`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
 
-[ ] Subtask 7.18. In `createEpicsWorkflow.ts`, define Step 2 prompt source with the exact Step 2 behavior from `create-epics-requirements.md`, including `upsert_epic` instructions and the final `pi-planning` reminder.
+[x] Subtask 7.18. In `createEpicsWorkflow.ts`, define Step 2 prompt source with the exact Step 2 behavior from `create-epics-requirements.md`, including `upsert_epic` instructions and the final `pi-planning` reminder.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
 
-[ ] Subtask 7.19. In `createEpicsWorkflow.ts`, ensure Step 2 prompt source renders `output_file`, `architecture_document`, `brainstorming_document`, and `additional_context_files` through `input.renderWorkflowValue(...)` rather than reconstructing paths.
+[x] Subtask 7.19. In `createEpicsWorkflow.ts`, ensure Step 2 prompt source renders `output_file`, `architecture_document`, `brainstorming_document`, and `additional_context_files` through `input.renderWorkflowValue(...)` rather than reconstructing paths.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
 
-[ ] Subtask 7.20. In `createEpicsWorkflow.ts`, define Step 2 decision tree to enter model-driven work through `project_prompt`.
+[x] Subtask 7.20. In `createEpicsWorkflow.ts`, define Step 2 decision tree to enter model-driven work through `project_prompt`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
 
-[ ] Subtask 7.21. In `createEpicsWorkflow.ts`, add `finalDeliveryFinalizer` that uses `input.resolveArtifactOutput(EPICS_INDEX_ARTIFACT_ID)` to resolve the runtime-owned `Epics.index.json` artifact output.
+[x] Subtask 7.21. In `createEpicsWorkflow.ts`, add `finalDeliveryFinalizer` that uses `input.resolveArtifactOutput(EPICS_INDEX_ARTIFACT_ID)` to resolve the runtime-owned `Epics.index.json` artifact output.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
 
-[ ] Subtask 7.22. In `createEpicsWorkflow.ts`, make `finalDeliveryFinalizer` read `output_file`, build index JSON with `buildEpicsIndexJson(...)`, write to the resolved index artifact absolute path, and return `{ kind: "succeeded"; workflowValueWrites: resolvedIndexArtifact.workflowValueWrites }` on success.
+[x] Subtask 7.22. In `createEpicsWorkflow.ts`, make `finalDeliveryFinalizer` read `output_file`, build index JSON with `buildEpicsIndexJson(...)`, write to the resolved index artifact absolute path, and return `{ kind: "succeeded"; workflowValueWrites: resolvedIndexArtifact.workflowValueWrites }` on success.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
 
-[ ] Subtask 7.23. In `createEpicsWorkflow.ts`, make `finalDeliveryFinalizer` return `{ kind: "failed"; errorMessage }` when `output_file`, artifact output resolution, file reading, index parsing, or index writing fails.
+[x] Subtask 7.23. In `createEpicsWorkflow.ts`, make `finalDeliveryFinalizer` return `{ kind: "failed"; errorMessage }` when `output_file`, artifact output resolution, file reading, index parsing, or index writing fails.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
 
-[ ] Subtask 7.24. In `createEpicsWorkflow.ts`, export `createEpicsWorkflowDefinition` with exactly two steps: `step-1` checklist label `Gather Inputs` and `step-2` checklist label `Draft Epics`.
+[x] Subtask 7.24. In `createEpicsWorkflow.ts`, export `createEpicsWorkflowDefinition` with exactly two steps: `step-1` checklist label `Gather Inputs` and `step-2` checklist label `Draft Epics`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
 
-[ ] Subtask 7.25. Create `src/core/task/workflow-runtime/workflow-modules/create-epics/index.ts` exporting `createEpicsWorkflowDefinition`.
+[x] Subtask 7.25. Create `src/core/task/workflow-runtime/workflow-modules/create-epics/index.ts` exporting `createEpicsWorkflowDefinition`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/index.ts`
 
-[ ] Subtask 7.26. Create `src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts` with coverage for workflow identity, metadata, persona, project subfolder, workflow value inventory, entry project value keys, artifact definitions, and output value mappings.
+[x] Subtask 7.26. Create `src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts` with coverage for workflow identity, metadata, persona, project subfolder, workflow value inventory, entry project value keys, artifact definitions, and output value mappings.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`
 
-[ ] Subtask 7.27. In `createEpicsWorkflow.test.ts`, add coverage for the `architecture_document` prerequisite declaration, proving it is required, targets `["planning"]`, matches exact filename `architecture.md`, identifies `create-architecture` as the producing workflow, persists to `architecture_document`, uses `outputDocumentReference: "module_document_builder"`, and is invoked by Step 1 through `resolve_prerequisite_files`.
+[x] Subtask 7.27. In `createEpicsWorkflow.test.ts`, add coverage for the `architecture_document` prerequisite declaration, proving it is required, targets `["planning"]`, matches exact filename `architecture.md`, identifies `create-architecture` as the producing workflow, persists to `architecture_document`, uses `outputDocumentReference: "module_document_builder"`, and is invoked by Step 1 through `resolve_prerequisite_files`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`
 
-[ ] Subtask 7.28. In `createEpicsWorkflow.test.ts`, add coverage for Step 1 context form Panel A, Panel B, Panel C, stale `brainstorming_document` clearing, and optional `additional_context_files` persistence.
+[x] Subtask 7.28. In `createEpicsWorkflow.test.ts`, add coverage for Step 1 context form Panel A, Panel B, Panel C, stale `brainstorming_document` clearing, and optional `additional_context_files` persistence.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`
 
-[ ] Subtask 7.29. In `createEpicsWorkflow.test.ts`, add coverage for Step 1 `creationRequired: true` route through prerequisite resolution action, context form, allocation, shell build, and Step 2 transition.
+[x] Subtask 7.29. In `createEpicsWorkflow.test.ts`, add coverage for Step 1 `creationRequired: true` route through prerequisite resolution action, context form, allocation, shell build, and Step 2 transition.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`
 
-[ ] Subtask 7.30. In `createEpicsWorkflow.test.ts`, add coverage for Step 1 `creationRequired: false` route through prerequisite resolution action, context form, and Step 2 transition with no allocation and no shell build.
+[x] Subtask 7.30. In `createEpicsWorkflow.test.ts`, add coverage for Step 1 `creationRequired: false` route through prerequisite resolution action, context form, and Step 2 transition with no allocation and no shell build.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`
 
-[ ] Subtask 7.31. In `createEpicsWorkflow.test.ts`, add coverage for Step 2 prompt source, Step 2 exact tool schema output, absence of forbidden model-facing tools, and final-delivery finalizer success/failure behavior including returned `epics_index_file` workflow-value writes.
+[x] Subtask 7.31. In `createEpicsWorkflow.test.ts`, add coverage for Step 2 prompt source, Step 2 exact tool schema output, absence of forbidden model-facing tools, and final-delivery finalizer success/failure behavior including returned `epics_index_file` workflow-value writes.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`
