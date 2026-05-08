@@ -455,17 +455,17 @@ Allowed files:
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
 
-[ ] Subtask 7.6. In `createEpicsWorkflow.ts`, add a Step 1 architecture prerequisite workflow form using `selectorDiscovery.root.kind: "selected_project_root"` and target path segments `["planning"]` for `architecture.md`.
+[ ] Subtask 7.6. In `createEpicsWorkflow.ts`, define `ARCHITECTURE_PREREQUISITE_ID = "architecture_document"`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
 
-[ ] Subtask 7.7. In `createEpicsWorkflow.ts`, ensure the Step 1 architecture prerequisite form persists the selected architecture path to `architecture_document`.
+[ ] Subtask 7.7. In `createEpicsWorkflow.ts`, add `prerequisiteFiles.architecture_document` to `createEpicsWorkflowDefinition` with `id: ARCHITECTURE_PREREQUISITE_ID`, `requirement: "required"`, `projectSubfolderSegments: ["planning"]`, `match: { kind: "exact_filename", filename: "architecture.md" }`, `producingWorkflowName: "create-architecture"`, `workflowValueKey: CreateEpicsWorkflowValueKey.ArchitectureDocument`, and `outputDocumentReference: "module_document_builder"`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
 
-[ ] Subtask 7.8. In `createEpicsWorkflow.ts`, ensure the Step 1 architecture prerequisite form copy identifies `create-architecture` as the workflow the user must run first when no valid architecture file is available.
+[ ] Subtask 7.8. In `createEpicsWorkflow.ts`, do not define a module-owned architecture prerequisite workflow form, `selectorDiscovery`, or prerequisite failure-copy panel; prerequisite discovery, confirmation, missing-file copy, and path persistence are owned by runtime through `resolve_prerequisite_files`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
@@ -495,12 +495,12 @@ Allowed files:
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
 
-[ ] Subtask 7.14. In `createEpicsWorkflow.ts`, define Step 1 decision-tree branches so `entry_artifact_resolution_completed` with `creationRequired: true` renders the architecture prerequisite form, then the context form, then allocates `Epics.md`, then builds the initial document shell, then transitions to Step 2.
+[ ] Subtask 7.14. In `createEpicsWorkflow.ts`, define Step 1 decision-tree branches so `entry_artifact_resolution_completed` with `creationRequired: true` runs `resolve_prerequisite_files` for `ARCHITECTURE_PREREQUISITE_ID`, then renders the context form, then allocates `Epics.md`, then builds the initial document shell, then transitions to Step 2.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
 
-[ ] Subtask 7.15. In `createEpicsWorkflow.ts`, define Step 1 decision-tree branches so `entry_artifact_resolution_completed` with `creationRequired: false` renders the architecture prerequisite form, then the context form, then transitions to Step 2 without `allocate_artifact` and without `build_workflow_document`.
+[ ] Subtask 7.15. In `createEpicsWorkflow.ts`, define Step 1 decision-tree branches so `entry_artifact_resolution_completed` with `creationRequired: false` runs `resolve_prerequisite_files` for `ARCHITECTURE_PREREQUISITE_ID`, then renders the context form, then transitions to Step 2 without `allocate_artifact` and without `build_workflow_document`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
@@ -560,7 +560,7 @@ Allowed files:
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`
 
-[ ] Subtask 7.27. In `createEpicsWorkflow.test.ts`, add coverage for the Step 1 architecture prerequisite form, missing-architecture user-facing failure copy, and selected architecture persistence to `architecture_document`.
+[ ] Subtask 7.27. In `createEpicsWorkflow.test.ts`, add coverage for the `architecture_document` prerequisite declaration, proving it is required, targets `["planning"]`, matches exact filename `architecture.md`, identifies `create-architecture` as the producing workflow, persists to `architecture_document`, uses `outputDocumentReference: "module_document_builder"`, and is invoked by Step 1 through `resolve_prerequisite_files`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`
@@ -570,12 +570,12 @@ Allowed files:
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`
 
-[ ] Subtask 7.29. In `createEpicsWorkflow.test.ts`, add coverage for Step 1 `creationRequired: true` route through prerequisite form, context form, allocation, shell build, and Step 2 transition.
+[ ] Subtask 7.29. In `createEpicsWorkflow.test.ts`, add coverage for Step 1 `creationRequired: true` route through prerequisite resolution action, context form, allocation, shell build, and Step 2 transition.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`
 
-[ ] Subtask 7.30. In `createEpicsWorkflow.test.ts`, add coverage for Step 1 `creationRequired: false` route through prerequisite form, context form, and Step 2 transition with no allocation and no shell build.
+[ ] Subtask 7.30. In `createEpicsWorkflow.test.ts`, add coverage for Step 1 `creationRequired: false` route through prerequisite resolution action, context form, and Step 2 transition with no allocation and no shell build.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`
@@ -696,6 +696,16 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-epics/action-plan.md`
 
 [ ] Subtask 12.4. Run `rg -n "create-epics\\.md|createEpics\\.md|/Users/robertboston/Documents/Cline/Workflows/create-epics.md|epic-delivery-spec-template.md|_bmad/bmm/agents/pm.md" src/core/task/workflow-runtime/workflow-modules/create-epics src/core/task/workflow-runtime/WorkflowRegistry.ts` and confirm no runtime dependency on migration source files or `.md` workflow identity aliases.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-epics/action-plan.md`
+
+[ ] Subtask 12.5. Run `rg -n "selectorDiscovery|selected_project_root" src/core/task/workflow-runtime/workflow-modules/create-epics` and confirm it returns no matches.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-epics/action-plan.md`
+
+[ ] Subtask 12.6. Run `rg -n "resolve_prerequisite_files|prerequisiteFiles" src/core/task/workflow-runtime/workflow-modules/create-epics` and confirm matches are limited to the create-epics workflow definition and tests.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-epics/action-plan.md`

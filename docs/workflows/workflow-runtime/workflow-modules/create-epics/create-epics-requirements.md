@@ -89,11 +89,13 @@ The create-epics workflow requires an existing `architecture.md` file in the sel
 
 The required architecture prerequisite is produced by the `create-architecture` workflow. If no valid `planning/architecture.md` file is discoverable for the selected project, the workflow must inform the user that they must run the `create-architecture` workflow first to generate the required architecture document, and the create-epics workflow must not proceed to artifact allocation, document initialization, model-driven work, or completion.
 
-The required architecture prerequisite must be resolved through a module-owned Step 1 workflow form using the shared runtime-owned workflow-form selector discovery seam bounded to the selected project root, per `FR-20j6` through `FR-20j8`.
+The required architecture prerequisite must be declared in `WorkflowDefinition.prerequisiteFiles` and resolved through the runtime-owned `resolve_prerequisite_files` decision action, per `FR-20j6` through `FR-20j8`. It must not be implemented as a module-owned `selectorDiscovery` workflow form.
 
-The prerequisite discovery target must resolve only under the selected project root and must target the selected project's `planning` subfolder. It must not accept absolute paths, parent-directory escapes, or files outside the selected project.
+The architecture prerequisite declaration must use `id: "architecture_document"`, `requirement: "required"`, `projectSubfolderSegments: ["planning"]`, `match: { kind: "exact_filename", filename: "architecture.md" }`, `producingWorkflowName: "create-architecture"`, `workflowValueKey: "architecture_document"`, and `outputDocumentReference: "module_document_builder"`.
 
-When exactly one valid `planning/architecture.md` file is discoverable, the Step 1 prerequisite form may present a confirmation panel instead of a file-selection list. When multiple valid prerequisite candidates are supported by later requirements, the form must present the discoverable candidates for user selection and confirmation.
+Runtime-owned prerequisite discovery must resolve only under the selected project root and must target the selected project's `planning` subfolder. It must not accept absolute paths, parent-directory escapes, or files outside the selected project.
+
+When exactly one valid `planning/architecture.md` file is discoverable, the runtime-owned prerequisite flow must present a confirmation panel. When multiple valid prerequisite candidates match, the runtime-owned prerequisite flow must present the discoverable candidates for user selection and confirmation.
 
 The workflow must not automatically discover an optional brainstorming workflow file. Optional brainstorming context must be collected through the Step 1 workflow form.
 
@@ -192,11 +194,11 @@ The module must define these two steps, using these exact `checklistLabel` value
 
 Step 1 must model progression by first receiving `entry_artifact_resolution_completed` for the `Epics.md` artifact and then resolving prerequisite files before any model-driven work begins.
 
-Step 1 must render a module-owned prerequisite workflow form that discovers the required `architecture.md` file under the selected project's `planning` subfolder.
+Step 1 must invoke `resolve_prerequisite_files` for the declared `architecture_document` prerequisite before rendering the module-owned context workflow form.
 
-If the required architecture prerequisite is not found, Step 1 must surface a user-facing notification that the user must run the `create-architecture` workflow first, and must stop without allocating or building `Epics.md`.
+If the required architecture prerequisite is not found, the runtime-owned prerequisite flow must surface a user-facing notification that the user must run the `create-architecture` workflow first, and Step 1 must stop without allocating or building `Epics.md`.
 
-If the required architecture prerequisite is found and confirmed, Step 1 must persist the selected absolute path to `architecture_document`.
+If the required architecture prerequisite is found and confirmed, runtime-owned prerequisite resolution must persist the selected absolute path to `architecture_document`.
 
 Step 1 must render a module-owned context workflow form after the required architecture prerequisite has been resolved.
 
