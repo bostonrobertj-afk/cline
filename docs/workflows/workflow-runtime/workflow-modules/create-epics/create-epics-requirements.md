@@ -328,9 +328,7 @@ Index generation must fail clearly if `Epics.md` contains no canonical epic sect
 
 Index generation must fail clearly if two canonical epic sections contain the same identity.
 
-Index generation must fail clearly if any canonical epic section has a missing, non-positive, or non-numeric identity.
-
-Index generation must fail clearly if any canonical epic section has an empty title.
+Malformed, missing, non-positive, non-numeric epic identities and empty epic titles must be rejected by `upsert_epic` before persistence. Index generation must parse canonical epic headings and must not treat malformed or noncanonical headings as valid index candidates.
 
 Index generation must write exactly this JSON shape:
 
@@ -395,6 +393,7 @@ The `upsert_epic` backend tool must include handler tests for:
 - active workflow gating
 - missing and malformed parameters
 - positive numeric identity validation
+- empty value rejection and non-empty title validation
 - canonical section insertion
 - same-identity replacement
 - numeric ordering
@@ -411,8 +410,6 @@ The index generation path must include tests for:
 - replacement of stale index content
 - failure when no canonical epics exist
 - failure for duplicate epic identities
-- failure for malformed identity
-- failure for empty title
 - exact schema shape with no story, remediation-story, review, scope, objective, or requirements data
 
 Prompt integration tests must prove:

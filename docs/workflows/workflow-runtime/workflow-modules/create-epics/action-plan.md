@@ -213,7 +213,7 @@ Allowed files:
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsDocument.ts`
 
-[ ] Subtask 3.7. In `createEpicsDocument.ts`, export `parseCanonicalEpicIndexEntries(documentContent: string): readonly { identity: string; title: string }[]` that returns only canonical `## Epic {identity}: {title}` headings with positive numeric identities and non-empty titles.
+[ ] Subtask 3.7. In `createEpicsDocument.ts`, export `parseCanonicalEpicIndexEntries(documentContent: string): readonly { identity: string; title: string }[]` that returns canonical `## Epic {identity}: {title}` headings with positive numeric identities and non-empty titles.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsDocument.ts`
@@ -223,7 +223,7 @@ Allowed files:
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsDocument.ts`
 
-[ ] Subtask 3.9. In `createEpicsDocument.ts`, make `buildEpicsIndexJson(...)` throw clear `Error` messages for no canonical epics, duplicate identities, malformed identities, and empty titles.
+[ ] Subtask 3.9. In `createEpicsDocument.ts`, make `buildEpicsIndexJson(...)` throw clear `Error` messages for no canonical epics and duplicate canonical epic identities. Malformed identities and empty titles must be rejected by `upsert_epic` before persistence, not handled as normal index-generation input.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsDocument.ts`
@@ -248,7 +248,7 @@ Allowed files:
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsDocument.test.ts`
 
-[ ] Subtask 3.14. In `createEpicsDocument.test.ts`, add coverage proving `buildEpicsIndexJson(...)` fails clearly for no canonical epics, duplicate identities, malformed identities, and empty titles.
+[ ] Subtask 3.14. In `createEpicsDocument.test.ts`, add coverage proving `buildEpicsIndexJson(...)` fails clearly for no canonical epics and duplicate canonical epic identities.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsDocument.test.ts`
@@ -363,7 +363,7 @@ Allowed files:
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/ToolExecutorCoordinator.ts`
 
-[ ] Subtask 5.11. Create `src/core/task/tools/handlers/__tests__/UpsertEpicToolHandler.test.ts` with coverage for active workflow gating, missing parameter rejection, malformed JSON rejection, positive numeric identity validation, and `output_file` path resolution.
+[ ] Subtask 5.11. Create `src/core/task/tools/handlers/__tests__/UpsertEpicToolHandler.test.ts` with coverage for active workflow gating, missing parameter rejection, malformed JSON rejection, empty value rejection, positive numeric identity validation, non-empty title validation, and `output_file` path resolution.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/UpsertEpicToolHandler.test.ts`
