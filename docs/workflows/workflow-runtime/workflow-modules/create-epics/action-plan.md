@@ -589,56 +589,56 @@ Allowed files:
 
 After completing this phase, pause for QA review before moving to Phase 6.
 
-[ ] Task 8. Register the create-epics workflow.
+[x] Task 8. Register the create-epics workflow.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRegistry.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/UseSkillToolHandler.test.ts`
 
-[ ] Subtask 8.1. In `src/core/task/workflow-runtime/WorkflowRegistry.ts`, import `createEpicsWorkflowDefinition` from the create-epics module.
+[x] Subtask 8.1. In `src/core/task/workflow-runtime/WorkflowRegistry.ts`, import `createEpicsWorkflowDefinition` from the create-epics module.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRegistry.ts`
 
-[ ] Subtask 8.2. In `src/core/task/workflow-runtime/WorkflowRegistry.ts`, add `createEpicsWorkflowDefinition` to `shippedWorkflowDefinitions`.
+[x] Subtask 8.2. In `src/core/task/workflow-runtime/WorkflowRegistry.ts`, add `createEpicsWorkflowDefinition` to `shippedWorkflowDefinitions`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRegistry.ts`
 
-[ ] Subtask 8.3. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add registry coverage proving `resolveWorkflowDefinition("create-epics")` returns the workflow and `resolveWorkflowDefinition("create-epics.md")` returns undefined.
+[x] Subtask 8.3. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add registry coverage proving `resolveWorkflowDefinition("create-epics")` returns the workflow and `resolveWorkflowDefinition("create-epics.md")` returns undefined.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 8.4. In `src/core/task/tools/handlers/__tests__/UseSkillToolHandler.test.ts`, add coverage proving `resolveWorkflowByUseSkillName("create-epics")` returns the create-epics workflow.
+[x] Subtask 8.4. In `src/core/task/tools/handlers/__tests__/UseSkillToolHandler.test.ts`, add coverage proving `resolveWorkflowByUseSkillName("create-epics")` returns the create-epics workflow.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/UseSkillToolHandler.test.ts`
 
-[ ] Task 9. Add prompt-projection and response-tool integration coverage.
+[x] Task 9. Add prompt-projection and response-tool integration coverage.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/response_tools.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
 
-[ ] Subtask 9.1. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, add coverage proving create-epics current step details appear in the input payload and not workflow system instructions.
+[x] Subtask 9.1. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, add coverage proving create-epics current step details appear in the input payload and not workflow system instructions.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 9.2. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, add coverage proving create-epics Step 2 native tool schema projection is exactly `read_file`, `upsert_epic`, `send_user_message`, `ask_followup_question`, and `attempt_completion`.
+[x] Subtask 9.2. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, add coverage proving create-epics Step 2 native tool schema projection is exactly `read_file`, `upsert_epic`, `send_user_message`, `ask_followup_question`, and `attempt_completion`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 9.3. In `src/core/prompts/system-prompt/__tests__/response_tools.test.ts`, add or update coverage proving create-epics Step 2 response-tool guidance includes only projected response tools from the active schema and does not mention `upsert_epic` as a response tool.
+[x] Subtask 9.3. In `src/core/prompts/system-prompt/__tests__/response_tools.test.ts`, add or update coverage proving create-epics Step 2 response-tool guidance includes only projected response tools from the active schema and does not mention `upsert_epic` as a response tool.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/response_tools.test.ts`
 
-[ ] Subtask 9.4. In `src/core/task/__tests__/workflow-runtime-metadata.test.ts`, add coverage proving create-epics workflow metadata persists workflow identity, persona, steps, `output_file`, and `epics_index_file` values without `.md` workflow identity aliases.
+[x] Subtask 9.4. In `src/core/task/__tests__/workflow-runtime-metadata.test.ts`, add coverage proving create-epics workflow metadata persists workflow identity, persona, steps, `output_file`, and `epics_index_file` values without `.md` workflow identity aliases.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`

@@ -48,6 +48,7 @@ import {
 	buildCreateArchitectureDocumentFromSession,
 	buildInitialCreateArchitectureDocument,
 } from "../workflow-modules/create-architecture/createArchitectureDocument"
+import { createEpicsWorkflowDefinition } from "../workflow-modules/create-epics"
 
 type ObservedDecisionPredicateInput = {
 	activeBranchId: string
@@ -1699,6 +1700,16 @@ describe("WorkflowRuntime", () => {
 		expect(resolvedWorkflow).to.equal(createArchitectureWorkflowDefinition)
 		expect(resolvedWorkflow?.name).to.equal("create-architecture")
 		expect(WorkflowRegistry.resolveWorkflowDefinition("create-architecture.md")).to.equal(undefined)
+	})
+
+	it("resolves only the unsuffixed shipped create-epics workflow identity", () => {
+		resolveWorkflowDefinitionStub.restore()
+
+		const resolvedWorkflow = WorkflowRegistry.resolveWorkflowDefinition("create-epics")
+
+		expect(resolvedWorkflow).to.equal(createEpicsWorkflowDefinition)
+		expect(resolvedWorkflow?.name).to.equal("create-epics")
+		expect(WorkflowRegistry.resolveWorkflowDefinition("create-epics.md")).to.equal(undefined)
 	})
 
 	it("activates create-architecture through the shared entry form and projects its nine-step checklist", async () => {

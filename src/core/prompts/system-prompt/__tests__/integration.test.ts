@@ -30,6 +30,7 @@ import type {
 } from "@/core/task/workflow-runtime/types"
 import { WorkflowRuntime } from "@/core/task/workflow-runtime/WorkflowRuntime"
 import { createArchitectureWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/create-architecture"
+import { createEpicsWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/create-epics"
 import type { McpHub } from "@/services/mcp/McpHub"
 import type { McpServer } from "@/shared/mcp"
 import { ModelFamily } from "@/shared/prompts"
@@ -542,6 +543,58 @@ const buildCreateArchitecturePromptContext = async (
 	const taskState = new TaskState()
 	taskState.activeWorkflowName = "create-architecture"
 	taskState.activeWorkflowSession = createCreateArchitectureWorkflowSession(activeStepNumber)
+	taskState.apiRequestCount = 1
+	const workflowProjection = await runtime.buildTurnProjection({ taskState })
+
+	return {
+		...baseContext,
+		mcpHub: makeMcpHub([]),
+		providerInfo: makeProviderInfo("gpt-5-codex", "openai"),
+		enableNativeToolCalls: true,
+		useMinimalGptPrompt: true,
+		...workflowProjection,
+	}
+}
+
+const CREATE_EPICS_OUTPUT_FILE = "/test/project/planning/Epics.md"
+const CREATE_EPICS_ARCHITECTURE_DOCUMENT = "/test/project/planning/architecture.md"
+const CREATE_EPICS_BRAINSTORMING_DOCUMENT = "/test/project/discovery/brainstorming.md"
+const CREATE_EPICS_ADDITIONAL_CONTEXT_FILES = "/test/project/planning/domain-notes.md"
+
+const createCreateEpicsWorkflowSession = (): ActiveWorkflowSession => ({
+	activeStepNumber: 2,
+	workflowValues: {
+		output_file: CREATE_EPICS_OUTPUT_FILE,
+		architecture_document: CREATE_EPICS_ARCHITECTURE_DOCUMENT,
+		brainstorming_document: CREATE_EPICS_BRAINSTORMING_DOCUMENT,
+		additional_context_files: CREATE_EPICS_ADDITIONAL_CONTEXT_FILES,
+	},
+	projectSelection: {
+		projectMode: "new",
+		projectTitle: "Create Epics Session",
+		projectFolderName: "create-epics-session",
+	},
+	lifecycle: {
+		projectSelectionCompleted: true,
+	},
+	entryArtifactResolution: undefined,
+	ui: {
+		suppressedWorkflowFormIds: [],
+		suppressedWorkflowStepResolutionRoutes: [],
+	},
+	branchContext: {
+		activeBranchId: createEpicsWorkflowDefinition.steps["step-2"].decisionTree.entryBranchId,
+	},
+})
+
+const buildCreateEpicsPromptContext = async (): Promise<SystemPromptContext & WorkflowPromptProjection> => {
+	const workspacePathPolicy: WorkflowWorkspacePathPolicy = {
+		validateAccess: () => true,
+	}
+	const runtime = new WorkflowRuntime({ cwd: "/test/project", workspacePathPolicy })
+	const taskState = new TaskState()
+	taskState.activeWorkflowName = "create-epics"
+	taskState.activeWorkflowSession = createCreateEpicsWorkflowSession()
 	taskState.apiRequestCount = 1
 	const workflowProjection = await runtime.buildTurnProjection({ taskState })
 
@@ -1208,6 +1261,30 @@ describe("Prompt System Integration Tests", () => {
 			})
 		})
 
+		it("projects active create-epics Step 2 tools into native GPT-5 prompts", async function () {
+			const context = await buildCreateEpicsPromptContext()
+
+			await runPromptTest(this, context, "gpt-5-codex", async ({ tools }) => {
+				const nativeToolNames = getNativeToolNames(tools)
+
+				expect(nativeToolNames).to.deep.equal([
+					"read_file",
+					"upsert_epic",
+					"send_user_message",
+					"ask_followup_question",
+					"attempt_completion",
+				])
+				expect(nativeToolNames).to.not.include("workflow_progress_request")
+				expect(nativeToolNames).to.not.include("build_workflow_document")
+				expect(nativeToolNames).to.not.include("apply_patch")
+				expect(nativeToolNames).to.not.include("set_workflow_values")
+				expect(nativeToolNames).to.not.include("create_workflow_artifact")
+				expect(nativeToolNames).to.not.include("archive_workflow_artifact")
+				expect(nativeToolNames).to.not.include("delete_workflow_artifact")
+				expect(nativeToolNames).to.not.include("move_workflow_project_file")
+			})
+		})
+
 		it("projects create-architecture workflow context into the full-turn input payload only", async function () {
 			const context = await buildCreateArchitecturePromptContext(3)
 			const workflowInputPayloadBlock = context.workflowInputPayloadBlock
@@ -1245,6 +1322,50 @@ describe("Prompt System Integration Tests", () => {
 				expect(systemPrompt).to.not.include("Step 3: Establish Architecture Foundational Elements")
 				expect(systemPrompt).to.not.include(`Read \`${CREATE_ARCHITECTURE_OUTPUT_FILE}\`.`)
 				expect(systemPrompt).to.not.include("Draft and propose content for Project Context Analysis")
+			})
+		})
+
+		it("projects create-epics current step details into the full-turn input payload only", async function () {
+			const context = await buildCreateEpicsPromptContext()
+			const workflowInputPayloadBlock = context.workflowInputPayloadBlock
+			expect(workflowInputPayloadBlock).to.not.equal(undefined)
+			if (workflowInputPayloadBlock === undefined) {
+				throw new Error("Expected create-epics workflow input payload.")
+			}
+
+			expect(workflowInputPayloadBlock).to.include("Workflow:\nCreate Epics")
+			expect(workflowInputPayloadBlock).to.include(
+				"Description: Create a project-level epics document from an existing architecture document, then generate the structured epic index used by downstream planning workflows.",
+			)
+			expect(workflowInputPayloadBlock).to.include("Name: John")
+			expect(workflowInputPayloadBlock).to.include("Role: Product Manager")
+			expect(workflowInputPayloadBlock).to.include("1. Gather Inputs - Complete")
+			expect(workflowInputPayloadBlock).to.include("2. Draft Epics - Active")
+			expect(workflowInputPayloadBlock).to.include("CURRENT STEP DETAILED INSTRUCTIONS")
+			expect(workflowInputPayloadBlock).to.include("Step 2: Draft Epics")
+			expect(workflowInputPayloadBlock).to.include(`Read \`${CREATE_EPICS_OUTPUT_FILE}\`.`)
+			expect(workflowInputPayloadBlock).to.include(`Read \`${CREATE_EPICS_ARCHITECTURE_DOCUMENT}\`.`)
+			expect(workflowInputPayloadBlock).to.include(`Read \`${CREATE_EPICS_BRAINSTORMING_DOCUMENT}\` when present.`)
+			expect(workflowInputPayloadBlock).to.include(
+				`Read any files listed in \`${CREATE_EPICS_ADDITIONAL_CONTEXT_FILES}\` when present.`,
+			)
+			expect(workflowInputPayloadBlock).to.include(
+				"Call `upsert_epic` for each user-aligned epic. Use `upsert_epic` to persist every accepted epic and every accepted revision.",
+			)
+			expect(workflowInputPayloadBlock).to.include(
+				"After the user indicates alignment with the drafted epics, use `attempt_completion` to provide a final recap and remind the user to run the `pi-planning` workflow for each epic to define that epic's user stories.",
+			)
+
+			await runPromptTest(this, context, "gpt-5-codex", async ({ systemPrompt }) => {
+				expect(systemPrompt).to.not.include("CURRENT STEP DETAILED INSTRUCTIONS")
+				expect(systemPrompt).to.not.include("Step 2: Draft Epics")
+				expect(systemPrompt).to.not.include(`Read \`${CREATE_EPICS_OUTPUT_FILE}\`.`)
+				expect(systemPrompt).to.not.include(
+					"Call `upsert_epic` for each user-aligned epic. Use `upsert_epic` to persist every accepted epic and every accepted revision.",
+				)
+				expect(systemPrompt).to.not.include(
+					"After the user indicates alignment with the drafted epics, use `attempt_completion` to provide a final recap and remind the user to run the `pi-planning` workflow for each epic to define that epic's user stories.",
+				)
 			})
 		})
 

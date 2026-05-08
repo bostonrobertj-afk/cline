@@ -36,6 +36,7 @@ import * as WorkflowRegistry from "@/core/task/workflow-runtime/WorkflowRegistry
 import { WorkflowRuntime } from "@/core/task/workflow-runtime/WorkflowRuntime"
 import { brainstormingWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/brainstorming"
 import { buildInitialBrainstormingDocument } from "@/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingDocument"
+import { createEpicsWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/create-epics"
 import { DiffViewProvider } from "@/integrations/editor/DiffViewProvider"
 import { BrowserSession } from "@/services/browser/BrowserSession"
 import { UrlContentFetcher } from "@/services/browser/UrlContentFetcher"
@@ -85,6 +86,40 @@ function createValidEntryArtifactResolution(): WorkflowEntryArtifactResolution {
 		artifactAbsolutePath: "/tmp/docs/projects/persisted-project/planning/Epics.md",
 		creationRequired: false,
 		existingArtifactAction: "continue_existing",
+	}
+}
+
+const CREATE_EPICS_METADATA_OUTPUT_FILE = "/tmp/docs/projects/create-epics-session/planning/Epics.md"
+const CREATE_EPICS_METADATA_INDEX_FILE = "/tmp/docs/projects/create-epics-session/planning/Epics.index.json"
+
+function createPersistedCreateEpicsSession(): PersistedWorkflowSession {
+	return {
+		activeStepNumber: 2,
+		workflowValues: {
+			output_file: CREATE_EPICS_METADATA_OUTPUT_FILE,
+			epics_index_file: CREATE_EPICS_METADATA_INDEX_FILE,
+			architecture_document: "/tmp/docs/projects/create-epics-session/planning/architecture.md",
+			brainstorming_document: "/tmp/docs/projects/create-epics-session/discovery/brainstorming.md",
+			additional_context_files: "/tmp/docs/projects/create-epics-session/planning/domain-notes.md",
+		},
+		projectSelection: {
+			projectMode: "new",
+			projectTitle: "Create Epics Session",
+			projectFolderName: "create-epics-session",
+		},
+		lifecycle: {
+			projectSelectionCompleted: true,
+		},
+		entryArtifactResolution: undefined,
+		ui: {
+			formSession: undefined,
+			stepResolutionSession: undefined,
+			suppressedWorkflowFormIds: [],
+			suppressedWorkflowStepResolutionRoutes: [],
+		},
+		branchContext: {
+			activeBranchId: createEpicsWorkflowDefinition.steps["step-2"].decisionTree.entryBranchId,
+		},
 	}
 }
 
@@ -639,6 +674,94 @@ describe("workflow runtime metadata persistence", () => {
 		expect(saveMetadata.firstCall.args[0]).to.equal("task-1")
 		expect(saveMetadata.firstCall.args[1].activeWorkflowName).to.equal(undefined)
 		expect(saveMetadata.firstCall.args[1].activeWorkflowSession).to.equal(undefined)
+	})
+
+	it("persists create-epics workflow metadata without md workflow identity aliases", async () => {
+		const taskState = new TaskState()
+		taskState.activeWorkflowName = createEpicsWorkflowDefinition.name
+		taskState.activeWorkflowSession = createPersistedCreateEpicsSession()
+		const metadata = createMetadata()
+		sandbox.stub(disk, "getTaskMetadata").resolves(metadata)
+		const saveMetadata = sandbox.stub(disk, "saveTaskMetadata").resolves()
+		const workflowRuntime = new WorkflowRuntime({
+			cwd: "/tmp",
+			workspacePathPolicy: createAllowAllWorkspacePathPolicy(),
+		})
+		const task = createTaskHarness(taskState, workflowRuntime)
+
+		await callTaskMethod(task, "persistWorkflowRuntimeMetadata")
+
+		sinon.assert.calledOnce(saveMetadata)
+		const savedMetadata = saveMetadata.firstCall.args[1]
+		expect(savedMetadata.activeWorkflowName).to.equal("create-epics")
+		expect(JSON.stringify(savedMetadata)).to.not.contain("create-epics.md")
+		const savedSession = savedMetadata.activeWorkflowSession
+		expect(savedSession).to.not.equal(undefined)
+		if (savedSession === undefined) {
+			throw new Error("Expected create-epics metadata session to be persisted.")
+		}
+		expect(savedSession.workflowValues.output_file).to.equal(CREATE_EPICS_METADATA_OUTPUT_FILE)
+		expect(savedSession.workflowValues.epics_index_file).to.equal(CREATE_EPICS_METADATA_INDEX_FILE)
+
+		saveMetadata.resetHistory()
+		const restoredTaskState = new TaskState()
+		const restoreRuntime = new WorkflowRuntime({
+			cwd: "/tmp",
+			workspacePathPolicy: createAllowAllWorkspacePathPolicy(),
+		})
+		const restoreTask = createTaskHarness(restoredTaskState, restoreRuntime)
+		const consumeWorkflowNextAction = sandbox.stub().resolves()
+		Reflect.set(restoreTask, "consumeWorkflowNextAction", consumeWorkflowNextAction)
+
+		await callTaskMethod(restoreTask, "restoreWorkflowRuntimeStateFromMetadata", savedMetadata)
+
+		sinon.assert.notCalled(saveMetadata)
+		expect(restoredTaskState.activeWorkflowName).to.equal("create-epics")
+		const restoredSession = restoredTaskState.activeWorkflowSession
+		expect(restoredSession).to.not.equal(undefined)
+		if (restoredSession === undefined) {
+			throw new Error("Expected create-epics metadata session to be restored.")
+		}
+		expect(restoredSession.workflowValues.output_file).to.equal(CREATE_EPICS_METADATA_OUTPUT_FILE)
+		expect(restoredSession.workflowValues.epics_index_file).to.equal(CREATE_EPICS_METADATA_INDEX_FILE)
+
+		const workflowProjection = await restoreRuntime.buildTurnProjection({
+			taskState: restoredTaskState,
+			isFirstTaskRequest: true,
+		})
+		const workflowInputPayloadBlock = workflowProjection.workflowInputPayloadBlock
+		expect(workflowInputPayloadBlock).to.not.equal(undefined)
+		if (workflowInputPayloadBlock === undefined) {
+			throw new Error("Expected create-epics workflow input payload after metadata restore.")
+		}
+		expect(workflowInputPayloadBlock).to.contain("Workflow:\nCreate Epics")
+		expect(workflowInputPayloadBlock).to.contain("Name: John")
+		expect(workflowInputPayloadBlock).to.contain("Role: Product Manager")
+		expect(workflowInputPayloadBlock).to.contain("1. Gather Inputs - Complete")
+		expect(workflowInputPayloadBlock).to.contain("2. Draft Epics - Active")
+		expect(workflowInputPayloadBlock).to.contain(CREATE_EPICS_METADATA_OUTPUT_FILE)
+		expect(workflowInputPayloadBlock).to.not.contain("create-epics.md")
+
+		saveMetadata.resetHistory()
+		const aliasMetadata = createMetadata()
+		aliasMetadata.activeWorkflowName = "create-epics.md"
+		aliasMetadata.activeWorkflowSession = createPersistedCreateEpicsSession()
+		const aliasTaskState = new TaskState()
+		const aliasTask = createTaskHarness(
+			aliasTaskState,
+			new WorkflowRuntime({
+				cwd: "/tmp",
+				workspacePathPolicy: createAllowAllWorkspacePathPolicy(),
+			}),
+		)
+
+		await callTaskMethod(aliasTask, "restoreWorkflowRuntimeStateFromMetadata", aliasMetadata)
+
+		sinon.assert.calledOnce(saveMetadata)
+		expect(aliasTaskState.activeWorkflowName).to.equal(undefined)
+		expect(aliasTaskState.activeWorkflowSession).to.equal(undefined)
+		expect(aliasMetadata.activeWorkflowName).to.equal(undefined)
+		expect(aliasMetadata.activeWorkflowSession).to.equal(undefined)
 	})
 
 	it("persists explicit teardown next actions and keeps true no_op actions non-persisting", async () => {

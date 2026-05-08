@@ -2,6 +2,7 @@ import { expect } from "chai"
 import { describe, it } from "mocha"
 import type { ActiveWorkflowSession, WorkflowPromptBuilderInput, WorkflowValue } from "@/core/task/workflow-runtime/types"
 import { createArchitectureWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/create-architecture"
+import { createEpicsWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/create-epics"
 import { ModelFamily } from "@/shared/prompts"
 import { ClineDefaultTool } from "@/shared/tools"
 import { getCurrentModeResponseToolsLine, getResponseToolsSection } from "../components/response_tools"
@@ -118,6 +119,46 @@ function buildCreateArchitectureWorkflowToolSchemaOverride(args: {
 }): readonly ClineToolSpec[] {
 	const step = createArchitectureWorkflowDefinition.steps[args.stepId]
 	return step.buildToolSchema(createCreateArchitecturePromptBuilderInput(args))
+}
+
+function createCreateEpicsPromptBuilderInput(): WorkflowPromptBuilderInput {
+	const step = createEpicsWorkflowDefinition.steps["step-2"]
+	const session: ActiveWorkflowSession = {
+		activeStepNumber: 2,
+		workflowValues: {
+			output_file: "/test/project/planning/Epics.md",
+			architecture_document: "/test/project/planning/architecture.md",
+			brainstorming_document: "/test/project/discovery/brainstorming.md",
+			additional_context_files: "/test/project/planning/domain-notes.md",
+		},
+		projectSelection: {
+			projectMode: "new",
+			projectTitle: "Create Epics Session",
+			projectFolderName: "create-epics-session",
+		},
+		lifecycle: {
+			projectSelectionCompleted: true,
+		},
+		entryArtifactResolution: undefined,
+		ui: {
+			suppressedWorkflowFormIds: [],
+			suppressedWorkflowStepResolutionRoutes: [],
+		},
+		branchContext: {
+			activeBranchId: step.decisionTree.entryBranchId,
+		},
+	}
+
+	return {
+		session,
+		step,
+		renderWorkflowValue,
+	}
+}
+
+function buildCreateEpicsWorkflowToolSchemaOverride(): readonly ClineToolSpec[] {
+	const step = createEpicsWorkflowDefinition.steps["step-2"]
+	return step.buildToolSchema(createCreateEpicsPromptBuilderInput())
 }
 
 describe("response tools prompt helpers", () => {
@@ -359,5 +400,26 @@ describe("response tools prompt helpers", () => {
 				expect(responseToolsSection).to.not.contain(absentSectionName)
 			}
 		}
+	})
+
+	it("derives create-epics Step 2 response guidance only from projected response tools", () => {
+		const context = makeContext({
+			enableNativeToolCalls: false,
+			workflowToolSchemaOverride: buildCreateEpicsWorkflowToolSchemaOverride(),
+		})
+		const currentModeLine = getCurrentModeResponseToolsLine(context)
+		const responseToolsSection = getResponseToolsSection(context)
+
+		expect(currentModeLine).to.equal(
+			"- Use `send_user_message`, `ask_followup_question` and `attempt_completion` when responding to the user.",
+		)
+		expect(responseToolsSection).to.contain("`send_user_message`")
+		expect(responseToolsSection).to.contain("`ask_followup_question`")
+		expect(responseToolsSection).to.contain("`attempt_completion`")
+		expect(responseToolsSection).to.not.contain("`read_file`")
+		expect(responseToolsSection).to.not.contain("`upsert_epic`")
+		expect(responseToolsSection).to.not.contain("`workflow_progress_request`")
+		expect(responseToolsSection).to.not.contain("`act_mode_respond`")
+		expect(responseToolsSection).to.not.contain("`generate_plan_output`")
 	})
 })

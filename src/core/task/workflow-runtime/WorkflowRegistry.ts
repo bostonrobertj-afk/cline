@@ -1,8 +1,13 @@
 import type { WorkflowDefinition, WorkflowName } from "@/core/task/workflow-runtime/types"
 import { brainstormingWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/brainstorming"
 import { createArchitectureWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/create-architecture"
+import { createEpicsWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/create-epics"
 
-const shippedWorkflowDefinitions: WorkflowDefinition[] = [brainstormingWorkflowDefinition, createArchitectureWorkflowDefinition]
+const shippedWorkflowDefinitions: WorkflowDefinition[] = [
+	brainstormingWorkflowDefinition,
+	createArchitectureWorkflowDefinition,
+	createEpicsWorkflowDefinition,
+]
 
 const shippedWorkflowDefinitionsByName = new Map<WorkflowName, WorkflowDefinition>(
 	shippedWorkflowDefinitions.map((definition) => [definition.name, definition]),
