@@ -16,6 +16,7 @@
     snapshots/generated surfaces
     docs/reference surfaces if treated as canonical in-repo
 - After writing an action plan, reach each line of the action plan and seek out any inconsistencies or conflicts. During this review, assess each task and subtask for internal dependencies, and ensure that no task or subtask is dependent upon a task or subtask which is sequenced after it in the action plan. Resolve them appropriately, asking the user for input if necessary, before indicating that the action plan is complete.
+- NEVER prescribe retyping, casting, renaming, or otherwise mutating existing capabilities/functionality within an action plan unless you have surfaced the proposed change as a single topic to the user and gained their approval. 
 
 # Required Action Plan Sections:
 - FrontMatter

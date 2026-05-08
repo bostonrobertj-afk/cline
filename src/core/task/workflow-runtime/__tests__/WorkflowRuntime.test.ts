@@ -29,6 +29,9 @@ import type {
 	WorkflowDocumentBuildActionInstruction,
 	WorkflowEntryArtifactResolution,
 	WorkflowEntryProjectValueKeys,
+	WorkflowFinalDeliveryArtifactResolution,
+	WorkflowFinalDeliveryFinalizationInput,
+	WorkflowFinalDeliveryFinalizationResult,
 	WorkflowNextAction,
 	WorkflowPersonaDefinition,
 	WorkflowStepDefinition,
@@ -1771,6 +1774,150 @@ describe("WorkflowRuntime", () => {
 
 		expect(finalDeliveryResult).to.deep.equal({ kind: "persist_workflow_teardown" })
 		expectWorkflowStateCleared(taskState)
+	})
+
+	it("preserves successful final-delivery teardown behavior when workflow has no finalizer", async () => {
+		const workflow = createWorkflowDefinition()
+		const activeSession = createParentWorkflowSession()
+		registerResolvedWorkflow(workflow)
+		taskState.activeWorkflowName = workflow.name
+		taskState.activeWorkflowSession = activeSession
+		taskState.currentFocusChainChecklist = "- [ ] Step 1"
+
+		const finalDeliveryResult = await runtime.completeActiveWorkflowAfterFinalDelivery({ taskState })
+
+		expect(finalDeliveryResult).to.deep.equal({ kind: "persist_workflow_teardown" })
+		expectWorkflowStateCleared(taskState)
+	})
+
+	it("runs successful finalizer before teardown with workflow context and artifact output resolver", async () => {
+		const {
+			workflow: workflowWithoutFinalizer,
+			artifactId,
+			outputValueKeys,
+		} = createEpicsArtifactWorkflow({ outputValuePrefix: "finalizer_epics" })
+		const activeSession = createParentWorkflowSession({
+			projectTitle: "Finalizer Project",
+			projectFolderName: "finalizer-project",
+		})
+		let observedInput: WorkflowFinalDeliveryFinalizationInput | undefined
+		let observedArtifactOutput: WorkflowFinalDeliveryArtifactResolution | undefined
+		let observedTaskStateWorkflowName: string | undefined
+		let observedTaskStateSession: ActiveWorkflowSession | undefined
+		const workflow: WorkflowDefinition = {
+			...workflowWithoutFinalizer,
+			finalDeliveryFinalizer: {
+				async finalize(input: WorkflowFinalDeliveryFinalizationInput): Promise<WorkflowFinalDeliveryFinalizationResult> {
+					observedInput = input
+					observedTaskStateWorkflowName = taskState.activeWorkflowName
+					observedTaskStateSession = taskState.activeWorkflowSession
+					observedArtifactOutput = await input.resolveArtifactOutput(artifactId)
+					return { kind: "succeeded" }
+				},
+			},
+		}
+		const expectedArtifactAbsolutePath = join(cwd, "docs", "projects", "finalizer-project", "planning", "Epics.md")
+		registerResolvedWorkflow(workflow)
+		taskState.activeWorkflowName = workflow.name
+		taskState.activeWorkflowSession = activeSession
+
+		const finalDeliveryResult = await runtime.completeActiveWorkflowAfterFinalDelivery({ taskState })
+
+		expect(finalDeliveryResult).to.deep.equal({ kind: "persist_workflow_teardown" })
+		expect(observedTaskStateWorkflowName).to.equal(workflow.name)
+		expect(observedTaskStateSession).to.equal(activeSession)
+		expect(observedInput?.workflowName).to.equal(workflow.name)
+		expect(observedInput?.session).to.equal(activeSession)
+		expect(observedArtifactOutput).to.deep.equal({
+			artifactId,
+			projectTitle: "Finalizer Project",
+			projectFolderName: "finalizer-project",
+			artifactFamily: WorkflowArtifactFamily.Epics,
+			artifactIdentity: "epics",
+			artifactFilename: "Epics.md",
+			artifactRelativePath: join("planning", "Epics.md"),
+			artifactAbsolutePath: expectedArtifactAbsolutePath,
+			parentIdentity: undefined,
+			targetIdentity: undefined,
+			workflowValueWrites: {
+				[outputValueKeys.projectTitle]: "Finalizer Project",
+				[outputValueKeys.projectFolderName]: "finalizer-project",
+				[outputValueKeys.artifactFamily]: WorkflowArtifactFamily.Epics,
+				[outputValueKeys.artifactIdentity]: "epics",
+				[outputValueKeys.artifactFilename]: "Epics.md",
+				[outputValueKeys.artifactRelativePath]: join("planning", "Epics.md"),
+				[outputValueKeys.artifactAbsolutePath]: expectedArtifactAbsolutePath,
+			},
+		})
+		expect(await pathExists(expectedArtifactAbsolutePath)).to.equal(false)
+		expectWorkflowStateCleared(taskState)
+	})
+
+	it("applies successful finalizer workflow-value writes before teardown", async () => {
+		const finalizerValueKey = "finalizer_index_path"
+		const workflowWithoutFinalizer = createWorkflowDefinition({
+			workflowValueKeys: [finalizerValueKey],
+		})
+		const activeSession = createParentWorkflowSession()
+		let observedWorkflowValuesAtTeardown: WorkflowValues | undefined
+		const originalTeardownWorkflow = runtime.teardownWorkflow.bind(runtime)
+		sandbox.stub(runtime, "teardownWorkflow").callsFake(async (teardownArgs: { taskState: TaskState }): Promise<void> => {
+			const session = teardownArgs.taskState.activeWorkflowSession
+			observedWorkflowValuesAtTeardown = session === undefined ? undefined : { ...session.workflowValues }
+			await originalTeardownWorkflow(teardownArgs)
+		})
+		const workflow: WorkflowDefinition = {
+			...workflowWithoutFinalizer,
+			finalDeliveryFinalizer: {
+				finalize(): WorkflowFinalDeliveryFinalizationResult {
+					return {
+						kind: "succeeded",
+						workflowValueWrites: {
+							[finalizerValueKey]: "Epics.index.json",
+						},
+					}
+				},
+			},
+		}
+		registerResolvedWorkflow(workflow)
+		taskState.activeWorkflowName = workflow.name
+		taskState.activeWorkflowSession = activeSession
+
+		const finalDeliveryResult = await runtime.completeActiveWorkflowAfterFinalDelivery({ taskState })
+
+		expect(finalDeliveryResult).to.deep.equal({ kind: "persist_workflow_teardown" })
+		expect(observedWorkflowValuesAtTeardown).to.deep.equal({
+			[finalizerValueKey]: "Epics.index.json",
+		})
+		expectWorkflowStateCleared(taskState)
+	})
+
+	it("returns terminal_error and preserves active workflow state when finalizer fails", async () => {
+		const workflowWithoutFinalizer = createWorkflowDefinition()
+		const workflow: WorkflowDefinition = {
+			...workflowWithoutFinalizer,
+			finalDeliveryFinalizer: {
+				finalize(): WorkflowFinalDeliveryFinalizationResult {
+					return {
+						kind: "failed",
+						errorMessage: "Unable to finalize delivery.",
+					}
+				},
+			},
+		}
+		const activeSession = createParentWorkflowSession()
+		registerResolvedWorkflow(workflow)
+		taskState.activeWorkflowName = workflow.name
+		taskState.activeWorkflowSession = activeSession
+
+		const finalDeliveryResult = await runtime.completeActiveWorkflowAfterFinalDelivery({ taskState })
+
+		expect(finalDeliveryResult).to.deep.equal({
+			kind: "terminal_error",
+			errorMessage: "Unable to finalize delivery.",
+		})
+		expect(taskState.activeWorkflowName).to.equal(workflow.name)
+		expect(taskState.activeWorkflowSession).to.equal(activeSession)
 	})
 
 	it("copies complete parent project selection into child workflow activation without rendering entry form", async () => {

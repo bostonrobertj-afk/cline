@@ -38,7 +38,7 @@ This plan also includes the approved shared runtime support required by the crea
 Approved implementation decision:
 
 - The user approved adding an optional workflow-definition finalization hook. `WorkflowRuntime.completeActiveWorkflowAfterFinalDelivery(...)` must invoke this hook before teardown. The create-epics module must use the hook to generate `Epics.index.json`. Workflows without a hook must retain existing teardown behavior.
-- The finalization hook must receive a runtime-owned artifact-output resolver so create-epics can resolve and persist `Epics.index.json` artifact metadata without allocating an empty index file and without module-local path construction.
+- The finalization hook must receive a runtime-owned final-delivery artifact resolver so create-epics can resolve and persist `Epics.index.json` artifact metadata without allocating an empty index file, without module-local path construction, and without repurposing or renaming the existing `WorkflowArtifactAllocationOutput` capability.
 
 Sibling-pattern audit summary:
 
@@ -71,104 +71,104 @@ Sibling-pattern audit summary:
 
 After completing this phase, pause for QA review before moving to Phase 2.
 
-[ ] Task 1. Add the optional workflow final-delivery finalization hook contract.
+[x] Task 1. Add the optional workflow final-delivery finalization hook contract.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 
-[ ] Subtask 1.1. In `src/core/task/workflow-runtime/types.ts`, add exported `WorkflowArtifactOutputResolution` with the same fields as the existing `WorkflowArtifactAllocationOutput` shape: `artifactId`, `projectTitle`, `projectFolderName`, `artifactFamily`, `artifactIdentity`, `artifactFilename`, `artifactRelativePath`, `artifactAbsolutePath`, `parentIdentity`, `targetIdentity`, and `workflowValueWrites`.
+[x] Subtask 1.1. In `src/core/task/workflow-runtime/types.ts`, add exported `WorkflowFinalDeliveryArtifactResolution` with required fields `artifactId`, `projectTitle`, `projectFolderName`, `artifactFamily`, `artifactIdentity`, `artifactFilename`, `artifactRelativePath`, `artifactAbsolutePath`, `parentIdentity`, `targetIdentity`, and `workflowValueWrites`. This type is final-delivery specific and must not replace, alias, or rename `WorkflowArtifactAllocationOutput`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 
-[ ] Subtask 1.2. In `src/core/task/workflow-runtime/types.ts`, add `WorkflowFinalDeliveryFinalizationResult` as a union of `{ kind: "succeeded"; workflowValueWrites?: WorkflowValues }` and `{ kind: "failed"; errorMessage: string }`.
+[x] Subtask 1.2. In `src/core/task/workflow-runtime/types.ts`, add `WorkflowFinalDeliveryFinalizationResult` as a union of `{ kind: "succeeded"; workflowValueWrites?: WorkflowValues }` and `{ kind: "failed"; errorMessage: string }`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 
-[ ] Subtask 1.3. In `src/core/task/workflow-runtime/types.ts`, add `WorkflowFinalDeliveryFinalizationInput` with required `session: ActiveWorkflowSession`, `workflowName: WorkflowName`, and `resolveArtifactOutput(artifactId: string): Promise<WorkflowArtifactOutputResolution>` fields.
+[x] Subtask 1.3. In `src/core/task/workflow-runtime/types.ts`, add `WorkflowFinalDeliveryFinalizationInput` with required `session: ActiveWorkflowSession`, `workflowName: WorkflowName`, and `resolveArtifactOutput(artifactId: string): Promise<WorkflowFinalDeliveryArtifactResolution>` fields.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 
-[ ] Subtask 1.4. In `src/core/task/workflow-runtime/types.ts`, add `WorkflowFinalDeliveryFinalizer` as an interface with `finalize(input: WorkflowFinalDeliveryFinalizationInput): WorkflowFinalDeliveryFinalizationResult | Promise<WorkflowFinalDeliveryFinalizationResult>`.
+[x] Subtask 1.4. In `src/core/task/workflow-runtime/types.ts`, add `WorkflowFinalDeliveryFinalizer` as an interface with `finalize(input: WorkflowFinalDeliveryFinalizationInput): WorkflowFinalDeliveryFinalizationResult | Promise<WorkflowFinalDeliveryFinalizationResult>`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 
-[ ] Subtask 1.5. In `src/core/task/workflow-runtime/types.ts`, add optional `finalDeliveryFinalizer?: WorkflowFinalDeliveryFinalizer` to `WorkflowDefinition`.
+[x] Subtask 1.5. In `src/core/task/workflow-runtime/types.ts`, add optional `finalDeliveryFinalizer?: WorkflowFinalDeliveryFinalizer` to `WorkflowDefinition`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 
-[ ] Task 2. Invoke the optional finalizer before workflow teardown.
+[x] Task 2. Invoke the optional finalizer before workflow teardown.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/AttemptCompletionHandler.postCompletionFollowup.test.ts`
 
-[ ] Subtask 2.1. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, update `completeActiveWorkflowAfterFinalDelivery(...)` so it resolves the active workflow definition and active session before teardown.
+[x] Subtask 2.1. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, update `completeActiveWorkflowAfterFinalDelivery(...)` so it resolves the active workflow definition and active session before teardown.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 2.2. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, update `completeActiveWorkflowAfterFinalDelivery(...)` so when the active workflow definition has no `finalDeliveryFinalizer`, it preserves the current behavior: teardown and return `persist_workflow_teardown`.
+[x] Subtask 2.2. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, update `completeActiveWorkflowAfterFinalDelivery(...)` so when the active workflow definition has no `finalDeliveryFinalizer`, it preserves the current behavior: teardown and return `persist_workflow_teardown`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 2.3. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, update `completeActiveWorkflowAfterFinalDelivery(...)` so it passes `resolveArtifactOutput(artifactId)` to the finalizer, backed by the existing runtime artifact allocation resolver without creating or deleting any file.
+[x] Subtask 2.3. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, update `completeActiveWorkflowAfterFinalDelivery(...)` so it passes `resolveArtifactOutput(artifactId)` to the finalizer, backed by a new final-delivery-specific runtime artifact resolver that does not call, replace, alias, rename, or mutate `resolveWorkflowArtifactAllocation(...)` or `WorkflowArtifactAllocationOutput`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 2.4. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, update `completeActiveWorkflowAfterFinalDelivery(...)` so when `finalDeliveryFinalizer.finalize(...)` returns `{ kind: "succeeded" }`, it applies any returned `workflowValueWrites` through `applyWorkflowValueWrites(...)`, tears down the workflow, and returns `persist_workflow_teardown`.
+[x] Subtask 2.4. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, update `completeActiveWorkflowAfterFinalDelivery(...)` so when `finalDeliveryFinalizer.finalize(...)` returns `{ kind: "succeeded" }`, it applies any returned `workflowValueWrites` through `applyWorkflowValueWrites(...)`, tears down the workflow, and returns `persist_workflow_teardown`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 2.5. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, update `completeActiveWorkflowAfterFinalDelivery(...)` so when `finalDeliveryFinalizer.finalize(...)` returns `{ kind: "failed" }`, it does not tear down the workflow and returns `terminal_error` with the finalizer error message.
+[x] Subtask 2.5. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, update `completeActiveWorkflowAfterFinalDelivery(...)` so when `finalDeliveryFinalizer.finalize(...)` returns `{ kind: "failed" }`, it does not tear down the workflow and returns `terminal_error` with the finalizer error message.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 2.6. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, update `validateWorkflowDefinition(...)` so a provided `finalDeliveryFinalizer` must be an object with a callable `finalize` function.
+[x] Subtask 2.6. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, update `validateWorkflowDefinition(...)` so a provided `finalDeliveryFinalizer` must be an object with a callable `finalize` function.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 2.7. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, remove the local `WorkflowArtifactAllocationOutput` interface only after replacing its uses with the exported `WorkflowArtifactOutputResolution` type from `types.ts`.
+[x] Subtask 2.7. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, preserve the existing local `WorkflowArtifactAllocationOutput` interface and all existing allocation method signatures that use it. Do not add a compatibility alias for this type.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 2.8. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving a workflow with no finalizer retains the existing successful final-delivery teardown behavior.
+[x] Subtask 2.8. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving a workflow with no finalizer retains the existing successful final-delivery teardown behavior.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 2.9. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving a successful finalizer runs before teardown and receives the active workflow name, active session, and a working `resolveArtifactOutput(...)` helper.
+[x] Subtask 2.9. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving a successful finalizer runs before teardown and receives the active workflow name, active session, and a working `resolveArtifactOutput(...)` helper.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 2.10. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving workflow-value writes returned by a successful finalizer are applied before teardown.
+[x] Subtask 2.10. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving workflow-value writes returned by a successful finalizer are applied before teardown.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 2.11. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving a failed finalizer returns `terminal_error` and leaves `taskState.activeWorkflowName` and `taskState.activeWorkflowSession` intact.
+[x] Subtask 2.11. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add coverage proving a failed finalizer returns `terminal_error` and leaves `taskState.activeWorkflowName` and `taskState.activeWorkflowSession` intact.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 2.12. In `src/core/task/tools/handlers/__tests__/AttemptCompletionHandler.postCompletionFollowup.test.ts`, update or add coverage proving successful `attempt_completion` queues `persist_workflow_teardown` only after a successful workflow finalizer.
+[x] Subtask 2.12. In `src/core/task/tools/handlers/__tests__/AttemptCompletionHandler.postCompletionFollowup.test.ts`, update or add coverage proving successful `attempt_completion` queues `persist_workflow_teardown` only after a successful workflow finalizer.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/AttemptCompletionHandler.postCompletionFollowup.test.ts`
 
-[ ] Subtask 2.13. In `src/core/task/tools/handlers/__tests__/AttemptCompletionHandler.postCompletionFollowup.test.ts`, add coverage proving a failed workflow finalizer causes `attempt_completion` to queue `terminal_error` rather than `persist_workflow_teardown`.
+[x] Subtask 2.13. In `src/core/task/tools/handlers/__tests__/AttemptCompletionHandler.postCompletionFollowup.test.ts`, add coverage proving a failed workflow finalizer causes `attempt_completion` to queue `terminal_error` rather than `persist_workflow_teardown`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/AttemptCompletionHandler.postCompletionFollowup.test.ts`

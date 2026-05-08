@@ -349,6 +349,36 @@ export type WorkflowArtifactOutputValueKeys =
 	| WorkflowParentedArtifactOutputValueKeys
 	| WorkflowTargetedArtifactOutputValueKeys
 
+export interface WorkflowFinalDeliveryArtifactResolution {
+	artifactId: string
+	projectTitle: string
+	projectFolderName: string
+	artifactFamily: string
+	artifactIdentity: string
+	artifactFilename: string
+	artifactRelativePath: string
+	artifactAbsolutePath: string
+	parentIdentity: string | undefined
+	targetIdentity: string | undefined
+	workflowValueWrites: WorkflowValues
+}
+
+export type WorkflowFinalDeliveryFinalizationResult =
+	| { kind: "succeeded"; workflowValueWrites?: WorkflowValues }
+	| { kind: "failed"; errorMessage: string }
+
+export interface WorkflowFinalDeliveryFinalizationInput {
+	session: ActiveWorkflowSession
+	workflowName: WorkflowName
+	resolveArtifactOutput(artifactId: string): Promise<WorkflowFinalDeliveryArtifactResolution>
+}
+
+export interface WorkflowFinalDeliveryFinalizer {
+	finalize(
+		input: WorkflowFinalDeliveryFinalizationInput,
+	): WorkflowFinalDeliveryFinalizationResult | Promise<WorkflowFinalDeliveryFinalizationResult>
+}
+
 export type WorkflowArtifactDefinition =
 	| {
 			id: string
@@ -425,6 +455,7 @@ export interface WorkflowDefinition {
 	workflowForms?: Record<WorkflowFormId, WorkflowFormDefinitionPayload>
 	artifacts?: Record<string, WorkflowArtifactDefinition>
 	childInheritance?: WorkflowChildInheritanceRule[]
+	finalDeliveryFinalizer?: WorkflowFinalDeliveryFinalizer
 }
 
 export interface WorkflowDiscoveryRequest {

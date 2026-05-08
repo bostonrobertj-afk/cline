@@ -61,6 +61,8 @@ import type {
 	WorkflowEntryArtifactPendingFileOperation,
 	WorkflowEntryArtifactResolution,
 	WorkflowEntryArtifactResolutionState,
+	WorkflowFinalDeliveryArtifactResolution,
+	WorkflowFinalDeliveryFinalizationResult,
 	WorkflowNextAction,
 	WorkflowProjectSelectionState,
 	WorkflowProjectSubfolder,
@@ -2322,12 +2324,68 @@ export class WorkflowRuntime {
 	}
 
 	async completeActiveWorkflowAfterFinalDelivery(args: { taskState: TaskState }): Promise<WorkflowNextAction> {
-		if (!args.taskState.activeWorkflowName && !args.taskState.activeWorkflowSession) {
+		const activeWorkflowName = args.taskState.activeWorkflowName
+		const session = args.taskState.activeWorkflowSession
+		if (activeWorkflowName === undefined && session === undefined) {
 			return { kind: "no_op" }
 		}
 
-		await this.teardownWorkflow({ taskState: args.taskState })
-		return { kind: "persist_workflow_teardown" }
+		if (activeWorkflowName === undefined || session === undefined) {
+			return this.teardownWorkflowAndRequirePersistence({ taskState: args.taskState })
+		}
+
+		const definition = resolveWorkflowDefinition(activeWorkflowName)
+		if (!definition) {
+			return this.teardownWorkflowAndRequirePersistence({ taskState: args.taskState })
+		}
+
+		if (definition.finalDeliveryFinalizer === undefined) {
+			await this.teardownWorkflow({ taskState: args.taskState })
+			return { kind: "persist_workflow_teardown" }
+		}
+
+		let finalizationResult: WorkflowFinalDeliveryFinalizationResult
+		try {
+			finalizationResult = await definition.finalDeliveryFinalizer.finalize({
+				session,
+				workflowName: activeWorkflowName,
+				resolveArtifactOutput: async (artifactId) => {
+					const artifactDefinition = definition.artifacts?.[artifactId]
+					if (artifactDefinition === undefined || artifactDefinition.id !== artifactId) {
+						throw new Error(`Active workflow ${definition.name} does not define artifactId ${artifactId}.`)
+					}
+
+					return this.resolveWorkflowFinalDeliveryArtifactOutput({
+						workflow: definition,
+						session,
+						artifactDefinition,
+					})
+				},
+			})
+		} catch (error) {
+			const errorMessage =
+				error instanceof Error && error.message.trim() !== ""
+					? error.message
+					: "Workflow final-delivery finalizer failed."
+			return {
+				kind: "terminal_error",
+				errorMessage,
+			}
+		}
+
+		if (finalizationResult.kind === "succeeded") {
+			if (finalizationResult.workflowValueWrites !== undefined) {
+				await this.applyWorkflowValueWrites({
+					taskState: args.taskState,
+					values: finalizationResult.workflowValueWrites,
+				})
+			}
+
+			await this.teardownWorkflow({ taskState: args.taskState })
+			return { kind: "persist_workflow_teardown" }
+		}
+
+		return { kind: "terminal_error", errorMessage: finalizationResult.errorMessage }
 	}
 
 	private async teardownWorkflowAndRequirePersistence(args: { taskState: TaskState }): Promise<WorkflowNextAction> {
@@ -4388,6 +4446,46 @@ export class WorkflowRuntime {
 		}
 	}
 
+	private async resolveWorkflowFinalDeliveryArtifactOutput(args: {
+		workflow: WorkflowDefinition
+		session: ActiveWorkflowSession
+		artifactDefinition: WorkflowArtifactDefinition
+	}): Promise<WorkflowFinalDeliveryArtifactResolution> {
+		const familyDefinition = WORKFLOW_ARTIFACT_FAMILY_REGISTRY[args.artifactDefinition.family]
+		const identityResolution = await this.resolveWorkflowArtifactIdentity({
+			workflow: args.workflow,
+			session: args.session,
+			artifactDefinition: args.artifactDefinition,
+			familyDefinition,
+		})
+		const artifactFilename = this.buildWorkflowArtifactFilename({
+			familyDefinition,
+			artifactIdentity: identityResolution.artifactIdentity,
+		})
+		const artifactRelativePath = join(args.workflow.projectSubfolder, artifactFilename)
+		const artifactAbsolutePath = join(this.resolveWorkflowProjectOutputFolder(args.session), artifactRelativePath)
+		const output = {
+			artifactId: args.artifactDefinition.id,
+			projectTitle: args.session.projectSelection.projectTitle,
+			projectFolderName: args.session.projectSelection.projectFolderName,
+			artifactFamily: args.artifactDefinition.family,
+			artifactIdentity: identityResolution.artifactIdentity,
+			artifactFilename,
+			artifactRelativePath,
+			artifactAbsolutePath,
+			parentIdentity: identityResolution.parentIdentity,
+			targetIdentity: identityResolution.targetIdentity,
+		}
+
+		return {
+			...output,
+			workflowValueWrites: this.buildWorkflowArtifactOutputValueWrites({
+				outputValueKeys: args.artifactDefinition.outputValueKeys,
+				output,
+			}),
+		}
+	}
+
 	private async discoverWorkflowArtifactFilenames(args: {
 		workflow: WorkflowDefinition
 		session: ActiveWorkflowSession
@@ -5192,6 +5290,17 @@ export class WorkflowRuntime {
 
 		if (workflow.entryPanel.promptMarkdown.trim() === "") {
 			return { valid: false, errorMessage: "Workflow entryPanel promptMarkdown must not be empty." }
+		}
+
+		const finalDeliveryFinalizer: unknown = workflow.finalDeliveryFinalizer
+		if (
+			finalDeliveryFinalizer !== undefined &&
+			(!this.isRecord(finalDeliveryFinalizer) || typeof finalDeliveryFinalizer.finalize !== "function")
+		) {
+			return {
+				valid: false,
+				errorMessage: "Workflow finalDeliveryFinalizer must be an object with a callable finalize function.",
+			}
 		}
 
 		const workflowValueKeys = new Set<string>()

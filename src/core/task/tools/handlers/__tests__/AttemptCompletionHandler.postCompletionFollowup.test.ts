@@ -8,14 +8,16 @@ import sinon from "sinon"
 import { Logger } from "@/shared/services/Logger"
 import { ClineDefaultTool } from "@/shared/tools"
 import { TaskState } from "../../../TaskState"
-import type { ActiveWorkflowSession } from "../../../workflow-runtime/types"
+import type { ActiveWorkflowSession, WorkflowNextAction } from "../../../workflow-runtime/types"
 import { WorkflowRuntime } from "../../../workflow-runtime/WorkflowRuntime"
 import { RESPONSE_TOOL_SUCCESS_MESSAGE } from "../../response/types"
 import type { TaskConfig } from "../../types/TaskConfig"
 import { ToolHookUtils } from "../../utils/ToolHookUtils"
 import { AttemptCompletionHandler } from "../AttemptCompletionHandler"
 
-function createConfig(options?: { autoApproveCommand?: boolean; workflowRuntime?: TaskConfig["workflowRuntime"] }): {
+type AttemptCompletionWorkflowRuntime = Pick<WorkflowRuntime, "completeActiveWorkflowAfterFinalDelivery">
+
+function createConfig(options?: { autoApproveCommand?: boolean; workflowRuntime?: AttemptCompletionWorkflowRuntime }): {
 	config: TaskConfig
 	callbacks: Record<string, sinon.SinonStub>
 	taskState: TaskState
@@ -205,6 +207,66 @@ describe("AttemptCompletionHandler post-completion follow-up", () => {
 		assert.equal(taskState.activeWorkflowSession, undefined)
 		assert.equal(taskState.currentFocusChainChecklist, null)
 		sinon.assert.calledOnceWithExactly(callbacks.queueWorkflowNextAction, { kind: "persist_workflow_teardown" })
+	})
+
+	it("queues workflow teardown after successful attempt_completion only after successful workflow finalizer", async () => {
+		const callOrder: string[] = []
+		const workflowRuntime: AttemptCompletionWorkflowRuntime = {
+			async completeActiveWorkflowAfterFinalDelivery(args: { taskState: TaskState }): Promise<WorkflowNextAction> {
+				callOrder.push("finalizer")
+				args.taskState.activeWorkflowName = undefined
+				args.taskState.activeWorkflowSession = undefined
+				args.taskState.currentFocusChainChecklist = null
+				return { kind: "persist_workflow_teardown" }
+			},
+		}
+		const workflowFinalizerSpy = sinon.spy(workflowRuntime, "completeActiveWorkflowAfterFinalDelivery")
+		const { config, callbacks, taskState } = createConfig({ workflowRuntime })
+		setActiveWorkflowState(taskState)
+		callbacks.queueWorkflowNextAction.callsFake((): void => {
+			callOrder.push("queue")
+		})
+
+		const handler = new AttemptCompletionHandler()
+		const result = await handler.execute(
+			config,
+			createAttemptCompletionBlock({
+				result: "Brainstorming complete.",
+			}),
+		)
+
+		assert.equal(result, RESPONSE_TOOL_SUCCESS_MESSAGE)
+		sinon.assert.calledOnce(workflowFinalizerSpy)
+		sinon.assert.calledOnceWithExactly(callbacks.queueWorkflowNextAction, { kind: "persist_workflow_teardown" })
+		assert.deepEqual(callOrder, ["finalizer", "queue"])
+	})
+
+	it("queues terminal_error instead of teardown when workflow finalizer fails after attempt_completion", async () => {
+		const workflowRuntime: AttemptCompletionWorkflowRuntime = {
+			async completeActiveWorkflowAfterFinalDelivery(): Promise<WorkflowNextAction> {
+				return {
+					kind: "terminal_error",
+					errorMessage: "Unable to finalize workflow delivery.",
+				}
+			},
+		}
+		const { config, callbacks, taskState } = createConfig({ workflowRuntime })
+		const activeSession = setActiveWorkflowState(taskState)
+
+		const handler = new AttemptCompletionHandler()
+		const result = await handler.execute(
+			config,
+			createAttemptCompletionBlock({
+				result: "Brainstorming complete.",
+			}),
+		)
+
+		assert.equal(result, RESPONSE_TOOL_SUCCESS_MESSAGE)
+		sinon.assert.calledOnceWithExactly(callbacks.queueWorkflowNextAction, {
+			kind: "terminal_error",
+			errorMessage: "Unable to finalize workflow delivery.",
+		})
+		assertActiveWorkflowStatePreserved(taskState, activeSession)
 	})
 
 	it("preserves active workflow state when attempt_completion is denied, invalid, or failed", async () => {
