@@ -16,6 +16,7 @@ import { Task } from "@/core/task"
 import { MessageStateHandler } from "@/core/task/message-state"
 import { TaskState } from "@/core/task/TaskState"
 import { AutoApprove } from "@/core/task/tools/autoApprove"
+import { getBackendWorkflowToolContract } from "@/core/task/tools/backendWorkflowToolContracts"
 import { BuildWorkflowDocumentToolHandler } from "@/core/task/tools/handlers/BuildWorkflowDocumentToolHandler"
 import { CreateWorkflowArtifactToolHandler } from "@/core/task/tools/handlers/CreateWorkflowArtifactToolHandler"
 import { ToolExecutorCoordinator } from "@/core/task/tools/ToolExecutorCoordinator"
@@ -819,6 +820,59 @@ describe("workflow runtime metadata persistence", () => {
 		sinon.assert.calledOnce(executeTool)
 		expect(executeTool.firstCall.args[0]).to.deep.equal(taskState.assistantMessageContent[0])
 		sinon.assert.calledOnceWithExactly(consumeWorkflowNextAction, returnedNextAction)
+	})
+
+	it("declares backend workflow tool contracts for story planning tools", () => {
+		expect(getBackendWorkflowToolContract(ClineDefaultTool.PLAN_STORY_ARTIFACTS)).to.deep.include({
+			id: ClineDefaultTool.PLAN_STORY_ARTIFACTS,
+			name: "plan_story_artifacts",
+		})
+		expect(getBackendWorkflowToolContract(ClineDefaultTool.PLAN_STORY_ARTIFACTS)?.parameters).to.deep.include.members([
+			{
+				name: "epic_identity",
+				required: true,
+				type: "string",
+				description: "Positive numeric epic identity for the story inventory sidecar.",
+			},
+			{
+				name: "story_count",
+				required: true,
+				type: "number",
+				description: "Positive story count to plan as primary stories for the selected epic.",
+			},
+		])
+		expect(getBackendWorkflowToolContract(ClineDefaultTool.PLAN_REMEDIATION_STORY_ARTIFACT)).to.deep.include({
+			id: ClineDefaultTool.PLAN_REMEDIATION_STORY_ARTIFACT,
+			name: "plan_remediation_story_artifact",
+		})
+		expect(
+			getBackendWorkflowToolContract(ClineDefaultTool.PLAN_REMEDIATION_STORY_ARTIFACT)?.parameters,
+		).to.deep.include.members([
+			{
+				name: "epic_identity",
+				required: true,
+				type: "string",
+				description: "Positive numeric epic identity for the story inventory sidecar.",
+			},
+			{
+				name: "target_story_identity",
+				required: true,
+				type: "string",
+				description: "Existing primary story identity that will own the remediation story.",
+			},
+		])
+		expect(getBackendWorkflowToolContract(ClineDefaultTool.GENERATE_STORY_FILES)).to.deep.include({
+			id: ClineDefaultTool.GENERATE_STORY_FILES,
+			name: "generate_story_files",
+		})
+		expect(getBackendWorkflowToolContract(ClineDefaultTool.GENERATE_STORY_FILES)?.parameters).to.deep.equal([
+			{
+				name: "epic_identity",
+				required: true,
+				type: "string",
+				description: "Positive numeric epic identity for the story inventory sidecar.",
+			},
+		])
 	})
 
 	it("does not re-enter workflow runtime only because set_workflow_values executed", async () => {

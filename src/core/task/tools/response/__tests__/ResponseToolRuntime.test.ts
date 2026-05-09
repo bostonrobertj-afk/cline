@@ -88,6 +88,9 @@ describe("ResponseToolRuntime", () => {
 		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.ARCHIVE_WORKFLOW_ARTIFACT), undefined)
 		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.DELETE_WORKFLOW_ARTIFACT), undefined)
 		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.MOVE_WORKFLOW_PROJECT_FILE), undefined)
+		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.PLAN_STORY_ARTIFACTS), undefined)
+		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.PLAN_REMEDIATION_STORY_ARTIFACT), undefined)
+		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.GENERATE_STORY_FILES), undefined)
 	})
 
 	it("registers post-turn thread display states for governed response tools", () => {

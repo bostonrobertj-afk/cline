@@ -17,6 +17,7 @@ import { ModelFamily } from "@/shared/prompts"
 import { ClineDefaultTool } from "@/shared/tools"
 import { WorkflowArtifactFamily } from "../artifactFamilies"
 import * as WorkflowDiscovery from "../discovery"
+import { parseWorkflowStoryIndexJson, stringifyWorkflowStoryIndex } from "../storyArtifacts"
 import type {
 	ActiveWorkflowSession,
 	PersistedWorkflowSession,
@@ -29,9 +30,6 @@ import type {
 	WorkflowDocumentBuildActionInstruction,
 	WorkflowEntryArtifactResolution,
 	WorkflowEntryProjectValueKeys,
-	WorkflowFinalDeliveryArtifactResolution,
-	WorkflowFinalDeliveryFinalizationInput,
-	WorkflowFinalDeliveryFinalizationResult,
 	WorkflowNextAction,
 	WorkflowPersonaDefinition,
 	WorkflowPrerequisiteFileDefinition,
@@ -1003,6 +1001,15 @@ describe("WorkflowRuntime", () => {
 		return { workflow, artifactId, outputValueKeys }
 	}
 
+	async function installCanonicalStoryTemplate(): Promise<string> {
+		const canonicalTemplatePath = join(process.cwd(), ".cline", "skills", "bmad-create-story", "template.md")
+		const canonicalTemplateContent = await readFile(canonicalTemplatePath, "utf8")
+		const runtimeTemplatePath = join(cwd, ".cline", "skills", "bmad-create-story", "template.md")
+		await mkdir(dirname(runtimeTemplatePath), { recursive: true })
+		await writeFile(runtimeTemplatePath, canonicalTemplateContent, "utf8")
+		return canonicalTemplateContent
+	}
+
 	function createPrerequisiteResolutionDecisionTree(args: {
 		prerequisiteIds: readonly string[]
 		artifactId: string
@@ -1937,166 +1944,91 @@ describe("WorkflowRuntime", () => {
 		}
 	})
 
-	it("tears down create-architecture through final delivery after Step 9 attempt_completion", async () => {
-		await advanceCreateArchitectureToStep3ProjectPrompt(taskState, "Create Architecture Runtime Project")
-		for (let stepNumber = 3; stepNumber <= 8; stepNumber += 1) {
-			const confirmedAction = await runtime.submitWorkflowProgressRequest({
-				taskState,
-				approved: true,
-			})
-			expect(confirmedAction.kind).to.equal("project_prompt")
-		}
-		const activeSession = getActiveWorkflowSession(taskState)
-		expect(activeSession.activeStepNumber).to.equal(9)
-
-		const finalDeliveryResult = await runtime.completeActiveWorkflowAfterFinalDelivery({ taskState })
-
-		expect(finalDeliveryResult).to.deep.equal({ kind: "persist_workflow_teardown" })
-		expectWorkflowStateCleared(taskState)
-	})
-
-	it("preserves successful final-delivery teardown behavior when workflow has no finalizer", async () => {
-		const workflow = createWorkflowDefinition()
-		const activeSession = createParentWorkflowSession()
-		registerResolvedWorkflow(workflow)
-		taskState.activeWorkflowName = workflow.name
-		taskState.activeWorkflowSession = activeSession
-		taskState.currentFocusChainChecklist = "- [ ] Step 1"
-
-		const finalDeliveryResult = await runtime.completeActiveWorkflowAfterFinalDelivery({ taskState })
-
-		expect(finalDeliveryResult).to.deep.equal({ kind: "persist_workflow_teardown" })
-		expectWorkflowStateCleared(taskState)
-	})
-
-	it("runs successful finalizer before teardown with workflow context and artifact output resolver", async () => {
-		const {
-			workflow: workflowWithoutFinalizer,
-			artifactId,
-			outputValueKeys,
-		} = createEpicsArtifactWorkflow({ outputValuePrefix: "finalizer_epics" })
-		const activeSession = createParentWorkflowSession({
-			projectTitle: "Finalizer Project",
-			projectFolderName: "finalizer-project",
-		})
-		let observedInput: WorkflowFinalDeliveryFinalizationInput | undefined
-		let observedArtifactOutput: WorkflowFinalDeliveryArtifactResolution | undefined
-		let observedTaskStateWorkflowName: string | undefined
-		let observedTaskStateSession: ActiveWorkflowSession | undefined
-		const workflow: WorkflowDefinition = {
-			...workflowWithoutFinalizer,
-			finalDeliveryFinalizer: {
-				async finalize(input: WorkflowFinalDeliveryFinalizationInput): Promise<WorkflowFinalDeliveryFinalizationResult> {
-					observedInput = input
-					observedTaskStateWorkflowName = taskState.activeWorkflowName
-					observedTaskStateSession = taskState.activeWorkflowSession
-					observedArtifactOutput = await input.resolveArtifactOutput(artifactId)
-					return { kind: "succeeded" }
-				},
-			},
-		}
-		const expectedArtifactAbsolutePath = join(cwd, "docs", "projects", "finalizer-project", "planning", "Epics.md")
-		registerResolvedWorkflow(workflow)
-		taskState.activeWorkflowName = workflow.name
-		taskState.activeWorkflowSession = activeSession
-
-		const finalDeliveryResult = await runtime.completeActiveWorkflowAfterFinalDelivery({ taskState })
-
-		expect(finalDeliveryResult).to.deep.equal({ kind: "persist_workflow_teardown" })
-		expect(observedTaskStateWorkflowName).to.equal(workflow.name)
-		expect(observedTaskStateSession).to.equal(activeSession)
-		expect(observedInput?.workflowName).to.equal(workflow.name)
-		expect(observedInput?.session).to.equal(activeSession)
-		expect(observedArtifactOutput).to.deep.equal({
-			artifactId,
-			projectTitle: "Finalizer Project",
-			projectFolderName: "finalizer-project",
-			artifactFamily: WorkflowArtifactFamily.Epics,
-			artifactIdentity: "epics",
-			artifactFilename: "Epics.md",
-			artifactRelativePath: join("planning", "Epics.md"),
-			artifactAbsolutePath: expectedArtifactAbsolutePath,
-			parentIdentity: undefined,
-			targetIdentity: undefined,
-			workflowValueWrites: {
-				[outputValueKeys.projectTitle]: "Finalizer Project",
-				[outputValueKeys.projectFolderName]: "finalizer-project",
-				[outputValueKeys.artifactFamily]: WorkflowArtifactFamily.Epics,
-				[outputValueKeys.artifactIdentity]: "epics",
-				[outputValueKeys.artifactFilename]: "Epics.md",
-				[outputValueKeys.artifactRelativePath]: join("planning", "Epics.md"),
-				[outputValueKeys.artifactAbsolutePath]: expectedArtifactAbsolutePath,
-			},
-		})
-		expect(await pathExists(expectedArtifactAbsolutePath)).to.equal(false)
-		expectWorkflowStateCleared(taskState)
-	})
-
-	it("applies successful finalizer workflow-value writes before teardown", async () => {
-		const finalizerValueKey = "finalizer_index_path"
-		const workflowWithoutFinalizer = createWorkflowDefinition({
-			workflowValueKeys: [finalizerValueKey],
-		})
-		const activeSession = createParentWorkflowSession()
-		let observedWorkflowValuesAtTeardown: WorkflowValues | undefined
-		const originalTeardownWorkflow = runtime.teardownWorkflow.bind(runtime)
-		sandbox.stub(runtime, "teardownWorkflow").callsFake(async (teardownArgs: { taskState: TaskState }): Promise<void> => {
-			const session = teardownArgs.taskState.activeWorkflowSession
-			observedWorkflowValuesAtTeardown = session === undefined ? undefined : { ...session.workflowValues }
-			await originalTeardownWorkflow(teardownArgs)
-		})
-		const workflow: WorkflowDefinition = {
-			...workflowWithoutFinalizer,
-			finalDeliveryFinalizer: {
-				finalize(): WorkflowFinalDeliveryFinalizationResult {
-					return {
-						kind: "succeeded",
-						workflowValueWrites: {
-							[finalizerValueKey]: "Epics.index.json",
+	it("preserves active workflow state when attempt_completion_succeeded has no matching route", async () => {
+		const workflow = createWorkflowDefinition({
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: {
+						entryBranchId: "await-attempt-completion",
+						branches: {
+							"await-attempt-completion": {
+								id: "await-attempt-completion",
+								routes: [
+									{
+										id: "different-event",
+										trigger: { kind: "on_event", eventKind: "workflow_progress_request_confirmed" },
+										action: { kind: "project_prompt" },
+									},
+								],
+							},
 						},
-					}
-				},
+					},
+				}),
 			},
-		}
-		registerResolvedWorkflow(workflow)
-		taskState.activeWorkflowName = workflow.name
-		taskState.activeWorkflowSession = activeSession
-
-		const finalDeliveryResult = await runtime.completeActiveWorkflowAfterFinalDelivery({ taskState })
-
-		expect(finalDeliveryResult).to.deep.equal({ kind: "persist_workflow_teardown" })
-		expect(observedWorkflowValuesAtTeardown).to.deep.equal({
-			[finalizerValueKey]: "Epics.index.json",
 		})
-		expectWorkflowStateCleared(taskState)
-	})
-
-	it("returns terminal_error and preserves active workflow state when finalizer fails", async () => {
-		const workflowWithoutFinalizer = createWorkflowDefinition()
-		const workflow: WorkflowDefinition = {
-			...workflowWithoutFinalizer,
-			finalDeliveryFinalizer: {
-				finalize(): WorkflowFinalDeliveryFinalizationResult {
-					return {
-						kind: "failed",
-						errorMessage: "Unable to finalize delivery.",
-					}
-				},
-			},
-		}
 		const activeSession = createParentWorkflowSession()
+		activeSession.branchContext.activeBranchId = "await-attempt-completion"
+		activeSession.ui.stepResolutionSession = {
+			sessionId: "step-resolution-1",
+			sourceRoute: {
+				branchId: "await-attempt-completion",
+				routeId: "different-event",
+			},
+			triggerSource: "execute_tool_backed_operation",
+			owner: {
+				kind: "workflow_step",
+				workflowName: workflow.name,
+				stepNumber: 1,
+			},
+			state: "pending",
+		}
 		registerResolvedWorkflow(workflow)
 		taskState.activeWorkflowName = workflow.name
 		taskState.activeWorkflowSession = activeSession
 
-		const finalDeliveryResult = await runtime.completeActiveWorkflowAfterFinalDelivery({ taskState })
+		const result = await runtime.handleAttemptCompletionSucceeded({ taskState })
 
-		expect(finalDeliveryResult).to.deep.equal({
-			kind: "terminal_error",
-			errorMessage: "Unable to finalize delivery.",
-		})
+		expect(result).to.deep.equal({ kind: "no_op" })
 		expect(taskState.activeWorkflowName).to.equal(workflow.name)
 		expect(taskState.activeWorkflowSession).to.equal(activeSession)
+		expect(activeSession.ui.stepResolutionSession).to.equal(undefined)
+		expect(activeSession.branchContext.lastTriggerEvent).to.deep.equal({ kind: "attempt_completion_succeeded" })
+	})
+
+	it("routes attempt_completion_succeeded through decision tree complete_workflow", async () => {
+		const workflow = createWorkflowDefinition({
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: {
+						entryBranchId: "await-attempt-completion",
+						branches: {
+							"await-attempt-completion": {
+								id: "await-attempt-completion",
+								routes: [
+									{
+										id: "attempt-completion-succeeded",
+										trigger: { kind: "on_event", eventKind: "attempt_completion_succeeded" },
+										action: { kind: "complete_workflow" },
+									},
+								],
+							},
+						},
+					},
+				}),
+			},
+		})
+		const activeSession = createParentWorkflowSession()
+		activeSession.branchContext.activeBranchId = "await-attempt-completion"
+		registerResolvedWorkflow(workflow)
+		taskState.activeWorkflowName = workflow.name
+		taskState.activeWorkflowSession = activeSession
+
+		const result = await runtime.handleAttemptCompletionSucceeded({ taskState })
+
+		expect(result).to.deep.equal({ kind: "complete_workflow" })
+		expectWorkflowStateCleared(taskState)
 	})
 
 	it("copies complete parent project selection into child workflow activation without rendering entry form", async () => {
@@ -3987,7 +3919,7 @@ describe("WorkflowRuntime", () => {
 		for (const subfolderName of ["discovery", "planning", "implementation", "review", "testing"]) {
 			await access(join(cwd, "docs", "projects", newProjectFolderName, subfolderName))
 		}
-		for (const storyFolderName of ["stories-backlog", "stories-review", "stories-complete"]) {
+		for (const storyFolderName of ["drafts", "stories-backlog", "stories-review", "stories-complete"]) {
 			await access(join(cwd, "docs", "projects", newProjectFolderName, "implementation", storyFolderName))
 		}
 
@@ -4010,7 +3942,7 @@ describe("WorkflowRuntime", () => {
 		for (const subfolderName of ["discovery", "planning", "implementation", "review", "testing", "archive"]) {
 			await access(join(cwd, "docs", "projects", "Existing Beta", subfolderName))
 		}
-		for (const storyFolderName of ["stories-backlog", "stories-review", "stories-complete"]) {
+		for (const storyFolderName of ["drafts", "stories-backlog", "stories-review", "stories-complete"]) {
 			await access(join(cwd, "docs", "projects", "Existing Beta", "implementation", storyFolderName))
 		}
 		const existingProjectDiscoveryRequest = discoverWorkflowCandidatesStub
@@ -8304,7 +8236,7 @@ describe("WorkflowRuntime", () => {
 		await mkdir(planningFolder, { recursive: true })
 		await writeFile(
 			join(planningFolder, "Epics.index.json"),
-			'{"version":1,"epics":[{"identity":"1","title":"One"}]}',
+			'{"version":1,"epics":[{"identity":"1","title":"One","epic-delivery-spec-generated":false}]}',
 			"utf8",
 		)
 
@@ -8475,7 +8407,10 @@ describe("WorkflowRuntime", () => {
 		})
 		await writeFile(
 			epicsIndexResult.artifactAbsolutePath,
-			JSON.stringify({ version: 1, epics: [{ identity: "1", title: "Foundation" }] }),
+			JSON.stringify({
+				version: 1,
+				epics: [{ identity: "1", title: "Foundation", "epic-delivery-spec-generated": false }],
+			}),
 			"utf8",
 		)
 		const deliverySpecResult = await runtime.createWorkflowArtifact({
@@ -8849,8 +8784,8 @@ describe("WorkflowRuntime", () => {
 			JSON.stringify({
 				version: 1,
 				epics: [
-					{ identity: "2", title: "Indexed Two" },
-					{ identity: "10", title: "Indexed Ten" },
+					{ identity: "2", title: "Indexed Two", "epic-delivery-spec-generated": true },
+					{ identity: "10", title: "Indexed Ten", "epic-delivery-spec-generated": false },
 				],
 			}),
 			"utf8",
@@ -8899,7 +8834,7 @@ describe("WorkflowRuntime", () => {
 		const planningFolder = join(cwd, "docs", "projects", "story-parent-validation-project", "planning")
 		await writeFile(
 			join(planningFolder, "Epics.index.json"),
-			'{"version":1,"epics":[{"identity":"1","title":"One"}]}',
+			'{"version":1,"epics":[{"identity":"1","title":"One","epic-delivery-spec-generated":false}]}',
 			"utf8",
 		)
 		await writeFile(join(planningFolder, "Epic-1.md"), "retired", "utf8")
@@ -8934,6 +8869,222 @@ describe("WorkflowRuntime", () => {
 			artifactIdentity: "1.1",
 			artifactFilename: "Story-1-1.md",
 			parentIdentity: "1",
+		})
+	})
+
+	it("plans primary story artifacts with canonical identities, filenames, and generated flags", async () => {
+		const workflow = createWorkflowDefinition()
+		await activateWorkflow(taskState, workflow)
+		await runtime.resolveNextAction({ taskState })
+		await submitNewProjectSelection(taskState, "Story Artifact Planning Project")
+
+		const preparation = await runtime.preparePlanStoryArtifacts({ taskState, epicIdentity: "3" })
+		const result = await runtime.planStoryArtifacts({
+			taskState,
+			epicIdentity: "3",
+			storyCount: 3,
+			expectedStoryIndexAbsolutePath: preparation.storyIndexAbsolutePath,
+		})
+
+		expect(result.appendedStoryIdentities).to.deep.equal(["3.1", "3.2", "3.3"])
+		expect(result.storyIndex.stories).to.deep.equal([
+			{
+				story_identity: "3.1",
+				story_file_name: "Story-3-1.md",
+				story_type: "primary",
+				parent_story_identity: null,
+				story_file_generated: false,
+				status: "draft",
+			},
+			{
+				story_identity: "3.2",
+				story_file_name: "Story-3-2.md",
+				story_type: "primary",
+				parent_story_identity: null,
+				story_file_generated: false,
+				status: "draft",
+			},
+			{
+				story_identity: "3.3",
+				story_file_name: "Story-3-3.md",
+				story_type: "primary",
+				parent_story_identity: null,
+				story_file_generated: false,
+				status: "draft",
+			},
+		])
+		expect(parseWorkflowStoryIndexJson(await readFile(preparation.storyIndexAbsolutePath, "utf8"))).to.deep.equal(
+			result.storyIndex,
+		)
+	})
+
+	it("preserves existing story index entries and appends only missing primary entries", async () => {
+		const workflow = createWorkflowDefinition()
+		await activateWorkflow(taskState, workflow)
+		await runtime.resolveNextAction({ taskState })
+		await submitNewProjectSelection(taskState, "Story Artifact Expansion Project")
+
+		const preparation = await runtime.preparePlanStoryArtifacts({ taskState, epicIdentity: "7" })
+		await runtime.planStoryArtifacts({
+			taskState,
+			epicIdentity: "7",
+			storyCount: 1,
+			expectedStoryIndexAbsolutePath: preparation.storyIndexAbsolutePath,
+		})
+		const existingIndex = parseWorkflowStoryIndexJson(await readFile(preparation.storyIndexAbsolutePath, "utf8"))
+		existingIndex.stories[0].story_file_generated = true
+		existingIndex.stories[0].status = "backlog"
+		await writeFile(preparation.storyIndexAbsolutePath, stringifyWorkflowStoryIndex(existingIndex), "utf8")
+
+		const expandedResult = await runtime.planStoryArtifacts({
+			taskState,
+			epicIdentity: "7",
+			storyCount: 3,
+			expectedStoryIndexAbsolutePath: preparation.storyIndexAbsolutePath,
+		})
+
+		expect(expandedResult.appendedStoryIdentities).to.deep.equal(["7.2", "7.3"])
+		expect(expandedResult.storyIndex.stories[0]).to.deep.equal({
+			story_identity: "7.1",
+			story_file_name: "Story-7-1.md",
+			story_type: "primary",
+			parent_story_identity: null,
+			story_file_generated: true,
+			status: "backlog",
+		})
+		expect(expandedResult.storyIndex.stories.map((story) => story.story_identity)).to.deep.equal(["7.1", "7.2", "7.3"])
+	})
+
+	it("plans remediation story artifacts under an existing target story", async () => {
+		const workflow = createWorkflowDefinition()
+		await activateWorkflow(taskState, workflow)
+		await runtime.resolveNextAction({ taskState })
+		await submitNewProjectSelection(taskState, "Remediation Story Planning Project")
+
+		const storyPreparation = await runtime.preparePlanStoryArtifacts({ taskState, epicIdentity: "8" })
+		await runtime.planStoryArtifacts({
+			taskState,
+			epicIdentity: "8",
+			storyCount: 1,
+			expectedStoryIndexAbsolutePath: storyPreparation.storyIndexAbsolutePath,
+		})
+		const remediationPreparation = await runtime.preparePlanRemediationStoryArtifact({ taskState, epicIdentity: "8" })
+
+		const firstResult = await runtime.planRemediationStoryArtifact({
+			taskState,
+			epicIdentity: "8",
+			targetStoryIdentity: "8.1",
+			expectedStoryIndexAbsolutePath: remediationPreparation.storyIndexAbsolutePath,
+		})
+		const secondResult = await runtime.planRemediationStoryArtifact({
+			taskState,
+			epicIdentity: "8",
+			targetStoryIdentity: "8.1",
+			expectedStoryIndexAbsolutePath: remediationPreparation.storyIndexAbsolutePath,
+		})
+
+		expect(firstResult.appendedStoryIdentity).to.equal("8.1.1")
+		expect(secondResult.appendedStoryIdentity).to.equal("8.1.2")
+		expect(secondResult.storyIndex.stories.slice(1).map((story) => story.story_identity)).to.deep.equal(["8.1.1", "8.1.2"])
+	})
+
+	it("fails remediation story planning when the target story is absent", async () => {
+		const workflow = createWorkflowDefinition()
+		await activateWorkflow(taskState, workflow)
+		await runtime.resolveNextAction({ taskState })
+		await submitNewProjectSelection(taskState, "Missing Remediation Target Project")
+
+		const storyPreparation = await runtime.preparePlanStoryArtifacts({ taskState, epicIdentity: "9" })
+		await runtime.planStoryArtifacts({
+			taskState,
+			epicIdentity: "9",
+			storyCount: 1,
+			expectedStoryIndexAbsolutePath: storyPreparation.storyIndexAbsolutePath,
+		})
+
+		let planningError: unknown
+		try {
+			await runtime.planRemediationStoryArtifact({
+				taskState,
+				epicIdentity: "9",
+				targetStoryIdentity: "9.2",
+				expectedStoryIndexAbsolutePath: storyPreparation.storyIndexAbsolutePath,
+			})
+		} catch (error) {
+			planningError = error
+		}
+
+		expect(planningError).to.be.instanceOf(Error)
+		if (!(planningError instanceof Error)) {
+			throw new Error("Expected missing target story planning to throw.")
+		}
+		expect(planningError.message).to.equal("Target story identity 9.2 was not found in the selected epic story index.")
+	})
+
+	it("generates missing draft story files with the canonical story template content", async () => {
+		const canonicalTemplateContent = await installCanonicalStoryTemplate()
+		const workflow = createWorkflowDefinition()
+		await activateWorkflow(taskState, workflow)
+		await runtime.resolveNextAction({ taskState })
+		await submitNewProjectSelection(taskState, "Draft Story Generation Project")
+
+		const storyPreparation = await runtime.preparePlanStoryArtifacts({ taskState, epicIdentity: "10" })
+		await runtime.planStoryArtifacts({
+			taskState,
+			epicIdentity: "10",
+			storyCount: 2,
+			expectedStoryIndexAbsolutePath: storyPreparation.storyIndexAbsolutePath,
+		})
+		const generationPreparation = await runtime.prepareGenerateStoryFiles({ taskState, epicIdentity: "10" })
+
+		const result = await runtime.generateStoryFiles({
+			taskState,
+			epicIdentity: "10",
+			expectedStoryIndexAbsolutePath: generationPreparation.storyIndexAbsolutePath,
+			expectedDraftStoryFileAbsolutePaths: generationPreparation.draftStoryFileAbsolutePaths,
+		})
+
+		expect(result.createdDraftStoryFileAbsolutePaths).to.deep.equal(generationPreparation.draftStoryFileAbsolutePaths)
+		for (const draftStoryFileAbsolutePath of generationPreparation.draftStoryFileAbsolutePaths) {
+			expect(await readFile(draftStoryFileAbsolutePath, "utf8")).to.equal(canonicalTemplateContent)
+		}
+		expect(result.storyIndex.stories.every((story) => story.story_file_generated === true)).to.equal(true)
+	})
+
+	it("does not overwrite existing draft story files and marks them generated", async () => {
+		await installCanonicalStoryTemplate()
+		const workflow = createWorkflowDefinition()
+		await activateWorkflow(taskState, workflow)
+		await runtime.resolveNextAction({ taskState })
+		await submitNewProjectSelection(taskState, "Existing Draft Story Project")
+
+		const storyPreparation = await runtime.preparePlanStoryArtifacts({ taskState, epicIdentity: "11" })
+		await runtime.planStoryArtifacts({
+			taskState,
+			epicIdentity: "11",
+			storyCount: 1,
+			expectedStoryIndexAbsolutePath: storyPreparation.storyIndexAbsolutePath,
+		})
+		const generationPreparation = await runtime.prepareGenerateStoryFiles({ taskState, epicIdentity: "11" })
+		const existingDraftStoryFilePath = generationPreparation.draftStoryFileAbsolutePaths[0]
+		await mkdir(dirname(existingDraftStoryFilePath), { recursive: true })
+		await writeFile(existingDraftStoryFilePath, "existing story content", "utf8")
+
+		const result = await runtime.generateStoryFiles({
+			taskState,
+			epicIdentity: "11",
+			expectedStoryIndexAbsolutePath: generationPreparation.storyIndexAbsolutePath,
+			expectedDraftStoryFileAbsolutePaths: generationPreparation.draftStoryFileAbsolutePaths,
+		})
+
+		expect(result.createdDraftStoryFileAbsolutePaths).to.deep.equal([])
+		expect(result.existingDraftStoryFileAbsolutePaths).to.deep.equal([existingDraftStoryFilePath])
+		expect(await readFile(existingDraftStoryFilePath, "utf8")).to.equal("existing story content")
+		expect(
+			parseWorkflowStoryIndexJson(await readFile(storyPreparation.storyIndexAbsolutePath, "utf8")).stories[0],
+		).to.deep.include({
+			story_identity: "11.1",
+			story_file_generated: true,
 		})
 	})
 
@@ -9031,7 +9182,7 @@ describe("WorkflowRuntime", () => {
 		const deniedIndexPath = join(cwd, "docs", "projects", deniedProjectFolderName, "planning", "Epics.index.json")
 		const deniedCase = await createDeliverySpecCase({
 			projectTitle: "Denied Index Project",
-			indexText: '{"version":1,"epics":[{"identity":"1","title":"One"}]}',
+			indexText: '{"version":1,"epics":[{"identity":"1","title":"One","epic-delivery-spec-generated":false}]}',
 			workspacePathPolicy: {
 				validateAccess: (filePath) => filePath !== deniedIndexPath,
 			},

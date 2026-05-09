@@ -41,6 +41,14 @@ import {
 	discoverWorkflowPrerequisiteFileCandidates,
 	type WorkflowPrerequisiteFileCandidate,
 } from "@/core/task/workflow-runtime/prerequisiteFiles"
+import {
+	buildEpicStoriesIndexFilename,
+	buildPrimaryStoryIndexEntry,
+	buildRemediationStoryIndexEntry,
+	parseWorkflowStoryIndexJson,
+	stringifyWorkflowStoryIndex,
+	type WorkflowStoryIndex,
+} from "@/core/task/workflow-runtime/storyArtifacts"
 import { resolveWorkflowDefinition } from "@/core/task/workflow-runtime/WorkflowRegistry"
 import { buildWorkflowStepResolutionStatusPayload } from "@/core/task/workflow-step-resolution/buildWorkflowStepResolutionStatusPayload"
 import type {
@@ -65,8 +73,6 @@ import type {
 	WorkflowEntryArtifactPendingFileOperation,
 	WorkflowEntryArtifactResolution,
 	WorkflowEntryArtifactResolutionState,
-	WorkflowFinalDeliveryArtifactResolution,
-	WorkflowFinalDeliveryFinalizationResult,
 	WorkflowNextAction,
 	WorkflowPrerequisiteFileDefinition,
 	WorkflowProjectSelectionState,
@@ -96,7 +102,7 @@ const WORKFLOW_PROJECT_SUBFOLDERS: readonly WorkflowProjectSubfolder[] = [
 	"testing",
 	"archive",
 ]
-const WORKFLOW_IMPLEMENTATION_STORY_CHILD_FOLDERS = ["stories-backlog", "stories-review", "stories-complete"] as const
+const WORKFLOW_IMPLEMENTATION_STORY_CHILD_FOLDERS = ["drafts", "stories-backlog", "stories-review", "stories-complete"] as const
 const WORKFLOW_PROJECT_OUTPUT_ROOT_PATH_SEGMENTS = ["docs", "projects"] as const
 const WORKFLOW_ENTRY_FORM_ID = "__workflow_runtime_entry_form__"
 const WORKFLOW_ENTRY_INFO_PANEL_ID = "__workflow_runtime_entry_info__"
@@ -154,6 +160,35 @@ export interface WorkflowProjectFileMovePreparation {
 
 export type WorkflowProjectFileMoveResult = WorkflowProjectFileMovePreparation
 
+export interface WorkflowPlanStoryArtifactsPreparation {
+	storyIndexAbsolutePath: string
+}
+
+export interface WorkflowPlanStoryArtifactsResult extends WorkflowPlanStoryArtifactsPreparation {
+	storyIndex: WorkflowStoryIndex
+	appendedStoryIdentities: readonly string[]
+}
+
+export interface WorkflowPlanRemediationStoryArtifactPreparation {
+	storyIndexAbsolutePath: string
+}
+
+export interface WorkflowPlanRemediationStoryArtifactResult extends WorkflowPlanRemediationStoryArtifactPreparation {
+	storyIndex: WorkflowStoryIndex
+	appendedStoryIdentity: string
+}
+
+export interface WorkflowGenerateStoryFilesPreparation {
+	storyIndexAbsolutePath: string
+	draftStoryFileAbsolutePaths: readonly string[]
+}
+
+export interface WorkflowGenerateStoryFilesResult extends WorkflowGenerateStoryFilesPreparation {
+	storyIndex: WorkflowStoryIndex
+	createdDraftStoryFileAbsolutePaths: readonly string[]
+	existingDraftStoryFileAbsolutePaths: readonly string[]
+}
+
 interface WorkflowArtifactIdentityResolution {
 	artifactIdentity: string
 	parentIdentity: string | undefined
@@ -170,6 +205,7 @@ interface ParsedWorkflowArtifactIdentity {
 interface WorkflowEpicsIndexEntry {
 	identity: string
 	title: string
+	"epic-delivery-spec-generated": boolean
 }
 
 interface WorkflowEpicsIndex {
@@ -997,6 +1033,278 @@ export class WorkflowRuntime {
 		return preparedMove
 	}
 
+	async preparePlanStoryArtifacts(args: {
+		taskState: TaskState
+		epicIdentity: string
+	}): Promise<WorkflowPlanStoryArtifactsPreparation> {
+		const session = args.taskState.activeWorkflowSession
+		if (!session) {
+			throw new Error("Cannot plan story artifacts without an active workflow session.")
+		}
+
+		return {
+			storyIndexAbsolutePath: this.resolveEpicStoriesIndexPath({
+				session,
+				epicIdentity: args.epicIdentity,
+			}),
+		}
+	}
+
+	async planStoryArtifacts(args: {
+		taskState: TaskState
+		epicIdentity: string
+		storyCount: number
+		expectedStoryIndexAbsolutePath: string
+	}): Promise<WorkflowPlanStoryArtifactsResult> {
+		if (Number.isInteger(args.storyCount) === false || args.storyCount <= 0) {
+			throw new Error("Story count must be a positive integer.")
+		}
+
+		const preparation = await this.preparePlanStoryArtifacts({
+			taskState: args.taskState,
+			epicIdentity: args.epicIdentity,
+		})
+		if (preparation.storyIndexAbsolutePath !== args.expectedStoryIndexAbsolutePath) {
+			throw new Error("Story index path changed before story artifact planning.")
+		}
+
+		const storyIndex = await this.readWorkflowStoryIndexOrCreateEmpty(preparation.storyIndexAbsolutePath)
+		const existingStoryIdentities = new Set(storyIndex.stories.map((story) => story.story_identity))
+		const appendedStoryIdentities: string[] = []
+		for (let storyNumber = 1; storyNumber <= args.storyCount; storyNumber += 1) {
+			const primaryStoryEntry = buildPrimaryStoryIndexEntry({
+				epicIdentity: args.epicIdentity.trim(),
+				storyNumber,
+			})
+			if (existingStoryIdentities.has(primaryStoryEntry.story_identity)) {
+				continue
+			}
+
+			storyIndex.stories.push(primaryStoryEntry)
+			existingStoryIdentities.add(primaryStoryEntry.story_identity)
+			appendedStoryIdentities.push(primaryStoryEntry.story_identity)
+		}
+
+		await this.writeWorkflowStoryIndex({
+			storyIndexAbsolutePath: preparation.storyIndexAbsolutePath,
+			storyIndex,
+		})
+
+		return {
+			...preparation,
+			storyIndex,
+			appendedStoryIdentities,
+		}
+	}
+
+	async preparePlanRemediationStoryArtifact(args: {
+		taskState: TaskState
+		epicIdentity: string
+	}): Promise<WorkflowPlanRemediationStoryArtifactPreparation> {
+		const session = args.taskState.activeWorkflowSession
+		if (!session) {
+			throw new Error("Cannot plan remediation story artifacts without an active workflow session.")
+		}
+
+		return {
+			storyIndexAbsolutePath: this.resolveEpicStoriesIndexPath({
+				session,
+				epicIdentity: args.epicIdentity,
+			}),
+		}
+	}
+
+	async planRemediationStoryArtifact(args: {
+		taskState: TaskState
+		epicIdentity: string
+		targetStoryIdentity: string
+		expectedStoryIndexAbsolutePath: string
+	}): Promise<WorkflowPlanRemediationStoryArtifactResult> {
+		const preparation = await this.preparePlanRemediationStoryArtifact({
+			taskState: args.taskState,
+			epicIdentity: args.epicIdentity,
+		})
+		if (preparation.storyIndexAbsolutePath !== args.expectedStoryIndexAbsolutePath) {
+			throw new Error("Story index path changed before remediation story artifact planning.")
+		}
+
+		const storyIndex = await this.readWorkflowStoryIndexOrCreateEmpty(preparation.storyIndexAbsolutePath)
+		const targetStory = storyIndex.stories.find((story) => story.story_identity === args.targetStoryIdentity)
+		if (targetStory === undefined) {
+			throw new Error(`Target story identity ${args.targetStoryIdentity} was not found in the selected epic story index.`)
+		}
+		if (targetStory.story_type !== "primary") {
+			throw new Error(`Target story identity ${args.targetStoryIdentity} must be a primary story.`)
+		}
+
+		const existingRemediationNumbers = storyIndex.stories
+			.filter((story) => story.story_type === "remediation" && story.parent_story_identity === args.targetStoryIdentity)
+			.map((story) => {
+				const remediationStoryNumber = story.story_identity.split(".")[2]
+				return remediationStoryNumber === undefined ? 0 : Number.parseInt(remediationStoryNumber, 10)
+			})
+			.filter((remediationStoryNumber) => Number.isInteger(remediationStoryNumber) && remediationStoryNumber > 0)
+		const nextRemediationStoryNumber = this.getNextPositiveInteger(existingRemediationNumbers)
+		const remediationStoryEntry = buildRemediationStoryIndexEntry({
+			parentStoryIdentity: args.targetStoryIdentity,
+			remediationStoryNumber: nextRemediationStoryNumber,
+		})
+		storyIndex.stories.push(remediationStoryEntry)
+
+		await this.writeWorkflowStoryIndex({
+			storyIndexAbsolutePath: preparation.storyIndexAbsolutePath,
+			storyIndex,
+		})
+
+		return {
+			...preparation,
+			storyIndex,
+			appendedStoryIdentity: remediationStoryEntry.story_identity,
+		}
+	}
+
+	async prepareGenerateStoryFiles(args: {
+		taskState: TaskState
+		epicIdentity: string
+	}): Promise<WorkflowGenerateStoryFilesPreparation> {
+		const session = args.taskState.activeWorkflowSession
+		if (!session) {
+			throw new Error("Cannot generate story files without an active workflow session.")
+		}
+
+		const storyIndexAbsolutePath = this.resolveEpicStoriesIndexPath({
+			session,
+			epicIdentity: args.epicIdentity,
+		})
+		const storyIndex = await this.readRequiredWorkflowStoryIndex(storyIndexAbsolutePath)
+		return {
+			storyIndexAbsolutePath,
+			draftStoryFileAbsolutePaths: storyIndex.stories.map((story) =>
+				this.resolveDraftStoryFilePath({
+					session,
+					storyFileName: story.story_file_name,
+				}),
+			),
+		}
+	}
+
+	async generateStoryFiles(args: {
+		taskState: TaskState
+		epicIdentity: string
+		expectedStoryIndexAbsolutePath: string
+		expectedDraftStoryFileAbsolutePaths: readonly string[]
+	}): Promise<WorkflowGenerateStoryFilesResult> {
+		const session = args.taskState.activeWorkflowSession
+		if (!session) {
+			throw new Error("Cannot generate story files without an active workflow session.")
+		}
+
+		const preparation = await this.prepareGenerateStoryFiles({
+			taskState: args.taskState,
+			epicIdentity: args.epicIdentity,
+		})
+		if (preparation.storyIndexAbsolutePath !== args.expectedStoryIndexAbsolutePath) {
+			throw new Error("Story index path changed before story-file generation.")
+		}
+		if (
+			this.areStringArraysEqual(preparation.draftStoryFileAbsolutePaths, args.expectedDraftStoryFileAbsolutePaths) === false
+		) {
+			throw new Error("Draft story file paths changed before story-file generation.")
+		}
+
+		const storyTemplatePath = join(this.cwd, ".cline", "skills", "bmad-create-story", "template.md")
+		this.assertWorkspacePathAllowed(storyTemplatePath)
+		const storyTemplateContent = await readFile(storyTemplatePath, "utf8")
+		const storyIndex = await this.readRequiredWorkflowStoryIndex(preparation.storyIndexAbsolutePath)
+		const createdDraftStoryFileAbsolutePaths: string[] = []
+		const existingDraftStoryFileAbsolutePaths: string[] = []
+
+		for (const story of storyIndex.stories) {
+			const draftStoryFileAbsolutePath = this.resolveDraftStoryFilePath({
+				session,
+				storyFileName: story.story_file_name,
+			})
+			this.assertWorkspacePathAllowed(dirname(draftStoryFileAbsolutePath))
+			await mkdir(dirname(draftStoryFileAbsolutePath), { recursive: true })
+			try {
+				await writeFile(draftStoryFileAbsolutePath, storyTemplateContent, { encoding: "utf8", flag: "wx" })
+				createdDraftStoryFileAbsolutePaths.push(draftStoryFileAbsolutePath)
+			} catch (error) {
+				if (this.isFileAlreadyExistsError(error)) {
+					const existingStats = await stat(draftStoryFileAbsolutePath)
+					if (existingStats.isFile() === false) {
+						throw new Error(
+							`Cannot generate story file because path already exists and is not a file: ${draftStoryFileAbsolutePath}`,
+						)
+					}
+					existingDraftStoryFileAbsolutePaths.push(draftStoryFileAbsolutePath)
+				} else {
+					throw error
+				}
+			}
+			story.story_file_generated = true
+		}
+
+		await this.writeWorkflowStoryIndex({
+			storyIndexAbsolutePath: preparation.storyIndexAbsolutePath,
+			storyIndex,
+		})
+
+		return {
+			...preparation,
+			storyIndex,
+			createdDraftStoryFileAbsolutePaths,
+			existingDraftStoryFileAbsolutePaths,
+		}
+	}
+
+	private async readWorkflowStoryIndexOrCreateEmpty(storyIndexAbsolutePath: string): Promise<WorkflowStoryIndex> {
+		this.assertWorkspacePathAllowed(storyIndexAbsolutePath)
+		try {
+			return parseWorkflowStoryIndexJson(await readFile(storyIndexAbsolutePath, "utf8"))
+		} catch (error) {
+			if (this.isFileNotFoundError(error)) {
+				return {
+					version: 1,
+					stories: [],
+				}
+			}
+
+			throw error
+		}
+	}
+
+	private areStringArraysEqual(leftValues: readonly string[], rightValues: readonly string[]): boolean {
+		if (leftValues.length !== rightValues.length) {
+			return false
+		}
+
+		return leftValues.every((leftValue, index) => leftValue === rightValues[index])
+	}
+
+	private async readRequiredWorkflowStoryIndex(storyIndexAbsolutePath: string): Promise<WorkflowStoryIndex> {
+		this.assertWorkspacePathAllowed(storyIndexAbsolutePath)
+		try {
+			return parseWorkflowStoryIndexJson(await readFile(storyIndexAbsolutePath, "utf8"))
+		} catch (error) {
+			if (this.isFileNotFoundError(error)) {
+				throw new Error(`Cannot generate story files because story index does not exist: ${storyIndexAbsolutePath}`)
+			}
+
+			throw error
+		}
+	}
+
+	private async writeWorkflowStoryIndex(args: {
+		storyIndexAbsolutePath: string
+		storyIndex: WorkflowStoryIndex
+	}): Promise<void> {
+		this.assertWorkspacePathAllowed(dirname(args.storyIndexAbsolutePath))
+		await mkdir(dirname(args.storyIndexAbsolutePath), { recursive: true })
+		this.assertWorkspacePathAllowed(args.storyIndexAbsolutePath)
+		await writeFile(args.storyIndexAbsolutePath, stringifyWorkflowStoryIndex(args.storyIndex), "utf8")
+	}
+
 	private async resolveActiveWorkflowNewArtifactOutputs(args: {
 		taskState: TaskState
 	}): Promise<readonly WorkflowArtifactAllocationOutput[]> {
@@ -1746,6 +2054,7 @@ export class WorkflowRuntime {
 		switch (value.kind) {
 			case "workflow_progress_request_confirmed":
 			case "workflow_progress_request_denied":
+			case "attempt_completion_succeeded":
 				return true
 			case "workflow_form_completed":
 				return typeof value.workflowFormId === "string" && value.workflowFormId.trim() !== ""
@@ -2354,69 +2663,18 @@ export class WorkflowRuntime {
 		taskState.currentFocusChainChecklist = null
 	}
 
-	async completeActiveWorkflowAfterFinalDelivery(args: { taskState: TaskState }): Promise<WorkflowNextAction> {
-		const activeWorkflowName = args.taskState.activeWorkflowName
+	async handleAttemptCompletionSucceeded(args: { taskState: TaskState }): Promise<WorkflowNextAction> {
 		const session = args.taskState.activeWorkflowSession
-		if (activeWorkflowName === undefined && session === undefined) {
+		if (session === undefined) {
 			return { kind: "no_op" }
 		}
 
-		if (activeWorkflowName === undefined || session === undefined) {
-			return this.teardownWorkflowAndRequirePersistence({ taskState: args.taskState })
+		session.branchContext.lastTriggerEvent = {
+			kind: "attempt_completion_succeeded",
 		}
+		session.ui.stepResolutionSession = undefined
 
-		const definition = resolveWorkflowDefinition(activeWorkflowName)
-		if (!definition) {
-			return this.teardownWorkflowAndRequirePersistence({ taskState: args.taskState })
-		}
-
-		if (definition.finalDeliveryFinalizer === undefined) {
-			await this.teardownWorkflow({ taskState: args.taskState })
-			return { kind: "persist_workflow_teardown" }
-		}
-
-		let finalizationResult: WorkflowFinalDeliveryFinalizationResult
-		try {
-			finalizationResult = await definition.finalDeliveryFinalizer.finalize({
-				session,
-				workflowName: activeWorkflowName,
-				resolveArtifactOutput: async (artifactId) => {
-					const artifactDefinition = definition.artifacts?.[artifactId]
-					if (artifactDefinition === undefined || artifactDefinition.id !== artifactId) {
-						throw new Error(`Active workflow ${definition.name} does not define artifactId ${artifactId}.`)
-					}
-
-					return this.resolveWorkflowFinalDeliveryArtifactOutput({
-						workflow: definition,
-						session,
-						artifactDefinition,
-					})
-				},
-			})
-		} catch (error) {
-			const errorMessage =
-				error instanceof Error && error.message.trim() !== ""
-					? error.message
-					: "Workflow final-delivery finalizer failed."
-			return {
-				kind: "terminal_error",
-				errorMessage,
-			}
-		}
-
-		if (finalizationResult.kind === "succeeded") {
-			if (finalizationResult.workflowValueWrites !== undefined) {
-				await this.applyWorkflowValueWrites({
-					taskState: args.taskState,
-					values: finalizationResult.workflowValueWrites,
-				})
-			}
-
-			await this.teardownWorkflow({ taskState: args.taskState })
-			return { kind: "persist_workflow_teardown" }
-		}
-
-		return { kind: "terminal_error", errorMessage: finalizationResult.errorMessage }
+		return this.resolveNextAction({ taskState: args.taskState })
 	}
 
 	private async teardownWorkflowAndRequirePersistence(args: { taskState: TaskState }): Promise<WorkflowNextAction> {
@@ -4982,6 +5240,32 @@ export class WorkflowRuntime {
 		return join(this.resolveWorkflowProjectOutputRoot(), session.projectSelection.projectFolderName)
 	}
 
+	private resolveEpicStoriesIndexPath(args: { session: ActiveWorkflowSession; epicIdentity: string }): string {
+		const epicIdentity = args.epicIdentity.trim()
+		const storyIndexFilename = buildEpicStoriesIndexFilename(epicIdentity)
+		const storyIndexPath = join(this.resolveWorkflowProjectOutputFolder(args.session), "implementation", storyIndexFilename)
+		this.assertWorkspacePathAllowed(dirname(storyIndexPath))
+		this.assertWorkspacePathAllowed(storyIndexPath)
+		return storyIndexPath
+	}
+
+	private resolveDraftStoryFilePath(args: { session: ActiveWorkflowSession; storyFileName: string }): string {
+		const storyFileName = args.storyFileName.trim()
+		if (isWorkflowDiscoveryTargetPathSegment(storyFileName) === false) {
+			throw new Error(`Story file name must be a single path segment: ${args.storyFileName}`)
+		}
+
+		const draftStoryFilePath = join(
+			this.resolveWorkflowProjectOutputFolder(args.session),
+			"implementation",
+			"drafts",
+			storyFileName,
+		)
+		this.assertWorkspacePathAllowed(dirname(draftStoryFilePath))
+		this.assertWorkspacePathAllowed(draftStoryFilePath)
+		return draftStoryFilePath
+	}
+
 	private resolveWorkflowProjectMovePath(args: {
 		selectedProjectRoot: string
 		filePath: string
@@ -5010,46 +5294,6 @@ export class WorkflowRuntime {
 		session: ActiveWorkflowSession
 		artifactDefinition: WorkflowArtifactDefinition
 	}): Promise<WorkflowArtifactAllocationOutput> {
-		const familyDefinition = WORKFLOW_ARTIFACT_FAMILY_REGISTRY[args.artifactDefinition.family]
-		const identityResolution = await this.resolveWorkflowArtifactIdentity({
-			workflow: args.workflow,
-			session: args.session,
-			artifactDefinition: args.artifactDefinition,
-			familyDefinition,
-		})
-		const artifactFilename = this.buildWorkflowArtifactFilename({
-			familyDefinition,
-			artifactIdentity: identityResolution.artifactIdentity,
-		})
-		const artifactRelativePath = join(args.workflow.projectSubfolder, artifactFilename)
-		const artifactAbsolutePath = join(this.resolveWorkflowProjectOutputFolder(args.session), artifactRelativePath)
-		const output = {
-			artifactId: args.artifactDefinition.id,
-			projectTitle: args.session.projectSelection.projectTitle,
-			projectFolderName: args.session.projectSelection.projectFolderName,
-			artifactFamily: args.artifactDefinition.family,
-			artifactIdentity: identityResolution.artifactIdentity,
-			artifactFilename,
-			artifactRelativePath,
-			artifactAbsolutePath,
-			parentIdentity: identityResolution.parentIdentity,
-			targetIdentity: identityResolution.targetIdentity,
-		}
-
-		return {
-			...output,
-			workflowValueWrites: this.buildWorkflowArtifactOutputValueWrites({
-				outputValueKeys: args.artifactDefinition.outputValueKeys,
-				output,
-			}),
-		}
-	}
-
-	private async resolveWorkflowFinalDeliveryArtifactOutput(args: {
-		workflow: WorkflowDefinition
-		session: ActiveWorkflowSession
-		artifactDefinition: WorkflowArtifactDefinition
-	}): Promise<WorkflowFinalDeliveryArtifactResolution> {
 		const familyDefinition = WORKFLOW_ARTIFACT_FAMILY_REGISTRY[args.artifactDefinition.family]
 		const identityResolution = await this.resolveWorkflowArtifactIdentity({
 			workflow: args.workflow,
@@ -5374,7 +5618,7 @@ export class WorkflowRuntime {
 			this.assertOnlyEpicsIndexKeys({
 				artifactId: args.artifactId,
 				record: entry,
-				allowedKeys: ["identity", "title"],
+				allowedKeys: ["identity", "title", "epic-delivery-spec-generated"],
 				context: `Epics.index.json epics[${index}]`,
 			})
 
@@ -5392,7 +5636,14 @@ export class WorkflowRuntime {
 				)
 			}
 
-			return { identity, title }
+			const epicDeliverySpecGenerated = entry["epic-delivery-spec-generated"]
+			if (typeof epicDeliverySpecGenerated !== "boolean") {
+				throw new Error(
+					`Cannot allocate workflow artifact ${args.artifactId} because Epics.index.json epics[${index}].epic-delivery-spec-generated must be a boolean.`,
+				)
+			}
+
+			return { identity, title, "epic-delivery-spec-generated": epicDeliverySpecGenerated }
 		})
 
 		return { version: 1, epics }
@@ -5518,6 +5769,7 @@ export class WorkflowRuntime {
 			case WorkflowArtifactFamily.ArchitectureDocument:
 				return undefined
 			case WorkflowArtifactFamily.EpicDeliverySpec:
+			case WorkflowArtifactFamily.EpicStoriesIndex:
 				return this.parseDottedWorkflowArtifactIdentity(match[1])
 			case WorkflowArtifactFamily.Story:
 				return this.parseDottedWorkflowArtifactIdentity(`${match[1]}.${match[2]}`)
@@ -5889,17 +6141,6 @@ export class WorkflowRuntime {
 
 		if (workflow.entryPanel.promptMarkdown.trim() === "") {
 			return { valid: false, errorMessage: "Workflow entryPanel promptMarkdown must not be empty." }
-		}
-
-		const finalDeliveryFinalizer: unknown = workflow.finalDeliveryFinalizer
-		if (
-			finalDeliveryFinalizer !== undefined &&
-			(!this.isRecord(finalDeliveryFinalizer) || typeof finalDeliveryFinalizer.finalize !== "function")
-		) {
-			return {
-				valid: false,
-				errorMessage: "Workflow finalDeliveryFinalizer must be an object with a callable finalize function.",
-			}
 		}
 
 		const workflowValueKeys = new Set<string>()

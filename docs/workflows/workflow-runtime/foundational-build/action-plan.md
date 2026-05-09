@@ -9207,59 +9207,59 @@ This phase updates foundational runtime behavior so `attempt_completion` is a re
 - Removing `finalDeliveryFinalizer` temporarily removes create-epics automatic `Epics.index.json` finalization until the create-epics module receives its follow-up module-owned route/action update.
 - `generate_story_files` must copy the approved canonical template content from `.cline/skills/bmad-create-story/template.md` into each generated story file. It must not synthesize a separate heading-only scaffold.
 
-[ ] Task 192. Replace final-delivery teardown with `attempt_completion_succeeded` lifecycle routing.
+[x] Task 192. Replace final-delivery teardown with `attempt_completion_succeeded` lifecycle routing.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/AttemptCompletionHandler.ts`
 
-[ ] Subtask 192.1. In `types.ts`, add `{ kind: "attempt_completion_succeeded" }` to `WorkflowBranchTriggerEvent`.
+[x] Subtask 192.1. In `types.ts`, add `{ kind: "attempt_completion_succeeded" }` to `WorkflowBranchTriggerEvent`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 
-[ ] Subtask 192.2. In `types.ts`, delete `WorkflowFinalDeliveryArtifactResolution`, `WorkflowFinalDeliveryFinalizationResult`, `WorkflowFinalDeliveryFinalizationInput`, and `WorkflowFinalDeliveryFinalizer`.
+[x] Subtask 192.2. In `types.ts`, delete `WorkflowFinalDeliveryArtifactResolution`, `WorkflowFinalDeliveryFinalizationResult`, `WorkflowFinalDeliveryFinalizationInput`, and `WorkflowFinalDeliveryFinalizer`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 
-[ ] Subtask 192.3. In `types.ts`, remove `finalDeliveryFinalizer?: WorkflowFinalDeliveryFinalizer` from `WorkflowDefinition`.
+[x] Subtask 192.3. In `types.ts`, remove `finalDeliveryFinalizer?: WorkflowFinalDeliveryFinalizer` from `WorkflowDefinition`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 
-[ ] Subtask 192.4. In `WorkflowRuntime.ts`, remove imports of deleted `WorkflowFinalDelivery*` types.
+[x] Subtask 192.4. In `WorkflowRuntime.ts`, remove imports of deleted `WorkflowFinalDelivery*` types.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 192.5. In `WorkflowRuntime.ts`, add `attempt_completion_succeeded` handling to `isWorkflowBranchTriggerEvent(...)`.
+[x] Subtask 192.5. In `WorkflowRuntime.ts`, add `attempt_completion_succeeded` handling to `isWorkflowBranchTriggerEvent(...)`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 192.6. In `WorkflowRuntime.ts`, add `handleAttemptCompletionSucceeded(args: { taskState: TaskState }): Promise<WorkflowNextAction>` that no-ops without an active workflow session, writes `{ kind: "attempt_completion_succeeded" }` into `session.branchContext.lastTriggerEvent`, clears runtime-owned active step-resolution UI state if present, and returns `resolveNextAction(...)`.
+[x] Subtask 192.6. In `WorkflowRuntime.ts`, add `handleAttemptCompletionSucceeded(args: { taskState: TaskState }): Promise<WorkflowNextAction>` that no-ops without an active workflow session, writes `{ kind: "attempt_completion_succeeded" }` into `session.branchContext.lastTriggerEvent`, clears runtime-owned active step-resolution UI state if present, and returns `resolveNextAction(...)`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 192.7. In `WorkflowRuntime.ts`, delete `completeActiveWorkflowAfterFinalDelivery(...)`.
+[x] Subtask 192.7. In `WorkflowRuntime.ts`, delete `completeActiveWorkflowAfterFinalDelivery(...)`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 192.8. In `WorkflowRuntime.ts`, delete final-delivery-finalizer validation from `validateWorkflowDefinition(...)`.
+[x] Subtask 192.8. In `WorkflowRuntime.ts`, delete final-delivery-finalizer validation from `validateWorkflowDefinition(...)`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 192.9. In `AttemptCompletionHandler.ts`, replace the call to `completeActiveWorkflowAfterFinalDelivery(...)` with `handleAttemptCompletionSucceeded(...)` and continue queueing any non-`no_op` returned next action.
+[x] Subtask 192.9. In `AttemptCompletionHandler.ts`, replace the call to `completeActiveWorkflowAfterFinalDelivery(...)` with `handleAttemptCompletionSucceeded(...)` and continue queueing any non-`no_op` returned next action.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/AttemptCompletionHandler.ts`
 
-[ ] Task 193. Update completion tests and perform create-epics compile-only finalizer cleanup.
+[x] Task 193. Update completion tests and perform create-epics compile-only finalizer cleanup.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/AttemptCompletionHandler.postCompletionFollowup.test.ts`
@@ -9267,62 +9267,62 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`
 
-[ ] Subtask 193.1. In `AttemptCompletionHandler.postCompletionFollowup.test.ts`, update the workflow-runtime test double type to use `handleAttemptCompletionSucceeded` instead of `completeActiveWorkflowAfterFinalDelivery`.
+[x] Subtask 193.1. In `AttemptCompletionHandler.postCompletionFollowup.test.ts`, update the workflow-runtime test double type to use `handleAttemptCompletionSucceeded` instead of `completeActiveWorkflowAfterFinalDelivery`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/AttemptCompletionHandler.postCompletionFollowup.test.ts`
 
-[ ] Subtask 193.2. In `AttemptCompletionHandler.postCompletionFollowup.test.ts`, replace the old successful-teardown assertion with coverage proving successful `attempt_completion` with an active workflow calls `handleAttemptCompletionSucceeded(...)`.
+[x] Subtask 193.2. In `AttemptCompletionHandler.postCompletionFollowup.test.ts`, replace the old successful-teardown assertion with coverage proving successful `attempt_completion` with an active workflow calls `handleAttemptCompletionSucceeded(...)`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/AttemptCompletionHandler.postCompletionFollowup.test.ts`
 
-[ ] Subtask 193.3. In `AttemptCompletionHandler.postCompletionFollowup.test.ts`, replace finalizer-success queueing coverage with coverage proving the handler queues a non-`no_op` next action returned by `handleAttemptCompletionSucceeded(...)`.
+[x] Subtask 193.3. In `AttemptCompletionHandler.postCompletionFollowup.test.ts`, replace finalizer-success queueing coverage with coverage proving the handler queues a non-`no_op` next action returned by `handleAttemptCompletionSucceeded(...)`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/AttemptCompletionHandler.postCompletionFollowup.test.ts`
 
-[ ] Subtask 193.4. In `AttemptCompletionHandler.postCompletionFollowup.test.ts`, delete finalizer-failure coverage that expects terminal errors from final-delivery finalizers.
+[x] Subtask 193.4. In `AttemptCompletionHandler.postCompletionFollowup.test.ts`, delete finalizer-failure coverage that expects terminal errors from final-delivery finalizers.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/AttemptCompletionHandler.postCompletionFollowup.test.ts`
 
-[ ] Subtask 193.5. In `WorkflowRuntime.test.ts`, delete tests that directly exercise `completeActiveWorkflowAfterFinalDelivery(...)`.
+[x] Subtask 193.5. In `WorkflowRuntime.test.ts`, delete tests that directly exercise `completeActiveWorkflowAfterFinalDelivery(...)`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 193.6. In `WorkflowRuntime.test.ts`, add coverage proving `handleAttemptCompletionSucceeded(...)` preserves active workflow state and returns `no_op` when no current step route matches `attempt_completion_succeeded`.
+[x] Subtask 193.6. In `WorkflowRuntime.test.ts`, add coverage proving `handleAttemptCompletionSucceeded(...)` preserves active workflow state and returns `no_op` when no current step route matches `attempt_completion_succeeded`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 193.7. In `WorkflowRuntime.test.ts`, add coverage proving a workflow decision-tree route can consume `attempt_completion_succeeded` and route to `complete_workflow`.
+[x] Subtask 193.7. In `WorkflowRuntime.test.ts`, add coverage proving a workflow decision-tree route can consume `attempt_completion_succeeded` and route to `complete_workflow`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 193.8. In `createEpicsWorkflow.ts`, remove finalizer-only imports: `mkdir`, `readFile`, `writeFile`, `dirname`, `WorkflowFinalDeliveryFinalizer`, and `buildEpicsIndexJson`.
+[x] Subtask 193.8. In `createEpicsWorkflow.ts`, remove finalizer-only imports: `mkdir`, `readFile`, `writeFile`, `dirname`, `WorkflowFinalDeliveryFinalizer`, and `buildEpicsIndexJson`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
 
-[ ] Subtask 193.9. In `createEpicsWorkflow.ts`, delete `CREATE_EPICS_FINAL_DELIVERY_FINALIZER`.
+[x] Subtask 193.9. In `createEpicsWorkflow.ts`, delete `CREATE_EPICS_FINAL_DELIVERY_FINALIZER`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
 
-[ ] Subtask 193.10. In `createEpicsWorkflow.ts`, remove `finalDeliveryFinalizer: CREATE_EPICS_FINAL_DELIVERY_FINALIZER` from `createEpicsWorkflowDefinition`.
+[x] Subtask 193.10. In `createEpicsWorkflow.ts`, remove `finalDeliveryFinalizer: CREATE_EPICS_FINAL_DELIVERY_FINALIZER` from `createEpicsWorkflowDefinition`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
 
-[ ] Subtask 193.11. In `createEpicsWorkflow.test.ts`, remove finalizer-only imports, helpers, and tests.
+[x] Subtask 193.11. In `createEpicsWorkflow.test.ts`, remove finalizer-only imports, helpers, and tests.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`
 
-[ ] Task 194. Add runtime-owned story inventory types, registry support, and pure helpers.
+[x] Task 194. Add runtime-owned story inventory types, registry support, and pure helpers.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/artifactFamilies.ts`
@@ -9331,67 +9331,67 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/storyArtifacts.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 194.1. In `artifactFamilies.ts`, add `EpicStoriesIndex = "epic_stories_index"` to `WorkflowArtifactFamily`.
+[x] Subtask 194.1. In `artifactFamilies.ts`, add `EpicStoriesIndex = "epic_stories_index"` to `WorkflowArtifactFamily`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/artifactFamilies.ts`
 
-[ ] Subtask 194.2. In `artifactFamilies.ts`, allow `WorkflowEpicIndexDerivedArtifactFamilyDefinition.family` to be `WorkflowArtifactFamily.EpicDeliverySpec | WorkflowArtifactFamily.EpicStoriesIndex`.
+[x] Subtask 194.2. In `artifactFamilies.ts`, allow `WorkflowEpicIndexDerivedArtifactFamilyDefinition.family` to be `WorkflowArtifactFamily.EpicDeliverySpec | WorkflowArtifactFamily.EpicStoriesIndex`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/artifactFamilies.ts`
 
-[ ] Subtask 194.3. In `artifactFamilies.ts`, add a `WORKFLOW_ARTIFACT_FAMILY_REGISTRY` entry for `EpicStoriesIndex` with filename pattern `epic-{E}-stories.index.json`, `.json` extension, `structured_json_index` content kind, `derived_from_epic_index` allocation mode, `epic_index` identity requirement, `epic_index` numbering scope, and discovery pattern `/^epic-(\d+)-stories\.index\.json$/`.
+[x] Subtask 194.3. In `artifactFamilies.ts`, add a `WORKFLOW_ARTIFACT_FAMILY_REGISTRY` entry for `EpicStoriesIndex` with filename pattern `epic-{E}-stories.index.json`, `.json` extension, `structured_json_index` content kind, `derived_from_epic_index` allocation mode, `epic_index` identity requirement, `epic_index` numbering scope, and discovery pattern `/^epic-(\d+)-stories\.index\.json$/`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/artifactFamilies.ts`
 
-[ ] Subtask 194.4. In `storyArtifacts.ts`, add exported story-index types for `WorkflowStoryType`, `WorkflowStoryStatus`, `WorkflowStoryIndexEntry`, and `WorkflowStoryIndex` matching `FR-20b2e1`.
+[x] Subtask 194.4. In `storyArtifacts.ts`, add exported story-index types for `WorkflowStoryType`, `WorkflowStoryStatus`, `WorkflowStoryIndexEntry`, and `WorkflowStoryIndex` matching `FR-20b2e1`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/storyArtifacts.ts`
 
-[ ] Subtask 194.5. In `storyArtifacts.ts`, add `buildEpicStoriesIndexFilename(epicIdentity: string): string` that returns `epic-{E}-stories.index.json` after validating a positive numeric epic identity.
+[x] Subtask 194.5. In `storyArtifacts.ts`, add `buildEpicStoriesIndexFilename(epicIdentity: string): string` that returns `epic-{E}-stories.index.json` after validating a positive numeric epic identity.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/storyArtifacts.ts`
 
-[ ] Subtask 194.6. In `storyArtifacts.ts`, add `buildPrimaryStoryIndexEntry(args: { epicIdentity: string; storyNumber: number }): WorkflowStoryIndexEntry` that produces `Story-{E}-{S}.md`, `story_type: "primary"`, `parent_story_identity: null`, `story_file_generated: false`, and `status: "draft"`.
+[x] Subtask 194.6. In `storyArtifacts.ts`, add `buildPrimaryStoryIndexEntry(args: { epicIdentity: string; storyNumber: number }): WorkflowStoryIndexEntry` that produces `Story-{E}-{S}.md`, `story_type: "primary"`, `parent_story_identity: null`, `story_file_generated: false`, and `status: "draft"`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/storyArtifacts.ts`
 
-[ ] Subtask 194.7. In `storyArtifacts.ts`, add `buildRemediationStoryIndexEntry(args: { parentStoryIdentity: string; remediationStoryNumber: number }): WorkflowStoryIndexEntry` that produces `Remediation-story-{E}-{S}-{R}.md`, `story_type: "remediation"`, `parent_story_identity` equal to the target story identity, `story_file_generated: false`, and `status: "draft"`.
+[x] Subtask 194.7. In `storyArtifacts.ts`, add `buildRemediationStoryIndexEntry(args: { parentStoryIdentity: string; remediationStoryNumber: number }): WorkflowStoryIndexEntry` that produces `Remediation-story-{E}-{S}-{R}.md`, `story_type: "remediation"`, `parent_story_identity` equal to the target story identity, `story_file_generated: false`, and `status: "draft"`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/storyArtifacts.ts`
 
-[ ] Subtask 194.8. In `storyArtifacts.ts`, add `parseWorkflowStoryIndexJson(rawJson: string): WorkflowStoryIndex` that validates version, array shape, story identity format, canonical filename format, story type, parent identity rules, boolean `story_file_generated`, and status enum values.
+[x] Subtask 194.8. In `storyArtifacts.ts`, add `parseWorkflowStoryIndexJson(rawJson: string): WorkflowStoryIndex` that validates version, array shape, story identity format, canonical filename format, story type, parent identity rules, boolean `story_file_generated`, and status enum values.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/storyArtifacts.ts`
 
-[ ] Subtask 194.9. In `storyArtifacts.ts`, add `stringifyWorkflowStoryIndex(index: WorkflowStoryIndex): string` that writes stable pretty JSON with a trailing newline.
+[x] Subtask 194.9. In `storyArtifacts.ts`, add `stringifyWorkflowStoryIndex(index: WorkflowStoryIndex): string` that writes stable pretty JSON with a trailing newline.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/storyArtifacts.ts`
 
-[ ] Subtask 194.10. In `WorkflowRuntime.ts`, update `WorkflowEpicsIndexEntry` and `loadEpicsIndex(...)` validation to require and preserve `epic-delivery-spec-generated: boolean`.
+[x] Subtask 194.10. In `WorkflowRuntime.ts`, update `WorkflowEpicsIndexEntry` and `loadEpicsIndex(...)` validation to require and preserve `epic-delivery-spec-generated: boolean`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 194.11. In `storyArtifacts.test.ts`, add focused tests for valid primary entries, valid remediation entries, invalid malformed story indexes, and stable JSON serialization.
+[x] Subtask 194.11. In `storyArtifacts.test.ts`, add focused tests for valid primary entries, valid remediation entries, invalid malformed story indexes, and stable JSON serialization.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/storyArtifacts.test.ts`
 
-[ ] Subtask 194.12. In `WorkflowRuntime.test.ts`, update Epics.index validation fixtures to include `epic-delivery-spec-generated`.
+[x] Subtask 194.12. In `WorkflowRuntime.test.ts`, update Epics.index validation fixtures to include `epic-delivery-spec-generated`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Task 195. Add backend tool contracts and wiring for story planning tools.
+[x] Task 195. Add backend tool contracts and wiring for story planning tools.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/shared/tools.ts`
@@ -9400,131 +9400,131 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/autoApprove.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/ToolExecutorCoordinator.ts`
 
-[ ] Subtask 195.1. In `tools.ts`, add `PLAN_STORY_ARTIFACTS = "plan_story_artifacts"` to `ClineDefaultTool`.
+[x] Subtask 195.1. In `tools.ts`, add `PLAN_STORY_ARTIFACTS = "plan_story_artifacts"` to `ClineDefaultTool`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/shared/tools.ts`
 
-[ ] Subtask 195.2. In `tools.ts`, add `PLAN_REMEDIATION_STORY_ARTIFACT = "plan_remediation_story_artifact"` to `ClineDefaultTool`.
+[x] Subtask 195.2. In `tools.ts`, add `PLAN_REMEDIATION_STORY_ARTIFACT = "plan_remediation_story_artifact"` to `ClineDefaultTool`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/shared/tools.ts`
 
-[ ] Subtask 195.3. In `tools.ts`, add `GENERATE_STORY_FILES = "generate_story_files"` to `ClineDefaultTool`.
+[x] Subtask 195.3. In `tools.ts`, add `GENERATE_STORY_FILES = "generate_story_files"` to `ClineDefaultTool`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/shared/tools.ts`
 
-[ ] Subtask 195.4. In `backendWorkflowToolContracts.ts`, add the `plan_story_artifacts` contract with required parameters `epic_identity` as string and `story_count` as number.
+[x] Subtask 195.4. In `backendWorkflowToolContracts.ts`, add the `plan_story_artifacts` contract with required parameters `epic_identity` as string and `story_count` as number.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/backendWorkflowToolContracts.ts`
 
-[ ] Subtask 195.5. In `backendWorkflowToolContracts.ts`, add the `plan_remediation_story_artifact` contract with required parameters `epic_identity` as string and `target_story_identity` as string.
+[x] Subtask 195.5. In `backendWorkflowToolContracts.ts`, add the `plan_remediation_story_artifact` contract with required parameters `epic_identity` as string and `target_story_identity` as string.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/backendWorkflowToolContracts.ts`
 
-[ ] Subtask 195.6. In `backendWorkflowToolContracts.ts`, add the `generate_story_files` contract with required parameter `epic_identity` as string.
+[x] Subtask 195.6. In `backendWorkflowToolContracts.ts`, add the `generate_story_files` contract with required parameter `epic_identity` as string.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/backendWorkflowToolContracts.ts`
 
-[ ] Subtask 195.7. In `ResponseToolRegistry.ts`, register the three new story tools with `undefined` response-tool metadata.
+[x] Subtask 195.7. In `ResponseToolRegistry.ts`, register the three new story tools with `undefined` response-tool metadata.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/response/ResponseToolRegistry.ts`
 
-[ ] Subtask 195.8. In `autoApprove.ts`, include the three new story tools in the same file-edit approval categories as `BUILD_WORKFLOW_DOCUMENT`, `CREATE_WORKFLOW_ARTIFACT`, and `UPSERT_EPIC`.
+[x] Subtask 195.8. In `autoApprove.ts`, include the three new story tools in the same file-edit approval categories as `BUILD_WORKFLOW_DOCUMENT`, `CREATE_WORKFLOW_ARTIFACT`, and `UPSERT_EPIC`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/autoApprove.ts`
 
-[ ] Subtask 195.9. In `ToolExecutorCoordinator.ts`, import and register handlers for `PLAN_STORY_ARTIFACTS`, `PLAN_REMEDIATION_STORY_ARTIFACT`, and `GENERATE_STORY_FILES`.
+[x] Subtask 195.9. In `ToolExecutorCoordinator.ts`, import and register handlers for `PLAN_STORY_ARTIFACTS`, `PLAN_REMEDIATION_STORY_ARTIFACT`, and `GENERATE_STORY_FILES`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/ToolExecutorCoordinator.ts`
 
-[ ] Task 196. Implement runtime methods for story inventory and draft story-file generation.
+[x] Task 196. Implement runtime methods for story inventory and draft story-file generation.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/.cline/skills/bmad-create-story/template.md`
 
-[ ] Subtask 196.1. In `WorkflowRuntime.ts`, add `drafts` to `WORKFLOW_IMPLEMENTATION_STORY_CHILD_FOLDERS`.
+[x] Subtask 196.1. In `WorkflowRuntime.ts`, add `drafts` to `WORKFLOW_IMPLEMENTATION_STORY_CHILD_FOLDERS`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 196.2. In `WorkflowRuntime.ts`, add a private helper that resolves `implementation/epic-{E}-stories.index.json` under the selected project folder for a validated epic identity.
+[x] Subtask 196.2. In `WorkflowRuntime.ts`, add a private helper that resolves `implementation/epic-{E}-stories.index.json` under the selected project folder for a validated epic identity.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 196.3. In `WorkflowRuntime.ts`, add a private helper that resolves `implementation/drafts/{story_file_name}` under the selected project folder and enforces workspace path policy.
+[x] Subtask 196.3. In `WorkflowRuntime.ts`, add a private helper that resolves `implementation/drafts/{story_file_name}` under the selected project folder and enforces workspace path policy.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 196.4. In `WorkflowRuntime.ts`, add `preparePlanStoryArtifacts(...)` returning the resolved story-index absolute path for approval and hook checks.
+[x] Subtask 196.4. In `WorkflowRuntime.ts`, add `preparePlanStoryArtifacts(...)` returning the resolved story-index absolute path for approval and hook checks.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 196.5. In `WorkflowRuntime.ts`, add `planStoryArtifacts(...)` that reads or creates `epic-{E}-stories.index.json`, preserves existing entries, appends missing primary entries through the requested positive story count, and writes stable JSON.
+[x] Subtask 196.5. In `WorkflowRuntime.ts`, add `planStoryArtifacts(...)` that reads or creates `epic-{E}-stories.index.json`, preserves existing entries, appends missing primary entries through the requested positive story count, and writes stable JSON.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 196.6. In `WorkflowRuntime.ts`, add `preparePlanRemediationStoryArtifact(...)` returning the resolved story-index absolute path for approval and hook checks.
+[x] Subtask 196.6. In `WorkflowRuntime.ts`, add `preparePlanRemediationStoryArtifact(...)` returning the resolved story-index absolute path for approval and hook checks.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 196.7. In `WorkflowRuntime.ts`, add `planRemediationStoryArtifact(...)` that reads the target epic story index, validates that `target_story_identity` exists in that index, appends the next remediation entry under that target story, and writes stable JSON.
+[x] Subtask 196.7. In `WorkflowRuntime.ts`, add `planRemediationStoryArtifact(...)` that reads the target epic story index, validates that `target_story_identity` exists in that index, appends the next remediation entry under that target story, and writes stable JSON.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 196.8. In `WorkflowRuntime.ts`, add `prepareGenerateStoryFiles(...)` returning the story-index absolute path and the absolute paths of draft story files that would be created or marked generated.
+[x] Subtask 196.8. In `WorkflowRuntime.ts`, add `prepareGenerateStoryFiles(...)` returning the story-index absolute path and the absolute paths of draft story files that would be created or marked generated.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 196.9. In `WorkflowRuntime.ts`, add `generateStoryFiles(...)` that reads the approved template file `.cline/skills/bmad-create-story/template.md`, creates only missing draft story files from story-index entries, does not overwrite existing story files, and writes the template content into each newly created file.
+[x] Subtask 196.9. In `WorkflowRuntime.ts`, add `generateStoryFiles(...)` that reads the approved template file `.cline/skills/bmad-create-story/template.md`, creates only missing draft story files from story-index entries, does not overwrite existing story files, and writes the template content into each newly created file.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/.cline/skills/bmad-create-story/template.md`
 
-[ ] Subtask 196.10. In `WorkflowRuntime.ts`, update `generateStoryFiles(...)` so entries whose draft files already exist are not overwritten and have `story_file_generated` set to `true` in the story index.
+[x] Subtask 196.10. In `WorkflowRuntime.ts`, update `generateStoryFiles(...)` so entries whose draft files already exist are not overwritten and have `story_file_generated` set to `true` in the story index.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Task 197. Add governed tool handlers for story planning and story-file generation.
+[x] Task 197. Add governed tool handlers for story planning and story-file generation.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/PlanStoryArtifactsToolHandler.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/PlanRemediationStoryArtifactToolHandler.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/GenerateStoryFilesToolHandler.ts`
 
-[ ] Subtask 197.1. Create `PlanStoryArtifactsToolHandler.ts` that validates only `epic_identity` and `story_count`, normalizes `story_count` to a positive integer, delegates path preparation to `WorkflowRuntime.preparePlanStoryArtifacts(...)`, applies cline-ignore and approval checks to the index path, runs file-write hooks, calls `WorkflowRuntime.planStoryArtifacts(...)`, and returns structured JSON output.
+[x] Subtask 197.1. Create `PlanStoryArtifactsToolHandler.ts` that validates only `epic_identity` and `story_count`, normalizes `story_count` to a positive integer, delegates path preparation to `WorkflowRuntime.preparePlanStoryArtifacts(...)`, applies cline-ignore and approval checks to the index path, runs file-write hooks, calls `WorkflowRuntime.planStoryArtifacts(...)`, and returns structured JSON output.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/PlanStoryArtifactsToolHandler.ts`
 
-[ ] Subtask 197.2. Create `PlanRemediationStoryArtifactToolHandler.ts` that validates only `epic_identity` and `target_story_identity`, delegates path preparation to `WorkflowRuntime.preparePlanRemediationStoryArtifact(...)`, applies cline-ignore and approval checks to the index path, runs file-write hooks, calls `WorkflowRuntime.planRemediationStoryArtifact(...)`, and returns structured JSON output.
+[x] Subtask 197.2. Create `PlanRemediationStoryArtifactToolHandler.ts` that validates only `epic_identity` and `target_story_identity`, delegates path preparation to `WorkflowRuntime.preparePlanRemediationStoryArtifact(...)`, applies cline-ignore and approval checks to the index path, runs file-write hooks, calls `WorkflowRuntime.planRemediationStoryArtifact(...)`, and returns structured JSON output.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/PlanRemediationStoryArtifactToolHandler.ts`
 
-[ ] Subtask 197.3. Create `GenerateStoryFilesToolHandler.ts` that validates only `epic_identity`, delegates path preparation to `WorkflowRuntime.prepareGenerateStoryFiles(...)`, applies cline-ignore and approval checks to the story-index path and every draft story-file path, runs file-write hooks, calls `WorkflowRuntime.generateStoryFiles(...)`, and returns structured JSON output.
+[x] Subtask 197.3. Create `GenerateStoryFilesToolHandler.ts` that validates only `epic_identity`, delegates path preparation to `WorkflowRuntime.prepareGenerateStoryFiles(...)`, applies cline-ignore and approval checks to the story-index path and every draft story-file path, runs file-write hooks, calls `WorkflowRuntime.generateStoryFiles(...)`, and returns structured JSON output.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/GenerateStoryFilesToolHandler.ts`
 
-[ ] Task 198. Add focused tests for Phase 62 behavior.
+[x] Task 198. Add focused tests for Phase 62 behavior.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
@@ -9536,107 +9536,107 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`
 
-[ ] Subtask 198.1. In `WorkflowRuntime.test.ts`, update project-folder creation coverage to assert `implementation/drafts` is created for new and existing projects.
+[x] Subtask 198.1. In `WorkflowRuntime.test.ts`, update project-folder creation coverage to assert `implementation/drafts` is created for new and existing projects.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 198.2. In `WorkflowRuntime.test.ts`, add coverage proving `planStoryArtifacts(...)` creates primary entries `E.1` through `E.N` with canonical filenames and `story_file_generated: false`.
+[x] Subtask 198.2. In `WorkflowRuntime.test.ts`, add coverage proving `planStoryArtifacts(...)` creates primary entries `E.1` through `E.N` with canonical filenames and `story_file_generated: false`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 198.3. In `WorkflowRuntime.test.ts`, add coverage proving a second `planStoryArtifacts(...)` call preserves existing entries and appends only missing primary entries when the requested story count increases.
+[x] Subtask 198.3. In `WorkflowRuntime.test.ts`, add coverage proving a second `planStoryArtifacts(...)` call preserves existing entries and appends only missing primary entries when the requested story count increases.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 198.4. In `WorkflowRuntime.test.ts`, add coverage proving `planRemediationStoryArtifact(...)` appends remediation identities `E.S.1`, then `E.S.2`, under an existing target story.
+[x] Subtask 198.4. In `WorkflowRuntime.test.ts`, add coverage proving `planRemediationStoryArtifact(...)` appends remediation identities `E.S.1`, then `E.S.2`, under an existing target story.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 198.5. In `WorkflowRuntime.test.ts`, add coverage proving `planRemediationStoryArtifact(...)` fails clearly when the target story identity is absent from the selected epic story index.
+[x] Subtask 198.5. In `WorkflowRuntime.test.ts`, add coverage proving `planRemediationStoryArtifact(...)` fails clearly when the target story identity is absent from the selected epic story index.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 198.6. In `WorkflowRuntime.test.ts`, add coverage proving `generateStoryFiles(...)` creates missing draft story files with the exact canonical template content from `.cline/skills/bmad-create-story/template.md`.
+[x] Subtask 198.6. In `WorkflowRuntime.test.ts`, add coverage proving `generateStoryFiles(...)` creates missing draft story files with the exact canonical template content from `.cline/skills/bmad-create-story/template.md`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 198.7. In `WorkflowRuntime.test.ts`, add coverage proving `generateStoryFiles(...)` does not overwrite an existing story file and still updates that entry to `story_file_generated: true`.
+[x] Subtask 198.7. In `WorkflowRuntime.test.ts`, add coverage proving `generateStoryFiles(...)` does not overwrite an existing story file and still updates that entry to `story_file_generated: true`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 198.8. In `PlanStoryArtifactsToolHandler.test.ts`, add handler coverage for parameter validation, approval/path-policy checks, successful runtime delegation, and unsupported-parameter rejection.
+[x] Subtask 198.8. In `PlanStoryArtifactsToolHandler.test.ts`, add handler coverage for parameter validation, approval/path-policy checks, successful runtime delegation, and unsupported-parameter rejection.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/PlanStoryArtifactsToolHandler.test.ts`
 
-[ ] Subtask 198.9. In `PlanRemediationStoryArtifactToolHandler.test.ts`, add handler coverage for parameter validation, approval/path-policy checks, successful runtime delegation, and unsupported-parameter rejection.
+[x] Subtask 198.9. In `PlanRemediationStoryArtifactToolHandler.test.ts`, add handler coverage for parameter validation, approval/path-policy checks, successful runtime delegation, and unsupported-parameter rejection.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/PlanRemediationStoryArtifactToolHandler.test.ts`
 
-[ ] Subtask 198.10. In `GenerateStoryFilesToolHandler.test.ts`, add handler coverage for parameter validation, approval/path-policy checks across index and draft story-file paths, successful runtime delegation, and unsupported-parameter rejection.
+[x] Subtask 198.10. In `GenerateStoryFilesToolHandler.test.ts`, add handler coverage for parameter validation, approval/path-policy checks across index and draft story-file paths, successful runtime delegation, and unsupported-parameter rejection.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/GenerateStoryFilesToolHandler.test.ts`
 
-[ ] Subtask 198.11. In `ResponseToolRuntime.test.ts`, add assertions that the three new story tools are not response tools.
+[x] Subtask 198.11. In `ResponseToolRuntime.test.ts`, add assertions that the three new story tools are not response tools.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/response/__tests__/ResponseToolRuntime.test.ts`
 
-[ ] Subtask 198.12. In `workflow-runtime-metadata.test.ts`, update backend workflow tool metadata coverage for the three new tool contracts.
+[x] Subtask 198.12. In `workflow-runtime-metadata.test.ts`, update backend workflow tool metadata coverage for the three new tool contracts.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
 
-[ ] Subtask 198.13. In `createEpicsWorkflow.test.ts`, update assertions so create-epics does not expect `finalDeliveryFinalizer`.
+[x] Subtask 198.13. In `createEpicsWorkflow.test.ts`, update assertions so create-epics does not expect `finalDeliveryFinalizer`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`
 
-[ ] Task 199. Update the module build guide for attempt-completion routing and story planning tools.
+[x] Task 199. Update the module build guide for attempt-completion routing and story planning tools.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
 
-[ ] Subtask 199.1. In `module-build-guide.md`, update the project folder guidance to include `implementation/drafts` alongside `implementation/stories-backlog`, `implementation/stories-review`, and `implementation/stories-complete`.
+[x] Subtask 199.1. In `module-build-guide.md`, update the project folder guidance to include `implementation/drafts` alongside `implementation/stories-backlog`, `implementation/stories-review`, and `implementation/stories-complete`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
 
-[ ] Subtask 199.2. In `module-build-guide.md`, add guidance that `epic-{E}-stories.index.json` is the canonical story inventory for an epic and that AI agents must not author canonical story numbers or story filenames.
+[x] Subtask 199.2. In `module-build-guide.md`, add guidance that `epic-{E}-stories.index.json` is the canonical story inventory for an epic and that AI agents must not author canonical story numbers or story filenames.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
 
-[ ] Subtask 199.3. In `module-build-guide.md`, document `plan_story_artifacts` as the module-exposed backend tool for creating or expanding primary story entries in `epic-{E}-stories.index.json`.
+[x] Subtask 199.3. In `module-build-guide.md`, document `plan_story_artifacts` as the module-exposed backend tool for creating or expanding primary story entries in `epic-{E}-stories.index.json`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
 
-[ ] Subtask 199.4. In `module-build-guide.md`, document `plan_remediation_story_artifact` as the module-exposed backend tool for appending the next remediation story entry under an existing target story.
+[x] Subtask 199.4. In `module-build-guide.md`, document `plan_remediation_story_artifact` as the module-exposed backend tool for appending the next remediation story entry under an existing target story.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
 
-[ ] Subtask 199.5. In `module-build-guide.md`, document `generate_story_files` as the module-exposed backend tool that creates missing draft story files from `epic-{E}-stories.index.json` using `.cline/skills/bmad-create-story/template.md`.
+[x] Subtask 199.5. In `module-build-guide.md`, document `generate_story_files` as the module-exposed backend tool that creates missing draft story files from `epic-{E}-stories.index.json` using `.cline/skills/bmad-create-story/template.md`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
 
-[ ] Subtask 199.6. In `module-build-guide.md`, replace guidance that says final delivery relies on generic workflow teardown after `attempt_completion` with guidance that modules must route `attempt_completion_succeeded` explicitly to `complete_workflow`, a step transition, deterministic/tool-backed follow-up work, or `no_op`.
+[x] Subtask 199.6. In `module-build-guide.md`, replace guidance that says final delivery relies on generic workflow teardown after `attempt_completion` with guidance that modules must route `attempt_completion_succeeded` explicitly to `complete_workflow`, a step transition, deterministic/tool-backed follow-up work, or `no_op`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
 
-[ ] Task 200. Validate Phase 62.
+[x] Task 200. Validate Phase 62.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/shared/tools.ts`
@@ -9664,54 +9664,132 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
 
-[ ] Subtask 200.1. Run `npm run test:unit -- src/core/task/tools/handlers/__tests__/AttemptCompletionHandler.postCompletionFollowup.test.ts src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`; it must pass before Phase 62 is marked complete.
+[x] Subtask 200.1. Run `npm run test:unit -- src/core/task/tools/handlers/__tests__/AttemptCompletionHandler.postCompletionFollowup.test.ts src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`; it must pass before Phase 62 is marked complete.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/AttemptCompletionHandler.postCompletionFollowup.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 200.2. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/storyArtifacts.test.ts src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`; it must pass before Phase 62 is marked complete.
+[x] Subtask 200.2. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/storyArtifacts.test.ts src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`; it must pass before Phase 62 is marked complete.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/storyArtifacts.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 200.3. Run `npm run test:unit -- src/core/task/tools/handlers/__tests__/PlanStoryArtifactsToolHandler.test.ts src/core/task/tools/handlers/__tests__/PlanRemediationStoryArtifactToolHandler.test.ts src/core/task/tools/handlers/__tests__/GenerateStoryFilesToolHandler.test.ts`; it must pass before Phase 62 is marked complete.
+[x] Subtask 200.3. Run `npm run test:unit -- src/core/task/tools/handlers/__tests__/PlanStoryArtifactsToolHandler.test.ts src/core/task/tools/handlers/__tests__/PlanRemediationStoryArtifactToolHandler.test.ts src/core/task/tools/handlers/__tests__/GenerateStoryFilesToolHandler.test.ts`; it must pass before Phase 62 is marked complete.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/PlanStoryArtifactsToolHandler.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/PlanRemediationStoryArtifactToolHandler.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/GenerateStoryFilesToolHandler.test.ts`
 
-[ ] Subtask 200.4. Run `npm run test:unit -- src/core/task/tools/response/__tests__/ResponseToolRuntime.test.ts src/core/task/__tests__/workflow-runtime-metadata.test.ts src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`; it must pass before Phase 62 is marked complete.
+[x] Subtask 200.4. Run `npm run test:unit -- src/core/task/tools/response/__tests__/ResponseToolRuntime.test.ts src/core/task/__tests__/workflow-runtime-metadata.test.ts src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`; it must pass before Phase 62 is marked complete.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/response/__tests__/ResponseToolRuntime.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`
 
-[ ] Subtask 200.5. Run `rg "completeActiveWorkflowAfterFinalDelivery|finalDeliveryFinalizer|WorkflowFinalDelivery" src/core/task`; it must return no matches before Phase 62 is marked complete.
+[x] Subtask 200.5. Run `rg "completeActiveWorkflowAfterFinalDelivery|finalDeliveryFinalizer|WorkflowFinalDelivery" src/core/task`; it must return no matches before Phase 62 is marked complete.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task`
 
-[ ] Subtask 200.6. Run `rg "upsert_story|UPSERT_STORY" src docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`; it must return no matches before Phase 62 is marked complete.
+[x] Subtask 200.6. Run `rg "upsert_story|UPSERT_STORY" src docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`; it must return no matches before Phase 62 is marked complete.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
 
-[ ] Subtask 200.7. Run `npm run check-types`; it must pass before Phase 62 is marked complete.
+[x] Subtask 200.7. Run `npm run check-types`; it must pass before Phase 62 is marked complete.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
 
-[ ] Subtask 200.8. Run `npm run lint`; it must pass before Phase 62 is marked complete.
+[x] Subtask 200.8. Run `npm run lint`; it must pass before Phase 62 is marked complete.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
+
+[x] Task 201. Remediate Phase 62 QA findings for non-native story-tool parsing and brittle create-epics prose assertions.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/assistant-message/index.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/ToolExecutor.canonicalization.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`
+
+[x] Subtask 201.1. In `src/core/assistant-message/index.ts`, add `epic_identity`, `story_count`, and `target_story_identity` to `toolParamNames`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/assistant-message/index.ts`
+
+[x] Subtask 201.2. In `src/core/task/__tests__/ToolExecutor.canonicalization.test.ts`, add parser coverage proving XML-style `plan_story_artifacts` tool calls parse `epic_identity` and `story_count` into `ToolUse.params`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/ToolExecutor.canonicalization.test.ts`
+
+[x] Subtask 201.3. In `src/core/task/__tests__/ToolExecutor.canonicalization.test.ts`, add parser coverage proving XML-style `plan_remediation_story_artifact` tool calls parse `epic_identity` and `target_story_identity` into `ToolUse.params`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/ToolExecutor.canonicalization.test.ts`
+
+[x] Subtask 201.4. In `src/core/task/__tests__/ToolExecutor.canonicalization.test.ts`, add parser coverage proving XML-style `generate_story_files` tool calls parse `epic_identity` into `ToolUse.params`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/ToolExecutor.canonicalization.test.ts`
+
+[x] Subtask 201.5. In `src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`, replace the exact workflow description assertion with assertions that `description` is a non-empty string and `entryPanel.promptMarkdown` equals `description`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`
+
+[x] Subtask 201.6. In `src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`, replace exact Step 1 context-form `promptMarkdown` assertions for panels A, B, and C with non-empty string assertions while preserving exact assertions for panel ids, field keys, workflow value keys, field kinds, required flags, allowed value types, textarea presentation, and transitions.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`
+
+[x] Subtask 201.7. In `src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`, remove brittle Step 2 prompt prose assertions for editable instruction copy, including `confirm alignment before drafting epics`, `coherent capability outcomes`, `Do not draft stories, tasks, subtasks, acceptance criteria, action plans`, and `run the pi-planning workflow for each epic`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`
+
+[x] Subtask 201.8. In `src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`, keep exact Step 2 assertions for runtime-interpolated file paths, `upsert_epic` tool instruction presence, forbidden runtime-edit tool instruction presence, and exact Step 2 tool-schema names.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`
+
+[x] Task 202. Validate Phase 62 QA remediation.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/assistant-message/index.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/ToolExecutor.canonicalization.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`
+
+[x] Subtask 202.1. Run `npm run test:unit -- src/core/task/__tests__/ToolExecutor.canonicalization.test.ts`; it must pass before Phase 62 QA remediation is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/ToolExecutor.canonicalization.test.ts`
+
+[x] Subtask 202.2. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`; it must pass before Phase 62 QA remediation is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`
+
+[x] Subtask 202.3. Run `npm run check-types`; it must pass before Phase 62 QA remediation is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/assistant-message/index.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/ToolExecutor.canonicalization.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`
+
+[x] Subtask 202.4. Run `npm run lint`; it must pass before Phase 62 QA remediation is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/assistant-message/index.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/ToolExecutor.canonicalization.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`
 
 ## Validation
 

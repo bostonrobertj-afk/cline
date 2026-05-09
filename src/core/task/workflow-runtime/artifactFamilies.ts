@@ -4,6 +4,7 @@ export enum WorkflowArtifactFamily {
 	BrainstormingSession = "brainstorming_session",
 	ArchitectureDocument = "architecture_document",
 	EpicDeliverySpec = "epic_delivery_spec",
+	EpicStoriesIndex = "epic_stories_index",
 	Story = "story",
 	RemediationStory = "remediation_story",
 	ReviewBlindHunter = "review_blind_hunter",
@@ -54,7 +55,7 @@ export interface WorkflowSingletonProjectArtifactFamilyDefinition extends Workfl
 }
 
 export interface WorkflowEpicIndexDerivedArtifactFamilyDefinition extends WorkflowArtifactFamilyDefinitionBase {
-	family: WorkflowArtifactFamily.EpicDeliverySpec
+	family: WorkflowArtifactFamily.EpicDeliverySpec | WorkflowArtifactFamily.EpicStoriesIndex
 	allocationMode: "derived_from_epic_index"
 	identityRequirement: "epic_index"
 	numberingScope: "epic_index"
@@ -139,6 +140,16 @@ export const WORKFLOW_ARTIFACT_FAMILY_REGISTRY: Readonly<Record<WorkflowArtifact
 		contentKind: "markdown",
 		numberingScope: "epic_index",
 		discoveryPattern: /^Epic-(\d+)-delivery-spec\.md$/,
+	},
+	[WorkflowArtifactFamily.EpicStoriesIndex]: {
+		family: WorkflowArtifactFamily.EpicStoriesIndex,
+		allocationMode: "derived_from_epic_index",
+		identityRequirement: "epic_index",
+		filenamePattern: "epic-{E}-stories.index.json",
+		fileExtension: ".json",
+		contentKind: "structured_json_index",
+		numberingScope: "epic_index",
+		discoveryPattern: /^epic-(\d+)-stories\.index\.json$/,
 	},
 	[WorkflowArtifactFamily.Story]: {
 		family: WorkflowArtifactFamily.Story,

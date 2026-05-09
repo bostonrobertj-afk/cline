@@ -165,7 +165,7 @@ export class AttemptCompletionHandler implements IToolHandler, IPartialBlockHand
 
 		const successResult = responseToolRuntime.finalizeSuccess(config, this.name)
 		if (config.taskState.activeWorkflowSession) {
-			const workflowNextAction = await config.workflowRuntime.completeActiveWorkflowAfterFinalDelivery({
+			const workflowNextAction = await config.workflowRuntime.handleAttemptCompletionSucceeded({
 				taskState: config.taskState,
 			})
 			if (workflowNextAction.kind !== "no_op") {

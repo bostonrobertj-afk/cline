@@ -17,6 +17,7 @@ import { CreateWorkflowArtifactToolHandler } from "./handlers/CreateWorkflowArti
 import { DeleteWorkflowArtifactToolHandler } from "./handlers/DeleteWorkflowArtifactToolHandler"
 import { ExecuteCommandToolHandler } from "./handlers/ExecuteCommandToolHandler"
 import { GenerateExplanationToolHandler } from "./handlers/GenerateExplanationToolHandler"
+import { GenerateStoryFilesToolHandler } from "./handlers/GenerateStoryFilesToolHandler"
 import { GetBrainstormingMethodsToolHandler } from "./handlers/GetBrainstormingMethodsToolHandler"
 import { ListCodeDefinitionNamesToolHandler } from "./handlers/ListCodeDefinitionNamesToolHandler"
 import { ListFilesToolHandler } from "./handlers/ListFilesToolHandler"
@@ -24,6 +25,8 @@ import { LoadMcpDocumentationHandler } from "./handlers/LoadMcpDocumentationHand
 import { MoveWorkflowProjectFileToolHandler } from "./handlers/MoveWorkflowProjectFileToolHandler"
 import { NewTaskHandler } from "./handlers/NewTaskHandler"
 import { PlanModeRespondHandler } from "./handlers/PlanModeRespondHandler"
+import { PlanRemediationStoryArtifactToolHandler } from "./handlers/PlanRemediationStoryArtifactToolHandler"
+import { PlanStoryArtifactsToolHandler } from "./handlers/PlanStoryArtifactsToolHandler"
 import { ReadFileRangeToolHandler } from "./handlers/ReadFileRangeToolHandler"
 import { ReadFileToolHandler } from "./handlers/ReadFileToolHandler"
 import { ReportBugHandler } from "./handlers/ReportBugHandler"
@@ -135,6 +138,9 @@ export class ToolExecutorCoordinator {
 		[ClineDefaultTool.APPEND_BRAINSTORMING_SELECTED_TECHNIQUE]: (_v: ToolValidator) =>
 			new AppendBrainstormingSelectedTechniqueToolHandler(),
 		[ClineDefaultTool.UPSERT_EPIC]: (v: ToolValidator) => new UpsertEpicToolHandler(v),
+		[ClineDefaultTool.PLAN_STORY_ARTIFACTS]: (v: ToolValidator) => new PlanStoryArtifactsToolHandler(v),
+		[ClineDefaultTool.PLAN_REMEDIATION_STORY_ARTIFACT]: (v: ToolValidator) => new PlanRemediationStoryArtifactToolHandler(v),
+		[ClineDefaultTool.GENERATE_STORY_FILES]: (v: ToolValidator) => new GenerateStoryFilesToolHandler(v),
 		[ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE]: (_v: ToolValidator) => new CodeReviewSpecUpdateToolHandler(),
 		[ClineDefaultTool.STORY_TASK_REMINDER]: (_v: ToolValidator) => new StoryTaskReminderToolHandler(),
 		[ClineDefaultTool.STORY_TASK_COMPLETE]: (_v: ToolValidator) => new StoryTaskCompleteToolHandler(),

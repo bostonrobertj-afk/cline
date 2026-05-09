@@ -100,6 +100,7 @@ export type WorkflowDecisionBranchId = string
 export type WorkflowBranchTriggerEvent =
 	| { kind: "workflow_progress_request_confirmed" }
 	| { kind: "workflow_progress_request_denied" }
+	| { kind: "attempt_completion_succeeded" }
 	| { kind: "workflow_form_completed"; workflowFormId: WorkflowFormId }
 	| { kind: "workflow_values_persisted"; changedKeys: readonly string[] }
 	| {
@@ -368,36 +369,6 @@ export type WorkflowArtifactOutputValueKeys =
 	| WorkflowParentedArtifactOutputValueKeys
 	| WorkflowTargetedArtifactOutputValueKeys
 
-export interface WorkflowFinalDeliveryArtifactResolution {
-	artifactId: string
-	projectTitle: string
-	projectFolderName: string
-	artifactFamily: string
-	artifactIdentity: string
-	artifactFilename: string
-	artifactRelativePath: string
-	artifactAbsolutePath: string
-	parentIdentity: string | undefined
-	targetIdentity: string | undefined
-	workflowValueWrites: WorkflowValues
-}
-
-export type WorkflowFinalDeliveryFinalizationResult =
-	| { kind: "succeeded"; workflowValueWrites?: WorkflowValues }
-	| { kind: "failed"; errorMessage: string }
-
-export interface WorkflowFinalDeliveryFinalizationInput {
-	session: ActiveWorkflowSession
-	workflowName: WorkflowName
-	resolveArtifactOutput(artifactId: string): Promise<WorkflowFinalDeliveryArtifactResolution>
-}
-
-export interface WorkflowFinalDeliveryFinalizer {
-	finalize(
-		input: WorkflowFinalDeliveryFinalizationInput,
-	): WorkflowFinalDeliveryFinalizationResult | Promise<WorkflowFinalDeliveryFinalizationResult>
-}
-
 export type WorkflowArtifactDefinition =
 	| {
 			id: string
@@ -475,7 +446,6 @@ export interface WorkflowDefinition {
 	artifacts?: Record<string, WorkflowArtifactDefinition>
 	prerequisiteFiles?: Record<string, WorkflowPrerequisiteFileDefinition>
 	childInheritance?: WorkflowChildInheritanceRule[]
-	finalDeliveryFinalizer?: WorkflowFinalDeliveryFinalizer
 }
 
 export interface WorkflowDiscoveryRequest {

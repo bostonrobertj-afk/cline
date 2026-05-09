@@ -217,6 +217,54 @@ export const backendWorkflowToolContracts: Partial<Record<ClineDefaultTool, Back
 			},
 		],
 	},
+	[ClineDefaultTool.PLAN_STORY_ARTIFACTS]: {
+		id: ClineDefaultTool.PLAN_STORY_ARTIFACTS,
+		name: "plan_story_artifacts",
+		parameters: [
+			{
+				name: "epic_identity",
+				required: true,
+				type: "string",
+				description: "Positive numeric epic identity for the story inventory sidecar.",
+			},
+			{
+				name: "story_count",
+				required: true,
+				type: "number",
+				description: "Positive story count to plan as primary stories for the selected epic.",
+			},
+		],
+	},
+	[ClineDefaultTool.PLAN_REMEDIATION_STORY_ARTIFACT]: {
+		id: ClineDefaultTool.PLAN_REMEDIATION_STORY_ARTIFACT,
+		name: "plan_remediation_story_artifact",
+		parameters: [
+			{
+				name: "epic_identity",
+				required: true,
+				type: "string",
+				description: "Positive numeric epic identity for the story inventory sidecar.",
+			},
+			{
+				name: "target_story_identity",
+				required: true,
+				type: "string",
+				description: "Existing primary story identity that will own the remediation story.",
+			},
+		],
+	},
+	[ClineDefaultTool.GENERATE_STORY_FILES]: {
+		id: ClineDefaultTool.GENERATE_STORY_FILES,
+		name: "generate_story_files",
+		parameters: [
+			{
+				name: "epic_identity",
+				required: true,
+				type: "string",
+				description: "Positive numeric epic identity for the story inventory sidecar.",
+			},
+		],
+	},
 	[ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE]: {
 		id: ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE,
 		name: "code_review_spec_update",

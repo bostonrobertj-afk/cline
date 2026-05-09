@@ -1,19 +1,15 @@
 import type { WorkflowFormDefinitionPayload } from "@shared/ExtensionMessage"
-import { mkdir, readFile, writeFile } from "fs/promises"
-import { dirname } from "path"
 import { WorkflowArtifactFamily } from "../../artifactFamilies"
 import type {
-	ActiveWorkflowSession,
 	WorkflowDecisionBranchTrigger,
 	WorkflowDecisionTree,
 	WorkflowDefinition,
-	WorkflowFinalDeliveryFinalizer,
 	WorkflowPersonaDefinition,
 	WorkflowPromptBuilderInput,
 	WorkflowStepDefinition,
 	WorkflowStepPromptSource,
 } from "../../types"
-import { buildEpicsIndexJson, buildInitialCreateEpicsDocumentFromSession } from "./createEpicsDocument"
+import { buildInitialCreateEpicsDocumentFromSession } from "./createEpicsDocument"
 import { buildCreateEpicsStep1ToolSchemas, buildCreateEpicsStep2ToolSchemas } from "./createEpicsToolSchemas"
 
 export enum CreateEpicsWorkflowValueKey {
@@ -535,46 +531,6 @@ function buildStep2DecisionTree(): WorkflowDecisionTree {
 	}
 }
 
-function readRequiredWorkflowStringValue(session: ActiveWorkflowSession, key: CreateEpicsWorkflowValueKey): string {
-	const value = session.workflowValues[key]
-	if (typeof value !== "string") {
-		throw new Error(`Workflow value '${key}' must be a non-empty string.`)
-	}
-
-	const trimmedValue = value.trim()
-	if (trimmedValue.length === 0) {
-		throw new Error(`Workflow value '${key}' must be a non-empty string.`)
-	}
-
-	return trimmedValue
-}
-
-const CREATE_EPICS_FINAL_DELIVERY_FINALIZER: WorkflowFinalDeliveryFinalizer = {
-	async finalize(input) {
-		try {
-			const resolvedIndexArtifact = await input.resolveArtifactOutput(EPICS_INDEX_ARTIFACT_ID)
-			const outputFile = readRequiredWorkflowStringValue(input.session, CreateEpicsWorkflowValueKey.OutputFile)
-			const epicsDocumentContent = await readFile(outputFile, "utf8")
-			const epicsIndexJson = buildEpicsIndexJson(epicsDocumentContent)
-			await mkdir(dirname(resolvedIndexArtifact.artifactAbsolutePath), { recursive: true })
-			await writeFile(resolvedIndexArtifact.artifactAbsolutePath, epicsIndexJson, "utf8")
-
-			return {
-				kind: "succeeded",
-				workflowValueWrites: resolvedIndexArtifact.workflowValueWrites,
-			}
-		} catch (error) {
-			return {
-				kind: "failed",
-				errorMessage:
-					error instanceof Error && error.message.trim() !== ""
-						? error.message
-						: "Unable to generate Epics.index.json.",
-			}
-		}
-	},
-}
-
 export const createEpicsWorkflowDefinition: WorkflowDefinition = {
 	name: CREATE_EPICS_WORKFLOW_NAME,
 	displayName: CREATE_EPICS_WORKFLOW_DISPLAY_NAME,
@@ -607,7 +563,6 @@ export const createEpicsWorkflowDefinition: WorkflowDefinition = {
 			outputDocumentReference: "module_document_builder",
 		},
 	},
-	finalDeliveryFinalizer: CREATE_EPICS_FINAL_DELIVERY_FINALIZER,
 	steps: {
 		"step-1": createStepDefinition({
 			stepNumber: 1,

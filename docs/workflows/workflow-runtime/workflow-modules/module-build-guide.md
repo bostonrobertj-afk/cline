@@ -142,7 +142,7 @@ Choose one of these step modes:
 | Step mode | Decision action pattern | Tool schema |
 | --- | --- | --- |
 | Runtime-driven | `allocate_artifact`, `render_workflow_form`, `run_deterministic_procedure`, `build_workflow_document`, `transition_step`, `terminal_error` | empty exported builder |
-| Model-driven | `project_prompt`, then event routes such as `workflow_progress_request_confirmed` or final delivery | non-empty exported builder |
+| Model-driven | `project_prompt`, then event routes such as `workflow_progress_request_confirmed` or `attempt_completion_succeeded` | non-empty exported builder |
 
 Do not let a step route to `project_prompt` while exposing an empty schema.
 
@@ -196,7 +196,13 @@ Optional prerequisite behavior is runtime-owned:
 
 Use the module decision action `move_project_file` for deterministic file lifecycle moves between folders under the selected project. The action should provide source and destination folder segments plus a `filenameWorkflowValueKey`; the runtime resolves the selected project root and performs the governed move.
 
-Project setup creates `implementation/stories-backlog`, `implementation/stories-review`, and `implementation/stories-complete` under every workflow project. Future story lifecycle modules should use those folders rather than inventing parallel backlog, review, or completed-story locations.
+Project setup creates `implementation/drafts`, `implementation/stories-backlog`, `implementation/stories-review`, and `implementation/stories-complete` under every workflow project. Future story lifecycle modules should use those folders rather than inventing parallel draft, backlog, review, or completed-story locations.
+
+`implementation/epic-{E}-stories.index.json` is the canonical story inventory for an epic. AI agents must not author canonical story numbers or story filenames directly. Modules should expose runtime-owned story planning tools when story inventory changes are needed:
+
+- `plan_story_artifacts` creates or expands primary story entries in `epic-{E}-stories.index.json`.
+- `plan_remediation_story_artifact` appends the next remediation story entry under an existing target story.
+- `generate_story_files` creates missing draft story files under `implementation/drafts` from `epic-{E}-stories.index.json` using `.cline/skills/bmad-create-story/template.md`.
 
 ### Deterministic Procedures
 
@@ -477,7 +483,7 @@ For a progress-gated step, the common pattern is:
 3. confirmed route transitions to the next step
 4. denied route returns to `project_prompt`
 
-For final delivery, expose `attempt_completion` and rely on generic workflow teardown after successful final delivery.
+For final delivery, expose `attempt_completion` only when the current step may complete or hand off final delivery. After successful `attempt_completion`, the runtime emits `attempt_completion_succeeded`. The module decision tree must route that event explicitly to `complete_workflow`, a step transition, deterministic or tool-backed follow-up work, or `no_op`.
 
 ## Registration
 
@@ -554,7 +560,7 @@ Add runtime coverage when the module depends on runtime behavior:
 - first next action after project selection
 - artifact allocation and output value mapping
 - runtime-owned document build actions
-- workflow completion and teardown
+- workflow completion through explicit `attempt_completion_succeeded` routing
 
 ### Prompt Integration Tests
 
@@ -649,6 +655,6 @@ For an interactive workflow, verify:
 - response-tool guidance matches the schema
 - the AI can perform the expected document reads/edits
 - progress confirmation advances the workflow
-- final delivery tears down workflow state
+- final delivery follows the module's explicit `attempt_completion_succeeded` route
 
 When the packaged run differs from tests, treat the packaged output as evidence. Update requirements and tests to cover the observed gap before changing implementation.
