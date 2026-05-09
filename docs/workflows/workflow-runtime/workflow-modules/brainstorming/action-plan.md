@@ -1246,6 +1246,110 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingToolSchemas.ts`
 
+### Phase 10 - Explicit Step 4 Completion Routing After `attempt_completion`
+
+### Phase 10 Scope
+
+Update the brainstorming workflow so successful `attempt_completion` no longer relies on response-tool-owned workflow teardown. Step 4 must explicitly route the runtime-emitted `attempt_completion_succeeded` event to `complete_workflow`.
+
+### Phase 10 Scope Boundary
+
+- Do not change brainstorming Step 1, Step 2, or Step 3 behavior.
+- Do not change the Step 4 model-facing tool schema.
+- Do not add a workflow-specific completion handler or finalizer.
+- Do not modify shared runtime behavior.
+- Do not modify create-architecture, create-epics, or any other workflow module.
+
+### Phase 10 Known Issues / Risks / Technical Debt
+
+Historical completed phases in this action plan reference the older generic teardown behavior. Phase 10 supersedes that runtime expectation for live brainstorming workflow behavior without rewriting completed historical task records.
+
+[ ] Task 27. Align brainstorming requirements with explicit `attempt_completion_succeeded` routing.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/brainstorming/brainstorming-requirements.md`
+
+[ ] Subtask 27.1. In `brainstorming-requirements.md`, revise the Step 4 row in the workflow step table so it states that Step 4 uses `attempt_completion` for final delivery and routes `attempt_completion_succeeded` to workflow completion through its decision tree.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/brainstorming/brainstorming-requirements.md`
+
+[ ] Subtask 27.2. In `brainstorming-requirements.md`, replace the Step 4 completion paragraph that says runtime performs normal completion and teardown after final delivery with language requiring the Step 4 decision tree to route `attempt_completion_succeeded` to `complete_workflow`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/brainstorming/brainstorming-requirements.md`
+
+[ ] Subtask 27.3. In `brainstorming-requirements.md`, revise the Completion section so it states that Step 4 completes through final user delivery followed by the module-owned `attempt_completion_succeeded` decision-tree route to `complete_workflow`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/brainstorming/brainstorming-requirements.md`
+
+[ ] Task 28. Update the brainstorming Step 4 decision tree.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[ ] Subtask 28.1. In `buildStep4DecisionTree()`, update the existing `"step-4-project-prompt"` route so it keeps the existing `project_prompt` action and adds `followingBranchId: "step-4-await-attempt-completion"`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[ ] Subtask 28.2. In `buildStep4DecisionTree()`, add a `"step-4-await-attempt-completion"` branch with route id `"step-4-complete-workflow-after-attempt-completion"`, trigger `{ kind: "on_event", eventKind: "attempt_completion_succeeded" }`, and action `{ kind: "complete_workflow" }`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[ ] Task 29. Update brainstorming workflow tests for explicit Step 4 completion routing.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
+[ ] Subtask 29.1. In `brainstormingWorkflow.test.ts`, update the Step 4 workflow test so it asserts the `"step-4-project-prompt"` route keeps action kind `"project_prompt"` and sets `followingBranchId` to `"step-4-await-attempt-completion"`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
+[ ] Subtask 29.2. In `brainstormingWorkflow.test.ts`, add coverage proving route `"step-4-complete-workflow-after-attempt-completion"` in branch `"step-4-await-attempt-completion"` uses trigger `{ kind: "on_event", eventKind: "attempt_completion_succeeded" }`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
+[ ] Subtask 29.3. In `brainstormingWorkflow.test.ts`, add coverage proving route `"step-4-complete-workflow-after-attempt-completion"` uses action `{ kind: "complete_workflow" }`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
+[ ] Task 30. Validate Phase 10.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/brainstorming/brainstorming-requirements.md`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
+[ ] Subtask 30.1. Run `rg -n "After that final delivery, the workflow runtime must perform normal workflow completion and teardown|triggers teardown after final delivery|generic runtime teardown" docs/workflows/workflow-runtime/workflow-modules/brainstorming/brainstorming-requirements.md src/core/task/workflow-runtime/workflow-modules/brainstorming`; it must return no matches.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/brainstorming/brainstorming-requirements.md`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[ ] Subtask 30.2. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingToolSchemas.test.ts`; it must pass before Phase 10 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingToolSchemas.test.ts`
+
+[ ] Subtask 30.3. Run `npm run check-types`; it must pass before Phase 10 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
+[ ] Subtask 30.4. Run `npm run lint`; it must pass before Phase 10 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
 ## Validation
 
 Run these commands after all tasks and subtasks are complete:
