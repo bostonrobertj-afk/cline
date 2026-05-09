@@ -1,11 +1,19 @@
-# Context
-
-## Architecture
-
-## Brainstorming
+# Primary Context
 
 ## Additional Context
 
-# Epics
+# Epic
+
+## Objective
+
+## Description
+
+## Requirements
+
+## Scope
+
+## Scope Boundary
+
+# Stories
 
 

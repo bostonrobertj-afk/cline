@@ -131,3 +131,13 @@ If at any point you cannot satisfy one or more of these rules (for example, due 
 - Prescribe exact tests to be executed after all tasks and subtasks are complete
 - Review the test expectations/ assertions and ensure that they will not be stale due to changes made during action plan implementation
 - Ensure that prescribed testing is supported by the repo
+
+# Test Prescription Calibration
+- Prescribe tests only for behavior, contracts, regressions, and material risks required by the requirements, architecture, or approved action plan scope.
+- Each prescribed test must have a clear purpose: success path, required failure path, boundary/security behavior, persistence contract, schema/tool exposure contract, or integration wiring.
+- Do not prescribe exhaustive deep-equality assertions for objects containing editable prompt prose, persona prose, descriptions, or other copy unless exact text is itself the approved runtime contract.
+- Use exact assertions for canonical machine-consumed outputs and stable contracts, including tool names/schema shape, artifact file formats, persisted metadata keys, required route/action kinds, generated index JSON, and canonical document structures.
+- Use shape and invariant assertions for editable content: required fields exist, strings are non-empty, arrays are non-empty, mapped role/category is correct, and forbidden legacy values are absent.
+- Avoid duplicative coverage across layers. Prefer unit tests for pure builders and handlers, integration tests for runtime projection/wiring, and E2E tests only when user-visible extension behavior cannot be adequately verified below that layer.
+- Do not add static guards unless they protect an approved boundary, forbidden legacy dependency, forbidden model-facing tool, or known regression risk.
+- Before prescribing validation, review the assertions that will be introduced or updated and ensure they will not fail only because approved editable wording changed.

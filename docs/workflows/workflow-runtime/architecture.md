@@ -319,6 +319,7 @@ Exact filenames beyond this level are deferred to requirements and implementatio
    - `discovery`
    - `planning`
    - `implementation`
+     - `drafts`
      - `stories-backlog`
      - `stories-review`
      - `stories-complete`
@@ -391,11 +392,12 @@ If the selected decision action is a step transition, workflow runtime mutates t
 
 ### 6.6 Scenario: Completion and Teardown
 
-1. Workflow runtime evaluates workflow completion rules after relevant workflow session mutations, including active-step mutation caused by a step-transition decision action.
-2. If completion criteria are satisfied, workflow runtime treats completion as a terminal condition; no workflow-specific completion handler runs at this point.
-3. Workflow runtime performs workflow-agnostic teardown of the canonical workflow session.
-4. Because workflow-owned values live inside that session, teardown clears workflow values by clearing the workflow session rather than by clearing separate mirrored state.
-5. Downstream prompt, focus-chain, UI, and persisted workflow state are cleared as projections of that teardown.
+1. Response tools, including `attempt_completion`, do not own workflow completion. When a response tool succeeds during an active workflow, runtime records the tool result, emits any supported workflow lifecycle event, and re-enters workflow next-action evaluation.
+2. Workflow runtime evaluates workflow completion rules after relevant workflow session mutations, including active-step mutation caused by a step-transition decision action.
+3. If completion criteria are satisfied, workflow runtime treats completion as a terminal condition; no workflow-specific completion handler runs at this point.
+4. Workflow runtime performs workflow-agnostic teardown of the canonical workflow session.
+5. Because workflow-owned values live inside that session, teardown clears workflow values by clearing the workflow session rather than by clearing separate mirrored state.
+6. Downstream prompt, focus-chain, UI, and persisted workflow state are cleared as projections of that teardown.
 
 ### 6.7 Scenario: Subagent Workflow Session
 
@@ -581,14 +583,15 @@ Workflow runtime also owns the typed artifact-family convention registry used fo
 
 Artifact identity is not always numeric. Numbered lineage artifacts use dotted numeric identities. Singleton project artifacts use stable registry-owned string identities.
 
-`Epics.index.json` is the structured epic inventory sidecar for `Epics.md`. It uses this schema: `{ "version": 1, "epics": [{ "identity": "1", "title": "..." }] }`. `identity` is a positive numeric string, `title` is a non-empty string, and the index does not contain story, remediation-story, or review data.
+`Epics.index.json` is the structured epic inventory sidecar for `Epics.md`. It uses this schema: `{ "version": 1, "epics": [{ "identity": "1", "title": "...", "epic-delivery-spec-generated": false }] }`. `identity` is a positive numeric string, `title` is a non-empty string, `epic-delivery-spec-generated` is a boolean, and the index does not contain story, remediation-story, or review data.
 
 The canonical artifact dependency chain is:
 
 ```text
 Epics.md + Epics.index.json
   -> Epic-{E}-delivery-spec.md
-      -> Story-{E}-{S}.md
+      -> epic-{E}-stories.index.json
+      -> implementation/drafts/Story-{E}-{S}.md
           -> Remediation-story-{E}-{S}-{R}.md
           -> review/input artifacts
 ```
@@ -599,7 +602,7 @@ That numbering policy must carry forward across related artifact families, for e
 
 - the epics document assigns canonical epic numbers
 - epic delivery specs consume those epic numbers
-- epic delivery specs assign canonical story numbers within an epic
+- workflow runtime assigns canonical story numbers within an epic through the Story artifact allocation capability, using the selected parent epic identity and convention-driven discovery of existing `Story-{E}-{S}.md` files
 - story documents consume the composite epic/story identifiers
 - remediation stories extend the same identifier lineage rather than inventing a new naming scheme
 - QA/review artifacts inherit the selected story or remediation-story target identity rather than allocating a review-specific number
@@ -614,6 +617,8 @@ Workflow runtime owns artifact allocation and derivation:
 - document builders consume runtime-resolved artifact destination paths and remain content builders rather than artifact identity, filename, or project-folder allocators
 
 Workflow runtime must provide a backend-owned file-move capability for workflow decision trees that need to move existing project files between canonical project folders. File moves remain runtime/tool-governed filesystem operations and must stay inside the selected project folder.
+
+PI planning creates or updates the canonical story inventory in `implementation/epic-{E}-stories.index.json` before story files are generated. Runtime-owned story planning tools assign primary and remediation story identities and filenames. Runtime-owned story generation creates missing draft story files in `implementation/drafts`, populates prescribed story headings, and updates `story_file_generated` in the story index. AI agents do not provide canonical story identities or canonical story filenames.
 
 Workflow runtime also owns canonical normalization of user-provided project titles into filesystem-safe project identity.
 
@@ -667,7 +672,7 @@ The canonical in-scope workflow mapping for this architecture is:
 | `create-story` | `scrum-master` | `planning` |
 | `dev-story` | `developer` | `implementation` |
 | `document-project` | `analyst` | `implementation` |
-| `pi-planning` | `scrum-master` | `planning` |
+| `pi-planning` | `product-manager` | `planning` |
 | `quick-dev` | `quick-flow-solo-dev` | `implementation` |
 | `problem-solving` | `analyst` | `discovery` |
 | `quick-spec` | `quick-flow-solo-dev` | `planning` |
