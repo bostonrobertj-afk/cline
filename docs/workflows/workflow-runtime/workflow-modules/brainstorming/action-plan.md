@@ -1264,87 +1264,87 @@ Update the brainstorming workflow so successful `attempt_completion` no longer r
 
 Historical completed phases in this action plan reference the older generic teardown behavior. Phase 10 supersedes that runtime expectation for live brainstorming workflow behavior without rewriting completed historical task records.
 
-[ ] Task 27. Align brainstorming requirements with explicit `attempt_completion_succeeded` routing.
+[x] Task 27. Align brainstorming requirements with explicit `attempt_completion_succeeded` routing.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/brainstorming/brainstorming-requirements.md`
 
-[ ] Subtask 27.1. In `brainstorming-requirements.md`, revise the Step 4 row in the workflow step table so it states that Step 4 uses `attempt_completion` for final delivery and routes `attempt_completion_succeeded` to workflow completion through its decision tree.
+[x] Subtask 27.1. In `brainstorming-requirements.md`, revise the Step 4 row in the workflow step table so it states that Step 4 uses `attempt_completion` for final delivery and routes `attempt_completion_succeeded` to workflow completion through its decision tree.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/brainstorming/brainstorming-requirements.md`
 
-[ ] Subtask 27.2. In `brainstorming-requirements.md`, replace the Step 4 completion paragraph that says runtime performs normal completion and teardown after final delivery with language requiring the Step 4 decision tree to route `attempt_completion_succeeded` to `complete_workflow`.
+[x] Subtask 27.2. In `brainstorming-requirements.md`, replace the Step 4 completion paragraph that says runtime performs normal completion and teardown after final delivery with language requiring the Step 4 decision tree to route `attempt_completion_succeeded` to `complete_workflow`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/brainstorming/brainstorming-requirements.md`
 
-[ ] Subtask 27.3. In `brainstorming-requirements.md`, revise the Completion section so it states that Step 4 completes through final user delivery followed by the module-owned `attempt_completion_succeeded` decision-tree route to `complete_workflow`.
+[x] Subtask 27.3. In `brainstorming-requirements.md`, revise the Completion section so it states that Step 4 completes through final user delivery followed by the module-owned `attempt_completion_succeeded` decision-tree route to `complete_workflow`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/brainstorming/brainstorming-requirements.md`
 
-[ ] Task 28. Update the brainstorming Step 4 decision tree.
+[x] Task 28. Update the brainstorming Step 4 decision tree.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
 
-[ ] Subtask 28.1. In `buildStep4DecisionTree()`, update the existing `"step-4-project-prompt"` route so it keeps the existing `project_prompt` action and adds `followingBranchId: "step-4-await-attempt-completion"`.
+[x] Subtask 28.1. In `buildStep4DecisionTree()`, update the existing `"step-4-project-prompt"` route so it keeps the existing `project_prompt` action and adds `followingBranchId: "step-4-await-attempt-completion"`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
 
-[ ] Subtask 28.2. In `buildStep4DecisionTree()`, add a `"step-4-await-attempt-completion"` branch with route id `"step-4-complete-workflow-after-attempt-completion"`, trigger `{ kind: "on_event", eventKind: "attempt_completion_succeeded" }`, and action `{ kind: "complete_workflow" }`.
+[x] Subtask 28.2. In `buildStep4DecisionTree()`, add a `"step-4-await-attempt-completion"` branch with route id `"step-4-complete-workflow-after-attempt-completion"`, trigger `{ kind: "on_event", eventKind: "attempt_completion_succeeded" }`, and action `{ kind: "complete_workflow" }`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
 
-[ ] Task 29. Update brainstorming workflow tests for explicit Step 4 completion routing.
+[x] Task 29. Update brainstorming workflow tests for explicit Step 4 completion routing.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
 
-[ ] Subtask 29.1. In `brainstormingWorkflow.test.ts`, update the Step 4 workflow test so it asserts the `"step-4-project-prompt"` route keeps action kind `"project_prompt"` and sets `followingBranchId` to `"step-4-await-attempt-completion"`.
+[x] Subtask 29.1. In `brainstormingWorkflow.test.ts`, update the Step 4 workflow test so it asserts the `"step-4-project-prompt"` route keeps action kind `"project_prompt"` and sets `followingBranchId` to `"step-4-await-attempt-completion"`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
 
-[ ] Subtask 29.2. In `brainstormingWorkflow.test.ts`, add coverage proving route `"step-4-complete-workflow-after-attempt-completion"` in branch `"step-4-await-attempt-completion"` uses trigger `{ kind: "on_event", eventKind: "attempt_completion_succeeded" }`.
+[x] Subtask 29.2. In `brainstormingWorkflow.test.ts`, add coverage proving route `"step-4-complete-workflow-after-attempt-completion"` in branch `"step-4-await-attempt-completion"` uses trigger `{ kind: "on_event", eventKind: "attempt_completion_succeeded" }`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
 
-[ ] Subtask 29.3. In `brainstormingWorkflow.test.ts`, add coverage proving route `"step-4-complete-workflow-after-attempt-completion"` uses action `{ kind: "complete_workflow" }`.
+[x] Subtask 29.3. In `brainstormingWorkflow.test.ts`, add coverage proving route `"step-4-complete-workflow-after-attempt-completion"` uses action `{ kind: "complete_workflow" }`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
 
-[ ] Task 30. Validate Phase 10.
+[x] Task 30. Validate Phase 10.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/brainstorming/brainstorming-requirements.md`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
 
-[ ] Subtask 30.1. Run `rg -n "After that final delivery, the workflow runtime must perform normal workflow completion and teardown|triggers teardown after final delivery|generic runtime teardown" docs/workflows/workflow-runtime/workflow-modules/brainstorming/brainstorming-requirements.md src/core/task/workflow-runtime/workflow-modules/brainstorming`; it must return no matches.
+[x] Subtask 30.1. Run `rg -n "After that final delivery, the workflow runtime must perform normal workflow completion and teardown|triggers teardown after final delivery|generic runtime teardown" docs/workflows/workflow-runtime/workflow-modules/brainstorming/brainstorming-requirements.md src/core/task/workflow-runtime/workflow-modules/brainstorming`; it must return no matches.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/brainstorming/brainstorming-requirements.md`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
 
-[ ] Subtask 30.2. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingToolSchemas.test.ts`; it must pass before Phase 10 is marked complete.
+[x] Subtask 30.2. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingToolSchemas.test.ts`; it must pass before Phase 10 is marked complete.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingToolSchemas.test.ts`
 
-[ ] Subtask 30.3. Run `npm run check-types`; it must pass before Phase 10 is marked complete.
+[x] Subtask 30.3. Run `npm run check-types`; it must pass before Phase 10 is marked complete.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
 
-[ ] Subtask 30.4. Run `npm run lint`; it must pass before Phase 10 is marked complete.
+[x] Subtask 30.4. Run `npm run lint`; it must pass before Phase 10 is marked complete.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
@@ -1394,7 +1394,7 @@ Run these commands after all tasks and subtasks are complete:
     - Confirm no runtime code reads `.cline/skills/bmad-brainstorming/brain-methods.csv`, `_bmad/core/skills/bmad-brainstorming/brain-methods.csv`, `.cline/skills/bmad-brainstorming/template.md`, or `/Users/robertboston/Documents/Cline/Workflows/brainstorming.md`.
     - Confirm `get_brainstorming_methods` and `append_brainstorming_selected_technique` are exposed only through brainstorming Step 3 module-owned `buildToolSchema`.
     - Confirm Step 2 random selection uses `run_deterministic_procedure` and not any tool-backed operation.
-    - Confirm Step 4 completion uses successful `attempt_completion` plus generic runtime teardown, with no workflow-specific completion handler.
+    - Confirm Step 4 completion uses successful `attempt_completion` followed by the module-owned `attempt_completion_succeeded` route to the runtime-owned `complete_workflow` action, with no workflow-specific completion handler or finalizer.
     - Confirm the Mary/Analyst persona is committed as module-owned data and not loaded from `_bmad/bmm/agents/analyst.md`.
     - Confirm Step 3 and Step 4 tool schemas are delegated through `brainstormingToolSchemas.ts` and expose exactly the tools required by `brainstorming-requirements.md`.
 

@@ -678,8 +678,23 @@ describe("brainstormingWorkflowDefinition", () => {
 		])
 		expect(step4ToolNames).not.to.include("build_workflow_document")
 		expect(step4ToolNames).not.to.include("set_workflow_values")
-		expect(getAction("step-4", "step-4-project-prompt", "step-4-project-prompt")).to.deep.include({
+		const step4ProjectPromptRoute = findRoute("step-4", "step-4-project-prompt", "step-4-project-prompt")
+		expect(step4ProjectPromptRoute.action).to.deep.include({
 			kind: "project_prompt",
+		})
+		expect(step4ProjectPromptRoute.followingBranchId).to.equal("step-4-await-attempt-completion")
+
+		const completionRoute = findRoute(
+			"step-4",
+			"step-4-await-attempt-completion",
+			"step-4-complete-workflow-after-attempt-completion",
+		)
+		expect(completionRoute.trigger).to.deep.equal({
+			kind: "on_event",
+			eventKind: "attempt_completion_succeeded",
+		})
+		expect(completionRoute.action).to.deep.equal({
+			kind: "complete_workflow",
 		})
 	})
 

@@ -1223,6 +1223,19 @@ function buildStep4DecisionTree(): WorkflowDecisionTree {
 						action: {
 							kind: "project_prompt",
 						},
+						followingBranchId: "step-4-await-attempt-completion",
+					},
+				],
+			},
+			"step-4-await-attempt-completion": {
+				id: "step-4-await-attempt-completion",
+				routes: [
+					{
+						id: "step-4-complete-workflow-after-attempt-completion",
+						trigger: { kind: "on_event", eventKind: "attempt_completion_succeeded" },
+						action: {
+							kind: "complete_workflow",
+						},
 					},
 				],
 			},

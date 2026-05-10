@@ -91,7 +91,7 @@ The module must define these four steps, using these exact `checklistLabel` valu
 | `step-1` | 1 | `Gather Inputs` | Branch on runtime entry singleton artifact resolution. When `creationRequired` is `true`, allocate/create `brainstorming.md`, build the initial document shell, render one multi-panel setup form, and write submitted context/topic/goals into the output document. When `creationRequired` is `false`, skip allocation, skip initial document builds, skip the Step 1 setup form, and transition directly to Step 3 to continue work against the existing `output_file`. |
 | `step-2` | 2 | `Resolve Session Approach` | Present the three approach paths, persist `selected_approach`, route through choose/random/suggest behavior, and write selected technique state into the output document. |
 | `step-3` | 3 | `Perform Interactive Brainstorming` | Model-driven facilitation step; may retrieve brainstorming methods when suggestion was requested; progression requires `workflow_progress_request` confirmation. |
-| `step-4` | 4 | `Organize Ideas & Plan Next Actions` | Model-driven organization/final-report step that appends the summary to `output_file`, completes the workflow, and triggers teardown after final delivery. |
+| `step-4` | 4 | `Organize Ideas & Plan Next Actions` | Model-driven organization/final-report step that appends the summary to `output_file`, uses `attempt_completion` for final delivery, and routes `attempt_completion_succeeded` to workflow completion through its decision tree. |
 
 ## Forms And Deterministic Behavior
 
@@ -284,7 +284,7 @@ Step 4 `buildPromptSource` must construct the Step 4 prompt from the source work
 
 Step 4 tool schema must expose `read_file`, `apply_patch`, `send_user_message`, `ask_followup_question`, and `attempt_completion` for reviewing ideas, updating `{output_file}`, asking the user which ideas matter most, and delivering the final user-facing completion message.
 
-Step 4 completion requires successful final delivery through `attempt_completion`. After that final delivery, the workflow runtime must perform normal workflow completion and teardown. Step 4 must not use a workflow-specific completion handler.
+Step 4 completion requires successful final delivery through `attempt_completion`. The Step 4 decision tree must then route `attempt_completion_succeeded` to `complete_workflow`. Step 4 must not use a workflow-specific completion handler.
 
 ## Prompting And Tools
 
@@ -312,7 +312,7 @@ Every Step 3 variant must expose `get_brainstorming_methods` and `append_brainst
 
 ## Completion
 
-Step 4 completes through final user delivery and workflow teardown. No workflow-specific completion handler is allowed.
+Step 4 completes through final user delivery followed by the module-owned `attempt_completion_succeeded` decision-tree route to `complete_workflow`. No workflow-specific completion handler is allowed.
 
 ## Cleanup / Compatibility
 
