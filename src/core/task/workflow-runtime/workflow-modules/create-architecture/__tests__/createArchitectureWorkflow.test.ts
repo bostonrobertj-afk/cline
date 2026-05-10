@@ -571,6 +571,38 @@ describe("createArchitectureWorkflowDefinition", () => {
 		}
 	})
 
+	it("routes the Step 9 project prompt to the attempt-completion await branch", () => {
+		const step9ProjectPromptRoute = findRoute("step-9", "step-9-project-prompt", "step-9-project-prompt")
+
+		expect(step9ProjectPromptRoute.action.kind).to.equal("project_prompt")
+		expect(step9ProjectPromptRoute.followingBranchId).to.equal("step-9-await-attempt-completion")
+	})
+
+	it("listens for successful Step 9 attempt_completion before completing the workflow", () => {
+		const completionRoute = findRoute(
+			"step-9",
+			"step-9-await-attempt-completion",
+			"step-9-complete-workflow-after-attempt-completion",
+		)
+
+		expect(completionRoute.trigger).to.deep.equal({
+			kind: "on_event",
+			eventKind: "attempt_completion_succeeded",
+		})
+	})
+
+	it("completes the workflow after successful Step 9 attempt_completion", () => {
+		const completionRoute = findRoute(
+			"step-9",
+			"step-9-await-attempt-completion",
+			"step-9-complete-workflow-after-attempt-completion",
+		)
+
+		expect(completionRoute.action).to.deep.equal({
+			kind: "complete_workflow",
+		})
+	})
+
 	it("delegates every buildToolSchema directly to named create-architecture builders", () => {
 		const expectations: readonly StepToolSchemaBuilderExpectation[] = [
 			{ stepId: "step-1", buildToolSchema: buildCreateArchitectureStep1ToolSchemas },

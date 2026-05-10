@@ -732,6 +732,19 @@ function buildStep9DecisionTree(): WorkflowDecisionTree {
 						action: {
 							kind: "project_prompt",
 						},
+						followingBranchId: "step-9-await-attempt-completion",
+					},
+				],
+			},
+			"step-9-await-attempt-completion": {
+				id: "step-9-await-attempt-completion",
+				routes: [
+					{
+						id: "step-9-complete-workflow-after-attempt-completion",
+						trigger: { kind: "on_event", eventKind: "attempt_completion_succeeded" },
+						action: {
+							kind: "complete_workflow",
+						},
 					},
 				],
 			},

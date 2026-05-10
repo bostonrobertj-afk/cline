@@ -804,67 +804,67 @@ Update the create-architecture workflow so successful `attempt_completion` is ha
 
 Historical completed phases in this action plan reference the older response-tool-driven teardown behavior. Phase 7 supersedes that runtime expectation for live create-architecture workflow behavior without rewriting completed historical task records.
 
-[ ] Task 14. Update the create-architecture Step 9 decision tree.
+[x] Task 14. Update the create-architecture Step 9 decision tree.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/createArchitectureWorkflow.ts`
 
-[ ] Subtask 14.1. In `buildStep9DecisionTree()`, update the existing `"step-9-project-prompt"` route so it keeps the existing `project_prompt` action and adds `followingBranchId: "step-9-await-attempt-completion"`.
+[x] Subtask 14.1. In `buildStep9DecisionTree()`, update the existing `"step-9-project-prompt"` route so it keeps the existing `project_prompt` action and adds `followingBranchId: "step-9-await-attempt-completion"`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/createArchitectureWorkflow.ts`
 
-[ ] Subtask 14.2. In `buildStep9DecisionTree()`, add a `"step-9-await-attempt-completion"` branch with route id `"step-9-complete-workflow-after-attempt-completion"`, trigger `{ kind: "on_event", eventKind: "attempt_completion_succeeded" }`, and action `{ kind: "complete_workflow" }`.
+[x] Subtask 14.2. In `buildStep9DecisionTree()`, add a `"step-9-await-attempt-completion"` branch with route id `"step-9-complete-workflow-after-attempt-completion"`, trigger `{ kind: "on_event", eventKind: "attempt_completion_succeeded" }`, and action `{ kind: "complete_workflow" }`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/createArchitectureWorkflow.ts`
 
-[ ] Task 15. Update create-architecture workflow tests for explicit Step 9 completion routing.
+[x] Task 15. Update create-architecture workflow tests for explicit Step 9 completion routing.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`
 
-[ ] Subtask 15.1. In `createArchitectureWorkflow.test.ts`, add coverage proving the `"step-9-project-prompt"` route keeps action kind `"project_prompt"` and sets `followingBranchId` to `"step-9-await-attempt-completion"`.
+[x] Subtask 15.1. In `createArchitectureWorkflow.test.ts`, add coverage proving the `"step-9-project-prompt"` route keeps action kind `"project_prompt"` and sets `followingBranchId` to `"step-9-await-attempt-completion"`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`
 
-[ ] Subtask 15.2. In `createArchitectureWorkflow.test.ts`, add coverage proving route `"step-9-complete-workflow-after-attempt-completion"` in branch `"step-9-await-attempt-completion"` uses trigger `{ kind: "on_event", eventKind: "attempt_completion_succeeded" }`.
+[x] Subtask 15.2. In `createArchitectureWorkflow.test.ts`, add coverage proving route `"step-9-complete-workflow-after-attempt-completion"` in branch `"step-9-await-attempt-completion"` uses trigger `{ kind: "on_event", eventKind: "attempt_completion_succeeded" }`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`
 
-[ ] Subtask 15.3. In `createArchitectureWorkflow.test.ts`, add coverage proving route `"step-9-complete-workflow-after-attempt-completion"` uses action `{ kind: "complete_workflow" }`.
+[x] Subtask 15.3. In `createArchitectureWorkflow.test.ts`, add coverage proving route `"step-9-complete-workflow-after-attempt-completion"` uses action `{ kind: "complete_workflow" }`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`
 
-[ ] Task 16. Validate Phase 7.
+[x] Task 16. Validate Phase 7.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/createArchitectureWorkflow.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-architecture/create-architecture-requirements.md`
 
-[ ] Subtask 16.1. Run `rg -n "After that final delivery, the workflow runtime must perform normal workflow completion and teardown|relies on normal attempt_completion workflow teardown|existing generic final-delivery teardown path" docs/workflows/workflow-runtime/workflow-modules/create-architecture/create-architecture-requirements.md src/core/task/workflow-runtime/workflow-modules/create-architecture`; it must return no matches.
+[x] Subtask 16.1. Run `rg -n "After that final delivery, the workflow runtime must perform normal workflow completion and teardown|relies on normal attempt_completion workflow teardown|existing generic final-delivery teardown path" docs/workflows/workflow-runtime/workflow-modules/create-architecture/create-architecture-requirements.md src/core/task/workflow-runtime/workflow-modules/create-architecture`; it must return no matches.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-architecture/create-architecture-requirements.md`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/createArchitectureWorkflow.ts`
 
-[ ] Subtask 16.2. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureToolSchemas.test.ts`; it must pass before Phase 7 is marked complete.
+[x] Subtask 16.2. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureToolSchemas.test.ts`; it must pass before Phase 7 is marked complete.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureToolSchemas.test.ts`
 
-[ ] Subtask 16.3. Run `npm run check-types`; it must pass before Phase 7 is marked complete.
+[x] Subtask 16.3. Run `npm run check-types`; it must pass before Phase 7 is marked complete.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/createArchitectureWorkflow.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`
 
-[ ] Subtask 16.4. Run `npm run lint`; it must pass before Phase 7 is marked complete.
+[x] Subtask 16.4. Run `npm run lint`; it must pass before Phase 7 is marked complete.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/createArchitectureWorkflow.ts`
