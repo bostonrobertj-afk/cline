@@ -1,3 +1,5 @@
+import { readFile } from "fs/promises"
+
 import type { ActiveWorkflowSession, WorkflowValue } from "../../types"
 
 export const CREATE_EPICS_DOCUMENT_HEADING_CONTEXT = "Context"
@@ -25,6 +27,7 @@ export interface CreateEpicSectionInput {
 export interface CanonicalEpicIndexEntry {
 	identity: string
 	title: string
+	"story-index-generated": boolean
 }
 
 interface CreateEpicsDocumentSection {
@@ -245,6 +248,7 @@ export function parseCanonicalEpicIndexEntries(documentContent: string): readonl
 	return parseEpicsBody(documentContent.slice(epicsHeadingEnd)).sections.map((section) => ({
 		identity: section.identity,
 		title: section.title,
+		"story-index-generated": false,
 	}))
 }
 
@@ -277,6 +281,15 @@ export function buildEpicsIndexJson(documentContent: string): string {
 	const epics = [...parsedEntries].sort((leftEntry, rightEntry) => Number(leftEntry.identity) - Number(rightEntry.identity))
 
 	return `${JSON.stringify({ version: 1, epics }, undefined, 2)}\n`
+}
+
+export async function buildEpicsIndexJsonFromSession(session: ActiveWorkflowSession): Promise<string> {
+	const outputFile = readRenderedWorkflowValue(session, "output_file")
+	if (outputFile === undefined) {
+		throw new Error("Cannot build Epics.index.json because output_file is missing.")
+	}
+
+	return buildEpicsIndexJson(await readFile(outputFile, "utf8"))
 }
 
 export function upsertCanonicalEpicSection(documentContent: string, input: CreateEpicSectionInput): string {

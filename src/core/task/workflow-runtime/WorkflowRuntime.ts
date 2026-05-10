@@ -205,7 +205,7 @@ interface ParsedWorkflowArtifactIdentity {
 interface WorkflowEpicsIndexEntry {
 	identity: string
 	title: string
-	"epic-delivery-spec-generated": boolean
+	"story-index-generated": boolean
 }
 
 interface WorkflowEpicsIndex {
@@ -5618,7 +5618,7 @@ export class WorkflowRuntime {
 			this.assertOnlyEpicsIndexKeys({
 				artifactId: args.artifactId,
 				record: entry,
-				allowedKeys: ["identity", "title", "epic-delivery-spec-generated"],
+				allowedKeys: ["identity", "title", "story-index-generated"],
 				context: `Epics.index.json epics[${index}]`,
 			})
 
@@ -5636,14 +5636,14 @@ export class WorkflowRuntime {
 				)
 			}
 
-			const epicDeliverySpecGenerated = entry["epic-delivery-spec-generated"]
-			if (typeof epicDeliverySpecGenerated !== "boolean") {
+			const storyIndexGenerated = entry["story-index-generated"]
+			if (typeof storyIndexGenerated !== "boolean") {
 				throw new Error(
-					`Cannot allocate workflow artifact ${args.artifactId} because Epics.index.json epics[${index}].epic-delivery-spec-generated must be a boolean.`,
+					`Cannot allocate workflow artifact ${args.artifactId} because Epics.index.json epics[${index}].story-index-generated must be a boolean.`,
 				)
 			}
 
-			return { identity, title, "epic-delivery-spec-generated": epicDeliverySpecGenerated }
+			return { identity, title, "story-index-generated": storyIndexGenerated }
 		})
 
 		return { version: 1, epics }

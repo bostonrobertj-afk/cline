@@ -177,7 +177,8 @@ Establish the project foundation needed for future workflow capabilities.
   "epics": [
     {
       "identity": "1",
-      "title": "First outcome"
+      "title": "First outcome",
+      "story-index-generated": false
     }
   ]
 }
@@ -204,22 +205,25 @@ Establish the project foundation needed for future workflow capabilities.
   "epics": [
     {
       "identity": "2",
-      "title": "Second outcome"
+      "title": "Second outcome",
+      "story-index-generated": false
     },
     {
       "identity": "10",
-      "title": "Tenth outcome"
+      "title": "Tenth outcome",
+      "story-index-generated": false
     }
   ]
 }
 `)
-		expect(indexJson).not.to.include("story")
+		expect(indexJson).not.to.include("story, review")
 		expect(indexJson).not.to.include("review")
 		expect(indexJson).not.to.include("objective")
 		expect(indexJson).not.to.include("scope")
 		expect(indexJson).not.to.include("requirements")
 		expect(indexJson).not.to.include("Requirement 10")
 		expect(indexJson).not.to.include("Scope 10")
+		expect(indexJson).not.to.include(["epic", "delivery", "spec", "generated"].join("-"))
 	})
 
 	it("fails clearly when Epics.md contains no canonical epic sections", () => {

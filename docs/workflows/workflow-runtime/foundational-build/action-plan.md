@@ -9791,6 +9791,124 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/ToolExecutor.canonicalization.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`
 
+### Phase 63 - Replace Epics Index Delivery-Spec Flag With Story-Index Flag
+
+### Phase 63 Scope
+
+Update shared runtime handling of `Epics.index.json` so indexed epics use `story-index-generated` instead of the retired `epic-delivery-spec-generated` flag.
+
+### Phase 63 Scope Boundary
+
+- Do not modify create-epics module behavior in this phase.
+- Do not remove `WorkflowArtifactFamily.EpicDeliverySpec` or its existing allocation code.
+- Do not change story planning tool behavior.
+
+### Phase 63 Known Issues / Risks / Technical Debt
+
+`EpicDeliverySpec` runtime support still exists for compatibility with currently built artifact-family code, but the active create-epics workflow will no longer generate or track delivery specs.
+
+[x] Task 203. Align shared requirements and architecture with the new `Epics.index.json` flag.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/requirements.md`
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/requirements.md`
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/architecture.md`
+
+[x] Subtask 203.1. In `docs/workflows/workflow-runtime/requirements.md`, replace `epic-delivery-spec-generated` with `story-index-generated` in the `Epics.index.json` schema text.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/requirements.md`
+
+[x] Subtask 203.2. In `docs/workflows/workflow-runtime/foundational-build/requirements.md`, replace `epic-delivery-spec-generated` with `story-index-generated` in the `Epics.index.json` schema text.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/requirements.md`
+
+[x] Subtask 203.3. In `docs/workflows/workflow-runtime/architecture.md`, replace `epic-delivery-spec-generated` with `story-index-generated` in the `Epics.index.json` architecture paragraph.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/architecture.md`
+
+[x] Task 204. Update shared runtime Epics index validation.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 204.1. In `WorkflowRuntime.ts`, update `WorkflowEpicsIndexEntry` so each entry requires `"story-index-generated": boolean` instead of `"epic-delivery-spec-generated": boolean`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 204.2. In `WorkflowRuntime.ts`, update `parseEpicsIndexJson(...)` allowed entry keys to `identity`, `title`, and `story-index-generated`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 204.3. In `WorkflowRuntime.ts`, update `parseEpicsIndexJson(...)` to validate `story-index-generated` as a boolean.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 204.4. In `WorkflowRuntime.ts`, update `parseEpicsIndexJson(...)` to return entries containing `story-index-generated`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Task 205. Update shared runtime tests.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 205.1. In `WorkflowRuntime.test.ts`, replace `epic-delivery-spec-generated` fixtures with `story-index-generated`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 205.2. In `WorkflowRuntime.test.ts`, update malformed-index validation expectations for the new key.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 205.3. In `WorkflowRuntime.test.ts`, add coverage proving `epic-delivery-spec-generated` is rejected as an unsupported key.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Task 206. Validate Phase 63.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/requirements.md`
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/requirements.md`
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/architecture.md`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 206.1. Run `rg -n "epic-delivery-spec-generated" src/core/task/workflow-runtime docs/workflows/workflow-runtime/requirements.md docs/workflows/workflow-runtime/architecture.md docs/workflows/workflow-runtime/foundational-build/requirements.md`; it must return no matches.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/requirements.md`
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/requirements.md`
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/architecture.md`
+
+[x] Subtask 206.2. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`; it must pass before Phase 63 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 206.3. Run `npm run check-types`; it must pass before Phase 63 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 206.4. Run `npm run lint`; it must pass before Phase 63 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
 ## Validation
 
 After all implementation tasks are complete, run these commands from `/Users/robertboston/Documents/Cline Extension/cline`:

@@ -760,3 +760,188 @@ Allowed files:
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-epics/action-plan.md`
+
+### Phase 7 - Story-Index Epics Index And Explicit Completion Routing
+
+### Phase 7 Scope
+
+Update create-epics so `Epics.index.json` records `story-index-generated: false` for every epic, and Step 2 generates the index through workflow-owned routing after `attempt_completion_succeeded` before completing the workflow.
+
+### Phase 7 Scope Boundary
+
+- Do not expose `build_workflow_document`, `create_workflow_artifact`, or `set_workflow_values` to the model.
+- Do not reintroduce `finalDeliveryFinalizer`.
+- Do not generate story files or story indexes in create-epics.
+- Do not change Step 1 prerequisite behavior.
+
+[x] Task 13. Align create-epics requirements.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-epics/create-epics-requirements.md`
+
+[x] Subtask 13.1. In `create-epics-requirements.md`, replace the `Epics.index.json` schema so each epic has `identity`, `title`, and `story-index-generated`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-epics/create-epics-requirements.md`
+
+[x] Subtask 13.2. In `create-epics-requirements.md`, require index generation to set `story-index-generated` to `false` for every epic.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-epics/create-epics-requirements.md`
+
+[x] Subtask 13.3. In `create-epics-requirements.md`, replace finalizer/teardown language with explicit `attempt_completion_succeeded` routing to index generation and then `complete_workflow`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-epics/create-epics-requirements.md`
+
+[x] Task 14. Update create-epics index document builders.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsDocument.ts`
+
+[x] Subtask 14.1. In `createEpicsDocument.ts`, update `CanonicalEpicIndexEntry` to include `"story-index-generated": boolean`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsDocument.ts`
+
+[x] Subtask 14.2. In `createEpicsDocument.ts`, update `parseCanonicalEpicIndexEntries(...)` so every parsed epic returns `"story-index-generated": false`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsDocument.ts`
+
+[x] Subtask 14.3. In `createEpicsDocument.ts`, add an exported async builder that reads `output_file` from the active session and returns `buildEpicsIndexJson(...)` for use by `build_workflow_document`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsDocument.ts`
+
+[x] Task 15. Update create-epics document tests.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsDocument.test.ts`
+
+[x] Subtask 15.1. In `createEpicsDocument.test.ts`, update expected `Epics.index.json` output to include `"story-index-generated": false`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsDocument.test.ts`
+
+[x] Subtask 15.2. In `createEpicsDocument.test.ts`, add coverage proving `epic-delivery-spec-generated` is absent from generated index JSON.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsDocument.test.ts`
+
+[x] Task 16. Update Step 2 completion routing.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
+
+[x] Subtask 16.1. In `createEpicsWorkflow.ts`, import the new session-based epics-index document builder.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
+
+[x] Subtask 16.2. In `createEpicsWorkflow.ts`, add Step 2 trigger helpers that distinguish `attempt_completion_succeeded` with and without a resolved non-empty `epics_index_file`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
+
+[x] Subtask 16.3. In `buildStep2DecisionTree()`, add `followingBranchId: "step-2-await-attempt-completion"` to the Step 2 entry `project_prompt` route.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
+
+[x] Subtask 16.4. In `buildStep2DecisionTree()`, add an `attempt_completion_succeeded` route with resolved `epics_index_file` that runs `build_workflow_document` for `EPICS_INDEX_ARTIFACT_ID`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
+
+[x] Subtask 16.5. In `buildStep2DecisionTree()`, add an `attempt_completion_succeeded` route without resolved `epics_index_file` that runs `allocate_artifact` for `EPICS_INDEX_ARTIFACT_ID`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
+
+[x] Subtask 16.6. In `buildStep2DecisionTree()`, add an allocation-success route that builds `Epics.index.json`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
+
+[x] Subtask 16.7. In `buildStep2DecisionTree()`, add allocation-failure and index-build-failure routes that return `terminal_error`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
+
+[x] Subtask 16.8. In `buildStep2DecisionTree()`, add an index-build-success route that returns `complete_workflow`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
+
+[x] Task 17. Update create-epics workflow tests.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`
+
+[x] Subtask 17.1. In `createEpicsWorkflow.test.ts`, assert Step 2 entry follows `step-2-await-attempt-completion`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`
+
+[x] Subtask 17.2. In `createEpicsWorkflow.test.ts`, assert `attempt_completion_succeeded` with `epics_index_file` routes to `build_workflow_document`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`
+
+[x] Subtask 17.3. In `createEpicsWorkflow.test.ts`, assert `attempt_completion_succeeded` without `epics_index_file` routes to `allocate_artifact`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`
+
+[x] Subtask 17.4. In `createEpicsWorkflow.test.ts`, assert index-build success routes to `complete_workflow`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`
+
+[x] Subtask 17.5. In `createEpicsWorkflow.test.ts`, assert Step 2 tool schema remains unchanged.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`
+
+[x] Task 18. Validate Phase 7.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-epics/create-epics-requirements.md`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsDocument.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsDocument.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsToolSchemas.test.ts`
+
+[x] Subtask 18.1. Run `rg -n "finalDeliveryFinalizer|epic-delivery-spec-generated" src/core/task/workflow-runtime/workflow-modules/create-epics docs/workflows/workflow-runtime/workflow-modules/create-epics/create-epics-requirements.md`; it must return no matches.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-epics/create-epics-requirements.md`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsDocument.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsDocument.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`
+
+[x] Subtask 18.2. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsDocument.test.ts src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsToolSchemas.test.ts`; it must pass before Phase 7 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsDocument.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsToolSchemas.test.ts`
+
+[x] Subtask 18.3. Run `npm run check-types`; it must pass before Phase 7 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsDocument.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsDocument.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`
+
+[x] Subtask 18.4. Run `npm run lint`; it must pass before Phase 7 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsDocument.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsDocument.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`

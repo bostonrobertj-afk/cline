@@ -50,6 +50,12 @@ function buildWorkflowFormCompletedEvent(workflowFormId: string): WorkflowBranch
 	}
 }
 
+function buildAttemptCompletionSucceededEvent(): WorkflowBranchTriggerEvent {
+	return {
+		kind: "attempt_completion_succeeded",
+	}
+}
+
 function buildToolBackedOperationEvent(
 	kind: "tool_backed_operation_succeeded" | "tool_backed_operation_failed",
 	branchId: string,
@@ -119,6 +125,44 @@ function expectRouteMatchesToolBackedOperationEvent(
 			activeBranchId: branchId,
 			workflowValues: {},
 			step: createEpicsWorkflowDefinition.steps["step-1"],
+			triggerEvent: buildToolBackedOperationEvent(kind, branchId, routeId),
+		}),
+	).to.equal(true)
+}
+
+function expectStep2RouteMatchesAttemptCompletionSucceeded(
+	route: WorkflowDecisionBranchRoute,
+	workflowValues: WorkflowValues,
+): void {
+	if (route.trigger.kind !== "event_predicate") {
+		throw new Error(`Expected event_predicate trigger, received ${route.trigger.kind}.`)
+	}
+
+	expect(
+		route.trigger.matches({
+			activeBranchId: "step-2-await-attempt-completion",
+			workflowValues,
+			step: createEpicsWorkflowDefinition.steps["step-2"],
+			triggerEvent: buildAttemptCompletionSucceededEvent(),
+		}),
+	).to.equal(true)
+}
+
+function expectStep2RouteMatchesToolBackedOperationEvent(
+	route: WorkflowDecisionBranchRoute,
+	kind: "tool_backed_operation_succeeded" | "tool_backed_operation_failed",
+	branchId: string,
+	routeId: string,
+): void {
+	if (route.trigger.kind !== "event_predicate") {
+		throw new Error(`Expected event_predicate trigger, received ${route.trigger.kind}.`)
+	}
+
+	expect(
+		route.trigger.matches({
+			activeBranchId: "step-2-await-index-build",
+			workflowValues: {},
+			step: createEpicsWorkflowDefinition.steps["step-2"],
 			triggerEvent: buildToolBackedOperationEvent(kind, branchId, routeId),
 		}),
 	).to.equal(true)
@@ -500,6 +544,67 @@ describe("createEpicsWorkflowDefinition", () => {
 		expect(existingArtifactActionKinds).to.deep.equal(["render_workflow_form", "transition_step"])
 		expect(existingArtifactActionKinds).not.to.include("allocate_artifact")
 		expect(existingArtifactActionKinds).not.to.include("build_workflow_document")
+	})
+
+	it("routes Step 2 project prompt to await attempt completion", () => {
+		const projectPromptRoute = findRoute("step-2", "step-2-project-prompt", "step-2-project-prompt")
+
+		expect(projectPromptRoute.trigger).to.deep.equal({ kind: "always" })
+		expect(projectPromptRoute.action).to.deep.equal({
+			kind: "project_prompt",
+		})
+		expect(projectPromptRoute.followingBranchId).to.equal("step-2-await-attempt-completion")
+	})
+
+	it("routes attempt completion with an existing Epics.index.json path to index document build", () => {
+		const buildIndexRoute = findRoute(
+			"step-2",
+			"step-2-await-attempt-completion",
+			"step-2-build-index-after-attempt-completion",
+		)
+
+		expectStep2RouteMatchesAttemptCompletionSucceeded(buildIndexRoute, {
+			epics_index_file: "/tmp/create-epics-project/planning/Epics.index.json",
+		})
+		expect(buildIndexRoute.action.kind).to.equal("build_workflow_document")
+		if (buildIndexRoute.action.kind !== "build_workflow_document") {
+			throw new Error(`Expected build_workflow_document, received ${buildIndexRoute.action.kind}.`)
+		}
+		expect(buildIndexRoute.action.instruction.artifactId).to.equal("epics_index")
+		expect(buildIndexRoute.followingBranchId).to.equal("step-2-await-index-build")
+	})
+
+	it("routes attempt completion without an Epics.index.json path to index artifact allocation", () => {
+		const allocateIndexRoute = findRoute(
+			"step-2",
+			"step-2-await-attempt-completion",
+			"step-2-allocate-index-after-attempt-completion",
+		)
+
+		expectStep2RouteMatchesAttemptCompletionSucceeded(allocateIndexRoute, {})
+		expect(allocateIndexRoute.action).to.deep.equal({
+			kind: "allocate_artifact",
+			artifactId: "epics_index",
+		})
+		expect(allocateIndexRoute.followingBranchId).to.equal("step-2-await-index-allocation")
+	})
+
+	it("routes successful Epics.index.json builds to workflow completion", () => {
+		const completeWorkflowRoute = findRoute(
+			"step-2",
+			"step-2-await-index-build",
+			"step-2-complete-workflow-after-index-build",
+		)
+
+		expectStep2RouteMatchesToolBackedOperationEvent(
+			completeWorkflowRoute,
+			"tool_backed_operation_succeeded",
+			"step-2-await-attempt-completion",
+			"step-2-build-index-after-attempt-completion",
+		)
+		expect(completeWorkflowRoute.action).to.deep.equal({
+			kind: "complete_workflow",
+		})
 	})
 
 	it("builds the Step 2 prompt and exposes only the approved model-facing tools", () => {

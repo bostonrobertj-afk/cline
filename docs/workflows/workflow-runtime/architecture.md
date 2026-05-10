@@ -583,7 +583,7 @@ Workflow runtime also owns the typed artifact-family convention registry used fo
 
 Artifact identity is not always numeric. Numbered lineage artifacts use dotted numeric identities. Singleton project artifacts use stable registry-owned string identities.
 
-`Epics.index.json` is the structured epic inventory sidecar for `Epics.md`. It uses this schema: `{ "version": 1, "epics": [{ "identity": "1", "title": "...", "epic-delivery-spec-generated": false }] }`. `identity` is a positive numeric string, `title` is a non-empty string, `epic-delivery-spec-generated` is a boolean, and the index does not contain story, remediation-story, or review data.
+`Epics.index.json` is the structured epic inventory sidecar for `Epics.md`. It uses this schema: `{ "version": 1, "epics": [{ "identity": "1", "title": "...", "story-index-generated": false }] }`. `identity` is a positive numeric string, `title` is a non-empty string, `story-index-generated` is a boolean, and the index does not contain story, remediation-story, or review data.
 
 The canonical artifact dependency chain is:
 

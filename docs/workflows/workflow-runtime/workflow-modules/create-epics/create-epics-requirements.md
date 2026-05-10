@@ -125,13 +125,13 @@ When `entry_artifact_resolution_completed` reports `creationRequired: true` for 
 
 When `entry_artifact_resolution_completed` reports `creationRequired: false` for `Epics.md`, Step 1 must skip `allocate_artifact` and skip the initial `build_workflow_document` shell build for `Epics.md`; it must use the runtime-persisted `output_file` and continue against the existing document only after the required architecture prerequisite has been resolved and the context workflow form has completed.
 
-`Epics.index.json` must be generated or regenerated deterministically after the AI agent uses `attempt_completion` and before workflow teardown. The final index content must match this schema exactly:
+`Epics.index.json` must be generated or regenerated deterministically when Step 2 receives `attempt_completion_succeeded`, and successful index generation must route to `complete_workflow`. The final index content must match this schema exactly:
 
 ```json
-{ "version": 1, "epics": [{ "identity": "1", "title": "..." }] }
+{ "version": 1, "epics": [{ "identity": "1", "title": "...", "story-index-generated": false }] }
 ```
 
-`identity` values in `Epics.index.json` must be positive numeric strings matching the epic numbers in `Epics.md`. `title` values must be non-empty strings matching the canonical epic titles in `Epics.md`. The index must not contain story, remediation-story, review, scope, objective, or requirements data.
+`identity` values in `Epics.index.json` must be positive numeric strings matching the epic numbers in `Epics.md`. `title` values must be non-empty strings matching the canonical epic titles in `Epics.md`. Index generation must set `story-index-generated` to `false` for every epic. The index must not contain story, remediation-story, review, scope, objective, or requirements data.
 
 ## Document Template
 
@@ -176,14 +176,14 @@ The module must define each workflow step as a `WorkflowStepDefinition` that sat
 - `buildToolSchema` must provide module-owned per-step tool schema per `FR-15` and `FR-35`.
 - `decisionTree` must own step progression, form rendering, deterministic actions, transitions, model handoff, and completion behavior per `FR-16` and `FR-29`.
 - Any workflow-form or deterministic operation selected by a step must follow `FR-39` through `FR-43`.
-- Final-step completion must use workflow-runtime completion and teardown behavior per `FR-46` through `FR-49`, except that this workflow must run the required `Epics.index.json` generation before teardown.
+- Final-step completion must route `attempt_completion_succeeded` through deterministic `Epics.index.json` generation and then `complete_workflow` per `FR-46` through `FR-49`.
 
 The module must define these two steps, using these exact `checklistLabel` values:
 
 | Step id | Step number | `checklistLabel` | Required runtime shape |
 | --- | --- | --- | --- |
 | `step-1` | 1 | `Gather Inputs` | Wait for entry artifact resolution, resolve required `architecture.md`, render the context-input workflow form, allocate and initialize `Epics.md` only when creation is required, and transition to Step 2. |
-| `step-2` | 2 | `Draft Epics` | Model-driven epic drafting step; AI must draft epics with the user, persist each accepted epic through `upsert_epic`, use `attempt_completion` after user alignment, and trigger deterministic `Epics.index.json` generation before teardown. |
+| `step-2` | 2 | `Draft Epics` | Model-driven epic drafting step; AI must draft epics with the user, persist each accepted epic through `upsert_epic`, use `attempt_completion` after user alignment, and route `attempt_completion_succeeded` through deterministic `Epics.index.json` generation before `complete_workflow`. |
 
 ## Step 1: Gather Inputs
 
@@ -319,7 +319,7 @@ Step 2 must not expose:
 
 ## Epics Index Generation
 
-After the AI agent uses `attempt_completion` and before workflow teardown, the runtime must generate or regenerate `Epics.index.json` from the canonical epic sections in `Epics.md`.
+When Step 2 receives `attempt_completion_succeeded`, workflow-owned decision routing must generate or regenerate `Epics.index.json` from the canonical epic sections in `Epics.md` and then route successful index builds to `complete_workflow`.
 
 Index generation must fail clearly if `Epics.md` contains no canonical epic sections.
 
@@ -335,7 +335,8 @@ Index generation must write exactly this JSON shape:
   "epics": [
     {
       "identity": "1",
-      "title": "Example"
+      "title": "Example",
+      "story-index-generated": false
     }
   ]
 }

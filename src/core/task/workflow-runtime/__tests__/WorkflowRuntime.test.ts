@@ -8236,7 +8236,7 @@ describe("WorkflowRuntime", () => {
 		await mkdir(planningFolder, { recursive: true })
 		await writeFile(
 			join(planningFolder, "Epics.index.json"),
-			'{"version":1,"epics":[{"identity":"1","title":"One","epic-delivery-spec-generated":false}]}',
+			'{"version":1,"epics":[{"identity":"1","title":"One","story-index-generated":false}]}',
 			"utf8",
 		)
 
@@ -8409,7 +8409,7 @@ describe("WorkflowRuntime", () => {
 			epicsIndexResult.artifactAbsolutePath,
 			JSON.stringify({
 				version: 1,
-				epics: [{ identity: "1", title: "Foundation", "epic-delivery-spec-generated": false }],
+				epics: [{ identity: "1", title: "Foundation", "story-index-generated": false }],
 			}),
 			"utf8",
 		)
@@ -8784,8 +8784,8 @@ describe("WorkflowRuntime", () => {
 			JSON.stringify({
 				version: 1,
 				epics: [
-					{ identity: "2", title: "Indexed Two", "epic-delivery-spec-generated": true },
-					{ identity: "10", title: "Indexed Ten", "epic-delivery-spec-generated": false },
+					{ identity: "2", title: "Indexed Two", "story-index-generated": true },
+					{ identity: "10", title: "Indexed Ten", "story-index-generated": false },
 				],
 			}),
 			"utf8",
@@ -8834,7 +8834,7 @@ describe("WorkflowRuntime", () => {
 		const planningFolder = join(cwd, "docs", "projects", "story-parent-validation-project", "planning")
 		await writeFile(
 			join(planningFolder, "Epics.index.json"),
-			'{"version":1,"epics":[{"identity":"1","title":"One","epic-delivery-spec-generated":false}]}',
+			'{"version":1,"epics":[{"identity":"1","title":"One","story-index-generated":false}]}',
 			"utf8",
 		)
 		await writeFile(join(planningFolder, "Epic-1.md"), "retired", "utf8")
@@ -9178,11 +9178,64 @@ describe("WorkflowRuntime", () => {
 		expect(malformedError.message).to.contain("Epics.index.json is malformed JSON")
 		expect(await pathExists(malformedCase.deliverySpecPath)).to.equal(false)
 
+		const invalidStoryIndexFlagCase = await createDeliverySpecCase({
+			projectTitle: "Invalid Story Index Flag Project",
+			indexText: JSON.stringify({
+				version: 1,
+				epics: [{ identity: "1", title: "One", "story-index-generated": "false" }],
+			}),
+		})
+		let invalidStoryIndexFlagError: unknown
+		try {
+			await runtime.createWorkflowArtifact({
+				taskState: invalidStoryIndexFlagCase.state,
+				artifactId: "delivery_spec_doc",
+				expectedArtifactAbsolutePath: undefined,
+			})
+		} catch (error) {
+			invalidStoryIndexFlagError = error
+		}
+		expect(invalidStoryIndexFlagError).to.be.instanceOf(Error)
+		if (!(invalidStoryIndexFlagError instanceof Error)) {
+			throw new Error("Expected invalid Epics.index.json story index flag to throw.")
+		}
+		expect(invalidStoryIndexFlagError.message).to.equal(
+			"Cannot allocate workflow artifact delivery_spec_doc because Epics.index.json epics[0].story-index-generated must be a boolean.",
+		)
+		expect(await pathExists(invalidStoryIndexFlagCase.deliverySpecPath)).to.equal(false)
+
+		const retiredEpicsIndexKey = ["epic", "delivery", "spec", "generated"].join("-")
+		const retiredEpicsIndexKeyCase = await createDeliverySpecCase({
+			projectTitle: "Retired Index Key Project",
+			indexText: JSON.stringify({
+				version: 1,
+				epics: [{ identity: "1", title: "One", [retiredEpicsIndexKey]: false }],
+			}),
+		})
+		let retiredEpicsIndexKeyError: unknown
+		try {
+			await runtime.createWorkflowArtifact({
+				taskState: retiredEpicsIndexKeyCase.state,
+				artifactId: "delivery_spec_doc",
+				expectedArtifactAbsolutePath: undefined,
+			})
+		} catch (error) {
+			retiredEpicsIndexKeyError = error
+		}
+		expect(retiredEpicsIndexKeyError).to.be.instanceOf(Error)
+		if (!(retiredEpicsIndexKeyError instanceof Error)) {
+			throw new Error("Expected retired Epics.index.json key to throw.")
+		}
+		expect(retiredEpicsIndexKeyError.message).to.equal(
+			`Cannot allocate workflow artifact delivery_spec_doc because Epics.index.json epics[0] contains unsupported key ${retiredEpicsIndexKey}.`,
+		)
+		expect(await pathExists(retiredEpicsIndexKeyCase.deliverySpecPath)).to.equal(false)
+
 		const deniedProjectFolderName = "denied-index-project"
 		const deniedIndexPath = join(cwd, "docs", "projects", deniedProjectFolderName, "planning", "Epics.index.json")
 		const deniedCase = await createDeliverySpecCase({
 			projectTitle: "Denied Index Project",
-			indexText: '{"version":1,"epics":[{"identity":"1","title":"One","epic-delivery-spec-generated":false}]}',
+			indexText: '{"version":1,"epics":[{"identity":"1","title":"One","story-index-generated":false}]}',
 			workspacePathPolicy: {
 				validateAccess: (filePath) => filePath !== deniedIndexPath,
 			},

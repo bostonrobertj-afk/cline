@@ -9,7 +9,7 @@ import type {
 	WorkflowStepDefinition,
 	WorkflowStepPromptSource,
 } from "../../types"
-import { buildInitialCreateEpicsDocumentFromSession } from "./createEpicsDocument"
+import { buildEpicsIndexJsonFromSession, buildInitialCreateEpicsDocumentFromSession } from "./createEpicsDocument"
 import { buildCreateEpicsStep1ToolSchemas, buildCreateEpicsStep2ToolSchemas } from "./createEpicsToolSchemas"
 
 export enum CreateEpicsWorkflowValueKey {
@@ -246,6 +246,27 @@ function workflowFormCompleted(workflowFormId: string): WorkflowDecisionBranchTr
 		kind: "event_predicate",
 		matches: ({ triggerEvent }) =>
 			triggerEvent.kind === "workflow_form_completed" && triggerEvent.workflowFormId === workflowFormId,
+	}
+}
+
+function hasResolvedEpicsIndexFile(workflowValues: Record<string, unknown>): boolean {
+	const epicsIndexFile = workflowValues[CreateEpicsWorkflowValueKey.EpicsIndexFile]
+	return typeof epicsIndexFile === "string" && epicsIndexFile.trim().length > 0
+}
+
+function attemptCompletionSucceededWithResolvedEpicsIndexFile(): WorkflowDecisionBranchTrigger {
+	return {
+		kind: "event_predicate",
+		matches: ({ triggerEvent, workflowValues }) =>
+			triggerEvent.kind === "attempt_completion_succeeded" && hasResolvedEpicsIndexFile(workflowValues),
+	}
+}
+
+function attemptCompletionSucceededWithoutResolvedEpicsIndexFile(): WorkflowDecisionBranchTrigger {
+	return {
+		kind: "event_predicate",
+		matches: ({ triggerEvent, workflowValues }) =>
+			triggerEvent.kind === "attempt_completion_succeeded" && hasResolvedEpicsIndexFile(workflowValues) === false,
 	}
 }
 
@@ -523,6 +544,112 @@ function buildStep2DecisionTree(): WorkflowDecisionTree {
 						trigger: { kind: "always" },
 						action: {
 							kind: "project_prompt",
+						},
+						followingBranchId: "step-2-await-attempt-completion",
+					},
+				],
+			},
+			"step-2-await-attempt-completion": {
+				id: "step-2-await-attempt-completion",
+				routes: [
+					{
+						id: "step-2-build-index-after-attempt-completion",
+						trigger: attemptCompletionSucceededWithResolvedEpicsIndexFile(),
+						action: {
+							kind: "build_workflow_document",
+							instruction: {
+								artifactId: EPICS_INDEX_ARTIFACT_ID,
+								buildContent: buildEpicsIndexJsonFromSession,
+							},
+						},
+						followingBranchId: "step-2-await-index-build",
+					},
+					{
+						id: "step-2-allocate-index-after-attempt-completion",
+						trigger: attemptCompletionSucceededWithoutResolvedEpicsIndexFile(),
+						action: {
+							kind: "allocate_artifact",
+							artifactId: EPICS_INDEX_ARTIFACT_ID,
+						},
+						followingBranchId: "step-2-await-index-allocation",
+					},
+				],
+			},
+			"step-2-await-index-allocation": {
+				id: "step-2-await-index-allocation",
+				routes: [
+					{
+						id: "step-2-build-index-after-allocation",
+						trigger: toolBackedOperationSucceeded(
+							"step-2-await-attempt-completion",
+							"step-2-allocate-index-after-attempt-completion",
+						),
+						action: {
+							kind: "build_workflow_document",
+							instruction: {
+								artifactId: EPICS_INDEX_ARTIFACT_ID,
+								buildContent: buildEpicsIndexJsonFromSession,
+							},
+						},
+						followingBranchId: "step-2-await-index-build",
+					},
+					{
+						id: "step-2-terminal-error-after-index-allocation",
+						trigger: toolBackedOperationFailed(
+							"step-2-await-attempt-completion",
+							"step-2-allocate-index-after-attempt-completion",
+						),
+						action: {
+							kind: "terminal_error",
+							errorMessage: "Unable to allocate Epics.index.json.",
+						},
+					},
+				],
+			},
+			"step-2-await-index-build": {
+				id: "step-2-await-index-build",
+				routes: [
+					{
+						id: "step-2-complete-workflow-after-index-build",
+						trigger: {
+							kind: "event_predicate",
+							matches: ({ triggerEvent }) =>
+								triggerEvent.kind === "tool_backed_operation_succeeded" &&
+								(sourceRouteMatches(
+									triggerEvent.sourceRoute,
+									"step-2-await-attempt-completion",
+									"step-2-build-index-after-attempt-completion",
+								) ||
+									sourceRouteMatches(
+										triggerEvent.sourceRoute,
+										"step-2-await-index-allocation",
+										"step-2-build-index-after-allocation",
+									)),
+						},
+						action: {
+							kind: "complete_workflow",
+						},
+					},
+					{
+						id: "step-2-terminal-error-after-index-build",
+						trigger: {
+							kind: "event_predicate",
+							matches: ({ triggerEvent }) =>
+								triggerEvent.kind === "tool_backed_operation_failed" &&
+								(sourceRouteMatches(
+									triggerEvent.sourceRoute,
+									"step-2-await-attempt-completion",
+									"step-2-build-index-after-attempt-completion",
+								) ||
+									sourceRouteMatches(
+										triggerEvent.sourceRoute,
+										"step-2-await-index-allocation",
+										"step-2-build-index-after-allocation",
+									)),
+						},
+						action: {
+							kind: "terminal_error",
+							errorMessage: "Unable to build Epics.index.json.",
 						},
 					},
 				],
