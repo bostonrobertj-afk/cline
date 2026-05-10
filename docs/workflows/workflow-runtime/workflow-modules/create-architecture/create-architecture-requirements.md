@@ -192,7 +192,7 @@ The module must define these nine steps, using these exact `checklistLabel` valu
 | `step-6` | 6 | `Identify Key Tradeoffs & Risks` | Model-driven tradeoff and risk step; progression requires `workflow_progress_request` confirmation. |
 | `step-7` | 7 | `Map out Blast Radius` | Model-driven blast-radius step; progression requires `workflow_progress_request` confirmation. |
 | `step-8` | 8 | `Build Project Roadmap` | Model-driven dependency and roadmap step; progression requires `workflow_progress_request` confirmation. |
-| `step-9` | 9 | `Finalize Architecture Document` | Model-driven final readiness review and final delivery through `attempt_completion`. |
+| `step-9` | 9 | `Finalize Architecture Document` | Model-driven final readiness review and final delivery through `attempt_completion`; routes `attempt_completion_succeeded` to workflow completion through its decision tree. |
 
 ## Step 1: Generate Output Document
 
@@ -422,7 +422,7 @@ Step 9 tool schema must expose exactly:
 - `ask_followup_question`
 - `attempt_completion`
 
-Step 9 completion requires successful final delivery through `attempt_completion`. After that final delivery, the workflow runtime must perform normal workflow completion and teardown. Step 9 must not use a workflow-specific completion handler.
+Step 9 completion requires successful final delivery through `attempt_completion`. Successful `attempt_completion` emits `attempt_completion_succeeded`; the Step 9 decision tree must route that event to the runtime-owned `complete_workflow` action. Step 9 must not use a workflow-specific completion handler or finalizer.
 
 ## Prompting And Tools
 
@@ -448,9 +448,9 @@ The legacy tool matrix is a loose migration reference only. The create-architect
 
 ## Completion
 
-Step 9 completes through final user delivery and workflow teardown. No workflow-specific completion handler is allowed.
+Step 9 completes through final user delivery followed by the module-owned `attempt_completion_succeeded` route to the runtime-owned `complete_workflow` action. No workflow-specific completion handler or finalizer is allowed.
 
-The workflow is complete only after `attempt_completion` succeeds in Step 9.
+The workflow is complete only after `attempt_completion` succeeds in Step 9 and the Step 9 decision tree routes `attempt_completion_succeeded` to `complete_workflow`.
 
 ## Tests And Validation Expectations
 
