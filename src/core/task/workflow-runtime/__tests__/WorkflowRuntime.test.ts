@@ -150,6 +150,39 @@ describe("WorkflowRuntime", () => {
 		}
 	}
 
+	async function writeEpicsIndex(
+		epicsIndexAbsolutePath: string,
+		epics: readonly { identity: string; title: string; storyIndexGenerated: boolean }[],
+	): Promise<void> {
+		await mkdir(dirname(epicsIndexAbsolutePath), { recursive: true })
+		await writeFile(
+			epicsIndexAbsolutePath,
+			`${JSON.stringify(
+				{
+					version: 1,
+					epics: epics.map((epic) => ({
+						identity: epic.identity,
+						title: epic.title,
+						"story-index-generated": epic.storyIndexGenerated,
+					})),
+				},
+				undefined,
+				2,
+			)}\n`,
+			"utf8",
+		)
+	}
+
+	async function writeSingleEpicIndex(epicsIndexAbsolutePath: string, epicIdentity: string): Promise<void> {
+		await writeEpicsIndex(epicsIndexAbsolutePath, [
+			{
+				identity: epicIdentity,
+				title: `Epic ${epicIdentity}`,
+				storyIndexGenerated: false,
+			},
+		])
+	}
+
 	const ARTIFACT_ALLOCATION_TERMINAL_ERROR_MESSAGE = "Artifact allocation failed."
 	const STEP_RESOLUTION_SOURCE_ROUTE: WorkflowStepResolutionSourceRoute = {
 		branchId: "run-step-resolution",
@@ -8879,11 +8912,17 @@ describe("WorkflowRuntime", () => {
 		await submitNewProjectSelection(taskState, "Story Artifact Planning Project")
 
 		const preparation = await runtime.preparePlanStoryArtifacts({ taskState, epicIdentity: "3" })
+		await writeEpicsIndex(preparation.epicsIndexAbsolutePath, [
+			{ identity: "1", title: "Unselected One", storyIndexGenerated: false },
+			{ identity: "3", title: "Selected Three", storyIndexGenerated: false },
+			{ identity: "4", title: "Unselected Four", storyIndexGenerated: true },
+		])
 		const result = await runtime.planStoryArtifacts({
 			taskState,
 			epicIdentity: "3",
 			storyCount: 3,
 			expectedStoryIndexAbsolutePath: preparation.storyIndexAbsolutePath,
+			expectedEpicsIndexAbsolutePath: preparation.epicsIndexAbsolutePath,
 		})
 
 		expect(result.appendedStoryIdentities).to.deep.equal(["3.1", "3.2", "3.3"])
@@ -8916,6 +8955,49 @@ describe("WorkflowRuntime", () => {
 		expect(parseWorkflowStoryIndexJson(await readFile(preparation.storyIndexAbsolutePath, "utf8"))).to.deep.equal(
 			result.storyIndex,
 		)
+		const updatedEpicsIndex: unknown = JSON.parse(await readFile(preparation.epicsIndexAbsolutePath, "utf8"))
+		expect(updatedEpicsIndex).to.deep.equal({
+			version: 1,
+			epics: [
+				{ identity: "1", title: "Unselected One", "story-index-generated": false },
+				{ identity: "3", title: "Selected Three", "story-index-generated": true },
+				{ identity: "4", title: "Unselected Four", "story-index-generated": true },
+			],
+		})
+	})
+
+	it("fails primary story artifact planning when the requested epic is absent from Epics.index.json", async () => {
+		const workflow = createWorkflowDefinition()
+		await activateWorkflow(taskState, workflow)
+		await runtime.resolveNextAction({ taskState })
+		await submitNewProjectSelection(taskState, "Missing Story Planning Epic Project")
+
+		const preparation = await runtime.preparePlanStoryArtifacts({ taskState, epicIdentity: "5" })
+		await writeEpicsIndex(preparation.epicsIndexAbsolutePath, [
+			{ identity: "4", title: "Different Epic", storyIndexGenerated: false },
+		])
+
+		let planningError: unknown
+		try {
+			await runtime.planStoryArtifacts({
+				taskState,
+				epicIdentity: "5",
+				storyCount: 1,
+				expectedStoryIndexAbsolutePath: preparation.storyIndexAbsolutePath,
+				expectedEpicsIndexAbsolutePath: preparation.epicsIndexAbsolutePath,
+			})
+		} catch (error) {
+			planningError = error
+		}
+
+		expect(planningError).to.be.instanceOf(Error)
+		if (!(planningError instanceof Error)) {
+			throw new Error("Expected missing indexed epic story planning to throw.")
+		}
+		expect(planningError.message).to.equal(
+			"Cannot plan story artifacts because epic_identity 5 is not present in Epics.index.json.",
+		)
+		expect(await pathExists(preparation.storyIndexAbsolutePath)).to.equal(false)
 	})
 
 	it("preserves existing story index entries and appends only missing primary entries", async () => {
@@ -8925,11 +9007,13 @@ describe("WorkflowRuntime", () => {
 		await submitNewProjectSelection(taskState, "Story Artifact Expansion Project")
 
 		const preparation = await runtime.preparePlanStoryArtifacts({ taskState, epicIdentity: "7" })
+		await writeSingleEpicIndex(preparation.epicsIndexAbsolutePath, "7")
 		await runtime.planStoryArtifacts({
 			taskState,
 			epicIdentity: "7",
 			storyCount: 1,
 			expectedStoryIndexAbsolutePath: preparation.storyIndexAbsolutePath,
+			expectedEpicsIndexAbsolutePath: preparation.epicsIndexAbsolutePath,
 		})
 		const existingIndex = parseWorkflowStoryIndexJson(await readFile(preparation.storyIndexAbsolutePath, "utf8"))
 		existingIndex.stories[0].story_file_generated = true
@@ -8941,6 +9025,7 @@ describe("WorkflowRuntime", () => {
 			epicIdentity: "7",
 			storyCount: 3,
 			expectedStoryIndexAbsolutePath: preparation.storyIndexAbsolutePath,
+			expectedEpicsIndexAbsolutePath: preparation.epicsIndexAbsolutePath,
 		})
 
 		expect(expandedResult.appendedStoryIdentities).to.deep.equal(["7.2", "7.3"])
@@ -8962,11 +9047,13 @@ describe("WorkflowRuntime", () => {
 		await submitNewProjectSelection(taskState, "Remediation Story Planning Project")
 
 		const storyPreparation = await runtime.preparePlanStoryArtifacts({ taskState, epicIdentity: "8" })
+		await writeSingleEpicIndex(storyPreparation.epicsIndexAbsolutePath, "8")
 		await runtime.planStoryArtifacts({
 			taskState,
 			epicIdentity: "8",
 			storyCount: 1,
 			expectedStoryIndexAbsolutePath: storyPreparation.storyIndexAbsolutePath,
+			expectedEpicsIndexAbsolutePath: storyPreparation.epicsIndexAbsolutePath,
 		})
 		const remediationPreparation = await runtime.preparePlanRemediationStoryArtifact({ taskState, epicIdentity: "8" })
 
@@ -8995,11 +9082,13 @@ describe("WorkflowRuntime", () => {
 		await submitNewProjectSelection(taskState, "Missing Remediation Target Project")
 
 		const storyPreparation = await runtime.preparePlanStoryArtifacts({ taskState, epicIdentity: "9" })
+		await writeSingleEpicIndex(storyPreparation.epicsIndexAbsolutePath, "9")
 		await runtime.planStoryArtifacts({
 			taskState,
 			epicIdentity: "9",
 			storyCount: 1,
 			expectedStoryIndexAbsolutePath: storyPreparation.storyIndexAbsolutePath,
+			expectedEpicsIndexAbsolutePath: storyPreparation.epicsIndexAbsolutePath,
 		})
 
 		let planningError: unknown
@@ -9029,11 +9118,13 @@ describe("WorkflowRuntime", () => {
 		await submitNewProjectSelection(taskState, "Draft Story Generation Project")
 
 		const storyPreparation = await runtime.preparePlanStoryArtifacts({ taskState, epicIdentity: "10" })
+		await writeSingleEpicIndex(storyPreparation.epicsIndexAbsolutePath, "10")
 		await runtime.planStoryArtifacts({
 			taskState,
 			epicIdentity: "10",
 			storyCount: 2,
 			expectedStoryIndexAbsolutePath: storyPreparation.storyIndexAbsolutePath,
+			expectedEpicsIndexAbsolutePath: storyPreparation.epicsIndexAbsolutePath,
 		})
 		const generationPreparation = await runtime.prepareGenerateStoryFiles({ taskState, epicIdentity: "10" })
 
@@ -9059,11 +9150,13 @@ describe("WorkflowRuntime", () => {
 		await submitNewProjectSelection(taskState, "Existing Draft Story Project")
 
 		const storyPreparation = await runtime.preparePlanStoryArtifacts({ taskState, epicIdentity: "11" })
+		await writeSingleEpicIndex(storyPreparation.epicsIndexAbsolutePath, "11")
 		await runtime.planStoryArtifacts({
 			taskState,
 			epicIdentity: "11",
 			storyCount: 1,
 			expectedStoryIndexAbsolutePath: storyPreparation.storyIndexAbsolutePath,
+			expectedEpicsIndexAbsolutePath: storyPreparation.epicsIndexAbsolutePath,
 		})
 		const generationPreparation = await runtime.prepareGenerateStoryFiles({ taskState, epicIdentity: "11" })
 		const existingDraftStoryFilePath = generationPreparation.draftStoryFileAbsolutePaths[0]

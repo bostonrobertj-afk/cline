@@ -64,6 +64,7 @@ function createPlanStoryArtifactsBlock(args?: {
 function createPreparation(cwd: string): WorkflowPlanStoryArtifactsPreparation {
 	return {
 		storyIndexAbsolutePath: path.join(cwd, "project-one", "implementation", "epic-1-stories.index.json"),
+		epicsIndexAbsolutePath: path.join(cwd, "project-one", "planning", "Epics.index.json"),
 	}
 }
 
@@ -209,6 +210,22 @@ function createConfig(args?: {
 
 describe("PlanStoryArtifactsToolHandler", () => {
 	let sandbox: sinon.SinonSandbox
+	const deniedPathCases: readonly {
+		testName: string
+		ignoredRelativePath: string
+		resolveDeniedAbsolutePath: (preparation: WorkflowPlanStoryArtifactsPreparation) => string
+	}[] = [
+		{
+			testName: "story index path",
+			ignoredRelativePath: "project-one/implementation/epic-1-stories.index.json",
+			resolveDeniedAbsolutePath: (preparation) => preparation.storyIndexAbsolutePath,
+		},
+		{
+			testName: "Epics index path",
+			ignoredRelativePath: "project-one/planning/Epics.index.json",
+			resolveDeniedAbsolutePath: (preparation) => preparation.epicsIndexAbsolutePath,
+		},
+	]
 
 	beforeEach(() => {
 		sandbox = sinon.createSandbox()
@@ -243,32 +260,35 @@ describe("PlanStoryArtifactsToolHandler", () => {
 		sinon.assert.notCalled(stubs.planStoryArtifacts)
 	})
 
-	it("returns a clineignore tool error before approval, hooks, or planning for blocked index paths", async () => {
-		const cwd = await mkdtemp(path.join(tmpdir(), "plan-story-artifacts-clineignore-test-"))
-		const clineIgnoreController = new ClineIgnoreController(cwd)
-		try {
-			await writeFile(path.join(cwd, ".clineignore"), "project-one/implementation/epic-1-stories.index.json\n", "utf8")
-			await clineIgnoreController.initialize()
-			const { config, preparation, stubs } = createConfig({ cwd })
-			const hookStub = sandbox.stub(ToolHookUtils, "runPreToolUseIfEnabled").resolves(true)
-			const handler = new PlanStoryArtifactsToolHandler(new ToolValidator(clineIgnoreController))
+	for (const deniedPathCase of deniedPathCases) {
+		it(`returns a clineignore tool error before approval, hooks, or planning for blocked ${deniedPathCase.testName}`, async () => {
+			const cwd = await mkdtemp(path.join(tmpdir(), "plan-story-artifacts-clineignore-test-"))
+			const clineIgnoreController = new ClineIgnoreController(cwd)
+			try {
+				await writeFile(path.join(cwd, ".clineignore"), `${deniedPathCase.ignoredRelativePath}\n`, "utf8")
+				await clineIgnoreController.initialize()
+				const { config, preparation, stubs } = createConfig({ cwd })
+				const hookStub = sandbox.stub(ToolHookUtils, "runPreToolUseIfEnabled").resolves(true)
+				const handler = new PlanStoryArtifactsToolHandler(new ToolValidator(clineIgnoreController))
+				const deniedAbsolutePath = deniedPathCase.resolveDeniedAbsolutePath(preparation)
 
-			const result = await handler.execute(config, createPlanStoryArtifactsBlock())
+				const result = await handler.execute(config, createPlanStoryArtifactsBlock())
 
-			expect(result).to.equal(formatResponse.toolError(formatResponse.clineIgnoreError(preparation.storyIndexAbsolutePath)))
-			sinon.assert.calledOnceWithExactly(stubs.preparePlanStoryArtifacts, {
-				taskState: config.taskState,
-				epicIdentity: "1",
-			})
-			sinon.assert.notCalled(stubs.shouldAutoApproveToolWithPath)
-			sinon.assert.notCalled(stubs.ask)
-			sinon.assert.notCalled(hookStub)
-			sinon.assert.notCalled(stubs.planStoryArtifacts)
-		} finally {
-			await clineIgnoreController.dispose()
-			await rm(cwd, { recursive: true, force: true })
-		}
-	})
+				expect(result).to.equal(formatResponse.toolError(formatResponse.clineIgnoreError(deniedAbsolutePath)))
+				sinon.assert.calledOnceWithExactly(stubs.preparePlanStoryArtifacts, {
+					taskState: config.taskState,
+					epicIdentity: "1",
+				})
+				sinon.assert.notCalled(stubs.shouldAutoApproveToolWithPath)
+				sinon.assert.notCalled(stubs.ask)
+				sinon.assert.notCalled(hookStub)
+				sinon.assert.notCalled(stubs.planStoryArtifacts)
+			} finally {
+				await clineIgnoreController.dispose()
+				await rm(cwd, { recursive: true, force: true })
+			}
+		})
+	}
 
 	it("delegates planning through the workflow runtime and returns structured success JSON", async () => {
 		const { config, preparation, result: planningResult, stubs } = createConfig({ autoApprove: true })
@@ -277,6 +297,11 @@ describe("PlanStoryArtifactsToolHandler", () => {
 			readCount: 1,
 			mtime: 1,
 			snapshotText: "index",
+		})
+		config.taskState.fileReadCache.set(preparation.epicsIndexAbsolutePath.toLowerCase(), {
+			readCount: 1,
+			mtime: 1,
+			snapshotText: "epics index",
 		})
 		const block = createPlanStoryArtifactsBlock()
 		const handler = new PlanStoryArtifactsToolHandler(createToolValidator(config.cwd))
@@ -287,10 +312,16 @@ describe("PlanStoryArtifactsToolHandler", () => {
 			taskState: config.taskState,
 			epicIdentity: "1",
 		})
-		sinon.assert.calledOnceWithExactly(
+		sinon.assert.calledTwice(stubs.shouldAutoApproveToolWithPath)
+		sinon.assert.calledWithExactly(
 			stubs.shouldAutoApproveToolWithPath,
 			ClineDefaultTool.PLAN_STORY_ARTIFACTS,
 			preparation.storyIndexAbsolutePath,
+		)
+		sinon.assert.calledWithExactly(
+			stubs.shouldAutoApproveToolWithPath,
+			ClineDefaultTool.PLAN_STORY_ARTIFACTS,
+			preparation.epicsIndexAbsolutePath,
 		)
 		sinon.assert.calledOnceWithExactly(hookStub, config, block)
 		sinon.assert.calledOnceWithExactly(stubs.planStoryArtifacts, {
@@ -298,6 +329,7 @@ describe("PlanStoryArtifactsToolHandler", () => {
 			epicIdentity: "1",
 			storyCount: 2,
 			expectedStoryIndexAbsolutePath: preparation.storyIndexAbsolutePath,
+			expectedEpicsIndexAbsolutePath: preparation.epicsIndexAbsolutePath,
 		})
 		expect(JSON.parse(result as string)).to.deep.equal({
 			persisted: true,
@@ -308,6 +340,7 @@ describe("PlanStoryArtifactsToolHandler", () => {
 			stories: planningResult.storyIndex.stories,
 		})
 		expect(config.taskState.fileReadCache.has(preparation.storyIndexAbsolutePath.toLowerCase())).to.equal(false)
+		expect(config.taskState.fileReadCache.has(preparation.epicsIndexAbsolutePath.toLowerCase())).to.equal(false)
 		expect(config.taskState.didEditFile).to.equal(true)
 		expect(config.taskState.consecutiveMistakeCount).to.equal(0)
 	})

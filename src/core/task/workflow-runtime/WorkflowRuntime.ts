@@ -162,6 +162,7 @@ export type WorkflowProjectFileMoveResult = WorkflowProjectFileMovePreparation
 
 export interface WorkflowPlanStoryArtifactsPreparation {
 	storyIndexAbsolutePath: string
+	epicsIndexAbsolutePath: string
 }
 
 export interface WorkflowPlanStoryArtifactsResult extends WorkflowPlanStoryArtifactsPreparation {
@@ -1047,6 +1048,7 @@ export class WorkflowRuntime {
 				session,
 				epicIdentity: args.epicIdentity,
 			}),
+			epicsIndexAbsolutePath: this.resolveEpicsIndexPath(session),
 		}
 	}
 
@@ -1055,6 +1057,7 @@ export class WorkflowRuntime {
 		epicIdentity: string
 		storyCount: number
 		expectedStoryIndexAbsolutePath: string
+		expectedEpicsIndexAbsolutePath: string
 	}): Promise<WorkflowPlanStoryArtifactsResult> {
 		if (Number.isInteger(args.storyCount) === false || args.storyCount <= 0) {
 			throw new Error("Story count must be a positive integer.")
@@ -1067,13 +1070,25 @@ export class WorkflowRuntime {
 		if (preparation.storyIndexAbsolutePath !== args.expectedStoryIndexAbsolutePath) {
 			throw new Error("Story index path changed before story artifact planning.")
 		}
+		if (preparation.epicsIndexAbsolutePath !== args.expectedEpicsIndexAbsolutePath) {
+			throw new Error("Epics index path changed before story artifact planning.")
+		}
+
+		const epicsIndex = await this.readEpicsIndexForStoryPlanning(preparation.epicsIndexAbsolutePath)
+		const epicIdentity = args.epicIdentity.trim()
+		const selectedEpic = epicsIndex.epics.find((epic) => epic.identity === epicIdentity)
+		if (selectedEpic === undefined) {
+			throw new Error(
+				`Cannot plan story artifacts because epic_identity ${epicIdentity} is not present in Epics.index.json.`,
+			)
+		}
 
 		const storyIndex = await this.readWorkflowStoryIndexOrCreateEmpty(preparation.storyIndexAbsolutePath)
 		const existingStoryIdentities = new Set(storyIndex.stories.map((story) => story.story_identity))
 		const appendedStoryIdentities: string[] = []
 		for (let storyNumber = 1; storyNumber <= args.storyCount; storyNumber += 1) {
 			const primaryStoryEntry = buildPrimaryStoryIndexEntry({
-				epicIdentity: args.epicIdentity.trim(),
+				epicIdentity,
 				storyNumber,
 			})
 			if (existingStoryIdentities.has(primaryStoryEntry.story_identity)) {
@@ -1089,12 +1104,54 @@ export class WorkflowRuntime {
 			storyIndexAbsolutePath: preparation.storyIndexAbsolutePath,
 			storyIndex,
 		})
+		selectedEpic["story-index-generated"] = true
+		await this.writeWorkflowEpicsIndex({
+			epicsIndexAbsolutePath: preparation.epicsIndexAbsolutePath,
+			epicsIndex,
+		})
 
 		return {
 			...preparation,
 			storyIndex,
 			appendedStoryIdentities,
 		}
+	}
+
+	private async readEpicsIndexForStoryPlanning(epicsIndexAbsolutePath: string): Promise<WorkflowEpicsIndex> {
+		this.assertWorkspacePathAllowed(epicsIndexAbsolutePath)
+
+		let epicsIndexText: string
+		try {
+			epicsIndexText = await readFile(epicsIndexAbsolutePath, "utf8")
+		} catch (error) {
+			const errorMessage = error instanceof Error ? ` ${error.message}` : ""
+			throw new Error(`Cannot plan story artifacts because Epics.index.json could not be read.${errorMessage}`)
+		}
+
+		return this.parseEpicsIndexJson({ artifactId: "plan_story_artifacts", epicsIndexText })
+	}
+
+	private async writeWorkflowEpicsIndex(args: {
+		epicsIndexAbsolutePath: string
+		epicsIndex: WorkflowEpicsIndex
+	}): Promise<void> {
+		this.assertWorkspacePathAllowed(args.epicsIndexAbsolutePath)
+		await writeFile(args.epicsIndexAbsolutePath, this.stringifyWorkflowEpicsIndex(args.epicsIndex), "utf8")
+	}
+
+	private stringifyWorkflowEpicsIndex(epicsIndex: WorkflowEpicsIndex): string {
+		return `${JSON.stringify(
+			{
+				version: epicsIndex.version,
+				epics: epicsIndex.epics.map((epic) => ({
+					identity: epic.identity,
+					title: epic.title,
+					"story-index-generated": epic["story-index-generated"],
+				})),
+			},
+			undefined,
+			2,
+		)}\n`
 	}
 
 	async preparePlanRemediationStoryArtifact(args: {
@@ -5247,6 +5304,13 @@ export class WorkflowRuntime {
 		this.assertWorkspacePathAllowed(dirname(storyIndexPath))
 		this.assertWorkspacePathAllowed(storyIndexPath)
 		return storyIndexPath
+	}
+
+	private resolveEpicsIndexPath(session: ActiveWorkflowSession): string {
+		const epicsIndexPath = join(this.resolveWorkflowProjectOutputFolder(session), "planning", "Epics.index.json")
+		this.assertWorkspacePathAllowed(dirname(epicsIndexPath))
+		this.assertWorkspacePathAllowed(epicsIndexPath)
+		return epicsIndexPath
 	}
 
 	private resolveDraftStoryFilePath(args: { session: ActiveWorkflowSession; storyFileName: string }): string {

@@ -119,9 +119,12 @@ export class PlanStoryArtifactsToolHandler implements IToolHandler {
 				taskState: config.taskState,
 				epicIdentity: parsedRequest.request.epicIdentity,
 			})
-			const accessValidation = this.validator.checkClineIgnorePath(preparation.storyIndexAbsolutePath)
-			if (!accessValidation.ok) {
-				return formatResponse.toolError(formatResponse.clineIgnoreError(preparation.storyIndexAbsolutePath))
+			const preparedPaths = [preparation.storyIndexAbsolutePath, preparation.epicsIndexAbsolutePath] as const
+			for (const preparedPath of preparedPaths) {
+				const accessValidation = this.validator.checkClineIgnorePath(preparedPath)
+				if (!accessValidation.ok) {
+					return formatResponse.toolError(formatResponse.clineIgnoreError(preparedPath))
+				}
 			}
 
 			const completeMessage = JSON.stringify({
@@ -130,9 +133,13 @@ export class PlanStoryArtifactsToolHandler implements IToolHandler {
 				content: `Epic ${parsedRequest.request.epicIdentity} story inventory`,
 				operationIsLocatedInWorkspace: await isLocatedInWorkspace(preparation.storyIndexAbsolutePath),
 			})
-			const shouldAutoApprove =
-				config.isSubagentExecution ||
-				(await config.callbacks.shouldAutoApproveToolWithPath(block.name, preparation.storyIndexAbsolutePath))
+			let shouldAutoApprove = config.isSubagentExecution
+			if (!config.isSubagentExecution) {
+				const [storyIndexAutoApproved, epicsIndexAutoApproved] = await Promise.all(
+					preparedPaths.map((preparedPath) => config.callbacks.shouldAutoApproveToolWithPath(block.name, preparedPath)),
+				)
+				shouldAutoApprove = storyIndexAutoApproved && epicsIndexAutoApproved
+			}
 
 			if (shouldAutoApprove) {
 				if (!config.isSubagentExecution) {
@@ -168,10 +175,12 @@ export class PlanStoryArtifactsToolHandler implements IToolHandler {
 				epicIdentity: parsedRequest.request.epicIdentity,
 				storyCount: parsedRequest.request.storyCount,
 				expectedStoryIndexAbsolutePath: preparation.storyIndexAbsolutePath,
+				expectedEpicsIndexAbsolutePath: preparation.epicsIndexAbsolutePath,
 			})
 
 			config.taskState.didEditFile = true
 			config.taskState.fileReadCache.delete(result.storyIndexAbsolutePath.toLowerCase())
+			config.taskState.fileReadCache.delete(result.epicsIndexAbsolutePath.toLowerCase())
 			config.taskState.consecutiveMistakeCount = 0
 
 			return formatResponse.toolResult(

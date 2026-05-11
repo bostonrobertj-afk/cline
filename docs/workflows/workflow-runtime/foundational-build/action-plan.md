@@ -9923,127 +9923,113 @@ This phase does not change `plan_remediation_story_artifact`, `generate_story_fi
 
 `plan_story_artifacts` currently writes only `implementation/epic-{E}-stories.index.json`. Because it now writes both the story index and `planning/Epics.index.json`, handler approval, cline-ignore checks, file cache invalidation, and tests must cover both paths.
 
-[ ] Task 207. Add Epics index path preparation to story planning.
+[x] Task 207. Add Epics index path preparation to story planning.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 207.1. In `WorkflowRuntime.ts`, add `epicsIndexAbsolutePath: string` to `WorkflowPlanStoryArtifactsPreparation`.
+[x] Subtask 207.1. In `WorkflowRuntime.ts`, add `epicsIndexAbsolutePath: string` to `WorkflowPlanStoryArtifactsPreparation`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 207.2. In `WorkflowRuntime.ts`, add a private resolver for `planning/Epics.index.json` under the selected project folder with workspace path validation.
+[x] Subtask 207.2. In `WorkflowRuntime.ts`, add a private resolver for `planning/Epics.index.json` under the selected project folder with workspace path validation.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 207.3. In `preparePlanStoryArtifacts(...)`, return both `storyIndexAbsolutePath` and `epicsIndexAbsolutePath`.
+[x] Subtask 207.3. In `preparePlanStoryArtifacts(...)`, return both `storyIndexAbsolutePath` and `epicsIndexAbsolutePath`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 207.4. In `planStoryArtifacts(...)`, add `expectedEpicsIndexAbsolutePath: string` and fail if the prepared Epics index path changes before execution.
+[x] Subtask 207.4. In `planStoryArtifacts(...)`, add `expectedEpicsIndexAbsolutePath: string` and fail if the prepared Epics index path changes before execution.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Task 208. Persist the selected epic's story-index flag.
+[x] Task 208. Persist the selected epic's story-index flag.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 208.1. In `planStoryArtifacts(...)`, read and validate `planning/Epics.index.json` before writing the story index.
+[x] Subtask 208.1. In `planStoryArtifacts(...)`, read and validate `planning/Epics.index.json` before writing the story index.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 208.2. In `planStoryArtifacts(...)`, fail clearly when `epic_identity` is not present in `Epics.index.json`.
+[x] Subtask 208.2. In `planStoryArtifacts(...)`, fail clearly when `epic_identity` is not present in `Epics.index.json`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 208.3. In `planStoryArtifacts(...)`, after the story index write succeeds, set only the matching epic entry's `"story-index-generated"` value to `true`.
+[x] Subtask 208.3. In `planStoryArtifacts(...)`, after the story index write succeeds, set only the matching epic entry's `"story-index-generated"` value to `true`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 208.4. In `planStoryArtifacts(...)`, write the updated `Epics.index.json` while preserving existing epic order, identities, titles, and unrelated flags.
+[x] Subtask 208.4. In `planStoryArtifacts(...)`, write the updated `Epics.index.json` while preserving existing epic order, identities, titles, and unrelated flags.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Task 209. Update `plan_story_artifacts` handler path handling.
+[x] Task 209. Update `plan_story_artifacts` handler path handling.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/PlanStoryArtifactsToolHandler.ts`
 
-[ ] Subtask 209.1. In `PlanStoryArtifactsToolHandler.ts`, run cline-ignore checks for both prepared paths before approval, hooks, or planning.
+[x] Subtask 209.1. In `PlanStoryArtifactsToolHandler.ts`, run cline-ignore checks for both prepared paths before approval, hooks, or planning.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/PlanStoryArtifactsToolHandler.ts`
 
-[ ] Subtask 209.2. In `PlanStoryArtifactsToolHandler.ts`, call `shouldAutoApproveToolWithPath(...)` for both prepared paths and auto-approve only when both paths are approved, unless running as subagent execution.
+[x] Subtask 209.2. In `PlanStoryArtifactsToolHandler.ts`, call `shouldAutoApproveToolWithPath(...)` for both prepared paths and auto-approve only when both paths are approved, unless running as subagent execution.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/PlanStoryArtifactsToolHandler.ts`
 
-[ ] Subtask 209.3. In `PlanStoryArtifactsToolHandler.ts`, pass `expectedEpicsIndexAbsolutePath` into `WorkflowRuntime.planStoryArtifacts(...)`.
+[x] Subtask 209.3. In `PlanStoryArtifactsToolHandler.ts`, pass `expectedEpicsIndexAbsolutePath` into `WorkflowRuntime.planStoryArtifacts(...)`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/PlanStoryArtifactsToolHandler.ts`
 
-[ ] Subtask 209.4. In `PlanStoryArtifactsToolHandler.ts`, clear `fileReadCache` entries for both the story index path and Epics index path after success.
+[x] Subtask 209.4. In `PlanStoryArtifactsToolHandler.ts`, clear `fileReadCache` entries for both the story index path and Epics index path after success.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/PlanStoryArtifactsToolHandler.ts`
 
-[ ] Task 210. Update tests for story-index flag persistence.
+[x] Task 210. Update tests for story-index flag persistence.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/PlanStoryArtifactsToolHandler.test.ts`
 
-[ ] Subtask 210.1. In `WorkflowRuntime.test.ts`, add coverage proving `planStoryArtifacts(...)` changes only the selected epic's `"story-index-generated"` value to `true`.
+[x] Subtask 210.1. In `WorkflowRuntime.test.ts`, add coverage proving `planStoryArtifacts(...)` changes only the selected epic's `"story-index-generated"` value to `true`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 210.2. In `WorkflowRuntime.test.ts`, add coverage proving `planStoryArtifacts(...)` fails when the requested epic identity is absent from `Epics.index.json`.
+[x] Subtask 210.2. In `WorkflowRuntime.test.ts`, add coverage proving `planStoryArtifacts(...)` fails when the requested epic identity is absent from `Epics.index.json`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 210.3. In `PlanStoryArtifactsToolHandler.test.ts`, update fixtures to include `epicsIndexAbsolutePath`.
+[x] Subtask 210.3. In `PlanStoryArtifactsToolHandler.test.ts`, update fixtures to include `epicsIndexAbsolutePath`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/PlanStoryArtifactsToolHandler.test.ts`
 
-[ ] Subtask 210.4. In `PlanStoryArtifactsToolHandler.test.ts`, assert handler approval/path checks include both prepared paths.
+[x] Subtask 210.4. In `PlanStoryArtifactsToolHandler.test.ts`, assert handler approval/path checks include both prepared paths.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/PlanStoryArtifactsToolHandler.test.ts`
 
-[ ] Subtask 210.5. In `PlanStoryArtifactsToolHandler.test.ts`, assert runtime delegation includes `expectedEpicsIndexAbsolutePath`.
+[x] Subtask 210.5. In `PlanStoryArtifactsToolHandler.test.ts`, assert runtime delegation includes `expectedEpicsIndexAbsolutePath`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/PlanStoryArtifactsToolHandler.test.ts`
 
-[ ] Task 211. Validate Phase 64.
-
-Allowed files:
-- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
-- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
-- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/PlanStoryArtifactsToolHandler.ts`
-- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/PlanStoryArtifactsToolHandler.test.ts`
-
-[ ] Subtask 211.1. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/tools/handlers/__tests__/PlanStoryArtifactsToolHandler.test.ts`; it must pass before Phase 64 is marked complete.
-
-Allowed files:
-- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
-- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/PlanStoryArtifactsToolHandler.test.ts`
-
-[ ] Subtask 211.2. Run `npm run check-types`; it must pass before Phase 64 is marked complete.
+[x] Task 211. Validate Phase 64.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
@@ -10051,7 +10037,21 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/PlanStoryArtifactsToolHandler.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/PlanStoryArtifactsToolHandler.test.ts`
 
-[ ] Subtask 211.3. Run `npm run lint`; it must pass before Phase 64 is marked complete.
+[x] Subtask 211.1. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/tools/handlers/__tests__/PlanStoryArtifactsToolHandler.test.ts`; it must pass before Phase 64 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/PlanStoryArtifactsToolHandler.test.ts`
+
+[x] Subtask 211.2. Run `npm run check-types`; it must pass before Phase 64 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/PlanStoryArtifactsToolHandler.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/PlanStoryArtifactsToolHandler.test.ts`
+
+[x] Subtask 211.3. Run `npm run lint`; it must pass before Phase 64 is marked complete.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
