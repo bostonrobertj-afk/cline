@@ -151,143 +151,143 @@ Allowed files:
 
 After completing this phase, pause for QA review before moving to Phase 3.
 
-[ ] Task 3. Create the module-owned pi-planning tool-schema builders.
+[x] Task 3. Create the module-owned pi-planning tool-schema builders.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningToolSchemas.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningToolSchemas.test.ts`
 
-[ ] Subtask 3.1. Create `src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningToolSchemas.ts` importing `ClineToolSpec`, `AGENT_FEEDBACK_PARAMETER`, `ModelFamily`, and `ClineDefaultTool`, and define module-local constant `PI_PLANNING_TOOL_SCHEMA_VARIANT = ModelFamily.NATIVE_GPT_5`.
+[x] Subtask 3.1. Create `src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningToolSchemas.ts` importing `ClineToolSpec`, `AGENT_FEEDBACK_PARAMETER`, `ModelFamily`, and `ClineDefaultTool`, and define module-local constant `PI_PLANNING_TOOL_SCHEMA_VARIANT = ModelFamily.NATIVE_GPT_5`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningToolSchemas.ts`
 
-[ ] Subtask 3.2. In `piPlanningToolSchemas.ts`, export `buildPiPlanningStep1ToolSchemas(): readonly ClineToolSpec[]` returning an empty readonly array.
+[x] Subtask 3.2. In `piPlanningToolSchemas.ts`, export `buildPiPlanningStep1ToolSchemas(): readonly ClineToolSpec[]` returning an empty readonly array.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningToolSchemas.ts`
 
-[ ] Subtask 3.3. In `piPlanningToolSchemas.ts`, export `buildPiPlanningReadFileToolSchema(): ClineToolSpec` using `ClineDefaultTool.FILE_READ`, name `read_file`, and one required string `path` parameter matching the existing create-architecture read-file schema shape.
+[x] Subtask 3.3. In `piPlanningToolSchemas.ts`, export `buildPiPlanningReadFileToolSchema(): ClineToolSpec` using `ClineDefaultTool.FILE_READ`, name `read_file`, and one required string `path` parameter matching the existing create-architecture read-file schema shape.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningToolSchemas.ts`
 
-[ ] Subtask 3.4. In `piPlanningToolSchemas.ts`, export `buildPiPlanningReadFileRangeToolSchema(): ClineToolSpec` using `ClineDefaultTool.FILE_READ_RANGE`, name `read_file_range`, and required `path`, `start_line`, and `end_line` parameters matching the existing create-architecture read-file-range schema shape.
+[x] Subtask 3.4. In `piPlanningToolSchemas.ts`, export `buildPiPlanningReadFileRangeToolSchema(): ClineToolSpec` using `ClineDefaultTool.FILE_READ_RANGE`, name `read_file_range`, and required `path`, `start_line`, and `end_line` parameters matching the existing create-architecture read-file-range schema shape.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningToolSchemas.ts`
 
-[ ] Subtask 3.5. In `piPlanningToolSchemas.ts`, export `buildPiPlanningListFilesToolSchema(): ClineToolSpec` using `ClineDefaultTool.LIST_FILES`, name `list_files`, required string `path`, and optional boolean `recursive` parameters matching the existing create-architecture list-files schema shape.
+[x] Subtask 3.5. In `piPlanningToolSchemas.ts`, export `buildPiPlanningListFilesToolSchema(): ClineToolSpec` using `ClineDefaultTool.LIST_FILES`, name `list_files`, required string `path`, and optional boolean `recursive` parameters matching the existing create-architecture list-files schema shape.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningToolSchemas.ts`
 
-[ ] Subtask 3.6. In `piPlanningToolSchemas.ts`, export `buildPiPlanningSearchFilesToolSchema(): ClineToolSpec` using `ClineDefaultTool.SEARCH`, name `search_files`, required string `path` and `regex`, and optional string `file_pattern` parameters matching the existing create-architecture search-files schema shape.
+[x] Subtask 3.6. In `piPlanningToolSchemas.ts`, export `buildPiPlanningSearchFilesToolSchema(): ClineToolSpec` using `ClineDefaultTool.SEARCH`, name `search_files`, required string `path` and `regex`, and optional string `file_pattern` parameters matching the existing create-architecture search-files schema shape.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningToolSchemas.ts`
 
-[ ] Subtask 3.7. In `piPlanningToolSchemas.ts`, export `buildPiPlanningListCodeDefinitionNamesToolSchema(): ClineToolSpec` using `ClineDefaultTool.LIST_CODE_DEF`, name `list_code_definition_names`, and one required string `path` parameter matching the existing create-architecture list-code-definition-names schema shape.
+[x] Subtask 3.7. In `piPlanningToolSchemas.ts`, export `buildPiPlanningListCodeDefinitionNamesToolSchema(): ClineToolSpec` using `ClineDefaultTool.LIST_CODE_DEF`, name `list_code_definition_names`, and one required string `path` parameter matching the existing create-architecture list-code-definition-names schema shape.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningToolSchemas.ts`
 
-[ ] Subtask 3.8. In `piPlanningToolSchemas.ts`, export `buildPiPlanningApplyPatchToolSchema(): ClineToolSpec` using `ClineDefaultTool.APPLY_PATCH`, name `apply_patch`, and one required string `input` parameter matching the existing create-architecture apply-patch schema shape.
+[x] Subtask 3.8. In `piPlanningToolSchemas.ts`, export `buildPiPlanningApplyPatchToolSchema(): ClineToolSpec` using `ClineDefaultTool.APPLY_PATCH`, name `apply_patch`, and one required string `input` parameter matching the existing create-architecture apply-patch schema shape.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningToolSchemas.ts`
 
-[ ] Subtask 3.9. In `piPlanningToolSchemas.ts`, export `buildPiPlanningSendUserMessageToolSchema(): ClineToolSpec` using `ClineDefaultTool.SEND_USER_MESSAGE`, name `send_user_message`, one required string `message` parameter, and `AGENT_FEEDBACK_PARAMETER`.
+[x] Subtask 3.9. In `piPlanningToolSchemas.ts`, export `buildPiPlanningSendUserMessageToolSchema(): ClineToolSpec` using `ClineDefaultTool.SEND_USER_MESSAGE`, name `send_user_message`, one required string `message` parameter, and `AGENT_FEEDBACK_PARAMETER`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningToolSchemas.ts`
 
-[ ] Subtask 3.10. In `piPlanningToolSchemas.ts`, export `buildPiPlanningAskFollowupQuestionToolSchema(): ClineToolSpec` using `ClineDefaultTool.ASK`, name `ask_followup_question`, required string `question`, required string-array `options`, and `AGENT_FEEDBACK_PARAMETER`.
+[x] Subtask 3.10. In `piPlanningToolSchemas.ts`, export `buildPiPlanningAskFollowupQuestionToolSchema(): ClineToolSpec` using `ClineDefaultTool.ASK`, name `ask_followup_question`, required string `question`, required string-array `options`, and `AGENT_FEEDBACK_PARAMETER`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningToolSchemas.ts`
 
-[ ] Subtask 3.11. In `piPlanningToolSchemas.ts`, export `buildPiPlanningWorkflowProgressRequestToolSchema(): ClineToolSpec` using `ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST`, name `workflow_progress_request`, and no parameters.
+[x] Subtask 3.11. In `piPlanningToolSchemas.ts`, export `buildPiPlanningWorkflowProgressRequestToolSchema(): ClineToolSpec` using `ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST`, name `workflow_progress_request`, and no parameters.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningToolSchemas.ts`
 
-[ ] Subtask 3.12. In `piPlanningToolSchemas.ts`, export `buildPiPlanningAttemptCompletionToolSchema(): ClineToolSpec` using `ClineDefaultTool.ATTEMPT`, name `attempt_completion`, and one required string `result` parameter.
+[x] Subtask 3.12. In `piPlanningToolSchemas.ts`, export `buildPiPlanningAttemptCompletionToolSchema(): ClineToolSpec` using `ClineDefaultTool.ATTEMPT`, name `attempt_completion`, and one required string `result` parameter.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningToolSchemas.ts`
 
-[ ] Subtask 3.13. In `piPlanningToolSchemas.ts`, export `buildPiPlanningPlanStoryArtifactsToolSchema(): ClineToolSpec` using `ClineDefaultTool.PLAN_STORY_ARTIFACTS`, name `plan_story_artifacts`, required string `epic_identity`, and required integer `story_count`.
+[x] Subtask 3.13. In `piPlanningToolSchemas.ts`, export `buildPiPlanningPlanStoryArtifactsToolSchema(): ClineToolSpec` using `ClineDefaultTool.PLAN_STORY_ARTIFACTS`, name `plan_story_artifacts`, required string `epic_identity`, and required integer `story_count`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningToolSchemas.ts`
 
-[ ] Subtask 3.14. In `piPlanningToolSchemas.ts`, export `buildPiPlanningGenerateStoryFilesToolSchema(): ClineToolSpec` using `ClineDefaultTool.GENERATE_STORY_FILES`, name `generate_story_files`, and required string `epic_identity`.
+[x] Subtask 3.14. In `piPlanningToolSchemas.ts`, export `buildPiPlanningGenerateStoryFilesToolSchema(): ClineToolSpec` using `ClineDefaultTool.GENERATE_STORY_FILES`, name `generate_story_files`, and required string `epic_identity`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningToolSchemas.ts`
 
-[ ] Subtask 3.15. In `piPlanningToolSchemas.ts`, export `buildPiPlanningSetWorkflowValuesToolSchema(): ClineToolSpec` using `ClineDefaultTool.SET_WORKFLOW_VALUES`, name `set_workflow_values`, and one required object parameter `values` with only one allowed property `stories_index` of type string and `requiredProperties: ["stories_index"]`.
+[x] Subtask 3.15. In `piPlanningToolSchemas.ts`, export `buildPiPlanningSetWorkflowValuesToolSchema(): ClineToolSpec` using `ClineDefaultTool.SET_WORKFLOW_VALUES`, name `set_workflow_values`, and one required object parameter `values` with only one allowed property `stories_index` of type string and `requiredProperties: ["stories_index"]`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningToolSchemas.ts`
 
-[ ] Subtask 3.16. In `piPlanningToolSchemas.ts`, export `buildPiPlanningStep2ToolSchemas()` returning exactly `read_file`, `send_user_message`, `ask_followup_question`, and `workflow_progress_request`.
+[x] Subtask 3.16. In `piPlanningToolSchemas.ts`, export `buildPiPlanningStep2ToolSchemas()` returning exactly `read_file`, `send_user_message`, `ask_followup_question`, and `workflow_progress_request`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningToolSchemas.ts`
 
-[ ] Subtask 3.17. In `piPlanningToolSchemas.ts`, export `buildPiPlanningStep3ToolSchemas()` returning exactly `list_files`, `search_files`, `list_code_definition_names`, `read_file`, `read_file_range`, `send_user_message`, `ask_followup_question`, and `workflow_progress_request`.
+[x] Subtask 3.17. In `piPlanningToolSchemas.ts`, export `buildPiPlanningStep3ToolSchemas()` returning exactly `list_files`, `search_files`, `list_code_definition_names`, `read_file`, `read_file_range`, `send_user_message`, `ask_followup_question`, and `workflow_progress_request`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningToolSchemas.ts`
 
-[ ] Subtask 3.18. In `piPlanningToolSchemas.ts`, export `buildPiPlanningStep4ToolSchemas()` returning exactly `read_file`, `plan_story_artifacts`, `set_workflow_values`, `send_user_message`, `ask_followup_question`, and `workflow_progress_request`.
+[x] Subtask 3.18. In `piPlanningToolSchemas.ts`, export `buildPiPlanningStep4ToolSchemas()` returning exactly `read_file`, `plan_story_artifacts`, `set_workflow_values`, `send_user_message`, `ask_followup_question`, and `workflow_progress_request`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningToolSchemas.ts`
 
-[ ] Subtask 3.19. In `piPlanningToolSchemas.ts`, export `buildPiPlanningStep5ToolSchemas()` returning exactly `generate_story_files`, `send_user_message`, and `ask_followup_question`.
+[x] Subtask 3.19. In `piPlanningToolSchemas.ts`, export `buildPiPlanningStep5ToolSchemas()` returning exactly `generate_story_files`, `send_user_message`, and `ask_followup_question`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningToolSchemas.ts`
 
-[ ] Subtask 3.20. In `piPlanningToolSchemas.ts`, export `buildPiPlanningStep6ToolSchemas()` returning exactly `list_files`, `read_file`, `apply_patch`, `plan_story_artifacts`, `generate_story_files`, `send_user_message`, `ask_followup_question`, and `attempt_completion`.
+[x] Subtask 3.20. In `piPlanningToolSchemas.ts`, export `buildPiPlanningStep6ToolSchemas()` returning exactly `list_files`, `read_file`, `apply_patch`, `plan_story_artifacts`, `generate_story_files`, `send_user_message`, `ask_followup_question`, and `attempt_completion`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningToolSchemas.ts`
 
-[ ] Task 4. Add focused tool-schema tests.
+[x] Task 4. Add focused tool-schema tests.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningToolSchemas.test.ts`
 
-[ ] Subtask 4.1. Create `piPlanningToolSchemas.test.ts` with a `schemaNames(...)` helper that maps `readonly ClineToolSpec[]` to tool names.
+[x] Subtask 4.1. Create `piPlanningToolSchemas.test.ts` with a `schemaNames(...)` helper that maps `readonly ClineToolSpec[]` to tool names.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningToolSchemas.test.ts`
 
-[ ] Subtask 4.2. In `piPlanningToolSchemas.test.ts`, add coverage proving Step 1 returns an empty schema array.
+[x] Subtask 4.2. In `piPlanningToolSchemas.test.ts`, add coverage proving Step 1 returns an empty schema array.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningToolSchemas.test.ts`
 
-[ ] Subtask 4.3. In `piPlanningToolSchemas.test.ts`, add exact-order coverage for Step 2 through Step 6 tool names matching Subtasks 3.16 through 3.20.
+[x] Subtask 4.3. In `piPlanningToolSchemas.test.ts`, add exact-order coverage for Step 2 through Step 6 tool names matching Subtasks 3.16 through 3.20.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningToolSchemas.test.ts`
 
-[ ] Subtask 4.4. In `piPlanningToolSchemas.test.ts`, add coverage proving `set_workflow_values` appears only in Step 4.
+[x] Subtask 4.4. In `piPlanningToolSchemas.test.ts`, add coverage proving `set_workflow_values` appears only in Step 4.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningToolSchemas.test.ts`
 
-[ ] Subtask 4.5. In `piPlanningToolSchemas.test.ts`, add coverage proving the Step 4 `set_workflow_values` schema only permits the `stories_index` value key.
+[x] Subtask 4.5. In `piPlanningToolSchemas.test.ts`, add coverage proving the Step 4 `set_workflow_values` schema only permits the `stories_index` value key.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningToolSchemas.test.ts`
 
-[ ] Subtask 4.6. In `piPlanningToolSchemas.test.ts`, add coverage proving model-facing schemas do not expose `build_workflow_document`, `create_workflow_artifact`, `archive_workflow_artifact`, `delete_workflow_artifact`, `move_workflow_project_file`, or `execute_command`.
+[x] Subtask 4.6. In `piPlanningToolSchemas.test.ts`, add coverage proving model-facing schemas do not expose `build_workflow_document`, `create_workflow_artifact`, `archive_workflow_artifact`, `delete_workflow_artifact`, `move_workflow_project_file`, or `execute_command`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningToolSchemas.test.ts`
