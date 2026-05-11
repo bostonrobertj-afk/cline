@@ -180,6 +180,10 @@ export class GenerateStoryFilesToolHandler implements IToolHandler {
 				config.taskState.fileReadCache.delete(createdDraftStoryFileAbsolutePath.toLowerCase())
 			}
 			config.taskState.consecutiveMistakeCount = 0
+			const nextAction = await config.workflowRuntime.resolveNextAction({ taskState: config.taskState })
+			if (nextAction.kind !== "no_op") {
+				config.callbacks.queueWorkflowNextAction(nextAction)
+			}
 
 			return formatResponse.toolResult(
 				JSON.stringify({

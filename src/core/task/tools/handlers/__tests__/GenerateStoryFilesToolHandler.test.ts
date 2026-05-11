@@ -8,6 +8,7 @@ import sinon from "sinon"
 import { ClineIgnoreController } from "@/core/ignore/ClineIgnoreController"
 import { formatResponse } from "@/core/prompts/responses"
 import { TaskState } from "@/core/task/TaskState"
+import type { WorkflowNextAction } from "@/core/task/workflow-runtime/types"
 import type {
 	WorkflowGenerateStoryFilesPreparation,
 	WorkflowGenerateStoryFilesResult,
@@ -28,6 +29,8 @@ interface GenerateStoryFilesHandlerConfigResult {
 		ask: sinon.SinonStub
 		prepareGenerateStoryFiles: sinon.SinonStub
 		generateStoryFiles: sinon.SinonStub
+		resolveNextAction: sinon.SinonStub
+		queueWorkflowNextAction: sinon.SinonStub
 		shouldAutoApproveToolWithPath: sinon.SinonStub
 	}
 }
@@ -112,6 +115,8 @@ function createConfig(args?: {
 	const ask = sinon.stub().resolves({ response: args?.askResponse ?? "yesButtonClicked" })
 	const prepareGenerateStoryFiles = sinon.stub().resolves(preparation)
 	const generateStoryFiles = sinon.stub().resolves(result)
+	const resolveNextAction = sinon.stub().resolves({ kind: "no_op" })
+	const queueWorkflowNextAction = sinon.stub()
 	const shouldAutoApproveToolWithPath = sinon.stub().resolves(args?.autoApprove ?? false)
 	const callbacks = {
 		say: sinon.stub().resolves(undefined),
@@ -125,7 +130,7 @@ function createConfig(args?: {
 		cancelRunningCommandTool: sinon.stub().resolves(false),
 		doesLatestTaskCompletionHaveNewChanges: sinon.stub().resolves(false),
 		updateFCListFromToolResponse: sinon.stub().resolves({ accepted: true }),
-		queueWorkflowNextAction: sinon.stub(),
+		queueWorkflowNextAction,
 		shouldAutoApproveTool: sinon.stub().returns([false, false]),
 		shouldAutoApproveToolWithPath,
 		postStateToWebview: sinon.stub().resolves(),
@@ -187,6 +192,7 @@ function createConfig(args?: {
 		workflowRuntime: {
 			prepareGenerateStoryFiles,
 			generateStoryFiles,
+			resolveNextAction,
 		},
 		coordinator: {
 			getHandler: sinon.stub(),
@@ -202,6 +208,8 @@ function createConfig(args?: {
 			ask,
 			prepareGenerateStoryFiles,
 			generateStoryFiles,
+			resolveNextAction,
+			queueWorkflowNextAction,
 			shouldAutoApproveToolWithPath,
 		},
 	}
@@ -310,6 +318,7 @@ describe("GenerateStoryFilesToolHandler", () => {
 			expectedStoryIndexAbsolutePath: preparation.storyIndexAbsolutePath,
 			expectedDraftStoryFileAbsolutePaths: preparation.draftStoryFileAbsolutePaths,
 		})
+		sinon.assert.calledOnceWithExactly(stubs.resolveNextAction, { taskState: config.taskState })
 		expect(JSON.parse(result as string)).to.deep.equal({
 			persisted: true,
 			epic_identity: "1",
@@ -324,5 +333,20 @@ describe("GenerateStoryFilesToolHandler", () => {
 		expect(config.taskState.fileReadCache.has(preparation.draftStoryFileAbsolutePaths[1].toLowerCase())).to.equal(true)
 		expect(config.taskState.didEditFile).to.equal(true)
 		expect(config.taskState.consecutiveMistakeCount).to.equal(0)
+	})
+
+	it("queues a non-no_op next action after successful generation", async () => {
+		const { config, stubs } = createConfig({ autoApprove: true })
+		const hookStub = sandbox.stub(ToolHookUtils, "runPreToolUseIfEnabled").resolves(true)
+		const nextAction: WorkflowNextAction = { kind: "complete_workflow" }
+		stubs.resolveNextAction.resolves(nextAction)
+		const block = createGenerateStoryFilesBlock()
+		const handler = new GenerateStoryFilesToolHandler(createToolValidator(config.cwd))
+
+		await handler.execute(config, block)
+
+		sinon.assert.calledOnceWithExactly(hookStub, config, block)
+		sinon.assert.calledOnceWithExactly(stubs.resolveNextAction, { taskState: config.taskState })
+		sinon.assert.calledOnceWithExactly(stubs.queueWorkflowNextAction, nextAction)
 	})
 })

@@ -182,6 +182,10 @@ export class PlanStoryArtifactsToolHandler implements IToolHandler {
 			config.taskState.fileReadCache.delete(result.storyIndexAbsolutePath.toLowerCase())
 			config.taskState.fileReadCache.delete(result.epicsIndexAbsolutePath.toLowerCase())
 			config.taskState.consecutiveMistakeCount = 0
+			const nextAction = await config.workflowRuntime.resolveNextAction({ taskState: config.taskState })
+			if (nextAction.kind !== "no_op") {
+				config.callbacks.queueWorkflowNextAction(nextAction)
+			}
 
 			return formatResponse.toolResult(
 				JSON.stringify({

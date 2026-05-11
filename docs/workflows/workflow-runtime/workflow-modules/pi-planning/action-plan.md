@@ -75,74 +75,74 @@ Sibling-pattern audit summary:
 
 After completing this phase, pause for QA review before moving to Phase 2.
 
-[ ] Task 1. Update story planning tool handlers so successful model-called tools re-enter workflow route evaluation.
+[x] Task 1. Update story planning tool handlers so successful model-called tools re-enter workflow route evaluation.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/PlanStoryArtifactsToolHandler.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/GenerateStoryFilesToolHandler.ts`
 
-[ ] Subtask 1.1. In `PlanStoryArtifactsToolHandler.ts`, after successful `config.workflowRuntime.planStoryArtifacts(...)`, cache invalidation, `didEditFile` update, and `consecutiveMistakeCount` reset, call `config.workflowRuntime.resolveNextAction({ taskState: config.taskState })` before returning the success result.
+[x] Subtask 1.1. In `PlanStoryArtifactsToolHandler.ts`, after successful `config.workflowRuntime.planStoryArtifacts(...)`, cache invalidation, `didEditFile` update, and `consecutiveMistakeCount` reset, call `config.workflowRuntime.resolveNextAction({ taskState: config.taskState })` before returning the success result.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/PlanStoryArtifactsToolHandler.ts`
 
-[ ] Subtask 1.2. In `PlanStoryArtifactsToolHandler.ts`, if the next action from `resolveNextAction(...)` is not `no_op`, queue it through `config.callbacks.queueWorkflowNextAction(nextAction)`.
+[x] Subtask 1.2. In `PlanStoryArtifactsToolHandler.ts`, if the next action from `resolveNextAction(...)` is not `no_op`, queue it through `config.callbacks.queueWorkflowNextAction(nextAction)`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/PlanStoryArtifactsToolHandler.ts`
 
-[ ] Subtask 1.3. In `GenerateStoryFilesToolHandler.ts`, after successful `config.workflowRuntime.generateStoryFiles(...)`, cache invalidation, `didEditFile` update, and `consecutiveMistakeCount` reset, call `config.workflowRuntime.resolveNextAction({ taskState: config.taskState })` before returning the success result.
+[x] Subtask 1.3. In `GenerateStoryFilesToolHandler.ts`, after successful `config.workflowRuntime.generateStoryFiles(...)`, cache invalidation, `didEditFile` update, and `consecutiveMistakeCount` reset, call `config.workflowRuntime.resolveNextAction({ taskState: config.taskState })` before returning the success result.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/GenerateStoryFilesToolHandler.ts`
 
-[ ] Subtask 1.4. In `GenerateStoryFilesToolHandler.ts`, if the next action from `resolveNextAction(...)` is not `no_op`, queue it through `config.callbacks.queueWorkflowNextAction(nextAction)`.
+[x] Subtask 1.4. In `GenerateStoryFilesToolHandler.ts`, if the next action from `resolveNextAction(...)` is not `no_op`, queue it through `config.callbacks.queueWorkflowNextAction(nextAction)`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/GenerateStoryFilesToolHandler.ts`
 
-[ ] Task 2. Update handler tests for successful next-action re-entry.
+[x] Task 2. Update handler tests for successful next-action re-entry.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/PlanStoryArtifactsToolHandler.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/GenerateStoryFilesToolHandler.test.ts`
 
-[ ] Subtask 2.1. In `PlanStoryArtifactsToolHandler.test.ts`, add a `resolveNextAction` Sinon stub to the default `workflowRuntime` test double, defaulting to `{ kind: "no_op" }`.
+[x] Subtask 2.1. In `PlanStoryArtifactsToolHandler.test.ts`, add a `resolveNextAction` Sinon stub to the default `workflowRuntime` test double, defaulting to `{ kind: "no_op" }`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/PlanStoryArtifactsToolHandler.test.ts`
 
-[ ] Subtask 2.2. In `PlanStoryArtifactsToolHandler.test.ts`, expose the `resolveNextAction` stub through the returned `stubs` object.
+[x] Subtask 2.2. In `PlanStoryArtifactsToolHandler.test.ts`, expose the `resolveNextAction` stub through the returned `stubs` object.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/PlanStoryArtifactsToolHandler.test.ts`
 
-[ ] Subtask 2.3. In the existing successful `plan_story_artifacts` test, assert `resolveNextAction` is called once with `{ taskState: config.taskState }`.
+[x] Subtask 2.3. In the existing successful `plan_story_artifacts` test, assert `resolveNextAction` is called once with `{ taskState: config.taskState }`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/PlanStoryArtifactsToolHandler.test.ts`
 
-[ ] Subtask 2.4. In `PlanStoryArtifactsToolHandler.test.ts`, add coverage proving a non-`no_op` next action returned by `resolveNextAction` is queued through `callbacks.queueWorkflowNextAction(...)`.
+[x] Subtask 2.4. In `PlanStoryArtifactsToolHandler.test.ts`, add coverage proving a non-`no_op` next action returned by `resolveNextAction` is queued through `callbacks.queueWorkflowNextAction(...)`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/PlanStoryArtifactsToolHandler.test.ts`
 
-[ ] Subtask 2.5. In `GenerateStoryFilesToolHandler.test.ts`, add a `resolveNextAction` Sinon stub to the default `workflowRuntime` test double, defaulting to `{ kind: "no_op" }`.
+[x] Subtask 2.5. In `GenerateStoryFilesToolHandler.test.ts`, add a `resolveNextAction` Sinon stub to the default `workflowRuntime` test double, defaulting to `{ kind: "no_op" }`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/GenerateStoryFilesToolHandler.test.ts`
 
-[ ] Subtask 2.6. In `GenerateStoryFilesToolHandler.test.ts`, expose the `resolveNextAction` stub through the returned `stubs` object.
+[x] Subtask 2.6. In `GenerateStoryFilesToolHandler.test.ts`, expose the `resolveNextAction` stub through the returned `stubs` object.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/GenerateStoryFilesToolHandler.test.ts`
 
-[ ] Subtask 2.7. In the existing successful `generate_story_files` test, assert `resolveNextAction` is called once with `{ taskState: config.taskState }`.
+[x] Subtask 2.7. In the existing successful `generate_story_files` test, assert `resolveNextAction` is called once with `{ taskState: config.taskState }`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/GenerateStoryFilesToolHandler.test.ts`
 
-[ ] Subtask 2.8. In `GenerateStoryFilesToolHandler.test.ts`, add coverage proving a non-`no_op` next action returned by `resolveNextAction` is queued through `callbacks.queueWorkflowNextAction(...)`.
+[x] Subtask 2.8. In `GenerateStoryFilesToolHandler.test.ts`, add coverage proving a non-`no_op` next action returned by `resolveNextAction` is queued through `callbacks.queueWorkflowNextAction(...)`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/GenerateStoryFilesToolHandler.test.ts`
