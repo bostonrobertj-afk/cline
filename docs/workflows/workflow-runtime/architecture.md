@@ -589,20 +589,19 @@ The canonical artifact dependency chain is:
 
 ```text
 Epics.md + Epics.index.json
-  -> Epic-{E}-delivery-spec.md
-      -> epic-{E}-stories.index.json
+  -> implementation/epic-{E}-stories.index.json
       -> implementation/drafts/Story-{E}-{S}.md
-          -> Remediation-story-{E}-{S}-{R}.md
+          -> implementation/drafts/Remediation-story-{E}-{S}-{R}.md
           -> review/input artifacts
 ```
 
-Stories validate against the selected `Epic-{E}-delivery-spec.md`; `Epics.index.json` alone is not sufficient proof that story artifacts may be allocated for that epic.
+Story planning validates the selected epic against `Epics.index.json`. Story file generation validates against the selected epic's `implementation/epic-{E}-stories.index.json`; `Epics.index.json` alone is not sufficient proof that a specific story file exists or should be generated.
 
 That numbering policy must carry forward across related artifact families, for example:
 
 - the epics document assigns canonical epic numbers
-- epic delivery specs consume those epic numbers
-- workflow runtime assigns canonical story numbers within an epic through the Story artifact allocation capability, using the selected parent epic identity and convention-driven discovery of existing `Story-{E}-{S}.md` files
+- story indexes consume those epic numbers
+- workflow runtime assigns canonical story numbers within an epic through runtime-owned story planning tools, using the selected parent epic identity and existing `epic-{E}-stories.index.json` entries
 - story documents consume the composite epic/story identifiers
 - remediation stories extend the same identifier lineage rather than inventing a new naming scheme
 - QA/review artifacts inherit the selected story or remediation-story target identity rather than allocating a review-specific number
@@ -760,7 +759,7 @@ Rationale:
 
 Rationale:
 
-- related workflow outputs depend on a shared numbering lineage across epics, delivery specs, stories, remediation stories, and QA/review artifacts
+- related workflow outputs depend on a shared numbering lineage across epics, story indexes, stories, remediation stories, and QA/review artifacts
 - QA/review outputs must inherit the selected target story or remediation-story identity rather than create a separate review numbering scheme
 - distributing numbering, filename, extension, or discovery-pattern logic across workflow modules would recreate drift and fragmented methodology
 - one runtime-owned numbering policy and typed artifact-family convention registry provide a single canonical identity chain for related artifacts inside a project
