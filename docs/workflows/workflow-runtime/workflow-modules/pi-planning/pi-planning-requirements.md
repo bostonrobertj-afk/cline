@@ -174,8 +174,7 @@ Step 1 must render one module-owned workflow form containing these panels:
 | --- | --- | --- |
 | Panel A | First panel | Ask `Which epic are we working on during this workflow?`; render a required dropdown populated from `epics_index`; option labels must identify the epic clearly; selected value must persist `target_epic` and `epic_identity`; if the selected epic has `story-index-generated: true`, runtime/module logic must set `stories_index` to the selected epic's `implementation/epic-{E}-stories.index.json` absolute path. |
 | Panel B | After Panel A | Show the required context files `Epics.index.json`, `Epics.md`, and `architecture.md` as friendly file-name hyperlinks; require confirmation before continuing. |
-| Panel C | After Panel B if optional `brainstorming_document` was found | Show `brainstorming.md` as a friendly file-name hyperlink; allow the user to confirm use of the optional file; rejection must clear or omit `brainstorming_document`. |
-| Panel D | After Panel B, or after Panel C when Panel C is shown | Ask `If you'd like to include any other files as workflow context please provide their full file paths below.`; collect optional large-text-area input into `additional_context`. |
+| Panel C | After Panel B | Ask `If you'd like to include any other files as workflow context please provide their full file paths below.`; collect optional large-text-area input into `additional_context`. |
 
 Panel A must derive its dropdown from `Epics.index.json`, not from markdown parsing of `Epics.md`.
 
@@ -323,7 +322,7 @@ Step 4 must not expose:
 - `delete_workflow_artifact`
 - `move_workflow_project_file`
 
-Step 4 must transition to Step 5 after successful `plan_story_artifacts`.
+Step 4 must transition to Step 5 after successful story-index availability is confirmed. When `stories_index` already existed at workflow start, successful `plan_story_artifacts` may re-enter runtime and route directly to Step 5. When `stories_index` did not exist at workflow start, the AI must call `set_workflow_values` after `plan_story_artifacts` succeeds, and Step 4 must transition to Step 5 only after `stories_index` is persisted.
 
 Step 4 must also transition to Step 5 after `workflow_progress_request_confirmed` when no additional stories are required. A denied progression request must return to the Step 4 project prompt.
 
@@ -447,7 +446,6 @@ The pi-planning module must include module tests for:
 - target epic dropdown population from `Epics.index.json`
 - persistence of `target_epic`, `epic_identity`, and existing `stories_index`
 - required context confirmation panel behavior
-- optional brainstorming context confirmation behavior
 - optional `additional_context` persistence
 - Step 1 transition to Step 2 after setup completion
 - Step 2 prompt source output
@@ -458,7 +456,7 @@ The pi-planning module must include module tests for:
 - Step 2 through Step 6 decision-tree route structure
 - exact Step 1 through Step 6 tool-schema outputs
 - Step 4 `set_workflow_values` schema restriction to `stories_index`
-- Step 4 transition after successful `plan_story_artifacts`
+- Step 4 transition after successful existing-index `plan_story_artifacts` re-entry and after new-index `stories_index` persistence
 - Step 4 transition after confirmed no-additional-stories progression
 - Step 5 transition after successful `generate_story_files`
 - Step 6 completion through explicit `attempt_completion_succeeded` routing
