@@ -1166,6 +1166,91 @@ describe("WorkflowFormRuntime", () => {
 		})
 	}
 
+	for (const jsonBackedCase of [
+		{
+			kind: "dropdown",
+			key: "selected_epic",
+			allowedValueType: "string",
+			value: { stringValue: "missing-epic" },
+		},
+		{
+			kind: "checkbox_group",
+			key: "selected_epics",
+			allowedValueType: "array",
+			value: {
+				arrayValue: {
+					values: [{ stringValue: "missing-epic" }],
+				},
+			},
+		},
+	] satisfies Array<{
+		kind: WorkflowFormFieldKind
+		key: string
+		allowedValueType: "string" | "array"
+		value: NonNullable<WorkflowFormSubmissionRequest["fields"]>[number]["value"]
+	}>) {
+		it(`rejects jsonOptionsSource ${jsonBackedCase.kind} submissions outside rendered options`, () => {
+			const runtime = createRuntime()
+			const session = createSession({
+				runtime,
+				definitionPayload: createDefinition({
+					firstPanelId: "selectors",
+					panels: {
+						selectors: {
+							panelId: "selectors",
+							title: "Selectors",
+							promptMarkdown: "Choose a JSON-backed option.",
+							fields: [
+								{
+									key: jsonBackedCase.key,
+									kind: jsonBackedCase.kind,
+									label: "Epic",
+									required: true,
+									allowedValueType: jsonBackedCase.allowedValueType,
+									options: [{ value: "1", label: "Epic 1" }],
+									jsonOptionsSource: {
+										root: {
+											kind: "selected_project_root",
+										},
+										sourcePathSegments: ["planning", "Epics.index.json"],
+										itemsPath: "epics",
+										valueProperty: "identity",
+										labelTemplate: "Epic {identity}",
+									},
+								},
+							],
+							allowedActions: ["submit"],
+							transition: createTerminalTransition(),
+						},
+					},
+				}),
+			})
+
+			const outcome = runtime.handleSubmission(
+				session,
+				createSubmitRequest({
+					sessionId: session.sessionId,
+					panelId: "selectors",
+					fields: [
+						{
+							key: jsonBackedCase.key,
+							value: jsonBackedCase.value,
+						},
+					],
+				}),
+			)
+
+			expect(outcome.kind).to.equal("render_form")
+			if (outcome.kind !== "render_form") {
+				throw new Error(`Expected render_form, received ${outcome.kind}.`)
+			}
+			expect(outcome.session.failure).to.deep.equal({
+				panelId: "selectors",
+				errorMessage: `Field "${jsonBackedCase.key}" does not satisfy the declared selection rules.`,
+			})
+		})
+	}
+
 	it("verifies value normalization for numeric and checkbox-group submissions", () => {
 		const runtime = createRuntime()
 		const session = createSession({

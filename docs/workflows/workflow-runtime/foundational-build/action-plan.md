@@ -10075,175 +10075,159 @@ This phase does not implement pi-planning. It does not change `selectorDiscovery
 
 Panel-specific derived values, such as deriving `target_epic`, `epic_identity`, or `stories_index` from one selected option, remain module-owned deterministic behavior and are out of scope for this foundational phase.
 
-[ ] Task 212. Add JSON option source form types.
+[x] Task 212. Add JSON option source form types.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/shared/ExtensionMessage.ts`
 
-[ ] Subtask 212.1. In `ExtensionMessage.ts`, add `WorkflowFormJsonOptionsSourceRoot` with only `{ kind: "selected_project_root" }`.
+[x] Subtask 212.1. In `ExtensionMessage.ts`, add `WorkflowFormJsonOptionsSourceRoot` with only `{ kind: "selected_project_root" }`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/shared/ExtensionMessage.ts`
 
-[ ] Subtask 212.2. In `ExtensionMessage.ts`, add `WorkflowFormJsonOptionsSourceConfig` with `root`, `sourcePathSegments`, `itemsPath`, `valueProperty`, `labelTemplate`, and optional `descriptionTemplate`.
+[x] Subtask 212.2. In `ExtensionMessage.ts`, add `WorkflowFormJsonOptionsSourceConfig` with `root`, `sourcePathSegments`, `itemsPath`, `valueProperty`, `labelTemplate`, and optional `descriptionTemplate`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/shared/ExtensionMessage.ts`
 
-[ ] Subtask 212.3. In `WorkflowFormFieldDefinition`, add `jsonOptionsSource?: WorkflowFormJsonOptionsSourceConfig`.
+[x] Subtask 212.3. In `WorkflowFormFieldDefinition`, add `jsonOptionsSource?: WorkflowFormJsonOptionsSourceConfig`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/shared/ExtensionMessage.ts`
 
-[ ] Task 213. Populate workflow-form options from selected-project JSON.
+[x] Task 213. Populate workflow-form options from selected-project JSON.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 213.1. In `WorkflowRuntime.ts`, rename `populateWorkflowFormSelectorOptions(...)` to a generic dynamic-options helper that handles both selector discovery and JSON option sources.
+[x] Subtask 213.1. In `WorkflowRuntime.ts`, rename `populateWorkflowFormSelectorOptions(...)` to a generic dynamic-options helper that handles both selector discovery and JSON option sources.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 213.2. In `WorkflowRuntime.ts`, add JSON option source path resolution under `resolveWorkflowProjectOutputFolder(session)` using `sourcePathSegments`.
+[x] Subtask 213.2. In `WorkflowRuntime.ts`, add JSON option source path resolution under `resolveWorkflowProjectOutputFolder(session)` using `sourcePathSegments`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 213.3. In `WorkflowRuntime.ts`, validate the resolved JSON source path with workspace path policy before reading.
+[x] Subtask 213.3. In `WorkflowRuntime.ts`, validate the resolved JSON source path with workspace path policy before reading.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 213.4. In `WorkflowRuntime.ts`, read and parse the configured JSON source file.
+[x] Subtask 213.4. In `WorkflowRuntime.ts`, read and parse the configured JSON source file.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 213.5. In `WorkflowRuntime.ts`, traverse `itemsPath` and require it to resolve to an array of objects.
+[x] Subtask 213.5. In `WorkflowRuntime.ts`, traverse `itemsPath` and require it to resolve to an array of objects.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 213.6. In `WorkflowRuntime.ts`, build option values from each item's `valueProperty`, requiring non-empty string values.
+[x] Subtask 213.6. In `WorkflowRuntime.ts`, build option values from each item's `valueProperty`, requiring non-empty string values.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 213.7. In `WorkflowRuntime.ts`, build option labels by replacing `{propertyName}` placeholders in `labelTemplate` with direct string, number, or boolean item properties.
+[x] Subtask 213.7. In `WorkflowRuntime.ts`, build option labels by replacing `{propertyName}` placeholders in `labelTemplate` with direct string, number, or boolean item properties.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 213.8. In `WorkflowRuntime.ts`, build option descriptions from `descriptionTemplate` using the same placeholder rules when `descriptionTemplate` is present.
+[x] Subtask 213.8. In `WorkflowRuntime.ts`, build option descriptions from `descriptionTemplate` using the same placeholder rules when `descriptionTemplate` is present.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 213.9. In `WorkflowRuntime.ts`, reject duplicate generated option values with a clear error.
+[x] Subtask 213.9. In `WorkflowRuntime.ts`, reject duplicate generated option values with a clear error.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Task 214. Enforce JSON option source submission and definition validation.
+[x] Task 214. Enforce JSON option source submission and definition validation.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 214.1. In `WorkflowFormRuntime.ts`, update option-match enforcement so fields with `jsonOptionsSource` require submitted values to match rendered options.
+[x] Subtask 214.1. In `WorkflowFormRuntime.ts`, update option-match enforcement so fields with `jsonOptionsSource` require submitted values to match rendered options.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
 
-[ ] Subtask 214.2. In `WorkflowRuntime.ts`, reject workflow form fields that define both `selectorDiscovery` and `jsonOptionsSource`.
+[x] Subtask 214.2. In `WorkflowRuntime.ts`, reject workflow form fields that define both `selectorDiscovery` and `jsonOptionsSource`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 214.3. In `WorkflowRuntime.ts`, reject `jsonOptionsSource` on field kinds other than `dropdown`, `radio_group`, `multi_select`, or `checkbox_group`.
+[x] Subtask 214.3. In `WorkflowRuntime.ts`, reject `jsonOptionsSource` on field kinds other than `dropdown`, `radio_group`, `multi_select`, or `checkbox_group`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 214.4. In `WorkflowRuntime.ts`, reject unsafe `jsonOptionsSource.sourcePathSegments` entries.
+[x] Subtask 214.4. In `WorkflowRuntime.ts`, reject unsafe `jsonOptionsSource.sourcePathSegments` entries.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 214.5. In `WorkflowRuntime.ts`, reject empty or untrimmed `itemsPath`, `valueProperty`, `labelTemplate`, and `descriptionTemplate` values.
+[x] Subtask 214.5. In `WorkflowRuntime.ts`, reject empty or untrimmed `itemsPath`, `valueProperty`, `labelTemplate`, and `descriptionTemplate` values.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Task 215. Add JSON option source tests.
+[x] Task 215. Add JSON option source tests.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`
 
-[ ] Subtask 215.1. In `WorkflowRuntime.test.ts`, add coverage proving a dropdown renders options from selected-project `planning/Epics.index.json`.
+[x] Subtask 215.1. In `WorkflowRuntime.test.ts`, add coverage proving a dropdown renders options from selected-project `planning/Epics.index.json`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 215.2. In `WorkflowRuntime.test.ts`, add coverage proving `radio_group`, `multi_select`, and `checkbox_group` can render options from the same JSON source.
+[x] Subtask 215.2. In `WorkflowRuntime.test.ts`, add coverage proving `radio_group`, `multi_select`, and `checkbox_group` can render options from the same JSON source.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 215.3. In `WorkflowRuntime.test.ts`, add coverage proving missing or malformed JSON source files fail clearly.
+[x] Subtask 215.3. In `WorkflowRuntime.test.ts`, add coverage proving missing or malformed JSON source files fail clearly.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 215.4. In `WorkflowRuntime.test.ts`, add validation coverage for unsafe path segments, both-source conflicts, unsupported field kinds, and invalid JSON option config strings.
+[x] Subtask 215.4. In `WorkflowRuntime.test.ts`, add validation coverage for unsafe path segments, both-source conflicts, unsupported field kinds, and invalid JSON option config strings.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 215.5. In `WorkflowFormRuntime.test.ts`, add coverage proving submitted values outside rendered JSON-backed options are rejected.
+[x] Subtask 215.5. In `WorkflowFormRuntime.test.ts`, add coverage proving submitted values outside rendered JSON-backed options are rejected.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`
 
-[ ] Task 216. Update module build guide guidance.
+[x] Task 216. Update module build guide guidance.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
 
-[ ] Subtask 216.1. In `module-build-guide.md`, add guidance that modules must use `jsonOptionsSource` when a workflow form field needs options derived from a selected-project JSON index file.
+[x] Subtask 216.1. In `module-build-guide.md`, add guidance that modules must use `jsonOptionsSource` when a workflow form field needs options derived from a selected-project JSON index file.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
 
-[ ] Subtask 216.2. In `module-build-guide.md`, state that `selectorDiscovery` remains only for filesystem discovery and must not be repurposed for JSON index content.
+[x] Subtask 216.2. In `module-build-guide.md`, state that `selectorDiscovery` remains only for filesystem discovery and must not be repurposed for JSON index content.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
 
-[ ] Subtask 216.3. In `module-build-guide.md`, state that a workflow form field persists at most one durable workflow value and modules must use deterministic post-form behavior for derived workflow values.
+[x] Subtask 216.3. In `module-build-guide.md`, state that a workflow form field persists at most one durable workflow value and modules must use deterministic post-form behavior for derived workflow values.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
 
-[ ] Task 217. Validate Phase 65.
-
-Allowed files:
-- `/Users/robertboston/Documents/Cline Extension/cline/src/shared/ExtensionMessage.ts`
-- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
-- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
-- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
-- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`
-- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
-
-[ ] Subtask 217.1. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`; it must pass before Phase 65 is marked complete.
-
-Allowed files:
-- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
-- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`
-
-[ ] Subtask 217.2. Run `npm run check-types`; it must pass before Phase 65 is marked complete.
+[x] Task 217. Validate Phase 65.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/shared/ExtensionMessage.ts`
@@ -10251,8 +10235,24 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
 
-[ ] Subtask 217.3. Run `npm run lint`; it must pass before Phase 65 is marked complete.
+[x] Subtask 217.1. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`; it must pass before Phase 65 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`
+
+[x] Subtask 217.2. Run `npm run check-types`; it must pass before Phase 65 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/shared/ExtensionMessage.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`
+
+[x] Subtask 217.3. Run `npm run lint`; it must pass before Phase 65 is marked complete.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/shared/ExtensionMessage.ts`

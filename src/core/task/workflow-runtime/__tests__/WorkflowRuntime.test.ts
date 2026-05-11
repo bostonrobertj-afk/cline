@@ -1,4 +1,9 @@
-import type { WorkflowFormDefinitionPayload, WorkflowFormPanelDefinition } from "@shared/ExtensionMessage"
+import type {
+	WorkflowFormDefinitionPayload,
+	WorkflowFormFieldDefinition,
+	WorkflowFormFieldKind,
+	WorkflowFormPanelDefinition,
+} from "@shared/ExtensionMessage"
 import { WorkflowFormAction, WorkflowFormSubmissionRequest, type WorkflowFormValue } from "@shared/proto/cline/task"
 import { expect } from "chai"
 import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "fs/promises"
@@ -181,6 +186,69 @@ describe("WorkflowRuntime", () => {
 				storyIndexGenerated: false,
 			},
 		])
+	}
+
+	type JsonOptionsFieldKind = Extract<WorkflowFormFieldKind, "dropdown" | "radio_group" | "multi_select" | "checkbox_group">
+
+	function createEpicsJsonOptionsSource(
+		args?: Partial<NonNullable<WorkflowFormFieldDefinition["jsonOptionsSource"]>>,
+	): NonNullable<WorkflowFormFieldDefinition["jsonOptionsSource"]> {
+		return {
+			root: {
+				kind: "selected_project_root",
+			},
+			sourcePathSegments: args?.sourcePathSegments ?? ["planning", "Epics.index.json"],
+			itemsPath: args?.itemsPath ?? "epics",
+			valueProperty: args?.valueProperty ?? "identity",
+			labelTemplate: args?.labelTemplate ?? "Epic {identity}: {title}",
+			...(args?.descriptionTemplate !== undefined ? { descriptionTemplate: args.descriptionTemplate } : {}),
+		}
+	}
+
+	function createEpicsJsonOptionsField(args: {
+		key: string
+		kind: JsonOptionsFieldKind
+		workflowValueKey: string | undefined
+		jsonOptionsSource?: NonNullable<WorkflowFormFieldDefinition["jsonOptionsSource"]>
+	}): WorkflowFormFieldDefinition {
+		const allowsMultipleValues = args.kind === "multi_select" || args.kind === "checkbox_group"
+		const field: WorkflowFormFieldDefinition = {
+			key: args.key,
+			kind: args.kind,
+			label: "Epic",
+			required: true,
+			allowedValueType: allowsMultipleValues ? "array" : "string",
+			jsonOptionsSource: args.jsonOptionsSource ?? createEpicsJsonOptionsSource(),
+			valueSchema: allowsMultipleValues ? { type: "array", items: { type: "string" } } : { type: "string" },
+		}
+		if (args.workflowValueKey !== undefined) {
+			field.workflowValueKey = args.workflowValueKey
+		}
+
+		return field
+	}
+
+	function createJsonOptionsWorkflowForm(args: {
+		workflowFormId: string
+		fields: WorkflowFormFieldDefinition[]
+	}): WorkflowFormDefinitionPayload {
+		return {
+			definitionVersion: 2,
+			title: "JSON Options Form",
+			toolDictionaryTitle: "JSON Options Tools",
+			toolDictionaryMarkdown: "JSON options help",
+			firstPanelId: "json-options",
+			panels: {
+				"json-options": {
+					panelId: "json-options",
+					title: "JSON Options",
+					promptMarkdown: "Choose from JSON-backed options.",
+					fields: args.fields,
+					allowedActions: ["submit"],
+					transition: createTerminalTransition(),
+				},
+			},
+		}
 	}
 
 	const ARTIFACT_ALLOCATION_TERMINAL_ERROR_MESSAGE = "Artifact allocation failed."
@@ -5952,6 +6020,288 @@ describe("WorkflowRuntime", () => {
 				`Field "${invalidCase.fieldKey}" does not satisfy the declared selection rules.`,
 			)
 			expect(getActiveWorkflowSession(caseTaskState).workflowValues).to.not.have.property(invalidCase.workflowValueKey)
+		}
+	})
+
+	it("renders dropdown options from selected-project planning/Epics.index.json", async () => {
+		const workflowFormId = "json-options-dropdown-form"
+		const workflowValueKey = "selected_epic"
+		const projectFolderName = "json-options-dropdown-project"
+		await writeEpicsIndex(join(cwd, "docs", "projects", projectFolderName, "planning", "Epics.index.json"), [
+			{ identity: "1", title: "Foundation", storyIndexGenerated: false },
+			{ identity: "2", title: "Delivery", storyIndexGenerated: true },
+		])
+
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: [workflowValueKey],
+			workflowForms: {
+				[workflowFormId]: createJsonOptionsWorkflowForm({
+					workflowFormId,
+					fields: [
+						createEpicsJsonOptionsField({
+							key: "epic",
+							kind: "dropdown",
+							workflowValueKey,
+							jsonOptionsSource: createEpicsJsonOptionsSource({
+								descriptionTemplate: "Story index generated: {story-index-generated}",
+							}),
+						}),
+					],
+				}),
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createWorkflowFormDecisionTree({ workflowFormId }),
+				}),
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		const renderFormAction = await submitNewProjectSelection(taskState, projectFolderName)
+
+		expect(renderFormAction.kind).to.equal("render_workflow_form")
+		if (renderFormAction.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${renderFormAction.kind}.`)
+		}
+
+		const expectedOptions = [
+			{ value: "1", label: "Epic 1: Foundation", description: "Story index generated: false" },
+			{ value: "2", label: "Epic 2: Delivery", description: "Story index generated: true" },
+		]
+		expect(renderFormAction.payload.panel?.fields.find((field) => field.key === "epic")?.options).to.deep.equal(
+			expectedOptions,
+		)
+		expect(
+			renderFormAction.formSession.definitionPayload.panels["json-options"].fields.find((field) => field.key === "epic")
+				?.options,
+		).to.deep.equal(expectedOptions)
+	})
+
+	it("renders radio group, multi-select, and checkbox-group options from the same JSON source", async () => {
+		const workflowFormId = "json-options-option-kinds-form"
+		const projectFolderName = "json-options-kinds-project"
+		await writeEpicsIndex(join(cwd, "docs", "projects", projectFolderName, "planning", "Epics.index.json"), [
+			{ identity: "1", title: "Foundation", storyIndexGenerated: false },
+			{ identity: "2", title: "Delivery", storyIndexGenerated: false },
+		])
+
+		const workflow = createWorkflowDefinition({
+			workflowForms: {
+				[workflowFormId]: createJsonOptionsWorkflowForm({
+					workflowFormId,
+					fields: [
+						createEpicsJsonOptionsField({ key: "radio_epic", kind: "radio_group", workflowValueKey: undefined }),
+						createEpicsJsonOptionsField({
+							key: "multi_epics",
+							kind: "multi_select",
+							workflowValueKey: undefined,
+						}),
+						createEpicsJsonOptionsField({
+							key: "checkbox_epics",
+							kind: "checkbox_group",
+							workflowValueKey: undefined,
+						}),
+					],
+				}),
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createWorkflowFormDecisionTree({ workflowFormId }),
+				}),
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		const renderFormAction = await submitNewProjectSelection(taskState, projectFolderName)
+
+		expect(renderFormAction.kind).to.equal("render_workflow_form")
+		if (renderFormAction.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${renderFormAction.kind}.`)
+		}
+
+		const expectedOptions = [
+			{ value: "1", label: "Epic 1: Foundation" },
+			{ value: "2", label: "Epic 2: Delivery" },
+		]
+		for (const fieldKey of ["radio_epic", "multi_epics", "checkbox_epics"]) {
+			expect(renderFormAction.payload.panel?.fields.find((field) => field.key === fieldKey)?.options).to.deep.equal(
+				expectedOptions,
+			)
+		}
+	})
+
+	it("fails clearly when JSON option source files are missing or malformed", async () => {
+		const expectJsonOptionsRenderFailure = async (args: {
+			projectFolderName: string
+			expectedMessageParts: readonly string[]
+			writeSourceFile: boolean
+			sourceFileText: string
+		}): Promise<void> => {
+			if (args.writeSourceFile) {
+				const sourcePath = join(cwd, "docs", "projects", args.projectFolderName, "planning", "Epics.index.json")
+				await mkdir(dirname(sourcePath), { recursive: true })
+				await writeFile(sourcePath, args.sourceFileText, "utf8")
+			}
+
+			const failureState = new TaskState()
+			const workflowFormId = `${args.projectFolderName}-form`
+			const workflow = createWorkflowDefinition({
+				workflowForms: {
+					[workflowFormId]: createJsonOptionsWorkflowForm({
+						workflowFormId,
+						fields: [
+							createEpicsJsonOptionsField({
+								key: "epic",
+								kind: "dropdown",
+								workflowValueKey: undefined,
+							}),
+						],
+					}),
+				},
+				steps: {
+					"step-1": createStepDefinition({
+						stepNumber: 1,
+						decisionTree: createWorkflowFormDecisionTree({ workflowFormId }),
+					}),
+				},
+			})
+			await activateWorkflow(failureState, workflow)
+
+			let thrownError: Error | undefined
+			try {
+				await submitNewProjectSelection(failureState, args.projectFolderName)
+			} catch (error) {
+				if (error instanceof Error) {
+					thrownError = error
+				}
+			}
+
+			expect(thrownError).to.not.equal(undefined)
+			if (thrownError === undefined) {
+				throw new Error("Expected JSON option source rendering to fail.")
+			}
+			for (const expectedMessagePart of args.expectedMessageParts) {
+				expect(thrownError.message).to.contain(expectedMessagePart)
+			}
+		}
+
+		await expectJsonOptionsRenderFailure({
+			projectFolderName: "json-options-missing-project",
+			expectedMessageParts: ["jsonOptionsSource file", "could not be read"],
+			writeSourceFile: false,
+			sourceFileText: "",
+		})
+		await expectJsonOptionsRenderFailure({
+			projectFolderName: "json-options-malformed-project",
+			expectedMessageParts: ["jsonOptionsSource file", "is malformed JSON"],
+			writeSourceFile: true,
+			sourceFileText: "{",
+		})
+		await expectJsonOptionsRenderFailure({
+			projectFolderName: "json-options-duplicate-project",
+			expectedMessageParts: ["jsonOptionsSource generated duplicate option value 1"],
+			writeSourceFile: true,
+			sourceFileText: JSON.stringify({
+				version: 1,
+				epics: [
+					{ identity: "1", title: "Foundation", "story-index-generated": false },
+					{ identity: "1", title: "Duplicate", "story-index-generated": false },
+				],
+			}),
+		})
+	})
+
+	it("rejects invalid JSON option source definitions before activation", async () => {
+		const createWorkflowWithField = (field: WorkflowFormFieldDefinition): WorkflowDefinition => {
+			const workflowFormId = `invalid-${field.key}-form`
+			return createWorkflowDefinition({
+				workflowForms: {
+					[workflowFormId]: createJsonOptionsWorkflowForm({
+						workflowFormId,
+						fields: [field],
+					}),
+				},
+			})
+		}
+		const createDropdownField = (
+			jsonOptionsSource: NonNullable<WorkflowFormFieldDefinition["jsonOptionsSource"]>,
+		): WorkflowFormFieldDefinition =>
+			createEpicsJsonOptionsField({
+				key: "epic",
+				kind: "dropdown",
+				workflowValueKey: undefined,
+				jsonOptionsSource,
+			})
+
+		const invalidFieldCases: Array<{ readonly label: string; readonly field: WorkflowFormFieldDefinition }> = [
+			...[
+				{ label: "empty string", segment: "" },
+				{ label: "current directory", segment: "." },
+				{ label: "parent directory", segment: ".." },
+				{ label: "slash", segment: "nested/path" },
+				{ label: "backslash", segment: "nested\\path" },
+				{ label: "absolute path", segment: join(cwd, "outside") },
+				{ label: "Windows drive syntax", segment: "C:" },
+			].map((invalidSegment) => ({
+				label: `unsafe sourcePathSegments ${invalidSegment.label}`,
+				field: createDropdownField(
+					createEpicsJsonOptionsSource({
+						sourcePathSegments: ["planning", invalidSegment.segment],
+					}),
+				),
+			})),
+			{
+				label: "selectorDiscovery conflict",
+				field: {
+					...createDropdownField(createEpicsJsonOptionsSource()),
+					selectorDiscovery: {
+						root: {
+							kind: "selected_project_root",
+						},
+						entryType: "file",
+						immediateChildrenOnly: true,
+						sort: "alpha_asc",
+					},
+				},
+			},
+			{
+				label: "unsupported field kind",
+				field: {
+					key: "summary",
+					kind: "small_text",
+					label: "Summary",
+					required: true,
+					allowedValueType: "string",
+					jsonOptionsSource: createEpicsJsonOptionsSource(),
+				},
+			},
+			{
+				label: "empty itemsPath",
+				field: createDropdownField(createEpicsJsonOptionsSource({ itemsPath: "" })),
+			},
+			{
+				label: "untrimmed valueProperty",
+				field: createDropdownField(createEpicsJsonOptionsSource({ valueProperty: " identity" })),
+			},
+			{
+				label: "empty labelTemplate",
+				field: createDropdownField(createEpicsJsonOptionsSource({ labelTemplate: " " })),
+			},
+			{
+				label: "untrimmed descriptionTemplate",
+				field: createDropdownField(createEpicsJsonOptionsSource({ descriptionTemplate: "Description " })),
+			},
+		]
+
+		for (const invalidFieldCase of invalidFieldCases) {
+			const invalidState = new TaskState()
+			const result = await activateWorkflow(invalidState, createWorkflowWithField(invalidFieldCase.field))
+
+			expect(result, invalidFieldCase.label).to.deep.equal({ kind: "no_op" })
+			expect(invalidState.activeWorkflowName, invalidFieldCase.label).to.be.undefined
+			expect(invalidState.activeWorkflowSession, invalidFieldCase.label).to.be.undefined
 		}
 	})
 

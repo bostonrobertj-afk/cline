@@ -511,7 +511,7 @@ function validateSelectionRules(
 }
 
 function requiresDeclaredOptionMatch(field: WorkflowFormFieldDefinition): boolean {
-	return field.selectorDiscovery !== undefined
+	return field.selectorDiscovery !== undefined || field.jsonOptionsSource !== undefined
 }
 
 function hasRenderableValue(value: WorkflowFormSubmittedValuePayload | undefined): boolean {

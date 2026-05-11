@@ -3,6 +3,7 @@ import type {
 	WorkflowFormConditionDefinition,
 	WorkflowFormDefinitionPayload,
 	WorkflowFormFieldDefinition,
+	WorkflowFormJsonOptionsSourceConfig,
 	WorkflowFormOptionDefinition,
 	WorkflowFormPanelAction,
 	WorkflowFormPanelDefinition,
@@ -4316,7 +4317,7 @@ export class WorkflowRuntime {
 			}
 
 			resolvedFields.push(
-				await this.populateWorkflowFormSelectorOptions({
+				await this.populateWorkflowFormDynamicOptions({
 					taskState: args.taskState,
 					workflow: args.workflow,
 					field: resolvedField,
@@ -4327,20 +4328,33 @@ export class WorkflowRuntime {
 		return resolvedFields
 	}
 
-	private async populateWorkflowFormSelectorOptions(args: {
+	private async populateWorkflowFormDynamicOptions(args: {
 		taskState: TaskState
 		workflow: WorkflowDefinition
 		field: WorkflowFormFieldDefinition
 	}): Promise<WorkflowFormFieldDefinition> {
-		const discoveredOptions = await this.discoverWorkflowFormSelectorOptions(args)
-		if (!discoveredOptions) {
+		const dynamicOptions = await this.resolveWorkflowFormDynamicOptions(args)
+		if (!dynamicOptions) {
 			return args.field
 		}
 
 		return {
 			...args.field,
-			options: discoveredOptions,
+			options: dynamicOptions,
 		}
+	}
+
+	private async resolveWorkflowFormDynamicOptions(args: {
+		taskState: TaskState
+		workflow: WorkflowDefinition
+		field: WorkflowFormFieldDefinition
+	}): Promise<WorkflowFormOptionDefinition[] | undefined> {
+		const selectorOptions = await this.discoverWorkflowFormSelectorOptions(args)
+		if (selectorOptions !== undefined) {
+			return selectorOptions
+		}
+
+		return this.loadWorkflowFormJsonOptions(args)
 	}
 
 	private async discoverWorkflowFormSelectorOptions(args: {
@@ -4381,6 +4395,278 @@ export class WorkflowRuntime {
 			sort: discoveryConfig.sort,
 			buildLabel: (entryName) => discoveryConfig.labelTemplate?.replace("{entryName}", entryName) ?? entryName,
 		})
+	}
+
+	private async loadWorkflowFormJsonOptions(args: {
+		taskState: TaskState
+		workflow: WorkflowDefinition
+		field: WorkflowFormFieldDefinition
+	}): Promise<WorkflowFormOptionDefinition[] | undefined> {
+		const sourceConfig = args.field.jsonOptionsSource
+		if (sourceConfig === undefined) {
+			return undefined
+		}
+
+		const sourcePath = this.resolveWorkflowFormJsonOptionsSourcePath({
+			taskState: args.taskState,
+			fieldKey: args.field.key,
+			sourceConfig,
+		})
+
+		let sourceText: string
+		try {
+			sourceText = await readFile(sourcePath, "utf8")
+		} catch (error) {
+			const errorMessage = error instanceof Error ? ` ${error.message}` : ""
+			throw new Error(
+				`Workflow form field ${args.field.key} jsonOptionsSource file ${sourcePath} could not be read.${errorMessage}`,
+			)
+		}
+
+		let parsedSource: unknown
+		try {
+			parsedSource = JSON.parse(sourceText)
+		} catch (error) {
+			const errorMessage = error instanceof Error ? ` ${error.message}` : ""
+			throw new Error(
+				`Workflow form field ${args.field.key} jsonOptionsSource file ${sourcePath} is malformed JSON.${errorMessage}`,
+			)
+		}
+
+		const items = this.resolveWorkflowFormJsonOptionItems({
+			fieldKey: args.field.key,
+			sourceConfig,
+			sourcePath,
+			parsedSource,
+		})
+
+		return this.buildWorkflowFormJsonOptions({
+			fieldKey: args.field.key,
+			sourceConfig,
+			sourcePath,
+			items,
+		})
+	}
+
+	private resolveWorkflowFormJsonOptionsSourcePath(args: {
+		taskState: TaskState
+		fieldKey: string
+		sourceConfig: WorkflowFormJsonOptionsSourceConfig
+	}): string {
+		const session = args.taskState.activeWorkflowSession
+		if (session === undefined) {
+			throw new Error(`Workflow form field ${args.fieldKey} jsonOptionsSource requires an active workflow session.`)
+		}
+
+		const selectedProjectRoot = resolve(this.resolveWorkflowProjectOutputFolder(session))
+		const sourcePath = resolve(selectedProjectRoot, ...args.sourceConfig.sourcePathSegments)
+		const relativeSourcePath = relative(selectedProjectRoot, sourcePath)
+		if (relativeSourcePath === ".." || relativeSourcePath.startsWith(`..${sep}`) || isAbsolute(relativeSourcePath)) {
+			throw new Error(
+				`Workflow form field ${args.fieldKey} jsonOptionsSource file must stay under selected project root: ${sourcePath}`,
+			)
+		}
+
+		this.assertWorkspacePathAllowed(sourcePath)
+		return sourcePath
+	}
+
+	private resolveWorkflowFormJsonOptionItems(args: {
+		fieldKey: string
+		sourceConfig: WorkflowFormJsonOptionsSourceConfig
+		sourcePath: string
+		parsedSource: unknown
+	}): Record<string, unknown>[] {
+		let currentValue = args.parsedSource
+		for (const pathSegment of args.sourceConfig.itemsPath.split(".")) {
+			if (this.isPlainRecord(currentValue) === false) {
+				throw new Error(
+					`Workflow form field ${args.fieldKey} jsonOptionsSource itemsPath ${args.sourceConfig.itemsPath} could not traverse ${pathSegment} in ${args.sourcePath}.`,
+				)
+			}
+
+			currentValue = currentValue[pathSegment]
+		}
+
+		if (Array.isArray(currentValue) === false) {
+			throw new Error(
+				`Workflow form field ${args.fieldKey} jsonOptionsSource itemsPath ${args.sourceConfig.itemsPath} must resolve to an array in ${args.sourcePath}.`,
+			)
+		}
+
+		const items: Record<string, unknown>[] = []
+		for (const [index, item] of currentValue.entries()) {
+			if (this.isPlainRecord(item) === false) {
+				throw new Error(
+					`Workflow form field ${args.fieldKey} jsonOptionsSource itemsPath ${args.sourceConfig.itemsPath}[${index}] must be an object in ${args.sourcePath}.`,
+				)
+			}
+
+			items.push(item)
+		}
+
+		return items
+	}
+
+	private buildWorkflowFormJsonOptions(args: {
+		fieldKey: string
+		sourceConfig: WorkflowFormJsonOptionsSourceConfig
+		sourcePath: string
+		items: Record<string, unknown>[]
+	}): WorkflowFormOptionDefinition[] {
+		const seenValues = new Set<string>()
+		const options: WorkflowFormOptionDefinition[] = []
+
+		for (const [index, item] of args.items.entries()) {
+			const optionValue = item[args.sourceConfig.valueProperty]
+			if (typeof optionValue !== "string" || optionValue.trim() === "") {
+				throw new Error(
+					`Workflow form field ${args.fieldKey} jsonOptionsSource item ${index} valueProperty ${args.sourceConfig.valueProperty} must be a non-empty string in ${args.sourcePath}.`,
+				)
+			}
+
+			if (seenValues.has(optionValue)) {
+				throw new Error(
+					`Workflow form field ${args.fieldKey} jsonOptionsSource generated duplicate option value ${optionValue} in ${args.sourcePath}.`,
+				)
+			}
+			seenValues.add(optionValue)
+
+			const option: WorkflowFormOptionDefinition = {
+				value: optionValue,
+				label: this.renderWorkflowFormJsonOptionTemplate({
+					fieldKey: args.fieldKey,
+					sourcePath: args.sourcePath,
+					itemIndex: index,
+					item,
+					template: args.sourceConfig.labelTemplate,
+				}),
+			}
+
+			if (args.sourceConfig.descriptionTemplate !== undefined) {
+				option.description = this.renderWorkflowFormJsonOptionTemplate({
+					fieldKey: args.fieldKey,
+					sourcePath: args.sourcePath,
+					itemIndex: index,
+					item,
+					template: args.sourceConfig.descriptionTemplate,
+				})
+			}
+
+			options.push(option)
+		}
+
+		return options
+	}
+
+	private renderWorkflowFormJsonOptionTemplate(args: {
+		fieldKey: string
+		sourcePath: string
+		itemIndex: number
+		item: Record<string, unknown>
+		template: string
+	}): string {
+		return args.template.replace(/\{([^{}]+)\}/g, (placeholder, propertyName) => {
+			const propertyValue = args.item[propertyName]
+			if (typeof propertyValue === "string" || typeof propertyValue === "number" || typeof propertyValue === "boolean") {
+				return String(propertyValue)
+			}
+
+			throw new Error(
+				`Workflow form field ${args.fieldKey} jsonOptionsSource template placeholder ${placeholder} must resolve to a direct string, number, or boolean property on item ${args.itemIndex} in ${args.sourcePath}.`,
+			)
+		})
+	}
+
+	private isWorkflowFormJsonOptionsSourceFieldKind(kind: WorkflowFormFieldDefinition["kind"]): boolean {
+		switch (kind) {
+			case "dropdown":
+			case "radio_group":
+			case "multi_select":
+			case "checkbox_group":
+				return true
+			default:
+				return false
+		}
+	}
+
+	private validateWorkflowFormJsonOptionsSourceString(args: {
+		workflowFormId: string
+		fieldKey: string
+		propertyName: string
+		value: string
+	}): WorkflowValidationResult {
+		if (args.value.trim() === "") {
+			return {
+				valid: false,
+				errorMessage: `Workflow form ${args.workflowFormId} field ${args.fieldKey} jsonOptionsSource.${args.propertyName} must not be empty.`,
+			}
+		}
+
+		if (args.value.trim() !== args.value) {
+			return {
+				valid: false,
+				errorMessage: `Workflow form ${args.workflowFormId} field ${args.fieldKey} jsonOptionsSource.${args.propertyName} must already be trimmed.`,
+			}
+		}
+
+		return { valid: true }
+	}
+
+	private validateWorkflowFormJsonOptionsSourceConfig(args: {
+		workflowFormId: string
+		field: WorkflowFormFieldDefinition
+	}): WorkflowValidationResult {
+		const sourceConfig = args.field.jsonOptionsSource
+		if (sourceConfig === undefined) {
+			return { valid: true }
+		}
+
+		if (args.field.selectorDiscovery !== undefined) {
+			return {
+				valid: false,
+				errorMessage: `Workflow form ${args.workflowFormId} field ${args.field.key} must not define both selectorDiscovery and jsonOptionsSource.`,
+			}
+		}
+
+		if (this.isWorkflowFormJsonOptionsSourceFieldKind(args.field.kind) === false) {
+			return {
+				valid: false,
+				errorMessage: `Workflow form ${args.workflowFormId} field ${args.field.key} jsonOptionsSource is only supported for dropdown, radio_group, multi_select, or checkbox_group fields.`,
+			}
+		}
+
+		for (const sourcePathSegment of sourceConfig.sourcePathSegments) {
+			if (isWorkflowDiscoveryTargetPathSegment(sourcePathSegment) === false) {
+				return {
+					valid: false,
+					errorMessage: `Workflow form ${args.workflowFormId} field ${args.field.key} jsonOptionsSource sourcePathSegments entry ${sourcePathSegment} is invalid.`,
+				}
+			}
+		}
+
+		const requiredStrings: Array<{ readonly propertyName: string; readonly value: string }> = [
+			{ propertyName: "itemsPath", value: sourceConfig.itemsPath },
+			{ propertyName: "valueProperty", value: sourceConfig.valueProperty },
+			{ propertyName: "labelTemplate", value: sourceConfig.labelTemplate },
+		]
+		if (sourceConfig.descriptionTemplate !== undefined) {
+			requiredStrings.push({ propertyName: "descriptionTemplate", value: sourceConfig.descriptionTemplate })
+		}
+
+		for (const requiredString of requiredStrings) {
+			const validation = this.validateWorkflowFormJsonOptionsSourceString({
+				workflowFormId: args.workflowFormId,
+				fieldKey: args.field.key,
+				propertyName: requiredString.propertyName,
+				value: requiredString.value,
+			})
+			if (validation.valid === false) {
+				return validation
+			}
+		}
+
+		return { valid: true }
 	}
 
 	private async discoverPrerequisiteFileCandidates(args: {
@@ -6277,6 +6563,14 @@ export class WorkflowRuntime {
 		for (const [workflowFormId, workflowForm] of Object.entries(workflowForms)) {
 			for (const panel of Object.values(workflowForm.panels)) {
 				for (const field of panel.fields) {
+					const jsonOptionsSourceValidation = this.validateWorkflowFormJsonOptionsSourceConfig({
+						workflowFormId,
+						field,
+					})
+					if (jsonOptionsSourceValidation.valid === false) {
+						return jsonOptionsSourceValidation
+					}
+
 					for (const targetPathSegment of field.selectorDiscovery?.targetPathSegments ?? []) {
 						if (!isWorkflowDiscoveryTargetPathSegment(targetPathSegment)) {
 							return {

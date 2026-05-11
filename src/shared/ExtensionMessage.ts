@@ -478,6 +478,19 @@ export interface WorkflowFormSelectorDiscoveryConfig {
 	sort: "alpha_asc" | "alpha_desc"
 }
 
+export type WorkflowFormJsonOptionsSourceRoot = {
+	kind: "selected_project_root"
+}
+
+export interface WorkflowFormJsonOptionsSourceConfig {
+	root: WorkflowFormJsonOptionsSourceRoot
+	sourcePathSegments: readonly string[]
+	itemsPath: string
+	valueProperty: string
+	labelTemplate: string
+	descriptionTemplate?: string
+}
+
 export interface WorkflowFormFieldDefinition {
 	key: string
 	workflowValueKey?: string
@@ -506,6 +519,7 @@ export interface WorkflowFormFieldDefinition {
 	contentMarkdown?: string
 	presentation?: WorkflowFormFieldPresentation
 	selectorDiscovery?: WorkflowFormSelectorDiscoveryConfig
+	jsonOptionsSource?: WorkflowFormJsonOptionsSourceConfig
 }
 
 export type WorkflowFormTransitionDefinition =

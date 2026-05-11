@@ -155,10 +155,15 @@ Rules of thumb:
 - Use one multi-panel form for one logical input flow.
 - Put panel sequencing, conditional branches, back navigation, and stale value clearing inside the form definition.
 - Use `workflowValueKey` only when the submitted value must persist beyond form-local state.
+- A workflow form field persists at most one durable workflow value. If one user choice determines additional module values, derive those values in deterministic post-form behavior instead of trying to make the field persist multiple workflow values.
 - Use `staleValueKeysToClear`, `resetValueKeysOnChange`, and back-panel stale clearing to prevent stale dependent values.
 - Do not split a single form flow into multiple workflow forms unless requirements explicitly demand it.
 
 The brainstorming Step 2 form is the reference pattern: approach selection, category selection, technique selection, and random confirmation are all one form with conditional panels.
+
+Use `jsonOptionsSource` when a `dropdown`, `radio_group`, `multi_select`, or `checkbox_group` field needs options derived from a selected-project JSON index file such as `planning/Epics.index.json`. Configure the source path relative to the selected project root, set `itemsPath` to the array of index entries, use `valueProperty` for stable option values, and render labels or descriptions with direct item-property placeholders.
+
+Use `selectorDiscovery` only for filesystem discovery. Do not repurpose it to read JSON index content or to derive options from index entries.
 
 ### Prerequisite Files
 
