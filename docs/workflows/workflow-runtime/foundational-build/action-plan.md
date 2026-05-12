@@ -10739,3 +10739,132 @@ Allowed files:
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+### Phase 67 - Replace Markdown Runtime Dependency In Story File Generation
+
+Pause for QA review after completing Phase 67.
+
+### Phase 67 Scope
+
+This phase remediates the Phase 62 implementation defect where `generate_story_files` reads `.cline/skills/bmad-create-story/template.md` at runtime. Runtime story file generation must use a code-owned story file template/builder, consistent with `FR-55`.
+
+This phase does not delete `.cline/skills/bmad-create-story/template.md`; deletion remains owned by the create-story module cleanup phase after this runtime dependency is removed.
+
+### Phase 67 Scope Boundary
+
+- Do not implement or revise the create-story workflow module in this phase.
+- Do not delete `.cline/skills/bmad-create-story/template.md` in this phase.
+- Do not change `plan_story_artifacts`, `plan_remediation_story_artifact`, or story index numbering behavior.
+- Do not change `GenerateStoryFilesToolHandler` unless tests prove a compile-only import/type update is required.
+- Do not change pi-planning workflow module prompts or routes in this phase.
+
+### Phase 67 Known Issues / Risks / Technical Debt
+
+- Historical completed Phase 62 text in this action plan still mentions the invalid markdown runtime dependency. This phase supersedes that implementation detail without rewriting completed historical tasks.
+
+[ ] Task 227. Correct canonical documentation for story-file generation template ownership.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/requirements.md`
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
+
+[ ] Subtask 227.1. In `requirements.md`, replace the legacy migration matrix row for `.cline/skills/bmad-create-story/template.md` so its disposition is `Delete`, its replacement is `None`, and its note states that `generate_story_files` uses a code-owned runtime story-file template/builder rather than this markdown file.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/requirements.md`
+
+[ ] Subtask 227.2. In `requirements.md`, update the `Other create-story workflow package content` matrix row so the excluded paths are only `workflow.md` and `steps/**/*.md`; remove `template.md` from the exclusion list.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/requirements.md`
+
+[ ] Subtask 227.3. In `module-build-guide.md`, replace the `generate_story_files` bullet so it says the tool creates missing draft story files from `epic-{E}-stories.index.json` using a runtime-owned code template/builder, and must not read `.cline/skills/bmad-create-story/template.md` or other markdown workflow assets at runtime.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
+
+[ ] Task 228. Replace the runtime markdown-template read with a code-owned story file template builder.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/storyFileTemplate.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[ ] Subtask 228.1. Create `storyFileTemplate.ts` exporting `buildWorkflowStoryFileTemplate(): string`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/storyFileTemplate.ts`
+
+[ ] Subtask 228.2. In `storyFileTemplate.ts`, implement `buildWorkflowStoryFileTemplate()` so it returns the code-owned story scaffold with `General Instructions`, `Objective`, `Scope`, `Scope Boundary`, `Requirements`, `Known Issues/ Risks/ Technical Debt`, `Tasks`, and `Validation` sections.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/storyFileTemplate.ts`
+
+[ ] Subtask 228.3. In `WorkflowRuntime.ts`, import `buildWorkflowStoryFileTemplate` from `./storyFileTemplate`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[ ] Subtask 228.4. In `WorkflowRuntime.generateStoryFiles(...)`, remove the `storyTemplatePath` construction, workspace path-policy check for that template path, and `readFile(storyTemplatePath, "utf8")`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[ ] Subtask 228.5. In `WorkflowRuntime.generateStoryFiles(...)`, set `storyTemplateContent` from `buildWorkflowStoryFileTemplate()` before creating draft story files.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[ ] Task 229. Update runtime tests for code-owned story-file generation.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 229.1. In `WorkflowRuntime.test.ts`, delete the `installCanonicalStoryTemplate()` helper.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 229.2. In `WorkflowRuntime.test.ts`, update the missing draft story generation test so it does not create `.cline/skills/bmad-create-story/template.md` in the runtime test workspace.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 229.3. In `WorkflowRuntime.test.ts`, update the missing draft story generation test to assert each generated file equals `buildWorkflowStoryFileTemplate()`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 229.4. In `WorkflowRuntime.test.ts`, add an assertion before generation proving the runtime test workspace does not contain `.cline/skills/bmad-create-story/template.md`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 229.5. In `WorkflowRuntime.test.ts`, update the existing draft story no-overwrite test so it no longer calls or depends on `installCanonicalStoryTemplate()`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Task 230. Validate Phase 67.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+[ ] Subtask 230.1. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+[ ] Subtask 230.2. Run `rg -n "bmad-create-story/template\\.md|\\.cline/skills/bmad-create-story/template\\.md" src/core/task src/shared docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md` and mark this subtask complete only if it returns no matches.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+[ ] Subtask 230.3. Run `npm run check-types`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+[ ] Subtask 230.4. Run `npm run lint`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
