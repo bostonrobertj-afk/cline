@@ -661,87 +661,87 @@ Allowed files:
 
 After completing this phase, pause for QA review before moving to Phase 6.
 
-[ ] Task 10. Add workflow definition tests.
+[x] Task 10. Add workflow definition tests.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`
 
-[ ] Subtask 10.1. Create `piPlanningWorkflow.test.ts` with coverage proving workflow name, display name, slash command, use-skill name, description, project subfolder, and no `.md` identity aliases in the module definition.
+[x] Subtask 10.1. Create `piPlanningWorkflow.test.ts` with coverage proving workflow name, display name, slash command, use-skill name, description, project subfolder, and no `.md` identity aliases in the module definition.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`
 
-[ ] Subtask 10.2. In `piPlanningWorkflow.test.ts`, add shape/invariant coverage for persona fields: name `John`, role `Product Manager`, non-empty identity, non-empty capabilities, non-empty communication style, and principles that include documentation/runtime-code validation.
+[x] Subtask 10.2. In `piPlanningWorkflow.test.ts`, add shape/invariant coverage for persona fields: name `John`, role `Product Manager`, non-empty identity, non-empty capabilities, non-empty communication style, and principles that include documentation/runtime-code validation.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`
 
-[ ] Subtask 10.3. In `piPlanningWorkflow.test.ts`, add coverage proving every expected workflow value key is declared, including `stories_index_existed_at_workflow_start`, and no undeclared entry project value key is used.
+[x] Subtask 10.3. In `piPlanningWorkflow.test.ts`, add coverage proving every expected workflow value key is declared, including `stories_index_existed_at_workflow_start`, and no undeclared entry project value key is used.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`
 
-[ ] Subtask 10.4. In `piPlanningWorkflow.test.ts`, add coverage proving the workflow has no artifact definitions.
+[x] Subtask 10.4. In `piPlanningWorkflow.test.ts`, add coverage proving the workflow has no artifact definitions.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`
 
-[ ] Subtask 10.5. In `piPlanningWorkflow.test.ts`, add coverage proving the four prerequisite declarations exactly match required/optional requirement, producing workflow, project subfolder, exact filename, workflow value key, and `outputDocumentReference: "none"`.
+[x] Subtask 10.5. In `piPlanningWorkflow.test.ts`, add coverage proving the four prerequisite declarations exactly match required/optional requirement, producing workflow, project subfolder, exact filename, workflow value key, and `outputDocumentReference: "none"`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`
 
-[ ] Subtask 10.6. In `piPlanningWorkflow.test.ts`, add coverage proving Step 1 form Panel A uses `jsonOptionsSource` for `planning/Epics.index.json`, `itemsPath: "epics"`, `valueProperty: "identity"`, and persists `epic_identity`.
+[x] Subtask 10.6. In `piPlanningWorkflow.test.ts`, add coverage proving Step 1 form Panel A uses `jsonOptionsSource` for `planning/Epics.index.json`, `itemsPath: "epics"`, `valueProperty: "identity"`, and persists `epic_identity`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`
 
-[ ] Subtask 10.7. In `piPlanningWorkflow.test.ts`, add coverage proving Step 1 form Panel B is informational, has `fields: []`, lists the three required prerequisite workflow-value hyperlinks, and advances with submit.
+[x] Subtask 10.7. In `piPlanningWorkflow.test.ts`, add coverage proving Step 1 form Panel B is informational, has `fields: []`, lists the three required prerequisite workflow-value hyperlinks, and advances with submit.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`
 
-[ ] Subtask 10.8. In `piPlanningWorkflow.test.ts`, add coverage proving Step 1 form Panel C persists optional `additional_context`.
+[x] Subtask 10.8. In `piPlanningWorkflow.test.ts`, add coverage proving Step 1 form Panel C persists optional `additional_context`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`
 
-[ ] Subtask 10.9. In `piPlanningWorkflow.test.ts`, add coverage proving Step 1 routes through prerequisite resolution, deterministic folder persistence, form rendering, selected-epic derivation, and transition to Step 2.
+[x] Subtask 10.9. In `piPlanningWorkflow.test.ts`, add coverage proving Step 1 routes through prerequisite resolution, deterministic folder persistence, form rendering, selected-epic derivation, and transition to Step 2.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`
 
-[ ] Subtask 10.10. In `piPlanningWorkflow.test.ts`, add coverage proving selected epic derivation writes `target_epic` and `stories_index_existed_at_workflow_start` for every selected epic; writes `stories_index` only when the selected epic has `"story-index-generated": true`; writes `stories_index_existed_at_workflow_start: true` for existing-index epics; and writes `stories_index_existed_at_workflow_start: false` for new-index epics.
+[x] Subtask 10.10. In `piPlanningWorkflow.test.ts`, add coverage proving selected epic derivation writes `target_epic` and `stories_index_existed_at_workflow_start` for every selected epic; writes `stories_index` only when the selected epic has `"story-index-generated": true`; writes `stories_index_existed_at_workflow_start: true` for existing-index epics; and writes `stories_index_existed_at_workflow_start: false` for new-index epics.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`
 
-[ ] Subtask 10.11. In `piPlanningWorkflow.test.ts`, add coverage proving Step 2 through Step 6 prompt sources include required workflow value references and forbidden backend-only tool names are absent from prompt instructions.
+[x] Subtask 10.11. In `piPlanningWorkflow.test.ts`, add coverage proving Step 2 through Step 6 prompt sources include required workflow value references and forbidden backend-only tool names are absent from prompt instructions.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`
 
-[ ] Subtask 10.12. In `piPlanningWorkflow.test.ts`, add coverage proving Step 3, Step 4, and Step 5 prompt builders use `stories_index_existed_at_workflow_start`, not current `stories_index` presence, for existing-story-index conditional behavior; include a regression case where `stories_index` is present and `stories_index_existed_at_workflow_start` is false.
+[x] Subtask 10.12. In `piPlanningWorkflow.test.ts`, add coverage proving Step 3, Step 4, and Step 5 prompt builders use `stories_index_existed_at_workflow_start`, not current `stories_index` presence, for existing-story-index conditional behavior; include a regression case where `stories_index` is present and `stories_index_existed_at_workflow_start` is false.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`
 
-[ ] Subtask 10.13. In `piPlanningWorkflow.test.ts`, add route-structure coverage proving Step 2 and Step 3 advance only on confirmed workflow progress requests and return to project prompt on denied requests.
+[x] Subtask 10.13. In `piPlanningWorkflow.test.ts`, add route-structure coverage proving Step 2 and Step 3 advance only on confirmed workflow progress requests and return to project prompt on denied requests.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`
 
-[ ] Subtask 10.14. In `piPlanningWorkflow.test.ts`, add route-structure coverage proving Step 4 advances on `model_tool_succeeded` for `plan_story_artifacts` only when `stories_index_existed_at_workflow_start` is true, advances on `workflow_values_persisted` including `stories_index` only when `stories_index_existed_at_workflow_start` is false, advances on confirmed `workflow_progress_request`, returns to `project_prompt` on denied `workflow_progress_request`, and returns to `project_prompt` on `model_tool_failed` for `plan_story_artifacts`.
+[x] Subtask 10.14. In `piPlanningWorkflow.test.ts`, add route-structure coverage proving Step 4 advances on `model_tool_succeeded` for `plan_story_artifacts` only when `stories_index_existed_at_workflow_start` is true, advances on `workflow_values_persisted` including `stories_index` only when `stories_index_existed_at_workflow_start` is false, advances on confirmed `workflow_progress_request`, returns to `project_prompt` on denied `workflow_progress_request`, and returns to `project_prompt` on `model_tool_failed` for `plan_story_artifacts`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`
 
-[ ] Subtask 10.15. In `piPlanningWorkflow.test.ts`, add route-structure coverage proving Step 5 advances only on `model_tool_succeeded` for `generate_story_files` and returns to `project_prompt` on `model_tool_failed` for `generate_story_files`.
+[x] Subtask 10.15. In `piPlanningWorkflow.test.ts`, add route-structure coverage proving Step 5 advances only on `model_tool_succeeded` for `generate_story_files` and returns to `project_prompt` on `model_tool_failed` for `generate_story_files`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`
 
-[ ] Subtask 10.16. In `piPlanningWorkflow.test.ts`, add route-structure coverage proving Step 6 routes `attempt_completion_succeeded` to `complete_workflow`.
+[x] Subtask 10.16. In `piPlanningWorkflow.test.ts`, add route-structure coverage proving Step 6 routes `attempt_completion_succeeded` to `complete_workflow`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`
