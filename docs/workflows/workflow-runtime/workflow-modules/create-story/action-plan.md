@@ -614,52 +614,57 @@ Allowed files:
 
 ### Phase 9 - Final Validation
 
-[ ] Task 9. Run final validation for the complete create-story buildout.
+[x] Task 9. Run final validation for the complete create-story buildout.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-story/action-plan.md`
 
-[ ] Subtask 9.1. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryToolSchemas.test.ts` and mark this subtask complete only if it passes.
+[x] Subtask 9.0. Run `npm run protos` to regenerate shared proto TypeScript before running Phase 9 unit tests that import `@shared/proto/...`; mark this subtask complete only if it passes.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-story/action-plan.md`
 
-[ ] Subtask 9.2. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts` and mark this subtask complete only if it passes.
+[x] Subtask 9.1. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryToolSchemas.test.ts` and mark this subtask complete only if it passes.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-story/action-plan.md`
 
-[ ] Subtask 9.3. Run `npm run test:unit -- src/core/task/tools/handlers/__tests__/UpdateStoryIndexStatusToolHandler.test.ts` and mark this subtask complete only if it passes.
+[x] Subtask 9.2. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts` and mark this subtask complete only if it passes.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-story/action-plan.md`
 
-[ ] Subtask 9.4. Run `npm run test:unit -- src/core/prompts/system-prompt/__tests__/integration.test.ts` and mark this subtask complete only if it passes.
+[x] Subtask 9.3. Run `npm run test:unit -- src/core/task/tools/handlers/__tests__/UpdateStoryIndexStatusToolHandler.test.ts` and mark this subtask complete only if it passes.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-story/action-plan.md`
 
-[ ] Subtask 9.5. Run `rg -n "BuildStoryDocumentToolHandler" src .cline` and mark this subtask complete only if it returns no active runtime matches.
+[x] Subtask 9.4. Run `npm run test:unit -- src/core/prompts/system-prompt/__tests__/integration.test.ts` and mark this subtask complete only if it passes.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-story/action-plan.md`
 
-[ ] Subtask 9.6. Run `rg -n "build_workflow_document|create_workflow_artifact|archive_workflow_artifact|delete_workflow_artifact|move_workflow_project_file|update_story_index_status|set_workflow_values|plan_story_artifacts|plan_remediation_story_artifact|generate_story_files|execute_command" src/core/task/workflow-runtime/workflow-modules/create-story/createStoryToolSchemas.ts` and mark this subtask complete only if it returns no matches.
+[x] Subtask 9.5. Run `rg -n "BuildStoryDocumentToolHandler" src .cline` and mark this subtask complete only if it returns no active runtime matches.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-story/action-plan.md`
 
-[ ] Subtask 9.7. Run `rg -n "_bmad|sm\\.md|create-story\\.md|\\.cline/skills/bmad-create-story" src/core/task/workflow-runtime/workflow-modules/create-story` and mark this subtask complete only if it returns no runtime dependency matches.
+[x] Subtask 9.6. Run `rg -n "build_workflow_document|create_workflow_artifact|archive_workflow_artifact|delete_workflow_artifact|move_workflow_project_file|update_story_index_status|set_workflow_values|plan_story_artifacts|plan_remediation_story_artifact|generate_story_files|execute_command" src/core/task/workflow-runtime/workflow-modules/create-story/createStoryToolSchemas.ts` and mark this subtask complete only if it returns no matches.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-story/action-plan.md`
 
-[ ] Subtask 9.8. Run `npm run check-types` and mark this subtask complete only if it passes.
+[x] Subtask 9.7. Run `rg -n "_bmad|sm\\.md|create-story\\.md|\\.cline/skills/bmad-create-story" src/core/task/workflow-runtime/workflow-modules/create-story` and mark this subtask complete only if it returns no runtime dependency matches.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-story/action-plan.md`
 
-[ ] Subtask 9.9. Run `npm run lint` and mark this subtask complete only if it passes.
+[x] Subtask 9.8. Run `npm run check-types` and mark this subtask complete only if it passes.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-story/action-plan.md`
+
+[x] Subtask 9.9. Run `npm run lint` and mark this subtask complete only if it passes.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-story/action-plan.md`
