@@ -290,46 +290,52 @@ Allowed files:
 
 After completing this phase, pause for QA review before moving to Phase 5.
 
-[ ] Task 4. Add module-owned create-story tool-schema builders and tests.
+[x] Task 4. Add module-owned create-story tool-schema builders and tests.
 
 Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryToolSchemas.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryToolSchemas.test.ts`
 
-[ ] Subtask 4.1. Create `createStoryToolSchemas.ts` with module-local schema builders for `read_file`, `read_file_range`, `list_files`, `search_files`, `list_code_definition_names`, `apply_patch`, `send_user_message`, `ask_followup_question`, `workflow_progress_request`, and `attempt_completion`, following the current pi-planning/create-architecture schema shapes.
+[x] Subtask 4.1. Create `createStoryToolSchemas.ts` with module-local schema builders for `read_file`, `read_file_range`, `list_files`, `search_files`, `list_code_definition_names`, `apply_patch`, `send_user_message`, `ask_followup_question`, `workflow_progress_request`, and `attempt_completion`, following the current pi-planning/create-architecture schema shapes.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryToolSchemas.ts`
 
-[ ] Subtask 4.2. In `createStoryToolSchemas.ts`, export `buildCreateStoryStep1ToolSchemas()` returning an empty readonly tool array.
+[x] Subtask 4.2. In `createStoryToolSchemas.ts`, export `buildCreateStoryStep1ToolSchemas()` returning an empty readonly tool array.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryToolSchemas.ts`
 
-[ ] Subtask 4.3. In `createStoryToolSchemas.ts`, export `buildCreateStoryStep2ToolSchemas()` returning exactly `read_file`, `send_user_message`, `ask_followup_question`, `workflow_progress_request`, `apply_patch`, `list_files`, `search_files`, `list_code_definition_names`, and `read_file_range`.
+[x] Subtask 4.3. In `createStoryToolSchemas.ts`, export `buildCreateStoryStep2ToolSchemas()` returning exactly `read_file`, `send_user_message`, `ask_followup_question`, `workflow_progress_request`, `apply_patch`, `list_files`, `search_files`, `list_code_definition_names`, and `read_file_range`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryToolSchemas.ts`
 
-[ ] Subtask 4.4. In `createStoryToolSchemas.ts`, export `buildCreateStoryStep3ToolSchemas()` returning exactly `list_files`, `search_files`, `list_code_definition_names`, `read_file`, `read_file_range`, `apply_patch`, `send_user_message`, `ask_followup_question`, and `workflow_progress_request`.
+[x] Subtask 4.4. In `createStoryToolSchemas.ts`, export `buildCreateStoryStep3ToolSchemas()` returning exactly `list_files`, `search_files`, `list_code_definition_names`, `read_file`, `read_file_range`, `apply_patch`, `send_user_message`, `ask_followup_question`, and `workflow_progress_request`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryToolSchemas.ts`
 
-[ ] Subtask 4.5. In `createStoryToolSchemas.ts`, export `buildCreateStoryStep4ToolSchemas()` returning exactly `read_file`, `read_file_range`, `apply_patch`, `send_user_message`, `ask_followup_question`, and `attempt_completion`.
+[x] Subtask 4.5. In `createStoryToolSchemas.ts`, export `buildCreateStoryStep4ToolSchemas()` returning exactly `read_file`, `read_file_range`, `apply_patch`, `send_user_message`, `ask_followup_question`, and `attempt_completion`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryToolSchemas.ts`
 
-[ ] Subtask 4.6. Add `createStoryToolSchemas.test.ts` asserting exact tool-name order for Step 1 through Step 4.
+[x] Subtask 4.6. Add `createStoryToolSchemas.test.ts` asserting exact tool-name order for Step 1 through Step 4.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryToolSchemas.test.ts`
 
-[ ] Subtask 4.7. In `createStoryToolSchemas.test.ts`, add negative assertions proving no step exposes `set_workflow_values`, `plan_story_artifacts`, `plan_remediation_story_artifact`, `generate_story_files`, `build_workflow_document`, `create_workflow_artifact`, `archive_workflow_artifact`, `delete_workflow_artifact`, `move_workflow_project_file`, `update_story_index_status`, or `execute_command`.
+[x] Subtask 4.7. In `createStoryToolSchemas.test.ts`, add negative assertions proving no step exposes `set_workflow_values`, `plan_story_artifacts`, `plan_remediation_story_artifact`, `generate_story_files`, `build_workflow_document`, `create_workflow_artifact`, `archive_workflow_artifact`, `delete_workflow_artifact`, `move_workflow_project_file`, `update_story_index_status`, or `execute_command`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryToolSchemas.test.ts`
+
+[x] Subtask 4.8. In `WorkflowRuntime.ts`, in the `update_story_index_status` decision-action branch, replace the inferred ternary `toolParams` object with an explicit `const toolParams: Record<string, string>` containing `stories_index`, `story_identity`, and `status`; add `expected_current_status` to that record only inside an `if (action.expectedCurrentStatus !== undefined)` block before passing `toolParams` to the `UPDATE_STORY_INDEX_STATUS` tool-backed operation.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
 ### Phase 5 - Create-Story Workflow Definition And Step 1 Routing
 

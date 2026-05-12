@@ -5694,19 +5694,14 @@ export class WorkflowRuntime {
 					key: action.storyIdentityWorkflowValueKey,
 					context: `story index status update route ${sourceRoute.branchId}/${sourceRoute.routeId}`,
 				})
-				const toolParams =
-					action.expectedCurrentStatus === undefined
-						? {
-								stories_index: storiesIndex,
-								story_identity: storyIdentity,
-								status: action.status,
-							}
-						: {
-								stories_index: storiesIndex,
-								story_identity: storyIdentity,
-								status: action.status,
-								expected_current_status: action.expectedCurrentStatus,
-							}
+				const toolParams: Record<string, string> = {
+					stories_index: storiesIndex,
+					story_identity: storyIdentity,
+					status: action.status,
+				}
+				if (action.expectedCurrentStatus !== undefined) {
+					toolParams.expected_current_status = action.expectedCurrentStatus
+				}
 
 				session.ui.stepResolutionSession = undefined
 				return {
