@@ -447,88 +447,88 @@ Allowed files:
 
 After completing this phase, pause for QA review before moving to Phase 7.
 
-[ ] Task 6. Add model-driven Step 2 through Step 4 prompts, progression routes, and finalization routes.
+[x] Task 6. Add model-driven Step 2 through Step 4 prompts, progression routes, and finalization routes.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`
 
-[ ] Subtask 6.1. In `createStoryWorkflow.ts`, add Step 2 prompt-source builder that renders the context-review instructions required by `create-story-requirements.md` for primary draft, remediation draft, and backlog revision variants.
+[x] Subtask 6.1. In `createStoryWorkflow.ts`, add Step 2 prompt-source builder that renders the context-review instructions required by `create-story-requirements.md` for primary draft, remediation draft, and backlog revision variants.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
 
-[ ] Subtask 6.2. In `createStoryWorkflow.ts`, add Step 2 decision tree that enters `project_prompt`, transitions to Step 3 only on `workflow_progress_request_confirmed`, and returns to the Step 2 project prompt on `workflow_progress_request_denied`.
+[x] Subtask 6.2. In `createStoryWorkflow.ts`, add Step 2 decision tree that enters `project_prompt`, transitions to Step 3 only on `workflow_progress_request_confirmed`, and returns to the Step 2 project prompt on `workflow_progress_request_denied`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
 
-[ ] Subtask 6.3. In `createStoryWorkflow.ts`, add Step 3 prompt-source builder that renders the task/subtask authoring instructions required by `create-story-requirements.md` for draft and backlog revision variants.
+[x] Subtask 6.3. In `createStoryWorkflow.ts`, add Step 3 prompt-source builder that renders the task/subtask authoring instructions required by `create-story-requirements.md` for draft and backlog revision variants.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
 
-[ ] Subtask 6.4. In `createStoryWorkflow.ts`, add Step 3 decision tree that enters `project_prompt`, transitions to Step 4 only on `workflow_progress_request_confirmed`, and returns to the Step 3 project prompt on `workflow_progress_request_denied`.
+[x] Subtask 6.4. In `createStoryWorkflow.ts`, add Step 3 decision tree that enters `project_prompt`, transitions to Step 4 only on `workflow_progress_request_confirmed`, and returns to the Step 3 project prompt on `workflow_progress_request_denied`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
 
-[ ] Subtask 6.5. In `createStoryWorkflow.ts`, add Step 4 prompt-source builder that renders final story handoff validation instructions and tells the AI to call `attempt_completion` only after validation passes.
+[x] Subtask 6.5. In `createStoryWorkflow.ts`, add Step 4 prompt-source builder that renders final story handoff validation instructions and tells the AI to call `attempt_completion` only after validation passes.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
 
-[ ] Subtask 6.6. In `createStoryWorkflow.ts`, add Step 4 decision tree entry route to `project_prompt` and an `attempt_completion_succeeded` route for draft stories that runs `update_story_index_status` from `draft` to `backlog`.
+[x] Subtask 6.6. In `createStoryWorkflow.ts`, add Step 4 decision tree entry route to `project_prompt` and an `attempt_completion_succeeded` route for draft stories that runs `update_story_index_status` from `draft` to `backlog`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
 
-[ ] Subtask 6.7. In `createStoryWorkflow.ts`, add draft-story success routing from `update_story_index_status` to `move_project_file` from `implementation/drafts` to `implementation/stories-backlog` using `target_story_filename_for_move`.
+[x] Subtask 6.7. In `createStoryWorkflow.ts`, add draft-story success routing from `update_story_index_status` to `move_project_file` from `implementation/drafts` to `implementation/stories-backlog` using `target_story_filename_for_move`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
 
-[ ] Subtask 6.8. In `createStoryWorkflow.ts`, add draft-story success routing from successful `move_project_file` to `complete_workflow`, and route failed status update or failed move to `terminal_error`.
+[x] Subtask 6.8. In `createStoryWorkflow.ts`, add draft-story success routing from successful `move_project_file` to `complete_workflow`, and route failed status update or failed move to `terminal_error`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
 
-[ ] Subtask 6.9. In `createStoryWorkflow.ts`, add Step 4 `attempt_completion_succeeded` routing for backlog revisions that confirms or sets story status to `backlog` through `update_story_index_status` and routes successful status confirmation to `complete_workflow`.
+[x] Subtask 6.9. In `createStoryWorkflow.ts`, add Step 4 `attempt_completion_succeeded` routing for backlog revisions that confirms or sets story status to `backlog` through `update_story_index_status` and routes successful status confirmation to `complete_workflow`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
 
-[ ] Subtask 6.10. In `createStoryWorkflow.ts`, update `createStoryWorkflowDefinition.steps` to include Step 2, Step 3, and Step 4 with exact checklist labels and direct tool-schema delegation to the named builders in `createStoryToolSchemas.ts`.
+[x] Subtask 6.10. In `createStoryWorkflow.ts`, update `createStoryWorkflowDefinition.steps` to include Step 2, Step 3, and Step 4 with exact checklist labels and direct tool-schema delegation to the named builders in `createStoryToolSchemas.ts`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
 
-[ ] Subtask 6.11. In `createStoryWorkflow.test.ts`, add prompt-source coverage for Step 2 primary draft, remediation draft, and backlog revision variants using shape/invariant assertions rather than exact editable prose equality.
+[x] Subtask 6.11. In `createStoryWorkflow.test.ts`, add prompt-source coverage for Step 2 primary draft, remediation draft, and backlog revision variants using shape/invariant assertions rather than exact editable prose equality.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`
 
-[ ] Subtask 6.12. In `createStoryWorkflow.test.ts`, add prompt-source coverage for Step 3 draft and backlog revision variants using shape/invariant assertions rather than exact editable prose equality.
+[x] Subtask 6.12. In `createStoryWorkflow.test.ts`, add prompt-source coverage for Step 3 draft and backlog revision variants using shape/invariant assertions rather than exact editable prose equality.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`
 
-[ ] Subtask 6.13. In `createStoryWorkflow.test.ts`, add Step 4 prompt-source coverage proving it contains validation/final handoff requirements and exposes completion only through Step 4 schema.
+[x] Subtask 6.13. In `createStoryWorkflow.test.ts`, add Step 4 prompt-source coverage proving it contains validation/final handoff requirements and exposes completion only through Step 4 schema.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`
 
-[ ] Subtask 6.14. In `createStoryWorkflow.test.ts`, add decision-tree route coverage for Step 2 and Step 3 progress confirmation/denial behavior.
+[x] Subtask 6.14. In `createStoryWorkflow.test.ts`, add decision-tree route coverage for Step 2 and Step 3 progress confirmation/denial behavior.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`
 
-[ ] Subtask 6.15. In `createStoryWorkflow.test.ts`, add Step 4 decision-tree route coverage proving draft story finalization performs status update, then file move, then workflow completion, and routes failures to terminal error.
+[x] Subtask 6.15. In `createStoryWorkflow.test.ts`, add Step 4 decision-tree route coverage proving draft story finalization performs status update, then file move, then workflow completion, and routes failures to terminal error.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`
 
-[ ] Subtask 6.16. In `createStoryWorkflow.test.ts`, add Step 4 decision-tree route coverage proving backlog revision finalization performs story-index status confirmation without file movement before workflow completion.
+[x] Subtask 6.16. In `createStoryWorkflow.test.ts`, add Step 4 decision-tree route coverage proving backlog revision finalization performs story-index status confirmation without file movement before workflow completion.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`

@@ -10,11 +10,17 @@ import type {
 	WorkflowDefinition,
 	WorkflowDeterministicProcedureResult,
 	WorkflowPersonaDefinition,
+	WorkflowPromptBuilderInput,
 	WorkflowStepDefinition,
 	WorkflowStepPromptSource,
 	WorkflowValues,
 } from "../../types"
-import { buildCreateStoryStep1ToolSchemas } from "./createStoryToolSchemas"
+import {
+	buildCreateStoryStep1ToolSchemas,
+	buildCreateStoryStep2ToolSchemas,
+	buildCreateStoryStep3ToolSchemas,
+	buildCreateStoryStep4ToolSchemas,
+} from "./createStoryToolSchemas"
 
 export const CREATE_STORY_WORKFLOW_NAME = "create-story"
 export const CREATE_STORY_WORKFLOW_DISPLAY_NAME = "Create Story"
@@ -150,18 +156,142 @@ function createEmptyPromptSource(): WorkflowStepPromptSource {
 }
 
 function createStepDefinition(args: {
-	stepNumber: 1
+	stepNumber: 1 | 2 | 3 | 4
 	checklistLabel: string
 	decisionTree: WorkflowDecisionTree
+	buildPromptSource?: WorkflowStepDefinition["buildPromptSource"]
 	buildToolSchema: WorkflowStepDefinition["buildToolSchema"]
 }): WorkflowStepDefinition {
 	return {
 		id: `step-${args.stepNumber}`,
 		stepNumber: args.stepNumber,
 		checklistLabel: args.checklistLabel,
-		buildPromptSource: createEmptyPromptSource,
+		buildPromptSource: args.buildPromptSource ?? createEmptyPromptSource,
 		buildToolSchema: args.buildToolSchema,
 		decisionTree: args.decisionTree,
+	}
+}
+
+function renderWorkflowValueByKey(input: WorkflowPromptBuilderInput, key: CreateStoryWorkflowValueKey): string {
+	return input.renderWorkflowValue(input.session.workflowValues[key] ?? key)
+}
+
+function buildStep2VariantInstructions(input: WorkflowPromptBuilderInput): string {
+	const selectedStoryStatus = readWorkflowStringValue(
+		input.session.workflowValues,
+		CreateStoryWorkflowValueKey.SelectedStoryStatus,
+	)
+	const selectedStoryType = readWorkflowStringValue(input.session.workflowValues, CreateStoryWorkflowValueKey.SelectedStoryType)
+	const reviseBacklogStory = readWorkflowBooleanValue(
+		input.session.workflowValues,
+		CreateStoryWorkflowValueKey.ReviseBacklogStory,
+	)
+	const targetStory = renderWorkflowValueByKey(input, CreateStoryWorkflowValueKey.TargetStory)
+
+	if (selectedStoryStatus === "backlog" && reviseBacklogStory === true) {
+		return `You are revising an existing story file at \`${targetStory}\`.
+Ask the user to explain the required revisions before proposing changes, and ground any suggested revisions in provided context plus existing runtime code and tests.`
+	}
+
+	if (selectedStoryStatus === "draft" && selectedStoryType === "remediation") {
+		const parentStory = renderWorkflowValueByKey(input, CreateStoryWorkflowValueKey.ParentStory)
+		const findingsDocument = renderWorkflowValueByKey(input, CreateStoryWorkflowValueKey.FindingsDocument)
+		return `You are preparing a remediation story file for implementation by adding tasks and subtasks.
+Use parent story \`${parentStory}\` and findings document \`${findingsDocument}\` as required context.`
+	}
+
+	return `You are preparing a story file for implementation by adding tasks and subtasks.`
+}
+
+function buildStep2PromptSource(input: WorkflowPromptBuilderInput): WorkflowStepPromptSource {
+	const targetStory = renderWorkflowValueByKey(input, CreateStoryWorkflowValueKey.TargetStory)
+	const architectureDocument = renderWorkflowValueByKey(input, CreateStoryWorkflowValueKey.ArchitectureDocument)
+	const epicsDocument = renderWorkflowValueByKey(input, CreateStoryWorkflowValueKey.EpicsDocument)
+	const brainstormingDocument = renderWorkflowValueByKey(input, CreateStoryWorkflowValueKey.BrainstormingDocument)
+	const parentStory = renderWorkflowValueByKey(input, CreateStoryWorkflowValueKey.ParentStory)
+	const findingsDocument = renderWorkflowValueByKey(input, CreateStoryWorkflowValueKey.FindingsDocument)
+
+	return {
+		currentStepInstructions: `${buildStep2VariantInstructions(input)}
+
+Focus on \`${targetStory}\`.
+Read \`${targetStory}\`.
+Read \`${architectureDocument}\`.
+Read \`${epicsDocument}\`.
+Read \`${brainstormingDocument}\` when present.
+For remediation stories, read \`${parentStory}\` and \`${findingsDocument}\`.
+
+Ensure existing non-task story content fully aligns with project architecture and epics context.
+For remediation stories, ensure the target remediation story aligns with the QA findings that produced it.
+Identify conflicts or misalignment before task/subtask authoring begins.
+Notify the user of conflicts, ambiguities, or missing information.
+Work with the user to identify the appropriate resolution when a decision is needed.
+Proceed only once the story objective, scope, scope boundary, requirements, and known issues/risks/technical-debt sections align with the provided project documentation.
+For backlog revisions, ask the user to explain the required revisions and ground any suggested revisions in provided context and existing runtime code/tests.
+
+		Call \`workflow_progress_request\` only after context review is complete and blocking issues are resolved or the user confirms the current context is sufficient.`,
+	}
+}
+
+function buildStep3VariantInstructions(input: WorkflowPromptBuilderInput): string {
+	const selectedStoryStatus = readWorkflowStringValue(
+		input.session.workflowValues,
+		CreateStoryWorkflowValueKey.SelectedStoryStatus,
+	)
+	const targetStory = renderWorkflowValueByKey(input, CreateStoryWorkflowValueKey.TargetStory)
+
+	if (selectedStoryStatus === "backlog") {
+		return `Review existing tasks and subtasks in \`${targetStory}\` and determine whether they satisfy all requirements, scope, scope boundary, objective, story instructions, test coverage expectations, and action-plan quality rules.`
+	}
+
+	return `Review runtime code and tests, then identify the full set of in-scope revisions needed to deliver the story's requirements and objective.`
+}
+
+function buildStep3PromptSource(input: WorkflowPromptBuilderInput): WorkflowStepPromptSource {
+	const targetStory = renderWorkflowValueByKey(input, CreateStoryWorkflowValueKey.TargetStory)
+
+	return {
+		currentStepInstructions: `${buildStep3VariantInstructions(input)}
+
+Inspect relevant runtime code and tests before authoring tasks and subtasks.
+Trace any required existing artifact, placeholder, resolver, handler, runtime consumer, test, or document convention end to end.
+Perform sibling-pattern audits for any new artifact, tool, schema entry, prompt/tool exposure, approval/path policy, test, snapshot, or canonical document surface.
+Provide the user with the identified revision set before translating it into tasks and subtasks.
+
+Author implementation-ready tasks and subtasks in \`${targetStory}\`.
+Verify proposed tasks and subtasks for project standards, architecture fit, downstream impact, and code hygiene.
+Prefer deep architectural fixes over surface workarounds.
+Identify downstream or peripheral risks and propose follow-up mitigations where needed.
+Avoid prescribing hardcoded values where configuration or constants are appropriate.
+Prescribe removal of cruft and failed-attempt remnants when the story retires or replaces existing behavior.
+Avoid \`any\`, broad type assertions, forced assertions, non-boolean boolean checks, stale domain naming, compatibility remaps for retired concepts, and other prohibited code-hygiene patterns.
+Avoid introducing architecture not backed by upstream requirements or architecture documents.
+Avoid in-plan churn by prescribing the final intended code shape directly.
+
+Ensure the resulting story can end in a repo-valid intermediate state that passes focused tests, formatting, lint, and typecheck.
+Ensure each task and subtask is ordered so no item depends on a later item.
+Require each subtask to be scoped to a single revision in a single target file with specific allowed files.
+		Ask the user to review the tasks/subtasks section in \`${targetStory}\`, refine based on feedback, and call \`workflow_progress_request\` only after the user is satisfied with that section.`,
+	}
+}
+
+function buildStep4PromptSource(input: WorkflowPromptBuilderInput): WorkflowStepPromptSource {
+	const targetStory = renderWorkflowValueByKey(input, CreateStoryWorkflowValueKey.TargetStory)
+
+	return {
+		currentStepInstructions: `Validate \`${targetStory}\` as a complete implementation handoff.
+
+Verify every acceptance criterion is covered by one or more tasks.
+Verify every task maps to a real part of the approved story scope.
+Verify task order is executable and non-conflicting.
+Verify no two tasks prescribe contradictory file changes or incompatible invariants.
+Verify every planned code change has corresponding test-maintenance coverage where needed.
+Verify stale assertions, mocks, snapshots, validators, and type contracts are accounted for when affected.
+Verify task/subtask content remains aligned with story objective, scope, scope boundary, requirements, and general instructions.
+
+If you detect ambiguity, contradiction, missing coverage, or unsafe handoff content, correct it when the correction does not require a new user decision. If correction requires a new decision, stop and ask the user.
+
+Call \`attempt_completion\` only after validation passes and the story is complete and ready for implementation.`,
 	}
 }
 
@@ -244,6 +374,61 @@ function workflowFormCompleted(workflowFormId: string): WorkflowDecisionBranchTr
 		kind: "event_predicate",
 		matches: ({ triggerEvent }) =>
 			triggerEvent.kind === "workflow_form_completed" && triggerEvent.workflowFormId === workflowFormId,
+	}
+}
+
+function workflowProgressRequestConfirmed(): WorkflowDecisionBranchTrigger {
+	return {
+		kind: "on_event",
+		eventKind: "workflow_progress_request_confirmed",
+	}
+}
+
+function workflowProgressRequestDenied(): WorkflowDecisionBranchTrigger {
+	return {
+		kind: "on_event",
+		eventKind: "workflow_progress_request_denied",
+	}
+}
+
+function attemptCompletionSucceededForSelectedStoryStatus(status: WorkflowStoryStatus): WorkflowDecisionBranchTrigger {
+	return {
+		kind: "event_predicate",
+		matches: ({ triggerEvent, workflowValues }) =>
+			triggerEvent.kind === "attempt_completion_succeeded" &&
+			readWorkflowStringValue(workflowValues, CreateStoryWorkflowValueKey.SelectedStoryStatus) === status,
+	}
+}
+
+function attemptCompletionSucceededForBacklogRevision(): WorkflowDecisionBranchTrigger {
+	return {
+		kind: "event_predicate",
+		matches: ({ triggerEvent, workflowValues }) =>
+			triggerEvent.kind === "attempt_completion_succeeded" &&
+			readWorkflowStringValue(workflowValues, CreateStoryWorkflowValueKey.SelectedStoryStatus) === "backlog" &&
+			readWorkflowBooleanValue(workflowValues, CreateStoryWorkflowValueKey.ReviseBacklogStory) === true,
+	}
+}
+
+function sourceRouteMatches(sourceRoute: { branchId: string; routeId: string }, branchId: string, routeId: string): boolean {
+	return sourceRoute.branchId === branchId && sourceRoute.routeId === routeId
+}
+
+function toolBackedOperationSucceeded(branchId: string, routeId: string): WorkflowDecisionBranchTrigger {
+	return {
+		kind: "event_predicate",
+		matches: ({ triggerEvent }) =>
+			triggerEvent.kind === "tool_backed_operation_succeeded" &&
+			sourceRouteMatches(triggerEvent.sourceRoute, branchId, routeId),
+	}
+}
+
+function toolBackedOperationFailed(branchId: string, routeId: string): WorkflowDecisionBranchTrigger {
+	return {
+		kind: "event_predicate",
+		matches: ({ triggerEvent }) =>
+			triggerEvent.kind === "tool_backed_operation_failed" &&
+			sourceRouteMatches(triggerEvent.sourceRoute, branchId, routeId),
 	}
 }
 
@@ -1058,6 +1243,226 @@ function buildStep1DecisionTree(): WorkflowDecisionTree {
 	}
 }
 
+function buildStep2DecisionTree(): WorkflowDecisionTree {
+	return {
+		entryBranchId: "step-2-project-prompt",
+		branches: {
+			"step-2-project-prompt": {
+				id: "step-2-project-prompt",
+				routes: [
+					{
+						id: "step-2-project-prompt",
+						trigger: { kind: "always" },
+						action: {
+							kind: "project_prompt",
+						},
+						followingBranchId: "step-2-await-progress-request",
+					},
+				],
+			},
+			"step-2-await-progress-request": {
+				id: "step-2-await-progress-request",
+				routes: [
+					{
+						id: "step-2-transition-to-step-3",
+						trigger: workflowProgressRequestConfirmed(),
+						action: {
+							kind: "transition_step",
+							target: {
+								kind: "entry_branch",
+								stepNumber: 3,
+							},
+						},
+					},
+					{
+						id: "step-2-return-to-project-prompt",
+						trigger: workflowProgressRequestDenied(),
+						action: {
+							kind: "project_prompt",
+						},
+					},
+				],
+			},
+		},
+	}
+}
+
+function buildStep3DecisionTree(): WorkflowDecisionTree {
+	return {
+		entryBranchId: "step-3-project-prompt",
+		branches: {
+			"step-3-project-prompt": {
+				id: "step-3-project-prompt",
+				routes: [
+					{
+						id: "step-3-project-prompt",
+						trigger: { kind: "always" },
+						action: {
+							kind: "project_prompt",
+						},
+						followingBranchId: "step-3-await-progress-request",
+					},
+				],
+			},
+			"step-3-await-progress-request": {
+				id: "step-3-await-progress-request",
+				routes: [
+					{
+						id: "step-3-transition-to-step-4",
+						trigger: workflowProgressRequestConfirmed(),
+						action: {
+							kind: "transition_step",
+							target: {
+								kind: "entry_branch",
+								stepNumber: 4,
+							},
+						},
+					},
+					{
+						id: "step-3-return-to-project-prompt",
+						trigger: workflowProgressRequestDenied(),
+						action: {
+							kind: "project_prompt",
+						},
+					},
+				],
+			},
+		},
+	}
+}
+
+function buildStep4DecisionTree(): WorkflowDecisionTree {
+	return {
+		entryBranchId: "step-4-project-prompt",
+		branches: {
+			"step-4-project-prompt": {
+				id: "step-4-project-prompt",
+				routes: [
+					{
+						id: "step-4-project-prompt",
+						trigger: { kind: "always" },
+						action: {
+							kind: "project_prompt",
+						},
+						followingBranchId: "step-4-await-attempt-completion",
+					},
+				],
+			},
+			"step-4-await-attempt-completion": {
+				id: "step-4-await-attempt-completion",
+				routes: [
+					{
+						id: "step-4-update-draft-story-status-to-backlog",
+						trigger: attemptCompletionSucceededForSelectedStoryStatus("draft"),
+						action: {
+							kind: "update_story_index_status",
+							storyIndexWorkflowValueKey: CreateStoryWorkflowValueKey.StoriesIndex,
+							storyIdentityWorkflowValueKey: CreateStoryWorkflowValueKey.SelectedStoryIdentity,
+							status: "backlog",
+							expectedCurrentStatus: "draft",
+						},
+						followingBranchId: "step-4-await-draft-status-update",
+					},
+					{
+						id: "step-4-confirm-backlog-story-status",
+						trigger: attemptCompletionSucceededForBacklogRevision(),
+						action: {
+							kind: "update_story_index_status",
+							storyIndexWorkflowValueKey: CreateStoryWorkflowValueKey.StoriesIndex,
+							storyIdentityWorkflowValueKey: CreateStoryWorkflowValueKey.SelectedStoryIdentity,
+							status: "backlog",
+							expectedCurrentStatus: "backlog",
+						},
+						followingBranchId: "step-4-await-backlog-status-update",
+					},
+				],
+			},
+			"step-4-await-draft-status-update": {
+				id: "step-4-await-draft-status-update",
+				routes: [
+					{
+						id: "step-4-move-draft-story-to-backlog",
+						trigger: toolBackedOperationSucceeded(
+							"step-4-await-attempt-completion",
+							"step-4-update-draft-story-status-to-backlog",
+						),
+						action: {
+							kind: "move_project_file",
+							sourceFolderSegments: ["implementation", "drafts"],
+							destinationFolderSegments: ["implementation", "stories-backlog"],
+							filenameWorkflowValueKey: CreateStoryWorkflowValueKey.TargetStoryFilenameForMove,
+						},
+						followingBranchId: "step-4-await-draft-story-move",
+					},
+					{
+						id: "step-4-terminal-error-after-draft-status-update",
+						trigger: toolBackedOperationFailed(
+							"step-4-await-attempt-completion",
+							"step-4-update-draft-story-status-to-backlog",
+						),
+						action: {
+							kind: "terminal_error",
+							errorMessage: "Unable to update selected draft story status to backlog.",
+						},
+					},
+				],
+			},
+			"step-4-await-draft-story-move": {
+				id: "step-4-await-draft-story-move",
+				routes: [
+					{
+						id: "step-4-complete-workflow-after-draft-story-move",
+						trigger: toolBackedOperationSucceeded(
+							"step-4-await-draft-status-update",
+							"step-4-move-draft-story-to-backlog",
+						),
+						action: {
+							kind: "complete_workflow",
+						},
+					},
+					{
+						id: "step-4-terminal-error-after-draft-story-move",
+						trigger: toolBackedOperationFailed(
+							"step-4-await-draft-status-update",
+							"step-4-move-draft-story-to-backlog",
+						),
+						action: {
+							kind: "terminal_error",
+							errorMessage: "Unable to move selected draft story to the implementation backlog.",
+						},
+					},
+				],
+			},
+			"step-4-await-backlog-status-update": {
+				id: "step-4-await-backlog-status-update",
+				routes: [
+					{
+						id: "step-4-complete-workflow-after-backlog-status-confirmation",
+						trigger: toolBackedOperationSucceeded(
+							"step-4-await-attempt-completion",
+							"step-4-confirm-backlog-story-status",
+						),
+						action: {
+							kind: "complete_workflow",
+						},
+					},
+					{
+						id: "step-4-terminal-error-after-backlog-status-confirmation",
+						trigger: toolBackedOperationFailed(
+							"step-4-await-attempt-completion",
+							"step-4-confirm-backlog-story-status",
+						),
+						action: {
+							kind: "terminal_error",
+							errorMessage: "Unable to confirm selected backlog story status.",
+						},
+					},
+				],
+			},
+		},
+	}
+}
+
 export const createStoryWorkflowDefinition: WorkflowDefinition = {
 	name: CREATE_STORY_WORKFLOW_NAME,
 	displayName: CREATE_STORY_WORKFLOW_DISPLAY_NAME,
@@ -1083,6 +1488,27 @@ export const createStoryWorkflowDefinition: WorkflowDefinition = {
 			checklistLabel: "Gather Inputs",
 			decisionTree: buildStep1DecisionTree(),
 			buildToolSchema: buildCreateStoryStep1ToolSchemas,
+		}),
+		"step-2": createStepDefinition({
+			stepNumber: 2,
+			checklistLabel: "Review Context & Ensure Project Alignment",
+			decisionTree: buildStep2DecisionTree(),
+			buildPromptSource: buildStep2PromptSource,
+			buildToolSchema: buildCreateStoryStep2ToolSchemas,
+		}),
+		"step-3": createStepDefinition({
+			stepNumber: 3,
+			checklistLabel: "Author Tasks & Subtasks",
+			decisionTree: buildStep3DecisionTree(),
+			buildPromptSource: buildStep3PromptSource,
+			buildToolSchema: buildCreateStoryStep3ToolSchemas,
+		}),
+		"step-4": createStepDefinition({
+			stepNumber: 4,
+			checklistLabel: "Finalize & Validate Story Document",
+			decisionTree: buildStep4DecisionTree(),
+			buildPromptSource: buildStep4PromptSource,
+			buildToolSchema: buildCreateStoryStep4ToolSchemas,
 		}),
 	},
 }

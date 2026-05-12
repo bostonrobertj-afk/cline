@@ -48,6 +48,16 @@ interface ProjectPaths {
 	storiesIndex: string
 }
 
+interface ProgressionRouteExpectation {
+	stepId: WorkflowStepDefinition["id"]
+	projectPromptBranchId: string
+	projectPromptRouteId: string
+	awaitBranchId: string
+	confirmedRouteId: string
+	deniedRouteId: string
+	nextStepNumber: number
+}
+
 function createSession(workflowValues: WorkflowValues, projectRoot = "/tmp/create-story-project"): ActiveWorkflowSession {
 	return {
 		activeStepNumber: 1,
@@ -81,6 +91,15 @@ function findRoute(branchId: string, routeId: string): WorkflowDecisionBranchRou
 	const route = getStep("step-1").decisionTree.branches[branchId]?.routes.find((candidate) => candidate.id === routeId)
 	if (route === undefined) {
 		throw new Error(`Missing route ${branchId}/${routeId}.`)
+	}
+
+	return route
+}
+
+function findStepRoute(stepId: WorkflowStepDefinition["id"], branchId: string, routeId: string): WorkflowDecisionBranchRoute {
+	const route = getStep(stepId).decisionTree.branches[branchId]?.routes.find((candidate) => candidate.id === routeId)
+	if (route === undefined) {
+		throw new Error(`Missing route ${stepId}/${branchId}/${routeId}.`)
 	}
 
 	return route
@@ -130,6 +149,33 @@ function createPromptInput(): WorkflowPromptBuilderInput {
 	}
 }
 
+function createPromptInputForStep(
+	stepId: WorkflowStepDefinition["id"],
+	workflowValues: WorkflowValues,
+): WorkflowPromptBuilderInput {
+	const step = getStep(stepId)
+	return {
+		session: createSession(workflowValues),
+		step,
+		renderWorkflowValue,
+	}
+}
+
+function getPromptInstructions(stepId: WorkflowStepDefinition["id"], workflowValues: WorkflowValues): string {
+	const promptSource = getStep(stepId).buildPromptSource(createPromptInputForStep(stepId, workflowValues))
+	if (promptSource.currentStepInstructions === undefined) {
+		throw new Error(`Missing prompt instructions for ${stepId}.`)
+	}
+
+	return promptSource.currentStepInstructions
+}
+
+function getToolNamesForStep(stepId: WorkflowStepDefinition["id"]): string[] {
+	return getStep(stepId)
+		.buildToolSchema(createPromptInputForStep(stepId, {}))
+		.map((schema) => schema.name)
+}
+
 function buildWorkflowValuesPersistedEvent(changedKeys: readonly string[]): WorkflowBranchTriggerEvent {
 	return {
 		kind: "workflow_values_persisted",
@@ -141,6 +187,26 @@ function buildWorkflowFormCompletedEvent(workflowFormId: string): WorkflowBranch
 	return {
 		kind: "workflow_form_completed",
 		workflowFormId,
+	}
+}
+
+function buildToolBackedOperationSucceededEvent(branchId: string, routeId: string): WorkflowBranchTriggerEvent {
+	return {
+		kind: "tool_backed_operation_succeeded",
+		sourceRoute: {
+			branchId,
+			routeId,
+		},
+	}
+}
+
+function buildToolBackedOperationFailedEvent(branchId: string, routeId: string): WorkflowBranchTriggerEvent {
+	return {
+		kind: "tool_backed_operation_failed",
+		sourceRoute: {
+			branchId,
+			routeId,
+		},
 	}
 }
 
@@ -158,6 +224,26 @@ function expectEventPredicateMatches(args: {
 			activeBranchId: "test-branch",
 			workflowValues: args.workflowValues,
 			step: getStep("step-1"),
+			triggerEvent: args.triggerEvent,
+		}),
+	).to.equal(true)
+}
+
+function expectEventPredicateMatchesForStep(args: {
+	stepId: WorkflowStepDefinition["id"]
+	route: WorkflowDecisionBranchRoute
+	workflowValues: WorkflowValues
+	triggerEvent: WorkflowBranchTriggerEvent
+}): void {
+	if (args.route.trigger.kind !== "event_predicate") {
+		throw new Error(`Expected event_predicate trigger, received ${args.route.trigger.kind}.`)
+	}
+
+	expect(
+		args.route.trigger.matches({
+			activeBranchId: "test-branch",
+			workflowValues: args.workflowValues,
+			step: getStep(args.stepId),
 			triggerEvent: args.triggerEvent,
 		}),
 	).to.equal(true)
@@ -338,11 +424,26 @@ describe("createStoryWorkflowDefinition", () => {
 			projectFolderName: CreateStoryWorkflowValueKey.ProjectFolderName,
 		})
 		expect(createStoryWorkflowDefinition.artifacts).to.equal(undefined)
-		expect(Object.keys(createStoryWorkflowDefinition.steps)).to.deep.equal(["step-1"])
+		expect(Object.keys(createStoryWorkflowDefinition.steps)).to.deep.equal(["step-1", "step-2", "step-3", "step-4"])
 		expect(getStep("step-1")).to.deep.include({
 			id: "step-1",
 			stepNumber: 1,
 			checklistLabel: "Gather Inputs",
+		})
+		expect(getStep("step-2")).to.deep.include({
+			id: "step-2",
+			stepNumber: 2,
+			checklistLabel: "Review Context & Ensure Project Alignment",
+		})
+		expect(getStep("step-3")).to.deep.include({
+			id: "step-3",
+			stepNumber: 3,
+			checklistLabel: "Author Tasks & Subtasks",
+		})
+		expect(getStep("step-4")).to.deep.include({
+			id: "step-4",
+			stepNumber: 4,
+			checklistLabel: "Finalize & Validate Story Document",
 		})
 	})
 
@@ -816,5 +917,341 @@ describe("createStoryWorkflowDefinition Step 1", () => {
 			triggerEvent: buildWorkflowFormCompletedEvent(CREATE_STORY_STORY_SELECTION_FORM_ID),
 		})
 		expectRunDeterministicProcedureAction(route.action)
+	})
+})
+
+describe("createStoryWorkflowDefinition Step 2", () => {
+	it("builds a primary draft context-review prompt", () => {
+		const prompt = getPromptInstructions("step-2", {
+			[CreateStoryWorkflowValueKey.TargetStory]: "/tmp/create-story-project/implementation/drafts/Story-1-1.md",
+			[CreateStoryWorkflowValueKey.ArchitectureDocument]: "/tmp/create-story-project/planning/architecture.md",
+			[CreateStoryWorkflowValueKey.EpicsDocument]: "/tmp/create-story-project/planning/Epics.md",
+			[CreateStoryWorkflowValueKey.BrainstormingDocument]: "/tmp/create-story-project/discovery/brainstorming.md",
+			[CreateStoryWorkflowValueKey.SelectedStoryStatus]: "draft",
+			[CreateStoryWorkflowValueKey.SelectedStoryType]: "primary",
+		})
+
+		expect(prompt).to.include("preparing a story file for implementation by adding tasks and subtasks")
+		expect(prompt).to.include("Focus on `/tmp/create-story-project/implementation/drafts/Story-1-1.md`.")
+		expect(prompt).to.include("Read `/tmp/create-story-project/planning/architecture.md`.")
+		expect(prompt).to.include("Read `/tmp/create-story-project/planning/Epics.md`.")
+		expect(prompt).to.include("Read `/tmp/create-story-project/discovery/brainstorming.md` when present.")
+		expect(prompt).to.include("story objective, scope, scope boundary, requirements")
+		expect(prompt).to.include("workflow_progress_request")
+	})
+
+	it("builds a remediation draft context-review prompt with parent and findings context", () => {
+		const prompt = getPromptInstructions("step-2", {
+			[CreateStoryWorkflowValueKey.TargetStory]:
+				"/tmp/create-story-project/implementation/drafts/Remediation-story-1-1-1.md",
+			[CreateStoryWorkflowValueKey.ArchitectureDocument]: "/tmp/create-story-project/planning/architecture.md",
+			[CreateStoryWorkflowValueKey.EpicsDocument]: "/tmp/create-story-project/planning/Epics.md",
+			[CreateStoryWorkflowValueKey.SelectedStoryStatus]: "draft",
+			[CreateStoryWorkflowValueKey.SelectedStoryType]: "remediation",
+			[CreateStoryWorkflowValueKey.ParentStory]: "/tmp/create-story-project/implementation/stories-complete/Story-1-1.md",
+			[CreateStoryWorkflowValueKey.FindingsDocument]: "/tmp/create-story-project/review/Adversarial-review-1-1.md",
+		})
+
+		expect(prompt).to.include("preparing a remediation story file for implementation")
+		expect(prompt).to.include("/tmp/create-story-project/implementation/stories-complete/Story-1-1.md")
+		expect(prompt).to.include("/tmp/create-story-project/review/Adversarial-review-1-1.md")
+		expect(prompt).to.include("QA findings")
+		expect(prompt).to.include("workflow_progress_request")
+	})
+
+	it("builds a backlog revision context-review prompt", () => {
+		const prompt = getPromptInstructions("step-2", {
+			[CreateStoryWorkflowValueKey.TargetStory]: "/tmp/create-story-project/implementation/stories-backlog/Story-1-2.md",
+			[CreateStoryWorkflowValueKey.ArchitectureDocument]: "/tmp/create-story-project/planning/architecture.md",
+			[CreateStoryWorkflowValueKey.EpicsDocument]: "/tmp/create-story-project/planning/Epics.md",
+			[CreateStoryWorkflowValueKey.SelectedStoryStatus]: "backlog",
+			[CreateStoryWorkflowValueKey.SelectedStoryType]: "primary",
+			[CreateStoryWorkflowValueKey.ReviseBacklogStory]: true,
+		})
+
+		expect(prompt).to.include("revising an existing story file")
+		expect(prompt).to.include("/tmp/create-story-project/implementation/stories-backlog/Story-1-2.md")
+		expect(prompt).to.include("ask the user to explain the required revisions")
+		expect(prompt).to.include("existing runtime code/tests")
+		expect(prompt).to.include("workflow_progress_request")
+	})
+})
+
+describe("createStoryWorkflowDefinition Step 3", () => {
+	it("builds a draft task/subtask authoring prompt", () => {
+		const prompt = getPromptInstructions("step-3", {
+			[CreateStoryWorkflowValueKey.TargetStory]: "/tmp/create-story-project/implementation/drafts/Story-1-1.md",
+			[CreateStoryWorkflowValueKey.SelectedStoryStatus]: "draft",
+		})
+
+		expect(prompt).to.include("Review runtime code and tests")
+		expect(prompt).to.include("full set of in-scope revisions")
+		expect(prompt).to.include("Inspect relevant runtime code and tests")
+		expect(prompt).to.include("Author implementation-ready tasks and subtasks")
+		expect(prompt).to.include("single revision in a single target file")
+		expect(prompt).to.include("workflow_progress_request")
+	})
+
+	it("builds a backlog revision task/subtask authoring prompt", () => {
+		const prompt = getPromptInstructions("step-3", {
+			[CreateStoryWorkflowValueKey.TargetStory]: "/tmp/create-story-project/implementation/stories-backlog/Story-1-2.md",
+			[CreateStoryWorkflowValueKey.SelectedStoryStatus]: "backlog",
+		})
+
+		expect(prompt).to.include("Review existing tasks and subtasks")
+		expect(prompt).to.include("action-plan quality rules")
+		expect(prompt).to.include("/tmp/create-story-project/implementation/stories-backlog/Story-1-2.md")
+		expect(prompt).to.include("Provide the user with the identified revision set")
+		expect(prompt).to.include("Ask the user to review the tasks/subtasks section")
+		expect(prompt).to.include("workflow_progress_request")
+	})
+})
+
+describe("createStoryWorkflowDefinition Step 2 and Step 3 progression", () => {
+	it("routes progress confirmation forward and denial back to the project prompt", () => {
+		const progressionCases: readonly ProgressionRouteExpectation[] = [
+			{
+				stepId: "step-2",
+				projectPromptBranchId: "step-2-project-prompt",
+				projectPromptRouteId: "step-2-project-prompt",
+				awaitBranchId: "step-2-await-progress-request",
+				confirmedRouteId: "step-2-transition-to-step-3",
+				deniedRouteId: "step-2-return-to-project-prompt",
+				nextStepNumber: 3,
+			},
+			{
+				stepId: "step-3",
+				projectPromptBranchId: "step-3-project-prompt",
+				projectPromptRouteId: "step-3-project-prompt",
+				awaitBranchId: "step-3-await-progress-request",
+				confirmedRouteId: "step-3-transition-to-step-4",
+				deniedRouteId: "step-3-return-to-project-prompt",
+				nextStepNumber: 4,
+			},
+		]
+
+		for (const progressionCase of progressionCases) {
+			const projectPromptRoute = findStepRoute(
+				progressionCase.stepId,
+				progressionCase.projectPromptBranchId,
+				progressionCase.projectPromptRouteId,
+			)
+			expect(projectPromptRoute.trigger).to.deep.equal({ kind: "always" })
+			expect(projectPromptRoute.action).to.deep.equal({
+				kind: "project_prompt",
+			})
+			expect(projectPromptRoute.followingBranchId).to.equal(progressionCase.awaitBranchId)
+
+			const confirmedRoute = findStepRoute(
+				progressionCase.stepId,
+				progressionCase.awaitBranchId,
+				progressionCase.confirmedRouteId,
+			)
+			expect(confirmedRoute.trigger).to.deep.equal({
+				kind: "on_event",
+				eventKind: "workflow_progress_request_confirmed",
+			})
+			expectTransitionStepAction(confirmedRoute.action, progressionCase.nextStepNumber)
+
+			const deniedRoute = findStepRoute(
+				progressionCase.stepId,
+				progressionCase.awaitBranchId,
+				progressionCase.deniedRouteId,
+			)
+			expect(deniedRoute.trigger).to.deep.equal({
+				kind: "on_event",
+				eventKind: "workflow_progress_request_denied",
+			})
+			expect(deniedRoute.action).to.deep.equal({
+				kind: "project_prompt",
+			})
+		}
+	})
+})
+
+describe("createStoryWorkflowDefinition Step 4", () => {
+	it("builds a final validation prompt and exposes attempt_completion only in Step 4", () => {
+		const prompt = getPromptInstructions("step-4", {
+			[CreateStoryWorkflowValueKey.TargetStory]: "/tmp/create-story-project/implementation/drafts/Story-1-1.md",
+		})
+
+		expect(prompt).to.include("complete implementation handoff")
+		expect(prompt).to.include("every acceptance criterion")
+		expect(prompt).to.include("task order is executable and non-conflicting")
+		expect(prompt).to.include("ambiguity, contradiction, missing coverage, or unsafe handoff content")
+		expect(prompt).to.include("attempt_completion")
+		expect(prompt).to.include("only after validation passes")
+
+		expect(getToolNamesForStep("step-1")).not.to.include("attempt_completion")
+		expect(getToolNamesForStep("step-2")).not.to.include("attempt_completion")
+		expect(getToolNamesForStep("step-3")).not.to.include("attempt_completion")
+
+		const step4ToolNames = getToolNamesForStep("step-4")
+		expect(step4ToolNames).to.deep.equal([
+			"read_file",
+			"read_file_range",
+			"apply_patch",
+			"send_user_message",
+			"ask_followup_question",
+			"attempt_completion",
+		])
+		expect(step4ToolNames).not.to.include("workflow_progress_request")
+		expect(step4ToolNames).not.to.include("move_workflow_project_file")
+		expect(step4ToolNames).not.to.include("update_story_index_status")
+	})
+
+	it("routes draft finalization through status update, file move, completion, and terminal errors", () => {
+		const projectPromptRoute = findStepRoute("step-4", "step-4-project-prompt", "step-4-project-prompt")
+		expect(projectPromptRoute.trigger).to.deep.equal({ kind: "always" })
+		expect(projectPromptRoute.action).to.deep.equal({
+			kind: "project_prompt",
+		})
+		expect(projectPromptRoute.followingBranchId).to.equal("step-4-await-attempt-completion")
+
+		const statusUpdateRoute = findStepRoute(
+			"step-4",
+			"step-4-await-attempt-completion",
+			"step-4-update-draft-story-status-to-backlog",
+		)
+		expectEventPredicateMatchesForStep({
+			stepId: "step-4",
+			route: statusUpdateRoute,
+			workflowValues: {
+				[CreateStoryWorkflowValueKey.SelectedStoryStatus]: "draft",
+			},
+			triggerEvent: {
+				kind: "attempt_completion_succeeded",
+			},
+		})
+		expect(statusUpdateRoute.action).to.deep.equal({
+			kind: "update_story_index_status",
+			storyIndexWorkflowValueKey: CreateStoryWorkflowValueKey.StoriesIndex,
+			storyIdentityWorkflowValueKey: CreateStoryWorkflowValueKey.SelectedStoryIdentity,
+			status: "backlog",
+			expectedCurrentStatus: "draft",
+		})
+		expect(statusUpdateRoute.followingBranchId).to.equal("step-4-await-draft-status-update")
+
+		const moveRoute = findStepRoute("step-4", "step-4-await-draft-status-update", "step-4-move-draft-story-to-backlog")
+		expectEventPredicateMatchesForStep({
+			stepId: "step-4",
+			route: moveRoute,
+			workflowValues: {},
+			triggerEvent: buildToolBackedOperationSucceededEvent(
+				"step-4-await-attempt-completion",
+				"step-4-update-draft-story-status-to-backlog",
+			),
+		})
+		expect(moveRoute.action).to.deep.equal({
+			kind: "move_project_file",
+			sourceFolderSegments: ["implementation", "drafts"],
+			destinationFolderSegments: ["implementation", "stories-backlog"],
+			filenameWorkflowValueKey: CreateStoryWorkflowValueKey.TargetStoryFilenameForMove,
+		})
+		expect(moveRoute.followingBranchId).to.equal("step-4-await-draft-story-move")
+
+		const statusFailureRoute = findStepRoute(
+			"step-4",
+			"step-4-await-draft-status-update",
+			"step-4-terminal-error-after-draft-status-update",
+		)
+		expectEventPredicateMatchesForStep({
+			stepId: "step-4",
+			route: statusFailureRoute,
+			workflowValues: {},
+			triggerEvent: buildToolBackedOperationFailedEvent(
+				"step-4-await-attempt-completion",
+				"step-4-update-draft-story-status-to-backlog",
+			),
+		})
+		expect(statusFailureRoute.action.kind).to.equal("terminal_error")
+
+		const completionRoute = findStepRoute(
+			"step-4",
+			"step-4-await-draft-story-move",
+			"step-4-complete-workflow-after-draft-story-move",
+		)
+		expectEventPredicateMatchesForStep({
+			stepId: "step-4",
+			route: completionRoute,
+			workflowValues: {},
+			triggerEvent: buildToolBackedOperationSucceededEvent(
+				"step-4-await-draft-status-update",
+				"step-4-move-draft-story-to-backlog",
+			),
+		})
+		expect(completionRoute.action).to.deep.equal({
+			kind: "complete_workflow",
+		})
+
+		const moveFailureRoute = findStepRoute(
+			"step-4",
+			"step-4-await-draft-story-move",
+			"step-4-terminal-error-after-draft-story-move",
+		)
+		expectEventPredicateMatchesForStep({
+			stepId: "step-4",
+			route: moveFailureRoute,
+			workflowValues: {},
+			triggerEvent: buildToolBackedOperationFailedEvent(
+				"step-4-await-draft-status-update",
+				"step-4-move-draft-story-to-backlog",
+			),
+		})
+		expect(moveFailureRoute.action.kind).to.equal("terminal_error")
+	})
+
+	it("routes backlog revision finalization through status confirmation without file movement", () => {
+		const statusConfirmationRoute = findStepRoute(
+			"step-4",
+			"step-4-await-attempt-completion",
+			"step-4-confirm-backlog-story-status",
+		)
+		expectEventPredicateMatchesForStep({
+			stepId: "step-4",
+			route: statusConfirmationRoute,
+			workflowValues: {
+				[CreateStoryWorkflowValueKey.SelectedStoryStatus]: "backlog",
+				[CreateStoryWorkflowValueKey.ReviseBacklogStory]: true,
+			},
+			triggerEvent: {
+				kind: "attempt_completion_succeeded",
+			},
+		})
+		expect(statusConfirmationRoute.action).to.deep.equal({
+			kind: "update_story_index_status",
+			storyIndexWorkflowValueKey: CreateStoryWorkflowValueKey.StoriesIndex,
+			storyIdentityWorkflowValueKey: CreateStoryWorkflowValueKey.SelectedStoryIdentity,
+			status: "backlog",
+			expectedCurrentStatus: "backlog",
+		})
+		expect(statusConfirmationRoute.followingBranchId).to.equal("step-4-await-backlog-status-update")
+
+		const backlogStatusBranch = getStep("step-4").decisionTree.branches["step-4-await-backlog-status-update"]
+		if (backlogStatusBranch === undefined) {
+			throw new Error("Missing backlog status update branch.")
+		}
+		expect(backlogStatusBranch.routes.map((route) => route.action.kind)).to.deep.equal([
+			"complete_workflow",
+			"terminal_error",
+		])
+
+		const completionRoute = findStepRoute(
+			"step-4",
+			"step-4-await-backlog-status-update",
+			"step-4-complete-workflow-after-backlog-status-confirmation",
+		)
+		expectEventPredicateMatchesForStep({
+			stepId: "step-4",
+			route: completionRoute,
+			workflowValues: {},
+			triggerEvent: buildToolBackedOperationSucceededEvent(
+				"step-4-await-attempt-completion",
+				"step-4-confirm-backlog-story-status",
+			),
+		})
+		expect(completionRoute.action).to.deep.equal({
+			kind: "complete_workflow",
+		})
 	})
 })
