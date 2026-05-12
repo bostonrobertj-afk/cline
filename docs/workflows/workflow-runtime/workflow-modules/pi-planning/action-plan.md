@@ -833,62 +833,62 @@ Allowed files:
 
 ### Phase 7 - Final Validation
 
-[ ] Task 13. Run focused unit validation for pi-planning and shared story handlers.
+[x] Task 13. Run focused unit validation for pi-planning and shared story handlers.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/pi-planning/action-plan.md`
 
-[ ] Subtask 13.1. Run `npm run test:unit -- src/core/task/tools/handlers/__tests__/PlanStoryArtifactsToolHandler.test.ts src/core/task/tools/handlers/__tests__/GenerateStoryFilesToolHandler.test.ts`.
+[x] Subtask 13.1. Run `npm run test:unit -- src/core/task/tools/handlers/__tests__/PlanStoryArtifactsToolHandler.test.ts src/core/task/tools/handlers/__tests__/GenerateStoryFilesToolHandler.test.ts`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/pi-planning/action-plan.md`
 
-[ ] Subtask 13.2. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningToolSchemas.test.ts src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`.
+[x] Subtask 13.2. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningToolSchemas.test.ts src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/pi-planning/action-plan.md`
 
-[ ] Subtask 13.3. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`.
+[x] Subtask 13.3. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/pi-planning/action-plan.md`
 
-[ ] Subtask 13.4. Run `npm run test:unit -- src/core/prompts/system-prompt/__tests__/integration.test.ts`.
+[x] Subtask 13.4. Run `npm run test:unit -- src/core/prompts/system-prompt/__tests__/integration.test.ts`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/pi-planning/action-plan.md`
 
-[ ] Subtask 13.5. Run `npm run check-types`.
+[x] Subtask 13.5. Run `npm run check-types`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/pi-planning/action-plan.md`
 
-[ ] Subtask 13.6. Run `npm run lint`.
+[x] Subtask 13.6. Run `npm run lint`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/pi-planning/action-plan.md`
 
-[ ] Task 14. Run focused static regression checks.
+[x] Task 14. Run focused static regression checks.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/pi-planning/action-plan.md`
 
-[ ] Subtask 14.1. Run `rg -n "Epic-\\{E\\}-delivery-spec|epic-delivery-spec|BuildEpicDeliverySpecToolHandler" src/core/task/workflow-runtime/workflow-modules/pi-planning` and confirm no matches.
+[x] Subtask 14.1. Run `rg -n "Epic-\\{E\\}-delivery-spec|epic-delivery-spec|BuildEpicDeliverySpecToolHandler" src/core/task/workflow-runtime/workflow-modules/pi-planning` and confirm no matches.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/pi-planning/action-plan.md`
 
-[ ] Subtask 14.2. Run `rg -n "build_workflow_document|create_workflow_artifact|archive_workflow_artifact|delete_workflow_artifact|move_workflow_project_file|execute_command" src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningToolSchemas.ts` and confirm no matches.
+[x] Subtask 14.2. Run `rg -n "build_workflow_document|create_workflow_artifact|archive_workflow_artifact|delete_workflow_artifact|move_workflow_project_file|execute_command" src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningToolSchemas.ts` and confirm no matches.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/pi-planning/action-plan.md`
 
-[ ] Subtask 14.3. Run `rg -n "pi-planning\\.md|/Users/robertboston/Documents/Cline/Workflows/pi-planning.md|_bmad/bmm/agents/pm.md|\\.cline/workflow-config.yaml" src/core/task/workflow-runtime/workflow-modules/pi-planning src/core/task/workflow-runtime/WorkflowRegistry.ts` and confirm no runtime dependency on migration source files or `.md` workflow identity aliases.
+[x] Subtask 14.3. Run `rg -n "pi-planning\\.md|/Users/robertboston/Documents/Cline/Workflows/pi-planning.md|_bmad/bmm/agents/pm.md|\\.cline/workflow-config.yaml" src/core/task/workflow-runtime/workflow-modules/pi-planning src/core/task/workflow-runtime/WorkflowRegistry.ts` and confirm no runtime dependency on migration source files or `.md` workflow identity aliases.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/pi-planning/action-plan.md`
 
-[ ] Subtask 14.4. Run `rg -n "toolBackedOperation|tool_backed_operation" src/core/task/workflow-runtime/workflow-modules/pi-planning` and confirm no matches.
+[x] Subtask 14.4. Run `rg -n "toolBackedOperation|tool_backed_operation" src/core/task/workflow-runtime/workflow-modules/pi-planning` and confirm no matches.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/pi-planning/action-plan.md`
