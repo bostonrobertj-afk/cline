@@ -676,7 +676,7 @@ Allowed files:
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`
 
-[ ] Subtask 10.3. In `piPlanningWorkflow.test.ts`, add coverage proving every expected workflow value key is declared and no undeclared entry project value key is used.
+[ ] Subtask 10.3. In `piPlanningWorkflow.test.ts`, add coverage proving every expected workflow value key is declared, including `stories_index_existed_at_workflow_start`, and no undeclared entry project value key is used.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`
@@ -711,7 +711,7 @@ Allowed files:
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`
 
-[ ] Subtask 10.10. In `piPlanningWorkflow.test.ts`, add coverage proving selected epic derivation writes `target_epic` and writes `stories_index` only when the selected epic has `"story-index-generated": true`.
+[ ] Subtask 10.10. In `piPlanningWorkflow.test.ts`, add coverage proving selected epic derivation writes `target_epic` and `stories_index_existed_at_workflow_start` for every selected epic; writes `stories_index` only when the selected epic has `"story-index-generated": true`; writes `stories_index_existed_at_workflow_start: true` for existing-index epics; and writes `stories_index_existed_at_workflow_start: false` for new-index epics.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`
@@ -721,7 +721,7 @@ Allowed files:
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`
 
-[ ] Subtask 10.12. In `piPlanningWorkflow.test.ts`, add coverage proving Step 3, Step 4, and Step 5 prompt builders include the correct existing-story-index conditional behavior based on presence or absence of `stories_index`.
+[ ] Subtask 10.12. In `piPlanningWorkflow.test.ts`, add coverage proving Step 3, Step 4, and Step 5 prompt builders use `stories_index_existed_at_workflow_start`, not current `stories_index` presence, for existing-story-index conditional behavior; include a regression case where `stories_index` is present and `stories_index_existed_at_workflow_start` is false.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`
@@ -731,12 +731,12 @@ Allowed files:
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`
 
-[ ] Subtask 10.14. In `piPlanningWorkflow.test.ts`, add route-structure coverage proving Step 4 advances on successful `plan_story_artifacts` tool-backed operation for the existing-index branch, on `workflow_values_persisted` including `stories_index` for the new-index branch, and on confirmed `workflow_progress_request` for the no-additional-stories branch.
+[ ] Subtask 10.14. In `piPlanningWorkflow.test.ts`, add route-structure coverage proving Step 4 advances on `model_tool_succeeded` for `plan_story_artifacts` only when `stories_index_existed_at_workflow_start` is true, advances on `workflow_values_persisted` including `stories_index` only when `stories_index_existed_at_workflow_start` is false, advances on confirmed `workflow_progress_request`, returns to `project_prompt` on denied `workflow_progress_request`, and returns to `project_prompt` on `model_tool_failed` for `plan_story_artifacts`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`
 
-[ ] Subtask 10.15. In `piPlanningWorkflow.test.ts`, add route-structure coverage proving Step 5 advances only on successful `generate_story_files` tool-backed operation.
+[ ] Subtask 10.15. In `piPlanningWorkflow.test.ts`, add route-structure coverage proving Step 5 advances only on `model_tool_succeeded` for `generate_story_files` and returns to `project_prompt` on `model_tool_failed` for `generate_story_files`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`
@@ -786,7 +786,7 @@ Allowed files:
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 12.2. In `integration.test.ts`, add helper `createPiPlanningWorkflowSession(activeStepNumber)` that provides representative workflow values for `architecture_document`, `epics_document`, `epics_index`, `brainstorming_document`, `additional_context`, `target_epic`, `epic_identity`, `implementation_folder`, `drafts_folder`, and `stories_index`.
+[ ] Subtask 12.2. In `integration.test.ts`, add helper `createPiPlanningWorkflowSession(activeStepNumber)` that provides representative workflow values for `architecture_document`, `epics_document`, `epics_index`, `brainstorming_document`, `additional_context`, `target_epic`, `epic_identity`, `implementation_folder`, `drafts_folder`, `stories_index`, and `stories_index_existed_at_workflow_start`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
@@ -888,6 +888,11 @@ Allowed files:
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/pi-planning/action-plan.md`
 
+[ ] Subtask 14.4. Run `rg -n "toolBackedOperation|tool_backed_operation" src/core/task/workflow-runtime/workflow-modules/pi-planning` and confirm no matches.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/pi-planning/action-plan.md`
+
 ## Validation
 
 Required validation after all phases are complete:
@@ -902,8 +907,9 @@ npm run lint
 rg -n "Epic-\\{E\\}-delivery-spec|epic-delivery-spec|BuildEpicDeliverySpecToolHandler" src/core/task/workflow-runtime/workflow-modules/pi-planning
 rg -n "build_workflow_document|create_workflow_artifact|archive_workflow_artifact|delete_workflow_artifact|move_workflow_project_file|execute_command" src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningToolSchemas.ts
 rg -n "pi-planning\\.md|/Users/robertboston/Documents/Cline/Workflows/pi-planning.md|_bmad/bmm/agents/pm.md|\\.cline/workflow-config.yaml" src/core/task/workflow-runtime/workflow-modules/pi-planning src/core/task/workflow-runtime/WorkflowRegistry.ts
+rg -n "toolBackedOperation|tool_backed_operation" src/core/task/workflow-runtime/workflow-modules/pi-planning
 ```
 
 Expected `rg` result:
 
-- The three `rg` commands above must return no matches. If a command returns matches, review whether the match is this action-plan document or a test-only negative fixture. Runtime source matches must be treated as failures unless explicitly justified by the requirements.
+- The four `rg` commands above must return no matches. If a command returns matches, review whether the match is this action-plan document or a test-only negative fixture. Runtime source matches must be treated as failures unless explicitly justified by the requirements.
