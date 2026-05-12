@@ -161,7 +161,7 @@ Rules of thumb:
 
 The brainstorming Step 2 form is the reference pattern: approach selection, category selection, technique selection, and random confirmation are all one form with conditional panels.
 
-Use `jsonOptionsSource` when a `dropdown`, `radio_group`, `multi_select`, or `checkbox_group` field needs options derived from a selected-project JSON index file such as `planning/Epics.index.json`. Configure the source path relative to the selected project root, set `itemsPath` to the array of index entries, use `valueProperty` for stable option values, and render labels or descriptions with direct item-property placeholders.
+Use `jsonOptionsSource` when a `dropdown`, `radio_group`, `multi_select`, or `checkbox_group` field needs options derived from a selected-project JSON index file such as `planning/Epics.index.json`. A JSON options source may use `root.kind = "selected_project_root"` with `sourcePathSegments` for a selected-project-relative JSON file, or `root.kind = "workflow_value_path"` with `workflowValueKey` for a governed absolute JSON file path stored in a declared workflow value. Set `itemsPath` to the array of index entries, use `valueProperty` for stable option values, and render labels or descriptions with direct item-property placeholders.
 
 Use `selectorDiscovery` only for filesystem discovery. Do not repurpose it to read JSON index content or to derive options from index entries.
 
@@ -207,6 +207,8 @@ Project setup creates `implementation/drafts`, `implementation/stories-backlog`,
 
 - `plan_story_artifacts` creates or expands primary story entries in `epic-{E}-stories.index.json`.
 - `plan_remediation_story_artifact` appends the next remediation story entry under an existing target story.
+
+Use backend-only `update_story_index_status` for governed runtime status updates to existing story index entries. Modules may route to it through runtime-owned decision actions, but it must not be included in model-facing tool schemas.
 
 ### Deterministic Procedures
 

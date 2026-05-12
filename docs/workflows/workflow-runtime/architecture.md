@@ -346,6 +346,7 @@ Exact filenames beyond this level are deferred to requirements and implementatio
 
 1. Workflow runtime determines that the active step requires workflow-form interaction.
 2. Workflow runtime builds the per-panel payload for the active step using workflow-module configuration.
+   - JSON-backed option lists can resolve a source JSON file either from selected-project-relative path segments or from an active workflow value containing a governed absolute path.
 3. Workflow form capability renders the payload and captures user input.
 4. Workflow runtime receives the result and applies any declared durable form values through the workflow-value persistence seam.
 5. Workflow runtime performs any runtime-owned deterministic procedures needed to evaluate workflow/session state and re-enters canonical next-action evaluation.
@@ -619,6 +620,8 @@ Workflow runtime owns artifact allocation and derivation:
 Workflow runtime must provide a backend-owned file-move capability for workflow decision trees that need to move existing project files between canonical project folders. File moves remain runtime/tool-governed filesystem operations and must stay inside the selected project folder.
 
 PI planning creates or updates the canonical story inventory in `implementation/epic-{E}-stories.index.json` before story files are generated. Runtime-owned story planning tools assign primary and remediation story identities and filenames. Runtime-owned story generation creates missing draft story files in `implementation/drafts`, populates prescribed story headings, and updates `story_file_generated` in the story index. AI agents do not provide canonical story identities or canonical story filenames.
+
+Workflow modules can route deterministic story-status changes through a backend-only runtime story-index status update action before workflow completion.
 
 Workflow runtime also owns canonical normalization of user-provided project titles into filesystem-safe project identity.
 

@@ -76,39 +76,39 @@ Sibling-pattern audit summary:
 
 After completing this phase, pause for QA review before moving to Phase 2.
 
-[ ] Task 1. Record the approved shared form and story-index status support in canonical docs.
+[x] Task 1. Record the approved shared form and story-index status support in canonical docs.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/requirements.md`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/architecture.md`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
 
-[ ] Subtask 1.1. In `requirements.md`, add a functional requirement under the workflow form requirements stating that JSON-backed workflow form options may be sourced either from selected-project-relative `sourcePathSegments` or from an absolute JSON file path stored in a declared workflow value.
+[x] Subtask 1.1. In `requirements.md`, add a functional requirement under the workflow form requirements stating that JSON-backed workflow form options may be sourced either from selected-project-relative `sourcePathSegments` or from an absolute JSON file path stored in a declared workflow value.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/requirements.md`
 
-[ ] Subtask 1.2. In `requirements.md`, add a functional requirement near the story index requirements stating that runtime/tooling must provide backend-only `update_story_index_status` for governed updates to an existing story entry's `status` in `epic-{E}-stories.index.json`.
+[x] Subtask 1.2. In `requirements.md`, add a functional requirement near the story index requirements stating that runtime/tooling must provide backend-only `update_story_index_status` for governed updates to an existing story entry's `status` in `epic-{E}-stories.index.json`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/requirements.md`
 
-[ ] Subtask 1.3. In `architecture.md`, update the workflow form/json option architecture text to state that `jsonOptionsSource` can resolve a source JSON file either from selected-project-relative segments or from an active workflow value containing a governed absolute path.
+[x] Subtask 1.3. In `architecture.md`, update the workflow form/json option architecture text to state that `jsonOptionsSource` can resolve a source JSON file either from selected-project-relative segments or from an active workflow value containing a governed absolute path.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/architecture.md`
 
-[ ] Subtask 1.4. In `architecture.md`, update the story lifecycle architecture text to state that workflow modules can route deterministic story-status changes through a backend-only runtime story-index status update action before workflow completion.
+[x] Subtask 1.4. In `architecture.md`, update the story lifecycle architecture text to state that workflow modules can route deterministic story-status changes through a backend-only runtime story-index status update action before workflow completion.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/architecture.md`
 
-[ ] Subtask 1.5. In `module-build-guide.md`, revise the `jsonOptionsSource` guidance to document both `selected_project_root` and `workflow_value_path` roots, including the rule that `workflow_value_path` must name a declared workflow value containing a governed absolute JSON file path.
+[x] Subtask 1.5. In `module-build-guide.md`, revise the `jsonOptionsSource` guidance to document both `selected_project_root` and `workflow_value_path` roots, including the rule that `workflow_value_path` must name a declared workflow value containing a governed absolute JSON file path.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
 
-[ ] Subtask 1.6. In `module-build-guide.md`, add `update_story_index_status` to the story lifecycle guidance as a backend-only runtime status mutation action that must not be included in model-facing tool schemas.
+[x] Subtask 1.6. In `module-build-guide.md`, add `update_story_index_status` to the story lifecycle guidance as a backend-only runtime status mutation action that must not be included in model-facing tool schemas.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
@@ -361,42 +361,72 @@ Allowed files:
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
 
-[ ] Subtask 5.6. In `createStoryWorkflow.ts`, add the Step 1 workflow form with Panel A epic dropdown populated from `planning/Epics.index.json` through `jsonOptionsSource.root.kind = "selected_project_root"`.
+[ ] Subtask 5.6. In `createStoryWorkflow.ts`, add a Step 1 target-epic workflow form containing only Panel A, with a required epic dropdown populated from `planning/Epics.index.json` through `jsonOptionsSource.root.kind = "selected_project_root"` and a terminal transition after submission.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
 
-[ ] Subtask 5.7. In `createStoryWorkflow.ts`, add Panel B story dropdown populated from the persisted `stories_index` path through `jsonOptionsSource.root.kind = "workflow_value_path"`.
+[ ] Subtask 5.7. In `createStoryWorkflow.ts`, add a deterministic procedure that runs after the target-epic form completes, reads the submitted `epic_identity`, derives and persists `target_epic`, derives the selected epic `stories_index` path, and persists `stories_index` only when the story index file exists.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
 
-[ ] Subtask 5.8. In `createStoryWorkflow.ts`, add Panel C backlog revision yes/no form behavior, Panel D no-revision confirmation behavior, and Panel E review/complete blocked-story behavior exactly as prescribed by `create-story-requirements.md`.
+[ ] Subtask 5.8. In `createStoryWorkflow.ts`, add a Step 1 story-selection workflow form whose first panel is Panel B, with a required story dropdown populated from the persisted `stories_index` path through `jsonOptionsSource.root.kind = "workflow_value_path"` and a terminal transition after submission.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
 
-[ ] Subtask 5.9. In `createStoryWorkflow.ts`, add Step 1 decision-tree routes that resolve prerequisites first, render the Step 1 form only after prerequisite success, derive and persist selected epic/story metadata through deterministic procedures, block missing story index or `story_file_generated: false`, transition actionable draft stories to Step 2, transition user-approved backlog revisions to Step 2, and route Panel D confirmation directly to `complete_workflow`.
+[ ] Subtask 5.9. In `createStoryWorkflow.ts`, add Panel C to the story-selection workflow form with the prescribed backlog revision yes/no field, a terminal submit transition, `allowedActions: ["submit", "back"]`, and back behavior returning to Panel B while clearing `revise_backlog_story`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
 
-[ ] Subtask 5.10. In `createStoryWorkflow.ts`, define the exported `createStoryWorkflowDefinition` with Step 1 only, no artifacts, no AI-writable workflow values, the Step 1 form, and Step 1 tool-schema delegation to `buildCreateStoryStep1ToolSchemas`.
+[ ] Subtask 5.10. In `createStoryWorkflow.ts`, add Panel D to the story-selection workflow form as the prescribed no-revision confirmation panel with no story mutation behavior and a terminal submit transition.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
 
-[ ] Subtask 5.11. Create `index.ts` exporting `createStoryWorkflowDefinition` and any module constants required by tests.
+[ ] Subtask 5.11. In `createStoryWorkflow.ts`, add Panel E to the story-selection workflow form as the prescribed review/complete blocked-story panel with `allowedActions: ["back"]` and back behavior returning to Panel B.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
+
+[ ] Subtask 5.12. In `createStoryWorkflow.ts`, add Step 1 cannot-continue form behavior for missing `stories_index` and `story_file_generated: false`, rendering the prescribed user-facing messages without transitioning to model-driven work.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
+
+[ ] Subtask 5.13. In `createStoryWorkflow.ts`, add Step 1 decision-tree routes that resolve prerequisites, render the target-epic form, run selected-epic derivation after that form completes, render the story-selection form only when `stories_index` exists, and render the missing-story-index cannot-continue form when `stories_index` does not exist.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
+
+[ ] Subtask 5.14. In `createStoryWorkflow.ts`, add Step 1 decision-tree routes that run selected-story derivation after Panel B completes, branch `story_file_generated: false` to the cannot-continue form, branch `draft` stories to Step 2 after deriving `target_story` and remediation context, branch `backlog` stories to Panel C, and branch `review` or `complete` stories to Panel E.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
+
+[ ] Subtask 5.15. In `createStoryWorkflow.ts`, add Step 1 decision-tree routes that branch Panel C yes to Step 2 after deriving `target_story` and remediation context, branch Panel C no to Panel D, and route Panel D confirmation directly to `complete_workflow`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
+
+[ ] Subtask 5.16. In `createStoryWorkflow.ts`, define the exported `createStoryWorkflowDefinition` with Step 1 only, no artifacts, no AI-writable workflow values, all Step 1 workflow forms, and Step 1 tool-schema delegation to `buildCreateStoryStep1ToolSchemas`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
+
+[ ] Subtask 5.17. Create `index.ts` exporting `createStoryWorkflowDefinition` and any module constants required by tests.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/index.ts`
 
-[ ] Subtask 5.12. Add `createStoryWorkflow.test.ts` coverage for workflow identity, metadata, persona shape, workflow value inventory, absence of AI-writable workflow values, entry project keys, prerequisite declarations, and no artifacts.
+[ ] Subtask 5.18. Add `createStoryWorkflow.test.ts` coverage for workflow identity, metadata, persona shape, workflow value inventory, absence of AI-writable workflow values, entry project keys, prerequisite declarations, and no artifacts.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`
 
-[ ] Subtask 5.13. In `createStoryWorkflow.test.ts`, add Step 1 route/form coverage for epic dropdown source, story-index path derivation, missing story-index blocking, story dropdown source from `workflow_value_path`, selected story metadata persistence, generated-file blocking, status-based path derivation, backlog yes/no branching, review/complete blocking, remediation context derivation, invalid remediation failure, and Panel D completion routing.
+[ ] Subtask 5.19. In `createStoryWorkflow.test.ts`, add Step 1 route/form coverage proving Panel A completion derives `stories_index` before Panel B can render, missing story-index blocks before Panel B, Panel B uses `workflow_value_path`, selected-story derivation occurs after Panel B completion, generated-file blocking works, status-based branching works, Panel C back returns to Panel B, Panel D confirmation completes, and Panel E back returns to Panel B.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`
