@@ -122,15 +122,25 @@ Include this exact frontmatter at the top of every action plan document:
     - If there is an architecture or requirements document, the action plan must not introduce additional architecture beyond the scope of what those documents prescribe. There is no such thing as inferred architecture. If something is not explicitly prescribed, it is not prescribed at all.
     - If you determine that additional or different architecture is necessary while authoring the action plan, you must stop and inform the user so that the appropriate revisions can be made to upstream documents first.
 
+9. Avoid in-plan churn. Do not prescribe code in one task/ subtask only to replace the prescribed code in a subsequent task/ subtask. Identify the final shape of every line being prescribed, and require the dev agent to implement it that way in one task / subtask. 
+
+10. Every phase must end in a repo-valid intermediate state.
+- If an action plan is split into phases with QA pauses, each phase must leave the repo in a state that passes the same static gates required before commit, including formatting, lint, typecheck, and any focused tests prescribed for that phase.
+- Do not prescribe unused imports, unused helpers, placeholder scaffolding, future-step code, or partially wired definitions in an earlier phase unless that phase also wires them into legitimate runtime use.
+- If code cannot be cleanly introduced without being used until a later phase, move that code to the later phase or merge the phases so the pause point occurs after the code is used.
+- Phase boundaries must be implementation-cohesive, not merely topical. A phase should represent a valid, reviewable increment that can be committed without bypassing repo hooks.
+
+
 If at any point you cannot satisfy one or more of these rules (for example, due to missing context or constraints in the existing architecture), you MUST:
 - Explicitly state which rule(s) you cannot fully satisfy, and why.
 - Propose the best available compromise, and outline what a more ideal long-term fix would look like.
-9. Avoid in-plan churn. Do not prescribe code in one task/ subtask only to replace the prescribed code in a subsequent task/ subtask. Identify the final shape of every line being prescribed, and require the dev agent to implement it that way in one task / subtask. 
 
 # Validation Section Rules
 - Prescribe exact tests to be executed after all tasks and subtasks are complete
 - Review the test expectations/ assertions and ensure that they will not be stale due to changes made during action plan implementation
 - Ensure that prescribed testing is supported by the repo
+- For phased plans, prescribe phase-level validation at every QA pause, including the repo’s formatting/lint/typecheck gates needed for a clean commit.
+
 
 # Test Prescription Calibration
 - Prescribe tests only for behavior, contracts, regressions, and material risks required by the requirements, architecture, or approved action plan scope.

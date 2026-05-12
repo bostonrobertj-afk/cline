@@ -287,7 +287,7 @@ export class ToolExecutor {
 	 * @param error The error that occurred
 	 * @param block The tool use block that caused the error
 	 */
-	private async handleError(action: string, error: Error, block: ToolUse): Promise<void> {
+	private async handleError(action: string, error: Error, block: ToolUse): Promise<ToolResponse> {
 		const errorString = `Error ${action}: ${error.message}`
 		await this.say("error", errorString)
 
@@ -297,6 +297,7 @@ export class ToolExecutor {
 		if (block.isNativeToolCall && block.call_id && !this.taskState.nativeToolCallIdsExecuted.has(block.call_id)) {
 			this.taskState.nativeToolCallIdsSkipped.add(block.call_id)
 		}
+		return errorResponse
 	}
 
 	/**
@@ -369,6 +370,65 @@ export class ToolExecutor {
 		const mode = this.stateManager.getGlobalSettingsKey("mode")
 		const providerId = (mode === "plan" ? apiConfig.planModeApiProvider : apiConfig.actModeApiProvider) as string
 		return isParallelToolCallingEnabled(enableParallelSetting, { providerId, model, mode })
+	}
+
+	private shouldSkipGenericModelToolLifecycleEmission(toolName: ClineDefaultTool): boolean {
+		switch (toolName) {
+			case ClineDefaultTool.ATTEMPT:
+			case ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST:
+			case ClineDefaultTool.SET_WORKFLOW_VALUES:
+				return true
+			default:
+				return false
+		}
+	}
+
+	private isWorkflowRuntimeAuthoredToolUse(block: ToolUse): boolean {
+		if (!block.isNativeToolCall || block.call_id === undefined) {
+			return false
+		}
+
+		return block.call_id.startsWith("workflow_runtime_") || block.call_id.startsWith("workflow_step_resolution_")
+	}
+
+	private serializeModelToolLifecycleResult(toolResult: ToolResponse): string {
+		return typeof toolResult === "string" ? toolResult : JSON.stringify(toolResult)
+	}
+
+	private async emitModelToolLifecycleNextActionIfNeeded(args: {
+		block: ToolUse
+		toolResult: ToolResponse
+		emittedToolResult: boolean
+		workflowNextActions: WorkflowNextAction[]
+	}): Promise<void> {
+		if (!this.taskState.activeWorkflowSession) {
+			return
+		}
+
+		if (args.emittedToolResult === false) {
+			return
+		}
+
+		if (args.workflowNextActions.length > 0) {
+			return
+		}
+
+		if (this.isWorkflowRuntimeAuthoredToolUse(args.block)) {
+			return
+		}
+
+		if (this.shouldSkipGenericModelToolLifecycleEmission(args.block.name)) {
+			return
+		}
+
+		const nextAction = await this.workflowRuntime.handleModelToolResult({
+			taskState: this.taskState,
+			toolName: args.block.name,
+			toolResultText: this.serializeModelToolLifecycleResult(args.toolResult),
+		})
+		if (nextAction.kind !== "no_op") {
+			args.workflowNextActions.push(nextAction)
+		}
 	}
 
 	/**
@@ -498,7 +558,13 @@ export class ToolExecutor {
 			// Handle complete blocks
 			return await this.handleCompleteBlock(block, config, workflowNextActions)
 		} catch (error) {
-			await this.handleError(`executing ${block.name}`, error as Error, block)
+			const toolErrorResult = await this.handleError(`executing ${block.name}`, error as Error, block)
+			await this.emitModelToolLifecycleNextActionIfNeeded({
+				block,
+				toolResult: toolErrorResult,
+				emittedToolResult: true,
+				workflowNextActions,
+			})
 			return { status: "executed", emittedToolResult: true, workflowNextActions }
 		}
 	}
@@ -780,6 +846,13 @@ export class ToolExecutor {
 			// Re-throw the error after PostToolUse completes
 			throw error
 		}
+
+		await this.emitModelToolLifecycleNextActionIfNeeded({
+			block,
+			toolResult,
+			emittedToolResult,
+			workflowNextActions,
+		})
 
 		// Early return if hook requested cancellation
 		if (shouldCancelAfterHook) {

@@ -296,189 +296,189 @@ Allowed files:
 
 After completing this phase, pause for QA review before moving to Phase 4.
 
-[ ] Task 5. Create the pi-planning workflow definition scaffold and metadata.
+[x] Task 5. Create the pi-planning workflow definition scaffold and metadata.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/index.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`
 
-[ ] Subtask 5.1. Create `piPlanningWorkflow.ts` importing `dirname` and `join` from `node:path`, `readFile` from `node:fs/promises`, `WorkflowFormDefinitionPayload`, the required workflow-runtime types, and all `buildPiPlanningStep{N}ToolSchemas` exports from `piPlanningToolSchemas.ts`.
+[x] Subtask 5.1. Create `piPlanningWorkflow.ts` importing `dirname` and `join` from `node:path`, `readFile` from `node:fs/promises`, `WorkflowFormDefinitionPayload`, the required workflow-runtime types, and all `buildPiPlanningStep{N}ToolSchemas` exports from `piPlanningToolSchemas.ts`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Subtask 5.2. In `piPlanningWorkflow.ts`, add exported enum `PiPlanningWorkflowValueKey` with exactly `ProjectMode`, `ProjectTitle`, `ProjectFolderName`, `ImplementationFolder`, `DraftsFolder`, `ArchitectureDocument`, `EpicsDocument`, `EpicsIndex`, `BrainstormingDocument`, `AdditionalContext`, `TargetEpic`, `EpicIdentity`, and `StoriesIndex`.
+[x] Subtask 5.2. In `piPlanningWorkflow.ts`, add exported enum `PiPlanningWorkflowValueKey` with exactly `ProjectMode`, `ProjectTitle`, `ProjectFolderName`, `ImplementationFolder`, `DraftsFolder`, `ArchitectureDocument`, `EpicsDocument`, `EpicsIndex`, `BrainstormingDocument`, `AdditionalContext`, `TargetEpic`, `EpicIdentity`, and `StoriesIndex`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Subtask 5.3. In `piPlanningWorkflow.ts`, add constants for workflow name `pi-planning`, display name `PI Planning`, slash command `pi-planning`, use-skill name `pi-planning`, project subfolder `planning`, and description `Break a selected epic into implementation-ready draft story files using architecture, epics, and optional discovery context.`
+[x] Subtask 5.3. In `piPlanningWorkflow.ts`, add constants for workflow name `pi-planning`, display name `PI Planning`, slash command `pi-planning`, use-skill name `pi-planning`, project subfolder `planning`, and description `Break a selected epic into implementation-ready draft story files using architecture, epics, and optional discovery context.`
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Subtask 5.4. In `piPlanningWorkflow.ts`, add `PI_PLANNING_WORKFLOW_PERSONA` with `name: "John"`, `role: "Product Manager"`, an identity describing breaking well-defined epics down into deliverable stories with clear scope, capabilities including breaking epics into deliverable stories with clear scope, communication style that is detailed, diligent, to-the-point, and does not encourage assumptions, and principles including validation of documentation coverage and consistency against existing runtime code.
+[x] Subtask 5.4. In `piPlanningWorkflow.ts`, add `PI_PLANNING_WORKFLOW_PERSONA` with `name: "John"`, `role: "Product Manager"`, an identity describing breaking well-defined epics down into deliverable stories with clear scope, capabilities including breaking epics into deliverable stories with clear scope, communication style that is detailed, diligent, to-the-point, and does not encourage assumptions, and principles including validation of documentation coverage and consistency against existing runtime code.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Subtask 5.5. In `piPlanningWorkflow.ts`, add `PI_PLANNING_WORKFLOW_VALUE_KEYS` as `Object.values(PiPlanningWorkflowValueKey)`.
+[x] Subtask 5.5. In `piPlanningWorkflow.ts`, add `PI_PLANNING_WORKFLOW_VALUE_KEYS` as `Object.values(PiPlanningWorkflowValueKey)`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Subtask 5.6. In `piPlanningWorkflow.ts`, define prerequisite ids `ARCHITECTURE_PREREQUISITE_ID`, `EPICS_DOCUMENT_PREREQUISITE_ID`, `EPICS_INDEX_PREREQUISITE_ID`, and `BRAINSTORMING_PREREQUISITE_ID` matching their workflow value key strings.
+[x] Subtask 5.6. In `piPlanningWorkflow.ts`, define prerequisite ids `ARCHITECTURE_PREREQUISITE_ID`, `EPICS_DOCUMENT_PREREQUISITE_ID`, `EPICS_INDEX_PREREQUISITE_ID`, and `BRAINSTORMING_PREREQUISITE_ID` matching their workflow value key strings.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Subtask 5.7. In `index.ts`, export `piPlanningWorkflowDefinition` from `./piPlanningWorkflow`.
+[x] Subtask 5.7. In `index.ts`, export `piPlanningWorkflowDefinition` from `./piPlanningWorkflow`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/index.ts`
 
-[ ] Task 6. Add Step 1 deterministic helpers and workflow form.
+[x] Task 6. Add Step 1 deterministic helpers and workflow form.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Subtask 6.1. In `piPlanningWorkflow.ts`, add typed helper `readWorkflowStringValue(workflowValues, key): string | undefined` that returns a trimmed non-empty string or `undefined`.
+[x] Subtask 6.1. In `piPlanningWorkflow.ts`, add typed helper `readWorkflowStringValue(workflowValues, key): string | undefined` that returns a trimmed non-empty string or `undefined`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Subtask 6.2. In `piPlanningWorkflow.ts`, add interfaces for the `Epics.index.json` schema: a valid epic index contains `version: 1` and `epics` entries with `identity`, `title`, and `"story-index-generated"` fields.
+[x] Subtask 6.2. In `piPlanningWorkflow.ts`, add interfaces for the `Epics.index.json` schema: a valid epic index contains `version: 1` and `epics` entries with `identity`, `title`, and `"story-index-generated"` fields.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Subtask 6.3. In `piPlanningWorkflow.ts`, add a parser helper that accepts unknown JSON and returns the valid `Epics.index.json` shape only when `version` is `1`, `epics` is an array, each `identity` is a non-empty positive numeric string, each `title` is a non-empty string, and each `"story-index-generated"` value is boolean.
+[x] Subtask 6.3. In `piPlanningWorkflow.ts`, add a parser helper that accepts unknown JSON and returns the valid `Epics.index.json` shape only when `version` is `1`, `epics` is an array, each `identity` is a non-empty positive numeric string, each `title` is a non-empty string, and each `"story-index-generated"` value is boolean.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Subtask 6.4. In `piPlanningWorkflow.ts`, add `persistProjectFolderValuesFromEpicsIndex(session): WorkflowDeterministicProcedureResult` that reads `epics_index`, derives `projectRoot = dirname(dirname(epics_index))`, and writes `implementation_folder` and `drafts_folder`.
+[x] Subtask 6.4. In `piPlanningWorkflow.ts`, add `persistProjectFolderValuesFromEpicsIndex(session): WorkflowDeterministicProcedureResult` that reads `epics_index`, derives `projectRoot = dirname(dirname(epics_index))`, and writes `implementation_folder` and `drafts_folder`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Subtask 6.5. In `piPlanningWorkflow.ts`, add async deterministic helper `deriveSelectedEpicValuesFromForm(session): Promise<WorkflowDeterministicProcedureResult>` that reads `epic_identity` and `epics_index`, parses the index file, finds the matching epic, writes `target_epic` as `Epic {identity}: {title}`, and writes `stories_index` only when `"story-index-generated"` is `true`.
+[x] Subtask 6.5. In `piPlanningWorkflow.ts`, add async deterministic helper `deriveSelectedEpicValuesFromForm(session): Promise<WorkflowDeterministicProcedureResult>` that reads `epic_identity` and `epics_index`, parses the index file, finds the matching epic, writes `target_epic` as `Epic {identity}: {title}`, and writes `stories_index` only when `"story-index-generated"` is `true`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Subtask 6.6. In `deriveSelectedEpicValuesFromForm(...)`, when `"story-index-generated"` is `false`, return workflow value writes for `target_epic` only and do not write `stories_index`.
+[x] Subtask 6.6. In `deriveSelectedEpicValuesFromForm(...)`, when `"story-index-generated"` is `false`, return workflow value writes for `target_epic` only and do not write `stories_index`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Subtask 6.7. In `piPlanningWorkflow.ts`, add `buildStep1InputWorkflowForm(): WorkflowFormDefinitionPayload` with `definitionVersion: 2`, title `PI Planning Inputs`, tool dictionary title `PI Planning Inputs`, and first panel id `step-1-target-epic-panel`.
+[x] Subtask 6.7. In `piPlanningWorkflow.ts`, add `buildStep1InputWorkflowForm(): WorkflowFormDefinitionPayload` with `definitionVersion: 2`, title `PI Planning Inputs`, tool dictionary title `PI Planning Inputs`, and first panel id `step-1-target-epic-panel`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Subtask 6.8. In `buildStep1InputWorkflowForm()`, add Panel A id `step-1-target-epic-panel` with prompt `Which epic are we working on during this workflow?`, a required dropdown field keyed and persisted to `PiPlanningWorkflowValueKey.EpicIdentity`, `jsonOptionsSource` rooted at selected project root, `sourcePathSegments: ["planning", "Epics.index.json"]`, `itemsPath: "epics"`, `valueProperty: "identity"`, `labelTemplate: "Epic {identity}: {title}"`, and `descriptionTemplate: "Story index generated: {story-index-generated}"`.
+[x] Subtask 6.8. In `buildStep1InputWorkflowForm()`, add Panel A id `step-1-target-epic-panel` with prompt `Which epic are we working on during this workflow?`, a required dropdown field keyed and persisted to `PiPlanningWorkflowValueKey.EpicIdentity`, `jsonOptionsSource` rooted at selected project root, `sourcePathSegments: ["planning", "Epics.index.json"]`, `itemsPath: "epics"`, `valueProperty: "identity"`, `labelTemplate: "Epic {identity}: {title}"`, and `descriptionTemplate: "Story index generated: {story-index-generated}"`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Subtask 6.9. In `buildStep1InputWorkflowForm()`, make Panel A transition sequentially to Panel B id `step-1-required-context-panel`.
+[x] Subtask 6.9. In `buildStep1InputWorkflowForm()`, make Panel A transition sequentially to Panel B id `step-1-required-context-panel`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Subtask 6.10. In `buildStep1InputWorkflowForm()`, add Panel B id `step-1-required-context-panel` with no fields, `allowedActions: ["submit"]`, submit label `Continue`, and prompt markdown listing `[Epics.index.json](<{workflow.epics_index}>)`, `[Epics.md](<{workflow.epics_document}>)`, and `[architecture.md](<{workflow.architecture_document}>)`.
+[x] Subtask 6.10. In `buildStep1InputWorkflowForm()`, add Panel B id `step-1-required-context-panel` with no fields, `allowedActions: ["submit"]`, submit label `Continue`, and prompt markdown listing `[Epics.index.json](<{workflow.epics_index}>)`, `[Epics.md](<{workflow.epics_document}>)`, and `[architecture.md](<{workflow.architecture_document}>)`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Subtask 6.11. In `buildStep1InputWorkflowForm()`, make Panel B transition sequentially to Panel C id `step-1-additional-context-panel`.
+[x] Subtask 6.11. In `buildStep1InputWorkflowForm()`, make Panel B transition sequentially to Panel C id `step-1-additional-context-panel`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Subtask 6.12. In `buildStep1InputWorkflowForm()`, add Panel C id `step-1-additional-context-panel` with prompt `If you'd like to include any other files as workflow context please provide their full file paths below.`, one optional large-text field keyed and persisted to `PiPlanningWorkflowValueKey.AdditionalContext`, `presentation.textareaSize: "large"`, `allowedActions: ["submit", "back"]`, and a terminal transition.
+[x] Subtask 6.12. In `buildStep1InputWorkflowForm()`, add Panel C id `step-1-additional-context-panel` with prompt `If you'd like to include any other files as workflow context please provide their full file paths below.`, one optional large-text field keyed and persisted to `PiPlanningWorkflowValueKey.AdditionalContext`, `presentation.textareaSize: "large"`, `allowedActions: ["submit", "back"]`, and a terminal transition.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Task 7. Add the workflow definition with prerequisites and Step 1 routing.
+[x] Task 7. Add the workflow definition with prerequisites and Step 1 routing.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Subtask 7.1. In `piPlanningWorkflow.ts`, add `buildTerminalTransition()` using the existing terminal conditional transition pattern from other shipped modules.
+[x] Subtask 7.1. In `piPlanningWorkflow.ts`, add `buildTerminalTransition()` using the existing terminal conditional transition pattern from other shipped modules.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Subtask 7.2. In `piPlanningWorkflow.ts`, add trigger helpers `workflowFormCompleted(workflowFormId)`, `workflowProgressRequestConfirmed()`, `workflowProgressRequestDenied()`, `attemptCompletionSucceeded()`, `workflowValuesPersisted(...keys)`, `toolBackedOperationSucceeded(branchId, routeId)`, and `toolBackedOperationFailed(branchId, routeId)`.
+[x] Subtask 7.2. In `piPlanningWorkflow.ts`, add trigger helpers `workflowFormCompleted(workflowFormId)`, `workflowProgressRequestConfirmed()`, `workflowProgressRequestDenied()`, `attemptCompletionSucceeded()`, `workflowValuesPersisted(...keys)`, `toolBackedOperationSucceeded(branchId, routeId)`, and `toolBackedOperationFailed(branchId, routeId)`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Subtask 7.3. In `piPlanningWorkflow.ts`, add `createEmptyPromptSource()` and `createStepDefinition(...)` helpers matching the shipped module pattern, with required `buildToolSchema`.
+[x] Subtask 7.3. In `piPlanningWorkflow.ts`, add `createEmptyPromptSource()` and `createStepDefinition(...)` helpers matching the shipped module pattern, with required `buildToolSchema`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Subtask 7.4. In `piPlanningWorkflow.ts`, add `buildStep1DecisionTree()` whose entry route always runs `resolve_prerequisite_files` for `architecture_document`, `epics_document`, `epics_index`, and `brainstorming_document`, then follows to folder value persistence.
+[x] Subtask 7.4. In `piPlanningWorkflow.ts`, add `buildStep1DecisionTree()` whose entry route always runs `resolve_prerequisite_files` for `architecture_document`, `epics_document`, `epics_index`, and `brainstorming_document`, then follows to folder value persistence.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Subtask 7.5. In `buildStep1DecisionTree()`, after prerequisite resolution, run `persistProjectFolderValuesFromEpicsIndex` through `run_deterministic_procedure`, then follow to form rendering.
+[x] Subtask 7.5. In `buildStep1DecisionTree()`, after prerequisite resolution, run `persistProjectFolderValuesFromEpicsIndex` through `run_deterministic_procedure`, then follow to form rendering.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Subtask 7.6. In `buildStep1DecisionTree()`, render the Step 1 input form after folder values are persisted.
+[x] Subtask 7.6. In `buildStep1DecisionTree()`, render the Step 1 input form after folder values are persisted.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Subtask 7.7. In `buildStep1DecisionTree()`, after Step 1 input form completion, run `deriveSelectedEpicValuesFromForm` through `run_deterministic_procedure`.
+[x] Subtask 7.7. In `buildStep1DecisionTree()`, after Step 1 input form completion, run `deriveSelectedEpicValuesFromForm` through `run_deterministic_procedure`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Subtask 7.8. In `buildStep1DecisionTree()`, after `deriveSelectedEpicValuesFromForm` persists its workflow values, transition to Step 2.
+[x] Subtask 7.8. In `buildStep1DecisionTree()`, after `deriveSelectedEpicValuesFromForm` persists its workflow values, transition to Step 2.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Subtask 7.9. In `piPlanningWorkflow.ts`, export `piPlanningWorkflowDefinition: WorkflowDefinition` with no `artifacts` property.
+[x] Subtask 7.9. In `piPlanningWorkflow.ts`, export `piPlanningWorkflowDefinition: WorkflowDefinition` with no `artifacts` property.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Subtask 7.10. In `piPlanningWorkflowDefinition`, set identity, display, slash command, use-skill, persona, project subfolder, workflow value keys, entry project value keys, and entry panel from the constants and enum defined in Task 5.
+[x] Subtask 7.10. In `piPlanningWorkflowDefinition`, set identity, display, slash command, use-skill, persona, project subfolder, workflow value keys, entry project value keys, and entry panel from the constants and enum defined in Task 5.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Subtask 7.11. In `piPlanningWorkflowDefinition`, declare `workflowForms` with only the Step 1 input workflow form.
+[x] Subtask 7.11. In `piPlanningWorkflowDefinition`, declare `workflowForms` with only the Step 1 input workflow form.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Subtask 7.12. In `piPlanningWorkflowDefinition`, declare prerequisite `architecture_document` as required, producing workflow `create-architecture`, project subfolder `["planning"]`, exact filename `architecture.md`, workflow value key `architecture_document`, and `outputDocumentReference: "none"`.
+[x] Subtask 7.12. In `piPlanningWorkflowDefinition`, declare prerequisite `architecture_document` as required, producing workflow `create-architecture`, project subfolder `["planning"]`, exact filename `architecture.md`, workflow value key `architecture_document`, and `outputDocumentReference: "none"`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Subtask 7.13. In `piPlanningWorkflowDefinition`, declare prerequisite `epics_document` as required, producing workflow `create-epics`, project subfolder `["planning"]`, exact filename `Epics.md`, workflow value key `epics_document`, and `outputDocumentReference: "none"`.
+[x] Subtask 7.13. In `piPlanningWorkflowDefinition`, declare prerequisite `epics_document` as required, producing workflow `create-epics`, project subfolder `["planning"]`, exact filename `Epics.md`, workflow value key `epics_document`, and `outputDocumentReference: "none"`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Subtask 7.14. In `piPlanningWorkflowDefinition`, declare prerequisite `epics_index` as required, producing workflow `create-epics`, project subfolder `["planning"]`, exact filename `Epics.index.json`, workflow value key `epics_index`, and `outputDocumentReference: "none"`.
+[x] Subtask 7.14. In `piPlanningWorkflowDefinition`, declare prerequisite `epics_index` as required, producing workflow `create-epics`, project subfolder `["planning"]`, exact filename `Epics.index.json`, workflow value key `epics_index`, and `outputDocumentReference: "none"`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Subtask 7.15. In `piPlanningWorkflowDefinition`, declare prerequisite `brainstorming_document` as optional, producing workflow `brainstorming`, project subfolder `["discovery"]`, exact filename `brainstorming.md`, workflow value key `brainstorming_document`, and `outputDocumentReference: "none"`.
+[x] Subtask 7.15. In `piPlanningWorkflowDefinition`, declare prerequisite `brainstorming_document` as optional, producing workflow `brainstorming`, project subfolder `["discovery"]`, exact filename `brainstorming.md`, workflow value key `brainstorming_document`, and `outputDocumentReference: "none"`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
@@ -487,87 +487,172 @@ Allowed files:
 
 After completing this phase, pause for QA review before moving to Phase 5.
 
-[ ] Task 8. Add module-owned prompt builders for Step 2 through Step 6.
+[x] Task 8. Add module-owned prompt builders for Step 2 through Step 6.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Subtask 8.1. In `piPlanningWorkflow.ts`, add `buildStep2PromptSource(...)` that renders instructions for context review, includes `target_epic`, `epics_index`, `epics_document`, `architecture_document`, optional `brainstorming_document`, and optional `additional_context`, and includes every Step 2 issue-assessment requirement from `pi-planning-requirements.md`.
+[x] Subtask 8.1. In `piPlanningWorkflow.ts`, add `buildStep2PromptSource(...)` that renders instructions for context review, includes `target_epic`, `epics_index`, `epics_document`, `architecture_document`, optional `brainstorming_document`, and optional `additional_context`, and includes every Step 2 issue-assessment requirement from `pi-planning-requirements.md`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Subtask 8.2. In `piPlanningWorkflow.ts`, add `buildStep3PromptSource(...)` that renders the story-count analysis instructions, includes the existing-story-index conditional instruction only when `stories_index` is present, and includes the story-splitting and non-story guidance from `pi-planning-requirements.md`.
+[x] Subtask 8.2. In `piPlanningWorkflow.ts`, add `buildStep3PromptSource(...)` that renders the story-count analysis instructions, includes the existing-story-index conditional instruction only when `stories_index` is present, and includes the story-splitting and non-story guidance from `pi-planning-requirements.md`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Subtask 8.3. In `piPlanningWorkflow.ts`, add `buildStep4PromptSource(...)` that renders the existing-story-index branch when `stories_index` is present and the new-story-index branch when `stories_index` is absent, including instructions to use `epic_identity`, `story_count`, `plan_story_artifacts`, `set_workflow_values`, and `workflow_progress_request` exactly as prescribed in Step 4 requirements.
+[x] Subtask 8.3. In `piPlanningWorkflow.ts`, add `buildStep4PromptSource(...)` that renders the existing-story-index branch when `stories_index` is present and the new-story-index branch when `stories_index` is absent, including instructions to use `epic_identity`, `story_count`, `plan_story_artifacts`, `set_workflow_values`, and `workflow_progress_request` exactly as prescribed in Step 4 requirements.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Subtask 8.4. In `piPlanningWorkflow.ts`, add `buildStep5PromptSource(...)` that renders the existing-story-index branch when `stories_index` is present and the new-story-index branch when `stories_index` is absent, and instructs the AI to call `generate_story_files` with `epic_identity`.
+[x] Subtask 8.4. In `piPlanningWorkflow.ts`, add `buildStep5PromptSource(...)` that renders the existing-story-index branch when `stories_index` is present and the new-story-index branch when `stories_index` is absent, and instructs the AI to call `generate_story_files` with `epic_identity`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Subtask 8.5. In `piPlanningWorkflow.ts`, add `buildStep6PromptSource(...)` that renders the draft-story population instructions, dependency sequencing order, required headings `Scope`, `Scope Boundary`, `Requirements`, `Objective`, and `Known Issues/ Risks/ Technical Debt`, and the final user-alignment plus `attempt_completion` instructions from Step 6 requirements.
+[x] Subtask 8.5. In `piPlanningWorkflow.ts`, add `buildStep6PromptSource(...)` that renders the draft-story population instructions, dependency sequencing order, required headings `Scope`, `Scope Boundary`, `Requirements`, `Objective`, and `Known Issues/ Risks/ Technical Debt`, and the final user-alignment plus `attempt_completion` instructions from Step 6 requirements.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Task 9. Add Step 2 through Step 6 decision trees and attach all steps to the workflow definition.
+[x] Task 9. Add Step 2 through Step 6 decision trees and attach all steps to the workflow definition.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Subtask 9.1. In `piPlanningWorkflow.ts`, add `buildStep2DecisionTree()` with entry `project_prompt`, confirmed `workflow_progress_request` transition to Step 3, and denied `workflow_progress_request` route back to the Step 2 project prompt.
+[x] Subtask 9.1. In `piPlanningWorkflow.ts`, add `buildStep2DecisionTree()` with entry `project_prompt`, confirmed `workflow_progress_request` transition to Step 3, and denied `workflow_progress_request` route back to the Step 2 project prompt.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Subtask 9.2. In `piPlanningWorkflow.ts`, add `buildStep3DecisionTree()` with entry `project_prompt`, confirmed `workflow_progress_request` transition to Step 4, and denied `workflow_progress_request` route back to the Step 3 project prompt.
+[x] Subtask 9.2. In `piPlanningWorkflow.ts`, add `buildStep3DecisionTree()` with entry `project_prompt`, confirmed `workflow_progress_request` transition to Step 4, and denied `workflow_progress_request` route back to the Step 3 project prompt.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Subtask 9.3. In `piPlanningWorkflow.ts`, add `buildStep4DecisionTree()` with entry `project_prompt` followed by a waiting branch whose first route handles `workflow_progress_request_denied` by returning to the Step 4 project prompt.
+[x] Subtask 9.3. In `piPlanningWorkflow.ts`, add `buildStep4DecisionTree()` with entry `project_prompt` followed by a waiting branch whose first route handles `workflow_progress_request_denied` by returning to the Step 4 project prompt.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Subtask 9.4. In `buildStep4DecisionTree()`, add the waiting branch's second route so `workflow_progress_request_confirmed` transitions to Step 5 for the no-additional-stories branch.
+[x] Subtask 9.4. In `buildStep4DecisionTree()`, add the waiting branch's second route so `workflow_progress_request_confirmed` transitions to Step 5 for the no-additional-stories branch.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Subtask 9.5. In `buildStep4DecisionTree()`, add the waiting branch's third route so `workflow_values_persisted` including `stories_index` transitions to Step 5; this route handles the new-story-index branch after `set_workflow_values` persists the generated story-index path.
+[x] Subtask 9.5. In `buildStep4DecisionTree()`, add the waiting branch's third route so `workflow_values_persisted` including `stories_index` transitions to Step 5; this route handles the new-story-index branch after `set_workflow_values` persists the generated story-index path.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Subtask 9.6. In `buildStep4DecisionTree()`, add the waiting branch's fourth route so an `always` trigger transitions to Step 5 only when `stories_index` is already a non-empty string in workflow values. This route handles successful `plan_story_artifacts` re-entry for epics that already had a story index at workflow start and must be ordered after the denied progress route.
+[x] Subtask 9.6. In `buildStep4DecisionTree()`, add the waiting branch's fourth route so successful tool-backed operation completion for `plan_story_artifacts` transitions to Step 5. This route handles successful `plan_story_artifacts` re-entry for epics that already had a story index at workflow start and must not match on `stories_index` presence alone.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Subtask 9.7. In `piPlanningWorkflow.ts`, add `buildStep5DecisionTree()` with entry `project_prompt` followed by a branch whose `always` route transitions to Step 6. This route is reached only after Step 5 has entered the project prompt and `generate_story_files` re-enters workflow route evaluation through the Phase 1 handler update.
+[x] Subtask 9.7. In `piPlanningWorkflow.ts`, add `buildStep5DecisionTree()` with entry `project_prompt` followed by a waiting branch whose route transitions to Step 6 only after successful tool-backed operation completion for `generate_story_files`. Do not use an `always` route for Step 5 advancement.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Subtask 9.8. In `piPlanningWorkflow.ts`, add `buildStep6DecisionTree()` with entry `project_prompt` followed by a route from `attempt_completion_succeeded` to `complete_workflow`.
+[x] Subtask 9.8. In `piPlanningWorkflow.ts`, add `buildStep6DecisionTree()` with entry `project_prompt` followed by a route from `attempt_completion_succeeded` to `complete_workflow`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Subtask 9.9. In `piPlanningWorkflowDefinition.steps`, add Step 1 through Step 6 using checklist labels exactly `Gather Inputs`, `Review Context`, `Determine How Many Stories Are Needed`, `Generate an Updated Story Index`, `Generate Story Files from the Story Index`, and `Populate Story Files with Initial Details`.
+[x] Subtask 9.9. In `piPlanningWorkflowDefinition.steps`, add Step 1 through Step 6 using checklist labels exactly `Gather Inputs`, `Review Context`, `Determine How Many Stories Are Needed`, `Generate an Updated Story Index`, `Generate Story Files from the Story Index`, and `Populate Story Files with Initial Details`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
 
-[ ] Subtask 9.10. In `piPlanningWorkflowDefinition.steps`, make Step 1 delegate to `buildPiPlanningStep1ToolSchemas`, Step 2 to `buildPiPlanningStep2ToolSchemas`, Step 3 to `buildPiPlanningStep3ToolSchemas`, Step 4 to `buildPiPlanningStep4ToolSchemas`, Step 5 to `buildPiPlanningStep5ToolSchemas`, and Step 6 to `buildPiPlanningStep6ToolSchemas`.
+[x] Subtask 9.10. In `piPlanningWorkflowDefinition.steps`, make Step 1 delegate to `buildPiPlanningStep1ToolSchemas`, Step 2 to `buildPiPlanningStep2ToolSchemas`, Step 3 to `buildPiPlanningStep3ToolSchemas`, Step 4 to `buildPiPlanningStep4ToolSchemas`, Step 5 to `buildPiPlanningStep5ToolSchemas`, and Step 6 to `buildPiPlanningStep6ToolSchemas`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
+
+[x] Task 9A. Remediate Phase 4 model-tool lifecycle routing after foundational Phase 66.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
+
+[x] Subtask 9A.1. In `buildStep4DecisionTree()`, replace the stale existing-index route that matches `stories_index` presence with an `event_predicate` route matching `model_tool_succeeded` and `toolName === ClineDefaultTool.PLAN_STORY_ARTIFACTS`, transitioning to Step 5.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
+
+[x] Subtask 9A.2. In `buildStep4DecisionTree()`, add an `event_predicate` route matching `model_tool_failed` and `toolName === ClineDefaultTool.PLAN_STORY_ARTIFACTS`, returning to the Step 4 `project_prompt` for AI recovery.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
+
+[x] Subtask 9A.3. In `buildStep5DecisionTree()`, replace the stale `always` transition route with an `event_predicate` route matching `model_tool_succeeded` and `toolName === ClineDefaultTool.GENERATE_STORY_FILES`, transitioning to Step 6.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
+
+[x] Subtask 9A.4. In `buildStep5DecisionTree()`, add an `event_predicate` route matching `model_tool_failed` and `toolName === ClineDefaultTool.GENERATE_STORY_FILES`, returning to the Step 5 `project_prompt` for AI recovery.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
+
+[x] Task 9B. Remediate Phase 4 story-index start-state tracking and routing.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
+
+[x] Subtask 9B.1. In `PiPlanningWorkflowValueKey`, add `StoriesIndexExistedAtWorkflowStart = "stories_index_existed_at_workflow_start"`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
+
+[x] Subtask 9B.2. In `piPlanningWorkflow.ts`, add `readWorkflowBooleanValue(workflowValues: WorkflowValues, key: PiPlanningWorkflowValueKey): boolean | undefined` immediately after `readWorkflowStringValue(...)`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
+
+[x] Subtask 9B.3. In `piPlanningWorkflow.ts`, add a trigger helper for `plan_story_artifacts` success that matches only when `model_tool_succeeded`, `toolName === ClineDefaultTool.PLAN_STORY_ARTIFACTS`, and `stories_index_existed_at_workflow_start === true`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
+
+[x] Subtask 9B.4. In `piPlanningWorkflow.ts`, add a trigger helper for `workflow_values_persisted` including `stories_index` that matches only when `stories_index_existed_at_workflow_start === false`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
+
+[x] Subtask 9B.5. In `deriveSelectedEpicValuesFromForm(...)`, update the `"story-index-generated": true` branch so its `workflowValueWrites` include `stories_index_existed_at_workflow_start: true`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
+
+[x] Subtask 9B.6. In `deriveSelectedEpicValuesFromForm(...)`, update the `"story-index-generated": false` branch so its `workflowValueWrites` include `stories_index_existed_at_workflow_start: false`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
+
+[x] Subtask 9B.7. In `buildStep3PromptSource(...)`, render the existing-story-index instruction based on `stories_index_existed_at_workflow_start === true`, not current `stories_index` presence.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
+
+[x] Subtask 9B.8. In `buildStep4PromptSource(...)`, render the existing-index branch based on `stories_index_existed_at_workflow_start === true`, not current `stories_index` presence.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
+
+[x] Subtask 9B.9. In `buildStep5PromptSource(...)`, render the existing-index branch based on `stories_index_existed_at_workflow_start === true`, not current `stories_index` presence.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
+
+[x] Subtask 9B.10. In `buildStep4DecisionTree()`, update `step-4-transition-to-step-5-after-stories-index-persisted` to use the new persisted-stories-index trigger guarded by `stories_index_existed_at_workflow_start === false`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
+
+[x] Subtask 9B.11. In `buildStep4DecisionTree()`, update `step-4-transition-to-step-5-after-existing-stories-index-reentry` to use the new `plan_story_artifacts` success trigger guarded by `stories_index_existed_at_workflow_start === true`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
@@ -646,12 +731,12 @@ Allowed files:
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`
 
-[ ] Subtask 10.14. In `piPlanningWorkflow.test.ts`, add route-structure coverage proving Step 4 advances after `stories_index` is persisted and after confirmed no-additional-stories progress.
+[ ] Subtask 10.14. In `piPlanningWorkflow.test.ts`, add route-structure coverage proving Step 4 advances on successful `plan_story_artifacts` tool-backed operation for the existing-index branch, on `workflow_values_persisted` including `stories_index` for the new-index branch, and on confirmed `workflow_progress_request` for the no-additional-stories branch.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`
 
-[ ] Subtask 10.15. In `piPlanningWorkflow.test.ts`, add route-structure coverage proving Step 5 advances after successful `generate_story_files` route re-entry.
+[ ] Subtask 10.15. In `piPlanningWorkflow.test.ts`, add route-structure coverage proving Step 5 advances only on successful `generate_story_files` tool-backed operation.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`

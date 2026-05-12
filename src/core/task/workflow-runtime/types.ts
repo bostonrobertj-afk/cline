@@ -8,6 +8,7 @@ import type {
 	WorkflowToolBackedActionInstruction,
 	WorkflowToolBackedOperationExecutionRequest,
 } from "@/core/task/workflow-step-resolution/types"
+import type { ClineDefaultTool } from "@/shared/tools"
 
 export type WorkflowName = string
 export type WorkflowValue = string | number | boolean | WorkflowValue[] | { [key: string]: WorkflowValue }
@@ -101,6 +102,8 @@ export type WorkflowBranchTriggerEvent =
 	| { kind: "workflow_progress_request_confirmed" }
 	| { kind: "workflow_progress_request_denied" }
 	| { kind: "attempt_completion_succeeded" }
+	| { kind: "model_tool_succeeded"; toolName: ClineDefaultTool }
+	| { kind: "model_tool_failed"; toolName: ClineDefaultTool; errorMessage?: string }
 	| { kind: "workflow_form_completed"; workflowFormId: WorkflowFormId }
 	| { kind: "workflow_values_persisted"; changedKeys: readonly string[] }
 	| {

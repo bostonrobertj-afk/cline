@@ -10427,3 +10427,315 @@ Validation expectations:
 - `rg "startsWith\\(\"Error:\"\\)" src/core/task/workflow-runtime/WorkflowRuntime.ts` must return no matches; the legacy serialized failure check may exist only inside the shared classifier in `src/core/prompts/responses.ts`.
 - The workflow-runtime, workflow-form, workflow-progress-request, subagent, focus-chain, and system-prompt tests must all pass with the decision-tree progression model, runtime-owned prompt projection, runtime-projected workflow-tool exposure, and legacy-surface cleanup in place.
 - Final QA should verify the existing `WorkflowRuntime` definition-validation seam still satisfies `FR-63` and `FR-63a`; module-owned native tool schema contents must not be treated as a foundational runtime validation source during prompt/tool projection.
+
+### Phase 66 - Model-Called Workflow Tool Lifecycle Events
+
+After completing this phase, pause for QA review before moving to later workflow-module work.
+
+### Phase 66 Scope
+
+Implement documented `model_tool_succeeded` and `model_tool_failed` workflow branch trigger events for model-called workflow-projected tools. Dedicated workflow events must take precedence over generic model-tool lifecycle events.
+
+### Phase 66 Scope Boundary
+
+- Do not change `tool_backed_operation_succeeded` or `tool_backed_operation_failed` semantics.
+- Do not use `sourceRoute` for model-called tool lifecycle events.
+- Do not update any workflow module except compile/test expectations directly required by this phase.
+- Do not resume PI Planning Phase 4 in this phase.
+- Do not emit model-tool lifecycle events for tools that already use dedicated workflow lifecycle handling.
+
+### Phase 66 Known Issues / Risks / Technical Debt
+
+- `plan_story_artifacts` and `generate_story_files` currently perform handler-local `resolveNextAction(...)` calls added during PI Planning work. This phase removes that temporary routing path and replaces it with the shared model-tool lifecycle event contract.
+
+[x] Task 218. Add model-tool lifecycle trigger event types.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+
+[x] Subtask 218.1. In `WorkflowBranchTriggerEvent`, add `{ kind: "model_tool_succeeded"; toolName: ClineDefaultTool }`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+
+[x] Subtask 218.2. In `WorkflowBranchTriggerEvent`, add `{ kind: "model_tool_failed"; toolName: ClineDefaultTool; errorMessage?: string }`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+
+[x] Task 219. Add runtime handling for model-tool lifecycle events.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 219.1. Update `isWorkflowBranchTriggerEvent(...)` to validate `model_tool_succeeded` when `toolName` is a known `ClineDefaultTool`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 219.2. Update `isWorkflowBranchTriggerEvent(...)` to validate `model_tool_failed` when `toolName` is a known `ClineDefaultTool` and `errorMessage` is absent or a string.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 219.3. Update `isWorkflowBranchTriggerEventCompatibleWithDefinition(...)` so `model_tool_succeeded` is compatible only when the active step's projected tool schema contains the event `toolName`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 219.4. Update `isWorkflowBranchTriggerEventCompatibleWithDefinition(...)` so `model_tool_failed` is compatible only when the active step's projected tool schema contains the event `toolName`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 219.5. Add public method `handleModelToolResult({ taskState, toolName, toolResultText }): Promise<WorkflowNextAction>` to `WorkflowRuntime`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 219.6. In `handleModelToolResult(...)`, return `{ kind: "no_op" }` when there is no active workflow session, active workflow definition, or active step.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 219.7. In `handleModelToolResult(...)`, return `{ kind: "no_op" }` when the active step's projected tool schema does not contain `toolName`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 219.8. In `handleModelToolResult(...)`, classify failure with `isSerializedToolFailureResultText(toolResultText)`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 219.9. In `handleModelToolResult(...)`, set `session.branchContext.lastTriggerEvent` to `model_tool_succeeded` with `toolName` when the tool result is successful.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 219.10. In `handleModelToolResult(...)`, set `session.branchContext.lastTriggerEvent` to `model_tool_failed` with `toolName` and normalized `errorMessage` when the tool result is failed.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 219.11. In `handleModelToolResult(...)`, call `resolveNextAction({ taskState })` after recording the model-tool lifecycle event.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Task 220. Emit model-tool lifecycle events from the shared model-called tool execution path.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/ToolExecutor.ts`
+
+[x] Subtask 220.1. Add a private helper in `ToolExecutor.ts` that determines whether a tool name must skip generic model-tool lifecycle emission because it has dedicated workflow lifecycle handling.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/ToolExecutor.ts`
+
+[x] Subtask 220.2. The dedicated-event skip helper must skip at least `attempt_completion`, `workflow_progress_request`, and `set_workflow_values`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/ToolExecutor.ts`
+
+[x] Subtask 220.3. After a complete model-called tool emits a tool result and post-tool-use hook cancellation handling has completed, call `workflowRuntime.handleModelToolResult(...)` only when there is an active workflow session, `emittedToolResult` is true, no workflow next action has already been queued by the handler, and the tool is not skipped by the dedicated-event skip helper.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/ToolExecutor.ts`
+
+[x] Subtask 220.4. Queue the non-`no_op` `WorkflowNextAction` returned by `handleModelToolResult(...)`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/ToolExecutor.ts`
+
+[x] Subtask 220.5. In the thrown-error path after `handleError(...)` emits the tool error result, call `workflowRuntime.handleModelToolResult(...)` using the serialized tool error result only when there is an active workflow session, no workflow next action has already been queued, and the tool is not skipped by the dedicated-event skip helper.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/ToolExecutor.ts`
+
+[x] Subtask 220.6. Queue the non-`no_op` `WorkflowNextAction` returned by the thrown-error model-tool failure path.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/ToolExecutor.ts`
+
+[x] Task 221. Remove temporary handler-local generic route re-entry from story planning handlers.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/PlanStoryArtifactsToolHandler.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/GenerateStoryFilesToolHandler.ts`
+
+[x] Subtask 221.1. In `PlanStoryArtifactsToolHandler.ts`, remove the success-path direct call to `config.workflowRuntime.resolveNextAction(...)`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/PlanStoryArtifactsToolHandler.ts`
+
+[x] Subtask 221.2. In `PlanStoryArtifactsToolHandler.ts`, remove the success-path direct call to `config.callbacks.queueWorkflowNextAction(...)`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/PlanStoryArtifactsToolHandler.ts`
+
+[x] Subtask 221.3. In `GenerateStoryFilesToolHandler.ts`, remove the success-path direct call to `config.workflowRuntime.resolveNextAction(...)`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/GenerateStoryFilesToolHandler.ts`
+
+[x] Subtask 221.4. In `GenerateStoryFilesToolHandler.ts`, remove the success-path direct call to `config.callbacks.queueWorkflowNextAction(...)`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/GenerateStoryFilesToolHandler.ts`
+
+[x] Task 222. Update handler tests for removal of handler-local route re-entry.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/PlanStoryArtifactsToolHandler.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/GenerateStoryFilesToolHandler.test.ts`
+
+[x] Subtask 222.1. In `PlanStoryArtifactsToolHandler.test.ts`, remove the default `resolveNextAction` stub requirement from the workflow runtime test double if it is no longer used by the handler test setup.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/PlanStoryArtifactsToolHandler.test.ts`
+
+[x] Subtask 222.2. In `PlanStoryArtifactsToolHandler.test.ts`, remove assertions expecting handler-local `resolveNextAction(...)` on success.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/PlanStoryArtifactsToolHandler.test.ts`
+
+[x] Subtask 222.3. In `PlanStoryArtifactsToolHandler.test.ts`, remove handler-local non-`no_op` next-action queueing coverage.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/PlanStoryArtifactsToolHandler.test.ts`
+
+[x] Subtask 222.4. In `GenerateStoryFilesToolHandler.test.ts`, remove the default `resolveNextAction` stub requirement from the workflow runtime test double if it is no longer used by the handler test setup.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/GenerateStoryFilesToolHandler.test.ts`
+
+[x] Subtask 222.5. In `GenerateStoryFilesToolHandler.test.ts`, remove assertions expecting handler-local `resolveNextAction(...)` on success.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/GenerateStoryFilesToolHandler.test.ts`
+
+[x] Subtask 222.6. In `GenerateStoryFilesToolHandler.test.ts`, remove handler-local non-`no_op` next-action queueing coverage.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/GenerateStoryFilesToolHandler.test.ts`
+
+[x] Task 223. Add foundational runtime coverage for model-tool lifecycle events.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 223.1. Add coverage proving `model_tool_succeeded` is accepted as a valid `WorkflowBranchTriggerEvent` when `toolName` is a known `ClineDefaultTool`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 223.2. Add coverage proving `model_tool_failed` is accepted as a valid `WorkflowBranchTriggerEvent` when `toolName` is a known `ClineDefaultTool` and `errorMessage` is absent or a string.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 223.3. Add coverage proving `handleModelToolResult(...)` routes on `model_tool_succeeded` for a tool exposed by the active step's projected tool schema.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 223.4. Add coverage proving `handleModelToolResult(...)` routes on `model_tool_failed` for a tool exposed by the active step's projected tool schema.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 223.5. Add coverage proving `handleModelToolResult(...)` returns `no_op` when `toolName` is not exposed by the active step's projected tool schema.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 223.6. Add restore-validation coverage proving persisted `model_tool_succeeded` with a non-projected `toolName` is rejected.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 223.7. Add restore-validation coverage proving persisted `model_tool_failed` with a non-projected `toolName` is rejected.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Task 224. Add shared tool-executor coverage for model-tool lifecycle emission.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/ToolExecutor.workflowModelToolLifecycle.test.ts`
+
+[x] Subtask 224.1. Create `ToolExecutor.workflowModelToolLifecycle.test.ts` using existing `ToolExecutor` test patterns and type-safe test doubles.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/ToolExecutor.workflowModelToolLifecycle.test.ts`
+
+[x] Subtask 224.2. Add coverage proving a successful active-workflow projected model-called tool invokes `workflowRuntime.handleModelToolResult(...)` with the canonical tool name and successful tool result.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/ToolExecutor.workflowModelToolLifecycle.test.ts`
+
+[x] Subtask 224.3. Add coverage proving the non-`no_op` next action returned after a successful active-workflow projected model-called tool is queued.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/ToolExecutor.workflowModelToolLifecycle.test.ts`
+
+[x] Subtask 224.4. Add coverage proving a failed active-workflow projected model-called tool invokes `workflowRuntime.handleModelToolResult(...)` with the canonical tool name and serialized failure result.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/ToolExecutor.workflowModelToolLifecycle.test.ts`
+
+[x] Subtask 224.5. Add coverage proving the non-`no_op` next action returned after a failed active-workflow projected model-called tool is queued.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/ToolExecutor.workflowModelToolLifecycle.test.ts`
+
+[x] Subtask 224.6. Add coverage proving `ToolExecutor` does not call `workflowRuntime.handleModelToolResult(...)` when the handler already queued a dedicated workflow next action.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/ToolExecutor.workflowModelToolLifecycle.test.ts`
+
+[x] Subtask 224.7. Add coverage proving `ToolExecutor` does not emit generic model-tool lifecycle events for `attempt_completion`, `workflow_progress_request`, or `set_workflow_values`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/ToolExecutor.workflowModelToolLifecycle.test.ts`
+
+[x] Task 225. Update module build guide guidance for model-called tool lifecycle routing.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
+
+[x] Subtask 225.1. In the Decision Tree Patterns section, add guidance that model-called workflow-projected tools route through `model_tool_succeeded` and `model_tool_failed`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
+
+[x] Subtask 225.2. In the Decision Tree Patterns section, clarify that `tool_backed_operation_succeeded` and `tool_backed_operation_failed` are reserved for runtime-selected deterministic tool-backed actions with `sourceRoute`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
+
+[x] Subtask 225.3. In the Decision Tree Patterns section, add guidance that dedicated events such as `workflow_values_persisted`, `workflow_progress_request_confirmed`, `workflow_progress_request_denied`, and `attempt_completion_succeeded` take precedence over generic model-tool lifecycle events.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
+
+[x] Task 226. Validate Phase 66.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+[x] Subtask 226.1. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/__tests__/ToolExecutor.workflowModelToolLifecycle.test.ts src/core/task/tools/handlers/__tests__/PlanStoryArtifactsToolHandler.test.ts src/core/task/tools/handlers/__tests__/GenerateStoryFilesToolHandler.test.ts`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+[x] Subtask 226.2. Run `npm run check-types`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+[x] Subtask 226.3. Run the repo formatting/lint gate used by pre-commit, or an equivalent read-only check if available.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`

@@ -248,6 +248,7 @@ Responsibilities:
 - declare step graph and transition behavior through per-step next-action decision trees whose satisfied routes select exactly one decision action
 - assign stable non-empty route ids that are unique within each decision-tree branch; route ids are structural identifiers for runtime correlation, not user-visible instructions, route priority, or standalone workflow behavior
 - branch only on documented `WorkflowBranchTriggerEvent` variants and payloads; modules must not define custom trigger-event variants or depend on runtime-internal event fields
+- Model-called workflow-projected tool success and failure are emitted as model-tool lifecycle events carrying the canonical tool name. These events allow workflow modules to route success, retry, recovery, user notification, step transition, or completion behavior after AI-invoked tools without treating those tools as runtime-selected source-route operations. `tool_backed_operation_succeeded` and `tool_backed_operation_failed` remain reserved for runtime-selected deterministic tool-backed actions with `{ branchId, routeId }` source-route correlation.
 - declare selector discovery only through documented roots, target path segments, filters, labels, and sort rules; modules must not provide arbitrary filesystem paths or path traversal conventions
 - declare per-step prompt content
 - declare workflow-level and per-step native tool schema

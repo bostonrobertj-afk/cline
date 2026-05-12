@@ -56,7 +56,7 @@ import type {
 	WorkflowStepResolutionSessionState,
 	WorkflowStepResolutionSourceRoute,
 } from "@/core/task/workflow-step-resolution/types"
-import { ClineDefaultTool } from "@/shared/tools"
+import { ClineDefaultTool, toolUseNames } from "@/shared/tools"
 import type {
 	ActiveWorkflowSession,
 	PersistedWorkflowSession,
@@ -612,6 +612,53 @@ export class WorkflowRuntime {
 			taskState,
 			sourceRoute: pendingDocumentBuildSourceRoute,
 		})
+	}
+
+	async handleModelToolResult(args: {
+		taskState: TaskState
+		toolName: ClineDefaultTool
+		toolResultText?: string
+	}): Promise<WorkflowNextAction> {
+		const { taskState, toolName, toolResultText } = args
+		const session = taskState.activeWorkflowSession
+		if (!session) {
+			return { kind: "no_op" }
+		}
+
+		const definition = this.getActiveWorkflowDefinition(taskState)
+		if (!definition) {
+			return { kind: "no_op" }
+		}
+
+		const activeStep = this.getActiveStepDefinition(definition, session)
+		if (!activeStep) {
+			return { kind: "no_op" }
+		}
+
+		if (
+			this.isToolProjectedByWorkflowStep({
+				session,
+				step: activeStep,
+				toolName,
+			}) === false
+		) {
+			return { kind: "no_op" }
+		}
+
+		if (isSerializedToolFailureResultText(toolResultText)) {
+			session.branchContext.lastTriggerEvent = {
+				kind: "model_tool_failed",
+				toolName,
+				errorMessage: this.normalizeModelToolFailureMessage(toolResultText),
+			}
+		} else {
+			session.branchContext.lastTriggerEvent = {
+				kind: "model_tool_succeeded",
+				toolName,
+			}
+		}
+
+		return this.resolveNextAction({ taskState })
 	}
 
 	isWorkflowProgressRequestAllowed(args: { taskState: TaskState }): boolean {
@@ -2114,6 +2161,13 @@ export class WorkflowRuntime {
 			case "workflow_progress_request_denied":
 			case "attempt_completion_succeeded":
 				return true
+			case "model_tool_succeeded":
+				return this.isClineDefaultTool(value.toolName)
+			case "model_tool_failed":
+				return (
+					this.isClineDefaultTool(value.toolName) &&
+					(value.errorMessage === undefined || typeof value.errorMessage === "string")
+				)
 			case "workflow_form_completed":
 				return typeof value.workflowFormId === "string" && value.workflowFormId.trim() !== ""
 			case "workflow_values_persisted":
@@ -2478,6 +2532,7 @@ export class WorkflowRuntime {
 	private isWorkflowBranchTriggerEventCompatibleWithDefinition(
 		definition: WorkflowDefinition,
 		activeStep: WorkflowStepDefinition,
+		session: ActiveWorkflowSession,
 		triggerEvent: WorkflowBranchTriggerEvent,
 	): boolean {
 		switch (triggerEvent.kind) {
@@ -2485,6 +2540,13 @@ export class WorkflowRuntime {
 				return definition.workflowForms?.[triggerEvent.workflowFormId] !== undefined
 			case "workflow_values_persisted":
 				return triggerEvent.changedKeys.every((key) => definition.workflowValueKeys.includes(key))
+			case "model_tool_succeeded":
+			case "model_tool_failed":
+				return this.isToolProjectedByWorkflowStep({
+					session,
+					step: activeStep,
+					toolName: triggerEvent.toolName,
+				})
 			case "tool_backed_operation_succeeded":
 			case "tool_backed_operation_failed": {
 				const sourceRoute = this.getWorkflowDecisionRouteBySource({
@@ -2558,6 +2620,18 @@ export class WorkflowRuntime {
 		const branchContext: WorkflowBranchContextState = {
 			activeBranchId: persistedSession.branchContext.activeBranchId,
 		}
+		const compatibilitySession: ActiveWorkflowSession = {
+			activeStepNumber,
+			workflowValues: persistedSession.workflowValues,
+			projectSelection: persistedSession.projectSelection,
+			lifecycle: persistedSession.lifecycle,
+			entryArtifactResolution,
+			ui: {
+				suppressedWorkflowFormIds: [],
+				suppressedWorkflowStepResolutionRoutes: [],
+			},
+			branchContext,
+		}
 
 		if (persistedSession.branchContext.lastTriggerEvent !== undefined) {
 			if (this.isWorkflowBranchTriggerEvent(persistedSession.branchContext.lastTriggerEvent) === false) {
@@ -2568,6 +2642,7 @@ export class WorkflowRuntime {
 				this.isWorkflowBranchTriggerEventCompatibleWithDefinition(
 					definition,
 					activeStep,
+					compatibilitySession,
 					persistedSession.branchContext.lastTriggerEvent,
 				) === false
 			) {
@@ -6351,6 +6426,29 @@ export class WorkflowRuntime {
 	private normalizeToolBackedOperationFailureMessage(errorMessage: string | undefined): string {
 		const trimmedMessage = errorMessage?.trim()
 		return trimmedMessage && trimmedMessage.length > 0 ? trimmedMessage : "Tool-backed operation failed."
+	}
+
+	private normalizeModelToolFailureMessage(errorMessage: string | undefined): string {
+		const trimmedMessage = errorMessage?.trim()
+		return trimmedMessage && trimmedMessage.length > 0 ? trimmedMessage : "Model-called tool failed."
+	}
+
+	private isClineDefaultTool(value: unknown): value is ClineDefaultTool {
+		return typeof value === "string" && toolUseNames.some((toolName) => toolName === value)
+	}
+
+	private isToolProjectedByWorkflowStep(args: {
+		session: ActiveWorkflowSession
+		step: WorkflowStepDefinition
+		toolName: ClineDefaultTool
+	}): boolean {
+		const projectedToolSchema = args.step.buildToolSchema({
+			session: args.session,
+			step: args.step,
+			renderWorkflowValue: stringifyWorkflowValueForPrompt,
+		})
+
+		return projectedToolSchema.some((toolSpec) => toolSpec.id === args.toolName)
 	}
 
 	private isRuntimeOwnedWorkflowTool(toolName: string): boolean {

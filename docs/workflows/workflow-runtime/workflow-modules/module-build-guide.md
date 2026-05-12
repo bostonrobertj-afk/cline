@@ -490,6 +490,12 @@ For a progress-gated step, the common pattern is:
 
 For final delivery, expose `attempt_completion` only when the current step may complete or hand off final delivery. After successful `attempt_completion`, the runtime emits `attempt_completion_succeeded`. The module decision tree must route that event explicitly to `complete_workflow`, a step transition, deterministic or tool-backed follow-up work, or `no_op`.
 
+For model-called workflow-projected tools, route tool completion through `model_tool_succeeded` and `model_tool_failed`. These events carry the canonical tool name and are for tools the model called from the active step's projected schema.
+
+Reserve `tool_backed_operation_succeeded` and `tool_backed_operation_failed` for runtime-selected deterministic tool-backed actions. Those events use `sourceRoute` correlation and should not be used for model-called tool lifecycle routing.
+
+Dedicated workflow events take precedence over generic model-tool lifecycle events. Tools that emit events such as `workflow_values_persisted`, `workflow_progress_request_confirmed`, `workflow_progress_request_denied`, or `attempt_completion_succeeded` should route through those dedicated events instead of `model_tool_succeeded` or `model_tool_failed`.
+
 ## Registration
 
 Export the workflow module from its local `index.ts`, then register it in `WorkflowRegistry.ts`.

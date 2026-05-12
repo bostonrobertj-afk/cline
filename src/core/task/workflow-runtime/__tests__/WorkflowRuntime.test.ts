@@ -563,6 +563,45 @@ describe("WorkflowRuntime", () => {
 		}
 	}
 
+	function createModelToolLifecycleDecisionTree(args: {
+		toolName: ClineDefaultTool
+		successAction?: WorkflowDecisionAction
+		failureAction?: WorkflowDecisionAction
+		failureErrorMessage?: string
+	}): WorkflowDecisionTree {
+		return {
+			entryBranchId: "await-model-tool",
+			branches: {
+				"await-model-tool": {
+					id: "await-model-tool",
+					routes: [
+						{
+							id: "model-tool-succeeded",
+							trigger: {
+								kind: "event_predicate",
+								matches: ({ triggerEvent }) =>
+									triggerEvent.kind === "model_tool_succeeded" && triggerEvent.toolName === args.toolName,
+							},
+							action: args.successAction ?? { kind: "project_prompt" },
+						},
+						{
+							id: "model-tool-failed",
+							trigger: {
+								kind: "event_predicate",
+								matches: ({ triggerEvent }) =>
+									triggerEvent.kind === "model_tool_failed" &&
+									triggerEvent.toolName === args.toolName &&
+									(args.failureErrorMessage === undefined ||
+										triggerEvent.errorMessage === args.failureErrorMessage),
+							},
+							action: args.failureAction ?? { kind: "project_prompt" },
+						},
+					],
+				},
+			},
+		}
+	}
+
 	function createArtifactAllocationDecisionTree(artifactId: string): WorkflowDecisionTree {
 		return {
 			entryBranchId: "allocate-artifact",
@@ -861,6 +900,18 @@ describe("WorkflowRuntime", () => {
 				id: ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST,
 				name: "workflow_progress_request",
 				description: "Ask the user to confirm whether the current workflow step is ready to advance.",
+				parameters: [],
+			},
+		]
+	}
+
+	function createToolSchema(toolName: ClineDefaultTool): readonly ClineToolSpec[] {
+		return [
+			{
+				variant: ModelFamily.GPT_5,
+				id: toolName,
+				name: toolName,
+				description: `${toolName} test schema.`,
 				parameters: [],
 			},
 		]
@@ -2130,6 +2181,102 @@ describe("WorkflowRuntime", () => {
 
 		expect(result).to.deep.equal({ kind: "complete_workflow" })
 		expectWorkflowStateCleared(taskState)
+	})
+
+	it("routes projected model_tool_succeeded through the active step decision tree", async () => {
+		const toolName = ClineDefaultTool.PLAN_STORY_ARTIFACTS
+		const workflow = createWorkflowDefinition({
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					toolSchema: createToolSchema(toolName),
+					decisionTree: createModelToolLifecycleDecisionTree({
+						toolName,
+						successAction: createEntryBranchStepTransitionAction(2),
+					}),
+				}),
+				"step-2": createStepDefinition({ stepNumber: 2 }),
+			},
+		})
+		const activeSession = createParentWorkflowSession()
+		activeSession.branchContext.activeBranchId = "await-model-tool"
+		registerResolvedWorkflow(workflow)
+		taskState.activeWorkflowName = workflow.name
+		taskState.activeWorkflowSession = activeSession
+
+		const result = await runtime.handleModelToolResult({
+			taskState,
+			toolName,
+			toolResultText: "planned stories",
+		})
+
+		expect(result.kind).to.equal("project_prompt")
+		expect(getActiveWorkflowSession(taskState).activeStepNumber).to.equal(2)
+	})
+
+	it("routes projected model_tool_failed with normalized error text through the active step decision tree", async () => {
+		const toolName = ClineDefaultTool.GENERATE_STORY_FILES
+		const failureText = formatResponse.toolError("story generation failed")
+		const workflow = createWorkflowDefinition({
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					toolSchema: createToolSchema(toolName),
+					decisionTree: createModelToolLifecycleDecisionTree({
+						toolName,
+						failureAction: createEntryBranchStepTransitionAction(2),
+						failureErrorMessage: failureText,
+					}),
+				}),
+				"step-2": createStepDefinition({ stepNumber: 2 }),
+			},
+		})
+		const activeSession = createParentWorkflowSession()
+		activeSession.branchContext.activeBranchId = "await-model-tool"
+		registerResolvedWorkflow(workflow)
+		taskState.activeWorkflowName = workflow.name
+		taskState.activeWorkflowSession = activeSession
+
+		const result = await runtime.handleModelToolResult({
+			taskState,
+			toolName,
+			toolResultText: failureText,
+		})
+
+		expect(result.kind).to.equal("project_prompt")
+		expect(getActiveWorkflowSession(taskState).activeStepNumber).to.equal(2)
+	})
+
+	it("does not route model-tool results for tools omitted from the active step projected schema", async () => {
+		const unprojectedToolName = ClineDefaultTool.GENERATE_STORY_FILES
+		const workflow = createWorkflowDefinition({
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					toolSchema: createToolSchema(ClineDefaultTool.PLAN_STORY_ARTIFACTS),
+					decisionTree: createModelToolLifecycleDecisionTree({
+						toolName: unprojectedToolName,
+						successAction: createEntryBranchStepTransitionAction(2),
+					}),
+				}),
+				"step-2": createStepDefinition({ stepNumber: 2 }),
+			},
+		})
+		const activeSession = createParentWorkflowSession()
+		activeSession.branchContext.activeBranchId = "await-model-tool"
+		registerResolvedWorkflow(workflow)
+		taskState.activeWorkflowName = workflow.name
+		taskState.activeWorkflowSession = activeSession
+
+		const result = await runtime.handleModelToolResult({
+			taskState,
+			toolName: unprojectedToolName,
+			toolResultText: "generated stories",
+		})
+
+		expect(result).to.deep.equal({ kind: "no_op" })
+		expect(getActiveWorkflowSession(taskState).activeStepNumber).to.equal(1)
+		expect(getActiveWorkflowSession(taskState).branchContext.lastTriggerEvent).to.equal(undefined)
 	})
 
 	it("copies complete parent project selection into child workflow activation without rendering entry form", async () => {
@@ -10316,6 +10463,117 @@ describe("WorkflowRuntime", () => {
 		Reflect.set(persistedSession.branchContext, "lastTriggerEvent", {
 			kind: staleEventKind,
 		})
+
+		await expectPersistedRestoreFailsClosed(workflow, persistedSession)
+	})
+
+	it("restores persisted model_tool_succeeded for projected known tools", async () => {
+		const toolName = ClineDefaultTool.PLAN_STORY_ARTIFACTS
+		const workflow = createWorkflowDefinition({
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					toolSchema: createToolSchema(toolName),
+				}),
+				"step-2": createStepDefinition({ stepNumber: 2 }),
+			},
+		})
+		const persistedSession = await createRestorablePersistedSession(workflow)
+		persistedSession.branchContext.lastTriggerEvent = {
+			kind: "model_tool_succeeded",
+			toolName,
+		}
+		registerResolvedWorkflow(workflow)
+		const restoredState = new TaskState()
+		restoredState.activeWorkflowName = workflow.name
+
+		const restored = await runtime.restorePersistedSession({
+			taskState: restoredState,
+			persistedSession,
+		})
+
+		expect(restored?.kind).to.equal("project_prompt")
+		expect(restoredState.activeWorkflowName).to.equal(workflow.name)
+		expect(restoredState.activeWorkflowSession).to.not.equal(undefined)
+	})
+
+	it("restores persisted model_tool_failed for projected known tools with optional error text", async () => {
+		const toolName = ClineDefaultTool.GENERATE_STORY_FILES
+		const workflow = createWorkflowDefinition({
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					toolSchema: createToolSchema(toolName),
+				}),
+				"step-2": createStepDefinition({ stepNumber: 2 }),
+			},
+		})
+		const persistedSession = await createRestorablePersistedSession(workflow)
+		const events: readonly PersistedWorkflowSession["branchContext"]["lastTriggerEvent"][] = [
+			{
+				kind: "model_tool_failed",
+				toolName,
+			},
+			{
+				kind: "model_tool_failed",
+				toolName,
+				errorMessage: "story generation failed",
+			},
+		]
+
+		for (const event of events) {
+			const eventSession = structuredClone(persistedSession)
+			eventSession.branchContext.lastTriggerEvent = event
+			registerResolvedWorkflow(workflow)
+			const restoredState = new TaskState()
+			restoredState.activeWorkflowName = workflow.name
+
+			const restored = await runtime.restorePersistedSession({
+				taskState: restoredState,
+				persistedSession: eventSession,
+			})
+
+			expect(restored?.kind).to.equal("project_prompt")
+			expect(restoredState.activeWorkflowName).to.equal(workflow.name)
+			expect(restoredState.activeWorkflowSession).to.not.equal(undefined)
+		}
+	})
+
+	it("fails closed when restored model_tool_succeeded references a non-projected tool", async () => {
+		const workflow = createWorkflowDefinition({
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					toolSchema: createToolSchema(ClineDefaultTool.PLAN_STORY_ARTIFACTS),
+				}),
+				"step-2": createStepDefinition({ stepNumber: 2 }),
+			},
+		})
+		const persistedSession = await createRestorablePersistedSession(workflow)
+		persistedSession.branchContext.lastTriggerEvent = {
+			kind: "model_tool_succeeded",
+			toolName: ClineDefaultTool.GENERATE_STORY_FILES,
+		}
+
+		await expectPersistedRestoreFailsClosed(workflow, persistedSession)
+	})
+
+	it("fails closed when restored model_tool_failed references a non-projected tool", async () => {
+		const workflow = createWorkflowDefinition({
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					toolSchema: createToolSchema(ClineDefaultTool.GENERATE_STORY_FILES),
+				}),
+				"step-2": createStepDefinition({ stepNumber: 2 }),
+			},
+		})
+		const persistedSession = await createRestorablePersistedSession(workflow)
+		persistedSession.branchContext.lastTriggerEvent = {
+			kind: "model_tool_failed",
+			toolName: ClineDefaultTool.PLAN_STORY_ARTIFACTS,
+			errorMessage: "planning failed",
+		}
 
 		await expectPersistedRestoreFailsClosed(workflow, persistedSession)
 	})
