@@ -2,12 +2,14 @@ import type { WorkflowDefinition, WorkflowName } from "@/core/task/workflow-runt
 import { brainstormingWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/brainstorming"
 import { createArchitectureWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/create-architecture"
 import { createEpicsWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/create-epics"
+import { createStoryWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/create-story"
 import { piPlanningWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/pi-planning"
 
 const shippedWorkflowDefinitions: WorkflowDefinition[] = [
 	brainstormingWorkflowDefinition,
 	createArchitectureWorkflowDefinition,
 	createEpicsWorkflowDefinition,
+	createStoryWorkflowDefinition,
 	piPlanningWorkflowDefinition,
 ]
 

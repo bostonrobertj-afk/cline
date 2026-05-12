@@ -31,6 +31,15 @@ import type {
 import { WorkflowRuntime } from "@/core/task/workflow-runtime/WorkflowRuntime"
 import { createArchitectureWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/create-architecture"
 import { createEpicsWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/create-epics"
+import {
+	CreateStoryWorkflowValueKey,
+	createStoryWorkflowDefinition,
+} from "@/core/task/workflow-runtime/workflow-modules/create-story"
+import {
+	buildCreateStoryStep2ToolSchemas,
+	buildCreateStoryStep3ToolSchemas,
+	buildCreateStoryStep4ToolSchemas,
+} from "@/core/task/workflow-runtime/workflow-modules/create-story/createStoryToolSchemas"
 import { piPlanningWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/pi-planning"
 import type { McpHub } from "@/services/mcp/McpHub"
 import type { McpServer } from "@/shared/mcp"
@@ -609,6 +618,93 @@ const buildCreateEpicsPromptContext = async (): Promise<SystemPromptContext & Wo
 	}
 }
 
+type CreateStoryPromptStepNumber = 2 | 3 | 4
+
+const CREATE_STORY_ARCHITECTURE_DOCUMENT = "/test/project/planning/architecture.md"
+const CREATE_STORY_EPICS_DOCUMENT = "/test/project/planning/Epics.md"
+const CREATE_STORY_EPICS_INDEX = "/test/project/planning/Epics.index.json"
+const CREATE_STORY_BRAINSTORMING_DOCUMENT = "/test/project/discovery/brainstorming.md"
+const CREATE_STORY_TARGET_EPIC = "Epic 1: Runtime workflow module"
+const CREATE_STORY_EPIC_IDENTITY = "1"
+const CREATE_STORY_STORIES_INDEX = "/test/project/implementation/epic-1-stories.index.json"
+const CREATE_STORY_SELECTED_STORY_IDENTITY = "1.1"
+const CREATE_STORY_SELECTED_STORY_FILE_NAME = "Story-1-1.md"
+const CREATE_STORY_TARGET_STORY = "/test/project/implementation/drafts/Story-1-1.md"
+const CREATE_STORY_TARGET_STORY_FILENAME_FOR_MOVE = "Story-1-1.md"
+
+const getCreateStoryEntryBranchId = (activeStepNumber: CreateStoryPromptStepNumber): string => {
+	switch (activeStepNumber) {
+		case 2:
+			return createStoryWorkflowDefinition.steps["step-2"].decisionTree.entryBranchId
+		case 3:
+			return createStoryWorkflowDefinition.steps["step-3"].decisionTree.entryBranchId
+		case 4:
+			return createStoryWorkflowDefinition.steps["step-4"].decisionTree.entryBranchId
+	}
+
+	const unreachableActiveStepNumber: never = activeStepNumber
+	return unreachableActiveStepNumber
+}
+
+const createCreateStoryWorkflowSession = (activeStepNumber: CreateStoryPromptStepNumber): ActiveWorkflowSession => ({
+	activeStepNumber,
+	workflowValues: {
+		[CreateStoryWorkflowValueKey.ArchitectureDocument]: CREATE_STORY_ARCHITECTURE_DOCUMENT,
+		[CreateStoryWorkflowValueKey.EpicsDocument]: CREATE_STORY_EPICS_DOCUMENT,
+		[CreateStoryWorkflowValueKey.EpicsIndex]: CREATE_STORY_EPICS_INDEX,
+		[CreateStoryWorkflowValueKey.BrainstormingDocument]: CREATE_STORY_BRAINSTORMING_DOCUMENT,
+		[CreateStoryWorkflowValueKey.TargetEpic]: CREATE_STORY_TARGET_EPIC,
+		[CreateStoryWorkflowValueKey.EpicIdentity]: CREATE_STORY_EPIC_IDENTITY,
+		[CreateStoryWorkflowValueKey.StoriesIndex]: CREATE_STORY_STORIES_INDEX,
+		[CreateStoryWorkflowValueKey.SelectedStoryIdentity]: CREATE_STORY_SELECTED_STORY_IDENTITY,
+		[CreateStoryWorkflowValueKey.SelectedStoryFileName]: CREATE_STORY_SELECTED_STORY_FILE_NAME,
+		[CreateStoryWorkflowValueKey.SelectedStoryType]: "primary",
+		[CreateStoryWorkflowValueKey.SelectedStoryStatus]: "draft",
+		[CreateStoryWorkflowValueKey.SelectedStoryFileGenerated]: true,
+		[CreateStoryWorkflowValueKey.TargetStory]: CREATE_STORY_TARGET_STORY,
+		[CreateStoryWorkflowValueKey.TargetStoryFilenameForMove]: CREATE_STORY_TARGET_STORY_FILENAME_FOR_MOVE,
+	},
+	projectSelection: {
+		projectMode: "new",
+		projectTitle: "Create Story Session",
+		projectFolderName: "create-story-session",
+	},
+	lifecycle: {
+		projectSelectionCompleted: true,
+	},
+	entryArtifactResolution: undefined,
+	ui: {
+		suppressedWorkflowFormIds: [],
+		suppressedWorkflowStepResolutionRoutes: [],
+	},
+	branchContext: {
+		activeBranchId: getCreateStoryEntryBranchId(activeStepNumber),
+	},
+})
+
+const buildCreateStoryPromptContext = async (
+	activeStepNumber: CreateStoryPromptStepNumber,
+): Promise<SystemPromptContext & WorkflowPromptProjection> => {
+	const workspacePathPolicy: WorkflowWorkspacePathPolicy = {
+		validateAccess: () => true,
+	}
+	const runtime = new WorkflowRuntime({ cwd: "/test/project", workspacePathPolicy })
+	const taskState = new TaskState()
+	taskState.activeWorkflowName = "create-story"
+	taskState.activeWorkflowSession = createCreateStoryWorkflowSession(activeStepNumber)
+	taskState.apiRequestCount = 1
+	const workflowProjection = await runtime.buildTurnProjection({ taskState })
+
+	return {
+		...baseContext,
+		mcpHub: makeMcpHub([]),
+		providerInfo: makeProviderInfo("gpt-5-codex", "openai"),
+		enableNativeToolCalls: true,
+		useMinimalGptPrompt: true,
+		...workflowProjection,
+	}
+}
+
 type PiPlanningPromptStepNumber = 2 | 3 | 4 | 5 | 6
 
 const PI_PLANNING_ARCHITECTURE_DOCUMENT = "/test/project/planning/architecture.md"
@@ -729,6 +825,20 @@ async function expectPiPlanningProjectedToolNames(
 	const context = await buildPiPlanningPromptContext(activeStepNumber)
 	const projectedToolNames = (context.workflowToolSchemaOverride ?? []).map((tool) => tool.name)
 	expect(projectedToolNames).to.deep.equal(expectedToolNames)
+
+	await runPromptTest(testCtx, context, "gpt-5-codex", async ({ tools }) => {
+		expect(getNativeToolNames(tools)).to.deep.equal(expectedToolNames)
+	})
+}
+
+async function expectCreateStoryProjectedToolSurface(
+	testCtx: TestRunner,
+	activeStepNumber: CreateStoryPromptStepNumber,
+	expectedToolSpecs: readonly ClineToolSpec[],
+): Promise<void> {
+	const expectedToolNames = expectedToolSpecs.map((tool) => tool.name)
+	const context = await buildCreateStoryPromptContext(activeStepNumber)
+	expect(context.workflowToolSchemaOverride).to.deep.equal(expectedToolSpecs)
 
 	await runPromptTest(testCtx, context, "gpt-5-codex", async ({ tools }) => {
 		expect(getNativeToolNames(tools)).to.deep.equal(expectedToolNames)
@@ -1441,6 +1551,79 @@ describe("Prompt System Integration Tests", () => {
 			])
 		})
 
+		it("projects active create-story step tools from module-owned builders into native GPT-5 prompts", async function () {
+			const expectations: readonly {
+				activeStepNumber: CreateStoryPromptStepNumber
+				expectedToolSpecs: readonly ClineToolSpec[]
+			}[] = [
+				{
+					activeStepNumber: 2,
+					expectedToolSpecs: buildCreateStoryStep2ToolSchemas(),
+				},
+				{
+					activeStepNumber: 3,
+					expectedToolSpecs: buildCreateStoryStep3ToolSchemas(),
+				},
+				{
+					activeStepNumber: 4,
+					expectedToolSpecs: buildCreateStoryStep4ToolSchemas(),
+				},
+			]
+
+			for (const expectation of expectations) {
+				await expectCreateStoryProjectedToolSurface(this, expectation.activeStepNumber, expectation.expectedToolSpecs)
+			}
+		})
+
+		it("renders create-story response-tool guidance for progress steps and completion step only", async function () {
+			const workflowProgressStepNumbers: readonly CreateStoryPromptStepNumber[] = [2, 3]
+
+			for (const activeStepNumber of workflowProgressStepNumbers) {
+				const context = await buildCreateStoryPromptContext(activeStepNumber)
+				await runPromptTest(this, context, "gpt-5-codex", async ({ systemPrompt }) => {
+					expectResponseToolNames(systemPrompt, ["`workflow_progress_request`"], ["`attempt_completion`"])
+				})
+			}
+
+			const completionContext = await buildCreateStoryPromptContext(4)
+			await runPromptTest(this, completionContext, "gpt-5-codex", async ({ systemPrompt }) => {
+				expectResponseToolNames(systemPrompt, ["`attempt_completion`"], ["`workflow_progress_request`"])
+			})
+		})
+
+		it("does not statically expose forbidden runtime or story-planning tools in create-story prompt projection", async function () {
+			const activeStepNumbers: readonly CreateStoryPromptStepNumber[] = [2, 3, 4]
+			const forbiddenToolNames: readonly string[] = [
+				"build_workflow_document",
+				"create_workflow_artifact",
+				"archive_workflow_artifact",
+				"delete_workflow_artifact",
+				"move_workflow_project_file",
+				"plan_story_artifacts",
+				"plan_remediation_story_artifact",
+				"generate_story_files",
+				"set_workflow_values",
+				"update_story_index_status",
+				"execute_command",
+			]
+
+			for (const activeStepNumber of activeStepNumbers) {
+				const context = await buildCreateStoryPromptContext(activeStepNumber)
+				const projectedToolNames = (context.workflowToolSchemaOverride ?? []).map((tool) => tool.name)
+				for (const forbiddenToolName of forbiddenToolNames) {
+					expect(projectedToolNames).to.not.include(forbiddenToolName)
+				}
+
+				await runPromptTest(this, context, "gpt-5-codex", async ({ systemPrompt, tools }) => {
+					const nativeToolNames = getNativeToolNames(tools)
+					for (const forbiddenToolName of forbiddenToolNames) {
+						expect(nativeToolNames).to.not.include(forbiddenToolName)
+						expect(systemPrompt).to.not.include(forbiddenToolName)
+					}
+				})
+			}
+		})
+
 		it("projects create-architecture workflow context into the full-turn input payload only", async function () {
 			const context = await buildCreateArchitecturePromptContext(3)
 			const workflowInputPayloadBlock = context.workflowInputPayloadBlock
@@ -1522,6 +1705,35 @@ describe("Prompt System Integration Tests", () => {
 				expect(systemPrompt).to.not.include(
 					"After the user indicates alignment with the drafted epics, use `attempt_completion` to provide a final recap and remind the user to run the `pi-planning` workflow for each epic to define that epic's user stories.",
 				)
+			})
+		})
+
+		it("projects create-story current step details into the full-turn input payload only", async function () {
+			const context = await buildCreateStoryPromptContext(2)
+			const workflowInputPayloadBlock = context.workflowInputPayloadBlock
+			expect(workflowInputPayloadBlock).to.not.equal(undefined)
+			if (workflowInputPayloadBlock === undefined) {
+				throw new Error("Expected create-story workflow input payload.")
+			}
+
+			expect(workflowInputPayloadBlock).to.include("Workflow:\nCreate Story")
+			expect(workflowInputPayloadBlock).to.include("Name: Bob")
+			expect(workflowInputPayloadBlock).to.include("Role: Scrum Master")
+			expect(workflowInputPayloadBlock).to.include("1. Gather Inputs - Complete")
+			expect(workflowInputPayloadBlock).to.include("2. Review Context & Ensure Project Alignment - Active")
+			expect(workflowInputPayloadBlock).to.include("4. Finalize & Validate Story Document - Not Started")
+			expect(workflowInputPayloadBlock).to.include("CURRENT STEP DETAILED INSTRUCTIONS")
+			expect(workflowInputPayloadBlock).to.include("Step 2: Review Context & Ensure Project Alignment")
+			expect(workflowInputPayloadBlock).to.include(`Focus on \`${CREATE_STORY_TARGET_STORY}\`.`)
+			expect(workflowInputPayloadBlock).to.include(`Read \`${CREATE_STORY_TARGET_STORY}\`.`)
+			expect(workflowInputPayloadBlock).to.include("Ensure existing non-task story content fully aligns")
+
+			await runPromptTest(this, context, "gpt-5-codex", async ({ systemPrompt }) => {
+				expect(systemPrompt).to.not.include("CURRENT STEP DETAILED INSTRUCTIONS")
+				expect(systemPrompt).to.not.include("Step 2: Review Context & Ensure Project Alignment")
+				expect(systemPrompt).to.not.include(`Focus on \`${CREATE_STORY_TARGET_STORY}\`.`)
+				expect(systemPrompt).to.not.include(`Read \`${CREATE_STORY_TARGET_STORY}\`.`)
+				expect(systemPrompt).to.not.include("Ensure existing non-task story content fully aligns")
 			})
 		})
 

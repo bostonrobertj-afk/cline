@@ -537,39 +537,39 @@ Allowed files:
 
 After completing this phase, pause for QA review before moving to Phase 8.
 
-[ ] Task 7. Register create-story and validate prompt-projection behavior.
+[x] Task 7. Register create-story and validate prompt-projection behavior.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRegistry.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`
 
-[ ] Subtask 7.1. In `WorkflowRegistry.ts`, import `createStoryWorkflowDefinition` from the create-story module and add it to `shippedWorkflowDefinitions`.
+[x] Subtask 7.1. In `WorkflowRegistry.ts`, import `createStoryWorkflowDefinition` from the create-story module and add it to `shippedWorkflowDefinitions`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRegistry.ts`
 
-[ ] Subtask 7.2. In `createStoryWorkflow.test.ts`, add registry-facing assertions proving the workflow identity, slash command, and skill name are all `create-story` and no `.md` alias is registered by the module.
+[x] Subtask 7.2. In `createStoryWorkflow.test.ts`, add registry-facing assertions proving the workflow identity, slash command, and skill name are all `create-story` and no `.md` alias is registered by the module.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`
 
-[ ] Subtask 7.3. In `integration.test.ts`, add prompt integration coverage proving create-story current step details appear in input payload, not workflow system instructions.
+[x] Subtask 7.3. In `integration.test.ts`, add prompt integration coverage proving create-story current step details appear in input payload, not workflow system instructions.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 7.4. In `integration.test.ts`, add prompt integration coverage proving each active create-story step projects the exact native tool surface returned by its module-owned tool-schema builder.
+[x] Subtask 7.4. In `integration.test.ts`, add prompt integration coverage proving each active create-story step projects the exact native tool surface returned by its module-owned tool-schema builder.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 7.5. In `integration.test.ts`, add prompt integration coverage proving response-tool guidance includes `workflow_progress_request` only for Step 2 and Step 3 and includes `attempt_completion` only for Step 4.
+[x] Subtask 7.5. In `integration.test.ts`, add prompt integration coverage proving response-tool guidance includes `workflow_progress_request` only for Step 2 and Step 3 and includes `attempt_completion` only for Step 4.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 7.6. In `integration.test.ts`, add negative prompt-projection assertions proving backend-only runtime tools, story planning tools, `set_workflow_values`, and `update_story_index_status` are not statically exposed for create-story.
+[x] Subtask 7.6. In `integration.test.ts`, add negative prompt-projection assertions proving backend-only runtime tools, story planning tools, `set_workflow_values`, and `update_story_index_status` are not statically exposed for create-story.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`

@@ -20,6 +20,11 @@ import type {
 	WorkflowValues,
 } from "../../../types"
 import {
+	resolveWorkflowBySlashCommand,
+	resolveWorkflowByUseSkillName,
+	resolveWorkflowDefinition,
+} from "../../../WorkflowRegistry"
+import {
 	CREATE_STORY_ARCHITECTURE_PREREQUISITE_ID,
 	CREATE_STORY_BRAINSTORMING_PREREQUISITE_ID,
 	CREATE_STORY_CANNOT_CONTINUE_FORM_ID,
@@ -406,6 +411,15 @@ describe("createStoryWorkflowDefinition", () => {
 		expect(createStoryWorkflowDefinition.persona.capabilities).to.include("Story validation")
 		expect(createStoryWorkflowDefinition.persona.capabilities).to.include("story task and subtask authoring")
 		expect(createStoryWorkflowDefinition.persona.principles.join("\n")).to.contain("trace seams end-to-end")
+	})
+
+	it("resolves through registry identities without a markdown alias", () => {
+		expect(resolveWorkflowDefinition("create-story")).to.equal(createStoryWorkflowDefinition)
+		expect(resolveWorkflowBySlashCommand("create-story")).to.equal(createStoryWorkflowDefinition)
+		expect(resolveWorkflowByUseSkillName("create-story")).to.equal(createStoryWorkflowDefinition)
+		expect(resolveWorkflowDefinition("create-story.md")).to.equal(undefined)
+		expect(resolveWorkflowBySlashCommand("create-story.md")).to.equal(undefined)
+		expect(resolveWorkflowByUseSkillName("create-story.md")).to.equal(undefined)
 	})
 
 	it("declares the complete workflow value inventory and no AI-writable value surface", () => {
