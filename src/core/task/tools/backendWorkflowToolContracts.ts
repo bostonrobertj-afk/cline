@@ -265,6 +265,36 @@ export const backendWorkflowToolContracts: Partial<Record<ClineDefaultTool, Back
 			},
 		],
 	},
+	[ClineDefaultTool.UPDATE_STORY_INDEX_STATUS]: {
+		id: ClineDefaultTool.UPDATE_STORY_INDEX_STATUS,
+		name: "update_story_index_status",
+		parameters: [
+			{
+				name: "stories_index",
+				required: true,
+				type: "string",
+				description: "Resolved absolute story index path prepared upstream by WorkflowRuntime.",
+			},
+			{
+				name: "story_identity",
+				required: true,
+				type: "string",
+				description: "Existing story identity whose status will be updated.",
+			},
+			{
+				name: "status",
+				required: true,
+				type: "string",
+				description: "New story status: draft, backlog, review, or complete.",
+			},
+			{
+				name: "expected_current_status",
+				required: false,
+				type: "string",
+				description: "Optional expected current story status to enforce before updating.",
+			},
+		],
+	},
 	[ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE]: {
 		id: ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE,
 		name: "code_review_spec_update",

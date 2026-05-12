@@ -39,6 +39,7 @@ import { StoryTaskReminderToolHandler } from "./handlers/StoryTaskReminderToolHa
 import { StoryTestingCompleteToolHandler } from "./handlers/StoryTestingCompleteToolHandler"
 import { UseSubagentsToolHandler } from "./handlers/SubagentToolHandler"
 import { SummarizeTaskHandler } from "./handlers/SummarizeTaskHandler"
+import { UpdateStoryIndexStatusToolHandler } from "./handlers/UpdateStoryIndexStatusToolHandler"
 import { UpsertEpicToolHandler } from "./handlers/UpsertEpicToolHandler"
 import { UseMcpToolHandler } from "./handlers/UseMcpToolHandler"
 import { UseSkillToolHandler } from "./handlers/UseSkillToolHandler"
@@ -141,6 +142,7 @@ export class ToolExecutorCoordinator {
 		[ClineDefaultTool.PLAN_STORY_ARTIFACTS]: (v: ToolValidator) => new PlanStoryArtifactsToolHandler(v),
 		[ClineDefaultTool.PLAN_REMEDIATION_STORY_ARTIFACT]: (v: ToolValidator) => new PlanRemediationStoryArtifactToolHandler(v),
 		[ClineDefaultTool.GENERATE_STORY_FILES]: (v: ToolValidator) => new GenerateStoryFilesToolHandler(v),
+		[ClineDefaultTool.UPDATE_STORY_INDEX_STATUS]: (v: ToolValidator) => new UpdateStoryIndexStatusToolHandler(v),
 		[ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE]: (_v: ToolValidator) => new CodeReviewSpecUpdateToolHandler(),
 		[ClineDefaultTool.STORY_TASK_REMINDER]: (_v: ToolValidator) => new StoryTaskReminderToolHandler(),
 		[ClineDefaultTool.STORY_TASK_COMPLETE]: (_v: ToolValidator) => new StoryTaskCompleteToolHandler(),

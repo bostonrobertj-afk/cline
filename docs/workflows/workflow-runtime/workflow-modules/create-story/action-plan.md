@@ -201,87 +201,87 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
 
-[ ] Subtask 3.1. In `tools.ts`, add `UPDATE_STORY_INDEX_STATUS = "update_story_index_status"` to `ClineDefaultTool` next to the other story workflow tools.
+[x] Subtask 3.1. In `tools.ts`, add `UPDATE_STORY_INDEX_STATUS = "update_story_index_status"` to `ClineDefaultTool` next to the other story workflow tools.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/shared/tools.ts`
 
-[ ] Subtask 3.2. In `assistant-message/index.ts`, add `stories_index`, `story_identity`, `status`, and `expected_current_status` to `toolParamNames`.
+[x] Subtask 3.2. In `assistant-message/index.ts`, add `stories_index`, `story_identity`, `status`, and `expected_current_status` to `toolParamNames`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/assistant-message/index.ts`
 
-[ ] Subtask 3.3. In `backendWorkflowToolContracts.ts`, add a backend workflow tool contract for `ClineDefaultTool.UPDATE_STORY_INDEX_STATUS` with required string parameters `stories_index`, `story_identity`, and `status`, plus optional string parameter `expected_current_status`.
+[x] Subtask 3.3. In `backendWorkflowToolContracts.ts`, add a backend workflow tool contract for `ClineDefaultTool.UPDATE_STORY_INDEX_STATUS` with required string parameters `stories_index`, `story_identity`, and `status`, plus optional string parameter `expected_current_status`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/backendWorkflowToolContracts.ts`
 
-[ ] Subtask 3.4. In `ResponseToolRegistry.ts`, add `ClineDefaultTool.UPDATE_STORY_INDEX_STATUS: undefined` so the tool is explicitly not a response tool.
+[x] Subtask 3.4. In `ResponseToolRegistry.ts`, add `ClineDefaultTool.UPDATE_STORY_INDEX_STATUS: undefined` so the tool is explicitly not a response tool.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/response/ResponseToolRegistry.ts`
 
-[ ] Subtask 3.5. In `autoApprove.ts`, include `ClineDefaultTool.UPDATE_STORY_INDEX_STATUS` in the same edit-file approval branches as `PLAN_STORY_ARTIFACTS`, `GENERATE_STORY_FILES`, and `MOVE_WORKFLOW_PROJECT_FILE`.
+[x] Subtask 3.5. In `autoApprove.ts`, include `ClineDefaultTool.UPDATE_STORY_INDEX_STATUS` in the same edit-file approval branches as `PLAN_STORY_ARTIFACTS`, `GENERATE_STORY_FILES`, and `MOVE_WORKFLOW_PROJECT_FILE`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/autoApprove.ts`
 
-[ ] Subtask 3.6. Add `UpdateStoryIndexStatusToolHandler.ts` implementing an `IToolHandler` for `ClineDefaultTool.UPDATE_STORY_INDEX_STATUS` that rejects partial blocks, rejects unsupported parameters, validates required non-empty string parameters, validates `status` as `draft`, `backlog`, `review`, or `complete`, and accepts optional non-empty `expected_current_status`.
+[x] Subtask 3.6. Add `UpdateStoryIndexStatusToolHandler.ts` implementing an `IToolHandler` for `ClineDefaultTool.UPDATE_STORY_INDEX_STATUS` that rejects partial blocks, rejects unsupported parameters, validates required non-empty string parameters, validates `status` as `draft`, `backlog`, `review`, or `complete`, and accepts optional non-empty `expected_current_status`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/UpdateStoryIndexStatusToolHandler.ts`
 
-[ ] Subtask 3.7. In `UpdateStoryIndexStatusToolHandler.ts`, before mutation, call the backend contract guard, validate the `stories_index` path through `ToolValidator.checkClineIgnorePath(...)`, apply standard approval/pre-tool-use handling following the `PlanStoryArtifactsToolHandler` path-mutation pattern, then call `config.workflowRuntime.updateStoryIndexStatus(...)`.
+[x] Subtask 3.7. In `UpdateStoryIndexStatusToolHandler.ts`, before mutation, call the backend contract guard, validate the `stories_index` path through `ToolValidator.checkClineIgnorePath(...)`, apply standard approval/pre-tool-use handling following the `PlanStoryArtifactsToolHandler` path-mutation pattern, then call `config.workflowRuntime.updateStoryIndexStatus(...)`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/UpdateStoryIndexStatusToolHandler.ts`
 
-[ ] Subtask 3.8. In `UpdateStoryIndexStatusToolHandler.ts`, after successful runtime mutation, set `didEditFile`, invalidate `fileReadCache` for the story index path, reset `consecutiveMistakeCount`, and return JSON containing `persisted: true`, `stories_index`, `story_identity`, `previous_status`, and `status`.
+[x] Subtask 3.8. In `UpdateStoryIndexStatusToolHandler.ts`, after successful runtime mutation, set `didEditFile`, invalidate `fileReadCache` for the story index path, reset `consecutiveMistakeCount`, and return JSON containing `persisted: true`, `stories_index`, `story_identity`, `previous_status`, and `status`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/UpdateStoryIndexStatusToolHandler.ts`
 
-[ ] Subtask 3.9. In `ToolExecutorCoordinator.ts`, import and register `UpdateStoryIndexStatusToolHandler` in `toolHandlersMap`.
+[x] Subtask 3.9. In `ToolExecutorCoordinator.ts`, import and register `UpdateStoryIndexStatusToolHandler` in `toolHandlersMap`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/ToolExecutorCoordinator.ts`
 
-[ ] Subtask 3.10. In `types.ts`, add a `WorkflowDecisionAction` variant `{ kind: "update_story_index_status"; storyIndexWorkflowValueKey: string; storyIdentityWorkflowValueKey: string; status: WorkflowStoryStatus; expectedCurrentStatus?: WorkflowStoryStatus }` and import `WorkflowStoryStatus` from `storyArtifacts`.
+[x] Subtask 3.10. In `types.ts`, add a `WorkflowDecisionAction` variant `{ kind: "update_story_index_status"; storyIndexWorkflowValueKey: string; storyIdentityWorkflowValueKey: string; status: WorkflowStoryStatus; expectedCurrentStatus?: WorkflowStoryStatus }` and import `WorkflowStoryStatus` from `storyArtifacts`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 
-[ ] Subtask 3.11. In `WorkflowRuntime.ts`, add public `updateStoryIndexStatus(...)` runtime method that validates the active session, validates the expected story index path against the supplied path, reads/parses the existing story index, locates the selected story by identity, enforces `expectedCurrentStatus` when supplied, updates only the selected entry's `status`, writes the story index with `writeWorkflowStoryIndex(...)`, and returns previous/new status metadata.
+[x] Subtask 3.11. In `WorkflowRuntime.ts`, add public `updateStoryIndexStatus(...)` runtime method that validates the active session, validates the expected story index path against the supplied path, reads/parses the existing story index, locates the selected story by identity, enforces `expectedCurrentStatus` when supplied, updates only the selected entry's `status`, writes the story index with `writeWorkflowStoryIndex(...)`, and returns previous/new status metadata.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 3.12. In `WorkflowRuntime.ts`, add a `buildNextActionFromDecisionTreeAction(...)` branch for `update_story_index_status` that reads required string workflow values from `storyIndexWorkflowValueKey` and `storyIdentityWorkflowValueKey`, builds an `execute_tool_backed_operation` for `ClineDefaultTool.UPDATE_STORY_INDEX_STATUS`, and passes `stories_index`, `story_identity`, `status`, and optional `expected_current_status` as tool params.
+[x] Subtask 3.12. In `WorkflowRuntime.ts`, add a `buildNextActionFromDecisionTreeAction(...)` branch for `update_story_index_status` that reads required string workflow values from `storyIndexWorkflowValueKey` and `storyIdentityWorkflowValueKey`, builds an `execute_tool_backed_operation` for `ClineDefaultTool.UPDATE_STORY_INDEX_STATUS`, and passes `stories_index`, `story_identity`, `status`, and optional `expected_current_status` as tool params.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 3.13. In `WorkflowRuntime.ts`, extend workflow definition validation so `update_story_index_status.storyIndexWorkflowValueKey` and `update_story_index_status.storyIdentityWorkflowValueKey` must be trimmed, non-empty, and declared in `workflowValueKeys`.
+[x] Subtask 3.13. In `WorkflowRuntime.ts`, extend workflow definition validation so `update_story_index_status.storyIndexWorkflowValueKey` and `update_story_index_status.storyIdentityWorkflowValueKey` must be trimmed, non-empty, and declared in `workflowValueKeys`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 3.14. Add `UpdateStoryIndexStatusToolHandler.test.ts` covering missing params, unsupported params, invalid status, cline-ignore denial, approval denial, expected-current-status mismatch, successful mutation, cache invalidation, and no direct model response behavior.
+[x] Subtask 3.14. Add `UpdateStoryIndexStatusToolHandler.test.ts` covering missing params, unsupported params, invalid status, cline-ignore denial, approval denial, expected-current-status mismatch, successful mutation, cache invalidation, and no direct model response behavior.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/UpdateStoryIndexStatusToolHandler.test.ts`
 
-[ ] Subtask 3.15. In `WorkflowRuntime.test.ts`, add coverage proving `update_story_index_status` decision actions build an `UPDATE_STORY_INDEX_STATUS` tool-backed operation with params sourced from workflow values.
+[x] Subtask 3.15. In `WorkflowRuntime.test.ts`, add coverage proving `update_story_index_status` decision actions build an `UPDATE_STORY_INDEX_STATUS` tool-backed operation with params sourced from workflow values.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 3.16. In `WorkflowRuntime.test.ts`, add coverage proving successful `update_story_index_status` tool results route through `tool_backed_operation_succeeded` and failed/denied results route through `tool_backed_operation_failed`.
+[x] Subtask 3.16. In `WorkflowRuntime.test.ts`, add coverage proving successful `update_story_index_status` tool results route through `tool_backed_operation_succeeded` and failed/denied results route through `tool_backed_operation_failed`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 3.17. In `workflow-runtime-metadata.test.ts`, add assertions that `UPDATE_STORY_INDEX_STATUS` is present in backend workflow tool contracts with the exact approved parameter names and is not treated as a response tool.
+[x] Subtask 3.17. In `workflow-runtime-metadata.test.ts`, add assertions that `UPDATE_STORY_INDEX_STATUS` is present in backend workflow tool contracts with the exact approved parameter names and is not treated as a response tool.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`

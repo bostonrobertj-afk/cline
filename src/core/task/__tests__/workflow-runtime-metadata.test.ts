@@ -19,6 +19,7 @@ import { AutoApprove } from "@/core/task/tools/autoApprove"
 import { getBackendWorkflowToolContract } from "@/core/task/tools/backendWorkflowToolContracts"
 import { BuildWorkflowDocumentToolHandler } from "@/core/task/tools/handlers/BuildWorkflowDocumentToolHandler"
 import { CreateWorkflowArtifactToolHandler } from "@/core/task/tools/handlers/CreateWorkflowArtifactToolHandler"
+import { ResponseToolRegistry } from "@/core/task/tools/response/ResponseToolRegistry"
 import { ToolExecutorCoordinator } from "@/core/task/tools/ToolExecutorCoordinator"
 import { ToolValidator } from "@/core/task/tools/ToolValidator"
 import type { TaskConfig } from "@/core/task/tools/types/TaskConfig"
@@ -873,6 +874,38 @@ describe("workflow runtime metadata persistence", () => {
 				description: "Positive numeric epic identity for the story inventory sidecar.",
 			},
 		])
+		expect(getBackendWorkflowToolContract(ClineDefaultTool.UPDATE_STORY_INDEX_STATUS)).to.deep.include({
+			id: ClineDefaultTool.UPDATE_STORY_INDEX_STATUS,
+			name: "update_story_index_status",
+		})
+		expect(getBackendWorkflowToolContract(ClineDefaultTool.UPDATE_STORY_INDEX_STATUS)?.parameters).to.deep.equal([
+			{
+				name: "stories_index",
+				required: true,
+				type: "string",
+				description: "Resolved absolute story index path prepared upstream by WorkflowRuntime.",
+			},
+			{
+				name: "story_identity",
+				required: true,
+				type: "string",
+				description: "Existing story identity whose status will be updated.",
+			},
+			{
+				name: "status",
+				required: true,
+				type: "string",
+				description: "New story status: draft, backlog, review, or complete.",
+			},
+			{
+				name: "expected_current_status",
+				required: false,
+				type: "string",
+				description: "Optional expected current story status to enforce before updating.",
+			},
+		])
+		expect(ResponseToolRegistry.get(ClineDefaultTool.UPDATE_STORY_INDEX_STATUS)).to.equal(undefined)
+		expect(ResponseToolRegistry.isResponseTool(ClineDefaultTool.UPDATE_STORY_INDEX_STATUS)).to.equal(false)
 	})
 
 	it("does not re-enter workflow runtime only because set_workflow_values executed", async () => {

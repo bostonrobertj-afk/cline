@@ -47,6 +47,7 @@ export enum ClineDefaultTool {
 	PLAN_STORY_ARTIFACTS = "plan_story_artifacts",
 	PLAN_REMEDIATION_STORY_ARTIFACT = "plan_remediation_story_artifact",
 	GENERATE_STORY_FILES = "generate_story_files",
+	UPDATE_STORY_INDEX_STATUS = "update_story_index_status",
 	CODE_REVIEW_SPEC_UPDATE = "code_review_spec_update",
 	STORY_TASK_REMINDER = "story_task_reminder",
 	STORY_TASK_COMPLETE = "story_task_complete",

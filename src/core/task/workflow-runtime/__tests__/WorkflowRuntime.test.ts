@@ -22,7 +22,12 @@ import { ModelFamily } from "@/shared/prompts"
 import { ClineDefaultTool } from "@/shared/tools"
 import { WorkflowArtifactFamily } from "../artifactFamilies"
 import * as WorkflowDiscovery from "../discovery"
-import { parseWorkflowStoryIndexJson, stringifyWorkflowStoryIndex, type WorkflowStoryIndex } from "../storyArtifacts"
+import {
+	parseWorkflowStoryIndexJson,
+	stringifyWorkflowStoryIndex,
+	type WorkflowStoryIndex,
+	type WorkflowStoryStatus,
+} from "../storyArtifacts"
 import { buildWorkflowStoryFileTemplate } from "../storyFileTemplate"
 import type {
 	ActiveWorkflowSession,
@@ -112,6 +117,8 @@ describe("WorkflowRuntime", () => {
 		principles: ["Keep runtime fixtures explicit and deterministic."],
 	}
 	const MOVE_PROJECT_FILE_FILENAME_KEY = "selected_story_filename"
+	const UPDATE_STORY_INDEX_STATUS_STORIES_INDEX_KEY = "selected_stories_index"
+	const UPDATE_STORY_INDEX_STATUS_STORY_IDENTITY_KEY = "selected_story_identity"
 
 	let sandbox: sinon.SinonSandbox
 	let cwd: string
@@ -669,6 +676,21 @@ describe("WorkflowRuntime", () => {
 			sourceFolderSegments: args.sourceFolderSegments,
 			destinationFolderSegments: args.destinationFolderSegments,
 			filenameWorkflowValueKey: args.filenameWorkflowValueKey,
+		}
+	}
+
+	function createUpdateStoryIndexStatusAction(args?: {
+		storyIndexWorkflowValueKey?: string
+		storyIdentityWorkflowValueKey?: string
+		status?: WorkflowStoryStatus
+		expectedCurrentStatus?: WorkflowStoryStatus
+	}): WorkflowDecisionAction {
+		return {
+			kind: "update_story_index_status",
+			storyIndexWorkflowValueKey: args?.storyIndexWorkflowValueKey ?? UPDATE_STORY_INDEX_STATUS_STORIES_INDEX_KEY,
+			storyIdentityWorkflowValueKey: args?.storyIdentityWorkflowValueKey ?? UPDATE_STORY_INDEX_STATUS_STORY_IDENTITY_KEY,
+			status: args?.status ?? "backlog",
+			...(args?.expectedCurrentStatus === undefined ? {} : { expectedCurrentStatus: args.expectedCurrentStatus }),
 		}
 	}
 
@@ -10309,6 +10331,193 @@ describe("WorkflowRuntime", () => {
 			destination_path: join(cwd, "docs", "projects", "move-project", "implementation", "stories-review", "Story-1.md"),
 		})
 		expect(toolBackedOperation.toolRequest.toolInput).to.deep.equal({})
+	})
+
+	it("builds update_story_index_status tool-backed operations from workflow values", async () => {
+		const storiesIndexPath = join(
+			cwd,
+			"docs",
+			"projects",
+			"status-build-project",
+			"implementation",
+			"epic-1-stories.index.json",
+		)
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: [UPDATE_STORY_INDEX_STATUS_STORIES_INDEX_KEY, UPDATE_STORY_INDEX_STATUS_STORY_IDENTITY_KEY],
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createToolBackedOperationDecisionTree({
+						startAction: createUpdateStoryIndexStatusAction({
+							expectedCurrentStatus: "draft",
+						}),
+					}),
+				}),
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		getActiveWorkflowSession(taskState).workflowValues[UPDATE_STORY_INDEX_STATUS_STORIES_INDEX_KEY] = storiesIndexPath
+		getActiveWorkflowSession(taskState).workflowValues[UPDATE_STORY_INDEX_STATUS_STORY_IDENTITY_KEY] = "1.1"
+		await runtime.resolveNextAction({ taskState })
+		const toolBackedOperation = await submitNewProjectSelection(taskState, "Status Build Project")
+
+		expect(toolBackedOperation.kind).to.equal("execute_tool_backed_operation")
+		if (toolBackedOperation.kind !== "execute_tool_backed_operation") {
+			throw new Error(`Expected execute_tool_backed_operation, received ${toolBackedOperation.kind}.`)
+		}
+
+		expect(toolBackedOperation.toolBackedOperationSession).to.be.undefined
+		expect(toolBackedOperation.runtimeOwnedSourceRoute).to.deep.equal(STEP_RESOLUTION_SOURCE_ROUTE)
+		expect(toolBackedOperation.toolRequest.toolName).to.equal(ClineDefaultTool.UPDATE_STORY_INDEX_STATUS)
+		expect(toolBackedOperation.toolRequest.toolParams).to.deep.equal({
+			stories_index: storiesIndexPath,
+			story_identity: "1.1",
+			status: "backlog",
+			expected_current_status: "draft",
+		})
+		expect(toolBackedOperation.toolRequest.toolInput).to.deep.equal({})
+	})
+
+	it("updates story index status and routes successful update results through tool_backed_operation_succeeded", async () => {
+		const storiesIndexPath = join(
+			cwd,
+			"docs",
+			"projects",
+			"status-success-project",
+			"implementation",
+			"epic-1-stories.index.json",
+		)
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: [UPDATE_STORY_INDEX_STATUS_STORIES_INDEX_KEY, UPDATE_STORY_INDEX_STATUS_STORY_IDENTITY_KEY],
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createToolBackedOperationDecisionTree({
+						startAction: createUpdateStoryIndexStatusAction({
+							expectedCurrentStatus: "draft",
+						}),
+						successAction: createEntryBranchStepTransitionAction(2),
+					}),
+				}),
+				"step-2": createStepDefinition({ stepNumber: 2 }),
+			},
+		})
+		await writeStoryIndex(storiesIndexPath, [
+			{
+				story_identity: "1.1",
+				story_file_name: "Story-1-1.md",
+				story_type: "primary",
+				parent_story_identity: null,
+				story_file_generated: true,
+				status: "draft",
+			},
+		])
+
+		await activateWorkflow(taskState, workflow)
+		getActiveWorkflowSession(taskState).workflowValues[UPDATE_STORY_INDEX_STATUS_STORIES_INDEX_KEY] = storiesIndexPath
+		getActiveWorkflowSession(taskState).workflowValues[UPDATE_STORY_INDEX_STATUS_STORY_IDENTITY_KEY] = "1.1"
+		await runtime.resolveNextAction({ taskState })
+		const toolBackedOperation = await submitNewProjectSelection(taskState, "Status Success Project")
+
+		expect(toolBackedOperation.kind).to.equal("execute_tool_backed_operation")
+		if (toolBackedOperation.kind !== "execute_tool_backed_operation") {
+			throw new Error(`Expected execute_tool_backed_operation, received ${toolBackedOperation.kind}.`)
+		}
+
+		const updateResult = await runtime.updateStoryIndexStatus({
+			taskState,
+			storiesIndex: storiesIndexPath,
+			storyIdentity: "1.1",
+			status: "backlog",
+			expectedCurrentStatus: "draft",
+		})
+		expect(updateResult).to.deep.equal({
+			storiesIndex: storiesIndexPath,
+			storyIdentity: "1.1",
+			previousStatus: "draft",
+			status: "backlog",
+		})
+		const updatedIndex = parseWorkflowStoryIndexJson(await readFile(storiesIndexPath, "utf8"))
+		expect(updatedIndex.stories[0]?.status).to.equal("backlog")
+
+		const successResult = await runtime.handleToolBackedOperationToolResult({
+			taskState,
+			toolResultText: JSON.stringify({
+				persisted: true,
+				stories_index: storiesIndexPath,
+				story_identity: "1.1",
+				previous_status: "draft",
+				status: "backlog",
+			}),
+			runtimeOwnedSourceRoute: toolBackedOperation.runtimeOwnedSourceRoute,
+		})
+
+		expect(getActiveWorkflowSession(taskState).activeStepNumber).to.equal(2)
+		expect(successResult.kind).to.equal("project_prompt")
+		if (successResult.kind !== "project_prompt") {
+			throw new Error(`Expected project_prompt, received ${successResult.kind}.`)
+		}
+	})
+
+	it("routes serialized denied and errored update_story_index_status results through tool_backed_operation_failed", async () => {
+		const failureCases = [formatResponse.toolDenied(), formatResponse.toolError("boom")]
+
+		for (const [failureCaseIndex, toolResultText] of failureCases.entries()) {
+			const failureState = new TaskState()
+			const projectFolderName = `status-failure-project-${failureCaseIndex}`
+			const storiesIndexPath = join(
+				cwd,
+				"docs",
+				"projects",
+				projectFolderName,
+				"implementation",
+				"epic-1-stories.index.json",
+			)
+			const workflow = createWorkflowDefinition({
+				workflowValueKeys: [UPDATE_STORY_INDEX_STATUS_STORIES_INDEX_KEY, UPDATE_STORY_INDEX_STATUS_STORY_IDENTITY_KEY],
+				steps: {
+					"step-1": createStepDefinition({
+						stepNumber: 1,
+						decisionTree: createToolBackedOperationDecisionTree({
+							startAction: createUpdateStoryIndexStatusAction(),
+							successAction: {
+								kind: "terminal_error",
+								errorMessage: "Unexpected update success.",
+							},
+							failureAction: createEntryBranchStepTransitionAction(2),
+						}),
+					}),
+					"step-2": createStepDefinition({ stepNumber: 2 }),
+				},
+			})
+
+			await activateWorkflow(failureState, workflow)
+			getActiveWorkflowSession(failureState).workflowValues[UPDATE_STORY_INDEX_STATUS_STORIES_INDEX_KEY] = storiesIndexPath
+			getActiveWorkflowSession(failureState).workflowValues[UPDATE_STORY_INDEX_STATUS_STORY_IDENTITY_KEY] = "1.1"
+			await runtime.resolveNextAction({ taskState: failureState })
+			const toolBackedOperation = await submitNewProjectSelection(
+				failureState,
+				`Status Failure Project ${failureCaseIndex}`,
+			)
+
+			expect(toolBackedOperation.kind).to.equal("execute_tool_backed_operation")
+			if (toolBackedOperation.kind !== "execute_tool_backed_operation") {
+				throw new Error(`Expected execute_tool_backed_operation, received ${toolBackedOperation.kind}.`)
+			}
+
+			const result = await runtime.handleToolBackedOperationToolResult({
+				taskState: failureState,
+				toolResultText,
+				runtimeOwnedSourceRoute: toolBackedOperation.runtimeOwnedSourceRoute,
+			})
+
+			expect(getActiveWorkflowSession(failureState).activeStepNumber).to.equal(2)
+			expect(result.kind).to.equal("project_prompt")
+			if (result.kind !== "project_prompt") {
+				throw new Error(`Expected project_prompt, received ${result.kind}.`)
+			}
+		}
 	})
 
 	it("moves workflow project files and routes successful move results through tool_backed_operation_succeeded", async () => {

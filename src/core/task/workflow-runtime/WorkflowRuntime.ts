@@ -49,6 +49,7 @@ import {
 	parseWorkflowStoryIndexJson,
 	stringifyWorkflowStoryIndex,
 	type WorkflowStoryIndex,
+	type WorkflowStoryStatus,
 } from "@/core/task/workflow-runtime/storyArtifacts"
 import { resolveWorkflowDefinition } from "@/core/task/workflow-runtime/WorkflowRegistry"
 import { buildWorkflowStepResolutionStatusPayload } from "@/core/task/workflow-step-resolution/buildWorkflowStepResolutionStatusPayload"
@@ -190,6 +191,13 @@ export interface WorkflowGenerateStoryFilesResult extends WorkflowGenerateStoryF
 	storyIndex: WorkflowStoryIndex
 	createdDraftStoryFileAbsolutePaths: readonly string[]
 	existingDraftStoryFileAbsolutePaths: readonly string[]
+}
+
+export interface WorkflowUpdateStoryIndexStatusResult {
+	storiesIndex: string
+	storyIdentity: string
+	previousStatus: WorkflowStoryStatus
+	status: WorkflowStoryStatus
 }
 
 interface WorkflowArtifactIdentityResolution {
@@ -1362,6 +1370,63 @@ export class WorkflowRuntime {
 		}
 	}
 
+	async updateStoryIndexStatus(args: {
+		taskState: TaskState
+		storiesIndex: string
+		storyIdentity: string
+		status: WorkflowStoryStatus
+		expectedCurrentStatus: WorkflowStoryStatus | undefined
+	}): Promise<WorkflowUpdateStoryIndexStatusResult> {
+		const session = args.taskState.activeWorkflowSession
+		if (!session) {
+			throw new Error("Cannot update story index status without an active workflow session.")
+		}
+
+		if (!isAbsolute(args.storiesIndex)) {
+			throw new Error(`Story index status update path must be absolute: ${args.storiesIndex}`)
+		}
+
+		const storyIdentity = args.storyIdentity.trim()
+		if (storyIdentity === "") {
+			throw new Error("Story identity must be a non-empty string.")
+		}
+
+		const epicIdentity = this.resolveEpicIdentityFromStoryIdentity(storyIdentity)
+		const expectedStoryIndexAbsolutePath = this.resolveEpicStoriesIndexPath({
+			session,
+			epicIdentity,
+		})
+		if (args.storiesIndex !== expectedStoryIndexAbsolutePath) {
+			throw new Error("Story index path changed before story-index status update.")
+		}
+
+		const storyIndex = await this.readRequiredWorkflowStoryIndexForStatusUpdate(args.storiesIndex)
+		const selectedStory = storyIndex.stories.find((story) => story.story_identity === storyIdentity)
+		if (selectedStory === undefined) {
+			throw new Error(`Story identity ${storyIdentity} was not found in the selected epic story index.`)
+		}
+
+		const previousStatus = selectedStory.status
+		if (args.expectedCurrentStatus !== undefined && previousStatus !== args.expectedCurrentStatus) {
+			throw new Error(
+				`Cannot update story identity ${storyIdentity} because current status is ${previousStatus}, not ${args.expectedCurrentStatus}.`,
+			)
+		}
+
+		selectedStory.status = args.status
+		await this.writeWorkflowStoryIndex({
+			storyIndexAbsolutePath: args.storiesIndex,
+			storyIndex,
+		})
+
+		return {
+			storiesIndex: args.storiesIndex,
+			storyIdentity,
+			previousStatus,
+			status: args.status,
+		}
+	}
+
 	private async readWorkflowStoryIndexOrCreateEmpty(storyIndexAbsolutePath: string): Promise<WorkflowStoryIndex> {
 		this.assertWorkspacePathAllowed(storyIndexAbsolutePath)
 		try {
@@ -1384,6 +1449,29 @@ export class WorkflowRuntime {
 		}
 
 		return leftValues.every((leftValue, index) => leftValue === rightValues[index])
+	}
+
+	private resolveEpicIdentityFromStoryIdentity(storyIdentity: string): string {
+		const identitySegments = storyIdentity.split(".")
+		const epicIdentity = identitySegments[0]
+		if (epicIdentity === undefined || epicIdentity.trim() === "" || identitySegments.length < 2) {
+			throw new Error("Story identity must use canonical dotted positive numeric form E.S or E.S.R.")
+		}
+
+		return epicIdentity
+	}
+
+	private async readRequiredWorkflowStoryIndexForStatusUpdate(storyIndexAbsolutePath: string): Promise<WorkflowStoryIndex> {
+		this.assertWorkspacePathAllowed(storyIndexAbsolutePath)
+		try {
+			return parseWorkflowStoryIndexJson(await readFile(storyIndexAbsolutePath, "utf8"))
+		} catch (error) {
+			if (this.isFileNotFoundError(error)) {
+				throw new Error(`Cannot update story index status because story index does not exist: ${storyIndexAbsolutePath}`)
+			}
+
+			throw error
+		}
 	}
 
 	private async readRequiredWorkflowStoryIndex(storyIndexAbsolutePath: string): Promise<WorkflowStoryIndex> {
@@ -5595,6 +5683,42 @@ export class WorkflowRuntime {
 					},
 				}
 			}
+			case "update_story_index_status": {
+				const storiesIndex = readRequiredStringWorkflowValue({
+					workflowValues: session.workflowValues,
+					key: action.storyIndexWorkflowValueKey,
+					context: `story index status update route ${sourceRoute.branchId}/${sourceRoute.routeId}`,
+				})
+				const storyIdentity = readRequiredStringWorkflowValue({
+					workflowValues: session.workflowValues,
+					key: action.storyIdentityWorkflowValueKey,
+					context: `story index status update route ${sourceRoute.branchId}/${sourceRoute.routeId}`,
+				})
+				const toolParams =
+					action.expectedCurrentStatus === undefined
+						? {
+								stories_index: storiesIndex,
+								story_identity: storyIdentity,
+								status: action.status,
+							}
+						: {
+								stories_index: storiesIndex,
+								story_identity: storyIdentity,
+								status: action.status,
+								expected_current_status: action.expectedCurrentStatus,
+							}
+
+				session.ui.stepResolutionSession = undefined
+				return {
+					kind: "execute_tool_backed_operation",
+					runtimeOwnedSourceRoute: sourceRoute,
+					toolRequest: {
+						toolName: ClineDefaultTool.UPDATE_STORY_INDEX_STATUS,
+						toolInput: {},
+						toolParams,
+					},
+				}
+			}
 			case "resolve_prerequisite_files":
 				return this.buildResolvePrerequisiteFilesNextAction({
 					taskState,
@@ -6482,6 +6606,7 @@ export class WorkflowRuntime {
 			case ClineDefaultTool.ARCHIVE_WORKFLOW_ARTIFACT:
 			case ClineDefaultTool.DELETE_WORKFLOW_ARTIFACT:
 			case ClineDefaultTool.MOVE_WORKFLOW_PROJECT_FILE:
+			case ClineDefaultTool.UPDATE_STORY_INDEX_STATUS:
 			case ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT:
 			case ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST:
 				return true
@@ -7104,6 +7229,39 @@ export class WorkflowRuntime {
 								}
 							}
 							break
+						case "update_story_index_status": {
+							const workflowValueKeyChecks = [
+								{
+									name: "storyIndexWorkflowValueKey",
+									key: route.action.storyIndexWorkflowValueKey,
+								},
+								{
+									name: "storyIdentityWorkflowValueKey",
+									key: route.action.storyIdentityWorkflowValueKey,
+								},
+							] as const
+							for (const workflowValueKeyCheck of workflowValueKeyChecks) {
+								if (workflowValueKeyCheck.key.trim() === "") {
+									return {
+										valid: false,
+										errorMessage: `Workflow step ${step.id} route ${route.id} update_story_index_status ${workflowValueKeyCheck.name} must not be empty.`,
+									}
+								}
+								if (workflowValueKeyCheck.key.trim() !== workflowValueKeyCheck.key) {
+									return {
+										valid: false,
+										errorMessage: `Workflow step ${step.id} route ${route.id} update_story_index_status ${workflowValueKeyCheck.name} ${workflowValueKeyCheck.key} must already be trimmed.`,
+									}
+								}
+								if (!workflowValueKeys.has(workflowValueKeyCheck.key)) {
+									return {
+										valid: false,
+										errorMessage: `Workflow step ${step.id} route ${route.id} update_story_index_status ${workflowValueKeyCheck.name} ${workflowValueKeyCheck.key} must be declared in workflowValueKeys.`,
+									}
+								}
+							}
+							break
+						}
 						case "resolve_prerequisite_files": {
 							if (route.action.prerequisiteIds.length === 0) {
 								return {

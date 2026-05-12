@@ -101,6 +101,7 @@ const RESPONSE_TOOL_METADATA: Record<ClineDefaultTool, ResponseToolMetadata | un
 	[ClineDefaultTool.PLAN_STORY_ARTIFACTS]: undefined,
 	[ClineDefaultTool.PLAN_REMEDIATION_STORY_ARTIFACT]: undefined,
 	[ClineDefaultTool.GENERATE_STORY_FILES]: undefined,
+	[ClineDefaultTool.UPDATE_STORY_INDEX_STATUS]: undefined,
 	[ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE]: undefined,
 	[ClineDefaultTool.USE_SUBAGENTS]: undefined,
 }

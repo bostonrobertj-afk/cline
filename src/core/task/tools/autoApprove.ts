@@ -56,6 +56,7 @@ export class AutoApprove {
 				case ClineDefaultTool.PLAN_STORY_ARTIFACTS:
 				case ClineDefaultTool.PLAN_REMEDIATION_STORY_ARTIFACT:
 				case ClineDefaultTool.GENERATE_STORY_FILES:
+				case ClineDefaultTool.UPDATE_STORY_INDEX_STATUS:
 				case ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT:
 				case ClineDefaultTool.ARCHIVE_WORKFLOW_ARTIFACT:
 				case ClineDefaultTool.DELETE_WORKFLOW_ARTIFACT:
@@ -89,6 +90,7 @@ export class AutoApprove {
 				case ClineDefaultTool.PLAN_STORY_ARTIFACTS:
 				case ClineDefaultTool.PLAN_REMEDIATION_STORY_ARTIFACT:
 				case ClineDefaultTool.GENERATE_STORY_FILES:
+				case ClineDefaultTool.UPDATE_STORY_INDEX_STATUS:
 				case ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT:
 				case ClineDefaultTool.ARCHIVE_WORKFLOW_ARTIFACT:
 				case ClineDefaultTool.DELETE_WORKFLOW_ARTIFACT:
@@ -124,6 +126,7 @@ export class AutoApprove {
 			case ClineDefaultTool.PLAN_STORY_ARTIFACTS:
 			case ClineDefaultTool.PLAN_REMEDIATION_STORY_ARTIFACT:
 			case ClineDefaultTool.GENERATE_STORY_FILES:
+			case ClineDefaultTool.UPDATE_STORY_INDEX_STATUS:
 			case ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT:
 			case ClineDefaultTool.ARCHIVE_WORKFLOW_ARTIFACT:
 			case ClineDefaultTool.DELETE_WORKFLOW_ARTIFACT:
