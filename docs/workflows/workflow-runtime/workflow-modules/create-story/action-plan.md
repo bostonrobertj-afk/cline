@@ -578,7 +578,7 @@ Allowed files:
 
 After completing this phase, pause for QA review before moving to Phase 9.
 
-[ ] Task 8. Remove retired create-story package files and verify retired story document handler absence.
+[x] Task 8. Remove retired create-story package files and verify retired story document handler absence.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/.cline/skills/bmad-create-story/SKILL.md`
@@ -587,27 +587,27 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/.cline/skills/bmad-create-story/discover-inputs.md`
 - `/Users/robertboston/Documents/Cline Extension/cline/.cline/skills/bmad-create-story/template.md`
 
-[ ] Subtask 8.1. Delete `.cline/skills/bmad-create-story/SKILL.md`.
+[x] Subtask 8.1. Delete `.cline/skills/bmad-create-story/SKILL.md`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/.cline/skills/bmad-create-story/SKILL.md`
 
-[ ] Subtask 8.2. Delete `.cline/skills/bmad-create-story/bmad-skill-manifest.yaml`.
+[x] Subtask 8.2. Delete `.cline/skills/bmad-create-story/bmad-skill-manifest.yaml`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/.cline/skills/bmad-create-story/bmad-skill-manifest.yaml`
 
-[ ] Subtask 8.3. Delete `.cline/skills/bmad-create-story/checklist.md`.
+[x] Subtask 8.3. Delete `.cline/skills/bmad-create-story/checklist.md`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/.cline/skills/bmad-create-story/checklist.md`
 
-[ ] Subtask 8.4. Delete `.cline/skills/bmad-create-story/discover-inputs.md`.
+[x] Subtask 8.4. Delete `.cline/skills/bmad-create-story/discover-inputs.md`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/.cline/skills/bmad-create-story/discover-inputs.md`
 
-[ ] Subtask 8.5. Delete `.cline/skills/bmad-create-story/template.md`.
+[x] Subtask 8.5. Delete `.cline/skills/bmad-create-story/template.md`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/.cline/skills/bmad-create-story/template.md`
