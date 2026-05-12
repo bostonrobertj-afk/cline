@@ -22,7 +22,7 @@ import { ModelFamily } from "@/shared/prompts"
 import { ClineDefaultTool } from "@/shared/tools"
 import { WorkflowArtifactFamily } from "../artifactFamilies"
 import * as WorkflowDiscovery from "../discovery"
-import { parseWorkflowStoryIndexJson, stringifyWorkflowStoryIndex } from "../storyArtifacts"
+import { parseWorkflowStoryIndexJson, stringifyWorkflowStoryIndex, type WorkflowStoryIndex } from "../storyArtifacts"
 import { buildWorkflowStoryFileTemplate } from "../storyFileTemplate"
 import type {
 	ActiveWorkflowSession,
@@ -188,6 +188,11 @@ describe("WorkflowRuntime", () => {
 				storyIndexGenerated: false,
 			},
 		])
+	}
+
+	async function writeStoryIndex(storiesIndexAbsolutePath: string, stories: WorkflowStoryIndex["stories"]): Promise<void> {
+		await mkdir(dirname(storiesIndexAbsolutePath), { recursive: true })
+		await writeFile(storiesIndexAbsolutePath, stringifyWorkflowStoryIndex({ version: 1, stories }), "utf8")
 	}
 
 	type JsonOptionsFieldKind = Extract<WorkflowFormFieldKind, "dropdown" | "radio_group" | "multi_select" | "checkbox_group">
@@ -6232,6 +6237,219 @@ describe("WorkflowRuntime", () => {
 			renderFormAction.formSession.definitionPayload.panels["json-options"].fields.find((field) => field.key === "epic")
 				?.options,
 		).to.deep.equal(expectedOptions)
+	})
+
+	it("renders dropdown options from workflow-value-interpolated selected-project story index", async () => {
+		const workflowFormId = "json-options-story-index-form"
+		const projectFolderName = "json-options-story-index-project"
+		const parentSession = createParentWorkflowSession({ projectFolderName })
+		parentSession.workflowValues.epic_identity = "7"
+		await writeStoryIndex(join(cwd, "docs", "projects", projectFolderName, "implementation", "epic-7-stories.index.json"), [
+			{
+				story_identity: "7.1",
+				story_file_name: "Story-7-1.md",
+				story_type: "primary",
+				parent_story_identity: null,
+				story_file_generated: true,
+				status: "draft",
+			},
+			{
+				story_identity: "7.2",
+				story_file_name: "Story-7-2.md",
+				story_type: "primary",
+				parent_story_identity: null,
+				story_file_generated: true,
+				status: "backlog",
+			},
+		])
+
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: ["epic_identity", "selected_story"],
+			childInheritance: [{ parentKey: "epic_identity", childKey: "epic_identity" }],
+			workflowForms: {
+				[workflowFormId]: createJsonOptionsWorkflowForm({
+					workflowFormId,
+					fields: [
+						createEpicsJsonOptionsField({
+							key: "story",
+							kind: "dropdown",
+							workflowValueKey: "selected_story",
+							jsonOptionsSource: createEpicsJsonOptionsSource({
+								sourcePathSegments: ["implementation", "epic-{workflow.epic_identity}-stories.index.json"],
+								itemsPath: "stories",
+								valueProperty: "story_identity",
+								labelTemplate: "Story {story_identity}: {story_file_name}",
+								descriptionTemplate: "Status: {status}",
+							}),
+						}),
+					],
+				}),
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createWorkflowFormDecisionTree({ workflowFormId }),
+				}),
+			},
+		})
+		registerResolvedWorkflow(workflow)
+
+		const renderFormAction = await runtime.activateWorkflow({
+			taskState,
+			workflowName: workflow.name,
+			parentSession,
+		})
+
+		expect(renderFormAction.kind).to.equal("render_workflow_form")
+		if (renderFormAction.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${renderFormAction.kind}.`)
+		}
+
+		const expectedOptions = [
+			{ value: "7.1", label: "Story 7.1: Story-7-1.md", description: "Status: draft" },
+			{ value: "7.2", label: "Story 7.2: Story-7-2.md", description: "Status: backlog" },
+		]
+		expect(renderFormAction.payload.panel?.fields.find((field) => field.key === "story")?.options).to.deep.equal(
+			expectedOptions,
+		)
+	})
+
+	it("fails before reading JSON options when dynamic source path placeholders stay unresolved", async () => {
+		const workflowFormId = "json-options-unresolved-source-path-form"
+		const projectFolderName = "json-options-unresolved-source-path-project"
+		const parentSession = createParentWorkflowSession({ projectFolderName })
+		await writeStoryIndex(
+			join(cwd, "docs", "projects", projectFolderName, "implementation", "epic-{workflow.missing_epic}-stories.index.json"),
+			[
+				{
+					story_identity: "4.1",
+					story_file_name: "Story-4-1.md",
+					story_type: "primary",
+					parent_story_identity: null,
+					story_file_generated: true,
+					status: "draft",
+				},
+			],
+		)
+
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: ["selected_story"],
+			workflowForms: {
+				[workflowFormId]: createJsonOptionsWorkflowForm({
+					workflowFormId,
+					fields: [
+						createEpicsJsonOptionsField({
+							key: "story",
+							kind: "dropdown",
+							workflowValueKey: "selected_story",
+							jsonOptionsSource: createEpicsJsonOptionsSource({
+								sourcePathSegments: ["implementation", "epic-{workflow.missing_epic}-stories.index.json"],
+								itemsPath: "stories",
+								valueProperty: "story_identity",
+								labelTemplate: "Story {story_identity}: {story_file_name}",
+							}),
+						}),
+					],
+				}),
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createWorkflowFormDecisionTree({ workflowFormId }),
+				}),
+			},
+		})
+		registerResolvedWorkflow(workflow)
+
+		let thrownError: Error | undefined
+		try {
+			await runtime.activateWorkflow({
+				taskState,
+				workflowName: workflow.name,
+				parentSession,
+			})
+		} catch (error) {
+			if (error instanceof Error) {
+				thrownError = error
+			}
+		}
+
+		expect(thrownError).to.not.equal(undefined)
+		if (thrownError === undefined) {
+			throw new Error("Expected unresolved dynamic jsonOptionsSource path to fail.")
+		}
+		expect(thrownError.message).to.contain("contains an unresolved workflow-form placeholder")
+		expect(thrownError.message).to.not.contain("could not be read")
+	})
+
+	it("fails before reading JSON options when workflow values resolve source path placeholders to unsafe segments", async () => {
+		const workflowFormId = "json-options-unsafe-resolved-source-path-form"
+		const projectFolderName = "json-options-unsafe-resolved-source-path-project"
+		const parentSession = createParentWorkflowSession({ projectFolderName })
+		parentSession.workflowValues.epic_identity = "../outside"
+		await writeStoryIndex(
+			join(cwd, "docs", "projects", projectFolderName, "implementation", "epic-..", "outside-stories.index.json"),
+			[
+				{
+					story_identity: "5.1",
+					story_file_name: "Story-5-1.md",
+					story_type: "primary",
+					parent_story_identity: null,
+					story_file_generated: true,
+					status: "draft",
+				},
+			],
+		)
+
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: ["epic_identity", "selected_story"],
+			childInheritance: [{ parentKey: "epic_identity", childKey: "epic_identity" }],
+			workflowForms: {
+				[workflowFormId]: createJsonOptionsWorkflowForm({
+					workflowFormId,
+					fields: [
+						createEpicsJsonOptionsField({
+							key: "story",
+							kind: "dropdown",
+							workflowValueKey: "selected_story",
+							jsonOptionsSource: createEpicsJsonOptionsSource({
+								sourcePathSegments: ["implementation", "epic-{workflow.epic_identity}-stories.index.json"],
+								itemsPath: "stories",
+								valueProperty: "story_identity",
+								labelTemplate: "Story {story_identity}: {story_file_name}",
+							}),
+						}),
+					],
+				}),
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createWorkflowFormDecisionTree({ workflowFormId }),
+				}),
+			},
+		})
+		registerResolvedWorkflow(workflow)
+
+		let thrownError: Error | undefined
+		try {
+			await runtime.activateWorkflow({
+				taskState,
+				workflowName: workflow.name,
+				parentSession,
+			})
+		} catch (error) {
+			if (error instanceof Error) {
+				thrownError = error
+			}
+		}
+
+		expect(thrownError).to.not.equal(undefined)
+		if (thrownError === undefined) {
+			throw new Error("Expected unsafe resolved dynamic jsonOptionsSource path to fail.")
+		}
+		expect(thrownError.message).to.contain("resolved sourcePathSegments entry epic-../outside-stories.index.json is invalid")
+		expect(thrownError.message).to.not.contain("could not be read")
 	})
 
 	it("renders radio group, multi-select, and checkbox-group options from the same JSON source", async () => {

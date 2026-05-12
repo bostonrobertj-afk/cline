@@ -117,7 +117,7 @@ Allowed files:
 
 After completing this phase, pause for QA review before moving to Phase 3.
 
-[ ] Task 2. Extend selected-project JSON option sources so `sourcePathSegments` can derive safe concrete path segments from existing workflow-form interpolation.
+[x] Task 2. Extend selected-project JSON option sources so `sourcePathSegments` can derive safe concrete path segments from existing workflow-form interpolation.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/requirements.md`
@@ -126,57 +126,57 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 2.1. In `requirements.md`, replace `FR-39i1` with: `FR-39i1`: JSON-backed workflow form options must resolve source JSON files from the selected project root and module-declared `sourcePathSegments`. `sourcePathSegments` may contain existing lookup-only workflow-form placeholders using `{workflow.*}` and `{data.*}` interpolation. Runtime must interpolate each source path segment before resolving the source file, reject unresolved placeholders, reject unsafe resolved path segments, enforce selected-project-root containment, and apply workspace path policy before reading the JSON source.
+[x] Subtask 2.1. In `requirements.md`, replace `FR-39i1` with: `FR-39i1`: JSON-backed workflow form options must resolve source JSON files from the selected project root and module-declared `sourcePathSegments`. `sourcePathSegments` may contain existing lookup-only workflow-form placeholders using `{workflow.*}` and `{data.*}` interpolation. Runtime must interpolate each source path segment before resolving the source file, reject unresolved placeholders, reject unsafe resolved path segments, enforce selected-project-root containment, and apply workspace path policy before reading the JSON source.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/requirements.md`
 
-[ ] Subtask 2.2. In `architecture.md`, replace the workflow form JSON option sentence that mentions active workflow values containing governed absolute paths with: JSON-backed option lists resolve source JSON files from selected-project-relative `sourcePathSegments`. Source path segments may use the existing lookup-only workflow-form interpolation from workflow/session values; runtime interpolates those segments before selected-root path resolution and validates unresolved placeholders, resolved path segments, selected-root containment, and workspace path policy before file read.
+[x] Subtask 2.2. In `architecture.md`, replace the workflow form JSON option sentence that mentions active workflow values containing governed absolute paths with: JSON-backed option lists resolve source JSON files from selected-project-relative `sourcePathSegments`. Source path segments may use the existing lookup-only workflow-form interpolation from workflow/session values; runtime interpolates those segments before selected-root path resolution and validates unresolved placeholders, resolved path segments, selected-root containment, and workspace path policy before file read.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/architecture.md`
 
-[ ] Subtask 2.3. In `module-build-guide.md`, replace the `jsonOptionsSource` guidance paragraph so it documents only `root.kind = "selected_project_root"` with `sourcePathSegments`, including that a segment may use lookup-only placeholders such as `epic-{workflow.epic_identity}-stories.index.json`; do not document `workflow_value_path`.
+[x] Subtask 2.3. In `module-build-guide.md`, replace the `jsonOptionsSource` guidance paragraph so it documents only `root.kind = "selected_project_root"` with `sourcePathSegments`, including that a segment may use lookup-only placeholders such as `epic-{workflow.epic_identity}-stories.index.json`; do not document `workflow_value_path`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
 
-[ ] Subtask 2.4. In `WorkflowRuntime.ts`, pass the current workflow form session through the JSON dynamic-options call chain from `resolveWorkflowFormPanelFields(...)` to `resolveWorkflowFormJsonOptionsSourcePath(...)`.
+[x] Subtask 2.4. In `WorkflowRuntime.ts`, pass the current workflow form session through the JSON dynamic-options call chain from `resolveWorkflowFormPanelFields(...)` to `resolveWorkflowFormJsonOptionsSourcePath(...)`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 2.5. In `WorkflowRuntime.ts`, update `resolveWorkflowFormJsonOptionsSourcePath(...)` so each configured `sourcePathSegments` entry is interpolated with the existing `interpolateWorkflowFormText(...)` before source path resolution.
+[x] Subtask 2.5. In `WorkflowRuntime.ts`, update `resolveWorkflowFormJsonOptionsSourcePath(...)` so each configured `sourcePathSegments` entry is interpolated with the existing `interpolateWorkflowFormText(...)` before source path resolution.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 2.6. In `WorkflowRuntime.ts`, reject any interpolated `sourcePathSegments` entry that still contains an unresolved `{...}` placeholder before attempting to read the JSON source file.
+[x] Subtask 2.6. In `WorkflowRuntime.ts`, reject any interpolated `sourcePathSegments` entry that still contains an unresolved `{...}` placeholder before attempting to read the JSON source file.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 2.7. In `WorkflowRuntime.ts`, validate each interpolated `sourcePathSegments` entry with `isWorkflowDiscoveryTargetPathSegment(...)`, then preserve the existing selected-project-root containment check and workspace path-policy check.
+[x] Subtask 2.7. In `WorkflowRuntime.ts`, validate each interpolated `sourcePathSegments` entry with `isWorkflowDiscoveryTargetPathSegment(...)`, then preserve the existing selected-project-root containment check and workspace path-policy check.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 2.8. In `WorkflowRuntime.test.ts`, add coverage proving a dropdown renders story options from `implementation/epic-{workflow.epic_identity}-stories.index.json` when `epic_identity` is already persisted in workflow values.
+[x] Subtask 2.8. In `WorkflowRuntime.test.ts`, add coverage proving a dropdown renders story options from `implementation/epic-{workflow.epic_identity}-stories.index.json` when `epic_identity` is already persisted in workflow values.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 2.9. In `WorkflowRuntime.test.ts`, add coverage proving unresolved dynamic `sourcePathSegments` placeholders fail before JSON file read.
+[x] Subtask 2.9. In `WorkflowRuntime.test.ts`, add coverage proving unresolved dynamic `sourcePathSegments` placeholders fail before JSON file read.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 2.10. In `WorkflowRuntime.test.ts`, add coverage proving a workflow value that resolves a dynamic source path segment into an unsafe segment is rejected before JSON file read.
+[x] Subtask 2.10. In `WorkflowRuntime.test.ts`, add coverage proving a workflow value that resolves a dynamic source path segment into an unsafe segment is rejected before JSON file read.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 2.11. In `WorkflowRuntime.test.ts`, preserve coverage proving static selected-project `jsonOptionsSource` behavior still renders `planning/Epics.index.json` options and still rejects invalid static `sourcePathSegments`.
+[x] Subtask 2.11. In `WorkflowRuntime.test.ts`, preserve coverage proving static selected-project `jsonOptionsSource` behavior still renders `planning/Epics.index.json` options and still rejects invalid static `sourcePathSegments`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`

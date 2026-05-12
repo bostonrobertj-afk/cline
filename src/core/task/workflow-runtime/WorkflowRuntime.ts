@@ -4337,7 +4337,7 @@ export class WorkflowRuntime {
 	private async resolveWorkflowFormPanelFields(args: {
 		taskState: TaskState
 		workflow: WorkflowDefinition
-		session: Pick<WorkflowFormSessionState, "values" | "data">
+		session: WorkflowFormSessionState
 		panel: WorkflowFormPanelDefinition
 	}): Promise<WorkflowFormFieldDefinition[]> {
 		const visibleFields = args.panel.fields
@@ -4394,6 +4394,7 @@ export class WorkflowRuntime {
 				await this.populateWorkflowFormDynamicOptions({
 					taskState: args.taskState,
 					workflow: args.workflow,
+					formSession: args.session,
 					field: resolvedField,
 				}),
 			)
@@ -4405,6 +4406,7 @@ export class WorkflowRuntime {
 	private async populateWorkflowFormDynamicOptions(args: {
 		taskState: TaskState
 		workflow: WorkflowDefinition
+		formSession: WorkflowFormSessionState
 		field: WorkflowFormFieldDefinition
 	}): Promise<WorkflowFormFieldDefinition> {
 		const dynamicOptions = await this.resolveWorkflowFormDynamicOptions(args)
@@ -4421,6 +4423,7 @@ export class WorkflowRuntime {
 	private async resolveWorkflowFormDynamicOptions(args: {
 		taskState: TaskState
 		workflow: WorkflowDefinition
+		formSession: WorkflowFormSessionState
 		field: WorkflowFormFieldDefinition
 	}): Promise<WorkflowFormOptionDefinition[] | undefined> {
 		const selectorOptions = await this.discoverWorkflowFormSelectorOptions(args)
@@ -4474,6 +4477,7 @@ export class WorkflowRuntime {
 	private async loadWorkflowFormJsonOptions(args: {
 		taskState: TaskState
 		workflow: WorkflowDefinition
+		formSession: WorkflowFormSessionState
 		field: WorkflowFormFieldDefinition
 	}): Promise<WorkflowFormOptionDefinition[] | undefined> {
 		const sourceConfig = args.field.jsonOptionsSource
@@ -4483,6 +4487,7 @@ export class WorkflowRuntime {
 
 		const sourcePath = this.resolveWorkflowFormJsonOptionsSourcePath({
 			taskState: args.taskState,
+			formSession: args.formSession,
 			fieldKey: args.field.key,
 			sourceConfig,
 		})
@@ -4524,6 +4529,7 @@ export class WorkflowRuntime {
 
 	private resolveWorkflowFormJsonOptionsSourcePath(args: {
 		taskState: TaskState
+		formSession: WorkflowFormSessionState
 		fieldKey: string
 		sourceConfig: WorkflowFormJsonOptionsSourceConfig
 	}): string {
@@ -4532,8 +4538,27 @@ export class WorkflowRuntime {
 			throw new Error(`Workflow form field ${args.fieldKey} jsonOptionsSource requires an active workflow session.`)
 		}
 
+		const sourcePathSegments = args.sourceConfig.sourcePathSegments.map((sourcePathSegment) =>
+			this.interpolateWorkflowFormText({
+				text: sourcePathSegment,
+				workflowSession: session,
+				formSession: args.formSession,
+			}),
+		)
+		for (const sourcePathSegment of sourcePathSegments) {
+			if (/\{[^{}]+\}/.test(sourcePathSegment)) {
+				throw new Error(
+					`Workflow form field ${args.fieldKey} jsonOptionsSource sourcePathSegments entry ${sourcePathSegment} contains an unresolved workflow-form placeholder.`,
+				)
+			}
+			if (isWorkflowDiscoveryTargetPathSegment(sourcePathSegment) === false) {
+				throw new Error(
+					`Workflow form field ${args.fieldKey} jsonOptionsSource resolved sourcePathSegments entry ${sourcePathSegment} is invalid.`,
+				)
+			}
+		}
 		const selectedProjectRoot = resolve(this.resolveWorkflowProjectOutputFolder(session))
-		const sourcePath = resolve(selectedProjectRoot, ...args.sourceConfig.sourcePathSegments)
+		const sourcePath = resolve(selectedProjectRoot, ...sourcePathSegments)
 		const relativeSourcePath = relative(selectedProjectRoot, sourcePath)
 		if (relativeSourcePath === ".." || relativeSourcePath.startsWith(`..${sep}`) || isAbsolute(relativeSourcePath)) {
 			throw new Error(

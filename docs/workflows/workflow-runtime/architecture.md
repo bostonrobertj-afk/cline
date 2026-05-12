@@ -346,7 +346,7 @@ Exact filenames beyond this level are deferred to requirements and implementatio
 
 1. Workflow runtime determines that the active step requires workflow-form interaction.
 2. Workflow runtime builds the per-panel payload for the active step using workflow-module configuration.
-   - JSON-backed option lists can resolve a source JSON file either from selected-project-relative path segments or from an active workflow value containing a governed absolute path.
+   - JSON-backed option lists resolve source JSON files from selected-project-relative `sourcePathSegments`. Source path segments may use the existing lookup-only workflow-form interpolation from workflow/session values; runtime interpolates those segments before selected-root path resolution and validates unresolved placeholders, resolved path segments, selected-root containment, and workspace path policy before file read.
 3. Workflow form capability renders the payload and captures user input.
 4. Workflow runtime receives the result and applies any declared durable form values through the workflow-value persistence seam.
 5. Workflow runtime performs any runtime-owned deterministic procedures needed to evaluate workflow/session state and re-enters canonical next-action evaluation.
