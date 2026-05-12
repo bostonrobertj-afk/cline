@@ -750,83 +750,83 @@ Allowed files:
 
 After completing this phase, pause for QA review before moving to Phase 7.
 
-[ ] Task 11. Register the pi-planning workflow.
+[x] Task 11. Register the pi-planning workflow.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRegistry.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 11.1. In `WorkflowRegistry.ts`, import `piPlanningWorkflowDefinition` from `@/core/task/workflow-runtime/workflow-modules/pi-planning`.
+[x] Subtask 11.1. In `WorkflowRegistry.ts`, import `piPlanningWorkflowDefinition` from `@/core/task/workflow-runtime/workflow-modules/pi-planning`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRegistry.ts`
 
-[ ] Subtask 11.2. In `WorkflowRegistry.ts`, append `piPlanningWorkflowDefinition` to `shippedWorkflowDefinitions`.
+[x] Subtask 11.2. In `WorkflowRegistry.ts`, append `piPlanningWorkflowDefinition` to `shippedWorkflowDefinitions`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRegistry.ts`
 
-[ ] Subtask 11.3. In `WorkflowRuntime.test.ts`, add registry coverage proving `resolveWorkflowDefinition("pi-planning")`, `resolveWorkflowBySlashCommand("pi-planning")`, and `resolveWorkflowByUseSkillName("pi-planning")` return the pi-planning workflow.
+[x] Subtask 11.3. In `WorkflowRuntime.test.ts`, add registry coverage proving `resolveWorkflowDefinition("pi-planning")`, `resolveWorkflowBySlashCommand("pi-planning")`, and `resolveWorkflowByUseSkillName("pi-planning")` return the pi-planning workflow.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 11.4. In `WorkflowRuntime.test.ts`, add registry coverage proving `resolveWorkflowDefinition("pi-planning.md")`, `resolveWorkflowBySlashCommand("pi-planning.md")`, and `resolveWorkflowByUseSkillName("pi-planning.md")` return `undefined`.
+[x] Subtask 11.4. In `WorkflowRuntime.test.ts`, add registry coverage proving `resolveWorkflowDefinition("pi-planning.md")`, `resolveWorkflowBySlashCommand("pi-planning.md")`, and `resolveWorkflowByUseSkillName("pi-planning.md")` return `undefined`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Task 12. Add prompt-projection integration coverage for pi-planning.
+[x] Task 12. Add prompt-projection integration coverage for pi-planning.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 12.1. In `integration.test.ts`, import `piPlanningWorkflowDefinition`.
+[x] Subtask 12.1. In `integration.test.ts`, import `piPlanningWorkflowDefinition`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 12.2. In `integration.test.ts`, add helper `createPiPlanningWorkflowSession(activeStepNumber)` that provides representative workflow values for `architecture_document`, `epics_document`, `epics_index`, `brainstorming_document`, `additional_context`, `target_epic`, `epic_identity`, `implementation_folder`, `drafts_folder`, `stories_index`, and `stories_index_existed_at_workflow_start`.
+[x] Subtask 12.2. In `integration.test.ts`, add helper `createPiPlanningWorkflowSession(activeStepNumber)` that provides representative workflow values for `architecture_document`, `epics_document`, `epics_index`, `brainstorming_document`, `additional_context`, `target_epic`, `epic_identity`, `implementation_folder`, `drafts_folder`, `stories_index`, and `stories_index_existed_at_workflow_start`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 12.3. In `integration.test.ts`, add helper `buildPiPlanningPromptContext(activeStepNumber)` that activates `pi-planning`, sets the active branch for the requested model-driven step, and returns runtime turn projection using native GPT-5 prompt settings.
+[x] Subtask 12.3. In `integration.test.ts`, add helper `buildPiPlanningPromptContext(activeStepNumber)` that activates `pi-planning`, sets the active branch for the requested model-driven step, and returns runtime turn projection using native GPT-5 prompt settings.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 12.4. In `integration.test.ts`, add coverage proving active Step 2 projects exactly `read_file`, `send_user_message`, `ask_followup_question`, and `workflow_progress_request`.
+[x] Subtask 12.4. In `integration.test.ts`, add coverage proving active Step 2 projects exactly `read_file`, `send_user_message`, `ask_followup_question`, and `workflow_progress_request`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 12.5. In `integration.test.ts`, add coverage proving active Step 3 projects exactly `list_files`, `search_files`, `list_code_definition_names`, `read_file`, `read_file_range`, `send_user_message`, `ask_followup_question`, and `workflow_progress_request`.
+[x] Subtask 12.5. In `integration.test.ts`, add coverage proving active Step 3 projects exactly `list_files`, `search_files`, `list_code_definition_names`, `read_file`, `read_file_range`, `send_user_message`, `ask_followup_question`, and `workflow_progress_request`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 12.6. In `integration.test.ts`, add coverage proving active Step 4 projects exactly `read_file`, `plan_story_artifacts`, `set_workflow_values`, `send_user_message`, `ask_followup_question`, and `workflow_progress_request`.
+[x] Subtask 12.6. In `integration.test.ts`, add coverage proving active Step 4 projects exactly `read_file`, `plan_story_artifacts`, `set_workflow_values`, `send_user_message`, `ask_followup_question`, and `workflow_progress_request`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 12.7. In `integration.test.ts`, add coverage proving active Step 5 projects exactly `generate_story_files`, `send_user_message`, and `ask_followup_question`.
+[x] Subtask 12.7. In `integration.test.ts`, add coverage proving active Step 5 projects exactly `generate_story_files`, `send_user_message`, and `ask_followup_question`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 12.8. In `integration.test.ts`, add coverage proving active Step 6 projects exactly `list_files`, `read_file`, `apply_patch`, `plan_story_artifacts`, `generate_story_files`, `send_user_message`, `ask_followup_question`, and `attempt_completion`.
+[x] Subtask 12.8. In `integration.test.ts`, add coverage proving active Step 6 projects exactly `list_files`, `read_file`, `apply_patch`, `plan_story_artifacts`, `generate_story_files`, `send_user_message`, `ask_followup_question`, and `attempt_completion`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 12.9. In `integration.test.ts`, add coverage proving pi-planning current step details appear in the workflow input payload and not in the system prompt.
+[x] Subtask 12.9. In `integration.test.ts`, add coverage proving pi-planning current step details appear in the workflow input payload and not in the system prompt.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 12.10. In `integration.test.ts`, add coverage proving pi-planning prompt projection never statically exposes `build_workflow_document`, `create_workflow_artifact`, `archive_workflow_artifact`, `delete_workflow_artifact`, or `move_workflow_project_file`.
+[x] Subtask 12.10. In `integration.test.ts`, add coverage proving pi-planning prompt projection never statically exposes `build_workflow_document`, `create_workflow_artifact`, `archive_workflow_artifact`, `delete_workflow_artifact`, or `move_workflow_project_file`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`

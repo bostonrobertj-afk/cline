@@ -31,6 +31,7 @@ import type {
 import { WorkflowRuntime } from "@/core/task/workflow-runtime/WorkflowRuntime"
 import { createArchitectureWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/create-architecture"
 import { createEpicsWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/create-epics"
+import { piPlanningWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/pi-planning"
 import type { McpHub } from "@/services/mcp/McpHub"
 import type { McpServer } from "@/shared/mcp"
 import { ModelFamily } from "@/shared/prompts"
@@ -608,6 +609,93 @@ const buildCreateEpicsPromptContext = async (): Promise<SystemPromptContext & Wo
 	}
 }
 
+type PiPlanningPromptStepNumber = 2 | 3 | 4 | 5 | 6
+
+const PI_PLANNING_ARCHITECTURE_DOCUMENT = "/test/project/planning/architecture.md"
+const PI_PLANNING_EPICS_DOCUMENT = "/test/project/planning/Epics.md"
+const PI_PLANNING_EPICS_INDEX = "/test/project/planning/Epics.index.json"
+const PI_PLANNING_BRAINSTORMING_DOCUMENT = "/test/project/discovery/brainstorming.md"
+const PI_PLANNING_ADDITIONAL_CONTEXT = "/test/project/discovery/research-notes.md"
+const PI_PLANNING_TARGET_EPIC = "Epic 7: Workflow runtime PI planning"
+const PI_PLANNING_EPIC_IDENTITY = "7"
+const PI_PLANNING_IMPLEMENTATION_FOLDER = "/test/project/implementation"
+const PI_PLANNING_DRAFTS_FOLDER = "/test/project/implementation/drafts"
+const PI_PLANNING_STORIES_INDEX = "/test/project/implementation/epic-7-stories.index.json"
+
+const getPiPlanningEntryBranchId = (activeStepNumber: PiPlanningPromptStepNumber): string => {
+	switch (activeStepNumber) {
+		case 2:
+			return piPlanningWorkflowDefinition.steps["step-2"].decisionTree.entryBranchId
+		case 3:
+			return piPlanningWorkflowDefinition.steps["step-3"].decisionTree.entryBranchId
+		case 4:
+			return piPlanningWorkflowDefinition.steps["step-4"].decisionTree.entryBranchId
+		case 5:
+			return piPlanningWorkflowDefinition.steps["step-5"].decisionTree.entryBranchId
+		case 6:
+			return piPlanningWorkflowDefinition.steps["step-6"].decisionTree.entryBranchId
+	}
+
+	const unreachableActiveStepNumber: never = activeStepNumber
+	return unreachableActiveStepNumber
+}
+
+const createPiPlanningWorkflowSession = (activeStepNumber: PiPlanningPromptStepNumber): ActiveWorkflowSession => ({
+	activeStepNumber,
+	workflowValues: {
+		architecture_document: PI_PLANNING_ARCHITECTURE_DOCUMENT,
+		epics_document: PI_PLANNING_EPICS_DOCUMENT,
+		epics_index: PI_PLANNING_EPICS_INDEX,
+		brainstorming_document: PI_PLANNING_BRAINSTORMING_DOCUMENT,
+		additional_context: PI_PLANNING_ADDITIONAL_CONTEXT,
+		target_epic: PI_PLANNING_TARGET_EPIC,
+		epic_identity: PI_PLANNING_EPIC_IDENTITY,
+		implementation_folder: PI_PLANNING_IMPLEMENTATION_FOLDER,
+		drafts_folder: PI_PLANNING_DRAFTS_FOLDER,
+		stories_index: PI_PLANNING_STORIES_INDEX,
+		stories_index_existed_at_workflow_start: true,
+	},
+	projectSelection: {
+		projectMode: "new",
+		projectTitle: "PI Planning Session",
+		projectFolderName: "pi-planning-session",
+	},
+	lifecycle: {
+		projectSelectionCompleted: true,
+	},
+	entryArtifactResolution: undefined,
+	ui: {
+		suppressedWorkflowFormIds: [],
+		suppressedWorkflowStepResolutionRoutes: [],
+	},
+	branchContext: {
+		activeBranchId: getPiPlanningEntryBranchId(activeStepNumber),
+	},
+})
+
+const buildPiPlanningPromptContext = async (
+	activeStepNumber: PiPlanningPromptStepNumber,
+): Promise<SystemPromptContext & WorkflowPromptProjection> => {
+	const workspacePathPolicy: WorkflowWorkspacePathPolicy = {
+		validateAccess: () => true,
+	}
+	const runtime = new WorkflowRuntime({ cwd: "/test/project", workspacePathPolicy })
+	const taskState = new TaskState()
+	taskState.activeWorkflowName = "pi-planning"
+	taskState.activeWorkflowSession = createPiPlanningWorkflowSession(activeStepNumber)
+	taskState.apiRequestCount = 1
+	const workflowProjection = await runtime.buildTurnProjection({ taskState })
+
+	return {
+		...baseContext,
+		mcpHub: makeMcpHub([]),
+		providerInfo: makeProviderInfo("gpt-5-codex", "openai"),
+		enableNativeToolCalls: true,
+		useMinimalGptPrompt: true,
+		...workflowProjection,
+	}
+}
+
 const isNativeToolsFamily = (family: ModelFamily) =>
 	[ModelFamily.NATIVE_NEXT_GEN, ModelFamily.NATIVE_GPT_5, ModelFamily.NATIVE_GPT_5_1, ModelFamily.GEMINI_3].includes(family)
 
@@ -631,6 +719,20 @@ async function runPromptTest(
 			throw error
 		}
 	}
+}
+
+async function expectPiPlanningProjectedToolNames(
+	testCtx: TestRunner,
+	activeStepNumber: PiPlanningPromptStepNumber,
+	expectedToolNames: readonly string[],
+): Promise<void> {
+	const context = await buildPiPlanningPromptContext(activeStepNumber)
+	const projectedToolNames = (context.workflowToolSchemaOverride ?? []).map((tool) => tool.name)
+	expect(projectedToolNames).to.deep.equal(expectedToolNames)
+
+	await runPromptTest(testCtx, context, "gpt-5-codex", async ({ tools }) => {
+		expect(getNativeToolNames(tools)).to.deep.equal(expectedToolNames)
+	})
 }
 
 // ============================================================================
@@ -1285,6 +1387,60 @@ describe("Prompt System Integration Tests", () => {
 			})
 		})
 
+		it("projects active pi-planning Step 2 tools into native GPT-5 prompts", async function () {
+			await expectPiPlanningProjectedToolNames(this, 2, [
+				"read_file",
+				"send_user_message",
+				"ask_followup_question",
+				"workflow_progress_request",
+			])
+		})
+
+		it("projects active pi-planning Step 3 tools into native GPT-5 prompts", async function () {
+			await expectPiPlanningProjectedToolNames(this, 3, [
+				"list_files",
+				"search_files",
+				"list_code_definition_names",
+				"read_file",
+				"read_file_range",
+				"send_user_message",
+				"ask_followup_question",
+				"workflow_progress_request",
+			])
+		})
+
+		it("projects active pi-planning Step 4 tools into native GPT-5 prompts", async function () {
+			await expectPiPlanningProjectedToolNames(this, 4, [
+				"read_file",
+				"plan_story_artifacts",
+				"set_workflow_values",
+				"send_user_message",
+				"ask_followup_question",
+				"workflow_progress_request",
+			])
+		})
+
+		it("projects active pi-planning Step 5 tools into native GPT-5 prompts", async function () {
+			await expectPiPlanningProjectedToolNames(this, 5, [
+				"generate_story_files",
+				"send_user_message",
+				"ask_followup_question",
+			])
+		})
+
+		it("projects active pi-planning Step 6 tools into native GPT-5 prompts", async function () {
+			await expectPiPlanningProjectedToolNames(this, 6, [
+				"list_files",
+				"read_file",
+				"apply_patch",
+				"plan_story_artifacts",
+				"generate_story_files",
+				"send_user_message",
+				"ask_followup_question",
+				"attempt_completion",
+			])
+		})
+
 		it("projects create-architecture workflow context into the full-turn input payload only", async function () {
 			const context = await buildCreateArchitecturePromptContext(3)
 			const workflowInputPayloadBlock = context.workflowInputPayloadBlock
@@ -1367,6 +1523,69 @@ describe("Prompt System Integration Tests", () => {
 					"After the user indicates alignment with the drafted epics, use `attempt_completion` to provide a final recap and remind the user to run the `pi-planning` workflow for each epic to define that epic's user stories.",
 				)
 			})
+		})
+
+		it("projects pi-planning current step details into the full-turn input payload only", async function () {
+			const context = await buildPiPlanningPromptContext(2)
+			const workflowInputPayloadBlock = context.workflowInputPayloadBlock
+			expect(workflowInputPayloadBlock).to.not.equal(undefined)
+			if (workflowInputPayloadBlock === undefined) {
+				throw new Error("Expected pi-planning workflow input payload.")
+			}
+
+			expect(workflowInputPayloadBlock).to.include("Workflow:\nPI Planning")
+			expect(workflowInputPayloadBlock).to.include(
+				"Description: Break a selected epic into implementation-ready draft story files using architecture, epics, and optional discovery context.",
+			)
+			expect(workflowInputPayloadBlock).to.include("Name: John")
+			expect(workflowInputPayloadBlock).to.include("Role: Product Manager")
+			expect(workflowInputPayloadBlock).to.include("1. Gather Inputs - Complete")
+			expect(workflowInputPayloadBlock).to.include("2. Review Context - Active")
+			expect(workflowInputPayloadBlock).to.include("6. Populate Story Files with Initial Details - Not Started")
+			expect(workflowInputPayloadBlock).to.include("CURRENT STEP DETAILED INSTRUCTIONS")
+			expect(workflowInputPayloadBlock).to.include("Step 2: Review Context")
+			expect(workflowInputPayloadBlock).to.include("Prepare to break a single epic down into deliverable user stories.")
+			expect(workflowInputPayloadBlock).to.include(`Focus only on \`${PI_PLANNING_TARGET_EPIC}\`.`)
+			expect(workflowInputPayloadBlock).to.include(
+				`Read \`${PI_PLANNING_EPICS_INDEX}\`, \`${PI_PLANNING_EPICS_DOCUMENT}\`, and \`${PI_PLANNING_ARCHITECTURE_DOCUMENT}\`.`,
+			)
+
+			await runPromptTest(this, context, "gpt-5-codex", async ({ systemPrompt }) => {
+				expect(systemPrompt).to.not.include("CURRENT STEP DETAILED INSTRUCTIONS")
+				expect(systemPrompt).to.not.include("Step 2: Review Context")
+				expect(systemPrompt).to.not.include("Prepare to break a single epic down into deliverable user stories.")
+				expect(systemPrompt).to.not.include(`Focus only on \`${PI_PLANNING_TARGET_EPIC}\`.`)
+				expect(systemPrompt).to.not.include(
+					`Read \`${PI_PLANNING_EPICS_INDEX}\`, \`${PI_PLANNING_EPICS_DOCUMENT}\`, and \`${PI_PLANNING_ARCHITECTURE_DOCUMENT}\`.`,
+				)
+			})
+		})
+
+		it("does not statically expose backend-only runtime tools in pi-planning prompt projection", async function () {
+			const activeStepNumbers: readonly PiPlanningPromptStepNumber[] = [2, 3, 4, 5, 6]
+			const forbiddenToolNames: readonly string[] = [
+				"build_workflow_document",
+				"create_workflow_artifact",
+				"archive_workflow_artifact",
+				"delete_workflow_artifact",
+				"move_workflow_project_file",
+			]
+
+			for (const activeStepNumber of activeStepNumbers) {
+				const context = await buildPiPlanningPromptContext(activeStepNumber)
+				const projectedToolNames = (context.workflowToolSchemaOverride ?? []).map((tool) => tool.name)
+				for (const forbiddenToolName of forbiddenToolNames) {
+					expect(projectedToolNames).to.not.include(forbiddenToolName)
+				}
+
+				await runPromptTest(this, context, "gpt-5-codex", async ({ systemPrompt, tools }) => {
+					const nativeToolNames = getNativeToolNames(tools)
+					for (const forbiddenToolName of forbiddenToolNames) {
+						expect(nativeToolNames).to.not.include(forbiddenToolName)
+						expect(systemPrompt).to.not.include(forbiddenToolName)
+					}
+				})
+			}
 		})
 
 		it("projects active brainstorming Step 3 choose and random tools into native GPT-5 prompts", async function () {

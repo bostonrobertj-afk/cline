@@ -52,6 +52,7 @@ import {
 	buildInitialCreateArchitectureDocument,
 } from "../workflow-modules/create-architecture/createArchitectureDocument"
 import { createEpicsWorkflowDefinition } from "../workflow-modules/create-epics"
+import { piPlanningWorkflowDefinition } from "../workflow-modules/pi-planning"
 
 type ObservedDecisionPredicateInput = {
 	activeBranchId: string
@@ -1869,6 +1870,22 @@ describe("WorkflowRuntime", () => {
 		expect(resolvedWorkflow).to.equal(createEpicsWorkflowDefinition)
 		expect(resolvedWorkflow?.name).to.equal("create-epics")
 		expect(WorkflowRegistry.resolveWorkflowDefinition("create-epics.md")).to.equal(undefined)
+	})
+
+	it("resolves the shipped pi-planning workflow by workflow name, slash command, and use-skill name", () => {
+		resolveWorkflowDefinitionStub.restore()
+
+		expect(WorkflowRegistry.resolveWorkflowDefinition("pi-planning")).to.equal(piPlanningWorkflowDefinition)
+		expect(WorkflowRegistry.resolveWorkflowBySlashCommand("pi-planning")).to.equal(piPlanningWorkflowDefinition)
+		expect(WorkflowRegistry.resolveWorkflowByUseSkillName("pi-planning")).to.equal(piPlanningWorkflowDefinition)
+	})
+
+	it("does not resolve pi-planning markdown filename aliases", () => {
+		resolveWorkflowDefinitionStub.restore()
+
+		expect(WorkflowRegistry.resolveWorkflowDefinition("pi-planning.md")).to.equal(undefined)
+		expect(WorkflowRegistry.resolveWorkflowBySlashCommand("pi-planning.md")).to.equal(undefined)
+		expect(WorkflowRegistry.resolveWorkflowByUseSkillName("pi-planning.md")).to.equal(undefined)
 	})
 
 	it("activates create-architecture through the shared entry form and projects its nine-step checklist", async () => {
