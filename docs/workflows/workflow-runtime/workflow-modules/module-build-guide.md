@@ -207,7 +207,6 @@ Project setup creates `implementation/drafts`, `implementation/stories-backlog`,
 
 - `plan_story_artifacts` creates or expands primary story entries in `epic-{E}-stories.index.json`.
 - `plan_remediation_story_artifact` appends the next remediation story entry under an existing target story.
-- `generate_story_files` creates missing draft story files under `implementation/drafts` from `epic-{E}-stories.index.json` using `.cline/skills/bmad-create-story/template.md`.
 
 ### Deterministic Procedures
 

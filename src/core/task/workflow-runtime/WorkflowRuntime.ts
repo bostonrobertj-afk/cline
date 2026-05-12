@@ -57,6 +57,7 @@ import type {
 	WorkflowStepResolutionSourceRoute,
 } from "@/core/task/workflow-step-resolution/types"
 import { ClineDefaultTool, toolUseNames } from "@/shared/tools"
+import { buildWorkflowStoryFileTemplate } from "./storyFileTemplate"
 import type {
 	ActiveWorkflowSession,
 	PersistedWorkflowSession,
@@ -1317,9 +1318,7 @@ export class WorkflowRuntime {
 			throw new Error("Draft story file paths changed before story-file generation.")
 		}
 
-		const storyTemplatePath = join(this.cwd, ".cline", "skills", "bmad-create-story", "template.md")
-		this.assertWorkspacePathAllowed(storyTemplatePath)
-		const storyTemplateContent = await readFile(storyTemplatePath, "utf8")
+		const storyTemplateContent = buildWorkflowStoryFileTemplate()
 		const storyIndex = await this.readRequiredWorkflowStoryIndex(preparation.storyIndexAbsolutePath)
 		const createdDraftStoryFileAbsolutePaths: string[] = []
 		const existingDraftStoryFileAbsolutePaths: string[] = []

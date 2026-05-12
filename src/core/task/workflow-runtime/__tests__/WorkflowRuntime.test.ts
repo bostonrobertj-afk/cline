@@ -23,6 +23,7 @@ import { ClineDefaultTool } from "@/shared/tools"
 import { WorkflowArtifactFamily } from "../artifactFamilies"
 import * as WorkflowDiscovery from "../discovery"
 import { parseWorkflowStoryIndexJson, stringifyWorkflowStoryIndex } from "../storyArtifacts"
+import { buildWorkflowStoryFileTemplate } from "../storyFileTemplate"
 import type {
 	ActiveWorkflowSession,
 	PersistedWorkflowSession,
@@ -1152,15 +1153,6 @@ describe("WorkflowRuntime", () => {
 		})
 
 		return { workflow, artifactId, outputValueKeys }
-	}
-
-	async function installCanonicalStoryTemplate(): Promise<string> {
-		const canonicalTemplatePath = join(process.cwd(), ".cline", "skills", "bmad-create-story", "template.md")
-		const canonicalTemplateContent = await readFile(canonicalTemplatePath, "utf8")
-		const runtimeTemplatePath = join(cwd, ".cline", "skills", "bmad-create-story", "template.md")
-		await mkdir(dirname(runtimeTemplatePath), { recursive: true })
-		await writeFile(runtimeTemplatePath, canonicalTemplateContent, "utf8")
-		return canonicalTemplateContent
 	}
 
 	function createPrerequisiteResolutionDecisionTree(args: {
@@ -9624,8 +9616,8 @@ describe("WorkflowRuntime", () => {
 		expect(planningError.message).to.equal("Target story identity 9.2 was not found in the selected epic story index.")
 	})
 
-	it("generates missing draft story files with the canonical story template content", async () => {
-		const canonicalTemplateContent = await installCanonicalStoryTemplate()
+	it("generates missing draft story files with the runtime story template content", async () => {
+		const expectedStoryFileContent = buildWorkflowStoryFileTemplate()
 		const workflow = createWorkflowDefinition()
 		await activateWorkflow(taskState, workflow)
 		await runtime.resolveNextAction({ taskState })
@@ -9642,6 +9634,8 @@ describe("WorkflowRuntime", () => {
 		})
 		const generationPreparation = await runtime.prepareGenerateStoryFiles({ taskState, epicIdentity: "10" })
 
+		expect(await pathExists(join(cwd, ".cline", "skills", "bmad-create-story", "template.md"))).to.equal(false)
+
 		const result = await runtime.generateStoryFiles({
 			taskState,
 			epicIdentity: "10",
@@ -9651,13 +9645,12 @@ describe("WorkflowRuntime", () => {
 
 		expect(result.createdDraftStoryFileAbsolutePaths).to.deep.equal(generationPreparation.draftStoryFileAbsolutePaths)
 		for (const draftStoryFileAbsolutePath of generationPreparation.draftStoryFileAbsolutePaths) {
-			expect(await readFile(draftStoryFileAbsolutePath, "utf8")).to.equal(canonicalTemplateContent)
+			expect(await readFile(draftStoryFileAbsolutePath, "utf8")).to.equal(expectedStoryFileContent)
 		}
 		expect(result.storyIndex.stories.every((story) => story.story_file_generated === true)).to.equal(true)
 	})
 
 	it("does not overwrite existing draft story files and marks them generated", async () => {
-		await installCanonicalStoryTemplate()
 		const workflow = createWorkflowDefinition()
 		await activateWorkflow(taskState, workflow)
 		await runtime.resolveNextAction({ taskState })
