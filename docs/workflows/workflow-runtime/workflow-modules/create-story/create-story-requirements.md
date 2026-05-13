@@ -12,6 +12,14 @@ The create-story workflow must not create canonical story identities, canonical 
 
 Do not rely on the source markdown workflow file, legacy templates, BMAD files, placeholder workflow state, managed-workflow state, `.cline/workflow-config.yaml`, or other legacy workflow assets at runtime. Source files are migration references only.
 
+## Source Verbiage Fidelity
+
+The create-story requirements must preserve the exact user-provided UI and AI prompt verbiage from `/Users/robertboston/Documents/Cline/Workflows/create-story.md`.
+
+The module must not invent, paraphrase, summarize, or add UI-visible panel titles, `promptMarkdown`, field labels, action labels, static notice content, helper text, or AI prompt text.
+
+If required UI-visible text or prompt text is missing from the source document, the module build must stop and request source-document clarification before requirements, action-plan, or runtime implementation work proceeds.
+
 ## Workflow Identity
 
 - `name`: `create-story`
@@ -118,7 +126,7 @@ All prerequisite declarations must use `outputDocumentReference: "none"` because
 
 After the user selects an epic, runtime/module logic must derive the expected story index path as `implementation/epic-{E}-stories.index.json`, where `{E}` is the selected `epic_identity`.
 
-If the selected epic's story index file does not exist, the workflow must render a user-facing message stating that the selected epic does not yet have a story index file and that the user must run the `pi-planning` workflow to generate it. The workflow must not proceed to story selection or model-driven work.
+If the selected epic's `Epics.index.json` entry has `story-index-generated: false`, the workflow must render a user-facing message stating that the selected epic does not yet have a story index file and that the user must run the `pi-planning` workflow to generate it. The workflow must not proceed to story selection or model-driven work.
 
 `epic-{E}-stories.index.json` is the selected epic's canonical story inventory. The create-story workflow must use the story index to populate the target-story dropdown and derive story metadata. The AI must not parse story identities or filenames from markdown and must not provide canonical story identities or filenames.
 
@@ -168,7 +176,7 @@ The module must define these four steps, using these exact `checklistLabel` valu
 
 | Step id | Step number | `checklistLabel` | Required runtime shape |
 | --- | --- | --- | --- |
-| `step-1` | 1 | `Gather Inputs` | Resolve required and optional prerequisites, render target-epic and target-story workflow forms, derive story paths and metadata, and transition only actionable draft or user-approved backlog stories to Step 2. |
+| `step-1` | 1 | `Gather Inputs` | Resolve required and optional prerequisites, render one same-session workflow form for Panels A through G, derive story paths and metadata, and transition only actionable draft or user-approved backlog stories to Step 2. |
 | `step-2` | 2 | `Review Context & Ensure Project Alignment` | Model-driven context review step; progression requires `workflow_progress_request` confirmation. |
 | `step-3` | 3 | `Author Tasks & Subtasks` | Model-driven story task/subtask authoring or revision step; progression requires `workflow_progress_request` confirmation after user review. |
 | `step-4` | 4 | `Finalize & Validate Story Document` | Model-driven story validation step; final delivery uses `attempt_completion` and routes `attempt_completion_succeeded` through deterministic story finalization before completion. |
@@ -179,49 +187,138 @@ Step 1 must resolve prerequisite files before rendering module-owned input workf
 
 Step 1 must invoke `resolve_prerequisite_files` for `architecture_document`, `epics_document`, `epics_index`, and `brainstorming_document`.
 
-After prerequisite resolution succeeds or optional prerequisites are skipped, Step 1 must render module-owned workflow form behavior for story selection.
+After prerequisite resolution succeeds or optional prerequisites are skipped, Step 1 must render one module-owned workflow form session containing Panels A through G. Step 1 must not split Panels A through G across separate workflow form sessions.
 
-Panel A must ask `Which epic are we focusing on during this workflow?`
+Panel A must render through the initial `render_workflow_form` action. Panels B through G must render through Phase 68 same-session `continue_workflow_form` actions after workflow runtime evaluates module-owned routes/actions.
 
-Panel A must render a required dropdown populated from `planning/Epics.index.json` by using `jsonOptionsSource`. The option value must be the selected epic's `identity`; labels must identify the selected epic clearly from the index entry. The selected value must persist `epic_identity`, and runtime/module logic must persist the corresponding user-facing epic label or title to `target_epic`.
+Runtime/module logic must run between Step 1 panels when the next panel depends on selected inputs, deterministic backend checks, selected-project file checks, story index parsing, story file path derivation, remediation context derivation, or story status handling. Runtime/module logic must provide or replace the target panel data immediately before the continued panel renders.
 
-Panel A must derive its dropdown from `Epics.index.json`, not from markdown parsing of `Epics.md`.
+Back navigation must use explicit `backDestinationPanelId` values. Runtime must not assume the workflow form can replay module-owned routes/actions to infer prior panel history.
+
+Panel titles, `promptMarkdown`, field labels, action labels, allowed actions, and back destinations must match `/Users/robertboston/Documents/Cline/Workflows/create-story.md` exactly. The module must not add `static_notice` fields, helper fields, explanatory fields, or other UI-visible copy that is not present in the source document.
+
+Panel A must be:
+
+- `panelId`: module-owned Panel A id
+- `title`: `Epic Selection`
+- `promptMarkdown`: `Which epic are we focusing on during this workflow?`
+- field kind: `dropdown`
+- field label: `Target Epic`
+- field required: `true`
+- options: `JsonOptionsSource` with the list of epics derived from `planning/Epics.index.json`
+- option label: `Epic {identity}: {title}`
+- option descriptions: none
+
+Panel A must derive its dropdown from `Epics.index.json`, not from markdown parsing of `Epics.md`. The selected value must persist `epic_identity`, and runtime/module logic must persist the selected epic as `target_epic`.
 
 Panel A must reject or fail clearly if `Epics.index.json` contains no epics.
 
-After Panel A, runtime/module logic must derive `stories_index` for the selected epic. If the selected epic's story index file is absent, Step 1 must render the cannot-continue message described in `Story Index And Story File Ownership`.
+After Panel A, runtime/module logic must inspect the selected epic's canonical `story-index-generated` value from `Epics.index.json` and derive `stories_index` as `implementation/epic-{E}-stories.index.json`.
 
-Panel B must be shown only when the selected epic's story index file is present.
+Panel B must be shown after Panel A when the selected epic's `Epics.index.json` entry has `story-index-generated: true`.
 
-Panel B must ask `Which story should I focus on during this workflow?`
+Panel B must be:
 
-Panel B must render a required dropdown populated from the selected epic's `stories_index`. The option value must be the selected story's `story_identity`; labels must identify each story clearly from its indexed identity and filename.
+- `panelId`: module-owned Panel B id
+- `title`: `Story Selection`
+- `promptMarkdown`: `Which story should I focus on during this workflow?`
+- field kind: `dropdown`
+- field label: `Target Story`
+- field required: `true`
+- options: `JsonOptionsSource` with the list of all stories derived from the identified story index file
+- option label: `Story {story_identity}`
+- option descriptions: none
 
-After Panel B, runtime/module logic must persist `selected_story_identity`, `selected_story_file_name`, `selected_story_type`, `selected_story_status`, and `selected_story_file_generated` from the selected story index entry.
+Panel C must be shown after Panel A when the selected epic's `Epics.index.json` entry has `story-index-generated: false`.
 
-If the selected story has `story_file_generated: false`, Step 1 must render the cannot-continue message described in `Story Index And Story File Ownership`.
+Panel C must be:
 
-If the selected story has `status: "draft"`, Step 1 must derive and persist `target_story`, derive remediation context when applicable, and transition to Step 2.
+- `panelId`: module-owned Panel C id
+- `title`: `Missing Story Index for Selected Epic`
+- `promptMarkdown`: `The selected epic does not yet have a story index. Please end this workflow then run the pi-planning workflow in a new conversation to generate this epic's story index before running the create-story workflow.`
+- fields: none
+- allowed action: `submit`
+- submit action label: `End Workflow`
+- allowed action: `back`
+- back action label: `Select Another Epic`
+- `backDestinationPanelId`: Panel A
 
-If the selected story has `status: "backlog"`, Step 1 must render Panel C.
+Panel C submit must route to `complete_workflow` without model-driven work, story-index mutation, or file movement.
 
-Panel C must ask `The selected story appears to be ready for implementation. Do you want to revise the existing tasks and subtasks before implementing it via the dev-story workflow?`
+After Panel B, runtime/module logic must persist `selected_story_identity`, `selected_story_file_name`, `selected_story_type`, `selected_story_status`, and `selected_story_file_generated` from the selected story index entry. Runtime/module logic must derive the selected story's status from the story index file.
 
-Panel C must render a required yes/no field and must include a back option that lets the user return to Panel B to select another story.
+If the selected story has `status: "draft"`, runtime/module logic must set `target_story` to the selected story file path, derive remediation context when applicable, and transition to Step 2.
 
-If the user answers yes on Panel C, Step 1 must persist `revise_backlog_story`, derive and persist `target_story`, derive remediation context when applicable, and transition to Step 2.
+If the selected story is a remediation story, runtime/module logic must locate the story on which the remediation story was based, persist that full file path to `parent_story`, locate the review findings document that led to the remediation story's creation, and persist that full file path to `findings_document`.
 
-If the user answers no on Panel C, Step 1 must render Panel D.
+Panel D must be shown after Panel B when the selected story's index entry has `story_file_generated: false`.
 
-Panel D must state `Since the selected story already has been populated with tasks and subtasks, your next step is to run the dev-story workflow and select this story as the implementation target.`
+Panel D must be:
 
-Panel D must render a confirmation control. Confirmation must route to `complete_workflow` without model-driven work, story-index mutation, or file movement.
+- `panelId`: module-owned Panel D id
+- `title`: `Missing Story File`
+- `promptMarkdown`: `The selected story's document does not exist yet. Run the PI-planning workflow to generate the story document before selecting the story during the create-story workflow.`
+- fields: none
+- allowed action: `submit`
+- submit action label: `End workflow`
+- allowed action: `back`
+- back action label: `Select Another Story`
+- `backDestinationPanelId`: Panel B
 
-If the selected story has `status: "review"` or `status: "complete"`, Step 1 must render Panel E.
+Panel D submit must route to `complete_workflow` without model-driven work, story-index mutation, or file movement.
 
-Panel E must state `This story has already been implemented. New tasks should not be added to stories after implementation. If findings were documented during QA, the QA agent generated a remediation story to address those findings. Please go back and select the appropriate remediation story as the target for this workflow.`
+Panel E must be shown after Panel B when the selected story's status is `backlog`.
 
-Panel E must include a back option that lets the user return to Panel B to select another story.
+Panel E must be:
+
+- `panelId`: module-owned Panel E id
+- `title`: `Story Ready for Implementation`
+- `promptMarkdown`: `The selected story appears to be ready for implementation.`
+- field kind: `boolean`
+- field label: `Would you like to revise this story's existing tasks?`
+- field required: `true`
+- field `allowedValueType`: `boolean`
+- field `trueLabel`: `Yes`
+- field `falseLabel`: `No`
+- allowed action: `submit`
+- submit action label: `Continue`
+- allowed action: `back`
+- back action label: `Select Another Story`
+- `backDestinationPanelId`: Panel B
+
+If the user answers yes on Panel E, runtime/module logic must persist `revise_backlog_story`, derive and persist `target_story`, derive remediation context when applicable, and transition to Step 2.
+
+Panel F must be shown if the user answers no on Panel E.
+
+Panel F must be:
+
+- `panelId`: module-owned Panel F id
+- `title`: `Run Dev-Story Workflow`
+- `promptMarkdown`: `Since the selected story already has been populated with tasks and subtasks, your next step is to run the dev-story workflow and select this story as the implementation target.`
+- fields: none
+- allowed action: `submit`
+- submit action label: `End Workflow`
+- allowed action: `back`
+- back action label: `Select Another Story`
+- `backDestinationPanelId`: Panel B
+
+Panel F submit must route to `complete_workflow` without model-driven work, story-index mutation, or file movement.
+
+Panel G must be shown after Panel B when the selected story's status is `complete` or `review`.
+
+Panel G must be:
+
+- `panelId`: module-owned Panel G id
+- `title`: `Story Already Implemented`
+- `promptMarkdown`: `This story has already been implemented. New tasks should not be added to stories after implementation. If findings were documented during QA, the QA agent generated a remediation story to address those findings. Please go back and select the appropriate remediation story as the target for this workflow, or end this workflow.`
+- fields: none
+- allowed action: `submit`
+- submit action label: `End Workflow`
+- allowed action: `back`
+- back action label: `Select Another Story`
+- `backDestinationPanelId`: Panel B
+
+Panel G submit must route to `complete_workflow` without model-driven work, story-index mutation, or file movement.
 
 Step 1 must be runtime-driven and must expose an empty tool schema through an exported builder from `createStoryToolSchemas.ts`.
 
@@ -229,30 +326,62 @@ Step 1 must be runtime-driven and must expose an empty tool schema through an ex
 
 Step 2 must enter model-driven work through a `project_prompt` decision action.
 
-Step 2 `buildPromptSource` must construct the Step 2 prompt from module-owned code.
+Step 2 `buildPromptSource` must construct the Step 2 prompt from module-owned code. The Step 2 prompt must preserve the exact conditional prompt text from `/Users/robertboston/Documents/Cline/Workflows/create-story.md`, with workflow value placeholders rendered through deterministic workflow value rendering.
 
-When the selected story has `status: "backlog"` and the user answered yes on Panel C, the Step 2 prompt must instruct the AI that it is revising an existing story file.
+When the selected story has `status: "backlog"` and `revise_backlog_story: true`, Step 2 must use this exact prompt variant:
 
-When the selected story has `status: "draft"` and `story_type: "primary"`, the Step 2 prompt must instruct the AI that it is preparing a story file for implementation by adding tasks and subtasks.
+```text
+In this workflow you will be assisting the user in revising an existing story file.
 
-When the selected story has `status: "draft"` and `story_type: "remediation"`, the Step 2 prompt must instruct the AI that it is preparing a remediation story file for implementation by adding tasks and subtasks. The prompt must include `parent_story` and `findings_document`.
+The target story for this workflow is: target_story
 
-The Step 2 prompt must instruct the AI to:
+Before doing anything else, ensure that the existing content within the target story file fully aligns with the project's foundational documents, including:
+- Project Architecture: architecture_document
+- Epics Document: epics_document
+If you detect any conflict or misalignment, notify the user and work with them to identify the appropriate resolution. Only proceed once the story file's objective, scope, scope boundary, requirements, and Known Issues/ Risks/ Technical Debt sections fully align with the project's foundational documents.
 
-- focus on `target_story`
-- read `target_story`
-- read `architecture_document`
-- read `epics_document`
-- read `brainstorming_document` when present
-- for remediation stories, read `parent_story` and `findings_document`
-- ensure existing non-task story content fully aligns with project architecture and epics context
-- for remediation stories, ensure the target remediation story aligns with the QA findings that produced it
-- identify conflicts or misalignment before task/subtask authoring begins
-- notify the user of conflicts, ambiguities, or missing information
-- work with the user to identify the appropriate resolution when a decision is needed
-- proceed only once the story objective, scope, scope boundary, requirements, and known issues/risks/technical-debt sections align with the provided project documentation
-- for backlog revisions, ask the user to explain the required revisions and ground any suggested revisions in provided context and existing runtime code/tests
-- call `workflow_progress_request` only after context review is complete and blocking issues are resolved or the user confirms the current context is sufficient
+Then, ask the user to explain the revisions they require. If they ask you for suggestions regarding task/subtask revisions, ground your response in the provided context and existing runtime code/tests.
+
+Once you've reviewed context and ensured that the target story's existing non-task content aligns with the provided project documentation, call workflow_progress_request to unlock the next step's instructions.
+```
+
+When the selected story has `status: "draft"` and is not a remediation story, Step 2 must use this exact prompt variant:
+
+```text
+In this workflow, you'll be preparing a story file for implementation by adding tasks and subtasks.
+
+The target story for this workflow is: target_story
+
+Before beginning work on the story's tasks & subtasks, ensure that the existing content within the target story file fully aligns with the project's foundational documents, including:
+- Project Architecture: architecture_document
+- Epics Document: epics_document
+
+If you detect any conflict or misalignment, notify the user and work with them to identify the appropriate resolution. Only proceed once the story file's objective, scope, scope boundary, requirements, and Known Issues/ Risks/ Technical Debt sections fully align with the project's foundational documents.
+
+Once you've reviewed context and ensured that the target story's existing non-task content aligns with the provided project documentation, call workflow_progress_request to unlock the next step's instructions.
+```
+
+When the selected story has `status: "draft"` and is a remediation story, Step 2 must use this exact prompt variant:
+
+```text
+In this workflow, you'll be preparing a remediation story file for implementation by adding tasks and subtasks.
+
+The target story for this workflow is: target_story
+
+This story was generated due to QA findings after the following story was completed and reviewed:
+Originating story: parent_story
+The QA findings were documented in this file: findings_document
+
+Before doing anything else, review the originating story and QA findings and ensure that the existing content in the target story document aligns with the QA findings. Then, assess the target story document vs the project's foundational documents, including:
+- Project Architecture: architecture_document
+- Epics Document: epics_document
+
+If you detect any conflict or misalignment, notify the user and work with them to identify the appropriate resolution. Only proceed once the story file's objective, scope, scope boundary, requirements, and Known Issues/ Risks/ Technical Debt sections fully align with the project's foundational documents.
+
+Once you've reviewed context and ensured that the target story's existing non-task content aligns with the provided project documentation, call workflow_progress_request to unlock the next step's instructions.
+```
+
+No fallback Step 2 prompt variant is allowed. If workflow state does not match one of the supported Step 2 prompt conditions, the workflow must fail clearly instead of projecting a generic prompt.
 
 Step 2 tool schema must expose exactly:
 
@@ -285,34 +414,123 @@ Step 2 must transition to Step 3 only on `workflow_progress_request_confirmed`. 
 
 Step 3 must enter model-driven work through a `project_prompt` decision action.
 
-Step 3 `buildPromptSource` must construct the Step 3 prompt from module-owned code.
+Step 3 `buildPromptSource` must construct the Step 3 prompt from module-owned code. The Step 3 prompt must preserve the exact conditional prompt text from `/Users/robertboston/Documents/Cline/Workflows/create-story.md`, with workflow value placeholders rendered through deterministic workflow value rendering.
 
-When the selected story has `status: "backlog"`, the Step 3 prompt must instruct the AI to review existing tasks and subtasks in `target_story` and determine whether they satisfy all requirements, scope, scope boundary, objective, story instructions, test coverage expectations, and action-plan quality rules.
+When the selected story has `status: "backlog"`, Step 3 must begin with this exact prompt variant:
 
-When the selected story has `status: "draft"`, the Step 3 prompt must instruct the AI to review runtime code and tests and identify the full set of in-scope revisions needed to deliver the story's requirements and objective.
+```text
+Review the existing tasks and subtasks in target_story and determine whether they meet the following criteria:
+- They fully satisfy the story's requirements
+- They respect the story's scope and scope boundary
+- They support achievement of the story's objective
+- They prescribe changes in a manner which complies with the story's general instructions
+- Subtasks are scoped to a single revision in a single target file
+- Each subtask includes specific allowed files
+- Tasks & subtasks provide specific prescriptive revisions without deferring decision space to the implementing agent.
+- Requirements do not ask for delivery of imports, helpers, placeholder scaffolding, future-step code, or partially-wired definitions unless the story will also wire them into legitimate runtime use.
+- Prescribed tests provide adequate coverage of both happy paths and failure paths for all code revisions
+- Tests are prescribed only for behavior, contracts, regression, and material risks required by the story document and project documentation
+- Any tests built via the story's tasks use exact assertions for canonical machine-consumed outputs and stable contracts, including tool names/ schema shape, artifact file formats, and persisted metadata.
+- Any tests built via the story's tasks use shape and invariant assertions for editable content: required fields exist, strings are non-empty, mappings are correct, and forbidden legacy values are absent.
+- Any tests built via the story's tasks do not add static guards unless they protect an approved boundary, forbidden legacy dependency, or known regression risk.
 
-The Step 3 prompt must instruct the AI to:
+Notify the user that you've reviwed the existing tasks & subtasks for coverage, consistency, and quality, surface any issues you've identified to them, and ask them what additional issues or concerns they'd like you to address.
+```
 
-- inspect relevant runtime code and tests before authoring tasks and subtasks
-- trace any required existing artifact, placeholder, resolver, handler, runtime consumer, test, or document convention end to end
-- perform sibling-pattern audits for any new artifact, tool, schema entry, prompt/tool exposure, approval/path policy, test, snapshot, or canonical document surface
-- provide the user with the identified revision set before translating it into tasks and subtasks
-- author implementation-ready tasks and subtasks in `target_story`
-- verify proposed tasks and subtasks for project standards, architecture fit, downstream impact, and code hygiene
-- prefer deep architectural fixes over surface workarounds
-- identify any downstream or peripheral risks and propose follow-up mitigations where needed
-- avoid prescribing hardcoded values where configuration or constants are appropriate
-- prescribe removal of cruft and failed-attempt remnants when the story retires or replaces existing behavior
-- avoid `any`, broad type assertions, forced assertions, non-boolean boolean checks, stale domain naming, compatibility remaps for retired concepts, and other prohibited code-hygiene patterns
-- avoid introducing architecture not backed by upstream requirements or architecture documents
-- avoid in-plan churn by prescribing the final intended code shape directly
-- ensure the resulting story can end in a repo-valid intermediate state that passes focused tests, formatting, lint, and typecheck
-- ensure each task and subtask is ordered so no item depends on a later item
-- ask the user to review the tasks/subtasks section in `target_story`
-- refine based on user feedback
-- call `workflow_progress_request` only after the user is satisfied with the tasks/subtasks section
+When the selected story has `status: "draft"`, Step 3 must begin with this exact prompt variant:
 
-The Step 3 prompt must require task/subtask prescriptions to follow the module's action-plan/story authoring rules from the source workflow, including the rule that each subtask is scoped to a single revision in a single target file with specific allowed files.
+```text
+Review runtime code & tests and identify the full set of in-scope revisions needed to deliver the story's requirements and objective.
+If the story requires touching existing artifacts or placeholders, trace the exact runtime resolution path end to end:
+    config/source of truth
+    resolver/helper
+    handler/runtime consumer
+    tests/docs that assert the convention
+    For any plan that introduces a new artifact, tool, or schema entry, perform a sibling-pattern audit:
+    registration
+    executor wiring
+    prompt/tool exposure
+    approval/path policy
+    tests
+    snapshots/generated surfaces
+    docs/reference surfaces if treated as canonical in-repo
+Provide the user with the identified revision set and tell them your next step is to translate these revisions into implementation-ready tasks and subtasks.
+Next, build the story's tasks & subtasks using the identified revision set.
+```
+
+Both Step 3 prompt variants must then append this exact shared prompt text:
+
+```text
+You must follow these rules when authoring story tasks & subtasks:
+1. Verify solution quality and standards
+   - Ensure the proposed code or fix is appropriate, elegant, and consistent with modern, industry-standard practices for the project's tech stack, including CLEAN architecture.
+   - If you must deviate from best practices (e.g., due to constraints), clearly explain why and what the ideal pattern would be.
+2. Prescribe deep, architectural fixes over surface workarounds
+   - Check whether the issue can and should be solved at a deeper architectural layer (design, data flow, responsibilities) rather than with a shallow or hacky workaround.
+   - If you choose a workaround for pragmatic reasons, explicitly label it as such and describe the deeper architectural fix that would be ideal.
+3. Look for underlying design-pattern flaws
+   - Examine whether the issue reveals deeper design or pattern problems (e.g., responsibilities mixed, poor separation of concerns, leaky abstractions).
+   - If such problems exist, call them out explicitly and propose how they could be addressed, even if the full fix is out of scope for the immediate change.
+4. Consider downstream and peripheral impact
+   - Evaluate how the change may affect other modules, call sites, and features, including edge cases and lifecycle interactions. Search the codbase and read peripheral files if uncertain.
+   - If the change is likely to cause downstream or peripheral issues, that is acceptable only if:
+     a) You clearly identify and describe these risks, AND
+     b) You propose follow-up steps or mitigations as part of the solution.
+5. Avoid hardcoded values; prescribe integration with config/strings where appropriate
+   - Do NOT introduce hardcoded strings or values when they represent configuration, thresholds, labels, messages, or anything reasonably likely to change.
+   - Instead, integrate such values into the app’s configuration system when appropriate for user/admin/dev tweaking
+   - All user-facing or UI strings MUST go into a strings.xml (or similar)
+   - If you cannot follow this rule for some reason, explicitly state why.
+6. Prescribe removal of cruft and failed-attempt remnants
+   - Ensure that your changes do not leave behind obsolete code/imports, commented-out experiments, dead branches, or outdated patterns related to prior failed attempts.
+   - Consider related/downstream modules that may now contain redundant or inconsistent code as a result of your change.
+   - De-crufting should be treated as part of the fix: either perform it in your changes, or clearly specify what should be removed/refactored and where.
+- When deleting or retiring a domain concept, delete its named gates, helper methods, variables, and tests rather than repointing them at another surviving concept.
+7. Practice Good Code Hygiene by avoiding common bad habits:
+    - "any" typing
+    - val as SomeType
+    - as any in tests
+    - optional properties most of the time (explicitly model which combinations exist and which don't whenever possible)
+    - one-letter generics
+    - non-boolean boolean checks
+    - bang bang operators (explicitly check for the condition instead)
+    - != null (explicitly check for the condition instead)
+    - not declaring function return types
+    - abuse of type assertions (use them only in special scenarios where the type is clearly known, and give priority to type declarations, interfaces, or generics)
+    - Failing to use utility types (use utility types such as partial, pick, omit, etc when appropriate)
+    - forcing assertions when types don't match
+    - not using enums to manage constants
+    - not using generics to abstract duplicated code
+    - not using type narrowing
+    - not explicitly defining generics parameters
+    - semantic aliasing, where a variable/function/type with an old domain meaning is reassigned to a new generic or unrelated concept instead of being deleted
+    - stale domain naming after behavior migration; names must describe the current approved responsibility, not the historical source of the code
+    - compatibility remaps that preserve retired concepts by pointing them at surviving generic behavior unless the upstream requirements explicitly approve that remap
+    - boolean aliases whose name does not exactly match the condition they represent; use the existing boolean directly or introduce a correctly named concept only if the architecture requires it
+    - retaining obsolete gates/seams/flags after their original behavior is removed
+8. Do not introduce architecture in the action plan that is not prescribed in an upstream document.
+    - The action plan must not introduce architectural concepts or solutions which are not backed by existing project documentation. If something is not explicitly prescribed, you must gain user alignment and approval before including it in the action plan.
+    - If you determine that additional or different architecture is necessary while authoring the action plan, you must stop and inform the user so that the appropriate revisions can be made to upstream documents first.
+9. Avoid in-plan churn. Do not prescribe code in one task/ subtask only to replace the prescribed code in a subsequent task/ subtask. Identify the final shape of every line being prescribed, and require the dev agent to implement it that way in one task / subtask.
+10. The action plan must end in a repo-valid intermediate state that passes the same static gates required before commit, including formatting, lint, typecheck and any focused tests prescribed for that phase.
+    - Do not prescribe unused imports, unused helpers, placeholder scaffolding, future-step code, or partially wired definitions unless the story's tasks/ subtasks also wire them into legitimate runtime use.
+11. Tasks & Subtasks must be on their own lines starting with "[ ]" so that dev agents can mark completion as they progress through the action plan.
+    - tasks & subtasks must have numerical IDs, with subtasks inheriting the parent task ID, e.g. task 1, subtasks 1.1, 1.2.
+    - Subtasks must prescribe exact line-level revisions with target file indicated.
+    - Subtasks must never prescribe more than ONE required revision
+12. NEVER prescribe retyping, casting, renaming, or otherwise mutating existing capabilities/functionality within a task or subtask unless you have surfaced the proposed change as a single topic to the user and gained their approval.
+
+If at any point you cannot satisfy one or more of these rules (for example, due to missing context or constraints in the existing architecture), you MUST:
+- Explicitly state which rule(s) you cannot fully satisfy, and why.
+- Propose the best available compromise, and outline what a more ideal long-term fix would look like.
+
+After authoring the tasks & subtasks, reach each line of the story and seek out any inconsistencies or conflicts. During this review, assess each task and subtask for internal dependencies, and ensure that no task or subtask is dependent upon a task or subtask which is sequenced after it in the story. Resolve them appropriately, asking the user for input if necessary, before indicating that the tasks & subtasks are complete.
+
+*** User Review & Feedback ***
+Provide the user with the full path for target_story and ask them to review the tasks / subtasks section and provide feedback. Refine based on the user's feedback as needed. Once the user is satisfied with the tasks / subtasks section, unlock the next step's instructions by calling workflow_progress_request.
+```
+
+No fallback Step 3 prompt variant is allowed. If workflow state does not match one of the supported Step 3 prompt conditions, the workflow must fail clearly instead of projecting a generic prompt.
 
 Step 3 tool schema must expose exactly:
 
@@ -345,23 +563,23 @@ Step 3 must transition to Step 4 only on `workflow_progress_request_confirmed`. 
 
 Step 4 must enter model-driven work through a `project_prompt` decision action.
 
-Step 4 `buildPromptSource` must construct the Step 4 prompt from module-owned code.
+Step 4 `buildPromptSource` must construct the Step 4 prompt from module-owned code. The Step 4 prompt must preserve this exact prompt text from `/Users/robertboston/Documents/Cline/Workflows/create-story.md`, with workflow value placeholders rendered through deterministic workflow value rendering:
 
-The Step 4 prompt must instruct the AI to validate `target_story` as a complete implementation handoff.
+```text
+Verify that target_story is complete, correctly formatted, internally consistent, and safe to hand off for implementation.
 
-The Step 4 prompt must instruct the AI to verify:
-
+Validate the story as a complete implementation handoff:
 - every acceptance criterion is covered by one or more tasks
 - every task maps to a real part of the approved story scope
 - task order is executable and non-conflicting
 - no two tasks prescribe contradictory file changes or incompatible invariants
 - every planned code change has corresponding test-maintenance coverage where needed
 - stale assertions, mocks, snapshots, validators, and type contracts are accounted for when affected
-- task/subtask content remains aligned with story objective, scope, scope boundary, requirements, and general instructions
 
-If the AI detects ambiguity, contradiction, missing coverage, or unsafe handoff content, the prompt must instruct the AI to correct it when the correction does not require a new user decision. If correction requires a new decision, the AI must stop and ask the user.
+If you detect ambiguity, contradiction, or missing coverage, correct it. If correction requires a new decision, stop and ask the user.
 
-The Step 4 prompt must instruct the AI to call `attempt_completion` only after validation passes and the story is complete and ready for implementation.
+When validation passes, use attempt_completion to notify the user that the story is complete and ready for implementation.
+```
 
 Step 4 tool schema must expose exactly:
 
@@ -457,30 +675,44 @@ The create-story module must include module tests for:
 - entry project value keys
 - prerequisite declarations for `architecture_document`, `epics_document`, `epics_index`, and `brainstorming_document`
 - runtime-owned prerequisite resolution routes
+- one Step 1 workflow form session containing Panels A through G
 - target-epic dropdown population from `Epics.index.json`
 - persistence of `target_epic` and `epic_identity`
 - derived `stories_index` path after epic selection
-- cannot-continue behavior when the selected epic story index is missing
+- Panel A to Panel B same-session runtime-routed continuation when the selected epic has `story-index-generated: true`
+- Panel A to Panel C same-session runtime-routed continuation when the selected epic has `story-index-generated: false`
+- Panel C end-workflow behavior and back navigation to Panel A
 - target-story dropdown population from the selected epic's story index
 - persistence of selected story metadata from the story index
-- blocking behavior when `story_file_generated` is `false`
+- Panel B to Panel D same-session runtime-routed continuation when `story_file_generated` is `false`
+- Panel D end-workflow behavior and back navigation to Panel B
 - draft story path derivation under `implementation/drafts`
 - backlog story path derivation under `implementation/stories-backlog`
-- review and complete story blocking behavior with back navigation to story selection
-- backlog revision yes/no branching
+- Panel B to Step 2 transition for actionable draft stories
+- Panel B to Panel E same-session runtime-routed continuation for backlog stories
+- Panel E yes/no branching, including yes routing to Step 2 and no routing to Panel F
+- Panel F end-workflow behavior and back navigation to Panel B
+- Panel B to Panel G same-session runtime-routed continuation for `review` and `complete` stories
+- Panel G end-workflow behavior and back navigation to Panel B
+- exact Panel A through Panel G titles, `promptMarkdown`, field labels, action labels, allowed actions, and back destinations
+- exact Panel A and Panel B `jsonOptionsSource` option label templates, with no option descriptions
+- absence of unauthorized `static_notice` fields, helper fields, explanatory fields, or other source-unprescribed UI-visible copy in Panels A through G
 - remediation story parent-story and findings-document derivation
 - invalid remediation project-state failure for missing parent entry, missing parent file, or missing findings document
 - Step 1 transition to Step 2 only for actionable draft stories or user-approved backlog revisions
-- Panel D confirmation routing directly to workflow completion
-- Step 2 prompt source output for backlog revision, primary draft story, and remediation draft story variants
-- Step 3 prompt source output for backlog revision and draft story variants
-- Step 4 prompt source output
+- Step 2 prompt variant selection for backlog revision, primary draft story, and remediation draft story conditions, including deterministic rendering of required workflow-value placeholders and absence of known unauthorized legacy or invented prompt fragments
+- Step 2 unsupported prompt conditions fail clearly instead of falling back to a generic prompt
+- Step 3 prompt variant selection for backlog revision and draft story conditions, including deterministic rendering of required workflow-value placeholders and absence of known unauthorized legacy or invented prompt fragments
+- Step 3 unsupported prompt conditions fail clearly instead of falling back to a generic prompt
+- Step 4 prompt construction, including deterministic rendering of required workflow-value placeholders and absence of known unauthorized legacy or invented prompt fragments
 - Step 2 through Step 4 decision-tree route structure
 - exact Step 1 through Step 4 tool-schema outputs
 - Step 2 and Step 3 progression through explicit `workflow_progress_request_confirmed` routing
 - Step 4 finalization through explicit `attempt_completion_succeeded` routing
 - draft story finalization status update and move to `implementation/stories-backlog`
 - backlog story finalization without moving the story file out of `implementation/stories-backlog`
+
+Prompt tests must not assert complete prompt strings or duplicate full user-authored prompt bodies as test-owned expected values. The implementation remains required to preserve the exact source-document prompt wording prescribed in this requirements document, but tests must verify prompt behavior through variant selection, required workflow-value interpolation, unsupported-state failures, routing/tool exposure contracts, and absence of unauthorized legacy or invented wording.
 
 Tests must verify that model-facing schemas do not expose backend-only runtime tools:
 
