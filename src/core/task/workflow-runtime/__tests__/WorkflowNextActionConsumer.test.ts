@@ -216,6 +216,31 @@ describe("WorkflowNextActionConsumer", () => {
 		sinon.assert.calledOnceWithExactly(adapter.reportTerminalError, "Submitted workflow action failed.")
 	})
 
+	it("continues workflow forms, waits for submitted next action, and consumes it", async () => {
+		const formSession = createFormSession()
+		const formPayload = createFormPayload(formSession)
+		const submittedNextAction: WorkflowNextAction = {
+			kind: "project_prompt",
+			promptProjection: {
+				workflowInputPayloadBlock: undefined,
+				continuationWorkflowInputPayloadBlock: undefined,
+				workflowToolSchemaOverride: undefined,
+			},
+		}
+		adapter.waitForWorkflowFormCompletion.resolves(submittedNextAction)
+
+		await consumer.consume({
+			kind: "continue_workflow_form",
+			formSession,
+			payload: formPayload,
+		})
+
+		sinon.assert.calledTwice(adapter.persistWorkflowRuntimeMetadata)
+		sinon.assert.calledOnceWithExactly(adapter.renderWorkflowForm, formPayload)
+		sinon.assert.calledOnceWithExactly(adapter.waitForWorkflowFormCompletion, formSession)
+		sinon.assert.notCalled(adapter.reportTerminalError)
+	})
+
 	it("executes tool-backed operations, feeds results back to runtime, persists, and continues", async () => {
 		const operationSession = createToolBackedOperationSession()
 		const statusPayload = createStatusPayload(operationSession)

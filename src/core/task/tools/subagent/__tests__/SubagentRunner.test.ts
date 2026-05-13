@@ -2155,6 +2155,59 @@ describe("SubagentRunner", () => {
 		sinon.assert.notCalled(createMessage)
 	})
 
+	it("fails clearly when a child workflow attempts to continue a workflow form", async () => {
+		const runner = new SubagentRunner(createTaskConfig(false))
+		const state = new TaskState()
+		const nextAction: WorkflowNextAction = {
+			kind: "continue_workflow_form",
+			formSession: {
+				sessionId: "child-form-session",
+				workflowFormId: "child-form",
+				definitionVersion: 1,
+				definitionPayload: {
+					definitionVersion: 1,
+					title: "Child Form",
+					toolDictionaryTitle: "Tools",
+					toolDictionaryMarkdown: "",
+					firstPanelId: "panel-1",
+					panels: {
+						"panel-1": {
+							panelId: "panel-1",
+							title: "Panel",
+							promptMarkdown: "Collect child input.",
+							fields: [],
+							allowedActions: [],
+							transition: {
+								type: "conditional",
+								conditionSourceKey: "done",
+								branches: [],
+								defaultTerminal: true,
+							},
+						},
+					},
+				},
+				firstPanelId: "panel-1",
+				currentPanelId: "panel-1",
+				values: {},
+				data: {},
+			},
+			payload: {
+				sessionId: "child-form-session",
+				workflowFormId: "child-form",
+				title: "Child Form",
+				toolDictionaryTitle: "Tools",
+				toolDictionaryMarkdown: "",
+				renderState: "panel",
+				values: {},
+			},
+		}
+
+		await assert.rejects(
+			() => consumeChildWorkflowNextAction.call(runner, state, nextAction),
+			/Child workflow configuration is invalid: subagent workflows cannot render workflow forms\./,
+		)
+	})
+
 	it("executes child workflow tool-backed operations through the child handler path and continues consumption", async () => {
 		const config = createTaskConfig(false)
 		const runner = new SubagentRunner(config)

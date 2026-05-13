@@ -530,6 +530,11 @@ export type WorkflowFormTransitionDefinition =
 			staleDataKeysToClear?: string[]
 	  }
 	| {
+			type: "runtime_routed"
+			staleValueKeysToClear?: string[]
+			staleDataKeysToClear?: string[]
+	  }
+	| {
 			type: "conditional"
 			conditionSourceKey: string
 			branches: Array<{

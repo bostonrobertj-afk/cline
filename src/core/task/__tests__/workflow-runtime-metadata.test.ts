@@ -1083,6 +1083,57 @@ describe("workflow runtime metadata persistence", () => {
 		sinon.assert.notCalled(consumeWorkflowNextAction)
 	})
 
+	it("passes continued workflow-form actions to the pending form wait resolver without double-consuming", async () => {
+		const taskState = new TaskState()
+		const activeSession = createPersistedSession()
+		const formSession = createWorkflowFormSession()
+		activeSession.ui.formSession = formSession
+		taskState.activeWorkflowName = "workflow-runtime-test"
+		taskState.activeWorkflowSession = activeSession
+		const nextAction: WorkflowNextAction = {
+			kind: "continue_workflow_form",
+			formSession,
+			payload: {
+				sessionId: formSession.sessionId,
+				workflowFormId: formSession.workflowFormId,
+				title: "Workflow Form",
+				toolDictionaryTitle: "Tools",
+				toolDictionaryMarkdown: "",
+				renderState: "panel",
+				values: {},
+			},
+		}
+		const workflowRuntime = new WorkflowRuntime({
+			cwd: "/tmp",
+			workspacePathPolicy: createAllowAllWorkspacePathPolicy(),
+		})
+		const submitWorkflowForm = sandbox.stub(workflowRuntime, "submitWorkflowForm").resolves(nextAction)
+		const metadata = createMetadata()
+		sandbox.stub(disk, "getTaskMetadata").resolves(metadata)
+		sandbox.stub(disk, "saveTaskMetadata").resolves()
+		const task = createTaskHarness(taskState, workflowRuntime)
+		const consumedNextActions: WorkflowNextAction[] = []
+		const resolverMap = new Map<string, (submittedNextAction: WorkflowNextAction | undefined) => void>()
+		resolverMap.set(formSession.sessionId, (submittedNextAction) => {
+			if (submittedNextAction !== undefined) {
+				consumedNextActions.push(submittedNextAction)
+			}
+		})
+		Reflect.set(task, "workflowFormSubmissionNextActionResolvers", resolverMap)
+		const consumeWorkflowNextAction = sandbox.stub().resolves()
+		Reflect.set(task, "consumeWorkflowNextAction", consumeWorkflowNextAction)
+		const request = createWorkflowFormSubmissionRequest(formSession.sessionId)
+
+		await callTaskMethod(task, "handleWorkflowFormSubmission", request)
+
+		sinon.assert.calledOnceWithExactly(submitWorkflowForm, {
+			taskState,
+			request,
+		})
+		expect(consumedNextActions).to.deep.equal([nextAction])
+		sinon.assert.notCalled(consumeWorkflowNextAction)
+	})
+
 	it("keeps live workflow-form wait resolvers registered when submission mutates the active form session", async () => {
 		const taskState = new TaskState()
 		const activeSession = createPersistedSession()

@@ -61,6 +61,7 @@ export class WorkflowNextActionConsumer {
 					await this.adapter.persistWorkflowRuntimeMetadata()
 					return
 				case "render_workflow_form":
+				case "continue_workflow_form":
 					await this.adapter.persistWorkflowRuntimeMetadata()
 					await this.adapter.renderWorkflowForm(currentAction.payload)
 					const submittedNextAction = await this.adapter.waitForWorkflowFormCompletion(currentAction.formSession)

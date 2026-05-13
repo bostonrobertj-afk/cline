@@ -75,6 +75,7 @@ type ObservedDecisionPredicateInput = {
 }
 
 type WorkflowRenderFormDecisionAction = Extract<WorkflowDecisionAction, { kind: "render_workflow_form" }>
+type WorkflowContinueFormDecisionAction = Extract<WorkflowDecisionAction, { kind: "continue_workflow_form" }>
 type WorkflowExecuteToolBackedOperationNextAction = Extract<WorkflowNextAction, { kind: "execute_tool_backed_operation" }>
 type WorkflowRenderWorkflowFormNextAction = Extract<WorkflowNextAction, { kind: "render_workflow_form" }>
 
@@ -400,6 +401,101 @@ describe("WorkflowRuntime", () => {
 							},
 						}
 					: {}),
+			},
+		}
+	}
+
+	function createRuntimeRoutedWorkflowForm(args?: {
+		sourceWorkflowValueKey?: string
+		targetPanel?: WorkflowFormPanelDefinition
+	}): WorkflowFormDefinitionPayload {
+		const sourceField: WorkflowFormFieldDefinition = {
+			key: "source",
+			kind: "small_text",
+			label: "Source",
+			required: true,
+			allowedValueType: "string",
+		}
+		if (args?.sourceWorkflowValueKey !== undefined) {
+			sourceField.workflowValueKey = args.sourceWorkflowValueKey
+		}
+
+		const targetPanel: WorkflowFormPanelDefinition = args?.targetPanel ?? {
+			panelId: "continued",
+			title: "Default Continued",
+			promptMarkdown: "Default continued prompt.",
+			fields: [],
+			allowedActions: ["submit"],
+			transition: createTerminalTransition(),
+		}
+
+		return {
+			definitionVersion: 2,
+			title: "Runtime Routed Form",
+			toolDictionaryTitle: "Runtime Routed Tools",
+			toolDictionaryMarkdown: "Runtime routed help",
+			firstPanelId: "source",
+			panels: {
+				source: {
+					panelId: "source",
+					title: "Source",
+					promptMarkdown: "Capture source.",
+					fields: [sourceField],
+					allowedActions: ["submit"],
+					transition: {
+						type: "runtime_routed",
+					},
+				},
+				[targetPanel.panelId]: targetPanel,
+			},
+		}
+	}
+
+	function createRuntimeRoutedDecisionTree(args: {
+		workflowFormId: string
+		panelId?: string
+		buildReplacement: WorkflowContinueFormDecisionAction["buildReplacement"]
+	}): WorkflowDecisionTree {
+		const awaitBranchId = "await-runtime-routed-panel"
+
+		return {
+			entryBranchId: "show-runtime-routed-form",
+			branches: {
+				"show-runtime-routed-form": {
+					id: "show-runtime-routed-form",
+					routes: [
+						{
+							id: "render-runtime-routed-form",
+							trigger: { kind: "always" },
+							action: {
+								kind: "render_workflow_form",
+								workflowFormId: args.workflowFormId,
+							},
+							followingBranchId: awaitBranchId,
+						},
+					],
+				},
+				[awaitBranchId]: {
+					id: awaitBranchId,
+					routes: [
+						{
+							id: "continue-runtime-routed-form",
+							trigger: {
+								kind: "event_predicate",
+								matches: ({ triggerEvent }) =>
+									triggerEvent.kind === "workflow_form_panel_submitted" &&
+									triggerEvent.workflowFormId === args.workflowFormId,
+							},
+							action: {
+								kind: "continue_workflow_form",
+								workflowFormId: args.workflowFormId,
+								panelId: args.panelId ?? "continued",
+								buildReplacement: args.buildReplacement,
+							},
+							followingBranchId: awaitBranchId,
+						},
+					],
+				},
 			},
 		}
 	}
@@ -2949,6 +3045,33 @@ describe("WorkflowRuntime", () => {
 		expect(repeated.payload.panel?.panelId).to.equal(PREREQUISITE_CANNOT_CONTINUE_PANEL_ID)
 	})
 
+	it("returns no_op when prerequisite form handling receives a runtime-routed submission", async () => {
+		const { workflow } = createPrerequisiteResolutionWorkflow()
+		await activateWorkflow(taskState, workflow)
+
+		const prerequisitePrompt = await submitNewProjectSelection(taskState, "prerequisite-runtime-routed-submission")
+		expect(prerequisitePrompt.kind).to.equal("render_workflow_form")
+		if (prerequisitePrompt.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${prerequisitePrompt.kind}.`)
+		}
+		expect(prerequisitePrompt.formSession.currentPanelId).to.equal(PREREQUISITE_CANNOT_CONTINUE_PANEL_ID)
+		const activePanel = prerequisitePrompt.formSession.definitionPayload.panels[prerequisitePrompt.formSession.currentPanelId]
+		if (activePanel === undefined) {
+			throw new Error("Expected an active prerequisite form panel.")
+		}
+		activePanel.transition = { type: "runtime_routed" }
+
+		const result = await runtime.submitWorkflowForm({
+			taskState,
+			request: createFormSubmitRequest({
+				sessionId: prerequisitePrompt.formSession.sessionId,
+				panelId: prerequisitePrompt.formSession.currentPanelId,
+			}),
+		})
+
+		expect(result).to.deep.equal({ kind: "no_op" })
+	})
+
 	it("persists a required one-match prerequisite path after confirmation and continues next-action evaluation", async () => {
 		const projectFolderName = "prerequisite-one-match"
 		const prerequisitePath = await writePrerequisiteProjectFile(projectFolderName, join("planning", "requirements.md"))
@@ -4304,6 +4427,27 @@ describe("WorkflowRuntime", () => {
 		expect(emptySlugResult.payload.errorMessage).to.equal(
 			"Provide a project title that can be normalized into a folder name.",
 		)
+	})
+
+	it("returns no_op when entry form handling receives a runtime-routed submission", async () => {
+		const workflow = createWorkflowDefinition()
+		await activateWorkflow(taskState, workflow)
+		const formSession = getActiveFormSession(taskState)
+		const activePanel = formSession.definitionPayload.panels[formSession.currentPanelId]
+		if (activePanel === undefined) {
+			throw new Error("Expected an active entry form panel.")
+		}
+		activePanel.transition = { type: "runtime_routed" }
+
+		const result = await runtime.submitWorkflowForm({
+			taskState,
+			request: createFormSubmitRequest({
+				sessionId: formSession.sessionId,
+				panelId: formSession.currentPanelId,
+			}),
+		})
+
+		expect(result).to.deep.equal({ kind: "no_op" })
 	})
 
 	it("emits entry artifact resolution completed with creation required when an existing project has no singleton artifact", async () => {
@@ -8248,6 +8392,509 @@ describe("WorkflowRuntime", () => {
 			changedKeys: ["durable_choice"],
 		})
 		expect(routedAction.kind).to.equal("project_prompt")
+	})
+
+	it("persists runtime-routed workflow-form values before emitting panel-submitted events", async () => {
+		const workflowFormId = "runtime-routed-persistence-form"
+		let observedDurableValue: unknown
+		let observedSubmittedValueKeys: readonly string[] = []
+		let observedClearedValueKeys: readonly string[] = []
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: ["durable_source"],
+			workflowForms: {
+				[workflowFormId]: createRuntimeRoutedWorkflowForm({
+					sourceWorkflowValueKey: "durable_source",
+				}),
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: {
+						entryBranchId: "show-runtime-routed-form",
+						branches: {
+							"show-runtime-routed-form": {
+								id: "show-runtime-routed-form",
+								routes: [
+									{
+										id: "render-runtime-routed-form",
+										trigger: { kind: "always" },
+										action: { kind: "render_workflow_form", workflowFormId },
+										followingBranchId: "await-runtime-routed-submit",
+									},
+								],
+							},
+							"await-runtime-routed-submit": {
+								id: "await-runtime-routed-submit",
+								routes: [
+									{
+										id: "panel-submitted",
+										trigger: {
+											kind: "event_predicate",
+											matches: ({ triggerEvent, workflowValues }) => {
+												if (triggerEvent.kind !== "workflow_form_panel_submitted") {
+													return false
+												}
+
+												observedDurableValue = workflowValues.durable_source
+												observedSubmittedValueKeys = triggerEvent.submittedValueKeys
+												observedClearedValueKeys = triggerEvent.clearedValueKeys
+												return (
+													triggerEvent.workflowFormId === workflowFormId &&
+													triggerEvent.panelId === "source" &&
+													triggerEvent.action === "submit"
+												)
+											},
+										},
+										action: { kind: "project_prompt" },
+									},
+								],
+							},
+						},
+					},
+				}),
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		await runtime.resolveNextAction({ taskState })
+		const renderFormAction = await submitNewProjectSelection(taskState, "Runtime Routed Persistence Project")
+		expect(renderFormAction.kind).to.equal("render_workflow_form")
+		if (renderFormAction.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${renderFormAction.kind}.`)
+		}
+
+		const nextAction = await runtime.submitWorkflowForm({
+			taskState,
+			request: createFormSubmitRequest({
+				sessionId: renderFormAction.formSession.sessionId,
+				panelId: renderFormAction.formSession.currentPanelId,
+				fields: [
+					{
+						key: "source",
+						value: { stringValue: "persisted source" },
+					},
+				],
+			}),
+		})
+
+		expect(nextAction.kind).to.equal("project_prompt")
+		expect(observedDurableValue).to.equal("persisted source")
+		expect(observedSubmittedValueKeys).to.deep.equal(["source"])
+		expect(observedClearedValueKeys).to.deep.equal([])
+	})
+
+	it("continues runtime-routed workflow forms in the same session with replacement panel data", async () => {
+		const workflowFormId = "runtime-routed-continuation-form"
+		const replacementPanel: WorkflowFormPanelDefinition = {
+			panelId: "continued",
+			title: "Replacement Continued",
+			promptMarkdown: "Replacement prompt.",
+			fields: [],
+			allowedActions: ["submit"],
+			transition: createTerminalTransition(),
+		}
+		const workflow = createWorkflowDefinition({
+			workflowForms: {
+				[workflowFormId]: createRuntimeRoutedWorkflowForm(),
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createRuntimeRoutedDecisionTree({
+						workflowFormId,
+						buildReplacement: () => ({
+							panel: replacementPanel,
+							data: {
+								replacementMode: "active",
+							},
+						}),
+					}),
+				}),
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		await runtime.resolveNextAction({ taskState })
+		const renderFormAction = await submitNewProjectSelection(taskState, "Runtime Routed Continuation Project")
+		expect(renderFormAction.kind).to.equal("render_workflow_form")
+		if (renderFormAction.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${renderFormAction.kind}.`)
+		}
+
+		const continuedAction = await runtime.submitWorkflowForm({
+			taskState,
+			request: createFormSubmitRequest({
+				sessionId: renderFormAction.formSession.sessionId,
+				panelId: renderFormAction.formSession.currentPanelId,
+				fields: [
+					{
+						key: "source",
+						value: { stringValue: "continue" },
+					},
+				],
+			}),
+		})
+
+		expect(continuedAction.kind).to.equal("continue_workflow_form")
+		if (continuedAction.kind !== "continue_workflow_form") {
+			throw new Error(`Expected continue_workflow_form, received ${continuedAction.kind}.`)
+		}
+		expect(continuedAction.formSession.sessionId).to.equal(renderFormAction.formSession.sessionId)
+		expect(continuedAction.formSession.currentPanelId).to.equal("continued")
+		expect(continuedAction.formSession.definitionPayload.panels.continued?.title).to.equal("Replacement Continued")
+		expect(continuedAction.payload.panel?.title).to.equal("Replacement Continued")
+		expect(continuedAction.formSession.data).to.deep.equal({
+			replacementMode: "active",
+		})
+	})
+
+	it("finalizes continued panels through interpolation and JSON-backed option resolution", async () => {
+		const workflowFormId = "runtime-routed-json-options-form"
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: ["continued_title", "selected_epic"],
+			workflowForms: {
+				[workflowFormId]: createRuntimeRoutedWorkflowForm({
+					sourceWorkflowValueKey: "continued_title",
+				}),
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createRuntimeRoutedDecisionTree({
+						workflowFormId,
+						buildReplacement: () => ({
+							panel: {
+								panelId: "continued",
+								title: "Continued {workflow.continued_title}",
+								promptMarkdown: "Prompt {data.promptSuffix}",
+								fields: [
+									createEpicsJsonOptionsField({
+										key: "epic",
+										kind: "dropdown",
+										workflowValueKey: "selected_epic",
+									}),
+								],
+								allowedActions: ["submit"],
+								transition: createTerminalTransition(),
+							},
+							data: {
+								promptSuffix: "from replacement data",
+							},
+						}),
+					}),
+				}),
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		await runtime.resolveNextAction({ taskState })
+		const renderFormAction = await submitNewProjectSelection(taskState, "Runtime Routed JSON Options Project")
+		expect(renderFormAction.kind).to.equal("render_workflow_form")
+		if (renderFormAction.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${renderFormAction.kind}.`)
+		}
+		await writeSingleEpicIndex(
+			join(cwd, "docs", "projects", "runtime-routed-json-options-project", "planning", "Epics.index.json"),
+			"7",
+		)
+
+		const continuedAction = await runtime.submitWorkflowForm({
+			taskState,
+			request: createFormSubmitRequest({
+				sessionId: renderFormAction.formSession.sessionId,
+				panelId: renderFormAction.formSession.currentPanelId,
+				fields: [
+					{
+						key: "source",
+						value: { stringValue: "Dynamic Title" },
+					},
+				],
+			}),
+		})
+
+		expect(continuedAction.kind).to.equal("continue_workflow_form")
+		if (continuedAction.kind !== "continue_workflow_form") {
+			throw new Error(`Expected continue_workflow_form, received ${continuedAction.kind}.`)
+		}
+		expect(continuedAction.payload.panel?.title).to.equal("Continued Dynamic Title")
+		expect(continuedAction.payload.panel?.promptMarkdown).to.equal("Prompt from replacement data")
+		expect(continuedAction.payload.panel?.fields.find((field) => field.key === "epic")?.options).to.deep.equal([
+			{
+				value: "7",
+				label: "Epic 7: Epic 7",
+			},
+		])
+	})
+
+	it("preserves continued-panel back targets and recomputes replacement payloads after resubmission", async () => {
+		const workflowFormId = "runtime-routed-back-form"
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: ["source_value"],
+			workflowForms: {
+				[workflowFormId]: createRuntimeRoutedWorkflowForm({
+					sourceWorkflowValueKey: "source_value",
+				}),
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createRuntimeRoutedDecisionTree({
+						workflowFormId,
+						buildReplacement: (session) => ({
+							panel: {
+								panelId: "continued",
+								title: "Continued",
+								promptMarkdown: `Downstream ${String(session.workflowValues.source_value)}`,
+								fields: [],
+								allowedActions: ["submit", "back"],
+								transition: createTerminalTransition(),
+								backDestinationPanelId: "source",
+							},
+							data: {},
+						}),
+					}),
+				}),
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		await runtime.resolveNextAction({ taskState })
+		const renderFormAction = await submitNewProjectSelection(taskState, "Runtime Routed Back Project")
+		expect(renderFormAction.kind).to.equal("render_workflow_form")
+		if (renderFormAction.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${renderFormAction.kind}.`)
+		}
+
+		const firstContinuedAction = await runtime.submitWorkflowForm({
+			taskState,
+			request: createFormSubmitRequest({
+				sessionId: renderFormAction.formSession.sessionId,
+				panelId: "source",
+				fields: [
+					{
+						key: "source",
+						value: { stringValue: "one" },
+					},
+				],
+			}),
+		})
+		expect(firstContinuedAction.kind).to.equal("continue_workflow_form")
+		if (firstContinuedAction.kind !== "continue_workflow_form") {
+			throw new Error(`Expected continue_workflow_form, received ${firstContinuedAction.kind}.`)
+		}
+		expect(firstContinuedAction.payload.panel?.promptMarkdown).to.equal("Downstream one")
+		expect(firstContinuedAction.formSession.definitionPayload.panels.continued?.backDestinationPanelId).to.equal("source")
+
+		const backAction = await runtime.submitWorkflowForm({
+			taskState,
+			request: createFormSubmitRequest({
+				sessionId: firstContinuedAction.formSession.sessionId,
+				panelId: "continued",
+				action: WorkflowFormAction.BACK,
+			}),
+		})
+		expect(backAction.kind).to.equal("render_workflow_form")
+		if (backAction.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${backAction.kind}.`)
+		}
+		expect(backAction.formSession.currentPanelId).to.equal("source")
+
+		const secondContinuedAction = await runtime.submitWorkflowForm({
+			taskState,
+			request: createFormSubmitRequest({
+				sessionId: backAction.formSession.sessionId,
+				panelId: "source",
+				fields: [
+					{
+						key: "source",
+						value: { stringValue: "two" },
+					},
+				],
+			}),
+		})
+		expect(secondContinuedAction.kind).to.equal("continue_workflow_form")
+		if (secondContinuedAction.kind !== "continue_workflow_form") {
+			throw new Error(`Expected continue_workflow_form, received ${secondContinuedAction.kind}.`)
+		}
+		expect(secondContinuedAction.formSession.sessionId).to.equal(renderFormAction.formSession.sessionId)
+		expect(secondContinuedAction.payload.panel?.promptMarkdown).to.equal("Downstream two")
+	})
+
+	it("restores active continued form sessions with replacement panel data intact", async () => {
+		const workflowFormId = "runtime-routed-restore-form"
+		const workflow = createWorkflowDefinition({
+			workflowForms: {
+				[workflowFormId]: createRuntimeRoutedWorkflowForm(),
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createRuntimeRoutedDecisionTree({
+						workflowFormId,
+						buildReplacement: () => ({
+							panel: {
+								panelId: "continued",
+								title: "Persisted Replacement",
+								promptMarkdown: "Persisted replacement prompt.",
+								fields: [],
+								allowedActions: ["submit"],
+								transition: createTerminalTransition(),
+							},
+							data: {
+								persistedLabel: "Persisted Data",
+							},
+						}),
+					}),
+				}),
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		await runtime.resolveNextAction({ taskState })
+		const renderFormAction = await submitNewProjectSelection(taskState, "Runtime Routed Restore Project")
+		expect(renderFormAction.kind).to.equal("render_workflow_form")
+		if (renderFormAction.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${renderFormAction.kind}.`)
+		}
+		const continuedAction = await runtime.submitWorkflowForm({
+			taskState,
+			request: createFormSubmitRequest({
+				sessionId: renderFormAction.formSession.sessionId,
+				panelId: "source",
+				fields: [
+					{
+						key: "source",
+						value: { stringValue: "restore" },
+					},
+				],
+			}),
+		})
+		expect(continuedAction.kind).to.equal("continue_workflow_form")
+		if (continuedAction.kind !== "continue_workflow_form") {
+			throw new Error(`Expected continue_workflow_form, received ${continuedAction.kind}.`)
+		}
+		const persistedSession = runtime.getPersistedSession({ taskState })
+		if (persistedSession === undefined || persistedSession.ui.formSession === undefined) {
+			throw new Error("Expected a persisted continued form session.")
+		}
+		expect(persistedSession.ui.formSession.definitionPayload.panels.continued?.title).to.equal("Persisted Replacement")
+
+		registerResolvedWorkflow(workflow)
+		const restoredState = new TaskState()
+		restoredState.activeWorkflowName = workflow.name
+		const restored = await runtime.restorePersistedSession({
+			taskState: restoredState,
+			persistedSession,
+		})
+
+		expect(restored?.kind).to.equal("continue_workflow_form")
+		if (restored?.kind !== "continue_workflow_form") {
+			throw new Error(`Expected continue_workflow_form, received ${restored?.kind ?? "undefined"}.`)
+		}
+		expect(restored.formSession.sessionId).to.equal(renderFormAction.formSession.sessionId)
+		expect(restored.formSession.definitionPayload.panels.continued?.title).to.equal("Persisted Replacement")
+		expect(restored.formSession.data).to.deep.equal({
+			persistedLabel: "Persisted Data",
+		})
+		expect(restored.payload.panel?.title).to.equal("Persisted Replacement")
+	})
+
+	it("restores active original form sessions before runtime continuation as render_workflow_form", async () => {
+		const workflowFormId = "runtime-routed-original-restore-form"
+		const workflow = createWorkflowDefinition({
+			workflowForms: {
+				[workflowFormId]: createRuntimeRoutedWorkflowForm(),
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createRuntimeRoutedDecisionTree({
+						workflowFormId,
+						buildReplacement: () => ({
+							panel: {
+								panelId: "continued",
+								title: "Persisted Replacement",
+								promptMarkdown: "Persisted replacement prompt.",
+								fields: [],
+								allowedActions: ["submit"],
+								transition: createTerminalTransition(),
+							},
+							data: {
+								persistedLabel: "Persisted Data",
+							},
+						}),
+					}),
+				}),
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		await runtime.resolveNextAction({ taskState })
+		const renderFormAction = await submitNewProjectSelection(taskState, "Runtime Routed Original Restore Project")
+		expect(renderFormAction.kind).to.equal("render_workflow_form")
+		if (renderFormAction.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${renderFormAction.kind}.`)
+		}
+		expect(renderFormAction.formSession.currentPanelId).to.equal("source")
+		const persistedSession = runtime.getPersistedSession({ taskState })
+		if (persistedSession === undefined || persistedSession.ui.formSession === undefined) {
+			throw new Error("Expected a persisted original form session.")
+		}
+		expect(persistedSession.ui.formSession.currentPanelId).to.equal("source")
+
+		registerResolvedWorkflow(workflow)
+		const restoredState = new TaskState()
+		restoredState.activeWorkflowName = workflow.name
+		const restored = await runtime.restorePersistedSession({
+			taskState: restoredState,
+			persistedSession,
+		})
+
+		expect(restored?.kind).to.equal("render_workflow_form")
+		if (restored?.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${restored?.kind ?? "undefined"}.`)
+		}
+		expect(restored.formSession.sessionId).to.equal(renderFormAction.formSession.sessionId)
+		expect(restored.formSession.currentPanelId).to.equal("source")
+		expect(restored.payload.panel?.panelId).to.equal("source")
+	})
+
+	it("rejects invalid continue_workflow_form actions before workflow activation", async () => {
+		const workflowFormId = "runtime-routed-invalid-form"
+		const workflow = createWorkflowDefinition({
+			workflowForms: {
+				[workflowFormId]: createRuntimeRoutedWorkflowForm(),
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createRuntimeRoutedDecisionTree({
+						workflowFormId,
+						panelId: "missing-panel",
+						buildReplacement: () => ({
+							panel: {
+								panelId: "missing-panel",
+								title: "Missing",
+								promptMarkdown: "Missing.",
+								fields: [],
+								allowedActions: ["submit"],
+								transition: createTerminalTransition(),
+							},
+							data: {},
+						}),
+					}),
+				}),
+			},
+		})
+
+		registerResolvedWorkflow(workflow)
+		const activation = await runtime.activateWorkflow({
+			taskState,
+			workflowName: workflow.name,
+		})
+
+		expect(activation.kind).to.equal("no_op")
+		expect(taskState.activeWorkflowSession).to.equal(undefined)
 	})
 
 	it("persists typed workflow-form value destinations as JSON-safe workflow values", async () => {

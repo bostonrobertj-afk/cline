@@ -157,7 +157,11 @@ Use workflow forms for structured user input before model-driven work.
 Rules of thumb:
 
 - Use one multi-panel form for one logical input flow.
-- Put panel sequencing, conditional branches, back navigation, and stale value clearing inside the form definition.
+- Put form-local panel sequencing, conditional branches, back navigation, and stale value clearing inside the form definition. Use runtime-routed transitions only when the next panel must be chosen or prepared by workflow runtime route/action logic.
+- Use runtime-routed same-session panels when the next panel depends on module route/action logic, deterministic backend checks, tool-backed work, selected-project file checks, or backend-computed panel payload data.
+- A runtime-routed panel submission emits `workflow_form_panel_submitted`; the workflow module decision tree handles that event and returns `continue_workflow_form` to render the next panel in the same active form session.
+- Runtime-routed panels must prescribe `backDestinationPanelId` whenever `back` is allowed because the workflow form cannot infer or replay module-owned route/action decisions.
+- Continued panels use the same canonical panel-finalization pipeline as initially rendered panels, including prompt/content interpolation, `jsonOptionsSource` resolution, field validation, allowed actions, and stale value clearing.
 - Use `workflowValueKey` only when the submitted value must persist beyond form-local state.
 - A workflow form field persists at most one durable workflow value. If one user choice determines additional module values, derive those values in deterministic post-form behavior instead of trying to make the field persist multiple workflow values.
 - Use `staleValueKeysToClear`, `resetValueKeysOnChange`, and back-panel stale clearing to prevent stale dependent values.

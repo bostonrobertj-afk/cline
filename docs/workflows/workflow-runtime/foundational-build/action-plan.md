@@ -10890,179 +10890,179 @@ This phase implements runtime-routed same-session workflow form continuation. A 
 - Existing workflow form dynamic text and JSON-backed option resolution were introduced as workarounds for backend-derived panel data. This phase folds those capabilities into the single canonical panel-finalization path rather than preserving them as a separate model.
 - Workflow form back navigation cannot replay module route/action logic. Runtime-routed panels must therefore use explicit `backDestinationPanelId` values when a back action is allowed.
 
-[ ] Task 231. Update module-build guidance for runtime-routed same-session workflow form panels.
+[x] Task 231. Update module-build guidance for runtime-routed same-session workflow form panels.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
 
-[ ] Subtask 231.1. In `module-build-guide.md`, revise the workflow form guidance that currently says panel sequencing, conditional branches, back navigation, and stale clearing belong inside the form definition so it distinguishes form-local transitions from runtime-routed transitions.
+[x] Subtask 231.1. In `module-build-guide.md`, revise the workflow form guidance that currently says panel sequencing, conditional branches, back navigation, and stale clearing belong inside the form definition so it distinguishes form-local transitions from runtime-routed transitions.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
 
-[ ] Subtask 231.2. In `module-build-guide.md`, add guidance that runtime-routed same-session panels must be used when the next panel depends on module route/action logic, deterministic backend checks, tool-backed work, selected-project file checks, or backend-computed panel payload data.
+[x] Subtask 231.2. In `module-build-guide.md`, add guidance that runtime-routed same-session panels must be used when the next panel depends on module route/action logic, deterministic backend checks, tool-backed work, selected-project file checks, or backend-computed panel payload data.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
 
-[ ] Subtask 231.3. In `module-build-guide.md`, add guidance that a runtime-routed panel submission emits `workflow_form_panel_submitted`, the workflow module decision tree handles that event, and a `continue_workflow_form` action renders the next panel in the same active form session.
+[x] Subtask 231.3. In `module-build-guide.md`, add guidance that a runtime-routed panel submission emits `workflow_form_panel_submitted`, the workflow module decision tree handles that event, and a `continue_workflow_form` action renders the next panel in the same active form session.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
 
-[ ] Subtask 231.4. In `module-build-guide.md`, add guidance that runtime-routed panels must prescribe `backDestinationPanelId` whenever a back action is allowed because the workflow form cannot infer or replay module-owned route/action decisions.
+[x] Subtask 231.4. In `module-build-guide.md`, add guidance that runtime-routed panels must prescribe `backDestinationPanelId` whenever a back action is allowed because the workflow form cannot infer or replay module-owned route/action decisions.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
 
-[ ] Subtask 231.5. In `module-build-guide.md`, add guidance that continued panels use the same canonical panel-finalization pipeline as initially rendered panels, including prompt/content interpolation, `jsonOptionsSource` resolution, field validation, allowed actions, and stale value clearing.
+[x] Subtask 231.5. In `module-build-guide.md`, add guidance that continued panels use the same canonical panel-finalization pipeline as initially rendered panels, including prompt/content interpolation, `jsonOptionsSource` resolution, field validation, allowed actions, and stale value clearing.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
 
-[ ] Task 232. Add type contracts for runtime-routed workflow form submissions and same-session continuation.
+[x] Task 232. Add type contracts for runtime-routed workflow form submissions and same-session continuation.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/shared/ExtensionMessage.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/types.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 
-[ ] Subtask 232.1. In `ExtensionMessage.ts`, add a workflow form transition variant that represents a runtime-routed submission and supports stale workflow value keys to clear before workflow runtime evaluates the submitted event.
+[x] Subtask 232.1. In `ExtensionMessage.ts`, add a workflow form transition variant that represents a runtime-routed submission and supports stale workflow value keys to clear before workflow runtime evaluates the submitted event.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/shared/ExtensionMessage.ts`
 
-[ ] Subtask 232.2. In `workflow-form/types.ts`, add a `WorkflowFormRuntimeOutcome` variant for runtime-routed submissions that includes the active form session, persisted value changes, `workflowFormId`, `panelId`, and submitted action.
+[x] Subtask 232.2. In `workflow-form/types.ts`, add a `WorkflowFormRuntimeOutcome` variant for runtime-routed submissions that includes the active form session, persisted value changes, `workflowFormId`, `panelId`, and submitted action.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/types.ts`
 
-[ ] Subtask 232.3. In `workflow-runtime/types.ts`, add `workflow_form_panel_submitted` to the workflow branch trigger event union with payload fields for `workflowFormId`, `panelId`, `action`, `submittedValueKeys`, and `clearedValueKeys`.
+[x] Subtask 232.3. In `workflow-runtime/types.ts`, add `workflow_form_panel_submitted` to the workflow branch trigger event union with payload fields for `workflowFormId`, `panelId`, `action`, `submittedValueKeys`, and `clearedValueKeys`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 
-[ ] Subtask 232.4. In `workflow-runtime/types.ts`, add a typed session-data replacement contract for `continue_workflow_form` so a workflow module can provide or replace panel data before the continued panel renders.
+[x] Subtask 232.4. In `workflow-runtime/types.ts`, add a typed session-data replacement contract for `continue_workflow_form` so a workflow module can provide or replace panel data before the continued panel renders.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 
-[ ] Subtask 232.5. In `workflow-runtime/types.ts`, add `continue_workflow_form` to `WorkflowDecisionAction` as an explicit action variant that identifies the active `workflowFormId`, target `panelId`, and replacement panel/session data required before render.
+[x] Subtask 232.5. In `workflow-runtime/types.ts`, add `continue_workflow_form` to `WorkflowDecisionAction` as an explicit action variant that identifies the active `workflowFormId`, target `panelId`, and replacement panel/session data required before render.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 
-[ ] Subtask 232.6. In `workflow-runtime/types.ts`, add `continue_workflow_form` to `WorkflowNextAction` so runtime consumers can render the continued panel through the same workflow form session.
+[x] Subtask 232.6. In `workflow-runtime/types.ts`, add `continue_workflow_form` to `WorkflowNextAction` so runtime consumers can render the continued panel through the same workflow form session.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 
-[ ] Task 233. Implement runtime-routed submission behavior in `WorkflowFormRuntime`.
+[x] Task 233. Implement runtime-routed submission behavior in `WorkflowFormRuntime`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
 
-[ ] Subtask 233.1. In `WorkflowFormRuntime.ts`, update transition validation and resolution so the new runtime-routed transition is recognized without requiring a next panel or terminal completion target.
+[x] Subtask 233.1. In `WorkflowFormRuntime.ts`, update transition validation and resolution so the new runtime-routed transition is recognized without requiring a next panel or terminal completion target.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
 
-[ ] Subtask 233.2. In `WorkflowFormRuntime.ts`, ensure runtime-routed submissions still perform existing field validation, allowed-action validation, workflow value persistence preparation, and stale workflow value clearing before returning an outcome.
+[x] Subtask 233.2. In `WorkflowFormRuntime.ts`, ensure runtime-routed submissions still perform existing field validation, allowed-action validation, workflow value persistence preparation, and stale workflow value clearing before returning an outcome.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
 
-[ ] Subtask 233.3. In `WorkflowFormRuntime.ts`, make runtime-routed submissions return the new runtime-routed outcome instead of `render_form` or `complete_success`.
+[x] Subtask 233.3. In `WorkflowFormRuntime.ts`, make runtime-routed submissions return the new runtime-routed outcome instead of `render_form` or `complete_success`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/WorkflowFormRuntime.ts`
 
-[ ] Task 234. Implement workflow runtime handling for panel-submitted events and continued form rendering.
+[x] Task 234. Implement workflow runtime handling for panel-submitted events and continued form rendering.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 234.1. In `WorkflowRuntime.ts`, update workflow form submission handling so runtime-routed outcomes persist durable workflow value changes before emitting the workflow event.
+[x] Subtask 234.1. In `WorkflowRuntime.ts`, update workflow form submission handling so runtime-routed outcomes persist durable workflow value changes before emitting the workflow event.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 234.2. In `WorkflowRuntime.ts`, ensure runtime-routed outcomes keep `session.ui.formSession` active instead of completing or replacing the form session.
+[x] Subtask 234.2. In `WorkflowRuntime.ts`, ensure runtime-routed outcomes keep `session.ui.formSession` active instead of completing or replacing the form session.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 234.3. In `WorkflowRuntime.ts`, create a `workflow_form_panel_submitted` branch trigger event after a runtime-routed panel submission, including `workflowFormId`, `panelId`, submitted action, submitted value keys, and cleared value keys.
+[x] Subtask 234.3. In `WorkflowRuntime.ts`, create a `workflow_form_panel_submitted` branch trigger event after a runtime-routed panel submission, including `workflowFormId`, `panelId`, submitted action, submitted value keys, and cleared value keys.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 234.4. In `WorkflowRuntime.ts`, update `isWorkflowBranchTriggerEvent` so `workflow_form_panel_submitted` is recognized as a valid trigger event.
+[x] Subtask 234.4. In `WorkflowRuntime.ts`, update `isWorkflowBranchTriggerEvent` so `workflow_form_panel_submitted` is recognized as a valid trigger event.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 234.5. In `WorkflowRuntime.ts`, update persisted-event restore compatibility so sessions containing `workflow_form_panel_submitted` events can be restored safely.
+[x] Subtask 234.5. In `WorkflowRuntime.ts`, update persisted-event restore compatibility so sessions containing `workflow_form_panel_submitted` events can be restored safely.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 234.6. In `WorkflowRuntime.ts`, update decision-tree continuation handling so an active workflow form session can continue through a `continue_workflow_form` action after `workflow_form_panel_submitted`.
+[x] Subtask 234.6. In `WorkflowRuntime.ts`, update decision-tree continuation handling so an active workflow form session can continue through a `continue_workflow_form` action after `workflow_form_panel_submitted`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 234.7. In `WorkflowRuntime.ts`, implement `continue_workflow_form` action handling so it requires an active form session whose `workflowFormId` matches the action.
+[x] Subtask 234.7. In `WorkflowRuntime.ts`, implement `continue_workflow_form` action handling so it requires an active form session whose `workflowFormId` matches the action.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 234.8. In `WorkflowRuntime.ts`, apply `continue_workflow_form` replacement panel/session data to the active form session before building the render payload.
+[x] Subtask 234.8. In `WorkflowRuntime.ts`, apply `continue_workflow_form` replacement panel/session data to the active form session before building the render payload.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 234.9. In `WorkflowRuntime.ts`, ensure replacement panel data replaces only the target panel identified by the action and reject the action if the replacement panel id does not match the action target panel id.
+[x] Subtask 234.9. In `WorkflowRuntime.ts`, ensure replacement panel data replaces only the target panel identified by the action and reject the action if the replacement panel id does not match the action target panel id.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 234.10. In `WorkflowRuntime.ts`, set the active form session `currentPanelId` to the continued target panel and clear stale submission failure state before rendering.
+[x] Subtask 234.10. In `WorkflowRuntime.ts`, set the active form session `currentPanelId` to the continued target panel and clear stale submission failure state before rendering.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 234.11. In `WorkflowRuntime.ts`, build the continued panel render payload through the existing workflow form render payload builder so dynamic prompt/content interpolation and `jsonOptionsSource` resolution use the same path as initial panel rendering.
+[x] Subtask 234.11. In `WorkflowRuntime.ts`, build the continued panel render payload through the existing workflow form render payload builder so dynamic prompt/content interpolation and `jsonOptionsSource` resolution use the same path as initial panel rendering.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 234.12. In `WorkflowRuntime.ts`, update workflow definition validation so invalid `continue_workflow_form` actions are rejected before activation.
+[x] Subtask 234.12. In `WorkflowRuntime.ts`, update workflow definition validation so invalid `continue_workflow_form` actions are rejected before activation.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Task 235. Update next-action consumption for continued workflow form rendering.
+[x] Task 235. Update next-action consumption for continued workflow form rendering.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowNextActionConsumer.ts`
 
-[ ] Subtask 235.1. In `WorkflowNextActionConsumer.ts`, add a `continue_workflow_form` branch that persists workflow metadata before rendering the continued panel.
+[x] Subtask 235.1. In `WorkflowNextActionConsumer.ts`, add a `continue_workflow_form` branch that persists workflow metadata before rendering the continued panel.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowNextActionConsumer.ts`
 
-[ ] Subtask 235.2. In `WorkflowNextActionConsumer.ts`, render the continued workflow form panel through the existing form-render adapter so the same `sessionId` updates the existing workflow form frame.
+[x] Subtask 235.2. In `WorkflowNextActionConsumer.ts`, render the continued workflow form panel through the existing form-render adapter so the same `sessionId` updates the existing workflow form frame.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowNextActionConsumer.ts`
 
-[ ] Subtask 235.3. In `WorkflowNextActionConsumer.ts`, wait for the next workflow form submission after rendering a continued panel and consume the returned next action the same way existing rendered forms are consumed.
+[x] Subtask 235.3. In `WorkflowNextActionConsumer.ts`, wait for the next workflow form submission after rendering a continued panel and consume the returned next action the same way existing rendered forms are consumed.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowNextActionConsumer.ts`
 
-[ ] Task 236. Add focused test coverage for runtime-routed same-session workflow form continuation.
+[x] Task 236. Add focused test coverage for runtime-routed same-session workflow form continuation.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`
@@ -11071,82 +11071,159 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
 
-[ ] Subtask 236.1. In `WorkflowFormRuntime.test.ts`, add coverage proving a runtime-routed panel submission returns the runtime-routed outcome and does not locally advance to a next panel or complete the form.
+[x] Subtask 236.1. In `WorkflowFormRuntime.test.ts`, add coverage proving a runtime-routed panel submission returns the runtime-routed outcome and does not locally advance to a next panel or complete the form.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`
 
-[ ] Subtask 236.2. In `WorkflowFormRuntime.test.ts`, add coverage proving runtime-routed submissions apply stale workflow value clearing before returning the runtime-routed outcome.
+[x] Subtask 236.2. In `WorkflowFormRuntime.test.ts`, add coverage proving runtime-routed submissions apply stale workflow value clearing before returning the runtime-routed outcome.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts`
 
-[ ] Subtask 236.3. In `WorkflowRuntime.test.ts`, add coverage proving a runtime-routed panel submission persists durable workflow values before emitting `workflow_form_panel_submitted`.
+[x] Subtask 236.3. In `WorkflowRuntime.test.ts`, add coverage proving a runtime-routed panel submission persists durable workflow values before emitting `workflow_form_panel_submitted`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 236.4. In `WorkflowRuntime.test.ts`, add coverage proving a `workflow_form_panel_submitted` route can select `continue_workflow_form` and render the next panel with the same workflow form session id.
+[x] Subtask 236.4. In `WorkflowRuntime.test.ts`, add coverage proving a `workflow_form_panel_submitted` route can select `continue_workflow_form` and render the next panel with the same workflow form session id.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 236.5. In `WorkflowRuntime.test.ts`, add coverage proving replacement panel data provided by `continue_workflow_form` takes precedence over default panel data for the target panel.
+[x] Subtask 236.5. In `WorkflowRuntime.test.ts`, add coverage proving replacement panel data provided by `continue_workflow_form` takes precedence over default panel data for the target panel.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 236.6. In `WorkflowRuntime.test.ts`, add coverage proving a continued panel uses the same dynamic prompt/content interpolation and `jsonOptionsSource` option resolution path as an initially rendered panel.
+[x] Subtask 236.6. In `WorkflowRuntime.test.ts`, add coverage proving a continued panel uses the same dynamic prompt/content interpolation and `jsonOptionsSource` option resolution path as an initially rendered panel.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 236.7. In `WorkflowRuntime.test.ts`, add coverage proving an explicit `backDestinationPanelId` on a continued panel is preserved and changing an upstream value followed by resubmission recomputes the downstream continued panel payload.
+[x] Subtask 236.7. In `WorkflowRuntime.test.ts`, add coverage proving an explicit `backDestinationPanelId` on a continued panel is preserved and changing an upstream value followed by resubmission recomputes the downstream continued panel payload.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 236.8. In `WorkflowRuntime.test.ts`, add restore coverage proving an active continued form session can be persisted and restored with replacement panel data intact.
+[x] Subtask 236.8. In `WorkflowRuntime.test.ts`, add restore coverage proving an active continued form session can be persisted and restored with replacement panel data intact.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 236.9. In `WorkflowRuntime.test.ts`, add validation coverage proving invalid `continue_workflow_form` actions are rejected before workflow activation.
+[x] Subtask 236.9. In `WorkflowRuntime.test.ts`, add validation coverage proving invalid `continue_workflow_form` actions are rejected before workflow activation.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 236.10. In `WorkflowNextActionConsumer.test.ts`, add coverage proving `continue_workflow_form` persists metadata, renders through the existing workflow form adapter, waits for the next submission, and consumes the returned next action.
+[x] Subtask 236.10. In `WorkflowNextActionConsumer.test.ts`, add coverage proving `continue_workflow_form` persists metadata, renders through the existing workflow form adapter, waits for the next submission, and consumes the returned next action.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts`
 
-[ ] Subtask 236.11. In `workflow-runtime-metadata.test.ts`, add coverage proving pending workflow form resolution receives a continued form action without double-consuming the workflow form response.
+[x] Subtask 236.11. In `workflow-runtime-metadata.test.ts`, add coverage proving pending workflow form resolution receives a continued form action without double-consuming the workflow form response.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
 
-[ ] Subtask 236.12. In `SubagentRunner.test.ts`, add coverage proving child workflow execution rejects `continue_workflow_form` the same way it rejects workflow form rendering.
+[x] Subtask 236.12. In `SubagentRunner.test.ts`, add coverage proving child workflow execution rejects `continue_workflow_form` the same way it rejects workflow form rendering.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
 
-[ ] Task 237. Validate Phase 68.
+[x] Task 237. Correct workflow form continuation-route precedence during restore and active-session continuation.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 237.1. In `WorkflowRuntime.ts`, add a private helper named `findWorkflowFormContinuationSourceRoute(...)` that accepts `step`, `activeBranchId`, `workflowFormId`, and `currentPanelId`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 237.2. In `findWorkflowFormContinuationSourceRoute(...)`, first search continuation source routes for a `continue_workflow_form` action whose `workflowFormId` matches and whose `panelId` matches `currentPanelId`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 237.3. In `findWorkflowFormContinuationSourceRoute(...)`, only if no matching `continue_workflow_form` route is found, search continuation source routes for a `render_workflow_form` action whose `workflowFormId` matches.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 237.4. In `validateAndNormalizePersistedFormSessionForRestore(...)`, replace the mixed `render_workflow_form` / `continue_workflow_form` lookup with `findWorkflowFormContinuationSourceRoute(...)`, passing the persisted `currentPanelId`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 237.5. In `resolveDecisionTreeContinuationRoute(...)`, replace the mixed `render_workflow_form` / `continue_workflow_form` lookup with `findWorkflowFormContinuationSourceRoute(...)`, passing `activeFormSession.currentPanelId`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 237.6. In `WorkflowRuntime.test.ts`, keep the existing active continued form restore test expecting `continue_workflow_form`; do not weaken that assertion.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 237.7. In `WorkflowRuntime.test.ts`, add a sibling regression test proving an active original form session restored before runtime continuation still restores as `render_workflow_form`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Task 238. Run Phase 68 focused unit validation before final type and lint gates.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
 
-[ ] Subtask 237.1. Run `npm run test:unit -- src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts src/core/task/__tests__/workflow-runtime-metadata.test.ts src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`.
+[x] Subtask 238.1. Run `npm run test:unit -- src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts src/core/task/__tests__/workflow-runtime-metadata.test.ts src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
 
-[ ] Subtask 237.2. Run `npm run check-types`.
+[x] Task 239. Fail closed for impossible runtime-routed outcomes in entry and prerequisite form handlers.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 239.1. In `handleWorkflowEntryFormOutcome(...)`, add an explicit `runtime_routed_submission` switch case that returns `{ kind: "no_op" }`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 239.2. In `handleWorkflowPrerequisiteFormOutcome(...)`, add an explicit early guard for `runtime_routed_submission` that returns `{ kind: "no_op" }` before prerequisite route or selection logic runs.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 239.3. In `WorkflowRuntime.test.ts`, add focused coverage proving workflow entry form handling returns `no_op` when the form runtime returns `runtime_routed_submission`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 239.4. In `WorkflowRuntime.test.ts`, add focused coverage proving prerequisite form handling returns `no_op` when the form runtime returns `runtime_routed_submission`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Task 240. Run final Phase 68 validation.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
 
-[ ] Subtask 237.3. Run `npm run lint`.
+[x] Subtask 240.1. Run `npm run test:unit -- src/core/task/workflow-form/__tests__/WorkflowFormRuntime.test.ts src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/workflow-runtime/__tests__/WorkflowNextActionConsumer.test.ts src/core/task/__tests__/workflow-runtime-metadata.test.ts src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+[ ] Subtask 240.2. Run `npm run check-types`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+[ ] Subtask 240.3. Run `npm run lint`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`

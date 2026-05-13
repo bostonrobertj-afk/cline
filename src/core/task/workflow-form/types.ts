@@ -1,5 +1,5 @@
 import type { WorkflowFormDefinitionPayload, WorkflowFormSubmittedValuePayload } from "@shared/ExtensionMessage"
-import type { WorkflowFormSubmissionRequest } from "@shared/proto/cline/task"
+import type { WorkflowFormAction, WorkflowFormSubmissionRequest } from "@shared/proto/cline/task"
 
 export type WorkflowFormId = string
 
@@ -79,6 +79,14 @@ export type WorkflowFormRuntimeOutcome =
 			session: WorkflowFormSessionState
 			successMessage: string
 			valueChanges: WorkflowFormRuntimeValueChanges
+	  }
+	| {
+			kind: "runtime_routed_submission"
+			session: WorkflowFormSessionState
+			valueChanges: WorkflowFormRuntimeValueChanges
+			workflowFormId: WorkflowFormId
+			panelId: string
+			action: WorkflowFormAction
 	  }
 
 export interface WorkflowFormRuntimeLike {

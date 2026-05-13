@@ -76,6 +76,7 @@ import type {
 	WorkflowEntryArtifactPendingFileOperation,
 	WorkflowEntryArtifactResolution,
 	WorkflowEntryArtifactResolutionState,
+	WorkflowFormContinuationReplacement,
 	WorkflowNextAction,
 	WorkflowPrerequisiteFileDefinition,
 	WorkflowProjectSelectionState,
@@ -479,6 +480,27 @@ export class WorkflowRuntime {
 					workflowFormId: outcome.session.workflowFormId,
 				}
 				return this.resolveNextAction({ taskState })
+			case "runtime_routed_submission": {
+				await this.persistWorkflowFormValues({
+					taskState,
+					formSession: outcome.session,
+					valueChanges: outcome.valueChanges,
+				})
+				session.ui.formSession = outcome.session
+				const submittedAction = this.toWorkflowFormPanelAction(outcome.action)
+				if (submittedAction === undefined) {
+					return { kind: "no_op" }
+				}
+				session.branchContext.lastTriggerEvent = {
+					kind: "workflow_form_panel_submitted",
+					workflowFormId: outcome.workflowFormId,
+					panelId: outcome.panelId,
+					action: submittedAction,
+					submittedValueKeys: outcome.valueChanges.submittedValueKeys,
+					clearedValueKeys: outcome.valueChanges.clearedValueKeys,
+				}
+				return this.resolveNextAction({ taskState })
+			}
 		}
 	}
 
@@ -2111,6 +2133,61 @@ export class WorkflowRuntime {
 		return Array.isArray(value) && value.every((entry) => typeof entry === "string")
 	}
 
+	private toWorkflowFormPanelAction(action: WorkflowFormAction): WorkflowFormPanelAction | undefined {
+		switch (action) {
+			case WorkflowFormAction.SUBMIT:
+				return "submit"
+			case WorkflowFormAction.CANCEL:
+				return "cancel"
+			case WorkflowFormAction.BACK:
+				return "back"
+			case WorkflowFormAction.RETRY:
+				return "retry"
+			default:
+				return undefined
+		}
+	}
+
+	private isWorkflowFormPanelAction(value: unknown): value is WorkflowFormPanelAction {
+		return value === "submit" || value === "cancel" || value === "back" || value === "retry"
+	}
+
+	private isWorkflowFormPanelDefinition(value: unknown): value is WorkflowFormPanelDefinition {
+		if (this.isPlainRecord(value) === false) {
+			return false
+		}
+
+		const actionLabels = value.actionLabels
+		const backDestinationPanelId = value.backDestinationPanelId
+		const backStaleValueKeysToClear = value.backStaleValueKeysToClear
+		const backStaleDataKeysToClear = value.backStaleDataKeysToClear
+
+		return (
+			typeof value.panelId === "string" &&
+			value.panelId.trim() !== "" &&
+			typeof value.title === "string" &&
+			typeof value.promptMarkdown === "string" &&
+			Array.isArray(value.fields) &&
+			value.fields.every((field) => this.isPlainRecord(field)) &&
+			Array.isArray(value.allowedActions) &&
+			value.allowedActions.every((action) => this.isWorkflowFormPanelAction(action)) &&
+			this.isPlainRecord(value.transition) &&
+			typeof value.transition.type === "string" &&
+			(actionLabels === undefined || this.isPlainRecord(actionLabels)) &&
+			(backDestinationPanelId === undefined || typeof backDestinationPanelId === "string") &&
+			(backStaleValueKeysToClear === undefined || this.isStringArray(backStaleValueKeysToClear)) &&
+			(backStaleDataKeysToClear === undefined || this.isStringArray(backStaleDataKeysToClear))
+		)
+	}
+
+	private isWorkflowFormContinuationReplacement(value: unknown): value is WorkflowFormContinuationReplacement {
+		if (this.isPlainRecord(value) === false) {
+			return false
+		}
+
+		return this.isWorkflowFormPanelDefinition(value.panel) && this.isWorkflowFormSessionData(value.data)
+	}
+
 	private isWorkflowStepResolutionSourceRoute(value: unknown): value is WorkflowStepResolutionSourceRoute {
 		if (this.isPlainRecord(value) === false) {
 			return false
@@ -2257,6 +2334,16 @@ export class WorkflowRuntime {
 				)
 			case "workflow_form_completed":
 				return typeof value.workflowFormId === "string" && value.workflowFormId.trim() !== ""
+			case "workflow_form_panel_submitted":
+				return (
+					typeof value.workflowFormId === "string" &&
+					value.workflowFormId.trim() !== "" &&
+					typeof value.panelId === "string" &&
+					value.panelId.trim() !== "" &&
+					this.isWorkflowFormPanelAction(value.action) &&
+					this.isStringArray(value.submittedValueKeys) &&
+					this.isStringArray(value.clearedValueKeys)
+				)
 			case "workflow_values_persisted":
 				return this.isStringArray(value.changedKeys)
 			case "entry_artifact_resolution_completed":
@@ -2438,6 +2525,11 @@ export class WorkflowRuntime {
 			return undefined
 		}
 
+		const currentPanelId = persistedFormSession.currentPanelId
+		if (typeof currentPanelId !== "string" || currentPanelId.trim() === "") {
+			return undefined
+		}
+
 		let definitionPayload: WorkflowFormDefinitionPayload
 		if (workflowFormId === WORKFLOW_ENTRY_FORM_ID) {
 			if (projectSelection.projectTitle !== "" && projectSelection.projectFolderName !== "") {
@@ -2451,21 +2543,49 @@ export class WorkflowRuntime {
 				return undefined
 			}
 
-			const continuationRoute = this.findContinuationSourceRoute({
+			const continuationRoute = this.findWorkflowFormContinuationSourceRoute({
 				step: activeStep,
 				activeBranchId,
-				matches: ({ route }) =>
-					route.action.kind === "render_workflow_form" && route.action.workflowFormId === workflowFormId,
+				workflowFormId,
+				currentPanelId,
 			})
 			if (continuationRoute === undefined) {
 				return undefined
 			}
 
-			definitionPayload = workflowFormDefinitionPayload
+			if (continuationRoute.route.action.kind === "continue_workflow_form") {
+				if (currentPanelId !== continuationRoute.route.action.panelId) {
+					return undefined
+				}
+
+				const persistedDefinitionPayload = persistedFormSession.definitionPayload
+				if (this.isPlainRecord(persistedDefinitionPayload) === false) {
+					return undefined
+				}
+
+				const persistedPanels = persistedDefinitionPayload.panels
+				if (this.isPlainRecord(persistedPanels) === false) {
+					return undefined
+				}
+
+				const persistedPanel = persistedPanels[currentPanelId]
+				if (this.isWorkflowFormPanelDefinition(persistedPanel) === false || persistedPanel.panelId !== currentPanelId) {
+					return undefined
+				}
+
+				definitionPayload = {
+					...workflowFormDefinitionPayload,
+					panels: {
+						...workflowFormDefinitionPayload.panels,
+						[currentPanelId]: structuredClone(persistedPanel),
+					},
+				}
+			} else {
+				definitionPayload = workflowFormDefinitionPayload
+			}
 		}
 
-		const currentPanelId = persistedFormSession.currentPanelId
-		if (typeof currentPanelId !== "string" || definitionPayload.panels[currentPanelId] === undefined) {
+		if (definitionPayload.panels[currentPanelId] === undefined) {
 			return undefined
 		}
 
@@ -2494,6 +2614,17 @@ export class WorkflowRuntime {
 		}
 
 		if (this.isWorkflowFormSessionData(persistedFormSession.data) === false) {
+			return undefined
+		}
+
+		try {
+			this.workflowFormRuntime.createSession({
+				workflowFormId,
+				definitionPayload,
+				startPanelId: currentPanelId,
+				data: persistedFormSession.data,
+			})
+		} catch {
 			return undefined
 		}
 
@@ -2625,6 +2756,26 @@ export class WorkflowRuntime {
 		switch (triggerEvent.kind) {
 			case "workflow_form_completed":
 				return definition.workflowForms?.[triggerEvent.workflowFormId] !== undefined
+			case "workflow_form_panel_submitted": {
+				const workflowForm = definition.workflowForms?.[triggerEvent.workflowFormId]
+				if (workflowForm === undefined) {
+					return false
+				}
+
+				const panel = workflowForm.panels[triggerEvent.panelId]
+				if (panel === undefined || panel.allowedActions.includes(triggerEvent.action) === false) {
+					return false
+				}
+
+				const fieldKeys = new Set<string>()
+				for (const formPanel of Object.values(workflowForm.panels)) {
+					for (const field of formPanel.fields) {
+						fieldKeys.add(field.key)
+					}
+				}
+
+				return [...triggerEvent.submittedValueKeys, ...triggerEvent.clearedValueKeys].every((key) => fieldKeys.has(key))
+			}
 			case "workflow_values_persisted":
 				return triggerEvent.changedKeys.every((key) => definition.workflowValueKeys.includes(key))
 			case "model_tool_succeeded":
@@ -3561,6 +3712,8 @@ export class WorkflowRuntime {
 		}
 
 		switch (args.outcome.kind) {
+			case "runtime_routed_submission":
+				return { kind: "no_op" }
 			case "render_form":
 			case "complete_success": {
 				if (
@@ -3871,6 +4024,10 @@ export class WorkflowRuntime {
 	}): Promise<WorkflowNextAction> {
 		const session = args.taskState.activeWorkflowSession
 		if (!session) {
+			return { kind: "no_op" }
+		}
+
+		if (args.outcome.kind === "runtime_routed_submission") {
 			return { kind: "no_op" }
 		}
 
@@ -5322,15 +5479,18 @@ export class WorkflowRuntime {
 
 		const activeFormSession = session.ui.formSession
 		if (activeFormSession) {
-			const continuationRoute = this.findContinuationSourceRoute({
-				step,
-				activeBranchId,
-				matches: ({ route }) =>
-					this.isWorkflowPrerequisiteFormSession(activeFormSession)
-						? route.action.kind === "resolve_prerequisite_files"
-						: route.action.kind === "render_workflow_form" &&
-							route.action.workflowFormId === activeFormSession.workflowFormId,
-			})
+			const continuationRoute = this.isWorkflowPrerequisiteFormSession(activeFormSession)
+				? this.findContinuationSourceRoute({
+						step,
+						activeBranchId,
+						matches: ({ route }) => route.action.kind === "resolve_prerequisite_files",
+					})
+				: this.findWorkflowFormContinuationSourceRoute({
+						step,
+						activeBranchId,
+						workflowFormId: activeFormSession.workflowFormId,
+						currentPanelId: activeFormSession.currentPanelId,
+					})
 			if (continuationRoute) {
 				return {
 					route: continuationRoute.route,
@@ -5402,6 +5562,32 @@ export class WorkflowRuntime {
 		return undefined
 	}
 
+	private findWorkflowFormContinuationSourceRoute(args: {
+		step: WorkflowStepDefinition
+		activeBranchId: string
+		workflowFormId: string
+		currentPanelId: string
+	}): WorkflowContinuationSourceRoute | undefined {
+		const continuedFormRoute = this.findContinuationSourceRoute({
+			step: args.step,
+			activeBranchId: args.activeBranchId,
+			matches: ({ route }) =>
+				route.action.kind === "continue_workflow_form" &&
+				route.action.workflowFormId === args.workflowFormId &&
+				route.action.panelId === args.currentPanelId,
+		})
+		if (continuedFormRoute !== undefined) {
+			return continuedFormRoute
+		}
+
+		return this.findContinuationSourceRoute({
+			step: args.step,
+			activeBranchId: args.activeBranchId,
+			matches: ({ route }) =>
+				route.action.kind === "render_workflow_form" && route.action.workflowFormId === args.workflowFormId,
+		})
+	}
+
 	private transitionToStep(args: {
 		taskState: TaskState
 		definition: WorkflowDefinition
@@ -5436,6 +5622,102 @@ export class WorkflowRuntime {
 		return targetStep
 	}
 
+	private async buildContinueWorkflowFormNextAction(args: {
+		taskState: TaskState
+		definition: WorkflowDefinition
+		action: Extract<WorkflowDecisionAction, { kind: "continue_workflow_form" }>
+		sourceRoute: WorkflowStepResolutionSourceRoute
+	}): Promise<WorkflowNextAction> {
+		const { taskState, definition, action, sourceRoute } = args
+		const session = taskState.activeWorkflowSession
+		if (!session) {
+			return { kind: "no_op" }
+		}
+
+		const activeFormSession = session.ui.formSession
+		if (activeFormSession === undefined || activeFormSession.workflowFormId !== action.workflowFormId) {
+			return this.buildTerminalErrorNextAction({
+				taskState,
+				errorMessage: `Invalid workflow configuration: continue_workflow_form route ${sourceRoute.branchId}/${sourceRoute.routeId} requires an active form session for ${action.workflowFormId}.`,
+			})
+		}
+
+		const currentPanel = activeFormSession.definitionPayload.panels[action.panelId]
+		if (currentPanel === undefined) {
+			return this.buildTerminalErrorNextAction({
+				taskState,
+				errorMessage: `Invalid workflow configuration: continue_workflow_form route ${sourceRoute.branchId}/${sourceRoute.routeId} references missing panel ${action.panelId}.`,
+			})
+		}
+
+		let replacement: WorkflowFormContinuationReplacement
+		try {
+			const builtReplacement = await action.buildReplacement(session)
+			if (this.isWorkflowFormContinuationReplacement(builtReplacement) === false) {
+				return this.buildTerminalErrorNextAction({
+					taskState,
+					errorMessage: `Workflow form continuation replacement builder returned invalid data for form ${action.workflowFormId}.`,
+				})
+			}
+			replacement = builtReplacement
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : "Unknown error."
+			return this.buildTerminalErrorNextAction({
+				taskState,
+				errorMessage: `Workflow form continuation replacement builder failed for form ${action.workflowFormId}: ${errorMessage}`,
+			})
+		}
+
+		if (replacement.panel.panelId !== action.panelId) {
+			return this.buildTerminalErrorNextAction({
+				taskState,
+				errorMessage: `Invalid workflow configuration: continue_workflow_form route ${sourceRoute.branchId}/${sourceRoute.routeId} replacement panel ${replacement.panel.panelId} does not match target panel ${action.panelId}.`,
+			})
+		}
+
+		const definitionPayload: WorkflowFormDefinitionPayload = {
+			...activeFormSession.definitionPayload,
+			panels: {
+				...activeFormSession.definitionPayload.panels,
+				[action.panelId]: structuredClone(replacement.panel),
+			},
+		}
+
+		try {
+			this.workflowFormRuntime.createSession({
+				workflowFormId: action.workflowFormId,
+				definitionPayload,
+				startPanelId: action.panelId,
+				data: replacement.data,
+			})
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : "Unknown error."
+			return this.buildTerminalErrorNextAction({
+				taskState,
+				errorMessage: `Workflow form continuation replacement is invalid for form ${action.workflowFormId}: ${errorMessage}`,
+			})
+		}
+
+		const continuedFormSession: WorkflowFormSessionState = {
+			...activeFormSession,
+			definitionPayload,
+			currentPanelId: action.panelId,
+			data: structuredClone(replacement.data),
+			failure: undefined,
+		}
+		session.ui.formSession = continuedFormSession
+
+		return {
+			kind: "continue_workflow_form",
+			formSession: continuedFormSession,
+			payload: await this.buildWorkflowFormRenderPayload({
+				taskState,
+				workflow: definition,
+				session: continuedFormSession,
+			}),
+		}
+	}
+
 	private async buildNextActionFromDecisionTreeAction(args: {
 		taskState: TaskState
 		definition: WorkflowDefinition
@@ -5449,6 +5731,13 @@ export class WorkflowRuntime {
 		}
 
 		switch (action.kind) {
+			case "continue_workflow_form":
+				return this.buildContinueWorkflowFormNextAction({
+					taskState,
+					definition,
+					action,
+					sourceRoute,
+				})
 			case "render_workflow_form": {
 				if (session.ui.formSession?.workflowFormId === action.workflowFormId) {
 					const payload = await this.buildWorkflowFormRenderPayload({
@@ -7066,6 +7355,40 @@ export class WorkflowRuntime {
 					}
 
 					switch (route.action.kind) {
+						case "continue_workflow_form": {
+							const workflowForm = workflowForms[route.action.workflowFormId]
+							if (workflowForm === undefined) {
+								return {
+									valid: false,
+									errorMessage: `Workflow step ${step.id} route ${route.id} continue_workflow_form references missing workflowFormId ${route.action.workflowFormId}.`,
+								}
+							}
+							if (typeof route.action.panelId !== "string" || route.action.panelId.trim() === "") {
+								return {
+									valid: false,
+									errorMessage: `Workflow step ${step.id} route ${route.id} continue_workflow_form panelId must be a non-empty string.`,
+								}
+							}
+							if (route.action.panelId.trim() !== route.action.panelId) {
+								return {
+									valid: false,
+									errorMessage: `Workflow step ${step.id} route ${route.id} continue_workflow_form panelId ${route.action.panelId} must already be trimmed.`,
+								}
+							}
+							if (workflowForm.panels[route.action.panelId] === undefined) {
+								return {
+									valid: false,
+									errorMessage: `Workflow step ${step.id} route ${route.id} continue_workflow_form references missing panelId ${route.action.panelId}.`,
+								}
+							}
+							if (typeof route.action.buildReplacement !== "function") {
+								return {
+									valid: false,
+									errorMessage: `Workflow step ${step.id} route ${route.id} continue_workflow_form buildReplacement must be a function.`,
+								}
+							}
+							break
+						}
 						case "render_workflow_form": {
 							const workflowForm = workflowForms[route.action.workflowFormId]
 							if (workflowForm === undefined) {

@@ -1,4 +1,9 @@
-import type { WorkflowForm, WorkflowFormDefinitionPayload } from "@shared/ExtensionMessage"
+import type {
+	WorkflowForm,
+	WorkflowFormDefinitionPayload,
+	WorkflowFormPanelAction,
+	WorkflowFormPanelDefinition,
+} from "@shared/ExtensionMessage"
 import type { ClineToolSpec } from "@/core/prompts/system-prompt/spec"
 import type { WorkflowFormId, WorkflowFormSessionData, WorkflowFormSessionState } from "@/core/task/workflow-form/types"
 import type { WorkflowArtifactFamily } from "@/core/task/workflow-runtime/artifactFamilies"
@@ -106,6 +111,14 @@ export type WorkflowBranchTriggerEvent =
 	| { kind: "model_tool_succeeded"; toolName: ClineDefaultTool }
 	| { kind: "model_tool_failed"; toolName: ClineDefaultTool; errorMessage?: string }
 	| { kind: "workflow_form_completed"; workflowFormId: WorkflowFormId }
+	| {
+			kind: "workflow_form_panel_submitted"
+			workflowFormId: WorkflowFormId
+			panelId: string
+			action: WorkflowFormPanelAction
+			submittedValueKeys: readonly string[]
+			clearedValueKeys: readonly string[]
+	  }
 	| { kind: "workflow_values_persisted"; changedKeys: readonly string[] }
 	| {
 			kind: "entry_artifact_resolution_completed"
@@ -157,6 +170,12 @@ export interface WorkflowRenderFormNextAction {
 	payload: WorkflowForm
 }
 
+export interface WorkflowContinueFormNextAction {
+	kind: "continue_workflow_form"
+	formSession: WorkflowFormSessionState
+	payload: WorkflowForm
+}
+
 export interface WorkflowExecuteToolBackedOperationNextAction {
 	kind: "execute_tool_backed_operation"
 	toolRequest: WorkflowToolBackedOperationExecutionRequest
@@ -189,6 +208,7 @@ export interface WorkflowPersistWorkflowTeardownNextAction {
 
 export type WorkflowNextAction =
 	| WorkflowRenderFormNextAction
+	| WorkflowContinueFormNextAction
 	| WorkflowExecuteToolBackedOperationNextAction
 	| WorkflowProjectPromptNextAction
 	| WorkflowTerminalErrorNextAction
@@ -244,6 +264,15 @@ export type WorkflowFormSessionDataBuilder = (
 	session: ActiveWorkflowSession,
 ) => WorkflowFormSessionData | Promise<WorkflowFormSessionData>
 
+export interface WorkflowFormContinuationReplacement {
+	panel: WorkflowFormPanelDefinition
+	data: WorkflowFormSessionData
+}
+
+export type WorkflowFormContinuationReplacementBuilder = (
+	session: ActiveWorkflowSession,
+) => WorkflowFormContinuationReplacement | Promise<WorkflowFormContinuationReplacement>
+
 export interface WorkflowRenderFormDecisionActionWithFormIdOnly {
 	kind: "render_workflow_form"
 	workflowFormId: WorkflowFormId
@@ -274,8 +303,16 @@ export type WorkflowRenderFormDecisionAction =
 	| WorkflowRenderFormDecisionActionWithSessionData
 	| WorkflowRenderFormDecisionActionWithStartPanelAndSessionData
 
+export interface WorkflowContinueFormDecisionAction {
+	kind: "continue_workflow_form"
+	workflowFormId: WorkflowFormId
+	panelId: string
+	buildReplacement: WorkflowFormContinuationReplacementBuilder
+}
+
 export type WorkflowDecisionAction =
 	| WorkflowRenderFormDecisionAction
+	| WorkflowContinueFormDecisionAction
 	| { kind: "execute_tool_backed_operation"; instruction: WorkflowToolBackedActionInstruction }
 	| { kind: "run_deterministic_procedure"; instruction: WorkflowDeterministicProcedureActionInstruction }
 	| { kind: "build_workflow_document"; instruction: WorkflowDocumentBuildActionInstruction }

@@ -279,6 +279,133 @@ describe("WorkflowFormRuntime", () => {
 		})
 	})
 
+	it("returns runtime-routed submissions without locally advancing or completing", () => {
+		const runtime = createRuntime()
+		const session = createSession({
+			runtime,
+			workflowFormId: "runtime-routed-form",
+			definitionPayload: createDefinition({
+				firstPanelId: "route",
+				panels: {
+					route: {
+						panelId: "route",
+						title: "Route",
+						promptMarkdown: "Choose routing input.",
+						fields: [
+							{
+								key: "choice",
+								kind: "small_text",
+								label: "Choice",
+								required: true,
+								allowedValueType: "string",
+							},
+						],
+						allowedActions: ["submit"],
+						transition: {
+							type: "runtime_routed",
+						},
+					},
+				},
+			}),
+		})
+
+		const outcome = runtime.handleSubmission(
+			session,
+			createSubmitRequest({
+				sessionId: session.sessionId,
+				panelId: "route",
+				fields: [
+					{
+						key: "choice",
+						value: { stringValue: "alpha" },
+					},
+				],
+			}),
+		)
+
+		expect(outcome.kind).to.equal("runtime_routed_submission")
+		if (outcome.kind !== "runtime_routed_submission") {
+			throw new Error(`Expected runtime_routed_submission, received ${outcome.kind}.`)
+		}
+		expect(outcome.workflowFormId).to.equal("runtime-routed-form")
+		expect(outcome.panelId).to.equal("route")
+		expect(outcome.action).to.equal(WorkflowFormAction.SUBMIT)
+		expect(outcome.session.currentPanelId).to.equal("route")
+		expect(outcome.session.values.choice).to.deep.equal({
+			valueType: "string",
+			stringValue: "alpha",
+		})
+		expect(outcome.valueChanges.submittedValueKeys).to.deep.equal(["choice"])
+		expect(outcome.valueChanges.clearedValueKeys).to.deep.equal([])
+	})
+
+	it("clears stale values before returning runtime-routed submissions", () => {
+		const runtime = createRuntime()
+		const session = createSession({
+			runtime,
+			definitionPayload: createDefinition({
+				firstPanelId: "route",
+				panels: {
+					route: {
+						panelId: "route",
+						title: "Route",
+						promptMarkdown: "Choose routing input.",
+						fields: [
+							{
+								key: "source",
+								kind: "small_text",
+								label: "Source",
+								required: true,
+								allowedValueType: "string",
+							},
+							{
+								key: "stale",
+								kind: "small_text",
+								label: "Stale",
+								required: false,
+								allowedValueType: "string",
+							},
+						],
+						allowedActions: ["submit"],
+						transition: {
+							type: "runtime_routed",
+							staleValueKeysToClear: ["stale"],
+							staleDataKeysToClear: ["staleData"],
+						},
+					},
+				},
+			}),
+		})
+		session.values.stale = {
+			valueType: "string",
+			stringValue: "old",
+		}
+		session.data.staleData = "old"
+
+		const outcome = runtime.handleSubmission(
+			session,
+			createSubmitRequest({
+				sessionId: session.sessionId,
+				panelId: "route",
+				fields: [
+					{
+						key: "source",
+						value: { stringValue: "new" },
+					},
+				],
+			}),
+		)
+
+		expect(outcome.kind).to.equal("runtime_routed_submission")
+		if (outcome.kind !== "runtime_routed_submission") {
+			throw new Error(`Expected runtime_routed_submission, received ${outcome.kind}.`)
+		}
+		expect(outcome.session.values).to.not.have.property("stale")
+		expect(outcome.session.data).to.not.have.property("staleData")
+		expect(outcome.valueChanges.submittedValueKeys).to.deep.equal(["source"])
+		expect(outcome.valueChanges.clearedValueKeys).to.deep.equal(["stale"])
+	})
+
 	it("accepts an optional text field submitted as an explicit clear", () => {
 		const runtime = createRuntime()
 		const session = createSession({

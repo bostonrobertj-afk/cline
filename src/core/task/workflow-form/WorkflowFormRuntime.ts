@@ -628,6 +628,7 @@ function resolveTransitionOutcome(
 ): {
 	nextPanelId?: string
 	terminal?: boolean
+	runtimeRouted?: boolean
 	staleValueKeysToClear?: string[]
 	staleDataKeysToClear?: string[]
 } {
@@ -635,6 +636,12 @@ function resolveTransitionOutcome(
 		case "sequential":
 			return {
 				nextPanelId: transition.nextPanelId,
+				staleValueKeysToClear: transition.staleValueKeysToClear,
+				staleDataKeysToClear: transition.staleDataKeysToClear,
+			}
+		case "runtime_routed":
+			return {
+				runtimeRouted: true,
 				staleValueKeysToClear: transition.staleValueKeysToClear,
 				staleDataKeysToClear: transition.staleDataKeysToClear,
 			}
@@ -931,6 +938,17 @@ export class WorkflowFormRuntime {
 			data: clearedAfterTransition.data,
 		}
 
+		if (transitionOutcome.runtimeRouted === true) {
+			return {
+				kind: "runtime_routed_submission",
+				session: nextSession,
+				valueChanges,
+				workflowFormId: session.workflowFormId,
+				panelId: activePanel.panelId,
+				action: request.action,
+			}
+		}
+
 		if (transitionOutcome.terminal === true) {
 			return {
 				kind: "complete_success",
@@ -1111,6 +1129,10 @@ export class WorkflowFormRuntime {
 		definition: WorkflowFormDefinitionPayload,
 		transition: WorkflowFormTransitionDefinition,
 	): void {
+		if (transition.type === "runtime_routed") {
+			return
+		}
+
 		if (transition.type === "sequential" && !definition.panels[transition.nextPanelId]) {
 			throw new Error(`Workflow form definition references a nonexistent destination panel: ${transition.nextPanelId}`)
 		}
