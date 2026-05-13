@@ -144,6 +144,7 @@ If at any point you cannot satisfy one or more of these rules (for example, due 
 
 # Test Prescription Calibration
 - Prescribe tests only for behavior, contracts, regressions, and material risks required by the requirements, architecture, or approved action plan scope.
+- Tests related to prompting should look for non-empty prompt strings; they should never prescribe or assert specific prompt verbiage. 
 - Each prescribed test must have a clear purpose: success path, required failure path, boundary/security behavior, persistence contract, schema/tool exposure contract, or integration wiring.
 - Do not prescribe exhaustive deep-equality assertions for objects containing editable prompt prose, persona prose, descriptions, or other copy unless exact text is itself the approved runtime contract.
 - Use exact assertions for canonical machine-consumed outputs and stable contracts, including tool names/schema shape, artifact file formats, persisted metadata keys, required route/action kinds, generated index JSON, and canonical document structures.

@@ -1724,16 +1724,10 @@ describe("Prompt System Integration Tests", () => {
 			expect(workflowInputPayloadBlock).to.include("4. Finalize & Validate Story Document - Not Started")
 			expect(workflowInputPayloadBlock).to.include("CURRENT STEP DETAILED INSTRUCTIONS")
 			expect(workflowInputPayloadBlock).to.include("Step 2: Review Context & Ensure Project Alignment")
-			expect(workflowInputPayloadBlock).to.include(`Focus on \`${CREATE_STORY_TARGET_STORY}\`.`)
-			expect(workflowInputPayloadBlock).to.include(`Read \`${CREATE_STORY_TARGET_STORY}\`.`)
-			expect(workflowInputPayloadBlock).to.include("Ensure existing non-task story content fully aligns")
 
 			await runPromptTest(this, context, "gpt-5-codex", async ({ systemPrompt }) => {
 				expect(systemPrompt).to.not.include("CURRENT STEP DETAILED INSTRUCTIONS")
 				expect(systemPrompt).to.not.include("Step 2: Review Context & Ensure Project Alignment")
-				expect(systemPrompt).to.not.include(`Focus on \`${CREATE_STORY_TARGET_STORY}\`.`)
-				expect(systemPrompt).to.not.include(`Read \`${CREATE_STORY_TARGET_STORY}\`.`)
-				expect(systemPrompt).to.not.include("Ensure existing non-task story content fully aligns")
 			})
 		})
 

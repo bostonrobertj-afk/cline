@@ -1,6 +1,6 @@
 import { access, readdir, readFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
-import type { WorkflowFormDefinitionPayload } from "@shared/ExtensionMessage"
+import type { WorkflowFormDefinitionPayload, WorkflowFormPanelAction } from "@shared/ExtensionMessage"
 import type { WorkflowStoryIndex, WorkflowStoryIndexEntry, WorkflowStoryStatus } from "../../storyArtifacts"
 import { buildEpicStoriesIndexFilename, parseWorkflowStoryIndexJson } from "../../storyArtifacts"
 import type {
@@ -9,6 +9,7 @@ import type {
 	WorkflowDecisionTree,
 	WorkflowDefinition,
 	WorkflowDeterministicProcedureResult,
+	WorkflowFormContinuationReplacementBuilder,
 	WorkflowPersonaDefinition,
 	WorkflowPromptBuilderInput,
 	WorkflowStepDefinition,
@@ -117,6 +118,7 @@ export const CREATE_STORY_PREREQUISITE_FILES: NonNullable<WorkflowDefinition["pr
 interface CreateStoryEpicsIndexEntry {
 	identity: string
 	title: string
+	"story-index-generated": boolean
 }
 
 interface CreateStoryEpicsIndexJson {
@@ -125,16 +127,14 @@ interface CreateStoryEpicsIndexJson {
 }
 
 const POSITIVE_NUMERIC_ID_PATTERN = /^[1-9]\d*$/
-export const CREATE_STORY_TARGET_EPIC_FORM_ID = "step-1-target-epic-form"
-export const CREATE_STORY_STORY_SELECTION_FORM_ID = "step-1-story-selection-form"
-export const CREATE_STORY_CANNOT_CONTINUE_FORM_ID = "step-1-cannot-continue-form"
-export const CREATE_STORY_PANEL_A_TARGET_EPIC_ID = "step-1-panel-a-target-epic"
-export const CREATE_STORY_PANEL_B_TARGET_STORY_ID = "step-1-panel-b-target-story"
-export const CREATE_STORY_PANEL_C_BACKLOG_REVISION_ID = "step-1-panel-c-backlog-revision"
-export const CREATE_STORY_PANEL_D_NO_REVISION_CONFIRMATION_ID = "step-1-panel-d-no-revision-confirmation"
-export const CREATE_STORY_PANEL_E_IMPLEMENTED_STORY_BLOCKED_ID = "step-1-panel-e-implemented-story-blocked"
-export const CREATE_STORY_MISSING_STORY_INDEX_PANEL_ID = "step-1-missing-story-index"
-export const CREATE_STORY_STORY_FILE_NOT_GENERATED_PANEL_ID = "step-1-story-file-not-generated"
+export const CREATE_STORY_STEP_1_FORM_ID = "step-1-create-story-form"
+export const CREATE_STORY_PANEL_A_EPIC_SELECTION_ID = "step-1-panel-a-epic-selection"
+export const CREATE_STORY_PANEL_B_STORY_SELECTION_ID = "step-1-panel-b-story-selection"
+export const CREATE_STORY_PANEL_C_MISSING_STORY_INDEX_ID = "step-1-panel-c-missing-story-index"
+export const CREATE_STORY_PANEL_D_MISSING_STORY_FILE_ID = "step-1-panel-d-missing-story-file"
+export const CREATE_STORY_PANEL_E_STORY_READY_FOR_IMPLEMENTATION_ID = "step-1-panel-e-story-ready-for-implementation"
+export const CREATE_STORY_PANEL_F_RUN_DEV_STORY_WORKFLOW_ID = "step-1-panel-f-run-dev-story-workflow"
+export const CREATE_STORY_PANEL_G_STORY_ALREADY_IMPLEMENTED_ID = "step-1-panel-g-story-already-implemented"
 const STORY_STATUS_FOLDER_SEGMENTS: Readonly<Record<WorkflowStoryStatus, readonly string[]>> = {
 	draft: ["implementation", "drafts"],
 	backlog: ["implementation", "stories-backlog"],
@@ -142,12 +142,9 @@ const STORY_STATUS_FOLDER_SEGMENTS: Readonly<Record<WorkflowStoryStatus, readonl
 	complete: ["implementation", "stories-complete"],
 }
 
-function buildTerminalTransition(): WorkflowFormDefinitionPayload["panels"][string]["transition"] {
+function buildRuntimeRoutedTransition(): WorkflowFormDefinitionPayload["panels"][string]["transition"] {
 	return {
-		type: "conditional",
-		conditionSourceKey: "__terminal__",
-		branches: [],
-		defaultTerminal: true,
+		type: "runtime_routed",
 	}
 }
 
@@ -176,7 +173,16 @@ function renderWorkflowValueByKey(input: WorkflowPromptBuilderInput, key: Create
 	return input.renderWorkflowValue(input.session.workflowValues[key] ?? key)
 }
 
-function buildStep2VariantInstructions(input: WorkflowPromptBuilderInput): string {
+function renderCreateStoryPromptTemplate(input: WorkflowPromptBuilderInput, template: string): string {
+	return template
+		.replaceAll("target_story", renderWorkflowValueByKey(input, CreateStoryWorkflowValueKey.TargetStory))
+		.replaceAll("architecture_document", renderWorkflowValueByKey(input, CreateStoryWorkflowValueKey.ArchitectureDocument))
+		.replaceAll("epics_document", renderWorkflowValueByKey(input, CreateStoryWorkflowValueKey.EpicsDocument))
+		.replaceAll("parent_story", renderWorkflowValueByKey(input, CreateStoryWorkflowValueKey.ParentStory))
+		.replaceAll("findings_document", renderWorkflowValueByKey(input, CreateStoryWorkflowValueKey.FindingsDocument))
+}
+
+function buildStep2PromptSource(input: WorkflowPromptBuilderInput): WorkflowStepPromptSource {
 	const selectedStoryStatus = readWorkflowStringValue(
 		input.session.workflowValues,
 		CreateStoryWorkflowValueKey.SelectedStoryStatus,
@@ -186,112 +192,221 @@ function buildStep2VariantInstructions(input: WorkflowPromptBuilderInput): strin
 		input.session.workflowValues,
 		CreateStoryWorkflowValueKey.ReviseBacklogStory,
 	)
-	const targetStory = renderWorkflowValueByKey(input, CreateStoryWorkflowValueKey.TargetStory)
 
 	if (selectedStoryStatus === "backlog" && reviseBacklogStory === true) {
-		return `You are revising an existing story file at \`${targetStory}\`.
-Ask the user to explain the required revisions before proposing changes, and ground any suggested revisions in provided context plus existing runtime code and tests.`
+		return {
+			currentStepInstructions: renderCreateStoryPromptTemplate(
+				input,
+				`In this workflow you will be assisting the user in revising an existing story file.
+
+The target story for this workflow is: target_story
+
+Before doing anything else, ensure that the existing content within the target story file fully aligns with the project's foundational documents, including:
+- Project Architecture: architecture_document
+- Epics Document: epics_document
+If you detect any conflict or misalignment, notify the user and work with them to identify the appropriate resolution. Only proceed once the story file's objective, scope, scope boundary, requirements, and Known Issues/ Risks/ Technical Debt sections fully align with the project's foundational documents.
+
+Then, ask the user to explain the revisions they require. If they ask you for suggestions regarding task/subtask revisions, ground your response in the provided context and existing runtime code/tests.
+
+Once you've reviewed context and ensured that the target story's existing non-task content aligns with the provided project documentation, call workflow_progress_request to unlock the next step's instructions.`,
+			),
+		}
+	}
+
+	if (selectedStoryStatus === "draft" && selectedStoryType === "primary") {
+		return {
+			currentStepInstructions: renderCreateStoryPromptTemplate(
+				input,
+				`In this workflow, you'll be preparing a story file for implementation by adding tasks and subtasks.
+
+The target story for this workflow is: target_story
+
+Before beginning work on the story's tasks & subtasks, ensure that the existing content within the target story file fully aligns with the project's foundational documents, including:
+- Project Architecture: architecture_document
+- Epics Document: epics_document
+
+If you detect any conflict or misalignment, notify the user and work with them to identify the appropriate resolution. Only proceed once the story file's objective, scope, scope boundary, requirements, and Known Issues/ Risks/ Technical Debt sections fully align with the project's foundational documents.
+
+Once you've reviewed context and ensured that the target story's existing non-task content aligns with the provided project documentation, call workflow_progress_request to unlock the next step's instructions.`,
+			),
+		}
 	}
 
 	if (selectedStoryStatus === "draft" && selectedStoryType === "remediation") {
-		const parentStory = renderWorkflowValueByKey(input, CreateStoryWorkflowValueKey.ParentStory)
-		const findingsDocument = renderWorkflowValueByKey(input, CreateStoryWorkflowValueKey.FindingsDocument)
-		return `You are preparing a remediation story file for implementation by adding tasks and subtasks.
-Use parent story \`${parentStory}\` and findings document \`${findingsDocument}\` as required context.`
+		return {
+			currentStepInstructions: renderCreateStoryPromptTemplate(
+				input,
+				`In this workflow, you'll be preparing a remediation story file for implementation by adding tasks and subtasks.
+
+The target story for this workflow is: target_story
+
+This story was generated due to QA findings after the following story was completed and reviewed:
+Originating story: parent_story
+The QA findings were documented in this file: findings_document
+
+Before doing anything else, review the originating story and QA findings and ensure that the existing content in the target story document aligns with the QA findings. Then, assess the target story document vs the project's foundational documents, including:
+- Project Architecture: architecture_document
+- Epics Document: epics_document
+
+If you detect any conflict or misalignment, notify the user and work with them to identify the appropriate resolution. Only proceed once the story file's objective, scope, scope boundary, requirements, and Known Issues/ Risks/ Technical Debt sections fully align with the project's foundational documents.
+
+Once you've reviewed context and ensured that the target story's existing non-task content aligns with the provided project documentation, call workflow_progress_request to unlock the next step's instructions.`,
+			),
+		}
 	}
 
-	return `You are preparing a story file for implementation by adding tasks and subtasks.`
+	throw new Error(
+		`Create Story Step 2 prompt does not support selected_story_status ${selectedStoryStatus ?? "unset"}, selected_story_type ${selectedStoryType ?? "unset"}, and revise_backlog_story ${String(reviseBacklogStory)}.`,
+	)
 }
 
-function buildStep2PromptSource(input: WorkflowPromptBuilderInput): WorkflowStepPromptSource {
-	const targetStory = renderWorkflowValueByKey(input, CreateStoryWorkflowValueKey.TargetStory)
-	const architectureDocument = renderWorkflowValueByKey(input, CreateStoryWorkflowValueKey.ArchitectureDocument)
-	const epicsDocument = renderWorkflowValueByKey(input, CreateStoryWorkflowValueKey.EpicsDocument)
-	const brainstormingDocument = renderWorkflowValueByKey(input, CreateStoryWorkflowValueKey.BrainstormingDocument)
-	const parentStory = renderWorkflowValueByKey(input, CreateStoryWorkflowValueKey.ParentStory)
-	const findingsDocument = renderWorkflowValueByKey(input, CreateStoryWorkflowValueKey.FindingsDocument)
-
-	return {
-		currentStepInstructions: `${buildStep2VariantInstructions(input)}
-
-Focus on \`${targetStory}\`.
-Read \`${targetStory}\`.
-Read \`${architectureDocument}\`.
-Read \`${epicsDocument}\`.
-Read \`${brainstormingDocument}\` when present.
-For remediation stories, read \`${parentStory}\` and \`${findingsDocument}\`.
-
-Ensure existing non-task story content fully aligns with project architecture and epics context.
-For remediation stories, ensure the target remediation story aligns with the QA findings that produced it.
-Identify conflicts or misalignment before task/subtask authoring begins.
-Notify the user of conflicts, ambiguities, or missing information.
-Work with the user to identify the appropriate resolution when a decision is needed.
-Proceed only once the story objective, scope, scope boundary, requirements, and known issues/risks/technical-debt sections align with the provided project documentation.
-For backlog revisions, ask the user to explain the required revisions and ground any suggested revisions in provided context and existing runtime code/tests.
-
-		Call \`workflow_progress_request\` only after context review is complete and blocking issues are resolved or the user confirms the current context is sufficient.`,
-	}
-}
-
-function buildStep3VariantInstructions(input: WorkflowPromptBuilderInput): string {
+function buildStep3PromptSource(input: WorkflowPromptBuilderInput): WorkflowStepPromptSource {
 	const selectedStoryStatus = readWorkflowStringValue(
 		input.session.workflowValues,
 		CreateStoryWorkflowValueKey.SelectedStoryStatus,
 	)
-	const targetStory = renderWorkflowValueByKey(input, CreateStoryWorkflowValueKey.TargetStory)
 
 	if (selectedStoryStatus === "backlog") {
-		return `Review existing tasks and subtasks in \`${targetStory}\` and determine whether they satisfy all requirements, scope, scope boundary, objective, story instructions, test coverage expectations, and action-plan quality rules.`
+		return {
+			currentStepInstructions: renderCreateStoryPromptTemplate(
+				input,
+				`Review the existing tasks and subtasks in target_story and determine whether they meet the following criteria:
+- They fully satisfy the story's requirements
+- They respect the story's scope and scope boundary
+- They support achievement of the story's objective
+- They prescribe changes in a manner which complies with the story's general instructions
+- Subtasks are scoped to a single revision in a single target file
+- Each subtask includes specific allowed files
+- Tasks & subtasks provide specific prescriptive revisions without deferring decision space to the implementing agent.
+- Requirements do not ask for delivery of imports, helpers, placeholder scaffolding, future-step code, or partially-wired definitions unless the story will also wire them into legitimate runtime use.
+- Prescribed tests provide adequate coverage of both happy paths and failure paths for all code revisions
+- Tests are prescribed only for behavior, contracts, regression, and material risks required by the story document and project documentation
+- Any tests built via the story's tasks use exact assertions for canonical machine-consumed outputs and stable contracts, including tool names/ schema shape, artifact file formats, and persisted metadata.
+- Any tests built via the story's tasks use shape and invariant assertions for editable content: required fields exist, strings are non-empty, mappings are correct, and forbidden legacy values are absent.
+- Any tests built via the story's tasks do not add static guards unless they protect an approved boundary, forbidden legacy dependency, or known regression risk.
+
+Notify the user that you've reviwed the existing tasks & subtasks for coverage, consistency, and quality, surface any issues you've identified to them, and ask them what additional issues or concerns they'd like you to address.
+
+${STEP_3_SHARED_PROMPT_TEMPLATE}`,
+			),
+		}
 	}
 
-	return `Review runtime code and tests, then identify the full set of in-scope revisions needed to deliver the story's requirements and objective.`
-}
+	if (selectedStoryStatus === "draft") {
+		return {
+			currentStepInstructions: renderCreateStoryPromptTemplate(
+				input,
+				`Review runtime code & tests and identify the full set of in-scope revisions needed to deliver the story's requirements and objective.
+If the story requires touching existing artifacts or placeholders, trace the exact runtime resolution path end to end:
+    config/source of truth
+    resolver/helper
+    handler/runtime consumer
+    tests/docs that assert the convention
+    For any plan that introduces a new artifact, tool, or schema entry, perform a sibling-pattern audit:
+    registration
+    executor wiring
+    prompt/tool exposure
+    approval/path policy
+    tests
+    snapshots/generated surfaces
+    docs/reference surfaces if treated as canonical in-repo
+Provide the user with the identified revision set and tell them your next step is to translate these revisions into implementation-ready tasks and subtasks.
+Next, build the story's tasks & subtasks using the identified revision set.
 
-function buildStep3PromptSource(input: WorkflowPromptBuilderInput): WorkflowStepPromptSource {
-	const targetStory = renderWorkflowValueByKey(input, CreateStoryWorkflowValueKey.TargetStory)
-
-	return {
-		currentStepInstructions: `${buildStep3VariantInstructions(input)}
-
-Inspect relevant runtime code and tests before authoring tasks and subtasks.
-Trace any required existing artifact, placeholder, resolver, handler, runtime consumer, test, or document convention end to end.
-Perform sibling-pattern audits for any new artifact, tool, schema entry, prompt/tool exposure, approval/path policy, test, snapshot, or canonical document surface.
-Provide the user with the identified revision set before translating it into tasks and subtasks.
-
-Author implementation-ready tasks and subtasks in \`${targetStory}\`.
-Verify proposed tasks and subtasks for project standards, architecture fit, downstream impact, and code hygiene.
-Prefer deep architectural fixes over surface workarounds.
-Identify downstream or peripheral risks and propose follow-up mitigations where needed.
-Avoid prescribing hardcoded values where configuration or constants are appropriate.
-Prescribe removal of cruft and failed-attempt remnants when the story retires or replaces existing behavior.
-Avoid \`any\`, broad type assertions, forced assertions, non-boolean boolean checks, stale domain naming, compatibility remaps for retired concepts, and other prohibited code-hygiene patterns.
-Avoid introducing architecture not backed by upstream requirements or architecture documents.
-Avoid in-plan churn by prescribing the final intended code shape directly.
-
-Ensure the resulting story can end in a repo-valid intermediate state that passes focused tests, formatting, lint, and typecheck.
-Ensure each task and subtask is ordered so no item depends on a later item.
-Require each subtask to be scoped to a single revision in a single target file with specific allowed files.
-		Ask the user to review the tasks/subtasks section in \`${targetStory}\`, refine based on feedback, and call \`workflow_progress_request\` only after the user is satisfied with that section.`,
+${STEP_3_SHARED_PROMPT_TEMPLATE}`,
+			),
+		}
 	}
+
+	throw new Error(`Create Story Step 3 prompt does not support selected_story_status ${selectedStoryStatus ?? "unset"}.`)
 }
+
+const STEP_3_SHARED_PROMPT_TEMPLATE = `You must follow these rules when authoring story tasks & subtasks:
+1. Verify solution quality and standards
+   - Ensure the proposed code or fix is appropriate, elegant, and consistent with modern, industry-standard practices for the project's tech stack, including CLEAN architecture.
+   - If you must deviate from best practices (e.g., due to constraints), clearly explain why and what the ideal pattern would be.
+2. Prescribe deep, architectural fixes over surface workarounds
+   - Check whether the issue can and should be solved at a deeper architectural layer (design, data flow, responsibilities) rather than with a shallow or hacky workaround.
+   - If you choose a workaround for pragmatic reasons, explicitly label it as such and describe the deeper architectural fix that would be ideal.
+3. Look for underlying design-pattern flaws
+   - Examine whether the issue reveals deeper design or pattern problems (e.g., responsibilities mixed, poor separation of concerns, leaky abstractions).
+   - If such problems exist, call them out explicitly and propose how they could be addressed, even if the full fix is out of scope for the immediate change.
+4. Consider downstream and peripheral impact
+   - Evaluate how the change may affect other modules, call sites, and features, including edge cases and lifecycle interactions. Search the codbase and read peripheral files if uncertain.
+   - If the change is likely to cause downstream or peripheral issues, that is acceptable only if:
+     a) You clearly identify and describe these risks, AND
+     b) You propose follow-up steps or mitigations as part of the solution.
+5. Avoid hardcoded values; prescribe integration with config/strings where appropriate
+   - Do NOT introduce hardcoded strings or values when they represent configuration, thresholds, labels, messages, or anything reasonably likely to change.
+   - Instead, integrate such values into the app’s configuration system when appropriate for user/admin/dev tweaking
+   - All user-facing or UI strings MUST go into a strings.xml (or similar)
+   - If you cannot follow this rule for some reason, explicitly state why.
+6. Prescribe removal of cruft and failed-attempt remnants
+   - Ensure that your changes do not leave behind obsolete code/imports, commented-out experiments, dead branches, or outdated patterns related to prior failed attempts.
+   - Consider related/downstream modules that may now contain redundant or inconsistent code as a result of your change.
+   - De-crufting should be treated as part of the fix: either perform it in your changes, or clearly specify what should be removed/refactored and where.
+- When deleting or retiring a domain concept, delete its named gates, helper methods, variables, and tests rather than repointing them at another surviving concept.
+7. Practice Good Code Hygiene by avoiding common bad habits:
+    - "any" typing
+    - val as SomeType
+    - as any in tests
+    - optional properties most of the time (explicitly model which combinations exist and which don't whenever possible)
+    - one-letter generics
+    - non-boolean boolean checks
+    - bang bang operators (explicitly check for the condition instead)
+    - != null (explicitly check for the condition instead)
+    - not declaring function return types
+    - abuse of type assertions (use them only in special scenarios where the type is clearly known, and give priority to type declarations, interfaces, or generics)
+    - Failing to use utility types (use utility types such as partial, pick, omit, etc when appropriate)
+    - forcing assertions when types don't match
+    - not using enums to manage constants
+    - not using generics to abstract duplicated code
+    - not using type narrowing
+    - not explicitly defining generics parameters
+    - semantic aliasing, where a variable/function/type with an old domain meaning is reassigned to a new generic or unrelated concept instead of being deleted
+    - stale domain naming after behavior migration; names must describe the current approved responsibility, not the historical source of the code
+    - compatibility remaps that preserve retired concepts by pointing them at surviving generic behavior unless the upstream requirements explicitly approve that remap
+    - boolean aliases whose name does not exactly match the condition they represent; use the existing boolean directly or introduce a correctly named concept only if the architecture requires it
+    - retaining obsolete gates/seams/flags after their original behavior is removed
+8. Do not introduce architecture in the action plan that is not prescribed in an upstream document.
+    - The action plan must not introduce architectural concepts or solutions which are not backed by existing project documentation. If something is not explicitly prescribed, you must gain user alignment and approval before including it in the action plan.
+    - If you determine that additional or different architecture is necessary while authoring the action plan, you must stop and inform the user so that the appropriate revisions can be made to upstream documents first.
+9. Avoid in-plan churn. Do not prescribe code in one task/ subtask only to replace the prescribed code in a subsequent task/ subtask. Identify the final shape of every line being prescribed, and require the dev agent to implement it that way in one task / subtask.
+10. The action plan must end in a repo-valid intermediate state that passes the same static gates required before commit, including formatting, lint, typecheck and any focused tests prescribed for that phase.
+    - Do not prescribe unused imports, unused helpers, placeholder scaffolding, future-step code, or partially wired definitions unless the story's tasks/ subtasks also wire them into legitimate runtime use.
+11. Tasks & Subtasks must be on their own lines starting with "[ ]" so that dev agents can mark completion as they progress through the action plan.
+    - tasks & subtasks must have numerical IDs, with subtasks inheriting the parent task ID, e.g. task 1, subtasks 1.1, 1.2.
+    - Subtasks must prescribe exact line-level revisions with target file indicated.
+    - Subtasks must never prescribe more than ONE required revision
+12. NEVER prescribe retyping, casting, renaming, or otherwise mutating existing capabilities/functionality within a task or subtask unless you have surfaced the proposed change as a single topic to the user and gained their approval.
+
+If at any point you cannot satisfy one or more of these rules (for example, due to missing context or constraints in the existing architecture), you MUST:
+- Explicitly state which rule(s) you cannot fully satisfy, and why.
+- Propose the best available compromise, and outline what a more ideal long-term fix would look like.
+
+After authoring the tasks & subtasks, reach each line of the story and seek out any inconsistencies or conflicts. During this review, assess each task and subtask for internal dependencies, and ensure that no task or subtask is dependent upon a task or subtask which is sequenced after it in the story. Resolve them appropriately, asking the user for input if necessary, before indicating that the tasks & subtasks are complete.
+
+*** User Review & Feedback ***
+Provide the user with the full path for target_story and ask them to review the tasks / subtasks section and provide feedback. Refine based on the user's feedback as needed. Once the user is satisfied with the tasks / subtasks section, unlock the next step's instructions by calling workflow_progress_request.`
 
 function buildStep4PromptSource(input: WorkflowPromptBuilderInput): WorkflowStepPromptSource {
-	const targetStory = renderWorkflowValueByKey(input, CreateStoryWorkflowValueKey.TargetStory)
-
 	return {
-		currentStepInstructions: `Validate \`${targetStory}\` as a complete implementation handoff.
+		currentStepInstructions: renderCreateStoryPromptTemplate(
+			input,
+			`Verify that target_story is complete, correctly formatted, internally consistent, and safe to hand off for implementation.
 
-Verify every acceptance criterion is covered by one or more tasks.
-Verify every task maps to a real part of the approved story scope.
-Verify task order is executable and non-conflicting.
-Verify no two tasks prescribe contradictory file changes or incompatible invariants.
-Verify every planned code change has corresponding test-maintenance coverage where needed.
-Verify stale assertions, mocks, snapshots, validators, and type contracts are accounted for when affected.
-Verify task/subtask content remains aligned with story objective, scope, scope boundary, requirements, and general instructions.
+Validate the story as a complete implementation handoff:
+- every acceptance criterion is covered by one or more tasks
+- every task maps to a real part of the approved story scope
+- task order is executable and non-conflicting
+- no two tasks prescribe contradictory file changes or incompatible invariants
+- every planned code change has corresponding test-maintenance coverage where needed
+- stale assertions, mocks, snapshots, validators, and type contracts are accounted for when affected
 
-If you detect ambiguity, contradiction, missing coverage, or unsafe handoff content, correct it when the correction does not require a new user decision. If correction requires a new decision, stop and ask the user.
+If you detect ambiguity, contradiction, or missing coverage, correct it. If correction requires a new decision, stop and ask the user.
 
-Call \`attempt_completion\` only after validation passes and the story is complete and ready for implementation.`,
+When validation passes, use attempt_completion to notify the user that the story is complete and ready for implementation.`,
+		),
 	}
 }
 
@@ -306,7 +421,8 @@ function parseCreateStoryEpicsIndexEntry(value: unknown): CreateStoryEpicsIndexE
 
 	const identity = value.identity
 	const title = value.title
-	if (typeof identity !== "string" || typeof title !== "string") {
+	const storyIndexGenerated = value["story-index-generated"]
+	if (typeof identity !== "string" || typeof title !== "string" || typeof storyIndexGenerated !== "boolean") {
 		return undefined
 	}
 
@@ -319,6 +435,7 @@ function parseCreateStoryEpicsIndexEntry(value: unknown): CreateStoryEpicsIndexE
 	return {
 		identity: trimmedIdentity,
 		title: trimmedTitle,
+		"story-index-generated": storyIndexGenerated,
 	}
 }
 
@@ -369,11 +486,14 @@ function readWorkflowBooleanValue(workflowValues: WorkflowValues, key: CreateSto
 	return typeof value === "boolean" ? value : undefined
 }
 
-function workflowFormCompleted(workflowFormId: string): WorkflowDecisionBranchTrigger {
+function workflowFormPanelSubmitted(panelId: string, action: WorkflowFormPanelAction): WorkflowDecisionBranchTrigger {
 	return {
 		kind: "event_predicate",
 		matches: ({ triggerEvent }) =>
-			triggerEvent.kind === "workflow_form_completed" && triggerEvent.workflowFormId === workflowFormId,
+			triggerEvent.kind === "workflow_form_panel_submitted" &&
+			triggerEvent.workflowFormId === CREATE_STORY_STEP_1_FORM_ID &&
+			triggerEvent.panelId === panelId &&
+			triggerEvent.action === action,
 	}
 }
 
@@ -432,56 +552,35 @@ function toolBackedOperationFailed(branchId: string, routeId: string): WorkflowD
 	}
 }
 
-function workflowValuesPersistedForSelectedEpicWithStoriesIndex(): WorkflowDecisionBranchTrigger {
+function selectedEpicHasStoriesIndex(): WorkflowDecisionBranchTrigger {
 	return {
-		kind: "event_predicate",
-		matches: ({ triggerEvent, workflowValues }) =>
-			triggerEvent.kind === "workflow_values_persisted" &&
-			triggerEvent.changedKeys.includes(CreateStoryWorkflowValueKey.TargetEpic) &&
+		kind: "session_predicate",
+		matches: ({ workflowValues }) =>
 			readWorkflowStringValue(workflowValues, CreateStoryWorkflowValueKey.StoriesIndex) !== undefined,
 	}
 }
 
-function workflowValuesPersistedForSelectedEpicWithoutStoriesIndex(): WorkflowDecisionBranchTrigger {
+function selectedEpicDoesNotHaveStoriesIndex(): WorkflowDecisionBranchTrigger {
 	return {
-		kind: "event_predicate",
-		matches: ({ triggerEvent, workflowValues }) =>
-			triggerEvent.kind === "workflow_values_persisted" &&
-			triggerEvent.changedKeys.includes(CreateStoryWorkflowValueKey.TargetEpic) &&
+		kind: "session_predicate",
+		matches: ({ workflowValues }) =>
 			readWorkflowStringValue(workflowValues, CreateStoryWorkflowValueKey.StoriesIndex) === undefined,
 	}
 }
 
-function selectedStoryMetadataChanged(changedKeys: readonly string[]): boolean {
-	return [
-		CreateStoryWorkflowValueKey.SelectedStoryFileName,
-		CreateStoryWorkflowValueKey.SelectedStoryType,
-		CreateStoryWorkflowValueKey.SelectedStoryStatus,
-		CreateStoryWorkflowValueKey.SelectedStoryFileGenerated,
-	].some((key) => changedKeys.includes(key))
-}
-
-function workflowValuesPersistedForSelectedStoryWithoutGeneratedFile(): WorkflowDecisionBranchTrigger {
+function selectedStoryDoesNotHaveGeneratedFile(): WorkflowDecisionBranchTrigger {
 	return {
-		kind: "event_predicate",
-		matches: ({ triggerEvent, workflowValues }) =>
-			triggerEvent.kind === "workflow_values_persisted" &&
-			selectedStoryMetadataChanged(triggerEvent.changedKeys) &&
+		kind: "session_predicate",
+		matches: ({ workflowValues }) =>
 			readWorkflowBooleanValue(workflowValues, CreateStoryWorkflowValueKey.SelectedStoryFileGenerated) === false,
 	}
 }
 
-function workflowValuesPersistedForSelectedStoryStatus(
-	...statuses: readonly WorkflowStoryStatus[]
-): WorkflowDecisionBranchTrigger {
+function selectedStoryStatusMatches(...statuses: readonly WorkflowStoryStatus[]): WorkflowDecisionBranchTrigger {
 	return {
-		kind: "event_predicate",
-		matches: ({ triggerEvent, workflowValues }) => {
-			if (
-				triggerEvent.kind !== "workflow_values_persisted" ||
-				selectedStoryMetadataChanged(triggerEvent.changedKeys) === false ||
-				readWorkflowBooleanValue(workflowValues, CreateStoryWorkflowValueKey.SelectedStoryFileGenerated) !== true
-			) {
+		kind: "session_predicate",
+		matches: ({ workflowValues }) => {
+			if (readWorkflowBooleanValue(workflowValues, CreateStoryWorkflowValueKey.SelectedStoryFileGenerated) !== true) {
 				return false
 			}
 
@@ -491,31 +590,22 @@ function workflowValuesPersistedForSelectedStoryStatus(
 	}
 }
 
-function workflowValuesPersistedForTargetStory(): WorkflowDecisionBranchTrigger {
+function targetStoryIsPresent(): WorkflowDecisionBranchTrigger {
 	return {
-		kind: "event_predicate",
-		matches: ({ triggerEvent }) =>
-			triggerEvent.kind === "workflow_values_persisted" &&
-			triggerEvent.changedKeys.includes(CreateStoryWorkflowValueKey.TargetStory),
+		kind: "session_predicate",
+		matches: ({ workflowValues }) =>
+			readWorkflowStringValue(workflowValues, CreateStoryWorkflowValueKey.TargetStory) !== undefined,
 	}
 }
 
-function workflowFormCompletedWithoutBacklogRevision(workflowFormId: string): WorkflowDecisionBranchTrigger {
+function workflowFormPanelSubmittedWithBacklogRevisionAnswer(panelId: string, answer: boolean): WorkflowDecisionBranchTrigger {
 	return {
 		kind: "event_predicate",
 		matches: ({ triggerEvent, workflowValues }) =>
-			triggerEvent.kind === "workflow_form_completed" &&
-			triggerEvent.workflowFormId === workflowFormId &&
-			readWorkflowBooleanValue(workflowValues, CreateStoryWorkflowValueKey.ReviseBacklogStory) === undefined,
-	}
-}
-
-function workflowFormCompletedWithBacklogRevisionAnswer(workflowFormId: string, answer: boolean): WorkflowDecisionBranchTrigger {
-	return {
-		kind: "event_predicate",
-		matches: ({ triggerEvent, workflowValues }) =>
-			triggerEvent.kind === "workflow_form_completed" &&
-			triggerEvent.workflowFormId === workflowFormId &&
+			triggerEvent.kind === "workflow_form_panel_submitted" &&
+			triggerEvent.workflowFormId === CREATE_STORY_STEP_1_FORM_ID &&
+			triggerEvent.panelId === panelId &&
+			triggerEvent.action === "submit" &&
 			readWorkflowBooleanValue(workflowValues, CreateStoryWorkflowValueKey.ReviseBacklogStory) === answer,
 	}
 }
@@ -654,26 +744,55 @@ function resolveRequiredSelectedProjectRoot(session: ActiveWorkflowSession): str
 	throw new Error("Create Story requires a resolved Epics.index.json path before resolving story paths.")
 }
 
-function buildStep1TargetEpicWorkflowForm(): WorkflowFormDefinitionPayload {
+const PANEL_A_RESET_VALUE_KEYS = [
+	CreateStoryWorkflowValueKey.StoriesIndex,
+	CreateStoryWorkflowValueKey.SelectedStoryIdentity,
+	CreateStoryWorkflowValueKey.SelectedStoryFileName,
+	CreateStoryWorkflowValueKey.SelectedStoryType,
+	CreateStoryWorkflowValueKey.SelectedStoryStatus,
+	CreateStoryWorkflowValueKey.SelectedStoryFileGenerated,
+	CreateStoryWorkflowValueKey.TargetStory,
+	CreateStoryWorkflowValueKey.ParentStoryIdentity,
+	CreateStoryWorkflowValueKey.ParentStory,
+	CreateStoryWorkflowValueKey.FindingsDocument,
+	CreateStoryWorkflowValueKey.ReviseBacklogStory,
+	CreateStoryWorkflowValueKey.TargetStoryFilenameForMove,
+]
+
+const PANEL_B_RESET_VALUE_KEYS = [
+	CreateStoryWorkflowValueKey.SelectedStoryFileName,
+	CreateStoryWorkflowValueKey.SelectedStoryType,
+	CreateStoryWorkflowValueKey.SelectedStoryStatus,
+	CreateStoryWorkflowValueKey.SelectedStoryFileGenerated,
+	CreateStoryWorkflowValueKey.TargetStory,
+	CreateStoryWorkflowValueKey.ParentStoryIdentity,
+	CreateStoryWorkflowValueKey.ParentStory,
+	CreateStoryWorkflowValueKey.FindingsDocument,
+	CreateStoryWorkflowValueKey.ReviseBacklogStory,
+	CreateStoryWorkflowValueKey.TargetStoryFilenameForMove,
+]
+
+function buildStep1WorkflowForm(): WorkflowFormDefinitionPayload {
 	return {
 		definitionVersion: 2,
-		title: "Create Story Target Epic",
-		toolDictionaryTitle: "Create Story Target Epic",
-		toolDictionaryMarkdown: "Select the epic whose story should be prepared for implementation.",
-		firstPanelId: CREATE_STORY_PANEL_A_TARGET_EPIC_ID,
+		title: "Create Story",
+		toolDictionaryTitle: "Create Story",
+		toolDictionaryMarkdown: "Select the epic and story for the create-story workflow.",
+		firstPanelId: CREATE_STORY_PANEL_A_EPIC_SELECTION_ID,
 		panels: {
-			[CREATE_STORY_PANEL_A_TARGET_EPIC_ID]: {
-				panelId: CREATE_STORY_PANEL_A_TARGET_EPIC_ID,
-				title: "Target Epic",
+			[CREATE_STORY_PANEL_A_EPIC_SELECTION_ID]: {
+				panelId: CREATE_STORY_PANEL_A_EPIC_SELECTION_ID,
+				title: "Epic Selection",
 				promptMarkdown: "Which epic are we focusing on during this workflow?",
 				fields: [
 					{
 						key: CreateStoryWorkflowValueKey.EpicIdentity,
 						workflowValueKey: CreateStoryWorkflowValueKey.EpicIdentity,
 						kind: "dropdown",
-						label: "Target epic",
+						label: "Target Epic",
 						required: true,
 						allowedValueType: "string",
+						resetValueKeysOnChange: PANEL_A_RESET_VALUE_KEYS,
 						jsonOptionsSource: {
 							root: {
 								kind: "selected_project_root",
@@ -682,7 +801,6 @@ function buildStep1TargetEpicWorkflowForm(): WorkflowFormDefinitionPayload {
 							itemsPath: "epics",
 							valueProperty: "identity",
 							labelTemplate: "Epic {identity}: {title}",
-							descriptionTemplate: "Story index generated: {story-index-generated}",
 						},
 					},
 				],
@@ -690,32 +808,21 @@ function buildStep1TargetEpicWorkflowForm(): WorkflowFormDefinitionPayload {
 				actionLabels: {
 					submit: "Continue",
 				},
-				transition: buildTerminalTransition(),
+				transition: buildRuntimeRoutedTransition(),
 			},
-		},
-	}
-}
-
-function buildStep1StorySelectionWorkflowForm(): WorkflowFormDefinitionPayload {
-	return {
-		definitionVersion: 2,
-		title: "Create Story Story Selection",
-		toolDictionaryTitle: "Create Story Story Selection",
-		toolDictionaryMarkdown: "Select the story that should be prepared or revised for implementation.",
-		firstPanelId: CREATE_STORY_PANEL_B_TARGET_STORY_ID,
-		panels: {
-			[CREATE_STORY_PANEL_B_TARGET_STORY_ID]: {
-				panelId: CREATE_STORY_PANEL_B_TARGET_STORY_ID,
-				title: "Target Story",
+			[CREATE_STORY_PANEL_B_STORY_SELECTION_ID]: {
+				panelId: CREATE_STORY_PANEL_B_STORY_SELECTION_ID,
+				title: "Story Selection",
 				promptMarkdown: "Which story should I focus on during this workflow?",
 				fields: [
 					{
 						key: CreateStoryWorkflowValueKey.SelectedStoryIdentity,
 						workflowValueKey: CreateStoryWorkflowValueKey.SelectedStoryIdentity,
 						kind: "dropdown",
-						label: "Target story",
+						label: "Target Story",
 						required: true,
 						allowedValueType: "string",
+						resetValueKeysOnChange: PANEL_B_RESET_VALUE_KEYS,
 						jsonOptionsSource: {
 							root: {
 								kind: "selected_project_root",
@@ -723,8 +830,7 @@ function buildStep1StorySelectionWorkflowForm(): WorkflowFormDefinitionPayload {
 							sourcePathSegments: ["implementation", "epic-{workflow.epic_identity}-stories.index.json"],
 							itemsPath: "stories",
 							valueProperty: "story_identity",
-							labelTemplate: "Story {story_identity}: {story_file_name}",
-							descriptionTemplate: "Status: {status}; generated: {story_file_generated}; type: {story_type}",
+							labelTemplate: "Story {story_identity}",
 						},
 					},
 				],
@@ -732,19 +838,46 @@ function buildStep1StorySelectionWorkflowForm(): WorkflowFormDefinitionPayload {
 				actionLabels: {
 					submit: "Continue",
 				},
-				transition: buildTerminalTransition(),
+				transition: buildRuntimeRoutedTransition(),
 			},
-			[CREATE_STORY_PANEL_C_BACKLOG_REVISION_ID]: {
-				panelId: CREATE_STORY_PANEL_C_BACKLOG_REVISION_ID,
-				title: "Backlog Story Revision",
+			[CREATE_STORY_PANEL_C_MISSING_STORY_INDEX_ID]: {
+				panelId: CREATE_STORY_PANEL_C_MISSING_STORY_INDEX_ID,
+				title: "Missing Story Index for Selected Epic",
 				promptMarkdown:
-					"The selected story appears to be ready for implementation. Do you want to revise the existing tasks and subtasks before implementing it via the dev-story workflow?",
+					"The selected epic does not yet have a story index. Please end this workflow then run the pi-planning workflow in a new conversation to generate this epic's story index before running the create-story workflow.",
+				fields: [],
+				allowedActions: ["submit", "back"],
+				actionLabels: {
+					submit: "End Workflow",
+					back: "Select Another Epic",
+				},
+				backDestinationPanelId: CREATE_STORY_PANEL_A_EPIC_SELECTION_ID,
+				transition: buildRuntimeRoutedTransition(),
+			},
+			[CREATE_STORY_PANEL_D_MISSING_STORY_FILE_ID]: {
+				panelId: CREATE_STORY_PANEL_D_MISSING_STORY_FILE_ID,
+				title: "Missing Story File",
+				promptMarkdown:
+					"The selected story's document does not exist yet. Run the PI-planning workflow to generate the story document before selecting the story during the create-story workflow.",
+				fields: [],
+				allowedActions: ["submit", "back"],
+				actionLabels: {
+					submit: "End workflow",
+					back: "Select Another Story",
+				},
+				backDestinationPanelId: CREATE_STORY_PANEL_B_STORY_SELECTION_ID,
+				transition: buildRuntimeRoutedTransition(),
+			},
+			[CREATE_STORY_PANEL_E_STORY_READY_FOR_IMPLEMENTATION_ID]: {
+				panelId: CREATE_STORY_PANEL_E_STORY_READY_FOR_IMPLEMENTATION_ID,
+				title: "Story Ready for Implementation",
+				promptMarkdown: "The selected story appears to be ready for implementation.",
 				fields: [
 					{
 						key: CreateStoryWorkflowValueKey.ReviseBacklogStory,
 						workflowValueKey: CreateStoryWorkflowValueKey.ReviseBacklogStory,
 						kind: "boolean",
-						label: "Revise backlog story",
+						label: "Would you like to revise this story's existing tasks?",
 						required: true,
 						allowedValueType: "boolean",
 						trueLabel: "Yes",
@@ -754,89 +887,55 @@ function buildStep1StorySelectionWorkflowForm(): WorkflowFormDefinitionPayload {
 				allowedActions: ["submit", "back"],
 				actionLabels: {
 					submit: "Continue",
-					back: "Back",
+					back: "Select Another Story",
 				},
-				backDestinationPanelId: CREATE_STORY_PANEL_B_TARGET_STORY_ID,
+				backDestinationPanelId: CREATE_STORY_PANEL_B_STORY_SELECTION_ID,
 				backStaleValueKeysToClear: [CreateStoryWorkflowValueKey.ReviseBacklogStory],
-				transition: buildTerminalTransition(),
+				transition: buildRuntimeRoutedTransition(),
 			},
-			[CREATE_STORY_PANEL_D_NO_REVISION_CONFIRMATION_ID]: {
-				panelId: CREATE_STORY_PANEL_D_NO_REVISION_CONFIRMATION_ID,
-				title: "Ready for Dev Story",
+			[CREATE_STORY_PANEL_F_RUN_DEV_STORY_WORKFLOW_ID]: {
+				panelId: CREATE_STORY_PANEL_F_RUN_DEV_STORY_WORKFLOW_ID,
+				title: "Run Dev-Story Workflow",
 				promptMarkdown:
 					"Since the selected story already has been populated with tasks and subtasks, your next step is to run the dev-story workflow and select this story as the implementation target.",
-				fields: [
-					{
-						key: "ready_for_dev_story_confirmation",
-						kind: "static_notice",
-						label: "Ready for dev-story",
-						required: false,
-						contentMarkdown:
-							"Confirm when you are ready to complete this workflow and continue with the dev-story workflow.",
-					},
-				],
-				allowedActions: ["submit"],
+				fields: [],
+				allowedActions: ["submit", "back"],
 				actionLabels: {
-					submit: "Complete",
+					submit: "End Workflow",
+					back: "Select Another Story",
 				},
-				transition: buildTerminalTransition(),
+				backDestinationPanelId: CREATE_STORY_PANEL_B_STORY_SELECTION_ID,
+				transition: buildRuntimeRoutedTransition(),
 			},
-			[CREATE_STORY_PANEL_E_IMPLEMENTED_STORY_BLOCKED_ID]: {
-				panelId: CREATE_STORY_PANEL_E_IMPLEMENTED_STORY_BLOCKED_ID,
+			[CREATE_STORY_PANEL_G_STORY_ALREADY_IMPLEMENTED_ID]: {
+				panelId: CREATE_STORY_PANEL_G_STORY_ALREADY_IMPLEMENTED_ID,
 				title: "Story Already Implemented",
 				promptMarkdown:
-					"This story has already been implemented. New tasks should not be added to stories after implementation. If findings were documented during QA, the QA agent generated a remediation story to address those findings. Please go back and select the appropriate remediation story as the target for this workflow.",
+					"This story has already been implemented. New tasks should not be added to stories after implementation. If findings were documented during QA, the QA agent generated a remediation story to address those findings. Please go back and select the appropriate remediation story as the target for this workflow, or end this workflow.",
 				fields: [],
-				allowedActions: ["back"],
+				allowedActions: ["submit", "back"],
 				actionLabels: {
-					back: "Back",
+					submit: "End Workflow",
+					back: "Select Another Story",
 				},
-				backDestinationPanelId: CREATE_STORY_PANEL_B_TARGET_STORY_ID,
-				transition: buildTerminalTransition(),
+				backDestinationPanelId: CREATE_STORY_PANEL_B_STORY_SELECTION_ID,
+				transition: buildRuntimeRoutedTransition(),
 			},
 		},
 	}
 }
 
-function buildCannotContinuePanel(args: {
-	panelId: string
-	title: string
-	promptMarkdown: string
-}): WorkflowFormDefinitionPayload["panels"][string] {
-	return {
-		panelId: args.panelId,
-		title: args.title,
-		promptMarkdown: args.promptMarkdown,
-		fields: [],
-		allowedActions: ["submit"],
-		actionLabels: {
-			submit: "Close",
-		},
-		transition: buildTerminalTransition(),
-	}
-}
+function buildStep1ContinuationReplacementBuilder(panelId: string): WorkflowFormContinuationReplacementBuilder {
+	return () => {
+		const panel = buildStep1WorkflowForm().panels[panelId]
+		if (panel === undefined) {
+			throw new Error(`Create Story Step 1 workflow form is missing requested continuation panel ${panelId}.`)
+		}
 
-function buildStep1CannotContinueWorkflowForm(): WorkflowFormDefinitionPayload {
-	return {
-		definitionVersion: 2,
-		title: "Create Story Cannot Continue",
-		toolDictionaryTitle: "Create Story Cannot Continue",
-		toolDictionaryMarkdown: "The create-story workflow cannot continue until upstream planning is complete.",
-		firstPanelId: CREATE_STORY_MISSING_STORY_INDEX_PANEL_ID,
-		panels: {
-			[CREATE_STORY_MISSING_STORY_INDEX_PANEL_ID]: buildCannotContinuePanel({
-				panelId: CREATE_STORY_MISSING_STORY_INDEX_PANEL_ID,
-				title: "Story Index Missing",
-				promptMarkdown:
-					"The selected epic does not yet have a story index file. Run the pi-planning workflow to generate the selected epic's story index before running create-story.",
-			}),
-			[CREATE_STORY_STORY_FILE_NOT_GENERATED_PANEL_ID]: buildCannotContinuePanel({
-				panelId: CREATE_STORY_STORY_FILE_NOT_GENERATED_PANEL_ID,
-				title: "Story File Missing",
-				promptMarkdown:
-					"The selected story does not yet have a generated story file. Run the pi-planning workflow to generate a story file for the target story before running create-story.",
-			}),
-		},
+		return {
+			panel,
+			data: {},
+		}
 	}
 }
 
@@ -876,7 +975,7 @@ async function deriveSelectedEpicValuesFromForm(session: ActiveWorkflowSession):
 	const workflowValueWrites: WorkflowValues = {
 		[CreateStoryWorkflowValueKey.TargetEpic]: `Epic ${selectedEpic.identity}: ${selectedEpic.title}`,
 	}
-	if ((await pathExists(storiesIndex)) === true) {
+	if (selectedEpic["story-index-generated"] === true) {
 		workflowValueWrites[CreateStoryWorkflowValueKey.StoriesIndex] = storiesIndex
 	}
 
@@ -1025,97 +1124,104 @@ function buildStep1DecisionTree(): WorkflowDecisionTree {
 								CREATE_STORY_BRAINSTORMING_PREREQUISITE_ID,
 							],
 						},
-						followingBranchId: "step-1-render-target-epic-form",
+						followingBranchId: "step-1-render-workflow-form",
 					},
 				],
 			},
-			"step-1-render-target-epic-form": {
-				id: "step-1-render-target-epic-form",
+			"step-1-render-workflow-form": {
+				id: "step-1-render-workflow-form",
 				routes: [
 					{
-						id: "step-1-render-target-epic-form",
+						id: "step-1-render-workflow-form",
 						trigger: { kind: "always" },
 						action: {
 							kind: "render_workflow_form",
-							workflowFormId: CREATE_STORY_TARGET_EPIC_FORM_ID,
+							workflowFormId: CREATE_STORY_STEP_1_FORM_ID,
 						},
-						followingBranchId: "step-1-await-target-epic-form",
+						followingBranchId: "step-1-await-epic-selection-panel",
 					},
 				],
 			},
-			"step-1-await-target-epic-form": {
-				id: "step-1-await-target-epic-form",
+			"step-1-await-epic-selection-panel": {
+				id: "step-1-await-epic-selection-panel",
 				routes: [
 					{
 						id: "step-1-derive-selected-epic-values",
-						trigger: workflowFormCompleted(CREATE_STORY_TARGET_EPIC_FORM_ID),
+						trigger: workflowFormPanelSubmitted(CREATE_STORY_PANEL_A_EPIC_SELECTION_ID, "submit"),
 						action: {
 							kind: "run_deterministic_procedure",
 							instruction: {
 								run: deriveSelectedEpicValuesFromForm,
 							},
 						},
-						followingBranchId: "step-1-await-selected-epic-values",
+						followingBranchId: "step-1-route-after-epic-selection",
 					},
 				],
 			},
-			"step-1-await-selected-epic-values": {
-				id: "step-1-await-selected-epic-values",
+			"step-1-route-after-epic-selection": {
+				id: "step-1-route-after-epic-selection",
 				routes: [
 					{
-						id: "step-1-render-story-selection-form",
-						trigger: workflowValuesPersistedForSelectedEpicWithStoriesIndex(),
+						id: "step-1-continue-to-story-selection-panel",
+						trigger: selectedEpicHasStoriesIndex(),
 						action: {
-							kind: "render_workflow_form",
-							workflowFormId: CREATE_STORY_STORY_SELECTION_FORM_ID,
-							startPanelId: CREATE_STORY_PANEL_B_TARGET_STORY_ID,
+							kind: "continue_workflow_form",
+							workflowFormId: CREATE_STORY_STEP_1_FORM_ID,
+							panelId: CREATE_STORY_PANEL_B_STORY_SELECTION_ID,
+							buildReplacement: buildStep1ContinuationReplacementBuilder(CREATE_STORY_PANEL_B_STORY_SELECTION_ID),
 						},
-						followingBranchId: "step-1-await-story-selection-form",
+						followingBranchId: "step-1-await-story-selection-panel",
 					},
 					{
-						id: "step-1-render-missing-story-index-form",
-						trigger: workflowValuesPersistedForSelectedEpicWithoutStoriesIndex(),
+						id: "step-1-continue-to-missing-story-index-panel",
+						trigger: selectedEpicDoesNotHaveStoriesIndex(),
 						action: {
-							kind: "render_workflow_form",
-							workflowFormId: CREATE_STORY_CANNOT_CONTINUE_FORM_ID,
-							startPanelId: CREATE_STORY_MISSING_STORY_INDEX_PANEL_ID,
+							kind: "continue_workflow_form",
+							workflowFormId: CREATE_STORY_STEP_1_FORM_ID,
+							panelId: CREATE_STORY_PANEL_C_MISSING_STORY_INDEX_ID,
+							buildReplacement: buildStep1ContinuationReplacementBuilder(
+								CREATE_STORY_PANEL_C_MISSING_STORY_INDEX_ID,
+							),
 						},
-						followingBranchId: "step-1-await-cannot-continue-form",
+						followingBranchId: "step-1-await-terminal-panels",
 					},
 				],
 			},
-			"step-1-await-story-selection-form": {
-				id: "step-1-await-story-selection-form",
+			"step-1-await-story-selection-panel": {
+				id: "step-1-await-story-selection-panel",
 				routes: [
 					{
 						id: "step-1-derive-selected-story-values",
-						trigger: workflowFormCompleted(CREATE_STORY_STORY_SELECTION_FORM_ID),
+						trigger: workflowFormPanelSubmitted(CREATE_STORY_PANEL_B_STORY_SELECTION_ID, "submit"),
 						action: {
 							kind: "run_deterministic_procedure",
 							instruction: {
 								run: deriveSelectedStoryValuesFromForm,
 							},
 						},
-						followingBranchId: "step-1-await-selected-story-values",
+						followingBranchId: "step-1-route-after-story-selection",
 					},
 				],
 			},
-			"step-1-await-selected-story-values": {
-				id: "step-1-await-selected-story-values",
+			"step-1-route-after-story-selection": {
+				id: "step-1-route-after-story-selection",
 				routes: [
 					{
-						id: "step-1-render-story-file-not-generated-form",
-						trigger: workflowValuesPersistedForSelectedStoryWithoutGeneratedFile(),
+						id: "step-1-continue-to-missing-story-file-panel",
+						trigger: selectedStoryDoesNotHaveGeneratedFile(),
 						action: {
-							kind: "render_workflow_form",
-							workflowFormId: CREATE_STORY_CANNOT_CONTINUE_FORM_ID,
-							startPanelId: CREATE_STORY_STORY_FILE_NOT_GENERATED_PANEL_ID,
+							kind: "continue_workflow_form",
+							workflowFormId: CREATE_STORY_STEP_1_FORM_ID,
+							panelId: CREATE_STORY_PANEL_D_MISSING_STORY_FILE_ID,
+							buildReplacement: buildStep1ContinuationReplacementBuilder(
+								CREATE_STORY_PANEL_D_MISSING_STORY_FILE_ID,
+							),
 						},
-						followingBranchId: "step-1-await-cannot-continue-form",
+						followingBranchId: "step-1-await-terminal-panels",
 					},
 					{
 						id: "step-1-derive-draft-target-story",
-						trigger: workflowValuesPersistedForSelectedStoryStatus("draft"),
+						trigger: selectedStoryStatusMatches("draft"),
 						action: {
 							kind: "run_deterministic_procedure",
 							instruction: {
@@ -1125,24 +1231,30 @@ function buildStep1DecisionTree(): WorkflowDecisionTree {
 						followingBranchId: "step-1-await-target-story-values",
 					},
 					{
-						id: "step-1-render-backlog-revision-form",
-						trigger: workflowValuesPersistedForSelectedStoryStatus("backlog"),
+						id: "step-1-continue-to-story-ready-panel",
+						trigger: selectedStoryStatusMatches("backlog"),
 						action: {
-							kind: "render_workflow_form",
-							workflowFormId: CREATE_STORY_STORY_SELECTION_FORM_ID,
-							startPanelId: CREATE_STORY_PANEL_C_BACKLOG_REVISION_ID,
+							kind: "continue_workflow_form",
+							workflowFormId: CREATE_STORY_STEP_1_FORM_ID,
+							panelId: CREATE_STORY_PANEL_E_STORY_READY_FOR_IMPLEMENTATION_ID,
+							buildReplacement: buildStep1ContinuationReplacementBuilder(
+								CREATE_STORY_PANEL_E_STORY_READY_FOR_IMPLEMENTATION_ID,
+							),
 						},
-						followingBranchId: "step-1-await-backlog-revision-form",
+						followingBranchId: "step-1-await-story-ready-panel",
 					},
 					{
-						id: "step-1-render-implemented-story-blocked-form",
-						trigger: workflowValuesPersistedForSelectedStoryStatus("review", "complete"),
+						id: "step-1-continue-to-story-already-implemented-panel",
+						trigger: selectedStoryStatusMatches("review", "complete"),
 						action: {
-							kind: "render_workflow_form",
-							workflowFormId: CREATE_STORY_STORY_SELECTION_FORM_ID,
-							startPanelId: CREATE_STORY_PANEL_E_IMPLEMENTED_STORY_BLOCKED_ID,
+							kind: "continue_workflow_form",
+							workflowFormId: CREATE_STORY_STEP_1_FORM_ID,
+							panelId: CREATE_STORY_PANEL_G_STORY_ALREADY_IMPLEMENTED_ID,
+							buildReplacement: buildStep1ContinuationReplacementBuilder(
+								CREATE_STORY_PANEL_G_STORY_ALREADY_IMPLEMENTED_ID,
+							),
 						},
-						followingBranchId: "step-1-await-blocked-story-form",
+						followingBranchId: "step-1-await-terminal-panels",
 					},
 				],
 			},
@@ -1151,7 +1263,7 @@ function buildStep1DecisionTree(): WorkflowDecisionTree {
 				routes: [
 					{
 						id: "step-1-transition-to-step-2",
-						trigger: workflowValuesPersistedForTargetStory(),
+						trigger: targetStoryIsPresent(),
 						action: {
 							kind: "transition_step",
 							target: {
@@ -1162,12 +1274,15 @@ function buildStep1DecisionTree(): WorkflowDecisionTree {
 					},
 				],
 			},
-			"step-1-await-backlog-revision-form": {
-				id: "step-1-await-backlog-revision-form",
+			"step-1-await-story-ready-panel": {
+				id: "step-1-await-story-ready-panel",
 				routes: [
 					{
 						id: "step-1-derive-backlog-target-story-after-revision-approved",
-						trigger: workflowFormCompletedWithBacklogRevisionAnswer(CREATE_STORY_STORY_SELECTION_FORM_ID, true),
+						trigger: workflowFormPanelSubmittedWithBacklogRevisionAnswer(
+							CREATE_STORY_PANEL_E_STORY_READY_FOR_IMPLEMENTATION_ID,
+							true,
+						),
 						action: {
 							kind: "run_deterministic_procedure",
 							instruction: {
@@ -1177,64 +1292,52 @@ function buildStep1DecisionTree(): WorkflowDecisionTree {
 						followingBranchId: "step-1-await-target-story-values",
 					},
 					{
-						id: "step-1-render-no-revision-confirmation-form",
-						trigger: workflowFormCompletedWithBacklogRevisionAnswer(CREATE_STORY_STORY_SELECTION_FORM_ID, false),
+						id: "step-1-continue-to-run-dev-story-panel",
+						trigger: workflowFormPanelSubmittedWithBacklogRevisionAnswer(
+							CREATE_STORY_PANEL_E_STORY_READY_FOR_IMPLEMENTATION_ID,
+							false,
+						),
 						action: {
-							kind: "render_workflow_form",
-							workflowFormId: CREATE_STORY_STORY_SELECTION_FORM_ID,
-							startPanelId: CREATE_STORY_PANEL_D_NO_REVISION_CONFIRMATION_ID,
+							kind: "continue_workflow_form",
+							workflowFormId: CREATE_STORY_STEP_1_FORM_ID,
+							panelId: CREATE_STORY_PANEL_F_RUN_DEV_STORY_WORKFLOW_ID,
+							buildReplacement: buildStep1ContinuationReplacementBuilder(
+								CREATE_STORY_PANEL_F_RUN_DEV_STORY_WORKFLOW_ID,
+							),
 						},
-						followingBranchId: "step-1-await-no-revision-confirmation-form",
-					},
-					{
-						id: "step-1-derive-selected-story-values-after-backlog-back",
-						trigger: workflowFormCompletedWithoutBacklogRevision(CREATE_STORY_STORY_SELECTION_FORM_ID),
-						action: {
-							kind: "run_deterministic_procedure",
-							instruction: {
-								run: deriveSelectedStoryValuesFromForm,
-							},
-						},
-						followingBranchId: "step-1-await-selected-story-values",
+						followingBranchId: "step-1-await-terminal-panels",
 					},
 				],
 			},
-			"step-1-await-no-revision-confirmation-form": {
-				id: "step-1-await-no-revision-confirmation-form",
+			"step-1-await-terminal-panels": {
+				id: "step-1-await-terminal-panels",
 				routes: [
 					{
-						id: "step-1-complete-workflow-after-no-revision-confirmation",
-						trigger: workflowFormCompleted(CREATE_STORY_STORY_SELECTION_FORM_ID),
+						id: "step-1-complete-workflow-after-missing-story-index",
+						trigger: workflowFormPanelSubmitted(CREATE_STORY_PANEL_C_MISSING_STORY_INDEX_ID, "submit"),
 						action: {
 							kind: "complete_workflow",
 						},
 					},
-				],
-			},
-			"step-1-await-blocked-story-form": {
-				id: "step-1-await-blocked-story-form",
-				routes: [
 					{
-						id: "step-1-derive-selected-story-values-after-blocked-back",
-						trigger: workflowFormCompleted(CREATE_STORY_STORY_SELECTION_FORM_ID),
+						id: "step-1-complete-workflow-after-missing-story-file",
+						trigger: workflowFormPanelSubmitted(CREATE_STORY_PANEL_D_MISSING_STORY_FILE_ID, "submit"),
 						action: {
-							kind: "run_deterministic_procedure",
-							instruction: {
-								run: deriveSelectedStoryValuesFromForm,
-							},
+							kind: "complete_workflow",
 						},
-						followingBranchId: "step-1-await-selected-story-values",
 					},
-				],
-			},
-			"step-1-await-cannot-continue-form": {
-				id: "step-1-await-cannot-continue-form",
-				routes: [
 					{
-						id: "step-1-stop-after-cannot-continue-form",
-						trigger: workflowFormCompleted(CREATE_STORY_CANNOT_CONTINUE_FORM_ID),
+						id: "step-1-complete-workflow-after-run-dev-story-panel",
+						trigger: workflowFormPanelSubmitted(CREATE_STORY_PANEL_F_RUN_DEV_STORY_WORKFLOW_ID, "submit"),
 						action: {
-							kind: "no_op",
+							kind: "complete_workflow",
+						},
+					},
+					{
+						id: "step-1-complete-workflow-after-story-already-implemented",
+						trigger: workflowFormPanelSubmitted(CREATE_STORY_PANEL_G_STORY_ALREADY_IMPLEMENTED_ID, "submit"),
+						action: {
+							kind: "complete_workflow",
 						},
 					},
 				],
@@ -1477,9 +1580,7 @@ export const createStoryWorkflowDefinition: WorkflowDefinition = {
 		promptMarkdown: CREATE_STORY_WORKFLOW_DESCRIPTION,
 	},
 	workflowForms: {
-		[CREATE_STORY_TARGET_EPIC_FORM_ID]: buildStep1TargetEpicWorkflowForm(),
-		[CREATE_STORY_STORY_SELECTION_FORM_ID]: buildStep1StorySelectionWorkflowForm(),
-		[CREATE_STORY_CANNOT_CONTINUE_FORM_ID]: buildStep1CannotContinueWorkflowForm(),
+		[CREATE_STORY_STEP_1_FORM_ID]: buildStep1WorkflowForm(),
 	},
 	prerequisiteFiles: CREATE_STORY_PREREQUISITE_FILES,
 	steps: {

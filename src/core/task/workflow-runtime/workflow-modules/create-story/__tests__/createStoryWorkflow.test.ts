@@ -4,6 +4,7 @@ import { basename, join } from "node:path"
 import type {
 	WorkflowFormDefinitionPayload,
 	WorkflowFormFieldDefinition,
+	WorkflowFormPanelAction,
 	WorkflowFormPanelDefinition,
 } from "@shared/ExtensionMessage"
 import { expect } from "chai"
@@ -27,19 +28,17 @@ import {
 import {
 	CREATE_STORY_ARCHITECTURE_PREREQUISITE_ID,
 	CREATE_STORY_BRAINSTORMING_PREREQUISITE_ID,
-	CREATE_STORY_CANNOT_CONTINUE_FORM_ID,
 	CREATE_STORY_ENTRY_PROJECT_VALUE_KEYS,
 	CREATE_STORY_EPICS_DOCUMENT_PREREQUISITE_ID,
 	CREATE_STORY_EPICS_INDEX_PREREQUISITE_ID,
-	CREATE_STORY_MISSING_STORY_INDEX_PANEL_ID,
-	CREATE_STORY_PANEL_A_TARGET_EPIC_ID,
-	CREATE_STORY_PANEL_B_TARGET_STORY_ID,
-	CREATE_STORY_PANEL_C_BACKLOG_REVISION_ID,
-	CREATE_STORY_PANEL_D_NO_REVISION_CONFIRMATION_ID,
-	CREATE_STORY_PANEL_E_IMPLEMENTED_STORY_BLOCKED_ID,
-	CREATE_STORY_STORY_FILE_NOT_GENERATED_PANEL_ID,
-	CREATE_STORY_STORY_SELECTION_FORM_ID,
-	CREATE_STORY_TARGET_EPIC_FORM_ID,
+	CREATE_STORY_PANEL_A_EPIC_SELECTION_ID,
+	CREATE_STORY_PANEL_B_STORY_SELECTION_ID,
+	CREATE_STORY_PANEL_C_MISSING_STORY_INDEX_ID,
+	CREATE_STORY_PANEL_D_MISSING_STORY_FILE_ID,
+	CREATE_STORY_PANEL_E_STORY_READY_FOR_IMPLEMENTATION_ID,
+	CREATE_STORY_PANEL_F_RUN_DEV_STORY_WORKFLOW_ID,
+	CREATE_STORY_PANEL_G_STORY_ALREADY_IMPLEMENTED_ID,
+	CREATE_STORY_STEP_1_FORM_ID,
 	CREATE_STORY_WORKFLOW_DESCRIPTION,
 	CREATE_STORY_WORKFLOW_PERSONA,
 	CREATE_STORY_WORKFLOW_VALUE_KEYS,
@@ -181,17 +180,19 @@ function getToolNamesForStep(stepId: WorkflowStepDefinition["id"]): string[] {
 		.map((schema) => schema.name)
 }
 
-function buildWorkflowValuesPersistedEvent(changedKeys: readonly string[]): WorkflowBranchTriggerEvent {
+function buildWorkflowFormPanelSubmittedEvent(args: {
+	panelId: string
+	action?: WorkflowFormPanelAction
+	submittedValueKeys?: readonly string[]
+	clearedValueKeys?: readonly string[]
+}): WorkflowBranchTriggerEvent {
 	return {
-		kind: "workflow_values_persisted",
-		changedKeys,
-	}
-}
-
-function buildWorkflowFormCompletedEvent(workflowFormId: string): WorkflowBranchTriggerEvent {
-	return {
-		kind: "workflow_form_completed",
-		workflowFormId,
+		kind: "workflow_form_panel_submitted",
+		workflowFormId: CREATE_STORY_STEP_1_FORM_ID,
+		panelId: args.panelId,
+		action: args.action ?? "submit",
+		submittedValueKeys: args.submittedValueKeys ?? [],
+		clearedValueKeys: args.clearedValueKeys ?? [],
 	}
 }
 
@@ -254,6 +255,20 @@ function expectEventPredicateMatchesForStep(args: {
 	).to.equal(true)
 }
 
+function expectSessionPredicateMatches(args: { route: WorkflowDecisionBranchRoute; workflowValues: WorkflowValues }): void {
+	if (args.route.trigger.kind !== "session_predicate") {
+		throw new Error(`Expected session_predicate trigger, received ${args.route.trigger.kind}.`)
+	}
+
+	expect(
+		args.route.trigger.matches({
+			activeBranchId: "test-branch",
+			workflowValues: args.workflowValues,
+			step: getStep("step-1"),
+		}),
+	).to.equal(true)
+}
+
 function expectRunDeterministicProcedureAction(
 	action: WorkflowDecisionAction,
 ): Extract<WorkflowDecisionAction, { kind: "run_deterministic_procedure" }> {
@@ -269,6 +284,16 @@ function expectRenderWorkflowFormAction(
 ): Extract<WorkflowDecisionAction, { kind: "render_workflow_form" }> {
 	if (action.kind !== "render_workflow_form") {
 		throw new Error(`Expected render_workflow_form, received ${action.kind}.`)
+	}
+
+	return action
+}
+
+function expectContinueWorkflowFormAction(
+	action: WorkflowDecisionAction,
+): Extract<WorkflowDecisionAction, { kind: "continue_workflow_form" }> {
+	if (action.kind !== "continue_workflow_form") {
+		throw new Error(`Expected continue_workflow_form, received ${action.kind}.`)
 	}
 
 	return action
@@ -323,27 +348,29 @@ function createWorkflowValuesForSelectedStory(args: { status: string; storyFileG
 	}
 }
 
-function expectTerminalTransition(panel: WorkflowFormPanelDefinition): void {
+function expectRuntimeRoutedTransition(panel: WorkflowFormPanelDefinition): void {
 	expect(panel.transition).to.deep.equal({
-		type: "conditional",
-		conditionSourceKey: "__terminal__",
-		branches: [],
-		defaultTerminal: true,
+		type: "runtime_routed",
 	})
 }
 
-function expectRenderStartPanel(action: WorkflowDecisionAction, workflowFormId: string, startPanelId: string): void {
-	const renderAction = expectRenderWorkflowFormAction(action)
-	expect(renderAction.workflowFormId).to.equal(workflowFormId)
-	if ("startPanelId" in renderAction === false) {
-		throw new Error(`Expected render action for ${workflowFormId} to declare startPanelId.`)
+function expectContinueStep1Panel(action: WorkflowDecisionAction, panelId: string): void {
+	const continueAction = expectContinueWorkflowFormAction(action)
+	expect(continueAction.workflowFormId).to.equal(CREATE_STORY_STEP_1_FORM_ID)
+	expect(continueAction.panelId).to.equal(panelId)
+
+	const replacement = continueAction.buildReplacement(createSession({}))
+	if (replacement instanceof Promise) {
+		throw new Error("Expected synchronous create-story Step 1 continuation replacement.")
 	}
-	expect(renderAction.startPanelId).to.equal(startPanelId)
+	expect(replacement.panel.panelId).to.equal(panelId)
+	expect(replacement.data).to.deep.equal({})
 }
 
 async function createProjectWithStoryIndex(args?: {
 	storyIndexContent?: string
 	includeStoriesIndex?: boolean
+	storyIndexGenerated?: boolean
 }): Promise<ProjectPaths> {
 	const root = await mkdtemp(join(tmpdir(), "create-story-workflow-"))
 	await mkdir(join(root, "planning"), { recursive: true })
@@ -359,7 +386,7 @@ async function createProjectWithStoryIndex(args?: {
 					{
 						identity: "1",
 						title: "Runtime workflow module",
-						"story-index-generated": true,
+						"story-index-generated": args?.storyIndexGenerated ?? true,
 					},
 				],
 			},
@@ -504,36 +531,218 @@ describe("createStoryWorkflowDefinition", () => {
 })
 
 describe("createStoryWorkflowDefinition Step 1", () => {
-	it("defines Panel A target epic form and derives the story index before Panel B can render", async () => {
+	it("defines one same-session workflow form containing Panels A-G", () => {
+		const workflowForms = createStoryWorkflowDefinition.workflowForms ?? {}
+		const form = getWorkflowForm(CREATE_STORY_STEP_1_FORM_ID)
+
+		expect(Object.keys(workflowForms)).to.deep.equal([CREATE_STORY_STEP_1_FORM_ID])
+		expect(form.firstPanelId).to.equal(CREATE_STORY_PANEL_A_EPIC_SELECTION_ID)
+		expect(Object.keys(form.panels)).to.deep.equal([
+			CREATE_STORY_PANEL_A_EPIC_SELECTION_ID,
+			CREATE_STORY_PANEL_B_STORY_SELECTION_ID,
+			CREATE_STORY_PANEL_C_MISSING_STORY_INDEX_ID,
+			CREATE_STORY_PANEL_D_MISSING_STORY_FILE_ID,
+			CREATE_STORY_PANEL_E_STORY_READY_FOR_IMPLEMENTATION_ID,
+			CREATE_STORY_PANEL_F_RUN_DEV_STORY_WORKFLOW_ID,
+			CREATE_STORY_PANEL_G_STORY_ALREADY_IMPLEMENTED_ID,
+		])
+	})
+
+	it("configures Panel A epic selection with required JSON options and reset keys", () => {
+		const form = getWorkflowForm(CREATE_STORY_STEP_1_FORM_ID)
+		const panel = getPanel(form, CREATE_STORY_PANEL_A_EPIC_SELECTION_ID)
+		const field = getSingleField(panel)
+
+		expect(panel.title).to.equal("Epic Selection")
+		expect(panel.promptMarkdown).to.equal("Which epic are we focusing on during this workflow?")
+		expect(panel.allowedActions).to.deep.equal(["submit"])
+		expect(panel.actionLabels).to.deep.equal({
+			submit: "Continue",
+		})
+		expect(field).to.deep.include({
+			key: CreateStoryWorkflowValueKey.EpicIdentity,
+			workflowValueKey: CreateStoryWorkflowValueKey.EpicIdentity,
+			kind: "dropdown",
+			label: "Target Epic",
+			required: true,
+			allowedValueType: "string",
+		})
+		expect(field.resetValueKeysOnChange).to.deep.equal([
+			CreateStoryWorkflowValueKey.StoriesIndex,
+			CreateStoryWorkflowValueKey.SelectedStoryIdentity,
+			CreateStoryWorkflowValueKey.SelectedStoryFileName,
+			CreateStoryWorkflowValueKey.SelectedStoryType,
+			CreateStoryWorkflowValueKey.SelectedStoryStatus,
+			CreateStoryWorkflowValueKey.SelectedStoryFileGenerated,
+			CreateStoryWorkflowValueKey.TargetStory,
+			CreateStoryWorkflowValueKey.ParentStoryIdentity,
+			CreateStoryWorkflowValueKey.ParentStory,
+			CreateStoryWorkflowValueKey.FindingsDocument,
+			CreateStoryWorkflowValueKey.ReviseBacklogStory,
+			CreateStoryWorkflowValueKey.TargetStoryFilenameForMove,
+		])
+		expect(field.jsonOptionsSource).to.deep.equal({
+			root: {
+				kind: "selected_project_root",
+			},
+			sourcePathSegments: ["planning", "Epics.index.json"],
+			itemsPath: "epics",
+			valueProperty: "identity",
+			labelTemplate: "Epic {identity}: {title}",
+		})
+		expect(field.jsonOptionsSource?.descriptionTemplate).to.equal(undefined)
+		expectRuntimeRoutedTransition(panel)
+	})
+
+	it("configures Panel B story selection with required JSON options and reset keys", () => {
+		const form = getWorkflowForm(CREATE_STORY_STEP_1_FORM_ID)
+		const panel = getPanel(form, CREATE_STORY_PANEL_B_STORY_SELECTION_ID)
+		const field = getSingleField(panel)
+
+		expect(panel.title).to.equal("Story Selection")
+		expect(panel.promptMarkdown).to.equal("Which story should I focus on during this workflow?")
+		expect(panel.allowedActions).to.deep.equal(["submit"])
+		expect(panel.actionLabels).to.deep.equal({
+			submit: "Continue",
+		})
+		expect(field).to.deep.include({
+			key: CreateStoryWorkflowValueKey.SelectedStoryIdentity,
+			workflowValueKey: CreateStoryWorkflowValueKey.SelectedStoryIdentity,
+			kind: "dropdown",
+			label: "Target Story",
+			required: true,
+			allowedValueType: "string",
+		})
+		expect(field.resetValueKeysOnChange).to.deep.equal([
+			CreateStoryWorkflowValueKey.SelectedStoryFileName,
+			CreateStoryWorkflowValueKey.SelectedStoryType,
+			CreateStoryWorkflowValueKey.SelectedStoryStatus,
+			CreateStoryWorkflowValueKey.SelectedStoryFileGenerated,
+			CreateStoryWorkflowValueKey.TargetStory,
+			CreateStoryWorkflowValueKey.ParentStoryIdentity,
+			CreateStoryWorkflowValueKey.ParentStory,
+			CreateStoryWorkflowValueKey.FindingsDocument,
+			CreateStoryWorkflowValueKey.ReviseBacklogStory,
+			CreateStoryWorkflowValueKey.TargetStoryFilenameForMove,
+		])
+		expect(field.jsonOptionsSource).to.deep.equal({
+			root: {
+				kind: "selected_project_root",
+			},
+			sourcePathSegments: ["implementation", "epic-{workflow.epic_identity}-stories.index.json"],
+			itemsPath: "stories",
+			valueProperty: "story_identity",
+			labelTemplate: "Story {story_identity}",
+		})
+		expect(field.jsonOptionsSource?.descriptionTemplate).to.equal(undefined)
+		expectRuntimeRoutedTransition(panel)
+	})
+
+	it("configures Panels C-G with required actions, back destinations, and no extra fields", () => {
+		const form = getWorkflowForm(CREATE_STORY_STEP_1_FORM_ID)
+		const panelC = getPanel(form, CREATE_STORY_PANEL_C_MISSING_STORY_INDEX_ID)
+		const panelD = getPanel(form, CREATE_STORY_PANEL_D_MISSING_STORY_FILE_ID)
+		const panelE = getPanel(form, CREATE_STORY_PANEL_E_STORY_READY_FOR_IMPLEMENTATION_ID)
+		const panelF = getPanel(form, CREATE_STORY_PANEL_F_RUN_DEV_STORY_WORKFLOW_ID)
+		const panelG = getPanel(form, CREATE_STORY_PANEL_G_STORY_ALREADY_IMPLEMENTED_ID)
+
+		expect(panelC.title).to.equal("Missing Story Index for Selected Epic")
+		expect(panelC.promptMarkdown).to.include("selected epic does not yet have a story index")
+		expect(panelC.fields).to.deep.equal([])
+		expect(panelC.allowedActions).to.deep.equal(["submit", "back"])
+		expect(panelC.actionLabels).to.deep.equal({ submit: "End Workflow", back: "Select Another Epic" })
+		expect(panelC.backDestinationPanelId).to.equal(CREATE_STORY_PANEL_A_EPIC_SELECTION_ID)
+
+		expect(panelD.title).to.equal("Missing Story File")
+		expect(panelD.promptMarkdown).to.include("PI-planning workflow")
+		expect(panelD.fields).to.deep.equal([])
+		expect(panelD.allowedActions).to.deep.equal(["submit", "back"])
+		expect(panelD.actionLabels).to.deep.equal({ submit: "End workflow", back: "Select Another Story" })
+		expect(panelD.backDestinationPanelId).to.equal(CREATE_STORY_PANEL_B_STORY_SELECTION_ID)
+
+		expect(panelE.title).to.equal("Story Ready for Implementation")
+		expect(panelE.promptMarkdown).to.equal("The selected story appears to be ready for implementation.")
+		expect(panelE.allowedActions).to.deep.equal(["submit", "back"])
+		expect(panelE.actionLabels).to.deep.equal({ submit: "Continue", back: "Select Another Story" })
+		expect(panelE.backDestinationPanelId).to.equal(CREATE_STORY_PANEL_B_STORY_SELECTION_ID)
+		expect(getSingleField(panelE)).to.deep.include({
+			key: CreateStoryWorkflowValueKey.ReviseBacklogStory,
+			workflowValueKey: CreateStoryWorkflowValueKey.ReviseBacklogStory,
+			kind: "boolean",
+			label: "Would you like to revise this story's existing tasks?",
+			required: true,
+			allowedValueType: "boolean",
+			trueLabel: "Yes",
+			falseLabel: "No",
+		})
+
+		expect(panelF.title).to.equal("Run Dev-Story Workflow")
+		expect(panelF.promptMarkdown).to.include("run the dev-story workflow")
+		expect(panelF.fields).to.deep.equal([])
+		expect(panelF.allowedActions).to.deep.equal(["submit", "back"])
+		expect(panelF.actionLabels).to.deep.equal({ submit: "End Workflow", back: "Select Another Story" })
+		expect(panelF.backDestinationPanelId).to.equal(CREATE_STORY_PANEL_B_STORY_SELECTION_ID)
+
+		expect(panelG.title).to.equal("Story Already Implemented")
+		expect(panelG.promptMarkdown).to.include("This story has already been implemented")
+		expect(panelG.fields).to.deep.equal([])
+		expect(panelG.allowedActions).to.deep.equal(["submit", "back"])
+		expect(panelG.actionLabels).to.deep.equal({ submit: "End Workflow", back: "Select Another Story" })
+		expect(panelG.backDestinationPanelId).to.equal(CREATE_STORY_PANEL_B_STORY_SELECTION_ID)
+
+		for (const panel of [panelC, panelD, panelE, panelF, panelG]) {
+			expectRuntimeRoutedTransition(panel)
+		}
+	})
+
+	it("does not add unauthorized Step 1 UI fields or option descriptions", () => {
+		const form = getWorkflowForm(CREATE_STORY_STEP_1_FORM_ID)
+		const panels = Object.values(form.panels)
+
+		for (const panel of panels) {
+			for (const field of panel.fields) {
+				expect(field.kind).to.not.equal("static_notice")
+				expect(field.helpText).to.equal(undefined)
+				expect(field.contentMarkdown).to.equal(undefined)
+				expect(field.jsonOptionsSource?.descriptionTemplate).to.equal(undefined)
+			}
+		}
+
+		expect(getPanel(form, CREATE_STORY_PANEL_A_EPIC_SELECTION_ID).fields.map((field) => field.key)).to.deep.equal([
+			CreateStoryWorkflowValueKey.EpicIdentity,
+		])
+		expect(getPanel(form, CREATE_STORY_PANEL_B_STORY_SELECTION_ID).fields.map((field) => field.key)).to.deep.equal([
+			CreateStoryWorkflowValueKey.SelectedStoryIdentity,
+		])
+		expect(
+			getPanel(form, CREATE_STORY_PANEL_E_STORY_READY_FOR_IMPLEMENTATION_ID).fields.map((field) => field.key),
+		).to.deep.equal([CreateStoryWorkflowValueKey.ReviseBacklogStory])
+	})
+
+	it("renders Panel A through render_workflow_form", () => {
+		const route = findRoute("step-1-render-workflow-form", "step-1-render-workflow-form")
+		const action = expectRenderWorkflowFormAction(route.action)
+
+		expect(route.trigger).to.deep.equal({ kind: "always" })
+		expect(action.workflowFormId).to.equal(CREATE_STORY_STEP_1_FORM_ID)
+		expect("startPanelId" in action).to.equal(false)
+	})
+
+	it("derives selected epic values and continues to Panel B when the canonical story index flag is true", async () => {
 		const project = await createProjectWithStoryIndex()
 		try {
-			const form = getWorkflowForm(CREATE_STORY_TARGET_EPIC_FORM_ID)
-			const panel = getPanel(form, CREATE_STORY_PANEL_A_TARGET_EPIC_ID)
-			const field = getSingleField(panel)
-			expect(form.firstPanelId).to.equal(CREATE_STORY_PANEL_A_TARGET_EPIC_ID)
-			expect(panel.promptMarkdown).to.equal("Which epic are we focusing on during this workflow?")
-			expect(field).to.deep.include({
-				key: CreateStoryWorkflowValueKey.EpicIdentity,
-				workflowValueKey: CreateStoryWorkflowValueKey.EpicIdentity,
-				kind: "dropdown",
-				label: "Target epic",
-				required: true,
-				allowedValueType: "string",
+			const deriveRoute = findRoute("step-1-await-epic-selection-panel", "step-1-derive-selected-epic-values")
+			expectEventPredicateMatches({
+				route: deriveRoute,
+				workflowValues: {},
+				triggerEvent: buildWorkflowFormPanelSubmittedEvent({
+					panelId: CREATE_STORY_PANEL_A_EPIC_SELECTION_ID,
+					submittedValueKeys: [CreateStoryWorkflowValueKey.EpicIdentity],
+				}),
 			})
-			expect(field.jsonOptionsSource).to.deep.equal({
-				root: {
-					kind: "selected_project_root",
-				},
-				sourcePathSegments: ["planning", "Epics.index.json"],
-				itemsPath: "epics",
-				valueProperty: "identity",
-				labelTemplate: "Epic {identity}: {title}",
-				descriptionTemplate: "Story index generated: {story-index-generated}",
-			})
-			expectTerminalTransition(panel)
 
 			const derivationResult = await runDeterministicRoute({
-				branchId: "step-1-await-target-epic-form",
+				branchId: "step-1-await-epic-selection-panel",
 				routeId: "step-1-derive-selected-epic-values",
 				session: createSession(
 					{
@@ -548,33 +757,28 @@ describe("createStoryWorkflowDefinition Step 1", () => {
 				[CreateStoryWorkflowValueKey.StoriesIndex]: project.storiesIndex,
 			})
 
-			const renderStorySelectionRoute = findRoute("step-1-await-selected-epic-values", "step-1-render-story-selection-form")
-			expectEventPredicateMatches({
+			const renderStorySelectionRoute = findRoute(
+				"step-1-route-after-epic-selection",
+				"step-1-continue-to-story-selection-panel",
+			)
+			expectSessionPredicateMatches({
 				route: renderStorySelectionRoute,
 				workflowValues: {
 					[CreateStoryWorkflowValueKey.TargetEpic]: "Epic 1: Runtime workflow module",
 					[CreateStoryWorkflowValueKey.StoriesIndex]: project.storiesIndex,
 				},
-				triggerEvent: buildWorkflowValuesPersistedEvent([
-					CreateStoryWorkflowValueKey.TargetEpic,
-					CreateStoryWorkflowValueKey.StoriesIndex,
-				]),
 			})
-			expectRenderStartPanel(
-				renderStorySelectionRoute.action,
-				CREATE_STORY_STORY_SELECTION_FORM_ID,
-				CREATE_STORY_PANEL_B_TARGET_STORY_ID,
-			)
+			expectContinueStep1Panel(renderStorySelectionRoute.action, CREATE_STORY_PANEL_B_STORY_SELECTION_ID)
 		} finally {
 			await rm(project.root, { recursive: true, force: true })
 		}
 	})
 
-	it("blocks before Panel B when the selected epic story index is missing", async () => {
-		const project = await createProjectWithStoryIndex({ includeStoriesIndex: false })
+	it("continues to Panel C when the canonical story index flag is false", async () => {
+		const project = await createProjectWithStoryIndex({ includeStoriesIndex: false, storyIndexGenerated: false })
 		try {
 			const derivationResult = await runDeterministicRoute({
-				branchId: "step-1-await-target-epic-form",
+				branchId: "step-1-await-epic-selection-panel",
 				routeId: "step-1-derive-selected-epic-values",
 				session: createSession(
 					{
@@ -589,49 +793,19 @@ describe("createStoryWorkflowDefinition Step 1", () => {
 			})
 
 			const missingStoryIndexRoute = findRoute(
-				"step-1-await-selected-epic-values",
-				"step-1-render-missing-story-index-form",
+				"step-1-route-after-epic-selection",
+				"step-1-continue-to-missing-story-index-panel",
 			)
-			expectEventPredicateMatches({
+			expectSessionPredicateMatches({
 				route: missingStoryIndexRoute,
 				workflowValues: {
 					[CreateStoryWorkflowValueKey.TargetEpic]: "Epic 1: Runtime workflow module",
 				},
-				triggerEvent: buildWorkflowValuesPersistedEvent([CreateStoryWorkflowValueKey.TargetEpic]),
 			})
-			expectRenderStartPanel(
-				missingStoryIndexRoute.action,
-				CREATE_STORY_CANNOT_CONTINUE_FORM_ID,
-				CREATE_STORY_MISSING_STORY_INDEX_PANEL_ID,
-			)
-
-			const cannotContinueForm = getWorkflowForm(CREATE_STORY_CANNOT_CONTINUE_FORM_ID)
-			expect(getPanel(cannotContinueForm, CREATE_STORY_MISSING_STORY_INDEX_PANEL_ID).promptMarkdown).to.contain(
-				"Run the pi-planning workflow",
-			)
+			expectContinueStep1Panel(missingStoryIndexRoute.action, CREATE_STORY_PANEL_C_MISSING_STORY_INDEX_ID)
 		} finally {
 			await rm(project.root, { recursive: true, force: true })
 		}
-	})
-
-	it("defines Panel B with selected-project jsonOptionsSource and interpolated story-index segments", () => {
-		const form = getWorkflowForm(CREATE_STORY_STORY_SELECTION_FORM_ID)
-		const panel = getPanel(form, CREATE_STORY_PANEL_B_TARGET_STORY_ID)
-		const field = getSingleField(panel)
-		expect(form.firstPanelId).to.equal(CREATE_STORY_PANEL_B_TARGET_STORY_ID)
-		expect(panel.promptMarkdown).to.equal("Which story should I focus on during this workflow?")
-		expect(field.workflowValueKey).to.equal(CreateStoryWorkflowValueKey.SelectedStoryIdentity)
-		expect(field.jsonOptionsSource).to.deep.equal({
-			root: {
-				kind: "selected_project_root",
-			},
-			sourcePathSegments: ["implementation", "epic-{workflow.epic_identity}-stories.index.json"],
-			itemsPath: "stories",
-			valueProperty: "story_identity",
-			labelTemplate: "Story {story_identity}: {story_file_name}",
-			descriptionTemplate: "Status: {status}; generated: {story_file_generated}; type: {story_type}",
-		})
-		expectTerminalTransition(panel)
 	})
 
 	it("runs selected-story derivation after Panel B completion", async () => {
@@ -648,17 +822,20 @@ describe("createStoryWorkflowDefinition Step 1", () => {
 			]),
 		})
 		try {
-			const route = findRoute("step-1-await-story-selection-form", "step-1-derive-selected-story-values")
+			const route = findRoute("step-1-await-story-selection-panel", "step-1-derive-selected-story-values")
 			expectEventPredicateMatches({
 				route,
 				workflowValues: {
 					[CreateStoryWorkflowValueKey.SelectedStoryIdentity]: "1.2",
 				},
-				triggerEvent: buildWorkflowFormCompletedEvent(CREATE_STORY_STORY_SELECTION_FORM_ID),
+				triggerEvent: buildWorkflowFormPanelSubmittedEvent({
+					panelId: CREATE_STORY_PANEL_B_STORY_SELECTION_ID,
+					submittedValueKeys: [CreateStoryWorkflowValueKey.SelectedStoryIdentity],
+				}),
 			})
 
 			const result = await runDeterministicRoute({
-				branchId: "step-1-await-story-selection-form",
+				branchId: "step-1-await-story-selection-panel",
 				routeId: "step-1-derive-selected-story-values",
 				session: createSession(
 					{
@@ -679,74 +856,60 @@ describe("createStoryWorkflowDefinition Step 1", () => {
 		}
 	})
 
-	it("routes generated-file blocking to the cannot-continue story-file panel", () => {
-		const route = findRoute("step-1-await-selected-story-values", "step-1-render-story-file-not-generated-form")
-		expectEventPredicateMatches({
+	it("routes Panel B submission to Panel D when the selected story file is missing", () => {
+		const route = findRoute("step-1-route-after-story-selection", "step-1-continue-to-missing-story-file-panel")
+		expectSessionPredicateMatches({
 			route,
 			workflowValues: createWorkflowValuesForSelectedStory({
 				status: "draft",
 				storyFileGenerated: false,
 			}),
-			triggerEvent: buildWorkflowValuesPersistedEvent([CreateStoryWorkflowValueKey.SelectedStoryFileGenerated]),
 		})
-		expectRenderStartPanel(route.action, CREATE_STORY_CANNOT_CONTINUE_FORM_ID, CREATE_STORY_STORY_FILE_NOT_GENERATED_PANEL_ID)
-
-		const cannotContinueForm = getWorkflowForm(CREATE_STORY_CANNOT_CONTINUE_FORM_ID)
-		expect(getPanel(cannotContinueForm, CREATE_STORY_STORY_FILE_NOT_GENERATED_PANEL_ID).promptMarkdown).to.contain(
-			"generate a story file",
-		)
+		expectContinueStep1Panel(route.action, CREATE_STORY_PANEL_D_MISSING_STORY_FILE_ID)
 	})
 
-	it("branches selected story statuses to draft target derivation, Panel C, or Panel E", () => {
-		const draftRoute = findRoute("step-1-await-selected-story-values", "step-1-derive-draft-target-story")
-		expectEventPredicateMatches({
+	it("routes Panel B submission by selected story status", () => {
+		const draftRoute = findRoute("step-1-route-after-story-selection", "step-1-derive-draft-target-story")
+		expectSessionPredicateMatches({
 			route: draftRoute,
 			workflowValues: createWorkflowValuesForSelectedStory({
 				status: "draft",
 				storyFileGenerated: true,
 			}),
-			triggerEvent: buildWorkflowValuesPersistedEvent([CreateStoryWorkflowValueKey.SelectedStoryStatus]),
 		})
 		expectRunDeterministicProcedureAction(draftRoute.action)
 
-		const backlogRoute = findRoute("step-1-await-selected-story-values", "step-1-render-backlog-revision-form")
-		expectEventPredicateMatches({
+		const backlogRoute = findRoute("step-1-route-after-story-selection", "step-1-continue-to-story-ready-panel")
+		expectSessionPredicateMatches({
 			route: backlogRoute,
 			workflowValues: createWorkflowValuesForSelectedStory({
 				status: "backlog",
 				storyFileGenerated: true,
 			}),
-			triggerEvent: buildWorkflowValuesPersistedEvent([CreateStoryWorkflowValueKey.SelectedStoryStatus]),
 		})
-		expectRenderStartPanel(
-			backlogRoute.action,
-			CREATE_STORY_STORY_SELECTION_FORM_ID,
-			CREATE_STORY_PANEL_C_BACKLOG_REVISION_ID,
-		)
+		expectContinueStep1Panel(backlogRoute.action, CREATE_STORY_PANEL_E_STORY_READY_FOR_IMPLEMENTATION_ID)
 
-		const implementedRoute = findRoute("step-1-await-selected-story-values", "step-1-render-implemented-story-blocked-form")
+		const implementedRoute = findRoute(
+			"step-1-route-after-story-selection",
+			"step-1-continue-to-story-already-implemented-panel",
+		)
 		for (const status of ["review", "complete"]) {
-			expectEventPredicateMatches({
+			expectSessionPredicateMatches({
 				route: implementedRoute,
 				workflowValues: createWorkflowValuesForSelectedStory({
 					status,
 					storyFileGenerated: true,
 				}),
-				triggerEvent: buildWorkflowValuesPersistedEvent([CreateStoryWorkflowValueKey.SelectedStoryStatus]),
 			})
 		}
-		expectRenderStartPanel(
-			implementedRoute.action,
-			CREATE_STORY_STORY_SELECTION_FORM_ID,
-			CREATE_STORY_PANEL_E_IMPLEMENTED_STORY_BLOCKED_ID,
-		)
+		expectContinueStep1Panel(implementedRoute.action, CREATE_STORY_PANEL_G_STORY_ALREADY_IMPLEMENTED_ID)
 	})
 
 	it("derives target story paths and transitions actionable stories to Step 2", async () => {
 		const project = await createProjectWithStoryIndex()
 		try {
 			const result = await runDeterministicRoute({
-				branchId: "step-1-await-selected-story-values",
+				branchId: "step-1-route-after-story-selection",
 				routeId: "step-1-derive-draft-target-story",
 				session: createSession(
 					{
@@ -763,12 +926,11 @@ describe("createStoryWorkflowDefinition Step 1", () => {
 			})
 
 			const transitionRoute = findRoute("step-1-await-target-story-values", "step-1-transition-to-step-2")
-			expectEventPredicateMatches({
+			expectSessionPredicateMatches({
 				route: transitionRoute,
 				workflowValues: {
 					[CreateStoryWorkflowValueKey.TargetStory]: join(project.root, "implementation", "drafts", "Story-1-1.md"),
 				},
-				triggerEvent: buildWorkflowValuesPersistedEvent([CreateStoryWorkflowValueKey.TargetStory]),
 			})
 			expectTransitionStepAction(transitionRoute.action, 2)
 		} finally {
@@ -806,7 +968,7 @@ describe("createStoryWorkflowDefinition Step 1", () => {
 			await writeFile(findingsDocument, "# Findings\n")
 
 			const result = await runDeterministicRoute({
-				branchId: "step-1-await-selected-story-values",
+				branchId: "step-1-route-after-story-selection",
 				routeId: "step-1-derive-draft-target-story",
 				session: createSession(
 					{
@@ -834,127 +996,82 @@ describe("createStoryWorkflowDefinition Step 1", () => {
 		}
 	})
 
-	it("defines Panel C back behavior and branches yes/no answers", () => {
-		const panel = getPanel(getWorkflowForm(CREATE_STORY_STORY_SELECTION_FORM_ID), CREATE_STORY_PANEL_C_BACKLOG_REVISION_ID)
-		expect(panel.allowedActions).to.deep.equal(["submit", "back"])
-		expect(panel.backDestinationPanelId).to.equal(CREATE_STORY_PANEL_B_TARGET_STORY_ID)
-		expect(panel.backStaleValueKeysToClear).to.deep.equal([CreateStoryWorkflowValueKey.ReviseBacklogStory])
-		expect(getSingleField(panel)).to.deep.include({
-			key: CreateStoryWorkflowValueKey.ReviseBacklogStory,
-			workflowValueKey: CreateStoryWorkflowValueKey.ReviseBacklogStory,
-			kind: "boolean",
-			required: true,
-			allowedValueType: "boolean",
-		})
-
-		const yesRoute = findRoute(
-			"step-1-await-backlog-revision-form",
-			"step-1-derive-backlog-target-story-after-revision-approved",
-		)
+	it("routes Panel E yes/no answers to Step 2 derivation or Panel F continuation", () => {
+		const yesRoute = findRoute("step-1-await-story-ready-panel", "step-1-derive-backlog-target-story-after-revision-approved")
 		expectEventPredicateMatches({
 			route: yesRoute,
 			workflowValues: {
 				[CreateStoryWorkflowValueKey.ReviseBacklogStory]: true,
 			},
-			triggerEvent: buildWorkflowFormCompletedEvent(CREATE_STORY_STORY_SELECTION_FORM_ID),
+			triggerEvent: buildWorkflowFormPanelSubmittedEvent({
+				panelId: CREATE_STORY_PANEL_E_STORY_READY_FOR_IMPLEMENTATION_ID,
+				submittedValueKeys: [CreateStoryWorkflowValueKey.ReviseBacklogStory],
+			}),
 		})
 		expectRunDeterministicProcedureAction(yesRoute.action)
 
-		const noRoute = findRoute("step-1-await-backlog-revision-form", "step-1-render-no-revision-confirmation-form")
+		const noRoute = findRoute("step-1-await-story-ready-panel", "step-1-continue-to-run-dev-story-panel")
 		expectEventPredicateMatches({
 			route: noRoute,
 			workflowValues: {
 				[CreateStoryWorkflowValueKey.ReviseBacklogStory]: false,
 			},
-			triggerEvent: buildWorkflowFormCompletedEvent(CREATE_STORY_STORY_SELECTION_FORM_ID),
+			triggerEvent: buildWorkflowFormPanelSubmittedEvent({
+				panelId: CREATE_STORY_PANEL_E_STORY_READY_FOR_IMPLEMENTATION_ID,
+				submittedValueKeys: [CreateStoryWorkflowValueKey.ReviseBacklogStory],
+			}),
 		})
-		expectRenderStartPanel(
-			noRoute.action,
-			CREATE_STORY_STORY_SELECTION_FORM_ID,
-			CREATE_STORY_PANEL_D_NO_REVISION_CONFIRMATION_ID,
-		)
-
-		const backRoute = findRoute(
-			"step-1-await-backlog-revision-form",
-			"step-1-derive-selected-story-values-after-backlog-back",
-		)
-		expectEventPredicateMatches({
-			route: backRoute,
-			workflowValues: {
-				[CreateStoryWorkflowValueKey.SelectedStoryIdentity]: "1.2",
-			},
-			triggerEvent: buildWorkflowFormCompletedEvent(CREATE_STORY_STORY_SELECTION_FORM_ID),
-		})
-		expectRunDeterministicProcedureAction(backRoute.action)
+		expectContinueStep1Panel(noRoute.action, CREATE_STORY_PANEL_F_RUN_DEV_STORY_WORKFLOW_ID)
 	})
 
-	it("routes Panel D confirmation directly to workflow completion", () => {
-		const panel = getPanel(
-			getWorkflowForm(CREATE_STORY_STORY_SELECTION_FORM_ID),
-			CREATE_STORY_PANEL_D_NO_REVISION_CONFIRMATION_ID,
-		)
-		expect(panel.promptMarkdown).to.equal(
-			"Since the selected story already has been populated with tasks and subtasks, your next step is to run the dev-story workflow and select this story as the implementation target.",
-		)
-		expect(panel.allowedActions).to.deep.equal(["submit"])
-		expectTerminalTransition(panel)
-
-		const route = findRoute(
-			"step-1-await-no-revision-confirmation-form",
-			"step-1-complete-workflow-after-no-revision-confirmation",
-		)
-		expectEventPredicateMatches({
-			route,
-			workflowValues: {},
-			triggerEvent: buildWorkflowFormCompletedEvent(CREATE_STORY_STORY_SELECTION_FORM_ID),
-		})
-		expect(route.action.kind).to.equal("complete_workflow")
-	})
-
-	it("defines Panel E back behavior returning to Panel B", () => {
-		const panel = getPanel(
-			getWorkflowForm(CREATE_STORY_STORY_SELECTION_FORM_ID),
-			CREATE_STORY_PANEL_E_IMPLEMENTED_STORY_BLOCKED_ID,
-		)
-		expect(panel.promptMarkdown).to.equal(
-			"This story has already been implemented. New tasks should not be added to stories after implementation. If findings were documented during QA, the QA agent generated a remediation story to address those findings. Please go back and select the appropriate remediation story as the target for this workflow.",
-		)
-		expect(panel.allowedActions).to.deep.equal(["back"])
-		expect(panel.backDestinationPanelId).to.equal(CREATE_STORY_PANEL_B_TARGET_STORY_ID)
-
-		const route = findRoute("step-1-await-blocked-story-form", "step-1-derive-selected-story-values-after-blocked-back")
-		expectEventPredicateMatches({
-			route,
-			workflowValues: {
-				[CreateStoryWorkflowValueKey.SelectedStoryIdentity]: "1.1.1",
+	it("routes terminal Panel C, D, F, and G submit events to workflow completion", () => {
+		const completionCases: readonly { routeId: string; panelId: string }[] = [
+			{
+				routeId: "step-1-complete-workflow-after-missing-story-index",
+				panelId: CREATE_STORY_PANEL_C_MISSING_STORY_INDEX_ID,
 			},
-			triggerEvent: buildWorkflowFormCompletedEvent(CREATE_STORY_STORY_SELECTION_FORM_ID),
-		})
-		expectRunDeterministicProcedureAction(route.action)
+			{
+				routeId: "step-1-complete-workflow-after-missing-story-file",
+				panelId: CREATE_STORY_PANEL_D_MISSING_STORY_FILE_ID,
+			},
+			{
+				routeId: "step-1-complete-workflow-after-run-dev-story-panel",
+				panelId: CREATE_STORY_PANEL_F_RUN_DEV_STORY_WORKFLOW_ID,
+			},
+			{
+				routeId: "step-1-complete-workflow-after-story-already-implemented",
+				panelId: CREATE_STORY_PANEL_G_STORY_ALREADY_IMPLEMENTED_ID,
+			},
+		]
+
+		for (const completionCase of completionCases) {
+			const route = findRoute("step-1-await-terminal-panels", completionCase.routeId)
+			expectEventPredicateMatches({
+				route,
+				workflowValues: {},
+				triggerEvent: buildWorkflowFormPanelSubmittedEvent({
+					panelId: completionCase.panelId,
+				}),
+			})
+			expect(route.action.kind).to.equal("complete_workflow")
+		}
 	})
 })
 
 describe("createStoryWorkflowDefinition Step 2", () => {
-	it("builds a primary draft context-review prompt", () => {
+	it("builds a non-empty primary draft context-review prompt", () => {
 		const prompt = getPromptInstructions("step-2", {
 			[CreateStoryWorkflowValueKey.TargetStory]: "/tmp/create-story-project/implementation/drafts/Story-1-1.md",
 			[CreateStoryWorkflowValueKey.ArchitectureDocument]: "/tmp/create-story-project/planning/architecture.md",
 			[CreateStoryWorkflowValueKey.EpicsDocument]: "/tmp/create-story-project/planning/Epics.md",
-			[CreateStoryWorkflowValueKey.BrainstormingDocument]: "/tmp/create-story-project/discovery/brainstorming.md",
 			[CreateStoryWorkflowValueKey.SelectedStoryStatus]: "draft",
 			[CreateStoryWorkflowValueKey.SelectedStoryType]: "primary",
 		})
 
-		expect(prompt).to.include("preparing a story file for implementation by adding tasks and subtasks")
-		expect(prompt).to.include("Focus on `/tmp/create-story-project/implementation/drafts/Story-1-1.md`.")
-		expect(prompt).to.include("Read `/tmp/create-story-project/planning/architecture.md`.")
-		expect(prompt).to.include("Read `/tmp/create-story-project/planning/Epics.md`.")
-		expect(prompt).to.include("Read `/tmp/create-story-project/discovery/brainstorming.md` when present.")
-		expect(prompt).to.include("story objective, scope, scope boundary, requirements")
-		expect(prompt).to.include("workflow_progress_request")
+		expect(prompt).to.be.a("string").and.not.empty
 	})
 
-	it("builds a remediation draft context-review prompt with parent and findings context", () => {
+	it("builds a non-empty remediation draft context-review prompt", () => {
 		const prompt = getPromptInstructions("step-2", {
 			[CreateStoryWorkflowValueKey.TargetStory]:
 				"/tmp/create-story-project/implementation/drafts/Remediation-story-1-1-1.md",
@@ -966,14 +1083,10 @@ describe("createStoryWorkflowDefinition Step 2", () => {
 			[CreateStoryWorkflowValueKey.FindingsDocument]: "/tmp/create-story-project/review/Adversarial-review-1-1.md",
 		})
 
-		expect(prompt).to.include("preparing a remediation story file for implementation")
-		expect(prompt).to.include("/tmp/create-story-project/implementation/stories-complete/Story-1-1.md")
-		expect(prompt).to.include("/tmp/create-story-project/review/Adversarial-review-1-1.md")
-		expect(prompt).to.include("QA findings")
-		expect(prompt).to.include("workflow_progress_request")
+		expect(prompt).to.be.a("string").and.not.empty
 	})
 
-	it("builds a backlog revision context-review prompt", () => {
+	it("builds a non-empty backlog revision context-review prompt", () => {
 		const prompt = getPromptInstructions("step-2", {
 			[CreateStoryWorkflowValueKey.TargetStory]: "/tmp/create-story-project/implementation/stories-backlog/Story-1-2.md",
 			[CreateStoryWorkflowValueKey.ArchitectureDocument]: "/tmp/create-story-project/planning/architecture.md",
@@ -983,45 +1096,56 @@ describe("createStoryWorkflowDefinition Step 2", () => {
 			[CreateStoryWorkflowValueKey.ReviseBacklogStory]: true,
 		})
 
-		expect(prompt).to.include("revising an existing story file")
-		expect(prompt).to.include("/tmp/create-story-project/implementation/stories-backlog/Story-1-2.md")
-		expect(prompt).to.include("ask the user to explain the required revisions")
-		expect(prompt).to.include("existing runtime code/tests")
-		expect(prompt).to.include("workflow_progress_request")
+		expect(prompt).to.be.a("string").and.not.empty
+	})
+
+	it("fails clearly for unsupported Step 2 prompt state", () => {
+		expect(() =>
+			getPromptInstructions("step-2", {
+				[CreateStoryWorkflowValueKey.SelectedStoryStatus]: "backlog",
+				[CreateStoryWorkflowValueKey.SelectedStoryType]: "primary",
+				[CreateStoryWorkflowValueKey.ReviseBacklogStory]: false,
+			}),
+		).to.throw("Create Story Step 2 prompt does not support")
 	})
 })
 
 describe("createStoryWorkflowDefinition Step 3", () => {
-	it("builds a draft task/subtask authoring prompt", () => {
+	it("builds a non-empty draft task/subtask authoring prompt", () => {
 		const prompt = getPromptInstructions("step-3", {
 			[CreateStoryWorkflowValueKey.TargetStory]: "/tmp/create-story-project/implementation/drafts/Story-1-1.md",
 			[CreateStoryWorkflowValueKey.SelectedStoryStatus]: "draft",
 		})
 
-		expect(prompt).to.include("Review runtime code and tests")
-		expect(prompt).to.include("full set of in-scope revisions")
-		expect(prompt).to.include("Inspect relevant runtime code and tests")
-		expect(prompt).to.include("Author implementation-ready tasks and subtasks")
-		expect(prompt).to.include("single revision in a single target file")
-		expect(prompt).to.include("workflow_progress_request")
+		expect(prompt).to.be.a("string").and.not.empty
 	})
 
-	it("builds a backlog revision task/subtask authoring prompt", () => {
+	it("builds a non-empty backlog revision task/subtask authoring prompt", () => {
 		const prompt = getPromptInstructions("step-3", {
 			[CreateStoryWorkflowValueKey.TargetStory]: "/tmp/create-story-project/implementation/stories-backlog/Story-1-2.md",
 			[CreateStoryWorkflowValueKey.SelectedStoryStatus]: "backlog",
 		})
 
-		expect(prompt).to.include("Review existing tasks and subtasks")
-		expect(prompt).to.include("action-plan quality rules")
-		expect(prompt).to.include("/tmp/create-story-project/implementation/stories-backlog/Story-1-2.md")
-		expect(prompt).to.include("Provide the user with the identified revision set")
-		expect(prompt).to.include("Ask the user to review the tasks/subtasks section")
-		expect(prompt).to.include("workflow_progress_request")
+		expect(prompt).to.be.a("string").and.not.empty
+	})
+
+	it("fails clearly for unsupported Step 3 prompt state", () => {
+		expect(() =>
+			getPromptInstructions("step-3", {
+				[CreateStoryWorkflowValueKey.SelectedStoryStatus]: "review",
+			}),
+		).to.throw("Create Story Step 3 prompt does not support")
 	})
 })
 
 describe("createStoryWorkflowDefinition Step 2 and Step 3 progression", () => {
+	it("exposes workflow_progress_request only in progress-request steps", () => {
+		expect(getToolNamesForStep("step-1")).not.to.include("workflow_progress_request")
+		expect(getToolNamesForStep("step-2")).to.include("workflow_progress_request")
+		expect(getToolNamesForStep("step-3")).to.include("workflow_progress_request")
+		expect(getToolNamesForStep("step-4")).not.to.include("workflow_progress_request")
+	})
+
 	it("routes progress confirmation forward and denial back to the project prompt", () => {
 		const progressionCases: readonly ProgressionRouteExpectation[] = [
 			{
@@ -1084,18 +1208,15 @@ describe("createStoryWorkflowDefinition Step 2 and Step 3 progression", () => {
 })
 
 describe("createStoryWorkflowDefinition Step 4", () => {
-	it("builds a final validation prompt and exposes attempt_completion only in Step 4", () => {
+	it("builds a non-empty final validation prompt", () => {
 		const prompt = getPromptInstructions("step-4", {
 			[CreateStoryWorkflowValueKey.TargetStory]: "/tmp/create-story-project/implementation/drafts/Story-1-1.md",
 		})
 
-		expect(prompt).to.include("complete implementation handoff")
-		expect(prompt).to.include("every acceptance criterion")
-		expect(prompt).to.include("task order is executable and non-conflicting")
-		expect(prompt).to.include("ambiguity, contradiction, missing coverage, or unsafe handoff content")
-		expect(prompt).to.include("attempt_completion")
-		expect(prompt).to.include("only after validation passes")
+		expect(prompt).to.be.a("string").and.not.empty
+	})
 
+	it("exposes attempt_completion only in Step 4", () => {
 		expect(getToolNamesForStep("step-1")).not.to.include("attempt_completion")
 		expect(getToolNamesForStep("step-2")).not.to.include("attempt_completion")
 		expect(getToolNamesForStep("step-3")).not.to.include("attempt_completion")

@@ -685,7 +685,7 @@ This phase aligns the create-story runtime implementation with the corrected cre
 - Do not add tests that assert complete prompt strings or duplicate full user-authored prompt bodies.
 - Do not reintroduce separate Step 1 workflow form sessions.
 
-[ ] Task 10. Remediate create-story workflow implementation and tests.
+[x] Task 10. Remediate create-story workflow implementation and tests.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
@@ -694,227 +694,227 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-story/action-plan.md`
 
-[ ] Subtask 10.1. In `createStoryWorkflow.ts`, replace `CREATE_STORY_TARGET_EPIC_FORM_ID`, `CREATE_STORY_STORY_SELECTION_FORM_ID`, and `CREATE_STORY_CANNOT_CONTINUE_FORM_ID` with one exported `CREATE_STORY_STEP_1_FORM_ID`.
+[x] Subtask 10.1. In `createStoryWorkflow.ts`, replace `CREATE_STORY_TARGET_EPIC_FORM_ID`, `CREATE_STORY_STORY_SELECTION_FORM_ID`, and `CREATE_STORY_CANNOT_CONTINUE_FORM_ID` with one exported `CREATE_STORY_STEP_1_FORM_ID`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
 
-[ ] Subtask 10.2. In `createStoryWorkflow.ts`, replace obsolete Panel C/D/E and missing-panel constants with exported Panel A-G constants whose names match the corrected panel responsibilities: epic selection, story selection, missing story index, missing story file, story ready for implementation, run dev-story workflow, and story already implemented.
+[x] Subtask 10.2. In `createStoryWorkflow.ts`, replace obsolete Panel C/D/E and missing-panel constants with exported Panel A-G constants whose names match the corrected panel responsibilities: epic selection, story selection, missing story index, missing story file, story ready for implementation, run dev-story workflow, and story already implemented.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
 
-[ ] Subtask 10.3. In `createStoryWorkflow.ts`, update `CreateStoryEpicsIndexEntry` so it requires canonical `"story-index-generated": boolean`.
+[x] Subtask 10.3. In `createStoryWorkflow.ts`, update `CreateStoryEpicsIndexEntry` so it requires canonical `"story-index-generated": boolean`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
 
-[ ] Subtask 10.4. In `createStoryWorkflow.ts`, add the type import needed for `WorkflowFormContinuationReplacementBuilder`.
+[x] Subtask 10.4. In `createStoryWorkflow.ts`, add the type import needed for `WorkflowFormContinuationReplacementBuilder`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
 
-[ ] Subtask 10.5. In `createStoryWorkflow.ts`, add a `buildRuntimeRoutedTransition()` helper returning `{ type: "runtime_routed" }`.
+[x] Subtask 10.5. In `createStoryWorkflow.ts`, add a `buildRuntimeRoutedTransition()` helper returning `{ type: "runtime_routed" }`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
 
-[ ] Subtask 10.6. In `createStoryWorkflow.ts`, replace `buildStep1TargetEpicWorkflowForm`, `buildStep1StorySelectionWorkflowForm`, `buildCannotContinuePanel`, and `buildStep1CannotContinueWorkflowForm` with one `buildStep1WorkflowForm()` function.
+[x] Subtask 10.6. In `createStoryWorkflow.ts`, replace `buildStep1TargetEpicWorkflowForm`, `buildStep1StorySelectionWorkflowForm`, `buildCannotContinuePanel`, and `buildStep1CannotContinueWorkflowForm` with one `buildStep1WorkflowForm()` function.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
 
-[ ] Subtask 10.7. In `buildStep1WorkflowForm()`, configure Panel A exactly as required: title `Epic Selection`, promptMarkdown `Which epic are we focusing on during this workflow?`, dropdown label `Target Epic`, `jsonOptionsSource` from `planning/Epics.index.json`, `labelTemplate: "Epic {identity}: {title}"`, no `descriptionTemplate`, and `transition: buildRuntimeRoutedTransition()`.
+[x] Subtask 10.7. In `buildStep1WorkflowForm()`, configure Panel A exactly as required: title `Epic Selection`, promptMarkdown `Which epic are we focusing on during this workflow?`, dropdown label `Target Epic`, `jsonOptionsSource` from `planning/Epics.index.json`, `labelTemplate: "Epic {identity}: {title}"`, no `descriptionTemplate`, and `transition: buildRuntimeRoutedTransition()`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
 
-[ ] Subtask 10.8. In Panel A's dropdown field, add `resetValueKeysOnChange` for `stories_index`, `selected_story_identity`, `selected_story_file_name`, `selected_story_type`, `selected_story_status`, `selected_story_file_generated`, `target_story`, `parent_story_identity`, `parent_story`, `findings_document`, `revise_backlog_story`, and `target_story_filename_for_move`.
+[x] Subtask 10.8. In Panel A's dropdown field, add `resetValueKeysOnChange` for `stories_index`, `selected_story_identity`, `selected_story_file_name`, `selected_story_type`, `selected_story_status`, `selected_story_file_generated`, `target_story`, `parent_story_identity`, `parent_story`, `findings_document`, `revise_backlog_story`, and `target_story_filename_for_move`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
 
-[ ] Subtask 10.9. In `buildStep1WorkflowForm()`, configure Panel B exactly as required: title `Story Selection`, promptMarkdown `Which story should I focus on during this workflow?`, dropdown label `Target Story`, `jsonOptionsSource` from `implementation/epic-{workflow.epic_identity}-stories.index.json`, `labelTemplate: "Story {story_identity}"`, no `descriptionTemplate`, and `transition: buildRuntimeRoutedTransition()`.
+[x] Subtask 10.9. In `buildStep1WorkflowForm()`, configure Panel B exactly as required: title `Story Selection`, promptMarkdown `Which story should I focus on during this workflow?`, dropdown label `Target Story`, `jsonOptionsSource` from `implementation/epic-{workflow.epic_identity}-stories.index.json`, `labelTemplate: "Story {story_identity}"`, no `descriptionTemplate`, and `transition: buildRuntimeRoutedTransition()`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
 
-[ ] Subtask 10.10. In Panel B's dropdown field, add `resetValueKeysOnChange` for `selected_story_file_name`, `selected_story_type`, `selected_story_status`, `selected_story_file_generated`, `target_story`, `parent_story_identity`, `parent_story`, `findings_document`, `revise_backlog_story`, and `target_story_filename_for_move`.
+[x] Subtask 10.10. In Panel B's dropdown field, add `resetValueKeysOnChange` for `selected_story_file_name`, `selected_story_type`, `selected_story_status`, `selected_story_file_generated`, `target_story`, `parent_story_identity`, `parent_story`, `findings_document`, `revise_backlog_story`, and `target_story_filename_for_move`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
 
-[ ] Subtask 10.11. In `buildStep1WorkflowForm()`, configure Panel C exactly as required for missing story index, with no fields, submit label `End Workflow`, back label `Select Another Epic`, and `backDestinationPanelId` Panel A.
+[x] Subtask 10.11. In `buildStep1WorkflowForm()`, configure Panel C exactly as required for missing story index, with no fields, submit label `End Workflow`, back label `Select Another Epic`, and `backDestinationPanelId` Panel A.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
 
-[ ] Subtask 10.12. In `buildStep1WorkflowForm()`, configure Panel D exactly as required for missing story file, with no fields, submit label `End workflow`, back label `Select Another Story`, and `backDestinationPanelId` Panel B.
+[x] Subtask 10.12. In `buildStep1WorkflowForm()`, configure Panel D exactly as required for missing story file, with no fields, submit label `End workflow`, back label `Select Another Story`, and `backDestinationPanelId` Panel B.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
 
-[ ] Subtask 10.13. In `buildStep1WorkflowForm()`, configure Panel E exactly as required for backlog stories, including boolean label `Would you like to revise this story's existing tasks?`, true label `Yes`, false label `No`, submit label `Continue`, back label `Select Another Story`, and `backDestinationPanelId` Panel B.
+[x] Subtask 10.13. In `buildStep1WorkflowForm()`, configure Panel E exactly as required for backlog stories, including boolean label `Would you like to revise this story's existing tasks?`, true label `Yes`, false label `No`, submit label `Continue`, back label `Select Another Story`, and `backDestinationPanelId` Panel B.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
 
-[ ] Subtask 10.14. In `buildStep1WorkflowForm()`, configure Panel F exactly as required for the dev-story handoff, with no fields, submit label `End Workflow`, back label `Select Another Story`, and `backDestinationPanelId` Panel B.
+[x] Subtask 10.14. In `buildStep1WorkflowForm()`, configure Panel F exactly as required for the dev-story handoff, with no fields, submit label `End Workflow`, back label `Select Another Story`, and `backDestinationPanelId` Panel B.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
 
-[ ] Subtask 10.15. In `buildStep1WorkflowForm()`, configure Panel G exactly as required for implemented stories, with no fields, submit label `End Workflow`, back label `Select Another Story`, and `backDestinationPanelId` Panel B.
+[x] Subtask 10.15. In `buildStep1WorkflowForm()`, configure Panel G exactly as required for implemented stories, with no fields, submit label `End Workflow`, back label `Select Another Story`, and `backDestinationPanelId` Panel B.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
 
-[ ] Subtask 10.16. In `createStoryWorkflow.ts`, add a continuation replacement builder that returns the requested Step 1 panel from `buildStep1WorkflowForm()` with empty session data and throws a clear configuration error if the panel id is missing.
+[x] Subtask 10.16. In `createStoryWorkflow.ts`, add a continuation replacement builder that returns the requested Step 1 panel from `buildStep1WorkflowForm()` with empty session data and throws a clear configuration error if the panel id is missing.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
 
-[ ] Subtask 10.17. In `deriveSelectedEpicValuesFromForm`, replace the `pathExists(storiesIndex)` branch with a branch based on selected epic `"story-index-generated"`; persist `stories_index` only when the canonical flag is `true`.
+[x] Subtask 10.17. In `deriveSelectedEpicValuesFromForm`, replace the `pathExists(storiesIndex)` branch with a branch based on selected epic `"story-index-generated"`; persist `stories_index` only when the canonical flag is `true`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
 
-[ ] Subtask 10.18. In `createStoryWorkflow.ts`, replace Step 1 `workflow_form_completed` trigger helpers with `workflow_form_panel_submitted` helpers scoped to `CREATE_STORY_STEP_1_FORM_ID`, target panel id, and submitted action.
+[x] Subtask 10.18. In `createStoryWorkflow.ts`, replace Step 1 `workflow_form_completed` trigger helpers with `workflow_form_panel_submitted` helpers scoped to `CREATE_STORY_STEP_1_FORM_ID`, target panel id, and submitted action.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
 
-[ ] Subtask 10.19. In `createStoryWorkflow.ts`, replace Step 1 post-procedure `workflow_values_persisted` route triggers with `session_predicate` triggers so unchanged persisted values do not stall back/resubmit flows.
+[x] Subtask 10.19. In `createStoryWorkflow.ts`, replace Step 1 post-procedure `workflow_values_persisted` route triggers with `session_predicate` triggers so unchanged persisted values do not stall back/resubmit flows.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
 
-[ ] Subtask 10.20. In `buildStep1DecisionTree`, replace the Step 1 route tree so Panel A submit derives selected epic values, then continues to Panel B when `stories_index` is present or Panel C when it is absent.
+[x] Subtask 10.20. In `buildStep1DecisionTree`, replace the Step 1 route tree so Panel A submit derives selected epic values, then continues to Panel B when `stories_index` is present or Panel C when it is absent.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
 
-[ ] Subtask 10.21. In `buildStep1DecisionTree`, replace the Panel B route tree so Panel B submit derives selected story metadata, then routes to Panel D for `story_file_generated: false`, Step 2 for actionable draft stories, Panel E for backlog stories, or Panel G for `review`/`complete` stories.
+[x] Subtask 10.21. In `buildStep1DecisionTree`, replace the Panel B route tree so Panel B submit derives selected story metadata, then routes to Panel D for `story_file_generated: false`, Step 2 for actionable draft stories, Panel E for backlog stories, or Panel G for `review`/`complete` stories.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
 
-[ ] Subtask 10.22. In `buildStep1DecisionTree`, route Panel C, Panel D, Panel F, and Panel G submit events to `complete_workflow`.
+[x] Subtask 10.22. In `buildStep1DecisionTree`, route Panel C, Panel D, Panel F, and Panel G submit events to `complete_workflow`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
 
-[ ] Subtask 10.23. In `buildStep1DecisionTree`, route Panel E submit with `revise_backlog_story: true` through target story/remediation derivation and Step 2 transition, and route Panel E submit with `revise_backlog_story: false` to same-session Panel F continuation.
+[x] Subtask 10.23. In `buildStep1DecisionTree`, route Panel E submit with `revise_backlog_story: true` through target story/remediation derivation and Step 2 transition, and route Panel E submit with `revise_backlog_story: false` to same-session Panel F continuation.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
 
-[ ] Subtask 10.24. In the create-story workflow definition `workflowForms` map, replace the three old form entries with one entry keyed by `CREATE_STORY_STEP_1_FORM_ID`.
+[x] Subtask 10.24. In the create-story workflow definition `workflowForms` map, replace the three old form entries with one entry keyed by `CREATE_STORY_STEP_1_FORM_ID`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
 
-[ ] Subtask 10.25. In `createStoryWorkflow.ts`, replace Step 2 prompt construction so it selects only the three requirements-prescribed variants and fails clearly for unsupported conditions.
+[x] Subtask 10.25. In `createStoryWorkflow.ts`, replace Step 2 prompt construction so it selects only the three requirements-prescribed variants and fails clearly for unsupported conditions.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
 
-[ ] Subtask 10.26. In `createStoryWorkflow.ts`, replace Step 3 prompt construction so it selects only the two requirements-prescribed variants and fails clearly for unsupported conditions.
+[x] Subtask 10.26. In `createStoryWorkflow.ts`, replace Step 3 prompt construction so it selects only the two requirements-prescribed variants and fails clearly for unsupported conditions.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
 
-[ ] Subtask 10.27. In `createStoryWorkflow.ts`, replace Step 4 prompt construction so it preserves the requirements-prescribed prompt text with deterministic workflow-value interpolation.
+[x] Subtask 10.27. In `createStoryWorkflow.ts`, replace Step 4 prompt construction so it preserves the requirements-prescribed prompt text with deterministic workflow-value interpolation.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`
 
-[ ] Subtask 10.28. In `index.ts`, replace exports for obsolete Step 1 form and panel constants with exports for `CREATE_STORY_STEP_1_FORM_ID` and final Panel A-G constants.
+[x] Subtask 10.28. In `index.ts`, replace exports for obsolete Step 1 form and panel constants with exports for `CREATE_STORY_STEP_1_FORM_ID` and final Panel A-G constants.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/index.ts`
 
-[ ] Subtask 10.29. In `createStoryWorkflow.test.ts`, update imports and helper assertions to use `CREATE_STORY_STEP_1_FORM_ID`, final Panel A-G constants, and both `render_workflow_form` and `continue_workflow_form` action expectations.
+[x] Subtask 10.29. In `createStoryWorkflow.test.ts`, update imports and helper assertions to use `CREATE_STORY_STEP_1_FORM_ID`, final Panel A-G constants, and both `render_workflow_form` and `continue_workflow_form` action expectations.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`
 
-[ ] Subtask 10.30. In `createStoryWorkflow.test.ts`, replace Step 1 form definition tests so they assert one workflow form session containing Panels A-G.
+[x] Subtask 10.30. In `createStoryWorkflow.test.ts`, replace Step 1 form definition tests so they assert one workflow form session containing Panels A-G.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`
 
-[ ] Subtask 10.31. In `createStoryWorkflow.test.ts`, update Panel A assertions for exact title, promptMarkdown, field label, JSON option source path, option label template, no option description, runtime-routed transition, and downstream reset keys.
+[x] Subtask 10.31. In `createStoryWorkflow.test.ts`, update Panel A assertions for exact title, promptMarkdown, field label, JSON option source path, option label template, no option description, runtime-routed transition, and downstream reset keys.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`
 
-[ ] Subtask 10.32. In `createStoryWorkflow.test.ts`, update Panel B assertions for exact title, promptMarkdown, field label, JSON option source path, option label template, no option description, runtime-routed transition, and downstream reset keys.
+[x] Subtask 10.32. In `createStoryWorkflow.test.ts`, update Panel B assertions for exact title, promptMarkdown, field label, JSON option source path, option label template, no option description, runtime-routed transition, and downstream reset keys.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`
 
-[ ] Subtask 10.33. In `createStoryWorkflow.test.ts`, add Panel C-G assertions for required titles, promptMarkdown presence, field shape, allowed actions, action labels, and back destinations without asserting full prompt bodies beyond the requirements-owned UI strings.
+[x] Subtask 10.33. In `createStoryWorkflow.test.ts`, add Panel C-G assertions for required titles, promptMarkdown presence, field shape, allowed actions, action labels, and back destinations without asserting full prompt bodies beyond the requirements-owned UI strings.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`
 
-[ ] Subtask 10.34. In `createStoryWorkflow.test.ts`, add assertions proving Panels A-G do not contain `static_notice`, helper fields, unauthorized descriptions, or other source-unprescribed UI fields.
+[x] Subtask 10.34. In `createStoryWorkflow.test.ts`, add assertions proving Panels A-G do not contain `static_notice`, helper fields, unauthorized descriptions, or other source-unprescribed UI fields.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`
 
-[ ] Subtask 10.35. In `createStoryWorkflow.test.ts`, replace Step 1 route tests so Panel A submission routes to same-session Panel B when `"story-index-generated": true` and to same-session Panel C when `"story-index-generated": false`.
+[x] Subtask 10.35. In `createStoryWorkflow.test.ts`, replace Step 1 route tests so Panel A submission routes to same-session Panel B when `"story-index-generated": true` and to same-session Panel C when `"story-index-generated": false`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`
 
-[ ] Subtask 10.36. In `createStoryWorkflow.test.ts`, replace Step 1 route tests so Panel B submission routes to Panel D for missing story files, Step 2 for actionable draft stories, Panel E for backlog stories, and Panel G for `review`/`complete` stories.
+[x] Subtask 10.36. In `createStoryWorkflow.test.ts`, replace Step 1 route tests so Panel B submission routes to Panel D for missing story files, Step 2 for actionable draft stories, Panel E for backlog stories, and Panel G for `review`/`complete` stories.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`
 
-[ ] Subtask 10.37. In `createStoryWorkflow.test.ts`, add route tests proving Panel C, Panel D, Panel F, and Panel G submit events complete the workflow.
+[x] Subtask 10.37. In `createStoryWorkflow.test.ts`, add route tests proving Panel C, Panel D, Panel F, and Panel G submit events complete the workflow.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`
 
-[ ] Subtask 10.38. In `createStoryWorkflow.test.ts`, add Panel E route tests proving `true` routes through target story derivation to Step 2 and `false` routes to same-session Panel F.
+[x] Subtask 10.38. In `createStoryWorkflow.test.ts`, add Panel E route tests proving `true` routes through target story derivation to Step 2 and `false` routes to same-session Panel F.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`
 
-[ ] Subtask 10.39. In `createStoryWorkflow.test.ts`, update prompt tests to verify Step 2-4 variant selection, required workflow-value interpolation, unsupported-state failures, and absence of known unauthorized legacy or invented prompt fragments without asserting complete prompt strings.
+[x] Subtask 10.39. In `createStoryWorkflow.test.ts`, update Step 2 through Step 4 prompt tests so supported prompt states assert only that `currentStepInstructions` is a non-empty string; preserve unsupported-state failure tests and preserve separate tool-schema assertions for `workflow_progress_request` and `attempt_completion`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`
 
-[ ] Subtask 10.40. In `integration.test.ts`, replace create-story prompt integration expectations that assert old prompt fragments with behavior assertions for current-step payload placement, required workflow-value interpolation, and absence of old unauthorized prompt fragments.
+[x] Subtask 10.40. In `integration.test.ts`, update the create-story prompt-projection test so it asserts workflow input payload placement structurally without checking create-story prompt verbiage: keep workflow identity, active step identity, and `CURRENT STEP DETAILED INSTRUCTIONS` placement assertions; remove create-story prompt phrase, path interpolation, and forbidden prompt-fragment assertions from both workflow input payload and system prompt checks.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 10.41. Run `npm run protos` and mark this subtask complete only if it passes.
+[x] Subtask 10.41. Run `npm run protos` and mark this subtask complete only if it passes.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-story/action-plan.md`
 
-[ ] Subtask 10.42. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts` and mark this subtask complete only if it passes.
+[x] Subtask 10.42. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts` and mark this subtask complete only if it passes.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-story/action-plan.md`
 
-[ ] Subtask 10.43. Run `npm run test:unit -- src/core/prompts/system-prompt/__tests__/integration.test.ts` and mark this subtask complete only if it passes.
+[x] Subtask 10.43. Run `npm run test:unit -- src/core/prompts/system-prompt/__tests__/integration.test.ts` and mark this subtask complete only if it passes.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-story/action-plan.md`
 
-[ ] Subtask 10.44. Run `npm run check-types` and mark this subtask complete only if it passes.
+[x] Subtask 10.44. Run `npm run check-types` and mark this subtask complete only if it passes.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-story/action-plan.md`
 
-[ ] Subtask 10.45. Run `npm run lint` and mark this subtask complete only if it passes.
+[x] Subtask 10.45. Run `npm run lint` and mark this subtask complete only if it passes.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-story/action-plan.md`
