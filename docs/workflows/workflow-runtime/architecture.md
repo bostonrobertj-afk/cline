@@ -345,13 +345,16 @@ Exact filenames beyond this level are deferred to requirements and implementatio
 ### 6.3 Scenario: Workflow Form Step
 
 1. Workflow runtime determines that the active step requires workflow-form interaction.
-2. Workflow runtime builds the per-panel payload for the active step using workflow-module configuration.
-   - JSON-backed option lists resolve source JSON files from selected-project-relative `sourcePathSegments`. Source path segments may use the existing lookup-only workflow-form interpolation from workflow/session values; runtime interpolates those segments before selected-root path resolution and validates unresolved placeholders, resolved path segments, selected-root containment, and workspace path policy before file read.
+2. Workflow runtime builds and finalizes the per-panel payload for the active step using workflow-module configuration, runtime-owned workflow/session state, and the canonical panel-rendering pipeline.
+   - Dynamic prompt/content interpolation and JSON-backed option lists are resolved during panel finalization. JSON-backed option lists resolve source JSON files from selected-project-relative `sourcePathSegments`. Source path segments may use lookup-only workflow-form interpolation from workflow/session values; runtime interpolates those segments before selected-root path resolution and validates unresolved placeholders, resolved path segments, selected-root containment, and workspace path policy before file read.
 3. Workflow form capability renders the payload and captures user input.
 4. Workflow runtime receives the result and applies any declared durable form values through the workflow-value persistence seam.
-5. Workflow runtime performs any runtime-owned deterministic procedures needed to evaluate workflow/session state and re-enters canonical next-action evaluation.
-6. If the selected next action is an action-owned tool-backed deterministic instruction, workflow runtime invokes that one instruction through the normal tool path.
-7. Workflow runtime applies the result to workflow session state and either:
+5. If the result completes the workflow form, workflow runtime emits `workflow_form_completed` and re-enters canonical next-action evaluation.
+6. If the result is a runtime-routed non-terminal panel submission, workflow runtime keeps the active workflow form session open, emits `workflow_form_panel_submitted`, and re-enters canonical next-action evaluation.
+7. Workflow runtime performs any runtime-owned deterministic procedures needed to evaluate workflow/session state.
+8. If the selected next action is `continue_workflow_form`, workflow runtime targets the existing active workflow form session, finalizes the target panel payload through the canonical panel-rendering pipeline, and returns that panel to the workflow form capability in the same UI form frame.
+9. If the selected next action is an action-owned tool-backed deterministic instruction, workflow runtime invokes that one instruction through the normal tool path.
+10. Workflow runtime applies the result to workflow session state and either:
    - keeps the workflow on the same step
    - advances the step
    - if a tool-backed deterministic operation failed, executes the retry procedure defined for the active workflow and step, and if that retry fails, surfaces a final user-visible error
@@ -516,6 +519,7 @@ That means:
 
 - workflow runtime decides when to invoke a workflow form
 - workflow form capability still renders/runs the form surface
+- workflow runtime owns same-session workflow form continuation, including route/action evaluation between panels and final panel payload construction
 - workflow runtime executes direct runtime-owned deterministic procedures inside `WorkflowRuntime` or shared runtime-owned seams
 - workflow runtime decides when deterministic tool execution should happen
 - the normal tool path still executes the tool
@@ -540,11 +544,11 @@ Handler-level path-policy checks remain required for tool boundaries, but they d
 
 ### 8.6b Shared Next-Action Consumption
 
-Returned workflow next actions are the canonical continuation of workflow execution. Activation, workflow value persistence, workflow progress requests, workflow-form submission, and tool-backed operation result handling must route their returned next action into one shared consumer.
+Returned workflow next actions are the canonical continuation of workflow execution. Activation, workflow value persistence, workflow progress requests, workflow-form submission, same-session workflow-form continuation, and tool-backed operation result handling must route their returned next action into one shared consumer.
 
 `Task` and `SubagentRunner` may provide context-specific adapters, but they must not interpret workflow branches independently.
 
-The consumer persists workflow metadata for model-driven handoff actions, renders workflow forms only in main-task contexts, rejects workflow-form rendering in child contexts, executes action-owned tool-backed instructions through the normal tool path for that context without resolving generic operation ids through a workflow-level registry, feeds tool results back into `WorkflowRuntime`, and continues evaluation until control is handed back, completed, or failed.
+The consumer persists workflow metadata for model-driven handoff actions, renders workflow forms only in main-task contexts, continues active workflow form sessions only in main-task contexts, rejects workflow-form rendering or continuation in child contexts, executes action-owned tool-backed instructions through the normal tool path for that context without resolving generic operation ids through a workflow-level registry, feeds tool results back into `WorkflowRuntime`, and continues evaluation until control is handed back, completed, or failed.
 
 ### 8.7 Persistence and Resume
 

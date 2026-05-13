@@ -30,6 +30,10 @@ Build a workflow module in this order:
 
 Do not start from code. The requirements must own the final behavior, especially prompt text, step progression, artifact behavior, and model-visible tool schemas.
 
+When a user-authored workflow source document provides prompt text, user-facing panel text, labels, button text, or other UI-visible wording, the module requirements must prescribe that exact verbiage. Do not summarize, paraphrase, condense, or reinterpret user-authored prompt or UI copy while drafting requirements or action plans. Runtime implementation may interpolate deterministic workflow values into the prescribed text, but the surrounding wording must remain the user-authored wording unless the user explicitly approves a rewrite.
+
+Do not invent UI-visible fields, labels, notices, helper text, descriptions, button labels, or prompt wording. If a runtime form, prompt builder, or schema needs UI-visible text that the source document does not provide, stop and ask the user to add or approve the missing wording before writing requirements, action-plan tasks, or code.
+
 ## Requirements Checklist
 
 Every module requirements document should explicitly govern these areas.
@@ -165,6 +169,8 @@ Use `jsonOptionsSource` when a `dropdown`, `radio_group`, `multi_select`, or `ch
 
 Use `selectorDiscovery` only for filesystem discovery. Do not repurpose it to read JSON index content or to derive options from index entries.
 
+For a confirmation-only panel that displays prescribed text and advances through a single click, use the panel's `promptMarkdown` for the user-authored message, set `fields: []`, set `allowedActions: ["submit"]`, and set the approved confirmation button text through `actionLabels.submit`. Do not add a `static_notice`, `markdown_display`, or other non-input field unless the source document explicitly provides that additional displayed text. A fieldless submit-only panel is valid and does not need filler content to render.
+
 ### Prerequisite Files
 
 If a module requires prerequisite files from the selected project before model-driven work can begin, declare them in `WorkflowDefinition.prerequisiteFiles` and invoke them with the runtime-owned `resolve_prerequisite_files` decision action.
@@ -238,6 +244,8 @@ Prompt builders may interpolate workflow values only through the runtime prompt 
 The prompt and tool schema must match. If the prompt says the AI may call a tool, that tool must be in the current step schema. If the schema does not include the tool, the prompt must not instruct or imply that it is available.
 
 Shared prompt fragments are acceptable only when the final generated prompt for each variant is reviewable and tested. Do not split prompt construction in a way that hides the final ordering or makes requirements hard to compare against runtime output.
+
+When the user-authored source document provides step prompt wording, `buildPromptSource(...)` must preserve that wording exactly except for deterministic workflow-value interpolation and explicitly approved runtime-only substitutions. Tests should protect that preservation by asserting the required authored prompt content for each variant rather than only broad semantic summaries.
 
 ### Tool Schema Ownership
 
