@@ -1,3 +1,4 @@
+import type { WorkflowFormPanelAction } from "@shared/ExtensionMessage"
 import { expect } from "chai"
 import { describe, it } from "mocha"
 import { WorkflowArtifactFamily } from "../../../artifactFamilies"
@@ -117,6 +118,17 @@ function buildToolBackedOperationEvent(
 			branchId,
 			routeId,
 		},
+	}
+}
+
+function buildStep2WorkflowFormPanelSubmittedEvent(panelId: string, action: WorkflowFormPanelAction): WorkflowBranchTriggerEvent {
+	return {
+		kind: "workflow_form_panel_submitted",
+		workflowFormId: "step-2-approach-form",
+		panelId,
+		action,
+		submittedValueKeys: [],
+		clearedValueKeys: [],
 	}
 }
 
@@ -369,9 +381,21 @@ describe("brainstormingWorkflowDefinition", () => {
 			"I want a random technique",
 			"I want you to suggest a technique",
 		])
+		const approachTransition = approachPanel?.transition
+		expect(approachTransition?.type).to.equal("runtime_routed")
+		if (approachTransition?.type !== "runtime_routed") {
+			throw new Error(`Expected runtime_routed transition, received ${approachTransition?.type ?? "undefined"}.`)
+		}
+		expect(approachTransition.staleValueKeysToClear).to.deep.equal([
+			"chosen_technique_id",
+			"random_technique_candidate",
+			"random_technique_rejected_ids",
+			"random_technique_confirmation",
+		])
 
 		const categoryPanel = approachForm?.panels["step-2-category-panel"]
 		expect(categoryPanel?.title).to.equal("Which category would you like to explore?")
+		expect(categoryPanel?.backDestinationPanelId).to.equal("step-2-approach-panel")
 		expect(categoryPanel?.fields[0]?.workflowValueKey).to.equal(undefined)
 		expect(categoryPanel?.fields[0]?.options?.map((option) => option.value)).to.deep.equal([
 			"Collaborative",
@@ -397,6 +421,7 @@ describe("brainstormingWorkflowDefinition", () => {
 		expect(randomPanel?.promptMarkdown).to.equal(
 			"Random Technique: {workflow.random_technique_candidate.name}\n\nAbout This Technique: {workflow.random_technique_candidate.description}\n\nReady to get started?",
 		)
+		expect(randomPanel?.transition.type).to.equal("runtime_routed")
 		expect(randomPanel?.fields[0]?.workflowValueKey).to.equal("random_technique_confirmation")
 		expect(randomPanel?.fields[0]?.options?.map((option) => option.value)).to.deep.equal(["confirm", "retry"])
 	})
@@ -409,24 +434,55 @@ describe("brainstormingWorkflowDefinition", () => {
 		expect(step2ActionKinds).not.to.include("project_prompt")
 	})
 
-	it("keeps random confirmation inside the Step 2 approach form route", () => {
+	it("continues random confirmation inside the Step 2 approach form session", () => {
 		const workflowFormIds = Object.keys(brainstormingWorkflowDefinition.workflowForms ?? {})
-		const renderRandomConfirmationAction = getAction(
+		const continueRandomConfirmationAction = getAction(
 			"step-2",
 			"step-2-after-random-selection",
-			"step-2-render-random-confirmation",
+			"step-2-continue-to-random-confirmation",
 		)
 
 		expect(workflowFormIds).to.include("step-2-approach-form")
 		expect(workflowFormIds).to.not.include("step-2-random-confirmation-form")
-		expect(renderRandomConfirmationAction).to.deep.include({
-			kind: "render_workflow_form",
+		expect(continueRandomConfirmationAction).to.deep.include({
+			kind: "continue_workflow_form",
 			workflowFormId: "step-2-approach-form",
-			startPanelId: "step-2-random-confirmation-panel",
+			panelId: "step-2-random-confirmation-panel",
 		})
 	})
 
+	it("does not re-render the Step 2 approach form at the random confirmation panel", () => {
+		const step2 = brainstormingWorkflowDefinition.steps["step-2"]
+		const rendersRandomConfirmationPanel = Object.values(step2.decisionTree.branches).some((branch) =>
+			branch.routes.some(
+				(route) =>
+					route.action.kind === "render_workflow_form" &&
+					route.action.workflowFormId === "step-2-approach-form" &&
+					"startPanelId" in route.action &&
+					route.action.startPanelId === "step-2-random-confirmation-panel",
+			),
+		)
+
+		expect(rendersRandomConfirmationPanel).to.equal(false)
+	})
+
 	it("implements Step 2 choose, suggest, and random routes without a random-selection tool", async () => {
+		const step2 = brainstormingWorkflowDefinition.steps["step-2"]
+		const chooseContinueRoute = findRoute("step-2", "step-2-after-approach-form", "step-2-continue-to-category-selection")
+		if (chooseContinueRoute.trigger.kind !== "event_predicate") {
+			throw new Error(`Expected event_predicate trigger, received ${chooseContinueRoute.trigger.kind}.`)
+		}
+		expect(
+			chooseContinueRoute.trigger.matches({
+				activeBranchId: "step-2-after-approach-form",
+				workflowValues: {
+					selected_approach: "I want to choose",
+				},
+				step: step2,
+				triggerEvent: buildStep2WorkflowFormPanelSubmittedEvent("step-2-approach-panel", "submit"),
+			}),
+		).to.equal(true)
+
 		const chooseAction = getAction("step-2", "step-2-after-approach-form", "step-2-persist-chosen-technique")
 		expect(chooseAction.kind).to.equal("run_deterministic_procedure")
 		if (chooseAction.kind !== "run_deterministic_procedure") {
@@ -473,7 +529,21 @@ describe("brainstormingWorkflowDefinition", () => {
 		expect(chosenDocument).to.include("# selected approach\n\nI want to choose")
 		expect(chosenDocument).to.include("# selected techniques\n\n- Five Whys: Drill into root causes.")
 
-		const suggestAction = getAction("step-2", "step-2-after-approach-form", "step-2-write-suggestion-placeholder")
+		const suggestRoute = findRoute("step-2", "step-2-after-approach-form", "step-2-write-suggestion-placeholder")
+		if (suggestRoute.trigger.kind !== "event_predicate") {
+			throw new Error(`Expected event_predicate trigger, received ${suggestRoute.trigger.kind}.`)
+		}
+		expect(
+			suggestRoute.trigger.matches({
+				activeBranchId: "step-2-after-approach-form",
+				workflowValues: {
+					selected_approach: "I want you to suggest a technique",
+				},
+				step: step2,
+				triggerEvent: buildStep2WorkflowFormPanelSubmittedEvent("step-2-approach-panel", "submit"),
+			}),
+		).to.equal(true)
+		const suggestAction = suggestRoute.action
 		expect(suggestAction.kind).to.equal("build_workflow_document")
 		if (suggestAction.kind !== "build_workflow_document") {
 			throw new Error(`Expected build_workflow_document, received ${suggestAction.kind}.`)
@@ -486,7 +556,21 @@ describe("brainstormingWorkflowDefinition", () => {
 		expect(suggestDocument).to.include("# selected approach\n\nI want you to suggest a technique")
 		expect(suggestDocument).to.include("# selected techniques\n\nuser requested technique suggestion")
 
-		const randomSelectionAction = getAction("step-2", "step-2-after-approach-form", "step-2-select-random-technique")
+		const randomSelectionRoute = findRoute("step-2", "step-2-after-approach-form", "step-2-select-random-technique")
+		if (randomSelectionRoute.trigger.kind !== "event_predicate") {
+			throw new Error(`Expected event_predicate trigger, received ${randomSelectionRoute.trigger.kind}.`)
+		}
+		expect(
+			randomSelectionRoute.trigger.matches({
+				activeBranchId: "step-2-after-approach-form",
+				workflowValues: {
+					selected_approach: "I want a random technique",
+				},
+				step: step2,
+				triggerEvent: buildStep2WorkflowFormPanelSubmittedEvent("step-2-approach-panel", "submit"),
+			}),
+		).to.equal(true)
+		const randomSelectionAction = randomSelectionRoute.action
 		expect(randomSelectionAction.kind).to.equal("run_deterministic_procedure")
 		if (randomSelectionAction.kind !== "run_deterministic_procedure") {
 			throw new Error(`Expected run_deterministic_procedure, received ${randomSelectionAction.kind}.`)
@@ -509,22 +593,25 @@ describe("brainstormingWorkflowDefinition", () => {
 			category: BRAINSTORMING_TECHNIQUES[0]?.category,
 		})
 
-		const renderRandomConfirmationAction = getAction(
-			"step-2",
-			"step-2-after-random-selection",
-			"step-2-render-random-confirmation",
-		)
-		expect(renderRandomConfirmationAction).to.deep.include({
-			kind: "render_workflow_form",
-			workflowFormId: "step-2-approach-form",
-			startPanelId: "step-2-random-confirmation-panel",
-		})
-
-		const randomConfirmAction = getAction(
+		const randomConfirmRoute = findRoute(
 			"step-2",
 			"step-2-after-random-confirmation-form",
 			"step-2-persist-confirmed-random-technique",
 		)
+		if (randomConfirmRoute.trigger.kind !== "event_predicate") {
+			throw new Error(`Expected event_predicate trigger, received ${randomConfirmRoute.trigger.kind}.`)
+		}
+		expect(
+			randomConfirmRoute.trigger.matches({
+				activeBranchId: "step-2-after-random-confirmation-form",
+				workflowValues: {
+					random_technique_confirmation: "confirm",
+				},
+				step: step2,
+				triggerEvent: buildStep2WorkflowFormPanelSubmittedEvent("step-2-random-confirmation-panel", "submit"),
+			}),
+		).to.equal(true)
+		const randomConfirmAction = randomConfirmRoute.action
 		expect(randomConfirmAction.kind).to.equal("run_deterministic_procedure")
 		if (randomConfirmAction.kind !== "run_deterministic_procedure") {
 			throw new Error(`Expected run_deterministic_procedure, received ${randomConfirmAction.kind}.`)
@@ -551,6 +638,21 @@ describe("brainstormingWorkflowDefinition", () => {
 				category: "Deep",
 			},
 		])
+
+		const randomRetryRoute = findRoute("step-2", "step-2-after-random-confirmation-form", "step-2-retry-random-technique")
+		if (randomRetryRoute.trigger.kind !== "event_predicate") {
+			throw new Error(`Expected event_predicate trigger, received ${randomRetryRoute.trigger.kind}.`)
+		}
+		expect(
+			randomRetryRoute.trigger.matches({
+				activeBranchId: "step-2-after-random-confirmation-form",
+				workflowValues: {
+					random_technique_confirmation: "retry",
+				},
+				step: step2,
+				triggerEvent: buildStep2WorkflowFormPanelSubmittedEvent("step-2-random-confirmation-panel", "submit"),
+			}),
+		).to.equal(true)
 	})
 
 	it("does not reference a random technique selector tool in Step 2 routes or Step 3 schemas", () => {

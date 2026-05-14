@@ -2,6 +2,7 @@ import type {
 	WorkflowFormDefinitionPayload,
 	WorkflowFormFieldDefinition,
 	WorkflowFormOptionDefinition,
+	WorkflowFormPanelAction,
 } from "@shared/ExtensionMessage"
 import { WorkflowArtifactFamily } from "../../artifactFamilies"
 import type {
@@ -10,6 +11,7 @@ import type {
 	WorkflowDecisionTree,
 	WorkflowDefinition,
 	WorkflowDeterministicProcedureResult,
+	WorkflowFormContinuationReplacementBuilder,
 	WorkflowPersonaDefinition,
 	WorkflowPromptBuilderInput,
 	WorkflowStepDefinition,
@@ -315,6 +317,43 @@ function workflowFormCompleted(workflowFormId: string): WorkflowDecisionBranchTr
 	}
 }
 
+function workflowFormPanelSubmitted(panelId: string, action: WorkflowFormPanelAction): WorkflowDecisionBranchTrigger {
+	return {
+		kind: "event_predicate",
+		matches: ({ triggerEvent }) =>
+			triggerEvent.kind === "workflow_form_panel_submitted" &&
+			triggerEvent.workflowFormId === STEP_2_APPROACH_FORM_ID &&
+			triggerEvent.panelId === panelId &&
+			triggerEvent.action === action,
+	}
+}
+
+function workflowFormPanelSubmittedWithApproach(approach: BrainstormingSelectedApproach): WorkflowDecisionBranchTrigger {
+	return {
+		kind: "event_predicate",
+		matches: ({ triggerEvent, workflowValues }) =>
+			triggerEvent.kind === "workflow_form_panel_submitted" &&
+			triggerEvent.workflowFormId === STEP_2_APPROACH_FORM_ID &&
+			triggerEvent.panelId === "step-2-approach-panel" &&
+			triggerEvent.action === "submit" &&
+			readSelectedApproach(workflowValues) === approach,
+	}
+}
+
+function workflowFormPanelSubmittedWithRandomConfirmation(
+	confirmation: BrainstormingRandomTechniqueConfirmation,
+): WorkflowDecisionBranchTrigger {
+	return {
+		kind: "event_predicate",
+		matches: ({ triggerEvent, workflowValues }) =>
+			triggerEvent.kind === "workflow_form_panel_submitted" &&
+			triggerEvent.workflowFormId === STEP_2_APPROACH_FORM_ID &&
+			triggerEvent.panelId === STEP_2_RANDOM_CONFIRMATION_PANEL_ID &&
+			triggerEvent.action === "submit" &&
+			readRandomTechniqueConfirmation(workflowValues) === confirmation,
+	}
+}
+
 function workflowFormCompletedWithApproach(
 	workflowFormId: string,
 	approach: BrainstormingSelectedApproach,
@@ -325,18 +364,6 @@ function workflowFormCompletedWithApproach(
 			triggerEvent.kind === "workflow_form_completed" &&
 			triggerEvent.workflowFormId === workflowFormId &&
 			readSelectedApproach(workflowValues) === approach,
-	}
-}
-
-function workflowFormCompletedWithRandomConfirmation(
-	confirmation: BrainstormingRandomTechniqueConfirmation,
-): WorkflowDecisionBranchTrigger {
-	return {
-		kind: "event_predicate",
-		matches: ({ triggerEvent, workflowValues }) =>
-			triggerEvent.kind === "workflow_form_completed" &&
-			triggerEvent.workflowFormId === STEP_2_APPROACH_FORM_ID &&
-			readRandomTechniqueConfirmation(workflowValues) === confirmation,
 	}
 }
 
@@ -497,23 +524,13 @@ function buildStep2ApproachWorkflowForm(): WorkflowFormDefinitionPayload {
 					submit: "Continue",
 				},
 				transition: {
-					type: "conditional",
-					conditionSourceKey: BrainstormingWorkflowValueKey.SelectedApproach,
-					branches: [
-						{
-							matchValue: BrainstormingSelectedApproach.Choose,
-							nextPanelId: "step-2-category-panel",
-						},
-						{
-							matchValue: BrainstormingSelectedApproach.Random,
-							terminal: true,
-						},
-						{
-							matchValue: BrainstormingSelectedApproach.Suggest,
-							terminal: true,
-						},
+					type: "runtime_routed",
+					staleValueKeysToClear: [
+						BrainstormingWorkflowValueKey.ChosenTechniqueId,
+						BrainstormingWorkflowValueKey.RandomTechniqueCandidate,
+						BrainstormingWorkflowValueKey.RandomTechniqueRejectedIds,
+						BrainstormingWorkflowValueKey.RandomTechniqueConfirmation,
 					],
-					defaultTerminal: true,
 				},
 			},
 			"step-2-category-panel": {
@@ -540,6 +557,7 @@ function buildStep2ApproachWorkflowForm(): WorkflowFormDefinitionPayload {
 					nextPanelId: "step-2-technique-panel",
 					staleValueKeysToClear: [BrainstormingWorkflowValueKey.ChosenTechniqueId],
 				},
+				backDestinationPanelId: "step-2-approach-panel",
 			},
 			"step-2-technique-panel": {
 				panelId: "step-2-technique-panel",
@@ -593,9 +611,25 @@ function buildStep2ApproachWorkflowForm(): WorkflowFormDefinitionPayload {
 				actionLabels: {
 					submit: "Continue",
 				},
-				transition: buildTerminalTransition(),
+				transition: {
+					type: "runtime_routed",
+				},
 			},
 		},
+	}
+}
+
+function buildStep2ContinuationReplacementBuilder(panelId: string): WorkflowFormContinuationReplacementBuilder {
+	return () => {
+		const panel = buildStep2ApproachWorkflowForm().panels[panelId]
+		if (panel === undefined) {
+			throw new Error(`Brainstorming Step 2 workflow form is missing requested continuation panel ${panelId}.`)
+		}
+
+		return {
+			panel,
+			data: {},
+		}
 	}
 }
 
@@ -954,6 +988,17 @@ function buildStep2DecisionTree(): WorkflowDecisionTree {
 				id: "step-2-after-approach-form",
 				routes: [
 					{
+						id: "step-2-continue-to-category-selection",
+						trigger: workflowFormPanelSubmittedWithApproach(BrainstormingSelectedApproach.Choose),
+						action: {
+							kind: "continue_workflow_form",
+							workflowFormId: STEP_2_APPROACH_FORM_ID,
+							panelId: "step-2-category-panel",
+							buildReplacement: buildStep2ContinuationReplacementBuilder("step-2-category-panel"),
+						},
+						followingBranchId: "step-2-after-approach-form",
+					},
+					{
 						id: "step-2-persist-chosen-technique",
 						trigger: workflowFormCompletedWithApproach(STEP_2_APPROACH_FORM_ID, BrainstormingSelectedApproach.Choose),
 						action: {
@@ -966,10 +1011,7 @@ function buildStep2DecisionTree(): WorkflowDecisionTree {
 					},
 					{
 						id: "step-2-write-suggestion-placeholder",
-						trigger: workflowFormCompletedWithApproach(
-							STEP_2_APPROACH_FORM_ID,
-							BrainstormingSelectedApproach.Suggest,
-						),
+						trigger: workflowFormPanelSubmittedWithApproach(BrainstormingSelectedApproach.Suggest),
 						action: {
 							kind: "build_workflow_document",
 							instruction: {
@@ -981,14 +1023,7 @@ function buildStep2DecisionTree(): WorkflowDecisionTree {
 					},
 					{
 						id: "step-2-select-random-technique",
-						trigger: {
-							kind: "event_predicate",
-							matches: ({ triggerEvent, workflowValues }) =>
-								triggerEvent.kind === "workflow_form_completed" &&
-								triggerEvent.workflowFormId === STEP_2_APPROACH_FORM_ID &&
-								readSelectedApproach(workflowValues) === BrainstormingSelectedApproach.Random &&
-								readRandomTechniqueCandidate(workflowValues) === undefined,
-						},
+						trigger: workflowFormPanelSubmittedWithApproach(BrainstormingSelectedApproach.Random),
 						action: {
 							kind: "run_deterministic_procedure",
 							instruction: {
@@ -1044,7 +1079,7 @@ function buildStep2DecisionTree(): WorkflowDecisionTree {
 				id: "step-2-after-random-selection",
 				routes: [
 					{
-						id: "step-2-render-random-confirmation",
+						id: "step-2-continue-to-random-confirmation",
 						trigger: {
 							kind: "session_predicate",
 							matches: ({ workflowValues }) =>
@@ -1053,9 +1088,10 @@ function buildStep2DecisionTree(): WorkflowDecisionTree {
 								readRandomTechniqueConfirmation(workflowValues) === undefined,
 						},
 						action: {
-							kind: "render_workflow_form",
+							kind: "continue_workflow_form",
 							workflowFormId: STEP_2_APPROACH_FORM_ID,
-							startPanelId: STEP_2_RANDOM_CONFIRMATION_PANEL_ID,
+							panelId: STEP_2_RANDOM_CONFIRMATION_PANEL_ID,
+							buildReplacement: buildStep2ContinuationReplacementBuilder(STEP_2_RANDOM_CONFIRMATION_PANEL_ID),
 						},
 						followingBranchId: "step-2-after-random-confirmation-form",
 					},
@@ -1066,7 +1102,9 @@ function buildStep2DecisionTree(): WorkflowDecisionTree {
 				routes: [
 					{
 						id: "step-2-persist-confirmed-random-technique",
-						trigger: workflowFormCompletedWithRandomConfirmation(BrainstormingRandomTechniqueConfirmation.Confirm),
+						trigger: workflowFormPanelSubmittedWithRandomConfirmation(
+							BrainstormingRandomTechniqueConfirmation.Confirm,
+						),
 						action: {
 							kind: "run_deterministic_procedure",
 							instruction: {
@@ -1077,7 +1115,7 @@ function buildStep2DecisionTree(): WorkflowDecisionTree {
 					},
 					{
 						id: "step-2-retry-random-technique",
-						trigger: workflowFormCompletedWithRandomConfirmation(BrainstormingRandomTechniqueConfirmation.Retry),
+						trigger: workflowFormPanelSubmittedWithRandomConfirmation(BrainstormingRandomTechniqueConfirmation.Retry),
 						action: {
 							kind: "run_deterministic_procedure",
 							instruction: {

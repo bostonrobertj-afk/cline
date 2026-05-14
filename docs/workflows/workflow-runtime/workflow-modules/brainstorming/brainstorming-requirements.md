@@ -139,13 +139,13 @@ The selected value must persist to `selected_approach` and must be written under
 
 If `selected_approach` is `I want to choose`, the same Step 2 workflow form must continue to category and technique selection panels. The category panel title must be `Which category would you like to explore?` and must use a single dropdown with exactly these categories: `Collaborative`, `Creative`, `Deep`, `Introspective Delight`, `Structured`, `Theatrical`, `Wild`, `Biomimetic`, `Quantum`, and `Cultural`. The technique panel title must be `Which technique would you like?` and must use a single dropdown populated from the selected category. Back navigation must clear stale technique selection and refresh options for the newly selected category.
 
-If `selected_approach` is `I want a random technique`, the Step 2 decision tree must run the deterministic random-selection procedure. When that procedure succeeds, it must persist the selected candidate technique to `random_technique_candidate`, update any retry/exclusion state in `random_technique_rejected_ids`, and re-enter Step 2 next-action evaluation.
+If `selected_approach` is `I want a random technique`, the Step 2 approach panel submission must be `runtime_routed`. After that panel submission, the Step 2 decision tree must run the deterministic random-selection procedure. When that procedure succeeds, it must persist the selected candidate technique to `random_technique_candidate`, update any retry/exclusion state in `random_technique_rejected_ids`, and re-enter Step 2 next-action evaluation.
 
-After a random candidate exists, Step 2 must render a workflow form panel showing `Random Technique: {technique name}`, `About This Technique: {technique description}`, and `Ready to get started?`. The panel must collect a required `random_technique_confirmation` value with confirm/retry choices.
+After a random candidate exists, Step 2 must use `continue_workflow_form` to continue the active `step-2-approach-form` session to `step-2-random-confirmation-panel`, showing `Random Technique: {technique name}`, `About This Technique: {technique description}`, and `Ready to get started?`. The panel must collect a required `random_technique_confirmation` value with confirm/retry choices.
 
 If the user confirms the random candidate, Step 2 must persist the candidate into `selected_techniques`, write the selected technique name and description under the `selected techniques` heading in `brainstorming.md`, and then transition to Step 3.
 
-If the user requests another random technique, Step 2 must re-run the deterministic random-selection procedure. The procedure must avoid immediately presenting the same rejected candidate again when another eligible technique exists.
+If the user requests another random technique, retry submission from the random confirmation panel must be `runtime_routed`, Step 2 must re-run the deterministic random-selection procedure, and Step 2 must continue the same active `step-2-approach-form` session back to `step-2-random-confirmation-panel`. The procedure must avoid immediately presenting the same rejected candidate again when another eligible technique exists.
 
 If `selected_approach` is `I want you to suggest a technique`, Step 2 must write `user requested technique suggestion` under the `selected techniques` heading.
 
