@@ -291,9 +291,11 @@ Step 2 must not expose `story_notes_update`, `story_testing_complete`, `set_work
 
 The Step 2 progression rule is: all tasks and subtasks are marked as complete in the story file.
 
-After any successful model-called `story_task_complete`, the workflow must re-read the target story document and evaluate the `## Tasks` completion state.
+After any successful model-called `story_task_complete`, the workflow must evaluate the updated `## Tasks` completion state.
 
-If incomplete tasks remain, Step 2 must remain active and the AI agent must receive the next current incomplete task and its subtasks. This may be delivered through the `story_task_complete` tool result and through later Step 2 prompt projection.
+If the completed item does not complete its parent task, Step 2 must remain active and runtime must not automatically provide task detail again. The model may use `request_task_detail` if it needs task detail re-sent.
+
+If the completed item completes its parent task and incomplete tasks remain, Step 2 must remain active and runtime must provide only the next unlocked task and that task's subtasks. This next-task rendering must use the same task-detail formatter as `story_task_reminder`, and runtime must not resend the full Step 2 prompt.
 
 If all tasks and subtasks are complete, Step 2 must transition to Step 3.
 
@@ -324,26 +326,27 @@ The current incomplete task detail must include:
 
 `story_task_reminder` must return a model-visible tool failure and must not mutate the story file if no active dev-story workflow session exists, if `target_story` is missing, if `## Tasks` is missing, if task IDs cannot be parsed, or if there is no incomplete task. The tool failure must identify the failed operation as `story_task_reminder` and include the relevant missing workflow value, story path, task parsing reason, or all-complete state.
 
-`story_task_reminder` is the shared implementation source for current task detail. The AI-facing Step 2 detail request surface is `request_task_detail`.
+`story_task_reminder` is the canonical implementation source for Step 2 current-task detail. Initial Step 2 current-task rendering, next-task rendering after parent task completion, and `request_task_detail` must use the same task-detail formatting behavior. `story_task_complete` must not return current-task detail or next-task detail.
 
 ### `story_task_complete`
 
 `story_task_complete` must be AI-callable in Step 2.
 
-`story_task_complete` must accept:
+`story_task_complete` must use this model-facing schema:
 
-- required `storyTaskId`, a string task ID from the story document
-- optional `storySubtaskId`, a string subtask ID from the story document
+| Parameter | Required | Type | Description |
+| --- | --- | --- | --- |
+| `storyItemId` | yes | string | A task ID or subtask ID from the target story document. |
 
-When `storySubtaskId` is provided, `story_task_complete` must check only that subtask in the target story document.
+When `storyItemId` identifies a subtask, `story_task_complete` must check that subtask in the target story document.
 
 When all subtasks under a task are checked complete, `story_task_complete` must automatically check the parent task complete.
 
-When `storySubtaskId` is omitted, `story_task_complete` may check the parent task only if that task has no subtasks or all subtasks under that task are already checked complete. It must reject direct parent completion while any subtask under that task remains incomplete.
+When `storyItemId` identifies a parent task, `story_task_complete` may check the parent task only if that task has no subtasks or all subtasks under that task are already checked complete. It must reject parent task completion while any subtask under that task remains incomplete.
 
-After a successful update, `story_task_complete` must return a result that identifies what was completed and whether all story tasks are complete.
+After a successful update, `story_task_complete` must return progress metadata only: the completed story item ID, whether the completed item was a task or subtask, the parent task ID when the completed item was a subtask, whether the parent task is complete after the update, and whether all story tasks are complete.
 
-If incomplete tasks remain and the completed item caused a new task to unlock, `story_task_complete` must return the next incomplete task detail using the same format as `story_task_reminder`.
+`story_task_complete` must not return raw task text, raw subtask text, current task detail, next task detail, story frontmatter, or allowed-file content.
 
 `story_task_complete` must write only to `target_story`, must satisfy the existing file-write approval and hook seams, and must invalidate file cache for the target story after a successful write.
 
@@ -639,7 +642,9 @@ The dev-story module build must add focused tests for:
 - Step 2 prompt source shape, including non-empty story frontmatter rendering and non-empty current task rendering
 - Step 2 tool schema names and forbidden tool absence
 - `story_task_reminder`, `story_task_complete`, `request_task_detail`, and `show_incomplete_tasks` handler behavior
-- `story_task_complete` completing subtasks, auto-completing parent tasks, rejecting invalid direct parent completion, and reporting all-complete state
+- `story_task_complete` completing subtasks by `storyItemId`, completing eligible parent tasks by `storyItemId`, auto-completing parent tasks, rejecting parent task completion while subtasks remain incomplete, reporting parent/all-complete status, and not returning task-detail content
+- Step 2 staying active without automatic task-detail projection when the current parent task remains incomplete
+- Step 2 rendering only the next unlocked task and that task's subtasks after the current parent task becomes complete and more incomplete tasks remain, without resending the full Step 2 prompt
 - Step 2 transition to Step 3 only after all tasks and subtasks are complete in the story file
 - Step 3 prompt source shape and `attempt_completion` exposure
 - Step 3 explicit `attempt_completion_succeeded` route to Step 4

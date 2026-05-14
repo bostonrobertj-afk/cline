@@ -131,7 +131,7 @@ Allowed files:
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/shared/tools.ts`
 
-[ ] Subtask 2.3. In `assistant-message/index.ts`, add parser parameter names for `storyTaskId` and `storySubtaskId`.
+[ ] Subtask 2.3. In `assistant-message/index.ts`, add parser parameter names for `storyItemId` and `storyTaskId`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/assistant-message/index.ts`
@@ -166,12 +166,12 @@ Allowed files:
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/StoryTaskCompleteToolHandler.ts`
 
-[ ] Subtask 3.4. In `StoryTaskCompleteToolHandler.ts`, accept required `storyTaskId` and optional `storySubtaskId`, update only the selected story file, auto-check the parent task when all subtasks are complete, reject direct parent completion while child subtasks remain incomplete, and invalidate the file cache after a successful write.
+[ ] Subtask 3.4. In `StoryTaskCompleteToolHandler.ts`, accept required `storyItemId`, resolve whether it identifies a task or subtask from the parsed `## Tasks` story structure, update only the selected story file, auto-check the parent task when all subtasks are complete, reject parent task completion while child subtasks remain incomplete, invalidate the file cache after a successful write, and return progress metadata only: completed story item ID, completed item kind, parent task ID when applicable, parent-complete status, and all-story-tasks-complete status.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/StoryTaskCompleteToolHandler.ts`
 
-[ ] Subtask 3.5. In `StoryTaskCompleteToolHandler.ts`, after a successful completion update, call `workflowRuntime.resolveNextAction(...)` and queue the next workflow action when the dev-story workflow has progressed.
+[ ] Subtask 3.5. In `StoryTaskCompleteToolHandler.ts`, do not return raw task text, raw subtask text, current task detail, next task detail, story frontmatter, or allowed-file content. After successful completion, trigger workflow progression only when the completed item makes the parent task complete or when all story tasks are complete; do not trigger automatic Step 2 task-detail projection when the parent task remains incomplete.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/StoryTaskCompleteToolHandler.ts`
@@ -191,7 +191,7 @@ Allowed files:
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/ToolExecutorCoordinator.ts`
 
-[ ] Subtask 3.9. In `DevStoryStoryTools.test.ts`, replace legacy story-tool tests with handler tests for `story_task_reminder`, `story_task_complete`, `request_task_detail`, and `show_incomplete_tasks` using `target_story` workflow values and `## Tasks` documents.
+[ ] Subtask 3.9. In `DevStoryStoryTools.test.ts`, replace legacy story-tool tests with handler tests for `story_task_reminder`, `story_task_complete`, `request_task_detail`, and `show_incomplete_tasks` using `target_story` workflow values and `## Tasks` documents. The `story_task_complete` tests must assert `storyItemId` handling for subtasks and eligible parent tasks, progress metadata, parent auto-completion, all-complete reporting, invalid parent completion rejection, and absence of raw task/subtask detail in the tool result.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/DevStoryStoryTools.test.ts`
@@ -412,7 +412,7 @@ Allowed files:
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/dev-story/devStoryWorkflow.ts`
 
-[ ] Subtask 7.7. In `devStoryWorkflow.ts`, implement Step 2 as model-driven `project_prompt` using the exact approved Step 2 prompt text from `dev-story-requirements.md`, with deterministic workflow-value interpolation for story frontmatter and current incomplete task rendering, and route successful task completion to Step 3 only after all tasks and subtasks are complete in the story file.
+[ ] Subtask 7.7. In `devStoryWorkflow.ts`, implement Step 2 as model-driven `project_prompt` using the exact approved Step 2 prompt text from `dev-story-requirements.md`, with deterministic workflow-value interpolation for story frontmatter and current task rendering from the same formatter used by `story_task_reminder`. Route successful `story_task_complete` events as follows: no prompt re-projection when the parent task remains incomplete; when the parent task becomes complete and incomplete tasks remain, render only the next unlocked task and that task's subtasks using the `story_task_reminder` formatter without resending the full Step 2 prompt; transition to Step 3 only after all tasks and subtasks are complete in the story file.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/dev-story/devStoryWorkflow.ts`
@@ -437,7 +437,7 @@ Allowed files:
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/dev-story/devStoryWorkflow.ts`
 
-[ ] Subtask 7.12. Create `devStoryToolSchemas.ts` so Step 1 and Step 4 expose empty model-facing schemas; Step 2 exposes exactly `read_file`, `read_file_range`, `list_files`, `search_files`, `list_code_definition_names`, `apply_patch`, `execute_command`, `story_task_complete`, `request_task_detail`, `show_incomplete_tasks`, `ask_followup_question`, and `send_user_message`; Step 2 `story_task_complete` requires string `storyTaskId` and accepts optional string `storySubtaskId`; Step 2 `request_task_detail` requires string `storyTaskId`; Step 2 `show_incomplete_tasks` has no parameters; and Step 3 exposes exactly `read_file`, `read_file_range`, `list_files`, `search_files`, `ask_followup_question`, `send_user_message`, and `attempt_completion`.
+[ ] Subtask 7.12. Create `devStoryToolSchemas.ts` so Step 1 and Step 4 expose empty model-facing schemas; Step 2 exposes exactly `read_file`, `read_file_range`, `list_files`, `search_files`, `list_code_definition_names`, `apply_patch`, `execute_command`, `story_task_complete`, `request_task_detail`, `show_incomplete_tasks`, `ask_followup_question`, and `send_user_message`; Step 2 `story_task_complete` requires string `storyItemId` whose description states that it may identify a task or subtask from the target story document; Step 2 `request_task_detail` requires string `storyTaskId`; Step 2 `show_incomplete_tasks` has no parameters; and Step 3 exposes exactly `read_file`, `read_file_range`, `list_files`, `search_files`, `ask_followup_question`, `send_user_message`, and `attempt_completion`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/dev-story/devStoryToolSchemas.ts`
@@ -465,7 +465,7 @@ Allowed files:
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRegistry.ts`
 
-[ ] Subtask 8.2. Create `devStoryWorkflow.test.ts` covering workflow identity, entry panel description shape, registry resolution by `dev-story`, registry rejection of `dev-story.md`, prerequisite declaration, value inventory, Step 1 setup routes, story metadata derivation, Step 2 progression, Step 3 completion route, Step 4 move/status/git/final-form routes, Panel A/B field shapes, and terminal-error routing.
+[ ] Subtask 8.2. Create `devStoryWorkflow.test.ts` covering workflow identity, entry panel description shape, registry resolution by `dev-story`, registry rejection of `dev-story.md`, prerequisite declaration, value inventory, Step 1 setup routes, story metadata derivation, Step 2 progression, Step 3 completion route, Step 4 move/status/git/final-form routes, Panel A/B field shapes, and terminal-error routing. Include Step 2 routing tests proving ordinary subtask completion that leaves the parent incomplete does not project task detail, parent completion with remaining tasks renders only the next unlocked task and that task's subtasks without asserting exact prompt prose or resending the full Step 2 prompt, and all-complete state transitions to Step 3.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/dev-story/__tests__/devStoryWorkflow.test.ts`
