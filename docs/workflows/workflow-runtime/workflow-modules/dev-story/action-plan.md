@@ -200,7 +200,7 @@ Allowed files:
 
 After completing this phase, pause for QA review before moving to Phase 3.
 
-[ ] Task 4. Delete retired story tool handlers and remove their executor wiring.
+[x] Task 4. Delete retired story tool handlers and remove their executor wiring.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/shared/tools.ts`
@@ -211,42 +211,42 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/response/ResponseToolRegistry.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/DevStoryStoryTools.test.ts`
 
-[ ] Subtask 4.1. Delete `StoryNotesUpdateToolHandler.ts`.
+[x] Subtask 4.1. Delete `StoryNotesUpdateToolHandler.ts`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/StoryNotesUpdateToolHandler.ts`
 
-[ ] Subtask 4.2. Delete `StoryTestingCompleteToolHandler.ts`.
+[x] Subtask 4.2. Delete `StoryTestingCompleteToolHandler.ts`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/StoryTestingCompleteToolHandler.ts`
 
-[ ] Subtask 4.3. In `ToolExecutorCoordinator.ts`, remove imports and registration branches for `StoryNotesUpdateToolHandler` and `StoryTestingCompleteToolHandler`.
+[x] Subtask 4.3. In `ToolExecutorCoordinator.ts`, remove imports and registration branches for `StoryNotesUpdateToolHandler` and `StoryTestingCompleteToolHandler`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/ToolExecutorCoordinator.ts`
 
-[ ] Subtask 4.4. In `tools.ts`, remove `ClineDefaultTool.STORY_NOTES_UPDATE` and `ClineDefaultTool.STORY_TESTING_COMPLETE`.
+[x] Subtask 4.4. In `tools.ts`, remove `ClineDefaultTool.STORY_NOTES_UPDATE` and `ClineDefaultTool.STORY_TESTING_COMPLETE`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/shared/tools.ts`
 
-[ ] Subtask 4.5. In `ResponseToolRegistry.ts`, delete the registry entries for `story_notes_update` and `story_testing_complete`.
+[x] Subtask 4.5. In `ResponseToolRegistry.ts`, delete the registry entries for `story_notes_update` and `story_testing_complete`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/response/ResponseToolRegistry.ts`
 
-[ ] Subtask 4.6. In `storyTaskDocument.ts`, delete exactly these retired exports after `StoryNotesUpdateToolHandler.ts` and `StoryTestingCompleteToolHandler.ts` are deleted: `StoryNotesSectionHeading`, `appendStorySectionEntry`, and `markStoryStatusReview`. Do not delete `StoryTaskPromptPayload`, `buildCurrentStoryTaskPrompt`, `buildTestingRequirementsPrompt`, or `buildDevStoryWorkflowStartPrompt` in this subtask.
+[x] Subtask 4.6. In `storyTaskDocument.ts`, delete exactly these retired exports after `StoryNotesUpdateToolHandler.ts` and `StoryTestingCompleteToolHandler.ts` are deleted: `StoryNotesSectionHeading`, `appendStorySectionEntry`, and `markStoryStatusReview`. Do not delete `StoryTaskPromptPayload`, `buildCurrentStoryTaskPrompt`, `buildTestingRequirementsPrompt`, or `buildDevStoryWorkflowStartPrompt` in this subtask.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/story-tools/storyTaskDocument.ts`
 
-[ ] Subtask 4.7. In `DevStoryStoryTools.test.ts`, add negative coverage proving retired `story_notes_update` and `story_testing_complete` handlers are no longer registered. Because the enum members are deleted in this phase, tests must use the string literals `"story_notes_update"` and `"story_testing_complete"` instead of `ClineDefaultTool` enum references. Do not construct `ToolUse` objects for retired tool names because `ToolUse.name` is typed as `ClineDefaultTool`; use only string-compatible lookup APIs such as `ToolExecutorCoordinator.getHandler(...)` or `ToolExecutorCoordinator.has(...)`.
+[x] Subtask 4.7. In `DevStoryStoryTools.test.ts`, add negative coverage proving retired `story_notes_update` and `story_testing_complete` handlers are no longer registered. Because the enum members are deleted in this phase, tests must use the string literals `"story_notes_update"` and `"story_testing_complete"` instead of `ClineDefaultTool` enum references. Do not construct `ToolUse` objects for retired tool names because `ToolUse.name` is typed as `ClineDefaultTool`; use only string-compatible lookup APIs such as `ToolExecutorCoordinator.getHandler(...)` or `ToolExecutorCoordinator.has(...)`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/DevStoryStoryTools.test.ts`
 
-[ ] Task 5. Remove retired story prompt-state fields from runtime state and persisted metadata.
+[x] Task 5. Remove retired story prompt-state fields from runtime state and persisted metadata.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/TaskState.ts`
@@ -256,37 +256,37 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
 
-[ ] Subtask 5.1. In `TaskState.ts`, delete `activeStoryTaskId`, `activeStorySubtaskIds`, and `lastPromptedStoryTaskKey`.
+[x] Subtask 5.1. In `TaskState.ts`, delete `activeStoryTaskId`, `activeStorySubtaskIds`, and `lastPromptedStoryTaskKey`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/TaskState.ts`
 
-[ ] Subtask 5.2. In `ContextTrackerTypes.ts`, delete `activeStoryTaskId`, `activeStorySubtaskIds`, and `lastPromptedStoryTaskKey` from persisted task metadata types.
+[x] Subtask 5.2. In `ContextTrackerTypes.ts`, delete `activeStoryTaskId`, `activeStorySubtaskIds`, and `lastPromptedStoryTaskKey` from persisted task metadata types.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/context/context-tracking/ContextTrackerTypes.ts`
 
-[ ] Subtask 5.3. In `index.ts`, remove metadata persist/restore handling for `activeStoryTaskId`, `activeStorySubtaskIds`, and `lastPromptedStoryTaskKey`.
+[x] Subtask 5.3. In `index.ts`, remove metadata persist/restore handling for `activeStoryTaskId`, `activeStorySubtaskIds`, and `lastPromptedStoryTaskKey`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
 
-[ ] Subtask 5.4. In `index.ts`, delete `persistActiveStoryTaskPromptState(...)` and its call sites.
+[x] Subtask 5.4. In `index.ts`, delete `persistActiveStoryTaskPromptState(...)` and its call sites.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/index.ts`
 
-[ ] Subtask 5.5. In `SubagentRunner.ts`, remove cleanup references to `lastPromptedStoryTaskKey`.
+[x] Subtask 5.5. In `SubagentRunner.ts`, remove cleanup references to `lastPromptedStoryTaskKey`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/SubagentRunner.ts`
 
-[ ] Subtask 5.6. In `workflow-runtime-metadata.test.ts`, remove expectations for persisted `activeStoryTaskId`, `activeStorySubtaskIds`, and `lastPromptedStoryTaskKey`, and add negative assertions that restored metadata no longer owns those keys.
+[x] Subtask 5.6. In `workflow-runtime-metadata.test.ts`, remove expectations for persisted `activeStoryTaskId`, `activeStorySubtaskIds`, and `lastPromptedStoryTaskKey`, and add negative assertions that restored metadata no longer owns those keys.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
 
-[ ] Subtask 5.7. In `SubagentRunner.test.ts`, remove expectations that subagent cleanup mutates `lastPromptedStoryTaskKey`.
+[x] Subtask 5.7. In `SubagentRunner.test.ts`, remove expectations that subagent cleanup mutates `lastPromptedStoryTaskKey`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`

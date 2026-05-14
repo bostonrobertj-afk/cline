@@ -1323,9 +1323,6 @@ export class Task {
 			const taskMetadata = await getTaskMetadata(this.taskId)
 			taskMetadata.activeWorkflowName = this.taskState.activeWorkflowName
 			taskMetadata.activeWorkflowSession = this.workflowRuntime.getPersistedSession({ taskState: this.taskState })
-			taskMetadata.activeStoryTaskId = this.taskState.activeStoryTaskId
-			taskMetadata.activeStorySubtaskIds = this.taskState.activeStorySubtaskIds
-			taskMetadata.lastPromptedStoryTaskKey = this.taskState.lastPromptedStoryTaskKey
 			removeLegacyWorkflowRuntimeMetadata(taskMetadata)
 			await saveTaskMetadata(this.taskId, taskMetadata)
 		} catch {
@@ -1788,12 +1785,6 @@ export class Task {
 		return isGPT5ModelFamily(providerInfo.model.id)
 	}
 
-	private restoreActiveStoryPromptStateFromMetadata(metadata: TaskMetadata): void {
-		this.taskState.activeStoryTaskId = metadata.activeStoryTaskId
-		this.taskState.activeStorySubtaskIds = metadata.activeStorySubtaskIds ?? []
-		this.taskState.lastPromptedStoryTaskKey = metadata.lastPromptedStoryTaskKey
-	}
-
 	private async restoreWorkflowRuntimeStateFromMetadata(metadata: TaskMetadata): Promise<void> {
 		this.taskState.activeWorkflowName = metadata.activeWorkflowName
 		const restoreResult = await this.workflowRuntime.restorePersistedSession({
@@ -1819,28 +1810,6 @@ export class Task {
 			removeLegacyWorkflowRuntimeMetadata(metadata)
 			await saveTaskMetadata(this.taskId, metadata)
 		}
-	}
-
-	private async persistActiveStoryTaskPromptState(): Promise<void> {
-		try {
-			const metadata = await getTaskMetadata(this.taskId)
-			metadata.activeStoryTaskId = this.taskState.activeStoryTaskId
-			metadata.activeStorySubtaskIds = this.taskState.activeStorySubtaskIds
-			metadata.lastPromptedStoryTaskKey = this.taskState.lastPromptedStoryTaskKey
-			removeLegacyWorkflowRuntimeMetadata(metadata)
-			await saveTaskMetadata(this.taskId, metadata)
-		} catch {
-			// Non-fatal: the in-memory story-task prompt state remains canonical for the active turn.
-		}
-	}
-
-	private async clearLastPromptedStoryTaskKeyForContextCompaction(): Promise<void> {
-		if (this.taskState.lastPromptedStoryTaskKey === undefined) {
-			return
-		}
-
-		this.taskState.lastPromptedStoryTaskKey = undefined
-		await this.persistActiveStoryTaskPromptState()
 	}
 
 	/**
@@ -2128,7 +2097,6 @@ export class Task {
 		this.taskState.abandoned = false
 		try {
 			const metadata = await getTaskMetadata(this.taskId)
-			this.restoreActiveStoryPromptStateFromMetadata(metadata)
 			await this.restoreWorkflowRuntimeStateFromMetadata(metadata)
 		} catch {
 			// Non-fatal: tasks without metadata should still resume normally.
@@ -2838,7 +2806,6 @@ export class Task {
 		)
 
 		this.taskState.conversationHistoryDeletedRange = newDeletedRange
-		await this.clearLastPromptedStoryTaskKeyForContextCompaction()
 
 		await this.messageStateHandler.saveClineMessagesAndUpdateHistory()
 		await this.contextManager.triggerApplyStandardContextTruncationNoticeChange(
@@ -3029,7 +2996,6 @@ export class Task {
 
 		if (contextManagementMetadata.updatedConversationHistoryDeletedRange) {
 			this.taskState.conversationHistoryDeletedRange = contextManagementMetadata.conversationHistoryDeletedRange
-			await this.clearLastPromptedStoryTaskKeyForContextCompaction()
 			await this.messageStateHandler.saveClineMessagesAndUpdateHistory()
 			// saves task history item which we use to keep track of conversation history deleted range
 		}
@@ -3577,7 +3543,6 @@ export class Task {
 					const safeEnd = Math.min(end + 2, apiHistory.length - 1)
 					if (end + 2 <= safeEnd) {
 						this.taskState.conversationHistoryDeletedRange = [start, end + 2]
-						await this.clearLastPromptedStoryTaskKeyForContextCompaction()
 						await this.messageStateHandler.saveClineMessagesAndUpdateHistory()
 					}
 				}
@@ -4009,10 +3974,6 @@ export class Task {
 						}
 						case "response_id": {
 							responseId = chunk.id
-							break
-						}
-						case "context_compacted": {
-							await this.clearLastPromptedStoryTaskKeyForContextCompaction()
 							break
 						}
 					}

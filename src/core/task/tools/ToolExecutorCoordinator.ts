@@ -35,10 +35,8 @@ import { SearchFilesToolHandler } from "./handlers/SearchFilesToolHandler"
 import { SendUserMessageHandler } from "./handlers/SendUserMessageHandler"
 import { SetWorkflowValuesToolHandler } from "./handlers/SetWorkflowValuesToolHandler"
 import { ShowIncompleteTasksToolHandler } from "./handlers/ShowIncompleteTasksToolHandler"
-import { StoryNotesUpdateToolHandler } from "./handlers/StoryNotesUpdateToolHandler"
 import { StoryTaskCompleteToolHandler } from "./handlers/StoryTaskCompleteToolHandler"
 import { StoryTaskReminderToolHandler } from "./handlers/StoryTaskReminderToolHandler"
-import { StoryTestingCompleteToolHandler } from "./handlers/StoryTestingCompleteToolHandler"
 import { UseSubagentsToolHandler } from "./handlers/SubagentToolHandler"
 import { SummarizeTaskHandler } from "./handlers/SummarizeTaskHandler"
 import { UpdateStoryIndexStatusToolHandler } from "./handlers/UpdateStoryIndexStatusToolHandler"
@@ -150,8 +148,6 @@ export class ToolExecutorCoordinator {
 		[ClineDefaultTool.STORY_TASK_COMPLETE]: (_v: ToolValidator) => new StoryTaskCompleteToolHandler(),
 		[ClineDefaultTool.REQUEST_TASK_DETAIL]: (_v: ToolValidator) => new RequestTaskDetailToolHandler(),
 		[ClineDefaultTool.SHOW_INCOMPLETE_TASKS]: (_v: ToolValidator) => new ShowIncompleteTasksToolHandler(),
-		[ClineDefaultTool.STORY_NOTES_UPDATE]: (_v: ToolValidator) => new StoryNotesUpdateToolHandler(),
-		[ClineDefaultTool.STORY_TESTING_COMPLETE]: (_v: ToolValidator) => new StoryTestingCompleteToolHandler(),
 		[ClineDefaultTool.USE_SUBAGENTS]: (_v: ToolValidator) => new UseSubagentsToolHandler(),
 	}
 

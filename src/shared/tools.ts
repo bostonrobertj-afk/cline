@@ -53,8 +53,6 @@ export enum ClineDefaultTool {
 	STORY_TASK_COMPLETE = "story_task_complete",
 	REQUEST_TASK_DETAIL = "request_task_detail",
 	SHOW_INCOMPLETE_TASKS = "show_incomplete_tasks",
-	STORY_NOTES_UPDATE = "story_notes_update",
-	STORY_TESTING_COMPLETE = "story_testing_complete",
 	USE_SUBAGENTS = "use_subagents",
 }
 

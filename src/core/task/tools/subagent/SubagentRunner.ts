@@ -611,7 +611,6 @@ export class SubagentRunner {
 					)
 					contextState.conversationHistoryDeletedRange = compactResult.conversationHistoryDeletedRange
 					if (compactResult.didCompact) {
-						state.lastPromptedStoryTaskKey = undefined
 						Logger.warn("[SubagentRunner] Proactively compacted context before next subagent request.")
 					}
 					// Prevent repeated compaction attempts off the same token sample.
@@ -690,9 +689,6 @@ export class SubagentRunner {
 						case "response_id":
 							responseId = chunk.id
 							requestId = requestId ?? chunk.id
-							break
-						case "context_compacted":
-							state.lastPromptedStoryTaskKey = undefined
 							break
 					}
 
@@ -1240,9 +1236,6 @@ export class SubagentRunner {
 						contextState.conversationHistoryDeletedRange,
 					)
 					contextState.conversationHistoryDeletedRange = compactResult.conversationHistoryDeletedRange
-					if (compactResult.didCompact) {
-						state.lastPromptedStoryTaskKey = undefined
-					}
 					if (!compactResult.didCompact || this.shouldAbort() || attempt >= MAX_INITIAL_STREAM_ATTEMPTS) {
 						throw error
 					}

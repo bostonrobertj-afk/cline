@@ -1,8 +1,6 @@
 import path from "path"
 import type { WorkflowValues } from "@/core/task/workflow-runtime/types"
 
-export type StoryNotesSectionHeading = "## Completion Notes List" | "## File List"
-
 export interface StoryTaskPromptPayload {
 	storyTaskId: string
 	storySubtaskIds: string[]
@@ -719,44 +717,4 @@ export function completeStoryChecklistItem(args: {
 	}
 
 	return { error: `Could not find story task or subtask ${storyItemId}.` }
-}
-
-export function appendStorySectionEntry(args: {
-	storyMarkdown: string
-	sectionHeading: StoryNotesSectionHeading
-	entry: string
-}): { updatedMarkdown: string; manualPatch: string } | { error: string } {
-	const lines = normalizeMarkdownLines(args.storyMarkdown)
-	const range = findTopLevelSectionRange(lines, args.sectionHeading)
-
-	if (!range) {
-		return { error: `Could not find the ${args.sectionHeading} section in the story markdown.` }
-	}
-
-	const updatedLines = [...lines]
-	updatedLines.splice(range.end, 0, args.entry)
-
-	return {
-		updatedMarkdown: updatedLines.join("\n"),
-		manualPatch: `${args.sectionHeading}\n${args.entry}`,
-	}
-}
-
-export function markStoryStatusReview(
-	storyMarkdown: string,
-): { updatedMarkdown: string; manualPatch: string } | { error: string } {
-	const lines = normalizeMarkdownLines(storyMarkdown)
-	const statusLineIndex = lines.findIndex((line) => /^Status:/.test(line))
-
-	if (statusLineIndex === -1) {
-		return { error: "Could not find a top-level Status: line in the story markdown." }
-	}
-
-	const updatedLines = [...lines]
-	updatedLines[statusLineIndex] = "Status: review"
-
-	return {
-		updatedMarkdown: updatedLines.join("\n"),
-		manualPatch: "Status: review",
-	}
 }

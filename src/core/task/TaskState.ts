@@ -117,9 +117,6 @@ export class TaskState {
 	isInitialized = false
 	activeWorkflowName?: WorkflowName
 	activeWorkflowSession?: ActiveWorkflowSession
-	activeStoryTaskId?: string
-	activeStorySubtaskIds: string[] = []
-	lastPromptedStoryTaskKey?: string
 
 	// Focus Chain / Todo List Management
 	apiRequestCount = 0

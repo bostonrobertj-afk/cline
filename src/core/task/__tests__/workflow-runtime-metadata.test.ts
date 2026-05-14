@@ -188,6 +188,12 @@ function createMetadata(): TaskMetadata {
 	}
 }
 
+function expectNoRetiredStoryPromptMetadataKeys(value: object): void {
+	expect(Object.hasOwn(value, "activeStoryTaskId")).to.equal(false)
+	expect(Object.hasOwn(value, "activeStorySubtaskIds")).to.equal(false)
+	expect(Object.hasOwn(value, "lastPromptedStoryTaskKey")).to.equal(false)
+}
+
 function createAllowAllWorkspacePathPolicy(): WorkflowWorkspacePathPolicy {
 	return {
 		validateAccess: () => true,
@@ -696,6 +702,7 @@ describe("workflow runtime metadata persistence", () => {
 		sinon.assert.calledOnce(saveMetadata)
 		const savedMetadata = saveMetadata.firstCall.args[1]
 		expect(savedMetadata.activeWorkflowName).to.equal("create-epics")
+		expectNoRetiredStoryPromptMetadataKeys(savedMetadata)
 		expect(JSON.stringify(savedMetadata)).to.not.contain("create-epics.md")
 		const savedSession = savedMetadata.activeWorkflowSession
 		expect(savedSession).to.not.equal(undefined)
@@ -719,6 +726,7 @@ describe("workflow runtime metadata persistence", () => {
 
 		sinon.assert.notCalled(saveMetadata)
 		expect(restoredTaskState.activeWorkflowName).to.equal("create-epics")
+		expectNoRetiredStoryPromptMetadataKeys(restoredTaskState)
 		const restoredSession = restoredTaskState.activeWorkflowSession
 		expect(restoredSession).to.not.equal(undefined)
 		if (restoredSession === undefined) {

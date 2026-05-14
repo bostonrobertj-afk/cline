@@ -17,6 +17,7 @@ import { ClineDefaultTool } from "@/shared/tools"
 import { TaskState } from "../../../TaskState"
 import { AutoApprove } from "../../autoApprove"
 import { ToolExecutorCoordinator } from "../../ToolExecutorCoordinator"
+import { ToolValidator } from "../../ToolValidator"
 import type { TaskConfig } from "../../types/TaskConfig"
 import { RequestTaskDetailToolHandler } from "../RequestTaskDetailToolHandler"
 import { ShowIncompleteTasksToolHandler } from "../ShowIncompleteTasksToolHandler"
@@ -341,6 +342,42 @@ async function withStoryFile<T>(storyMarkdown: string, run: (storyPath: string) 
 }
 
 describe("Dev-story story task tool handlers", () => {
+	it("does not register retired story notes or testing-complete handlers", async () => {
+		await withStoryFile(
+			`# Story 1.2
+
+## Tasks
+- [ ] Task 1. Implement handlers
+`,
+			async (storyPath) => {
+				const { config } = createConfig(storyPath)
+				const coordinator = new ToolExecutorCoordinator()
+				const validator = new ToolValidator(config.services.clineIgnoreController)
+				const registeredStoryToolNames: readonly ClineDefaultTool[] = [
+					ClineDefaultTool.STORY_TASK_REMINDER,
+					ClineDefaultTool.STORY_TASK_COMPLETE,
+					ClineDefaultTool.REQUEST_TASK_DETAIL,
+					ClineDefaultTool.SHOW_INCOMPLETE_TASKS,
+				]
+
+				for (const toolName of registeredStoryToolNames) {
+					coordinator.registerByName(toolName, validator)
+				}
+
+				expect(coordinator.has(ClineDefaultTool.STORY_TASK_REMINDER)).to.equal(true)
+				expect(coordinator.has(ClineDefaultTool.STORY_TASK_COMPLETE)).to.equal(true)
+				expect(coordinator.has(ClineDefaultTool.REQUEST_TASK_DETAIL)).to.equal(true)
+				expect(coordinator.has(ClineDefaultTool.SHOW_INCOMPLETE_TASKS)).to.equal(true)
+				expect(Object.values(ClineDefaultTool)).not.to.include("story_notes_update")
+				expect(Object.values(ClineDefaultTool)).not.to.include("story_testing_complete")
+				expect(coordinator.has("story_notes_update")).to.equal(false)
+				expect(coordinator.has("story_testing_complete")).to.equal(false)
+				expect(coordinator.getHandler("story_notes_update")).to.equal(undefined)
+				expect(coordinator.getHandler("story_testing_complete")).to.equal(undefined)
+			},
+		)
+	})
+
 	it("story_task_reminder returns the current incomplete task detail from target_story", async () => {
 		await withStoryFile(
 			`# Story 1.2

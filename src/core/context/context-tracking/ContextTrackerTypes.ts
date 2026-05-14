@@ -33,7 +33,4 @@ export interface TaskMetadata {
 	environment_history: EnvironmentMetadataEntry[]
 	activeWorkflowName?: WorkflowName
 	activeWorkflowSession?: PersistedWorkflowSession
-	activeStoryTaskId?: string
-	activeStorySubtaskIds?: string[]
-	lastPromptedStoryTaskKey?: string
 }
