@@ -249,7 +249,7 @@ The prompt and tool schema must match. If the prompt says the AI may call a tool
 
 Shared prompt fragments are acceptable only when the final generated prompt for each variant is reviewable and tested. Do not split prompt construction in a way that hides the final ordering or makes requirements hard to compare against runtime output.
 
-When the user-authored source document provides step prompt wording, `buildPromptSource(...)` must preserve that wording exactly except for deterministic workflow-value interpolation and explicitly approved runtime-only substitutions. Tests should protect that preservation by asserting the required authored prompt content for each variant rather than only broad semantic summaries.
+When the user-authored source document provides step prompt wording, `buildPromptSource(...)` must preserve that wording exactly except for deterministic workflow-value interpolation and explicitly approved runtime-only substitutions. Tests must not assert exact editable prompt prose. Protect prompt behavior with shape and invariant assertions: prompt output exists when required, required workflow values are rendered non-empty, placeholders are not leaked, forbidden legacy text is absent, current step details are projected in the correct payload location, and the projected tool schema matches the prompt's tool references.
 
 ### Tool Schema Ownership
 
@@ -537,7 +537,7 @@ Add tests for:
 - decision-tree route structure
 - singleton artifact route for `entry_artifact_resolution_completed` with `creationRequired: true`
 - singleton artifact route for `entry_artifact_resolution_completed` with `creationRequired: false`
-- prompt source output
+- prompt source shape and non-empty required rendering
 - exact tool-schema outputs
 - absence of archive/delete workflow artifact tools from model-facing schemas
 - absence of retired tools

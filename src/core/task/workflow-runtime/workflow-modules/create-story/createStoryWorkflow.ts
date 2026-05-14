@@ -652,13 +652,8 @@ function resolveStoryFilePath(args: { selectedProjectRoot: string; story: Workfl
 
 function buildReviewFindingsDocumentFilenames(parentStoryIdentity: string): readonly string[] {
 	const targetIdentity = parentStoryIdentity.replace(/\./g, "-")
-	return [
-		`Review-blind-hunter-${targetIdentity}.md`,
-		`Review-edge-case-hunter-${targetIdentity}.md`,
-		`Adversarial-review-${targetIdentity}.md`,
-	]
+	return [`code-review-${targetIdentity}.md`]
 }
-
 async function resolveReviewFindingsDocumentPath(args: {
 	selectedProjectRoot: string
 	parentStoryIdentity: string
