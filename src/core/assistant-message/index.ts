@@ -62,6 +62,7 @@ export const toolParamNames = [
 	"expected_current_status",
 	"source_path",
 	"destination_path",
+	"operation",
 	"workflow_value_writes",
 	"name",
 	"description",

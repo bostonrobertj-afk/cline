@@ -295,7 +295,7 @@ Allowed files:
 
 After completing this phase, pause for QA review before moving to Phase 4.
 
-[ ] Task 6. Implement backend-only dev-story git finalization.
+[x] Task 6. Implement backend-only dev-story git finalization.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/shared/tools.ts`
@@ -306,67 +306,67 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/ToolExecutorCoordinator.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/DevStoryGitFinalizeToolHandler.test.ts`
 
-[ ] Subtask 6.1. In `tools.ts`, add `ClineDefaultTool.DEV_STORY_GIT_FINALIZE = "dev_story_git_finalize"` and do not add it to `READ_ONLY_TOOLS`.
+[x] Subtask 6.1. In `tools.ts`, add `ClineDefaultTool.DEV_STORY_GIT_FINALIZE = "dev_story_git_finalize"` and do not add it to `READ_ONLY_TOOLS`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/shared/tools.ts`
 
-[ ] Subtask 6.2. In `assistant-message/index.ts`, add parser parameter name `operation`.
+[x] Subtask 6.2. In `assistant-message/index.ts`, add parser parameter name `operation`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/assistant-message/index.ts`
 
-[ ] Subtask 6.3. In `backendWorkflowToolContracts.ts`, add a backend workflow tool contract with `id: ClineDefaultTool.DEV_STORY_GIT_FINALIZE`, `name: "dev_story_git_finalize"`, and one required string parameter named `operation` with description `Dev-story git finalization operation prepared by WorkflowRuntime.`
+[x] Subtask 6.3. In `backendWorkflowToolContracts.ts`, add a backend workflow tool contract with `id: ClineDefaultTool.DEV_STORY_GIT_FINALIZE`, `name: "dev_story_git_finalize"`, and one required string parameter named `operation` with description `Dev-story git finalization operation prepared by WorkflowRuntime.`
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/backendWorkflowToolContracts.ts`
 
-[ ] Subtask 6.4. In `ResponseToolRegistry.ts`, add a registry entry for backend-only `dev_story_git_finalize` with `undefined` metadata, matching ordinary non-response tools.
+[x] Subtask 6.4. In `ResponseToolRegistry.ts`, add a registry entry for backend-only `dev_story_git_finalize` with `undefined` metadata, matching ordinary non-response tools.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/response/ResponseToolRegistry.ts`
 
-[ ] Subtask 6.5. Create `DevStoryGitFinalizeToolHandler.ts` with handler name `dev_story_git_finalize` and required `operation` parameter. Import `execa` from `"execa"` and import `ToolValidator`. Define and export `DevStoryGitCommandCall`, `DevStoryGitCommandResult`, and `DevStoryGitCommandRunner` types. The handler constructor must be `constructor(private readonly validator: ToolValidator, private readonly runner: DevStoryGitCommandRunner = defaultDevStoryGitCommandRunner)`. The default runner must call `execa("git", [...call.args], { cwd: call.cwd, shell: false, reject: false })` and return `{ exitCode, stdout, stderr }`. All git operations in this handler must go through the runner. Before this handler reads, writes, stages, unstages, commits, or reports any target story path, story index path, moved story source path, moved story destination path, allowed-file path, changed git path, or selected unpermitted path, it must validate the resolved path with `validator.checkClineIgnorePath(...)` and return a tool failure if access is blocked.
+[x] Subtask 6.5. Create `DevStoryGitFinalizeToolHandler.ts` with handler name `dev_story_git_finalize` and required `operation` parameter. Import `execa` from `"execa"` and import `ToolValidator`. Define and export `DevStoryGitCommandCall`, `DevStoryGitCommandResult`, and `DevStoryGitCommandRunner` types. The handler constructor must be `constructor(private readonly validator: ToolValidator, private readonly runner: DevStoryGitCommandRunner = defaultDevStoryGitCommandRunner)`. The default runner must call `execa("git", [...call.args], { cwd: call.cwd, shell: false, reject: false })` and return `{ exitCode, stdout, stderr }`. All git operations in this handler must go through the runner. Before this handler reads, writes, stages, unstages, commits, or reports any target story path, story index path, moved story source path, moved story destination path, allowed-file path, changed git path, or selected unpermitted path, it must validate the resolved path with `validator.checkClineIgnorePath(...)` and return a tool failure if access is blocked.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/DevStoryGitFinalizeToolHandler.ts`
 
-[ ] Subtask 6.6. In `DevStoryGitFinalizeToolHandler.ts`, reject any operation value other than `prepare_staging`, `stage_selected_unpermitted`, or `commit_staged` with a tool failure that does not mutate files, git index state, or workflow values.
+[x] Subtask 6.6. In `DevStoryGitFinalizeToolHandler.ts`, reject any operation value other than `prepare_staging`, `stage_selected_unpermitted`, or `commit_staged` with a tool failure that does not mutate files, git index state, or workflow values.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/DevStoryGitFinalizeToolHandler.ts`
 
-[ ] Subtask 6.7. In `DevStoryGitFinalizeToolHandler.ts`, require an active `dev-story` workflow session, use `TaskConfig.cwd` as the git root, derive the selected project root from the parent folder of the `implementation` folder that contains `stories_index`, and validate `target_story_filename`, `selected_story_identity`, `stories_index`, and `selected_unpermitted_file_paths` or `commit_staged_files` only for the operations that need them.
+[x] Subtask 6.7. In `DevStoryGitFinalizeToolHandler.ts`, require an active `dev-story` workflow session, use `TaskConfig.cwd` as the git root, derive the selected project root from the parent folder of the `implementation` folder that contains `stories_index`, and validate `target_story_filename`, `selected_story_identity`, `stories_index`, and `selected_unpermitted_file_paths` or `commit_staged_files` only for the operations that need them.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/DevStoryGitFinalizeToolHandler.ts`
 
-[ ] Subtask 6.8. In `DevStoryGitFinalizeToolHandler.ts`, implement `prepare_staging` to read the completed review story file from the derived selected project root, parse allowed files from `## Tasks`, and call the git runner with args `["status", "--porcelain=v1", "-z", "--untracked-files=all"]` and `cwd: TaskConfig.cwd`. Parse NUL-delimited porcelain records. Accept only changed/deleted/untracked statuses whose status columns contain `M`, `A`, `D`, `T`, or the exact untracked status `??`; ignore `!!`; reject malformed records, unmerged `U` statuses, rename `R` statuses, and copy `C` statuses with a tool failure. Resolve each accepted git path to a full path under `TaskConfig.cwd`. Compare those full paths to allowed-file full paths from the story document. Stage only allowed changed/deleted/untracked files, the moved story record paths, and the updated story index path with runner args `["add", "-A", "--", ...paths]`. Unstage any unpermitted path that is already staged, meaning its first porcelain status column is not a space, with runner args `["restore", "--staged", "--", path]`. Persist `unpermitted_file_paths` as normalized git path strings using `/` separators and no leading `./`.
+[x] Subtask 6.8. In `DevStoryGitFinalizeToolHandler.ts`, implement `prepare_staging` to read the completed review story file from the derived selected project root, parse allowed files from `## Tasks`, and call the git runner with args `["status", "--porcelain=v1", "-z", "--untracked-files=all"]` and `cwd: TaskConfig.cwd`. Parse NUL-delimited porcelain records. Accept only changed/deleted/untracked statuses whose status columns contain `M`, `A`, `D`, `T`, or the exact untracked status `??`; ignore `!!`; reject malformed records, unmerged `U` statuses, rename `R` statuses, and copy `C` statuses with a tool failure. Resolve each accepted git path to a full path under `TaskConfig.cwd`. Compare those full paths to allowed-file full paths from the story document. Stage only allowed changed/deleted/untracked files, the moved story record paths, and the updated story index path with runner args `["add", "-A", "--", ...paths]`. Unstage any unpermitted path that is already staged, meaning its first porcelain status column is not a space, with runner args `["restore", "--staged", "--", path]`. Persist `unpermitted_file_paths` as normalized git path strings using `/` separators and no leading `./`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/DevStoryGitFinalizeToolHandler.ts`
 
-[ ] Subtask 6.9. In `DevStoryGitFinalizeToolHandler.ts`, implement `stage_selected_unpermitted` to treat `selected_unpermitted_file_paths` values as normalized git path strings, reject selections not present in the latest persisted `unpermitted_file_paths`, reject any selection that resolves outside `TaskConfig.cwd`, validate each accepted selection with `validator.checkClineIgnorePath(...)`, and stage accepted selections with runner args `["add", "-A", "--", ...selectedPaths]` and `cwd: TaskConfig.cwd`. If `selected_unpermitted_file_paths` is an empty array, return success without running `git add`.
+[x] Subtask 6.9. In `DevStoryGitFinalizeToolHandler.ts`, implement `stage_selected_unpermitted` to treat `selected_unpermitted_file_paths` values as normalized git path strings, reject selections not present in the latest persisted `unpermitted_file_paths`, reject any selection that resolves outside `TaskConfig.cwd`, validate each accepted selection with `validator.checkClineIgnorePath(...)`, and stage accepted selections with runner args `["add", "-A", "--", ...selectedPaths]` and `cwd: TaskConfig.cwd`. If `selected_unpermitted_file_paths` is an empty array, return success without running `git add`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/DevStoryGitFinalizeToolHandler.ts`
 
-[ ] Subtask 6.10. In `DevStoryGitFinalizeToolHandler.ts`, implement `commit_staged` to commit staged files with runner args `["commit", "-m", "dev-story workflow run: story: <story_identity>"]` from `TaskConfig.cwd` only when `commit_staged_files` is `true`; replace `<story_identity>` with `selected_story_identity`. Before committing, call the runner with args `["diff", "--cached", "--quiet"]`. Treat exit code `0` as a tool failure for no staged files, exit code `1` as staged files present, and any other exit code as a git failure. When `commit_staged_files` is `false`, return success without running `git diff` or `git commit`.
+[x] Subtask 6.10. In `DevStoryGitFinalizeToolHandler.ts`, implement `commit_staged` to commit staged files with runner args `["commit", "-m", "dev-story workflow run: story: <story_identity>"]` from `TaskConfig.cwd` only when `commit_staged_files` is `true`; replace `<story_identity>` with `selected_story_identity`. Before committing, call the runner with args `["diff", "--cached", "--quiet"]`. Treat exit code `0` as a tool failure for no staged files, exit code `1` as staged files present, and any other exit code as a git failure. When `commit_staged_files` is `false`, return success without running `git diff` or `git commit`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/DevStoryGitFinalizeToolHandler.ts`
 
-[ ] Subtask 6.11. In `DevStoryGitFinalizeToolHandler.ts`, route missing/malformed story index, blocked paths, out-of-root allowed files, no stageable files, git failures, and commit failures to tool failures whose messages identify the operation, path or story ID, and concrete reason.
+[x] Subtask 6.11. In `DevStoryGitFinalizeToolHandler.ts`, route missing/malformed story index, blocked paths, out-of-root allowed files, no stageable files, git failures, and commit failures to tool failures whose messages identify the operation, path or story ID, and concrete reason.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/DevStoryGitFinalizeToolHandler.ts`
 
-[ ] Subtask 6.12. In `ToolExecutorCoordinator.ts`, register `DevStoryGitFinalizeToolHandler` by adding a static handler factory that constructs it as `new DevStoryGitFinalizeToolHandler(v)`, where `v` is the existing `ToolValidator` argument supplied by the coordinator.
+[x] Subtask 6.12. In `ToolExecutorCoordinator.ts`, register `DevStoryGitFinalizeToolHandler` by adding a static handler factory that constructs it as `new DevStoryGitFinalizeToolHandler(v)`, where `v` is the existing `ToolValidator` argument supplied by the coordinator.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/ToolExecutorCoordinator.ts`
 
-[ ] Subtask 6.13. Create `DevStoryGitFinalizeToolHandler.test.ts` covering `prepare_staging`, selected unpermitted staging, no-commit, commit, invalid operation, missing workflow values, backend contract registration, response registry metadata, out-of-root allowed files, blocked paths, no stageable files, workflow-value writeback through `WorkflowRuntime.applyWorkflowValueWrites(...)`, and git failure behavior. Instantiate `DevStoryGitFinalizeToolHandler` with a typed fake `ToolValidator` and a typed fake `DevStoryGitCommandRunner`; do not execute real git commands. The fake validator must expose `checkClineIgnorePath(...)` with the same return shape used by existing handler tests and must be configurable to reject paths so tests prove blocked paths return tool failures before runner calls. The tests must assert the exact runner calls from Subtasks 6.8 through 6.10, including `["status", "--porcelain=v1", "-z", "--untracked-files=all"]`, `["add", "-A", "--", ...paths]`, `["restore", "--staged", "--", path]`, `["diff", "--cached", "--quiet"]`, and `["commit", "-m", "dev-story workflow run: story: <story_identity>"]`. Tests must cover accepted `M`, `A`, `D`, `T`, and `??` statuses, ignored `!!` records, and rejected malformed, `U`, `R`, and `C` statuses.
+[x] Subtask 6.13. Create `DevStoryGitFinalizeToolHandler.test.ts` covering `prepare_staging`, selected unpermitted staging, no-commit, commit, invalid operation, missing workflow values, backend contract registration, response registry metadata, out-of-root allowed files, blocked paths, no stageable files, workflow-value writeback through `WorkflowRuntime.applyWorkflowValueWrites(...)`, and git failure behavior. Instantiate `DevStoryGitFinalizeToolHandler` with a typed fake `ToolValidator` and a typed fake `DevStoryGitCommandRunner`; do not execute real git commands. The fake validator must expose `checkClineIgnorePath(...)` with the same return shape used by existing handler tests and must be configurable to reject paths so tests prove blocked paths return tool failures before runner calls. The tests must assert the exact runner calls from Subtasks 6.8 through 6.10, including `["status", "--porcelain=v1", "-z", "--untracked-files=all"]`, `["add", "-A", "--", ...paths]`, `["restore", "--staged", "--", path]`, `["diff", "--cached", "--quiet"]`, and `["commit", "-m", "dev-story workflow run: story: <story_identity>"]`. Tests must cover accepted `M`, `A`, `D`, `T`, and `??` statuses, ignored `!!` records, and rejected malformed, `U`, `R`, and `C` statuses.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/DevStoryGitFinalizeToolHandler.test.ts`

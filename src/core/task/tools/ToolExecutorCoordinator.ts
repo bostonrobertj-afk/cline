@@ -15,6 +15,7 @@ import { CodeReviewSpecUpdateToolHandler } from "./handlers/CodeReviewSpecUpdate
 import { CondenseHandler } from "./handlers/CondenseHandler"
 import { CreateWorkflowArtifactToolHandler } from "./handlers/CreateWorkflowArtifactToolHandler"
 import { DeleteWorkflowArtifactToolHandler } from "./handlers/DeleteWorkflowArtifactToolHandler"
+import { DevStoryGitFinalizeToolHandler } from "./handlers/DevStoryGitFinalizeToolHandler"
 import { ExecuteCommandToolHandler } from "./handlers/ExecuteCommandToolHandler"
 import { GenerateExplanationToolHandler } from "./handlers/GenerateExplanationToolHandler"
 import { GenerateStoryFilesToolHandler } from "./handlers/GenerateStoryFilesToolHandler"
@@ -143,6 +144,7 @@ export class ToolExecutorCoordinator {
 		[ClineDefaultTool.PLAN_REMEDIATION_STORY_ARTIFACT]: (v: ToolValidator) => new PlanRemediationStoryArtifactToolHandler(v),
 		[ClineDefaultTool.GENERATE_STORY_FILES]: (v: ToolValidator) => new GenerateStoryFilesToolHandler(v),
 		[ClineDefaultTool.UPDATE_STORY_INDEX_STATUS]: (v: ToolValidator) => new UpdateStoryIndexStatusToolHandler(v),
+		[ClineDefaultTool.DEV_STORY_GIT_FINALIZE]: (v: ToolValidator) => new DevStoryGitFinalizeToolHandler(v),
 		[ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE]: (_v: ToolValidator) => new CodeReviewSpecUpdateToolHandler(),
 		[ClineDefaultTool.STORY_TASK_REMINDER]: (_v: ToolValidator) => new StoryTaskReminderToolHandler(),
 		[ClineDefaultTool.STORY_TASK_COMPLETE]: (_v: ToolValidator) => new StoryTaskCompleteToolHandler(),
